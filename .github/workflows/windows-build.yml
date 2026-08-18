@@ -68,6 +68,21 @@ jobs:
           restore-keys: |
             windows-${{ matrix.arch }}-swift-6.3.3-
 
+      - name: Drop cached dependency checkouts
+        shell: pwsh
+        run: |
+          # actions/cache does not faithfully round-trip the symlinks inside
+          # SwiftPM dependency checkouts on Windows: swift-docc-plugin shares
+          # its plugin sources through a "Symbolic Links" directory, and a
+          # restored checkout compiles those plugins without the shared
+          # sources ("cannot find type 'SnippetExtractor' in scope" — every
+          # cache-restoring run failed while the cold first run was green).
+          # Re-clone checkouts fresh each run; the bare mirrors under
+          # .build/repositories stay cached, so the re-checkout is cheap.
+          if (Test-Path .build\checkouts) {
+            Remove-Item -Recurse -Force .build\checkouts
+          }
+
       - name: Build all targets
         run: swift build
 
