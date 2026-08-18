@@ -1,16 +1,23 @@
 name: Windows Build
 
-# Build-only Windows lane (swift-tui-org Windows plan, Stage 6 item 2).
+# Windows build + test lane (swift-tui-org Windows plan, Stage 6 item 2).
 #
 # Builds every target plus the test bundles on both Windows architectures
 # via the swift.org installer route: arm64 matches the development VM's
 # aarch64-unknown-windows-msvc exactly (and the Swift Windows Docker images
 # are amd64-only, so arm64 has no container route); x64 covers the
-# ecosystem's dominant runner class. Test EXECUTION stays off until the
-# Stage 6 item-3 runtime survey lands — this lane exists so regressions in
-# the portable code are caught at build level while that survey is in
-# flight. SwiftPM dependency checkouts need the symlink privilege; hosted
-# GitHub runners have it (the dev-VM provisioning note from the plan).
+# ecosystem's dominant runner class. SwiftPM dependency checkouts need the
+# symlink privilege; hosted GitHub runners have it (the dev-VM provisioning
+# note from the plan).
+#
+# Test execution mirrors the item-3 runtime survey's proven shape:
+# gate-shaped serial lanes (`--no-parallel --filter <target>`), because a
+# plain parallel `swift test` dies early on Windows, and the runner linked
+# with `/STACK:16777216` — the default 1 MiB runner stack kills the
+# deep-descent suites (the item-9 class, test-harness edition). The lane
+# list is the survey's final green set; POSIX-only test targets
+# (PTY/attach/WebHost/UnixSignals/EntryPointLaunch families) compile empty
+# on Windows and are omitted rather than run vacuously.
 #
 # Deliberately NOT wired into the org-root gates: the operator keeps
 # Windows on the child repo's native `swift build` while per-repo version
@@ -33,7 +40,7 @@ jobs:
   build:
     name: Windows build (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -65,4 +72,26 @@ jobs:
         run: swift build
 
       - name: Build test bundles
-        run: swift build --build-tests
+        run: swift build --build-tests -Xlinker /STACK:16777216
+
+      - name: Run test lanes
+        shell: pwsh
+        run: |
+          $lanes = @(
+            'SwiftTUICoreTests', 'SwiftTUIGraphTests', 'SwiftTUIViewsTests',
+            'SwiftTUITests', 'SwiftTUIArgumentsTests', 'SwiftTUICLITests',
+            'SwiftTUIWASISurfaceBridgeTests', 'SwiftTUIWASITests',
+            'SwiftTUIAnimatedImageTests', 'SwiftTUIProfilingTests',
+            'SwiftTUIVendorFigletTests', 'SwiftTUIVendorGIFTests',
+            'SwiftTUIVendorJPEGTests', 'SwiftTUIVendorPNGTests'
+          )
+          $failed = @()
+          foreach ($lane in $lanes) {
+            Write-Host "=== lane $lane ==="
+            swift test --no-parallel --filter $lane -Xlinker /STACK:16777216
+            if ($LASTEXITCODE -ne 0) { $failed += $lane }
+          }
+          if ($failed.Count -gt 0) {
+            Write-Error ("failing lanes: " + ($failed -join ', '))
+            exit 1
+          }
