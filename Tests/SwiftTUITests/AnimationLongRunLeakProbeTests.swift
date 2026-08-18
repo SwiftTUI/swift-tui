@@ -82,9 +82,21 @@ struct AnimationLongRunLeakProbeTests {
     // far more frames than the deadline cadence allows.
     #expect(framesPerSecond < 45)
 
+    // Per-frame transients are cleared together at every evaluation start
+    // (ViewGraph.beginFrame's removeAll pair), so a point-in-time diff of
+    // them measures sampling phase, not accumulation: on a slow runner the
+    // frame-count signal can fire while the next frame's evaluation is
+    // already in flight, and sample B reads a non-empty set (first fired on
+    // the 2-vCPU amd64 CI runner, 0 -> 3 on both).
+    let perFrameTransients: Set<String> = [
+      "viewGraph.frameOrder",
+      "viewGraph.evaluatedNodeIDsThisFrame",
+    ]
+
     // No runtime container may grow across 300 frames of steady-state
     // animation cycling.
-    for (name, a, b) in sampleA.pairedCounts(with: sampleB) where b > a + 2 {
+    for (name, a, b) in sampleA.pairedCounts(with: sampleB)
+    where b > a + 2 && !perFrameTransients.contains(name) {
       Issue.record("container \(name) grew \(a) -> \(b) across 300 frames")
     }
   }
