@@ -449,10 +449,10 @@ struct InteractiveRuntimeTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = close(readDescriptor)
+        closeTestDescriptor(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = close(writeDescriptor)
+        closeTestDescriptor(writeDescriptor)
       }
     }
 
@@ -465,7 +465,7 @@ struct InteractiveRuntimeTests {
     ).flatMap { $0 }
 
     try writeAllBytes(burstBytes, to: writeDescriptor)
-    _ = close(writeDescriptor)
+    closeTestDescriptor(writeDescriptor)
     didCloseWriteDescriptor = true
 
     let inputReader = InputReader(fileDescriptor: readDescriptor)
@@ -477,7 +477,7 @@ struct InteractiveRuntimeTests {
       return events
     }.value
 
-    _ = close(readDescriptor)
+    closeTestDescriptor(readDescriptor)
     didCloseReadDescriptor = true
 
     #expect(
@@ -505,10 +505,10 @@ struct InteractiveRuntimeTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = close(readDescriptor)
+        closeTestDescriptor(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = close(writeDescriptor)
+        closeTestDescriptor(writeDescriptor)
       }
     }
 
@@ -539,11 +539,11 @@ struct InteractiveRuntimeTests {
     }
 
     _ = await writerTask.result
-    _ = close(writeDescriptor)
+    closeTestDescriptor(writeDescriptor)
     didCloseWriteDescriptor = true
     let receivedEvents = await receivedEventsTask.value
 
-    _ = close(readDescriptor)
+    closeTestDescriptor(readDescriptor)
     didCloseReadDescriptor = true
 
     #expect(!receivedEvents.isEmpty)
@@ -3192,10 +3192,10 @@ struct InteractiveRuntimeTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = close(readDescriptor)
+        closeTestDescriptor(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = close(writeDescriptor)
+        closeTestDescriptor(writeDescriptor)
       }
     }
 
@@ -3255,12 +3255,12 @@ struct InteractiveRuntimeTests {
 
     try writeAllBytes(scrollBytes, to: writeDescriptor)
 
-    _ = close(writeDescriptor)
+    closeTestDescriptor(writeDescriptor)
     didCloseWriteDescriptor = true
 
     let result = try await runTask.value
 
-    _ = close(readDescriptor)
+    closeTestDescriptor(readDescriptor)
     didCloseReadDescriptor = true
 
     let finalFrame = terminal.visibleFrames.last ?? ""
@@ -3470,10 +3470,10 @@ struct InteractiveRuntimeTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = close(readDescriptor)
+        closeTestDescriptor(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = close(writeDescriptor)
+        closeTestDescriptor(writeDescriptor)
       }
     }
 
@@ -3505,12 +3505,12 @@ struct InteractiveRuntimeTests {
       terminal.visibleFrames.count >= baselineFrameCount + 6
     }
 
-    _ = close(writeDescriptor)
+    closeTestDescriptor(writeDescriptor)
     didCloseWriteDescriptor = true
 
     let result = try await runTask.value
 
-    _ = close(readDescriptor)
+    closeTestDescriptor(readDescriptor)
     didCloseReadDescriptor = true
 
     #expect(result.exitReason == RunLoopExitReason.inputEnded)
@@ -3538,10 +3538,10 @@ struct InteractiveRuntimeTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = close(readDescriptor)
+        closeTestDescriptor(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = close(writeDescriptor)
+        closeTestDescriptor(writeDescriptor)
       }
     }
 
@@ -3601,12 +3601,12 @@ struct InteractiveRuntimeTests {
 
     try writeAllBytes(sgrPrimaryClick(at: .init(x: 1, y: 1)), to: writeDescriptor)
 
-    _ = close(writeDescriptor)
+    closeTestDescriptor(writeDescriptor)
     didCloseWriteDescriptor = true
 
     let result = try await runTask.value
 
-    _ = close(readDescriptor)
+    closeTestDescriptor(readDescriptor)
     didCloseReadDescriptor = true
 
     // The session has drained every byte, including the click, so the final
@@ -3966,10 +3966,10 @@ struct InteractiveRuntimeTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = close(readDescriptor)
+        closeTestDescriptor(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = close(writeDescriptor)
+        closeTestDescriptor(writeDescriptor)
       }
     }
 
@@ -4075,12 +4075,12 @@ struct InteractiveRuntimeTests {
         || (terminal.visibleFrames.last ?? "").contains("no-move")
     }
 
-    _ = close(writeDescriptor)
+    closeTestDescriptor(writeDescriptor)
     didCloseWriteDescriptor = true
 
     let result = try await runTask.value
 
-    _ = close(readDescriptor)
+    closeTestDescriptor(readDescriptor)
     didCloseReadDescriptor = true
 
     let finalFrame = terminal.visibleFrames.last ?? ""
@@ -4191,10 +4191,10 @@ struct InteractiveRuntimeTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = close(readDescriptor)
+        closeTestDescriptor(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = close(writeDescriptor)
+        closeTestDescriptor(writeDescriptor)
       }
     }
 
@@ -4270,12 +4270,12 @@ struct InteractiveRuntimeTests {
       """
     )
 
-    _ = close(writeDescriptor)
+    closeTestDescriptor(writeDescriptor)
     didCloseWriteDescriptor = true
 
     let result = try await runTask.value
 
-    _ = close(readDescriptor)
+    closeTestDescriptor(readDescriptor)
     didCloseReadDescriptor = true
 
     #expect(result.exitReason == RunLoopExitReason.inputEnded)

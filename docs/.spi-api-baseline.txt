@@ -248,6 +248,7 @@ SwiftTUITestSupport.StageBudgetExceeded.stages
 SwiftTUITestSupport.StageClock
 SwiftTUITestSupport.StageClock.currentStage()
 SwiftTUITestSupport.StageClock.waitForStage(atLeast:)
+SwiftTUITestSupport.closeTestDescriptor(_:)
 SwiftTUITestSupport.openTestPipe(_:nonblockingRead:)
 SwiftTUITestSupport.renderLinearAccessibilityOutput(_:)
 SwiftTUITestSupport.suspendUntilCancelled()

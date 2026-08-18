@@ -57,9 +57,9 @@
           DWORD(FILE_SHARE_READ) | DWORD(FILE_SHARE_WRITE),
           nil, DWORD(OPEN_EXISTING), 0, nil)
       }
-      let conin = try #require(unsafe coninHandle)
+      let conin = try unsafe #require(unsafe coninHandle)
       try #require(unsafe conin != INVALID_HANDLE_VALUE)
-      let rawFD = unsafe _open_osfhandle(Int(bitPattern: conin), 0)
+      let rawFD = _open_osfhandle(Int(bitPattern: conin), 0)
       try #require(rawFD >= 0)
       _ = unsafe FlushConsoleInputBuffer(conin)
 

@@ -43,6 +43,20 @@
   #endif
 }
 
+/// Closes a descriptor opened by `openTestPipe`, spelled per platform: POSIX
+/// `close(2)`, or the Windows CRT `_close` — the bare `close` alias is
+/// deprecated in ucrt and warns on every call site (Windows plan, Stage 6
+/// item 11). Returns 0 on success, matching `close(2)`.
+@_spi(Testing) @discardableResult public func closeTestDescriptor(
+  _ descriptor: Int32
+) -> Int32 {
+  #if os(Windows)
+    _close(descriptor)
+  #else
+    close(descriptor)
+  #endif
+}
+
 /// Sleeps the calling thread, spelled per platform: POSIX `usleep`, or the
 /// Windows `Sleep` millisecond API (rounded up so a nonzero request never
 /// becomes a zero-length yield).

@@ -1628,10 +1628,10 @@ struct TerminalPresentationTests {
       var didCloseWriteDescriptor = false
       defer {
         if !didCloseReadDescriptor {
-          _ = close(readDescriptor)
+          closeTestDescriptor(readDescriptor)
         }
         if !didCloseWriteDescriptor {
-          _ = close(writeDescriptor)
+          closeTestDescriptor(writeDescriptor)
         }
       }
 
@@ -1688,11 +1688,11 @@ struct TerminalPresentationTests {
         try completedWrite.get()
       }
 
-      _ = close(writeDescriptor)
+      closeTestDescriptor(writeDescriptor)
       didCloseWriteDescriptor = true
 
       let remainingBytes = try readAllBytes(from: readDescriptor)
-      _ = close(readDescriptor)
+      closeTestDescriptor(readDescriptor)
       didCloseReadDescriptor = true
 
       #expect(remainingBytes.suffix(2) == Array("ok".utf8))
