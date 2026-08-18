@@ -9,7 +9,14 @@ struct SwiftTUIOptionsResolutionTests {
     let options = try SwiftTUIOptions.parse([])
     let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
     #expect(configuration.color == .auto)
-    #expect(configuration.glyphs == .ascii)  // No UTF-8 in locale
+    #if os(Windows)
+      // The Windows console arm never keys glyphs on locale — the session
+      // controller owns the UTF-8 codepages — so an empty environment
+      // resolves unicode (Windows plan, Stage 6 item 10).
+      #expect(configuration.glyphs == .unicode)
+    #else
+      #expect(configuration.glyphs == .ascii)  // No UTF-8 in locale
+    #endif
     #expect(configuration.motion == .normal)
     #expect(configuration.stableOutput == false)
   }

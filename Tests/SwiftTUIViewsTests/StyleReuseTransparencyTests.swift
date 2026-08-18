@@ -118,7 +118,7 @@ struct StyleReuseTransparencyRosterTests {
     for (relativePath, expected) in Self.wrapperFactoryCounts {
       let source = try sourceText(relativePath: relativePath)
       let found = source.split(separator: "\n").count { line in
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.hasPrefix("public static var ") && trimmed.hasSuffix(": Self {")
       }
       #expect(
@@ -138,7 +138,7 @@ struct StyleReuseTransparencyRosterTests {
     for relativePath in Self.markerConformanceFiles {
       let source = try sourceText(relativePath: relativePath)
       conformances += source.split(separator: "\n").count { line in
-        line.trimmingCharacters(in: .whitespaces)
+        line.trimmingCharacters(in: .whitespacesAndNewlines)
           .hasSuffix(": ReuseTransparentStyle {}")
       }
     }

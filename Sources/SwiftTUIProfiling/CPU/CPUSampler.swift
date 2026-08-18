@@ -10,6 +10,10 @@
   import CRT
 #endif
 
+#if os(Windows)
+  import WinSDK
+#endif
+
 /// A single raw reading of the process's accumulated CPU time and peak resident
 /// memory, taken from `getrusage(RUSAGE_SELF)`.
 public struct ProcessCPUReading: Sendable, Equatable {
@@ -90,8 +94,9 @@ public enum CPUSamplerError: Error, Equatable, Sendable, CustomStringConvertible
   }
 }
 
-/// Reads process CPU/RSS via `getrusage`. Available on Darwin/Glibc/Android/
-/// Musl. On WASI, it does no work and throws `.unavailable`.
+/// Reads process CPU/RSS via `getrusage` on POSIX platforms and
+/// `GetProcessTimes` + the peak working set on Windows. On WASI, it does no
+/// work and throws `.unavailable`.
 public enum CPUSampler {
   public static let defaultSampleInterval: Duration = .milliseconds(250)
 
@@ -112,10 +117,42 @@ public enum CPUSampler {
         systemCPUSeconds: seconds(usage.ru_stime),
         maxResidentBytes: residentBytes(usage.ru_maxrss)
       )
+    #elseif os(Windows)
+      // GetProcessTimes reports accumulated CPU as 100 ns FILETIME ticks;
+      // the peak working set is the maxrss analogue (Windows plan, Stage 6
+      // item 3).
+      var creationTime = FILETIME()
+      var exitTime = FILETIME()
+      var kernelTime = FILETIME()
+      var userTime = FILETIME()
+      guard
+        unsafe GetProcessTimes(
+          GetCurrentProcess(), &creationTime, &exitTime, &kernelTime, &userTime)
+      else {
+        throw CPUSamplerError.getrusageFailed(errno: Int32(bitPattern: GetLastError()))
+      }
+      var counters = PROCESS_MEMORY_COUNTERS()
+      counters.cb = DWORD(MemoryLayout<PROCESS_MEMORY_COUNTERS>.size)
+      let peakResidentBytes =
+        unsafe K32GetProcessMemoryInfo(GetCurrentProcess(), &counters, counters.cb)
+        ? Int(counters.PeakWorkingSetSize) : 0
+      return ProcessCPUReading(
+        timestampSeconds: monotonicSeconds(),
+        userCPUSeconds: filetimeSeconds(userTime),
+        systemCPUSeconds: filetimeSeconds(kernelTime),
+        maxResidentBytes: peakResidentBytes
+      )
     #else
       throw CPUSamplerError.unavailable
     #endif
   }
+
+  #if os(Windows)
+    private static func filetimeSeconds(_ time: FILETIME) -> Double {
+      let ticks = (UInt64(time.dwHighDateTime) << 32) | UInt64(time.dwLowDateTime)
+      return Double(ticks) / 10_000_000
+    }
+  #endif
 
   public static func sampleDelta(
     from start: ProcessCPUReading,

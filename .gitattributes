@@ -1,0 +1,6 @@
+# Windows checkouts must smudge to LF (Windows plan, Stage 6 item 3): tests
+# byte-compare rendered output against committed fixtures and parse repo
+# files by line, so a core.autocrlf=true checkout breaks them with stray
+# carriage returns. `text=auto` keeps binary detection; eol=lf pins the
+# working-tree line ending on every platform.
+* text=auto eol=lf

@@ -2,9 +2,16 @@ import SwiftTUIVendorFiglet
 import SwiftTUIVendorFigletEmbeddedFonts
 import Testing
 
-private let repositoryRoot =
-  "/" + #filePath.split(separator: "/").dropLast(3).joined(separator: "/")
-private let testDirectory = "/" + #filePath.split(separator: "/").dropLast().joined(separator: "/")
+// #filePath uses the build host's separator; normalize so the directory
+// splits work on Windows (`\`) as well as POSIX (`/`). A POSIX absolute
+// path keeps its leading slash; a drive-letter path must not gain one.
+private func filePathAncestor(droppingLast levels: Int) -> String {
+  let normalized = String(#filePath.map { $0 == "\\" ? "/" : $0 })
+  let directory = normalized.split(separator: "/").dropLast(levels).joined(separator: "/")
+  return normalized.hasPrefix("/") ? "/" + directory : directory
+}
+private let repositoryRoot = filePathAncestor(droppingLast: 3)
+private let testDirectory = filePathAncestor(droppingLast: 1)
 private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Resources/Fonts"
 private let testOnlyFontData = #"""
   flf2a$ 1 1 1 0 0

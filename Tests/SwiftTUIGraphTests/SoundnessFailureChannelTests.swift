@@ -70,77 +70,83 @@ struct SoundnessFailureChannelTests {
     #expect(emittedKinds == Self.traceKinds)
   }
 
-  @Test("scanner rejects every unquarantined violation kind")
-  func scannerRejectsUnquarantinedKinds() throws {
-    let fixture = try makeScannerFixture(
-      lines: Self.traceKinds.map { "[SOUNDNESS] \($0): injected" },
-      quarantine: "# no quarantined kinds\n"
-    )
-    defer { try? FileManager.default.removeItem(at: fixture.scratch) }
-
-    let result = try runScanner(fixture)
-
-    #expect(result.status == 1)
-    for kind in Self.traceKinds {
-      #expect(result.output.contains("FAIL: \(kind)"))
-    }
-    #expect(result.output.contains("fixture-step.log"))
-  }
-
-  @Test("scanner accepts a quarantined kind at its exact baseline")
-  func scannerAcceptsExactQuarantineBaseline() throws {
-    let fixture = try makeScannerFixture(
-      lines: [
-        "[SOUNDNESS] registration-publication: first",
-        "[SOUNDNESS] registration-publication: second",
-      ],
-      quarantine:
-        "registration-publication 2026-07-28 TEST-1 count=2 exact test baseline\n"
-    )
-    defer { try? FileManager.default.removeItem(at: fixture.scratch) }
-
-    let result = try runScanner(fixture)
-
-    #expect(result.status == 0)
-    #expect(result.output.contains("WARNING: registration-publication count=2 matches baseline=2"))
-  }
-
-  @Test("scanner rejects quarantine growth")
-  func scannerRejectsQuarantineGrowth() throws {
-    let fixture = try makeScannerFixture(
-      lines: [
-        "[SOUNDNESS] teardown-coherence-leak: first",
-        "[SOUNDNESS] teardown-coherence-leak: second",
-      ],
-      quarantine:
-        "teardown-coherence-leak 2026-07-28 TEST-2 count=1 growth fixture\n"
-    )
-    defer { try? FileManager.default.removeItem(at: fixture.scratch) }
-
-    let result = try runScanner(fixture)
-
-    #expect(result.status == 1)
-    #expect(result.output.contains("FAIL: teardown-coherence-leak count=2 exceeds baseline=1"))
-  }
-
-  @Test("scanner reports quarantine shrink without failing")
-  func scannerReportsQuarantineShrink() throws {
-    let fixture = try makeScannerFixture(
-      lines: ["[SOUNDNESS] registration-publication: remaining"],
-      quarantine:
-        "registration-publication 2026-07-28 TEST-3 count=2 shrink fixture\n"
-    )
-    defer { try? FileManager.default.removeItem(at: fixture.scratch) }
-
-    let result = try runScanner(fixture)
-
-    #expect(result.status == 0)
-    #expect(
-      result.output.contains(
-        "WARNING: registration-publication count=1 is below baseline=2; reduce the ledger"
+  // Excluded from Windows runs (Windows plan, Stage 6 item 3): these four
+  // tests shell Scripts/scan_soundness_traces.sh through /bin/sh; the
+  // scanner is a POSIX-gate instrument with no Windows analogue.
+  #if !os(Windows)
+    @Test("scanner rejects every unquarantined violation kind")
+    func scannerRejectsUnquarantinedKinds() throws {
+      let fixture = try makeScannerFixture(
+        lines: Self.traceKinds.map { "[SOUNDNESS] \($0): injected" },
+        quarantine: "# no quarantined kinds\n"
       )
-    )
-  }
+      defer { try? FileManager.default.removeItem(at: fixture.scratch) }
+
+      let result = try runScanner(fixture)
+
+      #expect(result.status == 1)
+      for kind in Self.traceKinds {
+        #expect(result.output.contains("FAIL: \(kind)"))
+      }
+      #expect(result.output.contains("fixture-step.log"))
+    }
+
+    @Test("scanner accepts a quarantined kind at its exact baseline")
+    func scannerAcceptsExactQuarantineBaseline() throws {
+      let fixture = try makeScannerFixture(
+        lines: [
+          "[SOUNDNESS] registration-publication: first",
+          "[SOUNDNESS] registration-publication: second",
+        ],
+        quarantine:
+          "registration-publication 2026-07-28 TEST-1 count=2 exact test baseline\n"
+      )
+      defer { try? FileManager.default.removeItem(at: fixture.scratch) }
+
+      let result = try runScanner(fixture)
+
+      #expect(result.status == 0)
+      #expect(
+        result.output.contains("WARNING: registration-publication count=2 matches baseline=2"))
+    }
+
+    @Test("scanner rejects quarantine growth")
+    func scannerRejectsQuarantineGrowth() throws {
+      let fixture = try makeScannerFixture(
+        lines: [
+          "[SOUNDNESS] teardown-coherence-leak: first",
+          "[SOUNDNESS] teardown-coherence-leak: second",
+        ],
+        quarantine:
+          "teardown-coherence-leak 2026-07-28 TEST-2 count=1 growth fixture\n"
+      )
+      defer { try? FileManager.default.removeItem(at: fixture.scratch) }
+
+      let result = try runScanner(fixture)
+
+      #expect(result.status == 1)
+      #expect(result.output.contains("FAIL: teardown-coherence-leak count=2 exceeds baseline=1"))
+    }
+
+    @Test("scanner reports quarantine shrink without failing")
+    func scannerReportsQuarantineShrink() throws {
+      let fixture = try makeScannerFixture(
+        lines: ["[SOUNDNESS] registration-publication: remaining"],
+        quarantine:
+          "registration-publication 2026-07-28 TEST-3 count=2 shrink fixture\n"
+      )
+      defer { try? FileManager.default.removeItem(at: fixture.scratch) }
+
+      let result = try runScanner(fixture)
+
+      #expect(result.status == 0)
+      #expect(
+        result.output.contains(
+          "WARNING: registration-publication count=1 is below baseline=2; reduce the ledger"
+        )
+      )
+    }
+  #endif
 
   private func recordEveryViolationKind() {
     SoundnessProbeConfiguration.recordStampCoherenceViolation("test")

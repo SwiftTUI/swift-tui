@@ -428,7 +428,8 @@ struct BranchingFactorOracleTests {
       let contents = try String(contentsOf: url, encoding: .utf8)
       var rows: [String: Int] = [:]
       for line in contents.split(separator: "\n") {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        // whitespacesAndNewlines: a CRLF checkout leaves \r on every line.
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else {
           continue
         }
