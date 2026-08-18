@@ -41,6 +41,12 @@ jobs:
     name: Windows build (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    env:
+      # Same policy as the POSIX repo gate: the gate builds with
+      # warnings-as-errors so new Windows-only warnings fail here instead of
+      # accreting (Windows plan, Stage 6 item 11; the manifest reads this at
+      # evaluation time, so it must cover every swift invocation in the job).
+      SWIFTTUI_WARNINGS_AS_ERRORS: "1"
     strategy:
       fail-fast: false
       matrix:
