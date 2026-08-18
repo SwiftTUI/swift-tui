@@ -6,6 +6,67 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [0.9.2] - 2026-08-18
+
+### Added
+
+- **Windows is a supported terminal platform.** `import SwiftTUI` + `@main`
+  builds and runs natively on Windows 10 1809+ (build 17763) / Windows
+  Server 2019+ for `aarch64-` and `x86_64-unknown-windows-msvc`, with no
+  platform conditional in app code. Terminal control drives the Win32 console
+  directly: VT processing with the session owning the UTF-8 code pages (both
+  console modes and both code pages restored on exit), input read as console
+  records (`ReadConsoleInputW`) and re-linearized into the same VT byte
+  stream the parser consumes on POSIX — which is what makes typed non-ASCII
+  text reliable on every supported Windows version, where the console's
+  byte-oriented read path is not — resize through the record pump, Ctrl+C
+  in-band as `0x03`, and legacy-conhost mouse records translated to SGR so
+  mouse works in both Windows Terminal and `conhost`. On Windows the
+  `SwiftTUI` umbrella serves the terminal launch surface only: `--web`, PTY
+  embedding, and `--attach` remain POSIX. About 5,400 tests run natively
+  green, and a two-arch Windows CI lane (full build plus serial test lanes,
+  warnings-as-errors) now guards the port.
+- **Automatic stack-floor handling on Windows.** A default-linked Windows
+  executable reserves 1 MiB of main-thread stack (POSIX mains get 8 MiB). At
+  session start the runtime measures the reserve and arms the stack-lean
+  resolve profile below the 8 MiB full-engine floor; a debug build that
+  degrades emits a `windows.stack-floor-lean-profile` runtime issue naming
+  the remedy (`swift build -Xlinker /STACK:16777216`). An explicit
+  `SWIFTTUI_STACK_LEAN_PROFILE` value overrides the automatic choice.
+- **Platform-aware terminal capability detection.** Detection now has
+  per-platform arms. On Windows the platform is the signal — Unicode glyphs
+  and 24-bit color by default, because the session controller owns VT
+  processing and the UTF-8 code pages — while `NO_COLOR` still wins, an
+  explicit foreign `TERM` reads like the POSIX arm, and `WT_SESSION` adds
+  OSC 8 hyperlinks and synchronized output. POSIX detection is unchanged.
+- **A total ASCII degradation map for box drawing.** Every glyph in the
+  box-drawing (U+2500–U+257F) and block-elements (U+2580–U+259F) ranges plus
+  `■` now has an ASCII fallback, on every platform — heavy half-stubs, tees,
+  and crossings no longer degrade to `?` at the ascii glyph rung.
+
+### Changed
+
+- **The CLI layer is re-cut for portability; every existing import keeps
+  working.** `SwiftTUICLI` split into the portable `SwiftTUITerminalCLI`
+  (launch) and the POSIX-only `SwiftTUICLIAttach` (PTY + scene attach) over
+  a new internal syscall facade, with `SwiftTUICLI` remaining as an
+  `@_exported` compatibility facade. SwiftTerm is isolated behind the new
+  `SwiftTUITerminalEmulation` target, and the PTY/SwiftTerm dependency edges
+  are platform-conditional, so Windows builds never attempt them. Launch
+  routing moved to `SwiftTUITerminalCLI.SwiftTUILauncher`;
+  `WebHostCLIRunner` remains as a source-compatible facade (its formal
+  deprecation is deferred to a later release).
+
+### Fixed
+
+- **A windowed-measurement worker crash under filtered parallel test runs
+  (all platforms).** The retained lazy-stack snapshot could read a retained
+  live source's measurement signature on the frame-tail worker; the guard
+  now refuses retained-live-source reads off the main actor.
+- **`Image(fileURLString:)` resolves drive-lettered file URLs on Windows.**
+  The Foundation-free file-URL parser returned `/C:/…`-shaped paths, which
+  the filesystem rejects; the Windows arm strips the leading slash.
+
 ## [0.9.1] - 2026-08-16
 
 Android tooling fixes only; no framework behaviour change.
