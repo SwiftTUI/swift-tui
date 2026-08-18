@@ -6,6 +6,20 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [0.9.3] - 2026-08-18
+
+Chart fixture refresh only; no framework behaviour change.
+
+### Fixed
+
+- **swift-tui-charts' ascii preview fixtures track the 0.9.2 degradation
+  map.** The 0.9.2 release candidate caught five stale `preview-ascii`
+  fixtures in the charts repository: rendered against the pre-0.9.2 map,
+  they still expected `?` where sparkline ramps, legend markers, heat
+  strips, the calendar heatmap, and line-chart area fills now draw real
+  ASCII. The fixtures are regenerated; framework code is unchanged from
+  0.9.2.
+
 ## [0.9.2] - 2026-08-18
 
 ### Added
