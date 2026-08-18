@@ -145,6 +145,13 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
+    "Check platform-conditional import gates" \
+    "./Scripts/check_platform_conditional_import_gates.sh" \
+    ./Scripts/check_platform_conditional_import_gates.sh
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
     "Check repository split boundary" \
     "./Scripts/check_repository_split_boundary.sh" \
     ./Scripts/check_repository_split_boundary.sh
