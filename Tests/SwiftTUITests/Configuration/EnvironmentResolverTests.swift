@@ -7,7 +7,14 @@ struct EnvironmentResolverTests {
   func emptyEnvironmentTTY() {
     let configuration = RuntimeConfiguration.detect(environment: [:], isStdoutTTY: true)
     #expect(configuration.color == .auto)
-    #expect(configuration.glyphs == .ascii)  // No UTF-8 in locale → ascii fallback (matches TerminalCapabilityProfile.detect)
+    #if os(Windows)
+      // The Windows console arm never keys glyphs on locale — the session
+      // controller owns the UTF-8 codepages — so an empty environment
+      // resolves unicode (Windows plan, Stage 6 item 10).
+      #expect(configuration.glyphs == .unicode)
+    #else
+      #expect(configuration.glyphs == .ascii)  // No UTF-8 in locale → ascii fallback (matches TerminalCapabilityProfile.detect)
+    #endif
     #expect(configuration.motion == .normal)
     #expect(configuration.stableOutput == false)
     #expect(configuration.debug == false)
@@ -67,7 +74,13 @@ struct EnvironmentResolverTests {
   @Test("LANG=C forces ASCII glyphs")
   func langCForcesAscii() {
     let configuration = RuntimeConfiguration.detect(environment: ["LANG": "C"], isStdoutTTY: true)
-    #expect(configuration.glyphs == .ascii)
+    #if os(Windows)
+      // The Windows console arm ignores POSIX locale variables entirely
+      // (Windows plan, Stage 6 item 10); LANG=C is a POSIX-only signal.
+      #expect(configuration.glyphs == .unicode)
+    #else
+      #expect(configuration.glyphs == .ascii)
+    #endif
   }
 
   @Test("LANG with UTF-8 enables unicode glyphs")

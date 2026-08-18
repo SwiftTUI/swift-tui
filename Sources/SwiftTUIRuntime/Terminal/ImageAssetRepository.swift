@@ -583,7 +583,27 @@ private func parseFileURL(
     return nil
   }
 
-  return percentDecoded(pathComponent)
+  guard let decoded = percentDecoded(pathComponent) else {
+    return nil
+  }
+  #if os(Windows)
+    // A file URL spells an absolute drive-lettered path as `/C:/…`; the
+    // filesystem wants it without the leading slash (the CRT open path
+    // accepts forward separators).
+    let scalars = Array(decoded.unicodeScalars)
+    if scalars.count >= 3, scalars[0] == "/", scalars[2] == ":",
+      isASCIILetter(scalars[1])
+    {
+      return String(decoded.dropFirst())
+    }
+  #endif
+  return decoded
+}
+
+private func isASCIILetter(
+  _ scalar: Unicode.Scalar
+) -> Bool {
+  ("A"..."Z").contains(scalar) || ("a"..."z").contains(scalar)
 }
 
 private func percentDecoded(
