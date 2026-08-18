@@ -3,7 +3,7 @@
 **SwiftUI semantics, drawn in terminal cells.**
 
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
-![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20iOS%20%C2%B7%20WASI%20%C2%B7%20Android-1E90FF)
+![Platforms](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows%20%C2%B7%20iOS%20%C2%B7%20WASI%20%C2%B7%20Android-1E90FF)
 ![Status](https://img.shields.io/badge/beta-0.9.1-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
@@ -63,8 +63,8 @@ Please [open a github issue](https://github.com/SwiftTUI/swift-tui/issues/new/ch
 ## Quick start
 
 SwiftTUI apps are plain SwiftPM packages: any Swift 6.3+ toolchain builds and
-runs them from the command line, on macOS or Linux, with no Xcode project, no
-simulator, and no app store. Author a view and an `@main` `App`:
+runs them from the command line, on macOS, Linux, or Windows, with no Xcode
+project, no simulator, and no app store. Author a view and an `@main` `App`:
 
 ```swift
 import SwiftTUI
@@ -105,7 +105,8 @@ minor release from breaking your build. Then add the `SwiftTUI` product:
 `swift run` builds the app and launches it in the terminal. The app uses the
 alternate screen until you exit. Then it restores your shell. Add `--web` to
 run the same app through the localhost WebHost in a browser. This mode requires
-no code change.
+no code change. On Windows the `SwiftTUI` import serves the terminal surface
+only, so `--web` is unavailable there.
 
 The `SwiftTUI` import re-exports the platform-neutral runtime, argument parser,
 combined terminal/WebHost runner, and animated-image playback. Charts ship in
@@ -147,8 +148,13 @@ let package = Package(
 | Swift toolchain | Swift 6.3 (`swift-tools-version: 6.3`) |
 | Apple package platforms | macOS 15+, iOS 18+ |
 | Terminal / WASI / Android builds | supported via the Swift open-source toolchain |
+| Windows terminal builds | Windows 10 1809+ (build 17763) / Windows Server 2019+, `aarch64-` / `x86_64-unknown-windows-msvc` |
 
-`SwiftTUITerminal` / PTY embedding is macOS and Linux only. See the
+`SwiftTUITerminal` / PTY embedding is macOS and Linux only. On Windows the
+umbrella serves the terminal launch surface only (no `--web`), and real apps
+should link with `-Xlinker /STACK:16777216` — release builds included — or the
+runtime degrades to the stack-lean engine profile below the 8 MiB main-thread
+stack floor. See the
 [Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md)
 DocC article for the full platform-by-product matrix.
 
@@ -197,7 +203,7 @@ DocC article.
 
 | Ship as | Product | Start here |
 | --- | --- | --- |
-| Terminal executable (+ `--web`) | `SwiftTUI` (or the explicit `SwiftTUICLI` runner) | the sample above |
+| Terminal executable (+ `--web` outside Windows) | `SwiftTUI` (or the explicit `SwiftTUICLI` runner) | the sample above |
 | Static WASI / browser bundle | `SwiftTUIWASI` → `@swifttui/web` + `@swifttui/build` | [swift-tui-web](https://github.com/SwiftTUI/swift-tui-web) |
 | Native SwiftUI surface (macOS · iOS) | `SwiftUIHost` | [swift-tui-swiftui](https://github.com/SwiftTUI/swift-tui-swiftui) |
 | Native Android surface (arm64-v8a) | `SwiftTUIAndroidHost` | [swift-tui-android](https://github.com/SwiftTUI/swift-tui-android) |

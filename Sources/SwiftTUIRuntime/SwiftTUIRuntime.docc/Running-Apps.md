@@ -75,7 +75,9 @@ It does not pull in runner products on its own.
 
 For ordinary apps, import `SwiftTUI` and mark your app type with `@main` to use
 the default launcher. It runs in the terminal by default and switches to the
-localhost WebHost when `--web` is present.
+localhost WebHost when `--web` is present. On Windows the umbrella carries the
+terminal launch surface only, so `--web` fails there with a clear
+web-runner-not-linked diagnostic.
 
 `@main` is the supported launch form. Because `App` refines an
 `AsyncParsableCommand`, `App.main()` is `async` and only `@main` binds it
@@ -112,8 +114,11 @@ consumes the same authored scene model on top of a `SwiftTUIWASI` build.
 
 `SwiftTUIWebHost` is deliberately compound: `SwiftTUIWebHost` provides
 `WebHostRunner` for localhost-browser launch, while `SwiftTUIWebHostCLI`
-provides `WebHostCLIRunner` for binaries that support both terminal-native and
-`--web` launch. `SwiftTUI` includes that combined runner by default. Import
+installs the `--web` arm of the shared `SwiftTUILauncher` for binaries that
+support both terminal-native and `--web` launch (its `WebHostCLIRunner` entry
+remains as a source-compatible facade). `SwiftTUI` includes that combined
+launch surface by default on platforms where the WebHost products build; on
+Windows it re-exports the portable terminal launcher instead. Import
 `SwiftTUIWebHostCLI` directly only for a narrower graph.
 
 ## See Also

@@ -105,11 +105,13 @@ guarantees fully main-actor execution.
 
 The stack-lean profile trades resolve-pass conveniences for shallow call
 stacks. It exists for WASI browser hosts, where worker threads get a small
-fraction of the main thread's native stack.
+fraction of the main thread's native stack, and for Windows, where a
+default-linked executable reserves only 1 MiB of main-thread stack (POSIX
+mains get 8 MiB).
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `SWIFTTUI_STACK_LEAN_PROFILE` | exactly `0` or `1` | The stack-lean resolve profile: lean ambient slots instead of task-locals, reuse/memo/selective evaluation off, chunked descent. Defaults on for WASI builds, off natively. Other values are ignored. |
+| `SWIFTTUI_STACK_LEAN_PROFILE` | exactly `0` or `1` | The stack-lean resolve profile: lean ambient slots instead of task-locals, reuse/memo/selective evaluation off, chunked descent. Defaults on for WASI builds. On Windows it arms automatically when the measured main-thread stack reserve is below the 8 MiB full-engine floor (link with `-Xlinker /STACK:16777216` to run the full engine); an explicit value overrides that automatic choice, and a debug build that degrades emits a `windows.stack-floor-lean-profile` runtime issue. Otherwise off natively. Other values are ignored. |
 | `SWIFTTUI_LEAN_RETAINED_REUSE` | exactly `1` | Re-enables retained reuse under the lean profile (a reuse hit shortens the descent, so it can only shallow the stack). Ignored when the lean profile is off. |
 | `SWIFTTUI_RESOLVE_DEPTH_LIMIT` | positive integer | Overrides the chunked-descent depth cap (default 6 under the lean profile) and force-enables the chunked resolve driver on native builds for debugging. `0` or negative disables the driver. |
 

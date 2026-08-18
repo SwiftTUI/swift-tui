@@ -17,16 +17,21 @@ per-host engine profile below.
 
 | Mode | Product | Presents to | Notes |
 | --- | --- | --- | --- |
-| Terminal-native | `SwiftTUICLI` (`TerminalRunner`) | A real terminal via `TerminalHost` | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUIWebHostCLI`. |
+| Terminal-native | `SwiftTUITerminalCLI` (`TerminalRunner`); `SwiftTUICLI` remains the POSIX facade that adds scene attach | A real terminal via `TerminalHost` — a POSIX terminal or the Win32 console | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUILauncher`. |
 | WASI / browser | `SwiftTUIWASI` (`WASIRunner`) | A browser canvas | Swift compiled to WASI. Raster output drawn onto a canvas via the `web-surface` transport. Uses the stack-lean resolve profile by default. |
 | Host-managed Android | `SwiftTUIAndroidHost` | An Android Compose view inside an app | Retains ``HostedSceneSession`` values behind a JNI/C ABI and serializes committed frames as web-surface records (the converged wire). Draws styled cells/images plus a semantics overlay in Compose. The Swift host cross-compiles for arm64 and x86_64. |
 | Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded in-tree HTTP/WebSocket server and drives a bundled browser runtime over the `web-surface` protocol (v1/v2 full frames, v3 delta frames). |
 | Native SwiftUI host (external package) | `SwiftUIHost` from [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) | A SwiftUI view on macOS or iOS | Retains the same runtime sessions. Presents raster, damage, focus, and accessibility through AppKit/UIKit-backed SwiftUI views. Bridges input plus clipboard writes back to the runtime. It is not a product of this package. |
 
-A binary can support more than one mode. `SwiftTUIWebHostCLI`
-(`WebHostCLIRunner`) combines terminal-native and localhost-browser launch in
-one executable. `--web` selects the WebHost path. The `SwiftTUI` convenience
-product includes that combined runner by default.
+A binary can support more than one mode. `SwiftTUILauncher` (in
+`SwiftTUITerminalCLI`) routes launch: the terminal by default, the localhost
+WebHost when `--web` is present and `SwiftTUIWebHostCLI` installed its web arm
+at launch. `WebHostCLIRunner` remains as a source-compatible facade over the
+same launcher. The `SwiftTUI` convenience product re-exports exactly one
+launch surface per platform: the combined terminal/WebHost launcher where the
+WebHost products build (macOS, Mac Catalyst, iOS, Linux, Android), and the
+portable terminal launcher on Windows, where `--web` fails with a clear
+web-runner-not-linked diagnostic and the WebHost types are absent.
 
 Hosts in other package ecosystems keep their non-Swift half in dedicated
 sibling repositories: [`swift-tui-web`](https://github.com/SwiftTUI/swift-tui-web)
@@ -40,6 +45,7 @@ back to this package.
 | Surface | 0.9 tier | Supported boundary |
 | --- | --- | --- |
 | Terminal runtime | Supported preview surface | Native macOS and Linux launch, input, raster presentation, and terminal graphics through the published SwiftPM products. |
+| Windows terminal runtime | Preview — added after 0.9.1; the next tagged release is the first to carry it | Native Windows launch, input, and raster presentation on Windows 10 1809+ (build 17763) / Windows Server 2019+ — the ConPTY line — for `aarch64-` and `x86_64-unknown-windows-msvc`. Terminal surface only: WebHost, PTY embedding, and `--attach` are not part of the Windows claim. Full input fidelity (bracketed paste, focus events, mouse from conhost's own window) varies with the console host — current Windows Terminal, or Windows 11 24H2 conhost; the console-record input pump keeps older in-box conhost degrading gracefully rather than misbehaving. |
 | WASI / browser and localhost WebHost | Supported preview surface | Published npm/browser packages, keyboard and pointer input, resize and scroll, canvas/DOM raster presentation, and the converged host wire. |
 | Native SwiftUI host | Supported preview surface | The lockstep external host on macOS 15+ and iOS 18+, including keyboard, pointer/touch, clipboard writes, native image placement, and semantic presentation. |
 | Android Compose host | Preview, arm64 | `arm64-v8a`, API 28+, NDK `27.3.13750724`, Swift 6.3.x, the Swift Android SDK, and the published AAR/Gradle-plugin packaging path. The core host can cross-compile x86_64, but x86_64 packaging and Android IME marked/pre-edit composition are outside the 0.9 support claim. |
@@ -68,6 +74,15 @@ The full/native profile uses the normal `TaskLocal` context bindings. It keeps
 retained and memoized resolve reuse available. It enables selective evaluation
 after the first full render and leaves the chunked-descent depth limit unset by
 default.
+
+On Windows, the runtime measures the main thread's stack reserve at session
+start and arms the stack-lean profile automatically when the reserve is below
+the 8 MiB full-engine floor — a default-linked Windows executable reserves
+only 1 MiB. Link apps with `-Xlinker /STACK:16777216` (release builds
+included) to run the full/native profile. An explicit
+`SWIFTTUI_STACK_LEAN_PROFILE` value overrides the automatic choice, and a
+debug build that degrades emits a `windows.stack-floor-lean-profile` runtime
+issue naming the remedy.
 
 The stack-lean profile preserves the same phase products and committed-frame
 contract while changing resolve mechanics to fit constrained WebAssembly
@@ -177,7 +192,9 @@ invalidation as frontend damage.
 
 ## The Terminal Host
 
-`TerminalHost` is the POSIX terminal host.
+`TerminalHost` is the terminal host. Terminal control sits behind a platform
+seam: a POSIX controller (termios raw mode, `poll`-based reads, `SIGWINCH`
+resize) and a Win32 console controller on Windows.
 
 - **Output** is written by a `PresentationWriter` on a private serial
   `DispatchQueue`, so a blocking `write(2)` never stalls the run loop. Stale
@@ -188,6 +205,20 @@ invalidation as frontend damage.
 - **Crash safety** is the runner's job, not the framework's.
   `CrashSignalHandler` is installed by the CLI runner so a crash restores the
   terminal. `SwiftTUICore` and `SwiftTUIRuntime` install no signal handlers.
+- **Windows console control**: the controller enables VT processing and owns
+  the UTF-8 code pages for the session, restoring both console modes and both
+  code pages on exit — code pages are console-global and outlive the process.
+  Input is read as console records (`ReadConsoleInputW`) and re-linearized
+  into the same VT byte stream the input parser consumes on POSIX, which is
+  what makes typed non-ASCII text reliable on every supported Windows version
+  — the console's byte-oriented read path has shipped broken for UTF-8 input
+  since Windows 10, so the record path is load-bearing, not an optimization.
+  Resize arrives through the same record pump
+  (there is no SIGWINCH), Ctrl+C arrives in-band as `0x03`, and legacy conhost
+  mouse records are translated into SGR sequences so mouse input works in both
+  Windows Terminal and `conhost`. The signal-based crash-restore path is
+  POSIX-only: on Windows an abnormal termination can leave the console in
+  raw/mouse-tracking modes.
 
 ## Platform Support Matrix
 
@@ -195,6 +226,7 @@ invalidation as frontend damage.
 | --- | --- |
 | macOS package development | Primary supported Apple-host path (macOS 15+). |
 | Linux terminal builds and tests | Supported through `swiftly`. |
+| Windows terminal builds | Supported natively on Windows 10 1809+ (build 17763) / Windows Server 2019+ for `aarch64-` and `x86_64-unknown-windows-msvc`. The `SwiftTUI` umbrella serves the terminal launch surface only: the WebHost and PTY-embedding products do not build there, and `--web` fails with the web-runner-not-linked diagnostic. Link apps with `-Xlinker /STACK:16777216` — release builds included — or the runtime degrades to the stack-lean engine profile below the 8 MiB main-thread stack floor (see the per-host engine profiles). |
 | iOS package builds | Supported for host-compatible products (iOS 18+). PTY/terminal-embedding products are excluded. |
 | WASI / browser | Supported through `SwiftTUIWASI` and the [`swift-tui-web`](https://github.com/SwiftTUI/swift-tui-web) browser packages. |
 | Android host / cross-compilation | `SwiftTUIAndroidHost` cross-compiles for `aarch64-unknown-linux-android28` and `x86_64-unknown-linux-android28`. The reusable Compose host + JNI shim ship as the published `sh.swifttui:android-host` AAR, with the `sh.swifttui.android` Gradle plugin, from [`swift-tui-android`](https://github.com/SwiftTUI/swift-tui-android). Consumer apps depend on the tagged `SwiftTUIAndroidHost` SwiftPM product over HTTPS and let the plugin cross-build their Swift host. |

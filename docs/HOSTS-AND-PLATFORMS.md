@@ -46,3 +46,19 @@ boundaries are recorded in the
   [divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
 - **CI floors.** GitHub `macos-26` is the macOS CI floor. iOS CI builds
   host-compatible products but does not run tests.
+- **Windows CI.** `.github/workflows/windows-build.yml` builds all targets +
+  test bundles on `windows-11-arm` (arm64) and `windows-2022` (amd64) via
+  `compnerd/gha-setup-swift`. The lane is build-only until the Windows plan's
+  test-target survey concludes, and it is deliberately **not** wired into the
+  org-root gates (per-repo version drift is planned). Windows test runners
+  need `swift test -Xlinker /STACK:16777216` — the default 1 MiB runner stack
+  kills deep-descent suites.
+- **Windows checkouts are LF.** The committed `.gitattributes`
+  (`* text=auto eol=lf`) exists because `core.autocrlf=true` checkouts append
+  `\r` to fixture lines and break byte-compare and parser tests. Never remove
+  it; a CRLF-smudged working tree is the first suspect for
+  Windows-only fixture failures.
+- **Windows dev workflow.** The macOS→Parallels-VM loop (prlctl exec, the
+  `\\Mac\Home` share, the no-console trap, exit-code capture) is documented in
+  the appendix of the org repo's
+  `docs/plans/2026-08-16-001-windows-support-module-recut-plan.md`.
