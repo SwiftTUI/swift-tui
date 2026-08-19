@@ -121,20 +121,6 @@ struct EnvironmentResolverTests {
     #expect(configuration.debug == true)
   }
 
-  @Test("SWIFTTUI_VERBOSE=2 sets verbosity to .verbose(level: 2)")
-  func swiftTUIVerbose() {
-    let configuration = RuntimeConfiguration.detect(
-      environment: ["SWIFTTUI_VERBOSE": "2"], isStdoutTTY: true)
-    #expect(configuration.verbosity == .verbose(level: 2))
-  }
-
-  @Test("SWIFTTUI_QUIET=1 sets verbosity to .quiet")
-  func swiftTUIQuiet() {
-    let configuration = RuntimeConfiguration.detect(
-      environment: ["SWIFTTUI_QUIET": "1"], isStdoutTTY: true)
-    #expect(configuration.verbosity == .quiet)
-  }
-
   @Test("SWIFTTUI_WEB=1 with default port produces WebConfig")
   func swiftTUIWeb() {
     let configuration = RuntimeConfiguration.detect(

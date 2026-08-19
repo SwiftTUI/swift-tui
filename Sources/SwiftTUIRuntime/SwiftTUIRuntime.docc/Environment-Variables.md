@@ -50,8 +50,6 @@ start.
 | `SWIFTTUI_ASCII` | boolean | Forces ASCII glyphs in place of Unicode box drawing and symbols. |
 | `SWIFTTUI_REDUCE_MOTION` | `0` / truthy | Truthy sets the app-visible accessibility reduce-motion preference and renders built-in animation in its static form. |
 | `SWIFTTUI_STABLE_OUTPUT` | `0` / truthy | Explicitly disables built-in animation for deterministic capture without changing the accessibility preference. When unset, `CI=true` or a non-TTY stdout enables stable output automatically. |
-| `SWIFTTUI_QUIET` | boolean | Quiet verbosity. Wins over `SWIFTTUI_VERBOSE`. |
-| `SWIFTTUI_VERBOSE` | integer > 0 | Verbose logging at the given level. |
 | `SWIFTTUI_DEBUG` | boolean | Debug mode: arms the session debug bundle (see *Debug bundles and trace selection*), including the diagnostics TSV and the frame trace. |
 | `SWIFTTUI_CURSOR_FOLLOWS_FOCUS` | boolean | Moves the hardware terminal cursor to the focused control so screen readers can track focus. |
 

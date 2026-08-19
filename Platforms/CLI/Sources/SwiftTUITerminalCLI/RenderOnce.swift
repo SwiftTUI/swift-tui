@@ -66,7 +66,7 @@ public enum RenderOnce {
     isStdoutTTY: Bool = standardOutputIsTTY()
   ) -> String {
     let resolvedWidth = width ?? resolveTerminalWidth(environment: environment)
-    // ArgumentParser-managed properties (e.g. `@Flag verbose: Int`) aren't
+    // ArgumentParser-managed properties without explicit defaults aren't
     // initialized by the synthesized `init()`, so the blessed way to get a
     // defaults-only instance is `parse([])`. Fall through if even that fails.
     let resolvedOptions = options ?? (try? SwiftTUIOptions.parse([])) ?? SwiftTUIOptions()

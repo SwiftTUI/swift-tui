@@ -79,15 +79,6 @@ extension RuntimeConfiguration {
       return WebConfig(port: port, bind: bind, openBrowser: openBrowser, sceneID: sceneID)
     }()
 
-    // Verbosity.
-    let verbosity: Verbosity = {
-      if let v = environment["SWIFTTUI_QUIET"], !v.isEmpty, v != "0" { return .quiet }
-      if let v = environment["SWIFTTUI_VERBOSE"], let level = Int(v), level > 0 {
-        return .verbose(level: level)
-      }
-      return .normal
-    }()
-
     let debug = (environment["SWIFTTUI_DEBUG"].map { !$0.isEmpty && $0 != "0" }) ?? false
 
     return RuntimeConfiguration(
@@ -96,7 +87,6 @@ extension RuntimeConfiguration {
       motion: motion,
       stableOutput: stableOutput,
       output: output,
-      verbosity: verbosity,
       web: web,
       debug: debug,
       cursorFollowsFocus: cursorFollowsFocus

@@ -94,7 +94,6 @@ import SwiftTUICore
         + " motion=\(configuration.motion.rawValue)"
         + " stableOutput=\(configuration.stableOutput)"
         + " output=\(configuration.output.rawValue)"
-        + " verbosity=\(configuration.verbosity.rawLevel)"
         + " debug=\(configuration.debug)"
         + " cursorFollowsFocus=\(configuration.cursorFollowsFocus)"
     )

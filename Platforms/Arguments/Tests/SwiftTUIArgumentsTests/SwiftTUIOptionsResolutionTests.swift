@@ -230,31 +230,6 @@ struct SwiftTUIOptionsResolutionTests {
     #expect(configuration.web?.openBrowser == false)
   }
 
-  @Test("-vv produces verbosity .verbose(level: 2)")
-  func cliVerboseLevelTwo() throws {
-    var options = try SwiftTUIOptions.parse([])
-    options.verbose = 2
-    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
-    #expect(configuration.verbosity == .verbose(level: 2))
-  }
-
-  @Test("--quiet produces verbosity .quiet")
-  func cliQuietProducesQuiet() throws {
-    var options = try SwiftTUIOptions.parse([])
-    options.quiet = true
-    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
-    #expect(configuration.verbosity == .quiet)
-  }
-
-  @Test("--quiet wins over -v")
-  func cliQuietBeatsVerbose() throws {
-    var options = try SwiftTUIOptions.parse([])
-    options.quiet = true
-    options.verbose = 2
-    let configuration = options.runtimeConfiguration(environment: [:], isStdoutTTY: true)
-    #expect(configuration.verbosity == .quiet)
-  }
-
   @Test("Env var honored when CLI flag is default")
   func envVarHonoredWhenCLIDefault() throws {
     let options = try SwiftTUIOptions.parse([])

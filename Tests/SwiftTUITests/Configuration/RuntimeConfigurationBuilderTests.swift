@@ -11,7 +11,6 @@ struct RuntimeConfigurationBuilderTests {
       .motion(.reduced)
       .stableOutput(true)
       .output(.json)
-      .verbosity(.verbose(level: 2))
       .debug(true)
       .cursorFollowsFocus(true)
       .build()
@@ -21,7 +20,6 @@ struct RuntimeConfigurationBuilderTests {
     #expect(configuration.motion == .reduced)
     #expect(configuration.stableOutput == true)
     #expect(configuration.output == .json)
-    #expect(configuration.verbosity == .verbose(level: 2))
     #expect(configuration.debug == true)
     #expect(configuration.cursorFollowsFocus == true)
   }

@@ -279,11 +279,11 @@ struct RootCommandDispatchTests {
     // bounds the set of apps whose option binding can change. It fails loudly
     // if the matcher is ever "improved" to scan the whole argument list.
     let command = try DispatchingRootFixture.parseSwiftTUIRootCommand(arguments: [
-      "--verbose", "info",
+      "--json", "info",
     ])
     let root = try #require(command as? DispatchingRootFixture)
     #expect(root.path == "info")
-    #expect(root.swiftTUIOptions.verbose == 1)
+    #expect(root.swiftTUIOptions.json == true)
   }
 
   @Test("T-13 a declared alias resolves to the verb")

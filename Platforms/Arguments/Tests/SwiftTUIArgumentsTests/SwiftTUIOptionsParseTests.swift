@@ -19,8 +19,6 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.bind == "127.0.0.1")
     #expect(options.open == false)
     #expect(options.scene == nil)
-    #expect(options.verbose == 0)
-    #expect(options.quiet == false)
     #expect(options.debug == false)
   }
 
@@ -54,18 +52,6 @@ struct SwiftTUIOptionsParseTests {
     #expect(options.bind == "0.0.0.0")
     #expect(options.open == true)
     #expect(options.scene == "details")
-  }
-
-  @Test("Parses -v -v -v as verbose level 3")
-  func parsesRepeatedVerboseShort() throws {
-    let options = try SwiftTUIOptions.parse(["-v", "-v", "-v"])
-    #expect(options.verbose == 3)
-  }
-
-  @Test("Parses --quiet")
-  func parsesQuiet() throws {
-    let options = try SwiftTUIOptions.parse(["--quiet"])
-    #expect(options.quiet == true)
   }
 
   @Test("Parses --debug")

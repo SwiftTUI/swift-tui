@@ -6,6 +6,21 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [Unreleased]
+
+### Removed
+
+- **The unimplemented verbosity surface is gone.** `--verbose`/`-v` and
+  `--quiet` were advertised in every `SwiftTUICommand` app's `--help` (and
+  `SWIFTTUI_VERBOSE`/`SWIFTTUI_QUIET` in the environment-variable reference)
+  but never controlled any framework logging: the resolved
+  `RuntimeConfiguration.verbosity` was only echoed into the debug-bundle
+  manifest. The flags, the env vars, `RuntimeConfiguration.Verbosity`, the
+  `verbosity` property/initializer parameter, and `Builder.verbosity(_:)`
+  are removed rather than left as dead surface. Apps that want a verbosity
+  flag can declare their own; the `--verbose`, `-v`, and `--quiet` names are
+  no longer reserved by the framework.
+
 ## [0.9.3] - 2026-08-18
 
 Chart fixture refresh only; no framework behaviour change.

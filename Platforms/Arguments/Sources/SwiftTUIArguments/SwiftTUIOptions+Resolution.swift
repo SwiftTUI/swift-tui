@@ -71,13 +71,6 @@ extension SwiftTUIOptions {
       return baseline.web
     }()
 
-    // Verbosity: --quiet > --verbose level > baseline.
-    let verbosity: RuntimeConfiguration.Verbosity = {
-      if quiet { return .quiet }
-      if verbose > 0 { return .verbose(level: verbose) }
-      return baseline.verbosity
-    }()
-
     // Debug: --debug overrides baseline.
     let debug = self.debug || baseline.debug
 
@@ -87,7 +80,6 @@ extension SwiftTUIOptions {
       motion: motion,
       stableOutput: stableOutput,
       output: output,
-      verbosity: verbosity,
       web: web,
       debug: debug,
       cursorFollowsFocus: cursorFollowsFocus

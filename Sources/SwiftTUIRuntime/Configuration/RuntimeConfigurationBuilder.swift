@@ -48,12 +48,6 @@ extension RuntimeConfiguration {
       return copy
     }
 
-    public func verbosity(_ value: Verbosity) -> Self {
-      var copy = self
-      copy.configuration.verbosity = value
-      return copy
-    }
-
     public func debug(_ value: Bool) -> Self {
       var copy = self
       copy.configuration.debug = value

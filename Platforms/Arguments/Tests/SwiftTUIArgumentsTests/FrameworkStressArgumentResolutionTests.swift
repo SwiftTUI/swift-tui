@@ -10,18 +10,13 @@ struct FrameworkStressArgumentResolutionTests {
   func argumentResolution001EveryBooleanFlagParsesTogether() throws {
     let options = try SwiftTUIOptions.parse([
       "--no-color", "--force-color", "--accessible", "--ascii", "--reduce-motion",
-      "--cursor-follows-focus", "--json", "--web", "--open", "--quiet",
+      "--cursor-follows-focus", "--json", "--web", "--open",
       "--debug",
     ])
     #expect(options.noColor && options.forceColor && options.accessible && options.ascii)
     #expect(options.reduceMotion)
     #expect(options.cursorFollowsFocus && options.json && options.web && options.open)
-    #expect(options.quiet && options.debug)
-  }
-
-  @Test("stress argument resolution 002 bundled verbose flags preserve count")
-  func argumentResolution002BundledVerboseFlagsPreserveCount() throws {
-    #expect(try SwiftTUIOptions.parse(["-vvv"]).verbose == 3)
+    #expect(options.debug)
   }
 
   @Test("stress argument resolution 003 equals syntax preserves option values")
@@ -114,22 +109,6 @@ struct FrameworkStressArgumentResolutionTests {
       options.runtimeConfiguration(
         environment: ["SWIFTTUI_WEB": "1", "SWIFTTUI_BIND": "0.0.0.0"], isStdoutTTY: true
       ).web?.bind == "127.0.0.1")
-  }
-
-  @Test("stress argument resolution 017 CLI quiet overrides environment verbosity")
-  func argumentResolution017CLIQuietOverridesEnvironmentVerbosity() throws {
-    let options = try SwiftTUIOptions.parse(["--quiet"])
-    #expect(
-      options.runtimeConfiguration(environment: ["SWIFTTUI_VERBOSE": "9"], isStdoutTTY: true)
-        .verbosity == .quiet)
-  }
-
-  @Test("stress argument resolution 018 CLI verbosity overrides environment quiet")
-  func argumentResolution018CLIVerbosityOverridesEnvironmentQuiet() throws {
-    let options = try SwiftTUIOptions.parse(["-vv"])
-    #expect(
-      options.runtimeConfiguration(environment: ["SWIFTTUI_QUIET": "1"], isStdoutTTY: true)
-        .verbosity == .verbose(level: 2))
   }
 
   @Test("stress argument resolution 019 CLI debug survives false environment value")

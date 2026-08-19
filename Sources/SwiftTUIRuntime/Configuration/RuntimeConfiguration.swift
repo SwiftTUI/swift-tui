@@ -34,23 +34,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     case json
   }
 
-  public enum Verbosity: Sendable, Equatable {
-    /// Suppress non-error log output.
-    case quiet
-    /// Default log level.
-    case normal
-    /// `-v`, `-vv`, `-vvv`: level is 1, 2, 3.
-    case verbose(level: Int)
-
-    public var rawLevel: Int {
-      switch self {
-      case .quiet: return -1
-      case .normal: return 0
-      case .verbose(let level): return level
-      }
-    }
-  }
-
   /// The configuration for a runner that serves a SwiftTUI app over HTTP, such as the embedded web host.
   public struct WebConfig: Sendable, Equatable {
     /// TCP port. `0` means OS-assigned ephemeral port.
@@ -89,8 +72,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public var stableOutput: Bool
   /// Top-level output strategy (TUI render or JSON).
   public var output: OutputMode
-  /// Log verbosity level for framework-internal diagnostics.
-  public var verbosity: Verbosity
   /// If this value is not `nil`, the runner serves the app over HTTP.
   /// The runner can use HTTP instead of a local terminal, or it can use both.
   public var web: WebConfig?
@@ -105,7 +86,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     motion: MotionMode = .normal,
     stableOutput: Bool = false,
     output: OutputMode = .tui,
-    verbosity: Verbosity = .normal,
     web: WebConfig? = nil,
     debug: Bool = false,
     cursorFollowsFocus: Bool = false
@@ -115,7 +95,6 @@ public struct RuntimeConfiguration: Sendable, Equatable {
     self.motion = motion
     self.stableOutput = stableOutput
     self.output = output
-    self.verbosity = verbosity
     self.web = web
     self.debug = debug
     self.cursorFollowsFocus = cursorFollowsFocus

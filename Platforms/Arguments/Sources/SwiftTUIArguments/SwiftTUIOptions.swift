@@ -108,19 +108,7 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   )
   public var scene: String?
 
-  // ─── Logging / diagnostics ─────────────────────────────────────
-
-  @Flag(
-    name: .shortAndLong,
-    help: "Verbose logging. Use -vv or -vvv for higher levels. [env: SWIFTTUI_VERBOSE]"
-  )
-  public var verbose: Int
-
-  @Flag(
-    name: .customLong("quiet"),
-    help: "Suppress non-error log output. [env: SWIFTTUI_QUIET]"
-  )
-  public var quiet: Bool = false
+  // ─── Diagnostics ───────────────────────────────────────────────
 
   @Flag(
     name: .customLong("debug"),

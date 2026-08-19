@@ -11,7 +11,6 @@ struct RuntimeConfigurationTests {
     #expect(configuration.motion == .normal)
     #expect(configuration.stableOutput == false)
     #expect(configuration.output == .tui)
-    #expect(configuration.verbosity == .normal)
     #expect(configuration.web == nil)
     #expect(configuration.debug == false)
     #expect(configuration.cursorFollowsFocus == false)

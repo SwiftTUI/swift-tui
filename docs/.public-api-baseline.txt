@@ -116,12 +116,10 @@ SwiftTUIArguments.SwiftTUIOptions.json
 SwiftTUIArguments.SwiftTUIOptions.noColor
 SwiftTUIArguments.SwiftTUIOptions.open
 SwiftTUIArguments.SwiftTUIOptions.port
-SwiftTUIArguments.SwiftTUIOptions.quiet
 SwiftTUIArguments.SwiftTUIOptions.reduceMotion
 SwiftTUIArguments.SwiftTUIOptions.runtimeConfiguration(environment:isStdoutTTY:)
 SwiftTUIArguments.SwiftTUIOptions.scene
 SwiftTUIArguments.SwiftTUIOptions.stableOutput
-SwiftTUIArguments.SwiftTUIOptions.verbose
 SwiftTUIArguments.SwiftTUIOptions.web
 SwiftTUIArguments.standardOutputIsATTY()
 SwiftTUICLIAttach.ScenePty
@@ -2572,7 +2570,6 @@ SwiftTUIRuntime.RuntimeConfiguration.Builder.init()
 SwiftTUIRuntime.RuntimeConfiguration.Builder.motion(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.output(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.stableOutput(_:)
-SwiftTUIRuntime.RuntimeConfiguration.Builder.verbosity(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.web(port:bind:openBrowser:sceneID:)
 SwiftTUIRuntime.RuntimeConfiguration.ColorMode
 SwiftTUIRuntime.RuntimeConfiguration.ColorMode.always
@@ -2591,11 +2588,6 @@ SwiftTUIRuntime.RuntimeConfiguration.OutputMode
 SwiftTUIRuntime.RuntimeConfiguration.OutputMode.init(rawValue:)
 SwiftTUIRuntime.RuntimeConfiguration.OutputMode.json
 SwiftTUIRuntime.RuntimeConfiguration.OutputMode.tui
-SwiftTUIRuntime.RuntimeConfiguration.Verbosity
-SwiftTUIRuntime.RuntimeConfiguration.Verbosity.normal
-SwiftTUIRuntime.RuntimeConfiguration.Verbosity.quiet
-SwiftTUIRuntime.RuntimeConfiguration.Verbosity.rawLevel
-SwiftTUIRuntime.RuntimeConfiguration.Verbosity.verbose(level:)
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig.bind
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig.init(port:bind:openBrowser:sceneID:)
@@ -2609,11 +2601,10 @@ SwiftTUIRuntime.RuntimeConfiguration.debug
 SwiftTUIRuntime.RuntimeConfiguration.default
 SwiftTUIRuntime.RuntimeConfiguration.detect(environment:isStdoutTTY:)
 SwiftTUIRuntime.RuntimeConfiguration.glyphs
-SwiftTUIRuntime.RuntimeConfiguration.init(color:glyphs:motion:stableOutput:output:verbosity:web:debug:cursorFollowsFocus:)
+SwiftTUIRuntime.RuntimeConfiguration.init(color:glyphs:motion:stableOutput:output:web:debug:cursorFollowsFocus:)
 SwiftTUIRuntime.RuntimeConfiguration.motion
 SwiftTUIRuntime.RuntimeConfiguration.output
 SwiftTUIRuntime.RuntimeConfiguration.stableOutput
-SwiftTUIRuntime.RuntimeConfiguration.verbosity
 SwiftTUIRuntime.RuntimeConfiguration.web
 SwiftTUIRuntime.RuntimeIssueSink.standardError
 SwiftTUIRuntime.RuntimeRenderMode
