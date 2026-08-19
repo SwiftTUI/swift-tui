@@ -5,6 +5,13 @@ registries and semantic vocabulary that ride on it.
 
 ## Overview
 
+> Note: This is an engine layer. Apps do not import it directly — its
+> app-facing vocabulary (such as ``DynamicProperty``, ``PreferenceKey``, and
+> ``KeyPress``) arrives through `import SwiftTUI` or any other authoring
+> product. Start from the
+> [`SwiftTUI` module](https://swifttui.sh/docs/documentation/swifttui) unless
+> you are working on the framework itself.
+
 `SwiftTUIGraph` owns the resolved view tree and the mechanisms that decide *what
 changed*. These mechanisms include state slots, dependency tracking,
 invalidation planning, reuse gates, checkpoints, and entity routing. They also

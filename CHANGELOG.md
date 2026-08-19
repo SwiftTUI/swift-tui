@@ -6,7 +6,22 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
-## [Unreleased]
+## [0.9.4] - 2026-08-18
+
+### Changed
+
+- **The published documentation is reorganized around app authors.** The
+  combined DocC archive no longer publishes two plumbing modules whose types
+  app code never names (`SwiftTUIPTYPrimitives`, `SwiftTUICLIAttach`); the
+  intentional omissions are recorded in the archive manifest and mirrored in
+  `.spi.yml`. The `SwiftTUI` umbrella catalog gains an All Guides index
+  article that collects every developer guide by task, and its landing page
+  curates it. The engine-layer landing pages (`SwiftTUIGraph`,
+  `SwiftTUICore`, `SwiftTUIPrimitives`) now open by signposting that apps
+  reach their vocabulary through re-export rather than direct imports. The
+  Coming-From-SwiftUI and Runtime-Render-Pipeline articles cross-link their
+  website counterparts. Reference documentation for every symbol that
+  surfaces in app code is unchanged.
 
 ### Removed
 

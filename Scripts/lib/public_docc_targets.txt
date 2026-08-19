@@ -1,10 +1,22 @@
 # DocC targets generated for the public website.
 # Format: target-name|docc-catalog-directory
-# Example packages in SwiftTUI/swift-tui-examples are intentionally not listed;
-# they are runnable samples and regression surfaces, not externally linked products.
-# Every root package library product in Package.swift must appear here. The
-# list may also include support targets whose symbols are part of the published
-# reference through re-exported or dependent public APIs.
+#
+# The published archive is scoped to material that serves people building
+# apps with SwiftTUI: the products an app imports, the host and integration
+# products, and the engine modules that declare vocabulary the authoring
+# surface re-exports (for example `PreferenceKey`, `DynamicProperty`,
+# `Alignment`, `CellSize`). A library product may be intentionally absent
+# when app code never names its types; record each omission here.
+#
+# Intentionally not published:
+#   - SwiftTUIPTYPrimitives — pty plumbing behind SwiftTUITerminal; only
+#     ChildProcessPty's advanced surface names its types.
+#   - SwiftTUICLIAttach — the POSIX-only attach subsystem behind SwiftTUICLI;
+#     apps never name its one public type (ScenePty).
+#   - Example packages in SwiftTUI/swift-tui-examples — runnable samples and
+#     regression surfaces, not externally linked products.
+#
+# Keep .spi.yml's documentation_targets aligned with this list.
 SwiftTUIPrimitives|Sources/SwiftTUIPrimitives/SwiftTUIPrimitives.docc
 SwiftTUIGraph|Sources/SwiftTUIGraph/SwiftTUIGraph.docc
 SwiftTUICore|Sources/SwiftTUICore/SwiftTUICore.docc
@@ -13,9 +25,7 @@ SwiftTUIRuntime|Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc
 SwiftTUI|Sources/SwiftTUI/SwiftTUI.docc
 SwiftTUIArguments|Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIArguments.docc
 SwiftTUITerminalCLI|Platforms/CLI/Sources/SwiftTUITerminalCLI/SwiftTUITerminalCLI.docc
-SwiftTUICLIAttach|Platforms/CLI/Sources/SwiftTUICLIAttach/SwiftTUICLIAttach.docc
 SwiftTUICLI|Platforms/CLI/Sources/SwiftTUICLI/SwiftTUICLI.docc
-SwiftTUIPTYPrimitives|Platforms/Embedding/Sources/SwiftTUIPTYPrimitives/SwiftTUIPTYPrimitives.docc
 SwiftTUITerminalEmulation|Platforms/Embedding/Sources/SwiftTUITerminalEmulation/SwiftTUITerminalEmulation.docc
 SwiftTUITerminal|Platforms/Embedding/Sources/SwiftTUITerminal/SwiftTUITerminal.docc
 SwiftTUIWASI|Platforms/WASI/Sources/SwiftTUIWASI/SwiftTUIWASI.docc

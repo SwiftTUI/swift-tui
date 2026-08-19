@@ -12,10 +12,10 @@ usage() {
 Usage: Scripts/build_docc_archive.sh [--output-path PATH] [--hosting-base-path PATH]
 
 Builds the combined DocC archive for every DocC target listed in
-Scripts/lib/public_docc_targets.txt. That manifest must include every externally
-linkable root package product, and may include support targets whose symbols are
-part of the published reference. Example packages in SwiftTUI/swift-tui-examples
-are intentionally excluded from DocC coverage.
+Scripts/lib/public_docc_targets.txt. That manifest is scoped to the app-facing
+published reference: products an app imports, host/integration products, and
+the engine modules whose re-exported vocabulary surfaces in app code. Targets
+that are intentionally unpublished are recorded in the manifest header.
 EOF
 }
 

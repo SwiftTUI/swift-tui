@@ -10,6 +10,8 @@ arriving with SwiftUI muscle memory. It summarizes and links; the
 authoritative list of every recorded departure is <doc:Divergences-And-Gaps>,
 and the rationale for the principled omissions is published in
 [About SwiftTUI](https://swifttui.sh/docs/documentation/swifttuiruntime/vision).
+The website publishes a shorter, side-by-side version of this tour as
+[Differences from SwiftUI](https://swifttui.sh/differences-from-swiftui/).
 
 ## What transfers unchanged
 

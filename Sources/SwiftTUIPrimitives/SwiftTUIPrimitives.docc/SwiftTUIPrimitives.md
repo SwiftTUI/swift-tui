@@ -5,6 +5,13 @@ geometry, color and style, draw payloads, and animation math.
 
 ## Overview
 
+> Note: Apps use these types constantly — ``CellSize``, ``Alignment``,
+> ``Animatable`` — but never import this module directly; the vocabulary
+> arrives through `import SwiftTUI` or any other authoring product. Start
+> from the
+> [`SwiftTUI` module](https://swifttui.sh/docs/documentation/swifttui) unless
+> you are working on the framework itself.
+
 `SwiftTUIPrimitives` is the bottom of the module stack. It holds **values, not
 engines**. It contains no reconciliation, render algorithms, or terminal I/O.
 It builds independently and is Foundation-free.

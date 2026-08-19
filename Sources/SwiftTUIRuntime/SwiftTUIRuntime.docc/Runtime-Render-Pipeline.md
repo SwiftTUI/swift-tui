@@ -5,6 +5,10 @@ commit policy, diagnostics, and host handoff.
 
 ## Overview
 
+> Tip: The website publishes an interactive walkthrough of this pipeline at
+> [swifttui.sh/pipeline](https://swifttui.sh/pipeline/); this article is the
+> developer-level reference for the same machinery.
+
 SwiftTUI has two overlapping pipeline views:
 
 - **Phase products** are the values the engine computes:

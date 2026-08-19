@@ -56,12 +56,17 @@ WebHost bridge. Use `SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWebHost`, or
 `SwiftTUIWebHostCLI` directly when building a narrower custom graph. Add peer
 products such as `SwiftTUITerminal` only when that surface is part of your
 app. Charts ship separately from
-[`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts).
+[`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts), with
+[their own documentation archive](https://swifttui.sh/docs/charts/documentation/swifttuicharts).
 For host-managed app declarations that do not conform to `SwiftTUICommand`,
 import `SwiftTUIRuntime` directly.
+
+The reference is organized by module, but the developer guides span them:
+<doc:Guides> is the task-oriented index across the whole set.
 
 ## Topics
 
 ### Getting Started
 
 - <doc:Choosing-Modules-And-Platforms>
+- <doc:Guides>

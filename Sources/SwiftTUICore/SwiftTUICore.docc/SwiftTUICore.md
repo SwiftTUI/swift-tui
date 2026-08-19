@@ -4,6 +4,12 @@ Pure frame-pipeline types and algorithms for SwiftTUI.
 
 ## Overview
 
+> Note: This is an engine layer. Apps do not import it directly — anything
+> app-facing here arrives through `import SwiftTUI` or any other authoring
+> product. Start from the
+> [`SwiftTUI` module](https://swifttui.sh/docs/documentation/swifttui) unless
+> you are working on the framework itself.
+
 The `SwiftTUICore` module owns the parts of the system that remain independent
 from terminal I/O:
 

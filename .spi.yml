@@ -3,7 +3,8 @@ builder:
   configs:
     - documentation_targets:
         # Keep SwiftTUI first as the primary hosted documentation entry point.
-        # Keep this list aligned with Scripts/lib/public_docc_targets.txt.
+        # Keep this list aligned with Scripts/lib/public_docc_targets.txt,
+        # which also records the intentionally unpublished targets.
         - SwiftTUI
         - SwiftTUIViews
         - SwiftTUIRuntime
@@ -12,9 +13,7 @@ builder:
         - SwiftTUIPrimitives
         - SwiftTUIArguments
         - SwiftTUITerminalCLI
-        - SwiftTUICLIAttach
         - SwiftTUICLI
-        - SwiftTUIPTYPrimitives
         - SwiftTUITerminalEmulation
         - SwiftTUITerminal
         - SwiftTUIWASI
