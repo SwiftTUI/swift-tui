@@ -1,0 +1,16 @@
+name: Feature or API request
+description: Ask for a SwiftUI API you're missing, or propose something new.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: What would you like?
+      description: >-
+        If it's a SwiftUI API, naming it is enough (e.g. `NavigationSplitView`) —
+        a line on what you were building when you hit the gap helps us
+        prioritize. A few omissions are deliberate; the
+        [Divergences and Gaps register](https://swifttui.sh/docs/documentation/swifttuiviews/divergences-and-gaps/)
+        lists them, but don't feel you need to check before filing.
+    validations:
+      required: true

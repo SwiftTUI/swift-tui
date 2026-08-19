@@ -1,0 +1,42 @@
+name: Bug report
+description: Something renders wrong, crashes, or doesn't behave like SwiftUI would.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: >-
+        What did you see, and what did you expect instead? A code snippet or
+        steps to reproduce help a lot, but a rough description is fine too.
+        Screenshots and recordings welcome — drag them straight into this
+        field.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Optional — fill in whatever you know; partial info is fine.
+      value: |
+        - SwiftTUI version:
+        - Swift version (`swift --version`):
+        - OS:
+        - Surface: terminal / browser (WASI) / WebHost / SwiftUI host / Android
+        - Terminal emulator (if terminal):
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug logs
+      description: >-
+        Optional. If you can reproduce the problem, run your app with
+        `SWIFTTUI_DEBUG=1 SWIFTTUI_DEBUG_DIR=swifttui-debug` — that writes a
+        debug bundle (frame trace, diagnostics, manifest) into that directory.
+        Zip it and drag it into the field above, or paste the interesting
+        parts here. Crash logs are welcome too. Finer-grained traces are in
+        the [environment-variable reference](https://swifttui.sh/docs/documentation/swifttuiruntime/environment-variables/).
+      render: text
+    validations:
+      required: false
