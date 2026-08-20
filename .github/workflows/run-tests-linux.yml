@@ -5,11 +5,6 @@ on:
     branches:
       - main
   pull_request:
-  # Nightly run: the only trigger that exercises the macOS lane automatically.
-  # macOS is the primary user platform for a terminal UI framework but was
-  # workflow_dispatch-only, so releases shipped on Linux-only signal.
-  schedule:
-    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       run_arm64:
@@ -26,8 +21,8 @@ on:
 permissions:
   contents: read
 
-# The event name keeps scheduled runs in their own group: a push to main must
-# not cancel the in-flight nightly macOS lane (its only automatic signal).
+# The event name keeps each trigger in its own group, so a push to main cannot
+# cancel an in-flight workflow_dispatch run.
 concurrency:
   group: repo-gate-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
@@ -321,7 +316,13 @@ jobs:
   macos-gate:
     name: macOS repo gate
     runs-on: macos-26
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_macos) }}
+    # Dispatch-only by decision (2026-08-19). The nightly cron used to be this
+    # lane's only automatic trigger; with crons removed org-wide, macOS is
+    # exercised on demand — `workflow_dispatch` with `run_macos` — rather than
+    # spending a macOS runner on every push to main. Run it before a release:
+    # macOS is the primary user platform, so a release cut on Linux-only signal
+    # is exactly the gap this lane exists to close.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos }}
     timeout-minutes: 30
 
     steps:
@@ -451,7 +452,7 @@ jobs:
         shell: bash
         env:
           RUN_ARM64: ${{ github.event_name == 'workflow_dispatch' && inputs.run_arm64 }}
-          RUN_MACOS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_macos) }}
+          RUN_MACOS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos }}
         run: |
           set -euo pipefail
           mkdir -p .ci-results

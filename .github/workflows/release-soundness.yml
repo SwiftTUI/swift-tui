@@ -1,14 +1,14 @@
 name: Release Soundness Lane
 
-# F05: the only release-configuration test executions in the repo. Scheduled
-# rather than push/PR-gating: release builds are slow, and the lane's flaky-
-# suite step intentionally exercises the load-flaky run-loop suites
+# F05: the only release-configuration test executions in the repo. Run on
+# demand rather than push/PR-gating: release builds are slow, and the lane's
+# flaky-suite step intentionally exercises the load-flaky run-loop suites
 # (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md #1) where an intermittent red is signal, not a
-# merge blocker.
+# merge blocker. The nightly cron was removed because a red here settles onto
+# an already-pinned commit and re-fails the coordination root's
+# //:child_ci_status hours after that pin went green.
 
 on:
-  schedule:
-    - cron: "42 4 * * *"
   workflow_dispatch:
     inputs:
       run_race_checks:
@@ -119,7 +119,7 @@ jobs:
           fi
 
       - name: Actor data-race checks variant
-        if: ${{ github.event_name == 'schedule' || inputs.run_race_checks }}
+        if: ${{ inputs.run_race_checks }}
         shell: bash
         run: |
           set -euo pipefail

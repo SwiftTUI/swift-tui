@@ -485,28 +485,35 @@ struct DynamicPropertyUpdatePassTests {
     #expect(log.events == ["update:inner", "update:outer", "body"])
   }
 
-  @Test("the pass covers ResolvableView primitives' dynamic-property scopes")
-  func updatePassCoversPrimitiveDynamicScopes() {
-    var updated: [String] = []
-    DynamicPropertyUpdatePassProbe.onUpdate = { container, property in
-      updated.append("\(container):\(property)")
-    }
-    defer { DynamicPropertyUpdatePassProbe.onUpdate = nil }
+  // `DynamicPropertyUpdatePassProbe` is `#if DEBUG` in SwiftTUIViews, so this
+  // case cannot compile in release configuration. Guarding it keeps the
+  // release-soundness lane (`swift test -c release`) building; without it the
+  // whole SwiftTUIViewsTests module fails to compile and every release-config
+  // test is lost, not just this one.
+  #if DEBUG
+    @Test("the pass covers ResolvableView primitives' dynamic-property scopes")
+    func updatePassCoversPrimitiveDynamicScopes() {
+      var updated: [String] = []
+      DynamicPropertyUpdatePassProbe.onUpdate = { container, property in
+        updated.append("\(container):\(property)")
+      }
+      defer { DynamicPropertyUpdatePassProbe.onUpdate = nil }
 
-    let graph = ViewGraph()
-    graph.beginFrame()
-    _ = Resolver().resolve(
-      TextEditor(text: .constant("hello")),
-      in: makeContext(graph, identity: testIdentity("PrimitiveScope"))
-    )
-    // TextEditor stores a `Binding<String>` plus three `@State` — the pass
-    // must reach the primitive's stored wrappers through its own
-    // dynamic-property authoring scope.
-    #expect(
-      updated.contains { $0.hasPrefix("TextEditor:") },
-      "no update(in:) ran for TextEditor's stored dynamic properties; saw \(updated)"
-    )
-  }
+      let graph = ViewGraph()
+      graph.beginFrame()
+      _ = Resolver().resolve(
+        TextEditor(text: .constant("hello")),
+        in: makeContext(graph, identity: testIdentity("PrimitiveScope"))
+      )
+      // TextEditor stores a `Binding<String>` plus three `@State` — the pass
+      // must reach the primitive's stored wrappers through its own
+      // dynamic-property authoring scope.
+      #expect(
+        updated.contains { $0.hasPrefix("TextEditor:") },
+        "no update(in:) ran for TextEditor's stored dynamic properties; saw \(updated)"
+      )
+    }
+  #endif
 
   @Test("update(in:) runs before a ViewModifier's composed body")
   func updateRunsBeforeViewModifierBody() {

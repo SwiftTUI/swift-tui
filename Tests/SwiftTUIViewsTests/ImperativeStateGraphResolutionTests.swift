@@ -48,7 +48,12 @@ struct ImperativeStateGraphResolutionTests {
     /// gesture or task closure captures `self`.
     func flagReader() -> @MainActor () -> Bool { { flag } }
     func flagWriter() -> @MainActor (Bool) -> Void { { flag = $0 } }
-    func rememberedOwnerCount() -> Int { _flag.rememberedOwnerCountForTesting }
+    // `rememberedOwnerCountForTesting` is `#if DEBUG` in SwiftTUIViews, so the
+    // owner-accumulation assertion below is debug-only. The rest of this suite
+    // is configuration-independent and still runs under `swift test -c release`.
+    #if DEBUG
+      func rememberedOwnerCount() -> Int { _flag.rememberedOwnerCountForTesting }
+    #endif
   }
 
   private static let flagOrdinal = StateSlotOrdinals.authored(
@@ -153,7 +158,9 @@ struct ImperativeStateGraphResolutionTests {
       }
     }
 
-    #expect(probe.rememberedOwnerCount() == 1)
+    #if DEBUG
+      #expect(probe.rememberedOwnerCount() == 1)
+    #endif
   }
 
   @Test("a write through one box is observed by a read through a different box")

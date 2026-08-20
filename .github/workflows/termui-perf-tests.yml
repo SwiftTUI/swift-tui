@@ -17,8 +17,6 @@ on:
       - "Package.resolved"
       - "Package.swift"
       - "Tools/TermUIPerf/**"
-  schedule:
-    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
