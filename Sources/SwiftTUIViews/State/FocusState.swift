@@ -334,7 +334,8 @@ public struct FocusState<Value: Equatable> {
     {
       viewNode.recordStateSlotClaim(
         slotIdentifier,
-        claimant: ObjectIdentifier(box)
+        claimant: ObjectIdentifier(box),
+        wrapperDescription: "@FocusState<\(Value.self)>"
       )
     }
 

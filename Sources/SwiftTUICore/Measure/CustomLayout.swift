@@ -186,7 +186,7 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     )?
   package let stackMinimumMainSizeHandler:
     (
-      @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Axis, LayoutPassContext?) -> Int?
+      @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Axis, Int, LayoutPassContext?) -> Int?
     )?
 
   package init(
@@ -214,7 +214,7 @@ package final class CustomLayoutHandle: CustomLayoutToken {
       )? = nil,
     stackMinimumMainSizeHandler:
       (
-        @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Axis, LayoutPassContext?) -> Int?
+        @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Axis, Int, LayoutPassContext?) -> Int?
       )? = nil
   ) {
     self.proxy = proxy
@@ -344,9 +344,10 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     node: ResolvedNode,
     idealMeasurement: MeasuredNode,
     axis: Axis,
+    contentMinimum: Int,
     passContext: LayoutPassContext?
   ) -> Int? {
-    stackMinimumMainSizeHandler?(engine, node, idealMeasurement, axis, passContext)
+    stackMinimumMainSizeHandler?(engine, node, idealMeasurement, axis, contentMinimum, passContext)
   }
 }
 

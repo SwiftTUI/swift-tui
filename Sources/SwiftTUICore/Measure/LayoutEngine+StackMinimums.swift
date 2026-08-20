@@ -363,6 +363,7 @@ extension LayoutEngine {
         node: node,
         idealMeasurement: idealMeasurement,
         axis: axis,
+        contentMinimum: childMinimums.max() ?? 0,
         passContext: nil
       ) ?? 0
     }

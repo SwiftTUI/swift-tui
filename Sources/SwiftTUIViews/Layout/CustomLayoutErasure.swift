@@ -30,11 +30,6 @@ protocol AnyLayoutBox: Sendable {
   var measurementReuseSignature: String? { get }
   var placementReuseSignature: String? { get }
 
-  func stackMinimumMainSize(
-    axis: SwiftTUICore.Axis,
-    idealSize: LayoutSize
-  ) -> Int?
-
   func makeCache(subviews: LayoutSubviews) -> any Sendable
 
   func updateCache(
@@ -73,14 +68,6 @@ struct ConcreteAnyLayoutBox<L: Layout>: AnyLayoutBox {
 
   var placementReuseSignature: String? {
     layout.placementReuseSignature
-  }
-
-  func stackMinimumMainSize(
-    axis: SwiftTUICore.Axis,
-    idealSize: LayoutSize
-  ) -> Int? {
-    (layout as? any StackMinimumLayoutProviding)?
-      .stackMinimumMainSize(axis: axis, idealSize: idealSize)
   }
 
   func makeCache(subviews: LayoutSubviews) -> any Sendable {
@@ -270,10 +257,15 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
     node _: ResolvedNode,
     idealMeasurement: MeasuredNode,
     axis: SwiftTUICore.Axis,
+    contentMinimum: Int,
     passContext _: LayoutPassContext?
   ) -> Int? {
     (layout as? any StackMinimumLayoutProviding)?
-      .stackMinimumMainSize(axis: axis, idealSize: idealMeasurement.measuredSize)
+      .stackMinimumMainSize(
+        axis: axis,
+        idealSize: idealMeasurement.measuredSize,
+        contentMinimum: contentMinimum
+      )
   }
 
   func placeSubviews(

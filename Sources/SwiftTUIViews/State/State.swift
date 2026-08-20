@@ -105,6 +105,11 @@ private final class StateBox<Value> {
   private var seedValue: Value
   private var boundLocationsByOwner: [StateStorageOwner: DynamicStateLocation<Value>]
   private var retainedValuesByOwner: [StateStorageOwner: Value]
+  /// Latches once any owner binds a location. Distinguishes a pre-mount
+  /// seed read (expected: the box has only its seed) from an imperative
+  /// access that lost its live slot and silently degraded to the seed —
+  /// the `state.imperativeSeedFallback` warning fires only for the latter.
+  private(set) var hasEverBeenGraphBound = false
 
   init(
     seedValue: Value,
@@ -132,6 +137,7 @@ private final class StateBox<Value> {
       pruneRetiredBoundLocations()
     }
     boundLocationsByOwner[owner] = location
+    hasEverBeenGraphBound = true
   }
 
   func rememberedLocation(for owner: StateStorageOwner) -> DynamicStateLocation<Value>? {
@@ -278,7 +284,16 @@ public struct State<Value> {
 
   public var wrappedValue: Value {
     get {
-      activeLocation()?.getValue() ?? box.currentSeedValue()
+      if let location = activeLocation() {
+        return location.getValue()
+      }
+      if box.hasEverBeenGraphBound, ViewNodeContext.current == nil {
+        reportImperativeSeedFallback(
+          slotOrdinal: box.currentOrdinal,
+          reason: "no live state owner could be resolved from the dispatch context"
+        )
+      }
+      return box.currentSeedValue()
     }
     nonmutating set {
       if let location = activeLocation() {
@@ -375,7 +390,8 @@ public struct State<Value> {
         // signature (see `ViewNode.recordStateSlotClaim`).
         viewNode.recordStateSlotClaim(
           StateSlotIdentifier(ordinal: box.currentOrdinal, path: path),
-          claimant: ObjectIdentifier(box)
+          claimant: ObjectIdentifier(box),
+          wrapperDescription: "@State<\(Value.self)>"
         )
       }
     }
@@ -411,11 +427,18 @@ public struct State<Value> {
     // a new slot from carried mutation would resurrect state across committed
     // removal and leak writes into replacement identities.
     let authoredSeed = box.currentSeedValue()
+    let slotOrdinal = box.currentOrdinal
     return DynamicStateLocation(
       getValue: { [weak box] in
         guard let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) else {
           if let retainedValue = box?.retainedValue(for: storageOwner) {
             return retainedValue
+          }
+          if ViewNodeContext.current == nil {
+            reportImperativeSeedFallback(
+              slotOrdinal: slotOrdinal,
+              reason: "the state's owning node is no longer live and holds no retained value"
+            )
           }
           return authoredSeed
         }
@@ -459,6 +482,32 @@ public struct State<Value> {
       }
     )
   }
+}
+
+/// Records the silent-corruption signature as a diagnosable warning: an
+/// imperative `@State` access on a box that once had a live graph slot
+/// bottomed out at the authored seed. Every dispatch surface that loses its
+/// owner (identity churn between registration and fire, a cleared ambient
+/// context) ends here, and the read silently returns the *initial* value —
+/// the warning is what makes that observable. Dispatch-time issues buffer in
+/// `ImperativeRuntimeIssueQueue` and surface at the next frame head.
+@MainActor
+private func reportImperativeSeedFallback(slotOrdinal: Int, reason: String) {
+  var message =
+    "An imperative @State access fell back to the authored initial value: "
+    + reason + ". The closure observed the seed, not the last written value."
+  if slotOrdinal >= 0 {
+    message +=
+      " The state is declared near line \(slotOrdinal >> 16), column \(slotOrdinal & 0xFFFF)."
+  }
+  ImperativeRuntimeIssueQueue.record(
+    RuntimeIssue(
+      severity: .warning,
+      code: "state.imperativeSeedFallback",
+      message: message,
+      source: "@State"
+    )
+  )
 }
 
 extension State: DynamicProperty {

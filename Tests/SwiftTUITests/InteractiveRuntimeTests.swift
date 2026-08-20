@@ -754,7 +754,6 @@ struct InteractiveRuntimeTests {
       InteractiveDemoIdentity.resetButton,
       InteractiveDemoIdentity.accentToggle,
       InteractiveDemoIdentity.presetMenu,
-      listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 5),
       listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 6),
       listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 7),
       InteractiveDemoIdentity.inputField,
@@ -769,7 +768,7 @@ struct InteractiveRuntimeTests {
       InteractiveDemoIdentity.resetButton,
       InteractiveDemoIdentity.accentToggle,
       InteractiveDemoIdentity.presetMenu,
-      listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 5),
+      listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 6),
       InteractiveDemoIdentity.inputField,
       InteractiveDemoIdentity.selectionModePicker,
       InteractiveDemoIdentity.textLabDisclosure,
@@ -828,11 +827,9 @@ struct InteractiveRuntimeTests {
         InteractiveDemoIdentity.decrementButton,
         InteractiveDemoIdentity.accentToggle,
         InteractiveDemoIdentity.presetMenu,
-        listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 1),
         listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 2),
         listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 3),
         listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 4),
-        listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 5),
         InteractiveDemoIdentity.inputField,
         InteractiveDemoIdentity.selectionModePicker,
         InteractiveDemoIdentity.textLabDisclosure,
@@ -923,7 +920,7 @@ struct InteractiveRuntimeTests {
       terminal: terminal,
       events: [
         KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab),
-        KeyPress(.arrowDown), KeyPress(.arrowDown), KeyPress(.arrowDown), KeyPress(.return),
+        KeyPress(.arrowDown), KeyPress(.arrowDown), KeyPress(.return),
         KeyPress(.character("d"), modifiers: .ctrl),
       ]
     )
@@ -932,15 +929,20 @@ struct InteractiveRuntimeTests {
     #expect(result.finalState == InteractiveDemoState(value: 2))
     let firstFrame = try #require(terminal.frames.first)
     #expect(firstFrame.contains("▤ Presets"))
+    // The chrome border rows are layout-bearing: the box's corner glyph is
+    // followed by its horizontal run (never by row text — rows can no longer
+    // slide under the border), and the overflow indicators sit inside the box
+    // on their own display lines.
+    #expect(firstFrame.contains("│╭─"))
+    #expect(!firstFrame.contains("│╭  "))
+    #expect(firstFrame.contains("││↑"))
+    #expect(firstFrame.contains("││↓"))
     // The list reserves a 2-cell selection gutter unconditionally so that
-    // toggling focus does not shift row content sideways; row text therefore
-    // sits two columns inside the corner glyph rather than butting against it.
-    #expect(firstFrame.contains("│╭  -5"))
-    #expect(firstFrame.contains("│ ↑"))
-    #expect(firstFrame.contains("│ ↓"))
+    // toggling focus does not shift row content sideways.
+    #expect(firstFrame.contains("││  -3"))
     #expect(
       terminal.frames.contains(where: {
-        $0.contains("│ ↑")
+        $0.contains("││↑")
           && $0.contains("││▌ 2")
       }))
     let lastFrame = try #require(terminal.frames.last)

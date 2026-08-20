@@ -356,7 +356,8 @@ public struct GestureState<Value> {
       // Resolve-time claim bookkeeping (see `ViewNode.recordStateSlotClaim`).
       viewNode.recordStateSlotClaim(
         slotIdentifier,
-        claimant: ObjectIdentifier(box)
+        claimant: ObjectIdentifier(box),
+        wrapperDescription: "@GestureState<\(Value.self)>"
       )
     }
 

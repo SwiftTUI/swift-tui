@@ -217,8 +217,12 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       presentationSession.reset()
 
       var shouldRestoreOnFailure = true
+      var screenOwnershipAcquired = false
       defer {
         if shouldRestoreOnFailure {
+          if screenOwnershipAcquired {
+            TerminalScreenOwnership.release()
+          }
           let restorePlan = rawModeSession.deactivate()
           presentationSession.reset()
           if let savedSnapshot = restorePlan.savedSnapshot {
@@ -233,6 +237,8 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
 
       refreshAppearanceIfNeeded()
       try write(TerminalHostEscapeSequences.enterAlternateScreen)
+      TerminalScreenOwnership.acquire()
+      screenOwnershipAcquired = true
       try write(TerminalHostEscapeSequences.clearScreen)
       try write(TerminalHostEscapeSequences.cursor(to: .zero))
       try write(TerminalHostEscapeSequences.hideCursor)
@@ -263,6 +269,13 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
     public func disableRawMode() throws {
       guard rawModeSession.isEnabled else {
         return
+      }
+      // Balanced against enableRawMode's post-enter acquire. Released via
+      // defer (not after the exit write) so a throw partway through teardown
+      // cannot leak the latch — after this call the session is over either
+      // way, and deferred issues flush at runner teardown.
+      defer {
+        TerminalScreenOwnership.release()
       }
 
       let presentationWriter = presentationSession.writer

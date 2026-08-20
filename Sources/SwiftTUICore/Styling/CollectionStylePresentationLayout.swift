@@ -65,6 +65,9 @@ package enum ListLayoutDerivationProbe {
 
 /// The resolved display-line window of a list, and the line arithmetic it was
 /// derived from.
+///
+/// Display line 0 is row 0: chrome border rows are layout-bearing content
+/// insets outside the scrollable stream, never lines of the stream itself.
 package struct ListLineWindow: Equatable, Sendable {
   /// The first visible display line.
   package var offset: Int
@@ -75,8 +78,6 @@ package struct ListLineWindow: Equatable, Sendable {
   package var displayLineCount: Int
   /// Display lines per row: 2 when the style draws row separators.
   package var rowSpan: Int
-  /// Display lines preceding row 0 (per-section chrome padding).
-  package var chromeInset: Int
 
   package var end: Int {
     min(displayLineCount, offset + visibleLineCount)
@@ -87,11 +88,6 @@ extension ListStylePresentation {
   /// Display lines one row of a viewport-backed list occupies.
   package var listRowDisplaySpan: Int {
     showsRowSeparators ? 2 : 1
-  }
-
-  /// Display lines preceding row 0 of a viewport-backed list.
-  package var listChromeLineInset: Int {
-    container != nil && chromeScope == .eachSection ? 1 : 0
   }
 
   /// The display-line window a viewport-backed list shows.
@@ -110,23 +106,20 @@ extension ListStylePresentation {
     showsIndicators: Bool,
     viewportLineCount: Int
   ) -> ListLineWindow {
-    let sectionInsetCount = container != nil && chromeScope == .eachSection ? 2 : 0
     let rowSpan = listRowDisplaySpan
-    let bodyLineCount = itemCount <= 0 ? 0 : itemCount * rowSpan - (rowSpan - 1)
-    let displayLineCount = sectionInsetCount + bodyLineCount
+    let displayLineCount = itemCount <= 0 ? 0 : itemCount * rowSpan - (rowSpan - 1)
     let visibleLineCount =
       displayLineCount > viewportLineCount && showsIndicators && viewportLineCount >= 3
       ? max(1, viewportLineCount - 2)
       : viewportLineCount
-    let chromeInset = listChromeLineInset
     let maxOffset = max(0, displayLineCount - visibleLineCount)
     let offset: Int
     if let anchorRowIndex {
       let anchorRow = min(max(0, anchorRowIndex), max(0, itemCount - 1))
-      offset = min(max(0, chromeInset + anchorRow * rowSpan), maxOffset)
+      offset = min(max(0, anchorRow * rowSpan), maxOffset)
     } else {
       let selectedRow = min(max(selectedRowIndex ?? 0, 0), max(0, itemCount - 1))
-      let selectedLine = chromeInset + selectedRow * rowSpan
+      let selectedLine = selectedRow * rowSpan
       offset = min(max(0, selectedLine - (visibleLineCount / 2)), maxOffset)
     }
 
@@ -134,8 +127,7 @@ extension ListStylePresentation {
       offset: offset,
       visibleLineCount: visibleLineCount,
       displayLineCount: displayLineCount,
-      rowSpan: rowSpan,
-      chromeInset: chromeInset
+      rowSpan: rowSpan
     )
   }
 
@@ -182,12 +174,12 @@ extension ListStylePresentation {
     return ListVisibleLayout(
       contentBounds: contentBounds,
       lines: lines,
-      sectionChromeBounds: listChromeBounds(
-        for: lines,
+      sectionChromeBounds: sectionChromeBounds(
+        for: payload,
+        lines: lines,
         in: contentBounds,
-        coveringFullContent: generated.isWindowed
-          ? (height: totalContentHeight, yOffset: 0)
-          : nil
+        totalContentHeight: totalContentHeight,
+        isWindowed: generated.isWindowed
       ),
       totalContentHeight: totalContentHeight
     )
@@ -292,16 +284,18 @@ extension ListStylePresentation {
     )
   }
 
-  /// The rect a viewport-backed list lays its display lines into: its bounds
-  /// minus the style's content insets. `nil` for payloads whose line model is
-  /// materialized, where the same answer is not O(1).
+  /// The rect a list lays its display lines into: its bounds minus the
+  /// style's content insets. Serves both payload paths — the materialized
+  /// line model shares the same O(1) band arithmetic.
   ///
   /// Scroll routing publishes this as the collection's viewport instead of the
   /// node's full bounds. The difference is the container chrome and content
-  /// insets — two or three cells that the node occupies but never draws rows
+  /// insets — the cells that the node occupies but never draws rows
   /// into. Publishing the full bounds makes every scroll consumer believe that
   /// many more rows are visible than are drawn, so reveal-shaped decisions
-  /// fire while the target is still on screen.
+  /// fire while the target is still on screen — and, with the border rows now
+  /// layout-bearing, the anchor arithmetic pins a top row the real window
+  /// never shows.
   ///
   /// The overflow-indicator lines are deliberately NOT subtracted here: they
   /// live inside this rect, and the consumers that care re-derive them through
@@ -311,10 +305,7 @@ extension ListStylePresentation {
     for payload: ListPayload,
     in bounds: CellRect
   ) -> CellRect? {
-    guard payload.isViewportBacked else {
-      return nil
-    }
-    return listContentBounds(in: bounds)
+    listContentBounds(in: bounds)
   }
 
   /// The cells a list's display lines are laid into for `bounds`.
@@ -327,18 +318,20 @@ extension ListStylePresentation {
   private func listContentBounds(
     in bounds: CellRect
   ) -> CellRect {
-    let verticalInsets =
-      container != nil && chromeScope == .eachSection
-      ? (top: 0, bottom: 0)
-      : (top: contentInsets.top, bottom: contentInsets.bottom)
-    return CellRect(
+    // Vertical insets are layout-bearing for every chrome scope, matching the
+    // horizontal axis and `measuredListIdealSize` (which reserves them on
+    // both payload paths). `eachSection` styles used to zero them and model
+    // the border rows as scrollable spacer lines instead — so an overflowing
+    // list slid a real row under the stroked box (only one spacer fits in a
+    // contiguous window) and the row erased the border's horizontal run.
+    CellRect(
       origin: .init(
         x: bounds.origin.x + contentInsets.leading,
-        y: bounds.origin.y + verticalInsets.top
+        y: bounds.origin.y + contentInsets.top
       ),
       size: .init(
         width: max(0, bounds.size.width - contentInsets.leading - contentInsets.trailing),
-        height: max(0, bounds.size.height - verticalInsets.top - verticalInsets.bottom)
+        height: max(0, bounds.size.height - contentInsets.top - contentInsets.bottom)
       )
     )
   }
@@ -463,7 +456,6 @@ extension ListStylePresentation {
       viewportLineCount: viewportLineCount
     )
     let rowSpan = window.rowSpan
-    let bodyLineCount = payload.rowCount * rowSpan - (rowSpan - 1)
     let displayLineCount = window.displayLineCount
     var offset = window.offset
     var end = window.end
@@ -477,9 +469,8 @@ extension ListStylePresentation {
     // shift every row.
     var isWindowed = false
     if let rowWindow, !rowWindow.isEmpty, viewportLineCount >= displayLineCount {
-      let chromeInset = window.chromeInset
-      let windowStart = max(offset, chromeInset + rowWindow.lowerBound * rowSpan)
-      let windowEnd = min(end, chromeInset + rowWindow.upperBound * rowSpan)
+      let windowStart = max(offset, rowWindow.lowerBound * rowSpan)
+      let windowEnd = min(end, rowWindow.upperBound * rowSpan)
       if windowStart < windowEnd, windowEnd - windowStart < end - offset {
         offset = windowStart
         end = windowEnd
@@ -491,8 +482,7 @@ extension ListStylePresentation {
         at: position,
         payload: payload,
         usesSectionChrome: usesSectionChrome,
-        rowSpan: rowSpan,
-        bodyLineCount: bodyLineCount
+        rowSpan: rowSpan
       )
     }
 
@@ -535,19 +525,9 @@ extension ListStylePresentation {
     at position: Int,
     payload: ListPayload,
     usesSectionChrome: Bool,
-    rowSpan: Int,
-    bodyLineCount: Int
+    rowSpan: Int
   ) -> ListDisplayLine {
-    let bodyPosition = position - (usesSectionChrome ? 1 : 0)
-    if bodyPosition < 0 || bodyPosition >= bodyLineCount {
-      return .init(
-        kind: .text("", .init(opacity: payload.opacity)),
-        isHeader: true,
-        rowIndex: nil,
-        sectionIndex: usesSectionChrome ? 0 : nil
-      )
-    }
-    if rowSpan == 2, bodyPosition % 2 == 1 {
+    if rowSpan == 2, position % 2 == 1 {
       return .init(
         kind: .separator(payload.borderStyle ?? .semantic(.separator)),
         isHeader: false,
@@ -556,7 +536,7 @@ extension ListStylePresentation {
       )
     }
 
-    let rowIndex = bodyPosition / rowSpan
+    let rowIndex = position / rowSpan
     // A viewport-backed payload stores no items: the row is a committed child
     // node and the payload's copy was an empty stub carrying only defaults, so
     // the default is exactly what the stub would have supplied.
@@ -623,29 +603,29 @@ extension ListStylePresentation {
         return
       }
 
-      let spacerStyle = TextStyle(opacity: payload.opacity)
-      lines.append(
-        .init(
-          kind: .text("", spacerStyle),
-          isHeader: true,
-          rowIndex: nil,
-          sectionIndex: sectionIndex
-        )
-      )
+      // Two spacer lines separate consecutive sections: the previous
+      // section's bottom-border row and this section's top-border row.
+      // They carry no section index, so the chrome ranges break across them.
+      // The outermost border rows are not lines at all — they live in the
+      // vertical content insets, which the chrome rects expand back into.
+      if sectionIndex > 0 {
+        let spacerStyle = TextStyle(opacity: payload.opacity)
+        for _ in 0..<2 {
+          lines.append(
+            .init(
+              kind: .text("", spacerStyle),
+              isHeader: true,
+              rowIndex: nil
+            )
+          )
+        }
+      }
       lines.append(
         contentsOf: sectionLines.map { line in
           var sectionLine = line
           sectionLine.sectionIndex = sectionIndex
           return sectionLine
         }
-      )
-      lines.append(
-        .init(
-          kind: .text("", spacerStyle),
-          isHeader: true,
-          rowIndex: nil,
-          sectionIndex: sectionIndex
-        )
       )
       sectionLines.removeAll(keepingCapacity: true)
       sectionIndex += 1
@@ -762,61 +742,65 @@ extension ListStylePresentation {
 
     if usesSectionChrome {
       flushSection()
-      if payload.items.isEmpty {
-        let spacerStyle = TextStyle(opacity: payload.opacity)
-        lines.append(
-          .init(
-            kind: .text("", spacerStyle),
-            isHeader: true,
-            rowIndex: nil,
-            sectionIndex: sectionIndex
-          )
-        )
-        lines.append(
-          .init(
-            kind: .text("", spacerStyle),
-            isHeader: true,
-            rowIndex: nil,
-            sectionIndex: sectionIndex
-          )
-        )
-      }
+      // An empty payload emits no lines; its empty two-row box comes from the
+      // chrome derivation, which strokes the bare vertical insets.
     }
 
     return lines
   }
 
-  /// `coveringFullContent` replaces the line-derived section ranges with a
-  /// single range over the whole content. Windowed generation only produces
-  /// lines for the realized band, so deriving section chrome from them would
-  /// draw the section's border around the window instead of around the
-  /// section — and a viewport-backed payload has exactly one section anyway
-  /// (`viewportBackedListLine` stamps `sectionIndex: 0` on every line it
-  /// makes), so the whole-content range is the same answer the full line array
-  /// would have produced.
-  private func listChromeBounds(
-    for lines: [ListDisplayLine],
+  /// The stroked chrome rects for `eachSection` styles. Every rect expands
+  /// the content-relative line range back out by the content insets on both
+  /// axes, so the border rows/columns land in the reserved insets (or, for
+  /// inter-section boundaries, in the spacer lines between the sections) —
+  /// never on cells a row occupies.
+  ///
+  /// A viewport-backed payload has exactly one section, so its box hugs the
+  /// visible content directly (clamped to the band, wrapping the overflow
+  /// indicators when they show) instead of being derived from line ranges —
+  /// which would misplace the border onto the indicator rows. `isWindowed`
+  /// (the `ScrollView` case, where the bounds cover the whole content)
+  /// strokes the full content extent for the same single section.
+  private func sectionChromeBounds(
+    for payload: ListPayload,
+    lines: [ListDisplayLine],
     in contentBounds: CellRect,
-    coveringFullContent: (height: Int, yOffset: Int)? = nil
+    totalContentHeight: Int,
+    isWindowed: Bool
   ) -> [CellRect] {
-    guard container != nil, chromeScope == .eachSection, !lines.isEmpty else {
+    guard container != nil, chromeScope == .eachSection else {
       return []
     }
 
-    if let coveringFullContent {
-      return [
-        CellRect(
-          origin: .init(
-            x: contentBounds.origin.x - contentInsets.leading,
-            y: contentBounds.origin.y + coveringFullContent.yOffset
-          ),
-          size: .init(
-            width: contentBounds.size.width + contentInsets.leading
-              + contentInsets.trailing,
-            height: coveringFullContent.height
-          )
+    func chromeRect(fromLine start: Int, toLine end: Int) -> CellRect {
+      CellRect(
+        origin: .init(
+          x: contentBounds.origin.x - contentInsets.leading,
+          y: contentBounds.origin.y + start - contentInsets.top
+        ),
+        size: .init(
+          width: contentBounds.size.width + contentInsets.leading
+            + contentInsets.trailing,
+          height: end - start + contentInsets.top + contentInsets.bottom
         )
-      ]
+      )
+    }
+
+    if isWindowed {
+      return [chromeRect(fromLine: 0, toLine: totalContentHeight)]
+    }
+
+    if payload.isViewportBacked {
+      guard payload.rowCount > 0 else {
+        return []
+      }
+      let visibleContentHeight = min(totalContentHeight, contentBounds.size.height)
+      return [chromeRect(fromLine: 0, toLine: visibleContentHeight)]
+    }
+
+    if lines.isEmpty {
+      // An empty grouped payload keeps its empty box: the bare border rows.
+      return payload.items.isEmpty ? [chromeRect(fromLine: 0, toLine: 0)] : []
     }
 
     var bounds: [CellRect] = []
@@ -827,22 +811,10 @@ extension ListStylePresentation {
       guard let start = rangeStart else {
         return
       }
-      bounds.append(
-        CellRect(
-          origin: .init(
-            x: contentBounds.origin.x - contentInsets.leading,
-            y: contentBounds.origin.y + start
-          ),
-          size: .init(
-            width: contentBounds.size.width + contentInsets.leading
-              + contentInsets.trailing,
-            height: endIndex - start
-          )
-        )
-      )
+      bounds.append(chromeRect(fromLine: start, toLine: endIndex))
     }
 
-    for (index, line) in lines.enumerated() {
+    for line in lines {
       guard let sectionIndex = line.sectionIndex else {
         appendRange(endingAt: line.yOffset)
         rangeStart = nil
@@ -855,10 +827,42 @@ extension ListStylePresentation {
         rangeStart = line.yOffset
         activeSectionIndex = sectionIndex
       }
-      _ = index
     }
 
     appendRange(endingAt: lines.last.map { $0.yOffset + max(1, $0.height) } ?? 0)
+
+    // When the visible slice's outermost lines carry no section index (an
+    // overflow indicator, or a window boundary that landed on a spacer), the
+    // ±inset expansion above would stroke the outer border on that line's
+    // row instead of the band's reserved border row. Extend the outermost
+    // boxes to the band edges so the indicators sit inside the box and the
+    // reserved rows carry the border — the same geometry the viewport-backed
+    // branch produces directly.
+    if !bounds.isEmpty {
+      if lines.first?.sectionIndex == nil {
+        let first = bounds[0]
+        let bandTop = contentBounds.origin.y - contentInsets.top
+        bounds[0] = CellRect(
+          origin: .init(x: first.origin.x, y: bandTop),
+          size: .init(
+            width: first.size.width,
+            height: first.size.height + (first.origin.y - bandTop)
+          )
+        )
+      }
+      if lines.last?.sectionIndex == nil {
+        let last = bounds[bounds.count - 1]
+        let bandBottom =
+          contentBounds.origin.y + contentBounds.size.height + contentInsets.bottom
+        bounds[bounds.count - 1] = CellRect(
+          origin: last.origin,
+          size: .init(
+            width: last.size.width,
+            height: max(last.size.height, bandBottom - last.origin.y)
+          )
+        )
+      }
+    }
     return bounds
   }
 

@@ -23,19 +23,19 @@
       "bench-storm" : {
         "cold" : {
           "answered_inputs" : 0,
-          "builtin_child_measure_requests" : 235,
-          "builtin_child_measure_requests_probe" : 128,
-          "builtin_container_measures" : 40,
+          "builtin_child_measure_requests" : 229,
+          "builtin_child_measure_requests_probe" : 125,
+          "builtin_container_measures" : 39,
           "committed_frames" : 1,
           "custom_child_measure_requests" : 0,
           "custom_child_measure_requests_probe" : 0,
           "custom_container_measures" : 0,
           "custom_placement_child_measure_requests" : 0,
-          "draw_nodes" : 134,
+          "draw_nodes" : 130,
           "full_repaint_frames" : 0,
-          "measured_computed" : 266,
+          "measured_computed" : 259,
           "present_cells" : 3187,
-          "resolved_computed" : 172,
+          "resolved_computed" : 167,
           "resolved_reused" : 0
         }
       },
@@ -178,19 +178,19 @@
       "bench-storm" : {
         "cold" : {
           "answered_inputs" : 0,
-          "builtin_child_measure_requests" : 235,
-          "builtin_child_measure_requests_probe" : 128,
-          "builtin_container_measures" : 40,
+          "builtin_child_measure_requests" : 229,
+          "builtin_child_measure_requests_probe" : 125,
+          "builtin_container_measures" : 39,
           "committed_frames" : 1,
           "custom_child_measure_requests" : 0,
           "custom_child_measure_requests_probe" : 0,
           "custom_container_measures" : 0,
           "custom_placement_child_measure_requests" : 0,
-          "draw_nodes" : 134,
+          "draw_nodes" : 130,
           "full_repaint_frames" : 0,
-          "measured_computed" : 266,
+          "measured_computed" : 259,
           "present_cells" : 3187,
-          "resolved_computed" : 172,
+          "resolved_computed" : 167,
           "resolved_reused" : 0
         }
       },

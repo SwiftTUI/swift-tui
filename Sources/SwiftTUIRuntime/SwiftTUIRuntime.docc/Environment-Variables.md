@@ -144,7 +144,7 @@ SWIFTTUI_DEBUG=1 SWIFTTUI_DEBUG_DIR=/tmp/myapp-debug myapp
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `SWIFTTUI_DEBUG_DIR` | directory path | The bundle directory. Every diagnostic stream without an explicit `*_FILE` override writes here under its fixed name: `frames.tsv`, `diagnostics.tsv`, `memo.log`, `reuse.log`, `inval.log`, `soundness.log`, `profile.tsv`/`profile.jsonl`, `manifest.txt`. Created on first use; unavailable on WASI. |
+| `SWIFTTUI_DEBUG_DIR` | directory path | The bundle directory. Every diagnostic stream without an explicit `*_FILE` override writes here under its fixed name: `frames.tsv`, `diagnostics.tsv`, `memo.log`, `reuse.log`, `inval.log`, `soundness.log`, `profile.tsv`/`profile.jsonl`, `runtime-issues.log`, `manifest.txt`. Created on first use; unavailable on WASI. `runtime-issues.log` receives runtime issues reported while the terminal session owns the screen; without a bundle those issues are held and flushed to stderr after the session ends. |
 | `SWIFTTUI_TRACE` | `trace *("," trace)` with `trace = name["@" sampleN]` | Arms diagnostic-trace emission by name: `frames`, `memo`, `reuse`, `inval`, `soundness`, `publication`. `@N` sets the owning oracle's 1-in-*N* sampling (`memo`, `soundness`). Example: `SWIFTTUI_TRACE=memo@256,reuse,frames`. Malformed input fails closed; unknown names are ignored. |
 
 The per-trace variable triplets below keep working and win over the bundle

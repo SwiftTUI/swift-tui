@@ -65,8 +65,23 @@ public struct KeyCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
     else {
       // Modifier-less registrations are framework-reserved for typing,
       // arrow navigation, Tab, Enter, and Escape (function keys are the
-      // exception — they never produce text). Silently drop the
-      // registration; the command will never fire.
+      // exception — they never produce text). Drop the registration — the
+      // command can never fire — but say so: a silently inert binding
+      // reads as a broken app, not a reserved key.
+      context.viewGraph?.recordFrameRuntimeIssue(
+        RuntimeIssue(
+          severity: .warning,
+          code: "keyCommand.modifierlessIgnored",
+          message:
+            "The key command \"\(description)\" binds \(binding.key) with no "
+            + "modifiers; modifier-less keys are reserved for typing and "
+            + "built-in navigation, so this registration is ignored and the "
+            + "command will never fire. Add a modifier (for example .ctrl) "
+            + "to the binding.",
+          identity: node.identity,
+          source: ".keyCommand"
+        )
+      )
       return [node]
     }
     let intake = HandlerDescriptorIntake(

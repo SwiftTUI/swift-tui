@@ -6356,6 +6356,38 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.cells[6][0].character == "└")
   }
 
+  @Test("vertical ScrollView text wraps to its pane width inside a horizontal stack")
+  func verticalScrollViewWrapsInsideHorizontalStack() {
+    // The pane/sidebar shell: a vertical scroll pane sharing an HStack with a
+    // fixed sidebar. The HStack's ideal round measures the pane's content at
+    // an unspecified width (so the text measures unwrapped); the scroll view
+    // must NOT republish that unwrapped ideal as a hard structural minimum —
+    // a `Text` keeps its zero horizontal structural minimum inside a vertical
+    // scroll view, so the pane compresses to the remaining width and the
+    // text wraps there instead of painting through the sibling's cells.
+    let artifacts = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Text("Side")
+          .frame(width: 6, alignment: .topLeading)
+        ScrollView(.vertical) {
+          Text("alpha beta gamma delta epsilon zeta")
+        }
+        .scrollIndicators(.hidden)
+      },
+      context: .init(identity: testIdentity("VerticalScrollPaneWrap")),
+      proposal: .init(width: 20, height: 4)
+    )
+
+    #expect(artifacts.measuredTree.measuredSize.width == 20)
+    let lines = artifacts.rasterSurface.lines
+    #expect(lines.allSatisfy { $0.count <= 20 })
+    let surface = lines.joined(separator: "\n")
+    #expect(surface.contains("alpha beta"))
+    // Wrapped, not truncated: the tail of the text is on a later line.
+    #expect(surface.contains("epsilon"))
+    #expect(lines.first?.contains("epsilon") == false)
+  }
+
   @Test(
     "finite vertical stacks allow unclipped children to overflow a constrained frame"
   )

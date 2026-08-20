@@ -335,9 +335,16 @@ protocol BuiltinLayoutBehaviorProviding {
 }
 
 package protocol StackMinimumLayoutProviding {
+  /// The structural minimum a stack must allocate this layout along `axis`,
+  /// or `nil` for "fully compressible". `idealSize` is the layout's ideal
+  /// measurement; `contentMinimum` is the derived structural minimum of its
+  /// children — the two differ exactly when the ideal was measured
+  /// unconstrained (a vertical scroll view's content measures unwrapped at
+  /// an unspecified width, but compresses to its children's minimum).
   func stackMinimumMainSize(
     axis: SwiftTUICore.Axis,
-    idealSize: LayoutSize
+    idealSize: LayoutSize,
+    contentMinimum: Int
   ) -> Int?
 }
 
@@ -372,12 +379,14 @@ public struct AnyLayout: Layout {
         measurementReuseSignature: layout.measurementReuseSignature,
         placementReuseSignature: layout.placementReuseSignature,
         workerProxy: workerProxy,
-        stackMinimumMainSizeHandler: { engine, node, idealMeasurement, axis, passContext in
+        stackMinimumMainSizeHandler: {
+          engine, node, idealMeasurement, axis, contentMinimum, passContext in
           workerProxy.stackMinimumMainSize(
             engine: engine,
             node: node,
             idealMeasurement: idealMeasurement,
             axis: axis,
+            contentMinimum: contentMinimum,
             passContext: passContext
           )
         }

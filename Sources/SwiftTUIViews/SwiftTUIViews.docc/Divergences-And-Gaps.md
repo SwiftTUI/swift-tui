@@ -265,9 +265,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   literal default keeps padded layouts predictable.
 - **`border` defaults to inset placement and does not affect layout.**
   *Ratified (parity).* The default occupies the content's existing outermost
-  cells, aligning with SwiftUI's non-layout-affecting overlay behavior.
-  SwiftTUI additionally exposes explicit `placement: .outset`, which reserves
-  terminal cells around the content and grows the frame.
+  cells, aligning with SwiftUI's non-layout-affecting overlay behavior — but
+  where SwiftUI strokes at sub-cell resolution and never occludes, a cell
+  grid makes "inside the bounds" necessarily mean *replacing* the outermost
+  content cells: a border on content with no padding overwrites its first
+  and last rows and columns, and small content can disappear entirely with
+  no diagnostic. Pad the content, size the frame for the border, or use
+  explicit `placement: .outset`, which reserves terminal cells around the
+  content and grows the frame.
 - **`ignoresSafeArea` takes the edge set positionally.** *Ratified.*
   SwiftUI's first positional is `SafeAreaRegions`; terminal safe areas have a
   single region, so the positional parameter is the edge set. The labeled

@@ -70,8 +70,11 @@ public enum TerminalRunner {
     case .app(let instanceName):
       // Announce the debug bundle after the session ends (and after teardown
       // restored the primary screen), succeed or throw — a crashed session is
-      // exactly when the bundle matters.
+      // exactly when the bundle matters. Screen-deferred runtime issues flush
+      // first for the same reason: they were withheld precisely because the
+      // session owned the screen this stderr write needs.
       defer {
+        RuntimeIssueSink.flushDeferredStandardErrorIssues()
         if let announcement = DebugBundle.announcementLine() {
           FileHandle.standardError.write(Data(announcement.utf8))
         }

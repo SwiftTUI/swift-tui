@@ -37,13 +37,23 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
 
   func stackMinimumMainSize(
     axis: SwiftTUICore.Axis,
-    idealSize: LayoutSize
+    idealSize: LayoutSize,
+    contentMinimum: Int
   ) -> Int? {
+    // The scrolling axis is fully compressible. The non-scrolling axis
+    // reports the content's structural minimum, NOT the ideal: the ideal was
+    // measured with the scrolling axis unconstrained, and an `HStack`'s
+    // ideal round proposes `.unspecified` on the other axis too — so text
+    // content measures unwrapped there, and republishing that width as a
+    // hard minimum made the pane rigid at the unwrapped ideal (min == max
+    // for non-flexible subtrees), overflowing any ancestor pane. A `Text`
+    // keeps its zero horizontal structural minimum whether or not a
+    // vertical scroll view wraps it.
     switch axis {
     case .horizontal:
-      return axes.contains(.horizontal) ? nil : idealSize.width
+      return axes.contains(.horizontal) ? nil : contentMinimum
     case .vertical:
-      return axes.contains(.vertical) ? nil : idealSize.height
+      return axes.contains(.vertical) ? nil : contentMinimum
     }
   }
 

@@ -577,28 +577,43 @@ package final class ViewNode {
   /// bypass the discovery pass — reports a ``RuntimeIssue`` instead of
   /// nothing. Same-box re-claims (every re-access re-makes the location)
   /// are the normal path and stay silent.
-  private var stateSlotClaimantsThisEvaluation: [StateSlotIdentifier: ObjectIdentifier] = [:]
+  private var stateSlotClaimantsThisEvaluation: [StateSlotIdentifier: StateSlotClaimRecord] =
+    [:]
 
   package func recordStateSlotClaim(
     _ identifier: StateSlotIdentifier,
-    claimant: ObjectIdentifier
+    claimant: ObjectIdentifier,
+    wrapperDescription: String
   ) {
     guard let existing = stateSlotClaimantsThisEvaluation[identifier] else {
-      stateSlotClaimantsThisEvaluation[identifier] = claimant
+      stateSlotClaimantsThisEvaluation[identifier] = StateSlotClaimRecord(
+        claimant: claimant,
+        wrapperDescription: wrapperDescription
+      )
       return
     }
-    guard existing != claimant else {
+    guard existing.claimant != claimant else {
       return
     }
+    // The wrapper descriptions classify the collision at a glance: two
+    // app-authored composed wrappers point at the DynamicProperty guidance,
+    // while two framework-primitive claimants (e.g. a ScrollView's own
+    // @State) indicate the framework routed two distinct containers through
+    // one node — an identity-aliasing defect to report, not an app-side fix.
     ownerGraph?.recordFrameRuntimeIssue(
       RuntimeIssue(
         severity: .warning,
         code: "state.duplicateSlotClaim",
         message:
-          "Two wrapper instances claimed one state slot \(identifier) on "
-          + "\(identity.path.isEmpty ? "$root" : identity.path) in a single evaluation; "
-          + "they silently share storage. Conform the composing wrapper to DynamicProperty "
-          + "so each instance gets path-qualified storage.",
+          "Two wrapper instances (\(existing.wrapperDescription) and "
+          + "\(wrapperDescription)) claimed one state slot \(identifier) on "
+          + "\(identity.path.isEmpty ? "$root" : identity.path) "
+          + "(node \(ObjectIdentifier(self)), evaluation depth \(evaluationDepth)) "
+          + "in a single evaluation; they silently share storage. For a composed "
+          + "app wrapper, conform it to DynamicProperty so each instance gets "
+          + "path-qualified storage. If both claimants are framework-declared "
+          + "state, two containers were routed through one node — please report "
+          + "this to SwiftTUI.",
         identity: identity
       )
     )
@@ -2254,7 +2269,7 @@ extension ViewNode {
     /// Evaluation-scoped duplicate-slot-claim scratch. Restoring a stale image
     /// is self-healing: `beginEvaluation` resets it at outermost depth before
     /// any post-restore re-resolve records claims.
-    package var stateSlotClaimantsThisEvaluation: [StateSlotIdentifier: ObjectIdentifier]
+    package var stateSlotClaimantsThisEvaluation: [StateSlotIdentifier: StateSlotClaimRecord]
     /// Derived memoization (see the live property): entries are
     /// content-verified at adoption, so restoring an older image is safe —
     /// a mismatched entry misses and re-mints.
@@ -2377,5 +2392,20 @@ extension ViewNode {
       visitedFrameID: visitedFrameID,
       evaluatorInstalled: evaluator != nil
     )
+  }
+}
+
+/// One recorded state-slot claim: the claiming box's identity plus a
+/// human-readable wrapper description (property-wrapper kind and value type)
+/// so the duplicate-claim diagnostic can name both parties — which is what
+/// classifies a collision as an app-side composed wrapper versus two
+/// framework primitives routed through one node.
+package struct StateSlotClaimRecord: Sendable, Equatable {
+  package var claimant: ObjectIdentifier
+  package var wrapperDescription: String
+
+  package init(claimant: ObjectIdentifier, wrapperDescription: String) {
+    self.claimant = claimant
+    self.wrapperDescription = wrapperDescription
   }
 }

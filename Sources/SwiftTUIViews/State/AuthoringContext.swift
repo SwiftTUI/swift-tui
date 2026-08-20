@@ -413,8 +413,16 @@ package func withImperativeAuthoringContext<Result>(
   _ snapshot: ImperativeAuthoringContextSnapshot?,
   _ apply: () -> Result
 ) -> Result {
-  withAuthoringContext(snapshot?.authoringContext) {
-    withRegistrationEnvironment(snapshot?.environmentValues) {
+  // A nil snapshot means "registration saw no ambient context", not "clear
+  // the context": installing nil here severed a nested dispatch (a user
+  // closure firing inside a control's established dispatch context) from the
+  // ambient owner, downgrading every `@State` read in the closure to the
+  // authored-seed fallback. Preserve the caller's ambient instead.
+  guard let snapshot else {
+    return apply()
+  }
+  return withAuthoringContext(snapshot.authoringContext) {
+    withRegistrationEnvironment(snapshot.environmentValues) {
       apply()
     }
   }
@@ -425,8 +433,11 @@ package func withImperativeAuthoringContext<Result>(
   _ snapshot: ImperativeAuthoringContextSnapshot?,
   _ apply: () async -> Result
 ) async -> Result {
-  await withAuthoringContext(snapshot?.authoringContext) {
-    await withRegistrationEnvironment(snapshot?.environmentValues) {
+  guard let snapshot else {
+    return await apply()
+  }
+  return await withAuthoringContext(snapshot.authoringContext) {
+    await withRegistrationEnvironment(snapshot.environmentValues) {
       await apply()
     }
   }

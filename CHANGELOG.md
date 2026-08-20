@@ -6,6 +6,76 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [Unreleased]
+
+### Added
+
+- **A modifier-less `.keyCommand` binding now says why it never fires.** The
+  framework reserves bare keys for typing and built-in navigation and
+  ignores such registrations (function keys excepted); that drop used to be
+  silent. It now records a `keyCommand.modifierlessIgnored` runtime warning
+  naming the command and the fix (add a modifier).
+
+- **`state.duplicateSlotClaim` now names both claimants.** The warning
+  reports each claiming wrapper (kind and value type), the node token, and
+  the evaluation depth — enough to tell an app-side composed wrapper (fix:
+  conform it to `DynamicProperty`) from two framework primitives routed
+  through one node (a framework identity-aliasing defect to report).
+
+### Fixed
+
+- **Action closures no longer silently observe stale `@State`.** A handler
+  registered with no ambient authoring context (`.onSubmit` and peers
+  constructed outside a resolve pass) used to *clear* the dispatch context at
+  fire time instead of preserving the caller's, so `@State` reads inside the
+  closure silently fell back to the authored initial value — the field
+  rendered the typed text while the submit closure read the seed. A nil
+  registration snapshot now preserves the ambient dispatch context. Any
+  imperative `@State` access that still bottoms out at the authored seed on
+  a previously graph-bound box now records a `state.imperativeSeedFallback`
+  runtime warning naming the declaration site, instead of failing silently.
+
+- **`ScrollView(.vertical)` no longer forces its pane to the unwrapped text
+  width.** In a horizontal layout (pane/sidebar shells), a stack measures
+  each child's ideal with an unspecified cross dimension, so a vertical
+  scroll view's text content measured unwrapped — and the scroll view then
+  republished that unwrapped ideal as a hard structural *minimum*, making
+  the pane rigid at the unwrapped width and painting it through the parent's
+  border. The non-scrolling axis now reports the content's structural
+  minimum instead (a `Text` keeps its zero horizontal minimum inside a
+  vertical scroll view), so the pane compresses to the available width and
+  the text wraps there. Plain vertical stacks were never affected.
+
+- **The default `List` style no longer draws rows over its own border.** For
+  box-drawing styles (`.automatic`/`.insetGrouped`), the top and bottom
+  border rows were modeled as scrollable blank lines inside the row stream,
+  so an overflowing list slid a real row onto the border row and the row
+  erased the border's horizontal run (corner glyphs survived in the side
+  columns). The vertical content insets are now layout-bearing — matching
+  the horizontal axis, the `.wholeList` chrome scope, and what
+  `measuredListIdealSize` already reserved — and the stroked box expands
+  back into those reserved rows, with overflow indicators on their own
+  lines inside the box. Scroll routing now publishes the inset content band
+  for materialized (sectioned) lists too, so anchor arithmetic agrees with
+  the drawn window. Behavior change: an overflowing boxed list shows the
+  rows that actually fit inside its border (previously one row rendered
+  under the border); non-overflowing lists are unchanged, and `.plain` is
+  unaffected.
+
+- **Runtime warnings no longer paint over the running app.** The terminal
+  CLI's `RuntimeIssueSink.standardError` used to write straight to fd 2 —
+  the same tty as the owned alternate screen — so each warning spliced into
+  the frame it described (often inside the focused field, where
+  `cursorFollowsFocus` parks the hardware cursor) and desynchronized the
+  incremental-damage baseline until a full repaint. The sink is now
+  screen-aware: while a terminal session owns the screen, issues append to
+  `runtime-issues.log` in the active debug bundle (`SWIFTTUI_DEBUG_DIR` /
+  `--debug`), or are held in a bounded buffer flushed to stderr after
+  teardown restores the primary screen — including for sessions that end by
+  throwing. Behavior without an owned screen is unchanged. One visible
+  delta: `2>warnings.log` on an interactive session now captures the
+  deferred issues at exit rather than live.
+
 ## [0.9.4] - 2026-08-18
 
 ### Changed
