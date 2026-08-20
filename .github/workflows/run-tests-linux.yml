@@ -60,8 +60,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          Scripts/apt_get_retry.sh update
+          Scripts/apt_get_retry.sh install -y --no-install-recommends \
             ca-certificates \
             curl \
             git \
@@ -144,7 +144,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          command -v gdb >/dev/null 2>&1 || sudo apt-get install -y --no-install-recommends gdb
+          command -v gdb >/dev/null 2>&1 || Scripts/apt_get_retry.sh install -y --no-install-recommends gdb
 
       - name: Run repo gate
         shell: bash
@@ -236,8 +236,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev
+          Scripts/apt_get_retry.sh update
+          Scripts/apt_get_retry.sh install -y --no-install-recommends libcurl4-openssl-dev
 
       - name: Cache Swiftly toolchain
         uses: actions/cache@v6

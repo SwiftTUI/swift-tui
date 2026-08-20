@@ -725,6 +725,12 @@ run_step \
   Scripts/check_step_watchdog.sh
 
 run_step \
+  "Self-test apt-get retry wrapper" \
+  "$repo_root" \
+  "Scripts/check_apt_get_retry.sh" \
+  Scripts/check_apt_get_retry.sh
+
+run_step \
   "Self-test serialized-execution check" \
   "$repo_root" \
   "Scripts/check_serialized_execution.sh --self-test" \
