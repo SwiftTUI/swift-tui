@@ -97,12 +97,39 @@ package enum StateCaptureCensus {
 
   #if DEBUG
     package private(set) static var counts: [Event: Int] = [:]
+
+    /// Suite-scale census instrument (plan 2026-08-20-001 Stages 0/4/5):
+    /// when `SWIFTTUI_STATE_CAPTURE_CENSUS_FILE` names a file, every
+    /// ladder/seed/miss/skip event appends one line there — `sort | uniq -c`
+    /// over a full-suite run is the rung census that gates ladder deletion.
+    /// Hit-path events (`captureHit`, `captureRefreshedOwner`, `bindBound`)
+    /// stay counter-only: they are hot and carry no deletion signal.
+    private static let censusFilePath: String? =
+      FeatureFlags.environmentValue(named: "SWIFTTUI_STATE_CAPTURE_CENSUS_FILE")
+
+    private static func emitCensusLine(for event: Event) {
+      guard let censusFilePath else {
+        return
+      }
+      switch event {
+      case .captureHit, .captureRefreshedOwner, .bindBound:
+        return
+      case .bindSkippedTier, .bindNoOwner, .classConflictDemoted, .captureMiss,
+        .ladderExactOwner, .ladderAncestorWalk, .ladderSoleBinding, .ladderMinted,
+        .seedFallback:
+        DebugLogRouter.emit(
+          "[STATE-CENSUS] \(event.rawValue)\n",
+          toFileAt: censusFilePath
+        )
+      }
+    }
   #endif
 
   @inline(__always)
   package static func record(_ event: Event) {
     #if DEBUG
       counts[event, default: 0] += 1
+      emitCensusLine(for: event)
     #endif
   }
 

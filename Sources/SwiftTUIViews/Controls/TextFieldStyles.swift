@@ -253,7 +253,10 @@ private struct ConcreteAnyTextFieldStyleBox<S: TextFieldStyle>: AnyTextFieldStyl
     configuration: TextFieldStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolveStyleBody(style.makeBody(configuration: configuration), in: context)
+    resolveStyleBody(
+      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
+      in: context
+    )
   }
 }
 

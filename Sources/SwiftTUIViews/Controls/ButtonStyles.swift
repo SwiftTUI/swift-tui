@@ -328,7 +328,10 @@ private struct ConcreteAnyButtonStyleBox<S: ButtonStyle>: AnyButtonStyleBox {
     configuration: ButtonStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolveStyleBody(style.makeBody(configuration: configuration), in: context)
+    resolveStyleBody(
+      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
+      in: context
+    )
   }
 }
 

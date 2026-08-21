@@ -1,14 +1,17 @@
-package import SwiftTUIGraph
+import SwiftTUIGraph
 
-// The capture-bind pass (plan 2026-08-20-001 Stage 2).
+// The capture-bind pass (plan 2026-08-20-001 Stages 2–3).
 //
-// A sibling of the dynamic-property update pass that runs inside
-// `resolveView`'s fresh-evaluation closure, after `beginEvaluation` has
-// produced the graph node and immediately before the body evaluates: it
-// writes each `@State` (and future `CaptureBindableDynamicProperty`) field's
-// owner into the exact container copy body evaluation consumes, so closures
-// the body creates carry their state owner instead of re-deriving it from
-// ambient dispatch scope at fire time.
+// A sibling of the dynamic-property update pass that runs immediately before
+// user-authored code evaluates, at three seams: `resolveViewElements`'
+// resolvable branch (every `ResolvableView` evaluation), its plain-body tail
+// (every `body` evaluation, transparent forwarding containers included), and
+// the forwarding seams where a composed `ViewModifier` or style struct runs
+// its body (`bindingForwardedDynamicPropertyCaptures`). It writes each
+// `@State` (and future `CaptureBindableDynamicProperty`) field's owner into
+// the exact container copy that code consumes, so closures it creates carry
+// their state owner instead of re-deriving it from ambient dispatch scope at
+// fire time.
 //
 // The pass is deliberately independent of the update pass: certification,
 // the `ForwardedDynamicPropertyPreparationScope` handoff, and third-party
@@ -24,16 +27,25 @@ package import SwiftTUIGraph
 /// `@unsafe` because applying the binder to a raw base pointer is the unsafe
 /// act; every application site spells `unsafe`.
 @unsafe package struct DynamicPropertyCaptureFieldBinder {
+  /// The stored-field index this binder writes, mirrored from the update
+  /// pass's field discovery so an `AdditionalDynamicPropertyUpdating`
+  /// container can exclude fields it forwards itself (those bind as their
+  /// own root at the forwarding seam, with root-relative paths — binding
+  /// them here under an appended path would name a different slot than the
+  /// forwarded update claims).
+  package let index: Int
   package let apply:
     @MainActor (UnsafeMutableRawPointer, StateCaptureBinding, _ sharedMutableContainer: Bool)
       -> Void
 
   package init(
+    index: Int,
     apply:
       @escaping @MainActor (
         UnsafeMutableRawPointer, StateCaptureBinding, _ sharedMutableContainer: Bool
       ) -> Void
   ) {
+    unsafe self.index = index
     unsafe self.apply = apply
   }
 }
@@ -125,28 +137,54 @@ package enum DynamicPropertyCaptureBindPlanCache {
   }
 #endif
 
-/// Binds a `ResolvableView` container's fields against its own node's
-/// dynamic-property authoring scope — the same owner selection the update
-/// pass uses ahead of the reuse door. Called from `resolveView`'s fresh
-/// evaluation, where `graphNode` is this evaluation's node.
+/// Binds a `ResolvableView` container's fields immediately before its
+/// `resolveElements` runs — at `resolveViewElements`' resolvable branch, the
+/// one seam every resolvable evaluation funnels through: `resolveView`'s
+/// fresh path, `ScopedBuilder`'s transparent resolvable-output closure, a
+/// body result that is itself a resolvable container, and conditional-branch
+/// content all route here. Owner selection is exactly
+/// `dynamicPropertyAuthoringContext(for:current:viewNode:)` — the same
+/// function `withDynamicPropertyUpdateScope` applies inside every
+/// resolvable's `resolveElements` — so the capture and the update pass's box
+/// binding can never disagree: a same-node ambient scope (a rebased style
+/// override, a body-result container sharing its author's node) keeps that
+/// scope's owner, and any other shape resolves to the currently evaluating
+/// node's own scope.
 @MainActor
-package func bindingDynamicPropertyCaptures<V>(
+package func bindingResolvableDynamicPropertyCaptures<V>(
   _ view: V,
-  in context: ResolveContext,
-  graphNode: SwiftTUICore.ViewNode?,
-  authoringContextOverride: AuthoringContext?
+  in context: ResolveContext
 ) -> V {
   guard StateCaptureBindingConfiguration.isEnabled else {
     return view
   }
   return boundCopy(view) {
-    let scope =
-      authoringContextOverride.map { rebasedAuthoringContext($0, viewNode: graphNode) }
-      ?? dynamicPropertyAuthoringContext(
-        for: context,
-        current: currentAuthoringContext(),
-        viewNode: graphNode
-      )
+    let scope = dynamicPropertyAuthoringContext(
+      for: context,
+      current: currentAuthoringContext(),
+      viewNode: ViewNodeContext.current
+    )
+    return rootCaptureBinding(for: scope)
+  }
+}
+
+/// Binds a transparently forwarded payload as its own root container under
+/// the current ambient scope — the exact mirror of
+/// `runForwardedDynamicPropertyUpdates`, which updates such payloads with
+/// root-relative paths under the scope active at the forwarding seam. Used
+/// for a composed `ViewModifier` value before its `body(content:)` runs and
+/// for a style struct before its `makeBody(configuration:)` runs; both are
+/// evaluated under an installed ambient scope, so a nil ambient here means
+/// no owner is nameable and the value stays unbound (counted).
+@MainActor
+package func bindingForwardedDynamicPropertyCaptures<V>(_ value: V) -> V {
+  guard StateCaptureBindingConfiguration.isEnabled else {
+    return value
+  }
+  return boundCopy(value) {
+    guard let scope = currentAuthoringContext() else {
+      return nil
+    }
     return rootCaptureBinding(for: scope)
   }
 }
@@ -218,6 +256,11 @@ private func boundCopy<V>(
       }
     }
   #endif
+  // A transparent container that forwards fields itself (ScopedBuilder's
+  // output, ModifiedContent's content/modifier) excludes them here exactly
+  // as the update pass does: those values bind as their own root at their
+  // forwarding seam.
+  let traversalOwner = view as? any AdditionalDynamicPropertyUpdating
   switch unsafe plan {
   case .none:
     return view
@@ -238,7 +281,8 @@ private func boundCopy<V>(
         binders,
         atBase: UnsafeMutableRawPointer(base),
         binding: binding,
-        sharedMutableContainer: false
+        sharedMutableContainer: false,
+        excludingFieldsOwnedBy: traversalOwner
       )
     }
     StateCaptureCensus.record(.bindBound)
@@ -254,7 +298,8 @@ private func boundCopy<V>(
       binders,
       atBase: base,
       binding: binding,
-      sharedMutableContainer: true
+      sharedMutableContainer: true,
+      excludingFieldsOwnedBy: traversalOwner
     )
     StateCaptureCensus.record(.bindBound)
     return view
@@ -266,12 +311,18 @@ private func applyCaptureBinders(
   _ binders: [DynamicPropertyCaptureFieldBinder],
   atBase base: UnsafeMutableRawPointer,
   binding: StateCaptureBinding,
-  sharedMutableContainer: Bool
+  sharedMutableContainer: Bool,
+  excludingFieldsOwnedBy owner: (any AdditionalDynamicPropertyUpdating)? = nil
 ) {
   // Index loop on purpose: `for unsafe x in` is mangled by swift-format
   // (see the env-cleanup 2026-08-10 lesson), so spell the unsafe access per
   // element instead.
   for index in 0..<(unsafe binders.count) {
+    if owner?.ownsDynamicPropertyTraversal(ofStoredFieldAt: unsafe binders[index].index)
+      == true
+    {
+      continue
+    }
     unsafe binders[index].apply(base, binding, sharedMutableContainer)
   }
 }
@@ -285,6 +336,7 @@ private func bindNestedCaptures<T>(
   binding: StateCaptureBinding
 ) {
   let plan = unsafe DynamicPropertyCaptureBindPlanCache.plan(for: T.self)
+  let traversalOwner = unsafe pointer.pointee as? any AdditionalDynamicPropertyUpdating
   switch unsafe plan {
   case .none:
     return
@@ -293,7 +345,8 @@ private func bindNestedCaptures<T>(
       binders,
       atBase: UnsafeMutableRawPointer(pointer),
       binding: binding,
-      sharedMutableContainer: false
+      sharedMutableContainer: false,
+      excludingFieldsOwnedBy: traversalOwner
     )
   case .classFields(let binders):
     let object = unsafe pointer.pointee as AnyObject
@@ -302,7 +355,8 @@ private func bindNestedCaptures<T>(
       binders,
       atBase: base,
       binding: binding,
-      sharedMutableContainer: true
+      sharedMutableContainer: true,
+      excludingFieldsOwnedBy: traversalOwner
     )
   }
 }
@@ -331,7 +385,8 @@ where T: CaptureBindableDynamicProperty {
   static func captureBinder(atOffset offset: Int, index: Int)
     -> DynamicPropertyCaptureFieldBinder
   {
-    unsafe DynamicPropertyCaptureFieldBinder { base, binding, sharedMutableContainer in
+    unsafe DynamicPropertyCaptureFieldBinder(index: index) {
+      base, binding, sharedMutableContainer in
       unsafe (base + offset).assumingMemoryBound(to: T.self).pointee.bindCapture(
         binding,
         sharedMutableContainer: sharedMutableContainer
@@ -344,7 +399,7 @@ extension CaptureBinderFieldShim: CaptureRecursableFieldBinding where T: Dynamic
   static func nestedCaptureBinder(atOffset offset: Int, index: Int)
     -> DynamicPropertyCaptureFieldBinder
   {
-    unsafe DynamicPropertyCaptureFieldBinder { base, binding, _ in
+    unsafe DynamicPropertyCaptureFieldBinder(index: index) { base, binding, _ in
       // A nested wrapper's own fields bind under the container's field path —
       // the same qualification `updateDynamicProperty` gives the nested
       // update walk — so composed-wrapper instances keep distinct slots.

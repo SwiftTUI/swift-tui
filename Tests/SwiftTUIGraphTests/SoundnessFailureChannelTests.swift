@@ -42,6 +42,8 @@ struct SoundnessFailureChannelTests {
     "handler-resolution-gesture",
     "action-dispatch-miss",
     "stranded-listing",
+    "state-seed-fallback",
+    "state-capture-miss",
     "layout-shadow-divergence",
   ]
 
@@ -187,6 +189,8 @@ struct SoundnessFailureChannelTests {
     )
     SoundnessProbeConfiguration.recordActionDispatchMiss("test")
     SoundnessProbeConfiguration.recordStrandedListingViolation("test")
+    SoundnessProbeConfiguration.recordStateSeedFallbackViolation("test")
+    SoundnessProbeConfiguration.recordStateCaptureMissViolation("test")
     SoundnessProbeConfiguration.recordLayoutShadowDivergence("test")
   }
 
@@ -332,6 +336,8 @@ private struct ProbeState {
   let gestureRouteResolutionViolationCount: Int
   let actionDispatchMissCount: Int
   let strandedListingViolationCount: Int
+  let stateSeedFallbackViolationCount: Int
+  let stateCaptureMissViolationCount: Int
   let layoutShadowDivergenceCount: Int
   let layoutShadowWindowedExclusionCount: Int
   let layoutShadowDepthExclusionCount: Int
@@ -383,6 +389,10 @@ private struct ProbeState {
       actionDispatchMissCount: SoundnessProbeConfiguration.actionDispatchMissCount,
       strandedListingViolationCount:
         SoundnessProbeConfiguration.strandedListingViolationCount,
+      stateSeedFallbackViolationCount:
+        SoundnessProbeConfiguration.stateSeedFallbackViolationCount,
+      stateCaptureMissViolationCount:
+        SoundnessProbeConfiguration.stateCaptureMissViolationCount,
       layoutShadowDivergenceCount:
         SoundnessProbeConfiguration.layoutShadowDivergenceCount,
       layoutShadowWindowedExclusionCount:
@@ -438,6 +448,10 @@ private struct ProbeState {
     SoundnessProbeConfiguration.actionDispatchMissCount = actionDispatchMissCount
     SoundnessProbeConfiguration.strandedListingViolationCount =
       strandedListingViolationCount
+    SoundnessProbeConfiguration.stateSeedFallbackViolationCount =
+      stateSeedFallbackViolationCount
+    SoundnessProbeConfiguration.stateCaptureMissViolationCount =
+      stateCaptureMissViolationCount
     SoundnessProbeConfiguration.layoutShadowDivergenceCount = layoutShadowDivergenceCount
     SoundnessProbeConfiguration.layoutShadowWindowedExclusionCount =
       layoutShadowWindowedExclusionCount

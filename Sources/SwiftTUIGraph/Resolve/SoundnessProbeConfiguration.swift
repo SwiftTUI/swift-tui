@@ -35,6 +35,8 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
   package var gestureRouteResolutionViolationCount: Int
   package var actionDispatchMissCount: Int
   package var strandedListingViolationCount: Int
+  package var stateSeedFallbackViolationCount: Int
+  package var stateCaptureMissViolationCount: Int
   package var layoutShadowDivergenceCount: Int
   package var layoutShadowWindowedExclusionCount: Int
   package var layoutShadowDepthExclusionCount: Int
@@ -82,6 +84,10 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
       actionDispatchMissCount: SoundnessProbeConfiguration.actionDispatchMissCount,
       strandedListingViolationCount:
         SoundnessProbeConfiguration.strandedListingViolationCount,
+      stateSeedFallbackViolationCount:
+        SoundnessProbeConfiguration.stateSeedFallbackViolationCount,
+      stateCaptureMissViolationCount:
+        SoundnessProbeConfiguration.stateCaptureMissViolationCount,
       layoutShadowDivergenceCount:
         SoundnessProbeConfiguration.layoutShadowDivergenceCount,
       layoutShadowWindowedExclusionCount:
@@ -228,6 +234,18 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
       to: &growth
     )
     appendGrowth(
+      kind: "state-seed-fallback",
+      previous: previous.stateSeedFallbackViolationCount,
+      current: stateSeedFallbackViolationCount,
+      to: &growth
+    )
+    appendGrowth(
+      kind: "state-capture-miss",
+      previous: previous.stateCaptureMissViolationCount,
+      current: stateCaptureMissViolationCount,
+      to: &growth
+    )
+    appendGrowth(
       kind: "layout-shadow-divergence",
       previous: previous.layoutShadowDivergenceCount,
       current: layoutShadowDivergenceCount,
@@ -351,6 +369,8 @@ package enum SoundnessProbeConfiguration {
   package static var gestureRouteResolutionViolationCount = 0
   package static var actionDispatchMissCount = 0
   package static var strandedListingViolationCount = 0
+  package static var stateSeedFallbackViolationCount = 0
+  package static var stateCaptureMissViolationCount = 0
   package static var layoutShadowDivergenceCount = 0
   /// T-info currency for the layout shadow oracle's windowed carve-out:
   /// subtrees under a windowed lazy/hosted product are excluded from the
@@ -590,6 +610,36 @@ package enum SoundnessProbeConfiguration {
     ambientEnvironmentFallbackReadCount += 1
     recordViolationDetail(detail(), for: "ambient-environment-fallback")
     emitTrace("ambient-environment-fallback")
+  }
+
+  /// Records one imperative `@State` access that bottomed out at the
+  /// authored initial value while capture binding was enabled (plan
+  /// 2026-08-20-001 Stage 3): with captures live, every body-created
+  /// closure carries its owner, so a seed fallback means an access no
+  /// capture, refresh, or ambient rung could serve — the silent
+  /// stale-state corruption class the capture pass exists to retire.
+  /// Callers gate on the capture-binding configuration; with the gate off
+  /// the fallback remains a loud RuntimeIssue outside this oracle.
+  package static func recordStateSeedFallbackViolation(
+    _ detail: @autoclosure () -> String
+  ) {
+    stateSeedFallbackViolationCount += 1
+    recordViolationDetail(detail(), for: "state-seed-fallback")
+    emitTrace("state-seed-fallback")
+  }
+
+  /// Records one bound capture whose owner was dead and whose fire-time
+  /// identity refresh also failed (plan 2026-08-20-001 Stage 3), dropping
+  /// the access to the ambient ladder. Committed removal legitimately
+  /// takes this path, so a hit means a closure outlived its subtree —
+  /// expected to hold at zero across the suite and fuzzer campaigns;
+  /// deliberate-removal tests suppress tracing while proving the counter.
+  package static func recordStateCaptureMissViolation(
+    _ detail: @autoclosure () -> String
+  ) {
+    stateCaptureMissViolationCount += 1
+    recordViolationDetail(detail(), for: "state-capture-miss")
+    emitTrace("state-capture-miss")
   }
 
   /// Records one dropped in-flight state-slot restoration (F93): a

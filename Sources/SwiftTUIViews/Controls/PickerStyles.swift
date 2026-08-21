@@ -379,7 +379,10 @@ private struct ConcreteAnyPickerStyleBox<S: PickerStyle>: AnyPickerStyleBox {
     configuration: PickerStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolveStyleBody(style.makeBody(configuration: configuration), in: context)
+    resolveStyleBody(
+      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
+      in: context
+    )
   }
 }
 

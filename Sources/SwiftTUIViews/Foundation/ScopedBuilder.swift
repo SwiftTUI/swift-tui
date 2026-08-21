@@ -26,15 +26,13 @@ package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
   ) {
     self.output = output
     self.authoringContext = authoringContext
-    let erased: Any = output
 
-    if let resolvable = erased as? any ResolvableView {
-      resolveElementsClosure = Self.resolveWithAuthoringContext(authoringContext) { context in
-        resolvable.resolveElements(in: context)
-      }
-      return
-    }
-
+    // One route for resolvable and plain outputs alike:
+    // `resolveViewElements` performs the identical resolvable dispatch this
+    // closure used to special-case, and its two branches are where the
+    // capture-bind pass runs — a resolvable output forwarded here without
+    // its own `resolveView` still binds its `@State` ownership before its
+    // `resolveElements` evaluates.
     resolveElementsClosure = Self.resolveWithAuthoringContext(authoringContext) { context in
       resolveViewElements(output, in: context)
     }

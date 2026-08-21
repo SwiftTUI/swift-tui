@@ -291,7 +291,14 @@ public struct ModifiedContent<Content, Modifier> {
 
 extension ModifiedContent: View where Content: View, Modifier: ViewModifier {
   public var body: some View {
-    return modifier.body(
+    // Capture-bind pass (plan 2026-08-20-001): the modifier is a forwarded
+    // payload — `updateAdditionalDynamicProperties` runs its `@State` as its
+    // own root with root-relative paths — so it binds as its own root here,
+    // at the seam its body runs, under the same ambient scope. Binding it as
+    // a nested field of this wrapper would append a field path the update
+    // pass never claims (the outer walk excludes fields 0/1 for the same
+    // reason).
+    return bindingForwardedDynamicPropertyCaptures(modifier).body(
       content: ViewModifierContent(
         base: content,
         authoringScope: authoringScope

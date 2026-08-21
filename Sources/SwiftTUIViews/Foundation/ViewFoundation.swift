@@ -265,7 +265,15 @@ package func resolveViewElements<V: View>(
 ) -> [ResolvedNode] {
   let erased: Any = view
   if let resolvable = erased as? any ResolvableView {
-    return resolvable.resolveElements(in: context)
+    // Capture-bind pass (plan 2026-08-20-001), resolvable tier: every
+    // `ResolvableView` evaluation funnels through this branch —
+    // `resolveView`'s fresh path, `ScopedBuilder`'s transparent
+    // resolvable-output closure, body results that are themselves
+    // resolvable containers, and conditional-branch content — so binding
+    // here covers them all with one seam. The owner rule inside matches
+    // `withDynamicPropertyUpdateScope` exactly.
+    let bound: Any = bindingResolvableDynamicPropertyCaptures(view, in: context)
+    return ((bound as? any ResolvableView) ?? resolvable).resolveElements(in: context)
   }
   // Capture-bind pass (plan 2026-08-20-001), body tier: this is the one
   // seam every plain body evaluation funnels through — the `{ view.body }`
@@ -502,25 +510,19 @@ func resolveView<V: View>(
       EnvironmentValuesStorage.binding(context.environmentValues) {
         ViewNodeContext.withValue(graphNode) {
           if erased is any ResolvableView {
-            // Capture-bind pass (plan 2026-08-20-001), ResolvableView tier:
-            // bind the container's `@State` ownership against this node's
-            // scope so registration closures it creates carry their owner.
-            // Fresh evaluations only — reuse serves never run this, and the
-            // stored evaluator/deferred-descent closures capture the
-            // pre-bind `view` and re-bind on re-entry. Plain bodies bind at
-            // the `resolveViewElements` body seam instead (the one funnel
-            // transparent forwarding containers also route through).
-            // `memoViewValue` below stashes the pre-bind `view` so memo
-            // comparison sees authored values, not captures.
-            let boundView = bindingDynamicPropertyCaptures(
-              view,
-              in: context,
-              graphNode: graphNode,
-              authoringContextOverride: authoringContextOverride
-            )
+            // Capture binding (plan 2026-08-20-001) happens inside
+            // `resolveViewElements`' resolvable branch — the funnel this
+            // call and every resolvable bypass route share — under the same
+            // owner rule the container's own update scope applies. Fresh
+            // evaluations only by construction: reuse serves never reach
+            // `resolveViewElements`, and the stored evaluator and
+            // deferred-descent closures capture the pre-bind `view` and
+            // re-bind on re-entry. `memoViewValue` below stashes the
+            // pre-bind `view` so memo comparison sees authored values,
+            // never captures.
             let resolve = {
               normalizeResolvedElements(
-                resolveViewElements(boundView, in: context),
+                resolveViewElements(view, in: context),
                 in: context
               )
             }

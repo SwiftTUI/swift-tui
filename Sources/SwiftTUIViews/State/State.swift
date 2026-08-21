@@ -432,6 +432,11 @@ public struct State<Value> {
       return location(for: refreshedOwner, path: binding.path)
     }
     StateCaptureCensus.record(.captureMiss)
+    if StateCaptureBindingConfiguration.isEnabled {
+      SoundnessProbeConfiguration.recordStateCaptureMissViolation(
+        "state-capture-miss: owner dead and refresh failed for \(binding.identity)"
+      )
+    }
     return nil
   }
 
@@ -569,6 +574,13 @@ public struct State<Value> {
 @MainActor
 private func reportImperativeSeedFallback(slotOrdinal: Int, reason: String) {
   StateCaptureCensus.record(.seedFallback)
+  if StateCaptureBindingConfiguration.isEnabled {
+    // Oracle promotion (plan 2026-08-20-001 Stage 3): with captures live,
+    // a seed fallback is a soundness failure, not merely a loud diagnostic.
+    SoundnessProbeConfiguration.recordStateSeedFallbackViolation(
+      "state-seed-fallback: slot \(slotOrdinal): \(reason)"
+    )
+  }
   var message =
     "An imperative @State access fell back to the authored initial value: "
     + reason + ". The closure observed the seed, not the last written value."

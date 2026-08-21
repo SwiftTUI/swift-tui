@@ -455,11 +455,168 @@ struct StateCaptureBindingTests {
         #expect(StateCaptureCensus.count(of: .classConflictDemoted) == 1)
         StateCaptureCensus.resetForTesting()
       #endif
+      // The deliberate post-demotion seed read fires the gate-on
+      // `state-seed-fallback` oracle by design: suppress its trace while
+      // proving the counter path, per the soundness-oracle reduction
+      // convention.
+      let savedTrace = SoundnessProbeConfiguration.isTraceEnabled
+      SoundnessProbeConfiguration.isTraceEnabled = false
+      defer { SoundnessProbeConfiguration.isTraceEnabled = savedTrace }
+      let seedFallbacksBefore = SoundnessProbeConfiguration.stateSeedFallbackViolationCount
       #expect(read() == "seed")
+      #expect(SoundnessProbeConfiguration.stateSeedFallbackViolationCount > seedFallbacksBefore)
       #if DEBUG
         #expect(StateCaptureCensus.count(of: .captureHit) == 0)
         #expect(StateCaptureCensus.count(of: .seedFallback) >= 1)
       #endif
+    }
+  }
+
+  // MARK: - Stage 3: remaining body-evaluation edges (§2.5)
+
+  private struct StatefulCaptureModifier: ViewModifier, DynamicProperty {
+    @State private var value = "seed"
+    let log: ClosureLog
+
+    func body(content: Content) -> some View {
+      log.bodyObserved.append(value)
+      log.read = { value }
+      log.write = { value = $0 }
+      return content
+    }
+  }
+
+  @Test("a composed modifier's state binds as its own root, not a nested field")
+  func composedModifierBindsAsOwnRoot() throws {
+    try withCaptureBinding(enabled: true) {
+      let graph = ViewGraph()
+      graph.beginFrame()
+      let identity = testIdentity("ComposedModifierBind")
+      let log = ClosureLog()
+      _ = Resolver().resolve(
+        Text("base").modifier(StatefulCaptureModifier(log: log)),
+        in: makeContext(graph, identity: identity)
+      )
+      let write = try #require(log.write)
+      let read = try #require(log.read)
+
+      write("typed")
+      #expect(read() == "typed")
+      #if DEBUG
+        #expect(StateCaptureCensus.count(of: .captureHit) >= 2)
+        #expect(StateCaptureCensus.count(of: .seedFallback) == 0)
+      #endif
+
+      // Root-relative path fidelity: the forwarded update pass claims the
+      // modifier's slots as its own root, so a capture carrying a nested
+      // field path would fork the write into a phantom slot the resolve
+      // pass never reads. A fresh body evaluation must observe the
+      // capture-routed write.
+      _ = Resolver().resolve(
+        Text("base").modifier(StatefulCaptureModifier(log: log)),
+        in: makeContext(graph, identity: identity)
+      )
+      #expect(log.bodyObserved.last == "typed")
+    }
+  }
+
+  @MainActor
+  private struct StatefulCaptureButtonStyle: ButtonStyle {
+    @State private var value = "seed"
+    let log: ClosureLog
+
+    init(log: ClosureLog) {
+      self.log = log
+    }
+
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+      log.bodyObserved.append(value)
+      log.read = { value }
+      log.write = { value = $0 }
+      return configuration.label
+    }
+  }
+
+  private struct StyledHost: View {
+    let log: ClosureLog
+
+    var body: some View {
+      Button("styled") {}.buttonStyle(StatefulCaptureButtonStyle(log: log))
+    }
+  }
+
+  @Test("a style struct's state binds before its makeBody runs")
+  func styleStructBindsBeforeMakeBody() throws {
+    try withCaptureBinding(enabled: true) {
+      let graph = ViewGraph()
+      graph.beginFrame()
+      let identity = testIdentity("StyleBind")
+      let log = ClosureLog()
+      // The style seam evaluates under the enclosing body's ambient scope
+      // (the owner its `@State` binds against), so the styled control is
+      // mounted through a host body, as every real mount is.
+      _ = Resolver().resolve(
+        StyledHost(log: log),
+        in: makeContext(graph, identity: identity)
+      )
+      let write = try #require(log.write)
+      let read = try #require(log.read)
+
+      write("typed")
+      #expect(read() == "typed")
+      #if DEBUG
+        #expect(StateCaptureCensus.count(of: .captureHit) >= 2)
+        #expect(StateCaptureCensus.count(of: .seedFallback) == 0)
+      #endif
+
+      _ = Resolver().resolve(
+        StyledHost(log: log),
+        in: makeContext(graph, identity: identity)
+      )
+      #expect(log.bodyObserved.last == "typed")
+    }
+  }
+
+  private struct ResolvableCaptureHost: PrimitiveView, ResolvableView {
+    @State private var value = "seed"
+    let log: ClosureLog
+
+    func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+      withDynamicPropertyUpdateScope(self, for: context) {
+        log.bodyObserved.append(value)
+        log.read = { value }
+        log.write = { value = $0 }
+        return resolveViewElements(Text(value), in: context)
+      }
+    }
+  }
+
+  @Test("a resolvable output forwarded by ScopedBuilder binds before resolving")
+  func scopedBuilderResolvableOutputBinds() throws {
+    try withCaptureBinding(enabled: true) {
+      let graph = ViewGraph()
+      graph.beginFrame()
+      let identity = testIdentity("ScopedResolvableBind")
+      let log = ClosureLog()
+      _ = Resolver().resolve(
+        ScopedBuilder(scoped: ResolvableCaptureHost(log: log), authoringContext: nil),
+        in: makeContext(graph, identity: identity)
+      )
+      let write = try #require(log.write)
+      let read = try #require(log.read)
+
+      write("typed")
+      #expect(read() == "typed")
+      #if DEBUG
+        #expect(StateCaptureCensus.count(of: .captureHit) >= 2)
+        #expect(StateCaptureCensus.count(of: .seedFallback) == 0)
+      #endif
+
+      _ = Resolver().resolve(
+        ScopedBuilder(scoped: ResolvableCaptureHost(log: log), authoringContext: nil),
+        in: makeContext(graph, identity: identity)
+      )
+      #expect(log.bodyObserved.last == "typed")
     }
   }
 }

@@ -39,7 +39,10 @@ struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
   ) -> ResolvedNode {
     // TabBody is the seam the `8ace32a5` regression wedged on, and so the
     // reason `resolveStyleBody` rebases rather than mints a fresh scope.
-    resolveStyleBody(style.makeBody(configuration: configuration), in: context)
+    resolveStyleBody(
+      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
+      in: context
+    )
   }
 }
 
