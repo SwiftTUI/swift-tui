@@ -252,6 +252,14 @@ private final class StateBox<Value> {
 /// a later snapshot or mount never inherits a retired owner's fallback value.
 public struct State<Value> {
   private let box: StateBox<Value>
+  /// The owner this copy was bound to by the capture-bind pass (plan
+  /// 2026-08-20-001) — written in place into the exact container copy body
+  /// evaluation consumes, so closures created in the body carry their state
+  /// owner. `.unbound` until a bind pass runs; `.conflicted` latches a
+  /// shared class instance mounted at several identities back onto the
+  /// ambient ladder. Per-copy by struct value semantics: distinct mounts
+  /// bind distinct copies.
+  private var capture: StateCaptureSlot = .unbound
 
   /// Creates state with the supplied initial wrapped value.
   public init(
@@ -316,17 +324,19 @@ public struct State<Value> {
     package var rememberedOwnerCountForTesting: Int {
       box.rememberedOwnerCount
     }
+
+    package var captureSlotForTesting: StateCaptureSlot {
+      capture
+    }
   #endif
 
   private func activeLocation() -> DynamicStateLocation<Value>? {
-    guard let context = AuthoringContextStorage.current else {
-      return nil
-    }
-    guard let storageOwner = stateStorageOwner(for: context) else {
-      return nil
-    }
-
     if ViewNodeContext.current != nil {
+      guard let context = AuthoringContextStorage.current,
+        let storageOwner = stateStorageOwner(for: context)
+      else {
+        return nil
+      }
       // The update pass refreshes both top-level and path-qualified bindings
       // immediately before body evaluation. Reuse that exact binding: making
       // another unqualified location here would duplicate closure/claim work,
@@ -348,11 +358,28 @@ public struct State<Value> {
       return location
     }
 
+    // Imperative access. The carried capture is the exact owner the body
+    // that created this closure was evaluated against — more specific than
+    // any ambient dispatch context — so it serves first. Only bind-pass
+    // evaluations produce `.bound`, which keeps this rung inert whenever the
+    // capture-binding gate is off.
+    if let location = captureLocation() {
+      return location
+    }
+
+    guard let context = AuthoringContextStorage.current,
+      let storageOwner = stateStorageOwner(for: context)
+    else {
+      return nil
+    }
+
     if let location = box.rememberedLocation(for: storageOwner) {
+      StateCaptureCensus.record(.ladderExactOwner)
       return location
     }
 
     if let location = box.rememberedAncestorLocation(for: storageOwner) {
+      StateCaptureCensus.record(.ladderAncestorWalk)
       return location
     }
 
@@ -363,6 +390,7 @@ public struct State<Value> {
     // minting a second slot on the foreign dispatch owner below — which would
     // fork the state and make the author's write a silent no-op.
     if let location = box.soleRememberedLocation() {
+      StateCaptureCensus.record(.ladderSoleBinding)
       return location
     }
 
@@ -370,7 +398,54 @@ public struct State<Value> {
     // binding. Preserve the exact captured owner handle in a location whose
     // closures revalidate liveness on every access; never substitute identity
     // or raw node addressing.
+    StateCaptureCensus.record(.ladderMinted)
     let location = makeImperativeLocation(storageOwner: storageOwner)
+    box.remember(
+      location,
+      for: storageOwner
+    )
+    return location
+  }
+
+  /// Rung 2 of imperative resolution: route through the capture written by
+  /// the bind pass. A live captured owner serves directly; a dead one takes
+  /// the fire-time identity refresh — map the capture's resolve identity
+  /// through its own graph scope's live identity index to the current
+  /// occupant node (the ratified focused-values category: dispatch context
+  /// is runtime state). The refresh never crosses graph scopes and requires
+  /// a live occupant, so committed removal still falls through to the
+  /// ambient ladder; it re-addresses dispatch, never mints storage on a
+  /// foreign graph.
+  private func captureLocation() -> DynamicStateLocation<Value>? {
+    guard case .bound(let binding) = capture else {
+      return nil
+    }
+    if LiveViewGraphRegistry.node(for: binding.owner) != nil {
+      StateCaptureCensus.record(.captureHit)
+      return location(for: binding.owner, path: binding.path)
+    }
+    if let liveGraph = LiveViewGraphRegistry.graph(for: binding.graphScope),
+      let occupant = liveGraph.nodeForIdentity(binding.identity),
+      let refreshedOwner = occupant.stateOwnerHandle
+    {
+      StateCaptureCensus.record(.captureRefreshedOwner)
+      return location(for: refreshedOwner, path: binding.path)
+    }
+    StateCaptureCensus.record(.captureMiss)
+    return nil
+  }
+
+  private func location(
+    for storageOwner: StateStorageOwner,
+    path: StateSlotPath
+  ) -> DynamicStateLocation<Value> {
+    if let remembered = box.rememberedLocation(for: storageOwner) {
+      return remembered
+    }
+    let location = graphSlotLocation(
+      storageOwner: storageOwner,
+      path: path
+    )
     box.remember(
       location,
       for: storageOwner
@@ -493,6 +568,7 @@ public struct State<Value> {
 /// `ImperativeRuntimeIssueQueue` and surface at the next frame head.
 @MainActor
 private func reportImperativeSeedFallback(slotOrdinal: Int, reason: String) {
+  StateCaptureCensus.record(.seedFallback)
   var message =
     "An imperative @State access fell back to the authored initial value: "
     + reason + ". The closure observed the seed, not the last written value."
@@ -508,6 +584,36 @@ private func reportImperativeSeedFallback(slotOrdinal: Int, reason: String) {
       source: "@State"
     )
   )
+}
+
+extension State: CaptureBindableDynamicProperty {
+  /// Writes the bind pass's owner into this copy. Struct copies are private
+  /// to their mount, so overwriting is always correct there. A shared class
+  /// instance mounted at several live identities would collapse every mount
+  /// onto the last writer — that shape demotes to `.conflicted` (permanent
+  /// ambient-ladder fallback for the instance) instead. Overwriting a dead
+  /// owner is a normal re-bind: identity churn and teardown must not latch.
+  package mutating func bindCapture(
+    _ binding: StateCaptureBinding,
+    sharedMutableContainer: Bool
+  ) {
+    switch capture {
+    case .conflicted:
+      return
+    case .bound(let existing):
+      if sharedMutableContainer,
+        existing.owner != binding.owner,
+        LiveViewGraphRegistry.node(for: existing.owner) != nil
+      {
+        capture = .conflicted
+        StateCaptureCensus.record(.classConflictDemoted)
+        return
+      }
+      capture = .bound(binding)
+    case .unbound:
+      capture = .bound(binding)
+    }
+  }
 }
 
 extension State: DynamicProperty {

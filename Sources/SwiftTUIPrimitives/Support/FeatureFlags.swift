@@ -27,6 +27,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case measureSizeStabilityCutoff
   case persistentCustomLayoutCache
   case focusMoveInvalidationNarrowing
+  case stateCaptureBinding
 
   package var environmentVariableName: String {
     switch self {
@@ -56,6 +57,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_PERSISTENT_LAYOUT_CACHE"
     case .focusMoveInvalidationNarrowing:
       "SWIFTTUI_FOCUS_MOVE_NARROWING"
+    case .stateCaptureBinding:
+      "SWIFTTUI_STATE_CAPTURE_BINDING"
     }
   }
 
@@ -184,6 +187,14 @@ package enum FeatureGate: CaseIterable, Sendable {
       // `SWIFTTUI_FOCUS_MOVE_NARROWING=0` restores the event-time raw
       // enqueue wholesale (and is the A/B lever).
       true
+    case .stateCaptureBinding:
+      // Opt-in staging gate (plan 2026-08-20-001 Stage 2): bind `@State`
+      // ownership into the view copy body evaluation captures, so imperative
+      // closures resolve state through their carried owner instead of the
+      // ambient dispatch context. Default flips on only after the plan's
+      // Stage-3 exit criteria (zero seed-fallback and zero unallowed capture
+      // misses across the suite and fuzzer campaigns).
+      false
     }
   }
 

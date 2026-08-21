@@ -23,6 +23,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_MEASURE_CUTOFF",
         "SWIFTTUI_PERSISTENT_LAYOUT_CACHE",
         "SWIFTTUI_FOCUS_MOVE_NARROWING",
+        "SWIFTTUI_STATE_CAPTURE_BINDING",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)
@@ -36,6 +37,10 @@ struct FeatureGateRegistryTests {
     // The presented-progress guard's default flip is gated on its rusage A/B
     // bound (docs/plans/2026-07-20-001 Stage 5, land-only-on-wins).
     #expect(!FeatureGate.presentedProgressGuard.defaultIsEnabled)
+    // Bound-at-capture state ownership stages behind an opt-in until the
+    // plan's Stage-3 exit criteria hold (plan 2026-08-20-001 Stage 4 flips
+    // it).
+    #expect(!FeatureGate.stateCaptureBinding.defaultIsEnabled)
   }
 
   @Test("focus-move narrowing defaults on as a kill switch")

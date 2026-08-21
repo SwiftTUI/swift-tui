@@ -267,8 +267,15 @@ package func resolveViewElements<V: View>(
   if let resolvable = erased as? any ResolvableView {
     return resolvable.resolveElements(in: context)
   }
-  return view.resolveBody(in: context) {
-    view.body
+  // Capture-bind pass (plan 2026-08-20-001), body tier: this is the one
+  // seam every plain body evaluation funnels through — the `{ view.body }`
+  // closure formed here is what the body's closures ultimately capture, so
+  // binding the copy here (under the ambient-wins owner rule the nested
+  // `resolveBody` applies) covers direct `resolveView` children and
+  // transparent forwarding containers (`ScopedBuilder` and peers) alike.
+  let boundView = bindingBodyDynamicPropertyCaptures(view, in: context)
+  return boundView.resolveBody(in: context) {
+    boundView.body
   }
 }
 
@@ -495,9 +502,25 @@ func resolveView<V: View>(
       EnvironmentValuesStorage.binding(context.environmentValues) {
         ViewNodeContext.withValue(graphNode) {
           if erased is any ResolvableView {
+            // Capture-bind pass (plan 2026-08-20-001), ResolvableView tier:
+            // bind the container's `@State` ownership against this node's
+            // scope so registration closures it creates carry their owner.
+            // Fresh evaluations only — reuse serves never run this, and the
+            // stored evaluator/deferred-descent closures capture the
+            // pre-bind `view` and re-bind on re-entry. Plain bodies bind at
+            // the `resolveViewElements` body seam instead (the one funnel
+            // transparent forwarding containers also route through).
+            // `memoViewValue` below stashes the pre-bind `view` so memo
+            // comparison sees authored values, not captures.
+            let boundView = bindingDynamicPropertyCaptures(
+              view,
+              in: context,
+              graphNode: graphNode,
+              authoringContextOverride: authoringContextOverride
+            )
             let resolve = {
               normalizeResolvedElements(
-                resolveViewElements(view, in: context),
+                resolveViewElements(boundView, in: context),
                 in: context
               )
             }
