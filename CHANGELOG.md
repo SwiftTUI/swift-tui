@@ -6,6 +6,25 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [Unreleased]
+
+### Changed
+
+- **`@State` ownership is now bound at capture time.** Closures created
+  during body evaluation (actions, tasks, submit handlers, gesture
+  closures) carry their state owner the way a `Binding` carries its
+  accessors, instead of re-deriving ownership from the ambient dispatch
+  context at fire time. A closure fired after a structural churn re-minted
+  its owner's node (list reshape, unmount/remount) re-addresses through a
+  fire-time identity refresh and observes the live occupant's state. This
+  retires the silent-stale-`@State` corruption class for good: the
+  registration-time ambient ladder (ancestor walk, sole-live-binding, and
+  imperative mint tiers) is deleted, and an access nothing can serve reads
+  the authored seed loudly — as a runtime issue and the new
+  `state-seed-fallback` soundness violation — never another owner's slot
+  silently. `SWIFTTUI_STATE_CAPTURE_BINDING=0` disables the bind pass as a
+  diagnostic A/B lever. No public API changed.
+
 ## [0.9.5] - 2026-08-20
 
 ### Added

@@ -10,10 +10,14 @@ import Testing
 /// when the body never read that property — so no per-box seed can go stale.
 ///
 /// The end-to-end behavior is pinned by `TaskReadsUnbodiedStateTests`; these
-/// tests isolate the mechanism: the imperative write lands on the graph slot,
-/// the imperative read observes it live, a different `StateBox` for the same
-/// owner rendezvous at that same slot, and a retired graph scope falls back to
-/// the seed instead of leaking another session's state.
+/// tests isolate the mechanism. Since plan 2026-08-20-001 Stage 5 the
+/// imperative tier serves only exactly-known bindings — the carried capture
+/// or the dispatch snapshot's exact recorded owner — so this suite pins both
+/// halves: the exact tier lands reads and writes on the owner's graph slot,
+/// and every shape the deleted guessing tiers (ancestor walk, sole live
+/// binding, imperative mint) used to serve now REFUSES loudly instead of
+/// forking or borrowing state. A retired graph scope still falls back to the
+/// seed instead of leaking another session's state.
 @MainActor
 struct ImperativeStateGraphResolutionTests {
   /// Smuggles the imperative authoring snapshot captured during resolve out to
@@ -119,8 +123,27 @@ struct ImperativeStateGraphResolutionTests {
     #expect(readBack == true)
   }
 
-  @Test("a forwarded action binds body-unread @State to its authored ancestor owner")
-  func forwardedActionBindsUnreadStateToAuthoredOwner() throws {
+  /// Deliberate refusals in this suite fire the gate-on
+  /// `state-seed-fallback` oracle by design: suppress its trace, restore
+  /// its counter, and drain the runtime-issue queue afterward so no
+  /// parallel or later test observes this suite's deliberate fallbacks
+  /// (the oracle-reduction convention).
+  private func withDeliberateSeedFallback<Result>(
+    _ body: () throws -> Result
+  ) rethrows -> Result {
+    let savedTrace = SoundnessProbeConfiguration.isTraceEnabled
+    let savedCount = SoundnessProbeConfiguration.stateSeedFallbackViolationCount
+    SoundnessProbeConfiguration.isTraceEnabled = false
+    defer {
+      SoundnessProbeConfiguration.isTraceEnabled = savedTrace
+      SoundnessProbeConfiguration.stateSeedFallbackViolationCount = savedCount
+      _ = ImperativeRuntimeIssueQueue.drain()
+    }
+    return try body()
+  }
+
+  @Test("a foreign-snapshot dispatch refuses instead of walking to an ancestor")
+  func foreignSnapshotDispatchRefusesLoudly() throws {
     let captured = CapturedSnapshot()
     let probe = BodyNeverReadsFlagProbe(captured: captured)
     let (graph, ownerIdentity, ownerSnapshot) = try resolve(probe, captured: captured)
@@ -135,12 +158,20 @@ struct ImperativeStateGraphResolutionTests {
     let descendant = try #require(graph.nodeForIdentity(descendantIdentity))
     let descendantSnapshot = try snapshot(for: descendant)
 
-    withImperativeAuthoringContext(descendantSnapshot) { probe.flagWriter()(true) }
-
+    // The deleted live-parent ancestor walk used to route this write to the
+    // author's slot. A dispatch context naming a foreign owner now refuses:
+    // the write reaches only the box seed — loudly — and no node's slot
+    // forks. The real forwarded-action shape carries the author as a
+    // capture (the closure is created in the author's body) and never
+    // reaches this tier.
+    withDeliberateSeedFallback {
+      withImperativeAuthoringContext(descendantSnapshot) { probe.flagWriter()(true) }
+    }
     let owner = try #require(graph.nodeForIdentity(ownerIdentity))
-    #expect(owner.stateSlot(ordinal: Self.flagOrdinal, seed: false) == true)
+    #expect(owner.stateSlot(ordinal: Self.flagOrdinal, seed: false) == false)
     #expect(descendant.stateSlotStorage(ordinal: Self.flagOrdinal) == nil)
-    #expect(withImperativeAuthoringContext(ownerSnapshot) { probe.flagReader()() } == true)
+    // The author's own snapshot still serves the live slot exactly.
+    #expect(withImperativeAuthoringContext(ownerSnapshot) { probe.flagReader()() } == false)
   }
 
   @Test("eager unread State binding prunes retired owner lifetimes")
@@ -163,181 +194,79 @@ struct ImperativeStateGraphResolutionTests {
     #endif
   }
 
-  @Test("a write through one box is observed by a read through a different box")
-  func crossBoxRendezvousAtGraphSlot() throws {
-    // `probe1` is resolved (creating the owner node + registering the graph) and
-    // supplies the read closure bound to box 1 — standing in for the long-lived
-    // `.task` that captured the first body's box. `probe2` is never resolved;
-    // its write closure is bound to a distinct box 2 — standing in for the
-    // gesture that captured a later body's box. They share neither box nor seed,
-    // only the owner identity and graph scope.
+  @Test("cross-box rendezvous requires a resolved binding; an unresolved copy refuses")
+  func crossBoxRendezvousRequiresAResolvedBinding() throws {
     let captured1 = CapturedSnapshot()
     let probe1 = BodyNeverReadsFlagProbe(captured: captured1)
-    let probe2 = BodyNeverReadsFlagProbe(captured: CapturedSnapshot())
     let (graph, ownerIdentity, snapshot) = try resolve(probe1, captured: captured1)
-
     let readViaBox1 = probe1.flagReader()
-    let writeViaBox2 = probe2.flagWriter()
 
+    // An unresolved copy's closure carries no capture and no remembered
+    // binding. The deleted imperative mint used to fabricate a location
+    // from the ambient handle; the write now reaches only that copy's own
+    // pre-mount seed (its box was never graph-bound, so this stays the
+    // quiet pre-mount arm) and the graph slot is untouched.
+    let unresolved = BodyNeverReadsFlagProbe(captured: CapturedSnapshot())
+    withImperativeAuthoringContext(snapshot) { unresolved.flagWriter()(true) }
     #expect(withImperativeAuthoringContext(snapshot) { readViaBox1() } == false)
 
-    withImperativeAuthoringContext(snapshot) { writeViaBox2(true) }
+    // A LATER RESOLVED copy — the real "a gesture captured a later body's
+    // box" shape — rendezvous at the shared slot through its own binding.
+    let captured2 = CapturedSnapshot()
+    let probe2 = BodyNeverReadsFlagProbe(captured: captured2)
+    var context = ResolveContext(
+      identity: ownerIdentity,
+      environmentValues: .init(),
+      applyEnvironmentValues: true
+    )
+    context.viewGraph = graph
+    _ = Resolver().resolve(probe2, in: context)
+    withImperativeAuthoringContext(snapshot) { probe2.flagWriter()(true) }
 
-    // Box 2's write rendezvous with box 1's read at the shared graph slot.
     #expect(withImperativeAuthoringContext(snapshot) { readViaBox1() } == true)
     let node = try #require(graph.nodeForIdentity(ownerIdentity))
     let storage = try #require(node.stateSlotStorage(ordinal: Self.flagOrdinal))
     #expect(storage.value(as: Bool.self) == true)
   }
 
-  @Test("imperative State chooses its nearest already-bound owner on the live parent chain")
-  func imperativeStateUsesNearestBoundAncestorOwner() throws {
-    let probe = BodyNeverReadsFlagProbe(captured: CapturedSnapshot())
-    let graph = ViewGraph()
-    let root = testIdentity("AncestorFallback")
-    let ownerIdentity = testIdentity("AncestorFallback", "Owner")
-    let wrapperIdentity = testIdentity("AncestorFallback", "Owner", "WrapperWithUnrelatedState")
-    let leafIdentity = testIdentity(
-      "AncestorFallback", "Owner", "WrapperWithUnrelatedState", "DeepButton")
+  @Test("a leaf-snapshot dispatch never walks the parent chain or forks a node")
+  func leafSnapshotDispatchRefusesWithoutWalkOrFork() throws {
+    let captured = CapturedSnapshot()
+    let probe = BodyNeverReadsFlagProbe(captured: captured)
+    let (graph, ownerIdentity, _) = try resolve(probe, captured: captured)
+    let wrapperIdentity = testIdentity("Root", "Wrapper")
+    let leafIdentity = testIdentity("Root", "Wrapper", "DeepButton")
+    let siblingIdentity = testIdentity("Root", "Sibling")
     _ = graph.applySnapshot(
       ResolvedNode(
-        identity: root,
+        identity: ownerIdentity,
         kind: .root,
         children: [
           ResolvedNode(
-            identity: ownerIdentity,
-            kind: .view("Owner"),
-            children: [
-              ResolvedNode(
-                identity: wrapperIdentity,
-                kind: .view("Wrapper"),
-                children: [ResolvedNode(identity: leafIdentity, kind: .view("Button"))]
-              )
-            ]
-          )
+            identity: wrapperIdentity,
+            kind: .view("Wrapper"),
+            children: [ResolvedNode(identity: leafIdentity, kind: .view("Button"))]
+          ),
+          ResolvedNode(identity: siblingIdentity, kind: .view("Mount")),
         ]
       )
     )
+    let leaf = try #require(graph.nodeForIdentity(leafIdentity))
+    let sibling = try #require(graph.nodeForIdentity(siblingIdentity))
+    let leafSnapshot = try snapshot(for: leaf)
+
+    // The deleted live-parent walk used to find the author's binding from
+    // here, and the deleted sole-binding pick used to serve it even from
+    // detached subtrees. Both now refuse: the write reaches only the box
+    // seed — loudly, since the box was graph-bound — and no node in any
+    // branch forks a slot. Graph- and sibling-isolation hold by refusal.
+    withDeliberateSeedFallback {
+      withImperativeAuthoringContext(leafSnapshot) { probe.flagWriter()(true) }
+    }
     let owner = try #require(graph.nodeForIdentity(ownerIdentity))
-    let leaf = try #require(graph.nodeForIdentity(leafIdentity))
-    let ownerSnapshot = try snapshot(for: owner)
-    let leafSnapshot = try snapshot(for: leaf)
-
-    #expect(withImperativeAuthoringContext(ownerSnapshot) { probe.flagReader()() } == false)
-    withImperativeAuthoringContext(leafSnapshot) { probe.flagWriter()(true) }
-
-    #expect(owner.stateSlot(ordinal: Self.flagOrdinal, seed: false) == true)
+    #expect(owner.stateSlot(ordinal: Self.flagOrdinal, seed: false) == false)
     #expect(leaf.stateSlotStorage(ordinal: Self.flagOrdinal) == nil)
-  }
-
-  @Test("each captured StateBox chooses its own bound ancestor past unrelated state")
-  func multipleCapturedStateBoxesChooseTheirOwnAncestorOwners() throws {
-    let outerProbe = BodyNeverReadsFlagProbe(captured: CapturedSnapshot())
-    let middleProbe = BodyNeverReadsFlagProbe(captured: CapturedSnapshot())
-    let unrelatedProbe = BodyNeverReadsFlagProbe(captured: CapturedSnapshot(), column: 8)
-    let graph = ViewGraph()
-    let root = testIdentity("MultipleAncestorBoxes")
-    let outerIdentity = testIdentity("MultipleAncestorBoxes", "Outer")
-    let middleIdentity = testIdentity("MultipleAncestorBoxes", "Outer", "Middle")
-    let leafIdentity = testIdentity("MultipleAncestorBoxes", "Outer", "Middle", "Button")
-    _ = graph.applySnapshot(
-      ResolvedNode(
-        identity: root,
-        kind: .root,
-        children: [
-          ResolvedNode(
-            identity: outerIdentity,
-            kind: .view("Outer"),
-            children: [
-              ResolvedNode(
-                identity: middleIdentity,
-                kind: .view("Middle"),
-                children: [ResolvedNode(identity: leafIdentity, kind: .view("Button"))]
-              )
-            ]
-          )
-        ]
-      )
-    )
-    let outer = try #require(graph.nodeForIdentity(outerIdentity))
-    let middle = try #require(graph.nodeForIdentity(middleIdentity))
-    let leaf = try #require(graph.nodeForIdentity(leafIdentity))
-    let outerSnapshot = try snapshot(for: outer)
-    let middleSnapshot = try snapshot(for: middle)
-    let leafSnapshot = try snapshot(for: leaf)
-
-    _ = withImperativeAuthoringContext(outerSnapshot) { outerProbe.flagReader()() }
-    _ = withImperativeAuthoringContext(middleSnapshot) { middleProbe.flagReader()() }
-    _ = withImperativeAuthoringContext(middleSnapshot) { unrelatedProbe.flagReader()() }
-    withImperativeAuthoringContext(leafSnapshot) {
-      outerProbe.flagWriter()(true)
-      middleProbe.flagWriter()(true)
-    }
-
-    #expect(outer.stateSlot(ordinal: Self.flagOrdinal, seed: false) == true)
-    #expect(middle.stateSlot(ordinal: Self.flagOrdinal, seed: false) == true)
-    #expect(
-      withImperativeAuthoringContext(middleSnapshot) { unrelatedProbe.flagReader()() } == false)
-    #expect(leaf.stateSlotStorage(ordinal: Self.flagOrdinal) == nil)
-  }
-
-  @Test("ancestor fallback stays within the dispatching graph and sibling branch")
-  func ancestorFallbackIsolatesGraphsAndSiblingMounts() throws {
-    let sharedProbe = BodyNeverReadsFlagProbe(captured: CapturedSnapshot())
-
-    func makeGraph(_ name: String) throws -> (
-      graph: ViewGraph, first: SwiftTUICore.ViewNode, firstLeaf: SwiftTUICore.ViewNode,
-      second: SwiftTUICore.ViewNode, secondLeaf: SwiftTUICore.ViewNode
-    ) {
-      let graph = ViewGraph()
-      let root = testIdentity(name)
-      let firstIdentity = testIdentity(name, "First")
-      let secondIdentity = testIdentity(name, "Second")
-      let firstLeafIdentity = testIdentity(name, "First", "Button")
-      let secondLeafIdentity = testIdentity(name, "Second", "Button")
-      _ = graph.applySnapshot(
-        ResolvedNode(
-          identity: root,
-          kind: .root,
-          children: [
-            ResolvedNode(
-              identity: firstIdentity,
-              kind: .view("Mount"),
-              children: [ResolvedNode(identity: firstLeafIdentity, kind: .view("Button"))]
-            ),
-            ResolvedNode(
-              identity: secondIdentity,
-              kind: .view("Mount"),
-              children: [ResolvedNode(identity: secondLeafIdentity, kind: .view("Button"))]
-            ),
-          ]
-        )
-      )
-      return (
-        graph,
-        try #require(graph.nodeForIdentity(firstIdentity)),
-        try #require(graph.nodeForIdentity(firstLeafIdentity)),
-        try #require(graph.nodeForIdentity(secondIdentity)),
-        try #require(graph.nodeForIdentity(secondLeafIdentity))
-      )
-    }
-
-    let primary = try makeGraph("AncestorIsolationPrimary")
-    let secondary = try makeGraph("AncestorIsolationSecondary")
-    for owner in [primary.first, primary.second, secondary.first, secondary.second] {
-      let ownerSnapshot = try snapshot(for: owner)
-      #expect(withImperativeAuthoringContext(ownerSnapshot) { sharedProbe.flagReader()() } == false)
-    }
-
-    withImperativeAuthoringContext(try snapshot(for: primary.firstLeaf)) {
-      sharedProbe.flagWriter()(true)
-    }
-
-    #expect(primary.first.stateSlot(ordinal: Self.flagOrdinal, seed: false) == true)
-    #expect(primary.second.stateSlot(ordinal: Self.flagOrdinal, seed: false) == false)
-    #expect(secondary.first.stateSlot(ordinal: Self.flagOrdinal, seed: false) == false)
-    #expect(secondary.second.stateSlot(ordinal: Self.flagOrdinal, seed: false) == false)
-    #expect(primary.firstLeaf.stateSlotStorage(ordinal: Self.flagOrdinal) == nil)
+    #expect(sibling.stateSlotStorage(ordinal: Self.flagOrdinal) == nil)
   }
 
   @Test("a retired descendant handle cannot recover an unmounted State owner")

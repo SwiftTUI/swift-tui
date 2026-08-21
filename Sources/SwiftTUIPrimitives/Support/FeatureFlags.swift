@@ -188,13 +188,15 @@ package enum FeatureGate: CaseIterable, Sendable {
       // enqueue wholesale (and is the A/B lever).
       true
     case .stateCaptureBinding:
-      // Opt-in staging gate (plan 2026-08-20-001 Stage 2): bind `@State`
-      // ownership into the view copy body evaluation captures, so imperative
-      // closures resolve state through their carried owner instead of the
-      // ambient dispatch context. Default flips on only after the plan's
-      // Stage-3 exit criteria (zero seed-fallback and zero unallowed capture
-      // misses across the suite and fuzzer campaigns).
-      false
+      // Default-on (plan 2026-08-20-001 Stage 4): bind `@State` ownership
+      // into the view copy body evaluation captures, so imperative closures
+      // resolve state through their carried owner instead of the ambient
+      // dispatch context. `SWIFTTUI_STATE_CAPTURE_BINDING=0` disables the
+      // bind pass as a diagnostic A/B lever; with the ambient ladder deleted
+      // (Stage 5) that arm serves imperative reads from the loud authored
+      // seed, so it attributes capture regressions — it does not restore the
+      // pre-capture dispatch behavior.
+      true
     }
   }
 

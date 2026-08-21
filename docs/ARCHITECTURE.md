@@ -115,7 +115,14 @@ and then `SwiftTUIRuntime`.
 - **`SwiftTUIViews`** — the authoring surface. The `View` protocol, view
   builders, containers, controls, layout, state, focus, gestures, modifiers,
   and shapes. `View` is body-only and `@MainActor`-isolated. Lowering to
-  primitives is package-internal.
+  primitives is package-internal. `@State` ownership is bound at capture
+  time: a pass at the body-evaluation seams (`resolveViewElements`' two
+  branches, plus the composed-modifier and style-body forwarding seams)
+  writes each evaluation's state owner into the exact container copy the
+  body consumes, so closures created in bodies carry their owner. Imperative
+  access resolves resolve-ambient → carried capture (with a fire-time
+  identity refresh for re-minted nodes) → loud authored seed; there is no
+  ambient owner-guessing ladder (plan 2026-08-20-001).
 - **`SwiftTUIRuntime`** — the run loop, the renderer, scenes (`App`, `Scene`,
   `WindowGroup`), terminal hosting, and the host-frame contracts.
 

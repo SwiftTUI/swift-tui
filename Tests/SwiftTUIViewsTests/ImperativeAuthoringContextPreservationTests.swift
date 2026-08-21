@@ -72,6 +72,24 @@ struct ImperativeAuthoringContextPreservationTests {
     }
   }
 
+  /// The deliberate seed-fallback shapes below fire the gate-on
+  /// `state-seed-fallback` soundness oracle by design: suppress its trace
+  /// AND restore its counter afterward, per the oracle-reduction convention —
+  /// a parallel stress test's `SoundnessGuard` window must not observe this
+  /// suite's deliberate growth.
+  private func withSeedFallbackTraceSuppressed<Result>(
+    _ body: () throws -> Result
+  ) rethrows -> Result {
+    let savedTrace = SoundnessProbeConfiguration.isTraceEnabled
+    let savedCount = SoundnessProbeConfiguration.stateSeedFallbackViolationCount
+    SoundnessProbeConfiguration.isTraceEnabled = false
+    defer {
+      SoundnessProbeConfiguration.isTraceEnabled = savedTrace
+      SoundnessProbeConfiguration.stateSeedFallbackViolationCount = savedCount
+    }
+    return try body()
+  }
+
   @Test("a nil imperative snapshot preserves the ambient authoring context")
   func nilSnapshotPreservesAmbientContext() throws {
     let captured = CapturedSnapshot()
@@ -141,7 +159,9 @@ struct ImperativeAuthoringContextPreservationTests {
 
     // A context-free read on the bound box degrades to the seed — silently,
     // before this warning existed.
-    _ = probe.flagReader()()
+    withSeedFallbackTraceSuppressed {
+      _ = probe.flagReader()()
+    }
 
     let issues = drainSeedFallbackIssues()
     #expect(issues.count == 1)
@@ -166,7 +186,9 @@ struct ImperativeAuthoringContextPreservationTests {
     graph.removeSubtree(rootedAt: owner)
     _ = drainSeedFallbackIssues()
 
-    _ = withImperativeAuthoringContext(snapshot) { probe.flagReader()() }
+    withSeedFallbackTraceSuppressed {
+      _ = withImperativeAuthoringContext(snapshot) { probe.flagReader()() }
+    }
 
     let issues = drainSeedFallbackIssues()
     #expect(issues.count == 1)

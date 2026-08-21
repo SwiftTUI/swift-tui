@@ -128,6 +128,18 @@ are omitted even when SwiftUI exposes a corresponding API.
   `DynamicPropertyContext.invalidationLease` supplies a lifetime-scoped route
   for asynchronous storage; departed callbacks are inert. See
   <doc:Custom-Dynamic-Properties>.
+- **State ownership is bound at capture, with an identity-refresh tier.**
+  *Ratified.* Closures created during body evaluation carry their `@State`
+  owner — SwiftTUI's analog of SwiftUI's `_location` injection, adapted to
+  value-semantic checkpointable slots. A closure fired after its owner node
+  was re-minted under the same resolve identity (list reshape, unmount/
+  remount) re-addresses dispatch through a fire-time identity refresh and
+  observes the live occupant's state; a closure that outlives its state's
+  committed removal reads the authored seed *loudly* (a runtime issue plus
+  the `state-seed-fallback` soundness violation) where SwiftUI's dead
+  `_location` reads are silent. There is no ambient dispatch-context
+  guessing: SwiftTUI never resolves a closure's state against whichever
+  owner happens to be ambient at fire time.
 - **Dynamic-property discovery sees stored properties only.** *Ratified.*
   Discovery reflects stored properties (as SwiftUI does); computed
   properties never participate in the update pass. Wrappers composed inside

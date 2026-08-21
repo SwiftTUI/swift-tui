@@ -368,7 +368,6 @@ struct StateCaptureBindingTests {
         #expect(StateCaptureCensus.count(of: .captureHit) >= 2)
         #expect(StateCaptureCensus.count(of: .seedFallback) == 0)
         #expect(StateCaptureCensus.count(of: .ladderExactOwner) == 0)
-        #expect(StateCaptureCensus.count(of: .ladderMinted) == 0)
       #endif
 
       // Path fidelity: a fresh body evaluation must observe the value the
@@ -456,13 +455,17 @@ struct StateCaptureBindingTests {
         StateCaptureCensus.resetForTesting()
       #endif
       // The deliberate post-demotion seed read fires the gate-on
-      // `state-seed-fallback` oracle by design: suppress its trace while
-      // proving the counter path, per the soundness-oracle reduction
-      // convention.
+      // `state-seed-fallback` oracle by design: suppress its trace, prove
+      // the counter path, then restore the counter so a parallel stress
+      // test's `SoundnessGuard` window cannot observe this suite's
+      // deliberate growth (the oracle-reduction convention).
       let savedTrace = SoundnessProbeConfiguration.isTraceEnabled
       SoundnessProbeConfiguration.isTraceEnabled = false
-      defer { SoundnessProbeConfiguration.isTraceEnabled = savedTrace }
       let seedFallbacksBefore = SoundnessProbeConfiguration.stateSeedFallbackViolationCount
+      defer {
+        SoundnessProbeConfiguration.isTraceEnabled = savedTrace
+        SoundnessProbeConfiguration.stateSeedFallbackViolationCount = seedFallbacksBefore
+      }
       #expect(read() == "seed")
       #expect(SoundnessProbeConfiguration.stateSeedFallbackViolationCount > seedFallbacksBefore)
       #if DEBUG

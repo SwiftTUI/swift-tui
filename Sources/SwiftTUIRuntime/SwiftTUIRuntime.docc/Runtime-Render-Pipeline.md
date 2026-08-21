@@ -237,6 +237,30 @@ main actor when the execution strategy supports it. That boundary separates the
 runtime stage pipeline from the phase-product model. The fused tail is a
 scheduling optimization over distinct products, not a different data model.
 
+## State Ownership At Capture
+
+`@State` ownership travels with the closures a body creates. Immediately
+before a body, style body, or composed-modifier body evaluates, the
+capture-bind pass writes the evaluation's state owner into the exact
+container copy that code consumes — so an action, task, or submit closure
+carries its owner the way a `Binding` carries its accessors, instead of
+re-deriving ownership from whatever dispatch context happens to be ambient
+when it later fires.
+
+An imperative access resolves in order: the resolve-pass ambient scope
+(inside a body), then the carried capture — served directly while the owner
+node is live, or re-addressed through a fire-time identity refresh when a
+structural churn re-minted the node under the same resolve identity (same
+graph scope and a live occupant only; committed removal falls through) —
+then the loud authored-seed fallback, which records the
+`state-seed-fallback` soundness violation. There is no ambient
+owner-guessing tier: a closure that outlives its state's committed removal
+reads the seed loudly rather than another owner's slot silently.
+
+`SWIFTTUI_STATE_CAPTURE_BINDING=0` disables the bind pass as a diagnostic
+A/B lever for attributing capture regressions; it does not substitute a
+different ownership model.
+
 ## Lazy Container Windowing
 
 `LazyVStack`/`LazyHStack` content backed by an indexed source (a direct

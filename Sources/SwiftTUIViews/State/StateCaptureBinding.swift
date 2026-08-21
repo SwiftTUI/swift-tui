@@ -89,9 +89,6 @@ package enum StateCaptureCensus {
     case captureRefreshedOwner = "state.capture.refreshedOwner"
     case captureMiss = "state.capture.miss"
     case ladderExactOwner = "state.ladder.exactOwner"
-    case ladderAncestorWalk = "state.ladder.ancestorWalk"
-    case ladderSoleBinding = "state.ladder.soleBinding"
-    case ladderMinted = "state.ladder.minted"
     case seedFallback = "state.ladder.seedFallback"
   }
 
@@ -115,8 +112,7 @@ package enum StateCaptureCensus {
       case .captureHit, .captureRefreshedOwner, .bindBound:
         return
       case .bindSkippedTier, .bindNoOwner, .classConflictDemoted, .captureMiss,
-        .ladderExactOwner, .ladderAncestorWalk, .ladderSoleBinding, .ladderMinted,
-        .seedFallback:
+        .ladderExactOwner, .seedFallback:
         DebugLogRouter.emit(
           "[STATE-CENSUS] \(event.rawValue)\n",
           toFileAt: censusFilePath

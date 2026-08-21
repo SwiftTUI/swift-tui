@@ -37,10 +37,15 @@ struct FeatureGateRegistryTests {
     // The presented-progress guard's default flip is gated on its rusage A/B
     // bound (docs/plans/2026-07-20-001 Stage 5, land-only-on-wins).
     #expect(!FeatureGate.presentedProgressGuard.defaultIsEnabled)
-    // Bound-at-capture state ownership stages behind an opt-in until the
-    // plan's Stage-3 exit criteria hold (plan 2026-08-20-001 Stage 4 flips
-    // it).
-    #expect(!FeatureGate.stateCaptureBinding.defaultIsEnabled)
+  }
+
+  @Test("capture binding defaults on as a diagnostic lever")
+  func stateCaptureBindingDefaultsOn() {
+    // Flip plan 2026-08-20-001 Stage 4: default-on after the Stage-3 exit
+    // criteria (edge coverage, zero seed-fallback/capture-miss oracles).
+    // `SWIFTTUI_STATE_CAPTURE_BINDING=0` disables the bind pass for A/B
+    // attribution; it does not restore the deleted ambient ladder.
+    #expect(FeatureGate.stateCaptureBinding.defaultIsEnabled)
   }
 
   @Test("focus-move narrowing defaults on as a kill switch")

@@ -144,62 +144,6 @@ private final class StateBox<Value> {
     return boundLocationsByOwner[owner]
   }
 
-  /// Finds this box's nearest already-bound owner on the exact live dispatch
-  /// owner's parent chain. This is the imperative callback seam for an action
-  /// closure authored by an ancestor and forwarded through arbitrary custom
-  /// views before reaching a control: each captured StateBox selects its own
-  /// bound ancestor rather than minting storage on the forwarding leaf.
-  ///
-  /// The search is deliberately handle- and relation-only. The registry first
-  /// resolves the exact graph/lifetime pair, then the walk follows only that
-  /// node's live parents. It never scans graph identities, sibling branches,
-  /// raw node IDs, or a retired owner's retained object.
-  func rememberedAncestorLocation(
-    for dispatchOwner: StateStorageOwner
-  ) -> DynamicStateLocation<Value>? {
-    guard let dispatchNode = LiveViewGraphRegistry.node(for: dispatchOwner) else {
-      return nil
-    }
-    let dispatchGraph = dispatchNode.ownerGraph
-    var ancestor = dispatchNode.parent
-    while let candidate = ancestor {
-      guard candidate.ownerGraph === dispatchGraph else {
-        return nil
-      }
-      if let candidateOwner = candidate.stateOwnerHandle,
-        let location = boundLocationsByOwner[candidateOwner]
-      {
-        return location
-      }
-      ancestor = candidate.parent
-    }
-    return nil
-  }
-
-  /// This box's only live binding, when exactly one remains.
-  ///
-  /// ``rememberedAncestorLocation(for:)`` walks the dispatch node's live
-  /// parent chain, which covers an action closure forwarded down a single
-  /// subtree. It cannot cover a closure forwarded into a *detached* subtree —
-  /// `.background`, `.overlay`, and presentation layers mount content whose
-  /// ancestry never reaches the authoring view — so the walk misses even
-  /// though the author's slot is bound and live.
-  ///
-  /// Minting fresh storage on the foreign dispatch owner is never the right
-  /// answer for an already-bound box: it silently forks the state, so the
-  /// author's reads keep seeing the authored seed while writes land in a
-  /// second slot nobody observes. A single remaining binding is unambiguous —
-  /// it is the author's own slot — so prefer it. Boxes shared across several
-  /// live owners stay ambiguous and fall through to the imperative path,
-  /// which keeps its exact-handle behaviour.
-  func soleRememberedLocation() -> DynamicStateLocation<Value>? {
-    pruneRetiredBoundLocations()
-    guard boundLocationsByOwner.count == 1 else {
-      return nil
-    }
-    return boundLocationsByOwner.values.first
-  }
-
   func retainedValue(
     for owner: StateStorageOwner
   ) -> Value? {
@@ -307,6 +251,18 @@ public struct State<Value> {
       if let location = activeLocation() {
         location.setValue(newValue)
       } else {
+        // Pre-mount seeding is the legitimate use of this arm. A write on a
+        // box that once had a live slot lands only in the authored seed —
+        // the silent-no-op-write half of the corruption class — so it is as
+        // loud as the read-side fallback (plan 2026-08-20-001 Stage 5).
+        if box.hasEverBeenGraphBound, ViewNodeContext.current == nil {
+          reportImperativeSeedFallback(
+            slotOrdinal: box.currentOrdinal,
+            reason:
+              "no live state owner could be resolved from the dispatch context; "
+              + "the write reached only the authored seed"
+          )
+        }
         box.updateSeedValue(newValue)
       }
     }
@@ -367,43 +323,23 @@ public struct State<Value> {
       return location
     }
 
+    // Dispatch-snapshot tier: an installed imperative context names an exact
+    // recorded owner handle, so serving it is precise by construction — no
+    // guessing. It covers closures minted from app-held view values (copies
+    // the bind pass never saw) dispatched under a registration snapshot, the
+    // a81ee22e nil-preservation contract. The guessing tiers that used to
+    // follow — the live-parent ancestor walk, the sole-live-binding pick,
+    // and the imperative location mint — are deleted (plan 2026-08-20-001
+    // Stage 5): body-created closures carry their owner as captures, and an
+    // access neither a capture nor an exact bound location can serve reads
+    // the authored seed loudly instead of another owner's slot silently.
     guard let context = AuthoringContextStorage.current,
-      let storageOwner = stateStorageOwner(for: context)
+      let storageOwner = stateStorageOwner(for: context),
+      let location = box.rememberedLocation(for: storageOwner)
     else {
       return nil
     }
-
-    if let location = box.rememberedLocation(for: storageOwner) {
-      StateCaptureCensus.record(.ladderExactOwner)
-      return location
-    }
-
-    if let location = box.rememberedAncestorLocation(for: storageOwner) {
-      StateCaptureCensus.record(.ladderAncestorWalk)
-      return location
-    }
-
-    // The ancestor walk cannot see across a detached subtree: `.background`,
-    // `.overlay`, and presentation layers dispatch from nodes whose live
-    // ancestry never reaches the authoring view. An already-bound box with a
-    // single live owner is unambiguous, so use that binding rather than
-    // minting a second slot on the foreign dispatch owner below — which would
-    // fork the state and make the author's write a silent no-op.
-    if let location = box.soleRememberedLocation() {
-      StateCaptureCensus.record(.ladderSoleBinding)
-      return location
-    }
-
-    // A legacy/undiscovered imperative path may arrive without an update-pass
-    // binding. Preserve the exact captured owner handle in a location whose
-    // closures revalidate liveness on every access; never substitute identity
-    // or raw node addressing.
-    StateCaptureCensus.record(.ladderMinted)
-    let location = makeImperativeLocation(storageOwner: storageOwner)
-    box.remember(
-      location,
-      for: storageOwner
-    )
+    StateCaptureCensus.record(.ladderExactOwner)
     return location
   }
 
@@ -478,18 +414,6 @@ public struct State<Value> {
     return graphSlotLocation(
       storageOwner: storageOwner,
       path: path
-    )
-  }
-
-  /// Builds an exact-handle location for imperative access outside a resolve
-  /// pass. Construction does not require the node to be live: each read/write
-  /// resolves the owner handle again, and a retired owner uses only its own
-  /// retained value (then the authored seed), never another graph or identity.
-  private func makeImperativeLocation(
-    storageOwner: StateStorageOwner
-  ) -> DynamicStateLocation<Value> {
-    return graphSlotLocation(
-      storageOwner: storageOwner
     )
   }
 
