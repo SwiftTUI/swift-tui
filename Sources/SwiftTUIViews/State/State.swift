@@ -367,13 +367,24 @@ public struct State<Value> {
       StateCaptureCensus.record(.captureRefreshedOwner)
       return location(for: refreshedOwner, path: binding.path)
     }
+    // Owner dead and no live occupant at the identity (committed removal, or
+    // a dormant-archived subtree whose node is out of the live registry).
+    // Serve the captured owner's own location: its closures degrade to the
+    // per-owner retained value — the separately-retained-`Binding` contract
+    // the pre-capture remembered locations honored — and then to the loud
+    // authored-seed report. The miss is a violation only when no retained
+    // value exists either: a retained-value serve is the documented stale-
+    // binding degrade, not an unserveable access.
     StateCaptureCensus.record(.captureMiss)
-    if StateCaptureBindingConfiguration.isEnabled {
+    if StateCaptureBindingConfiguration.isEnabled,
+      box.retainedValue(for: binding.owner) == nil
+    {
       SoundnessProbeConfiguration.recordStateCaptureMissViolation(
-        "state-capture-miss: owner dead and refresh failed for \(binding.identity)"
+        "state-capture-miss: owner dead, refresh failed, no retained value for "
+          + "\(binding.identity)"
       )
     }
-    return nil
+    return location(for: binding.owner, path: binding.path)
   }
 
   private func location(
