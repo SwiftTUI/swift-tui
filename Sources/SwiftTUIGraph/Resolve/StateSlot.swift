@@ -164,6 +164,20 @@ package struct AnyStateSlot {
     return !isDormantValueOnly(malformed)
   }
 
+  /// Module prefixes whose `CustomReflectable` mirrors are trusted to expose
+  /// their logical payload honestly. Matched against `String(reflecting:)` of
+  /// the runtime type, so the swift-foundation split modules count too.
+  private static let trustedMirrorModulePrefixes = [
+    "Swift.",
+    "Foundation.",
+    "FoundationEssentials.",
+    "FoundationInternationalization.",
+  ]
+
+  private static func hasTrustedMirrorModulePrefix(_ typeName: String) -> Bool {
+    trustedMirrorModulePrefixes.contains { typeName.hasPrefix($0) }
+  }
+
   private static func isDormantValueOnly(_ value: Any) -> Bool {
     var remainingNodes = 4_096
     return isDormantValueOnly(
@@ -205,21 +219,34 @@ package struct AnyStateSlot {
       return false
     }
     switch RuntimeFieldReflection.metadataKind(of: valueType) {
-    case 0, 0x203:
+    case 0, 0x203, 0x204, 0x305:
       // Runtime type metadata is authoritative. A CustomReflectable class can
       // report a struct-shaped mirror, but cannot change its metadata kind.
+      // Native, foreign, and foreign-reference classes plus Objective-C class
+      // wrappers (`NSObject` and friends on Darwin) are all reference payloads.
       return false
     default:
       break
     }
 
+    // SIMD vectors are fixed-width scalar lanes. Their storage reflects as a
+    // `Builtin.Vec…` leaf, which the builtin-handle rule below would reject;
+    // the protocol conformance is the honest classification of the value.
+    if value is any SIMD || value is any SIMDStorage {
+      return true
+    }
+
     let typeName = String(reflecting: valueType)
 
     // A user-defined custom mirror can omit reference-bearing fields or
-    // recursively yield itself. Standard-library value containers have
-    // trusted mirrors that expose their logical payloads; every other custom
-    // mirror is conservatively ineligible for dormant storage.
-    if value is any CustomReflectable, !typeName.hasPrefix("Swift.") {
+    // recursively yield itself. Standard-library and Foundation value
+    // containers have trusted mirrors that expose their logical payloads
+    // (`UUID` publishes an empty struct mirror, `Date` its interval); every
+    // other custom mirror is conservatively ineligible for dormant storage.
+    // Foundation reference types never reach this rule: the metadata-kind
+    // check above already rejected them, and a Foundation struct whose mirror
+    // exposes a pointer or class still fails the leaf rules that follow.
+    if value is any CustomReflectable, !Self.hasTrustedMirrorModulePrefix(typeName) {
       return false
     }
 

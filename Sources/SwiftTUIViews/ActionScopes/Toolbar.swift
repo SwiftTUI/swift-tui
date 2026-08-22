@@ -256,11 +256,32 @@ extension ResolvedNode {
     absorbedPreferences[ToolbarItemsPreferenceKey.self] = []
 
     let stripContext = context.child(component: .named("toolbar-strip"))
-    let stripNode = resolvedToolbarItemsStrip(
+    let strip = resolvedToolbarItemsStrip(
       items: items,
       style: style,
       context: stripContext
     )
+    let stripNode = strip.node
+    // This reconcile runs in the late-preference stage, outside any dirty
+    // plan. When the ITEM SET changes (the content changed under a frontier
+    // that is a sibling of `…/toolbar-strip` beneath this scope) the host's
+    // graph node still applies last frame's strip: the departed item's nodes
+    // stay live (the barrier defers their teardown until the host next
+    // applies), their action registrations stay published, and the
+    // presented strip lags until some later root frame. Ask for a follow-up
+    // frame rooted at the host so it re-applies through the normal dirty
+    // plan; teardown, registrations, and damage then all see the new strip.
+    // The follow-up frame finds the new signature already cached, so this
+    // cannot re-arm itself. A same-frame install was tried and rejected: the
+    // tail's first layout pass has already visited the old strip's
+    // style-body islands, so a cascade from the host spares them as a
+    // decapitated strand the barrier cannot reclaim (the toolbar-strip item
+    // churn strand). And the trigger is the SIGNATURE, never a bare cache
+    // miss: a focused text field moves the environment every frame, so a
+    // miss-based trigger re-armed the follow-up forever.
+    if strip.itemSetChanged {
+      context.invalidationProxy?.invalidator?.requestInvalidation(of: [identity])
+    }
 
     // Keep the scope boundary on `base` so toolbar-focus inherits the
     // ActionScope's identity. Install the safe-area reclaiming step on
@@ -351,16 +372,38 @@ private func isKind(
 
 private let toolbarStripReuseCacheNamespace = "SwiftTUI.toolbar-strip"
 
+/// The strip subtree plus whether its item-set/style signature differs from
+/// the one the reuse cache last stored for this strip — i.e. a committed
+/// strip was REPLACED by a different item set. A plain cache miss (first
+/// frame, environment or transaction drift, a suppressed-reuse frame) is not
+/// a replacement and must not re-arm the host follow-up frame.
+private struct ResolvedToolbarStrip {
+  var node: ResolvedNode
+  var itemSetChanged: Bool
+}
+
 @MainActor
 private func resolvedToolbarItemsStrip(
   items: [ToolbarItemConfig],
   style: AnyToolbarStyle,
   context: ResolveContext
-) -> ResolvedNode {
+) -> ResolvedToolbarStrip {
   guard let signature = ToolbarStripSignature(items: items, style: style) else {
-    return ToolbarItemsStrip(items: items, style: style).resolve(in: context)
+    // No reuse signature (a custom layout without measurement/placement
+    // signatures): the strip resolves fresh every frame and carries no
+    // comparable item-set identity — never re-arm the host follow-up here.
+    return ResolvedToolbarStrip(
+      node: ToolbarItemsStrip(items: items, style: style).resolve(in: context),
+      itemSetChanged: false
+    )
   }
 
+  let previousSignature = context.viewGraph?.resolvedNodeReuseCacheSignature(
+    namespace: toolbarStripReuseCacheNamespace,
+    owner: context.identity
+  )
+  let itemSetChanged =
+    previousSignature != nil && previousSignature != signature.cacheSignature
   if !context.effectiveSuppressesRetainedReuse(at: context.identity),
     let reused = context.viewGraph?.cachedReusableResolvedNode(
       namespace: toolbarStripReuseCacheNamespace,
@@ -398,7 +441,7 @@ private func resolvedToolbarItemsStrip(
       context.recordResolvedReuse(count: reused.subtreeNodeCount)
       var structurallyStamped = reused
       structurallyStamped.structuralPath = context.structuralPath
-      return structurallyStamped
+      return ResolvedToolbarStrip(node: structurallyStamped, itemSetChanged: false)
     }
   }
 
@@ -409,7 +452,7 @@ private func resolvedToolbarItemsStrip(
     signature: signature.cacheSignature,
     node: resolved
   )
-  return resolved
+  return ResolvedToolbarStrip(node: resolved, itemSetChanged: itemSetChanged)
 }
 
 @MainActor

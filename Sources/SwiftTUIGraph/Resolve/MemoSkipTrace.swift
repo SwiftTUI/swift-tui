@@ -120,7 +120,9 @@ package enum MemoSkipTrace {
   package static func recordUnsoundSkip(
     hadReads: Bool,
     contentDivergenceField: String? = nil,
-    firstDifferingField: String? = nil
+    firstDifferingField: String? = nil,
+    identity: Identity? = nil,
+    viewTypeName: String? = nil
   ) {
     guard shouldObserve else { return }
     unsoundSkip += 1
@@ -134,9 +136,16 @@ package enum MemoSkipTrace {
     }
     guard !hadReads, let contentField = contentDivergenceField else { return }
     unsoundContentNoReads += 1
-    SoundnessProbeConfiguration.recordMemoUnsoundSkip(
-      "memo shadow oracle: content field '\(contentField)' diverged on a no-reads would-skip node"
-    )
+    // Name the node: a bare field name leaves the reader with nothing to
+    // bisect, while the identity path and view type pin the authored site.
+    var detail = "memo shadow oracle: content field '\(contentField)' diverged on a no-reads would-skip node"
+    if let identity {
+      detail += " at \(identity.path.isEmpty ? "$root" : identity.path)"
+    }
+    if let viewTypeName {
+      detail += " (\(viewTypeName))"
+    }
+    SoundnessProbeConfiguration.recordMemoUnsoundSkip(detail)
   }
 
   package static func recordPlanTier(_ tier: MemoPlanTier) {

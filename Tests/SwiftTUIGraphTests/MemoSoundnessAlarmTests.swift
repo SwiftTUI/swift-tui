@@ -120,6 +120,26 @@ struct MemoSoundnessAlarmTests {
     }
   }
 
+  @Test("the alarm detail names the diverging node and its view type")
+  func alarmDetailNamesNodeAndViewType() {
+    // A bare field name ("drawEffects diverged") gave a gallery user nothing
+    // to bisect; the identity path and view type pin the authored site.
+    withRestoredTraceAndAlarmState {
+      beginObservedFrame()
+      MemoSkipTrace.recordUnsoundSkip(
+        hadReads: false,
+        contentDivergenceField: "drawEffects",
+        firstDifferingField: "drawEffects",
+        identity: testIdentity("Root", "Cards", "HStack[1]"),
+        viewTypeName: "ModifiedContent<ZStack, DrawEffectModifier>"
+      )
+      let detail = SoundnessProbeConfiguration.lastViolationDetail ?? ""
+      #expect(detail.contains("drawEffects"))
+      #expect(detail.contains("Root/Cards/HStack[1]"), "detail: \(detail)")
+      #expect(detail.contains("(ModifiedContent<ZStack, DrawEffectModifier>)"), "detail: \(detail)")
+    }
+  }
+
   @Test("a with-reads divergence never alarms (dependency-explained re-run)")
   func withReadsDivergenceDoesNotAlarm() {
     withRestoredTraceAndAlarmState {

@@ -59,7 +59,7 @@
 # cross-check. Take a baseline only from a full `bun run test`
 # (it clears .build/soundness-trace first); a standalone scan reads whatever
 # ad-hoc `swift test` runs have accumulated there and reports inflated counts.
-registration-publication 2026-08-14 runtime-lane-unmasked count=1237 scoped-restore residual re-measured on a runtime lane completing all 3247 tests
+registration-publication 2026-08-22 toolbar-strip-follow-up count=1194 scoped-restore residual after the toolbar-strip host follow-up frame; re-measured 1237 -> 1194 on macOS and the Linux container lane (both full gates)
 teardown-coherence-leak 2026-08-14 runtime-lane-unmasked count=499 existing unreachable-node residual re-measured on a runtime lane completing all 3247 tests
 action-dispatch-miss 2026-08-14 runtime-lane-unmasked count=1 DormantIncrement-inner-B has no published handler; first observable once the lane completed
-handler-resolution-gesture 2026-08-14 runtime-lane-unmasked count=1 GestureScroll026 committed tree names gesture handlers absent from the published registry
+handler-resolution-gesture 2026-08-22 toolbar-strip-follow-up count=0 GestureScroll026 residual measured 0 on macOS and the Linux container lane after the toolbar-strip host follow-up frame; row held at 0 so a recurrence fails

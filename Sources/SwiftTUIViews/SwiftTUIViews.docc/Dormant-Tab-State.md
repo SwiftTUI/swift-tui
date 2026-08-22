@@ -53,13 +53,21 @@ and exist only so activation can preseed parent routes before descendant state:
 - navigation-destination activation currency
 
 `State` remains generic, so persistent provenance is followed by a second
-safety audit. Values containing a class instance, task/native-object handle,
-metatype, `ObjectIdentifier`, binding or other closure, unmanaged reference,
-or unsafe pointer are not archived. Archive records store only the audited
-value and its type metadata; they reconstruct a fresh slot on activation
-rather than retaining the live slot's comparator closure. A nested archive may
-carry that framework-owned type metadata only when it exactly matches the
-audited enclosed value; user-authored metatype state remains ineligible.
+safety audit. Values containing a class instance (including Objective-C
+classes), task/native-object handle, metatype, `ObjectIdentifier`, binding or
+other closure, unmanaged reference, or unsafe pointer are not archived.
+Standard-library and Foundation value types pass the audit through their own
+mirrors (`UUID`, `Date`, and the SIMD vector types are plain values), so rows
+keyed by `UUID` or a `[SIMD2<Float>]` control-point array persist. Archive
+records store only the audited value and its type metadata; they reconstruct a
+fresh slot on activation rather than retaining the live slot's comparator
+closure. A nested archive may carry that framework-owned type metadata only
+when it exactly matches the audited enclosed value; user-authored metatype
+state remains ineligible.
+
+Framework-owned scratch that a control re-derives after reactivation (a
+`TextEditor`'s measured content width) is declared transient for dormancy and
+is neither archived nor reported.
 
 Excluding persistent state is never silent. SwiftTUI emits the deduplicated
 `tab.dormantStateUnsupportedValue` runtime issue with the stored type and asks

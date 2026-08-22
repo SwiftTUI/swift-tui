@@ -1,3 +1,4 @@
+import Foundation
 @_spi(Testing) import SwiftTUITestSupport
 import Testing
 
@@ -872,6 +873,109 @@ struct DormantTabStateTests {
     #expect(lifecycleProbe.appears == 2)
   }
 
+  @Test("SIMD vectors and Foundation value leaves archive as dormant state")
+  func simdAndFoundationValueLeavesArchive() throws {
+    // Gallery shapes that the audit used to reject: a mesh-gradient point
+    // array (`[SIMD2<Float>]` reflects its lanes as a `Builtin.Vec…` leaf)
+    // and `Identifiable` rows keyed by `UUID` (a Foundation struct whose
+    // custom mirror is empty). Both are plain values and must round-trip.
+    let root = testIdentity("DormantSIMDFoundationLeaves")
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let node = graph.beginEvaluation(identity: root, invalidator: nil)
+    let points: [SIMD2<Float>] = [SIMD2(0.25, 0.75), SIMD2(1, 0)]
+    let rowID = UUID()
+    let stamp = Date(timeIntervalSinceReferenceDate: 1_234.5)
+    let rows = [DormantIdentifiedRow(id: rowID, title: "Write docs", done: false)]
+
+    withPersistentDormantStateSlot {
+      node.setStateSlotSilently(ordinal: 3_001, value: points)
+      node.setStateSlotSilently(ordinal: 3_002, value: rowID)
+      node.setStateSlotSilently(ordinal: 3_003, value: stamp)
+      node.setStateSlotSilently(ordinal: 3_004, value: rows)
+    }
+
+    let archive = graph.captureDormantStateArchive(rootedAt: root)
+    let issues = graph.frameRuntimeIssues.filter {
+      $0.code == "tab.dormantStateUnsupportedValue"
+    }
+    #expect(issues.isEmpty, "unexpected rejections: \(issues.map(\.message))")
+    #expect(archive.persistentSlotCount == 4)
+
+    let restoredGraph = ViewGraph()
+    restoredGraph.beginFrame()
+    restoredGraph.restoreDormantStateArchive(archive)
+    let restoredNode = try #require(restoredGraph.nodeForIdentity(root))
+    #expect(
+      try #require(restoredNode.stateSlotStorage(ordinal: 3_001)).value(as: [SIMD2<Float>].self)
+        == points
+    )
+    #expect(try #require(restoredNode.stateSlotStorage(ordinal: 3_002)).value(as: UUID.self) == rowID)
+    #expect(try #require(restoredNode.stateSlotStorage(ordinal: 3_003)).value(as: Date.self) == stamp)
+    #expect(
+      try #require(restoredNode.stateSlotStorage(ordinal: 3_004)).value(
+        as: [DormantIdentifiedRow].self
+      ) == rows
+    )
+  }
+
+  @Test("a Foundation reference behind a value wrapper is still rejected")
+  func foundationReferencesStayRejected() throws {
+    // Trusting Foundation's value-type mirrors must not become a door for
+    // reference payloads: the metadata-kind check still rejects a class, and
+    // a Foundation struct whose mirror exposes a raw pointer (`Data`) still
+    // hits the pointer leaf rule.
+    let root = testIdentity("DormantFoundationReferences")
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let node = graph.beginEvaluation(identity: root, invalidator: nil)
+    withPersistentDormantStateSlot {
+      node.setStateSlotSilently(ordinal: 3_011, value: NSObject())
+      node.setStateSlotSilently(ordinal: 3_012, value: Data([1, 2, 3]))
+    }
+    let archive = graph.captureDormantStateArchive(rootedAt: root)
+    #expect(archive.persistentSlotCount == 0)
+    let issues = graph.frameRuntimeIssues.filter {
+      $0.code == "tab.dormantStateUnsupportedValue"
+    }
+    #expect(issues.count == 2, "issues: \(issues.map(\.message))")
+  }
+
+  @Test("a TextEditor's measured-width scratch never reaches the dormant archive")
+  func textEditorScratchStateIsTransientForDormancy() async {
+    // The editor carries a reference-typed width carrier in `@State` so the
+    // layout pass can write it without scheduling a frame. It is re-derived on
+    // the first layout after reactivation, so it is declared transient for
+    // dormancy — the archive must neither store it nor warn about it.
+    let renderer = DefaultRenderer()
+    let root = testIdentity("DormantTextEditorScratch")
+    var actions = LocalActionRegistry()
+    let first = await renderer.renderAsync(
+      DormantTextEditorFixture(),
+      context: dormantContext(root: root, actions: actions)
+    )
+    #expect(surfaceText(first).contains("editor seed"))
+
+    #expect(actions.dispatch(identity: testIdentity("DormantTextEditorShowOther")))
+    actions = LocalActionRegistry()
+    let departed = await renderer.renderAsync(
+      DormantTextEditorFixture(),
+      context: dormantContext(root: root, actions: actions)
+    )
+    #expect(surfaceText(departed).contains("Other"))
+    let unsupported = departed.diagnostics.runtime.issues.filter {
+      $0.code == "tab.dormantStateUnsupportedValue"
+    }
+    #expect(unsupported.isEmpty, "unexpected: \(unsupported.map(\.message))")
+
+    #expect(actions.dispatch(identity: testIdentity("DormantTextEditorShowEditor")))
+    let restored = await renderer.renderAsync(
+      DormantTextEditorFixture(),
+      context: dormantContext(root: root, actions: LocalActionRegistry())
+    )
+    #expect(surfaceText(restored).contains("editor seed"))
+  }
+
   @Test("collection scroll anchors are persistent archive values")
   func collectionScrollAnchorRoundTripsThroughArchive() throws {
     let root = testIdentity("DormantScrollAnchor")
@@ -1700,4 +1804,36 @@ private func dormantContext(
 
 private func surfaceText(_ snapshot: RenderSnapshot) -> String {
   snapshot.rasterSurface.lines.joined(separator: "\n")
+}
+
+private struct DormantIdentifiedRow: Identifiable, Equatable {
+  var id: UUID
+  var title: String
+  var done: Bool
+}
+
+private struct DormantTextEditorFixture: View {
+  @State private var selection = "A"
+  @State private var text = "editor seed"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      HStack(spacing: 1) {
+        Button("Show editor") { selection = "A" }
+          .id(testIdentity("DormantTextEditorShowEditor"))
+        Button("Show other") { selection = "B" }
+          .id(testIdentity("DormantTextEditorShowOther"))
+      }
+      TabView(selection: $selection) {
+        Tab("Editor", value: "A") {
+          TextEditor(text: $text)
+            .frame(width: 24, height: 3)
+        }
+        Tab("Other", value: "B") {
+          Text("Other")
+        }
+      }
+      .tabViewStyle(.literalTabs)
+    }
+  }
 }

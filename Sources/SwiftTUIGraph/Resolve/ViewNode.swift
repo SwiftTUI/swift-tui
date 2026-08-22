@@ -209,6 +209,13 @@ package final class ViewNode {
     }
     frameState.dynamicPropertyLeaseKeysSeenThisUpdate.removeAll(keepingCapacity: true)
     frameState.nextDynamicPropertyLeaseOccurrenceOrdinal = 0
+    // The duplicate-slot-claim window opens HERE, not only at
+    // `beginEvaluation`: the update pass records this container's claims
+    // before the reuse door, and a reuse-served resolve never reaches
+    // `beginEvaluation`'s reset. Left in place, the claim a served update
+    // pass made collides with the next evaluation's (legitimately new) box —
+    // one container per evaluation, reported as two wrappers sharing a slot.
+    stateSlotClaimantsThisEvaluation.removeAll(keepingCapacity: true)
   }
 
   private func reconcileDynamicPropertyLeases() {

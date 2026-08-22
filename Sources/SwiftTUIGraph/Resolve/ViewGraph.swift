@@ -949,6 +949,21 @@ package final class ViewGraph {
     return entry.node
   }
 
+  /// The signature the reuse cache last stored for `owner` in `namespace`,
+  /// independent of whether that entry would currently be served (its
+  /// environment or transaction may have moved on). Lets a late-preference
+  /// consumer tell "the item set changed" apart from "the cache merely
+  /// missed" — a focus move inside a text field changes the environment
+  /// every frame, and treating that miss as a content change re-arms the
+  /// toolbar host's follow-up frame forever.
+  package func resolvedNodeReuseCacheSignature(
+    namespace: String,
+    owner: Identity
+  ) -> String? {
+    resolvedNodeReuseCache[ResolvedNodeReuseCacheKey(namespace: namespace, owner: owner)]?
+      .signature
+  }
+
   package func storeResolvedNodeReuseCache(
     namespace: String,
     owner: Identity,

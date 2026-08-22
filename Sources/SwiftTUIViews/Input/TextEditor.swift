@@ -6,7 +6,11 @@ public struct TextEditor: PrimitiveView, ResolvableView {
   public var text: Binding<String>
   @State private var scrollPosition = ScrollCellOffset.zero
   @State private var textInputValue = TextInputValue()
-  @State private var measuredContentWidth = TextEditorMeasuredContentWidth()
+  // Transient for dormancy: the carrier is re-derived by the first layout pass
+  // after a dormant tab returns, so the archive must neither keep the
+  // reference nor report it as unsupported state.
+  @State(dormantPolicy: .transient) private var measuredContentWidth =
+    TextEditorMeasuredContentWidth()
   private let authoringScope: AuthoringContext?
 
   public init(text: Binding<String>) {

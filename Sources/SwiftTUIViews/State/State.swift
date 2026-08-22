@@ -102,6 +102,11 @@ private struct DynamicStateLocation<Value> {
 @MainActor
 private final class StateBox<Value> {
   private let slotOrdinal: Int
+  /// Whether the graph slots this box binds may ride a lazy container's
+  /// dormant archive (`.persistent`, the authored-state default) or are
+  /// re-derived scratch that must stay out of it (`.transient`). Fixed at
+  /// construction: the slot keeps the policy it was born with.
+  let dormantPolicy: DormantStateSlotPolicy
   private var seedValue: Value
   private var boundLocationsByOwner: [StateStorageOwner: DynamicStateLocation<Value>]
   private var retainedValuesByOwner: [StateStorageOwner: Value]
@@ -113,9 +118,11 @@ private final class StateBox<Value> {
 
   init(
     seedValue: Value,
-    slotOrdinal: Int
+    slotOrdinal: Int,
+    dormantPolicy: DormantStateSlotPolicy = .persistent
   ) {
     self.slotOrdinal = slotOrdinal
+    self.dormantPolicy = dormantPolicy
     self.seedValue = seedValue
     boundLocationsByOwner = [:]
     retainedValuesByOwner = [:]
@@ -231,6 +238,29 @@ public struct State<Value> {
         line: line,
         column: column
       )
+    )
+  }
+
+  /// Framework-internal state with an explicit dormancy policy. `.transient`
+  /// keeps the slot out of a lazy container's dormant archive: the archive
+  /// neither stores it nor reports it as unsupported, and a returning tab
+  /// re-seeds it from the authored value. For re-derived scratch that a
+  /// reference type carries across re-renders without scheduling a frame
+  /// (a measured width, a layout cache), that is the honest contract —
+  /// the value is rebuilt on the first pass after reactivation anyway.
+  package init(
+    wrappedValue: Value,
+    dormantPolicy: DormantStateSlotPolicy,
+    line: UInt = #line,
+    column: UInt = #column
+  ) {
+    box = StateBox(
+      seedValue: wrappedValue,
+      slotOrdinal: StateSlotOrdinals.authored(
+        line: line,
+        column: column
+      ),
+      dormantPolicy: dormantPolicy
     )
   }
 
@@ -443,6 +473,7 @@ public struct State<Value> {
     // removal and leak writes into replacement identities.
     let authoredSeed = box.currentSeedValue()
     let slotOrdinal = box.currentOrdinal
+    let dormantPolicy = box.dormantPolicy
     return DynamicStateLocation(
       getValue: { [weak box] in
         guard let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) else {
@@ -457,7 +488,7 @@ public struct State<Value> {
           }
           return authoredSeed
         }
-        return withPersistentDormantStateSlot {
+        return withDormantStateSlotPolicy(dormantPolicy) {
           liveViewNode.stateSlot(
             slotIdentifier,
             seed: authoredSeed
@@ -480,7 +511,7 @@ public struct State<Value> {
         // such a write lands in a graph that no longer exists and the next
         // render silently re-seeds from the authored value.
         if let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) {
-          withPersistentDormantStateSlot {
+          withDormantStateSlotPolicy(dormantPolicy) {
             liveViewNode.setStateSlot(
               slotIdentifier,
               value: newValue,
@@ -496,6 +527,21 @@ public struct State<Value> {
         }
       }
     )
+  }
+}
+
+/// Installs the slot-policy scope a `StateBox`'s graph accesses materialize
+/// under, so the slot is born with the policy its wrapper declared.
+@MainActor
+private func withDormantStateSlotPolicy<Result>(
+  _ policy: DormantStateSlotPolicy,
+  _ body: () throws -> Result
+) rethrows -> Result {
+  switch policy {
+  case .persistent:
+    return try withPersistentDormantStateSlot(body)
+  case .transient:
+    return try withTransientDormantStateSlot(body)
   }
 }
 

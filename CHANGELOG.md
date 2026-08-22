@@ -8,7 +8,42 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`state.duplicateSlotClaim` no longer fires for a container whose update
+  pass was reuse-served.** The dynamic-property update pass records a
+  container's slot claims before the reuse door, and a reuse-served resolve
+  never reached `beginEvaluation`'s per-evaluation reset — so the claim a
+  served `ScrollView`, `TimelineView`, or popover-tip modifier left behind
+  collided with its next evaluation's (legitimately new) box and reported
+  phantom sharing. The claim window now opens at the update pass.
+- **Dormant-tab archives accept SIMD vectors and Foundation value types.**
+  `[SIMD2<Float>]` (its lanes reflect as a `Builtin.Vec…` leaf) and
+  `Identifiable` rows keyed by `UUID` (an empty custom mirror) were rejected
+  as non-value payloads, so `TabView` restarted that state on every return
+  and reported `tab.dormantStateUnsupportedValue` on every departure. SIMD
+  conformers are accepted as leaves and Foundation's value-type mirrors are
+  trusted like the standard library's; Objective-C class wrappers are now
+  rejected by metadata kind like every other class.
+- **`TextEditor` no longer reports its measured-width scratch as
+  unsupported dormant state.** The reference-typed carrier is declared
+  transient for dormancy (framework-internal `@State` policy), so a
+  departing tab neither archives nor warns about it.
+- **A toolbar item that departs under a frontier-scoped frame is torn down
+  and unpublished.** When the item set changes because the content changed
+  (a `TabView` selection flip under a `.toolbar()` scope), the strip is
+  rebuilt in the late-preference stage outside the dirty plan; the departed
+  item's nodes stayed live, its action stayed in the live registry (the
+  `registration-publication` residual `live=1 rebuilt=0`), and the presented
+  strip lagged until some later root frame. The reconcile now schedules a
+  follow-up frame rooted at the host so it re-applies through the normal
+  plan.
+
 ### Changed
+
+- **The memo-soundness alarm names the diverging node.** The
+  `memo shadow oracle` detail now carries the node's identity path and view
+  type instead of a bare field name.
 
 - **`@State` ownership is now bound at capture time.** Closures created
   during body evaluation (actions, tasks, submit handlers, gesture

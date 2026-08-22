@@ -627,6 +627,8 @@ struct MemoComputationObservation {
   /// Whether the node had recorded dynamic reads last frame — distinguishes a
   /// dependency-closable unsound mismatch from a comparator false-equal.
   let hadReads: Bool
+  /// The observed view's type, for the alarm detail.
+  let viewTypeName: String
 }
 
 /// Classifies a recomputed node: records it as `computed`, and — if it was
@@ -694,7 +696,8 @@ func beginMemoObservation<V: View>(
     }
     return MemoComputationObservation(
       priorCommitted: graphNode.committed,
-      hadReads: hadReads
+      hadReads: hadReads,
+      viewTypeName: String(reflecting: V.self)
     )
   }
 }
@@ -720,7 +723,9 @@ func finishMemoObservation(
       ),
       firstDifferingField: newResolved.memoFirstDifferingField(
         from: observation.priorCommitted
-      )
+      ),
+      identity: newResolved.identity,
+      viewTypeName: observation.viewTypeName
     )
   }
 }

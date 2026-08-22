@@ -50,7 +50,7 @@ cell. Keep the comment's kind, recorder, and counter spellings exact.
 | `teardown-barrier-non-convergence` — teardown reaches a fixed point within its derived bound | Fixed-point barrier in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `TeardownBarrierFixedPointTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: teardown-barrier-non-convergence ; recordBarrierNonConvergence ; barrierNonConvergenceCount --> |
 | `automatic-lifetime-anchor` — detached results requiring inferred durable ownership | Resolve-scope classification in [`ResolveLifetimeScope.swift`](../Sources/SwiftTUIGraph/Resolve/ResolveLifetimeScope.swift) | T-info. Counter only | Event | Snapshot/reporting only. Deliberately no trace | `ResolveLifetimeScopeTests`, `SoundnessProbeConfigurationTests` | Informational adoption currency, not a violation  <!-- oracle-map: automatic-lifetime-anchor ; recordAutomaticLifetimeAnchor ; automaticLifetimeAnchorCount --> |
 | `resolve-lifetime-scope-unclassified` — every observed live resolved node has a durable lifetime classification | Resolve-scope close audit in [`ResolveLifetimeScope.swift`](../Sources/SwiftTUIGraph/Resolve/ResolveLifetimeScope.swift) | T-fail. DEBUG scope assertion | Event | Assertion, trace scan, serialized snapshot delta | `ResolveLifetimeScopeTests`, `DroppedElementAnchoringTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: resolve-lifetime-scope-unclassified ; recordUnclassifiedResolvedNode ; unclassifiedResolvedNodeCount --> |
-| `registration-publication` — scoped registry publication matches a scratch full rebuild | Publication fingerprint comparison in [`ViewGraphFrameDraft.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphFrameDraft.swift) | T-ratchet | Sampled frame | Exact-count trace scan | `RuntimeRegistrationRestoreScopingTests`, `GesturePairedRouteLivenessTests`, `SoundnessFailureChannelTests` | Quarantined at 1,237 (re-measured 2026-08-14; `Program-5-S0` first quarantined it at 1,194)  <!-- oracle-map: registration-publication ; recordRegistrationPublicationViolation ; registrationPublicationViolationCount --> |
+| `registration-publication` — scoped registry publication matches a scratch full rebuild | Publication fingerprint comparison in [`ViewGraphFrameDraft.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphFrameDraft.swift) | T-ratchet | Sampled frame | Exact-count trace scan | `RuntimeRegistrationRestoreScopingTests`, `GesturePairedRouteLivenessTests`, `SoundnessFailureChannelTests` | Quarantined at 1,194 (re-measured 2026-08-22 after the toolbar-strip host follow-up frame: 1,237 → 1,194 on macOS and Linux; `Program-5-S0` first quarantined it at 1,194)  <!-- oracle-map: registration-publication ; recordRegistrationPublicationViolation ; registrationPublicationViolationCount --> |
 | `memo-unsound-skip` — a memo candidate never skips when fresh output differs in content | Shadow recomputation in [`MemoSkipTrace.swift`](../Sources/SwiftTUIGraph/Resolve/MemoSkipTrace.swift) | T-fail. DEBUG zero-census assertion | Sampled frame | Assertion, trace scan, serialized snapshot delta | `MemoSoundnessAlarmTests`, `EquatableViewReuseTests`, `SoundnessAssertPromotionTests` | None  <!-- oracle-map: memo-unsound-skip ; recordMemoUnsoundSkip ; memoUnsoundSkipCount --> |
 | `duplicate-registration` — one capture session does not overwrite a single-slot identity | Registration capture guard in [`ViewNode.swift`](../Sources/SwiftTUIGraph/Resolve/ViewNode.swift) | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `DuplicateRegistrationProbeTests`, `SoundnessFailureChannelTests` | Key-command carry-over is an intentional exemption tested at HEAD  <!-- oracle-map: duplicate-registration ; recordDuplicateRegistrationOverwrite ; duplicateRegistrationOverwriteCount --> |
 | `planner-targetless-frontier` — dirty work is never silently discarded for lack of a stitchable evaluator | Root-escalation alarm in [`ViewGraphDirtyEvaluationPlanning.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphDirtyEvaluationPlanning.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `FrameworkStressGraphPlanningAndRoutingTests`, `SoundnessFailureChannelTests` | Safe root fallback preserves output. Alarm still fails  <!-- oracle-map: planner-targetless-frontier ; recordPlannerTargetlessFrontierEscalation ; plannerTargetlessFrontierEscalationCount --> |
@@ -62,7 +62,7 @@ cell. Keep the comment's kind, recorder, and counter spellings exact.
 | `handler-resolution-key` — committed key/paste identity resolves in the live key registry | Key/paste leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | Either key or paste registration satisfies the inventory  <!-- oracle-map: handler-resolution-key ; recordInteractiveHandlerResolutionViolation ; keyHandlerResolutionViolationCount --> |
 | `handler-resolution-command` — committed command scope resolves in the live command registry | Command leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: handler-resolution-command ; recordInteractiveHandlerResolutionViolation ; commandScopeResolutionViolationCount --> |
 | `handler-resolution-drop` — committed drop scope resolves in the live drop registry | Drop leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: handler-resolution-drop ; recordInteractiveHandlerResolutionViolation ; dropScopeResolutionViolationCount --> |
-| `handler-resolution-gesture` — committed gesture route resolves both recognizer and pointer handler | Gesture leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | A present partial pair fails. An absent optional registry is outside caller scope. **Temporarily quarantined at 1** (2026-08-14): `GestureScroll026` names gesture handlers absent from the published registry. The row burns down when that already-failing test is fixed — it is not an allowance for a second instance  <!-- oracle-map: handler-resolution-gesture ; recordInteractiveHandlerResolutionViolation ; gestureRouteResolutionViolationCount --> |
+| `handler-resolution-gesture` — committed gesture route resolves both recognizer and pointer handler | Gesture leg of the shared committed walk | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | A present partial pair fails. An absent optional registry is outside caller scope. **Row held at 0** (re-measured 2026-08-22 on macOS and Linux after the toolbar-strip host follow-up frame; it was temporarily quarantined at 1 on 2026-08-14 for `GestureScroll026`, whose committed tree named gesture handlers absent from the published registry). Any recurrence fails the scan  <!-- oracle-map: handler-resolution-gesture ; recordInteractiveHandlerResolutionViolation ; gestureRouteResolutionViolationCount --> |
 | `action-dispatch-miss` — dispatch never targets a missing published action | Failed lookup in [`LocalActionRegistry.swift`](../Sources/SwiftTUIGraph/Runtime/LocalActionRegistry.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `CommittedHandlerResolutionOracleTests`, `SoundnessFailureChannelTests` | A found handler returning `false` is not a lookup miss. **Temporarily quarantined at 1** (2026-08-14): the `DormantIncrement-inner-B` probe has no published handler. The row burns down when that already-failing test is fixed — it is not an allowance for a second instance  <!-- oracle-map: action-dispatch-miss ; recordActionDispatchMiss ; actionDispatchMissCount --> |
 | `stranded-listing` — a node never claims a child seated under another live parent | Post-finalize listing audit in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail. DEBUG call-site assertion | Sampled frame | Assertion, trace scan, serialized snapshot delta | `StrandedListingProbeTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: stranded-listing ; recordStrandedListingViolation ; strandedListingViolationCount --> |
 | `state-seed-fallback` — with capture binding enabled, no imperative `@State` access bottoms out at the authored seed | Fallback reporter in [`State.swift`](../Sources/SwiftTUIViews/State/State.swift), recorded only while `StateCaptureBindingConfiguration.isEnabled` (plan 2026-08-20-001 Stage 3) | T-fail | Event | Trace scan and serialized snapshot delta | `StateCaptureBindingTests`, `SoundnessFailureChannelTests` | Gate-off accesses keep the loud RuntimeIssue outside this oracle  <!-- oracle-map: state-seed-fallback ; recordStateSeedFallbackViolation ; stateSeedFallbackViolationCount --> |
@@ -95,19 +95,19 @@ existed, a stage tag (`Program-5-S0`) in
 record of *why* the team quarantined them. The tag names a program but does not
 explain the reason.
 
-| Kind | Baseline | Measured 2026-08-14 | Provenance | What the residual is | Burn-down expectation |
+| Kind | Baseline | Measured 2026-08-22 | Provenance | What the residual is | Burn-down expectation |
 | --- | --: | --: | --- | --- | --- |
-| `registration-publication` | 1237 | 1237 | `Program-5-S0`, re-measured `runtime-lane-unmasked` | Post-suppression scoped-restore residual | Reduce with the next scoped-restore fix. Not expected to reach zero on its own |
+| `registration-publication` | 1194 | 1194 | `Program-5-S0`, re-measured `runtime-lane-unmasked`, reduced by `toolbar-strip-follow-up` (2026-08-22) | Post-suppression scoped-restore residual; the toolbar-strip shrink under a frontier-scoped plan accounted for 43 of it | Reduce with the next scoped-restore fix. Not expected to reach zero on its own |
 | `teardown-coherence-leak` | 499 | 499 | `Program-5-S0`, re-measured `runtime-lane-unmasked` | Existing unreachable-node residual (under-removal arm) | Reduce with teardown-lifetime work. See the leak census currency |
 | `action-dispatch-miss` | 1 | 1 | `runtime-lane-unmasked` (2026-08-14) | `DormantIncrement-inner-B` has no published handler | Burns down with its already-failing test. Designed as `T-fail`; the row is a temporary hold, not an allowance |
-| `handler-resolution-gesture` | 1 | 1 | `runtime-lane-unmasked` (2026-08-14) | `GestureScroll026` names gesture handlers absent from the published registry | Burns down with its already-failing test. Designed as `T-fail`; the row is a temporary hold, not an allowance |
+| `handler-resolution-gesture` | 0 | 0 | `runtime-lane-unmasked` (2026-08-14), measured 0 by `toolbar-strip-follow-up` (2026-08-22) | `GestureScroll026` named gesture handlers absent from the published registry; now 0 on both platforms | Held at 0 so a recurrence fails. Designed as `T-fail`; the row is a temporary hold, not an allowance |
 
 Every row currently sits exactly on its baseline:
 
 ```
 WARNING: action-dispatch-miss count=1 matches baseline=1
-WARNING: handler-resolution-gesture count=1 matches baseline=1
-WARNING: registration-publication count=1237 matches baseline=1237
+WARNING: handler-resolution-gesture count=0 matches baseline=0
+WARNING: registration-publication count=1194 matches baseline=1194
 WARNING: teardown-coherence-leak count=499 matches baseline=499
 PASS: soundness trace counts are within their exact quarantine baselines
 ```
@@ -172,16 +172,21 @@ expected rather than a defect. The report is a **pre-S1** census. The ledger is
 The S0 columns below are a **dated snapshot** and are kept as history. Only the
 last column is current:
 
-| Kind | S0 raw | S0 injected | S0 residual | Ledger post-S1 | Measured 2026-07-30 | **Ledger and measured 2026-08-14** |
-| --- | --: | --: | --: | --: | --: | --: |
-| `registration-publication` | 1,197 | 1 | 1,196 | 1194 | 1122 | **1237** |
-| `teardown-coherence-leak` | 479 | 1 | 478 | 478 | 478 | **499** |
+| Kind | S0 raw | S0 injected | S0 residual | Ledger post-S1 | Measured 2026-07-30 | Ledger and measured 2026-08-14 | **Ledger and measured 2026-08-22** |
+| --- | --: | --: | --: | --: | --: | --: | --: |
+| `registration-publication` | 1,197 | 1 | 1,196 | 1194 | 1122 | 1237 | **1194** |
+| `teardown-coherence-leak` | 479 | 1 | 478 | 478 | 478 | 499 | **499** |
 
 Read that 2026-07-30 column as a *floor observed under partial coverage*, not as
 a truth the later figures contradict. `registration-publication`'s apparent
 drop to 1122 and its later rise to 1237 are the same phenomenon seen from two
 sides: how much of the runtime lane completed on the day of the measurement.
-See the coverage-sensitivity note above for the two truncations involved.
+See the coverage-sensitivity note above for the two truncations involved. The
+2026-08-22 move back to 1194 is a genuine burn-down, not coverage: the lane
+completed on both platforms, and the 43 residuals were the toolbar strip
+shrinking under a frontier-scoped plan (its departed item's registration
+survived the scoped reset until the host next applied); the strip now
+schedules a host follow-up frame.
 
 S1's scoped-restore suppression is the one genuine movement in this table: it
 changed the S0 report's 1,196 to the ledger's 1194, which the ledger row records
