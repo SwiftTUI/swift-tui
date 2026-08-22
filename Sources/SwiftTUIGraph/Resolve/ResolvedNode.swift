@@ -572,3 +572,28 @@ extension ResolvedNode {
     self.entityStructuralPath = entityStructuralPath
   }
 }
+
+extension ResolvedNode {
+  /// Re-stamps onto this rebuilt child value the semantic decorations only its
+  /// parent authors, read from `slice` — the parent's committed copy of the
+  /// child from the parent's last apply.
+  ///
+  /// A hosted collection (`List`, `Table`) writes each row's
+  /// `hostedCollectionItem` onto ITS copy of the row at resolve time; the row's
+  /// own committed value never carries it, and the semantics pass derives every
+  /// row focus/interaction region from that stamp. A `snapshot()` rebuild that
+  /// re-pulls the children's committed values would otherwise serve the
+  /// collection with unstamped rows until the collection itself re-resolves —
+  /// one frame with zero row regions, which clears focus and silently re-seats
+  /// it on row 0 (swift-tui issue #4).
+  ///
+  /// Only parent-authored decorations are carried: a child never writes its own
+  /// `hostedCollectionItem`, so the parent's slice is authoritative for it, and
+  /// positional pairing keeps it attached to the same row.
+  package mutating func carryParentAuthoredSemantics(from slice: ResolvedNode) {
+    guard let hostedCollectionItem = slice.semanticMetadata.hostedCollectionItem else {
+      return
+    }
+    semanticMetadata.hostedCollectionItem = hostedCollectionItem
+  }
+}

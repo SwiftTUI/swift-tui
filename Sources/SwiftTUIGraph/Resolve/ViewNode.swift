@@ -2054,10 +2054,19 @@ package final class ViewNode {
       // producer, 2026-07-17 campaign §5). The placeholder can never refresh
       // itself — the only writer of its slice is the parent's apply — so the
       // parent's committed slice is always the freshest truth for it.
+      // An applied child's own committed value is the freshest content, but
+      // it never carries the decorations only this node authors for it (a
+      // hosted collection's row stamps); carry those forward from the
+      // committed slice or the rebuild erases them until this node's next
+      // apply (swift-tui issue #4: one stampless frame dropped every row
+      // focus region and re-seated focus on row 0).
       rebuilt.children = zip(committed.children, children).map { valueChild, nodeChild in
-        nodeChild.hasEverApplied
-          ? nodeChild.snapshotRebuilding(entered: &entered)
-          : valueChild
+        guard nodeChild.hasEverApplied else {
+          return valueChild
+        }
+        var rebuiltChild = nodeChild.snapshotRebuilding(entered: &entered)
+        rebuiltChild.carryParentAuthoredSemantics(from: valueChild)
+        return rebuiltChild
       }
     } else {
       // Count mismatch (mid-apply exotic states): keep the historical
