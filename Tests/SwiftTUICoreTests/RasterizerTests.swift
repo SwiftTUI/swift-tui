@@ -1316,6 +1316,52 @@ struct RasterizerTests {
     #expect(verified.surface == fresh.surface)
     #expect(verified.incrementalMismatch != nil)
     #expect(verified.incrementalMismatch?.mismatchedRows == [1])
+    // The evidence names what the incremental path trusted and what each side
+    // painted on the diverged row, so a crash report identifies the producer.
+    let evidence = verified.incrementalMismatch?.evidence ?? ""
+    #expect(evidence.contains("trusted damage rows [0]"), "evidence: \(evidence)")
+    #expect(evidence.contains("row 1 incremental=\"ABCD\" fresh=\"AB\""), "evidence: \(evidence)")
+  }
+
+  @Test("incremental mismatch evidence names style-only divergence by column")
+  func incrementalMismatchEvidenceNamesStyleOnlyColumns() {
+    let plain = RasterCell(character: "A")
+    var styled = plain
+    styled.style = ResolvedTextStyle(emphasis: .bold)
+    let incremental = RasterSurface(
+      size: .init(width: 2, height: 1),
+      cells: [[plain, plain]]
+    )
+    let fresh = RasterSurface(
+      size: .init(width: 2, height: 1),
+      cells: [[plain, styled]]
+    )
+    let evidence = Rasterizer.incrementalMismatchEvidence(
+      mismatchedRows: [0],
+      incremental: incremental,
+      fresh: fresh,
+      trustedDirtyRows: [3]
+    )
+    #expect(evidence.contains("trusted damage rows [3]"), "evidence: \(evidence)")
+    #expect(
+      evidence.contains("row 0 glyphs agree, cell styles differ at columns [1]"),
+      "evidence: \(evidence)"
+    )
+  }
+
+  @Test("incremental mismatch evidence names non-cell divergence")
+  func incrementalMismatchEvidenceNamesNonCellDivergence() {
+    let cells = [[RasterCell(character: "A")]]
+    let incremental = RasterSurface(size: .init(width: 1, height: 1), cells: cells)
+    var fresh = incremental
+    fresh.metadata["cursor"] = "0,0"
+    let evidence = Rasterizer.incrementalMismatchEvidence(
+      mismatchedRows: [],
+      incremental: incremental,
+      fresh: fresh,
+      trustedDirtyRows: []
+    )
+    #expect(evidence.contains("metadata diverged"), "evidence: \(evidence)")
   }
 
   @Test("a sound incremental repaint reports no mismatch")

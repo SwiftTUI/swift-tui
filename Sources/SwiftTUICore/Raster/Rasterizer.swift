@@ -46,12 +46,24 @@ package struct Rasterizer: Sendable {
   /// unreachable; the main-actor frame coordinator records it on return.
   package struct IncrementalRasterMismatch: Sendable, Equatable {
     /// Rows whose cells differ between the incremental and fresh surfaces.
-    /// Empty when only non-cell surface state (image attachments or
-    /// presentation layers) diverged.
+    /// Empty when only non-cell surface state (image attachments, surface
+    /// attachments, or metadata) diverged.
     package var mismatchedRows: [Int]
+    /// Human-readable evidence for the divergence: the damage rows the
+    /// incremental path trusted, and for the first few mismatched rows the
+    /// row text each side produced (or the differing columns when only cell
+    /// styles diverged). Empty when the caller has nothing beyond the rows.
+    ///
+    /// The crash diagnostics are frequently the only artifact a consumer can
+    /// hand back: a DEBUG trap names the rows but, without the cells, a report
+    /// cannot say which painter or damage producer under-reported. Carried on
+    /// the mismatch so the main-actor recorder can fold it into the assertion
+    /// message and the probe's per-kind detail.
+    package var evidence: String
 
-    package init(mismatchedRows: [Int]) {
+    package init(mismatchedRows: [Int], evidence: String = "") {
       self.mismatchedRows = mismatchedRows
+      self.evidence = evidence
     }
   }
 
@@ -394,7 +406,8 @@ package struct Rasterizer: Sendable {
       if var freshFallback = freshRasterizationIfIncrementalMismatch(
         draw,
         surfaceSize: surfaceSize,
-        incrementalSurface: surface
+        incrementalSurface: surface,
+        trustedDirtyRows: dirtyRows
       ) {
         freshFallback.path = .incrementalRepaired
         return freshFallback
@@ -608,7 +621,8 @@ package struct Rasterizer: Sendable {
   private func freshRasterizationIfIncrementalMismatch(
     _ draw: DrawNode,
     surfaceSize: CellSize,
-    incrementalSurface: RasterSurface
+    incrementalSurface: RasterSurface,
+    trustedDirtyRows: Set<Int>
   ) -> RasterizationResult? {
     var fresh = rasterizeFreshCollectingVisibleIdentities(
       draw,
@@ -618,13 +632,111 @@ package struct Rasterizer: Sendable {
       return nil
     }
 
+    let mismatchedRows = fresh.surface.cells.indices.filter { row in
+      row >= incrementalSurface.cells.count
+        || fresh.surface.cells[row] != incrementalSurface.cells[row]
+    }
     fresh.incrementalMismatch = IncrementalRasterMismatch(
-      mismatchedRows: fresh.surface.cells.indices.filter { row in
-        row >= incrementalSurface.cells.count
-          || fresh.surface.cells[row] != incrementalSurface.cells[row]
-      }
+      mismatchedRows: mismatchedRows,
+      evidence: Self.incrementalMismatchEvidence(
+        mismatchedRows: mismatchedRows,
+        incremental: incrementalSurface,
+        fresh: fresh.surface,
+        trustedDirtyRows: trustedDirtyRows
+      )
     )
     return fresh
+  }
+
+  /// How many mismatched rows the evidence spells out cell-by-cell. The trap
+  /// message is a single line in a crash report; the first few rows identify
+  /// the painter, more only pad the log.
+  private static let incrementalMismatchEvidenceRowLimit = 4
+  private static let incrementalMismatchEvidenceColumnLimit = 8
+  private static let incrementalMismatchEvidenceTextLimit = 160
+
+  /// Builds the human-readable evidence for an incremental-vs-fresh divergence.
+  ///
+  /// Row text is the glyph projection of each side's cells; rows whose glyphs
+  /// agree while their cell styles differ are reported by column so a
+  /// style-only divergence (a bold or colour that did not repaint) is named
+  /// instead of looking like an empty diff.
+  internal static func incrementalMismatchEvidence(
+    mismatchedRows: [Int],
+    incremental: RasterSurface,
+    fresh: RasterSurface,
+    trustedDirtyRows: Set<Int>
+  ) -> String {
+    var parts: [String] = []
+    parts.append("trusted damage rows \(trustedDirtyRows.sorted())")
+    if mismatchedRows.isEmpty {
+      if incremental.imageAttachments != fresh.imageAttachments {
+        parts.append(
+          "image attachments diverged (incremental \(incremental.imageAttachments.count), "
+            + "fresh \(fresh.imageAttachments.count))"
+        )
+      }
+      if incremental.attachments != fresh.attachments {
+        parts.append(
+          "attachments diverged (incremental \(incremental.attachments.count), "
+            + "fresh \(fresh.attachments.count))"
+        )
+      }
+      if incremental.metadata != fresh.metadata {
+        parts.append("metadata diverged")
+      }
+      if incremental.size != fresh.size {
+        parts.append("size diverged (incremental \(incremental.size), fresh \(fresh.size))")
+      }
+      return parts.joined(separator: "; ")
+    }
+    for row in mismatchedRows.prefix(incrementalMismatchEvidenceRowLimit) {
+      let incrementalRow = row < incremental.cells.count ? incremental.cells[row] : []
+      let freshRow = row < fresh.cells.count ? fresh.cells[row] : []
+      let incrementalText = rowText(incrementalRow)
+      let freshText = rowText(freshRow)
+      if incrementalText == freshText {
+        let width = max(incrementalRow.count, freshRow.count)
+        let columns = (0..<width).filter { column in
+          let lhs = column < incrementalRow.count ? incrementalRow[column] : .empty
+          let rhs = column < freshRow.count ? freshRow[column] : .empty
+          return lhs != rhs
+        }
+        let shown = columns.prefix(incrementalMismatchEvidenceColumnLimit).map(String.init)
+        let suffix = columns.count > incrementalMismatchEvidenceColumnLimit ? ", …" : ""
+        parts.append(
+          "row \(row) glyphs agree, cell styles differ at columns "
+            + "[\(shown.joined(separator: ", "))\(suffix)] text=\"\(incrementalText)\""
+        )
+      } else {
+        parts.append(
+          "row \(row) incremental=\"\(incrementalText)\" fresh=\"\(freshText)\""
+        )
+      }
+    }
+    if mismatchedRows.count > incrementalMismatchEvidenceRowLimit {
+      parts.append(
+        "\(mismatchedRows.count - incrementalMismatchEvidenceRowLimit) more mismatched rows"
+      )
+    }
+    return parts.joined(separator: "; ")
+  }
+
+  private static func rowText(_ row: [RasterCell]) -> String {
+    var end = row.count
+    while end > 0, row[end - 1].character == " ", !row[end - 1].isContinuation,
+      row[end - 1].style == nil
+    {
+      end -= 1
+    }
+    var characters: [Character] = []
+    for cell in row[..<end] where !cell.isContinuation {
+      characters.append(cell.character)
+    }
+    if characters.count > incrementalMismatchEvidenceTextLimit {
+      return String(characters.prefix(incrementalMismatchEvidenceTextLimit)) + "…"
+    }
+    return String(characters)
   }
 
   private static func defaultIncrementalVerificationPolicy()

@@ -94,10 +94,19 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     guard let mismatch else {
       return
     }
-    let detail =
+    var detail =
       mismatch.mismatchedRows.isEmpty
       ? "incremental raster mismatch: non-cell surface state diverged from fresh raster"
       : "incremental raster mismatch: rows \(mismatch.mismatchedRows) diverged from fresh raster"
+    if !mismatch.evidence.isEmpty {
+      // The evidence names the trusted damage and the cells on each side so
+      // a crash report can say which painter or damage producer under-reported
+      // (issue #5 arrived with only the rows, which could not be acted on).
+      detail += " — \(mismatch.evidence)"
+    }
+    detail +=
+      " (the frame was repaired from the fresh raster; this DEBUG trap reports an "
+      + "incomplete-damage framework bug — SWIFTTUI_SOUNDNESS_PROBE=0 disables it)"
     SoundnessProbeConfiguration.recordRasterDamageMismatch(detail)
     // The 2026-07-28 full-gate census observed zero unexpected mismatches.
     // Record first so the release trace and crash diagnostics retain context.
