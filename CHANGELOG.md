@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-08-22
+
 ### Fixed
 
 - **A `@MainActor` app builds under the `ApproachableConcurrency` upcoming
@@ -25,6 +27,16 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   the initializer swift-argument-parser already calls from nonisolated code).
   `SwiftTUIArgumentsTests` now compiles with `ApproachableConcurrency`, so
   every command fixture exercises the consumer default. (swift-tui#6)
+- **A selected `List` or `Table` row no longer loses focus across a snapshot
+  rebuild.** `List` and `Table` stamp each row's role and selectability onto
+  their own copy of the row at resolve time, and every row focus region is
+  derived from that stamp; a frame served by `ViewNode.snapshotRebuilding`
+  re-pulled each row's committed value without it, so the semantics pass
+  emitted zero row focus regions, focus cleared, and the convergence render
+  re-seated it on row 0 -- Down, an inert key, then Return activated row 0
+  while the selection still showed the chosen row. The rebuild now carries
+  the parent-authored stamp from the parent's committed slice onto the
+  rebuilt child. (swift-tui#4)
 - **`state.duplicateSlotClaim` no longer fires for a container whose update
   pass was reuse-served.** The dynamic-property update pass records a
   container's slot claims before the reuse door, and a reuse-served resolve
@@ -59,6 +71,19 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 - **The memo-soundness alarm names the diverging node.** The
   `memo shadow oracle` detail now carries the node's identity path and view
   type instead of a bare field name.
+- **The DEBUG incremental-raster mismatch trap names its evidence.** The
+  `IncrementalRasterMismatch` assertion (and the `raster-damage` probe
+  detail) now carries the damage rows the incremental path trusted and, for
+  the first mismatched rows, the text each side produced -- or the columns
+  whose cell styles differ, or which non-cell field diverged -- plus what the
+  trap means and the `SWIFTTUI_SOUNDNESS_PROBE=0` opt-out. The journey from
+  swift-tui#5 (a segmented row of `.bordered` Buttons changing selection) is
+  pinned as a regression test that reaches the incremental rasterizer with
+  zero oracle growth. (swift-tui#5)
+
+## [0.9.6] - 2026-08-22
+
+### Changed
 
 - **`@State` ownership is now bound at capture time.** Closures created
   during body evaluation (actions, tasks, submit handlers, gesture
