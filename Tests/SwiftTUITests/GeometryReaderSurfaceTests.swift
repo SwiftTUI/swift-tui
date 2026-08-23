@@ -358,7 +358,7 @@ struct GeometryReaderSurfaceTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(
       terminal.distinctCountValues.count >= 2,
       """
@@ -599,7 +599,7 @@ private final class GeometryReaderAutonomousTaskQuitGate {
       return
     }
     didFinish = true
-    continuation.yield(.key(KeyPress(.character("d"), modifiers: .ctrl)))
+    continuation.yield(.key(KeyPress(.character("c"), modifiers: .ctrl)))
     continuation.finish()
   }
 }

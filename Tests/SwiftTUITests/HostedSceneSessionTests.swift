@@ -118,10 +118,10 @@ struct HostedSceneSessionTests {
       recorder.surfaceCount >= 2 && recorder.latestSurface?.size == .init(width: 32, height: 8)
     }
 
-    session.sendInput([0x04])  // Ctrl+D
+    session.sendInput([0x03])  // Ctrl+C
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
   }
 
   @Test("hosted scene session publishes raster surfaces and accepts direct input events")
@@ -141,10 +141,10 @@ struct HostedSceneSessionTests {
 
     #expect(recorder.latestSurface?.lines.first?.contains("Primary") == true)
 
-    session.send(.key(.init(.character("d"), modifiers: .ctrl)))
+    session.send(.key(.init(.character("c"), modifiers: .ctrl)))
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
   }
 
   @Test("hosted scene session forwards live scroll-region offsets in semantic frames")
@@ -182,7 +182,7 @@ struct HostedSceneSessionTests {
     }
     #expect(recorder.latestSnapshot?.scrollRoutes.first?.contentOffset.y == 2)
 
-    session.send(.key(.init(.character("d"), modifiers: .ctrl)))
+    session.send(.key(.init(.character("c"), modifiers: .ctrl)))
     _ = try await task.value
   }
 
@@ -210,9 +210,12 @@ struct HostedSceneSessionTests {
 
     await clipboardRecorder.updates.wait { clipboardRecorder.writes == ["hello"] }
 
-    session.send(.key(.init(.character("d"), modifiers: .ctrl)))
+    // Copy leaves the selection in place, so a second Ctrl+C would copy again.
+    // Collapse the selection first; Ctrl+C with nothing selected is the exit.
+    session.send(.key(.init(.arrowRight)))
+    session.send(.key(.init(.character("c"), modifiers: .ctrl)))
     let exitReason = try await task.value
-    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
   }
 
   @Test("hosted raster surface publishes damage-bearing semantic frames beside raster surfaces")
@@ -366,10 +369,10 @@ struct HostedSceneSessionTests {
 
     await recorder.updates.wait { recorder.surfaceCount >= 2 }
 
-    session.sendInput([0x04])  // Ctrl+D
+    session.sendInput([0x03])  // Ctrl+C
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
   }
 
   @Test("hosted scene session publishes committed focus presentation changes")

@@ -325,12 +325,12 @@ struct TextInputRuntimeIntegrationTests {
     #expect(box.value == "secret")
   }
 
-  @Test("TextEditor runtime Ctrl+D uses default exit binding")
-  func textEditorRuntimeCtrlDUsesDefaultExitBinding() throws {
+  @Test("TextEditor runtime Ctrl+C with no selection uses default exit binding")
+  func textEditorRuntimeCtrlCWithoutSelectionUsesDefaultExitBinding() throws {
     let box = PasteTextBox()
     box.value = "hello"
     let identity = testIdentity("ExitBindingTextEditor")
-    let exitKey = KeyPress(.character("d"), modifiers: .ctrl)
+    let exitKey = KeyPress(.character("c"), modifiers: .ctrl)
     let runLoop = makeTextInputRunLoop {
       TextEditor(text: box.binding())
         .id(identity)

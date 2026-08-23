@@ -87,7 +87,7 @@ package final class ImmediateFinishSignalReader: SignalReading {
 /// A dual `InputReading` + `TerminalInputReading` double that walks scripted
 /// steps, **staying open** across an autonomous wake via a direct
 /// `MainActorConditionSignal` (no per-test sleep), then quits with `quitKey`
-/// (Ctrl+D → `.userExit`). `onTermination` cancels the driver task.
+/// (Ctrl+C → `.userExit`). `onTermination` cancels the driver task.
 package final class ScriptedAutonomousWakeInputReader:
   InputReading, TerminalInputReading
 {
@@ -98,7 +98,7 @@ package final class ScriptedAutonomousWakeInputReader:
   package init(
     frameSignal: MainActorConditionSignal,
     steps: [ScriptedWakeStep],
-    quitKey: KeyPress = KeyPress(.character("d"), modifiers: .ctrl)
+    quitKey: KeyPress = KeyPress(.character("c"), modifiers: .ctrl)
   ) {
     self.frameSignal = frameSignal
     self.steps = steps

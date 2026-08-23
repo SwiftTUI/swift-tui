@@ -93,7 +93,7 @@ struct BranchMountTaskSingleStartTests {
         .awaitCondition {
           recorder.activeTransitions == [true, false]
         },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
       ])
     let runLoop = makeRunLoop(
       terminal: terminal,
@@ -107,7 +107,7 @@ struct BranchMountTaskSingleStartTests {
     } recorder: { recorder }
 
     let result = try await runLoop.run()
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(runLoop.lifecycleCoordinator.taskStartSkipCount == 0)
     #expect(
       recorder.starts.count == 1,
@@ -157,7 +157,7 @@ struct BranchMountTaskSingleStartTests {
         .awaitCondition {
           recorder.activeTransitions == [true, false, true, false]
         },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
       ])
     let rootIdentity = testIdentity("ExplicitIDBranchMountRoot")
     let runLoop = SwiftTUIRuntime.RunLoop(
@@ -184,7 +184,7 @@ struct BranchMountTaskSingleStartTests {
     )
 
     let result = try await runLoop.run()
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(
       recorder.startCount(generation: 1) == 1
         && recorder.startCount(generation: 2) == 1,
@@ -229,7 +229,7 @@ struct BranchMountTaskSingleStartTests {
         .awaitCondition {
           recorder.activeTransitions == [true, false, true, false]
         },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
       ])
     let runLoop = makeRunLoop(
       terminal: terminal,
@@ -239,7 +239,7 @@ struct BranchMountTaskSingleStartTests {
     } recorder: { recorder }
 
     let result = try await runLoop.run()
-    guard result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)) else {
+    guard result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)) else {
       return "unexpected exit reason \(result.exitReason)"
     }
     let skips = runLoop.lifecycleCoordinator.taskStartSkipCount

@@ -202,7 +202,7 @@ extension FrameworkStressSceneHostTests {
 
       #expect(try #require(bindings).keys == currentKeys)
       #expect(bindings?.contains(KeyPress(.character("a"), modifiers: .ctrl)) == false)
-      #expect(bindings?.contains(KeyPress(.character("d"), modifiers: .ctrl)) == false)
+      #expect(bindings?.contains(KeyPress(.character("c"), modifiers: .ctrl)) == false)
     }
   }
 }
@@ -586,14 +586,14 @@ extension FrameworkStressSceneHostTests {
     }
 
     _ = await surface.waitForFrame()
-    session.send(.key(KeyPress(.character("d"), modifiers: .ctrl)))
+    session.send(.key(KeyPress(.character("c"), modifiers: .ctrl)))
 
     var results: [RunLoopExitReason] = []
     for caller in callers {
       results.append(try await caller.value)
     }
     #expect(results.count == 8)
-    let expected = RunLoopExitReason.userExit(KeyPress(.character("d"), modifiers: .ctrl))
+    let expected = RunLoopExitReason.userExit(KeyPress(.character("c"), modifiers: .ctrl))
     #expect(results.allSatisfy { $0 == expected })
   }
 }

@@ -52,7 +52,7 @@ struct ConditionalHostTaskStartSkipTests {
         .awaitCondition {
           terminal.frames.contains { $0.contains("editor ready") }
         },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
       ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
@@ -76,7 +76,7 @@ struct ConditionalHostTaskStartSkipTests {
 
     let result = try await runLoop.run()
 
-    guard result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)) else {
+    guard result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)) else {
       return "unexpected exit reason \(result.exitReason)"
     }
     let skips = runLoop.lifecycleCoordinator.taskStartSkipCount

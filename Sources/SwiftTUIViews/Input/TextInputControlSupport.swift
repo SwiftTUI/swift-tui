@@ -98,13 +98,18 @@ private func applyTextInputCommand(
     traits: traits,
     layout: layout(currentValue)
   )
-  let isClipboardCommand =
-    command == .copySelection || command == .cutSelection
-    || command == .pasteClipboard
+  // Cut and paste consume their chord even when they change nothing (an
+  // empty clipboard, a secure field), so the key never bubbles on as
+  // unhandled. Copy is handled only when there was a selection to copy: a
+  // `Ctrl+C` with a collapsed selection (or in a secure field) is not an
+  // edit, and declining it lets the scene's exit binding — `Ctrl+C` by
+  // default — take the key.
+  let isClipboardCommand = command == .cutSelection || command == .pasteClipboard
+  let copiedSelection = command == .copySelection && mutation.clipboardText != nil
   let didWriteClipboard: Bool
   if let clipboardText = mutation.clipboardText {
     guard clipboardWriteAction(clipboardText) else {
-      return isClipboardCommand
+      return isClipboardCommand || copiedSelection
     }
     didWriteClipboard = true
   } else {
@@ -113,7 +118,7 @@ private func applyTextInputCommand(
 
   guard
     mutation.value != currentValue || mutation.shouldWriteBinding || didWriteClipboard
-      || isClipboardCommand
+      || isClipboardCommand || copiedSelection
   else {
     return false
   }
@@ -123,7 +128,7 @@ private func applyTextInputCommand(
     binding.wrappedValue = mutation.value.text
   }
   return mutation.shouldRequestFrame || mutation.shouldWriteBinding || didWriteClipboard
-    || isClipboardCommand
+    || isClipboardCommand || copiedSelection
 }
 
 package func textInputCommand(

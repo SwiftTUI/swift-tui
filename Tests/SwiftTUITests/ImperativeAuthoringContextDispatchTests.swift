@@ -295,7 +295,7 @@ struct ImperativeAuthoringContextDispatchTests {
     try renderInitial(primary.runLoop)
     try renderInitial(secondary.runLoop)
 
-    _ = primary.runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
+    _ = primary.runLoop.handleKeyPress(KeyPress(.character("c"), modifiers: .ctrl))
 
     try await renderUntil("disappear lifecycle mutation") {
       do {
@@ -947,7 +947,7 @@ private struct DisappearLifecycleScopeFixture: View {
         }
       }
     }
-    .keyCommand("Toggle child", key: .character("d"), modifiers: .ctrl) {
+    .keyCommand("Toggle child", key: .character("c"), modifiers: .ctrl) {
       showsChild.toggle()
     }
   }

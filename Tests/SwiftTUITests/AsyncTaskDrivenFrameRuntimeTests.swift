@@ -40,7 +40,7 @@ struct AsyncTaskDrivenFrameRuntimeTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.frames.contains { $0.contains("task pending") })
     #expect(terminal.frames.contains { $0.contains("task ready") })
   }
@@ -77,7 +77,7 @@ struct AsyncTaskDrivenFrameRuntimeTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.frames.contains { $0.contains("action idle") })
     #expect(terminal.frames.contains { $0.contains("action ready") })
   }

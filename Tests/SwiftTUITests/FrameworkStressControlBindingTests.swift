@@ -142,7 +142,7 @@ extension FrameworkStressControlBindingTests {
 
     let target = try #require(harness.point(forText: "Press target 003"))
     _ = try harness.sendMouse(.down(.primary), at: target)
-    _ = try harness.pressKey(KeyPress(.character("d"), modifiers: .ctrl))
+    _ = try harness.pressKey(KeyPress(.character("c"), modifiers: .ctrl))
     _ = try harness.sendMouse(.up(.primary), at: target)
 
     #expect(probe.value == 0)
@@ -164,7 +164,7 @@ private struct ControlStress003Fixture: View {
         .disabled(!isEnabled)
       }
     }
-    .keyCommand("Disable target 003", key: .character("d"), modifiers: .ctrl) {
+    .keyCommand("Disable target 003", key: .character("c"), modifiers: .ctrl) {
       isEnabled = false
     }
   }
@@ -1187,7 +1187,7 @@ extension FrameworkStressControlBindingTests {
     defer { harness.shutdown() }
 
     _ = try harness.focus(ControlStress025Fixture.fieldIdentity)
-    _ = try harness.pressKey(KeyPress(.character("d"), modifiers: .ctrl))
+    _ = try harness.pressKey(KeyPress(.character("c"), modifiers: .ctrl))
     _ = try harness.pressKey(KeyPress(.character("x")))
     #expect(text.value == "beta")
     #expect(text.writes.isEmpty)
@@ -1219,7 +1219,7 @@ private struct ControlStress025Fixture: View {
           .disabled(!isEnabled)
       }
     }
-    .keyCommand("Disable and replace field 025", key: .character("d"), modifiers: .ctrl) {
+    .keyCommand("Disable and replace field 025", key: .character("c"), modifiers: .ctrl) {
       isEnabled = false
       text.value = "beta"
       externalRevision += 1

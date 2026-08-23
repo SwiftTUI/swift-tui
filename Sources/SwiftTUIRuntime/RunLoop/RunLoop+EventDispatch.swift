@@ -74,6 +74,27 @@ extension RunLoop {
     }
   }
 
+  /// Dispatches `keyPress` to the focused identity's handlers and then up its
+  /// hosting chain, stopping at the first handler that consumes it. Returns
+  /// `true` when the event was consumed. The dispatch backstop is requested
+  /// only in that case: an unhandled key gets none (see the caller).
+  private func dispatchKeyPressAlongBubblePath(
+    _ keyPress: KeyPress,
+    from focusedIdentity: Identity
+  ) -> Bool {
+    let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
+    for identity in renderer.viewGraph.keyEventBubblePath(from: focusedIdentity)
+    where localKeyHandlerRegistry.hasHandler(identity: identity) {
+      if localKeyHandlerRegistry.dispatch(identity: identity, keyPress: keyPress) {
+        requestDispatchBackstopInvalidation(
+          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
+        )
+        return true
+      }
+    }
+    return false
+  }
+
   package func handleKeyPress(
     _ keyPress: KeyPress
   ) -> RunLoopExitReason? {
@@ -92,7 +113,7 @@ extension RunLoop {
     // Walks the current focus chain shallowest-first; a matching
     // keyCommand consumes the event (or blocks dispatch if disabled)
     // before the configured exit bindings run — so a consumer that
-    // registers a `keyCommand` for an exit key (e.g. Ctrl+D) takes
+    // registers a `keyCommand` for an exit key (e.g. Ctrl+C) takes
     // precedence over the framework-level exit for the duration that
     // scope is on the focus chain.
     if !keyPress.modifiers.isEmpty
@@ -117,48 +138,44 @@ extension RunLoop {
         latestSemanticSnapshot.focusRegions.first(where: { $0.identity == identity })
       }?.focusInteractions ?? .automatic
 
-    // Preserve the established editor contract: scene exit bindings win before
-    // a TextField/TextEditor can interpret the modified character as authored
-    // input. Non-edit focus continues through consumer handlers below, which
-    // lets an app-owned modal editor such as a search overlay conditionally
-    // claim a bare character binding.
+    // Exit bindings under text-edit focus. A *modified* chord is never text, so
+    // the focused editor (and the handlers stacked above it) may claim it as an
+    // edit first: `Ctrl+C` — the default exit key — copies a non-empty
+    // selection and the session continues, while with nothing to copy the
+    // editor declines and the same key exits. A bare character configured as
+    // an exit key still exits before the editor can insert it. Non-edit focus
+    // continues through consumer handlers below, which lets an app-owned modal
+    // editor such as a search overlay conditionally claim a bare character
+    // binding.
     if focusedInteractions == .edit, exitKeyBindings.contains(keyPress) {
+      if !keyPress.modifiers.isEmpty, let focusedIdentity,
+        dispatchKeyPressAlongBubblePath(keyPress, from: focusedIdentity)
+      {
+        return nil
+      }
       return .userExit(keyPress)
     }
 
-    if let focusedIdentity {
-      // Bubble from the focused identity up its hosting chain (SwiftUI
-      // parity: `.onKeyPress` above a `.frame`/`.id` boundary registers at
-      // the structural ancestor identity, which an identity-string walk
-      // cannot reach from a rerooted focus identity). The focused identity
-      // itself dispatches first, preserving stacked-handler priority and
-      // editor interception at the exact identity.
-      let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
-      var handled = false
-      for identity in renderer.viewGraph.keyEventBubblePath(from: focusedIdentity)
-      where localKeyHandlerRegistry.hasHandler(identity: identity) {
-        if localKeyHandlerRegistry.dispatch(identity: identity, keyPress: keyPress) {
-          handled = true
-          break
-        }
-      }
-      // The handler's own `@State` writes already invalidate the precise
-      // readers (reader attribution), so the coarse root sweep is redundant
-      // whenever the dispatch invalidated anything — and a full-tree re-resolve
-      // on every key is expensive (e.g. re-running a presenting view's whole
-      // body for each character typed into a focused TextField). An UNHANDLED
-      // key gets no backstop either (mirroring the control-action path, which
-      // records follow-ups only for handled dispatches): the handler declined
-      // the event, and every fall-through branch below carries its own
-      // backstop — a declined ESC previously root-swept here before the
-      // framework dismiss branch even ran, riding the close transition's
-      // replayed sets as `root_invalidated`.
-      if handled {
-        requestDispatchBackstopInvalidation(
-          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
-        )
-        return nil
-      }
+    // Bubble from the focused identity up its hosting chain (SwiftUI parity:
+    // `.onKeyPress` above a `.frame`/`.id` boundary registers at the
+    // structural ancestor identity, which an identity-string walk cannot
+    // reach from a rerooted focus identity). The focused identity itself
+    // dispatches first, preserving stacked-handler priority and editor
+    // interception at the exact identity.
+    //
+    // The handler's own `@State` writes already invalidate the precise
+    // readers (reader attribution), so the coarse root sweep is redundant
+    // whenever the dispatch invalidated anything — and a full-tree re-resolve
+    // on every key is expensive (e.g. re-running a presenting view's whole
+    // body for each character typed into a focused TextField). An UNHANDLED
+    // key gets no backstop either (mirroring the control-action path, which
+    // records follow-ups only for handled dispatches): the handler declined
+    // the event, and every fall-through branch below carries its own
+    // backstop — a declined ESC previously root-swept here before the
+    // framework dismiss branch even ran, riding the close transition's
+    // replayed sets as `root_invalidated`.
+    if let focusedIdentity, dispatchKeyPressAlongBubblePath(keyPress, from: focusedIdentity) {
+      return nil
     }
 
     // Configured exit bindings are the fallback after focused view handlers.

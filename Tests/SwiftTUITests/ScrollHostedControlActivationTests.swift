@@ -109,11 +109,11 @@ struct ScrollHostedControlActivationTests {
       inputReader: ScriptedSceneInputReader([
         .mouse(.init(kind: .down(.primary), location: loc)),
         .mouse(.init(kind: .up(.primary), location: loc)),
-        .key(KeyPress(.character("d"), modifiers: .ctrl)),
+        .key(KeyPress(.character("c"), modifiers: .ctrl)),
       ]),
       signalReader: nil)
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(
       taps.taps == 1,
       "button inside ScrollView=\(inScrollView) should activate on tap; taps=\(taps.taps)")

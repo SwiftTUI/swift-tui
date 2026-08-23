@@ -28,7 +28,7 @@ struct PortalPrimitiveTests {
         .awaitCondition {
           terminal.frames.contains { $0.contains("Tick 1") }
         },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
       ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
@@ -50,7 +50,7 @@ struct PortalPrimitiveTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.frames.contains { $0.contains("Inspector") })
     #expect(terminal.frames.contains { $0.contains("Tick 0") })
     #expect(terminal.frames.contains { $0.contains("Tick 1") })
@@ -86,7 +86,7 @@ struct PortalPrimitiveTests {
               advancedGlyphs.contains { frame.contains($0) }
             }
         },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
       ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
@@ -106,7 +106,7 @@ struct PortalPrimitiveTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.frames.contains { $0.contains("Inspector") })
     #expect(terminal.frames.contains { $0.contains("⠋") })
     #expect(
@@ -133,7 +133,7 @@ struct PortalPrimitiveTests {
             expectedGlyphs: expectedGlyphs
           ).count >= 7
         },
-        .press(KeyPress(.character("d"), modifiers: .ctrl)),
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
       ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
@@ -153,7 +153,7 @@ struct PortalPrimitiveTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.frames.contains { $0.contains("Inspector") })
     #expect(terminal.frames.contains { $0.contains("⠋") })
     #expect(

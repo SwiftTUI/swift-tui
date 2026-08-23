@@ -382,7 +382,7 @@ private final class PerTickCadenceHarness {
       stateContainer: stateContainer,
       focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
       keyHandler: { keyPress, _, _ in
-        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -412,7 +412,7 @@ private final class PerTickCadenceHarness {
     // Stop the workload first so the cooperative-exit drain has no live
     // tick producer left to replay (the logo-tab flush-before-exit shape).
     model.stopped = true
-    inputReader.send(.key(.character("d"), modifiers: .ctrl))
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
     inputReader.finish()
   }
 }

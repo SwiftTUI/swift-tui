@@ -20,7 +20,7 @@ import Testing
 /// It drives the shared `ScriptedAutonomousWakeInputReader` + recording surface
 /// from `SwiftTUITestSupport`: synchronization is direct, not timeout-polled (per
 /// the test-sync ratchet) — the reader stays open across the wake via a poll-free
-/// `MainActorConditionSignal.wait(until:)`, then quits with Ctrl-D → `.userExit`.
+/// `MainActorConditionSignal.wait(until:)`, then quits with Ctrl-C → `.userExit`.
 @MainActor
 @Suite("Autonomous task wake on the terminal-input path")
 struct AutonomousWakeTerminalInputTests {
@@ -31,7 +31,7 @@ struct AutonomousWakeTerminalInputTests {
     let rootIdentity = testIdentity("AutonomousWakeTerminalRoot")
 
     // No scripted input at all: the only step keeps the stream open until the
-    // autonomous `.task` write lands its frame, then the reader quits with Ctrl+D.
+    // autonomous `.task` write lands its frame, then the reader quits with Ctrl+C.
     let inputReader = ScriptedAutonomousWakeInputReader(
       frameSignal: terminal.frameSignal,
       steps: [
@@ -69,7 +69,7 @@ struct AutonomousWakeTerminalInputTests {
 
     // The loop reached the quit key the reader yielded *after* the autonomous
     // frame — i.e. it stayed alive across the wake (not `.inputEnded`).
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.frames.contains { $0.contains("task pending") })
     #expect(terminal.frames.contains { $0.contains("task ready") })
   }

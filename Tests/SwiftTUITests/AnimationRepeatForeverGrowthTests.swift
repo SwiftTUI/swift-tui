@@ -623,7 +623,7 @@ struct AnimationRepeatForeverGrowthTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(
       result.renderedFrames >= 3,
       """
@@ -780,7 +780,7 @@ private final class FrameCountQuitTerminalInputReader: TerminalInputReading {
         // present() rather than after a fixed wall-clock delay — the
         // repeat-forever animation gets a deterministic number of ticks.
         await frameSignal.wait(until: quitWhen)
-        continuation.yield(.key(KeyPress(.character("d"), modifiers: .ctrl)))
+        continuation.yield(.key(KeyPress(.character("c"), modifiers: .ctrl)))
         continuation.finish()
       }
 

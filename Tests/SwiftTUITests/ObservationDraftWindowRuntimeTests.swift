@@ -68,7 +68,7 @@ struct ObservationDraftWindowRuntimeTests {
       ),
       focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
       keyHandler: { keyPress, _, _ in
-        if keyPress == KeyPress(.character("d"), modifiers: .ctrl) {
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
           return .exit(.userExit(keyPress))
         }
         return .ignored
@@ -118,7 +118,7 @@ struct ObservationDraftWindowRuntimeTests {
       terminal.frames.contains { $0.contains("value 2") }
     }
 
-    inputReader.send(.key(.character("d"), modifiers: .ctrl))
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
     inputReader.finish()
     phase("awaiting run-loop exit")
     _ = try await runTask.value

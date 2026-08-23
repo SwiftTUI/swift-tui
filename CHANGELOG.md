@@ -8,6 +8,24 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- **The default exit key is `Ctrl+C` (was `Ctrl+D`).** `ExitKeyBindings.default`
+  now binds `Ctrl+C` alone; `Ctrl+D` no longer ends a session unless an app
+  configures it with `WindowGroup.exitOnKey(.character("d"), modifiers: .ctrl)`.
+  The terminal runs in raw mode, so `Ctrl+C` still arrives as a key press, not
+  `SIGINT` — previously it was delivered to the app and, unhandled, did nothing,
+  while `Ctrl+D` collided with half-page-down in pagers and delete-forward in
+  line editors. Consumer `keyCommand`s and non-edit focused `onKeyPress`
+  handlers keep precedence over the exit bindings, and `onTerminationRequest`
+  can still cancel the exit. Under text-edit focus the rule is now: a
+  *modified* exit chord reaches the focused editor first, but only as an edit —
+  `Ctrl+C` copies a non-empty selection and the session continues, and with
+  nothing selected it exits; a bare character configured as an exit key still
+  exits before the editor can insert it. Correspondingly, a text input's
+  `Ctrl+C` counts as handled only when there was a selection to copy (cut and
+  paste still consume their chords unconditionally).
+
 ## [0.9.7] - 2026-08-22
 
 ### Fixed

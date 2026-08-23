@@ -71,6 +71,20 @@ profiles. This article describes the shared runtime entry points.
 `SwiftTUIRuntime` owns scene declarations, manifests, and hosted-session APIs.
 It does not pull in runner products on its own.
 
+### Exiting
+
+`Ctrl+C` ends an interactive session by default. The terminal runs in raw
+mode, so the key arrives in-band rather than as `SIGINT`, and the runtime
+restores the terminal on the way out. `WindowGroup/exitOnKeys(_:)` replaces
+the set wholesale (`ExitKeyBindings/none` disables framework exits; the
+session then ends only on signals, `stdin` EOF, or an explicit exit from a
+consumer `keyHandler` or `keyCommand`). Consumer `keyCommand`s and non-edit
+focused `onKeyPress` handlers run before the exit bindings; a focused text
+input sees a modified exit chord first only as an edit, so `Ctrl+C` copies a
+non-empty selection and exits when nothing is selected. `onTerminationRequest`
+can cancel a key- or signal-initiated exit (for example to confirm unsaved
+changes); `stdin` EOF is not cancellable.
+
 ### Executable runners
 
 For ordinary apps, import `SwiftTUI` and mark your app type with `@main` to use

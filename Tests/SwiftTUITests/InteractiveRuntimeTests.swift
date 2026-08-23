@@ -896,11 +896,11 @@ struct InteractiveRuntimeTests {
       events: [
         KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab),
         KeyPress(.tab), KeyPress(.arrowDown), KeyPress(.escape), KeyPress(.tab),
-        KeyPress(.character("d"), modifiers: .ctrl),
+        KeyPress(.character("c"), modifiers: .ctrl),
       ]
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState.selectionMode == .accent)
     #expect(
       terminal.frames.contains(where: {
@@ -921,11 +921,11 @@ struct InteractiveRuntimeTests {
       events: [
         KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab),
         KeyPress(.arrowDown), KeyPress(.arrowDown), KeyPress(.return),
-        KeyPress(.character("d"), modifiers: .ctrl),
+        KeyPress(.character("c"), modifiers: .ctrl),
       ]
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState == InteractiveDemoState(value: 2))
     let firstFrame = try #require(terminal.frames.first)
     #expect(firstFrame.contains("▤ Presets"))
@@ -960,11 +960,11 @@ struct InteractiveRuntimeTests {
         KeyPress(.backspace),
         KeyPress(.character("-")), KeyPress(.character("1")), KeyPress(.character("2")),
         KeyPress(.return),
-        KeyPress(.character("d"), modifiers: .ctrl),
+        KeyPress(.character("c"), modifiers: .ctrl),
       ]
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState.value == -12)
     #expect(result.finalState.inputBuffer == "-12")
     let firstMetrics = try #require(terminal.presentationMetrics.first)
@@ -984,11 +984,11 @@ struct InteractiveRuntimeTests {
       terminal: terminal,
       events: [
         KeyPress(.tab), KeyPress(.tab), KeyPress(.return),
-        KeyPress(.character("d"), modifiers: .ctrl),
+        KeyPress(.character("c"), modifiers: .ctrl),
       ]
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState.accentPreviewEnabled)
     #expect(terminal.frames.contains(where: { $0.contains("Accent Preview") }))
   }
@@ -1009,7 +1009,7 @@ struct InteractiveRuntimeTests {
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
-        KeyPress(.return), KeyPress(.character("d"), modifiers: .ctrl),
+        KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
       signalReader: EmptySignalReader(),
       scheduler: FrameScheduler(),
@@ -1032,7 +1032,7 @@ struct InteractiveRuntimeTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState == 1)
 
     let initialRoot = try #require(
@@ -1153,7 +1153,7 @@ struct InteractiveRuntimeTests {
       terminal: terminal,
       events: [
         .key(.return),
-        .key(KeyPress(.character("d"), modifiers: .ctrl)),
+        .key(KeyPress(.character("c"), modifiers: .ctrl)),
       ],
       rootIdentity: testIdentity("StandaloneLinkRuntime"),
       terminalSize: .init(width: 20, height: 1),
@@ -1169,7 +1169,7 @@ struct InteractiveRuntimeTests {
       }
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(recorder.destinations == ["https://example.com"])
   }
 
@@ -1187,7 +1187,7 @@ struct InteractiveRuntimeTests {
         .key(.return),
         .key(.tab),
         .key(.return),
-        .key(KeyPress(.character("d"), modifiers: .ctrl)),
+        .key(KeyPress(.character("c"), modifiers: .ctrl)),
       ],
       rootIdentity: testIdentity("InlineLinkRuntime"),
       terminalSize: .init(width: 24, height: 1),
@@ -1204,7 +1204,7 @@ struct InteractiveRuntimeTests {
       }
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(
       recorder.destinations == [
         "https://one.example",
@@ -1239,7 +1239,7 @@ struct InteractiveRuntimeTests {
       events: [
         .mouse(.init(kind: .down(.primary), location: centerPoint(of: rect))),
         .mouse(.init(kind: .up(.primary), location: centerPoint(of: rect))),
-        .key(KeyPress(.character("d"), modifiers: .ctrl)),
+        .key(KeyPress(.character("c"), modifiers: .ctrl)),
       ],
       rootIdentity: rootIdentity,
       terminalSize: terminalSize,
@@ -1254,7 +1254,7 @@ struct InteractiveRuntimeTests {
       }
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(recorder.destinations == ["https://example.com"])
   }
 
@@ -1314,11 +1314,11 @@ struct InteractiveRuntimeTests {
       recorder: recorder,
       focusable: true,
       events: [
-        .init(value: KeyPress(.character("d"), modifiers: .ctrl))
+        .init(value: KeyPress(.character("c"), modifiers: .ctrl))
       ]
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.frames.count == 1)
     #expect(recorder.appearCountsAtPresent == [0])
     #expect(recorder.events(matchingPrefix: "appear:").count == 1)
@@ -1336,11 +1336,11 @@ struct InteractiveRuntimeTests {
       recorder: recorder,
       events: [
         .init(value: KeyPress(.character("t"))),
-        .init(value: KeyPress(.character("d"), modifiers: .ctrl)),
+        .init(value: KeyPress(.character("c"), modifiers: .ctrl)),
       ]
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState.showChild == false)
     #expect(await recorder.waitForEvent("taskStart:\(lifecycleProbeIdentity)"))
     #expect(await recorder.waitForEvent("disappear:\(lifecycleProbeIdentity)"))
@@ -1360,28 +1360,28 @@ struct InteractiveRuntimeTests {
       terminal: RecordingTerminalHost(),
       recorder: recorder,
       events: [
-        .init(value: KeyPress(.character("d"), modifiers: .ctrl))
+        .init(value: KeyPress(.character("c"), modifiers: .ctrl))
       ]
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(await recorder.waitForEvent("taskCancel:\(lifecycleProbeIdentity)"))
   }
 
   @MainActor
-  @Test("run loop cancels lifecycle tasks on ctrl-d")
-  func runLoopCancelsLifecycleTasksOnCtrlD() async throws {
+  @Test("run loop cancels lifecycle tasks on ctrl-c")
+  func runLoopCancelsLifecycleTasksOnCtrlC() async throws {
     let recorder = RuntimeLifecycleRecorder()
 
     let result = try await makeLifecycleRuntimeHarness(
       terminal: RecordingTerminalHost(),
       recorder: recorder,
       events: [
-        .init(value: KeyPress(.character("d"), modifiers: .ctrl))
+        .init(value: KeyPress(.character("c"), modifiers: .ctrl))
       ]
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(await recorder.waitForEvent("taskCancel:\(lifecycleProbeIdentity)"))
   }
 
@@ -1450,7 +1450,7 @@ struct InteractiveRuntimeTests {
       sessionName: "InteractiveRuntimeTests.ResizeWindow",
       presentationSurface: terminal,
       inputReader: GateInputReader(
-        gate: quitGate, event: KeyPress(.character("d"), modifiers: .ctrl)),
+        gate: quitGate, event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
         signals: [
           .init(value: "SIGWINCH")
@@ -1460,7 +1460,7 @@ struct InteractiveRuntimeTests {
       )
     )
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames == 2)
     #expect(terminal.presentedSurfaceSizes == [initialSize, resizedSize])
   }
@@ -1497,7 +1497,7 @@ struct InteractiveRuntimeTests {
       sessionName: "InteractiveRuntimeTests.LiteralTabResize",
       presentationSurface: terminal,
       inputReader: GateInputReader(
-        gate: quitGate, event: KeyPress(.character("d"), modifiers: .ctrl)),
+        gate: quitGate, event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
         signals: [
           .init(value: "SIGWINCH")
@@ -1510,7 +1510,7 @@ struct InteractiveRuntimeTests {
     let firstFrame = try #require(terminal.frames.first)
     let secondFrame = try #require(terminal.frames.last)
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames == 2)
     #expect(terminal.presentedSurfaceSizes == [initialSize, resizedSize])
     #expect(firstFrame.contains("▾") == false)
@@ -1534,7 +1534,7 @@ struct InteractiveRuntimeTests {
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
       inputReader: GateInputReader(
-        gate: quitGate, event: KeyPress(.character("d"), modifiers: .ctrl)),
+        gate: quitGate, event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: EmptySignalReader(),
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -1574,7 +1574,7 @@ struct InteractiveRuntimeTests {
     let firstFrame = try #require(terminal.frames.first)
     let lastFrame = try #require(terminal.frames.last)
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(dismissalFrame.kind == .frameCommitted)
     #expect(result.renderedFrames >= 2)
     #expect(firstFrame.contains("Action performed"))
@@ -1595,7 +1595,7 @@ struct InteractiveRuntimeTests {
       rootIdentity: rootIdentity,
       presentationSurface: terminal,
       inputReader: GateInputReader(
-        gate: AsyncEventGate(), event: KeyPress(.character("d"), modifiers: .ctrl)),
+        gate: AsyncEventGate(), event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
         signals: [
           .init(value: "SIGTERM")

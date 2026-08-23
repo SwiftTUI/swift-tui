@@ -31,7 +31,7 @@ struct PresentationPortalForceQueueTests {
           .awaitCondition {
             terminal.frames.contains { $0.contains("Count 1") }
           },
-          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+          .press(KeyPress(.character("c"), modifiers: .ctrl)),
         ]
       },
       viewBuilder: {
@@ -70,7 +70,7 @@ struct PresentationPortalForceQueueTests {
           .awaitCondition {
             terminal.frames.contains { $0.contains("SheetBodyMarker") }
           },
-          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+          .press(KeyPress(.character("c"), modifiers: .ctrl)),
         ]
       },
       viewBuilder: {
@@ -119,7 +119,7 @@ struct PresentationPortalForceQueueTests {
           .awaitCondition {
             terminal.frames.last.map { !$0.contains("ToastBodyMarker") } ?? false
           },
-          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+          .press(KeyPress(.character("c"), modifiers: .ctrl)),
         ]
       },
       viewBuilder: {
@@ -176,7 +176,7 @@ struct PresentationPortalForceQueueTests {
           .awaitCondition {
             terminal.frames.last.map { !$0.contains("SheetBodyMarker") } ?? false
           },
-          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+          .press(KeyPress(.character("c"), modifiers: .ctrl)),
         ]
       },
       viewBuilder: {
@@ -212,7 +212,7 @@ struct PresentationPortalForceQueueTests {
               frame.contains("SectionRemoved") && !frame.contains("ToastBodyMarker")
             } ?? false
           },
-          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+          .press(KeyPress(.character("c"), modifiers: .ctrl)),
         ]
       },
       viewBuilder: {
@@ -247,7 +247,7 @@ struct PresentationPortalForceQueueTests {
           .awaitCondition {
             terminal.frames.last.map { !$0.contains("SheetBodyMarker") } ?? false
           },
-          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+          .press(KeyPress(.character("c"), modifiers: .ctrl)),
         ]
       },
       viewBuilder: {
@@ -302,7 +302,7 @@ struct PresentationPortalForceQueueTests {
           .awaitCondition {
             terminal.frames.last.map { !$0.contains("SheetBodyMarker") } ?? false
           },
-          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+          .press(KeyPress(.character("c"), modifiers: .ctrl)),
         ]
       },
       viewBuilder: {
@@ -347,7 +347,7 @@ struct PresentationPortalForceQueueTests {
           .awaitCondition {
             terminal.frames.contains { $0.contains("ImpToastUp") }
           },
-          .press(KeyPress(.character("d"), modifiers: .ctrl)),
+          .press(KeyPress(.character("c"), modifiers: .ctrl)),
         ]
       },
       viewBuilder: {
@@ -457,7 +457,7 @@ private func runPortalForceQueueScenario<V: View>(
   runLoop.frameSink = TSVFileSink(path: diagnosticsURL.path)
 
   let result = try await runLoop.run()
-  #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+  #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
   if !timeoutLog.timedOutSteps.isEmpty {
     Issue.record(
       """

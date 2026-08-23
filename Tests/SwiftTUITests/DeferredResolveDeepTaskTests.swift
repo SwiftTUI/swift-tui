@@ -81,7 +81,7 @@ struct DeferredResolveDeepTaskTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .userExit(KeyPress(.character("d"), modifiers: .ctrl)))
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.frames.contains { $0.contains("gen 0") })
     #expect(
       terminal.frames.contains { $0.contains("gen 1") },

@@ -140,7 +140,7 @@ struct PreStartCancelForwardProgressTests {
         && terminal.frames.contains { $0.contains("progress 2") }
     }
 
-    inputReader.send(.key(.character("d"), modifiers: .ctrl))
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
     inputReader.finish()
     let result = try await runTask.value
     await workerBlockTask.value

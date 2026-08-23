@@ -129,7 +129,7 @@ struct AnimatedImageTests {
 
     #expect(
       result.exitReason
-        == RunLoopExitReason.userExit(KeyPress(.character("d"), modifiers: .ctrl))
+        == RunLoopExitReason.userExit(KeyPress(.character("c"), modifiers: .ctrl))
     )
     for expectedReference in expectedFrameReferences {
       #expect(host.observedReferences.contains(expectedReference))
@@ -198,7 +198,7 @@ struct AnimatedImageTests {
 
     #expect(
       result.exitReason
-        == RunLoopExitReason.userExit(KeyPress(.character("d"), modifiers: .ctrl))
+        == RunLoopExitReason.userExit(KeyPress(.character("c"), modifiers: .ctrl))
     )
     for expectedReference in expectedFrameReferences {
       let compositing = try #require(host.observedCompositingByReference[expectedReference])
@@ -388,7 +388,7 @@ private final class AnimatedImageConditionalInputReader: InputReading {
       let frameSignal = self.frameSignal
       let task = Task { @MainActor in
         await frameSignal.wait(until: shouldExit)
-        continuation.yield(KeyPress(.character("d"), modifiers: .ctrl))
+        continuation.yield(KeyPress(.character("c"), modifiers: .ctrl))
         continuation.finish()
       }
 
