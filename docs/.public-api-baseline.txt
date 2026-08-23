@@ -95,6 +95,7 @@ SwiftTUIArguments.SwiftTUICommand
 SwiftTUIArguments.SwiftTUICommand.completionCommand(forRawArguments:)
 SwiftTUIArguments.SwiftTUICommand.completionScript(forParsedCommand:)
 SwiftTUIArguments.SwiftTUICommand.configuration
+SwiftTUIArguments.SwiftTUICommand.init(from:)
 SwiftTUIArguments.SwiftTUICommand.installCompletionScript(forParsedCommand:)
 SwiftTUIArguments.SwiftTUICommand.parseSwiftTUIRootCommand(arguments:)
 SwiftTUIArguments.SwiftTUICommand.registeredSubcommand(forRawArguments:)

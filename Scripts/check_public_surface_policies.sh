@@ -75,6 +75,11 @@ if ! rg -U -n -P --quiet -- 'nonisolated\s+init\(\)' \
   fail "App.init must stay nonisolated so runner/argument protocols can compose with App."
 fi
 
+if ! rg -U -n -P --quiet -- 'nonisolated\s+init\(from decoder: any Decoder\) throws' \
+  Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUICommand.swift; then
+  fail "SwiftTUICommand must restate Decodable.init(from:) as a nonisolated requirement so a @MainActor conformer's synthesized Decodable conformance stays nonisolated under InferIsolatedConformances (swift-tui#6)."
+fi
+
 if ! rg -U -n -P --quiet -- '@SceneBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
   Sources/SwiftTUIRuntime/Scenes/App.swift; then
   fail "App.body must stay @SceneBuilder and @MainActor-annotated."

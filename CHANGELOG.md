@@ -10,6 +10,21 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- **A `@MainActor` app builds under the `ApproachableConcurrency` upcoming
+  feature** (the Swift 6.4 `swift package init` default). `SwiftTUICommand`
+  now restates `Decodable.init(from:)` as an explicitly `nonisolated`
+  requirement, so a conformer's compiler-synthesized initializer -- and with
+  it the type's `Decodable` conformance -- is inferred nonisolated instead of
+  main-actor-isolated under `InferIsolatedConformances`. An isolated
+  conformance cannot satisfy `ParsableArguments`' `Self: Decodable`, because
+  that protocol refines `SendableMetatype`, so every `struct MyApp: App` used
+  to fail with "main actor-isolated conformance of 'MyApp' to 'Decodable'
+  cannot satisfy conformance requirement for a 'SendableMetatype' type
+  parameter 'Self'". Apps need no change. A hand-written `init(from:)` on an
+  `App` or `SwiftTUICommand` conformer must now be marked `nonisolated` (it is
+  the initializer swift-argument-parser already calls from nonisolated code).
+  `SwiftTUIArgumentsTests` now compiles with `ApproachableConcurrency`, so
+  every command fixture exercises the consumer default. (swift-tui#6)
 - **`state.duplicateSlotClaim` no longer fires for a container whose update
   pass was reuse-served.** The dynamic-property update pass records a
   container's slot claims before the reuse door, and a reuse-served resolve

@@ -93,11 +93,35 @@ Declare a `version` on each verb that supports `--version`. Raw-verb
 interception causes this behavior. The hook does not cause it. `myapp
 completions --version` has the same behavior.
 
+## Building with upcoming concurrency features
+
+The Swift 6.4 `swift package init` executable template enables the
+`ApproachableConcurrency` upcoming feature, which includes
+`InferIsolatedConformances`. Under that feature a `@MainActor` type's
+conformance to a protocol is inferred main-actor-isolated whenever one of the
+conformance's witnesses is. ``SwiftTUICommand`` is `@MainActor`, so a
+conforming app's compiler-synthesized `Decodable` initializer -- and with it
+the app's `Decodable` conformance -- would be inferred main-actor-isolated.
+An isolated conformance cannot satisfy `ParsableArguments`'s `Self: Decodable`
+requirement, because `ParsableArguments` refines `SendableMetatype`, and the
+build fails with "main actor-isolated conformance of 'MyApp' to 'Decodable'
+cannot satisfy conformance requirement for a 'SendableMetatype' type parameter
+'Self'".
+
+``SwiftTUICommand/init(from:)`` restates `Decodable.init(from:)` as an
+explicitly `nonisolated` requirement. A witness infers `nonisolated` from an
+explicitly `nonisolated` requirement it satisfies, so the synthesized
+initializer and the `Decodable` conformance stay nonisolated, and an `App`
+builds unchanged with or without the feature. Do not implement this
+requirement by hand; swift-argument-parser needs the synthesized initializer.
+An app that does declare its own `init(from:)` must mark it `nonisolated`.
+
 ## Topics
 
 ### App Commands
 
 - ``SwiftTUICommand``
+- ``SwiftTUICommand/init(from:)``
 - ``SwiftTUIApp``
 - ``SwiftTUICommand/swiftTUIRootSubcommand(forRawArguments:)``
 - ``SwiftTUICommand/registeredSubcommand(forRawArguments:)``

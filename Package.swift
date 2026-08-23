@@ -605,7 +605,13 @@ let package = Package(
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       path: "Platforms/Arguments/Tests/SwiftTUIArgumentsTests",
-      swiftSettings: swiftSettings()
+      // Compiled under the consumer default: `swift package init` (Swift 6.4)
+      // enables ApproachableConcurrency, whose InferIsolatedConformances member
+      // once broke every `@MainActor` App's ParsableArguments conformance
+      // (swift-tui#6). Every command fixture in this target exercises that
+      // configuration; ApproachableConcurrencyConformanceTests guards the
+      // setting with `#error` so it cannot be dropped silently.
+      swiftSettings: swiftSettings(.enableUpcomingFeature("ApproachableConcurrency"))
     ),
     .testTarget(
       name: "SwiftTUICLITests",

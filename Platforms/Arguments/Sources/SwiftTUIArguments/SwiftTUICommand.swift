@@ -91,6 +91,33 @@ public protocol SwiftTUICommand: AsyncParsableCommand {
   nonisolated static func swiftTUIRootSubcommand(
     forRawArguments arguments: [String]
   ) throws -> (any ParsableCommand)?
+
+  /// `Decodable.init(from:)`, restated as an explicitly `nonisolated`
+  /// requirement. **Do not implement this by hand.** swift-argument-parser
+  /// decodes a command through the compiler-synthesized `init(from:)`, and that
+  /// synthesized initializer is the witness here too.
+  ///
+  /// The restatement exists for concurrency inference. `SwiftTUICommand` is
+  /// `@MainActor`, so a conforming type is main-actor-isolated. Under the
+  /// `InferIsolatedConformances` upcoming feature (part of
+  /// `ApproachableConcurrency`, which `swift package init` enables by default
+  /// from Swift 6.4) the synthesized `init(from:)` would be inferred
+  /// main-actor-isolated, the type's `Decodable` conformance would follow it,
+  /// and an isolated conformance cannot satisfy `ParsableArguments`'s
+  /// `Self: Decodable` requirement because `ParsableArguments` refines
+  /// `SendableMetatype` -- the build fails with "main actor-isolated
+  /// conformance of 'MyApp' to 'Decodable' cannot satisfy conformance
+  /// requirement for a 'SendableMetatype' type parameter 'Self'"
+  /// (swift-tui issue #6). A witness infers `nonisolated` from an explicitly
+  /// `nonisolated` requirement it satisfies, so this restatement keeps the
+  /// synthesized initializer -- and with it the `Decodable` conformance --
+  /// nonisolated, with or without the feature. The same mechanism keeps
+  /// `App.init()` nonisolated in `SwiftTUIRuntime`.
+  ///
+  /// A conformer that does declare its own `init(from:)` must mark it
+  /// `nonisolated`: it is the initializer swift-argument-parser already calls
+  /// from nonisolated code.
+  nonisolated init(from decoder: any Decoder) throws
 }
 
 @available(*, deprecated, renamed: "SwiftTUICommand")
