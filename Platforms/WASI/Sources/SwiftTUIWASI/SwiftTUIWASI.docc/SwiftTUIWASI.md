@@ -15,6 +15,10 @@ External apps must depend on `SwiftTUIWASI`, not
 
 ## Topics
 
+### Deployment
+
+- <doc:Deploying-To-The-Browser>
+
 ### WASI Launch
 
 - ``WASIRunner``

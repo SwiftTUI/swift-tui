@@ -17,14 +17,14 @@ per-host engine profile below.
 
 | Mode | Product | Presents to | Notes |
 | --- | --- | --- | --- |
-| Terminal-native | `SwiftTUITerminalCLI` (`TerminalRunner`); `SwiftTUICLI` remains the POSIX facade that adds scene attach | A real terminal via `TerminalHost` — a POSIX terminal or the Win32 console | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUILauncher`. |
+| Terminal-native | `SwiftTUICLI` (`TerminalRunner`) — re-exports the portable `SwiftTUITerminalCLI` launch target and adds the POSIX scene-attach subsystem | A real terminal via `TerminalHost` — a POSIX terminal or the Win32 console | Explicit terminal-only runner. The default `SwiftTUI` import reaches terminal launch through `SwiftTUILauncher`. |
 | WASI / browser | `SwiftTUIWASI` (`WASIRunner`) | A browser canvas | Swift compiled to WASI. Raster output drawn onto a canvas via the `web-surface` transport. Uses the stack-lean resolve profile by default. |
 | Host-managed Android | `SwiftTUIAndroidHost` | An Android Compose view inside an app | Retains ``HostedSceneSession`` values behind a JNI/C ABI and serializes committed frames as web-surface records (the converged wire). Draws styled cells/images plus a semantics overlay in Compose. The Swift host cross-compiles for arm64 and x86_64. |
 | Localhost WebHost | `SwiftTUIWebHost` (`WebHostRunner`) | A browser, served by the native process | The process runs an embedded in-tree HTTP/WebSocket server and drives a bundled browser runtime over the `web-surface` protocol (v1/v2 full frames, v3 delta frames). |
 | Native SwiftUI host (external package) | `SwiftUIHost` from [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) | A SwiftUI view on macOS or iOS | Retains the same runtime sessions. Presents raster, damage, focus, and accessibility through AppKit/UIKit-backed SwiftUI views. Bridges input plus clipboard writes back to the runtime. It is not a product of this package. |
 
-A binary can support more than one mode. `SwiftTUILauncher` (in
-`SwiftTUITerminalCLI`) routes launch: the terminal by default, the localhost
+A binary can support more than one mode. `SwiftTUILauncher` (shipped through
+the `SwiftTUICLI` product) routes launch: the terminal by default, the localhost
 WebHost when `--web` is present and `SwiftTUIWebHostCLI` installed its web arm
 at launch. `WebHostCLIRunner` remains as a source-compatible facade over the
 same launcher. The `SwiftTUI` convenience product re-exports exactly one

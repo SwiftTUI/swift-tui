@@ -71,6 +71,10 @@ repository's divergence and gap register
 
 ## Topics
 
+### Integration
+
+- <doc:Hosting-On-Android>
+
 ### Scene Host
 
 - ``AndroidHostSceneHost``

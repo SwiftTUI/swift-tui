@@ -61,8 +61,19 @@ app. Charts ship separately from
 For host-managed app declarations that do not conform to `SwiftTUICommand`,
 import `SwiftTUIRuntime` directly.
 
-The reference is organized by module, but the developer guides span them:
-<doc:Guides> is the task-oriented index across the whole set.
+A real SwiftTUI app, compiled to WebAssembly, runs live at
+<https://swifttui.sh/webexample/> — try it before you build.
+
+### Your First Hour
+
+The guides ship in the catalogs of the modules that own them; read these in
+order the first time through (all of them are indexed in <doc:Guides>):
+
+1. <doc:Choosing-Modules-And-Platforms>
+2. [Authoring Views](https://swifttui.sh/docs/documentation/swifttuiviews/authoring-views)
+3. [State, Environment, and Focus](https://swifttui.sh/docs/documentation/swifttuiviews/state-environment-and-focus)
+4. [Running Apps](https://swifttui.sh/docs/documentation/swifttuiruntime/running-apps)
+5. [Coming from SwiftUI](https://swifttui.sh/docs/documentation/swifttuiviews/coming-from-swiftui)
 
 ## Topics
 
