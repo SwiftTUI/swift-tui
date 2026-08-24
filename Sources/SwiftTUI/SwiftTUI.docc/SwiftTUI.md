@@ -81,3 +81,8 @@ order the first time through (all of them are indexed in <doc:Guides>):
 
 - <doc:Choosing-Modules-And-Platforms>
 - <doc:Guides>
+
+### Testing And Shipping
+
+- <doc:Testing-Your-App>
+- <doc:Distributing-Your-App>

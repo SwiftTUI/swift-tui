@@ -132,8 +132,8 @@ private func withTransactionRequestScope<Result>(
 /// Without this isolation, the closure is `nonisolated`.
 /// Then each `@State` write requires a `MainActor.assumeIsolated` hop.
 ///
-/// The closure is wrapped in its registration-time
-/// ``ImperativeAuthoringContextSnapshot``, the same way toolbar and key
+/// The closure is wrapped in its registration-time authoring-context
+/// snapshot (the internal `ImperativeAuthoringContextSnapshot`), the same way toolbar and key
 /// handlers are. This behavior makes the description above accurate.
 /// The controller fires completions outside a resolve pass.
 /// A `@State` write without a bound authoring context does not fail.

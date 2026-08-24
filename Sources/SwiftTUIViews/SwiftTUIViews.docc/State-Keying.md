@@ -1,76 +1,169 @@
 # State Keying
 
-How `@State` storage uses keys across evaluations, and where to put owners that
-must survive lazy seams.
+Where `@State` storage lives, why it resets, and how to place or key owners so
+the state you care about survives.
 
 ## Overview
 
-SwiftTUI separates the pieces that SwiftUI developers usually call "identity":
+Your view struct is a value: SwiftTUI rebuilds it on every evaluation, so the
+struct cannot hold state itself. Each `@State` declaration is stored by the
+framework and keyed to two things:
 
-- `StructuralPath` records an authored position in the resolved tree.
-- `EntityIdentity` records an explicit `.id(...)` value or a `ForEach` data key.
-- `ViewNodeID` is the runtime lifetime that owns local state, lifecycle, focus,
-  and other graph registrations.
-- Each `@State` declaration reconnects through a graph-scoped state slot:
-  owner `ViewNodeID` plus the declaration's source-location ordinal.
+- the view's **position** in the view structure — which container it sits in,
+  which slot among its siblings, and which `if`/`else` branch produced it, and
+- an optional **explicit identity** — an `.id(_:)` value, or the data key of
+  the `ForEach` element that produced it.
 
-For an unkeyed view, the owner lifetime follows structural position. Move the
-owner to a different structural slot and SwiftTUI creates a fresh state slot.
-For an explicitly keyed view, the entity identity can route the same
-`ViewNodeID` across structural moves. These moves include wrapper toggles or a
-row move between containers. Changing the explicit id creates a new entity and
-therefore a new state owner.
+While a view keeps the same position, or keeps the same explicit identity,
+every evaluation reconnects to the same storage. When neither matches, the old
+storage is torn down and `@State` starts over from its authored initial value.
+The classic "why did my state reset?" cases below are all instances of this
+one rule.
 
-Live runtime callbacks add one more internal scope: the view graph that
-registered the callback. Button actions, key-command handlers, projected
-bindings, and gesture updates mutate the graph-scoped state location captured
-when the handler was authored. Another live graph can reuse the same stateful
-view value. That graph then starts with its own storage and does not receive
-writes through a last-bound global fallback.
+## An if/else swap is a move
 
-`DefaultRenderer` remains snapshot-friendly when there is no invalidating
-runtime graph. If a test or preview reuses the same stateful view instance,
-imperative writes can still feed a later no-invalidator snapshot. This rule
-applies only to that same instance.
+The two branches of a conditional are different positions, even when both
+contain the same view type:
 
-Keying only protects the reconnection step. It does not recover state when the
-owning runtime lifetime is genuinely removed and no entity route preserves it.
+```swift
+struct Panel: View {
+  @State private var isCompact = false
 
-## Practical Owner Placement Guidance
+  var body: some View {
+    if isCompact {
+      Score()            // one position
+    } else {
+      Score().padding()  // a different position
+    }
+  }
+}
+```
 
-Keying is only about how a surviving or entity-routed owner reconnects to its
-persisted state slot. It does **not** protect state when the owner itself is
-removed.
+Each toggle of `isCompact` removes the view at one position and creates a
+fresh one at the other, so any `@State` inside `Score` restarts. Plain
+removal behaves the same way: when `if isVisible { Score() }` turns false,
+the storage is discarded, and reinserting the view later starts from the
+initial value again — state is never resurrected.
 
-That distinction matters because several runtime features intentionally resolve children lazily or out of line:
+## `.id(_:)` names the identity
 
-- active-tab content in `TabView`
-- scoped content payloads captured for later evaluation
+An explicit `.id(_:)` replaces position with a name. Changing the id is a
+deliberate reset switch — the old identity's storage is discarded and a fresh
+one begins:
+
+```swift
+struct Editor: View {
+  @State private var generation = 0
+
+  var body: some View {
+    VStack {
+      Button("Discard draft") { generation += 1 }
+      DraftField().id("draft-\(generation)")  // new id: fresh @State inside
+    }
+  }
+}
+```
+
+The other direction is just as useful: a *stable* id keeps state attached
+while positions shift around it. Without the id below, showing the banner
+shifts every following sibling to a new position and resets it; with the id,
+the field's state survives the shift:
+
+```swift
+VStack {
+  if showBanner {
+    Text("Saved")        // inserting this shifts the siblings below
+  }
+  DraftField().id("draft")  // stable id: state survives the shift
+}
+```
+
+## ForEach rows follow their data identity
+
+`ForEach` keys each row by its element's identity — `Identifiable`
+conformance, or the `id:` key path you pass. With stable ids, row-local state
+follows the item through insertion, removal, and reordering, including rows of
+a nested `ForEach` whose outer row moves:
+
+```swift
+// Stable identity: each row's state follows its item.
+ForEach(items) { item in
+  TodoRow(item: item)
+}
+
+// Index keying: state belongs to the position, not the item.
+ForEach(items.indices, id: \.self) { index in
+  TodoRow(item: items[index])
+}
+```
+
+In the index-keyed version, inserting or reordering items leaves each row's
+state at its old position, now paired with whichever item moved there. Key
+rows by a value that identifies the item itself, not where it currently sits.
+
+## Put the owner where it lives long enough
+
+Keying only controls how a *surviving* owner reconnects to its storage. It
+cannot recover state whose owner was genuinely torn down, and some features
+tear down or lazily resolve children by design:
+
+- windowed collections — `List` and `Table` realize only the rows near the
+  viewport, so a row scrolled far away may not stay resident
 - root-hoisted presentation overlays
-- wrapper-hosted and scene-hosted compositions that can re-resolve only part of the tree on a given frame
+- scoped content payloads captured for later evaluation
 
-If state must survive churn across one of those seams, own it above the seam.
-For the same logical value, you can instead give the moving child a stable
-explicit entity id. Keying cannot recover
-state from an owner that disappeared without a route.
+If per-item state must outlive that churn, own it above the seam and hand the
+rows bindings:
 
-Practical consequences:
+```swift
+struct Inbox: View {
+  let messages: [Message]
+  @State private var drafts: [Message.ID: String] = [:]  // outlives rows
 
-- Diagnose a "tab switch" or "presentation dismiss" reset as an owner-placement
-  error first, not a keying error.
-- Do not over-hoist by default. Tab-local state can be allowed to reset when a tab is genuinely deselected if that is the intended product behavior.
-- Distinguish transient visual flicker from true state loss. Flicker can come from composition or host-sync issues even when state ownership is correct.
-- Root-hoisted presentation churn must not affect the selected tab. If a
-  palette resets active-tab state without changing selection, it has a
-  presentation error.
-- When a child is resolved lazily, prefer parent-owned state plus explicit bindings over child-local `@State` for data that must persist across activation changes.
-- In a `ForEach`, the collection slot and each element's positional
-  `StructuralPath` are separate from the element's data identity. Row-local
-  state follows the element's routed `ViewNodeID`. State captured by the row
-  closure stays owned by the view that authored the closure.
+  var body: some View {
+    List(messages) { message in
+      ReplyField(text: binding(for: message.id))
+    }
+  }
+
+  private func binding(for id: Message.ID) -> Binding<String> {
+    Binding(
+      get: { drafts[id, default: ""] },
+      set: { drafts[id] = $0 }
+    )
+  }
+}
+```
+
+Do not hoist by reflex, though. State that *should* reset with its content —
+a highlight, a transient expansion — is best left local. And diagnose before
+moving anything: a "reset" during a presentation dismiss is usually an
+owner-placement problem, and transient flicker can be a rendering issue even
+when state ownership is correct.
+
+## Tab switches archive value state
+
+Switching tabs is not on the loses-state list. `TabView` resolves only the
+selected tab body, but when a tab is deselected its value-typed `@State` (and
+`@FocusState`) is archived and restored the next time that tag becomes
+active. State containing class instances, tasks, or closures does not survive
+dormancy; SwiftTUI reports a `tab.dormantStateUnsupportedValue` runtime issue
+and asks you to use value-only state or hoist that ownership above the
+`TabView`. Lifecycle is not archived: `onAppear` runs again and tasks restart
+on reactivation. The full contract is in <doc:Dormant-Tab-State>.
+
+## Live runtimes versus snapshots
+
+Button actions, bindings, and gesture updates write to the storage of the
+live runtime that registered them. Two runtimes can evaluate the same view
+value, and each still gets its own independent storage — writes never leak
+between them through the view value. Only in a snapshot context with no
+running app (a plain renderer pass in a test or preview) can reusing one view
+instance carry imperative writes into a later snapshot of that same instance.
 
 ## See Also
 
+- <doc:Dormant-Tab-State>
 - <doc:State-Environment-And-Focus>
 - <doc:Focus>
 - <doc:Authoring-Views>

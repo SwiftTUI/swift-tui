@@ -159,7 +159,7 @@ surprise. Each links back to its register section by name.
 
 | You write or expect | What happens here | Do instead |
 | --- | --- | --- |
-| Tab-local `@State` surviving tab switches | `TabView` resolves only the selected body; deselected tab state can reset | Hoist state that must survive above the tab seam |
+| Tab-local reference state surviving tab switches | `TabView` resolves only the selected body; value-typed `@State` is archived and restored across deselection, but class-backed state, running tasks, and captured closures are torn down | Hoist reference-backed models above the tab seam; see <doc:Dormant-Tab-State> |
 | `List(selection:)` with untagged rows | Rows render but are unselectable; a runtime issue is reported | An explicit `.tag` per row |
 | `Slider(value: $x)` | `in:` is required; there is no `0...1` default | Pass the range; `Double` forms are continuous by default |
 | Several simultaneous `alert`s | Prompts queue first-in, first-out; only the oldest is visible; Escape dismisses the most recent *visible* presentation | By design; sequence prompts |

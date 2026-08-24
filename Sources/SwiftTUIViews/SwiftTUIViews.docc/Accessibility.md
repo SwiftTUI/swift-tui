@@ -5,77 +5,160 @@ trees, VoiceOver, and TalkBack can present your interface.
 
 ## Overview
 
-SwiftTUI builds accessibility into the render pipeline rather than bolting it
-on. Every frame produces one semantic snapshot, and each presentation path
-(the terminal cursor-follows-focus mode, the Web/WASI ARIA tree, and the
-native SwiftUI and Android host overlays) presents that same snapshot.
+Every SwiftTUI frame carries semantics alongside its rendered cells, and each
+presentation path reads the same semantics: the terminal presents them through
+cursor-follows-focus mode for terminal screen readers, the Web/WASI host
+mounts them as an ARIA tree beside the raster canvas, and the SwiftUI and
+Android hosts map them to VoiceOver and TalkBack.
 
-## Semantic Modifiers
+Most interfaces get correct semantics for free. Annotation is for custom
+controls and for visual-only content.
 
-Authored views attach semantic metadata with modifiers:
+### When Built-Ins Are Enough
 
-- `.accessibilityRole(_:)`
-- `.accessibilityLabel(_:)`
-- `.accessibilityHint(_:)`
-- `.accessibilityHidden(_:)`
-- `.accessibilityLiveRegion(_:)`
-- `.accessibilityCursorAnchor(_:)`
+Built-in controls publish their own roles: `Button`, `Toggle`, `TextField`,
+`SecureField`, `TextEditor`, `Slider`, `Stepper`, `Picker`, `Link`, `Menu`,
+and `DisclosureGroup` each attach the matching `AccessibilityRole` and
+participate in focus. `TextField` and `SecureField` also publish their title
+as the accessible label. A plain form needs no annotation at all:
 
-`AccessibilityRole` is an open-ended enum covering controls and structures
-(button, link, text field, toggle, slider, tab, table, heading, and many
-more). `AccessibilityPoliteness` has `.off`, `.polite`, and `.assertive`.
+```swift
+VStack(alignment: .leading, spacing: 1) {
+    TextField("Title", text: $title)
+    Toggle("Include focused tests", isOn: $includeTests)
+    Picker("Priority", selection: $priority) {
+        ForEach(Priority.allCases, id: \.self) { priority in
+            Text(priority.rawValue).tag(priority)
+        }
+    }
+    Button("Save draft") { save() }
+}
+```
 
-During the semantics phase of the pipeline, the placed tree produces a
-semantic snapshot whose accessibility nodes form a flat array with parent
-links, so consumers can reconstruct a tree. A node carries identity, parent
-identity, rect, role, label, hint, hidden, live region, and cursor anchor. It
-deliberately does **not** bake in focus state: consumers cross-reference live
-focus during presentation, so one snapshot stays valid when focus moves.
-The current node does not carry activation, adjustment, enabled/selected
-state, or an assistive-technology-originated focus route.
+Reach for the accessibility modifiers when you:
 
-## Announcements
+- build a custom control out of `Text`, shapes, or `Canvas`
+- show visual-only content (images, charts, animation) that needs a label
+- surface changing status text that a screen reader should track
+- hide decorative content from assistive technology
 
-`AccessibilityAnnouncer.announce(_:politeness:)` lets app code push an
-announcement to the accessibility target of the active runtime. The runtime
-ignores calls that occur outside a running runtime.
+### Annotating A Custom Control
 
-## Reduced Motion
+A custom control opts into focus with `.focusable(_:interactions:)` and then
+describes itself with `.accessibilityRole(_:)`, `.accessibilityLabel(_:)`,
+and `.accessibilityHint(_:)`:
 
-The runtime resolves a motion policy that authored views can read as
-`EnvironmentValues.accessibilityReduceMotion`. Built-in animated views honor
-it: `Spinner` renders static text, `PhaseAnimator` renders only its first
-phase without cycling, and `AnimatedImage` renders its first frame.
+```swift
+struct RatingPicker: View {
+    @State private var rating = 3
 
-Automatic capture detection is separate from that accessibility preference.
-`CI=true`, redirected stdout, `SWIFTTUI_STABLE_OUTPUT=1`, and
-`--stable-output` select deterministic rendering for built-in animation, but
-they do not change `accessibilityReduceMotion` as observed by app code.
+    var body: some View {
+        HStack {
+            ForEach(1...5, id: \.self) { star in
+                Text(star <= rating ? "*" : ".")
+            }
+        }
+        .focusable(interactions: .edit)
+        .onKeyPress(.arrowRight) { _ in
+            rating = min(rating + 1, 5)
+            return .handled
+        }
+        .onKeyPress(.arrowLeft) { _ in
+            rating = max(rating - 1, 1)
+            return .handled
+        }
+        .accessibilityRole(.slider)
+        .accessibilityLabel("Rating: \(rating) of 5 stars")
+        .accessibilityHint("Use the left and right arrows to adjust.")
+    }
+}
+```
 
-## Output-Mode Detection
+SwiftTUI has no separate value modifier, so fold the current value into the
+label, as above. Because the label is re-resolved on every state change,
+assistive technology always reads the current value.
 
-The output, glyph, motion, and stable-output policies are resolved from the process environment
-and the TTY state at session start. The precedence is fixed:
+In cursor-follows-focus terminal mode, the hardware cursor parks on the
+focused view's origin by default; `.accessibilityCursorAnchor(_:)` moves that
+anchor to another `CellPoint` within the view's bounds when a different cell
+reads better.
 
-1. `NO_COLOR` / `CLICOLOR=0`, then `FORCE_COLOR` / `CLICOLOR_FORCE`.
-2. `SWIFTTUI_JSON=1` selects JSON output.
-3. `SWIFTTUI_ACCESSIBLE=1` is shorthand for `SWIFTTUI_REDUCE_MOTION=1` plus
-   `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`, and wins over explicit `0` values on
-   those two variables.
-4. `SWIFTTUI_STABLE_OUTPUT` explicitly controls deterministic capture output.
-5. `CI=true` and a non-TTY stdout imply stable output, without changing the
-   accessibility preference.
+### Announcements
 
-The full environment-variable reference lives in the `SwiftTUIRuntime` article
+For events with no natural place in the view tree — a save completing, a
+background failure — push a message imperatively with
+``AccessibilityAnnouncer``:
+
+```swift
+Button("Save draft") {
+    save()
+    AccessibilityAnnouncer.announce("Draft saved", politeness: .polite)
+}
+```
+
+`announce(_:politeness:)` accepts `AccessibilityPoliteness` values `.off`,
+`.polite` (default), and `.assertive`. Calls made outside a running SwiftTUI
+runtime are ignored.
+
+### Live Regions And Hidden Content
+
+For status text that updates in place, mark the region live so screen readers
+speak changes without moving focus, and hide purely decorative content:
+
+```swift
+VStack(alignment: .leading) {
+    LabeledContent("Priority", value: priority.rawValue)
+    LabeledContent("Focused tests", value: includeTests ? "yes" : "no")
+}
+.accessibilityLiveRegion(.polite)
+
+Text("~~~~~~~~~~")  // decorative divider
+    .accessibilityHidden()
+```
+
+`.accessibilityHidden(_:)` defaults to `true`; pass `false` to re-expose a
+subtree conditionally.
+
+### Reduced Motion
+
+The `--reduce-motion` flag (or `SWIFTTUI_REDUCE_MOTION=1`) suppresses
+animations and spinners, and `--accessible` (`SWIFTTUI_ACCESSIBLE=1`) implies
+both `--reduce-motion` and `--cursor-follows-focus`. Built-in animated views
+honor the preference: `Spinner` renders static text, `PhaseAnimator` holds
+its first phase, and `SwiftTUIAnimatedImage` shows its first frame. Authored
+animation should do the same:
+
+```swift
+struct PulseBadge: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if reduceMotion {
+            Text("● Recording")
+        } else {
+            PhaseAnimator([true, false]) { phase in
+                Text(phase ? "● Recording" : "○ Recording")
+            }
+        }
+    }
+}
+```
+
+### Output Modes
+
+Accessible mode is one of several runtime output policies (color, ASCII,
+JSON, stable capture output) resolved from flags, environment variables, and
+TTY state at session start. The full list and its precedence rules live in
+the `SwiftTUIRuntime` article
 [Environment Variables](https://swifttui.sh/docs/documentation/swifttuiruntime/environment-variables).
 
-## Current Limits
+### Current Limits
 
 Assistive-technology interaction is currently one-way. Runtime focus is
-presented to VoiceOver, TalkBack, and the browser tree, but focus traversal is
-not fed back into SwiftTUI's runtime. The semantic snapshot also has no action,
-adjustment, or control-value route, so native and browser accessibility trees
-present the interface but do not yet activate or adjust SwiftTUI controls.
+presented to VoiceOver, TalkBack, and the browser tree, but focus traversal
+is not fed back into SwiftTUI's runtime, and there is no action, adjustment,
+or control-value route, so native and browser accessibility trees present
+the interface but do not yet activate or adjust SwiftTUI controls.
 
 ## See Also
 

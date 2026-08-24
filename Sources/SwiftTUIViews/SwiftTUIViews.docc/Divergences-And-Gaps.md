@@ -334,9 +334,12 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **`TabView` resolves only the selected body.** *Ratified.* Resolving only
   the visible tab keeps resolve and commit cost proportional to the visible
   surface, which matters more on a terminal than in SwiftUI's retained scene
-  graph. Consequence: tab-local state can reset on deselection, so state that
-  must survive belongs above the tab seam. Preserving tab-local state across
-  deselection without eager resolution is an open gap.
+  graph. Consequence: value-typed `@State` in a deselected tab is archived
+  and restored on reselection (see <doc:Dormant-Tab-State>); reference-backed
+  state, running tasks, and captured closures are torn down — unsupported
+  values report `tab.dormantStateUnsupportedValue` — so hoist those above the
+  tab seam. The remaining gap is preserving reference-backed state across
+  deselection without eager resolution.
 - **`listRowBackground` takes a non-optional `ShapeStyle`.** *Ratified.*
   SwiftUI takes a `View?` and accepts `nil`. Terminal row backgrounds are
   cell paints, not arbitrary views; clearing is expressed by not applying the

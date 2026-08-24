@@ -151,8 +151,9 @@ even when visible output looks correct. The graph records them through
 `SoundnessProbeConfiguration` in
 `Sources/SwiftTUIGraph/Resolve/SoundnessProbeConfiguration.swift`. The
 canonical enforcement, sampling, residual, and test-owner inventory is
-contributor-facing and maintained in the repository's internal
-`docs/SOUNDNESS-ORACLES.md` map, not here.
+contributor-facing and maintained in the repository's
+[`docs/SOUNDNESS-ORACLES.md`](https://github.com/SwiftTUI/swift-tui/blob/main/docs/SOUNDNESS-ORACLES.md)
+map, not here.
 
 ## The reuse door
 
@@ -357,5 +358,6 @@ The reuse subsystem's local oracles are deliberately small:
 
 This section is not the inventory of every graph and runtime probe. Enforcement
 tier, sampling, release behavior, residual quarantine, source recorder, and
-owning tests are contributor-facing and belong to the repository's internal
-`docs/SOUNDNESS-ORACLES.md` map.
+owning tests are contributor-facing and belong to the repository's
+[`docs/SOUNDNESS-ORACLES.md`](https://github.com/SwiftTUI/swift-tui/blob/main/docs/SOUNDNESS-ORACLES.md)
+map.

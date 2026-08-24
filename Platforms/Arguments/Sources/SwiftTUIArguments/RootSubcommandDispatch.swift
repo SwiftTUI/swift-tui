@@ -72,8 +72,8 @@ extension SwiftTUICommand {
   /// You can also put it after the argument terminator as `myapp -- info`.
   ///
   /// - Throws: The dispatched command's own parse error, wrapped so that a
-  ///   launch site can attribute usage text to the verb. See
-  ///   ``DispatchedSubcommandError``.
+  ///   launch site can attribute usage text to the verb. See the internal
+  ///   `DispatchedSubcommandError`.
   public nonisolated static func registeredSubcommand(
     forRawArguments arguments: [String]
   ) throws -> (any ParsableCommand)? {
@@ -153,7 +153,7 @@ package struct DispatchedSubcommandError: Error, CustomStringConvertible {
 /// `SwiftTUIWebHostCLI`) so they cannot drift apart on attribution. The rules,
 /// in order:
 ///
-///   1. A ``DispatchedSubcommandError`` names its own verb — the verb's parse
+///   1. A `DispatchedSubcommandError` names its own verb — the verb's parse
 ///      failed, so no instance of it exists to inspect.
 ///   2. Otherwise, if a dispatched command was reached and ran, the failure is
 ///      the verb's and is rendered through the verb's dynamic type. This is

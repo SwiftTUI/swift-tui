@@ -8,7 +8,7 @@
 
   /// Chooses whether a `TerminalView` key press belongs to its host or child session.
   public enum TerminalViewKeyDisposition: Equatable, Sendable {
-    /// Convert the key press to a ``TerminalEmulatorKey`` and send it to the child session.
+    /// Convert the key press to a `TerminalEmulatorKey` and send it to the child session.
     case forwardToChild
     /// Consume the key press without sending it to the child session.
     case handledByHost
@@ -48,7 +48,7 @@
     /// - Parameters:
     ///   - session: The child terminal session to present.
     ///   - keyRouting: A host-level interceptor called with the original focused key press, before
-    ///     conversion to ``TerminalEmulatorKey``. Return
+    ///     conversion to `TerminalEmulatorKey`. Return
     ///     ``TerminalViewKeyDisposition/handledByHost`` to consume it in the host or
     ///     ``TerminalViewKeyDisposition/forwardToChild`` to preserve terminal forwarding.
     ///   - onTitleChange: An optional callback for child terminal title changes.

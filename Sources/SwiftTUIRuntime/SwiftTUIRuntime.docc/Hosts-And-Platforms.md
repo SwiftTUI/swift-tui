@@ -141,7 +141,8 @@ Hosts declare wire capabilities through one Swift-side currency
 `HEAD` is the named `acceptsDeltaFrames` bit. Absence keeps the default
 full-frame bytes. The canonical field/ingress manifest is
 `HostWireSchema.capabilityMappings`. The normative state and delivery rules
-are maintained in the repository's internal `docs/HOST-WIRE-CONTRACT.md`, not
+are maintained in the repository's
+[`docs/HOST-WIRE-CONTRACT.md`](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOST-WIRE-CONTRACT.md), not
 here.
 
 ### Pointer Paradigm
@@ -167,7 +168,7 @@ is right where a mouse is the pointing device.
 | Native SwiftUI host (macOS) | No | Desktop pointer. |
 | Native SwiftUI host (iOS) | Yes | Touch. |
 | Host-managed Android | Yes | Touch. |
-| WASI / browser, Localhost WebHost | Reported by the page | One bundle serves both paradigms, so the page declares what it sees through the `pointer:` control record (see the repository's internal `docs/HOST-WIRE-CONTRACT.md`). Absent record means desktop. |
+| WASI / browser, Localhost WebHost | Reported by the page | One bundle serves both paradigms, so the page declares what it sees through the `pointer:` control record (see the repository's [`docs/HOST-WIRE-CONTRACT.md`](https://github.com/SwiftTUI/swift-tui/blob/main/docs/HOST-WIRE-CONTRACT.md)). Absent record means desktop. |
 
 Wheel scrolling, scroll indicator drags, and keyboard scrolling are unaffected
 by the declaration and work on every host. Authored views can override the

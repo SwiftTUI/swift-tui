@@ -34,9 +34,26 @@ Read these in order the first time through:
 These guides ship in the `SwiftTUIViews` catalog, the authoring surface that
 every app product re-exports.
 
+- [Forms and Controls](https://swifttui.sh/docs/documentation/swifttuiviews/forms-and-controls)
+  — buttons, toggles, pickers, sliders, steppers, and text entry, built into
+  a working form.
+- [Commands and Key Input](https://swifttui.sh/docs/documentation/swifttuiviews/commands-and-key-input)
+  — `keyCommand` chords, the command palette, `onKeyPress`, and submit
+  handling.
 - [Understanding Focus](https://swifttui.sh/docs/documentation/swifttuiviews/focus)
   — the runtime focus model for input routing, state control, and context
   export.
+- [Navigation and Tabs](https://swifttui.sh/docs/documentation/swifttuiviews/navigation-and-tabs)
+  — `NavigationStack` push/pop with typed paths, destinations, and `TabView`
+  authoring.
+- [Scrolling](https://swifttui.sh/docs/documentation/swifttuiviews/scrolling)
+  — scroll views, programmatic scrolling, positions, and indicators.
+- [Styling and Theming](https://swifttui.sh/docs/documentation/swifttuiviews/styling-and-theming)
+  — built-in and custom control styles, semantic roles, colors, gradients,
+  and the theme model.
+- [Animating Views](https://swifttui.sh/docs/documentation/swifttuiviews/animating-views)
+  — implicit and explicit animation, transitions, phase animators, and
+  timelines in terminal cells.
 - [Lists and Tables](https://swifttui.sh/docs/documentation/swifttuiviews/collections)
   — collections with authored row content, selection, and viewport-backed
   data sources.
@@ -74,8 +91,19 @@ every app product re-exports.
 
 ### Running your app
 
-These guides ship in the `SwiftTUIRuntime` and platform catalogs.
+These guides ship in this catalog and in the `SwiftTUIRuntime` and platform
+catalogs.
 
+- <doc:Testing-Your-App> — one-shot frames with `RenderOnce`, renderer
+  snapshots, deterministic CI output, and the test-support product.
+- <doc:Distributing-Your-App> — release builds, the flags every binary
+  ships, shell completions, and platform packaging notes.
+- [Performance for App Authors](https://swifttui.sh/docs/documentation/swifttuiruntime/performance-for-app-authors)
+  — what is already fast, `.equatable()` memoization, stable identity, lazy
+  containers, and the profiling loop.
+- [Logging and Diagnostics](https://swifttui.sh/docs/documentation/swifttuiruntime/logging-and-diagnostics)
+  — where `print()` goes while the app owns the screen, debug bundles,
+  runtime issues, and safe logging patterns.
 - [Command-Line Options and Subcommands](https://swifttui.sh/docs/documentation/swifttuiarguments)
   — the standard `SwiftTUIOptions` flag surface, custom app flags, and verb
   routing under a positional root.

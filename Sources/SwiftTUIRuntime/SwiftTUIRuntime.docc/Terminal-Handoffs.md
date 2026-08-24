@@ -10,7 +10,7 @@ alternate screen. Launching an operation that expects a normal terminal while
 that ownership remains active causes the operation and SwiftTUI to compete for
 input and presentation.
 
-Use ``TerminalHandoffAction`` to transfer that ownership as one operation:
+Use `TerminalHandoffAction` to transfer that ownership as one operation:
 
 ```swift
 struct ShellButton: View {
@@ -40,14 +40,14 @@ The runtime performs this sequence:
 The restoration path runs when the operation succeeds, throws, or
 cooperatively observes task cancellation. If terminal ownership cannot be
 reclaimed, the action throws
-``TerminalHandoffError/failedToRestoreTerminal``.
+`TerminalHandoffError.failedToRestoreTerminal`.
 
 An unstructured task can outlive the run loop that created it. An operation can
 finish after its terminal session shuts down. In that case, the action throws
-``TerminalHandoffError/unavailable``. It does not re-enter raw mode or the
+`TerminalHandoffError.unavailable`. It does not re-enter raw mode or the
 alternate screen.
 
-The WASI ANSI runner currently reports ``TerminalHandoffError/unavailable``.
+The WASI ANSI runner currently reports `TerminalHandoffError.unavailable`.
 Its detached stdin poller cannot yet acknowledge a pause, so the runtime fails
 closed instead of letting SwiftTUI and the external operation race for input.
 
@@ -66,15 +66,14 @@ let openShell: @MainActor @Sendable () async throws -> Void = {
 
 The current action is scoped to the task running a terminal scene. Structured
 child tasks inherit it, while detached tasks and calls outside a live terminal
-session throw ``TerminalHandoffError/unavailable``. This avoids a
+session throw `TerminalHandoffError.unavailable`. This avoids a
 process-global "current terminal" that can route one scene's operation
 through another scene's run loop.
 
 Only one handoff can run in a terminal session at a time. A concurrent request
-throws ``TerminalHandoffError/alreadyInProgress``.
+throws `TerminalHandoffError.alreadyInProgress`.
 
-## Topics
-
-- ``TerminalHandoffAction``
-- ``TerminalHandoffError``
-- ``EnvironmentValues/terminalHandoff``
+The API surface — `TerminalHandoffAction`, `TerminalHandoffError`, and the
+`terminalHandoff` environment value — is declared in the authoring surface
+that every app product re-exports; its per-symbol reference lives in the
+`SwiftTUIViews` module.

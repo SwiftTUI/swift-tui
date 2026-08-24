@@ -168,7 +168,7 @@ moves the window. Selection moves within it.
 - **Arrow keys** move the selection. The window follows only when necessary. It
   moves only far enough to reveal the new row and one context row. A selection
   step within the visible rows does not scroll.
-- ``ScrollViewProxy/scrollTo(_:anchor:)`` reaches a row by ID whether or not it
+- ``ScrollViewProxy``'s `scrollTo(_:anchor:)` reaches a row by ID whether or not it
   is currently realized.
 
 > Note: before this contract, the wheel stepped the selection and the window

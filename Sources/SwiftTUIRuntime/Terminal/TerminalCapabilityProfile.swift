@@ -92,10 +92,10 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   /// On POSIX platforms the terminal emulator sits at the far end of a pty
   /// and can only be known through the environment it exports, so detection
   /// reads `TERM`, `COLORTERM`, `NO_COLOR`, and the locale
-  /// (``detectPOSIXTerminal(environment:isTTY:)``). On Windows the process
+  /// (`detectPOSIXTerminal(environment:isTTY:)`). On Windows the process
   /// talks to a console host the framework configures itself, so the
   /// platform carries the defaults and the environment only refines them
-  /// (``detectWindowsConsole(environment:isTTY:)``).
+  /// (`detectWindowsConsole(environment:isTTY:)`).
   public static func detect(
     environment: [String: String],
     isTTY: Bool

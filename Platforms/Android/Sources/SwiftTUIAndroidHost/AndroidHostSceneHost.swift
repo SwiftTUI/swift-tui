@@ -567,7 +567,8 @@ public final class AndroidHostSceneHost {
   /// `@MainActor` continuations that became ready since the last tick (the run
   /// loop's own `await`, autonomous `.task` bodies, animation deadline wakes).
   /// The Android host has no OS run loop to drain the main-actor queue, so the
-  /// render poll loop calls this each frame. See ``AndroidMainExecutorPump``.
+  /// render poll loop calls this each frame. See the internal
+  /// `AndroidMainExecutorPump`.
   /// Returns a diagnostic status code (mirrored into the JNI bridge log).
   @MainActor
   @discardableResult

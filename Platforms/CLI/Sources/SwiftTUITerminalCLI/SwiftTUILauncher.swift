@@ -36,7 +36,7 @@ package enum SwiftTUILaunchRegistry {
 /// This is the platform-neutral launch router (Stage 5.2 of the Windows
 /// plan): it lives with the portable terminal half so `import SwiftTUI` +
 /// `@main` composes identically on every platform, and only *names* the web
-/// arm through ``SwiftTUILaunchRegistry``. The legacy spelling
+/// arm through the internal `SwiftTUILaunchRegistry`. The legacy spelling
 /// `WebHostCLIRunner` remains in the web CLI module as a delegating facade.
 public enum SwiftTUILauncher {
   /// Constructs an app on the main actor and launches it using parsed CLI options.

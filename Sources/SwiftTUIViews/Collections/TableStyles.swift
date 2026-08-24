@@ -2,7 +2,7 @@ public import SwiftTUICore
 
 /// An extensible table style.
 ///
-/// A table style resolves a ``TableStylePresentation`` — border glyphs,
+/// A table style resolves a `TableStylePresentation` — border glyphs,
 /// header paints, insets, and border paint — from the table's render state.
 /// The table primitive keeps virtualization, selection, header semantics,
 /// cell layout, pointer routes, and scroll currency; a style cannot change

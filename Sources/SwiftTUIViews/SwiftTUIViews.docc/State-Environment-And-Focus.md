@@ -1,72 +1,84 @@
 # State, Environment, And Focus
 
+Own values with `@State`, share observable models through the environment,
+and steer focus — one invalidation path drives all of it.
+
 ## Overview
 
 SwiftTUI keeps state, observation, environment, and focus on one runtime
-invalidation path.
+invalidation path: a local `@State` write, an observable model write, and a
+focus change all rerender through the same scheduler. This article shows the
+wrappers working together, then routes each topic to the guide that owns it.
 
-That gives the framework a few important properties:
+```swift
+@MainActor @Observable
+final class SearchModel {  // implicitly Sendable
+  var query = ""
+}
 
-- local `@State` changes rerender the same way observable writes do
-- focus changes feed the same semantic system that keyboard interaction uses
-- environment reads stay in authored view composition, not out-of-band
-  configuration
+struct SearchScreen: View {
+  @Environment(SearchModel.self) private var model
+  @State private var showsLength = false
 
-## State
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      QueryField(model: model)
+      Toggle("Show length", isOn: $showsLength)
+      if showsLength {
+        Text("Query is \(model.query.count) characters")
+      }
+    }
+  }
+}
 
-Use ``State`` for local value ownership. Use ``Binding`` to project a value
-into child views.
+struct QueryField: View {
+  @Bindable var model: SearchModel
+  @FocusState private var isEditing: Bool
 
-`@State` storage is owned by a runtime `ViewNodeID` and a source-location
-ordinal, scoped to the active view graph. Unkeyed owners follow their
-`StructuralPath` in the resolved tree. Explicit `.id(...)` values and
-`ForEach` data keys produce an `EntityIdentity`. This identity can route the
-same owner across structural moves. A change to the explicit id creates a new
-owner.
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      TextField("Query", text: $model.query)
+        .focused($isEditing)
+      Button("Edit query") { isEditing = true }
+    }
+  }
+}
+```
 
-Interactive runtime callbacks are additionally scoped to the view graph that
-registered them. Projected bindings, button actions, key commands, dismiss
-closures, and gesture updates continue to mutate their original runtime graph.
-They do so even when another graph reuses the same view value. No-invalidator
-`DefaultRenderer` snapshots preserve test ergonomics by letting a reused view
-instance carry imperative writes into a later snapshot of that same instance.
+Inject the model once at the root —
+`SearchScreen().environment(SearchModel())` — and each wrapper plays its
+role. `SearchScreen` owns `showsLength` with ``State`` and passes
+`$showsLength`, a ``Binding``, to the `Toggle` control. Reading
+`model.query` in `body` subscribes that view to the model. ``Bindable``
+projects an editable binding into the model for `TextField`. ``FocusState``
+mirrors focus, so setting it in the button action moves focus to the field.
 
-## Observation
+### State and identity
 
-Use repository-owned ``Bindable`` with `Observation` models for editable
-bindings into observable reference types.
+`@State` storage belongs to the view's runtime identity: it survives
+re-evaluation but resets when that identity changes, for example under a
+changed `.id(...)` value or a moved `ForEach` row. For how identity is
+keyed, when state resets, and where to hoist owners that must survive lazy
+tabs or presentation churn, see <doc:State-Keying>.
 
-SwiftTUI tracks observable reads through the runtime invalidation bridge.
-Observable writes invalidate the exact identities that observed them. They do
-not use a second rendering system.
+### Observation
 
-Observable model writes may happen off the main actor, as in SwiftUI's
-background-task model writes. The bridge accepts the change from any
-executor, wakes the scheduler, and applies the invalidation on the main actor
-at the next frame head. `@State` and `Binding` writes remain main-actor-only,
-enforced at compile time.
+Author models as `@MainActor @Observable final class` — implicitly
+`Sendable`, which environment storage requires. Reads in `body` are
+dependency-tracked, and a write invalidates exactly the views that read the
+changed property. Observable writes are accepted from any executor and
+applied on the main actor at the next frame head; `@State` and ``Binding``
+writes are main-actor-only, enforced at compile time.
 
-## Environment
+### Environment
 
-Use ``Environment`` or ``EnvironmentReader`` with ``EnvironmentValues`` for
-values that descend through the tree. Use ``GeometryReader`` for authored
-content that responds to geometry from layout. A reader at the root receives
-the root terminal geometry.
-
-Environment updates can affect:
-
-- styling and appearance
-- focus affordances
-- enabled or disabled state
-- terminal-specific presentation details
-
-Environment writes are part of authored structure. They are not a late-stage
-rendering override.
-
-Runtime-injected environment actions expose host-owned verbs without putting
-host mechanics in views. ``EnvironmentValues/requestTermination`` asks the
-active session to end through the same ``View/onTerminationRequest(perform:)``
-policy used for exit keys and signals. For example:
+``Environment`` reads inherited values by key path,
+``View/environment(_:_:)`` writes one for a subtree, and
+``View/environment(_:)`` injects an observable model that descendants read
+back with `@Environment(Model.self)`. Runtime-injected actions expose
+host-owned verbs: ``EnvironmentValues/requestTermination`` asks the active
+session to end through the same ``View/onTerminationRequest(perform:)``
+policy used for exit keys and signals.
 
 ```swift
 struct QuitButton: View {
@@ -78,20 +90,17 @@ struct QuitButton: View {
 }
 ```
 
-``EnvironmentValues/terminalHandoff`` temporarily restores the user's terminal
-while an asynchronous external operation runs. The “Terminal Handoffs” guide
-in `SwiftTUIRuntime` describes the ownership and restoration contract.
+To define your own environment keys (``EnvironmentKey``) or build custom
+property wrappers that participate in evaluation like the built-ins, see
+<doc:Custom-Dynamic-Properties>.
 
-## Focus
+### Focus
 
-Use ``FocusState`` to model authored focus ownership. Use ``FocusedValue`` or
-``FocusedBinding`` to export context from the focused subtree.
-
-The runtime is keyboard-first, but focus also matters for:
-
-- selecting the control that reacts to key events
-- routing focused-value data to tool panels or status bars
-- coordinating editable controls with selection or activation behavior
+``FocusState`` lets app state observe and control which view receives key
+input, via ``View/focused(_:)`` or ``View/focused(_:equals:)``, while
+``FocusedValue`` and ``FocusedBinding`` export context outward from the
+focused subtree. The full model — traversal, defaults, reset, and each
+intentional SwiftUI difference — is in <doc:Focus>.
 
 ## Related Symbols
 
@@ -100,10 +109,8 @@ The runtime is keyboard-first, but focus also matters for:
 - ``Bindable``
 - ``Environment``
 - ``EnvironmentValues``
-- ``EnvironmentReader``
-- ``GeometryReader``
+- ``EnvironmentKey``
 - ``FocusState``
 - ``FocusedValue``
 - ``FocusedBinding``
 - ``RequestTerminationAction``
-- ``TerminalHandoffAction``

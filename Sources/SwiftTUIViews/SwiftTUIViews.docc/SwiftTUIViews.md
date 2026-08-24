@@ -75,8 +75,6 @@ Lowering helpers remain package-only implementation details.
 - ``State``
 - ``Binding``
 - ``Bindable``
-- <doc:State-Environment-And-Focus>
-- <doc:Custom-Dynamic-Properties>
 
 ### Layout
 
@@ -96,7 +94,6 @@ Lowering helpers remain package-only implementation details.
 - ``SpatialTapGesture``
 - ``ScrollWheelEvent``
 - ``ScrollWheelResult``
-- <doc:Pointer-And-Canvas>
 
 ### Shape Primitives
 
@@ -107,22 +104,28 @@ Lowering helpers remain package-only implementation details.
 - ``Circle``
 - ``Ellipse``
 - ``Capsule``
-- <doc:Shapes>
-- <doc:AspectCorrectShapes>
 
 ### Guides
 
 - <doc:Coming-From-SwiftUI>
-- <doc:Divergences-And-Gaps>
 - <doc:Authoring-Views>
-- <doc:Collections>
-- <doc:AnyView>
-- <doc:Geometry-And-Preferences>
+- <doc:Forms-And-Controls>
+- <doc:Commands-And-Key-Input>
+- <doc:Focus>
 - <doc:State-Environment-And-Focus>
 - <doc:State-Keying>
 - <doc:Dormant-Tab-State>
 - <doc:Custom-Dynamic-Properties>
-- <doc:Focus>
-- <doc:Accessibility>
+- <doc:Collections>
+- <doc:Scrolling>
+- <doc:Navigation-And-Tabs>
 - <doc:Dismissal-Is-Data>
+- <doc:Styling-And-Theming>
+- <doc:Animating-Views>
+- <doc:Geometry-And-Preferences>
 - <doc:Shapes>
+- <doc:AspectCorrectShapes>
+- <doc:Pointer-And-Canvas>
+- <doc:Accessibility>
+- <doc:AnyView>
+- <doc:Divergences-And-Gaps>

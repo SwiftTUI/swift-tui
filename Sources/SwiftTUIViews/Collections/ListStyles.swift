@@ -2,7 +2,7 @@ public import SwiftTUICore
 
 /// An extensible list style.
 ///
-/// A list style resolves a ``ListStylePresentation`` — container chrome,
+/// A list style resolves a `ListStylePresentation` — container chrome,
 /// insets, and separator visibility — from the list's render state. Table
 /// treatments are a separate family; see `TableStyle`.
 public protocol ListStyle: Sendable {

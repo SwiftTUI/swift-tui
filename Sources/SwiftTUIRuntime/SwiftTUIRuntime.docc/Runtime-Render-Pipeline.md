@@ -69,7 +69,8 @@ scheduling, async tail cancellation, or host presentation.
 ## Code Map
 
 Implementation entry points are contributor-facing and mapped in the
-coordination repository's `swift-tui-org/docs/swift-tui/CODEBASE-GUIDE.md`,
+coordination repository's
+[`CODEBASE-GUIDE.md`](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/CODEBASE-GUIDE.md),
 which pairs this article's stage descriptions with the owning source files.
 
 ## Renderer Entry Points
