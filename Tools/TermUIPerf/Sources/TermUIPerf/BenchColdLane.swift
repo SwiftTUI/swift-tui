@@ -185,7 +185,10 @@ enum BenchColdLane {
       customContainerMeasures: branching.customContainerMeasures,
       customChildMeasureRequests: branching.customChildMeasureRequests,
       customChildMeasureRequestsProbe: branching.customChildMeasureRequestsProbe,
-      customPlacementChildMeasureRequests: branching.customPlacementChildMeasureRequests
+      customPlacementChildMeasureRequests: branching.customPlacementChildMeasureRequests,
+      lifetimeAnchorWalked: work.lifetimeAnchorCounters.nodesWalked,
+      lifetimeAnchorReplace: work.lifetimeAnchorCounters.replaceCalls,
+      lifetimeAnchorReplaceNoop: work.lifetimeAnchorCounters.replaceNoops
     )
   }
 

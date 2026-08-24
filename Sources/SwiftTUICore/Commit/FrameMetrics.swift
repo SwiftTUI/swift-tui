@@ -33,13 +33,25 @@ public struct MeasurementCacheMetrics: Equatable, Sendable {
 package struct ResolveWorkMetrics: Equatable, Sendable {
   package var resolvedNodesComputed: Int
   package var resolvedNodesReused: Int
+  /// Committed-value anchor-projection walk tallies for the frame, merged
+  /// from the graph's per-frame diagnostics at the end of the head's last
+  /// resolve pass (serve-path plan 2026-08-12-003 counters).
+  package var lifetimeAnchorNodesWalked: Int
+  package var lifetimeAnchorReplaceCalls: Int
+  package var lifetimeAnchorReplaceNoops: Int
 
   package init(
     resolvedNodesComputed: Int = 0,
-    resolvedNodesReused: Int = 0
+    resolvedNodesReused: Int = 0,
+    lifetimeAnchorNodesWalked: Int = 0,
+    lifetimeAnchorReplaceCalls: Int = 0,
+    lifetimeAnchorReplaceNoops: Int = 0
   ) {
     self.resolvedNodesComputed = resolvedNodesComputed
     self.resolvedNodesReused = resolvedNodesReused
+    self.lifetimeAnchorNodesWalked = lifetimeAnchorNodesWalked
+    self.lifetimeAnchorReplaceCalls = lifetimeAnchorReplaceCalls
+    self.lifetimeAnchorReplaceNoops = lifetimeAnchorReplaceNoops
   }
 }
 

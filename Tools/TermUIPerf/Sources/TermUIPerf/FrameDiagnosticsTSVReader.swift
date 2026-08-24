@@ -181,7 +181,13 @@ enum PerfFrameDiagnosticsTSVReader {
           customChildMeasureRequestsProbe: optionalInt(
             "custom_child_measure_requests_probe", fields, column),
           customPlacementChildMeasureRequests: optionalInt(
-            "custom_placement_child_measure_requests", fields, column)
+            "custom_placement_child_measure_requests", fields, column),
+          lifetimeAnchorWalked: optionalInt(
+            "lifetime_anchor_walked", fields, column),
+          lifetimeAnchorReplace: optionalInt(
+            "lifetime_anchor_replace", fields, column),
+          lifetimeAnchorReplaceNoop: optionalInt(
+            "lifetime_anchor_replace_noop", fields, column)
         ),
         inputToCommitFirstMs: double("input_to_commit_first_ms", fields, column),
         inputToCommitLastMs: double("input_to_commit_last_ms", fields, column),

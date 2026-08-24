@@ -31,6 +31,40 @@ struct LifetimeAnchorIndexTests {
     #expect(index.isInverseConsistent)
   }
 
+  @Test("target replacement reports change and no-ops on an equal set")
+  func targetReplacementReportsChangeAndNoOps() {
+    let source = nodeID(1)
+    var index = LifetimeAnchorIndex()
+
+    let installed = index.replaceTargets(
+      ofKind: .committedValue,
+      sourcedBy: source,
+      with: [nodeID(2), nodeID(3)]
+    )
+    #expect(installed)
+    #expect(index.targets(of: .committedValue(source)) == [nodeID(2), nodeID(3)])
+
+    // Equal set: the early-out fires, nothing changes, and the index stays
+    // byte-identical (the per-node projection refresh's common case).
+    let before = index
+    let repeated = index.replaceTargets(
+      ofKind: .committedValue,
+      sourcedBy: source,
+      with: [nodeID(2), nodeID(3)]
+    )
+    #expect(!repeated)
+    #expect(index == before)
+
+    let narrowed = index.replaceTargets(
+      ofKind: .committedValue,
+      sourcedBy: source,
+      with: [nodeID(3)]
+    )
+    #expect(narrowed)
+    #expect(index.targets(of: .committedValue(source)) == [nodeID(3)])
+    #expect(index.isInverseConsistent)
+  }
+
   @Test("detached roots re-home exclusively")
   func detachedRehomeIsExclusive() {
     let root = nodeID(9)

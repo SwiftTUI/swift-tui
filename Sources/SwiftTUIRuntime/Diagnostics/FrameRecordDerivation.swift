@@ -132,6 +132,9 @@ package enum FrameRecordDerivation {
       elidedCommitDuration: nil
     )
     record.layoutBranching = diag.work.layoutBranching
+    record.lifetimeAnchorNodesWalked = diag.work.lifetimeAnchorTallies.nodesWalked
+    record.lifetimeAnchorReplaceCalls = diag.work.lifetimeAnchorTallies.replaceCalls
+    record.lifetimeAnchorReplaceNoops = diag.work.lifetimeAnchorTallies.replaceNoops
     if let answeredInputs = sample.answeredInputs {
       record.answeredInputCount = answeredInputs.count
       record.inputToCommitFirst = answeredInputs.first.duration(to: sample.commitInstant)

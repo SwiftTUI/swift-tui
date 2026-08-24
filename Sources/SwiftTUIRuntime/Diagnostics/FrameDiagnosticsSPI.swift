@@ -29,3 +29,24 @@ extension FrameDiagnosticWork {
     )
   }
 }
+
+/// SPI mirror of the committed-value anchor-projection walk tallies
+/// (serve-path plan 2026-08-12-003 counters), same contract as
+/// ``LayoutBranchingCounterSnapshot``: the cold bench lane reads its work
+/// census off the one-shot `RenderSnapshot`, and the package type stays
+/// free to move.
+@_spi(Runners) public struct LifetimeAnchorCounterSnapshot: Equatable, Sendable {
+  public let nodesWalked: Int
+  public let replaceCalls: Int
+  public let replaceNoops: Int
+}
+
+extension FrameDiagnosticWork {
+  @_spi(Runners) public var lifetimeAnchorCounters: LifetimeAnchorCounterSnapshot {
+    LifetimeAnchorCounterSnapshot(
+      nodesWalked: lifetimeAnchorTallies.nodesWalked,
+      replaceCalls: lifetimeAnchorTallies.replaceCalls,
+      replaceNoops: lifetimeAnchorTallies.replaceNoops
+    )
+  }
+}

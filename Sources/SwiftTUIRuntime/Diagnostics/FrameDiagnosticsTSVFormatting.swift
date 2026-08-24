@@ -210,6 +210,9 @@ package enum FrameDiagnosticsTSVFormatting {
     "elided_commit_runtime_registrations_ms",
     "elided_animation_commit_ms",
     "elided_commit_ms",
+    "lifetime_anchor_walked",
+    "lifetime_anchor_replace",
+    "lifetime_anchor_replace_noop",
   ]
 
   package static func fields(
@@ -439,6 +442,9 @@ package enum FrameDiagnosticsTSVFormatting {
       elidedCommitRuntimeRegistrationsMs,
       elidedAnimationCommitMs,
       elidedCommitMs,
+      String(record.lifetimeAnchorNodesWalked),
+      String(record.lifetimeAnchorReplaceCalls),
+      String(record.lifetimeAnchorReplaceNoops),
     ]
   }
 

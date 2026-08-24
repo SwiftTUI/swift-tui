@@ -61,4 +61,60 @@ struct IdentityValueCurrencyTests {
     #expect(decoded == identity)
     #expect(decoded.hashValue == identity.hashValue)
   }
+
+  @Test("structural paths minted through different routes agree on hash and equality")
+  func structuralPathMintRoutesAgree() {
+    let components = [
+      IdentityComponent.named("app"),
+      IdentityComponent.indexed("stack", index: 0),
+      IdentityComponent.named("row"),
+    ]
+    let direct = StructuralPath(components: components)
+    let appended = StructuralPath(components: [components[0]])
+      .appending(components[1])
+      .appending(components[2])
+
+    #expect(direct == appended)
+    #expect(direct.hashValue == appended.hashValue)
+
+    let probe: Set<StructuralPath> = [direct]
+    #expect(probe.contains(appended))
+    #expect(direct != appended.appending(.named("extra")))
+  }
+
+  @Test("identity and structural path conversions preserve hash agreement")
+  func identityStructuralPathConversionsAgree() {
+    let identity = Identity(components: ["app", "stack[0]", "row"])
+    let path = StructuralPath(identity: identity)
+    let direct = StructuralPath(
+      components: identity.components.map { IdentityComponent(rawValue: $0) }
+    )
+
+    #expect(path == direct)
+    #expect(path.hashValue == direct.hashValue)
+
+    let projected = path.identityProjection
+    #expect(projected == identity)
+    #expect(projected.hashValue == identity.hashValue)
+  }
+
+  @Test("structural path codable wire shape stays a single components key and round-trips")
+  func structuralPathCodableWireShapeStable() throws {
+    let path = StructuralPath(components: [
+      IdentityComponent.named("app"),
+      IdentityComponent.indexed("stack", index: 3),
+    ])
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+
+    let encoded = String(decoding: try encoder.encode(path), as: UTF8.self)
+    #expect(encoded == #"{"components":[{"rawValue":"app"},{"rawValue":"stack[3]"}]}"#)
+
+    let decoded = try JSONDecoder().decode(
+      StructuralPath.self,
+      from: try encoder.encode(path)
+    )
+    #expect(decoded == path)
+    #expect(decoded.hashValue == path.hashValue)
+  }
 }

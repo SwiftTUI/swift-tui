@@ -168,6 +168,11 @@ extension FrameDiagnostics {
       firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity
     )
     work.layoutBranching = layoutWork?.branching ?? .init()
+    if let resolveWork {
+      work.lifetimeAnchorTallies.nodesWalked = resolveWork.lifetimeAnchorNodesWalked
+      work.lifetimeAnchorTallies.replaceCalls = resolveWork.lifetimeAnchorReplaceCalls
+      work.lifetimeAnchorTallies.replaceNoops = resolveWork.lifetimeAnchorReplaceNoops
+    }
     return Self(
       input: .init(
         proposal: measured.proposal,

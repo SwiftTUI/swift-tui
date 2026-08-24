@@ -57,22 +57,40 @@ extension ViewGraph {
 
   /// Projects nearest-distinct stamped committed-value edges in one linear
   /// walk of the accepted tree.
+  ///
+  /// The walk runs per computed-node epilogue (`finishEvaluation`) and per
+  /// retained serve, so its per-visited-node constant is serve-path-hot.
+  /// It iterates sibling groups instead of pushing per-node value copies: a
+  /// `ResolvedNode` carries ~ten refcounted fields, and copying one per
+  /// visited node was the `initializeWithCopy for ResolvedNode` signature in
+  /// the serve-path profile (plan 2026-08-12-003). A group entry retains one
+  /// child-array buffer for the whole sibling run; per-node reads go through
+  /// subscripts at +0.
   func replaceCommittedValueAnchors(in acceptedRoot: ResolvedNode) {
     var targetsBySource: [ViewNodeID: Set<ViewNodeID>] = [:]
     var visitedSources: Set<ViewNodeID> = []
-    var stack: [(resolved: ResolvedNode, source: ViewNodeID?, crossedValueOnlyLayer: Bool)] = [
-      (acceptedRoot, nil, false)
-    ]
+    var nodesWalked = 0
 
-    while let entry = stack.popLast() {
-      let resolved = entry.resolved
-      var source = entry.source
-      var crossedValueOnlyLayer = entry.crossedValueOnlyLayer
-      if let stampedNodeID = resolved.viewNodeID,
+    struct SiblingGroup {
+      let siblings: [ResolvedNode]
+      var nextIndex: Int
+      let source: ViewNodeID?
+      let crossedValueOnlyLayer: Bool
+    }
+
+    // Visits one node: records its nearest-distinct committed-value edge and
+    // returns the (source, crossedValueOnlyLayer) pair its children inherit.
+    func visit(
+      stampedNodeID: ViewNodeID?,
+      source: ViewNodeID?,
+      crossedValueOnlyLayer: Bool
+    ) -> (source: ViewNodeID?, crossedValueOnlyLayer: Bool) {
+      nodesWalked += 1
+      if let stampedNodeID,
         let stampedNode = nodeIfExists(for: stampedNodeID)
       {
         visitedSources.insert(stampedNodeID)
-        if let nearestStampedAncestor = entry.source,
+        if let nearestStampedAncestor = source,
           nearestStampedAncestor != stampedNodeID,
           stampedNode.parent?.viewNodeID == nearestStampedAncestor
             || (crossedValueOnlyLayer
@@ -83,23 +101,73 @@ extension ViewGraph {
         {
           targetsBySource[nearestStampedAncestor, default: []].insert(stampedNodeID)
         }
-        source = stampedNodeID
-        crossedValueOnlyLayer = false
-      } else if entry.source != nil {
-        crossedValueOnlyLayer = true
+        return (stampedNodeID, false)
       }
-      for child in resolved.children.reversed() {
-        stack.append((child, source, crossedValueOnlyLayer))
+      if source != nil {
+        return (source, true)
+      }
+      return (source, crossedValueOnlyLayer)
+    }
+
+    let rootInherited = visit(
+      stampedNodeID: acceptedRoot.viewNodeID,
+      source: nil,
+      crossedValueOnlyLayer: false
+    )
+    var stack: [SiblingGroup] = []
+    if !acceptedRoot.children.isEmpty {
+      stack.append(
+        SiblingGroup(
+          siblings: acceptedRoot.children,
+          nextIndex: 0,
+          source: rootInherited.source,
+          crossedValueOnlyLayer: rootInherited.crossedValueOnlyLayer
+        )
+      )
+    }
+    while let top = stack.indices.last {
+      let index = stack[top].nextIndex
+      guard index < stack[top].siblings.count else {
+        stack.removeLast()
+        continue
+      }
+      stack[top].nextIndex = index + 1
+      let inherited = visit(
+        stampedNodeID: stack[top].siblings[index].viewNodeID,
+        source: stack[top].source,
+        crossedValueOnlyLayer: stack[top].crossedValueOnlyLayer
+      )
+      let grandchildren = stack[top].siblings[index].children
+      if !grandchildren.isEmpty {
+        stack.append(
+          SiblingGroup(
+            siblings: grandchildren,
+            nextIndex: 0,
+            source: inherited.source,
+            crossedValueOnlyLayer: inherited.crossedValueOnlyLayer
+          )
+        )
       }
     }
 
+    var replaceCalls = 0
+    var replaceNoops = 0
     for source in visitedSources {
-      lifetimeAnchors.replaceTargets(
+      replaceCalls += 1
+      let changed = lifetimeAnchors.replaceTargets(
         ofKind: .committedValue,
         sourcedBy: source,
         with: targetsBySource[source, default: []]
       )
+      if !changed {
+        replaceNoops += 1
+      }
     }
+    resolveDiagnostics.recordAnchorWalk(
+      nodesWalked: nodesWalked,
+      replaceCalls: replaceCalls,
+      replaceNoops: replaceNoops
+    )
   }
 
   func bindEntityRoute(

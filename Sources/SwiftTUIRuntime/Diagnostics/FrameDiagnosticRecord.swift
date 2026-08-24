@@ -9,6 +9,13 @@ public struct FrameDiagnosticRecord: Sendable {
   public var resolvedNodeCount: Int
   public var resolvedNodesComputed: Int
   public var resolvedNodesReused: Int
+  /// Committed-value anchor-projection walk tallies (serve-path plan
+  /// 2026-08-12-003 counters). `package` (defaulted, set post-init by the
+  /// derivation) so the public record surface stays frozen — the
+  /// `layoutBranching` pattern.
+  package var lifetimeAnchorNodesWalked = 0
+  package var lifetimeAnchorReplaceCalls = 0
+  package var lifetimeAnchorReplaceNoops = 0
   public var measuredNodeCount: Int
   public var measuredNodesComputed: Int
   public var measuredNodesReused: Int

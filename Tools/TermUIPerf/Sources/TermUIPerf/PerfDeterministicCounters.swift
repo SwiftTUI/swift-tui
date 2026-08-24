@@ -21,6 +21,11 @@ public struct PerfFrameWorkCounters: Equatable, Sendable {
   public var customChildMeasureRequests: Int?
   public var customChildMeasureRequestsProbe: Int?
   public var customPlacementChildMeasureRequests: Int?
+  /// Committed-value anchor-projection walk tallies (serve-path plan
+  /// 2026-08-12-003 counters).
+  public var lifetimeAnchorWalked: Int?
+  public var lifetimeAnchorReplace: Int?
+  public var lifetimeAnchorReplaceNoop: Int?
 
   public init(
     resolvedComputed: Int? = nil,
@@ -33,7 +38,10 @@ public struct PerfFrameWorkCounters: Equatable, Sendable {
     customContainerMeasures: Int? = nil,
     customChildMeasureRequests: Int? = nil,
     customChildMeasureRequestsProbe: Int? = nil,
-    customPlacementChildMeasureRequests: Int? = nil
+    customPlacementChildMeasureRequests: Int? = nil,
+    lifetimeAnchorWalked: Int? = nil,
+    lifetimeAnchorReplace: Int? = nil,
+    lifetimeAnchorReplaceNoop: Int? = nil
   ) {
     self.resolvedComputed = resolvedComputed
     self.resolvedReused = resolvedReused
@@ -46,6 +54,9 @@ public struct PerfFrameWorkCounters: Equatable, Sendable {
     self.customChildMeasureRequests = customChildMeasureRequests
     self.customChildMeasureRequestsProbe = customChildMeasureRequestsProbe
     self.customPlacementChildMeasureRequests = customPlacementChildMeasureRequests
+    self.lifetimeAnchorWalked = lifetimeAnchorWalked
+    self.lifetimeAnchorReplace = lifetimeAnchorReplace
+    self.lifetimeAnchorReplaceNoop = lifetimeAnchorReplaceNoop
   }
 }
 
@@ -98,6 +109,14 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
   public var customChildMeasureRequests: Int?
   public var customChildMeasureRequestsProbe: Int?
   public var customPlacementChildMeasureRequests: Int?
+  /// Committed-value anchor-projection walk totals (serve-path plan
+  /// 2026-08-12-003): nodes visited by `replaceCommittedValueAnchors`
+  /// walks, the committed-value `replaceTargets` calls they issued, and the
+  /// no-op subset. The walked total is the ratchet on the walk's O-term —
+  /// per-node work that scales with subtree size cannot regrow silently.
+  public var lifetimeAnchorWalked: Int?
+  public var lifetimeAnchorReplace: Int?
+  public var lifetimeAnchorReplaceNoop: Int?
 
   public init(
     committedFrames: Int = 0,
@@ -120,7 +139,10 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     customContainerMeasures: Int? = nil,
     customChildMeasureRequests: Int? = nil,
     customChildMeasureRequestsProbe: Int? = nil,
-    customPlacementChildMeasureRequests: Int? = nil
+    customPlacementChildMeasureRequests: Int? = nil,
+    lifetimeAnchorWalked: Int? = nil,
+    lifetimeAnchorReplace: Int? = nil,
+    lifetimeAnchorReplaceNoop: Int? = nil
   ) {
     self.committedFrames = committedFrames
     self.answeredInputs = answeredInputs
@@ -143,6 +165,9 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     self.customChildMeasureRequests = customChildMeasureRequests
     self.customChildMeasureRequestsProbe = customChildMeasureRequestsProbe
     self.customPlacementChildMeasureRequests = customPlacementChildMeasureRequests
+    self.lifetimeAnchorWalked = lifetimeAnchorWalked
+    self.lifetimeAnchorReplace = lifetimeAnchorReplace
+    self.lifetimeAnchorReplaceNoop = lifetimeAnchorReplaceNoop
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -167,6 +192,9 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     case customChildMeasureRequests = "custom_child_measure_requests"
     case customChildMeasureRequestsProbe = "custom_child_measure_requests_probe"
     case customPlacementChildMeasureRequests = "custom_placement_child_measure_requests"
+    case lifetimeAnchorWalked = "lifetime_anchor_walked"
+    case lifetimeAnchorReplace = "lifetime_anchor_replace"
+    case lifetimeAnchorReplaceNoop = "lifetime_anchor_replace_noop"
   }
 }
 
@@ -208,7 +236,13 @@ extension PerfDeterministicCounters {
       customChildMeasureRequestsProbe: sumIfAnyPresent(
         frames, \.workCounters.customChildMeasureRequestsProbe),
       customPlacementChildMeasureRequests: sumIfAnyPresent(
-        frames, \.workCounters.customPlacementChildMeasureRequests)
+        frames, \.workCounters.customPlacementChildMeasureRequests),
+      lifetimeAnchorWalked: sumIfAnyPresent(
+        frames, \.workCounters.lifetimeAnchorWalked),
+      lifetimeAnchorReplace: sumIfAnyPresent(
+        frames, \.workCounters.lifetimeAnchorReplace),
+      lifetimeAnchorReplaceNoop: sumIfAnyPresent(
+        frames, \.workCounters.lifetimeAnchorReplaceNoop)
     )
   }
 
@@ -245,6 +279,9 @@ extension PerfDeterministicCounters {
     append("custom_child_measure_requests", customChildMeasureRequests)
     append("custom_child_measure_requests_probe", customChildMeasureRequestsProbe)
     append("custom_placement_child_measure_requests", customPlacementChildMeasureRequests)
+    append("lifetime_anchor_walked", lifetimeAnchorWalked)
+    append("lifetime_anchor_replace", lifetimeAnchorReplace)
+    append("lifetime_anchor_replace_noop", lifetimeAnchorReplaceNoop)
     return entries
   }
 

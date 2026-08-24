@@ -35,6 +35,19 @@ package final class ResolveWorkTracker: Sendable {
     }
   }
 
+  /// Merges the graph's per-frame anchor-projection tallies (taken once at
+  /// the end of the head's last resolve pass — serve-path plan
+  /// 2026-08-12-003 counters).
+  package func recordLifetimeAnchorTallies(
+    _ tallies: LifetimeAnchorProjectionTallies
+  ) {
+    workMetrics.withLock { workMetrics in
+      workMetrics.lifetimeAnchorNodesWalked += tallies.nodesWalked
+      workMetrics.lifetimeAnchorReplaceCalls += tallies.replaceCalls
+      workMetrics.lifetimeAnchorReplaceNoops += tallies.replaceNoops
+    }
+  }
+
   package var snapshot: ResolveWorkMetrics {
     workMetrics.withLock { $0 }
   }

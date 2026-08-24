@@ -623,19 +623,37 @@ extension IdentityComponent {
 
 private let internedComponentsByKind = Mutex<[String: [IdentityComponent]]>([:])
 
+/// Left-fold path hash shared by `Identity` and `StructuralPath`: the cached
+/// hash of a path is the fold of this step over its component strings, so a
+/// child mint extends its parent's cached hash in O(1) instead of re-hashing
+/// the whole path — and the two types agree on the fold, letting
+/// `StructuralPath(identity:)` and `identityProjection` carry the cached
+/// value across without touching the components. Equal component sequences
+/// produce equal folds regardless of construction route, which is the
+/// invariant that keeps `Hashable` sound. Per-process only (`Hasher` seed);
+/// never enters any `Codable` wire shape.
+private func foldedPathHash(_ partial: Int, appending component: String) -> Int {
+  var hasher = Hasher()
+  hasher.combine(partial)
+  hasher.combine(component)
+  return hasher.finalize()
+}
+
+private let emptyPathHashSeed = 0
+
 public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringConvertible {
   public let components: [String]
-  /// The components' hash, computed once at mint. `Identity` is the
-  /// reconciliation layer's hottest key type — invalidation sets, the graph's
-  /// identity index, and the retained frame index all hash it on every probe
-  /// — and hashing a `[String]` walks every component. Minting pays that walk
-  /// once (alongside the component-array copy every mint already performs);
-  /// each later hash is then O(1), and inequality — the common outcome of a
-  /// dictionary probe — rejects on the cached hash without touching the
-  /// components. Derived from `components` alone (per-process `Hasher` seed),
-  /// so equal identities always agree on it; it never enters the `Codable`
-  /// wire shape.
-  private let precomputedHash: Int
+  /// The components' left-fold hash (see `foldedPathHash`), computed once at
+  /// mint. `Identity` is the reconciliation layer's hottest key type —
+  /// invalidation sets, the graph's identity index, and the retained frame
+  /// index all hash it on every probe — and hashing a `[String]` walks every
+  /// component. Minting pays the walk once — `child(_:)`, the per-descent
+  /// hot mint, extends the parent's fold in O(1) — each later hash is O(1),
+  /// and inequality — the common outcome of a dictionary probe — rejects on
+  /// the cached hash without touching the components. Derived from
+  /// `components` alone (per-process `Hasher` seed), so equal identities
+  /// always agree on it; it never enters the `Codable` wire shape.
+  package let precomputedHash: Int
 
   public init(components: [String]) {
     self.components = components
@@ -644,6 +662,20 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
 
   public init(components: [IdentityComponent]) {
     self.init(components: components.map(\.rawValue))
+  }
+
+  /// Trusted-fold mint: `trustedPathHash` MUST equal the fold of
+  /// `components` (the caller extends or transfers an already-cached fold).
+  /// Package-only; the debug assert keeps the invariant honest.
+  package init(components: [String], trustedPathHash: Int) {
+    #if DEBUG
+      assert(
+        trustedPathHash == Self.precomputedHash(for: components),
+        "trustedPathHash does not match the components' fold"
+      )
+    #endif
+    self.components = components
+    precomputedHash = trustedPathHash
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -669,9 +701,9 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
   }
 
   private static func precomputedHash(for components: [String]) -> Int {
-    var hasher = Hasher()
-    hasher.combine(components)
-    return hasher.finalize()
+    components.reduce(emptyPathHashSeed) { partial, component in
+      foldedPathHash(partial, appending: component)
+    }
   }
 
   public var path: String {
@@ -690,7 +722,10 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
   }
 
   public func child(_ component: String) -> Self {
-    Self(components: components + [component])
+    Self(
+      components: components + [component],
+      trustedPathHash: foldedPathHash(precomputedHash, appending: component)
+    )
   }
 
   public func child(
@@ -780,17 +815,39 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
 
 package struct StructuralPath: Hashable, Sendable, Codable, CustomStringConvertible {
   package let components: [IdentityComponent]
+  /// The components' left-fold hash (see `foldedPathHash`). `StructuralPath`
+  /// keys `nodeIDsByStructuralPath`, which is re-indexed per node evaluation
+  /// — synthesized hashing walked every component string on every probe (the
+  /// `Hasher.combine(bytes:)` + `String.hash` signature in the serve-path
+  /// profile, plan 2026-08-12-003 M4). Same fold as `Identity`, so the two
+  /// conversions transfer the cached value instead of re-hashing. Excluded
+  /// from the `Codable` wire shape.
+  private let precomputedHash: Int
 
   package init(components: [IdentityComponent] = []) {
     self.components = components
+    precomputedHash = components.reduce(emptyPathHashSeed) { partial, component in
+      foldedPathHash(partial, appending: component.rawValue)
+    }
+  }
+
+  private init(components: [IdentityComponent], trustedPathHash: Int) {
+    self.components = components
+    precomputedHash = trustedPathHash
   }
 
   package init(identity: Identity) {
+    // Identity folds over the same strings, so its cached fold is this
+    // path's fold verbatim.
     components = identity.components.map { IdentityComponent(rawValue: $0) }
+    precomputedHash = identity.precomputedHash
   }
 
   package var identityProjection: Identity {
-    Identity(components: components)
+    Identity(
+      components: components.map(\.rawValue),
+      trustedPathHash: precomputedHash
+    )
   }
 
   package var parent: Self? {
@@ -801,7 +858,34 @@ package struct StructuralPath: Hashable, Sendable, Codable, CustomStringConverti
   }
 
   package func appending(_ component: IdentityComponent) -> Self {
-    Self(components: components + [component])
+    Self(
+      components: components + [component],
+      trustedPathHash: foldedPathHash(precomputedHash, appending: component.rawValue)
+    )
+  }
+
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.precomputedHash == rhs.precomputedHash && lhs.components == rhs.components
+  }
+
+  package func hash(into hasher: inout Hasher) {
+    hasher.combine(precomputedHash)
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case components
+  }
+
+  package init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      components: try container.decode([IdentityComponent].self, forKey: .components)
+    )
+  }
+
+  package func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(components, forKey: .components)
   }
 
   package func isAncestor(of other: Self) -> Bool {

@@ -218,11 +218,15 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
     }
   }
 
+  /// Returns whether any edge actually changed. An unchanged target set —
+  /// the common case for the per-node committed-value projection refresh —
+  /// returns before allocating the two symmetric-difference sets.
+  @discardableResult
   package mutating func replaceTargets(
     ofKind kind: LifetimeAnchor.Kind,
     sourcedBy sourceNodeID: ViewNodeID,
     with targetNodeIDs: Set<ViewNodeID>
-  ) {
+  ) -> Bool {
     let anchor: LifetimeAnchor
     switch kind {
     case .parent:
@@ -237,12 +241,16 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
       preconditionFailure("entity-home anchors have no ViewNodeID source")
     }
     let previous = nodeIDsByAnchor[anchor, default: []]
+    guard previous != targetNodeIDs else {
+      return false
+    }
     for nodeID in previous.subtracting(targetNodeIDs) {
       remove(anchor: anchor, for: nodeID)
     }
     for nodeID in targetNodeIDs.subtracting(previous) {
       insert(anchor: anchor, for: nodeID)
     }
+    return true
   }
 
   /// Replaces one host's active navigation targets and returns its departed set.
@@ -253,6 +261,9 @@ package struct LifetimeAnchorIndex: Equatable, Sendable {
   ) -> Set<ViewNodeID> {
     let anchor = LifetimeAnchor.navigationSurface(hostNodeID)
     let previous = nodeIDsByAnchor[anchor, default: []]
+    guard previous != nodeIDs else {
+      return []
+    }
     for nodeID in previous.subtracting(nodeIDs) {
       remove(anchor: anchor, for: nodeID)
     }

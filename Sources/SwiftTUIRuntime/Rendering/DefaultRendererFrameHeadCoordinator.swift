@@ -149,6 +149,14 @@ struct DefaultRendererFrameHeadCoordinator {
       transaction.suspendPreparedState()
     }
 
+    // Drain the graph's per-frame anchor-projection tallies into this
+    // draft's work tracker (serve-path plan 2026-08-12-003 counters). The
+    // injection stage drains again for any post-head applies, so the two
+    // merges together cover every resolve this draft performed.
+    resolveContext.resolveWorkTracker?.recordLifetimeAnchorTallies(
+      viewGraph.resolveDiagnostics.takeLifetimeAnchorTallies()
+    )
+
     return FrameHeadDraft(
       clock: clock,
       renderGeneration: renderGeneration,
@@ -209,6 +217,12 @@ struct DefaultRendererFrameHeadCoordinator {
       draft.transaction.recordPreparedGraphState()
       draft.transaction.suspendPreparedState()
     }
+
+    // Second drain: any anchor-projection work the injection stage's applies
+    // performed lands on the same per-draft tracker (see computeFrameHead).
+    draft.resolveContext.resolveWorkTracker?.recordLifetimeAnchorTallies(
+      viewGraph.resolveDiagnostics.takeLifetimeAnchorTallies()
+    )
 
     return draft
   }

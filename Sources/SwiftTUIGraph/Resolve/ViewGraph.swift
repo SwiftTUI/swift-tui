@@ -159,6 +159,11 @@ package final class ViewGraph {
   /// so no checkpoint can ever observe non-default state.
   package let deferredResolveDriver = DeferredResolveDriver()
 
+  /// Per-frame diagnostics tallies (anchor-projection walk counters).
+  /// Deliberately outside the checkpointed field groups: diagnostics, not
+  /// graph state — a checkpoint restore must not rewind them.
+  package let resolveDiagnostics = ViewGraphResolveDiagnostics()
+
   #if DEBUG
     /// Test-only observability for reachability-context construction cost.
     ///

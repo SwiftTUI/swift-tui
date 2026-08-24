@@ -133,7 +133,10 @@ struct ViewGraphCheckpointTotalityTests {
     // `nextNodeOwnerLifetimeRawValue`, which form the lifetime-addressing
     // domain and must never rewind — plus `nextAnimationInputMutationToken`,
     // the ABA-safe monotonic allocator whose current content token is
-    // checkpointed in frame commit state.
+    // checkpointed in frame commit state — plus `resolveDiagnostics`, the
+    // per-frame anchor-projection tally box (serve-path plan 2026-08-12-003
+    // counters): frame diagnostics, not graph state, drained once per frame
+    // head and deliberately not rewound by restore.
     let groupPropertyNames: Set<String> = [
       "index",
       "rootEvaluation",
@@ -154,6 +157,7 @@ struct ViewGraphCheckpointTotalityTests {
           "nextAnimationInputMutationToken",
           "debugReachabilityContextBuildCount",
           "debugReuseCacheEvictionFlushCount",
+          "resolveDiagnostics",
         ])
     )
     // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.
