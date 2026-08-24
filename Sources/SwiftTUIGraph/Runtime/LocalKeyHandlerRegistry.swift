@@ -194,6 +194,15 @@ package final class LocalKeyHandlerRegistry: Equatable {
         }
       }
     }
+    // The KeyEvent fallback carries no modifier state, so a modified press
+    // must never reach it: handing `Ctrl+C`'s bare `.character("c")` to a
+    // text input's fallback inserted a literal "c" and claimed the key the
+    // KeyPress handler had just declined — which swallowed the default exit
+    // chord under edit focus (the pre-swap dispatch order exited before
+    // consulting the editor, masking this).
+    guard keyPress.modifiers.isEmpty else {
+      return false
+    }
     return handlers[identity]?(keyPress.key) ?? false
   }
 

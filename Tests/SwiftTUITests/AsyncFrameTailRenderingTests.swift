@@ -2287,7 +2287,7 @@ struct AsyncFrameTailRenderingTests {
     let renderer = DefaultRenderer()
     let commandRegistry = CommandRegistry()
     let initialBinding = KeyBinding(key: .character("i"), modifiers: .ctrl)
-    let draftBinding = KeyBinding(key: .character("c"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
     var context = ResolveContext(identity: rootIdentity)
     context.commandRegistry = commandRegistry
 
@@ -2535,7 +2535,7 @@ struct AsyncFrameTailRenderingTests {
     #expect(terminal.frames.contains { $0.contains("value 0") })
     #expect(runLoop.focusTracker.currentFocusIdentity != nil)
     let initialBinding = KeyBinding(key: .character("i"), modifiers: .ctrl)
-    let draftBinding = KeyBinding(key: .character("c"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
     let commandScope = try #require(
       runLoop.currentFocusScopePath().first {
         runLoop.commandRegistry.keyCommand(at: $0, matching: initialBinding) != nil
@@ -2580,7 +2580,7 @@ struct AsyncFrameTailRenderingTests {
       runLoop.commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?
         .isEnabled == true
     )
-    _ = runLoop.handleKeyPress(KeyPress(.character("c"), modifiers: .ctrl))
+    _ = runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
     #expect(recorder.events.contains("draft"))
   }
 
@@ -3121,7 +3121,7 @@ struct AsyncFrameTailRenderingTests {
 
     renderer.abortPreparedFrameHeadForCancellationTesting(draft)
 
-    _ = runLoop.handleKeyPress(KeyPress(.character("c"), modifiers: .ctrl))
+    _ = runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
     runLoop.handlePaste(PasteEvent(content: "/tmp/aborted-draft-drop.txt"))
     #expect(!recorder.events.contains("key-command"))
     #expect(!recorder.events.contains("drop:1"))
@@ -3150,7 +3150,7 @@ struct AsyncFrameTailRenderingTests {
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var committedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &committedFrames)
-    _ = runLoop.handleKeyPress(KeyPress(.character("c"), modifiers: .ctrl))
+    _ = runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
     runLoop.handlePaste(PasteEvent(content: "/tmp/committed-draft-drop.txt"))
 
     #expect(recorder.events.contains("key-command"))
@@ -3490,7 +3490,7 @@ struct AsyncFrameTailRenderingTests {
     let renderer = DefaultRenderer()
     let commandRegistry = CommandRegistry()
     let initialBinding = KeyBinding(key: .character("i"), modifiers: .ctrl)
-    let draftBinding = KeyBinding(key: .character("c"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
     var context = ResolveContext(identity: rootIdentity)
     context.commandRegistry = commandRegistry
 
