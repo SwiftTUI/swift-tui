@@ -442,17 +442,32 @@ private final class KeyframeAnimatorHarness<Content: View> {
   /// event is only the failure bound, and the signal resumes on cancellation.
   private func awaitPendingFrame(within limit: Duration) async {
     let deadline = AsyncEvent.firing(after: limit)
+    let waiter = KeyframeFrameSignalWaiter(wake: schedulerWake, scheduler: scheduler)
     await withTaskGroup(of: Void.self) { group in
-      group.addTask { await self.awaitFrameSignal() }
+      group.addTask { await waiter.awaitPendingFrame() }
       group.addTask { await deadline.wait() }
       await group.next()
       group.cancelAll()
     }
   }
+}
 
-  private func awaitFrameSignal() async {
+/// Non-generic, main-actor-isolated (so implicitly `Sendable`) waiter the
+/// harness hands to its task group: the generic harness itself carries a
+/// non-`Sendable` metatype that an isolated child task may not capture.
+@MainActor
+private final class KeyframeFrameSignalWaiter {
+  private let wake: MainActorConditionSignal
+  private let scheduler: FrameScheduler
+
+  init(wake: MainActorConditionSignal, scheduler: FrameScheduler) {
+    self.wake = wake
+    self.scheduler = scheduler
+  }
+
+  func awaitPendingFrame() async {
     let scheduler = self.scheduler
-    await schedulerWake.wait(until: { scheduler.hasPendingFrame() })
+    await wake.wait(until: { scheduler.hasPendingFrame() })
   }
 }
 
