@@ -6,7 +6,24 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
-## [Unreleased]
+## [0.9.8] - 2026-08-24
+
+### Fixed
+
+- **`Ctrl+C` reliably exits while a text input is focused.** A modified exit
+  chord declined by the focused editor (nothing selected to copy) could fall
+  through to a legacy key-event fallback that dropped the modifier, inserted
+  a literal character, and swallowed the exit. The fallback path is gone: a
+  modified press is either handled as the documented edit or exits.
+
+### Performance
+
+- **Resolve-path constants paid down.** Cached path hashes for the
+  reconciliation layer's hottest keys (child identities now mint in constant
+  time instead of re-hashing the whole path) and an allocation-free
+  committed-value anchor walk with an equality early-out. Large-tree frames
+  resolve 14-17% faster, retained-reuse frames up to 48% faster, with
+  per-node cost flat across tree size.
 
 ### Changed
 
