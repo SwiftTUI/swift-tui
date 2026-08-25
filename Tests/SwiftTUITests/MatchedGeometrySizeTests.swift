@@ -246,12 +246,21 @@ struct MatchedGeometrySizeTests {
     let rootIdentity = testIdentity("MatchedSizeRaster")
     let proposal = ProposedSize(width: .finite(30), height: .finite(3))
     let t0 = MonotonicInstant.now()
+    // The matched node is a Button: give the one-shot renderer a live action
+    // registry so the registration-publication oracle sees the same
+    // registration on scoped restore as on a full rebuild.
+    let actions = LocalActionRegistry()
+    func context(_ transaction: TransactionSnapshot = .init()) -> ResolveContext {
+      var context = ResolveContext(identity: rootIdentity, transaction: transaction)
+      context.localActionRegistry = actions
+      return context
+    }
 
     try withAnimationSinks(controller) {
       controller.register(animation)
       _ = renderer.render(
         MatchedRasterFixture(wide: false),
-        context: ResolveContext(identity: rootIdentity),
+        context: context(),
         proposal: proposal,
         frameInstant: t0
       )
@@ -259,7 +268,7 @@ struct MatchedGeometrySizeTests {
       transaction.animationRequest = .animate(animation.animationBox)
       _ = renderer.render(
         MatchedRasterFixture(wide: true),
-        context: ResolveContext(identity: rootIdentity, transaction: transaction),
+        context: context(transaction),
         proposal: proposal,
         frameInstant: t0
       )
@@ -267,7 +276,7 @@ struct MatchedGeometrySizeTests {
 
       let halfway = renderer.render(
         MatchedRasterFixture(wide: true),
-        context: ResolveContext(identity: rootIdentity),
+        context: context(),
         proposal: proposal,
         frameInstant: t0.advanced(by: .milliseconds(500))
       )

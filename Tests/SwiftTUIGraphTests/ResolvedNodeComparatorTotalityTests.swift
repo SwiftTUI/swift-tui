@@ -27,6 +27,7 @@ struct ResolvedNodeComparatorTotalityTests {
     "_storedChildren": "children",
     "_storedLayoutBehavior": "layoutBehavior",
     "_boxedDrawMetadata": "drawMetadata",
+    "_boxedMatchedGeometry": "matchedGeometry",
   ]
 
   /// Derived caches and runtime-stamping bookkeeping no comparator should

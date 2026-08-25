@@ -67,7 +67,7 @@ private let resolvedNodePhaseOwnershipManifest:
     ("subtreeDynamicPropertyReuseCertified", .derivedCache),
     ("supportsRetainedReuse", .derivedCache),
     ("subtreeRuntimeNodeIDsStamped", .derivedCache),
-    ("matchedGeometry", .placement),
+    ("_boxedMatchedGeometry", .placement),
     ("isTransient", .semantics),
   ]
 
