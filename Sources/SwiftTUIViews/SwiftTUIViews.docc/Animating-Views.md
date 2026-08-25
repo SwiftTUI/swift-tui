@@ -335,9 +335,10 @@ your own type to ``TimelineSchedule`` for custom timing.
 
 ## Move A View Between Positions
 
-``View/matchedGeometryEffect(id:in:isSource:)`` identifies the same logical
-view at two places in the tree, so swapping which branch renders animates a
-slide between the two slots. Scope the shared ID with ``Namespace``:
+``View/matchedGeometryEffect(id:in:properties:anchor:isSource:)`` identifies
+the same logical view at two places in the tree, so swapping which branch
+renders animates a slide between the two slots. Scope the shared ID with
+``Namespace``:
 
 ```swift
 struct HeroRow: View {
@@ -365,8 +366,22 @@ struct HeroRow: View {
 }
 ```
 
-The effect interpolates position only: a view whose size differs between
-its two slots renders at its destination size while its origin slides.
+`properties:` selects what interpolates. The default, `.frame`, slides the
+view's `anchor:` point (`.center` by default) from the source's to the
+destination's and resizes its bounds between the two sizes; `.position`
+only slides, and `.size` only resizes in place around the anchor. Size
+interpolates at the placed level, by bounds and clip rather than by
+re-layout: the content lays out once at its destination size and is clipped
+to the interpolated rect while the box grows or shrinks, so text never
+re-wraps mid-animation, and every descendant whose bounds coincide with the
+matched node's (a `.background`, an overlay, full-frame chrome) resizes with
+it. Because the modifier tags its content, tag the outermost node whose
+chrome should follow: `.background(...).border(...).matchedGeometryEffect(...)`,
+not the reverse.
+
+A non-source instance (`isSource: false`) receives the match when the key
+swaps to it between frames; an instance on screen together with its source
+is not positioned onto the source.
 
 ## Reduce Motion
 

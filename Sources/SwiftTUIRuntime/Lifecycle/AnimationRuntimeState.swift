@@ -23,11 +23,16 @@ package enum AnimationKind: Sendable {
   /// the starting delta; edge-relative moves are resolved against the
   /// render surface during placed sampling.
   case insertionOffset(from: TransitionModifiers)
-  /// A matched-geometry translation animation between two placed
-  /// bounds.  At progress 0 the target identity renders at
-  /// `fromBounds`; at progress 1 it renders at its natural new
-  /// bounds (looked up in the current placed tree).
-  case matchedGeometry(fromBounds: CellRect)
+  /// A matched-geometry animation between two placed bounds.  At
+  /// progress 0 the target identity renders at `fromBounds` (the
+  /// `properties` it tracks, measured around `anchor`); at progress 1 it
+  /// renders at its natural new bounds (looked up in the current placed
+  /// tree).
+  case matchedGeometry(
+    fromBounds: CellRect,
+    properties: MatchedGeometryProperties,
+    anchor: UnitPoint
+  )
 }
 
 /// An animation currently in flight for one ``AnimationKey``.

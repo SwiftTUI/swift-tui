@@ -26,6 +26,9 @@ struct MatchedGeometryAnimationPlan {
   var identity: Identity
   var key: MatchedGeometryKey
   var fromBounds: CellRect
+  /// The destination instance's configuration governs what interpolates.
+  var properties: MatchedGeometryProperties
+  var anchor: UnitPoint
   var animationBox: AnimationBox
   var batchID: AnimationBatchID?
 }
@@ -37,14 +40,15 @@ struct MatchedGeometryAnimationPlans {
 
 enum AnimationResolvedTreeDiffing {
   static func matchedGeometryPlans(
-    newMatchedKeysByIdentity: [Identity: MatchedGeometryKey],
+    newMatchedConfigsByIdentity: [Identity: MatchedGeometryConfig],
     previousMatchedKeyIdentities: [MatchedGeometryKey: Identity],
     previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect],
     transactionForIdentity: (Identity) -> TransactionSnapshot
   ) -> MatchedGeometryAnimationPlans {
     var animations: [MatchedGeometryAnimationPlan] = []
     var consumedKeys: Set<MatchedGeometryKey> = []
-    for (identity, key) in newMatchedKeysByIdentity {
+    for (identity, config) in newMatchedConfigsByIdentity {
+      let key = config.key
       if let previousIdentity = previousMatchedKeyIdentities[key],
         previousIdentity == identity
       {
@@ -62,6 +66,8 @@ enum AnimationResolvedTreeDiffing {
           identity: identity,
           key: key,
           fromBounds: fromBounds,
+          properties: config.properties,
+          anchor: config.anchor,
           animationBox: box,
           batchID: transaction.animationBatchID
         )

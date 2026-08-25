@@ -1114,7 +1114,7 @@ package final class AnimationController: Sendable {
     var newSnapshots: [Identity: AnimatableSnapshot] = [:]
     var newParentByIdentity: [Identity: Identity] = [:]
     var newChildIndexByIdentity: [Identity: Int] = [:]
-    var newMatchedKeysByIdentity: [Identity: MatchedGeometryKey] = [:]
+    var newMatchedConfigsByIdentity: [Identity: MatchedGeometryConfig] = [:]
     var newNodeIDByIdentity: [Identity: ViewNodeID] = [:]
     var newTransactionsByIdentity: [Identity: TransactionSnapshot] = [:]
     var newLiveNodeIDs: Set<ViewNodeID> = []
@@ -1135,7 +1135,7 @@ package final class AnimationController: Sendable {
       snapshotAccumulator: &newSnapshots,
       parentAccumulator: &newParentByIdentity,
       childIndexAccumulator: &newChildIndexByIdentity,
-      matchedKeyAccumulator: &newMatchedKeysByIdentity,
+      matchedKeyAccumulator: &newMatchedConfigsByIdentity,
       nodeIDAccumulator: &newNodeIDByIdentity,
       transactionAccumulator: &newTransactionsByIdentity,
       liveNodeIDAccumulator: &newLiveNodeIDs,
@@ -1213,7 +1213,7 @@ package final class AnimationController: Sendable {
     // maps.  Collect the set of keys that matched so the
     // counterpart removal/transition can be skipped.
     let matchedGeometryPlans = AnimationResolvedTreeDiffing.matchedGeometryPlans(
-      newMatchedKeysByIdentity: newMatchedKeysByIdentity,
+      newMatchedConfigsByIdentity: newMatchedConfigsByIdentity,
       previousMatchedKeyIdentities: previousMatchedKeyIdentities,
       previousMatchedGeometryBounds: previousMatchedGeometryBounds,
       transactionForIdentity: { identity in
@@ -1231,7 +1231,11 @@ package final class AnimationController: Sendable {
       }
       retainBatch(plan.batchID)
       activeAnimations[matchedKey] = ActiveAnimation(
-        kind: .matchedGeometry(fromBounds: plan.fromBounds),
+        kind: .matchedGeometry(
+          fromBounds: plan.fromBounds,
+          properties: plan.properties,
+          anchor: plan.anchor
+        ),
         animationBox: plan.animationBox,
         startTime: timestamp,
         batchID: plan.batchID
@@ -1252,7 +1256,7 @@ package final class AnimationController: Sendable {
     // transaction.  This matches SwiftUI, which only fires
     // .transition() when the view's conditional presence changes.
     for identity in insertedIdentities {
-      if let key = newMatchedKeysByIdentity[identity],
+      if let key = newMatchedConfigsByIdentity[identity]?.key,
         matchedKeysConsumedByMatch.contains(key)
       {
         continue
@@ -1749,7 +1753,7 @@ package final class AnimationController: Sendable {
     snapshotAccumulator: inout [Identity: AnimatableSnapshot],
     parentAccumulator: inout [Identity: Identity],
     childIndexAccumulator: inout [Identity: Int],
-    matchedKeyAccumulator: inout [Identity: MatchedGeometryKey],
+    matchedKeyAccumulator: inout [Identity: MatchedGeometryConfig],
     nodeIDAccumulator: inout [Identity: ViewNodeID],
     transactionAccumulator: inout [Identity: TransactionSnapshot],
     liveNodeIDAccumulator: inout Set<ViewNodeID>,
@@ -1829,7 +1833,7 @@ package final class AnimationController: Sendable {
     }
     childIndexAccumulator[node.identity] = childIndex
     if let config = node.matchedGeometry {
-      matchedKeyAccumulator[node.identity] = config.key
+      matchedKeyAccumulator[node.identity] = config
     }
     if let viewNodeID = node.viewNodeID {
       nodeIDAccumulator[node.identity] = viewNodeID

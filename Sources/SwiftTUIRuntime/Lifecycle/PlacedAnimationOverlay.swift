@@ -46,15 +46,20 @@ package struct PlacedAnimationOverlayOffset: Sendable {
   package var identity: Identity
   package var dx: Int
   package var dy: Int
+  /// The interpolated size a matched-geometry node renders at, or `nil`
+  /// to keep its natural size (a translation only).
+  package var size: CellSize?
 
   package init(
     identity: Identity,
     dx: Int,
-    dy: Int
+    dy: Int,
+    size: CellSize? = nil
   ) {
     self.identity = identity
     self.dx = dx
     self.dy = dy
+    self.size = size
   }
 }
 
@@ -96,22 +101,25 @@ package func applyPlacedAnimationOverlaySnapshot(
 
 private func overlayOffsetMap(
   _ offsets: [PlacedAnimationOverlayOffset]
-) -> [Identity: (dx: Int, dy: Int)] {
-  var result: [Identity: (dx: Int, dy: Int)] = [:]
+) -> [Identity: PlacedAnimationOverlayOffset] {
+  var result: [Identity: PlacedAnimationOverlayOffset] = [:]
   for offset in offsets {
-    result[offset.identity] = (dx: offset.dx, dy: offset.dy)
+    result[offset.identity] = offset
   }
   return result
 }
 
 private func translatePlacedNodesByIdentity(
   tree: PlacedNode,
-  offsets: [Identity: (dx: Int, dy: Int)]
+  offsets: [Identity: PlacedAnimationOverlayOffset]
 ) -> PlacedNode {
   var node = tree
   if let delta = offsets[node.identity] {
     var translated = node
     translateBounds(&translated, dx: delta.dx, dy: delta.dy)
+    if let size = delta.size {
+      resizeBounds(&translated, to: size)
+    }
     return translated
   }
   let walked = node.children.map { child in
@@ -119,6 +127,55 @@ private func translatePlacedNodesByIdentity(
   }
   node.children = walked
   return node
+}
+
+/// Resizes a matched-geometry node to its interpolated size at the placed
+/// level (plan 2026-08-25-002 §3.2, bounds-and-clip rather than re-layout):
+///
+/// - the node's `bounds` and `contentBounds` take the new size;
+/// - `drawMetadata.clipsToBounds` is set, which is what actually clips at
+///   draw time (`DrawExtractor` derives the draw clip from it; the placed
+///   `clipBounds` is never read by draw), and the placed `clipBounds` is
+///   narrowed to the new rect so semantics hit-test what is painted;
+/// - every descendant whose bounds coincided with the node's original
+///   bounds (a `.background` fill, an overlay, full-frame chrome) resizes to
+///   the same rect, so decoration follows the box while smaller content
+///   descendants keep their layout and are clipped or unmasked.
+private func resizeBounds(
+  _ node: inout PlacedNode,
+  to size: CellSize
+) {
+  let original = node.bounds
+  let target = CellRect(origin: original.origin, size: size)
+  resizeCoextensive(&node, from: original, to: target)
+}
+
+private func resizeCoextensive(
+  _ node: inout PlacedNode,
+  from original: CellRect,
+  to target: CellRect
+) {
+  node.bounds = target
+  let widthDelta = target.size.width - original.size.width
+  let heightDelta = target.size.height - original.size.height
+  node.contentBounds = CellRect(
+    origin: node.contentBounds.origin,
+    size: CellSize(
+      width: max(node.contentBounds.size.width + widthDelta, 0),
+      height: max(node.contentBounds.size.height + heightDelta, 0)
+    )
+  )
+  node.drawMetadata.clipsToBounds = true
+  if let clip = node.clipBounds {
+    node.clipBounds = clip.intersection(target) ?? CellRect(origin: target.origin, size: .zero)
+  } else {
+    node.clipBounds = target
+  }
+  var children = node.children
+  for index in children.indices where children[index].bounds == original {
+    resizeCoextensive(&children[index], from: original, to: target)
+  }
+  node.children = children
 }
 
 private func applyPlacedOverlayModifiers(

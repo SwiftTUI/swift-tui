@@ -93,30 +93,43 @@ extension View {
   /// For example, `if` and `else` branches can swap between two layouts.
   /// The controller animates the transition as one view that moves between the locations.
   ///
-  /// Matches SwiftUI's `.matchedGeometryEffect(id:in:isSource:)`
+  /// Matches SwiftUI's `.matchedGeometryEffect(id:in:properties:anchor:isSource:)`
   /// API shape.  Scope keys with `@Namespace` or pass a
   /// `MatchedGeometryNamespace` value explicitly.
   ///
+  /// `properties` selects what interpolates: `.frame` (the default) slides
+  /// the view's `anchor` point from the source's to the destination's and
+  /// resizes its bounds between the two sizes; `.position` only slides;
+  /// `.size` only resizes in place around the anchor.
+  ///
+  /// Size interpolates at the placed level, by bounds and clip, not by
+  /// re-layout: the content lays out once at its destination size and is
+  /// clipped to the interpolated rect while it grows or shrinks, and every
+  /// descendant whose bounds coincide with the matched node's (a
+  /// `.background`, an overlay, full-frame chrome) resizes with it. Tag the
+  /// outermost node whose chrome should follow,
+  /// `.background(...).border(...).matchedGeometryEffect(...)`, since the
+  /// modifier tags its content.
+  ///
   /// `isSource: false` lets you have multiple views with the same
   /// key where only the designated source view contributes its
-  /// geometry as the "from" reference. The non-source instances
-  /// still receive the match and are positioned at the source's
-  /// location when they appear.
-  ///
-  /// - Note: The current implementation interpolates position only,
-  ///   not size. A view that changes width between its source and
-  ///   destination appears at its natural destination size
-  ///   throughout the animation and translate its origin smoothly.
+  /// geometry as the "from" reference. A non-source instance receives the
+  /// match when the key swaps to it between frames; an instance that is on
+  /// screen together with its source is not positioned onto the source.
   public func matchedGeometryEffect<ID: Hashable>(
     id: ID,
     in namespace: MatchedGeometryNamespace = .default,
+    properties: MatchedGeometryProperties = .frame,
+    anchor: UnitPoint = .center,
     isSource: Bool = true
   ) -> some View {
     modifier(
       MatchedGeometryModifier(
         config: MatchedGeometryConfig(
           key: MatchedGeometryKey(namespace: namespace, id: id),
-          isSource: isSource
+          isSource: isSource,
+          properties: properties,
+          anchor: anchor
         )
       )
     )
