@@ -49,6 +49,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 #   - brotli:        available for local primary-repo web artifact checks
 #   - python3:       parses Swift loaded-module traces in policy checks
 #   - jq:            convenient for inspecting JSON in the container
+#   - gdb:           the repo gate's step watchdog dumps thread backtraces of
+#                    a wedged test process before killing it
+#                    (SWIFTTUI_HANG_DIAGNOSTICS=1; Scripts/lib/step_watchdog.sh)
 #
 # `--no-install-recommends` keeps the image close to the minimum, and we wipe
 # /var/lib/apt/lists in the same RUN so it never lands in a layer.
@@ -64,6 +67,7 @@ RUN apt-get update \
       brotli \
       python3 \
       jq \
+      gdb \
  && rm -rf /var/lib/apt/lists/*
 
 # Bun, installed system-wide. The official installer wants $BUN_INSTALL set,

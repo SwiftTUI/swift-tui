@@ -1,0 +1,36 @@
+name: Lane verdict record
+description: >-
+  Saves a one-byte marker under the key computed by `lane-verdict-probe`, so
+  the next scheduled run whose inputs hash to the same key skips itself. Call
+  it from the lane's final job, guarded on every upstream job having
+  succeeded; never on failure. Copied verbatim into every SwiftTUI repository
+  with a scheduled workflow (canonical copy: swift-tui-org/tools/ci/actions).
+inputs:
+  key:
+    description: The `key` output of lane-verdict-probe.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Write the marker
+      shell: bash
+      env:
+        KEY: ${{ inputs.key }}
+      run: |
+        set -euo pipefail
+        case "$KEY" in
+          lane-verdict-*) ;;
+          *)
+            echo "::error::key must come from lane-verdict-probe (got '$KEY')"
+            exit 1
+            ;;
+        esac
+        mkdir -p .lane-verdict
+        printf '1' > .lane-verdict/green
+        echo "recording green verdict under $KEY"
+
+    - name: Save the marker
+      uses: actions/cache/save@v6
+      with:
+        path: .lane-verdict
+        key: ${{ inputs.key }}

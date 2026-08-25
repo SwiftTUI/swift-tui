@@ -20,21 +20,26 @@ golden_file=$tmp_dir/golden.md
 mkdir -p "$results_dir"
 
 cat >"$expected_file" <<'EOF'
-linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
-linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
-macos|macOS repo gate|macOS|-|macos-26|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
+policy|Policy lane|Linux|amd64|ubuntu-24.04|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 sh ./Scripts/test_gate.sh --lane policy --skip-bun-install
+core|Core lane|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --lane core
+runtime-A|Runtime shard A|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:A
+runtime-A-arm64|Runtime shard A|Linux|arm64|ubuntu-24.04-arm (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:A
 EOF
 
-cat >"$results_dir/linux-amd64.result" <<'EOF'
-linux-amd64|success|840
+cat >"$results_dir/policy.result" <<'EOF'
+policy|success|95
 EOF
 
-cat >"$results_dir/linux-arm64.result" <<'EOF'
-linux-arm64|failure|65
+cat >"$results_dir/core.result" <<'EOF'
+core|success|840
 EOF
 
-cat >"$results_dir/macos.result" <<'EOF'
-macos|success
+cat >"$results_dir/runtime-A.result" <<'EOF'
+runtime-A|failure|65
+EOF
+
+cat >"$results_dir/runtime-A-arm64.result" <<'EOF'
+runtime-A-arm64|success
 EOF
 
 cat >"$golden_file" <<'EOF'
@@ -42,11 +47,12 @@ cat >"$golden_file" <<'EOF'
 
 | Lane | Platform | Arch | Runner | Result | Duration | Command |
 | --- | --- | --- | --- | --- | --- | --- |
-| Linux repo gate | Linux | amd64 | ubuntu-24.04 | success | 14m 0s | `SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
-| Linux repo gate | Linux | arm64 | ubuntu-24.04-arm | failure | 1m 5s | `SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
-| macOS repo gate | macOS | - | macos-26 | success | - | `SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install` |
+| Policy lane | Linux | amd64 | ubuntu-24.04 | success | 1m 35s | `SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 sh ./Scripts/test_gate.sh --lane policy --skip-bun-install` |
+| Core lane | Linux | amd64 | ubuntu-24.04 (swift-tui-linux image) | success | 14m 0s | `SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --lane core` |
+| Runtime shard A | Linux | amd64 | ubuntu-24.04 (swift-tui-linux image) | failure | 1m 5s | `sh ./Scripts/test_gate.sh --lane runtime:A` |
+| Runtime shard A | Linux | arm64 | ubuntu-24.04-arm (swift-tui-linux image) | success | - | `sh ./Scripts/test_gate.sh --lane runtime:A` |
 
-Overall result: failure (2 success, 1 failure)
+Overall result: failure (3 success, 1 failure)
 EOF
 
 "$repo_root/Scripts/render_ci_test_matrix_summary.sh" \

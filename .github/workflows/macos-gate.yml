@@ -1,0 +1,136 @@
+name: macOS Gate
+
+# The macOS repo gate, off the push path (swift-tui-org plan 2026-08-25-001,
+# Stage 1e): the push verdict is Linux-only and under 20 minutes; macOS —
+# the primary user platform — is verified nightly, on every release tag, and
+# on demand. The nightly run skips itself when `main` has not moved since
+# its last green run (§6 skip-if-unchanged guard), so an idle repo costs
+# nothing. Run it before a release: `gh workflow run macos-gate.yml`.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "*.*.*"
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-gate-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUN_VERSION: "1.3.14"
+
+jobs:
+  changes:
+    name: Skip if unchanged
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.probe.outputs.changed }}
+      key: ${{ steps.probe.outputs.key }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Probe the lane verdict cache
+        id: probe
+        uses: ./.github/actions/lane-verdict-probe
+        with:
+          lane: macos-gate
+
+  macos-gate:
+    name: macOS repo gate
+    runs-on: macos-26
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+          ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          hash -r
+          swift_version="$(tr -d '[:space:]' < .swift-version)"
+          swiftly install --use --assume-yes "$swift_version"
+          swiftly run swift --version
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
+
+      - name: Install macOS test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v rg >/dev/null 2>&1; then
+            brew install ripgrep
+          fi
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-gate-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-gate-
+            ${{ runner.os }}-swiftpm-
+
+      - name: Cache Bun deps
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-gate-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-gate-
+            ${{ runner.os }}-bun-
+
+      - name: Install Bun workspace deps
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Run repo gate
+        shell: bash
+        env:
+          SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
+          SWIFTTUI_SKIP_PUBLIC_API_BASELINE: "1"
+          SWIFTTUI_SKIP_TERMUIPERF: "1"
+        run: |
+          set -euo pipefail
+          sh ./Scripts/test_gate.sh --skip-bun-install
+
+  record:
+    name: Record green verdict
+    runs-on: ubuntu-24.04
+    needs:
+      - changes
+      - macos-gate
+    if: needs.changes.outputs.changed == 'true' && needs.macos-gate.result == 'success'
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Record the lane verdict
+        uses: ./.github/actions/lane-verdict-record
+        with:
+          key: ${{ needs.changes.outputs.key }}

@@ -1,12 +1,16 @@
 name: Release Soundness Lane
 
-# F05: the only release-configuration test executions in the repo. Run on
-# demand rather than push/PR-gating: release builds are slow, and the lane's
-# flaky-suite step intentionally exercises the load-flaky run-loop suites
-# (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md #1) where an intermittent red is signal, not a
-# merge blocker. The nightly cron was removed because a red here settles onto
-# an already-pinned commit and re-fails the coordination root's
-# //:child_ci_status hours after that pin went green.
+# F05: the only release-configuration test executions in the repo. Never a
+# push/PR gate: release builds are slow, and the lane's flaky-suite step
+# intentionally exercises the load-flaky run-loop suites
+# (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md #1) where an intermittent
+# red is signal, not a merge blocker.
+#
+# Runs nightly, on every release tag, and on demand (swift-tui-org plan
+# 2026-08-25-001 Stages 1e/5). The nightly run skips itself when `main` has
+# not moved since its last green run (§6 guard), which also answers the
+# reason the earlier cron was removed: a red can only settle onto a commit
+# this lane has not yet passed, never re-fail one it already cleared.
 
 on:
   workflow_dispatch:
@@ -16,21 +20,45 @@ on:
         required: false
         default: true
         type: boolean
+  push:
+    tags:
+      - "*.*.*"
+  schedule:
+    - cron: "5 4 * * *"
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-soundness-${{ github.ref }}
+  group: release-soundness-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   SWIFTLY_VERSION: "1.1.3"
 
 jobs:
+  changes:
+    name: Skip if unchanged
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.probe.outputs.changed }}
+      key: ${{ steps.probe.outputs.key }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Probe the lane verdict cache
+        id: probe
+        uses: ./.github/actions/lane-verdict-probe
+        with:
+          lane: release-soundness
+
   release-soundness:
     name: Release soundness lane
     runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
     timeout-minutes: 90
 
     steps:
@@ -118,9 +146,28 @@ jobs:
             exit 1
           fi
 
+      # `inputs` is empty on schedule and tag runs; the variant runs unless a
+      # dispatch explicitly opts out.
       - name: Actor data-race checks variant
-        if: ${{ inputs.run_race_checks }}
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_race_checks }}
         shell: bash
         run: |
           set -euo pipefail
           sh ./Scripts/release_soundness_lane.sh --race-checks
+
+  record:
+    name: Record green verdict
+    runs-on: ubuntu-24.04
+    needs:
+      - changes
+      - release-soundness
+    if: needs.changes.outputs.changed == 'true' && needs.release-soundness.result == 'success'
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Record the lane verdict
+        uses: ./.github/actions/lane-verdict-record
+        with:
+          key: ${{ needs.changes.outputs.key }}

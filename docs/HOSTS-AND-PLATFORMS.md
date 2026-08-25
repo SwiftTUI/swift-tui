@@ -48,10 +48,12 @@ boundaries are recorded in the
   host-compatible products but does not run tests.
 - **Windows CI.** `.github/workflows/windows-build.yml` builds all targets +
   test bundles on `windows-11-arm` (arm64) and `windows-2022` (amd64) via
-  `compnerd/gha-setup-swift`. The lane is build-only until the Windows plan's
-  test-target survey concludes, and it is deliberately **not** wired into the
-  org-root gates (per-repo version drift is planned). Windows test runners
-  need `swift test -Xlinker /STACK:16777216` — the default 1 MiB runner stack
+  `compnerd/gha-setup-swift`. It runs nightly (skipping itself when `main`
+  has not moved since its last green run), on every release tag, and on
+  dispatch — not on push, so the push verdict stays Linux-only and under 30
+  minutes. It is deliberately **not** wired into the org-root gates (per-repo
+  version drift is planned). Windows test runners need
+  `swift test -Xlinker /STACK:16777216` — the default 1 MiB runner stack
   kills deep-descent suites.
 - **Windows checkouts are LF.** The committed `.gitattributes`
   (`* text=auto eol=lf`) exists because `core.autocrlf=true` checkouts append

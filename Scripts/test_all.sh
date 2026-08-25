@@ -23,6 +23,23 @@ step_output_probe_ticks=${SWIFTTUI_TEST_STEP_OUTPUT_PROBE_TICKS:-25}
 soundness_trace_root=$repo_root/.build/soundness-trace
 soundness_quarantine_file=$repo_root/Scripts/soundness_quarantine.txt
 soundness_trace_invocation_index=0
+# Lane selection (plan 2026-08-25-001 Stage 1a). `all` is the local gate and
+# the historical single-job shape; `policy`, `core`, and `runtime:<shard>` are
+# the CI jobs that together cover exactly the same surface. The runtime
+# shards are defined in ONE file so the shard launches, the isolated-suite
+# skip list, and the coverage check cannot drift apart.
+runtime_shard_manifest=$repo_root/Scripts/data/runtime-shards.txt
+lane=all
+runtime_shard=""
+# Every Swift lane builds with `-emit-loaded-module-trace` so the Foundation
+# audit reads the core lane's own build (Stage 1c) instead of compiling
+# Core+Views a second time. The flag rides on EVERY swift build/test
+# invocation of every lane, including the runtime shards that never read the
+# traces: SwiftPM treats compiler flags as part of the build signature, so a
+# flagged build followed by one unflagged `swift test` — or two lanes run
+# back to back on one machine with different flags — recompiles the whole
+# module graph, the exact cost the trace reuse exists to remove.
+emit_module_trace=0
 
 write_full_log_report() {
   body_log=$1
@@ -191,7 +208,7 @@ export SWIFTTUI_WARNINGS_AS_ERRORS=1
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/test_all.sh [--clean] [--skip-bun-install]
+Usage: Scripts/test_all.sh [--clean] [--skip-bun-install] [--lane <lane>]
 
 Runs the exhaustive checked-in repo verification surface:
   - checked-in policy hooks
@@ -223,6 +240,19 @@ On Linux, the script also:
   - exports `DISABLE_EXPLICIT_PLATFORMS=1` for repo package resolution
 
 Pass --skip-bun-install to reuse the existing Bun install state.
+
+Pass --lane to run one CI lane of the surface instead of all of it:
+  all              every step below, in one process (the default; `bun run test`)
+  policy           the toolchain-free policy phase, guardrails, and self-tests
+  core             build once; every non-runtime test target in one parallel
+                   launch; the isolated SwiftTUITests suites; entry-point
+                   launch fixtures and tests
+  runtime:<shard>  one serialized SwiftTUITests shard from
+                   Scripts/data/runtime-shards.txt, plus its
+                   serialized-execution check
+The three CI lanes partition the `all` surface exactly; the soundness-trace
+scan runs in `all` and, for CI, once over the merged traces of every lane
+(.github/workflows/run-tests-linux.yml).
 
 Pass --clean to delete every SwiftPM `.build` directory before any step
 runs. The satellite packages reached via `--package-path` rebuild the repo's
@@ -277,6 +307,14 @@ swift_command_text() {
   for argument; do
     printf ' %s' "$argument"
   done
+
+  if [ "$emit_module_trace" -eq 1 ] && [ "$#" -gt 0 ]; then
+    case "$1" in
+    build | test)
+      printf ' -Xswiftc -emit-loaded-module-trace'
+      ;;
+    esac
+  fi
 }
 
 soundness_trace_slug() {
@@ -337,26 +375,112 @@ derive_failure_count() {
   fi
 }
 
-for argument in "$@"; do
-  case "$argument" in
+while [ "$#" -gt 0 ]; do
+  case "$1" in
   --skip-bun-install)
     skip_bun_install=1
     ;;
   --clean)
     clean_builds=1
     ;;
+  --lane)
+    shift
+    if [ "$#" -eq 0 ]; then
+      >&2 echo "--lane requires a value (all, policy, core, runtime:<shard>)."
+      exit 1
+    fi
+    lane=$1
+    ;;
+  --lane=*)
+    lane=${1#--lane=}
+    ;;
   -h | --help)
     usage
     exit 0
     ;;
   *)
-    >&2 echo "Unknown argument: $argument"
+    >&2 echo "Unknown argument: $1"
     >&2 echo ""
     usage
     exit 1
     ;;
   esac
+  shift
 done
+
+case "$lane" in
+all | policy | core) ;;
+runtime:?*)
+  runtime_shard=${lane#runtime:}
+  lane=runtime
+  ;;
+*)
+  >&2 echo "Unknown lane: $lane (expected all, policy, core, or runtime:<shard>)."
+  exit 1
+  ;;
+esac
+
+if [ "$lane" != policy ]; then
+  emit_module_trace=1
+fi
+
+lane_runs_policy() { [ "$lane" = all ] || [ "$lane" = policy ]; }
+lane_runs_core() { [ "$lane" = all ] || [ "$lane" = core ]; }
+lane_runs_runtime() { [ "$lane" = all ] || [ "$lane" = runtime ]; }
+lane_needs_swift() { [ "$lane" != policy ]; }
+
+# --- Runtime shard manifest (Scripts/data/runtime-shards.txt) ---------------
+# Rows are `<shard-id>|<regex>` (ordered, first match wins) or
+# `isolated|<SuiteType>`. Regexes may contain `|`, so split on the FIRST bar
+# only. Comments and blank lines are ignored.
+manifest_rows() {
+  if [ ! -f "$runtime_shard_manifest" ]; then
+    >&2 echo "Missing runtime shard manifest: $runtime_shard_manifest"
+    exit 1
+  fi
+  grep -v '^[[:space:]]*#' "$runtime_shard_manifest" | grep -v '^[[:space:]]*$'
+}
+
+manifest_shard_ids() {
+  manifest_rows | awk '{ id = $0; sub(/\|.*/, "", id); if (id != "isolated") print id }'
+}
+
+manifest_shard_regex() {
+  manifest_rows | awk -v id="$1" '
+    { row_id = $0; sub(/\|.*/, "", row_id) }
+    row_id == id { print substr($0, length(row_id) + 2); exit }
+  '
+}
+
+manifest_isolated_suites() {
+  manifest_rows | awk '{ id = $0; sub(/\|.*/, "", id); if (id == "isolated") print substr($0, length(id) + 2) }'
+}
+
+if [ "$lane" = runtime ]; then
+  if [ -z "$(manifest_shard_regex "$runtime_shard")" ]; then
+    >&2 echo "Unknown runtime shard: $runtime_shard (manifest: $runtime_shard_manifest)."
+    >&2 echo "Known shards: $(manifest_shard_ids | tr '\n' ' ')"
+    exit 1
+  fi
+fi
+
+# Prints, one per line, the `swift test` selection arguments for one shard:
+# `--filter <its regex>`, `--skip <regex>` for every shard listed above it in
+# the manifest (first match wins, so an earlier shard's suites are never
+# re-run here), and `--skip <suite>` for every isolated suite.
+runtime_shard_test_args() {
+  shard=$1
+  printf '%s\n' --filter "$(manifest_shard_regex "$shard")"
+  for earlier_shard in $(manifest_shard_ids); do
+    if [ "$earlier_shard" = "$shard" ]; then
+      break
+    fi
+    printf '%s\n' --skip "$(manifest_shard_regex "$earlier_shard")"
+  done
+  for isolated_suite in $(manifest_isolated_suites); do
+    printf '%s\n' --skip "$isolated_suite"
+  done
+}
 
 run_swift() {
   # Opt-in test-run modifiers, composed onto any `swift test` invocation. Both
@@ -397,6 +521,14 @@ run_swift() {
     fi
   fi
 
+  if [ "$emit_module_trace" -eq 1 ] && [ "$#" -gt 0 ]; then
+    case "$1" in
+    build | test)
+      set -- "$@" -Xswiftc -emit-loaded-module-trace
+      ;;
+    esac
+  fi
+
   swiftly run swift "$@"
 }
 
@@ -411,13 +543,53 @@ run_swift() {
 # tests, and an execution shape the following gate step can assert. The
 # root cause is open and recorded as KNOWN-TEST-FLAKES.md entry 14.
 run_swift_runtime_tests_without_isolated_async_suites() {
-  run_swift test "$@" \
-    --no-parallel \
-    --skip AsyncLifecycleGenerationTests \
-    --skip AsyncFrameTailRenderingTests \
-    --skip TaskReadsUnbodiedStateTests \
-    --skip PerTickPresentCadenceTests \
-    --skip ObservationDraftWindowRuntimeTests
+  set -- "$@" --no-parallel
+  for isolated_suite in $(manifest_isolated_suites); do
+    set -- "$@" --skip "$isolated_suite"
+  done
+  run_swift test "$@"
+}
+
+# Same lane, one shard of it (CI `runtime:<shard>` lane). Regex characters
+# must not be glob-expanded while the manifest lines are re-split into
+# arguments, hence the `set -f` bracket.
+run_swift_runtime_shard_tests() {
+  set -f
+  # shellcheck disable=SC2046
+  set -- $(runtime_shard_test_args "$runtime_shard")
+  set +f
+  run_swift test --no-parallel "$@"
+}
+
+runtime_shard_command_text() {
+  set -f
+  # shellcheck disable=SC2046
+  set -- $(runtime_shard_test_args "$runtime_shard")
+  set +f
+  text="$(swift_command_text test --no-parallel)"
+  for argument; do
+    case "$argument" in
+    --filter | --skip)
+      text="$text $argument"
+      ;;
+    *)
+      text="$text '$argument'"
+      ;;
+    esac
+  done
+  printf '%s' "$text"
+}
+
+# The core lane's single parallel launch of every test target except the
+# serialized SwiftTUITests lane (its shards run in the runtime jobs) and
+# EntryPointLaunchTests (which needs the fixture executables built first and
+# keeps its own launch below). swift-testing matches the regexes against the
+# fully qualified name `Module.Suite/test()`, so the anchored module prefix
+# cannot bleed into SwiftTUIWASITests or SwiftTUIWebHostTests.
+run_non_runtime_test_targets() {
+  run_swift test \
+    --skip '^SwiftTUITests\.' \
+    --skip '^EntryPointLaunchTests\.'
 }
 
 # The per-tick cadence suite re-runs under the WASI-shaped mode profiles so
@@ -666,8 +838,12 @@ print_summary() {
   fi
 }
 
-require_command swiftly
-require_command bun
+if lane_needs_swift; then
+  require_command swiftly
+fi
+if lane_runs_policy; then
+  require_command bun
+fi
 validate_timeout_configuration
 if [ -d "$soundness_trace_root" ]; then
   find "$soundness_trace_root" -type f -name '*.log' -delete
@@ -678,17 +854,23 @@ if [ "$is_linux" -eq 1 ]; then
   echo "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 for repo package resolution."
 fi
 
-swift_version_command=$(swift_command_text --version)
+echo "Lane: $lane${runtime_shard:+:$runtime_shard}"
 
-run_function_step \
-  "Check Swift toolchain" \
-  "$swift_version_command" \
-  check_swift_environment
+if lane_needs_swift; then
+  swift_version_command=$(swift_command_text --version)
 
-run_function_step \
-  "Check Bun availability" \
-  "bun --version" \
-  check_bun_environment
+  run_function_step \
+    "Check Swift toolchain" \
+    "$swift_version_command" \
+    check_swift_environment
+fi
+
+if lane_runs_policy; then
+  run_function_step \
+    "Check Bun availability" \
+    "bun --version" \
+    check_bun_environment
+fi
 
 run_function_step \
   "Check fixture recording is disabled" \
@@ -702,188 +884,228 @@ if [ "$clean_builds" -eq 1 ]; then
     clean_swift_build_directories
 fi
 
-if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_bun_install" -eq 0 ]; then
+# --- Policy lane: no Swift toolchain required ------------------------------
+if lane_runs_policy; then
+  if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_bun_install" -eq 0 ]; then
+    run_step \
+      "Install Bun workspace dependencies" \
+      "$repo_root" \
+      "bun install --frozen-lockfile" \
+      bun install --frozen-lockfile
+  fi
+
+  run_repo_policy_phase "$repo_root" test-all
+
   run_step \
-    "Install Bun workspace dependencies" \
+    "Run layout work-stack guardrails" \
     "$repo_root" \
-    "bun install --frozen-lockfile" \
-    bun install --frozen-lockfile
+    "Scripts/check_layout_work_stack_guardrails.sh" \
+    Scripts/check_layout_work_stack_guardrails.sh
+
+  run_step \
+    "Self-test step watchdog" \
+    "$repo_root" \
+    "Scripts/check_step_watchdog.sh" \
+    Scripts/check_step_watchdog.sh
+
+  run_step \
+    "Self-test apt-get retry wrapper" \
+    "$repo_root" \
+    "Scripts/check_apt_get_retry.sh" \
+    Scripts/check_apt_get_retry.sh
+
+  run_step \
+    "Self-test serialized-execution check" \
+    "$repo_root" \
+    "Scripts/check_serialized_execution.sh --self-test" \
+    Scripts/check_serialized_execution.sh --self-test
+
+  run_step \
+    "Run tree-walker recursion guardrails" \
+    "$repo_root" \
+    "Scripts/check_tree_walker_recursion.sh" \
+    Scripts/check_tree_walker_recursion.sh
+
+  run_step \
+    "Self-test tree-walker recursion guardrails" \
+    "$repo_root" \
+    "Scripts/check_tree_walker_recursion.sh --self-test" \
+    Scripts/check_tree_walker_recursion.sh --self-test
 fi
 
-run_repo_policy_phase "$repo_root" test-all
+# --- Core lane: compile once, then every non-runtime suite -----------------
+# The whole package and every test bundle are built in ONE step, with
+# `-emit-loaded-module-trace` (see `emit_module_trace`), so the Foundation
+# audit reads the traces of this build instead of compiling Core+Views a second
+# time into its own scratch, and every later `swift test` launch in the lane
+# is an incremental no-op build.
+if lane_runs_core; then
+  run_function_step \
+    "Build package and test bundles" \
+    "$(swift_command_text build --build-tests)" \
+    run_swift build --build-tests
 
-run_step \
-  "Run layout work-stack guardrails" \
-  "$repo_root" \
-  "Scripts/check_layout_work_stack_guardrails.sh" \
-  Scripts/check_layout_work_stack_guardrails.sh
+  run_step \
+    "Check Foundation-free layers (transitive)" \
+    "$repo_root" \
+    "Scripts/check_foundation_free_layers.sh --trace-dir .build/debug" \
+    Scripts/check_foundation_free_layers.sh --trace-dir .build/debug
+fi
 
-run_step \
-  "Self-test step watchdog" \
-  "$repo_root" \
-  "Scripts/check_step_watchdog.sh" \
-  Scripts/check_step_watchdog.sh
+if [ "$lane" = all ]; then
+  run_function_step \
+    "Run SwiftTUIGraph tests" \
+    "$(swift_command_text test --filter SwiftTUIGraphTests)" \
+    run_swift test --filter SwiftTUIGraphTests
 
-run_step \
-  "Self-test apt-get retry wrapper" \
-  "$repo_root" \
-  "Scripts/check_apt_get_retry.sh" \
-  Scripts/check_apt_get_retry.sh
+  run_function_step \
+    "Run SwiftTUICore tests" \
+    "$(swift_command_text test --filter SwiftTUICoreTests)" \
+    run_swift test --filter SwiftTUICoreTests
 
-run_step \
-  "Self-test serialized-execution check" \
-  "$repo_root" \
-  "Scripts/check_serialized_execution.sh --self-test" \
-  Scripts/check_serialized_execution.sh --self-test
+  run_function_step \
+    "Run SwiftTUIViews tests" \
+    "$(swift_command_text test --filter SwiftTUIViewsTests)" \
+    run_swift test --filter SwiftTUIViewsTests
 
-run_step \
-  "Run tree-walker recursion guardrails" \
-  "$repo_root" \
-  "Scripts/check_tree_walker_recursion.sh" \
-  Scripts/check_tree_walker_recursion.sh
+  run_function_step \
+    "Run SwiftTUIProfiling tests" \
+    "$(swift_command_text test --filter SwiftTUIProfilingTests)" \
+    run_swift test --filter SwiftTUIProfilingTests
+elif [ "$lane" = core ]; then
+  run_function_step \
+    "Run non-runtime test targets" \
+    "$(swift_command_text test --skip '^SwiftTUITests\.' --skip '^EntryPointLaunchTests\.')" \
+    run_non_runtime_test_targets
+fi
 
-run_step \
-  "Self-test tree-walker recursion guardrails" \
-  "$repo_root" \
-  "Scripts/check_tree_walker_recursion.sh --self-test" \
-  Scripts/check_tree_walker_recursion.sh --self-test
+if lane_runs_core; then
+  run_function_step \
+    "Run SwiftTUI async lifecycle tests" \
+    "$(swift_command_text test --filter SwiftTUITests.AsyncLifecycleGenerationTests)" \
+    run_swift test --filter SwiftTUITests.AsyncLifecycleGenerationTests
 
-run_step \
-  "Check Foundation-free layers (transitive)" \
-  "$repo_root" \
-  "Scripts/check_foundation_free_layers.sh" \
-  Scripts/check_foundation_free_layers.sh
+  run_function_step \
+    "Run SwiftTUI async frame-tail tests" \
+    "$(swift_command_text test --filter SwiftTUITests.AsyncFrameTailRenderingTests)" \
+    run_swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
 
-run_function_step \
-  "Run SwiftTUIGraph tests" \
-  "$(swift_command_text test --filter SwiftTUIGraphTests)" \
-  run_swift test --filter SwiftTUIGraphTests
+  run_function_step \
+    "Run SwiftTUI task-state observation tests" \
+    "$(swift_command_text test --filter SwiftTUITests.TaskReadsUnbodiedStateTests)" \
+    run_swift test --filter SwiftTUITests.TaskReadsUnbodiedStateTests
 
-run_function_step \
-  "Run SwiftTUICore tests" \
-  "$(swift_command_text test --filter SwiftTUICoreTests)" \
-  run_swift test --filter SwiftTUICoreTests
+  run_function_step \
+    "Run SwiftTUI per-tick present cadence tests" \
+    "$(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
+    run_swift test --filter SwiftTUITests.PerTickPresentCadenceTests
 
-run_function_step \
-  "Run SwiftTUIViews tests" \
-  "$(swift_command_text test --filter SwiftTUIViewsTests)" \
-  run_swift test --filter SwiftTUIViewsTests
+  run_function_step \
+    "Run SwiftTUI per-tick present cadence tests (stack-lean profile)" \
+    "SWIFTTUI_STACK_LEAN_PROFILE=1 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
+    run_per_tick_cadence_lean_lane
 
-run_function_step \
-  "Run SwiftTUIProfiling tests" \
-  "$(swift_command_text test --filter SwiftTUIProfilingTests)" \
-  run_swift test --filter SwiftTUIProfilingTests
+  run_function_step \
+    "Run SwiftTUI per-tick present cadence tests (chunked resolve driver)" \
+    "SWIFTTUI_RESOLVE_DEPTH_LIMIT=6 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
+    run_per_tick_cadence_depth_limit_lane
 
-run_function_step \
-  "Run SwiftTUI async lifecycle tests" \
-  "$(swift_command_text test --filter SwiftTUITests.AsyncLifecycleGenerationTests)" \
-  run_swift test --filter SwiftTUITests.AsyncLifecycleGenerationTests
+  run_function_step \
+    "Run SwiftTUI per-tick present cadence tests (stack-lean + retained reuse)" \
+    "SWIFTTUI_STACK_LEAN_PROFILE=1 SWIFTTUI_LEAN_RETAINED_REUSE=1 $(swift_command_text test --filter 'SwiftTUITests.PerTickPresentCadenceTests|LeanRetainedReuseGateTests')" \
+    run_per_tick_cadence_lean_reuse_lane
 
-run_function_step \
-  "Run SwiftTUI async frame-tail tests" \
-  "$(swift_command_text test --filter SwiftTUITests.AsyncFrameTailRenderingTests)" \
-  run_swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+  # Isolated like the other held-tail suites: the draft-window test parks a
+  # frame-tail worker thread on the raster gate, and inside the parallel lane
+  # that thread hold starves scheduling-sensitive siblings (observed: stress
+  # cancellation 020's yield-budget settle losing its producer thread in the
+  # Linux container lane).
+  run_function_step \
+    "Run SwiftTUI observation draft-window tests" \
+    "$(swift_command_text test --filter SwiftTUITests.ObservationDraftWindowRuntimeTests)" \
+    run_swift test --filter SwiftTUITests.ObservationDraftWindowRuntimeTests
+fi
 
-run_function_step \
-  "Run SwiftTUI task-state observation tests" \
-  "$(swift_command_text test --filter SwiftTUITests.TaskReadsUnbodiedStateTests)" \
-  run_swift test --filter SwiftTUITests.TaskReadsUnbodiedStateTests
+# --- Runtime lane: the serialized SwiftTUITests surface --------------------
+if [ "$lane" = all ]; then
+  run_function_step \
+    "Run SwiftTUI runtime tests" \
+    "$(swift_command_text test --filter SwiftTUITests --no-parallel --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests --skip PerTickPresentCadenceTests --skip ObservationDraftWindowRuntimeTests)" \
+    run_swift_runtime_tests_without_isolated_async_suites --filter SwiftTUITests
+elif [ "$lane" = runtime ]; then
+  run_function_step \
+    "Run SwiftTUI runtime tests (shard $runtime_shard)" \
+    "$(runtime_shard_command_text)" \
+    run_swift_runtime_shard_tests
+fi
 
-run_function_step \
-  "Run SwiftTUI per-tick present cadence tests" \
-  "$(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
-  run_swift test --filter SwiftTUITests.PerTickPresentCadenceTests
+if lane_runs_runtime; then
+  # The lane above claims `--no-parallel`. Verify the claim against the lane's
+  # own log rather than trusting the flag: two earlier serialization spellings
+  # were inert while their steps stayed green (KNOWN-TEST-FLAKES.md entry 14).
+  # The check also fails when the log holds NO test-start events, which is
+  # what a shard whose manifest regex matches nothing looks like.
+  runtime_lane_log=$log_root/step-$step_index.log
 
-run_function_step \
-  "Run SwiftTUI per-tick present cadence tests (stack-lean profile)" \
-  "SWIFTTUI_STACK_LEAN_PROFILE=1 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
-  run_per_tick_cadence_lean_lane
+  run_step \
+    "Check runtime lane executed serially" \
+    "$repo_root" \
+    "Scripts/check_serialized_execution.sh <runtime-lane-log>" \
+    Scripts/check_serialized_execution.sh "$runtime_lane_log"
+fi
 
-run_function_step \
-  "Run SwiftTUI per-tick present cadence tests (chunked resolve driver)" \
-  "SWIFTTUI_RESOLVE_DEPTH_LIMIT=6 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
-  run_per_tick_cadence_depth_limit_lane
+if [ "$lane" = all ]; then
+  run_function_step \
+    "Run SwiftTUIAnimatedImage tests" \
+    "$(swift_command_text test --filter SwiftTUIAnimatedImageTests)" \
+    run_swift test --filter SwiftTUIAnimatedImageTests
 
-run_function_step \
-  "Run SwiftTUI per-tick present cadence tests (stack-lean + retained reuse)" \
-  "SWIFTTUI_STACK_LEAN_PROFILE=1 SWIFTTUI_LEAN_RETAINED_REUSE=1 $(swift_command_text test --filter 'SwiftTUITests.PerTickPresentCadenceTests|LeanRetainedReuseGateTests')" \
-  run_per_tick_cadence_lean_reuse_lane
+  run_function_step \
+    "Run SwiftTUIArguments tests" \
+    "$(swift_command_text test --filter SwiftTUIArgumentsTests)" \
+    run_swift test --filter SwiftTUIArgumentsTests
 
-# Isolated like the other held-tail suites: the draft-window test parks a
-# frame-tail worker thread on the raster gate, and inside the parallel lane
-# that thread hold starves scheduling-sensitive siblings (observed: stress
-# cancellation 020's yield-budget settle losing its producer thread in the
-# Linux container lane).
-run_function_step \
-  "Run SwiftTUI observation draft-window tests" \
-  "$(swift_command_text test --filter SwiftTUITests.ObservationDraftWindowRuntimeTests)" \
-  run_swift test --filter SwiftTUITests.ObservationDraftWindowRuntimeTests
+  run_function_step \
+    "Run SwiftTUICLI tests" \
+    "$(swift_command_text test --filter SwiftTUICLITests)" \
+    run_swift test --filter SwiftTUICLITests
 
-run_function_step \
-  "Run SwiftTUI runtime tests" \
-  "$(swift_command_text test --filter SwiftTUITests --no-parallel --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests --skip PerTickPresentCadenceTests --skip ObservationDraftWindowRuntimeTests)" \
-  run_swift_runtime_tests_without_isolated_async_suites --filter SwiftTUITests
+  run_function_step \
+    "Run SwiftTUITerminal tests" \
+    "$(swift_command_text test --filter SwiftTUITerminalTests)" \
+    run_swift test --filter SwiftTUITerminalTests
 
-# The lane above claims `--no-parallel`. Verify the claim against the lane's
-# own log rather than trusting the flag: two earlier serialization spellings
-# were inert while their steps stayed green (KNOWN-TEST-FLAKES.md entry 14).
-runtime_lane_log=$log_root/step-$step_index.log
+  run_function_step \
+    "Run SwiftTUIPTYPrimitives tests" \
+    "$(swift_command_text test --filter SwiftTUIPTYPrimitivesTests)" \
+    run_swift test --filter SwiftTUIPTYPrimitivesTests
 
-run_step \
-  "Check runtime lane executed serially" \
-  "$repo_root" \
-  "Scripts/check_serialized_execution.sh <runtime-lane-log>" \
-  Scripts/check_serialized_execution.sh "$runtime_lane_log"
+  run_function_step \
+    "Run SwiftTUIWASISurfaceBridge tests" \
+    "$(swift_command_text test --filter SwiftTUIWASISurfaceBridgeTests)" \
+    run_swift test --filter SwiftTUIWASISurfaceBridgeTests
 
-run_function_step \
-  "Run SwiftTUIAnimatedImage tests" \
-  "$(swift_command_text test --filter SwiftTUIAnimatedImageTests)" \
-  run_swift test --filter SwiftTUIAnimatedImageTests
+  run_function_step \
+    "Run SwiftTUIWASI tests" \
+    "$(swift_command_text test --filter SwiftTUIWASITests)" \
+    run_swift test --filter SwiftTUIWASITests
 
-run_function_step \
-  "Run SwiftTUIArguments tests" \
-  "$(swift_command_text test --filter SwiftTUIArgumentsTests)" \
-  run_swift test --filter SwiftTUIArgumentsTests
+  run_function_step \
+    "Run SwiftTUIWebHost tests" \
+    "$(swift_command_text test --filter SwiftTUIWebHostTests)" \
+    run_swift test --filter SwiftTUIWebHostTests
 
-run_function_step \
-  "Run SwiftTUICLI tests" \
-  "$(swift_command_text test --filter SwiftTUICLITests)" \
-  run_swift test --filter SwiftTUICLITests
-
-run_function_step \
-  "Run SwiftTUITerminal tests" \
-  "$(swift_command_text test --filter SwiftTUITerminalTests)" \
-  run_swift test --filter SwiftTUITerminalTests
-
-run_function_step \
-  "Run SwiftTUIPTYPrimitives tests" \
-  "$(swift_command_text test --filter SwiftTUIPTYPrimitivesTests)" \
-  run_swift test --filter SwiftTUIPTYPrimitivesTests
-
-run_function_step \
-  "Run SwiftTUIWASISurfaceBridge tests" \
-  "$(swift_command_text test --filter SwiftTUIWASISurfaceBridgeTests)" \
-  run_swift test --filter SwiftTUIWASISurfaceBridgeTests
-
-run_function_step \
-  "Run SwiftTUIWASI tests" \
-  "$(swift_command_text test --filter SwiftTUIWASITests)" \
-  run_swift test --filter SwiftTUIWASITests
-
-run_function_step \
-  "Run SwiftTUIWebHost tests" \
-  "$(swift_command_text test --filter SwiftTUIWebHostTests)" \
-  run_swift test --filter SwiftTUIWebHostTests
-
-run_function_step \
-  "Run SwiftTUIAndroidHost tests" \
-  "$(swift_command_text test --filter SwiftTUIAndroidHostTests)" \
-  run_swift test --filter SwiftTUIAndroidHostTests
+  run_function_step \
+    "Run SwiftTUIAndroidHost tests" \
+    "$(swift_command_text test --filter SwiftTUIAndroidHostTests)" \
+    run_swift test --filter SwiftTUIAndroidHostTests
+fi
 
 # The fixtures are deliberately not build-order dependencies of the test
 # target (an executable dependency's `main` hijacks the release test runner's
 # entry point — see Package.swift), so build them explicitly before the suite
-# that launches them from disk.
+# that launches them from disk. After the lane's full build this is an
+# incremental no-op; the explicit step keeps the ordering guarantee visible.
 build_entry_point_launch_fixtures() {
   for fixture in \
     EntryPointFixtureAtMain \
@@ -898,58 +1120,72 @@ build_entry_point_launch_fixtures() {
   done
 }
 
-run_function_step \
-  "Build entry-point launch fixtures" \
-  "$(swift_command_text build --target 'EntryPointFixture{AtMain,Bare,CLIBare,WebHostCLIBare,CLIAsyncVerbDispatch,WebHostCLIAsyncVerbDispatch,VerbDispatch,VerbDispatchNoOptions}')" \
-  build_entry_point_launch_fixtures
+if lane_runs_core; then
+  run_function_step \
+    "Build entry-point launch fixtures" \
+    "$(swift_command_text build --target 'EntryPointFixture{AtMain,Bare,CLIBare,WebHostCLIBare,CLIAsyncVerbDispatch,WebHostCLIAsyncVerbDispatch,VerbDispatch,VerbDispatchNoOptions}')" \
+    build_entry_point_launch_fixtures
 
-run_function_step \
-  "Run entry-point launch tests" \
-  "$(swift_command_text test --filter EntryPointLaunchTests)" \
-  run_swift test --filter EntryPointLaunchTests
+  run_function_step \
+    "Run entry-point launch tests" \
+    "$(swift_command_text test --filter EntryPointLaunchTests)" \
+    run_swift test --filter EntryPointLaunchTests
+fi
 
 # Absorbed Vendor test targets (sources under Vendor/<pkg>/, targets first-class
 # inside swift-tui's Package.swift since the Vendor sub-packages were absorbed).
-run_function_step \
-  "Run vendored UnixSignals tests" \
-  "$(swift_command_text test --filter SwiftTUIVendorUnixSignalsTests)" \
-  run_swift test --filter SwiftTUIVendorUnixSignalsTests
-
-run_function_step \
-  "Run vendored SwiftFiglet tests" \
-  "$(swift_command_text test --filter SwiftTUIVendorFigletTests)" \
-  run_swift test --filter SwiftTUIVendorFigletTests
-
-run_function_step \
-  "Run vendored GIF tests" \
-  "$(swift_command_text test --filter SwiftTUIVendorGIFTests)" \
-  run_swift test --filter SwiftTUIVendorGIFTests
-
-run_function_step \
-  "Run vendored JPEG tests" \
-  "$(swift_command_text test --filter SwiftTUIVendorJPEGTests)" \
-  run_swift test --filter SwiftTUIVendorJPEGTests
-
-run_function_step \
-  "Run vendored PNG tests" \
-  "$(swift_command_text test --filter SwiftTUIVendorPNGTests)" \
-  run_swift test --filter SwiftTUIVendorPNGTests
-
-if [ "${SWIFTTUI_SKIP_TERMUIPERF:-0}" = "1" ]; then
-  skip_step \
-    "Run Tools/TermUIPerf tests" \
-    "covered by the separate TermUIPerf workflow"
-else
+# The core lane covers them in its single non-runtime launch.
+if [ "$lane" = all ]; then
   run_function_step \
-    "Run Tools/TermUIPerf tests" \
-    "$(swift_command_text test --package-path Tools/TermUIPerf)" \
-    run_swift test --package-path Tools/TermUIPerf
+    "Run vendored UnixSignals tests" \
+    "$(swift_command_text test --filter SwiftTUIVendorUnixSignalsTests)" \
+    run_swift test --filter SwiftTUIVendorUnixSignalsTests
+
+  run_function_step \
+    "Run vendored SwiftFiglet tests" \
+    "$(swift_command_text test --filter SwiftTUIVendorFigletTests)" \
+    run_swift test --filter SwiftTUIVendorFigletTests
+
+  run_function_step \
+    "Run vendored GIF tests" \
+    "$(swift_command_text test --filter SwiftTUIVendorGIFTests)" \
+    run_swift test --filter SwiftTUIVendorGIFTests
+
+  run_function_step \
+    "Run vendored JPEG tests" \
+    "$(swift_command_text test --filter SwiftTUIVendorJPEGTests)" \
+    run_swift test --filter SwiftTUIVendorJPEGTests
+
+  run_function_step \
+    "Run vendored PNG tests" \
+    "$(swift_command_text test --filter SwiftTUIVendorPNGTests)" \
+    run_swift test --filter SwiftTUIVendorPNGTests
 fi
 
-run_function_step \
-  "Scan soundness traces" \
-  "Scripts/scan_soundness_traces.sh .build/soundness-trace Scripts/soundness_quarantine.txt" \
-  Scripts/scan_soundness_traces.sh "$soundness_trace_root" "$soundness_quarantine_file"
+if lane_runs_core; then
+  if [ "${SWIFTTUI_SKIP_TERMUIPERF:-0}" = "1" ]; then
+    skip_step \
+      "Run Tools/TermUIPerf tests" \
+      "covered by the separate TermUIPerf workflow"
+  else
+    run_function_step \
+      "Run Tools/TermUIPerf tests" \
+      "$(swift_command_text test --package-path Tools/TermUIPerf)" \
+      run_swift test --package-path Tools/TermUIPerf
+  fi
+fi
+
+# The quarantine ledger counts are whole-surface counts. The `all` lane scans
+# here; the CI lanes upload their traces and the aggregator job scans the
+# merged set once (.github/workflows/run-tests-linux.yml), which is the same
+# number as long as every suite runs exactly once across the lanes — the
+# invariant Scripts/check_root_test_target_coverage.sh enforces.
+if [ "$lane" = all ]; then
+  run_function_step \
+    "Scan soundness traces" \
+    "Scripts/scan_soundness_traces.sh .build/soundness-trace Scripts/soundness_quarantine.txt" \
+    Scripts/scan_soundness_traces.sh "$soundness_trace_root" "$soundness_quarantine_file"
+fi
 
 if [ "$any_failed" -eq 0 ]; then
   print_summary

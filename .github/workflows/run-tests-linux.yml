@@ -1,5 +1,40 @@
 name: Repo Gate
 
+# The push/PR verdict for swift-tui: Linux only, one hot-path verdict per
+# push, ≤ 20 minutes wall-clock (swift-tui-org plan 2026-08-25-001, Stage 1).
+#
+# The single 30-minute job this replaced compiled the package once (≈ 9.6
+# min), launched `swift test` 27 more times (≈ 8 s of fixed cost each),
+# compiled Core+Views a second time for the Foundation audit, then spent
+# 18 minutes in the serialized SwiftTUITests lane. The jobs below run exactly
+# the same surface in parallel; `Scripts/test_all.sh --lane <lane>` is the
+# one implementation (its default `all` lane is the local `bun run test`),
+# and `Scripts/data/runtime-shards.txt` is the one source of truth for how
+# the serialized lane is sharded (the policy lane's coverage check fails if a
+# suite is claimed by no shard, or a shard claims nothing).
+#
+#   policy               bare runner + bun: policy phase, guardrails,
+#                        self-tests — no Swift toolchain            ~1.5 min
+#   core                 image: build once; every non-runtime test
+#                        target in one parallel launch; the isolated
+#                        SwiftTUITests suites; entry-point fixtures;
+#                        Foundation audit from the build's own
+#                        module traces                               ~15 min
+#   runtime (A, B, C)    image: one serialized SwiftTUITests shard
+#                        each, plus the serialized-execution check   ~16 min
+#   wasi-cross-compile   image (it ships the wasm SDK)                ~2 min
+#   Linux repo gate      aggregator: the branch-protection target;
+#                        scans the merged soundness traces of every
+#                        lane once, against the whole-surface ledger
+#
+# Container jobs run in the image build-linux-image.yml publishes (toolchain,
+# wasm SDK, bun, ripgrep, python3, gdb), which removes the apt + swiftly
+# install steps from every job and with them the apt-mirror stall class of
+# 2026-08-19. The image tag tracks .swift-version: bump the `swift-<version>`
+# tag below in the same commit as the toolchain pin. A pull failure or a
+# version mismatch (Scripts/prepare_ci_container.sh) fails fast on purpose —
+# no fallback to a network install.
+
 on:
   push:
     branches:
@@ -8,12 +43,7 @@ on:
   workflow_dispatch:
     inputs:
       run_arm64:
-        description: Run the Linux arm64 gate in addition to amd64
-        required: false
-        default: false
-        type: boolean
-      run_macos:
-        description: Run the macOS gate
+        description: Also run the core and runtime lanes on Linux arm64
         required: false
         default: false
         type: boolean
@@ -22,24 +52,28 @@ permissions:
   contents: read
 
 # The event name keeps each trigger in its own group, so a push to main cannot
-# cancel an in-flight workflow_dispatch run.
+# cancel an in-flight workflow_dispatch run. cancel-in-progress stays because
+# every job here is ≤ 20 minutes (plan principle P5).
 concurrency:
   group: repo-gate-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   BUN_VERSION: "1.3.14"
-  SWIFTLY_VERSION: "1.1.3"
+  # Per-step silence bound for the gate's watchdog. Every step is now ≤ ~10
+  # minutes and prints continuously (per-file compile lines, per-test lines),
+  # so 600 s of silence is a wedge, not a slow runner. The absolute cap is 4×.
+  SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "600"
+  SWIFTTUI_HANG_DIAGNOSTICS: "1"
+  # Covered by the path-filtered Public API Baseline and TermUIPerf workflows.
+  SWIFTTUI_SKIP_PUBLIC_API_BASELINE: "1"
+  SWIFTTUI_SKIP_TERMUIPERF: "1"
 
 jobs:
-  linux-gate:
-    name: Linux repo gate (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.run_arm64 && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
+  policy:
+    name: Policy lane
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -51,74 +85,21 @@ jobs:
           set -euo pipefail
           printf 'LANE_STARTED_EPOCH=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
 
-      - name: Install Linux test dependencies
+      # ripgrep is the only tool the policy scripts need that the runner
+      # image lacks.
+      - name: Install policy-lane dependencies
         shell: bash
         run: |
           set -euo pipefail
-          Scripts/apt_get_retry.sh update
-          Scripts/apt_get_retry.sh install -y --no-install-recommends \
-            ca-certificates \
-            curl \
-            git \
-            jq \
-            libcurl4-openssl-dev \
-            python3 \
-            ripgrep \
-            unzip
-
-      - name: Cache Swiftly toolchain
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.local/share/swiftly
-            ~/.local/bin/swiftly
-          key: ${{ runner.os }}-${{ matrix.arch }}-swiftly-${{ env.SWIFTLY_VERSION }}-${{ hashFiles('.swift-version') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-swiftly-${{ env.SWIFTLY_VERSION }}-
-
-      - name: Install swiftly and Swift toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          export SWIFTLY_HOME_DIR="$HOME/.local/share/swiftly"
-          export SWIFTLY_BIN_DIR="$HOME/.local/bin"
-          mkdir -p "$SWIFTLY_BIN_DIR"
-          export PATH="$SWIFTLY_BIN_DIR:$PATH"
-
-          if ! command -v swiftly >/dev/null 2>&1 || [ ! -f "${SWIFTLY_HOME_DIR}/env.sh" ]; then
-            tmpdir="$(mktemp -d)"
-            trap 'rm -rf "$tmpdir"' EXIT
-            cd "$tmpdir"
-            swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz"
-            curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}"
-            tar -zxf "$swiftly_archive"
-            ./swiftly init --skip-install --quiet-shell-followup --assume-yes
+          if ! command -v rg >/dev/null 2>&1; then
+            Scripts/apt_get_retry.sh update
+            Scripts/apt_get_retry.sh install -y --no-install-recommends ripgrep
           fi
-
-          . "${SWIFTLY_HOME_DIR}/env.sh"
-          hash -r
-          swift_version="$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/.swift-version")"
-          swiftly install --use --assume-yes "$swift_version"
-          swiftly run swift --version
-          echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
-          echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
-          echo "SWIFTLY_BIN_DIR=$SWIFTLY_BIN_DIR" >> "$GITHUB_ENV"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Cache SwiftPM
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cache/org.swift.swiftpm
-            ~/.swiftpm
-          key: ${{ runner.os }}-${{ matrix.arch }}-swiftpm-gate-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-swiftpm-gate-
-            ${{ runner.os }}-${{ matrix.arch }}-swiftpm-
 
       - name: Cache Bun deps
         uses: actions/cache@v6
@@ -126,37 +107,26 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-          key: ${{ runner.os }}-${{ matrix.arch }}-bun-gate-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-amd64-bun-gate-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-bun-gate-
-            ${{ runner.os }}-${{ matrix.arch }}-bun-
+            ${{ runner.os }}-amd64-bun-gate-
+            ${{ runner.os }}-amd64-bun-
 
       - name: Install Bun workspace deps
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Ensure gdb for hang diagnostics
+      - name: Run policy lane
         shell: bash
         run: |
           set -euo pipefail
-          command -v gdb >/dev/null 2>&1 || Scripts/apt_get_retry.sh install -y --no-install-recommends gdb
-
-      - name: Run repo gate
-        shell: bash
-        env:
-          SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
-          SWIFTTUI_HANG_DIAGNOSTICS: "1"
-          SWIFTTUI_SKIP_PUBLIC_API_BASELINE: "1"
-          SWIFTTUI_SKIP_TERMUIPERF: "1"
-        run: |
-          set -euo pipefail
-          sh ./Scripts/test_gate.sh --skip-bun-install
+          sh ./Scripts/test_gate.sh --lane policy --skip-bun-install
 
       - name: Record lane result
         if: always()
         shell: bash
         env:
-          LANE_ID: linux-${{ matrix.arch }}
+          LANE_ID: policy
           LANE_RESULT: ${{ job.status }}
         run: |
           set -euo pipefail
@@ -171,32 +141,204 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ci-test-result-linux-${{ matrix.arch }}
-          path: .ci-results/linux-${{ matrix.arch }}.result
+          name: ci-test-result-policy
+          path: .ci-results/policy.result
           if-no-files-found: error
           retention-days: 1
 
-  linux-gate-required:
-    name: Linux repo gate
-    runs-on: ubuntu-24.04
-    needs: linux-gate
-    if: always()
-    timeout-minutes: 5
+  core:
+    name: Core lane (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    container:
+      # Tracks .swift-version — bump together. See the header comment.
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+      # The step watchdog's hang diagnostics attach gdb to a process that is
+      # not its descendant; yama ptrace_scope=1 refuses that without the
+      # capability, and the default container capability set omits it.
+      options: --cap-add=SYS_PTRACE
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.run_arm64 && '{"include":[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]}' || '{"include":[{"arch":"amd64","runner":"ubuntu-24.04"}]}') }}
 
     steps:
-      - name: Require native Linux matrix
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Record lane start
         shell: bash
         env:
-          MATRIX_RESULT: ${{ needs.linux-gate.result }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          if [ "$MATRIX_RESULT" != "success" ]; then
-            printf 'Native Linux matrix finished with result: %s\n' "$MATRIX_RESULT" >&2
-            exit 1
+          lane_id=core
+          if [ "$ARCH" != "amd64" ]; then
+            lane_id="core-$ARCH"
+          fi
+          printf 'LANE_ID=%s\nLANE_STARTED_EPOCH=%s\n' "$lane_id" "$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Prepare container environment
+        shell: bash
+        run: Scripts/prepare_ci_container.sh
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/org.swift.swiftpm
+          key: ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-
+
+      # Present in images built after 2026-08-25; installed here until then.
+      # Root in the container has no sudo.
+      - name: Ensure gdb for hang diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v gdb >/dev/null 2>&1; then
+            if [ "$(id -u)" -eq 0 ]; then
+              export APT_GET_RETRY_SUDO_BIN=""
+            fi
+            Scripts/apt_get_retry.sh update
+            Scripts/apt_get_retry.sh install -y --no-install-recommends gdb
           fi
 
-  # Cross-compiles the WASI surface on every push/PR. The Linux gate never
-  # builds wasm32-wasi, so a WASI-only break (unguarded C stdio/POSIX outside
+      - name: Run core lane
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh ./Scripts/test_gate.sh --lane core
+
+      # Only the amd64 lanes feed the merged scan: the ledger counts every
+      # suite once, and an arm64 run would double them.
+      - name: Upload soundness traces
+        if: always() && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@v7
+        with:
+          name: soundness-trace-${{ env.LANE_ID }}
+          path: .build/soundness-trace
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Record lane result
+        if: always()
+        shell: bash
+        env:
+          LANE_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-results
+          duration="-"
+          if [ -n "${LANE_STARTED_EPOCH:-}" ]; then
+            duration="$(($(date +%s) - LANE_STARTED_EPOCH))"
+          fi
+          printf '%s|%s|%s\n' "$LANE_ID" "$LANE_RESULT" "$duration" > ".ci-results/$LANE_ID.result"
+
+      - name: Upload lane result
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-test-result-${{ env.LANE_ID }}
+          path: .ci-results/${{ env.LANE_ID }}.result
+          if-no-files-found: error
+          retention-days: 1
+
+  runtime:
+    name: Runtime shard ${{ matrix.shard }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+      options: --cap-add=SYS_PTRACE
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      # `arch` must be an original matrix key: an `include` row whose arch is
+      # absent from the list would otherwise become a shard-less combination.
+      matrix: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.run_arm64 && '{"shard":["A","B","C"],"arch":["amd64","arm64"],"include":[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]}' || '{"shard":["A","B","C"],"arch":["amd64"],"include":[{"arch":"amd64","runner":"ubuntu-24.04"}]}') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Record lane start
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          lane_id="runtime-$SHARD"
+          if [ "$ARCH" != "amd64" ]; then
+            lane_id="$lane_id-$ARCH"
+          fi
+          printf 'LANE_ID=%s\nLANE_STARTED_EPOCH=%s\n' "$lane_id" "$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Prepare container environment
+        shell: bash
+        run: Scripts/prepare_ci_container.sh
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/org.swift.swiftpm
+          key: ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-swiftpm-lane-
+
+      - name: Ensure gdb for hang diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v gdb >/dev/null 2>&1; then
+            if [ "$(id -u)" -eq 0 ]; then
+              export APT_GET_RETRY_SUDO_BIN=""
+            fi
+            Scripts/apt_get_retry.sh update
+            Scripts/apt_get_retry.sh install -y --no-install-recommends gdb
+          fi
+
+      - name: Run runtime shard
+        shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          sh ./Scripts/test_gate.sh --lane "runtime:$SHARD"
+
+      - name: Upload soundness traces
+        if: always() && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@v7
+        with:
+          name: soundness-trace-${{ env.LANE_ID }}
+          path: .build/soundness-trace
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Record lane result
+        if: always()
+        shell: bash
+        env:
+          LANE_RESULT: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-results
+          duration="-"
+          if [ -n "${LANE_STARTED_EPOCH:-}" ]; then
+            duration="$(($(date +%s) - LANE_STARTED_EPOCH))"
+          fi
+          printf '%s|%s|%s\n' "$LANE_ID" "$LANE_RESULT" "$duration" > ".ci-results/$LANE_ID.result"
+
+      - name: Upload lane result
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-test-result-${{ env.LANE_ID }}
+          path: .ci-results/${{ env.LANE_ID }}.result
+          if-no-files-found: error
+          retention-days: 1
+
+  # Cross-compiles the WASI surface on every push/PR. The Linux lanes never
+  # build wasm32-wasi, so a WASI-only break (unguarded C stdio/POSIX outside
   # `#if canImport(WASILibc)`) shipped green at 0.0.19 and again at 0.0.26 and
   # only surfaced in the swift-tui-examples / swift-tui-site gates after the
   # tag was cut. Building the SwiftTUIWASI product covers the WASI runner shim
@@ -204,11 +346,17 @@ jobs:
   wasi-cross-compile:
     name: wasm32-wasi cross-compile
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    container:
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Prepare container environment
+        shell: bash
+        run: Scripts/prepare_ci_container.sh
 
       # The toolchain version tracks the pinned .swift-version. The value is
       # validated against a strict pattern before any downstream use so
@@ -227,72 +375,20 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Install Linux Swift dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          Scripts/apt_get_retry.sh update
-          Scripts/apt_get_retry.sh install -y --no-install-recommends libcurl4-openssl-dev
-
-      - name: Cache Swiftly toolchain
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.local/share/swiftly
-            ~/.local/bin/swiftly
-          key: ${{ runner.os }}-amd64-swiftly-${{ env.SWIFTLY_VERSION }}-${{ hashFiles('.swift-version') }}
-          restore-keys: |
-            ${{ runner.os }}-amd64-swiftly-${{ env.SWIFTLY_VERSION }}-
-
-      - name: Install swiftly and Swift toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          export SWIFTLY_HOME_DIR="$HOME/.local/share/swiftly"
-          export SWIFTLY_BIN_DIR="$HOME/.local/bin"
-          mkdir -p "$SWIFTLY_BIN_DIR"
-          export PATH="$SWIFTLY_BIN_DIR:$PATH"
-
-          if ! command -v swiftly >/dev/null 2>&1 || [ ! -f "${SWIFTLY_HOME_DIR}/env.sh" ]; then
-            tmpdir="$(mktemp -d)"
-            trap 'rm -rf "$tmpdir"' EXIT
-            cd "$tmpdir"
-            swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz"
-            curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}"
-            tar -zxf "$swiftly_archive"
-            ./swiftly init --skip-install --quiet-shell-followup --assume-yes
-          fi
-
-          . "${SWIFTLY_HOME_DIR}/env.sh"
-          hash -r
-          swift_version="$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/.swift-version")"
-          swiftly install --use --assume-yes "$swift_version"
-          swiftly run swift --version
-          echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
-          echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
-
-      - name: Install the wasm32-wasi Swift SDK
+      # The image ships the SDK (Scripts/linux/Dockerfile); a missing SDK is
+      # image drift and fails here rather than being papered over by a
+      # network install.
+      - name: Require the wasm32-wasi Swift SDK
         shell: bash
         env:
           SWIFT_VERSION: ${{ steps.swift.outputs.version }}
         run: |
           set -euo pipefail
-          . "${SWIFTLY_HOME_DIR}/env.sh"
-          case "$SWIFT_VERSION" in
-            6.3.3)
-              WASM_SDK_CHECKSUM="cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7"
-              ;;
-            *)
-              echo "::error::No pinned wasm SDK checksum for Swift ${SWIFT_VERSION}"
-              exit 1
-              ;;
-          esac
-          if ! swiftly run swift sdk list | grep -q "swift-${SWIFT_VERSION}-RELEASE_wasm"; then
-            swiftly run swift sdk install \
-              "https://download.swift.org/swift-${SWIFT_VERSION}-release/wasm-sdk/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE_wasm.artifactbundle.tar.gz" \
-              --checksum "$WASM_SDK_CHECKSUM"
-          fi
           swiftly run swift sdk list
+          if ! swiftly run swift sdk list | grep -q "swift-${SWIFT_VERSION}-RELEASE_wasm"; then
+            echo "::error::the swift-tui-linux image does not ship swift-${SWIFT_VERSION}-RELEASE_wasm; rebuild the image (build-linux-image.yml) for the pinned toolchain"
+            exit 1
+          fi
 
       # --target, not --product: for an automatic library product SwiftPM
       # builds the whole package graph, which includes deliberately
@@ -308,128 +404,86 @@ jobs:
           SWIFTTUI_WARNINGS_AS_ERRORS: "1"
         run: |
           set -euo pipefail
-          . "${SWIFTLY_HOME_DIR}/env.sh"
           swiftly run swift build \
             --swift-sdk "swift-${SWIFT_VERSION}-RELEASE_wasm" \
             --target SwiftTUIWASI
 
-  macos-gate:
-    name: macOS repo gate
-    runs-on: macos-26
-    # Dispatch-only by decision (2026-08-19). The nightly cron used to be this
-    # lane's only automatic trigger; with crons removed org-wide, macOS is
-    # exercised on demand — `workflow_dispatch` with `run_macos` — rather than
-    # spending a macOS runner on every push to main. Run it before a release:
-    # macOS is the primary user platform, so a release cut on Linux-only signal
-    # is exactly the gap this lane exists to close.
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos }}
-    timeout-minutes: 30
+  # The branch-protection target. Its name must stay "Linux repo gate".
+  #
+  # `if: always() && !contains(needs.*.result, 'cancelled')`: when a newer
+  # push pre-empts this run (concurrency group above), the lanes are
+  # cancelled and this job is SKIPPED, so the SHA is left with no verdict —
+  # not a red one. Before this condition the aggregator converted a
+  # pre-empted matrix into a `failure` of its own, which is what the
+  # coordination root's child_ci_status reported as a red pin. A job that
+  # hit its timeout-minutes cap also reads as `cancelled` to `needs`; its own
+  # check-run annotation ("exceeded the maximum execution time") is what
+  # child_ci_status uses to tell that case apart and keep it RED.
+  linux-gate-required:
+    name: Linux repo gate
+    runs-on: ubuntu-24.04
+    needs:
+      - policy
+      - core
+      - runtime
+      - wasi-cross-compile
+    if: always() && !contains(needs.*.result, 'cancelled')
+    timeout-minutes: 10
 
     steps:
+      - name: Require every lane green
+        shell: bash
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          not_green="$(printf '%s' "$NEEDS" | jq -r 'to_entries[] | select(.value.result != "success") | "\(.key)=\(.value.result)"')"
+          if [ -n "$not_green" ]; then
+            printf 'Lanes not green:\n%s\n' "$not_green" >&2
+            exit 1
+          fi
+          echo "every lane green"
+
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Record lane start
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf 'LANE_STARTED_EPOCH=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+      # Each amd64 lane's traces land in their own subdirectory (no
+      # merge-multiple: step indices collide across lanes).
+      - name: Download soundness traces
+        uses: actions/download-artifact@v8
+        with:
+          path: .build/soundness-trace-merged
+          pattern: soundness-trace-*
 
-      - name: Install swiftly and Swift toolchain
+      # The quarantine ledger (Scripts/soundness_quarantine.txt) holds exact
+      # whole-surface counts, keyed by kind only. Every SwiftTUITests suite
+      # runs in exactly one of {core (isolated), runtime A, B, C} — the
+      # coverage check in the policy lane enforces that partition — and every
+      # other target runs once in core, so the merged trace set counts each
+      # probe exactly as often as the single-job gate did. One scan over the
+      # merged set therefore keeps the ledger's exact-count ratchet intact;
+      # a per-lane scan could only ever see a fraction and would mask growth.
+      - name: Scan merged soundness traces
         shell: bash
         run: |
           set -euo pipefail
-          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
-          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
-          ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
-          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
-          hash -r
-          swift_version="$(tr -d '[:space:]' < .swift-version)"
-          swiftly install --use --assume-yes "$swift_version"
-          swiftly run swift --version
-          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
-          echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
-
-      - name: Install macOS test dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! command -v rg >/dev/null 2>&1; then
-            brew install ripgrep
+          lanes="$(find .build/soundness-trace-merged -mindepth 1 -maxdepth 1 -type d -name 'soundness-trace-*' | sort)"
+          count="$(printf '%s\n' "$lanes" | sed '/^$/d' | wc -l | tr -d ' ')"
+          printf 'merged trace lanes (%s):\n%s\n' "$count" "$lanes"
+          if [ "$count" -ne 4 ]; then
+            echo "::error::expected traces from exactly 4 lanes (core, runtime-A, runtime-B, runtime-C); found $count — a lane's upload is missing, so the ledger counts would be understated"
+            exit 1
           fi
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Cache SwiftPM
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cache/org.swift.swiftpm
-            ~/.swiftpm
-          key: ${{ runner.os }}-swiftpm-gate-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-swiftpm-gate-
-            ${{ runner.os }}-swiftpm-
-
-      - name: Cache Bun deps
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.bun/install/cache
-            node_modules
-          key: ${{ runner.os }}-bun-gate-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-gate-
-            ${{ runner.os }}-bun-
-
-      - name: Install Bun workspace deps
-        shell: bash
-        run: bun install --frozen-lockfile
-
-      - name: Run repo gate
-        shell: bash
-        env:
-          SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
-          SWIFTTUI_SKIP_PUBLIC_API_BASELINE: "1"
-          SWIFTTUI_SKIP_TERMUIPERF: "1"
-        run: |
-          set -euo pipefail
-          sh ./Scripts/test_gate.sh --skip-bun-install
-
-      - name: Record lane result
-        if: always()
-        shell: bash
-        env:
-          LANE_ID: macos
-          LANE_RESULT: ${{ job.status }}
-        run: |
-          set -euo pipefail
-          mkdir -p .ci-results
-          duration="-"
-          if [ -n "${LANE_STARTED_EPOCH:-}" ]; then
-            duration="$(($(date +%s) - LANE_STARTED_EPOCH))"
-          fi
-          printf '%s|%s|%s\n' "$LANE_ID" "$LANE_RESULT" "$duration" > ".ci-results/$LANE_ID.result"
-
-      - name: Upload lane result
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: ci-test-result-macos
-          path: .ci-results/macos.result
-          if-no-files-found: error
-          retention-days: 1
+          Scripts/scan_soundness_traces.sh .build/soundness-trace-merged Scripts/soundness_quarantine.txt
 
   ci-summary:
     name: CI test matrix summary
     runs-on: ubuntu-24.04
     needs:
-      - linux-gate
+      - policy
+      - core
+      - runtime
       - linux-gate-required
-      - macos-gate
     if: always()
     timeout-minutes: 5
 
@@ -452,23 +506,24 @@ jobs:
         shell: bash
         env:
           RUN_ARM64: ${{ github.event_name == 'workflow_dispatch' && inputs.run_arm64 }}
-          RUN_MACOS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos }}
         run: |
           set -euo pipefail
           mkdir -p .ci-results
           expected_file=.ci-results/expected.txt
-          cat > "$expected_file" <<'EOF'
-          linux-amd64|Linux repo gate|Linux|amd64|ubuntu-24.04|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
-          EOF
+          cat > "$expected_file" <<'EOT'
+          policy|Policy lane|Linux|amd64|ubuntu-24.04|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 sh ./Scripts/test_gate.sh --lane policy --skip-bun-install
+          core|Core lane|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --lane core
+          runtime-A|Runtime shard A|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:A
+          runtime-B|Runtime shard B|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:B
+          runtime-C|Runtime shard C|Linux|amd64|ubuntu-24.04 (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:C
+          EOT
           if [ "$RUN_ARM64" = "true" ]; then
-            cat >> "$expected_file" <<'EOF'
-          linux-arm64|Linux repo gate|Linux|arm64|ubuntu-24.04-arm|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
-          EOF
-          fi
-          if [ "$RUN_MACOS" = "true" ]; then
-            cat >> "$expected_file" <<'EOF'
-          macos|macOS repo gate|macOS|-|macos-26|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --skip-bun-install
-          EOF
+            cat >> "$expected_file" <<'EOT'
+          core-arm64|Core lane|Linux|arm64|ubuntu-24.04-arm (swift-tui-linux image)|SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 SWIFTTUI_SKIP_TERMUIPERF=1 sh ./Scripts/test_gate.sh --lane core
+          runtime-A-arm64|Runtime shard A|Linux|arm64|ubuntu-24.04-arm (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:A
+          runtime-B-arm64|Runtime shard B|Linux|arm64|ubuntu-24.04-arm (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:B
+          runtime-C-arm64|Runtime shard C|Linux|arm64|ubuntu-24.04-arm (swift-tui-linux image)|sh ./Scripts/test_gate.sh --lane runtime:C
+          EOT
           fi
           Scripts/render_ci_test_matrix_summary.sh \
             "$expected_file" \

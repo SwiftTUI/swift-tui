@@ -22,12 +22,21 @@ name: Windows Build
 # Deliberately NOT wired into the org-root gates: the operator keeps
 # Windows on the child repo's native `swift build` while per-repo version
 # drift lands.
+#
+# Off the push path since swift-tui-org plan 2026-08-25-001 Stage 1e: the
+# lane demonstrably finds platform-guard breaks (two on 2026-08-25 alone),
+# but at ~35 minutes × 2 architectures per push its pre-emptions were the
+# most expensive kind. It now runs nightly — skipping itself when `main` has
+# not moved since its last green run (§6 guard) — on every release tag, and
+# on demand. The push verdict stays Linux-only.
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
+  push:
+    tags:
+      - "*.*.*"
+  schedule:
+    - cron: "41 3 * * *"
 
 permissions:
   contents: read
@@ -37,10 +46,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Skip if unchanged
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.probe.outputs.changed }}
+      key: ${{ steps.probe.outputs.key }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Probe the lane verdict cache
+        id: probe
+        uses: ./.github/actions/lane-verdict-probe
+        with:
+          lane: windows-build
+
   build:
     name: Windows build (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
+    # Green runs peak at 42.6 minutes; the former 120-minute cap only ever
+    # bounded hangs.
+    timeout-minutes: 60
     env:
       # Same policy as the POSIX repo gate: the gate builds with
       # warnings-as-errors so new Windows-only warnings fail here instead of
@@ -116,3 +146,20 @@ jobs:
             Write-Error ("failing lanes: " + ($failed -join ', '))
             exit 1
           }
+
+  record:
+    name: Record green verdict
+    runs-on: ubuntu-24.04
+    needs:
+      - changes
+      - build
+    if: needs.changes.outputs.changed == 'true' && needs.build.result == 'success'
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Record the lane verdict
+        uses: ./.github/actions/lane-verdict-record
+        with:
+          key: ${{ needs.changes.outputs.key }}

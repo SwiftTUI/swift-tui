@@ -6,11 +6,12 @@ repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/test_gate.sh [--clean] [--skip-bun-install]
+Usage: Scripts/test_gate.sh [--clean] [--skip-bun-install] [--lane all|policy|core|runtime:<shard>]
 
 Runs the curated repo gate:
   - the same policy, root-package, platform-package, and tooling checks as
-    Scripts/test_all.sh
+    Scripts/test_all.sh; --lane selects one CI lane of that surface (see
+    Scripts/test_all.sh --help)
 
 Pass --clean to delete every SwiftPM `.build` directory before any step runs,
 trading a from-scratch rebuild for a run that cannot be tripped by stale
@@ -20,11 +21,22 @@ Example-package coverage lives in SwiftTUI/swift-tui-examples.
 EOF
 }
 
+expect_lane_value=0
 for argument in "$@"; do
+  if [ "$expect_lane_value" -eq 1 ]; then
+    expect_lane_value=0
+    continue
+  fi
   case "$argument" in
   --skip-bun-install)
     ;;
   --clean)
+    ;;
+  --lane)
+    # The value is validated by test_all.sh.
+    expect_lane_value=1
+    ;;
+  --lane=*)
     ;;
   -h | --help)
     usage

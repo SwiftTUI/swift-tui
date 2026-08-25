@@ -1,0 +1,121 @@
+name: Lane verdict probe (skip-if-unchanged)
+description: >-
+  Decides whether a scheduled lane needs to run. Computes a key from the
+  checked-out SHA plus the branch-tip SHA of every sibling repository the
+  lane consumes, then looks that key up in the Actions cache without
+  downloading anything. A hit means an earlier run of this lane already went
+  green on exactly these inputs, so `changed` is `false` and every downstream
+  job can skip itself in under a minute. Events other than `schedule`
+  (workflow_dispatch, a tag push) always report `changed=true`: an explicit
+  ask always runs. Pair with `lane-verdict-record`, which saves the marker
+  under the same key when the lane succeeds. Cache entries expire after seven
+  days unused, so an idle lane re-runs about once a week, which is the
+  intended freshness check.
+
+  This file is copied verbatim into every SwiftTUI repository that has a
+  scheduled workflow (canonical copy: swift-tui-org/tools/ci/actions). Public
+  child repositories must not depend on the coordination root, so it is a
+  copy, not a reference. See swift-tui-org plan 2026-08-25-001 §6.
+inputs:
+  lane:
+    description: Lane name; namespaces the cache key ([A-Za-z0-9_.-]+).
+    required: true
+  siblings:
+    description: >-
+      Whitespace-separated `owner/repo[@branch]` list whose branch-tip SHAs
+      join the key (branch defaults to `main`). Public repositories need no
+      token beyond the default one.
+    required: false
+    default: ""
+  github-token:
+    description: Token for the sibling SHA lookups (rate limits only).
+    required: false
+    default: ${{ github.token }}
+outputs:
+  changed:
+    description: "'true' when the lane must run; 'false' when this exact input set already has a recorded green verdict."
+    value: ${{ steps.decide.outputs.changed }}
+  key:
+    description: The cache key that lane-verdict-record must save on success.
+    value: ${{ steps.key.outputs.key }}
+runs:
+  using: composite
+  steps:
+    - name: Compute the lane input key
+      id: key
+      shell: bash
+      env:
+        LANE: ${{ inputs.lane }}
+        SIBLINGS: ${{ inputs.siblings }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        HEAD_SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        case "$LANE" in
+          "" | *[!A-Za-z0-9_.-]*)
+            echo "::error::lane must match [A-Za-z0-9_.-]+ (got '$LANE')"
+            exit 1
+            ;;
+        esac
+        inputs="self=$HEAD_SHA"
+        echo "self = $HEAD_SHA"
+        for sibling in $SIBLINGS; do
+          repo=${sibling%%@*}
+          branch=main
+          case "$sibling" in *@*) branch=${sibling#*@} ;; esac
+          case "$repo" in
+            */*) ;;
+            *)
+              echo "::error::sibling '$sibling' must be owner/repo[@branch]"
+              exit 1
+              ;;
+          esac
+          sha="$(gh api "repos/$repo/commits/$branch" --jq .sha)"
+          case "$sha" in
+            "" | *[!0-9a-f]*)
+              echo "::error::could not resolve $repo@$branch (got '$sha')"
+              exit 1
+              ;;
+          esac
+          echo "$repo@$branch = $sha"
+          inputs="$inputs $repo@$branch=$sha"
+        done
+        if command -v sha256sum >/dev/null 2>&1; then
+          digest="$(printf '%s' "$inputs" | sha256sum | cut -c1-40)"
+        else
+          digest="$(printf '%s' "$inputs" | shasum -a 256 | cut -c1-40)"
+        fi
+        key="lane-verdict-$LANE-$digest"
+        echo "key = $key"
+        echo "key=$key" >> "$GITHUB_OUTPUT"
+
+    - name: Look the key up (schedule only)
+      id: probe
+      if: github.event_name == 'schedule'
+      uses: actions/cache/restore@v6
+      with:
+        path: .lane-verdict
+        key: ${{ steps.key.outputs.key }}
+        lookup-only: true
+
+    - name: Decide
+      id: decide
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        CACHE_HIT: ${{ steps.probe.outputs.cache-hit }}
+        KEY: ${{ steps.key.outputs.key }}
+      run: |
+        set -euo pipefail
+        if [ "$EVENT_NAME" != "schedule" ]; then
+          changed=true
+          reason="event '$EVENT_NAME' always runs"
+        elif [ "$CACHE_HIT" = "true" ]; then
+          changed=false
+          reason="a green verdict is already recorded under $KEY"
+        else
+          changed=true
+          reason="no green verdict recorded under $KEY"
+        fi
+        echo "changed=$changed ($reason)"
+        echo "changed=$changed" >> "$GITHUB_OUTPUT"

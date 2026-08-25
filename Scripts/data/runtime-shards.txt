@@ -1,0 +1,32 @@
+# Runtime-lane shard manifest — the single source of truth for how the
+# serialized `SwiftTUITests` lane is split across CI jobs (plan 2026-08-25-001
+# Stage 1a). Read by Scripts/test_all.sh (`--lane runtime:<shard>` and the
+# isolated-suite skip list of the `all` lane) and by
+# Scripts/check_root_test_target_coverage.sh (every suite must be claimed).
+#
+# Row kinds:
+#   <shard-id>|<regex>   an ordered shard. FIRST MATCH WINS: shard k runs
+#                        `swift test --no-parallel --filter <regex>` plus
+#                        `--skip <regex>` for every shard listed ABOVE it, so
+#                        the shards partition the suite set exactly and need
+#                        no lookahead. The last shard is the catch-all.
+#   isolated|<TypeName>  a SwiftTUITests suite that runs in its own launch in
+#                        the core lane (contention isolation) and is skipped by
+#                        every shard.
+#
+# Regexes are matched by swift-testing against the fully qualified test name
+# (`SwiftTUITests.<SuiteType>/<test>()`) and by the coverage check with
+# `grep -E`, so keep to anchors, groups, and alternation — no lookahead, no
+# whitespace. A shard whose regex claims nothing fails the coverage check
+# (`swift test --filter` that matches nothing exits 0 silently).
+#
+# Split from the measured 2026-08-25 lane profile (plan §2 item 3, §5 1a):
+# A ≈ 330 s, B ≈ 320 s, C ≈ 420 s serialized on amd64.
+A|^SwiftTUITests\.FrameworkStress(PopoverTipLifecycle|NavigationPresentation|StateIdentity|ObservationEffects|LayoutLifecycle|LayoutProposal)
+B|^SwiftTUITests\.FrameworkStress
+C|^SwiftTUITests\.
+isolated|AsyncLifecycleGenerationTests
+isolated|AsyncFrameTailRenderingTests
+isolated|TaskReadsUnbodiedStateTests
+isolated|PerTickPresentCadenceTests
+isolated|ObservationDraftWindowRuntimeTests

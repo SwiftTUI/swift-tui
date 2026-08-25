@@ -21,6 +21,18 @@
 #
 # `_DarwinFoundation1/2/3` are stdlib Darwin overlays present even in pure-stdlib
 # code; they are deliberately not treated as Foundation here.
+#
+# Two modes:
+#   (no arguments)      build the layers into .build/foundation-audit with the
+#                       trace flag and audit that scratch (self-contained; for
+#                       ad-hoc use).
+#   --trace-dir <dir>   audit the traces of an EXISTING build whose every swiftc
+#                       invocation carried `-emit-loaded-module-trace` (the repo
+#                       gate's lanes build this way — Scripts/test_all.sh
+#                       `emit_module_trace`), so the audit costs no second
+#                       compile. <dir> is typically `.build/debug`.
+#   --dump <file>       also write the sorted list of local modules the walk
+#                       visited (used once to prove the two modes equivalent).
 
 set -eu
 
@@ -34,34 +46,77 @@ fi
 
 layers="SwiftTUIPrimitives SwiftTUIGraph SwiftTUICore SwiftTUIViews"
 scratch=".build/foundation-audit"
+trace_dir=""
+dump_file=""
 
-rm -rf "$scratch"
-mkdir -p "$scratch"
-
-target_args=""
-for layer in $layers; do
-  target_args="$target_args --target $layer"
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+  --trace-dir)
+    shift
+    if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+      >&2 echo "--trace-dir requires a directory."
+      exit 2
+    fi
+    trace_dir=$1
+    ;;
+  --dump)
+    shift
+    if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+      >&2 echo "--dump requires a file path."
+      exit 2
+    fi
+    dump_file=$1
+    ;;
+  *)
+    >&2 echo "usage: $0 [--trace-dir <dir>] [--dump <file>]"
+    exit 2
+    ;;
+  esac
+  shift
 done
 
-echo "[check_foundation_free_layers] Building ($layers) with -emit-loaded-module-trace..." >&2
-# shellcheck disable=SC2086
-if ! swiftly run swift build --scratch-path "$scratch" $target_args \
-  -Xswiftc -emit-loaded-module-trace >"$scratch/build.log" 2>&1; then
-  >&2 echo "[check_foundation_free_layers] build failed:"
-  >&2 tail -40 "$scratch/build.log"
-  exit 1
+if [ -n "$trace_dir" ]; then
+  if [ ! -d "$trace_dir" ]; then
+    >&2 echo "[check_foundation_free_layers] no such trace directory: $trace_dir"
+    >&2 echo "Build first with -Xswiftc -emit-loaded-module-trace, or run without --trace-dir."
+    exit 1
+  fi
+  scratch=$trace_dir
+  echo "[check_foundation_free_layers] Auditing existing module traces under $trace_dir..." >&2
+else
+  rm -rf "$scratch"
+  mkdir -p "$scratch"
+
+  target_args=""
+  for layer in $layers; do
+    target_args="$target_args --target $layer"
+  done
+
+  echo "[check_foundation_free_layers] Building ($layers) with -emit-loaded-module-trace..." >&2
+  # shellcheck disable=SC2086
+  if ! swiftly run swift build --scratch-path "$scratch" $target_args \
+    -Xswiftc -emit-loaded-module-trace >"$scratch/build.log" 2>&1; then
+    >&2 echo "[check_foundation_free_layers] build failed:"
+    >&2 tail -40 "$scratch/build.log"
+    exit 1
+  fi
 fi
 
 violations=$(
-  python3 - "$scratch" $layers <<'PY'
+  SWIFTTUI_FOUNDATION_AUDIT_DUMP="$dump_file" python3 - "$scratch" $layers <<'PY'
 import glob
 import json
 import os
 import re
 import sys
 
-scratch = os.path.abspath(sys.argv[1])
+# realpath, not abspath: `.build/debug` is a symlink to `.build/<triple>/debug`,
+# and the trace records name modules by their real path. The containment test
+# below decides which modules are local (and therefore walked), so a symlinked
+# scratch would silently make the transitive walk shallow.
+scratch = os.path.realpath(sys.argv[1])
 layers = sys.argv[2:]
+dump_path = os.environ.get("SWIFTTUI_FOUNDATION_AUDIT_DUMP", "")
 
 # Exact module names that mean "Foundation reached this module". The
 # `_DarwinFoundation*` stdlib overlays are intentionally excluded.
@@ -131,6 +186,11 @@ while to_visit:
             to_visit.append(name)
     if found:
         failures.append(f"{module}: imports {', '.join(sorted(found))}")
+
+if dump_path:
+    with open(dump_path, "w") as dump:
+        for name in sorted(visited):
+            dump.write(name + "\n")
 
 for failure in sorted(failures):
     print(failure)
