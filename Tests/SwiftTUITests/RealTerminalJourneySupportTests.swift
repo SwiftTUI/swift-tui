@@ -181,9 +181,9 @@ struct RealTerminalJourneySupportTests {
           stallBudget: .milliseconds(300)
         )
         defer { pty.close() }
-        // A journey that never touches the harness again. Only the watchdog
-        // can end this process before the sleep does.
-        try await Task.sleep(for: .seconds(30))
+        // A journey that never touches the harness again: this suspends for
+        // good, so only the watchdog can end the process.
+        await suspendUntilCancelled()
       }
       let diagnostic = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
       #expect(diagnostic.contains("real-terminal journey watchdog fired"))
@@ -227,8 +227,9 @@ struct RealTerminalJourneySupportTests {
       #expect(watchdog.isArmed)
       pty.closeMaster()
       #expect(!watchdog.isArmed)
-      // Idle for four budgets after disarming: the process must survive.
-      try await Task.sleep(for: .milliseconds(800))
+      // Idle for four budgets after disarming: the process must survive. The
+      // signal awaited here is the absence of one, so it is deadline-shaped.
+      await AsyncEvent.firing(after: .milliseconds(800)).wait()
       pty.close()
     }
   #endif
