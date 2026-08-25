@@ -1,4 +1,5 @@
 @unsafe @preconcurrency public import Dispatch
+import Foundation
 public import SwiftTUICore
 import Synchronization
 
@@ -69,11 +70,14 @@ import Synchronization
   case writeMadeNoProgress
   case reachedEndOfFile(rendered: String, transcript: PTYByteTranscript)
   case timedOut(rendered: String, transcript: PTYByteTranscript)
+  case watchdogUnavailable(reason: String)
 
   @_spi(Testing) public var description: String {
     switch self {
     case .unsupportedPlatform:
       "Real-terminal journeys require Darwin or Glibc PTY support"
+    case .watchdogUnavailable(let reason):
+      "The real-terminal journey watchdog sidecar could not start: \(reason)"
     case .operationFailed(let operation, let errorNumber):
       "\(operation) failed with errno \(errorNumber)"
     case .writeMadeNoProgress:
@@ -174,12 +178,34 @@ import Synchronization
         )
       }
 
-      let watchdog = stallBudget.map { budget in
-        RealTerminalJourneyWatchdog.arm(
-          fileDescriptor: master,
-          stallBudget: budget,
-          origin: "\(fileID):\(line)"
+      // Neither descriptor may leak into the watchdog sidecar (or any other
+      // child spawned without explicit file actions): a stray master would
+      // keep the pair's child from ever seeing hangup, a stray slave would
+      // keep the master from ever reaching end of file. Children that need
+      // the slave receive it through dup2, which clears the flag on the copy.
+      for descriptor in [master, slave] where fcntl(descriptor, F_SETFD, FD_CLOEXEC) != 0 {
+        let errorNumber = errno
+        _ = DarwinOrGlibcClose(master)
+        _ = DarwinOrGlibcClose(slave)
+        throw RealTerminalJourneyError.operationFailed(
+          operation: "fcntl(F_SETFD, FD_CLOEXEC)",
+          errno: errorNumber
         )
+      }
+
+      let watchdog: RealTerminalJourneyWatchdog?
+      do {
+        watchdog = try stallBudget.map { budget in
+          try RealTerminalJourneyWatchdog.arm(
+            fileDescriptor: master,
+            stallBudget: budget,
+            origin: "\(fileID):\(line)"
+          )
+        }
+      } catch {
+        _ = DarwinOrGlibcClose(master)
+        _ = DarwinOrGlibcClose(slave)
+        throw error
       }
       return RealTerminalPTYPair(master: master, slave: slave, watchdog: watchdog)
     #else
@@ -239,56 +265,78 @@ import Synchronization
 ///
 /// Every ``RealTerminalPTYPair`` arms one watchdog in `open` and disarms it
 /// when its master descriptor closes. Progress is any harness traffic on that
-/// pair: a wait starting or finishing, bytes read, bytes written. The journey
-/// counts as stalled once `stallBudget` elapses with no progress, measured
-/// from the later of the last activity and the deadline of the wait in flight;
-/// a wait may run to its own deadline, and only overshooting that deadline by
-/// the budget is a stall. Healthy journeys that run for minutes keep touching
-/// the harness every few seconds and are never affected.
+/// pair — a wait starting or finishing, bytes read, bytes written — and each
+/// one is recorded as a heartbeat. The journey counts as stalled once
+/// `stallBudget` passes with no heartbeat; every consumer wait carries a
+/// deadline well inside the default budget, so healthy journeys that run for
+/// minutes keep heartbeating and are never affected.
 ///
-/// Swift Testing's `.timeLimit` cannot stop a body that never reaches a
-/// suspension point: a blocked syscall, a spinning parser, a continuation
-/// nobody resumes. This watchdog ticks on a libdispatch queue, independent of
-/// the cooperative pool and of task cancellation, and terminates the process
-/// with `_exit(70)` after flushing stdio and naming the `open` site on stderr.
-/// Test output through a CI pipe is block-buffered, so that flush is what lets
-/// the wedged journey's `◇ Test … started` line reach the log at all.
+/// The watchdog lives OUTSIDE the test process. `arm` spawns a `/bin/sh`
+/// sidecar that polls a heartbeat file and, on a stall, prints a diagnostic
+/// to the inherited stderr (the CI log) and signals the test process: SIGCONT
+/// and SIGABRT first, so a runtime with crash reporting enabled dumps its
+/// threads, then SIGKILL. Nothing inside the test process is trusted: Swift
+/// Testing's `.timeLimit` cannot stop a body that never reaches a suspension
+/// point, and the 0.9.8 example gates wedged a process thoroughly enough that
+/// an in-process libdispatch timer never ran either. The sidecar exits on its
+/// own when the pair disarms or the test process goes away, and removes its
+/// heartbeat file.
 @_spi(Testing) public final class RealTerminalJourneyWatchdog: Sendable {
-  /// Exit status of a test process the watchdog terminated (`EX_SOFTWARE`).
-  @_spi(Testing) public static let stallExitCode: Int32 = 70
-
   private struct State {
     var armed = true
-    var lastActivity: DispatchTime
-    var waitDeadline: DispatchTime?
-  }
-
-  private enum Verdict {
-    case disarmed
-    case healthy
-    case stalled(silentNanoseconds: UInt64, waitOvershootNanoseconds: UInt64?)
+    var heartbeat: UInt64 = 0
+    var lastWrite: DispatchTime
   }
 
   private static let registry = Mutex<[Int32: RealTerminalJourneyWatchdog]>([:])
 
+  /// Polls per `budget / ticks`; a short budget (the harness tests use a few
+  /// hundred milliseconds) still fires promptly and a 60-second budget is
+  /// checked every 15 seconds.
+  private static let ticksPerBudget = 4
+
+  /// The sidecar. Positional arguments: test pid, ticks per budget, tick
+  /// interval in seconds (may be fractional), heartbeat path, open site,
+  /// budget label, grace before SIGKILL. POSIX sh only — this runs on macOS
+  /// and Linux runners alike.
+  private static let sidecarScript = #"""
+    pid=$1; ticks=$2; interval=$3; file=$4; origin=$5; budget=$6; grace=$7
+    last=''; idle=0
+    while :; do
+      sleep "$interval"
+      kill -0 "$pid" 2>/dev/null || { rm -f "$file"; exit 0; }
+      v=$(cat "$file" 2>/dev/null)
+      if [ "$v" = disarmed ]; then rm -f "$file"; exit 0; fi
+      if [ "$v" = "$last" ]; then idle=$((idle + 1)); else idle=0; last=$v; fi
+      if [ "$idle" -ge "$ticks" ]; then
+        printf '\nSwiftTUITestSupport: real-terminal journey watchdog fired: the PTY pair opened at %s made no progress for about %s s (test process %s). Sending SIGABRT for a crash report, then SIGKILL, so CI fails now instead of at the job timeout. The wedged journey is the last "Test ... started" line without a result.\n\n' "$origin" "$budget" "$pid" >&2
+        kill -CONT "$pid" 2>/dev/null
+        kill -ABRT "$pid" 2>/dev/null
+        sleep "$grace"
+        kill -KILL "$pid" 2>/dev/null
+        rm -f "$file"
+        exit 0
+      fi
+    done
+    """#
+
   private let fileDescriptor: Int32
   private let origin: String
-  private let budgetNanoseconds: UInt64
-  private let tickNanoseconds: UInt64
-  private let queue = DispatchQueue(label: "SwiftTUITestSupport.realTerminalJourneyWatchdog")
+  private let heartbeatPath: String
+  private let minimumWriteSpacingNanoseconds: UInt64
   private let state: Mutex<State>
 
-  private init(fileDescriptor: Int32, stallBudget: Duration, origin: String) {
+  private init(
+    fileDescriptor: Int32,
+    origin: String,
+    heartbeatPath: String,
+    minimumWriteSpacingNanoseconds: UInt64
+  ) {
     self.fileDescriptor = fileDescriptor
     self.origin = origin
-    let budget = Self.nanoseconds(in: stallBudget)
-    budgetNanoseconds = budget
-    // Tick often enough that a sub-second budget (the harness tests use a few
-    // hundred milliseconds) fires promptly, without polling a 60-second budget
-    // more than once per second.
-    tickNanoseconds = min(1_000_000_000, max(50_000_000, budget / 4))
-    state = Mutex(State(lastActivity: .now()))
-    scheduleTick()
+    self.heartbeatPath = heartbeatPath
+    self.minimumWriteSpacingNanoseconds = minimumWriteSpacingNanoseconds
+    state = Mutex(State(lastWrite: .now()))
   }
 
   /// Arms a watchdog for `fileDescriptor`, replacing any earlier registration
@@ -297,14 +345,50 @@ import Synchronization
     fileDescriptor: Int32,
     stallBudget: Duration,
     origin: String
-  ) -> RealTerminalJourneyWatchdog {
-    let watchdog = RealTerminalJourneyWatchdog(
-      fileDescriptor: fileDescriptor,
-      stallBudget: stallBudget,
-      origin: origin
-    )
-    registry.withLock { $0[fileDescriptor] = watchdog }
-    return watchdog
+  ) throws -> RealTerminalJourneyWatchdog {
+    #if canImport(Darwin) || canImport(Glibc)
+      let budgetSeconds = max(0.05, seconds(in: stallBudget))
+      let interval = budgetSeconds / Double(ticksPerBudget)
+      let grace = min(20.0, max(1.0, budgetSeconds / 2))
+      let heartbeatPath = FileManager.default.temporaryDirectory
+        .appendingPathComponent(
+          "swifttui-journey-watchdog-\(getpid())-\(fileDescriptor)-\(UUID().uuidString)"
+        )
+        .path
+      do {
+        try writeAtomically("0", to: heartbeatPath)
+      } catch {
+        throw RealTerminalJourneyError.watchdogUnavailable(
+          reason: "could not seed \(heartbeatPath): \(error)"
+        )
+      }
+
+      let sidecar = Process()
+      sidecar.executableURL = URL(fileURLWithPath: "/bin/sh")
+      sidecar.arguments = [
+        "-c", sidecarScript, "swifttui-journey-watchdog",
+        String(getpid()), String(ticksPerBudget), format(interval), heartbeatPath, origin,
+        format(budgetSeconds), format(grace),
+      ]
+      sidecar.standardInput = FileHandle.nullDevice
+      do {
+        try sidecar.run()
+      } catch {
+        try? FileManager.default.removeItem(atPath: heartbeatPath)
+        throw RealTerminalJourneyError.watchdogUnavailable(reason: "\(error)")
+      }
+
+      let watchdog = RealTerminalJourneyWatchdog(
+        fileDescriptor: fileDescriptor,
+        origin: origin,
+        heartbeatPath: heartbeatPath,
+        minimumWriteSpacingNanoseconds: UInt64(interval / 4 * 1_000_000_000)
+      )
+      registry.withLock { $0[fileDescriptor] = watchdog }
+      return watchdog
+    #else
+      throw RealTerminalJourneyError.unsupportedPlatform
+    #endif
   }
 
   /// The armed watchdog for a PTY master descriptor, if any.
@@ -318,131 +402,76 @@ import Synchronization
     state.withLock { $0.armed }
   }
 
-  /// Records harness traffic on the pair.
+  /// Records harness traffic on the pair; rate-limited so a chatty read loop
+  /// does not rewrite the heartbeat file on every chunk.
   @_spi(Testing) public func noteActivity() {
-    state.withLock { $0.lastActivity = .now() }
+    heartbeat(forced: false)
   }
 
-  /// Marks a bounded wait as in flight; it may run to `deadline` before the
-  /// stall budget starts counting.
-  @_spi(Testing) public func beginWait(deadline: DispatchTime) {
-    state.withLock { state in
-      state.lastActivity = .now()
-      state.waitDeadline = deadline
-    }
+  /// Marks a bounded wait as in flight.
+  @_spi(Testing) public func beginWait() {
+    heartbeat(forced: true)
   }
 
   /// Marks the in-flight wait as finished.
   @_spi(Testing) public func endWait() {
-    state.withLock { state in
-      state.lastActivity = .now()
-      state.waitDeadline = nil
-    }
+    heartbeat(forced: true)
   }
 
-  /// Stops the watchdog; the pair calls this when its master descriptor closes.
+  /// Stops the watchdog; the pair calls this when its master descriptor
+  /// closes. The sidecar sees the sentinel within one tick and exits.
   fileprivate func disarm() {
-    state.withLock { $0.armed = false }
+    let wasArmed = state.withLock { state in
+      let wasArmed = state.armed
+      state.armed = false
+      return wasArmed
+    }
+    guard wasArmed else {
+      return
+    }
     Self.registry.withLock { registry in
       if registry[fileDescriptor] === self {
         registry[fileDescriptor] = nil
       }
     }
+    try? Self.writeAtomically("disarmed", to: heartbeatPath)
   }
 
-  private func scheduleTick() {
-    queue.asyncAfter(deadline: .now() + .nanoseconds(Int(tickNanoseconds))) { [weak self] in
-      self?.tick()
-    }
-  }
-
-  private func tick() {
-    let verdict: Verdict = state.withLock { state in
+  private func heartbeat(forced: Bool) {
+    let payload: UInt64? = state.withLock { state in
       guard state.armed else {
-        return .disarmed
+        return nil
       }
-      let now = DispatchTime.now().uptimeNanoseconds
-      let lastActivity = state.lastActivity.uptimeNanoseconds
-      let silent = now > lastActivity ? now - lastActivity : 0
-      var allowedUntil = lastActivity &+ budgetNanoseconds
-      var overshoot: UInt64?
-      if let waitDeadline = state.waitDeadline?.uptimeNanoseconds {
-        allowedUntil = max(allowedUntil, waitDeadline &+ budgetNanoseconds)
-        overshoot = now > waitDeadline ? now - waitDeadline : 0
+      let now = DispatchTime.now()
+      let sinceLastWrite = now.uptimeNanoseconds &- state.lastWrite.uptimeNanoseconds
+      if !forced, sinceLastWrite < minimumWriteSpacingNanoseconds {
+        return nil
       }
-      guard now >= allowedUntil else {
-        return .healthy
-      }
-      return .stalled(silentNanoseconds: silent, waitOvershootNanoseconds: overshoot)
+      state.heartbeat &+= 1
+      state.lastWrite = now
+      return state.heartbeat
     }
-    switch verdict {
-    case .disarmed:
+    guard let payload else {
       return
-    case .healthy:
-      scheduleTick()
-    case .stalled(let silent, let overshoot):
-      terminateStalledProcess(silentNanoseconds: silent, waitOvershootNanoseconds: overshoot)
     }
+    try? Self.writeAtomically(String(payload), to: heartbeatPath)
   }
 
-  private func terminateStalledProcess(
-    silentNanoseconds: UInt64,
-    waitOvershootNanoseconds: UInt64?
-  ) -> Never {
-    var message =
-      "\nSwiftTUITestSupport: real-terminal journey watchdog fired — the PTY pair opened at "
-      + "\(origin) (master fd \(fileDescriptor)) has made no progress for "
-      + "\(Self.seconds(silentNanoseconds)) s (stall budget \(Self.seconds(budgetNanoseconds)) s"
-    if let overshoot = waitOvershootNanoseconds {
-      message += "; the wait in flight overshot its own deadline by \(Self.seconds(overshoot)) s"
-    }
-    message +=
-      "). Terminating the test process with exit code \(Self.stallExitCode) so CI fails now "
-      + "instead of at the job timeout. The wedged journey is the last '◇ Test … started' line "
-      + "without a result; its child process is left for the runner to reap.\n\n"
-    #if canImport(Darwin) || canImport(Glibc)
-      fflush(nil)
-      let bytes = Array(message.utf8)
-      var offset = 0
-      while offset < bytes.count {
-        let written = unsafe bytes.withUnsafeBytes { rawBuffer -> Int in
-          guard let baseAddress = rawBuffer.baseAddress else {
-            return -1
-          }
-          return unsafe write(
-            STDERR_FILENO,
-            baseAddress.advanced(by: offset),
-            bytes.count - offset
-          )
-        }
-        if written > 0 {
-          offset += written
-          continue
-        }
-        if written < 0, errno == EINTR {
-          continue
-        }
-        break
-      }
-      _exit(Self.stallExitCode)
-    #else
-      // A pair never arms on Windows (`open` throws unsupportedPlatform), so
-      // this path only has to compile; a plain exit still fails the job.
-      exit(Self.stallExitCode)
-    #endif
+  private static func writeAtomically(_ contents: String, to path: String) throws {
+    try Data(contents.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
   }
 
-  private static func nanoseconds(in duration: Duration) -> UInt64 {
+  private static func seconds(in duration: Duration) -> Double {
     let (seconds, attoseconds) = duration.components
-    guard seconds >= 0 else {
-      return 0
-    }
-    return UInt64(seconds) * 1_000_000_000 + UInt64(max(0, attoseconds) / 1_000_000_000)
+    return Double(seconds) + Double(attoseconds) / 1e18
   }
 
-  private static func seconds(_ nanoseconds: UInt64) -> String {
-    let tenths = nanoseconds / 100_000_000
-    return "\(tenths / 10).\(tenths % 10)"
+  /// Millisecond-precision decimal text for `sleep`; hand-rolled because
+  /// `String(format:)` is a variadic (unsafe) call under strict memory safety.
+  private static func format(_ seconds: Double) -> String {
+    let milliseconds = Int((seconds * 1_000).rounded())
+    let fraction = String(milliseconds % 1_000)
+    return "\(milliseconds / 1_000)." + String(repeating: "0", count: 3 - fraction.count) + fraction
   }
 }
 
@@ -824,7 +853,7 @@ import Synchronization
     deadline: deadline
   )
   let watchdog = RealTerminalJourneyWatchdog.registered(for: fileDescriptor)
-  watchdog?.beginWait(deadline: deadline)
+  watchdog?.beginWait()
   defer { watchdog?.endWait() }
   do {
     var rendered = screen.renderedText

@@ -170,25 +170,21 @@ struct RealTerminalJourneySupportTests {
 
     // MARK: Journey watchdog
 
-    @Test("journey watchdog ends a stalled test process with exit code 70 and names the open site")
+    @Test("journey watchdog kills a stalled test process and names the open site")
     func journeyWatchdogTerminatesStalledProcess() async {
-      let result = await #expect(
-        processExitsWith: .exitCode(RealTerminalJourneyWatchdog.stallExitCode),
-        observing: [\.standardErrorContent]
-      ) {
+      let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
         let pty = try RealTerminalPTYPair.open(
           size: CellSize(width: 12, height: 3),
           stallBudget: .milliseconds(300)
         )
         defer { pty.close() }
         // A journey that never touches the harness again: this suspends for
-        // good, so only the watchdog can end the process.
+        // good, so only the watchdog sidecar can end the process.
         await suspendUntilCancelled()
       }
       let diagnostic = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
       #expect(diagnostic.contains("real-terminal journey watchdog fired"))
       #expect(diagnostic.contains("RealTerminalJourneySupportTests.swift"))
-      #expect(diagnostic.contains("exit code 70"))
     }
 
     @Test("journey watchdog stays quiet while bounded waits keep making progress")
