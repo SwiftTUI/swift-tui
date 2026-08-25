@@ -188,6 +188,83 @@ struct BounceBadge: View {
 }
 ```
 
+## Animate Along Keyframes
+
+``KeyframeAnimator`` interpolates a value along keyframe tracks and re-renders
+its content with each sample, about twenty times a second. Each
+``KeyframeTrack`` addresses one ``Animatable`` property of the value by key
+path and lists its keyframes: ``LinearKeyframe`` eases to a value along a
+``UnitCurve``, ``CubicKeyframe`` passes through values smoothly,
+``SpringKeyframe`` moves with a ``Spring``, and ``MoveKeyframe`` jumps. Tracks
+run independently; the animation lasts as long as the longest track and a
+shorter track holds its last keyframe.
+
+With a `trigger:`, the keyframes run once per trigger change, starting from
+the current value if a run is still in flight:
+
+```swift
+struct Marker {
+  var y = 0.0
+  var opacity = 1.0
+}
+
+struct BounceStar: View {
+  @State private var taps = 0
+
+  var body: some View {
+    VStack(spacing: 1) {
+      Button("Bounce") { taps += 1 }
+      KeyframeAnimator(initialValue: Marker(), trigger: taps) { marker in
+        Text("★")
+          .offset(x: 0, y: Int(marker.y.rounded()))
+          .opacity(marker.opacity)
+      } keyframes: { _ in
+        KeyframeTrack(\.y) {
+          CubicKeyframe(-3, duration: .milliseconds(400))
+          CubicKeyframe(1, duration: .milliseconds(300))
+          SpringKeyframe(0, spring: .bouncy)
+        }
+        KeyframeTrack(\.opacity) {
+          LinearKeyframe(0.4, duration: .milliseconds(200))
+          LinearKeyframe(1, duration: .milliseconds(600), timingCurve: .easeOut)
+        }
+      }
+    }
+  }
+}
+```
+
+`init(initialValue:repeating:content:keyframes:)` starts on appearance and,
+by default, loops. When the value is itself ``Animatable``, list bare
+keyframes and skip the track:
+
+```swift
+Text("▮")
+  .keyframeAnimator(initialValue: 8.0, repeating: true) { bar, width in
+    bar.frame(width: Int(width.rounded()))
+  } keyframes: { _ in
+    LinearKeyframe(24, duration: .milliseconds(800), timingCurve: .easeInOut)
+    SpringKeyframe(8, spring: .snappy)
+  }
+```
+
+The modifier forms hand the closure a ``PlaceholderContentView`` standing in
+for the modified view. ``KeyframeTimeline`` is the same interpolation as a
+plain value, `KeyframeTimeline(initialValue:content:)` with
+``KeyframeTimeline/value(time:)`` and ``KeyframeTimeline/value(progress:)``,
+for charts and tests. Two things to know:
+
+- Keyframe content does not animate implicitly. The animator writes every
+  sample under a transaction that disables animation, so a surrounding
+  `withAnimation` scope or ``View/animation(_:value:)`` cannot layer a curve
+  on top of the keyframe values, and transitions inside the content are
+  suppressed. Keep the content cheap; it runs on every tick.
+- `Int` properties step, because integer ``VectorArithmetic`` scaling
+  truncates. Use `Double` tracks and round in the content closure.
+
+Under reduce motion a trigger change writes the end value at once and
+repeating mode rests at its initial value.
+
 ## Redraw On A Schedule
 
 ``TimelineView`` re-evaluates its content at instants supplied by a
