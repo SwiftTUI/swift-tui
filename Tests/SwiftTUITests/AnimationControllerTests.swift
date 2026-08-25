@@ -2343,8 +2343,12 @@ struct AnimationControllerPropertyTests {
       )
       let afterLogicalCompletion = fireCount.count
 
-      _ = controller.placedAnimationOverlaySnapshot(
-        for: livePlaced,
+      // The head tick after the one-turn hold owns the purge and the
+      // `.removed` barrier: an elided frame runs no placed pass, so the
+      // barrier cannot depend on a second placed sample.
+      var held = removed
+      _ = controller.applyInterpolations(
+        to: &held,
         at: start.advanced(by: .milliseconds(201))
       )
       return (afterLogicalCompletion, fireCount.count)

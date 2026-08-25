@@ -50,6 +50,10 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   (an underdamped bounce, or a spring released toward its target), so
   bouncy springs finish where they actually come to rest.
 
+### Fixed
+
+- Exit-transition `.removed` completions fire on the controller's own turn. Once the overlay had faded out, every following deadline frame was elided, and an elided frame runs no placed pass, so the purge that releases `.removed` waited for the next outside input. The purge now runs at the head tick after the one-turn hold (`AnimationController.applyInterpolations`).
+
 ## [0.9.9] - 2026-08-24
 
 ### Fixed

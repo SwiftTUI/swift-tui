@@ -520,8 +520,13 @@ package final class AnimationController: Sendable {
     }
     // Keep the final visual for one committed turn so logical completion and
     // overlay removal are observably distinct barriers: the curve's end
-    // releases the batch's logical retain (its `.logicallyComplete`
-    // registrations fire), the overlay's removal the `.removed` one.
+    // releases the batch's logical retain here (its `.logicallyComplete`
+    // registrations fire); the next head tick purges the overlay and releases
+    // the `.removed` one (`applyInterpolations`). The purge lives at the head,
+    // not here, because a frame whose surface no longer changes is elided
+    // without a placed pass — an exit overlay that had faded out would
+    // otherwise never purge, and its `.removed` completion would wait for
+    // the next outside input.
     for viewNodeID in result.completedRemovalNodeIDs {
       guard var entry = removingNodes[viewNodeID] else { continue }
       guard entry.completionBatchID != nil else {
@@ -532,9 +537,6 @@ package final class AnimationController: Sendable {
         entry.isLogicallyComplete = true
         releaseLogicalBatch(entry.completionBatchID)
         removingNodes[viewNodeID] = entry
-      } else {
-        removingNodes.removeValue(forKey: viewNodeID)
-        releaseBatch(entry.completionBatchID, logicalAlreadyReleased: true)
       }
     }
 
@@ -999,7 +1001,9 @@ package final class AnimationController: Sendable {
       _ rhs: ResolvedNode,
       path: String
     ) -> String? {
-      if lhs.identity != rhs.identity { return "\(path): identity" }
+      if lhs.identity != rhs.identity {
+        return "\(path): identity prev=\(lhs.identity.path) current=\(rhs.identity.path)"
+      }
       if lhs.viewNodeID != rhs.viewNodeID {
         let lhsStamp = lhs.viewNodeID.map { "\($0.rawValue)" } ?? "nil"
         let rhsStamp = rhs.viewNodeID.map { "\($0.rawValue)" } ?? "nil"
@@ -2287,6 +2291,16 @@ package final class AnimationController: Sendable {
         let box = entry.animationBox,
         registeredAnimations[box] != nil
       {
+        if entry.isLogicallyComplete {
+          // The placed pass ended this overlay's curve on the previous
+          // committed turn and held its final visual for that turn. Purging
+          // here, at the head, fires the `.removed` barrier on this frame
+          // whether or not a placed pass follows (elided frames run none).
+          removingNodes.removeValue(forKey: viewNodeID)
+          releaseBatch(entry.completionBatchID, logicalAlreadyReleased: true)
+          redrawIdentities.insert(entry.identity)
+          continue
+        }
         redrawIdentities.insert(entry.identity)
         latestDeadline = timestamp.advanced(by: frameInterval)
         hasPendingWork = true
