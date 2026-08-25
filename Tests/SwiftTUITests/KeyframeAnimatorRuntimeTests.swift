@@ -438,19 +438,21 @@ private final class KeyframeAnimatorHarness<Content: View> {
   }
 
   /// Suspends until the scheduler has a pending frame or `limit` elapses.
+  /// The wait is signal-driven (the scheduler's wake); the Support deadline
+  /// event is only the failure bound, and the signal resumes on cancellation.
   private func awaitPendingFrame(within limit: Duration) async {
+    let deadline = AsyncEvent.firing(after: limit)
+    await withTaskGroup(of: Void.self) { group in
+      group.addTask { await self.awaitFrameSignal() }
+      group.addTask { await deadline.wait() }
+      await group.next()
+      group.cancelAll()
+    }
+  }
+
+  private func awaitFrameSignal() async {
     let scheduler = self.scheduler
-    let schedulerWake = self.schedulerWake
-    // The signal resumes on cancellation, so a timer task bounds the wait.
-    let waiter = Task { @MainActor in
-      await schedulerWake.wait(until: { scheduler.hasPendingFrame() })
-    }
-    let timer = Task { @MainActor in
-      try? await Task.sleep(for: limit)
-      waiter.cancel()
-    }
-    await waiter.value
-    timer.cancel()
+    await schedulerWake.wait(until: { scheduler.hasPendingFrame() })
   }
 }
 

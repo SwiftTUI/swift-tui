@@ -24,6 +24,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_PERSISTENT_LAYOUT_CACHE",
         "SWIFTTUI_FOCUS_MOVE_NARROWING",
         "SWIFTTUI_STATE_CAPTURE_BINDING",
+        "SWIFTTUI_ANIMATION_VELOCITY",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)

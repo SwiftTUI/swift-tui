@@ -123,6 +123,7 @@ share the standard boolean grammar.
 | `SWIFTTUI_SOUNDNESS_PROBE` | on | The reconciliation soundness probe: read-only oracles (stamp coherence, checkpoint equality, teardown coherence, …) run on sampled frames in release and every frame in debug. `0` opts out. |
 | `SWIFTTUI_SOUNDNESS_PROBE_SAMPLE` | `256` release, `1` debug | Runs the oracles on 1-in-*N* frames. Driven by the frame counter, so sampling is deterministic. |
 | `SWIFTTUI_SOUNDNESS_PROBE_TRACE` | off | Emits one `[SOUNDNESS]` line per recorded violation. Also armable via `SWIFTTUI_TRACE=soundness`. |
+| `SWIFTTUI_ANIMATION_VELOCITY` | on | The animation velocity channel: a built-in spring retargeted mid-flight carries the outgoing curve's velocity, and writes made under `Transaction.tracksVelocity` seed the next spring on the same value. `0` restores the at-rest restart wholesale (one-release kill switch). |
 | `SWIFTTUI_STATE_CAPTURE_BINDING` | on | Binds `@State` ownership into the view copies that body evaluation captures, so imperative closures resolve state through their carried owner. `0` disables the bind pass as a diagnostic A/B lever; it does not restore the earlier ambient-dispatch behavior. |
 | `SWIFTTUI_SOUNDNESS_PROBE_TRACE_FILE` | stderr | Path that receives the soundness trace lines instead of the debug bundle's `soundness.log` or stderr. |
 | `SWIFTTUI_RASTER_VERIFY_INCREMENTAL` | debug on, release off | Forces the incremental-raster verification policy: re-rasters fresh and compares byte-for-byte, recording any mismatch. |

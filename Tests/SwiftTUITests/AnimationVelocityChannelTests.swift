@@ -1,4 +1,3 @@
-import Foundation
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -202,13 +201,18 @@ struct AnimationVelocityChannelTests {
     }
     defer { harness.shutdown() }
     let controller = harness.runLoop.renderer.internalAnimationController
+    // Each drag frame needs its own instant for the velocity ring: drive the
+    // run loop's frame clock instead of waiting on the wall clock.
+    let clock = VirtualFrameClock()
+    harness.runLoop.frameClock = { clock.now }
 
     try withAnimationSinks(controller) {
       try harness.clickText("drag")
-      Thread.sleep(forTimeInterval: 0.02)
+      clock.advance(by: .milliseconds(20))
       try harness.clickText("drag")
-      Thread.sleep(forTimeInterval: 0.02)
+      clock.advance(by: .milliseconds(20))
       try harness.clickText("drag")
+      clock.advance(by: .milliseconds(20))
       #expect(controller.activeAnimationCount == 0, "tracking writes snap")
       #expect(controller.velocitySamplerCount == 1, "the drag writes fill one slot ring")
       try harness.clickText("release")
@@ -228,6 +232,15 @@ struct AnimationVelocityChannelTests {
 }
 
 // MARK: - Fixtures
+
+@MainActor
+private final class VirtualFrameClock {
+  private(set) var now = MonotonicInstant.now()
+
+  func advance(by duration: Duration) {
+    now = now.advanced(by: duration)
+  }
+}
 
 @MainActor
 private struct VelocityDragFixture: View {

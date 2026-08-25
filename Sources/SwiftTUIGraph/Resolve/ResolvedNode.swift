@@ -162,13 +162,23 @@ package struct ResolvedNode: Equatable, Sendable {
   /// alongside `viewNodeID`.
   package private(set) var subtreeRuntimeNodeIDsStamped: Bool
   /// Matched-geometry configuration set by
-  /// `View.matchedGeometryEffect(id:in:isSource:)`.  When two
-  /// views in different frames (typically behind an `if`/`else`
+  /// `View.matchedGeometryEffect(id:in:properties:anchor:isSource:)`.  When
+  /// two views in different frames (typically behind an `if`/`else`
   /// branch) share the same key, the animation controller treats
   /// the swap as a single view moving from the previous frame's
   /// placed bounds to the new frame's placed bounds and animates
-  /// the translation under `withAnimation`.
-  package var matchedGeometry: MatchedGeometryConfig? = nil
+  /// the translation (and, per `properties`, the size) under
+  /// `withAnimation`.
+  ///
+  /// Boxed and optional on purpose: the config carries a key string, a
+  /// `UnitPoint`, and flags, and storing it inline pushed `ResolvedNode`
+  /// past its teardown size budget (`DeepTreeTeardownTests`). `nil` is the
+  /// common case; only matched nodes populate it.
+  package var matchedGeometry: MatchedGeometryConfig? {
+    get { _boxedMatchedGeometry?.value }
+    set { _boxedMatchedGeometry = newValue.map(Boxed.init) }
+  }
+  private var _boxedMatchedGeometry: Boxed<MatchedGeometryConfig>? = nil
   /// Marks the node (and transitively any node that inherits this
   /// flag via the layout engine) as a non-semantic visual overlay.
   /// The animation controller sets this on every node in a removal
