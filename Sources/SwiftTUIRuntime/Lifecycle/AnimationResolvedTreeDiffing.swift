@@ -35,7 +35,14 @@ struct MatchedGeometryAnimationPlan {
 
 struct MatchedGeometryAnimationPlans {
   var animations: [MatchedGeometryAnimationPlan]
-  var consumedKeys: Set<MatchedGeometryKey>
+  /// The live identity that received each key consumed by a match this
+  /// frame — the counterpart a departing instance's exit overlay travels
+  /// toward while its transition plays.
+  var destinationIdentityByKey: [MatchedGeometryKey: Identity]
+
+  var consumedKeys: Set<MatchedGeometryKey> {
+    Set(destinationIdentityByKey.keys)
+  }
 }
 
 enum AnimationResolvedTreeDiffing {
@@ -46,7 +53,7 @@ enum AnimationResolvedTreeDiffing {
     transactionForIdentity: (Identity) -> TransactionSnapshot
   ) -> MatchedGeometryAnimationPlans {
     var animations: [MatchedGeometryAnimationPlan] = []
-    var consumedKeys: Set<MatchedGeometryKey> = []
+    var destinationIdentityByKey: [MatchedGeometryKey: Identity] = [:]
     for (identity, config) in newMatchedConfigsByIdentity {
       let key = config.key
       if let previousIdentity = previousMatchedKeyIdentities[key],
@@ -72,9 +79,9 @@ enum AnimationResolvedTreeDiffing {
           batchID: transaction.animationBatchID
         )
       )
-      consumedKeys.insert(key)
+      destinationIdentityByKey[key] = identity
     }
 
-    return .init(animations: animations, consumedKeys: consumedKeys)
+    return .init(animations: animations, destinationIdentityByKey: destinationIdentityByKey)
   }
 }

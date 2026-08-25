@@ -111,6 +111,13 @@ extension View {
   /// `.background(...).border(...).matchedGeometryEffect(...)`, since the
   /// modifier tags its content.
   ///
+  /// A `transition(_:)` on each instance composes with the match: the
+  /// departing instance's exit overlay travels to the destination rect while
+  /// its removal phase plays, and the arriving instance's insertion phase
+  /// plays from the source rect, so `.transition(.opacity)` on both
+  /// cross-fades the pair along one path. Without a transition the departing
+  /// instance is cut on the swap frame.
+  ///
   /// `isSource: false` lets you have multiple views with the same
   /// key where only the designated source view contributes its
   /// geometry as the "from" reference. A non-source instance receives the

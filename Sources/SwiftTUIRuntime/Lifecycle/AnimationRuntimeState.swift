@@ -152,10 +152,46 @@ package struct RemovalEntry: Sendable {
   /// cached), the controller falls back to the resolved-level
   /// injection path — see ``applyInterpolations(to:at:)``.
   package var placedSnapshot: PlacedNode? = nil
+  /// Set when the departing subtree carries a matched-geometry instance
+  /// whose key swapped to a live counterpart on the removal frame. The exit
+  /// overlay then travels to the counterpart's rect while its transition
+  /// plays, so the pair coincides and cross-fades along one path — the
+  /// SwiftUI behavior where a view in its removal transition is positioned
+  /// onto the new source. `nil` fades in place.
+  package var matchedTravel: MatchedRemovalTravel? = nil
   /// Per-key persistent state threaded into the removal animation's
   /// ``CustomAnimation/animate(value:time:context:)`` on each tick.
   /// Built-in bezier/spring curves ignore this; custom animations can
   /// use it to persist bookkeeping across the frames of an exit
   /// transition (e.g. a spring that accumulates velocity).
   package var customState: AnimationState = .init()
+}
+
+/// The counterpart a departing matched-geometry instance travels toward
+/// during its exit transition (``RemovalEntry/matchedTravel``).
+package struct MatchedRemovalTravel: Sendable, Equatable {
+  /// The matched node inside the frozen exit overlay: its frozen rect is
+  /// the `from`, and the interpolated rect is applied to it (and its
+  /// coextensive decoration) exactly as the live side applies a match.
+  package var matchedIdentity: Identity
+  /// The live identity that received the key this frame. Its rect is read
+  /// from the current placed tree on every sample, so a destination that
+  /// re-lays out mid-animation is still tracked.
+  package var destinationIdentity: Identity
+  /// The departing instance's own `properties` and `anchor`, as SwiftUI
+  /// reads the non-source's configuration.
+  package var properties: MatchedGeometryProperties
+  package var anchor: UnitPoint
+
+  package init(
+    matchedIdentity: Identity,
+    destinationIdentity: Identity,
+    properties: MatchedGeometryProperties,
+    anchor: UnitPoint
+  ) {
+    self.matchedIdentity = matchedIdentity
+    self.destinationIdentity = destinationIdentity
+    self.properties = properties
+    self.anchor = anchor
+  }
 }

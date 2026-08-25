@@ -95,6 +95,26 @@ enum AnimationTreeQueries {
     return nil
   }
 
+  /// Pre-order search of a resolved subtree for the first node carrying a
+  /// matched-geometry config that satisfies `predicate`. A removal overlay's
+  /// registered identity may sit above the matched node
+  /// (`.matchedGeometryEffect(...).padding(1).transition(...)`), so the
+  /// departing subtree is searched rather than the registered node alone.
+  static func firstMatchedGeometry(
+    in root: ResolvedNode,
+    where predicate: (MatchedGeometryConfig) -> Bool
+  ) -> (identity: Identity, config: MatchedGeometryConfig)? {
+    if let config = root.matchedGeometry, predicate(config) {
+      return (root.identity, config)
+    }
+    for child in root.children {
+      if let found = firstMatchedGeometry(in: child, where: predicate) {
+        return found
+      }
+    }
+    return nil
+  }
+
   /// Returns the set of every identity in a subtree, including the root.
   static func collectIdentities(in subtree: ResolvedNode) -> Set<Identity> {
     var result: Set<Identity> = [subtree.identity]

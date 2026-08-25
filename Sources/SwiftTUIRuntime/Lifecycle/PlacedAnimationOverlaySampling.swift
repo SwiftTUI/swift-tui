@@ -14,6 +14,7 @@ package enum PlacedAnimationOverlaySampling {
     let removalResult = sampleRemovalOverlays(
       removingNodes: removingNodes,
       registeredAnimations: registeredAnimations,
+      tree: tree,
       timestamp: timestamp,
       surfaceSize: effectiveSurfaceSize
     )
@@ -63,6 +64,7 @@ package enum PlacedAnimationOverlaySampling {
   private static func sampleRemovalOverlays(
     removingNodes: [ViewNodeID: RemovalEntry],
     registeredAnimations: [AnimationBox: Animation],
+    tree: PlacedNode,
     timestamp: MonotonicInstant,
     surfaceSize: CellSize
   ) -> RemovalSamplingResult {
@@ -110,17 +112,67 @@ package enum PlacedAnimationOverlaySampling {
         progress: progress,
         surfaceSize: surfaceSize
       )
+      let matchedGeometryOffset = entry.matchedTravel.flatMap { travel in
+        matchedRemovalOffset(
+          travel: travel,
+          overlay: placedSnapshot,
+          tree: tree,
+          progress: progress
+        )
+      }
       result.overlays.append(
         .init(
           parentIdentity: parentId,
           childIndex: entry.childIndex,
           snapshot: placedSnapshot,
-          modifiers: modifiers
+          modifiers: modifiers,
+          matchedGeometryOffset: matchedGeometryOffset
         )
       )
     }
 
     return result
+  }
+
+  /// The departing matched node's placed delta at `progress`: its frozen
+  /// rect inside the exit overlay interpolates toward the live counterpart's
+  /// current rect under the same anchor-space rule as the live side
+  /// (`interpolatedMatchedRect`), so the two instances coincide while their
+  /// transitions cross-fade. The delta is relative to the frozen rect, where
+  /// the overlay already sits; the live side's delta is relative to its
+  /// destination. `nil` when either rect is missing — the overlay then fades
+  /// in place.
+  private static func matchedRemovalOffset(
+    travel: MatchedRemovalTravel,
+    overlay: PlacedNode,
+    tree: PlacedNode,
+    progress: Double
+  ) -> PlacedAnimationOverlayOffset? {
+    guard
+      let fromBounds = AnimationTreeQueries.findBounds(
+        in: overlay,
+        identity: travel.matchedIdentity
+      ),
+      let toBounds = AnimationTreeQueries.findBounds(
+        in: tree,
+        identity: travel.destinationIdentity
+      )
+    else {
+      return nil
+    }
+    let rect = interpolatedMatchedRect(
+      from: fromBounds,
+      to: toBounds,
+      properties: travel.properties,
+      anchor: travel.anchor,
+      progress: progress
+    )
+    return .init(
+      identity: travel.matchedIdentity,
+      dx: rect.origin.x - fromBounds.origin.x,
+      dy: rect.origin.y - fromBounds.origin.y,
+      size: travel.properties.contains(.size) ? rect.size : nil
+    )
   }
 
   private static func sampleInsertionOffsets(

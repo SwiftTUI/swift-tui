@@ -633,6 +633,16 @@ are omitted even when SwiftUI exposes a corresponding API.
   node's bounds (a `.background`, an overlay, full-frame chrome) resize with
   it. Because the modifier tags its content, chrome that should follow the
   box goes inside the modifier.
+- **A matched-geometry swap plays the pair's transitions along the matched
+  path; there is no default transition.** *Ratified* / *Gap*. The departing
+  instance's exit overlay travels to the destination rect while its removal
+  phase plays and the arriving instance's insertion phase plays from the
+  source rect, so `.transition(.opacity)` on both cross-fades like SwiftUI's
+  removal-positioned-onto-source behaviour. An offset transition composes
+  additively with the matched translation. The remaining *Gap*: SwiftUI
+  applies a default `.opacity` transition to any view whose presence changes
+  inside an animated transaction; SwiftTUI plays only registered
+  transitions, so an untransitioned swap (or conditional) cuts.
 - **Co-present non-source instances are not positioned onto their source.**
   *Gap.* A view with `isSource: false` receives the match when the key swaps
   to it between frames; an instance on screen together with its source is

@@ -1226,8 +1226,8 @@ package final class AnimationController: Sendable {
     // frame's — regardless of whether either identity is newly
     // inserted.  Both "swap via reorder" and "swap via if/else"
     // cases are handled by comparing previous vs new key→identity
-    // maps.  Collect the set of keys that matched so the
-    // counterpart removal/transition can be skipped.
+    // maps.  Record which live identity received each matched key so
+    // the counterpart's exit overlay can travel toward it.
     let matchedGeometryPlans = AnimationResolvedTreeDiffing.matchedGeometryPlans(
       newMatchedConfigsByIdentity: newMatchedConfigsByIdentity,
       previousMatchedKeyIdentities: previousMatchedKeyIdentities,
@@ -1237,7 +1237,7 @@ package final class AnimationController: Sendable {
           ?? transactionPlan.transaction(for: identity)
       }
     )
-    let matchedKeysConsumedByMatch = matchedGeometryPlans.consumedKeys
+    let matchedDestinationsByKey = matchedGeometryPlans.destinationIdentityByKey
     for plan in matchedGeometryPlans.animations {
       let matchedKey = AnimationKey(
         identity: plan.identity, scope: .matchedGeometry
@@ -1259,11 +1259,16 @@ package final class AnimationController: Sendable {
     }
 
     // Process insertions: kick off willAppear -> identity animations.
-    // Skip insertions that are part of a matched-geometry swap —
-    // those use the matched-geometry pathway and shouldn't fire a
-    // redundant willAppear transition.
+    // A matched-geometry swap does not suppress the arriving instance's
+    // transition: the match owns the geometry (a placed-level translate and
+    // resize) and the transition owns opacity and offset, and the two
+    // compose — `.transition(.opacity)` fades the arriving instance in
+    // along the matched path while the departing instance's exit overlay
+    // travels the same path (`planRemovalOverlay`), the cross-fade SwiftUI
+    // shows when a view in its removal transition is positioned onto the
+    // new source.
     //
-    // Also skip structural first-appearances: when an identity's
+    // Skip structural first-appearances: when an identity's
     // parent was also just inserted, the whole subtree appeared
     // because a container was mounted (e.g. tab switch), NOT because
     // a conditional toggled inside withAnimation.  Playing insertion
@@ -1272,11 +1277,6 @@ package final class AnimationController: Sendable {
     // transaction.  This matches SwiftUI, which only fires
     // .transition() when the view's conditional presence changes.
     for identity in insertedIdentities {
-      if let key = newMatchedConfigsByIdentity[identity]?.key,
-        matchedKeysConsumedByMatch.contains(key)
-      {
-        continue
-      }
       // Structural first-appearance guard: if the parent identity is
       // also freshly inserted, this view appeared as part of a bulk
       // mount, not a conditional toggle.
@@ -1352,11 +1352,10 @@ package final class AnimationController: Sendable {
       planRemovalOverlay(
         removedNodeID: removedNodeID,
         identity: previousNode.identity,
-        matchedGeometryKey: previousNode.matchedGeometry?.key,
         transition: transition,
         previousRoot: previousRoot,
         newIdentities: newIdentities,
-        matchedKeysConsumedByMatch: matchedKeysConsumedByMatch,
+        matchedDestinationsByKey: matchedDestinationsByKey,
         transactionPlan: transactionPlan,
         timestamp: timestamp
       )
@@ -1381,19 +1380,18 @@ package final class AnimationController: Sendable {
         transitionIdentitiesByNodeID[nodeID] == nil,
         let transition = previousTransitionsByNodeID[nodeID],
         let previousRoot = previousTreeRoot,
-        let previousNode = AnimationTreeQueries.findResolvedNode(
+        AnimationTreeQueries.findResolvedNode(
           in: previousRoot,
           identity: registeredIdentity
-        )
+        ) != nil
       else { continue }
       planRemovalOverlay(
         removedNodeID: nodeID,
         identity: registeredIdentity,
-        matchedGeometryKey: previousNode.matchedGeometry?.key,
         transition: transition,
         previousRoot: previousRoot,
         newIdentities: newIdentities,
-        matchedKeysConsumedByMatch: matchedKeysConsumedByMatch,
+        matchedDestinationsByKey: matchedDestinationsByKey,
         transactionPlan: transactionPlan,
         timestamp: timestamp
       )
@@ -1602,23 +1600,13 @@ package final class AnimationController: Sendable {
   private func planRemovalOverlay(
     removedNodeID: ViewNodeID,
     identity: Identity,
-    matchedGeometryKey: MatchedGeometryKey?,
     transition: AnyTransition,
     previousRoot: ResolvedNode,
     newIdentities: Set<Identity>,
-    matchedKeysConsumedByMatch: Set<MatchedGeometryKey>,
+    matchedDestinationsByKey: [MatchedGeometryKey: Identity],
     transactionPlan: FrameAnimationTransactionPlan,
     timestamp: MonotonicInstant
   ) {
-    // If the removed identity's matched-geometry key was consumed by a match
-    // on this frame, the counterpart insertion already owns the visual
-    // transition.  Skip the removal overlay so the old view just disappears.
-    if let matchedGeometryKey,
-      matchedKeysConsumedByMatch.contains(matchedGeometryKey)
-    {
-      return
-    }
-
     // Resolve the injection point: the deepest disappearing ancestor (the
     // subtree to inject) and the first surviving ancestor it attaches to.
     // See `AnimationTransitionRemovalPlanning` for the walk-up rules.
@@ -1640,6 +1628,25 @@ package final class AnimationController: Sendable {
         identity: injectionTarget
       )
     else { return }
+
+    // A departing matched-geometry instance whose key swapped to a live
+    // counterpart this frame keeps its exit transition: the overlay travels
+    // to the counterpart's rect while the transition plays (sampled by
+    // `PlacedAnimationOverlaySampling`), so the pair coincides and
+    // cross-fades. The matched node may sit below the registered identity,
+    // so the injected subtree is searched rather than the registered node.
+    let matchedTravel = AnimationTreeQueries.firstMatchedGeometry(in: subtree) { config in
+      matchedDestinationsByKey[config.key] != nil
+    }.flatMap { found in
+      matchedDestinationsByKey[found.config.key].map { destination in
+        MatchedRemovalTravel(
+          matchedIdentity: found.identity,
+          destinationIdentity: destination,
+          properties: found.config.properties,
+          anchor: found.config.anchor
+        )
+      }
+    }
 
     // Before clearing the injected subtree's active animations, peek
     // at any mid-flight opacity animation on the transition's
@@ -1724,7 +1731,8 @@ package final class AnimationController: Sendable {
       startTime: timestamp,
       startOpacity: initialOpacity,
       completionBatchID: completionBatchID,
-      placedSnapshot: placedSnapshot
+      placedSnapshot: placedSnapshot,
+      matchedTravel: matchedTravel
     )
   }
 

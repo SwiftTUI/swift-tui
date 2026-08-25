@@ -28,17 +28,23 @@ package struct PlacedRemovalOverlaySnapshot: Sendable {
   package var childIndex: Int
   package var snapshot: PlacedNode
   package var modifiers: TransitionModifiers
+  /// The matched-geometry travel applied inside the overlay: the departing
+  /// matched node's delta (and interpolated size) from its frozen rect
+  /// toward its live counterpart's, or `nil` to fade in place.
+  package var matchedGeometryOffset: PlacedAnimationOverlayOffset?
 
   package init(
     parentIdentity: Identity,
     childIndex: Int,
     snapshot: PlacedNode,
-    modifiers: TransitionModifiers
+    modifiers: TransitionModifiers,
+    matchedGeometryOffset: PlacedAnimationOverlayOffset? = nil
   ) {
     self.parentIdentity = parentIdentity
     self.childIndex = childIndex
     self.snapshot = snapshot
     self.modifiers = modifiers
+    self.matchedGeometryOffset = matchedGeometryOffset
   }
 }
 
@@ -75,6 +81,15 @@ package func applyPlacedAnimationOverlaySnapshot(
         removal.modifiers.resolvingEdgeOffset(surfaceSize: tree.bounds.size),
         to: &clone
       )
+      if let travel = removal.matchedGeometryOffset {
+        // The departing matched node follows the same placed-level path as
+        // the live counterpart (translate, then bounds-and-clip resize), so
+        // the two rects coincide at every progress while they cross-fade.
+        clone = translatePlacedNodesByIdentity(
+          tree: clone,
+          offsets: [travel.identity: travel]
+        )
+      }
       injections[removal.parentIdentity, default: []].append(
         (childIndex: removal.childIndex, snapshot: clone)
       )

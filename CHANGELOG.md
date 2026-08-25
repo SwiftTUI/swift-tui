@@ -33,6 +33,14 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Changed
 
+- **Matched-geometry swaps play the pair's `.transition`s.** A swap used to
+  consume both instances' transitions: the departing instance was cut on the
+  swap frame and the arriving one appeared at full opacity. The departing
+  instance's exit overlay now travels to the destination rect while its
+  removal phase plays, and the arriving instance's insertion phase plays from
+  the source rect, so `.transition(.opacity)` on both cross-fades the pair
+  along one path (SwiftUI parity). Swaps without a registered transition are
+  unchanged.
 - **Matched geometry interpolates size (default `properties: .frame`).** A
   matched pair whose slots differ in size previously snapped to the
   destination size; it now resizes by bounds and clip at the placed level,

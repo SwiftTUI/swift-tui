@@ -415,6 +415,28 @@ it. Because the modifier tags its content, tag the outermost node whose
 chrome should follow: `.background(...).border(...).matchedGeometryEffect(...)`,
 not the reverse.
 
+Add ``View/transition(_:)`` to both instances and the swap cross-fades along
+one path: the departing instance's exit overlay travels to the destination
+rect while its removal phase plays, and the arriving instance fades in from
+the source rect while its insertion phase plays, so a change of colour or
+content between the two reads as a blend rather than a cut.
+
+```swift
+Text("ONE").padding(3).background(Color.red)
+  .transition(.opacity)
+  .matchedGeometryEffect(id: "hero", in: heroSpace)
+// … and in the other branch:
+Text("TWO").background(Color.blue)
+  .transition(.opacity)
+  .matchedGeometryEffect(id: "hero", in: heroSpace)
+```
+
+Only registered transitions play — a swap without `.transition` cuts the
+departing instance on the swap frame, as it does outside a match. An offset
+transition (`.move`, `.offset`, `.slide`) composes additively with the
+matched translation, as in SwiftUI when the transition is applied inside
+the effect.
+
 A non-source instance (`isSource: false`) receives the match when the key
 swaps to it between frames; an instance on screen together with its source
 is not positioned onto the source.

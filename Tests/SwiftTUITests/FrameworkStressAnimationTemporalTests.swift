@@ -1528,10 +1528,15 @@ extension FrameworkStressAnimationTemporalTests {
 // MARK: - Attempt 029: matched swap transition de-duplication
 
 extension FrameworkStressAnimationTemporalTests {
-  @Test("stress animation temporal 029 matched swap does not retain removal overlay")
-  func animationTemporal029MatchedSwapDoesNotRetainRemovalOverlay() throws {
-    // Hypothesis: a transition registration on the old matched counterpart can
-    // create a second removal animation after the match already consumed it.
+  @Test("stress animation temporal 029 matched swap keeps one traveling exit overlay")
+  func animationTemporal029MatchedSwapKeepsOneTravelingRemovalOverlay() throws {
+    // Hypothesis (original): a transition registration on the old matched
+    // counterpart creates a second, stray removal animation after the match
+    // consumed it. The match no longer consumes the counterpart's transition:
+    // exactly one exit overlay is retained for it, and that overlay carries a
+    // matched travel toward the live identity instead of fading in place.
+    // (`MatchedGeometryTransitionTests` pins that an untransitioned swap
+    // still retains nothing.)
     let controller = AnimationController()
     let animation = Animation.linear(duration: .seconds(2))
     controller.register(animation)
@@ -1579,7 +1584,25 @@ extension FrameworkStressAnimationTemporalTests {
       timestamp: start.advanced(by: .milliseconds(20))
     )
     #expect(controller.activeMatchedGeometryCount == 1)
-    #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+    #expect(controller.debugStateSnapshot().removingIdentities == [sourceID])
+
+    // Halfway through the 2 s curve the single overlay has traveled half the
+    // distance to the target slot and faded to 0.5.
+    let placed = animationTemporalPlacedRoot(
+      identity: rootID,
+      children: [animationTemporalPlacedMatchedNode(identity: targetID, key: key, x: 40)]
+    )
+    let snapshot = controller.placedAnimationOverlaySnapshot(
+      for: placed,
+      at: start.advanced(by: .milliseconds(1_020))
+    )
+    #expect(snapshot.removalOverlays.count == 1)
+    let overlay = try #require(snapshot.removalOverlays.first)
+    let travel = try #require(overlay.matchedGeometryOffset)
+    #expect(travel.identity == sourceID)
+    #expect(travel.dx == 20 && travel.dy == 0, "\(travel)")
+    #expect(travel.size == CellSize(width: 8, height: 1))
+    #expect(abs((overlay.modifiers.opacity ?? -1) - 0.5) < 0.001, "\(overlay.modifiers)")
   }
 }
 
