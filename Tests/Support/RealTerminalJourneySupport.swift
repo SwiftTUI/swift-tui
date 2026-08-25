@@ -543,7 +543,9 @@ import Synchronization
         // APIs take a pointer to its optional.
         var fileActions: posix_spawn_file_actions_t? = nil
       #else
-        var fileActions = posix_spawn_file_actions_t()
+        // Glibc's struct carries a raw pointer, so even its initializer is an
+        // unsafe construct under strict memory safety.
+        var fileActions = unsafe posix_spawn_file_actions_t()
       #endif
       guard unsafe posix_spawn_file_actions_init(&fileActions) == 0 else {
         throw RealTerminalJourneyError.watchdogUnavailable(
