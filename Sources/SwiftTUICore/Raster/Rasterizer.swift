@@ -327,22 +327,44 @@ package struct Rasterizer: Sendable {
         }
       }
     }
-    let orderClosure = presentationOrderDamageClosure(
-      dirtyRows,
-      previousLayers: previousSurface.presentationLayers,
-      surfaceHeight: surfaceSize.height
-    )
-    let orderClosedDirtyRows = orderClosure.dirtyRows
-    let presentationOrderRows = orderClosedDirtyRows.subtracting(dirtyRows)
-    if !presentationOrderRows.isEmpty {
-      dirtyRows = orderClosedDirtyRows
+    // Close the dirty set over rows the paint walk *reads* but the damage did
+    // not name: rows a repainting stroke edge samples for its inferred
+    // background (`strokeSamplingDamageClosure`) and rows the retained
+    // presentation-layer order needs re-recorded
+    // (`presentationOrderDamageClosure`). Either closure can hand the other a
+    // new row, so they run to a joint fixpoint; rows only grow and the surface
+    // bounds them.
+    var closedDirtyRows = dirtyRows
+    while true {
+      let rowCountBefore = closedDirtyRows.count
+      closedDirtyRows = strokeSamplingDamageClosure(
+        closedDirtyRows,
+        draw: draw,
+        surfaceHeight: surfaceSize.height
+      )
+      closedDirtyRows =
+        presentationOrderDamageClosure(
+          closedDirtyRows,
+          previousLayers: previousSurface.presentationLayers,
+          surfaceHeight: surfaceSize.height
+        ).dirtyRows
+      if closedDirtyRows.count == rowCountBefore {
+        break
+      }
+    }
+    let closureRows = closedDirtyRows.subtracting(dirtyRows)
+    if !closureRows.isEmpty {
+      dirtyRows = closedDirtyRows
       damage = PresentationDamage(
         textRows: damage.textRows
-          + presentationOrderRows.sorted().map { PresentationDamage.TextRow(row: $0) },
+          + closureRows.sorted().map { PresentationDamage.TextRow(row: $0) },
         graphicsInvalidation: damage.graphicsInvalidation,
         requiresFullTextRepaint: damage.requiresFullTextRepaint,
         requiresFullGraphicsReplay: damage.requiresFullGraphicsReplay
       )
+      // A served row the closure re-dirtied is cleared and repainted below,
+      // so the blit no longer accounts for it.
+      translatedRows.removeAll { closureRows.contains($0) }
     }
     var imageAttachments = previousSurface.imageAttachments.filter { attachment in
       !visibleBounds(attachment.visibleBounds, intersectsAnyOf: dirtyRows)

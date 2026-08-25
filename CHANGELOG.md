@@ -6,6 +6,24 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [Unreleased]
+
+### Fixed
+
+- **DEBUG trap "incremental raster mismatch" under a stroked border ring**
+  ([#5](https://github.com/SwiftTUI/swift-tui/issues/5)). A rectangle stroke
+  with no explicit background (a `strokeBorder` overlay, a `.bordered` button,
+  any `.border`) infers each edge cell's background from the neighbouring cell
+  outside the ring. That read depends on paint order, and the incremental
+  rasterizer replayed a ring whose edge row was dirty against a clean
+  neighbour row holding the *previous* frame's final cells — so a border
+  sitting directly above or below a later-painted control (a Button under a
+  focus ring inside a sheet, in the report) repainted with a different
+  background than a fresh raster and tripped the DEBUG oracle; release builds
+  showed the stale cell instead. The rasterizer now closes the dirty set over
+  the rows a repainting stroke edge samples, so both paths replay them in
+  authored order.
+
 ## [0.9.8] - 2026-08-24
 
 ### Fixed

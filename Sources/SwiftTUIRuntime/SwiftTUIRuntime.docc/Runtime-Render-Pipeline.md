@@ -325,6 +325,18 @@ Three properties are important:
   painter invariant, not a static type rule. The F13 comparison oracle enforces
   this invariant. It rasters every incremental frame again in DEBUG and asserts
   on a difference. Thus, a painter that exceeds the margin fails the suites.
+- **The rasterizer closes the dirty set over rows a repainting edge reads.**
+  The margin dilates *changed* nodes. An unchanged rectangle stroke repaints
+  whenever its edge row is dirty, and with no explicit background its edge
+  cells infer their background from the neighbouring row outside the ring.
+  That read depends on paint order: a fresh raster sees what earlier commands
+  painted there, while a clean row on an incremental raster holds the previous
+  frame's final cells, including ink from commands that paint after the
+  stroke. `Rasterizer.strokeSamplingDamageClosure` therefore adds the sampled
+  rows to the dirty set (to a fixpoint, jointly with the presentation-order
+  closure) so both paths replay them in authored order. Without it, a border
+  directly above or below a later-painted control diverged
+  (SwiftTUI/swift-tui#5).
 - **Animation frames barrier.** Property interpolation rewrites the resolved
   tree after invalidation. The placed animation overlay decorates the current
   tree with state that the retained baseline does not carry.
