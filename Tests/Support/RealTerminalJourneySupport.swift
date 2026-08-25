@@ -1,5 +1,4 @@
 @unsafe @preconcurrency public import Dispatch
-import Foundation
 public import SwiftTUICore
 import Synchronization
 
@@ -264,55 +263,91 @@ import Synchronization
 /// timeout (60–75 minutes on the example gates).
 ///
 /// Every ``RealTerminalPTYPair`` arms one watchdog in `open` and disarms it
-/// when its master descriptor closes. Progress is any harness traffic on that
-/// pair — a wait starting or finishing, bytes read, bytes written — and each
-/// one is recorded as a heartbeat. The journey counts as stalled once
-/// `stallBudget` passes with no heartbeat; every consumer wait carries a
-/// deadline well inside the default budget, so healthy journeys that run for
-/// minutes keep heartbeating and are never affected.
+/// when its master descriptor closes. Progress is any harness traffic on an
+/// armed pair — a wait starting or finishing, bytes read, bytes written — and
+/// each one is recorded as a heartbeat. The process counts as stalled once the
+/// smallest armed pair's `stallBudget` passes with no heartbeat; every consumer
+/// wait carries a deadline well inside the default budget, so healthy journeys
+/// that run for minutes keep heartbeating and are never affected.
 ///
-/// The watchdog lives OUTSIDE the test process. `arm` spawns a `/bin/sh`
-/// sidecar that polls a heartbeat file and, on a stall, prints a diagnostic
-/// to the inherited stderr (the CI log) and signals the test process: SIGCONT
-/// and SIGABRT first, so a runtime with crash reporting enabled dumps its
-/// threads, then SIGKILL. Nothing inside the test process is trusted: Swift
-/// Testing's `.timeLimit` cannot stop a body that never reaches a suspension
-/// point, and the 0.9.8 example gates wedged a process thoroughly enough that
-/// an in-process libdispatch timer never ran either. The sidecar exits on its
-/// own when the pair disarms or the test process goes away, and removes its
-/// heartbeat file.
+/// The watchdog lives OUTSIDE the test process, and is deliberately built from
+/// nothing but POSIX calls. The first `open` in a process `posix_spawn`s one
+/// `/bin/sh` sidecar for the whole process; it polls a heartbeat file four
+/// times a second and, on a stall, prints a diagnostic to the inherited stderr
+/// (the CI log) and signals the test process: SIGCONT and SIGABRT first, so a
+/// runtime with crash reporting enabled dumps its threads, then SIGKILL. It
+/// exits on its own when the test process is gone. Nothing inside the test
+/// process is trusted, and neither is Foundation: Swift Testing's `.timeLimit`
+/// cannot stop a body that never reaches a suspension point; the 0.9.8 example
+/// gates wedged a process so thoroughly that an in-process libdispatch timer
+/// never ran; and the org root's pretag job then showed `Foundation.Process.run()`
+/// itself never returning in that process — a sidecar spawned through it, per
+/// pair, never came to exist. Spawning once, early, through `posix_spawn` is
+/// what makes the guard independent of the failure it guards against.
 @_spi(Testing) public final class RealTerminalJourneyWatchdog: Sendable {
-  private struct State {
-    var armed = true
-    var heartbeat: UInt64 = 0
-    var lastWrite: DispatchTime
+  /// One armed pair, as the process-wide sidecar sees it.
+  private struct ArmedPair: Sendable {
+    var origin: String
+    var budgetMilliseconds: Int
   }
 
+  private struct SharedState: Sendable {
+    var sidecarProcessIdentifier: pid_t?
+    var heartbeatPath: String?
+    var armed: [Int32: ArmedPair] = [:]
+    var counter: UInt64 = 0
+    var lastWrite = DispatchTime.now()
+  }
+
+  private struct State: Sendable {
+    var armed = true
+  }
+
+  private static let shared = Mutex(SharedState())
   private static let registry = Mutex<[Int32: RealTerminalJourneyWatchdog]>([:])
 
-  /// Polls per `budget / ticks`; a short budget (the harness tests use a few
-  /// hundred milliseconds) still fires promptly and a 60-second budget is
-  /// checked every 15 seconds.
-  private static let ticksPerBudget = 4
+  /// The sidecar polls this often; budgets are rounded up to a multiple of it.
+  private static let pollMilliseconds = 250
 
-  /// The sidecar. Positional arguments: test pid, ticks per budget, tick
-  /// interval in seconds (may be fractional), heartbeat path, open site,
-  /// budget label, grace before SIGKILL. POSIX sh only — this runs on macOS
-  /// and Linux runners alike.
+  /// Heartbeat writes are coalesced to at most one per this interval so a
+  /// chatty read loop does not rewrite the file on every chunk.
+  private static let minimumWriteSpacingNanoseconds: UInt64 = 50_000_000
+
+  /// The sidecar. `$1` is the test pid, `$2` the heartbeat path. The file holds
+  /// `armed:counter:budgetMs:origins`; the sidecar counts idle polls only
+  /// while `armed` is non-zero and fires once they cover the budget. It must
+  /// never outlive the test process: it inherits that process's stdout and
+  /// stderr (the diagnostic has to land in the CI log), and `swift test`
+  /// waits for those pipes to close before it reaps the test binary — a
+  /// lingering sidecar would deadlock the runner against a zombie that still
+  /// answers `kill -0`. So the test process writes `exit` from an `atexit`
+  /// hook on every normal exit, and the sidecar also treats a zombie as gone.
+  /// POSIX sh plus `ps -o stat=` — this runs on macOS and Linux runners alike.
   private static let sidecarScript = #"""
-    pid=$1; ticks=$2; interval=$3; file=$4; origin=$5; budget=$6; grace=$7
+    pid=$1; file=$2
     last=''; idle=0
     while :; do
-      sleep "$interval"
-      kill -0 "$pid" 2>/dev/null || { rm -f "$file"; exit 0; }
+      sleep 0.25
+      if command -v ps >/dev/null 2>&1; then
+        state=$(ps -o stat= -p "$pid" 2>/dev/null)
+        case $state in ''|Z*) rm -f "$file"; exit 0 ;; esac
+      else
+        kill -0 "$pid" 2>/dev/null || { rm -f "$file"; exit 0; }
+      fi
       v=$(cat "$file" 2>/dev/null)
-      if [ "$v" = disarmed ]; then rm -f "$file"; exit 0; fi
+      case $v in exit) rm -f "$file"; exit 0 ;; esac
+      armed=${v%%:*}; rest=${v#*:}; counter=${rest%%:*}; rest=${rest#*:}
+      budget=${rest%%:*}; origins=${rest#*:}
+      case $armed in ''|0) idle=0; last=$v; continue ;; esac
+      case $budget in ''|*[!0-9]*) idle=0; last=$v; continue ;; esac
       if [ "$v" = "$last" ]; then idle=$((idle + 1)); else idle=0; last=$v; fi
-      if [ "$idle" -ge "$ticks" ]; then
-        printf '\nSwiftTUITestSupport: real-terminal journey watchdog fired: the PTY pair opened at %s made no progress for about %s s (test process %s). Sending SIGABRT for a crash report, then SIGKILL, so CI fails now instead of at the job timeout. The wedged journey is the last "Test ... started" line without a result.\n\n' "$origin" "$budget" "$pid" >&2
+      if [ $((idle * 250)) -ge "$budget" ]; then
+        seconds=$((budget / 1000)); millis=$((budget % 1000))
+        grace=$((budget / 2)); [ "$grace" -lt 1000 ] && grace=1000; [ "$grace" -gt 20000 ] && grace=20000
+        printf '\nSwiftTUITestSupport: real-terminal journey watchdog fired: the PTY pair opened at %s made no progress for %s.%03d s (test process %s). Sending SIGABRT for a crash report, then SIGKILL, so CI fails now instead of at the job timeout. The wedged journey is the last "Test ... started" line without a result.\n\n' "$origins" "$seconds" "$millis" "$pid" >&2
         kill -CONT "$pid" 2>/dev/null
         kill -ABRT "$pid" 2>/dev/null
-        sleep "$grace"
+        sleep "$((grace / 1000)).$(printf %03d $((grace % 1000)))"
         kill -KILL "$pid" 2>/dev/null
         rm -f "$file"
         exit 0
@@ -321,69 +356,41 @@ import Synchronization
     """#
 
   private let fileDescriptor: Int32
-  private let origin: String
-  private let heartbeatPath: String
-  private let minimumWriteSpacingNanoseconds: UInt64
-  private let state: Mutex<State>
+  private let state = Mutex(State())
 
-  private init(
-    fileDescriptor: Int32,
-    origin: String,
-    heartbeatPath: String,
-    minimumWriteSpacingNanoseconds: UInt64
-  ) {
+  private init(fileDescriptor: Int32) {
     self.fileDescriptor = fileDescriptor
-    self.origin = origin
-    self.heartbeatPath = heartbeatPath
-    self.minimumWriteSpacingNanoseconds = minimumWriteSpacingNanoseconds
-    state = Mutex(State(lastWrite: .now()))
   }
 
   /// Arms a watchdog for `fileDescriptor`, replacing any earlier registration
-  /// for a descriptor number the kernel has since recycled.
+  /// for a descriptor number the kernel has since recycled, and spawns the
+  /// process-wide sidecar if this is the first armed pair.
   fileprivate static func arm(
     fileDescriptor: Int32,
     stallBudget: Duration,
     origin: String
   ) throws -> RealTerminalJourneyWatchdog {
     #if canImport(Darwin) || canImport(Glibc)
-      let budgetSeconds = max(0.05, seconds(in: stallBudget))
-      let interval = budgetSeconds / Double(ticksPerBudget)
-      let grace = min(20.0, max(1.0, budgetSeconds / 2))
-      let heartbeatPath = FileManager.default.temporaryDirectory
-        .appendingPathComponent(
-          "swifttui-journey-watchdog-\(getpid())-\(fileDescriptor)-\(UUID().uuidString)"
+      let (seconds, attoseconds) = stallBudget.components
+      let requested = Int(seconds) * 1_000 + Int(attoseconds / 1_000_000_000_000_000)
+      let budgetMilliseconds = max(pollMilliseconds, requested)
+      try shared.withLock { shared in
+        if shared.heartbeatPath == nil {
+          let path = try heartbeatFilePath()
+          try writeFile("0:0:0:", to: path)
+          shared.heartbeatPath = path
+          shared.sidecarProcessIdentifier = try spawnSidecar(heartbeatPath: path)
+          // A literal closure with no captures is the only form `atexit`
+          // accepts as a C function pointer.
+          atexit { RealTerminalJourneyWatchdog.releaseSidecarAtProcessExit() }
+        }
+        shared.armed[fileDescriptor] = ArmedPair(
+          origin: origin,
+          budgetMilliseconds: budgetMilliseconds
         )
-        .path
-      do {
-        try writeAtomically("0", to: heartbeatPath)
-      } catch {
-        throw RealTerminalJourneyError.watchdogUnavailable(
-          reason: "could not seed \(heartbeatPath): \(error)"
-        )
+        try publish(&shared, forced: true)
       }
-
-      let sidecar = Process()
-      sidecar.executableURL = URL(fileURLWithPath: "/bin/sh")
-      sidecar.arguments = [
-        "-c", sidecarScript, "swifttui-journey-watchdog",
-        String(getpid()), String(ticksPerBudget), format(interval), heartbeatPath, origin,
-        format(budgetSeconds), format(grace),
-      ]
-      sidecar.standardInput = FileHandle.nullDevice
-      do {
-        try sidecar.run()
-      } catch {
-        try? FileManager.default.removeItem(atPath: heartbeatPath)
-        throw RealTerminalJourneyError.watchdogUnavailable(reason: "\(error)")
-      }
-
-      let watchdog = RealTerminalJourneyWatchdog(
-        fileDescriptor: fileDescriptor,
-        origin: origin,
-        heartbeatPath: heartbeatPath,
-        minimumWriteSpacingNanoseconds: UInt64(interval / 4 * 1_000_000_000)
-      )
+      let watchdog = RealTerminalJourneyWatchdog(fileDescriptor: fileDescriptor)
       registry.withLock { $0[fileDescriptor] = watchdog }
       return watchdog
     #else
@@ -402,8 +409,7 @@ import Synchronization
     state.withLock { $0.armed }
   }
 
-  /// Records harness traffic on the pair; rate-limited so a chatty read loop
-  /// does not rewrite the heartbeat file on every chunk.
+  /// Records harness traffic on the pair.
   @_spi(Testing) public func noteActivity() {
     heartbeat(forced: false)
   }
@@ -418,8 +424,8 @@ import Synchronization
     heartbeat(forced: true)
   }
 
-  /// Stops the watchdog; the pair calls this when its master descriptor
-  /// closes. The sidecar sees the sentinel within one tick and exits.
+  /// Stops guarding this pair; the pair calls this when its master descriptor
+  /// closes. With no pair armed the sidecar idles until the next `open`.
   fileprivate func disarm() {
     let wasArmed = state.withLock { state in
       let wasArmed = state.armed
@@ -434,45 +440,153 @@ import Synchronization
         registry[fileDescriptor] = nil
       }
     }
-    try? Self.writeAtomically("disarmed", to: heartbeatPath)
+    Self.shared.withLock { shared in
+      shared.armed[fileDescriptor] = nil
+      try? Self.publish(&shared, forced: true)
+    }
   }
 
   private func heartbeat(forced: Bool) {
-    let payload: UInt64? = state.withLock { state in
-      guard state.armed else {
-        return nil
-      }
-      let now = DispatchTime.now()
-      let sinceLastWrite = now.uptimeNanoseconds &- state.lastWrite.uptimeNanoseconds
-      if !forced, sinceLastWrite < minimumWriteSpacingNanoseconds {
-        return nil
-      }
-      state.heartbeat &+= 1
-      state.lastWrite = now
-      return state.heartbeat
-    }
-    guard let payload else {
+    guard isArmed else {
       return
     }
-    try? Self.writeAtomically(String(payload), to: heartbeatPath)
+    Self.shared.withLock { shared in
+      try? Self.publish(&shared, forced: forced)
+    }
   }
 
-  private static func writeAtomically(_ contents: String, to path: String) throws {
-    try Data(contents.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
+  /// Rewrites the heartbeat file from `shared`, coalescing unforced writes.
+  private static func publish(_ shared: inout SharedState, forced: Bool) throws {
+    guard let path = shared.heartbeatPath else {
+      return
+    }
+    let now = DispatchTime.now()
+    let sinceLastWrite = now.uptimeNanoseconds &- shared.lastWrite.uptimeNanoseconds
+    if !forced, sinceLastWrite < minimumWriteSpacingNanoseconds {
+      return
+    }
+    shared.counter &+= 1
+    shared.lastWrite = now
+    let budget = shared.armed.values.map(\.budgetMilliseconds).min() ?? 0
+    let origins = shared.armed.values.map(\.origin).sorted().joined(separator: ",")
+    try writeFile("\(shared.armed.count):\(shared.counter):\(budget):\(origins)", to: path)
   }
 
-  private static func seconds(in duration: Duration) -> Double {
-    let (seconds, attoseconds) = duration.components
-    return Double(seconds) + Double(attoseconds) / 1e18
-  }
+  #if canImport(Darwin) || canImport(Glibc)
+    /// Tells the sidecar to exit; registered with `atexit` when it is spawned.
+    /// A process the sidecar itself killed never gets here, and that is fine:
+    /// the sidecar exits on its own after firing.
+    private static func releaseSidecarAtProcessExit() {
+      shared.withLock { shared in
+        guard let path = shared.heartbeatPath else {
+          return
+        }
+        shared.armed = [:]
+        try? writeFile("exit", to: path)
+      }
+    }
 
-  /// Millisecond-precision decimal text for `sleep`; hand-rolled because
-  /// `String(format:)` is a variadic (unsafe) call under strict memory safety.
-  private static func format(_ seconds: Double) -> String {
-    let milliseconds = Int((seconds * 1_000).rounded())
-    let fraction = String(milliseconds % 1_000)
-    return "\(milliseconds / 1_000)." + String(repeating: "0", count: 3 - fraction.count) + fraction
-  }
+    private static func heartbeatFilePath() throws -> String {
+      var directory = "/tmp"
+      if let override = unsafe getenv("TMPDIR") {
+        let text = unsafe String(cString: override)
+        if !text.isEmpty {
+          directory = text.hasSuffix("/") ? String(text.dropLast()) : text
+        }
+      }
+      return "\(directory)/swifttui-journey-watchdog-\(getpid()).heartbeat"
+    }
+
+    private static func writeFile(_ contents: String, to path: String) throws {
+      let descriptor = unsafe path.withCString { cPath in
+        unsafe open(cPath, O_WRONLY | O_CREAT | O_TRUNC, 0o600)
+      }
+      guard descriptor >= 0 else {
+        throw RealTerminalJourneyError.watchdogUnavailable(
+          reason: "open(\(path)) failed with errno \(errno)"
+        )
+      }
+      defer { _ = DarwinOrGlibcClose(descriptor) }
+      try writeAllBytes(Array(contents.utf8), to: descriptor)
+    }
+
+    /// Spawns the sidecar with stdin from `/dev/null` and every descriptor
+    /// above stderr closed, so it can never pin a PTY, pipe, or socket open.
+    private static func spawnSidecar(heartbeatPath: String) throws -> pid_t {
+      let arguments = [
+        "/bin/sh", "-c", sidecarScript, "swifttui-journey-watchdog",
+        String(getpid()), heartbeatPath,
+      ]
+      var cArguments: [UnsafeMutablePointer<CChar>?] = unsafe arguments.map { argument in
+        unsafe argument.withCString { cString in
+          unsafe strdup(cString)
+        }
+      }
+      unsafe cArguments.append(nil)
+      defer {
+        let argumentCount = unsafe cArguments.count
+        var index = 0
+        while index < argumentCount {
+          if let pointer = unsafe cArguments[index] {
+            unsafe free(pointer)
+          }
+          index += 1
+        }
+      }
+
+      #if canImport(Darwin)
+        // Darwin's `posix_spawn_file_actions_t` is a raw pointer; the spawn
+        // APIs take a pointer to its optional.
+        var fileActions: posix_spawn_file_actions_t? = nil
+      #else
+        var fileActions = posix_spawn_file_actions_t()
+      #endif
+      guard unsafe posix_spawn_file_actions_init(&fileActions) == 0 else {
+        throw RealTerminalJourneyError.watchdogUnavailable(
+          reason: "posix_spawn_file_actions_init failed with errno \(errno)"
+        )
+      }
+      defer { _ = unsafe posix_spawn_file_actions_destroy(&fileActions) }
+      let nullResult = unsafe "/dev/null".withCString { devNull in
+        unsafe posix_spawn_file_actions_addopen(&fileActions, STDIN_FILENO, devNull, O_RDONLY, 0)
+      }
+      guard nullResult == 0 else {
+        throw RealTerminalJourneyError.watchdogUnavailable(
+          reason: "posix_spawn_file_actions_addopen failed with \(nullResult)"
+        )
+      }
+      let descriptorLimit = min(getdtablesize(), 65_536)
+      var descriptor: Int32 = 3
+      while descriptor < descriptorLimit {
+        if fcntl(descriptor, F_GETFD) >= 0 {
+          _ = unsafe posix_spawn_file_actions_addclose(&fileActions, descriptor)
+        }
+        descriptor += 1
+      }
+
+      var processIdentifier = pid_t()
+      let environment = unsafe environ
+      let spawnResult: Int32 = unsafe cArguments.withUnsafeMutableBufferPointer { buffer in
+        guard let baseAddress = buffer.baseAddress, let executable = unsafe baseAddress[0] else {
+          return ENOENT
+        }
+        return unsafe posix_spawn(
+          &processIdentifier,
+          executable,
+          &fileActions,
+          nil,
+          baseAddress,
+          environment
+        )
+      }
+      guard spawnResult == 0 else {
+        throw RealTerminalJourneyError.watchdogUnavailable(
+          reason: "posix_spawn(/bin/sh) failed with \(spawnResult)"
+        )
+      }
+      return processIdentifier
+    }
+  #endif
 }
 
 /// A `DispatchSource`-backed signal that a PTY has bytes ready to drain.
