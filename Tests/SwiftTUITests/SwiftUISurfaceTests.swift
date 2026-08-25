@@ -1134,8 +1134,8 @@ struct SwiftUISurfaceTests {
     )
 
     let fieldIdentity = try #require(initialArtifacts.semanticSnapshot.focusRegions.first?.identity)
-    #expect(localKeyHandlerRegistry.dispatch(identity: fieldIdentity, event: .character("H")))
-    #expect(localKeyHandlerRegistry.dispatch(identity: fieldIdentity, event: .character("i")))
+    #expect(localKeyHandlerRegistry.dispatch(identity: fieldIdentity, keyPress: KeyPress(.character("H"))))
+    #expect(localKeyHandlerRegistry.dispatch(identity: fieldIdentity, keyPress: KeyPress(.character("i"))))
 
     let updatedArtifacts = DefaultRenderer().render(
       view,
@@ -2346,10 +2346,10 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Count"))
     #expect(dispatched)
     #expect(box.value == 1)
-    #expect(keyRegistry.dispatch(identity: testIdentity("CountStepper"), event: .arrowRight))
+    #expect(keyRegistry.dispatch(identity: testIdentity("CountStepper"), keyPress: KeyPress(.arrowRight)))
     #expect(box.value == 2)
-    #expect(!keyRegistry.dispatch(identity: testIdentity("CountStepper"), event: .arrowRight))
-    #expect(keyRegistry.dispatch(identity: testIdentity("CountStepper"), event: .arrowLeft))
+    #expect(!keyRegistry.dispatch(identity: testIdentity("CountStepper"), keyPress: KeyPress(.arrowRight)))
+    #expect(keyRegistry.dispatch(identity: testIdentity("CountStepper"), keyPress: KeyPress(.arrowLeft)))
     #expect(box.value == 1)
   }
 
@@ -2386,9 +2386,9 @@ struct SwiftUISurfaceTests {
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("ValueSlider")])
     #expect(surface.contains("Value"))
     #expect(surface.contains("●"))
-    #expect(keyRegistry.dispatch(identity: testIdentity("ValueSlider"), event: .arrowRight))
+    #expect(keyRegistry.dispatch(identity: testIdentity("ValueSlider"), keyPress: KeyPress(.arrowRight)))
     #expect(box.value == 2)
-    #expect(keyRegistry.dispatch(identity: testIdentity("ValueSlider"), event: .arrowLeft))
+    #expect(keyRegistry.dispatch(identity: testIdentity("ValueSlider"), keyPress: KeyPress(.arrowLeft)))
     #expect(box.value == 1)
   }
 
@@ -2451,7 +2451,7 @@ struct SwiftUISurfaceTests {
     #expect(!surface.contains("0.449999"))
     #expect(actionRegistry.dispatch(identity: testIdentity("DoubleStepper")))
     #expect(stepperBox.value == 0.3)
-    #expect(keyRegistry.dispatch(identity: testIdentity("DoubleSlider"), event: .arrowRight))
+    #expect(keyRegistry.dispatch(identity: testIdentity("DoubleSlider"), keyPress: KeyPress(.arrowRight)))
     #expect(sliderBox.value == 0.55)
   }
 
@@ -2489,10 +2489,10 @@ struct SwiftUISurfaceTests {
     // The SwiftUI-shaped call is not a two-position control: arrows move a
     // tenth of the span, not the whole range.
     #expect(
-      keyRegistry.dispatch(identity: testIdentity("ContinuousSlider"), event: .arrowRight))
+      keyRegistry.dispatch(identity: testIdentity("ContinuousSlider"), keyPress: KeyPress(.arrowRight)))
     #expect(box.value == 0.6)
     #expect(
-      keyRegistry.dispatch(identity: testIdentity("ContinuousSlider"), event: .arrowLeft))
+      keyRegistry.dispatch(identity: testIdentity("ContinuousSlider"), keyPress: KeyPress(.arrowLeft)))
     #expect(box.value == 0.5)
   }
 
@@ -2708,11 +2708,11 @@ struct SwiftUISurfaceTests {
     #expect(!focusedArtifacts.rasterSurface.lines.joined(separator: "\n").isEmpty)
     #expect(!promptArtifacts.rasterSurface.lines.joined(separator: "\n").isEmpty)
 
-    #expect(registry.dispatch(identity: testIdentity("NameField"), event: .character("A")))
+    #expect(registry.dispatch(identity: testIdentity("NameField"), keyPress: KeyPress(.character("A"))))
     #expect(box.value == "A")
-    #expect(registry.dispatch(identity: testIdentity("NameField"), event: .space))
+    #expect(registry.dispatch(identity: testIdentity("NameField"), keyPress: KeyPress(.space)))
     #expect(box.value == "A ")
-    #expect(registry.dispatch(identity: testIdentity("NameField"), event: .backspace))
+    #expect(registry.dispatch(identity: testIdentity("NameField"), keyPress: KeyPress(.backspace)))
     #expect(box.value == "A")
   }
 
@@ -2746,8 +2746,8 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(registry.dispatch(identity: identity, event: .arrowLeft))
-    #expect(registry.dispatch(identity: identity, event: .character("b")))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.arrowLeft)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("b"))))
     #expect(box.value == "abc")
   }
 
@@ -2781,8 +2781,8 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(registry.dispatch(identity: identity, event: .arrowLeft))
-    #expect(registry.dispatch(identity: identity, event: .backspace))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.arrowLeft)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.backspace)))
     #expect(box.value == "ac")
   }
 
@@ -2816,11 +2816,11 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(registry.dispatch(identity: identity, event: .home))
-    #expect(registry.dispatch(identity: identity, event: .character("b")))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.home)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("b"))))
     #expect(box.value == "bac")
-    #expect(registry.dispatch(identity: identity, event: .end))
-    #expect(registry.dispatch(identity: identity, event: .character("d")))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.end)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("d"))))
     #expect(box.value == "bacd")
   }
 
@@ -3005,7 +3005,7 @@ struct SwiftUISurfaceTests {
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("PresetPicker")])
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("▌ Zero"))
-    #expect(registry.dispatch(identity: testIdentity("PresetPicker"), event: .arrowDown))
+    #expect(registry.dispatch(identity: testIdentity("PresetPicker"), keyPress: KeyPress(.arrowDown)))
     #expect(box.value == 2)
   }
 
@@ -3042,7 +3042,7 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Mode"))
-    #expect(registry.dispatch(identity: testIdentity("ModePicker"), event: .arrowRight))
+    #expect(registry.dispatch(identity: testIdentity("ModePicker"), keyPress: KeyPress(.arrowRight)))
     #expect(box.value == 2)
   }
 
@@ -3083,7 +3083,7 @@ struct SwiftUISurfaceTests {
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("RadioPicker")])
     #expect(surface.contains("( ) Two"))
-    #expect(registry.dispatch(identity: testIdentity("RadioPicker"), event: .arrowDown))
+    #expect(registry.dispatch(identity: testIdentity("RadioPicker"), keyPress: KeyPress(.arrowDown)))
     #expect(box.value == 2)
   }
 
@@ -3190,7 +3190,7 @@ struct SwiftUISurfaceTests {
     #expect(expandedSurface.contains("▴"))
     #expect(expandedSurface.contains("Two"))
     #expect(expandedSurface.contains("Three"))
-    #expect(registry.dispatch(identity: testIdentity("MenuPicker"), event: .arrowDown))
+    #expect(registry.dispatch(identity: testIdentity("MenuPicker"), keyPress: KeyPress(.arrowDown)))
     #expect(box.value == 2)
   }
 
@@ -3319,7 +3319,7 @@ struct SwiftUISurfaceTests {
         listRowIdentity(for: testIdentity("PresetList"), rowIndex: 2),
       ])
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("▌ Zero"))
-    #expect(registry.dispatch(identity: testIdentity("PresetList"), event: .arrowDown))
+    #expect(registry.dispatch(identity: testIdentity("PresetList"), keyPress: KeyPress(.arrowDown)))
     #expect(box.value == 2)
     #expect(
       actionRegistry.dispatch(
@@ -3633,7 +3633,7 @@ struct SwiftUISurfaceTests {
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("MetricsTable")])
     #expect(surface.contains("Name"))
     #expect(surface.contains("│ Alpha"))
-    #expect(registry.dispatch(identity: testIdentity("MetricsTable"), event: .arrowDown))
+    #expect(registry.dispatch(identity: testIdentity("MetricsTable"), keyPress: KeyPress(.arrowDown)))
     #expect(box.value == "beta")
   }
 
@@ -3914,7 +3914,7 @@ struct SwiftUISurfaceTests {
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(artifacts.semanticSnapshot.focusRegions.isEmpty)
-    #expect(!registry.dispatch(identity: testIdentity("ReadOnlyTable"), event: .arrowDown))
+    #expect(!registry.dispatch(identity: testIdentity("ReadOnlyTable"), keyPress: KeyPress(.arrowDown)))
     #expect(surface.contains("Alpha"))
     #expect(surface.contains("Beta"))
     #expect(!surface.contains("| Alpha"))
@@ -4396,9 +4396,9 @@ struct SwiftUISurfaceTests {
 
     _ = DefaultRenderer().render(view, context: context)
 
-    #expect(keyRegistry.dispatch(identity: scrollIdentity, event: .end))
+    #expect(keyRegistry.dispatch(identity: scrollIdentity, keyPress: KeyPress(.end)))
     #expect(box.position == .init(x: 0, y: 5))
-    #expect(keyRegistry.dispatch(identity: scrollIdentity, event: .home))
+    #expect(keyRegistry.dispatch(identity: scrollIdentity, keyPress: KeyPress(.home)))
     #expect(box.position == .zero)
   }
 
@@ -4642,7 +4642,7 @@ struct SwiftUISurfaceTests {
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [
         testIdentity("Scrollable"), indicatorIdentity,
       ])
-    #expect(registry.dispatch(identity: indicatorIdentity, event: .arrowDown))
+    #expect(registry.dispatch(identity: indicatorIdentity, keyPress: KeyPress(.arrowDown)))
     #expect(box.position == .init(x: 0, y: 1))
   }
 
@@ -4687,7 +4687,7 @@ struct SwiftUISurfaceTests {
       initialArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("Scrollable")]
     )
     #expect(initialArtifacts.rasterSurface.lines.prefix(2) == ["Row 0", "Row 1"])
-    #expect(registry.dispatch(identity: testIdentity("Scrollable"), event: .arrowDown))
+    #expect(registry.dispatch(identity: testIdentity("Scrollable"), keyPress: KeyPress(.arrowDown)))
     #expect(box.position == .init(x: 0, y: 1))
 
     let scrolledArtifacts = DefaultRenderer().render(

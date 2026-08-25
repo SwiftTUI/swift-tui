@@ -102,21 +102,6 @@ struct DuplicateRegistrationProbeTests {
     }
   }
 
-  @Test("a second same-identity bare key-handler record raises the alarm")
-  func keyHandlerDoubleRecordRaisesAlarm() {
-    let identity = testIdentity("Root", "Field")
-    let node = RegistrationKindDriver.makeRecordingNode(identity: identity)
-    withArmedProbe {
-      let before = alarmCount
-      ViewNodeContext.withValue(node) {
-        node.recordKeyHandlerRegistration(identity: identity) { _ in false }
-        node.recordKeyHandlerRegistration(identity: identity) { _ in true }
-      }
-      #expect(alarmCount == before + 1)
-      #expect(SoundnessProbeConfiguration.lastViolationDetail?.contains("key handler") == true)
-    }
-  }
-
   @Test("stacked key-press contributions at one identity do not alarm")
   func stackedKeyPressContributionsDoNotAlarm() {
     let identity = testIdentity("Root", "Field")

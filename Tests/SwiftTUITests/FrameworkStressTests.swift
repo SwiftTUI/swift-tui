@@ -1975,7 +1975,6 @@ enum FrameworkStressDiscoveryCase: String, CaseIterable, CustomStringConvertible
 
     var expectedTotal = 0
     var maxActions = harness.actionRegistrationCount
-    var maxKeyHandlers = harness.keyHandlerCount
     var maxKeyPressHandlers = harness.keyPressHandlerCount
     var maxPasteHandlers = harness.pasteHandlerCount
     var maxPointerHandlers = harness.pointerHandlerCount
@@ -1997,7 +1996,6 @@ enum FrameworkStressDiscoveryCase: String, CaseIterable, CustomStringConvertible
       assertExpectedRegistrations(harness)
 
       maxActions = max(maxActions, harness.actionRegistrationCount)
-      maxKeyHandlers = max(maxKeyHandlers, harness.keyHandlerCount)
       maxKeyPressHandlers = max(maxKeyPressHandlers, harness.keyPressHandlerCount)
       maxPasteHandlers = max(maxPasteHandlers, harness.pasteHandlerCount)
       maxPointerHandlers = max(maxPointerHandlers, harness.pointerHandlerCount)
@@ -2017,7 +2015,6 @@ enum FrameworkStressDiscoveryCase: String, CaseIterable, CustomStringConvertible
 
     assertMaxRegistrations(
       actions: maxActions,
-      keyHandlers: maxKeyHandlers,
       keyPressHandlers: maxKeyPressHandlers,
       pasteHandlers: maxPasteHandlers,
       pointerHandlers: maxPointerHandlers,
@@ -2196,16 +2193,16 @@ enum FrameworkStressDiscoveryCase: String, CaseIterable, CustomStringConvertible
       #expect(harness.actionRegistrationCount == 1)
 
     case .disabledTextFieldSkipsInputHandlers:
-      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.keyPressHandlerCount == 0)
       #expect(harness.keyPressHandlerCount == 0)
       #expect(harness.pasteHandlerCount == 0)
 
     case .disabledStepperSkipsInputHandlers:
-      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.keyPressHandlerCount == 0)
       #expect(harness.pointerHandlerCount == 0)
 
     case .disabledScrollViewSkipsPointerHandlers:
-      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.keyPressHandlerCount == 0)
       #expect(harness.pointerHandlerCount == 0)
 
     default:
@@ -2215,7 +2212,6 @@ enum FrameworkStressDiscoveryCase: String, CaseIterable, CustomStringConvertible
 
   private func assertMaxRegistrations(
     actions: Int,
-    keyHandlers: Int,
     keyPressHandlers: Int,
     pasteHandlers: Int,
     pointerHandlers: Int,
@@ -2237,31 +2233,29 @@ enum FrameworkStressDiscoveryCase: String, CaseIterable, CustomStringConvertible
     case .textFieldKeyHandlerRebinds,
       .secureFieldPasteHandlerRebinds,
       .textEditorPasteHandlerRebinds:
-      #expect(keyHandlers <= (self == .textEditorPasteHandlerRebinds ? 4 : 1))
-      #expect(keyPressHandlers <= 1)
+      #expect(keyPressHandlers <= (self == .textEditorPasteHandlerRebinds ? 4 : 1))
       #expect(pasteHandlers <= 1)
 
     case .disabledTextFieldSkipsInputHandlers:
-      #expect(keyHandlers == 0)
       #expect(keyPressHandlers == 0)
       #expect(pasteHandlers == 0)
 
     case .stepperKeyHandlerRebinds,
       .sliderKeyHandlerRebinds,
       .pickerKeyHandlerRebinds:
-      #expect(keyHandlers <= 1)
+      #expect(keyPressHandlers <= 1)
       #expect(pointerHandlers <= 5)
 
     case .disabledStepperSkipsInputHandlers:
-      #expect(keyHandlers == 0)
+      #expect(keyPressHandlers == 0)
       #expect(pointerHandlers == 0)
 
     case .scrollViewHandlersStayBounded:
-      #expect(keyHandlers <= 3)
+      #expect(keyPressHandlers <= 3)
       #expect(pointerHandlers <= 3)
 
     case .disabledScrollViewSkipsPointerHandlers:
-      #expect(keyHandlers == 0)
+      #expect(keyPressHandlers == 0)
       #expect(pointerHandlers == 0)
 
     case .tapGestureRecognizerRebinds,
@@ -2892,7 +2886,7 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
     case .disabledAncestorTextFieldSkipsHandlers,
       .disabledAncestorSecureFieldSkipsPaste,
       .disabledAncestorTextEditorSkipsPaste:
-      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.keyPressHandlerCount == 0)
       #expect(harness.keyPressHandlerCount == 0)
       #expect(harness.pasteHandlerCount == 0)
 
@@ -2900,7 +2894,7 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
       .disabledAncestorSliderSkipsHandlers,
       .disabledAncestorPickerSkipsHandlers,
       .disabledAncestorScrollViewSkipsHandlers:
-      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.keyPressHandlerCount == 0)
       #expect(harness.pointerHandlerCount == 0)
 
     case .disabledAncestorKeyPressSkipsHandlers:
@@ -2936,34 +2930,31 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
     case .anyViewTextFieldKeyRebinds,
       .panelTextFieldKeyRebinds,
       .anyViewSecureFieldPasteRebinds:
-      #expect(counts.keyHandlers <= 1)
       #expect(counts.keyPressHandlers <= 1)
       #expect(counts.pasteHandlers <= 1)
       #expect(counts.focusRegions <= 2)
 
     case .anyViewTextEditorPasteRebinds:
-      #expect(counts.keyHandlers <= 4)
-      #expect(counts.keyPressHandlers <= 1)
+      #expect(counts.keyPressHandlers <= 4)
       #expect(counts.pasteHandlers <= 1)
       #expect(counts.focusRegions <= 2)
 
     case .disabledAncestorTextFieldSkipsHandlers,
       .disabledAncestorSecureFieldSkipsPaste,
       .disabledAncestorTextEditorSkipsPaste:
-      #expect(counts.keyHandlers == 0)
       #expect(counts.keyPressHandlers == 0)
       #expect(counts.pasteHandlers == 0)
 
     case .anyViewStepperKeyRebinds,
       .anyViewSliderKeyRebinds,
       .anyViewPickerKeyRebinds:
-      #expect(counts.keyHandlers <= 1)
+      #expect(counts.keyPressHandlers <= 1)
       #expect(counts.pointerHandlers <= 5)
 
     case .disabledAncestorStepperSkipsHandlers,
       .disabledAncestorSliderSkipsHandlers,
       .disabledAncestorPickerSkipsHandlers:
-      #expect(counts.keyHandlers == 0)
+      #expect(counts.keyPressHandlers == 0)
       #expect(counts.pointerHandlers == 0)
 
     case .focusableTextRegionRebinds,
@@ -3007,12 +2998,12 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
 
     case .verticalScrollViewHandlersRebind,
       .horizontalScrollViewHandlersRebind:
-      #expect(counts.keyHandlers <= 3)
+      #expect(counts.keyPressHandlers <= 3)
       #expect(counts.pointerHandlers <= 3)
       #expect(counts.scrollPositions <= 1)
 
     case .disabledAncestorScrollViewSkipsHandlers:
-      #expect(counts.keyHandlers == 0)
+      #expect(counts.keyPressHandlers == 0)
       #expect(counts.pointerHandlers == 0)
       #expect(counts.scrollPositions == 0)
 
@@ -3056,7 +3047,6 @@ enum FrameworkStressExpansionCase: String, CaseIterable, CustomStringConvertible
 
 private struct FrameworkStressExpansionRegistryCounts {
   var actions: Int
-  var keyHandlers: Int
   var keyPressHandlers: Int
   var pasteHandlers: Int
   var pointerHandlers: Int
@@ -3076,7 +3066,6 @@ private struct FrameworkStressExpansionRegistryCounts {
   @MainActor
   init<Content: View>(_ harness: StressRuntimeHarness<Content>) {
     actions = harness.actionRegistrationCount
-    keyHandlers = harness.keyHandlerCount
     keyPressHandlers = harness.keyPressHandlerCount
     pasteHandlers = harness.pasteHandlerCount
     pointerHandlers = harness.pointerHandlerCount
@@ -3098,7 +3087,6 @@ private struct FrameworkStressExpansionRegistryCounts {
   mutating func observe<Content: View>(_ harness: StressRuntimeHarness<Content>) {
     let current = FrameworkStressExpansionRegistryCounts(harness)
     actions = max(actions, current.actions)
-    keyHandlers = max(keyHandlers, current.keyHandlers)
     keyPressHandlers = max(keyPressHandlers, current.keyPressHandlers)
     pasteHandlers = max(pasteHandlers, current.pasteHandlers)
     pointerHandlers = max(pointerHandlers, current.pointerHandlers)
@@ -3865,7 +3853,7 @@ enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertibl
     case .disabledKeyPressNestedNoLeak:
       #expect(harness.keyPressHandlerCount == 0)
     case .disabledNestedScrollViewSkipsHandlers:
-      #expect(harness.keyHandlerCount == 0)
+      #expect(harness.keyPressHandlerCount == 0)
       #expect(harness.pointerHandlerCount == 0)
       #expect(harness.scrollPositionRegistrationCount == 0)
     case .focusedValueInsidePanelRebinds:
@@ -3887,29 +3875,27 @@ enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertibl
 
     case .nestedPanelTextFieldKeyRebinds,
       .nestedAnyViewSecureFieldPasteRebinds:
-      #expect(counts.keyHandlers <= 1)
       #expect(counts.keyPressHandlers <= 1)
       #expect(counts.pasteHandlers <= 1)
       #expect(counts.focusRegions <= 2)
 
     case .panelTextEditorPasteRebinds:
-      #expect(counts.keyHandlers <= 4)
-      #expect(counts.keyPressHandlers <= 1)
+      #expect(counts.keyPressHandlers <= 4)
       #expect(counts.pasteHandlers <= 1)
       #expect(counts.focusRegions <= 2)
 
     case .forEachStepperKeyRebinds:
-      #expect(counts.keyHandlers <= 1)
+      #expect(counts.keyPressHandlers <= 1)
       #expect(counts.pointerHandlers <= 6)
       #expect(counts.focusRegions <= 2)
 
     case .conditionalSliderKeyRebinds:
-      #expect(counts.keyHandlers <= 1)
+      #expect(counts.keyPressHandlers <= 1)
       #expect(counts.pointerHandlers <= 5)
       #expect(counts.focusRegions <= 2)
 
     case .forEachPickerKeyRebinds:
-      #expect(counts.keyHandlers <= 1)
+      #expect(counts.keyPressHandlers <= 1)
       #expect(counts.pointerHandlers <= 8)
       #expect(counts.focusRegions <= 2)
 
@@ -3949,12 +3935,12 @@ enum FrameworkStressAdditionalCase: String, CaseIterable, CustomStringConvertibl
       #expect(counts.pointerHandlers <= 1)
 
     case .verticalScrollNestedPanelRebinds:
-      #expect(counts.keyHandlers <= 3)
+      #expect(counts.keyPressHandlers <= 3)
       #expect(counts.pointerHandlers <= 3)
       #expect(counts.scrollPositions <= 1)
 
     case .disabledNestedScrollViewSkipsHandlers:
-      #expect(counts.keyHandlers == 0)
+      #expect(counts.keyPressHandlers == 0)
       #expect(counts.pointerHandlers == 0)
       #expect(counts.scrollPositions == 0)
 
@@ -4964,10 +4950,6 @@ final class StressRuntimeHarness<Content: View> {
 
   var actionRegistrationCount: Int {
     runLoop.localActionRegistry.snapshot().count
-  }
-
-  var keyHandlerCount: Int {
-    runLoop.localKeyHandlerRegistry.snapshot().count
   }
 
   var pointerHandlerCount: Int {

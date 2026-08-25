@@ -46,10 +46,14 @@ extension LocalActionRegistry: RuntimeRegistry {
 extension LocalKeyHandlerRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .keyHandler }
 
-  // Key-press handlers are deliberately absent from this check at parity with
-  // the pre-unification fan-out; see `frameDropEligibilityBlockers()` history.
+  // The legacy KeyEvent generation used to carry this check alone (key-press
+  // handlers were absent at parity with the pre-unification fan-out). With
+  // that generation removed, its blocking population — the interactive
+  // controls' key handlers — lives in the key-press generation, so the
+  // check follows it: dropping a frame out from under an installed key
+  // handler stays ineligible.
   package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
-    snapshot().isEmpty && snapshotPasteHandlers().isEmpty
+    snapshotKeyPressHandlers().isEmpty && snapshotPasteHandlers().isEmpty
       ? nil
       : .handlerInstallations
   }
@@ -69,10 +73,6 @@ extension LocalKeyHandlerRegistry: RuntimeRegistry {
     from handlers: NodeHandlers,
     context: RuntimeRegistrationRestoreContext
   ) {
-    restore(
-      handlers.keyHandler.handlers,
-      ownersByIdentity: handlers.keyHandler.owners
-    )
     restoreKeyPressHandlers(
       handlers.keyHandler.keyPress.handlers,
       ownersByIdentity: handlers.keyHandler.keyPress.owners,
@@ -86,9 +86,6 @@ extension LocalKeyHandlerRegistry: RuntimeRegistry {
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
-    for identity in snapshot().keys {
-      builder.add("keyHandler", identity.path)
-    }
     for (identity, handlers) in snapshotKeyPressHandlers() {
       builder.add("keyPress", identity.path, count: handlers.count)
     }

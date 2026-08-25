@@ -170,21 +170,6 @@ package struct HandlerDescriptorIntake {
 
   // MARK: Key-event family
 
-  package func registerKeyHandler(
-    identity: Identity,
-    handler: @escaping @MainActor (KeyEvent) -> Bool
-  ) {
-    let scope = dispatchScope
-    context.localKeyHandlerRegistry?.register(
-      identity: identity,
-      handler: { event in
-        withImperativeAuthoringContext(scope) {
-          handler(event)
-        }
-      }
-    )
-  }
-
   package func registerKeyPressHandler(
     identity: Identity,
     handler: @escaping @MainActor (KeyPress) -> Bool

@@ -37,7 +37,7 @@ package struct CommittedHandlerInventory: Equatable, Sendable {
 extension NodeHandlers {
   /// Identity-only projection of the five interactive registration families.
   ///
-  /// Key identities unite bare key, key-press, and paste handlers. Command
+  /// Key identities unite key-press and paste handlers. Command
   /// scopes omit empty tables, which publish no dispatchable command. Gesture
   /// route identities are recognizer keys only: general pointer and hover
   /// routes are broader interaction infrastructure and do not imply a gesture.
@@ -45,8 +45,7 @@ extension NodeHandlers {
     CommittedHandlerInventory(
       actionIdentities: Array(action.registrations.keys),
       keyHandlerIdentities:
-        Array(keyHandler.handlers.keys)
-        + Array(keyHandler.keyPress.handlers.keys)
+        Array(keyHandler.keyPress.handlers.keys)
         + Array(keyHandler.paste.handlers.keys),
       commandScopes: command.keyCommandsByScope.compactMap { scope, table in
         table.isEmpty ? nil : scope

@@ -81,8 +81,11 @@ extension Picker {
         context: context,
         fallbackAuthoringScope: authoringScope
       )
-      intake.registerKeyHandler(identity: context.identity) { event in
-        let delta = pickerStyle.selectionDelta(for: event)
+      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+        guard keyPress.modifiers.isEmpty else {
+          return false
+        }
+        let delta = pickerStyle.selectionDelta(for: keyPress.key)
         guard let delta, !options.isEmpty else {
           return false
         }

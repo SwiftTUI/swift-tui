@@ -1892,9 +1892,6 @@ struct RuntimeRegistrationRestoreScopingTests {
         handler: { marker.hasSuffix("1") },
         followUpInvalidationIdentity: identity.child("follow-up-\(marker)")
       )
-      node.recordKeyHandlerRegistration(identity: identity) { _ in
-        marker.hasSuffix("1")
-      }
       node.recordKeyPressHandlerRegistration(identity: identity, ordinal: 0) { _ in
         marker.hasSuffix("1")
       }
@@ -2036,9 +2033,6 @@ struct RuntimeRegistrationRestoreScopingTests {
 
     let liveKeyRegistry = live.keyHandlerRegistry
     let fullKeyRegistry = fullRebuild.keyHandlerRegistry
-    let liveKeyHandlerKeys = Set((liveKeyRegistry?.snapshot() ?? [:]).keys)
-    let fullKeyHandlerKeys = Set((fullKeyRegistry?.snapshot() ?? [:]).keys)
-    #expect(liveKeyHandlerKeys == fullKeyHandlerKeys)
     #expect(
       handlerCounts(liveKeyRegistry?.snapshotKeyPressHandlers() ?? [:])
         == handlerCounts(fullKeyRegistry?.snapshotKeyPressHandlers() ?? [:])
@@ -2050,10 +2044,6 @@ struct RuntimeRegistrationRestoreScopingTests {
     for identity in identities {
       #expect(liveKeyRegistry?.hasHandler(identity: identity) == true)
       #expect(liveKeyRegistry?.hasPasteHandler(identity: identity) == true)
-      #expect(
-        liveKeyRegistry?.dispatch(identity: identity, event: .return)
-          == fullKeyRegistry?.dispatch(identity: identity, event: .return)
-      )
       #expect(
         liveKeyRegistry?.dispatch(identity: identity, keyPress: KeyPress(.space))
           == fullKeyRegistry?.dispatch(identity: identity, keyPress: KeyPress(.space))

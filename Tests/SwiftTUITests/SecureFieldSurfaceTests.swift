@@ -49,11 +49,11 @@ struct SecureFieldSurfaceTests {
     )
     #expect(focusedArtifacts.rasterSurface.lines.joined(separator: "\n").contains("_"))
 
-    #expect(registry.dispatch(identity: testIdentity("SecretField"), event: .character("h")))
+    #expect(registry.dispatch(identity: testIdentity("SecretField"), keyPress: KeyPress(.character("h"))))
     #expect(box.value == "h")
-    #expect(registry.dispatch(identity: testIdentity("SecretField"), event: .character("u")))
+    #expect(registry.dispatch(identity: testIdentity("SecretField"), keyPress: KeyPress(.character("u"))))
     #expect(box.value == "hu")
-    #expect(registry.dispatch(identity: testIdentity("SecretField"), event: .backspace))
+    #expect(registry.dispatch(identity: testIdentity("SecretField"), keyPress: KeyPress(.backspace)))
     #expect(box.value == "h")
 
     let updatedArtifacts = DefaultRenderer().render(
@@ -110,8 +110,8 @@ struct SecureFieldSurfaceTests {
       )
     )
 
-    #expect(registry.dispatch(identity: identity, event: .arrowLeft))
-    #expect(registry.dispatch(identity: identity, event: .character("b")))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.arrowLeft)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("b"))))
     #expect(box.value == "abc")
 
     let updatedArtifacts = DefaultRenderer().render(

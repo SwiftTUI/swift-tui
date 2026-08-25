@@ -58,7 +58,7 @@ struct PickerOptionDiagnosticsTests {
 
     let frame = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(frame.contains("Structured label"))
-    #expect(keyRegistry.dispatch(identity: pickerIdentity, event: .arrowDown))
+    #expect(keyRegistry.dispatch(identity: pickerIdentity, keyPress: KeyPress(.arrowDown)))
     #expect(selection.value == 2)
   }
 

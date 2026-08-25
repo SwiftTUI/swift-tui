@@ -58,7 +58,6 @@ public enum KeyEvent: Equatable, Hashable, Sendable {
 
 @MainActor
 package final class LocalKeyHandlerRegistry: Equatable {
-  package typealias Handler = @MainActor (KeyEvent) -> Bool
   package typealias KeyPressHandler = @MainActor (KeyPress) -> Bool
   package typealias PasteHandler = @MainActor (String) -> Bool
 
@@ -104,7 +103,6 @@ package final class LocalKeyHandlerRegistry: Equatable {
     }
   }
 
-  private var handlers: [Identity: Handler] = [:]
   private var keyPressHandlers: [Identity: ContributedHandlers<KeyPressHandler>] = [:]
   private var pasteHandlers: [Identity: ContributedHandlers<PasteHandler>] = [:]
   private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
@@ -119,18 +117,6 @@ package final class LocalKeyHandlerRegistry: Equatable {
     -> Bool
   {
     lhs === rhs
-  }
-
-  package func register(
-    identity: Identity,
-    handler: @escaping Handler
-  ) {
-    handlers[identity] = handler
-    ownersByIdentity[identity] = .current(identity: identity)
-    ViewNodeContext.current?.recordKeyHandlerRegistration(
-      identity: identity,
-      handler: handler
-    )
   }
 
   package func register(
@@ -177,33 +163,17 @@ package final class LocalKeyHandlerRegistry: Equatable {
   @discardableResult
   package func dispatch(
     identity: Identity,
-    event: KeyEvent
-  ) -> Bool {
-    handlers[identity]?(event) ?? false
-  }
-
-  @discardableResult
-  package func dispatch(
-    identity: Identity,
     keyPress: KeyPress
   ) -> Bool {
-    if let contributions = keyPressHandlers[identity] {
-      for handler in contributions.flattened.reversed() {
-        if handler(keyPress) {
-          return true
-        }
-      }
-    }
-    // The KeyEvent fallback carries no modifier state, so a modified press
-    // must never reach it: handing `Ctrl+C`'s bare `.character("c")` to a
-    // text input's fallback inserted a literal "c" and claimed the key the
-    // KeyPress handler had just declined — which swallowed the default exit
-    // chord under edit focus (the pre-swap dispatch order exited before
-    // consulting the editor, masking this).
-    guard keyPress.modifiers.isEmpty else {
+    guard let contributions = keyPressHandlers[identity] else {
       return false
     }
-    return handlers[identity]?(keyPress.key) ?? false
+    for handler in contributions.flattened.reversed() {
+      if handler(keyPress) {
+        return true
+      }
+    }
+    return false
   }
 
   @discardableResult
@@ -226,7 +196,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
   package func hasHandler(
     identity: Identity
   ) -> Bool {
-    handlers[identity] != nil || keyPressHandlers[identity]?.isEmpty == false
+    keyPressHandlers[identity]?.isEmpty == false
   }
 
   package func hasPasteHandler(
@@ -236,7 +206,6 @@ package final class LocalKeyHandlerRegistry: Equatable {
   }
 
   package func reset() {
-    handlers.removeAll(keepingCapacity: true)
     keyPressHandlers.removeAll(keepingCapacity: true)
     pasteHandlers.removeAll(keepingCapacity: true)
     ownersByIdentity.removeAll(keepingCapacity: true)
@@ -249,9 +218,6 @@ package final class LocalKeyHandlerRegistry: Equatable {
       return
     }
 
-    for identity in handlers.keys.filter({ matchesAnySubtreeRoot($0, roots: roots) }) {
-      handlers.removeValue(forKey: identity)
-    }
     removeContributionSubtrees(from: &keyPressHandlers, roots: roots)
     removeContributionSubtrees(from: &pasteHandlers, roots: roots)
     pruneOwnerMap()
@@ -273,30 +239,12 @@ package final class LocalKeyHandlerRegistry: Equatable {
     }
   }
 
-  package func snapshot() -> [Identity: Handler] {
-    handlers
-  }
-
   package func snapshotKeyPressHandlers() -> [Identity: [KeyPressHandler]] {
     keyPressHandlers.mapValues(\.flattened)
   }
 
   package func snapshotPasteHandlers() -> [Identity: [PasteHandler]] {
     pasteHandlers.mapValues(\.flattened)
-  }
-
-  package func restore(
-    _ snapshot: [Identity: Handler],
-    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
-  ) {
-    guard !snapshot.isEmpty else {
-      return
-    }
-
-    for (identity, handler) in snapshot {
-      handlers[identity] = handler
-      self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
-    }
   }
 
   package func restoreKeyPressHandlers(
@@ -397,8 +345,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
   }
 
   private func pruneOwnerMap() {
-    let liveIdentities = Set(handlers.keys)
-      .union(keyPressHandlers.keys)
+    let liveIdentities = Set(keyPressHandlers.keys)
       .union(pasteHandlers.keys)
     ownersByIdentity = ownersByIdentity.filter { liveIdentities.contains($0.key) }
   }

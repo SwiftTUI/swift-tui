@@ -132,7 +132,7 @@ struct RuntimeRegistrationKindTotalityTests {
     case .action:
       ["action"]
     case .keyHandler:
-      ["keyHandler", "keyPress", "paste"]
+      ["keyPress", "paste"]
     case .termination:
       ["termination"]
     case .pointerHandler:

@@ -223,7 +223,11 @@ extension List {
         }
       }
 
-      intake.registerKeyHandler(identity: context.identity) { event in
+      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+        guard keyPress.modifiers.isEmpty else {
+          return false
+        }
+        let event = keyPress.key
         if let scrollCurrency, applyCollectionScrollKey(event, to: scrollCurrency) {
           return true
         }
@@ -300,9 +304,12 @@ extension List {
           intake.registerAction(identity: rowIdentity) {
             policy.isMultiple ? policy.toggle(tag) : activate(tag)
           }
-          intake.registerKeyHandler(identity: rowIdentity) { event in
+          intake.registerKeyPressHandler(identity: rowIdentity) { keyPress in
+            guard keyPress.modifiers.isEmpty else {
+              return false
+            }
             let delta: Int?
-            switch event {
+            switch keyPress.key {
             case .arrowUp:
               delta = -1
             case .arrowDown:

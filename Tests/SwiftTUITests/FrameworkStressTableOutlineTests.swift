@@ -535,7 +535,7 @@ extension FrameworkStressTableOutlineTests {
         proposal: .init(width: 18, height: 8)
       )
 
-      #expect(registry.dispatch(identity: tableIdentity, event: .arrowDown))
+      #expect(registry.dispatch(identity: tableIdentity, keyPress: KeyPress(.arrowDown)))
       #expect(box.value == 2)
       #expect(box.writes == [2])
       #expect(priorBoxes.allSatisfy { $0.value == 2 && $0.writes == [2] })
@@ -592,7 +592,7 @@ extension FrameworkStressTableOutlineTests {
         proposal: .init(width: 16, height: 9)
       )
 
-      #expect(registry.dispatch(identity: tableIdentity, event: .arrowDown))
+      #expect(registry.dispatch(identity: tableIdentity, keyPress: KeyPress(.arrowDown)))
       #expect(box.value == order[1])
     }
   }
@@ -653,7 +653,7 @@ extension FrameworkStressTableOutlineTests {
         proposal: .init(width: 16, height: 8)
       )
 
-      #expect(registry.dispatch(identity: tableIdentity, event: .arrowDown) == enabled)
+      #expect(registry.dispatch(identity: tableIdentity, keyPress: KeyPress(.arrowDown)) == enabled)
       #expect(box.value == (enabled ? 2 : 1))
       #expect(box.writes == (enabled ? 1 : 0))
       #expect(retired.allSatisfy { $0.writes <= 1 })
@@ -716,7 +716,7 @@ extension FrameworkStressTableOutlineTests {
         proposal: .init(width: 18, height: 10)
       )
 
-      #expect(registry.dispatch(identity: tableIdentity, event: .arrowDown))
+      #expect(registry.dispatch(identity: tableIdentity, keyPress: KeyPress(.arrowDown)))
       #expect(box.value == (middleSelectable ? 2 : 3))
     }
   }
@@ -1320,7 +1320,7 @@ extension FrameworkStressTableOutlineTests {
         proposal: .init(width: 22, height: 10)
       )
 
-      #expect(registry.dispatch(identity: listIdentity, event: .arrowDown))
+      #expect(registry.dispatch(identity: listIdentity, keyPress: KeyPress(.arrowDown)))
       #expect(box.value == nodes[0].children?.first?.id)
     }
   }

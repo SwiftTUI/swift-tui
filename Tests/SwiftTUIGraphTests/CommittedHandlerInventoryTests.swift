@@ -30,7 +30,6 @@ struct CommittedHandlerInventoryTests {
     let root = testIdentity("Root")
     let actionAlpha = testIdentity("Root", "ActionAlpha")
     let actionBeta = testIdentity("Root", "ActionBeta")
-    let bareKey = testIdentity("Root", "KeyBare")
     let pasteKey = testIdentity("Root", "KeyPaste")
     let pressKey = testIdentity("Root", "KeyPress")
     let commandScope = testIdentity("Root", "Command")
@@ -52,7 +51,6 @@ struct CommittedHandlerInventoryTests {
         handler: { false },
         followUpInvalidationIdentity: nil
       )
-      node.recordKeyHandlerRegistration(identity: bareKey) { _ in false }
       node.recordKeyPressHandlerRegistration(identity: pressKey, ordinal: 0) { _ in false }
       node.recordPasteHandlerRegistration(identity: pasteKey, ordinal: 0) { _ in false }
       node.recordCommandRegistration(
@@ -100,7 +98,7 @@ struct CommittedHandlerInventoryTests {
 
     let inventory = node.snapshot().handlerInventory
     #expect(inventory.actionIdentities == [actionAlpha, actionBeta])
-    #expect(inventory.keyHandlerIdentities == [bareKey, pasteKey, pressKey])
+    #expect(inventory.keyHandlerIdentities == [pasteKey, pressKey])
     #expect(inventory.commandScopes == [commandScope])
     #expect(inventory.dropScopes == [dropScope])
     #expect(inventory.gestureRouteIdentities == [gesture])

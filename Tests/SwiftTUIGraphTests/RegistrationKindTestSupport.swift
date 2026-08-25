@@ -47,7 +47,6 @@ enum RegistrationKindDriver {
         followUpInvalidationIdentity: nil
       )
     case .keyHandler:
-      node.recordKeyHandlerRegistration(identity: identity) { _ in false }
       node.recordKeyPressHandlerRegistration(identity: identity, ordinal: 0) { _ in false }
       node.recordPasteHandlerRegistration(identity: identity, ordinal: 0) { _ in false }
     case .termination:

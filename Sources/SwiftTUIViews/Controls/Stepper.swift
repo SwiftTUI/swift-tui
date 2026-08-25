@@ -159,9 +159,12 @@ extension Stepper {
         binding.wrappedValue = next
         return true
       }
-      intake.registerKeyHandler(identity: context.identity) { event in
+      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+        guard keyPress.modifiers.isEmpty else {
+          return false
+        }
         let deltaCount: Int
-        switch event {
+        switch keyPress.key {
         case .arrowLeft:
           deltaCount = -1
         case .arrowRight:

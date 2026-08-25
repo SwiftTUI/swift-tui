@@ -761,7 +761,7 @@ extension FrameworkStressPresentationSemanticsTests {
     let frame = try harness.clickText("Disable picker")
 
     #expect(!frame.contains("Beta option"))
-    #expect(harness.keyHandlerCount == 0)
+    #expect(harness.keyPressHandlerCount == 0)
   }
 }
 

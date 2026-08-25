@@ -83,7 +83,6 @@ package struct ContributedHandlerNodeRecord<Handler>: RuntimeNodeRecord {
 }
 
 package struct KeyHandlerNodeRecord: RuntimeNodeRecord {
-  package var handlers: [Identity: LocalKeyHandlerRegistry.Handler] = [:]
   package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
   package var keyPress = ContributedHandlerNodeRecord<LocalKeyHandlerRegistry.KeyPressHandler>()
   package var paste = ContributedHandlerNodeRecord<LocalKeyHandlerRegistry.PasteHandler>()
@@ -91,23 +90,13 @@ package struct KeyHandlerNodeRecord: RuntimeNodeRecord {
   package init() {}
 
   package var isEmpty: Bool {
-    handlers.isEmpty && keyPress.isEmpty && paste.isEmpty
+    keyPress.isEmpty && paste.isEmpty
   }
 
   package mutating func absorbAdopted(_ departing: KeyHandlerNodeRecord) {
-    handlers.merge(departing.handlers, uniquingKeysWith: mergeKeepingCurrent)
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
     keyPress.absorbAdopted(departing.keyPress)
     paste.absorbAdopted(departing.paste)
-  }
-
-  @MainActor
-  package mutating func record(
-    identity: Identity,
-    handler: @escaping LocalKeyHandlerRegistry.Handler
-  ) {
-    owners[identity] = .current(identity: identity)
-    handlers[identity] = handler
   }
 }
 
@@ -654,13 +643,6 @@ package struct NodeHandlers {
       followUpInvalidationIdentity: followUpInvalidationIdentity,
       owner: owner
     )
-  }
-
-  package mutating func recordKeyHandler(
-    identity: Identity,
-    handler: @escaping LocalKeyHandlerRegistry.Handler
-  ) {
-    keyHandler.record(identity: identity, handler: handler)
   }
 
   package mutating func recordKeyPressHandler(

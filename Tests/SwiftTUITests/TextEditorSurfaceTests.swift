@@ -41,9 +41,9 @@ struct TextEditorSurfaceTests {
     #expect(focusedSurface.contains("Line 2"))
     #expect(focusedSurface.contains("Line 3"))
 
-    #expect(registry.dispatch(identity: identity, event: .return))
-    #expect(registry.dispatch(identity: identity, event: .character("A")))
-    #expect(registry.dispatch(identity: identity, event: .backspace))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.return)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("A"))))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.backspace)))
     #expect(box.value == "Line 1\nLine 2\nLine 3\nLine 4\n")
 
     let updatedArtifacts = DefaultRenderer().render(
@@ -98,9 +98,9 @@ struct TextEditorSurfaceTests {
       )
     )
 
-    #expect(registry.dispatch(identity: identity, event: .arrowLeft))
-    #expect(registry.dispatch(identity: identity, event: .return))
-    #expect(registry.dispatch(identity: identity, event: .character("b")))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.arrowLeft)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.return)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("b"))))
     #expect(box.value == "a\nbc")
   }
 
@@ -133,8 +133,8 @@ struct TextEditorSurfaceTests {
       )
     )
 
-    #expect(registry.dispatch(identity: identity, event: .arrowUp))
-    #expect(registry.dispatch(identity: identity, event: .character("X")))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.arrowUp)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("X"))))
     #expect(box.value == "abX\ncd")
   }
 
@@ -168,7 +168,7 @@ struct TextEditorSurfaceTests {
     )
 
     #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.arrowLeft, modifiers: .alt)))
-    #expect(registry.dispatch(identity: identity, event: .character("X")))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("X"))))
     #expect(box.value == "hello Xworld")
 
     #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.backspace, modifiers: .alt)))
@@ -176,7 +176,7 @@ struct TextEditorSurfaceTests {
 
     #expect(
       registry.dispatch(identity: identity, keyPress: KeyPress(.character("a"), modifiers: .ctrl)))
-    #expect(registry.dispatch(identity: identity, event: .character("Z")))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("Z"))))
     #expect(box.value == "Z")
   }
 

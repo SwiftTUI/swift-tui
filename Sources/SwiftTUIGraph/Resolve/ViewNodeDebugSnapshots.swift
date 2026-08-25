@@ -16,7 +16,6 @@ extension ViewNode {
 
     package struct HandlerSnapshot: Equatable {
       package var actionRegistrationIdentities: [String]
-      package var keyHandlerRegistrationIdentities: [String]
       package var keyPressHandlerRegistrationIdentities: [String]
       package var pasteHandlerRegistrationIdentities: [String]
       package var terminationHandlerRegistrationIdentities: [String]

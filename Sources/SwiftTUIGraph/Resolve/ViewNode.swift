@@ -1602,23 +1602,6 @@ package final class ViewNode {
     refreshCommittedHandlerInventoryOutsideCapture()
   }
 
-  package func recordKeyHandlerRegistration(
-    identity: Identity,
-    handler: @escaping LocalKeyHandlerRegistry.Handler
-  ) {
-    flagDuplicateRecordIfInCaptureSession(
-      family: "key handler",
-      identity: identity,
-      hasExistingEntry: registeredHandlers.keyHandler.handlers[identity] != nil
-    )
-    recordRuntimeRegistrationMutation()
-    registeredHandlers.recordKeyHandler(
-      identity: identity,
-      handler: handler
-    )
-    refreshCommittedHandlerInventoryOutsideCapture()
-  }
-
   package func recordKeyPressHandlerRegistration(
     identity: Identity,
     ordinal: UInt64,

@@ -440,7 +440,7 @@ struct ImperativeAuthoringContextDispatchTests {
     #expect(
       primary.runLoop.localKeyHandlerRegistry.dispatch(
         identity: testIdentity("ScopedTextField"),
-        event: .character("x")
+        keyPress: KeyPress(.character("x"))
       )
     )
     try renderPending(primary.runLoop)
@@ -484,7 +484,7 @@ struct ImperativeAuthoringContextDispatchTests {
     #expect(
       primary.runLoop.localKeyHandlerRegistry.dispatch(
         identity: testIdentity("ScopedTextEditor"),
-        event: .character("z")
+        keyPress: KeyPress(.character("z"))
       )
     )
     try renderPending(primary.runLoop)
@@ -508,7 +508,7 @@ struct ImperativeAuthoringContextDispatchTests {
     #expect(
       primary.runLoop.localKeyHandlerRegistry.dispatch(
         identity: testIdentity("ScopedStepper"),
-        event: .arrowRight
+        keyPress: KeyPress(.arrowRight)
       )
     )
     try renderPending(primary.runLoop)
@@ -532,7 +532,7 @@ struct ImperativeAuthoringContextDispatchTests {
     #expect(
       primary.runLoop.localKeyHandlerRegistry.dispatch(
         identity: testIdentity("ScopedSlider"),
-        event: .arrowRight
+        keyPress: KeyPress(.arrowRight)
       )
     )
     try renderPending(primary.runLoop)
@@ -556,7 +556,7 @@ struct ImperativeAuthoringContextDispatchTests {
     #expect(
       primary.runLoop.localKeyHandlerRegistry.dispatch(
         identity: testIdentity("ScopedPicker"),
-        event: .arrowDown
+        keyPress: KeyPress(.arrowDown)
       )
     )
     try renderPending(primary.runLoop)

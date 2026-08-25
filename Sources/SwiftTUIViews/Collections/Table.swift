@@ -245,7 +245,11 @@ extension Table {
         }
       }
 
-      intake.registerKeyHandler(identity: context.identity) { event in
+      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+        guard keyPress.modifiers.isEmpty else {
+          return false
+        }
+        let event = keyPress.key
         if let scrollCurrency, applyCollectionScrollKey(event, to: scrollCurrency) {
           return true
         }

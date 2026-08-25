@@ -300,7 +300,7 @@ struct Phase4ObservationAndEnvironmentTests {
     )
     let fieldIdentity = try #require(initialArtifacts.semanticSnapshot.focusRegions.first?.identity)
 
-    #expect(keyRegistry.dispatch(identity: fieldIdentity, event: .character("H")))
+    #expect(keyRegistry.dispatch(identity: fieldIdentity, keyPress: KeyPress(.character("H"))))
     #expect(invalidator.requests == [[testIdentity("Root")]])
 
     var updatedContext = ResolveContext(
@@ -316,7 +316,7 @@ struct Phase4ObservationAndEnvironmentTests {
     )
 
     invalidator.clear()
-    #expect(keyRegistry.dispatch(identity: fieldIdentity, event: .character("i")))
+    #expect(keyRegistry.dispatch(identity: fieldIdentity, keyPress: KeyPress(.character("i"))))
     #expect(model.name == "Hi")
     #expect(invalidator.requests == [[testIdentity("Root")]])
 
@@ -969,7 +969,7 @@ struct Phase4ObservationAndEnvironmentTests {
     )
     #expect(initialArtifacts.resolvedTree.descendant(withText: "Selection 0") != nil)
 
-    #expect(keyRegistry.dispatch(identity: testIdentity("StatefulPicker"), event: .arrowDown))
+    #expect(keyRegistry.dispatch(identity: testIdentity("StatefulPicker"), keyPress: KeyPress(.arrowDown)))
 
     let invalidatedIdentities = collectedInvalidatedIdentities(from: invalidator)
     #expect(!invalidatedIdentities.isEmpty)
@@ -1008,7 +1008,7 @@ struct Phase4ObservationAndEnvironmentTests {
     )
     #expect(initialArtifacts.resolvedTree.descendant(withText: "Value 0") != nil)
 
-    #expect(keyRegistry.dispatch(identity: testIdentity("StatefulStepper"), event: .arrowRight))
+    #expect(keyRegistry.dispatch(identity: testIdentity("StatefulStepper"), keyPress: KeyPress(.arrowRight)))
 
     let invalidatedIdentities = collectedInvalidatedIdentities(from: invalidator)
     #expect(!invalidatedIdentities.isEmpty)

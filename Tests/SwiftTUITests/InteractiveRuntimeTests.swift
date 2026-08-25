@@ -1278,7 +1278,7 @@ struct InteractiveRuntimeTests {
     )
 
     #expect(actionRegistry.dispatch(identity: testIdentity("Root", "Harness[0]")))
-    #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), event: .return))
+    #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), keyPress: KeyPress(.return)))
     #expect(recorder.actionCount == 1)
     #expect(recorder.keyEvents == [.return])
 
@@ -1294,7 +1294,7 @@ struct InteractiveRuntimeTests {
     )
 
     #expect(actionRegistry.dispatch(identity: testIdentity("Root", "Harness[0]")))
-    #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), event: .space))
+    #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), keyPress: KeyPress(.space)))
     #expect(recorder.actionCount == 2)
     #expect(recorder.keyEvents == [.return, .space])
   }
@@ -5249,10 +5249,13 @@ private struct ReusedHandlerProbe: PrimitiveView, ResolvableView {
       recorder.recordAction()
       return true
     }
-    context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
-      recorder.recordKey(event)
-      return true
-    }
+    context.localKeyHandlerRegistry?.register(
+      identity: context.identity,
+      keyPressHandler: { keyPress in
+        recorder.recordKey(keyPress.key)
+        return true
+      }
+    )
     return [interactiveProbeTextNode("Interactive", in: context)]
   }
 }

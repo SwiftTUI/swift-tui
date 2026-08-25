@@ -740,7 +740,7 @@ struct DiagnosticsAndCacheTests {
 
     #expect(dispatched)
     #expect(box.value == 1)
-    #expect(keyRegistry.dispatch(identity: testIdentity("CountStepper"), event: .arrowRight))
+    #expect(keyRegistry.dispatch(identity: testIdentity("CountStepper"), keyPress: KeyPress(.arrowRight)))
     #expect(box.value == 2)
   }
 

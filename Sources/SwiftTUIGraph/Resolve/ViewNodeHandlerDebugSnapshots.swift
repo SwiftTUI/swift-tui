@@ -2,7 +2,6 @@ extension NodeHandlers {
   func debugTotalStateSnapshot() -> ViewNode.DebugTotalStateSnapshot.HandlerSnapshot {
     ViewNode.DebugTotalStateSnapshot.HandlerSnapshot(
       actionRegistrationIdentities: sortedIdentityStrings(action.registrations.keys),
-      keyHandlerRegistrationIdentities: sortedIdentityStrings(keyHandler.handlers.keys),
       keyPressHandlerRegistrationIdentities: sortedIdentityStrings(
         keyHandler.keyPress.handlers.keys
       ),

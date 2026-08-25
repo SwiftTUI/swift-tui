@@ -51,12 +51,6 @@ package func registerTextInputBinding(
   }
 
   intake.registerKeyPressHandler(identity: context.identity, handler: handle)
-  // The KeyEvent fallback carries no modifier state, so it must stay
-  // editing-only: re-wrapping a declined modified Return as a bare KeyPress
-  // would re-enter the submit intercept without the modifier bits.
-  intake.registerKeyHandler(identity: context.identity) { event in
-    applyEditingCommand(KeyPress(event))
-  }
   intake.registerPasteHandler(
     identity: context.identity,
     handler: { content in

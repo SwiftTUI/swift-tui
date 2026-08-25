@@ -104,8 +104,12 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           bindingSourceID: binding.bindingSourceID
         )
         let scrollCommandRegistry = context.scrollCommandRegistry
-        let registerKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
-          intake.registerKeyHandler(identity: identity) { event in
+        let registerScrollKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
+          intake.registerKeyPressHandler(identity: identity) { keyPress in
+            guard keyPress.modifiers.isEmpty else {
+              return false
+            }
+            let event = keyPress.key
             if let edge = scrollBoundaryEdge(for: event, targetAxis: targetAxis) {
               return scrollCommandRegistry?.scrollToEdge(
                 edge,
@@ -136,9 +140,9 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
             return true
           }
         }
-        registerKeyHandler(context.identity, nil)
-        registerKeyHandler(verticalScrollIndicatorIdentity(for: context.identity), .vertical)
-        registerKeyHandler(
+        registerScrollKeyHandler(context.identity, nil)
+        registerScrollKeyHandler(verticalScrollIndicatorIdentity(for: context.identity), .vertical)
+        registerScrollKeyHandler(
           horizontalScrollIndicatorIdentity(for: context.identity),
           .horizontal
         )
