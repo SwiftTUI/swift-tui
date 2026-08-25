@@ -327,9 +327,11 @@ import Synchronization
   /// POSIX sh plus `ps -o stat=` — this runs on macOS and Linux runners alike.
   private static let sidecarScript = #"""
     pid=$1; file=$2
-    last=''; idle=0
+    last=''; idle=0; ticks=0
+    printf '[swifttui-journey-watchdog] guarding test process %s (heartbeat %s)\n' "$pid" "$file" >&2
     while :; do
       sleep 0.25
+      ticks=$((ticks + 1))
       if command -v ps >/dev/null 2>&1; then
         state=$(ps -o stat= -p "$pid" 2>/dev/null)
         case $state in ''|Z*) rm -f "$file"; exit 0 ;; esac
@@ -343,6 +345,9 @@ import Synchronization
       case $armed in ''|0) idle=0; last=$v; continue ;; esac
       case $budget in ''|*[!0-9]*) idle=0; last=$v; continue ;; esac
       if [ "$v" = "$last" ]; then idle=$((idle + 1)); else idle=0; last=$v; fi
+      if [ $((ticks % 1200)) -eq 0 ]; then
+        printf '[swifttui-journey-watchdog] still guarding %s: %s pair(s) armed, %s s idle, budget %s ms, %s\n' "$pid" "$armed" "$((idle / 4))" "$budget" "$origins" >&2
+      fi
       if [ $((idle * 250)) -ge "$budget" ]; then
         seconds=$((budget / 1000)); millis=$((budget % 1000))
         grace=$((budget / 2)); [ "$grace" -lt 1000 ] && grace=1000; [ "$grace" -gt 20000 ] && grace=20000
@@ -380,8 +385,18 @@ import Synchronization
         if shared.heartbeatPath == nil {
           let path = try heartbeatFilePath()
           try writeFile("0:0:0:", to: path)
+          do {
+            shared.sidecarProcessIdentifier = try spawnSidecar(heartbeatPath: path)
+          } catch {
+            // Leave `heartbeatPath` nil so the next open tries again, and say
+            // so: an unguarded journey must never be silent about it.
+            reportToStandardError(
+              "[swifttui-journey-watchdog] could not start the sidecar for \(origin): "
+                + "\(error); this journey runs unguarded, the next open retries"
+            )
+            throw error
+          }
           shared.heartbeatPath = path
-          shared.sidecarProcessIdentifier = try spawnSidecar(heartbeatPath: path)
           // A literal closure with no captures is the only form `atexit`
           // accepts as a C function pointer.
           atexit { RealTerminalJourneyWatchdog.releaseSidecarAtProcessExit() }
@@ -490,6 +505,11 @@ import Synchronization
       }
     }
 
+    /// Writes one line straight to stderr, bypassing stdio buffering.
+    private static func reportToStandardError(_ line: String) {
+      try? writeAllBytes(Array((line + "\n").utf8), to: STDERR_FILENO)
+    }
+
     private static func heartbeatFilePath() throws -> String {
       var directory = "/tmp"
       if let override = unsafe getenv("TMPDIR") {
@@ -561,10 +581,15 @@ import Synchronization
           reason: "posix_spawn_file_actions_addopen failed with \(nullResult)"
         )
       }
+      // Close-on-exec descriptors vanish at exec on their own; only the rest
+      // need an explicit close action. Keeping the list short also narrows
+      // the window in which a parallel test closing a descriptor between this
+      // scan and the spawn could turn into a spawn failure.
       let descriptorLimit = min(getdtablesize(), 65_536)
       var descriptor: Int32 = 3
       while descriptor < descriptorLimit {
-        if fcntl(descriptor, F_GETFD) >= 0 {
+        let flags = fcntl(descriptor, F_GETFD)
+        if flags >= 0, flags & FD_CLOEXEC == 0 {
           _ = unsafe posix_spawn_file_actions_addclose(&fileActions, descriptor)
         }
         descriptor += 1
