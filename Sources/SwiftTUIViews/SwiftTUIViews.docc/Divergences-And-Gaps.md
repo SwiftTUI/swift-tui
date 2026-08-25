@@ -156,7 +156,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   `.animation(_:value:)` requires `Equatable & Sendable`, `alignmentGuide`
   closures are `@Sendable`) because view inputs cross the off-main frame
   tail under strict, unsuppressed concurrency. Recorded once for the whole
-  class; individual members do not get separate entries.
+  class; individual members do not get separate entries. The keyframe
+  family is in this class: `KeyframeAnimator` requires `Value: Sendable`
+  and its `content`/`keyframes` closures are `@MainActor`, the scoped
+  `View.animation(_:body:)`/`View.transaction(_:body:)` closures are
+  `@MainActor`, `Transaction.addAnimationCompletion` closures are
+  `@MainActor @Sendable`, and `KeyframeTrack` names its property generic
+  parameter `TrackValue` because the `Keyframes` conformance binds `Value` to
+  the root type.
 - **`ForEach` over a collection binding writes back by identity; `Binding`
   collection conformances stay positional.** *Ratified.*
   `ForEach(_:content:)` and `ForEach(_:id:content:)` accept a `Binding` to a
@@ -568,27 +575,71 @@ are omitted even when SwiftUI exposes a corresponding API.
   `VectorArithmetic` with truncate-toward-zero scaling, so a delta of one
   jumps at the end of the curve. Terminal cell coordinates are
   integer-quantized; callers needing sub-cell precision use `Double`.
-- **`Transaction` residue: `tracksVelocity` absent and
-  `TransactionKey.Value` narrowed.** *Gap / Ratified mix.*
-  `Transaction` carries animation intent, `disablesAnimations`,
-  `isContinuous`, and custom `TransactionKey` values. `tracksVelocity` is
-  not built (*Gap*). `AnimationCompletionCriteria.logicallyComplete` fires
-  when every curve reaches its logical endpoint, while `.removed` waits for a
+  Keyframe tracks over `Int` step the same way; prefer `Double` tracks and
+  round in the content closure.
+- **Animation and keyframe durations are `Duration`.** *Ratified.*
+  `Animation`, the keyframe family (`LinearKeyframe`, `CubicKeyframe`,
+  `SpringKeyframe`, `KeyframeTimeline.duration`, `value(time:)`), `Spring`,
+  and `Animation.logicallyComplete(after:)` take Swift `Duration` values
+  where SwiftUI takes `TimeInterval` seconds.
+- **Keyframe content does not animate implicitly, and reduce motion snaps a
+  triggered keyframe animation to its end value and rests a repeating one at
+  its initial value.** *Ratified.* `KeyframeAnimator` writes every sample
+  under a `disablesAnimations` transaction, so an enclosing `withAnimation`
+  scope or `.animation(_:value:)` never layers a curve on the keyframe-driven
+  values; transitions inside keyframe content are suppressed as a
+  consequence. A trigger change under reduce motion writes the end value at
+  once; repeating mode starts no task.
+- **`Transaction` residue: `isContinuous` not consumed and
+  `TransactionKey.Value` narrowed.** *Ratified.* `Transaction` carries
+  animation intent, `disablesAnimations`, `isContinuous`, `tracksVelocity`,
+  custom `TransactionKey` values, and completions added with
+  `addAnimationCompletion(criteria:_:)`. `AnimationCompletionCriteria.logicallyComplete`
+  fires when every curve reaches its logical endpoint (or its
+  `logicallyComplete(after:)` instant), while `.removed` waits for a
   retained removal overlay to leave the tree. For non-removal animation they
   coincide. `TransactionKey.Value` requires `Hashable & Sendable` where
-  SwiftUI leaves the associated type unconstrained (*Ratified*: the
-  environment-`Sendable` narrowing precedent; values cross the off-main
-  frame tail and participate in reuse comparisons). `isContinuous` is
-  author-facing metadata: the framework neither sets nor consumes it yet,
-  and a SwiftUI probe (2026-08-05) showed SwiftUI does not auto-set it on
-  drag updates either.
+  SwiftUI leaves the associated type unconstrained (the environment-`Sendable`
+  narrowing precedent; values cross the off-main frame tail and participate
+  in reuse comparisons). `isContinuous` is author-facing metadata: the
+  framework neither sets nor consumes it, and a SwiftUI probe (2026-08-05)
+  showed SwiftUI does not auto-set it on drag updates either. A completion
+  added by a resolve-time `.transaction(_:)` transform has no scope to fire
+  in and is ignored.
+- **Retargeted built-in springs carry velocity (flag).** *Ratified.* A
+  spring retargeted mid-flight continues with the outgoing curve's velocity
+  instead of restarting at rest, and writes made under
+  `Transaction.tracksVelocity` seed the next spring on the same value.
+  `SWIFTTUI_ANIMATION_VELOCITY=0` restores the at-rest restart for one
+  release.
+- **Scoped `body:` forms govern node-owning and node-decorating modifiers.**
+  *Gap (narrowed).* `View.animation(_:body:)` and `View.transaction(_:body:)`
+  scope the transaction to modifiers that create a node (`offset`,
+  `position`, `frame`, `padding`, `border`) or decorate the placeholder node
+  (`opacity`, draw effects). A style that flows through the environment
+  (`foregroundStyle`, `tint`) applied inside `body` lands on the wrapped
+  content's own nodes and follows their transaction, where SwiftUI scopes it
+  too.
 - **Custom `Transition` bodies are not exposed.** *Ratified.* SwiftTUI ships
   the built-in `AnyTransition` opacity, move, offset, combined, and asymmetric
   effects. It does not accept an arbitrary view body and then silently discard
   unsupported modifiers. A built-in `.scale` transition remains a *Gap*.
-- **`matchedGeometryEffect` interpolates position only.** *Gap.* A matched
-  pair that changes size snaps to the destination size for the whole
-  animation, and the signature omits `properties:` and `anchor:`.
+- **Matched size interpolates by bounds and clip, not re-layout; tag outside
+  the chrome.** *Ratified.* `matchedGeometryEffect(id:in:properties:anchor:isSource:)`
+  interpolates the rect in anchor space; a size change is applied at the
+  placed level: the node's bounds take the interpolated size and clip to it
+  (the content lays out once at its destination size, so text never
+  re-wraps mid-animation), and descendants coextensive with the matched
+  node's bounds (a `.background`, an overlay, full-frame chrome) resize with
+  it. Because the modifier tags its content, chrome that should follow the
+  box goes inside the modifier.
+- **Co-present non-source instances are not positioned onto their source.**
+  *Gap.* A view with `isSource: false` receives the match when the key swaps
+  to it between frames; an instance on screen together with its source is
+  not moved onto the source's frame the way SwiftUI does. Deferred: the
+  next-frame `from` rect is captured from the un-adopted layout baseline, so
+  a placed-level adoption would need its own capture channel to keep a later
+  swap from jumping.
 - **Matched-geometry namespaces work without `@Namespace`.** *Provisional.*
   The wrapper exists with SwiftUI semantics, but
   `matchedGeometryEffect(id:in:)` also accepts `.default`, one global

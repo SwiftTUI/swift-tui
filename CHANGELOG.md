@@ -6,6 +6,50 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [Unreleased]
+
+### Added
+
+- **Keyframe animation.** `KeyframeAnimator` (trigger and repeating modes),
+  the `View.keyframeAnimator(...)` and `View.phaseAnimator(...)` modifier
+  forms over `PlaceholderContentView`, `KeyframeTimeline`, `KeyframeTrack`,
+  `LinearKeyframe`/`CubicKeyframe`/`SpringKeyframe`/`MoveKeyframe`, the
+  `Keyframes` and `KeyframeTrackContent` protocols with their builders, and
+  the `UnitCurve` and `Spring` value types (also accepted by
+  `Animation.timingCurve(_:duration:)` and `Animation.spring(_:)`). A
+  retriggered animator restarts from its current value and carries velocity
+  into a leading cubic or spring keyframe.
+- **Transactions.** `Transaction(animation:)`, the key-path
+  `withTransaction(_:_:_:)`, `View.transaction(value:_:)`, the scoped
+  `View.animation(_:body:)` and `View.transaction(_:body:)` forms,
+  `Transaction.addAnimationCompletion(criteria:_:)` (any number of
+  completions per transaction, each at its own barrier),
+  `Animation.logicallyComplete(after:)`, and `Transaction.tracksVelocity`.
+- **Matched geometry.** `matchedGeometryEffect(id:in:properties:anchor:isSource:)`
+  gains `properties:` (`MatchedGeometryProperties`) and `anchor:`. The new
+  parameters have defaults, so `matchedGeometryEffect(id:in:isSource:)` call
+  sites keep compiling; the symbol itself (and
+  `MatchedGeometryConfig.init`) is renamed in the public API baseline.
+
+### Changed
+
+- **Matched geometry interpolates size (default `properties: .frame`).** A
+  matched pair whose slots differ in size previously snapped to the
+  destination size; it now resizes by bounds and clip at the placed level,
+  with coextensive decoration descendants following. Pass
+  `properties: .position` for the earlier translation-only behavior.
+- **Retargeted built-in springs carry velocity.** A spring retargeted
+  mid-flight continues with its current velocity instead of restarting at
+  rest. `SWIFTTUI_ANIMATION_VELOCITY=0` restores the at-rest restart for one
+  release.
+- **Overlapping `withAnimation` completions all fire.** Completion
+  registrations are list-valued per batch with per-closure barriers; a
+  second registration on the same batch no longer replaces the first.
+- **Spring completion requires the velocity to settle too.** A spring no
+  longer reports completion at a zero crossing it is still moving through
+  (an underdamped bounce, or a spring released toward its target), so
+  bouncy springs finish where they actually come to rest.
+
 ## [0.9.9] - 2026-08-24
 
 ### Fixed

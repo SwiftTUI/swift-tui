@@ -280,6 +280,23 @@ classifications:
     - "SwiftTUIViews.withAnimation(_:_:)"
     - "SwiftTUIViews.withAnimation(_:completionCriteria:_:completion:)"
     - "SwiftTUIViews.withTransaction(_:_:)"
+    - "SwiftTUIViews.withTransaction(_:_:_:)"
+
+    # ─── View keyframe animation (plan 2026-08-25-002) ─────────────────────
+    - SwiftTUIViews.CubicKeyframe
+    - SwiftTUIViews.KeyframeAnimator
+    - SwiftTUIViews.Keyframes
+    - SwiftTUIViews.KeyframesBuilder
+    - SwiftTUIViews.KeyframeTimeline
+    - SwiftTUIViews.KeyframeTrack
+    - SwiftTUIViews.KeyframeTrackContent
+    - SwiftTUIViews.KeyframeTrackContentBuilder
+    - SwiftTUIViews.LinearKeyframe
+    - SwiftTUIViews.MoveKeyframe
+    - SwiftTUIViews.PlaceholderContentView
+    - SwiftTUIViews.Spring
+    - SwiftTUIViews.SpringKeyframe
+    - SwiftTUIViews.UnitCurve
 
     # ─── View style protocols + concrete styles ────────────────────────────
     - SwiftTUIViews.AnyButtonStyle
@@ -357,6 +374,8 @@ classifications:
     - SwiftTUIViews.ToolbarItemContributionModifier
     - SwiftTUIViews.ToolbarModifier
     - SwiftTUIViews.TransactionModifier
+    - SwiftTUIViews.KeyframeSequence
+    - SwiftTUIViews.KeyframeTrackContentSequence
     - SwiftTUIViews.ValueNavigationDestinationModifier
     - SwiftTUIViews.TransitionRegistrationModifier
     - SwiftTUIViews.ValueAnimationModifier
@@ -637,6 +656,7 @@ classifications:
     - SwiftTUIGraph.MatchedGeometryConfig
     - SwiftTUIGraph.MatchedGeometryKey
     - SwiftTUIGraph.MatchedGeometryNamespace
+    - SwiftTUIGraph.MatchedGeometryProperties
     - SwiftTUIPrimitives.Matrix3x3
     - SwiftTUIPrimitives.MeshGradient
     - SwiftTUICore.MeasurementCacheMetrics

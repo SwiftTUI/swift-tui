@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 299 | 1682 |
+| `SwiftTUIViews` | 316 | 1786 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -35,7 +35,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
 | `SwiftTUIPrimitives` | 168 | 1464 |
-| `SwiftTUIGraph` | 59 | 349 |
+| `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 0 | 0 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -126,13 +126,13 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (299)
+### Canonical surface (316)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 6 members
 - `AnchorPreferenceTransformModifier` — struct
 - `AnchorPreferenceWritingModifier` — struct
-- `Animation` — struct — 20 members
+- `Animation` — struct — 23 members
 - `AnimationCompletionCriteria` — struct — 2 members
 - `AnimationContext` — struct — 3 members
 - `AnimationEnvironmentSnapshot` — struct — 1 member
@@ -188,6 +188,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ContentShapeModifier` — struct
 - `ControlGroup` — struct — 3 members
 - `CoordinateSpace` — struct — 9 members
+- `CubicKeyframe` — struct — 2 members
 - `CustomAnimation` — protocol — 5 members
 - `DangerToastStyle` — struct — 2 members
 - `DefaultBottomToolbarStyle` — struct — 4 members
@@ -249,6 +250,15 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `InsetTableStyle` — struct — 3 members
 - `ItemNavigationDestinationModifier` — struct
 - `KeyCommandRegistrationModifier` — struct
+- `KeyframeAnimator` — struct — 3 members
+- `Keyframes` — protocol — 4 members
+- `KeyframesBuilder` — enum — 12 members
+- `KeyframeSequence` — struct — 1 member
+- `KeyframeTimeline` — struct — 4 members
+- `KeyframeTrack` — struct — 3 members
+- `KeyframeTrackContent` — protocol — 4 members
+- `KeyframeTrackContentBuilder` — enum — 8 members
+- `KeyframeTrackContentSequence` — struct — 1 member
 - `KeyPressMatch` — struct — 3 members
 - `KeyPressModifier` — struct
 - `Label` — struct — 3 members
@@ -264,6 +274,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `LazyHStack` — struct — 3 members
 - `LazyVStack` — struct — 3 members
 - `LinearGradient` — extension — 1 member
+- `LinearKeyframe` — struct — 2 members
 - `Link` — struct — 2 members
 - `LinkButtonStyle` — struct — 3 members
 - `List` — struct — 18 members
@@ -275,6 +286,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `Menu` — struct — 2 members
 - `MenuPickerStyle` — struct — 5 members
 - `ModifiedContent` — struct — 10 members
+- `MoveKeyframe` — struct — 2 members
 - `NamedCoordinateSpace` — struct — 2 members
 - `NamedCoordinateSpaceModifier` — struct
 - `Namespace` — struct — 4 members
@@ -298,6 +310,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `Picker` — struct — 3 members
 - `PickerStyle` — protocol — 8 members
 - `PickerStyleConfiguration` — struct — 16 members
+- `PlaceholderContentView` — struct
 - `PlainButtonStyle` — struct — 3 members
 - `PlainListStyle` — struct — 3 members
 - `PlainOutlineStyle` — struct — 3 members
@@ -354,6 +367,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `SpinnerStyle` — protocol — 41 members
 - `SpinnerStyleConfiguration` — struct — 3 members
 - `SpinnerStylePresentation` — struct — 6 members
+- `Spring` — struct — 19 members
+- `SpringKeyframe` — struct — 2 members
 - `Standard` — enum — 12 members
 - `State` — struct — 5 members
 - `Stepper` — struct — 4 members
@@ -402,18 +417,19 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ToolbarModifier` — struct
 - `ToolbarPlacement` — enum — 2 members
 - `ToolbarStyle` — protocol — 7 members
-- `Transaction` — struct — 5 members
+- `Transaction` — struct — 8 members
 - `TransactionKey` — protocol — 2 members
 - `TransactionModifier` — struct
 - `TransitionRegistrationModifier` — struct
 - `TupleView` — struct — 1 member
 - `UnderlineTabViewStyle` — struct — 4 members
+- `UnitCurve` — struct — 7 members
 - `ValueAnimationModifier` — struct
 - `ValueNavigationDestinationModifier` — struct
 - `VariadicView` — struct — 1 member
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 161 members
+- `View` — protocol — 168 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member
@@ -424,6 +440,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `WarningToastStyle` — struct — 2 members
 - `withAnimation(_:_:)` — func
 - `withAnimation(_:completionCriteria:_:completion:)` — func
+- `withTransaction(_:_:_:)` — func
 - `withTransaction(_:_:)` — func
 - `ZStack` — struct — 2 members
 - `ZStackLayout` — struct — 4 members
@@ -783,7 +800,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (56)
+### Canonical surface (57)
 
 - `AccessibilityNode` — struct — 10 members
 - `AccessibilityPoliteness` — enum — 4 members
@@ -815,9 +832,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `KeyPress` — struct — 3 members
 - `KeyPressResult` — enum — 2 members
 - `LifecycleMetadata` — struct — 6 members
-- `MatchedGeometryConfig` — struct — 3 members
+- `MatchedGeometryConfig` — struct — 5 members
 - `MatchedGeometryKey` — struct — 4 members
 - `MatchedGeometryNamespace` — struct — 3 members
+- `MatchedGeometryProperties` — struct — 5 members
 - `NodeLifecycleInfo` — struct — 3 members
 - `NodeSemanticInfo` — struct — 2 members
 - `PreferenceKey` — protocol — 3 members

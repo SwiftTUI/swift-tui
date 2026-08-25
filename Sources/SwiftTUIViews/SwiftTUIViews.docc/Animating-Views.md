@@ -194,6 +194,42 @@ transaction. ``Animation/logicallyComplete(after:)`` moves the
 settling tail does not hold up dependent logic while `.removed` still waits
 for the visual to finish.
 
+## Carry Gesture Velocity Into A Spring
+
+Set ``Transaction/tracksVelocity`` on the writes a drag makes and the
+spring that runs when the drag ends starts with the release velocity, so a
+fast fling overshoots in the drag direction before settling:
+
+```swift
+struct Fling: View {
+  @State private var offsetX = 0
+
+  var body: some View {
+    Text("◆")
+      .offset(x: offsetX, y: 0)
+      .gesture(
+        DragGesture()
+          .onChanged { value in
+            withTransaction(\.tracksVelocity, true) {
+              offsetX = Int(value.translation.width)
+            }
+          }
+          .onEnded { _ in
+            withAnimation(.spring(duration: .milliseconds(600), bounce: 0.2)) {
+              offsetX = 0
+            }
+          }
+      )
+  }
+}
+```
+
+The framework samples each tracked write with its timestamp over a short
+window and seeds the next spring on the same value; two or more tracked
+writes are needed before a release carries velocity. A spring retargeted
+mid-flight carries its current velocity the same way. Both are behind the
+`SWIFTTUI_ANIMATION_VELOCITY` kill switch (default on).
+
 ## Cycle Through Phases
 
 ``PhaseAnimator`` steps through a phase sequence, animating each step. With
