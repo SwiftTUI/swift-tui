@@ -16,23 +16,29 @@ package struct AnimationInvalidationSegment: Equatable, Sendable {
   /// Custom `TransactionKey` values riding the write. Like `isContinuous`,
   /// resolve-side data deliberately absent from ``isExplicit``.
   package var customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
+  /// `Transaction.tracksVelocity` riding the write. Unlike the two fields
+  /// above it IS part of ``isExplicit``: the animation controller must see
+  /// the write to sample its value into the velocity channel.
+  package var tracksVelocity: Bool = false
 
   package init(
     identities: Set<Identity>,
     animationRequest: AnimationRequest,
     animationBatchID: AnimationBatchID? = nil,
     isContinuous: Bool = false,
-    customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
+    customValues: [ObjectIdentifier: AnyHashableSendable] = [:],
+    tracksVelocity: Bool = false
   ) {
     self.identities = identities
     self.animationRequest = animationRequest
     self.animationBatchID = animationBatchID
     self.isContinuous = isContinuous
     self.customValues = customValues
+    self.tracksVelocity = tracksVelocity
   }
 
   package var isExplicit: Bool {
-    animationRequest != .inherit || animationBatchID != nil
+    animationRequest != .inherit || animationBatchID != nil || tracksVelocity
   }
 }
 
@@ -176,6 +182,7 @@ package struct FrameAnimationTransactionPlan: Equatable, Sendable {
     transaction.animationBatchID = segment.animationBatchID
     transaction.isContinuous = segment.isContinuous
     transaction.customValues = segment.customValues
+    transaction.tracksVelocity = segment.tracksVelocity
     return transaction
   }
 }

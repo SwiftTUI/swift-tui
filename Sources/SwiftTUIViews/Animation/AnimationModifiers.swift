@@ -86,6 +86,21 @@ public struct Transaction: Sendable {
   /// not auto-set it on gesture updates either (verified 2026-08-05).
   public var isContinuous: Bool = false
 
+  /// Whether the framework should record the velocity of the values written
+  /// under this transaction, so a later spring animation on the same values
+  /// starts with that velocity instead of at rest.
+  ///
+  /// Set it on the writes a drag makes (`GestureState`'s update body, or a
+  /// `withTransaction(\.tracksVelocity, true)` scope around the write) and
+  /// the spring that runs when the drag ends carries the release velocity:
+  /// a fast fling overshoots in the drag direction before settling.
+  ///
+  /// The framework samples each written animatable value with its
+  /// timestamp over a short window (100 ms); the channel is per view and
+  /// per animated property, and is dropped when the view leaves the tree.
+  /// `SWIFTTUI_ANIMATION_VELOCITY=0` disables the channel wholesale.
+  public var tracksVelocity: Bool = false
+
   package var request: AnimationRequest
 
   /// Custom ``TransactionKey`` values, keyed by key-type identity.
@@ -105,7 +120,7 @@ public struct Transaction: Sendable {
   /// `withTransaction` wrap for default-constructed stored transactions.
   package var isInert: Bool {
     request == .inherit && !isContinuous && customValues.isEmpty
-      && pendingCompletions.isEmpty
+      && pendingCompletions.isEmpty && !tracksVelocity
   }
 
   /// Creates a default transaction with inherited animation intent.
@@ -142,11 +157,13 @@ public struct Transaction: Sendable {
   package init(
     request: AnimationRequest,
     isContinuous: Bool = false,
-    customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
+    customValues: [ObjectIdentifier: AnyHashableSendable] = [:],
+    tracksVelocity: Bool = false
   ) {
     self.request = request
     self.isContinuous = isContinuous
     self.customValues = customValues
+    self.tracksVelocity = tracksVelocity
   }
 
   private func _animation(fromBox box: AnimationBox) -> Animation? {
@@ -249,7 +266,8 @@ public struct TransactionModifier: PrimitiveViewModifier, Sendable {
     var transaction = Transaction(
       request: context.transaction.animationRequest,
       isContinuous: context.transaction.isContinuous,
-      customValues: context.transaction.customValues
+      customValues: context.transaction.customValues,
+      tracksVelocity: context.transaction.tracksVelocity
     )
     transform(&transaction)
 
@@ -261,6 +279,7 @@ public struct TransactionModifier: PrimitiveViewModifier, Sendable {
     }
     childContext.transaction.isContinuous = transaction.isContinuous
     childContext.transaction.customValues = transaction.customValues
+    childContext.transaction.tracksVelocity = transaction.tracksVelocity
     // See ValueAnimationModifier: the authored edit must survive nested
     // `resolveView` frame-input refreshes below this modifier (F137).
     childContext.propagated.authoredTransactionOverride = true

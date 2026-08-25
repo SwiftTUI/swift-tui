@@ -59,7 +59,8 @@ package struct ValueTransactionModifier<Value: Equatable & Sendable>: PrimitiveV
     var transaction = Transaction(
       request: context.transaction.animationRequest,
       isContinuous: context.transaction.isContinuous,
-      customValues: context.transaction.customValues
+      customValues: context.transaction.customValues,
+      tracksVelocity: context.transaction.tracksVelocity
     )
     transform(&transaction)
 
@@ -71,6 +72,7 @@ package struct ValueTransactionModifier<Value: Equatable & Sendable>: PrimitiveV
       )
     childContext.transaction.isContinuous = transaction.isContinuous
     childContext.transaction.customValues = transaction.customValues
+    childContext.transaction.tracksVelocity = transaction.tracksVelocity
     childContext.propagated.authoredTransactionOverride = true
     let resolved = content.resolveElements(in: childContext)
     gate.storeFirstAppearanceBaseline(value, in: context)

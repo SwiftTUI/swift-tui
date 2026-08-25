@@ -86,7 +86,8 @@ package protocol AnimationAwareInvalidating: Invalidating {
     animation: AnimationRequest,
     batchID: AnimationBatchID?,
     isContinuous: Bool,
-    customValues: [ObjectIdentifier: AnyHashableSendable]
+    customValues: [ObjectIdentifier: AnyHashableSendable],
+    tracksVelocity: Bool
   )
 }
 
@@ -101,7 +102,8 @@ extension AnimationAwareInvalidating {
       animation: animation,
       batchID: nil,
       isContinuous: false,
-      customValues: [:]
+      customValues: [:],
+      tracksVelocity: false
     )
   }
 
@@ -117,7 +119,26 @@ extension AnimationAwareInvalidating {
       animation: animation,
       batchID: batchID,
       isContinuous: false,
-      customValues: [:]
+      customValues: [:],
+      tracksVelocity: false
+    )
+  }
+
+  /// Back-compat shim for call sites that do not carry the velocity flag.
+  package func requestInvalidation(
+    of identities: Set<Identity>,
+    animation: AnimationRequest,
+    batchID: AnimationBatchID?,
+    isContinuous: Bool,
+    customValues: [ObjectIdentifier: AnyHashableSendable]
+  ) {
+    requestInvalidation(
+      of: identities,
+      animation: animation,
+      batchID: batchID,
+      isContinuous: isContinuous,
+      customValues: customValues,
+      tracksVelocity: false
     )
   }
 }

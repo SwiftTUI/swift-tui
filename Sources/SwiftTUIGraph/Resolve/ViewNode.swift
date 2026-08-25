@@ -713,7 +713,8 @@ package final class ViewNode {
       InvalidationSourceTrace.note("state-write", invalidationIdentities)
       let animationRequest = AnimationContextStorage.currentRequest
       let batchID = AnimationContextStorage.currentBatchID
-      if animationRequest != .inherit || batchID != nil,
+      let tracksVelocity = AnimationContextStorage.currentTracksVelocity
+      if animationRequest != .inherit || batchID != nil || tracksVelocity,
         let animationAware = invalidator as? any AnimationAwareInvalidating
       {
         animationAware.requestInvalidation(
@@ -721,7 +722,8 @@ package final class ViewNode {
           animation: animationRequest,
           batchID: batchID,
           isContinuous: AnimationContextStorage.currentIsContinuous,
-          customValues: AnimationContextStorage.currentCustomValues
+          customValues: AnimationContextStorage.currentCustomValues,
+          tracksVelocity: tracksVelocity
         )
       } else {
         // A continuity-only scope takes this branch on purpose: with no

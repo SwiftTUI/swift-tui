@@ -18,6 +18,11 @@ package enum AnimationContextStorage {
   /// Custom `TransactionKey` values scoped by `withTransaction` (View
   /// module), threaded onto invalidation segments like `currentIsContinuous`.
   @TaskLocal package static var currentCustomValues: [ObjectIdentifier: AnyHashableSendable] = [:]
+  /// `Transaction.tracksVelocity` scoped by `withTransaction` (View module).
+  /// Unlike continuity it is animation-explicit: a write under it must reach
+  /// the animation controller so the value can be sampled into the velocity
+  /// channel, so the write branches take the animation-aware path for it.
+  @TaskLocal package static var currentTracksVelocity: Bool = false
 }
 
 /// Internal completion barrier carried across the graph/runtime boundary.

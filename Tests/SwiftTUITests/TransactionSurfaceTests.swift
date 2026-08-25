@@ -26,6 +26,13 @@ struct TransactionSurfaceTests {
     #expect(disabled.disablesAnimations)
   }
 
+  @Test("isInert is false for a velocity-only transaction")
+  func velocityOnlyTransactionIsNotInert() {
+    var transaction = Transaction()
+    transaction.tracksVelocity = true
+    #expect(!transaction.isInert)
+  }
+
   @Test("isInert is false for a completion-only transaction")
   func completionOnlyTransactionIsNotInert() {
     var transaction = Transaction()

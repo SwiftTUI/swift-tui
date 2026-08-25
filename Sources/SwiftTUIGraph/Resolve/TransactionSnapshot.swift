@@ -20,6 +20,12 @@ public struct TransactionSnapshot: Equatable, Sendable {
   /// The node's part in a scoped transaction (`View.animation(_:body:)` /
   /// `View.transaction(_:body:)`); `.none` for every ordinary node.
   package var scopeRole: TransactionScopeRole = .none
+  /// `Transaction.tracksVelocity`: writes under it are sampled into the
+  /// animation controller's per-slot velocity channel so a later spring on
+  /// the same slot starts with that velocity. Carried through
+  /// `TransactionModifier.resolve`, so it participates in reuse equivalence
+  /// like `isContinuous` (flips are gesture start and end).
+  package var tracksVelocity: Bool = false
 
   public init(debugSignature: String = "") {
     self.debugSignature = debugSignature
@@ -38,6 +44,7 @@ public struct TransactionSnapshot: Equatable, Sendable {
       && isContinuous == other.isContinuous
       && customValues == other.customValues
       && scopeRole == other.scopeRole
+      && tracksVelocity == other.tracksVelocity
   }
 }
 

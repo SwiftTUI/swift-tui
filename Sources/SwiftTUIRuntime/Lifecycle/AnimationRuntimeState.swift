@@ -71,6 +71,12 @@ package struct ActiveAnimation: Sendable {
   /// instant), so the release at curve end decrements only the removed
   /// count.
   package var isLogicallyReleased = false
+  /// The velocity this animation was released with, in progress units per
+  /// second along its own `from -> to` axis (plan 2026-08-25-002 T4): the
+  /// outgoing curve's velocity on a retarget, or the sampled velocity of
+  /// preceding `tracksVelocity` writes. `nil` starts the curve at rest.
+  /// Consumed by ``Animation/evaluate(elapsed:state:initialVelocity:)``.
+  package var initialVelocity: Double? = nil
 }
 
 /// Result of a tick: tells the runtime whether more frames are needed

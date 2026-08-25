@@ -643,7 +643,8 @@ extension FrameScheduler: AnimationAwareInvalidating {
     animation: AnimationRequest,
     batchID: AnimationBatchID?,
     isContinuous: Bool,
-    customValues: [ObjectIdentifier: AnyHashableSendable]
+    customValues: [ObjectIdentifier: AnyHashableSendable],
+    tracksVelocity: Bool
   ) {
     coalescingLock.withLock { state in
       state.pendingCauses.insert(.invalidation)
@@ -656,7 +657,8 @@ extension FrameScheduler: AnimationAwareInvalidating {
           animationRequest: animation,
           animationBatchID: batchID,
           isContinuous: isContinuous,
-          customValues: customValues
+          customValues: customValues,
+          tracksVelocity: tracksVelocity
         ),
         to: &state.pendingAnimationSegments
       )

@@ -85,7 +85,9 @@ public func withTransaction<Result>(
     // passes the enclosing scope's animation intent through untouched.
     try AnimationContextStorage.$currentIsContinuous.withValue(transaction.isContinuous) {
       try AnimationContextStorage.$currentCustomValues.withValue(transaction.customValues) {
-        try withTransactionRequestScope(transaction, body)
+        try AnimationContextStorage.$currentTracksVelocity.withValue(transaction.tracksVelocity) {
+          try withTransactionRequestScope(transaction, body)
+        }
       }
     }
   }
@@ -109,7 +111,8 @@ public func withTransaction<Result, Value>(
   var transaction = Transaction(
     request: .inherit,
     isContinuous: AnimationContextStorage.currentIsContinuous,
-    customValues: AnimationContextStorage.currentCustomValues
+    customValues: AnimationContextStorage.currentCustomValues,
+    tracksVelocity: AnimationContextStorage.currentTracksVelocity
   )
   transaction[keyPath: keyPath] = value
   return try withTransaction(transaction, body)

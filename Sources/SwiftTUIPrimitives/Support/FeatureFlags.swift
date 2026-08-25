@@ -28,6 +28,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case persistentCustomLayoutCache
   case focusMoveInvalidationNarrowing
   case stateCaptureBinding
+  case animationVelocity
 
   package var environmentVariableName: String {
     switch self {
@@ -59,6 +60,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_FOCUS_MOVE_NARROWING"
     case .stateCaptureBinding:
       "SWIFTTUI_STATE_CAPTURE_BINDING"
+    case .animationVelocity:
+      "SWIFTTUI_ANIMATION_VELOCITY"
     }
   }
 
@@ -196,6 +199,14 @@ package enum FeatureGate: CaseIterable, Sendable {
       // (Stage 5) that arm serves imperative reads from the loud authored
       // seed, so it attributes capture regressions — it does not restore the
       // pre-capture dispatch behavior.
+      true
+    case .animationVelocity:
+      // Kill switch, not an opt-in (plan 2026-08-25-002 T4): the animation
+      // velocity channel seeds a built-in spring with the outgoing curve's
+      // velocity on retarget and with the sampled velocity of preceding
+      // `tracksVelocity` writes, so a retargeted or released spring no
+      // longer restarts at rest. `SWIFTTUI_ANIMATION_VELOCITY=0` restores
+      // the at-rest restart wholesale for one release.
       true
     }
   }

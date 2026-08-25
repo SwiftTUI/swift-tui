@@ -264,6 +264,13 @@ package final class AnimationController: Sendable {
     set { frameHead.lastCompletionCount = newValue }
   }
 
+  /// Per-slot rings of values written under `Transaction.tracksVelocity`
+  /// (see `PreviousFrameState.velocitySamplers`).
+  private var slotVelocitySamplers: [AnimationKey: SlotVelocitySampler] {
+    get { previousFrame.velocitySamplers }
+    set { previousFrame.velocitySamplers = newValue }
+  }
+
   /// Target frame interval during active animation (30 FPS).
   private let frameInterval: Duration = .milliseconds(33)
   /// Default duration used for transition animations when no explicit
@@ -683,7 +690,11 @@ package final class AnimationController: Sendable {
 
     let elapsed = animation.startTime.duration(to: timestamp)
     var state = animation.customState
-    let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+    let evaluated = anim.evaluate(
+      elapsed: elapsed,
+      state: &state,
+      initialVelocity: animation.initialVelocity
+    )
     // Store the updated custom state back on the active animation so the
     // next tick carries user bookkeeping forward.
     activeAnimations[key]?.customState = state
@@ -929,6 +940,7 @@ package final class AnimationController: Sendable {
       && !transactionPlan.hasExplicitTransactions
       && transactionPlan.base.animationRequest.animationBoxIfAny == nil
       && transactionPlan.base.animationBatchID == nil
+      && !transactionPlan.base.tracksVelocity
       && (graphAnimationInputToken == nil
         || graphAnimationInputToken == previousFrame.graphAnimationInputToken)
   }
@@ -1421,6 +1433,9 @@ package final class AnimationController: Sendable {
         firingCompletion: false
       )
     }
+    if !slotVelocitySamplers.isEmpty {
+      slotVelocitySamplers = slotVelocitySamplers.filter { newIdentities.contains($0.key.identity) }
+    }
 
     previousSnapshots = newSnapshots
     previousIdentities = newIdentities
@@ -1791,6 +1806,8 @@ package final class AnimationController: Sendable {
         effectiveTransaction.animationBatchID = frameSegment.animationBatchID
         effectiveTransaction.isContinuous =
           effectiveTransaction.isContinuous || frameSegment.isContinuous
+        effectiveTransaction.tracksVelocity =
+          effectiveTransaction.tracksVelocity || frameSegment.tracksVelocity
         effectiveTransaction.customValues = frameSegment.customValues.merging(
           effectiveTransaction.customValues
         ) { _, node in node }
@@ -1799,6 +1816,8 @@ package final class AnimationController: Sendable {
         effectiveTransaction.animationBatchID = transaction.animationBatchID
         effectiveTransaction.isContinuous =
           effectiveTransaction.isContinuous || transaction.isContinuous
+        effectiveTransaction.tracksVelocity =
+          effectiveTransaction.tracksVelocity || transaction.tracksVelocity
         effectiveTransaction.customValues = transaction.customValues.merging(
           effectiveTransaction.customValues
         ) { _, node in node }
@@ -1822,6 +1841,7 @@ package final class AnimationController: Sendable {
         current: snapshot,
         request: effectiveTransaction.animationRequest,
         batchID: effectiveTransaction.animationBatchID,
+        tracksVelocity: effectiveTransaction.tracksVelocity,
         timestamp: timestamp
       )
     }
@@ -1873,6 +1893,7 @@ package final class AnimationController: Sendable {
     current: AnimatableSnapshot,
     request: AnimationRequest,
     batchID: AnimationBatchID?,
+    tracksVelocity: Bool,
     timestamp: MonotonicInstant
   ) {
     // Union of slot keys from both snapshots — a slot that appears
@@ -1889,6 +1910,7 @@ package final class AnimationController: Sendable {
         current: current[slot],
         request: request,
         batchID: batchID,
+        tracksVelocity: tracksVelocity,
         timestamp: timestamp
       )
     }
@@ -1902,6 +1924,7 @@ package final class AnimationController: Sendable {
     current: AnyAnimatable?,
     request: AnimationRequest,
     batchID: AnimationBatchID?,
+    tracksVelocity: Bool,
     timestamp: MonotonicInstant
   ) {
     // No change → nothing to do.
@@ -1913,6 +1936,14 @@ package final class AnimationController: Sendable {
     case .inherit, .disabled:
       if let superseded = activeAnimations.removeValue(forKey: key) {
         releaseBatch(superseded.batchID, logicalAlreadyReleased: superseded.isLogicallyReleased)
+      }
+      // A `tracksVelocity` write is sampled into the slot's velocity ring
+      // so a later spring on this slot can start with that velocity.
+      // Two or more writes are needed before a release can carry velocity.
+      if tracksVelocity, AnimationVelocityConfiguration.isEnabled, let current {
+        var sampler = slotVelocitySamplers[key] ?? SlotVelocitySampler()
+        sampler.record(current, at: timestamp)
+        slotVelocitySamplers[key] = sampler
       }
 
     case .animate(let box):
@@ -1929,28 +1960,24 @@ package final class AnimationController: Sendable {
       // mid-flight retarget behavior.
       let effectiveFrom: AnyAnimatable
       var carriedCustomState = AnimationState()
+      var initialVelocity: Double?
+      let velocityChannelEnabled = AnimationVelocityConfiguration.isEnabled
       if let existing = activeAnimations[key],
         let sampled = sampleAdvancingCustomState(existing, at: timestamp)
       {
         effectiveFrom = sampled.value
-        // Custom-curve retarget handoff.  Gated on `.custom` so built-in
-        // bezier/spring retargets stay byte-for-byte unchanged: their
-        // shouldMerge/velocity are the protocol defaults (false / nil) and
-        // they never touch custom state, so this block is a pure no-op for
-        // them and `carriedCustomState` stays the default `.init()`.
         let outgoing = registeredAnimations[existing.animationBox]
         let incoming = registeredAnimations[box]
+        let elapsed = existing.startTime.duration(to: timestamp)
         if outgoing?.isCustomCurve == true || incoming?.isCustomCurve == true {
-          // Carry the sample-advanced custom state into the replacement so
-          // a retargeting custom curve keeps its per-key bookkeeping
-          // instead of resetting to an empty buffer (011).
+          // Custom-curve retarget handoff.  Carry the sample-advanced custom
+          // state into the replacement so a retargeting custom curve keeps
+          // its per-key bookkeeping instead of resetting to an empty buffer
+          // (011); query the outgoing curve's velocity hook (013); consult
+          // the incoming curve's merge policy against the previously
+          // registered animation (012).
           carriedCustomState = sampled.state
-          let elapsed = existing.startTime.duration(to: timestamp)
-          // Query the outgoing curve's velocity for interrupted momentum
-          // handoff (013).
           _ = outgoing?.velocity(elapsed: elapsed, state: sampled.state)
-          // Consult the incoming curve's merge policy against the
-          // previously-registered animation (012).
           if let incoming, let outgoing {
             _ = incoming.shouldMerge(
               previous: outgoing,
@@ -1958,11 +1985,39 @@ package final class AnimationController: Sendable {
               state: &carriedCustomState
             )
           }
+        } else if velocityChannelEnabled,
+          case .property(let oldFrom, let oldTo) = existing.kind,
+          let outgoing,
+          let progressVelocity = outgoing.velocity(
+            elapsed: elapsed,
+            state: sampled.state,
+            initialVelocity: existing.initialVelocity
+          ),
+          let projection = AnyAnimatable.progressProjection(
+            of: (from: oldFrom, to: oldTo),
+            onto: (from: effectiveFrom, to: current)
+          )
+        {
+          // Built-in retarget continuity (T4): the outgoing curve's progress
+          // velocity along its own axis, re-expressed along the new segment's
+          // axis so the replacement spring continues instead of restarting
+          // at rest. Clamped to zero when the new axis is degenerate.
+          let seeded = progressVelocity * projection
+          initialVelocity = seeded.isFinite && abs(seeded) > 1e-6 ? seeded : nil
         }
         releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)
       } else {
         effectiveFrom = previous
+        if velocityChannelEnabled,
+          let sampler = slotVelocitySamplers[key],
+          let sampled = sampler.progressVelocity(from: previous, to: current, at: timestamp),
+          abs(sampled) > 1e-6
+        {
+          // The preceding `tracksVelocity` writes release into this spring.
+          initialVelocity = sampled
+        }
       }
+      slotVelocitySamplers.removeValue(forKey: key)
 
       retainBatch(batchID)
       activeAnimations[key] = ActiveAnimation(
@@ -1971,9 +2026,22 @@ package final class AnimationController: Sendable {
         ownerViewNodeID: viewNodeID,
         startTime: timestamp,
         customState: carriedCustomState,
-        batchID: batchID
+        batchID: batchID,
+        initialVelocity: initialVelocity
       )
     }
+  }
+
+  /// The number of slots currently holding `tracksVelocity` samples. Test hook.
+  package var velocitySamplerCount: Int {
+    slotVelocitySamplers.count
+  }
+
+  /// The velocity the property animation on `slot` was released with, in
+  /// progress units per second, or `nil` when it started at rest or there
+  /// is no such animation. Test hook.
+  package func initialVelocity(forIdentity identity: Identity, slot: AnimatableSlot) -> Double? {
+    activeAnimations[AnimationKey(identity: identity, slot: slot)]?.initialVelocity
   }
 
   private func retainBatch(_ batchID: AnimationBatchID?) {
@@ -2458,7 +2526,13 @@ package final class AnimationController: Sendable {
     }
     let elapsed = animation.startTime.duration(to: timestamp)
     var state = animation.customState
-    guard let progress = anim.evaluate(elapsed: elapsed, state: &state) else {
+    guard
+      let progress = anim.evaluate(
+        elapsed: elapsed,
+        state: &state,
+        initialVelocity: animation.initialVelocity
+      )
+    else {
       return (to, state)
     }
     let value = AnimationPropertyValueApplication.interpolate(

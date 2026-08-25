@@ -78,7 +78,8 @@ package struct ScopedTransactionContent<Base: View, Content: View>: PrimitiveVie
     var transaction = Transaction(
       request: outer.animationRequest,
       isContinuous: outer.isContinuous,
-      customValues: outer.customValues
+      customValues: outer.customValues,
+      tracksVelocity: outer.tracksVelocity
     )
     transform(&transaction)
 
@@ -90,6 +91,7 @@ package struct ScopedTransactionContent<Base: View, Content: View>: PrimitiveVie
       )
     childContext.transaction.isContinuous = transaction.isContinuous
     childContext.transaction.customValues = transaction.customValues
+    childContext.transaction.tracksVelocity = transaction.tracksVelocity
     // The scoped edit must survive nested `resolveView` frame-input
     // refreshes below this node (F137); the placeholder sets the same flag
     // on its own hop when it restores `outer`.

@@ -93,8 +93,15 @@ package struct SpringSolver: Sendable {
     guard t >= 0 else { return 1.0 }
     let displacement = displacement(at: t)
 
-    // Check if settled
-    if abs(displacement) < settlingThreshold && t > 0.05 {
+    // Settled once both the displacement and the velocity are inside the
+    // threshold (velocity scaled by the natural frequency, the solver's
+    // own rate unit). Displacement alone would report a spring settled at
+    // a zero crossing it is still moving through: an underdamped bounce,
+    // or a spring released with a velocity toward its target.
+    if abs(displacement) < settlingThreshold
+      && abs(velocity(at: t)) < settlingThreshold * max(naturalFrequency, 1)
+      && t > 0.05
+    {
       return nil
     }
 

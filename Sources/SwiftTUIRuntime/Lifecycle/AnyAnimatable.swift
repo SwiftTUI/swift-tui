@@ -53,6 +53,23 @@ package struct AnyAnimatable: Equatable, Sendable {
   package static func == (lhs: AnyAnimatable, rhs: AnyAnimatable) -> Bool {
     lhs.box.isEqual(to: rhs.box)
   }
+
+  /// The scalar projection of the vector `delta.to - delta.from` onto the
+  /// unit-progress axis `axis.to - axis.from`, in progress units: how far
+  /// along `axis` the `delta` reaches, relative to the axis length. Computed
+  /// in `animatableData` space through the polarization identity (the
+  /// vector protocol has no dot product). `nil` when the wrapped types
+  /// differ or the axis is too short to define a direction.
+  package static func progressProjection(
+    of delta: (from: AnyAnimatable, to: AnyAnimatable),
+    onto axis: (from: AnyAnimatable, to: AnyAnimatable)
+  ) -> Double? {
+    delta.from.box.progressProjection(
+      to: delta.to.box,
+      axisFrom: axis.from.box,
+      axisTo: axis.to.box
+    )
+  }
 }
 
 /// Reports whether two animatable values are gradients whose stop counts
@@ -80,6 +97,11 @@ private protocol _AnyAnimatableBox: Sendable {
     to other: any _AnyAnimatableBox,
     progress: Double
   ) -> AnyAnimatable?
+  func progressProjection(
+    to deltaTo: any _AnyAnimatableBox,
+    axisFrom: any _AnyAnimatableBox,
+    axisTo: any _AnyAnimatableBox
+  ) -> Double?
 }
 
 private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimatableBox {
@@ -145,5 +167,29 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
     var result = value
     result.animatableData = fromData
     return AnyAnimatable(result)
+  }
+
+  func progressProjection(
+    to deltaTo: any _AnyAnimatableBox,
+    axisFrom: any _AnyAnimatableBox,
+    axisTo: any _AnyAnimatableBox
+  ) -> Double? {
+    guard let deltaTo = deltaTo as? _AnimatableBox<T>,
+      let axisFrom = axisFrom as? _AnimatableBox<T>,
+      let axisTo = axisTo as? _AnimatableBox<T>
+    else {
+      return nil
+    }
+    if value is TileStyle || animatableStructureDiffers(axisFrom.value, axisTo.value) {
+      return nil
+    }
+    let delta = deltaTo.value.animatableData - value.animatableData
+    let axis = axisTo.value.animatableData - axisFrom.value.animatableData
+    let axisLength = axis.magnitudeSquared
+    guard axisLength > 1e-9 else { return nil }
+    // a . b = (|a + b|^2 - |a - b|^2) / 4
+    let dot = ((delta + axis).magnitudeSquared - (delta - axis).magnitudeSquared) / 4
+    guard dot.isFinite else { return nil }
+    return dot / axisLength
   }
 }

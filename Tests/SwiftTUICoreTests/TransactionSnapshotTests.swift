@@ -44,6 +44,32 @@ struct TransactionSnapshotTests {
     #expect(!discrete.isReuseEquivalent(to: continuous))
   }
 
+  @Test("tracksVelocity affects retained reuse equivalence")
+  func tracksVelocityAffectsReuseEquivalence() {
+    // Carried through `TransactionModifier.resolve` like `isContinuous`, so
+    // a reused subtree must not serve a stale value; flips are gesture
+    // start and end.
+    let still = TransactionSnapshot()
+    var tracking = TransactionSnapshot()
+    tracking.tracksVelocity = true
+
+    #expect(!still.isReuseEquivalent(to: tracking))
+  }
+
+  @Test("a tracksVelocity-only segment is explicit and reaches the plan")
+  func tracksVelocitySegmentIsExplicit() {
+    let identity = Identity(components: ["root", "leaf"])
+    let segment = AnimationInvalidationSegment(
+      identities: [identity],
+      animationRequest: .inherit,
+      tracksVelocity: true
+    )
+    #expect(segment.isExplicit)
+    let plan = FrameAnimationTransactionPlan(base: TransactionSnapshot(), segments: [segment])
+    #expect(plan.hasExplicitTransactions)
+    #expect(plan.transaction(for: identity).tracksVelocity)
+  }
+
   @Test("scopeRole affects retained reuse equivalence")
   func scopeRoleAffectsReuseEquivalence() {
     // The animation controller reads the role at processing time to decide

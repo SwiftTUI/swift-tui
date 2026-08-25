@@ -44,7 +44,8 @@ public final class StateContainer<State: Equatable & Sendable> {
   private func requestInvalidation() {
     let animationRequest = AnimationContextStorage.currentRequest
     let batchID = AnimationContextStorage.currentBatchID
-    if animationRequest != .inherit || batchID != nil,
+    let tracksVelocity = AnimationContextStorage.currentTracksVelocity
+    if animationRequest != .inherit || batchID != nil || tracksVelocity,
       let animationAware = invalidator as? any AnimationAwareInvalidating
     {
       animationAware.requestInvalidation(
@@ -52,7 +53,8 @@ public final class StateContainer<State: Equatable & Sendable> {
         animation: animationRequest,
         batchID: batchID,
         isContinuous: AnimationContextStorage.currentIsContinuous,
-        customValues: AnimationContextStorage.currentCustomValues
+        customValues: AnimationContextStorage.currentCustomValues,
+        tracksVelocity: tracksVelocity
       )
     } else {
       invalidator?.requestInvalidation(of: invalidationIdentities)

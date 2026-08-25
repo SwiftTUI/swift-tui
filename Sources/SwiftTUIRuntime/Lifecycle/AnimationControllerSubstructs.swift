@@ -20,6 +20,12 @@ extension AnimationController {
   /// insertions, removals, and matched-geometry swaps on the next frame.
   package struct PreviousFrameState: Sendable {
     package var snapshots: [Identity: AnimatableSnapshot] = [:]
+    /// Per-slot rings of values written under `Transaction.tracksVelocity`,
+    /// seeding the next `.animate(spring)` on the same slot (plan
+    /// 2026-08-25-002 T4). Lives here so the frame-head draft's samples ride
+    /// the checkpoint that publishes to the live controller; pruned with
+    /// departed identities.
+    package var velocitySamplers: [AnimationKey: SlotVelocitySampler] = [:]
     package var treeRoot: ResolvedNode?
     package var placedRoot: PlacedNode?
     package var matchedGeometryBounds: [MatchedGeometryKey: CellRect] = [:]
@@ -47,6 +53,7 @@ extension AnimationController {
     /// and set members so a reset on the hot path doesn't re-allocate.
     package mutating func reset() {
       snapshots.removeAll(keepingCapacity: true)
+      velocitySamplers.removeAll(keepingCapacity: true)
       treeRoot = nil
       placedRoot = nil
       matchedGeometryBounds.removeAll(keepingCapacity: true)

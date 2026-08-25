@@ -277,6 +277,34 @@ public struct Animation: Equatable, Hashable, Sendable {
     return rawProgress
   }
 
+  /// ``evaluate(elapsed:state:)`` with the curve released at
+  /// `initialVelocity` (progress units per second of elapsed time). Only a
+  /// built-in spring consumes it: the solver is rebuilt per evaluation from
+  /// the registered animation (never mutated, its box identity keys the
+  /// registrations), converting the velocity into the solver's adjusted
+  /// time (``speed(_:)`` folds into the rate) and into solver space, where
+  /// progress is `1 - displacement` and a toward-target velocity is the
+  /// initial progress slope. Bezier and custom curves ignore the parameter.
+  package func evaluate(
+    elapsed: Duration,
+    state: inout AnimationState,
+    initialVelocity: Double?
+  ) -> Double? {
+    guard let initialVelocity, initialVelocity != 0, initialVelocity.isFinite,
+      case .spring(let solver) = curve
+    else {
+      return evaluate(elapsed: elapsed, state: &state)
+    }
+    let seeded = Animation(
+      curve: .spring(solver.with(initialVelocity: initialVelocity / speedMultiplier)),
+      delay: delayDuration,
+      speed: speedMultiplier,
+      repeatBehavior: repeatBehavior,
+      logicalDuration: logicalDuration
+    )
+    return seeded.evaluate(elapsed: elapsed, state: &state)
+  }
+
   /// Evaluates a single iteration of the curve at `elapsed`.  Returns
   /// nil when the iteration has run to completion.  Repeat bookkeeping
   /// is handled by the outer ``evaluate`` wrapper.
@@ -399,15 +427,39 @@ public struct Animation: Equatable, Hashable, Sendable {
     return box.shouldMerge(previous, adjustedTime(elapsed), &state)
   }
 
-  /// Queries a custom curve's ``CustomAnimation/velocity`` hook for an
-  /// interrupted handoff.  Built-in bezier/spring curves return `nil`
-  /// (the protocol default) — they carry no user-defined momentum.
+  /// The curve's progress velocity at `elapsed`, in progress units per
+  /// second of elapsed time, for an interrupted handoff.
+  ///
+  /// Custom curves answer through their ``CustomAnimation/velocity`` hook.
+  /// Built-in bezier and spring curves answer with a central finite
+  /// difference of ``evaluate(elapsed:state:)`` over the whole animation
+  /// (delay, speed, and repeats folded in), seeded with `initialVelocity`
+  /// when the curve was itself released with one. `nil` once the curve has
+  /// completed.
   package func velocity(
     elapsed: Duration,
-    state: AnimationState
+    state: AnimationState,
+    initialVelocity: Double? = nil
   ) -> Double? {
-    guard case .custom(let box) = curve else { return nil }
-    return box.velocity(adjustedTime(elapsed), state)
+    if case .custom(let box) = curve {
+      return box.velocity(adjustedTime(elapsed), state)
+    }
+    let step = Duration.milliseconds(1)
+    let before = elapsed > step ? elapsed - step : .zero
+    let after = elapsed + step
+    var beforeState = state
+    var afterState = state
+    guard
+      let progressBefore = evaluate(
+        elapsed: before, state: &beforeState, initialVelocity: initialVelocity),
+      let progressAfter = evaluate(
+        elapsed: after, state: &afterState, initialVelocity: initialVelocity)
+    else {
+      return nil
+    }
+    let seconds = Self.durationSeconds(after - before)
+    guard seconds > 0 else { return nil }
+    return (progressAfter - progressBefore) / seconds
   }
 }
 
