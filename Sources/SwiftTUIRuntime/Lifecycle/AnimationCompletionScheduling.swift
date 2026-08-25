@@ -18,7 +18,7 @@ enum AnimationCompletionScheduling {
     timestamp: MonotonicInstant,
     registeredAnimations: [AnimationBox: Animation],
     batchRefCounts: [AnimationBatchID: Int],
-    completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void],
+    completions: [AnimationBatchID: [AnimationController.AnimationCompletionRegistration]],
     pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
   ) -> StrandedBatchDecision {
     // A single withAnimation scope opens at most one completion-bearing batch
@@ -26,14 +26,27 @@ enum AnimationCompletionScheduling {
     // until the requested animation duration elapses.
     guard let batchID = transaction.animationBatchID else { return .ignore }
     guard batchRefCounts[batchID] == nil else { return .ignore }
-    guard completionClosures[batchID] != nil else { return .ignore }
+    guard let registrations = completions[batchID], !registrations.isEmpty else {
+      return .ignore
+    }
     guard pendingEmptyBatchCompletions[batchID] == nil else { return .ignore }
 
     let drainDelay: Duration?
     switch transaction.animationRequest {
     case .animate(let box):
       if let animation = registeredAnimations[box] {
-        drainDelay = animation.totalDuration
+        // A batch whose registrations all wait on the logical barrier drains
+        // at the curve's `logicallyComplete(after:)` instant when that comes
+        // first; any `.removed` registration holds the drain to the full
+        // duration.
+        let total = animation.totalDuration
+        if registrations.allSatisfy({ $0.barrier == .logicallyComplete }),
+          let logical = animation.logicalDuration
+        {
+          drainDelay = total.map { min($0, logical) } ?? logical
+        } else {
+          drainDelay = total
+        }
       } else {
         // A transaction can be built directly with an unregistered box; keep the
         // existing snap/immediate-completion behavior for that defensive path.

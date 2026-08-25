@@ -71,8 +71,8 @@ extension AnimationController {
     package var interpolatedByIdentity: [Identity: [AnimatableSlot: AnyAnimatable]] = [:]
     package var parentByIdentity: [Identity: Identity] = [:]
     package var childIndexByIdentity: [Identity: Int] = [:]
-    package var removalInjectionsByParent:
-      [Identity: [(childIndex: Int, snapshot: ResolvedNode)]] = [:]
+    package var removalInjectionsByParent: [Identity: [(childIndex: Int, snapshot: ResolvedNode)]] =
+      [:]
 
     package init(
       interpolatedByNodeID: [ViewNodeID: [AnimatableSlot: AnyAnimatable]] = [:],
@@ -122,7 +122,14 @@ extension AnimationController {
   /// their per-batch active-animation ref counts, and the deadlines for batches
   /// that registered a completion but retained no animations.
   package struct BatchCompletionState: Sendable {
+    /// Retainers that have not yet passed the `.removed` barrier (the curve
+    /// is still running or the exit overlay is still on screen).
     package var batchRefCounts: [AnimationBatchID: Int] = [:]
+    /// Retainers that have not yet passed the `.logicallyComplete` barrier.
+    /// Every retain bumps both counts; a curve past its
+    /// `logicallyComplete(after:)` instant, or an exit overlay whose curve
+    /// ended, releases this one first and `batchRefCounts` later.
+    package var batchLogicalRefCounts: [AnimationBatchID: Int] = [:]
     package var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant] = [:]
 
     package init() {}
@@ -132,7 +139,25 @@ extension AnimationController {
     /// async-writable registration set — and are cleared by its `reset()`.)
     package mutating func reset() {
       batchRefCounts.removeAll(keepingCapacity: true)
+      batchLogicalRefCounts.removeAll(keepingCapacity: true)
       pendingEmptyBatchCompletions.removeAll(keepingCapacity: true)
+    }
+  }
+
+  /// One completion closure registered for a batch and the barrier it fires
+  /// at. A batch holds a list: `withAnimation(_:completionCriteria:_:completion:)`
+  /// registers one, `Transaction.addAnimationCompletion(criteria:_:)` any
+  /// number, each with its own barrier.
+  package struct AnimationCompletionRegistration: Sendable {
+    package var barrier: AnimationCompletionBarrier
+    package var closure: @MainActor @Sendable () -> Void
+
+    package init(
+      barrier: AnimationCompletionBarrier,
+      closure: @escaping @MainActor @Sendable () -> Void
+    ) {
+      self.barrier = barrier
+      self.closure = closure
     }
   }
 
@@ -146,11 +171,11 @@ extension AnimationController {
   /// the carry/checkpoint extend with it — closing the gap where a third map,
   /// open-coded into the publish path, would be silently orphaned.
   package struct CompletionLedger: Sendable {
-    /// Completion closures registered by `withAnimation` overloads, keyed by
-    /// batch ID; fired once every animation tagged with the batch ID drains.
-    package var completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void] = [:]
-    /// Barrier selected by the matching completion registration.
-    package var completionBarriers: [AnimationBatchID: AnimationCompletionBarrier] = [:]
+    /// Completion registrations keyed by batch ID; each fires once every
+    /// animation tagged with the batch ID passes its barrier. A batch's list
+    /// is complete when its scope opens (registration precedes the body), so
+    /// the keyed carry below stays exact.
+    package var completions: [AnimationBatchID: [AnimationCompletionRegistration]] = [:]
     /// Animation boxes registered for the current frame, keyed by box.
     package var registeredAnimations: [AnimationBox: Animation] = [:]
 
@@ -158,8 +183,7 @@ extension AnimationController {
 
     /// Clears the async-writable registration set, preserving allocated capacity.
     package mutating func reset() {
-      completionClosures.removeAll(keepingCapacity: true)
-      completionBarriers.removeAll(keepingCapacity: true)
+      completions.removeAll(keepingCapacity: true)
       registeredAnimations.removeAll(keepingCapacity: true)
     }
 
@@ -170,13 +194,9 @@ extension AnimationController {
       -> ConcurrentRegistrations
     {
       ConcurrentRegistrations(
-        completionClosures: ConcurrentRegistrationCarry.sinceBaseline(
-          live: completionClosures,
-          baseline: baseline.completionClosures
-        ),
-        completionBarriers: ConcurrentRegistrationCarry.sinceBaseline(
-          live: completionBarriers,
-          baseline: baseline.completionBarriers
+        completions: ConcurrentRegistrationCarry.sinceBaseline(
+          live: completions,
+          baseline: baseline.completions
         ),
         registeredAnimations: ConcurrentRegistrationCarry.sinceBaseline(
           live: registeredAnimations,
@@ -188,15 +208,13 @@ extension AnimationController {
     /// Re-applies `carried` concurrent registrations into this (post-restore
     /// draft) ledger, never overwriting an entry the restored draft already holds.
     package mutating func reapply(_ carried: ConcurrentRegistrations) {
-      ConcurrentRegistrationCarry.reapply(carried.completionClosures, into: &completionClosures)
-      ConcurrentRegistrationCarry.reapply(carried.completionBarriers, into: &completionBarriers)
+      ConcurrentRegistrationCarry.reapply(carried.completions, into: &completions)
       ConcurrentRegistrationCarry.reapply(carried.registeredAnimations, into: &registeredAnimations)
     }
 
     /// The carried async registrations between two ledger snapshots.
     package struct ConcurrentRegistrations: Sendable {
-      package var completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void]
-      package var completionBarriers: [AnimationBatchID: AnimationCompletionBarrier]
+      package var completions: [AnimationBatchID: [AnimationCompletionRegistration]]
       package var registeredAnimations: [AnimationBox: Animation]
     }
   }

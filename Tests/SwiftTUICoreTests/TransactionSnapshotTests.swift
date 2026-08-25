@@ -44,6 +44,18 @@ struct TransactionSnapshotTests {
     #expect(!discrete.isReuseEquivalent(to: continuous))
   }
 
+  @Test("scopeRole affects retained reuse equivalence")
+  func scopeRoleAffectsReuseEquivalence() {
+    // The animation controller reads the role at processing time to decide
+    // which ancestor a scoped placeholder inherits from, so a reused subtree
+    // must not serve a stale role.
+    let plain = TransactionSnapshot()
+    var placeholder = TransactionSnapshot()
+    placeholder.scopeRole = .restoresOuter
+
+    #expect(!plain.isReuseEquivalent(to: placeholder))
+  }
+
   @Test("a frame plan's segment selection carries isContinuous")
   func planSegmentSelectionCarriesIsContinuous() {
     let identity = Identity(components: ["root", "leaf"])

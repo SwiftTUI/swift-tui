@@ -92,16 +92,51 @@ public struct Transaction: Sendable {
   /// Accessed through `transaction[MyKey.self]` (see `TransactionKey.swift`).
   package var customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
 
+  /// Completion closures added with ``addAnimationCompletion(criteria:_:)``.
+  /// Consumed when the transaction opens a scope (``withTransaction(_:_:)``
+  /// or a write through a ``Binding`` that stores this transaction); never
+  /// carried on a resolve-time snapshot, so a completion added by a
+  /// ``View/transaction(_:)`` transform has no scope to fire in and is
+  /// ignored.
+  package var pendingCompletions: [TransactionCompletion] = []
+
   /// True when this transaction carries no intent at all — applying it to
   /// a write would change nothing. `Binding` uses this to skip the
   /// `withTransaction` wrap for default-constructed stored transactions.
   package var isInert: Bool {
     request == .inherit && !isContinuous && customValues.isEmpty
+      && pendingCompletions.isEmpty
   }
 
   /// Creates a default transaction with inherited animation intent.
   public init() {
     self.request = .inherit
+  }
+
+  /// Creates a transaction carrying `animation`; `nil` disables animation
+  /// for the scope, exactly like assigning ``animation``.
+  public init(animation: Animation?) {
+    self.init()
+    self.animation = animation
+  }
+
+  /// Adds a closure to run once the animations started under this
+  /// transaction finish, at the barrier `criteria` selects.
+  ///
+  /// Several completions can be added to one transaction; each fires at its
+  /// own barrier. The closure is main-actor isolated and can write view
+  /// state directly. Completions are consumed when the transaction opens a
+  /// scope: through ``withTransaction(_:_:)``, or through a write made via a
+  /// ``Binding/transaction(_:)`` projection outside any enclosing
+  /// `withAnimation`/`withTransaction` scope (a write inside such a scope
+  /// never sees the stored transaction, so its completions do not fire).
+  public mutating func addAnimationCompletion(
+    criteria: AnimationCompletionCriteria = .logicallyComplete,
+    _ completion: @escaping @MainActor @Sendable () -> Void
+  ) {
+    pendingCompletions.append(
+      TransactionCompletion(barrier: criteria.barrier, closure: completion)
+    )
   }
 
   package init(
@@ -120,6 +155,20 @@ public struct Transaction: Sendable {
     // This lets `Transaction.animation` round-trip cleanly whenever
     // the box was constructed from an `Animation` in the first place.
     box.unwrap(as: Animation.self)
+  }
+}
+
+/// One completion added to a ``Transaction`` and the barrier it fires at.
+package struct TransactionCompletion: Sendable {
+  package var barrier: AnimationCompletionBarrier
+  package var closure: @MainActor @Sendable () -> Void
+
+  package init(
+    barrier: AnimationCompletionBarrier,
+    closure: @escaping @MainActor @Sendable () -> Void
+  ) {
+    self.barrier = barrier
+    self.closure = closure
   }
 }
 
@@ -143,127 +192,39 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    // Read the previous value from a non-invalidating state slot.
-    let (previousValue, ordinal) = previousValueAndOrdinal(in: context)
-    let valueChanged = previousValue.map { $0 != value } ?? true
+    // The value-gate mechanics (silent per-node slot, outer-first cursor
+    // reservation, per-node ordinal claim, first-appearance baseline) are
+    // shared with `ValueTransactionModifier` through
+    // `ValueGatedTransactionSupport`; this modifier keeps its public shape.
+    let gate = ValueGatedTransactionSupport.openGate(value: value, in: context)
 
-    // Store the current value without invalidating.
-    if let ordinal, let node = context.viewGraph?.nodeForIdentity(context.identity) {
-      node.setStateSlotSilently(ordinal: ordinal, value: value)
-    }
-
-    // First-appearance baseline reservation. When the identity's node does not
-    // yet exist pre-resolve (a replacement `.id`, a freshly inserted entity),
-    // `previousValueAndOrdinal` returns `(nil, nil)` and no baseline is stored:
-    // the node mints deeper inside `content.resolveElements`, after this read.
-    // The next frame then re-seeds the still-empty slot with the *current*
-    // value, so a genuine change is never detected and the replacement owner
-    // never animates. Reserve this modifier's slot ordinal now from the
-    // identity-scoped context cursor — which advances OUTER-first, exactly
-    // mirroring the per-node `claimValueAnimationModifierOrdinal` order the
-    // steady-state read uses — and store the baseline post-resolve once the
-    // node exists. Claiming from the node counter post-resolve instead would
-    // reverse stacked modifiers' ordinals (post-resolve unwinds inner-first),
-    // desyncing the next frame's read; the pre-resolve cursor cannot.
-    let firstAppearanceOrdinal: Int? =
-      ordinal == nil
-      ? StateSlotOrdinals.valueAnimation(context.valueAnimationOrdinalCursor)
-      : nil
-
-    var childContext = context
-    // Advance the cursor so a stacked inner `.animation(_, value:)` at this
-    // same identity reserves the next index, matching the per-node counter's
-    // outer-first claim sequence. Reset to 0 across every identity boundary
-    // (the cursor is a direct `ResolveContext` field, so `child` /
-    // `replacingIdentity` drop it) — one identity is one node, one counter.
-    childContext.valueAnimationOrdinalCursor = context.valueAnimationOrdinalCursor + 1
-
-    guard valueChanged else {
+    guard gate.valueChanged else {
       // Value unchanged — pass through the parent transaction as-is (the only
       // difference between `childContext` and `context` here is the cursor,
       // which is excluded from reuse-gating equality).
-      let resolved = content.resolveElements(in: childContext)
-      storeFirstAppearanceBaseline(firstAppearanceOrdinal, in: context)
+      let resolved = content.resolveElements(in: gate.childContext)
+      gate.storeFirstAppearanceBaseline(value, in: context)
       return resolved
     }
 
+    var childContext = gate.childContext
     // Only the request is overridden here: every other transaction field
     // (`isContinuous`, future additions) flows through on the context copy
     // untouched — this modifier authors animation intent, not a whole
     // transaction (plan 2026-08-04-002 mechanics §5).
-    if context.environmentValues.renderingReduceMotion {
-      childContext.transaction.animationRequest = .disabled
-    } else if let animation {
-      // Deliver the concrete animation to the renderer-owned sink (the
-      // `withAnimation` contract): the controller purges any active
-      // animation whose box carries no registration in the same render
-      // pass, so an unregistered value-animation curve dies before its
-      // first tick.
-      let box = animation.animationBox
-      AnimationRegistrationStorage.effectiveSink?.registerAnimationBox(
-        box,
-        payload: animation
+    childContext.transaction.animationRequest =
+      ValueGatedTransactionSupport.registeredRequest(
+        for: animation,
+        reduceMotion: context.environmentValues.renderingReduceMotion
       )
-      childContext.transaction.animationRequest = .animate(box)
-    } else {
-      childContext.transaction.animationRequest = .disabled
-    }
     // The narrowed request survives nested `resolveView` boundaries through
     // the authored-transaction override (F137): without it the frame-input
     // refresh re-stamped the frame-root transaction over every descendant,
     // and the request reached only the subtree roots.
     childContext.propagated.authoredTransactionOverride = true
     let resolved = content.resolveElements(in: childContext)
-    storeFirstAppearanceBaseline(firstAppearanceOrdinal, in: context)
+    gate.storeFirstAppearanceBaseline(value, in: context)
     return resolved
-  }
-
-  /// Stores the reserved first-appearance baseline on the now-minted node.
-  /// Skips a slot already holding a *different* type: the outer-first cursor
-  /// keeps stacked modifiers' ordinals distinct so this cannot arise from a
-  /// well-formed chain, but leaving a foreign occupant untouched keeps the
-  /// slot's stored-type invariant (`AnyStateSlot.set`) trap-free regardless.
-  private func storeFirstAppearanceBaseline(
-    _ ordinal: Int?,
-    in context: ResolveContext
-  ) {
-    guard let ordinal,
-      let node = context.viewGraph?.nodeForIdentity(context.identity)
-    else {
-      return
-    }
-    if let existing = node.stateSlotStorage(ordinal: ordinal),
-      existing.isInitialized,
-      !existing.stores(Value.self)
-    {
-      return
-    }
-    node.setStateSlotSilently(ordinal: ordinal, value: value)
-  }
-
-  private func previousValueAndOrdinal(
-    in context: ResolveContext
-  ) -> (Value?, Int?) {
-    guard let viewGraph = context.viewGraph,
-      let node = viewGraph.nodeForIdentity(context.identity)
-    else {
-      return (nil, nil)
-    }
-    // Each stacked `.animation(_, value:)` on one node claims its own
-    // per-resolve ordinal (reset with the node's other modifier-ordinal
-    // counters): a shared slot would alias two stacked modifiers'
-    // baselines — each write invalidates the other's comparison, so every
-    // steady-state resolve manufactures a phantom "value changed" — and
-    // would trap on the slot's stored-type check when the watched values
-    // have different types.
-    let ordinal = StateSlotOrdinals.valueAnimation(
-      node.claimValueAnimationModifierOrdinal()
-    )
-    let stored: Value = node.stateSlot(
-      ordinal: ordinal,
-      seed: value
-    )
-    return (stored, ordinal)
   }
 }
 

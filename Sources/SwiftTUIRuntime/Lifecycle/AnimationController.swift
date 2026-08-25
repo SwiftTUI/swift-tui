@@ -175,16 +175,14 @@ package final class AnimationController: Sendable {
     set { previousFrame.liveNodeIDs = newValue }
   }
 
-  /// Completion closures registered by ``withAnimation`` overloads.
-  /// The controller fires and removes the entry once every animation
-  /// (and every removal overlay) tagged with the batch ID has drained.
-  private var completionClosures: [AnimationBatchID: @MainActor @Sendable () -> Void] {
-    get { completionLedger.completionClosures }
-    set { completionLedger.completionClosures = newValue }
-  }
-  private var completionBarriers: [AnimationBatchID: AnimationCompletionBarrier] {
-    get { completionLedger.completionBarriers }
-    set { completionLedger.completionBarriers = newValue }
+  /// Completion registrations from ``withAnimation`` and
+  /// ``Transaction/addAnimationCompletion``, keyed by batch. The controller
+  /// fires and removes each once every animation (and every removal
+  /// overlay) tagged with the batch ID has passed the registration's
+  /// barrier.
+  private var completions: [AnimationBatchID: [AnimationCompletionRegistration]] {
+    get { completionLedger.completions }
+    set { completionLedger.completions = newValue }
   }
   /// Animation boxes registered for the current frame. Forwarded to the
   /// ``CompletionLedger`` so the per-tick logic reads the original name while the
@@ -199,6 +197,10 @@ package final class AnimationController: Sendable {
   private var batchRefCounts: [AnimationBatchID: Int] {
     get { batchCompletion.batchRefCounts }
     set { batchCompletion.batchRefCounts = newValue }
+  }
+  private var batchLogicalRefCounts: [AnimationBatchID: Int] {
+    get { batchCompletion.batchLogicalRefCounts }
+    set { batchCompletion.batchLogicalRefCounts = newValue }
   }
   /// Batches whose `withAnimation { ... } completion: { ... }` scope
   /// registered a completion closure but produced zero retained
@@ -426,7 +428,7 @@ package final class AnimationController: Sendable {
       activeAnimationKeys: Set(activeAnimations.keys),
       activeAnimationBoxesByKey: activeAnimations.mapValues(\.animationBox),
       registeredAnimationCount: registeredAnimations.count,
-      completionClosureBatchIDs: Set(completionClosures.keys),
+      completionClosureBatchIDs: Set(completions.keys),
       batchRefCounts: batchRefCounts,
       pendingEmptyBatchCompletions: pendingEmptyBatchCompletions,
       removalAnimationBoxesByNodeID: removingNodes.mapValues(\.animationBox),
@@ -506,11 +508,13 @@ package final class AnimationController: Sendable {
     }
     for key in result.completedAnimationKeys {
       if let entry = activeAnimations.removeValue(forKey: key) {
-        releaseBatch(entry.batchID)
+        releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
       }
     }
     // Keep the final visual for one committed turn so logical completion and
-    // overlay removal are observably distinct barriers.
+    // overlay removal are observably distinct barriers: the curve's end
+    // releases the batch's logical retain (its `.logicallyComplete`
+    // registrations fire), the overlay's removal the `.removed` one.
     for viewNodeID in result.completedRemovalNodeIDs {
       guard var entry = removingNodes[viewNodeID] else { continue }
       guard entry.completionBatchID != nil else {
@@ -519,16 +523,11 @@ package final class AnimationController: Sendable {
       }
       if !entry.isLogicallyComplete {
         entry.isLogicallyComplete = true
-        if let batchID = entry.completionBatchID,
-          completionBarriers[batchID] == .logicallyComplete
-        {
-          entry.completionBatchID = nil
-          releaseBatch(batchID)
-        }
+        releaseLogicalBatch(entry.completionBatchID)
         removingNodes[viewNodeID] = entry
       } else {
         removingNodes.removeValue(forKey: viewNodeID)
-        releaseBatch(entry.completionBatchID)
+        releaseBatch(entry.completionBatchID, logicalAlreadyReleased: true)
       }
     }
 
@@ -598,7 +597,8 @@ package final class AnimationController: Sendable {
     lastFrameHeadCompletionCount = 0
 
     var keysToRemove: [AnimationKey] = []
-    var completedBatches: [AnimationBatchID] = []
+    var completedBatches: [CompletedBatchRelease] = []
+    var logicallyCompletedBatches: [AnimationBatchID] = []
     var completedAnimationBoxes: Set<AnimationBox> = []
     var redrawIdentities: Set<Identity> = []
     var latestDeadline: MonotonicInstant = timestamp
@@ -614,6 +614,7 @@ package final class AnimationController: Sendable {
         at: timestamp,
         keysToRemove: &keysToRemove,
         completedBatches: &completedBatches,
+        logicallyCompletedBatches: &logicallyCompletedBatches,
         completedAnimationBoxes: &completedAnimationBoxes,
         redrawIdentities: &redrawIdentities
       ) {
@@ -628,8 +629,11 @@ package final class AnimationController: Sendable {
     for key in keysToRemove {
       activeAnimations.removeValue(forKey: key)
     }
-    for batchID in completedBatches {
-      releaseBatch(batchID)
+    for batchID in logicallyCompletedBatches {
+      releaseLogicalBatch(batchID)
+    }
+    for release in completedBatches {
+      releaseBatch(release.batchID, logicalAlreadyReleased: release.logicalAlreadyReleased)
     }
     // The eligibility gate guarantees `removingNodes` is empty off-screen, so
     // the shared prune's removal-overlay scan is a no-op here (F178: before
@@ -663,13 +667,17 @@ package final class AnimationController: Sendable {
     animation: ActiveAnimation,
     at timestamp: MonotonicInstant,
     keysToRemove: inout [AnimationKey],
-    completedBatches: inout [AnimationBatchID],
+    completedBatches: inout [CompletedBatchRelease],
+    logicallyCompletedBatches: inout [AnimationBatchID],
     completedAnimationBoxes: inout Set<AnimationBox>,
     redrawIdentities: inout Set<Identity>
   ) -> PropertyAnimationStepResult {
+    let release = animation.batchID.map {
+      CompletedBatchRelease(batchID: $0, logicalAlreadyReleased: animation.isLogicallyReleased)
+    }
     guard let anim = registeredAnimations[animation.animationBox] else {
       keysToRemove.append(key)
-      if let batchID = animation.batchID { completedBatches.append(batchID) }
+      if let release { completedBatches.append(release) }
       return .unregistered
     }
 
@@ -683,13 +691,32 @@ package final class AnimationController: Sendable {
     guard let progress = evaluated else {
       keysToRemove.append(key)
       completedAnimationBoxes.insert(animation.animationBox)
-      if let batchID = animation.batchID { completedBatches.append(batchID) }
+      if let release { completedBatches.append(release) }
       redrawIdentities.insert(key.identity)
       return .completed
     }
 
+    // Logical-completion latch: an `Animation.logicallyComplete(after:)`
+    // curve reports its batch's `.logicallyComplete` barrier at that instant
+    // while the curve keeps ticking toward the `.removed` barrier.
+    if let logicalDuration = anim.logicalDuration,
+      let batchID = animation.batchID,
+      !animation.isLogicallyReleased,
+      elapsed >= logicalDuration
+    {
+      activeAnimations[key]?.isLogicallyReleased = true
+      logicallyCompletedBatches.append(batchID)
+    }
+
     redrawIdentities.insert(key.identity)
     return .progressed(progress)
+  }
+
+  /// A batch retain to drop at the end of a tick, with whether its logical
+  /// half was already released by the latch above.
+  private struct CompletedBatchRelease {
+    var batchID: AnimationBatchID
+    var logicalAlreadyReleased: Bool
   }
 
   /// Prune registration-ledger entries for property curves that just completed
@@ -730,7 +757,7 @@ package final class AnimationController: Sendable {
       count: activeAnimations.count,
       detail: [
         "registered": registeredAnimations.count,
-        "completions": completionClosures.count,
+        "completions": completions.count,
         "batchRefCounts": batchRefCounts.count,
         "pendingEmptyBatches": pendingEmptyBatchCompletions.count,
       ]
@@ -783,7 +810,7 @@ package final class AnimationController: Sendable {
 
   package var frameDropEligibilityBlockers: Set<FrameDropEligibility.Blocker> {
     var blockers: Set<FrameDropEligibility.Blocker> = []
-    if lastFrameHeadCompletionCount > 0 || !completionClosures.isEmpty
+    if lastFrameHeadCompletionCount > 0 || !completions.isEmpty
       || !pendingEmptyBatchCompletions.isEmpty || !deferredFrameHeadCompletions.isEmpty
     {
       blockers.insert(.animationCompletion)
@@ -1102,6 +1129,7 @@ package final class AnimationController: Sendable {
       parentIdentity: nil,
       childIndex: 0,
       transaction: transaction,
+      scopeOuterTransaction: nil,
       transactionPlan: transactionPlan,
       timestamp: timestamp,
       snapshotAccumulator: &newSnapshots,
@@ -1169,7 +1197,10 @@ package final class AnimationController: Sendable {
       }
       for viewNodeID in supersededRemovals.keys {
         if let entry = removingNodes.removeValue(forKey: viewNodeID) {
-          releaseBatch(entry.completionBatchID)
+          releaseBatch(
+            entry.completionBatchID,
+            logicalAlreadyReleased: entry.isLogicallyComplete
+          )
         }
       }
     }
@@ -1196,7 +1227,7 @@ package final class AnimationController: Sendable {
         identity: plan.identity, scope: .matchedGeometry
       )
       if let existing = activeAnimations[matchedKey] {
-        releaseBatch(existing.batchID)
+        releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)
       }
       retainBatch(plan.batchID)
       activeAnimations[matchedKey] = ActiveAnimation(
@@ -1380,7 +1411,11 @@ package final class AnimationController: Sendable {
     }
     for key in departedKeys {
       guard let entry = activeAnimations.removeValue(forKey: key) else { continue }
-      releaseBatch(entry.batchID, firingCompletion: false)
+      releaseBatch(
+        entry.batchID,
+        logicalAlreadyReleased: entry.isLogicallyReleased,
+        firingCompletion: false
+      )
     }
 
     previousSnapshots = newSnapshots
@@ -1451,7 +1486,7 @@ package final class AnimationController: Sendable {
       timestamp: timestamp,
       registeredAnimations: registeredAnimations,
       batchRefCounts: batchRefCounts,
-      completionClosures: completionClosures,
+      completions: completions,
       pendingEmptyBatchCompletions: pendingEmptyBatchCompletions
     )
 
@@ -1461,7 +1496,7 @@ package final class AnimationController: Sendable {
     case .schedule(let batchID, let deadline):
       pendingEmptyBatchCompletions[batchID] = deadline
     case .dropCompletion(let batchID):
-      _ = takeCompletion(for: batchID)
+      _ = takeCompletions(for: batchID)
     }
   }
 
@@ -1493,7 +1528,9 @@ package final class AnimationController: Sendable {
       let effectiveFrom: AnyAnimatable =
         sampleCurrentValue(for: key, at: timestamp)
         ?? AnyAnimatable(startOpacity)
-      if let existing = activeAnimations[key] { releaseBatch(existing.batchID) }
+      if let existing = activeAnimations[key] {
+        releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)
+      }
       retainBatch(batchID)
       activeAnimations[key] = ActiveAnimation(
         kind: .property(
@@ -1521,7 +1558,7 @@ package final class AnimationController: Sendable {
       )
       let offsetKey = AnimationKey(identity: identity, scope: .insertionOffset)
       if let existing = activeAnimations[offsetKey] {
-        releaseBatch(existing.batchID)
+        releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)
       }
       retainBatch(batchID)
       activeAnimations[offsetKey] = ActiveAnimation(
@@ -1627,7 +1664,7 @@ package final class AnimationController: Sendable {
       transactionPlan: transactionPlan
     )
     let completionBatchID = removalTransaction.animationBatchID.flatMap { batchID in
-      completionClosures[batchID] == nil ? nil : batchID
+      completions[batchID] == nil ? nil : batchID
     }
     retainBatch(completionBatchID)
 
@@ -1638,7 +1675,7 @@ package final class AnimationController: Sendable {
       !injectedIdentities.contains($0.key.identity)
     }
     for (_, entry) in supersededEntries {
-      releaseBatch(entry.batchID)
+      releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
     }
 
     // If a previous placed tree is cached, look up the frozen
@@ -1706,6 +1743,7 @@ package final class AnimationController: Sendable {
     parentIdentity: Identity?,
     childIndex: Int,
     transaction: TransactionSnapshot,
+    scopeOuterTransaction: TransactionSnapshot?,
     transactionPlan: FrameAnimationTransactionPlan,
     timestamp: MonotonicInstant,
     snapshotAccumulator: inout [Identity: AnimatableSnapshot],
@@ -1731,7 +1769,15 @@ package final class AnimationController: Sendable {
     // Determine the effective transaction. A resolved node normally already
     // carries its frame-selected segment. Consulting the plan here also covers
     // controller-direct inputs and departed/reused transaction snapshots.
+    //
+    // A scoped modifier's placeholder (`restoresOuter`) inherits from the
+    // nearest scope root's effective transaction — the transaction outside
+    // the scope — instead of from its scoped resolved parent.
     let frameSegment = transactionPlan.segment(for: node.identity)
+    let transaction =
+      node.transactionSnapshot.scopeRole == .restoresOuter
+      ? (scopeOuterTransaction ?? transaction)
+      : transaction
     var effectiveTransaction = node.transactionSnapshot
     if effectiveTransaction.animationRequest == .inherit {
       // Metadata fields (`isContinuous`, custom key values) inherit with
@@ -1791,12 +1837,17 @@ package final class AnimationController: Sendable {
     }
     transactionAccumulator[node.identity] = effectiveTransaction
 
+    let childScopeOuterTransaction =
+      node.transactionSnapshot.scopeRole == .scopeRoot
+      ? effectiveTransaction
+      : scopeOuterTransaction
     for (index, child) in node.children.enumerated() {
       processNode(
         child,
         parentIdentity: node.identity,
         childIndex: index,
         transaction: effectiveTransaction,
+        scopeOuterTransaction: childScopeOuterTransaction,
         transactionPlan: transactionPlan,
         timestamp: timestamp,
         snapshotAccumulator: &snapshotAccumulator,
@@ -1857,14 +1908,14 @@ package final class AnimationController: Sendable {
     switch request {
     case .inherit, .disabled:
       if let superseded = activeAnimations.removeValue(forKey: key) {
-        releaseBatch(superseded.batchID)
+        releaseBatch(superseded.batchID, logicalAlreadyReleased: superseded.isLogicallyReleased)
       }
 
     case .animate(let box):
       guard let previous, let current else {
         // One side nil — cannot interpolate, snap.
         if let superseded = activeAnimations.removeValue(forKey: key) {
-          releaseBatch(superseded.batchID)
+          releaseBatch(superseded.batchID, logicalAlreadyReleased: superseded.isLogicallyReleased)
         }
         return
       }
@@ -1904,7 +1955,7 @@ package final class AnimationController: Sendable {
             )
           }
         }
-        releaseBatch(existing.batchID)
+        releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)
       } else {
         effectiveFrom = previous
       }
@@ -1924,6 +1975,29 @@ package final class AnimationController: Sendable {
   private func retainBatch(_ batchID: AnimationBatchID?) {
     guard let batchID else { return }
     batchRefCounts[batchID, default: 0] += 1
+    batchLogicalRefCounts[batchID, default: 0] += 1
+  }
+
+  /// Drops one logical retain. When the last logical retainer lets go, the
+  /// batch's `.logicallyComplete` registrations fire (or are dropped, on the
+  /// departed-identity prune's arm); its `.removed` registrations wait for
+  /// ``releaseBatch(_:logicalAlreadyReleased:firingCompletion:)``.
+  private func releaseLogicalBatch(
+    _ batchID: AnimationBatchID?,
+    firingCompletion: Bool = true
+  ) {
+    guard let batchID, let count = batchLogicalRefCounts[batchID] else { return }
+    if count <= 1 {
+      batchLogicalRefCounts.removeValue(forKey: batchID)
+      let closures = takeCompletions(for: batchID, barrier: .logicallyComplete)
+      if firingCompletion {
+        for closure in closures {
+          fireOrDeferCompletion(closure)
+        }
+      }
+    } else {
+      batchLogicalRefCounts[batchID] = count - 1
+    }
   }
 
   /// `firingCompletion: false` is the departed-identity prune's arm: when the
@@ -1933,29 +2007,53 @@ package final class AnimationController: Sendable {
   /// continuation — see ``requiresContinuedAnimationFrames``). If a live
   /// animation in the same batch releases last instead, the completion fires
   /// normally through the default arm.
+  ///
+  /// `logicalAlreadyReleased: true` is for a retainer that passed its logical
+  /// barrier earlier (a latched `logicallyComplete(after:)` curve, an exit
+  /// overlay whose curve already ended) so the logical count is not
+  /// decremented twice; every other release drops both halves, logical
+  /// first, so a batch that ends in one step fires its `.logicallyComplete`
+  /// registrations before its `.removed` ones.
   private func releaseBatch(
     _ batchID: AnimationBatchID?,
+    logicalAlreadyReleased: Bool = false,
     firingCompletion: Bool = true
   ) {
     guard let batchID, let count = batchRefCounts[batchID] else { return }
+    if !logicalAlreadyReleased {
+      releaseLogicalBatch(batchID, firingCompletion: firingCompletion)
+    }
     let newCount = count - 1
     if newCount <= 0 {
       batchRefCounts.removeValue(forKey: batchID)
-      if let closure = takeCompletion(for: batchID),
-        firingCompletion
-      {
-        fireOrDeferCompletion(closure)
+      batchLogicalRefCounts.removeValue(forKey: batchID)
+      let closures = takeCompletions(for: batchID)
+      if firingCompletion {
+        for closure in closures {
+          fireOrDeferCompletion(closure)
+        }
       }
     } else {
       batchRefCounts[batchID] = newCount
     }
   }
 
-  private func takeCompletion(
-    for batchID: AnimationBatchID
-  ) -> (@MainActor @Sendable () -> Void)? {
-    completionBarriers.removeValue(forKey: batchID)
-    return completionClosures.removeValue(forKey: batchID)
+  /// Removes and returns the batch's registrations at `barrier`, or every
+  /// registration when `barrier` is `nil`; a batch whose list empties leaves
+  /// the ledger so pending-work checks see only live completions.
+  private func takeCompletions(
+    for batchID: AnimationBatchID,
+    barrier: AnimationCompletionBarrier? = nil
+  ) -> [@MainActor @Sendable () -> Void] {
+    guard let registrations = completions[batchID] else { return [] }
+    let taken = registrations.filter { barrier == nil || $0.barrier == barrier }
+    let remaining = registrations.filter { barrier != nil && $0.barrier != barrier }
+    if remaining.isEmpty {
+      completions.removeValue(forKey: batchID)
+    } else {
+      completions[batchID] = remaining
+    }
+    return taken.map(\.closure)
   }
 
   private func fireOrDeferCompletion(_ completion: @escaping @MainActor @Sendable () -> Void) {
@@ -2002,7 +2100,8 @@ package final class AnimationController: Sendable {
     // release their ref counts in a second pass (after this iteration
     // closes).  Releasing during the iteration would mutate
     // activeAnimations and invalidate the dictionary traversal.
-    var completedBatches: [AnimationBatchID] = []
+    var completedBatches: [CompletedBatchRelease] = []
+    var logicallyCompletedBatches: [AnimationBatchID] = []
 
     // Boxes of property animations that ran to completion this tick. After the
     // active/removal maps are finalized below, each such box whose LAST live
@@ -2027,6 +2126,7 @@ package final class AnimationController: Sendable {
           at: timestamp,
           keysToRemove: &keysToRemove,
           completedBatches: &completedBatches,
+          logicallyCompletedBatches: &logicallyCompletedBatches,
           completedAnimationBoxes: &completedAnimationBoxes,
           redrawIdentities: &redrawIdentities
         ) {
@@ -2082,10 +2182,13 @@ package final class AnimationController: Sendable {
       activeAnimations.removeValue(forKey: key)
     }
     // Release the batch references for everything that completed.
-    // ``releaseBatch`` fires the matching completion closure when the
-    // ref count hits zero.
-    for batchID in completedBatches {
-      releaseBatch(batchID)
+    // ``releaseBatch`` fires the matching completion closures when the
+    // ref counts hit zero; latched logical completions release first.
+    for batchID in logicallyCompletedBatches {
+      releaseLogicalBatch(batchID)
+    }
+    for release in completedBatches {
+      releaseBatch(release.batchID, logicalAlreadyReleased: release.logicalAlreadyReleased)
     }
 
     // Process removal entries: compute interpolated transition modifiers
@@ -2166,12 +2269,7 @@ package final class AnimationController: Sendable {
           removalsToPurge.append(viewNodeID)
         } else {
           removingNodes[viewNodeID]?.isLogicallyComplete = true
-          if let batchID = entry.completionBatchID,
-            completionBarriers[batchID] == .logicallyComplete
-          {
-            removingNodes[viewNodeID]?.completionBatchID = nil
-            releaseBatch(batchID)
-          }
+          releaseLogicalBatch(entry.completionBatchID)
           latestDeadline = timestamp.advanced(by: frameInterval)
           hasPendingWork = true
         }
@@ -2209,7 +2307,10 @@ package final class AnimationController: Sendable {
 
     for viewNodeID in removalsToPurge {
       if let entry = removingNodes.removeValue(forKey: viewNodeID) {
-        releaseBatch(entry.completionBatchID)
+        releaseBatch(
+          entry.completionBatchID,
+          logicalAlreadyReleased: entry.isLogicallyComplete
+        )
       }
     }
 
@@ -2271,7 +2372,7 @@ package final class AnimationController: Sendable {
       }
       for batchID in pendingDrain.drainedBatchIDs {
         pendingEmptyBatchCompletions.removeValue(forKey: batchID)
-        if let closure = takeCompletion(for: batchID) {
+        for closure in takeCompletions(for: batchID) {
           fireOrDeferCompletion(closure)
         }
       }
@@ -2460,7 +2561,7 @@ extension AnimationController: AnimationCompletionSink {
     at now: MonotonicInstant
   ) {
     for batchID in batchIDs {
-      guard completionClosures[batchID] != nil,
+      guard completions[batchID] != nil,
         batchRefCounts[batchID] == nil,
         pendingEmptyBatchCompletions[batchID] == nil
       else { continue }
@@ -2473,12 +2574,14 @@ extension AnimationController: AnimationCompletionSink {
     barrier: AnimationCompletionBarrier = .logicallyComplete,
     closure: @escaping @MainActor @Sendable () -> Void
   ) {
-    // Store the closure; it fires when the batch's ref count hits zero
-    // in ``releaseBatch``.  Registering a second closure for the same
-    // batch ID replaces the first, matching SwiftUI's last-writer-wins
-    // behavior when overlapping ``withAnimation`` calls collide.
-    completionClosures[batchID] = closure
-    completionBarriers[batchID] = barrier
+    // Append the registration; it fires when the batch's matching ref count
+    // hits zero (`.logicallyComplete` on the logical count, `.removed` on the
+    // removed count). A batch keeps every registration made for it, so
+    // `Transaction.addAnimationCompletion` can add several with their own
+    // barriers and overlapping scopes that share a batch all fire.
+    completions[batchID, default: []].append(
+      AnimationCompletionRegistration(barrier: barrier, closure: closure)
+    )
   }
 }
 

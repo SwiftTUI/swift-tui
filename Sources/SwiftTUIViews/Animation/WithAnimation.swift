@@ -75,14 +75,77 @@ public func withTransaction<Result>(
   _ transaction: Transaction,
   _ body: () throws -> Result
 ) rethrows -> Result {
-  // Continuity and custom key values are scoped for every request shape
-  // so state writes inside `body` can thread them onto their invalidation
-  // segments. A metadata-only transaction (request `.inherit`) still
-  // passes the enclosing scope's animation intent through untouched.
-  try AnimationContextStorage.$currentIsContinuous.withValue(transaction.isContinuous) {
-    try AnimationContextStorage.$currentCustomValues.withValue(transaction.customValues) {
-      try withTransactionRequestScope(transaction, body)
+  // Completions added with `addAnimationCompletion` open one batch for the
+  // scope (the `withAnimation(_:completionCriteria:_:completion:)` path),
+  // so every animation the body starts reports to every registered closure.
+  try withCompletionBatch(transaction.pendingCompletions) {
+    // Continuity and custom key values are scoped for every request shape
+    // so state writes inside `body` can thread them onto their invalidation
+    // segments. A metadata-only transaction (request `.inherit`) still
+    // passes the enclosing scope's animation intent through untouched.
+    try AnimationContextStorage.$currentIsContinuous.withValue(transaction.isContinuous) {
+      try AnimationContextStorage.$currentCustomValues.withValue(transaction.customValues) {
+        try withTransactionRequestScope(transaction, body)
+      }
     }
+  }
+}
+
+/// Executes `body` under the current transaction with one field changed:
+/// the key-path form of ``withTransaction(_:_:)``, matching SwiftUI's
+/// `withTransaction(_:_:_:)`.
+///
+/// The transaction starts from the enclosing scope's continuity and custom
+/// key values and inherits its animation intent, so
+/// `withTransaction(\.disablesAnimations, true) { ... }` inside a
+/// `withAnimation` scope snaps just the writes in `body`.
+@MainActor
+@discardableResult
+public func withTransaction<Result, Value>(
+  _ keyPath: WritableKeyPath<Transaction, Value>,
+  _ value: Value,
+  _ body: () throws -> Result
+) rethrows -> Result {
+  var transaction = Transaction(
+    request: .inherit,
+    isContinuous: AnimationContextStorage.currentIsContinuous,
+    customValues: AnimationContextStorage.currentCustomValues
+  )
+  transaction[keyPath: keyPath] = value
+  return try withTransaction(transaction, body)
+}
+
+/// Opens a completion batch for `completions` around `body`: allocates the
+/// batch ID, registers every closure (wrapped in its registration-time
+/// authoring context) with the renderer-owned sink, and scopes the batch ID
+/// so each state write inside `body` carries it. An empty list runs `body`
+/// unchanged.
+@MainActor
+private func withCompletionBatch<Result>(
+  _ completions: [TransactionCompletion],
+  _ body: () throws -> Result
+) rethrows -> Result {
+  guard !completions.isEmpty else {
+    return try body()
+  }
+  let batchID = AnimationBatchIDAllocator.next()
+  let snapshot = currentImperativeAuthoringContextSnapshot()
+  for completion in completions {
+    let closure = completion.closure
+    let scopedCompletion: @MainActor @Sendable () -> Void
+    if let snapshot {
+      scopedCompletion = { withImperativeAuthoringContext(snapshot) { closure() } }
+    } else {
+      scopedCompletion = closure
+    }
+    AnimationCompletionStorage.effectiveSink?.registerCompletion(
+      batchID: batchID,
+      barrier: completion.barrier,
+      closure: scopedCompletion
+    )
+  }
+  return try AnimationContextStorage.$currentBatchID.withValue(batchID) {
+    try body()
   }
 }
 
@@ -152,19 +215,9 @@ public func withAnimation<Result>(
   _ body: () throws -> Result,
   completion: @escaping @MainActor @Sendable () -> Void
 ) rethrows -> Result {
-  let batchID = AnimationBatchIDAllocator.next()
-  let scopedCompletion: @MainActor @Sendable () -> Void
-  if let snapshot = currentImperativeAuthoringContextSnapshot() {
-    scopedCompletion = { withImperativeAuthoringContext(snapshot) { completion() } }
-  } else {
-    scopedCompletion = completion
-  }
-  AnimationCompletionStorage.effectiveSink?.registerCompletion(
-    batchID: batchID,
-    barrier: completionCriteria.barrier,
-    closure: scopedCompletion
-  )
-  return try AnimationContextStorage.$currentBatchID.withValue(batchID) {
+  try withCompletionBatch(
+    [TransactionCompletion(barrier: completionCriteria.barrier, closure: completion)]
+  ) {
     try withAnimation(animation, body)
   }
 }

@@ -61,6 +61,11 @@ package struct ActiveAnimation: Sendable {
   /// at enqueue time.  Used to look up a registered completion closure
   /// when every animation in the batch has drained.
   package var batchID: AnimationBatchID?
+  /// Set once this animation released its logical retain on `batchID`
+  /// early (an `Animation.logicallyComplete(after:)` curve past that
+  /// instant), so the release at curve end decrements only the removed
+  /// count.
+  package var isLogicallyReleased = false
 }
 
 /// Result of a tick: tells the runtime whether more frames are needed

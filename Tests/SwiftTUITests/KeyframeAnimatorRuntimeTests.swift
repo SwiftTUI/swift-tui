@@ -32,7 +32,7 @@ struct KeyframeAnimatorRuntimeTests {
   func oneTriggerRunsToTheEnd() async throws {
     let probe = KeyframeValueProbe()
     let harness = try KeyframeAnimatorHarness {
-      KeyframeTriggerFixture(probe: probe, duration: .milliseconds(300))
+      KeyframeTriggerFixture(probe: probe, duration: .milliseconds(800))
     }
     defer { harness.shutdown() }
 
@@ -54,7 +54,7 @@ struct KeyframeAnimatorRuntimeTests {
   func retriggerContinuesFromCurrentValue() async throws {
     let probe = KeyframeValueProbe()
     let harness = try KeyframeAnimatorHarness {
-      KeyframeTriggerFixture(probe: probe, duration: .milliseconds(600))
+      KeyframeTriggerFixture(probe: probe, duration: .milliseconds(1_200))
     }
     defer { harness.shutdown() }
 
@@ -261,7 +261,7 @@ private struct KeyframeCubicTriggerFixture: View {
         let _ = probe.record(value)
         Text("v=\(Int(value.rounded()))")
       } keyframes: { _ in
-        CubicKeyframe(10.0, duration: .milliseconds(700))
+        CubicKeyframe(10.0, duration: .milliseconds(1_500))
       }
     }
   }
@@ -297,7 +297,7 @@ private struct KeyframeAncestorAnimationFixture: View {
         let _ = probe.record(value)
         Text("★").offset(x: Int(value.rounded()), y: 0)
       } keyframes: { _ in
-        LinearKeyframe(10.0, duration: .milliseconds(300))
+        LinearKeyframe(10.0, duration: .milliseconds(800))
       }
     }
     .animation(.linear(duration: .seconds(2)), value: bumps)

@@ -6,17 +6,24 @@ public struct Animation: Equatable, Hashable, Sendable {
   let delayDuration: Duration
   let speedMultiplier: Double
   let repeatBehavior: RepeatBehavior?
+  /// The elapsed time after which the animation reports logical completion
+  /// (``logicallyComplete(after:)``), or `nil` to report it when the curve
+  /// finishes. Measured from the animation's start, before delay and speed
+  /// adjustments.
+  package let logicalDuration: Duration?
 
   init(
     curve: AnimationCurve,
     delay: Duration = .zero,
     speed: Double = 1.0,
-    repeatBehavior: RepeatBehavior? = nil
+    repeatBehavior: RepeatBehavior? = nil,
+    logicalDuration: Duration? = nil
   ) {
     self.curve = curve
     delayDuration = delay
     speedMultiplier = speed
     self.repeatBehavior = repeatBehavior
+    self.logicalDuration = logicalDuration
   }
 
   // MARK: - Timing Curves
@@ -132,7 +139,8 @@ public struct Animation: Equatable, Hashable, Sendable {
       curve: curve,
       delay: delayDuration + delay,
       speed: speedMultiplier,
-      repeatBehavior: repeatBehavior
+      repeatBehavior: repeatBehavior,
+      logicalDuration: logicalDuration
     )
   }
 
@@ -141,7 +149,8 @@ public struct Animation: Equatable, Hashable, Sendable {
       curve: curve,
       delay: delayDuration,
       speed: speedMultiplier * speed,
-      repeatBehavior: repeatBehavior
+      repeatBehavior: repeatBehavior,
+      logicalDuration: logicalDuration
     )
   }
 
@@ -153,7 +162,8 @@ public struct Animation: Equatable, Hashable, Sendable {
       curve: curve,
       delay: delayDuration,
       speed: speedMultiplier,
-      repeatBehavior: .count(count, autoreverses: autoreverses)
+      repeatBehavior: .count(count, autoreverses: autoreverses),
+      logicalDuration: logicalDuration
     )
   }
 
@@ -164,7 +174,34 @@ public struct Animation: Equatable, Hashable, Sendable {
       curve: curve,
       delay: delayDuration,
       speed: speedMultiplier,
-      repeatBehavior: .forever(autoreverses: autoreverses)
+      repeatBehavior: .forever(autoreverses: autoreverses),
+      logicalDuration: logicalDuration
+    )
+  }
+
+  /// An animation that reports logical completion `duration` after it
+  /// starts, while the curve keeps running to its visual end.
+  ///
+  /// A completion registered with ``AnimationCompletionCriteria/logicallyComplete``
+  /// fires at that instant; one registered with
+  /// ``AnimationCompletionCriteria/removed`` still waits for the curve to
+  /// finish. Useful for springs whose settling tail should not hold up
+  /// dependent logic:
+  ///
+  /// ```swift
+  /// withAnimation(.bouncy.logicallyComplete(after: .milliseconds(400))) {
+  ///   isExpanded = true
+  /// } completion: {
+  ///   loadDetails()
+  /// }
+  /// ```
+  public func logicallyComplete(after duration: Duration) -> Animation {
+    Animation(
+      curve: curve,
+      delay: delayDuration,
+      speed: speedMultiplier,
+      repeatBehavior: repeatBehavior,
+      logicalDuration: duration
     )
   }
 

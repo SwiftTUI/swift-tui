@@ -91,10 +91,32 @@ struct Meter: View {
 
 For finer control, ``withTransaction(_:_:)`` runs a body under a
 ``Transaction`` — set ``Transaction/disablesAnimations`` to suppress an
-inherited animation for one write. ``View/transaction(_:)`` edits the
-transaction seen by a subtree, and ``Binding/animation(_:)`` returns a
+inherited animation for one write, or change one field with the key-path
+form, `withTransaction(\.disablesAnimations, true) { count += 1 }`, which
+keeps everything else about the enclosing scope. ``View/transaction(_:)``
+edits the transaction seen by a subtree, ``View/transaction(value:_:)`` does
+so only when a value changes (the whole-transaction sibling of
+``View/animation(_:value:)``), and ``Binding/animation(_:)`` returns a
 binding whose writes animate, so a control can animate the state it sets:
 `Toggle("Wide", isOn: $wide.animation(.snappy))`.
+
+The scoped forms narrow an animation to the modifiers inside a closure.
+``View/animation(_:body:)`` hands the closure a ``PlaceholderContentView``
+standing in for the modified view; modifiers applied to it animate, while
+the view itself keeps the transaction in effect outside, so its own changes
+snap:
+
+```swift
+Text(label)
+  .foregroundStyle(color)              // snaps
+  .animation(.easeInOut) { text in
+    text.offset(x: offsetX, y: 0)      // animates whenever offsetX changes
+  }
+```
+
+``View/transaction(_:body:)`` is the same shape with a transaction
+transform, for example `{ $0.disablesAnimations = true }` to hold one
+modifier still inside an animated scope.
 
 ## Transitions On Insertion And Removal
 
@@ -152,6 +174,25 @@ is fully removed. The completion closure is main-actor isolated and can
 write `@State` directly. Under reduce motion the state change applies
 instantly and the completion still fires, so completion-driven logic keeps
 working when no motion is drawn.
+
+A ``Transaction`` carries any number of completions, each with its own
+criteria, through ``Transaction/addAnimationCompletion(criteria:_:)``; every
+animation the scope starts reports to all of them:
+
+```swift
+var transaction = Transaction(animation: .bouncy)
+transaction.addAnimationCompletion { logicalRuns += 1 }
+transaction.addAnimationCompletion(criteria: .removed) { settledRuns += 1 }
+withTransaction(transaction) { isExpanded.toggle() }
+```
+
+A binding that stores such a transaction (``Binding/transaction(_:)``) fires
+the completions once per write made outside any enclosing `withAnimation`
+or `withTransaction` scope; a write inside one never sees the stored
+transaction. ``Animation/logicallyComplete(after:)`` moves the
+`.logicallyComplete` instant earlier than the curve's end, so a spring's
+settling tail does not hold up dependent logic while `.removed` still waits
+for the visual to finish.
 
 ## Cycle Through Phases
 

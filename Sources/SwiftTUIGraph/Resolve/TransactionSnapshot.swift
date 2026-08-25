@@ -17,6 +17,9 @@ public struct TransactionSnapshot: Equatable, Sendable {
   /// Like `isContinuous`, resolve-side data with no animation intent of
   /// its own.
   package var customValues: [ObjectIdentifier: AnyHashableSendable] = [:]
+  /// The node's part in a scoped transaction (`View.animation(_:body:)` /
+  /// `View.transaction(_:body:)`); `.none` for every ordinary node.
+  package var scopeRole: TransactionScopeRole = .none
 
   public init(debugSignature: String = "") {
     self.debugSignature = debugSignature
@@ -34,5 +37,22 @@ public struct TransactionSnapshot: Equatable, Sendable {
       && animationBatchID == other.animationBatchID
       && isContinuous == other.isContinuous
       && customValues == other.customValues
+      && scopeRole == other.scopeRole
   }
+}
+
+/// How a resolved node takes part in a scoped transaction. The animation
+/// controller inherits an `.inherit` request from the resolved parent; the
+/// two roles let a scoped modifier's wrapped content inherit from *outside*
+/// the scope instead.
+package enum TransactionScopeRole: Sendable, Equatable {
+  /// An ordinary node.
+  case none
+  /// The scoped modifier's own node: its effective transaction is the
+  /// "outer" transaction its placeholder restores.
+  case scopeRoot
+  /// The placeholder standing in for the wrapped content: an `.inherit`
+  /// request here inherits from the nearest `scopeRoot` ancestor's
+  /// effective transaction, not from the scoped parent.
+  case restoresOuter
 }
