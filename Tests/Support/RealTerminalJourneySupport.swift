@@ -6,6 +6,8 @@ import Synchronization
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(ucrt)
+  import CRT
 #endif
 
 /// What actually arrived on the PTY while a wait was running.
@@ -422,8 +424,12 @@ import Synchronization
         }
         break
       }
+      _exit(Self.stallExitCode)
+    #else
+      // A pair never arms on Windows (`open` throws unsupportedPlatform), so
+      // this path only has to compile; a plain exit still fails the job.
+      exit(Self.stallExitCode)
     #endif
-    _exit(Self.stallExitCode)
   }
 
   private static func nanoseconds(in duration: Duration) -> UInt64 {
