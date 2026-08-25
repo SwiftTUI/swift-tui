@@ -109,10 +109,12 @@ import Synchronization
   @_spi(Testing) public let slave: Int32
 
   private let state = Mutex(State())
+  private let watchdog: RealTerminalJourneyWatchdog?
 
-  private init(master: Int32, slave: Int32) {
+  private init(master: Int32, slave: Int32, watchdog: RealTerminalJourneyWatchdog?) {
     self.master = master
     self.slave = slave
+    self.watchdog = watchdog
   }
 
   deinit {
@@ -121,7 +123,18 @@ import Synchronization
   }
 
   /// Opens a PTY with the requested initial terminal size.
-  @_spi(Testing) public static func open(size: CellSize) throws -> RealTerminalPTYPair {
+  ///
+  /// The pair arms a ``RealTerminalJourneyWatchdog`` with `stallBudget`, so a
+  /// journey that stops making progress ends the test process about that long
+  /// after its last activity instead of at the CI job timeout. Pass `nil` to
+  /// run without one. The `open` call site is what the watchdog names when it
+  /// fires, so open the pair from the journey itself rather than a helper.
+  @_spi(Testing) public static func open(
+    size: CellSize,
+    stallBudget: Duration? = .seconds(60),
+    fileID: String = #fileID,
+    line: Int = #line
+  ) throws -> RealTerminalPTYPair {
     #if canImport(Darwin) || canImport(Glibc)
       var master: Int32 = -1
       var slave: Int32 = -1
@@ -159,7 +172,14 @@ import Synchronization
         )
       }
 
-      return RealTerminalPTYPair(master: master, slave: slave)
+      let watchdog = stallBudget.map { budget in
+        RealTerminalJourneyWatchdog.arm(
+          fileDescriptor: master,
+          stallBudget: budget,
+          origin: "\(fileID):\(line)"
+        )
+      }
+      return RealTerminalPTYPair(master: master, slave: slave, watchdog: watchdog)
     #else
       throw RealTerminalJourneyError.unsupportedPlatform
     #endif
@@ -177,6 +197,7 @@ import Synchronization
     guard shouldClose else {
       return
     }
+    watchdog?.disarm()
     Self.close(fileDescriptor: master)
   }
 
@@ -205,6 +226,217 @@ import Synchronization
     #if canImport(Darwin) || canImport(Glibc)
       _ = DarwinOrGlibcClose(fileDescriptor)
     #endif
+  }
+}
+
+// MARK: - Journey watchdog
+
+/// Ends the test process when a real-terminal journey stops making progress,
+/// so a wedged journey fails CI in about a minute instead of at the job's
+/// timeout (60–75 minutes on the example gates).
+///
+/// Every ``RealTerminalPTYPair`` arms one watchdog in `open` and disarms it
+/// when its master descriptor closes. Progress is any harness traffic on that
+/// pair: a wait starting or finishing, bytes read, bytes written. The journey
+/// counts as stalled once `stallBudget` elapses with no progress, measured
+/// from the later of the last activity and the deadline of the wait in flight;
+/// a wait may run to its own deadline, and only overshooting that deadline by
+/// the budget is a stall. Healthy journeys that run for minutes keep touching
+/// the harness every few seconds and are never affected.
+///
+/// Swift Testing's `.timeLimit` cannot stop a body that never reaches a
+/// suspension point: a blocked syscall, a spinning parser, a continuation
+/// nobody resumes. This watchdog ticks on a libdispatch queue, independent of
+/// the cooperative pool and of task cancellation, and terminates the process
+/// with `_exit(70)` after flushing stdio and naming the `open` site on stderr.
+/// Test output through a CI pipe is block-buffered, so that flush is what lets
+/// the wedged journey's `◇ Test … started` line reach the log at all.
+@_spi(Testing) public final class RealTerminalJourneyWatchdog: Sendable {
+  /// Exit status of a test process the watchdog terminated (`EX_SOFTWARE`).
+  @_spi(Testing) public static let stallExitCode: Int32 = 70
+
+  private struct State {
+    var armed = true
+    var lastActivity: DispatchTime
+    var waitDeadline: DispatchTime?
+  }
+
+  private enum Verdict {
+    case disarmed
+    case healthy
+    case stalled(silentNanoseconds: UInt64, waitOvershootNanoseconds: UInt64?)
+  }
+
+  private static let registry = Mutex<[Int32: RealTerminalJourneyWatchdog]>([:])
+
+  private let fileDescriptor: Int32
+  private let origin: String
+  private let budgetNanoseconds: UInt64
+  private let tickNanoseconds: UInt64
+  private let queue = DispatchQueue(label: "SwiftTUITestSupport.realTerminalJourneyWatchdog")
+  private let state: Mutex<State>
+
+  private init(fileDescriptor: Int32, stallBudget: Duration, origin: String) {
+    self.fileDescriptor = fileDescriptor
+    self.origin = origin
+    let budget = Self.nanoseconds(in: stallBudget)
+    budgetNanoseconds = budget
+    // Tick often enough that a sub-second budget (the harness tests use a few
+    // hundred milliseconds) fires promptly, without polling a 60-second budget
+    // more than once per second.
+    tickNanoseconds = min(1_000_000_000, max(50_000_000, budget / 4))
+    state = Mutex(State(lastActivity: .now()))
+    scheduleTick()
+  }
+
+  /// Arms a watchdog for `fileDescriptor`, replacing any earlier registration
+  /// for a descriptor number the kernel has since recycled.
+  fileprivate static func arm(
+    fileDescriptor: Int32,
+    stallBudget: Duration,
+    origin: String
+  ) -> RealTerminalJourneyWatchdog {
+    let watchdog = RealTerminalJourneyWatchdog(
+      fileDescriptor: fileDescriptor,
+      stallBudget: stallBudget,
+      origin: origin
+    )
+    registry.withLock { $0[fileDescriptor] = watchdog }
+    return watchdog
+  }
+
+  /// The armed watchdog for a PTY master descriptor, if any.
+  @_spi(Testing) public static func registered(
+    for fileDescriptor: Int32
+  ) -> RealTerminalJourneyWatchdog? {
+    registry.withLock { $0[fileDescriptor] }
+  }
+
+  @_spi(Testing) public var isArmed: Bool {
+    state.withLock { $0.armed }
+  }
+
+  /// Records harness traffic on the pair.
+  @_spi(Testing) public func noteActivity() {
+    state.withLock { $0.lastActivity = .now() }
+  }
+
+  /// Marks a bounded wait as in flight; it may run to `deadline` before the
+  /// stall budget starts counting.
+  @_spi(Testing) public func beginWait(deadline: DispatchTime) {
+    state.withLock { state in
+      state.lastActivity = .now()
+      state.waitDeadline = deadline
+    }
+  }
+
+  /// Marks the in-flight wait as finished.
+  @_spi(Testing) public func endWait() {
+    state.withLock { state in
+      state.lastActivity = .now()
+      state.waitDeadline = nil
+    }
+  }
+
+  /// Stops the watchdog; the pair calls this when its master descriptor closes.
+  fileprivate func disarm() {
+    state.withLock { $0.armed = false }
+    Self.registry.withLock { registry in
+      if registry[fileDescriptor] === self {
+        registry[fileDescriptor] = nil
+      }
+    }
+  }
+
+  private func scheduleTick() {
+    queue.asyncAfter(deadline: .now() + .nanoseconds(Int(tickNanoseconds))) { [weak self] in
+      self?.tick()
+    }
+  }
+
+  private func tick() {
+    let verdict: Verdict = state.withLock { state in
+      guard state.armed else {
+        return .disarmed
+      }
+      let now = DispatchTime.now().uptimeNanoseconds
+      let lastActivity = state.lastActivity.uptimeNanoseconds
+      let silent = now > lastActivity ? now - lastActivity : 0
+      var allowedUntil = lastActivity &+ budgetNanoseconds
+      var overshoot: UInt64?
+      if let waitDeadline = state.waitDeadline?.uptimeNanoseconds {
+        allowedUntil = max(allowedUntil, waitDeadline &+ budgetNanoseconds)
+        overshoot = now > waitDeadline ? now - waitDeadline : 0
+      }
+      guard now >= allowedUntil else {
+        return .healthy
+      }
+      return .stalled(silentNanoseconds: silent, waitOvershootNanoseconds: overshoot)
+    }
+    switch verdict {
+    case .disarmed:
+      return
+    case .healthy:
+      scheduleTick()
+    case .stalled(let silent, let overshoot):
+      terminateStalledProcess(silentNanoseconds: silent, waitOvershootNanoseconds: overshoot)
+    }
+  }
+
+  private func terminateStalledProcess(
+    silentNanoseconds: UInt64,
+    waitOvershootNanoseconds: UInt64?
+  ) -> Never {
+    var message =
+      "\nSwiftTUITestSupport: real-terminal journey watchdog fired — the PTY pair opened at "
+      + "\(origin) (master fd \(fileDescriptor)) has made no progress for "
+      + "\(Self.seconds(silentNanoseconds)) s (stall budget \(Self.seconds(budgetNanoseconds)) s"
+    if let overshoot = waitOvershootNanoseconds {
+      message += "; the wait in flight overshot its own deadline by \(Self.seconds(overshoot)) s"
+    }
+    message +=
+      "). Terminating the test process with exit code \(Self.stallExitCode) so CI fails now "
+      + "instead of at the job timeout. The wedged journey is the last '◇ Test … started' line "
+      + "without a result; its child process is left for the runner to reap.\n\n"
+    #if canImport(Darwin) || canImport(Glibc)
+      fflush(nil)
+      let bytes = Array(message.utf8)
+      var offset = 0
+      while offset < bytes.count {
+        let written = unsafe bytes.withUnsafeBytes { rawBuffer -> Int in
+          guard let baseAddress = rawBuffer.baseAddress else {
+            return -1
+          }
+          return unsafe write(
+            STDERR_FILENO,
+            baseAddress.advanced(by: offset),
+            bytes.count - offset
+          )
+        }
+        if written > 0 {
+          offset += written
+          continue
+        }
+        if written < 0, errno == EINTR {
+          continue
+        }
+        break
+      }
+    #endif
+    _exit(Self.stallExitCode)
+  }
+
+  private static func nanoseconds(in duration: Duration) -> UInt64 {
+    let (seconds, attoseconds) = duration.components
+    guard seconds >= 0 else {
+      return 0
+    }
+    return UInt64(seconds) * 1_000_000_000 + UInt64(max(0, attoseconds) / 1_000_000_000)
+  }
+
+  private static func seconds(_ nanoseconds: UInt64) -> String {
+    let tenths = nanoseconds / 100_000_000
+    return "\(tenths / 10).\(tenths % 10)"
   }
 }
 
@@ -263,6 +495,7 @@ import Synchronization
 ) throws {
   #if canImport(Darwin) || canImport(Glibc)
     var totalBytesWritten = 0
+    RealTerminalJourneyWatchdog.registered(for: fileDescriptor)?.noteActivity()
 
     try unsafe bytes.withUnsafeBytes { rawBuffer in
       guard let baseAddress = rawBuffer.baseAddress else {
@@ -584,6 +817,9 @@ import Synchronization
     fileDescriptor: fileDescriptor,
     deadline: deadline
   )
+  let watchdog = RealTerminalJourneyWatchdog.registered(for: fileDescriptor)
+  watchdog?.beginWait(deadline: deadline)
+  defer { watchdog?.endWait() }
   do {
     var rendered = screen.renderedText
     var transcript = PTYByteTranscript()
@@ -663,6 +899,7 @@ private func readAvailablePTYBytes(
   #if canImport(Darwin) || canImport(Glibc)
     var collected: [UInt8] = []
     var buffer = Array(repeating: UInt8(0), count: 4096)
+    let watchdog = RealTerminalJourneyWatchdog.registered(for: fileDescriptor)
 
     while collected.count < realTerminalDrainByteBudget {
       try Task.checkCancellation()
@@ -672,6 +909,7 @@ private func readAvailablePTYBytes(
       let bytesRead = unsafe read(fileDescriptor, &buffer, buffer.count)
 
       if bytesRead > 0 {
+        watchdog?.noteActivity()
         collected.append(contentsOf: buffer.prefix(Int(bytesRead)))
         continue
       }

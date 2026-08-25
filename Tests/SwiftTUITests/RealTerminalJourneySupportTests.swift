@@ -167,5 +167,69 @@ struct RealTerminalJourneySupportTests {
         Issue.record("expected CancellationError, got \(error)")
       }
     }
+
+    // MARK: Journey watchdog
+
+    @Test("journey watchdog ends a stalled test process with exit code 70 and names the open site")
+    func journeyWatchdogTerminatesStalledProcess() async {
+      let result = await #expect(
+        processExitsWith: .exitCode(RealTerminalJourneyWatchdog.stallExitCode),
+        observing: [\.standardErrorContent]
+      ) {
+        let pty = try RealTerminalPTYPair.open(
+          size: CellSize(width: 12, height: 3),
+          stallBudget: .milliseconds(300)
+        )
+        defer { pty.close() }
+        // A journey that never touches the harness again. Only the watchdog
+        // can end this process before the sleep does.
+        try await Task.sleep(for: .seconds(30))
+      }
+      let diagnostic = String(decoding: result?.standardErrorContent ?? [], as: UTF8.self)
+      #expect(diagnostic.contains("real-terminal journey watchdog fired"))
+      #expect(diagnostic.contains("RealTerminalJourneySupportTests.swift"))
+      #expect(diagnostic.contains("exit code 70"))
+    }
+
+    @Test("journey watchdog stays quiet while bounded waits keep making progress")
+    func journeyWatchdogToleratesProgress() async throws {
+      let pty = try RealTerminalPTYPair.open(
+        size: CellSize(width: 12, height: 3),
+        stallBudget: .milliseconds(300)
+      )
+      defer { pty.close() }
+      var screen = ANSIVisibleScreen(size: CellSize(width: 12, height: 3))
+      let clock = ContinuousClock()
+      let end = clock.now + .milliseconds(1_200)
+      // Each wait times out at its own deadline on the silent host; that is
+      // progress, so four budgets' worth of them must not fire the watchdog,
+      // which would end this process rather than fail this test.
+      while clock.now < end {
+        do {
+          _ = try await waitForANSIVisibleScreen(
+            on: pty.master,
+            screen: &screen,
+            deadline: .now() + .milliseconds(150)
+          ) { _ in false }
+          Issue.record("expected the silent host to time out")
+        } catch is RealTerminalJourneyError {}
+      }
+      #expect(RealTerminalJourneyWatchdog.registered(for: pty.master)?.isArmed == true)
+    }
+
+    @Test("closing the master disarms the journey watchdog")
+    func journeyWatchdogDisarmsWhenMasterCloses() async throws {
+      let pty = try RealTerminalPTYPair.open(
+        size: CellSize(width: 12, height: 3),
+        stallBudget: .milliseconds(200)
+      )
+      let watchdog = try #require(RealTerminalJourneyWatchdog.registered(for: pty.master))
+      #expect(watchdog.isArmed)
+      pty.closeMaster()
+      #expect(!watchdog.isArmed)
+      // Idle for four budgets after disarming: the process must survive.
+      try await Task.sleep(for: .milliseconds(800))
+      pty.close()
+    }
   #endif
 }
