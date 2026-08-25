@@ -92,7 +92,9 @@ struct FrameworkStressTests {
 
     var maxLifecycleRegistrations = harness.lifecycleRegistrationCount
 
-    for cycle in 1...6 {
+    // Hot-path budget (plan 2026-08-25-001 Stage 2b): 54.6 s at the full count
+    // on the amd64 gate; SWIFTTUI_STRESS_FULL=1 restores it on the nightly lanes.
+    for cycle in 1...stressIterations(full: 6, hotPath: 1) {
       let rootButtonPoint = try #require(harness.point(forText: "Increment Root"))
 
       var frame = try harness.clickText("Increment Root")
@@ -194,7 +196,9 @@ struct FrameworkStressTests {
     #expect(frame.contains("Alpha action view"))
     #expect(!frame.contains("Beta action view"))
 
-    for iteration in 1...12 {
+    // Hot-path budget (plan 2026-08-25-001 Stage 2b): 13.1 s at the full count
+    // on the amd64 gate; SWIFTTUI_STRESS_FULL=1 restores it on the nightly lanes.
+    for iteration in 1...stressIterations(full: 12, hotPath: 4) {
       frame = try harness.clickText("Increment Alpha")
       #expect(frame.contains("Totals alpha \(iteration) beta \(iteration - 1)"))
       #expect(frame.contains("Alpha action view"))
@@ -230,7 +234,9 @@ struct FrameworkStressTests {
     var sourceVersion = 0
     var maxLifecycleRegistrations = harness.lifecycleRegistrationCount
 
-    for iteration in 1...15 {
+    // Hot-path budget (plan 2026-08-25-001 Stage 2b): 12.0 s at the full count
+    // on the amd64 gate; SWIFTTUI_STRESS_FULL=1 restores it on the nightly lanes.
+    for iteration in 1...stressIterations(full: 15, hotPath: 5) {
       let surface = DeferredSourcePruningSurface(iteration: iteration)
       var frame = try harness.clickText(surface.openLabel)
       #expect(frame.contains(surface.bodyText))
@@ -273,7 +279,9 @@ struct FrameworkStressTests {
 
     var maxRestorationStackCount = harness.focusModalRestorationStackCount
 
-    for generation in 0..<20 {
+    // Hot-path budget (plan 2026-08-25-001 Stage 2b): 29.9 s at the full count
+    // on the amd64 gate; SWIFTTUI_STRESS_FULL=1 restores it on the nightly lanes.
+    for generation in 0..<stressIterations(full: 20, hotPath: 4) {
       _ = try harness.clickText("Base Focus \(generation)")
       var frame = try harness.clickText("Open Modal Owner")
       #expect(frame.contains("Modal body \(generation)"))

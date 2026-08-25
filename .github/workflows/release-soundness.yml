@@ -35,6 +35,9 @@ concurrency:
 
 env:
   SWIFTLY_VERSION: "1.1.3"
+  # Full stress churn-loop iteration counts (plan 2026-08-25-001 Stage 2b):
+  # the push gate runs the hot-path counts; this lane restores the full ones.
+  SWIFTTUI_STRESS_FULL: "1"
 
 jobs:
   changes:

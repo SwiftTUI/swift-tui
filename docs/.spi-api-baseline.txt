@@ -263,6 +263,8 @@ SwiftTUITestSupport.StageClock.waitForStage(atLeast:)
 SwiftTUITestSupport.closeTestDescriptor(_:)
 SwiftTUITestSupport.openTestPipe(_:nonblockingRead:)
 SwiftTUITestSupport.renderLinearAccessibilityOutput(_:)
+SwiftTUITestSupport.stressFullLaneRequested
+SwiftTUITestSupport.stressIterations(full:hotPath:)
 SwiftTUITestSupport.suspendUntilCancelled()
 SwiftTUITestSupport.testSleep(microseconds:)
 SwiftTUITestSupport.waitForANSIVisibleScreen(on:screen:deadline:condition:)

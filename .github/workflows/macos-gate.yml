@@ -114,6 +114,10 @@ jobs:
           SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
           SWIFTTUI_SKIP_PUBLIC_API_BASELINE: "1"
           SWIFTTUI_SKIP_TERMUIPERF: "1"
+          # The nightly/tag lane runs the stress churn loops at their full
+          # historical iteration counts (plan 2026-08-25-001 Stage 2b); the
+          # push gate runs the hot-path counts and the 20 s per-test ratchet.
+          SWIFTTUI_STRESS_FULL: "1"
         run: |
           set -euo pipefail
           sh ./Scripts/test_gate.sh --skip-bun-install

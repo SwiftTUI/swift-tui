@@ -850,7 +850,9 @@ extension FrameworkStressLayoutLifecycleTests {
     }
     defer { harness.shutdown() }
 
-    for _ in 1...6 {
+    // Hot-path budget (plan 2026-08-25-001 Stage 2b): 10.0 s at the full count
+    // on the amd64 gate; SWIFTTUI_STRESS_FULL=1 restores it on the nightly lanes.
+    for _ in 1...stressIterations(full: 6, hotPath: 3) {
       var frame = try harness.clickText("Open Sheet A")
       #expect(frame.contains("sheet A body"))
       frame = try harness.clickText("Open Sheet B", chooseLast: true)

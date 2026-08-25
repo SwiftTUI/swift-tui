@@ -216,6 +216,8 @@ Runs the exhaustive checked-in repo verification surface:
   - explicit layout work-stack guardrails
   - per-step watchdog self-test
   - serialized-execution check for the runtime lane (plus its self-test)
+  - per-test duration ratchet for the runtime shards (plus its self-test;
+    SWIFTTUI_STRESS_FULL=1 runs the full churn-loop counts and skips it)
   - frame-tail tree-walker recursion guardrails (plus their self-test)
   - public DocC catalog and website build guardrails
   - root Package.swift test-target coverage guardrails
@@ -921,6 +923,12 @@ if lane_runs_policy; then
     Scripts/check_serialized_execution.sh --self-test
 
   run_step \
+    "Self-test test-duration ratchet" \
+    "$repo_root" \
+    "Scripts/check_test_durations.sh --self-test" \
+    Scripts/check_test_durations.sh --self-test
+
+  run_step \
     "Run tree-walker recursion guardrails" \
     "$repo_root" \
     "Scripts/check_tree_walker_recursion.sh" \
@@ -1027,31 +1035,71 @@ if lane_runs_core; then
 fi
 
 # --- Runtime lane: the serialized SwiftTUITests surface --------------------
-if [ "$lane" = all ]; then
+# Two checks follow every runtime launch, against that launch's own log:
+#   * serialized execution — the launch claims `--no-parallel`; verify the
+#     claim rather than trusting the flag (two earlier serialization spellings
+#     were inert while their steps stayed green, KNOWN-TEST-FLAKES.md entry
+#     14). The check also fails when the log holds NO test-start events, which
+#     is what a shard whose manifest regex matches nothing looks like.
+#   * per-test durations — the hot-path budget (plan 2026-08-25-001 Stage 2b):
+#     every test <= 10 s target, > 20 s fails; churn loops read their counts
+#     from stressIterations(full:hotPath:). Under SWIFTTUI_STRESS_FULL=1 the
+#     full counts run by design, so the ratchet is skipped rather than made
+#     to fail the nightly lane it exists to complement.
+check_runtime_lane_log() {
+  launch_label=$1
+  runtime_lane_log=$log_root/step-$step_index.log
+
+  run_step \
+    "Check runtime lane executed serially$launch_label" \
+    "$repo_root" \
+    "Scripts/check_serialized_execution.sh <runtime-lane-log>" \
+    Scripts/check_serialized_execution.sh "$runtime_lane_log"
+
+  if [ "${SWIFTTUI_STRESS_FULL:-0}" = "1" ]; then
+    skip_step \
+      "Check runtime lane test durations$launch_label" \
+      "SWIFTTUI_STRESS_FULL=1 runs the full iteration counts"
+  else
+    run_step \
+      "Check runtime lane test durations$launch_label" \
+      "$repo_root" \
+      "Scripts/check_test_durations.sh <runtime-lane-log>" \
+      Scripts/check_test_durations.sh "$runtime_lane_log"
+  fi
+}
+
+# `all` runs the SAME shard launches CI runs, in the same order (Stage 2d),
+# so the local gate and the CI aggregator scan identically partitioned
+# traces against one ledger (Scripts/soundness_quarantine.txt). Measured
+# 2026-08-25: the three-shard `all` run reproduces the single-process
+# ledger to the unit (registration-publication 1199, teardown-coherence-leak
+# 499) — the counts are per-test, not per-process, so the partition does not
+# move them; keeping the shapes identical removes the question rather than
+# answering it every time. SWIFTTUI_RUNTIME_LANE_SHAPE=single restores the
+# historical one-process launch for diagnosis (reproducing an entry-14 stall
+# at its lane offset, bisecting a cross-suite interaction).
+if [ "$lane" = all ] && [ "${SWIFTTUI_RUNTIME_LANE_SHAPE:-shards}" = single ]; then
   run_function_step \
     "Run SwiftTUI runtime tests" \
     "$(swift_command_text test --filter SwiftTUITests --no-parallel --skip AsyncLifecycleGenerationTests --skip AsyncFrameTailRenderingTests --skip TaskReadsUnbodiedStateTests --skip PerTickPresentCadenceTests --skip ObservationDraftWindowRuntimeTests)" \
     run_swift_runtime_tests_without_isolated_async_suites --filter SwiftTUITests
+  check_runtime_lane_log ""
+elif [ "$lane" = all ]; then
+  for runtime_shard in $(manifest_shard_ids); do
+    run_function_step \
+      "Run SwiftTUI runtime tests (shard $runtime_shard)" \
+      "$(runtime_shard_command_text)" \
+      run_swift_runtime_shard_tests
+    check_runtime_lane_log " (shard $runtime_shard)"
+  done
+  runtime_shard=""
 elif [ "$lane" = runtime ]; then
   run_function_step \
     "Run SwiftTUI runtime tests (shard $runtime_shard)" \
     "$(runtime_shard_command_text)" \
     run_swift_runtime_shard_tests
-fi
-
-if lane_runs_runtime; then
-  # The lane above claims `--no-parallel`. Verify the claim against the lane's
-  # own log rather than trusting the flag: two earlier serialization spellings
-  # were inert while their steps stayed green (KNOWN-TEST-FLAKES.md entry 14).
-  # The check also fails when the log holds NO test-start events, which is
-  # what a shard whose manifest regex matches nothing looks like.
-  runtime_lane_log=$log_root/step-$step_index.log
-
-  run_step \
-    "Check runtime lane executed serially" \
-    "$repo_root" \
-    "Scripts/check_serialized_execution.sh <runtime-lane-log>" \
-    Scripts/check_serialized_execution.sh "$runtime_lane_log"
+  check_runtime_lane_log " (shard $runtime_shard)"
 fi
 
 if [ "$lane" = all ]; then

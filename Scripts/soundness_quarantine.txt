@@ -59,6 +59,16 @@
 # cross-check. Take a baseline only from a full `bun run test`
 # (it clears .build/soundness-trace first); a standalone scan reads whatever
 # ad-hoc `swift test` runs have accumulated there and reports inflated counts.
+# Re-measured 2026-08-25 on the sharded gate (plan 2026-08-25-001 Stages 1-2):
+# the runtime surface now runs as three serialized shard launches (A/B/C,
+# Scripts/data/runtime-shards.txt) both locally (`--lane all`) and in CI
+# (separate jobs whose traces the aggregator merges before ONE scan). A full
+# local `bun run test` on the sharded shape reports every row below
+# unchanged: registration-publication 1199 (shards 46 + 995 + 157, isolated
+# frame-tail 1), teardown-coherence-leak 499 (graph 325, shards 54 + 110 +
+# 10), action-dispatch-miss 1, handler-resolution-gesture 0. The counts are
+# per-test, not per-process; the partition does not move them. First CI
+# merged scan pending (Linux cross-check).
 registration-publication 2026-08-24 legacy-keyevent-removal count=1199 scoped-restore residual re-measured 1194 -> 1199 after the bare-KeyEvent strand deletion: five stress-fixture control registrations moved into the contributed key-press strand, whose per-owner restore the oracle can observe (the deleted flat-union restore overwrote across owners invisibly); confirmed on full macOS and Linux container gates
 teardown-coherence-leak 2026-08-14 runtime-lane-unmasked count=499 existing unreachable-node residual re-measured on a runtime lane completing all 3247 tests
 action-dispatch-miss 2026-08-14 runtime-lane-unmasked count=1 DormantIncrement-inner-B has no published handler; first observable once the lane completed
