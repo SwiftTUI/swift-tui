@@ -51,6 +51,15 @@ public struct Animation: Equatable, Hashable, Sendable {
     Animation(curve: .bezier(.init(c0x, c0y, c1x, c1y), duration))
   }
 
+  /// An animation that follows `curve` over `duration`; the ``UnitCurve``
+  /// form of ``timingCurve(_:_:_:_:duration:)``.
+  public static func timingCurve(
+    _ curve: UnitCurve,
+    duration: Duration = .milliseconds(200)
+  ) -> Animation {
+    Animation(curve: .bezier(curve.solver, duration))
+  }
+
   // MARK: - Springs
 
   public static func spring(
@@ -63,6 +72,12 @@ public struct Animation: Equatable, Hashable, Sendable {
           duration: durationSeconds(duration),
           bounce: bounce
         )))
+  }
+
+  /// An animation driven by a ``Spring`` value: the same curve
+  /// ``spring(duration:bounce:)`` builds from the spring's parameters.
+  public static func spring(_ spring: Spring) -> Animation {
+    Animation(curve: .spring(spring.solver))
   }
 
   public static var smooth: Animation { spring(bounce: 0.0) }

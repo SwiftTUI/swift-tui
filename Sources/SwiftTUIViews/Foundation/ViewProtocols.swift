@@ -30,8 +30,13 @@ extension Never: View {
   /// Primitive views use `Never` as their body type.
   public typealias Body = Never
 
-  public var body: Never {
-    fatalError("Never.body is unreachable.")
+  /// Nonisolated so the same unreachable witness also satisfies the
+  /// nonisolated `body` requirements of `Keyframes` and
+  /// `KeyframeTrackContent` (a `@MainActor` witness could not). The explicit
+  /// `return` keeps the inferred `@ViewBuilder` transform, whose build
+  /// methods are main-actor isolated, off this getter.
+  public nonisolated var body: Never {
+    return fatalError("Never.body is unreachable.")
   }
 }
 

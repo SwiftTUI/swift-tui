@@ -32,6 +32,28 @@ package struct BezierSolver: Sendable {
     return evaluateY(at: t)
   }
 
+  /// Returns the slope `dy/dx` of the progress curve at a time fraction —
+  /// the analytic velocity behind `UnitCurve.velocity(at:)`.
+  ///
+  /// Where the parametric tangent degenerates (both derivatives vanish at
+  /// an endpoint whose control point sits on the origin or the far corner,
+  /// as the linear curve's do) the slope falls back to a central finite
+  /// difference of ``progress(for:)`` so the result stays finite.
+  package func slope(at timeFraction: Double) -> Double {
+    let x = min(max(timeFraction, 0), 1)
+    let t = solveTForX(x)
+    let dx = derivativeX(at: t)
+    let dy = derivativeY(at: t)
+    if abs(dx) > 1e-9 {
+      return dy / dx
+    }
+    let h = 1e-4
+    let lo = max(x - h, 0)
+    let hi = min(x + h, 1)
+    guard hi > lo else { return 0 }
+    return (progress(for: hi) - progress(for: lo)) / (hi - lo)
+  }
+
   private func evaluateX(at t: Double) -> Double {
     let mt = 1.0 - t
     return 3.0 * mt * mt * t * c0x + 3.0 * mt * t * t * c1x + t * t * t
@@ -45,6 +67,11 @@ package struct BezierSolver: Sendable {
   private func derivativeX(at t: Double) -> Double {
     let mt = 1.0 - t
     return 3.0 * mt * mt * c0x + 6.0 * mt * t * (c1x - c0x) + 3.0 * t * t * (1.0 - c1x)
+  }
+
+  private func derivativeY(at t: Double) -> Double {
+    let mt = 1.0 - t
+    return 3.0 * mt * mt * c0y + 6.0 * mt * t * (c1y - c0y) + 3.0 * t * t * (1.0 - c1y)
   }
 
   private func solveTForX(_ x: Double) -> Double {
