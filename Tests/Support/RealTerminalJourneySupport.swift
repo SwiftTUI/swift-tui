@@ -292,7 +292,9 @@ import Synchronization
   }
 
   private struct SharedState: Sendable {
-    var sidecarProcessIdentifier: pid_t?
+    /// `pid_t` on Darwin and Glibc; spelled out so the type exists on Windows,
+    /// where no sidecar is ever spawned.
+    var sidecarProcessIdentifier: Int32?
     var heartbeatPath: String?
     var armed: [Int32: ArmedPair] = [:]
     var counter: UInt64 = 0
@@ -469,7 +471,9 @@ import Synchronization
     shared.lastWrite = now
     let budget = shared.armed.values.map(\.budgetMilliseconds).min() ?? 0
     let origins = shared.armed.values.map(\.origin).sorted().joined(separator: ",")
-    try writeFile("\(shared.armed.count):\(shared.counter):\(budget):\(origins)", to: path)
+    #if canImport(Darwin) || canImport(Glibc)
+      try writeFile("\(shared.armed.count):\(shared.counter):\(budget):\(origins)", to: path)
+    #endif
   }
 
   #if canImport(Darwin) || canImport(Glibc)
