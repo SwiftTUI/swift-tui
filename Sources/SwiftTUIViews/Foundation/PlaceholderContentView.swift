@@ -1,4 +1,4 @@
-public import SwiftTUICore
+import SwiftTUICore
 
 /// A stand-in for the view a closure-taking modifier was applied to.
 ///

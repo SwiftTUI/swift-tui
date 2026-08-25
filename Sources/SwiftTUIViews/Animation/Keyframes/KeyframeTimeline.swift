@@ -1,4 +1,4 @@
-public import SwiftTUICore
+import SwiftTUICore
 
 /// A keyframe-defined function of time, sampled at any instant.
 ///

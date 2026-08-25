@@ -1,4 +1,4 @@
-public import SwiftTUICore
+import SwiftTUICore
 
 extension View {
   /// Drives modifiers applied to this view with a value interpolated along

@@ -1,4 +1,4 @@
-public import SwiftTUICore
+import SwiftTUICore
 
 // MARK: - Public surface
 

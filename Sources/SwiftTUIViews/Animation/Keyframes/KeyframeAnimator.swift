@@ -1,4 +1,4 @@
-public import SwiftTUICore
+import SwiftTUICore
 
 /// A view that drives its content with a value interpolated along keyframes.
 ///
