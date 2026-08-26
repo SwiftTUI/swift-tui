@@ -1026,7 +1026,16 @@ package final class AnimationController: Sendable {
       path: String
     ) -> String? {
       if lhs.identity != rhs.identity {
-        return "\(path): identity prev=\(lhs.identity.path) current=\(rhs.identity.path)"
+        // Name the node shapes too: an identity divergence at one position is
+        // usually a wrapper level present on one evaluation path and absent on
+        // the other (plan 2026-08-25-003 P3), which the kinds and child counts
+        // show at a glance.
+        return
+          "\(path): identity prev=\(lhs.identity.path) current=\(rhs.identity.path) "
+          + "(prev \(lhs.kind) x\(lhs.children.count) children"
+          + "\(lhs.children.first.map { " first=\($0.kind)@\($0.identity.path)" } ?? ""); "
+          + "current \(rhs.kind) x\(rhs.children.count) children"
+          + "\(rhs.children.first.map { " first=\($0.kind)@\($0.identity.path)" } ?? ""))"
       }
       if lhs.viewNodeID != rhs.viewNodeID {
         let lhsStamp = lhs.viewNodeID.map { "\($0.rawValue)" } ?? "nil"
