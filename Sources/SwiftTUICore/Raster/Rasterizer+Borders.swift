@@ -82,10 +82,8 @@ extension Rasterizer {
           if paintsTopRow {
             writeStrokeGlyph(
               glyphs.top,
-              borderSet: resolvedSet,
               foregroundColorMode: foregroundColorMode,
               backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
-              fallbackBackgroundSides: [.top],
               environment: environment,
               bounds: shapeBounds,
               x: x,
@@ -101,10 +99,8 @@ extension Rasterizer {
           if maxY != minY, paintsBottomRow {
             writeStrokeGlyph(
               glyphs.bottom,
-              borderSet: resolvedSet,
               foregroundColorMode: foregroundColorMode,
               backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
-              fallbackBackgroundSides: [.bottom],
               environment: environment,
               bounds: shapeBounds,
               x: x,
@@ -129,10 +125,8 @@ extension Rasterizer {
           }
           writeStrokeGlyph(
             glyphs.left,
-            borderSet: resolvedSet,
             foregroundColorMode: foregroundColorMode,
             backgroundStyle: backgroundStyle?.backgroundStyle(for: .left),
-            fallbackBackgroundSides: [.left],
             environment: environment,
             bounds: shapeBounds,
             x: minX,
@@ -147,10 +141,8 @@ extension Rasterizer {
           if maxX != minX {
             writeStrokeGlyph(
               glyphs.right,
-              borderSet: resolvedSet,
               foregroundColorMode: foregroundColorMode,
               backgroundStyle: backgroundStyle?.backgroundStyle(for: .right),
-              fallbackBackgroundSides: [.right],
               environment: environment,
               bounds: shapeBounds,
               x: maxX,
@@ -168,10 +160,8 @@ extension Rasterizer {
 
       writeStrokeGlyph(
         glyphs.topLeading,
-        borderSet: resolvedSet,
         foregroundColorMode: foregroundColorMode,
         backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
-        fallbackBackgroundSides: [.top, .left],
         environment: environment,
         bounds: shapeBounds,
         x: minX,
@@ -186,10 +176,8 @@ extension Rasterizer {
       if maxX != minX {
         writeStrokeGlyph(
           glyphs.topTrailing,
-          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
-          fallbackBackgroundSides: [.top, .right],
           environment: environment,
           bounds: shapeBounds,
           x: maxX,
@@ -205,10 +193,8 @@ extension Rasterizer {
       if maxY != minY {
         writeStrokeGlyph(
           glyphs.bottomLeading,
-          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
-          fallbackBackgroundSides: [.bottom, .left],
           environment: environment,
           bounds: shapeBounds,
           x: minX,
@@ -224,10 +210,8 @@ extension Rasterizer {
       if maxX != minX, maxY != minY {
         writeStrokeGlyph(
           glyphs.bottomTrailing,
-          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
-          fallbackBackgroundSides: [.bottom, .right],
           environment: environment,
           bounds: shapeBounds,
           x: maxX,
@@ -286,10 +270,8 @@ extension Rasterizer {
       for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
         writeStrokeGlyph(
           glyphs.horizontal,
-          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: nil,
-          fallbackBackgroundSides: [],
           environment: environment,
           bounds: bounds,
           x: x,
@@ -311,10 +293,8 @@ extension Rasterizer {
         }
         writeStrokeGlyph(
           glyphs.vertical,
-          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: nil,
-          fallbackBackgroundSides: [],
           environment: environment,
           bounds: bounds,
           x: x,
@@ -332,10 +312,8 @@ extension Rasterizer {
 
   internal func writeStrokeGlyph(
     _ character: Character,
-    borderSet: BorderSet,
     foregroundColorMode: ResolvedShapeColorMode,
     backgroundStyle: AnyShapeStyle?,
-    fallbackBackgroundSides: [BorderSide],
     environment: StyleEnvironmentSnapshot,
     bounds: CellRect,
     x: Int,
@@ -355,14 +333,11 @@ extension Rasterizer {
         sampleY: y
       ),
       backgroundColor: resolvedStrokeBackgroundColor(
-        borderSet: borderSet,
         explicitBackgroundStyle: backgroundStyle,
-        fallbackSides: fallbackBackgroundSides,
         environment: environment,
         bounds: bounds,
         x: x,
-        y: y,
-        cells: cells
+        y: y
       )
     )
     write(
@@ -379,54 +354,40 @@ extension Rasterizer {
     )
   }
 
+  /// The background a stroke glyph carries, or `nil` to keep whatever the
+  /// cell already holds.
+  ///
+  /// A stroke never reads another cell. With no explicit per-side background
+  /// the glyph has no background of its own and `write` composites it over
+  /// the cell's current style (`ResolvedTextStyle.composited(over:)` keeps
+  /// the underlay's background), so a ring drawn over its own fill shows that
+  /// fill and a ring on bare surface stays bare. The built-in control chrome
+  /// insets its fill by the stroke width for exactly this reason: the ring
+  /// cells are left holding the surface the control sits on.
+  ///
+  /// The painter used to infer the background from the neighbouring cell
+  /// *outside* the ring. That let a highlighted row above a control, or a
+  /// later-painted control below it, bleed into the ring — and because the
+  /// read crossed rows it was a paint-order dependency the incremental raster
+  /// had to replay (SwiftTUI/swift-tui#5). Keeping the underlay needs no read
+  /// at all, and composes correctly under a blend mode, which feeding the
+  /// cell's own colour back in as an overlay would not.
   internal func resolvedStrokeBackgroundColor(
-    borderSet: BorderSet,
     explicitBackgroundStyle: AnyShapeStyle?,
-    fallbackSides: [BorderSide],
     environment: StyleEnvironmentSnapshot,
     bounds: CellRect,
     x: Int,
-    y: Int,
-    cells: [[RasterCell]]
+    y: Int
   ) -> Color? {
-    if let explicitBackgroundStyle {
-      return resolveColor(
-        from: explicitBackgroundStyle,
-        environment: environment,
-        bounds: bounds,
-        sampleX: x,
-        sampleY: y
-      )
+    guard let explicitBackgroundStyle else {
+      return nil
     }
-
-    // Inner half-block borders (used for presentation chrome) draw into the
-    // inset region of their owning container (popovers, toasts, menus), so
-    // their glyph cells should inherit the interior fill rather than the
-    // surrounding background.
-    if borderSet == .innerHalfBlock {
-      for side in fallbackSides {
-        if let inferred = sampledBackgroundColor(
-          inside: side,
-          fromX: x,
-          y: y,
-          cells: cells
-        ) {
-          return inferred
-        }
-      }
-    }
-
-    for side in fallbackSides {
-      if let inferred = sampledBackgroundColor(
-        outside: side,
-        fromX: x,
-        y: y,
-        cells: cells
-      ) {
-        return inferred
-      }
-    }
-
-    return nil
+    return resolveColor(
+      from: explicitBackgroundStyle,
+      environment: environment,
+      bounds: bounds,
+      sampleX: x,
+      sampleY: y
+    )
   }
 }

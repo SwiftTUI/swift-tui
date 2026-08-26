@@ -318,25 +318,24 @@ Three properties are important:
 - **Every changed rect carries a one-cell margin.** A terminal cell is not the
   smallest unit this renderer paints. Half-block glyphs give it sub-cell
   resolution. The cell that carries the half block sits *outside* the region
-  whose color it shows. A panel's border ring takes its background from the
-  interior it encloses. A control's focus fill shows through the boundary cell
-  of the adjacent row. A change confined to a node's bounds can therefore
+  whose color it shows. A change confined to a node's bounds can therefore
   repaint the cells immediately around them. The one-cell reach is an assumed
   painter invariant, not a static type rule. The F13 comparison oracle enforces
   this invariant. It rasters every incremental frame again in DEBUG and asserts
   on a difference. Thus, a painter that exceeds the margin fails the suites.
-- **The rasterizer closes the dirty set over rows a repainting edge reads.**
-  The margin dilates *changed* nodes. An unchanged rectangle stroke repaints
-  whenever its edge row is dirty, and with no explicit background its edge
-  cells infer their background from the neighbouring row outside the ring.
-  That read depends on paint order: a fresh raster sees what earlier commands
-  painted there, while a clean row on an incremental raster holds the previous
-  frame's final cells, including ink from commands that paint after the
-  stroke. `Rasterizer.strokeSamplingDamageClosure` therefore adds the sampled
-  rows to the dirty set (to a fixpoint, jointly with the presentation-order
-  closure) so both paths replay them in authored order. Without it, a border
-  directly above or below a later-painted control diverged
-  (SwiftTUI/swift-tui#5).
+- **No painter reads outside the row it writes.** Every painter writes cells
+  or reads the cell it is about to write: `write` composites a style over the
+  cell's current one, and `tintCell` and opacity baking read the same cell. A
+  stroke with no explicit background carries none and keeps whatever lies
+  beneath it. This is what makes the dirty-row premise hold. A dirty row is
+  cleared and replayed by the same commands in the same order as a fresh
+  raster, so a painter's inputs on that row are identical on both paths. The
+  stroke painter used to infer an edge's background from the neighbouring row
+  *outside* the ring. That read was a paint-order dependency: an unchanged
+  border above a later-painted control diverged (SwiftTUI/swift-tui#5), and
+  it needed a damage closure over the sampled rows. The read is gone. The one
+  closure left, `presentationOrderDamageClosure`, grows the dirty set over
+  rows the retained presentation-layer order needs re-recorded.
 - **Animation frames barrier.** Property interpolation rewrites the resolved
   tree after invalidation. The placed animation overlay decorates the current
   tree with state that the retained baseline does not carry.

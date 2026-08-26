@@ -327,31 +327,17 @@ package struct Rasterizer: Sendable {
         }
       }
     }
-    // Close the dirty set over rows the paint walk *reads* but the damage did
-    // not name: rows a repainting stroke edge samples for its inferred
-    // background (`strokeSamplingDamageClosure`) and rows the retained
-    // presentation-layer order needs re-recorded
-    // (`presentationOrderDamageClosure`). Either closure can hand the other a
-    // new row, so they run to a joint fixpoint; rows only grow and the surface
-    // bounds them.
-    var closedDirtyRows = dirtyRows
-    while true {
-      let rowCountBefore = closedDirtyRows.count
-      closedDirtyRows = strokeSamplingDamageClosure(
-        closedDirtyRows,
-        draw: draw,
-        surfaceHeight: surfaceSize.height
-      )
-      closedDirtyRows =
-        presentationOrderDamageClosure(
-          closedDirtyRows,
-          previousLayers: previousSurface.presentationLayers,
-          surfaceHeight: surfaceSize.height
-        ).dirtyRows
-      if closedDirtyRows.count == rowCountBefore {
-        break
-      }
-    }
+    // Close the dirty set over rows the retained presentation-layer order
+    // needs re-recorded (`presentationOrderDamageClosure`). It is the only
+    // closure: no painter reads a cell outside the row it writes (a stroke
+    // with no explicit background keeps the background beneath it through
+    // `write`'s compositing), so damage never has to grow to cover a
+    // painter's reads.
+    let closedDirtyRows = presentationOrderDamageClosure(
+      dirtyRows,
+      previousLayers: previousSurface.presentationLayers,
+      surfaceHeight: surfaceSize.height
+    ).dirtyRows
     let closureRows = closedDirtyRows.subtracting(dirtyRows)
     if !closureRows.isEmpty {
       dirtyRows = closedDirtyRows

@@ -57,8 +57,25 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   longer reports completion at a zero crossing it is still moving through
   (an underdamped bounce, or a spring released toward its target), so
   bouncy springs finish where they actually come to rest.
+- **Stroke borders keep the background beneath them.** A `stroke` or
+  `strokeBorder` with no explicit `background:` no longer infers each edge
+  cell's background from the neighbouring cell outside the ring. The glyph
+  carries no background of its own and composites over whatever the cell
+  already holds. A ring drawn over an un-inset fill now shows that fill
+  (inset the fill by the stroke width, as the built-in control chrome does,
+  to leave the ring on the surrounding surface), and a ring on bare surface
+  stays bare. Explicit `BorderBackgroundStyle`s are unchanged. With no
+  cross-cell read left in the rasterizer,
+  `Rasterizer.strokeSamplingDamageClosure` (0.9.9) is removed.
 
 ### Fixed
+
+- A highlighted or filled neighbour no longer bleeds into a control's border.
+  A selected list row directly above a `TextField`, or a focused `Toggle` row
+  above one, painted its background across the field's top edge because the
+  edge sampled the row above it; a later-painted control below a ring did the
+  same to the bottom edge. Same mechanism as swift-tui#5, now removed rather
+  than replayed.
 
 - Exit-transition `.removed` completions fire on the controller's own turn. Once the overlay had faded out, every following deadline frame was elided, and an elided frame runs no placed pass, so the purge that releases `.removed` waited for the next outside input. The purge now runs at the head tick after the one-turn hold (`AnimationController.applyInterpolations`).
 

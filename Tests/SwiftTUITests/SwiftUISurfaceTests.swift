@@ -1769,9 +1769,12 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.cells[1][2].style == nil)
   }
 
-  @Test("stroke borders sample the surrounding background instead of leaking the fill")
+  @Test("stroke borders keep the background beneath them")
   @MainActor
-  func strokeBordersUseSurroundingBackgroundOutsideTheFill() {
+  func strokeBordersKeepTheBackgroundBeneathThem() {
+    // The fill covers the whole footprint, ring cells included, so the ring
+    // shows the fill; the padding around it shows the green surface. Nothing
+    // is inferred from the cells outside the ring.
     let artifacts = DefaultRenderer().render(
       RoundedRectangle(cornerRadius: 1)
         .fill(Color.blue)
@@ -1784,13 +1787,75 @@ struct SwiftUISurfaceTests {
         .background {
           Rectangle().fill(Color.green)
         },
-      context: .init(identity: testIdentity("BorderBackgroundSampling"))
+      context: .init(identity: testIdentity("BorderBackgroundBeneath"))
+    )
+
+    #expect(artifacts.rasterSurface.lines == ["      ", " ╭──╮ ", " │  │ ", " ╰──╯ ", "      "])
+    #expect(artifacts.rasterSurface.cells[1][2].style?.backgroundColor == Color.blue)
+    #expect(artifacts.rasterSurface.cells[2][1].style?.backgroundColor == Color.blue)
+    #expect(artifacts.rasterSurface.cells[2][2].style?.backgroundColor == Color.blue)
+    #expect(artifacts.rasterSurface.cells[0][2].style?.backgroundColor == Color.green)
+    #expect(artifacts.rasterSurface.cells[2][0].style?.backgroundColor == Color.green)
+  }
+
+  @Test("an inset fill leaves the stroke border on the surrounding surface")
+  @MainActor
+  func insetFillLeavesStrokeBorderOnSurroundingSurface() {
+    // The built-in control chrome shape: the fill is inset by the stroke
+    // width, so the ring cells hold the surface the control sits on.
+    let artifacts = DefaultRenderer().render(
+      RoundedRectangle(cornerRadius: 1)
+        .inset(by: 1)
+        .fill(Color.blue)
+        .frame(width: 4, height: 3, alignment: .topLeading)
+        .overlay {
+          RoundedRectangle(cornerRadius: 1)
+            .strokeBorder(Color.white, style: .rounded)
+        }
+        .padding(1)
+        .background {
+          Rectangle().fill(Color.green)
+        },
+      context: .init(identity: testIdentity("BorderBackgroundInsetFill"))
     )
 
     #expect(artifacts.rasterSurface.lines == ["      ", " ╭──╮ ", " │  │ ", " ╰──╯ ", "      "])
     #expect(artifacts.rasterSurface.cells[1][2].style?.backgroundColor == Color.green)
     #expect(artifacts.rasterSurface.cells[2][1].style?.backgroundColor == Color.green)
     #expect(artifacts.rasterSurface.cells[2][2].style?.backgroundColor == Color.blue)
+  }
+
+  @Test("a highlighted neighbour never bleeds into a stroke border")
+  @MainActor
+  func highlightedNeighbourNeverBleedsIntoStrokeBorder() {
+    // The reported shape: a selected row directly above a text field. The
+    // field's top edge used to take the row's highlight as its background.
+    let artifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("row")
+          .frame(width: 6, alignment: .leading)
+          .background {
+            Rectangle().fill(Color.magenta)
+          }
+        RoundedRectangle(cornerRadius: 1)
+          .inset(by: 1)
+          .fill(Color.blue)
+          .frame(width: 4, height: 3, alignment: .topLeading)
+          .overlay {
+            RoundedRectangle(cornerRadius: 1)
+              .strokeBorder(Color.white, style: .rounded)
+          }
+      },
+      context: .init(identity: testIdentity("BorderNeighbourHighlight"))
+    )
+
+    #expect(artifacts.rasterSurface.lines == ["row   ", "╭──╮", "│  │", "╰──╯"])
+    #expect(artifacts.rasterSurface.cells[0][0].style?.backgroundColor == Color.magenta)
+    #expect(artifacts.rasterSurface.cells[0][5].style?.backgroundColor == Color.magenta)
+    for x in 0..<4 {
+      #expect(artifacts.rasterSurface.cells[1][x].style?.backgroundColor == nil)
+    }
+    #expect(artifacts.rasterSurface.cells[2][1].style?.backgroundColor == Color.blue)
   }
 
   @Test("terminal appearance derives semantic foreground and background roles")
