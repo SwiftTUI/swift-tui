@@ -10,6 +10,18 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- **`ContentTransition`.** `View.contentTransition(_:)` (and
+  `EnvironmentValues.contentTransition`) tells the `Text` views beneath it how
+  to change when their string changes inside an animated transaction:
+  `.numericText(countsDown:)` and `.numericText(value:)` roll each changed
+  digit column through the intermediate digits like a counter, dimming it at
+  the midpoint, and cross-fade any other changed column; `.opacity` dims the
+  old string out and the new string in; `.identity` (the default) cuts. The
+  roll is a draw-time substitution on the new string's layout — a length
+  change lays out at the new width at once and fades the added columns in —
+  so it never re-wraps, a retarget continues from the digit on screen, and
+  reduce motion or an unanimated write cuts. SwiftUI's `.interpolate` has no
+  cell-grid reading and is not offered (register entry).
 - **Co-present matched geometry.** An `isSource: false` instance that shares
   a key with a source on the same screen is now rendered at the source's
   frame every frame — per its own `properties:` and `anchor:`, without an

@@ -81,6 +81,17 @@ package struct AnimatableSnapshot: Sendable {
       }
     }
 
+    // A `Text` that resolved with a content transition: the at-rest roll
+    // value carries the string so a string change starts a roll. Nodes
+    // without the stamp (the default `.identity`) have no slot and cut.
+    if case .text(let content) = node.drawPayload,
+      let transition = node.drawMetadata.contentTransition
+    {
+      snapshot[.textRoll] = AnyAnimatable(
+        TextRollValue(text: content, transition: transition)
+      )
+    }
+
     // Layout-derived slots.
     switch node.layoutBehavior {
     case .padding(let insets):

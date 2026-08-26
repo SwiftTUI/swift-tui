@@ -47,6 +47,8 @@ package enum AnimatableSlot: Hashable, Sendable {
   case frameHeight
   case shapeFillStyle
   case shapeStrokeStyle
+  /// A `Text` node's content-transition roll (`TextRollValue`).
+  case textRoll
 }
 
 /// Keyed identifier for a single active animation.  Carries the view

@@ -624,6 +624,25 @@ are omitted even when SwiftUI exposes a corresponding API.
   the built-in `AnyTransition` opacity, move, offset, combined, and asymmetric
   effects. It does not accept an arbitrary view body and then silently discard
   unsupported modifiers. A built-in `.scale` transition remains a *Gap*.
+- **Content transitions roll per digit column; `.interpolate` is not
+  offered.** *Ratified.* `View.contentTransition(_:)` and
+  `EnvironmentValues.contentTransition` carry a `ContentTransition` to every
+  `Text` beneath them (`Label` and `Button` titles included). When a
+  plain-string `Text` changes inside an animated transaction,
+  `.numericText(countsDown:)` steps each changed ASCII-digit column through
+  the intermediate digits toward its target over the curve and dims the
+  column at the midpoint; `.numericText(value:)` takes the direction from the
+  sign of the change; any other changed column cross-fades (same-width ASCII
+  glyphs old-then-new, anything else fades the new glyph in); a length change
+  lays out at the new width at once and the added columns fade in, the
+  remaining columns paired right-aligned so the units column stays put.
+  `.opacity` dims the whole old string out to the midpoint and the new string
+  in. The roll is a draw-time substitution on the new string's layout — every
+  drawn column is the new string's character or a same-width substitute — so
+  it never re-wraps or re-measures, and a retarget mid-roll continues from the
+  digit on screen. An unanimated write, reduce motion, `.identity`, and rich
+  `Text` content cut. SwiftUI's `.interpolate` (font and colour interpolation)
+  has no cell-grid reading and is not offered.
 - **Matched size interpolates by bounds and clip, not re-layout; tag outside
   the chrome.** *Ratified.* `matchedGeometryEffect(id:in:properties:anchor:isSource:)`
   interpolates the rect in anchor space; a size change is applied at the

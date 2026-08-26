@@ -322,6 +322,19 @@ package enum AnimationPropertyValueApplication {
           )
         )
       )
+
+    case .textRoll:
+      // The roll only decorates a node whose payload is the string it rolls
+      // toward; a payload that moved on under an unanimated write keeps its
+      // plain draw. The sampled end value (phase 1) clears the decoration.
+      guard let roll = value.unwrap(as: TextRollValue.self),
+        case .text(let content) = node.drawPayload
+      else {
+        return
+      }
+      var drawMetadata = node.drawMetadata
+      drawMetadata.textRoll = roll.isRolling && roll.text == content ? roll : nil
+      node.drawMetadata = drawMetadata
     }
   }
 

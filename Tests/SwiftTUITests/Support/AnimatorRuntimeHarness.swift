@@ -65,6 +65,10 @@ final class AnimatorRuntimeHarness<Content: View> {
 
   var frame: String { terminal.frames.last ?? "" }
 
+  /// Every presented raster surface, oldest first, for per-cell assertions
+  /// (glyphs and resolved colours) that the rendered string cannot carry.
+  var surfaces: [RasterSurface] { terminal.surfaces }
+
   /// Every rendered frame's diagnostic record, oldest first.
   var frameRecords: [FrameDiagnosticRecord] { frameSink.records }
 
@@ -137,7 +141,16 @@ final class AnimatorRuntimeHarness<Content: View> {
   /// The wait is signal-driven (the scheduler's wake); the Support deadline
   /// event is only the failure bound, and the signal resumes on cancellation.
   private func awaitPendingFrame(within limit: Duration) async {
-    let deadline = AsyncEvent.firing(after: limit)
+    let now = MonotonicInstant.now()
+    guard !scheduler.hasPendingFrame(at: now) else { return }
+    // A controller-driven animation tick arms a scheduler deadline rather
+    // than a wake cause, so the wake signal never fires for it; bound the
+    // wait by the next armed instant, as the run loop's own driver does.
+    var bound = limit
+    if let nextWake = scheduler.nextWakeInstant(after: now) {
+      bound = min(bound, max(now.duration(to: nextWake), .zero))
+    }
+    let deadline = AsyncEvent.firing(after: bound)
     let waiter = AnimatorFrameSignalWaiter(wake: schedulerWake, scheduler: scheduler)
     await withTaskGroup(of: Void.self) { group in
       group.addTask { await waiter.awaitPendingFrame() }
@@ -180,6 +193,7 @@ final class AnimatorRecordingHost: PresentationSurface {
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private(set) var frames: [String] = []
+  private(set) var surfaces: [RasterSurface] = []
 
   init(surfaceSize: CellSize) {
     self.surfaceSize = surfaceSize
@@ -194,6 +208,7 @@ final class AnimatorRecordingHost: PresentationSurface {
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     let rendered = TerminalSurfaceRenderer(capabilityProfile: capabilityProfile).render(surface)
     frames.append(rendered.replacingOccurrences(of: "\r\n", with: "\n"))
+    surfaces.append(surface)
     return .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
   }
 

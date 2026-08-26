@@ -8,7 +8,8 @@ and keep every animation meaningful under reduce motion.
 SwiftTUI animates the way SwiftUI does: change state inside an animation
 scope, and the framework interpolates every affected view from its old value
 to its new one over time. Colors, offsets, positions, frame sizes, opacity,
-and gradients all animate. Two terminal realities shape the result:
+and gradients all animate, and a `Text` can roll its digits when its string
+changes. Two terminal realities shape the result:
 
 - The drawing unit is a character cell. Animated values interpolate
   continuously, but each drawn frame snaps to whole cells, so a short
@@ -151,6 +152,50 @@ behavior, ``AnyTransition/asymmetric(insertion:removal:)``. The built-in
 surface is intentionally opacity- and offset-based — scaling glyphs has no
 meaning on a cell grid. While a removal transition plays, the departing view
 is display-only: it no longer participates in layout, focus, or input.
+
+## Roll A Number When It Changes
+
+``View/contentTransition(_:)`` describes how a ``Text`` changes when its
+string changes inside an animation scope.
+``ContentTransition/numericText(countsDown:)`` rolls each changed digit
+column through the intermediate digits, like a counter:
+
+```swift
+struct Odometer: View {
+  @State private var count = 41
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("\(count)")
+        .contentTransition(.numericText())
+      Button("Add ten") {
+        withAnimation(.easeInOut(duration: .milliseconds(800))) {
+          count += 10
+        }
+      }
+    }
+  }
+}
+```
+
+Pressing the button rolls the tens column `4 → 5` over the animation's
+curve, dimming it at the midpoint, and leaves the units column untouched. A
+digit that has further to go passes through every digit on the way
+(`7 → 8 → 9 → 0`); ``ContentTransition/numericText(countsDown:)`` with
+`countsDown: true` rolls the other way, and
+``ContentTransition/numericText(value:)`` picks the direction from the sign
+of the change in `value`. When the string changes length (`99 → 109`) the
+text lays out at its new width at once and the added column fades in while
+the shared columns roll. Columns that are not digits cross-fade, and
+``ContentTransition/opacity`` cross-fades the whole string.
+
+The roll is a drawing-time substitution on the new string's layout: the text
+is measured once, at its new value, so a rolling number never re-wraps its
+neighbours. Like a transition, it plays only inside an animation scope — an
+unanimated write cuts to the new string, and so does
+``ContentTransition/identity`` (the default). The modifier writes the
+environment, so setting it on a container reaches every `Text` inside,
+including `Label` and `Button` titles.
 
 ## Run Code When An Animation Finishes
 
@@ -479,6 +524,7 @@ reference. Every built-in animation then renders in static form:
 
 - Animated state changes apply instantly at their final value, and
   `withAnimation` completions still fire.
+- ``View/contentTransition(_:)`` cuts to the new string instead of rolling.
 - ``PhaseAnimator`` rests at its first phase instead of cycling.
 - ``TimelineView`` schedules run at a low cadence — the `.animation`
   schedule drops to about four updates per second, and periodic schedules

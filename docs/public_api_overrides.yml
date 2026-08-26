@@ -275,6 +275,7 @@ classifications:
     - SwiftTUIViews.AnimationEnvironmentSnapshot
     - SwiftTUIViews.AnimationState
     - SwiftTUIViews.AnyTransition
+    - SwiftTUIViews.ContentTransition
     - SwiftTUIViews.Transaction
     - SwiftTUIViews.TransactionKey
     - "SwiftTUIViews.withAnimation(_:_:)"

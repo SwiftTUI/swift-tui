@@ -126,6 +126,13 @@ public struct Text: PrimitiveView, ResolvableView {
     if stampedDrawMetadata.strikethroughStyle == nil, !strikethroughExplicitlyCleared {
       stampedDrawMetadata.strikethroughStyle = decorations.strikethrough
     }
+    // A plain string with a non-identity content transition records it on
+    // the node: the animation controller reads the stamp to start a roll,
+    // and the frame tail cannot read the environment. Rich content keeps
+    // its per-run styling and cuts.
+    if case .plain = storage, let contentTransition = ambientContentTransition(in: context) {
+      stampedDrawMetadata.contentTransition = contentTransition
+    }
     let node = ResolvedNode(
       identity: context.identity,
       kind: .view("Text"),

@@ -149,6 +149,15 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
       )
     }
 
+    // A text roll carries two strings and a phase; its `animatableData` is
+    // the phase alone, so the generic path would drop the string it rolls
+    // from. Route through the value's own roll so the sample keeps both.
+    if let selfRoll = value as? TextRollValue,
+      let otherRoll = other.value as? TextRollValue
+    {
+      return AnyAnimatable(selfRoll.rolling(to: otherRoll, progress: t))
+    }
+
     // Gradients are variant in stop count: interpolating between differing
     // stop counts collapses the stops-array subtraction to empty, and the
     // ``Gradient`` setter then silently drops it (its own count guard), which
@@ -180,7 +189,9 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
     else {
       return nil
     }
-    if value is TileStyle || animatableStructureDiffers(axisFrom.value, axisTo.value) {
+    if value is TileStyle || value is TextRollValue
+      || animatableStructureDiffers(axisFrom.value, axisTo.value)
+    {
       return nil
     }
     let delta = deltaTo.value.animatableData - value.animatableData

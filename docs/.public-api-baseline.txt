@@ -3298,6 +3298,11 @@ SwiftTUIViews.ConditionalContent.Storage.falseContent(_:)
 SwiftTUIViews.ConditionalContent.Storage.trueContent(_:)
 SwiftTUIViews.ConditionalContent.body
 SwiftTUIViews.ContentShapeModifier
+SwiftTUIViews.ContentTransition
+SwiftTUIViews.ContentTransition.identity
+SwiftTUIViews.ContentTransition.numericText(countsDown:)
+SwiftTUIViews.ContentTransition.numericText(value:)
+SwiftTUIViews.ContentTransition.opacity
 SwiftTUIViews.ControlGroup
 SwiftTUIViews.ControlGroup.init(_:content:)
 SwiftTUIViews.ControlGroup.init(content:)
@@ -3391,6 +3396,7 @@ SwiftTUIViews.EnvironmentValues.buttonBorderShape
 SwiftTUIViews.EnvironmentValues.cellPixelMetrics
 SwiftTUIViews.EnvironmentValues.clipboardWriteAction
 SwiftTUIViews.EnvironmentValues.colorSchemeContrast
+SwiftTUIViews.EnvironmentValues.contentTransition
 SwiftTUIViews.EnvironmentValues.controlProminence
 SwiftTUIViews.EnvironmentValues.foregroundStyle
 SwiftTUIViews.EnvironmentValues.imageResourceRoots
@@ -4563,6 +4569,7 @@ SwiftTUIViews.View.confirmationDialog(_:item:onDismiss:)
 SwiftTUIViews.View.confirmationDialog(_:item:onDismiss:actions:message:)
 SwiftTUIViews.View.contentShape(_:)
 SwiftTUIViews.View.contentShape(_:)
+SwiftTUIViews.View.contentTransition(_:)
 SwiftTUIViews.View.controlProminence(_:)
 SwiftTUIViews.View.coordinateSpace(_:)
 SwiftTUIViews.View.defaultFocus(_:_:)

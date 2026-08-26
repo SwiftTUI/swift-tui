@@ -57,6 +57,12 @@ package struct DrawMetadata: Equatable, Sendable {
     var focusedScrollIndicatorAxes: AxisSet?
     var scrollIndicatorForegroundStyle: AnyShapeStyle?
     var listStyle: ListStyleMetadata?
+    /// The content transition a `Text` node resolved with, or `nil` for
+    /// `.identity`. Stamped at resolve; read by the animation controller.
+    var contentTransition: TextContentTransition? = nil
+    /// The roll the animation controller applied for this frame, or `nil`
+    /// when the text is at rest. Never set by resolve.
+    var textRoll: TextRollValue? = nil
 
     init(
       foregroundStyle: AnyShapeStyle? = nil,
@@ -98,6 +104,8 @@ package struct DrawMetadata: Equatable, Sendable {
         other.focusedScrollIndicatorAxes ?? focusedScrollIndicatorAxes
       merged.scrollIndicatorForegroundStyle =
         other.scrollIndicatorForegroundStyle ?? scrollIndicatorForegroundStyle
+      merged.contentTransition = other.contentTransition ?? contentTransition
+      merged.textRoll = other.textRoll ?? textRoll
       merged.listStyle =
         switch (listStyle, other.listStyle) {
         case (let lhs?, let rhs?):
@@ -319,5 +327,15 @@ package struct DrawMetadata: Equatable, Sendable {
   package var listStyle: ListStyleMetadata? {
     get { heavyFields.value.listStyle }
     set { heavyFields.value.listStyle = newValue }
+  }
+
+  package var contentTransition: TextContentTransition? {
+    get { heavyFields.value.contentTransition }
+    set { heavyFields.value.contentTransition = newValue }
+  }
+
+  package var textRoll: TextRollValue? {
+    get { heavyFields.value.textRoll }
+    set { heavyFields.value.textRoll = newValue }
   }
 }

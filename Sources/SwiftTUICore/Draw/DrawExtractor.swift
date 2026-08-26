@@ -243,16 +243,34 @@ extension DrawExtractor {
     case .none:
       break
     case .text(let content):
-      commands.append(
-        .text(
-          bounds: bounds,
-          content: content,
-          style: textStyle(from: drawMetadata, effectiveOpacity: effectiveOpacity),
-          lineLimit: layoutMetadata.lineLimit,
-          truncationMode: layoutMetadata.textTruncationMode ?? .tail,
-          wrappingStrategy: layoutMetadata.textWrappingStrategy ?? .wordBoundary
+      if let roll = drawMetadata.textRoll, roll.isRolling, roll.text == content {
+        // A content-transition roll in flight: the intermediate glyphs of
+        // each column, per-column dimmed, as rich-text runs in the node's
+        // own style. Same cells, same layout as the plain string.
+        commands.append(
+          .richText(
+            bounds: bounds,
+            payload: TextRollRendering.payload(
+              for: roll,
+              style: textStyle(from: drawMetadata, effectiveOpacity: effectiveOpacity)
+            ),
+            lineLimit: layoutMetadata.lineLimit,
+            truncationMode: layoutMetadata.textTruncationMode ?? .tail,
+            wrappingStrategy: layoutMetadata.textWrappingStrategy ?? .wordBoundary
+          )
         )
-      )
+      } else {
+        commands.append(
+          .text(
+            bounds: bounds,
+            content: content,
+            style: textStyle(from: drawMetadata, effectiveOpacity: effectiveOpacity),
+            lineLimit: layoutMetadata.lineLimit,
+            truncationMode: layoutMetadata.textTruncationMode ?? .tail,
+            wrappingStrategy: layoutMetadata.textWrappingStrategy ?? .wordBoundary
+          )
+        )
+      }
     case .textFigure(let payload):
       let renderedFigure = TextFigureSupport.render(
         payload,
