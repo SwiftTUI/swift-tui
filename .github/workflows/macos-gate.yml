@@ -48,7 +48,14 @@ jobs:
     runs-on: macos-26
     needs: changes
     if: needs.changes.outputs.changed == 'true'
-    timeout-minutes: 30
+    # The unsharded gate does not fit in 30 minutes on a macOS runner. Three of
+    # the five runs to 2026-08-26 were "cancelled" at 30m20s-30m24s — the cap,
+    # reported as a cancellation — and the two that failed did so at 26-28 min
+    # only because a failing lane ended the step early. With that failure fixed
+    # the gate runs further and hits the cap every time, so a green verdict was
+    # unreachable. Linux gets ~18 minutes by sharding across three runners;
+    # this lane runs the whole thing in one job.
+    timeout-minutes: 75
 
     steps:
       - name: Checkout
