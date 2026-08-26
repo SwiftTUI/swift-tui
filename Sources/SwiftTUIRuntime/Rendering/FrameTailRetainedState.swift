@@ -89,25 +89,34 @@ final class FrameTailRetainedState: Sendable {
   ///
   /// When no overlays were injected this frame, pass the same
   /// `placedTree` as baseline — the two are identical.
+  ///
+  /// `overlayHasTransientDecoration` is the tail's own flag; direct callers
+  /// (tests) may omit it, in which case the effective tree differing from the
+  /// baseline stands in for a transient decoration, the pre-adoption proxy.
   func storeCommittedFrame(
     _ artifacts: FrameArtifacts,
     baselinePlacedTree: PlacedNode,
+    overlayHasTransientDecoration: Bool? = nil,
     proposal: ProposedSize
   ) {
     var indexable = artifacts
     indexable.placedTree = baselinePlacedTree
-    // Phase products are reusable next frame only when this frame's committed
-    // (effective) tree equals the pre-overlay baseline — i.e. no animation
-    // overlay decorated the tree. Comparing the trees directly is the
-    // overlay-empty proxy: it allocates nothing and short-circuits on the first
-    // difference, replacing the previous *two* full `RetainedPhaseExtractionSignature`
-    // builds (one per tree) and their compare with a single comparison plus, only
-    // when reusable, one build. The stored signature is OPTIONAL: a tree with an
-    // unsupported node (`.canvas`/custom layout) yields `nil`, which previously
-    // discarded the products entirely — disabling reuse tree-wide. Keeping the
-    // products with a `nil` signature disables only the whole-tree fast path; the
-    // per-subtree partial-reuse path still reuses every supported subtree.
-    let effectiveMatchesBaseline = artifacts.placedTree == baselinePlacedTree
+    // Phase products are reusable next frame only when no animation *sample*
+    // decorated this frame's committed (effective) tree: an exit overlay or a
+    // live insertion/matched offset is a one-frame decoration the next frame
+    // does not repeat. Co-present matched-geometry adoption is the exception
+    // — it decorates every frame with the same layout identically — so the
+    // gate keys on the tail's transient flag rather than on the effective
+    // tree byte-matching the pre-overlay baseline (the previous proxy, which
+    // adoption would fail every frame). The stored signature is OPTIONAL: a
+    // tree with an unsupported node (`.canvas`/custom layout) yields `nil`,
+    // which previously discarded the products entirely — disabling reuse
+    // tree-wide. Keeping the products with a `nil` signature disables only the
+    // whole-tree fast path; the per-subtree partial-reuse path still reuses
+    // every supported subtree.
+    let hasTransientDecoration =
+      overlayHasTransientDecoration ?? (artifacts.placedTree != baselinePlacedTree)
+    let effectiveMatchesBaseline = !hasTransientDecoration
     state.withLock { state in
       state.previousFrameIndex = .init(
         patching: state.previousFrameIndex,

@@ -2,13 +2,16 @@
 package import SwiftTUIViews
 
 package enum PlacedAnimationOverlaySampling {
+  /// - Parameter adoption: the tree's co-present pairs, when the caller's
+  ///   capture already walked the tree; `nil` walks it here.
   package static func sample(
     removingNodes: [ViewNodeID: RemovalEntry],
     activeAnimations: [AnimationKey: ActiveAnimation],
     registeredAnimations: [AnimationBox: Animation],
     tree: PlacedNode,
     timestamp: MonotonicInstant,
-    surfaceSize: CellSize?
+    surfaceSize: CellSize?,
+    adoption: [MatchedGeometryAdoptionPair]? = nil
   ) -> PlacedAnimationOverlaySamplingResult {
     let effectiveSurfaceSize = surfaceSize ?? tree.bounds.size
     let removalResult = sampleRemovalOverlays(
@@ -36,17 +39,52 @@ package enum PlacedAnimationOverlaySampling {
       activeCustomStates[key] = state
     }
 
+    // Adoption follows a source that is itself in flight: a source with a
+    // live matched or insertion offset is drawn away from its baseline rect
+    // this frame, and its adoptee should sit on the drawn rect.
+    let adoptionOffsets = sampleAdoption(
+      tree: tree,
+      pairs: adoption,
+      liveOffsets: insertionResult.offsets + matchedResult.offsets
+    )
+
     return PlacedAnimationOverlaySamplingResult(
       snapshot: PlacedAnimationOverlaySnapshot(
         removalOverlays: removalResult.overlays,
         insertionOffsets: insertionResult.offsets,
-        matchedGeometryOffsets: matchedResult.offsets
+        matchedGeometryOffsets: matchedResult.offsets,
+        adoptionOffsets: adoptionOffsets
       ),
       removalCustomStates: removalResult.customStates,
       activeAnimationCustomStates: activeCustomStates,
       completedAnimationKeys: insertionResult.completedKeys + matchedResult.completedKeys,
       completedRemovalNodeIDs: removalResult.completedNodeIDs
     )
+  }
+
+  /// The time-free adoption channel: each co-present non-source moves onto
+  /// its source's rect (`MatchedGeometryAdoption`). Pure in its inputs, so
+  /// the controller's capture can run the same pairing without a clock.
+  package static func sampleAdoption(
+    tree: PlacedNode,
+    pairs: [MatchedGeometryAdoptionPair]? = nil,
+    liveOffsets: [PlacedAnimationOverlayOffset] = []
+  ) -> [PlacedAnimationOverlayOffset] {
+    let pairs = pairs ?? MatchedGeometryAdoption.pairs(in: tree)
+    guard !pairs.isEmpty else { return [] }
+    var overrides: [Identity: CellRect] = [:]
+    if !liveOffsets.isEmpty {
+      let sources = Set(pairs.map(\.source))
+      for offset in liveOffsets where sources.contains(offset.identity) {
+        guard let baseline = pairs.first(where: { $0.source == offset.identity })?.sourceBounds
+        else { continue }
+        overrides[offset.identity] = CellRect(
+          origin: CellPoint(x: baseline.origin.x + offset.dx, y: baseline.origin.y + offset.dy),
+          size: offset.size ?? baseline.size
+        )
+      }
+    }
+    return MatchedGeometryAdoption.offsets(for: pairs, sourceRectOverrides: overrides)
   }
 
   private struct RemovalSamplingResult {

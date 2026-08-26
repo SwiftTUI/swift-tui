@@ -145,7 +145,8 @@ extension DefaultRenderer {
     publishCommittedFrame(
       artifacts,
       draft: candidate.draft,
-      baselinePlacedTree: tail.baselinePlaced
+      baselinePlacedTree: tail.baselinePlaced,
+      overlayHasTransientDecoration: tail.overlayHasTransientDecoration
     )
     return artifacts
   }
@@ -220,7 +221,8 @@ extension DefaultRenderer {
   func publishCommittedFrame(
     _ artifacts: FrameArtifacts,
     draft: FrameHeadDraft,
-    baselinePlacedTree: PlacedNode
+    baselinePlacedTree: PlacedNode,
+    overlayHasTransientDecoration: Bool
   ) {
     draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
@@ -233,6 +235,7 @@ extension DefaultRenderer {
     frameTailRenderer.storeCommittedFrame(
       artifacts,
       baselinePlacedTree: baselinePlacedTree,
+      overlayHasTransientDecoration: overlayHasTransientDecoration,
       proposal: draft.frameTailInput.proposal
     )
     storeCommittedPresentationPortalState()

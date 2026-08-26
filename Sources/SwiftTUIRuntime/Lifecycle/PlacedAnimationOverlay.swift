@@ -5,21 +5,39 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
   package var removalOverlays: [PlacedRemovalOverlaySnapshot]
   package var insertionOffsets: [PlacedAnimationOverlayOffset]
   package var matchedGeometryOffsets: [PlacedAnimationOverlayOffset]
+  /// Co-present matched-geometry adoption: the deltas that render each
+  /// `isSource: false` instance at its source's rect (plan 2026-08-25-003
+  /// Stage A). Unlike the three channels above this one is steady-state —
+  /// a deterministic function of the layout, not an animation sample — so
+  /// it is applied first and does not count as transient decoration.
+  package var adoptionOffsets: [PlacedAnimationOverlayOffset]
 
   package init(
     removalOverlays: [PlacedRemovalOverlaySnapshot] = [],
     insertionOffsets: [PlacedAnimationOverlayOffset] = [],
-    matchedGeometryOffsets: [PlacedAnimationOverlayOffset] = []
+    matchedGeometryOffsets: [PlacedAnimationOverlayOffset] = [],
+    adoptionOffsets: [PlacedAnimationOverlayOffset] = []
   ) {
     self.removalOverlays = removalOverlays
     self.insertionOffsets = insertionOffsets
     self.matchedGeometryOffsets = matchedGeometryOffsets
+    self.adoptionOffsets = adoptionOffsets
   }
 
+  /// No channel at all: the effective tree is the baseline.
   package var isEmpty: Bool {
-    removalOverlays.isEmpty
-      && insertionOffsets.isEmpty
-      && matchedGeometryOffsets.isEmpty
+    !hasTransientDecoration && adoptionOffsets.isEmpty
+  }
+
+  /// Whether an animation *sample* decorates the tree this frame: an exit
+  /// overlay, an insertion offset, or a matched-geometry offset. These are
+  /// the channels the retained-products and incremental-raster gates must
+  /// barrier on; an adoption-only snapshot decorates the tree the same way
+  /// on every frame with the same layout and takes the incremental path.
+  package var hasTransientDecoration: Bool {
+    !removalOverlays.isEmpty
+      || !insertionOffsets.isEmpty
+      || !matchedGeometryOffsets.isEmpty
   }
 }
 
@@ -73,6 +91,17 @@ package func applyPlacedAnimationOverlaySnapshot(
   _ snapshot: PlacedAnimationOverlaySnapshot,
   to tree: inout PlacedNode
 ) {
+  // Adoption first: every later channel's offset is a delta relative to a
+  // node's own rect, so a traveling exit overlay or a live insertion offset
+  // on an adopted node composes on top of the adopted rect additively.
+  let adoptionOffsets = overlayOffsetMap(snapshot.adoptionOffsets)
+  if !adoptionOffsets.isEmpty {
+    tree = translatePlacedNodesByIdentity(
+      tree: tree,
+      offsets: adoptionOffsets
+    )
+  }
+
   if !snapshot.removalOverlays.isEmpty {
     var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
     for removal in snapshot.removalOverlays {
@@ -124,7 +153,12 @@ private func overlayOffsetMap(
   return result
 }
 
-private func translatePlacedNodesByIdentity(
+/// Translates (and, when the offset carries a `size`, resizes by bounds and
+/// clip) the first node matching each offset's identity. The walk stops at a
+/// hit: an offset on a node *inside* a translated subtree is dropped, so a
+/// nested matched node rides its ancestor's move (the register's nested-node
+/// *Gap (narrowed)*).
+package func translatePlacedNodesByIdentity(
   tree: PlacedNode,
   offsets: [Identity: PlacedAnimationOverlayOffset]
 ) -> PlacedNode {

@@ -129,4 +129,44 @@ struct RetainedPhaseProductGateTests {
 
     #expect(state.input(invalidatedIdentities: []).previousPhaseProducts == nil)
   }
+
+  @Test("an adoption-only decorated frame retains its phase products")
+  func adoptionOnlyFrameRetainsProducts() {
+    // Co-present matched-geometry adoption (plan 2026-08-25-003 A3) moves a
+    // non-source onto its source every frame with the same layout, so the
+    // effective tree never byte-matches the baseline while the pair is on
+    // screen. The tail reports whether a *transient* channel decorated the
+    // frame; adoption alone keeps the products reusable.
+    let rootID = testIdentity("root")
+    let effective = PlacedNode(
+      identity: rootID,
+      bounds: .init(origin: .init(x: 2, y: 0), size: .init(width: 4, height: 1)),
+      drawPayload: .text("badge")
+    )
+    let baseline = PlacedNode(
+      identity: rootID,
+      bounds: .init(origin: .init(x: 0, y: 3), size: .init(width: 4, height: 1)),
+      drawPayload: .text("badge")
+    )
+    let draw = DrawNode(identity: rootID, bounds: effective.bounds)
+
+    let state = FrameTailRetainedState()
+    state.storeCommittedFrame(
+      artifacts(placed: effective, draw: draw),
+      baselinePlacedTree: baseline,
+      overlayHasTransientDecoration: false,
+      proposal: .unspecified
+    )
+    #expect(state.input(invalidatedIdentities: []).previousPhaseProducts != nil)
+
+    // The same trees under a transient decoration are withheld.
+    let transient = FrameTailRetainedState()
+    transient.storeCommittedFrame(
+      artifacts(placed: effective, draw: draw),
+      baselinePlacedTree: baseline,
+      overlayHasTransientDecoration: true,
+      proposal: .unspecified
+    )
+    #expect(transient.input(invalidatedIdentities: []).previousPhaseProducts == nil)
+  }
 }

@@ -738,7 +738,8 @@ public struct DefaultRenderer {
     publishCommittedFrame(
       artifacts,
       draft: draft,
-      baselinePlacedTree: tail.baselinePlaced
+      baselinePlacedTree: tail.baselinePlaced,
+      overlayHasTransientDecoration: tail.overlayHasTransientDecoration
     )
     return artifacts
   }

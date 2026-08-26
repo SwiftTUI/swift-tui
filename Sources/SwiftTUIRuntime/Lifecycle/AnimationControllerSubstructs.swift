@@ -30,6 +30,12 @@ extension AnimationController {
     package var placedRoot: PlacedNode?
     package var matchedGeometryBounds: [MatchedGeometryKey: CellRect] = [:]
     package var matchedKeyIdentities: [MatchedGeometryKey: Identity] = [:]
+    /// The co-present adoption offsets of the previous frame's placed tree
+    /// (plan 2026-08-25-003 Stage A): where each adopted non-source was
+    /// drawn relative to its baseline slot. A departing adoptee's frozen
+    /// exit overlay is translated by its entry so it starts where the node
+    /// was drawn; the baseline itself stays un-adopted.
+    package var adoptionOffsets: [Identity: PlacedAnimationOverlayOffset] = [:]
     package var parentByIdentity: [Identity: Identity] = [:]
     package var childIndexByIdentity: [Identity: Int] = [:]
     package var identities: Set<Identity> = []

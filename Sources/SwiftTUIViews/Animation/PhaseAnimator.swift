@@ -56,12 +56,21 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
   // whose hash collided with the previous value would silently never
   // restart the phase cycle (F176).
   private let trigger: PhaseAnimatorTriggerKey?
+  /// The authoring context of the body that created `content`; the closure
+  /// is evaluated under it so an enclosing view's `@State` reads through its
+  /// own owner (see ``KeyframeAnimator``).
+  private let contentAuthoringContext: AuthoringContext?
 
   @State private var currentPhase: Phase
-  // Set to true the first time the trigger-mode task fires so we
-  // can skip the initial-mount invocation (trigger mode should not
-  // animate on appear, only on subsequent trigger changes).
-  @State private var didSeeInitialTrigger: Bool = false
+  // Trigger mode: the trigger value the last cycle ran for, or the value
+  // seen at mount (which runs nothing). Only a *change* runs a cycle. A
+  // dormant tab archives this value with the rest of the view's state, so
+  // an unchanged trigger does not replay the cycle when the tab is shown
+  // again, while a trigger that changed while the tab was dormant runs one
+  // cycle on re-mount — SwiftUI observes the change at re-mount. The
+  // previous seen-once flag survived the round trip as `true` and made the
+  // re-mounted `.task(id:)` replay the bounce on every return.
+  @State private var lastRunTrigger: PhaseAnimatorTriggerKey? = nil
 
   public init(
     _ phases: [Phase],
@@ -76,6 +85,7 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
     self.content = content
     self.animation = animation
     self.trigger = nil
+    contentAuthoringContext = currentAuthoringContext()
     _currentPhase = State(wrappedValue: phases[0])
   }
 
@@ -93,6 +103,7 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
     self.content = content
     self.animation = animation
     self.trigger = PhaseAnimatorTriggerKey(base: trigger)
+    contentAuthoringContext = currentAuthoringContext()
     _currentPhase = State(wrappedValue: phases[0])
   }
 
@@ -105,9 +116,9 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
   @ViewBuilder
   private func phaseAnimatorBody(accessibilityReduceMotion: Bool) -> some View {
     if accessibilityReduceMotion {
-      content(phases[0])
+      phaseContent(phases[0])
     } else if let trigger {
-      // Touch `didSeeInitialTrigger` in body so `State.remember(...)`
+      // Touch `lastRunTrigger` in body so `State.remember(...)`
       // registers a per-instance location for it during the normal
       // `withAuthoringContext` body evaluation. Without this read, the
       // only access to the property happens inside the `.task(id:)`
@@ -115,24 +126,33 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
       // no authoring context is active and writes fall through to
       // `updateSeedValue(...)` (global seed) instead of persisting on
       // this PhaseAnimator instance.
-      _ = didSeeInitialTrigger
-      content(currentPhase)
+      _ = lastRunTrigger
+      phaseContent(currentPhase)
         .task(id: trigger) { @MainActor in
-          // .task(id:) fires on initial appearance too, so skip the
-          // first invocation — trigger mode should only advance
-          // phases on subsequent changes.
-          if !didSeeInitialTrigger {
-            didSeeInitialTrigger = true
+          // .task(id:) fires on initial appearance and on every re-mount
+          // (a dormant tab returning), not only on trigger changes. Run a
+          // cycle only for a trigger the animator has not run yet; the
+          // first sighting records the value without animating.
+          guard let lastRunTrigger else {
+            self.lastRunTrigger = trigger
             return
           }
+          guard trigger != lastRunTrigger else { return }
+          self.lastRunTrigger = trigger
           await runCycleOnce()
         }
     } else {
-      content(currentPhase)
+      phaseContent(currentPhase)
         .task { @MainActor in
           await runPhaseLoop()
         }
     }
+  }
+
+  /// Evaluates the enclosing view's closure under the context that authored
+  /// it. `phase` is read from this animator's own slot by the caller.
+  private func phaseContent(_ phase: Phase) -> Content {
+    withAuthoringContext(contentAuthoringContext) { content(phase) }
   }
 
   @MainActor

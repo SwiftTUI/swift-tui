@@ -24,6 +24,23 @@ enum AnimationTreeQueries {
     }
   }
 
+  /// Pre-order walk recording every matched-geometry node — sources and
+  /// non-sources alike — for co-present adoption pairing. Transient nodes
+  /// (exit overlays) are skipped: a frozen clone is neither a source nor an
+  /// adoptee.
+  package static func collectMatchedGeometryEntries(
+    _ node: PlacedNode,
+    into entries: inout [MatchedGeometryPlacedEntry]
+  ) {
+    if node.isTransient { return }
+    if let config = node.matchedGeometry {
+      entries.append(.init(identity: node.identity, bounds: node.bounds, config: config))
+    }
+    for child in node.children {
+      collectMatchedGeometryEntries(child, into: &entries)
+    }
+  }
+
   static func findBounds(
     in node: PlacedNode,
     identity: Identity

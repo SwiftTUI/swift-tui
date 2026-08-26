@@ -478,6 +478,17 @@ struct FrameTailPresentationDamageReachabilityTests {
     )
     #expect(decorated.damage == nil)
     #expect(decorated.barriers == [.animationOverlayDecorated])
+
+    // Co-present matched-geometry adoption is steady-state decoration, not an
+    // animation sample: it does not barrier (plan 2026-08-25-003 A3). The
+    // draw-tree diff sees an adopted node's rect move like any bounds change.
+    let adopted = plan(
+      overlaySnapshot: .init(
+        adoptionOffsets: [.init(identity: dirtyIdentity, dx: 0, dy: 1)]
+      )
+    )
+    #expect(adopted.barriers.isEmpty)
+    #expect(adopted.damage != nil)
   }
 }
 

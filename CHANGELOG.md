@@ -6,6 +6,47 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [Unreleased]
+
+### Added
+
+- **Co-present matched geometry.** An `isSource: false` instance that shares
+  a key with a source on the same screen is now rendered at the source's
+  frame every frame — per its own `properties:` and `anchor:`, without an
+  animation — and hit-tests and focuses where it is drawn, the SwiftUI rule
+  a non-source badge relies on. Adoption is a placed-level override: the
+  retained layout baseline and the incremental raster path are untouched, a
+  key with zero or several sources adopts nothing, and a departing adoptee's
+  exit overlay starts where it was drawn. A sole non-source keeps receiving
+  the match when its key swaps to it.
+- `Scripts/purge_downstream_build_products.sh <module>` removes the SwiftPM
+  products of every module downstream of `<module>` (the surgical form of
+  `Scripts/test_all.sh --clean`), and the repo gate prints the command when
+  a step crashes by signal after a `SwiftTUIPrimitives`/`SwiftTUIGraph`/
+  `SwiftTUICore` source changed since the previous gate.
+
+### Fixed
+
+- **A co-present non-source no longer flies in from its source** on an
+  unrelated animated write: the controller plans no matched animation for a
+  non-source whose key has a source in the same frame.
+- **`PhaseAnimator` replayed its trigger-mode cycle on every dormant-tab
+  return.** The animator now records the trigger it last ran for instead of a
+  seen-once flag, so an unchanged trigger does not replay when the tab is
+  shown again while a trigger that changed while the tab was dormant runs
+  one cycle on re-mount.
+- **Animator content read the enclosing view's `@State` seed.**
+  `KeyframeAnimator`, `PhaseAnimator`, and `TimelineView` evaluate their
+  `content` closure under the authoring context that created it, so a
+  `@State` owned by the enclosing view reads (and writes) through its own
+  owner during a run.
+
+### Changed
+
+- Internal: the retained-products and incremental-raster gates key on
+  transient overlay decoration (exit overlays, insertion and matched
+  offsets) instead of on the overlay snapshot being empty.
+
 ## [0.9.10] - 2026-08-25
 
 ### Added

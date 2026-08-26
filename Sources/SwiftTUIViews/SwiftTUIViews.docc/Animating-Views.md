@@ -437,9 +437,37 @@ transition (`.move`, `.offset`, `.slide`) composes additively with the
 matched translation, as in SwiftUI when the transition is applied inside
 the effect.
 
-A non-source instance (`isSource: false`) receives the match when the key
-swaps to it between frames; an instance on screen together with its source
-is not positioned onto the source.
+### Position a view onto another
+
+An `isSource: false` instance that shares a key with a source on the same
+screen is laid out at its own slot but *rendered* at the source's frame,
+every frame and without an animation — SwiftUI's co-present rule. A badge
+declared elsewhere in the tree sticks to the card it names, follows the card
+when the card animates, and stays interactive where it is drawn:
+
+```swift
+VStack(alignment: .leading, spacing: 1) {
+  HStack(spacing: 2) {
+    if cardOnRight { Spacer() }
+    Text("Card").padding(1).border()
+      .matchedGeometryEffect(id: "card", in: heroSpace)
+    if !cardOnRight { Spacer() }
+  }
+  Button("NEW") { … }
+    .matchedGeometryEffect(id: "card", in: heroSpace, properties: .position,
+                           anchor: .topTrailing, isSource: false)
+}
+```
+
+`properties:` and `anchor:` on the non-source govern the adoption:
+`.position` tracks the source's anchor point at the badge's own size (the
+example pins the badge's top-trailing corner to the card's), `.size` takes
+the source's size around the badge's own anchor, and `.frame` takes both.
+Adoption needs exactly one source per key — with none the badge stays at
+its slot, with several nothing moves. Layout is untouched (the badge's slot
+still takes space; hide it with `.hidden()` or a zero frame if it should
+not), reduce motion leaves adoption on, and when the source leaves inside
+an animated transaction the badge slides home from where it was drawn.
 
 ## Reduce Motion
 

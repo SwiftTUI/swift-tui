@@ -43,7 +43,12 @@ enum FrameTailPresentationDamageResolver {
     guard animationRedrawIdentities.isEmpty else {
       return .init(damage: nil, barriers: [.animationInterpolationApplied])
     }
-    guard animationOverlaySnapshot.isEmpty else {
+    // Co-present adoption is not a barrier: it decorates the tree the same
+    // way on every frame with the same layout, the previous committed draw
+    // tree was extracted from an equally adopted tree, and the draw-tree diff
+    // below sees an adopted node's rect move exactly as it sees any other
+    // bounds change. Only animation *samples* barrier.
+    guard !animationOverlaySnapshot.hasTransientDecoration else {
       return .init(damage: nil, barriers: [.animationOverlayDecorated])
     }
 

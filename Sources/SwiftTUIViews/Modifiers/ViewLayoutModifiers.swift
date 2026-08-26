@@ -120,9 +120,13 @@ extension View {
   ///
   /// `isSource: false` lets you have multiple views with the same
   /// key where only the designated source view contributes its
-  /// geometry as the "from" reference. A non-source instance receives the
-  /// match when the key swaps to it between frames; an instance that is on
-  /// screen together with its source is not positioned onto the source.
+  /// geometry as the "from" reference. While a non-source instance is on
+  /// screen together with its source it is laid out at its own slot but
+  /// rendered at the source's frame — per its own `properties` and
+  /// `anchor`, every frame, without an animation — and stays interactive
+  /// where it is drawn; a key with zero or several sources adopts nothing.
+  /// A non-source that is the sole holder of its key receives the match
+  /// when the key swaps to it between frames.
   public func matchedGeometryEffect<ID: Hashable>(
     id: ID,
     in namespace: MatchedGeometryNamespace = .default,

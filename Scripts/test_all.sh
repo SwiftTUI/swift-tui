@@ -639,6 +639,50 @@ require_command() {
   fi
 }
 
+# The three layers whose stored-struct growth leaves downstream SwiftPM
+# products stale (plan 2026-08-25-003 P4): a consumer object compiled against
+# the old layout of a Graph/Core struct segfaults instead of recompiling.
+layer_sources_fingerprint() {
+  find Sources/SwiftTUIPrimitives Sources/SwiftTUIGraph Sources/SwiftTUICore \
+    -name '*.swift' -type f -print 2>/dev/null \
+    | LC_ALL=C sort \
+    | xargs cat 2>/dev/null \
+    | cksum \
+    | cut -d ' ' -f 1-2
+}
+
+layer_fingerprint_stamp=$repo_root/.build/.swifttui-gate-layer-fingerprint
+layer_sources_changed_since_last_gate=0
+
+# Records this gate's Primitives/Graph/Core source fingerprint and remembers
+# whether it differs from the previous gate's, so a signal-11 crash can be
+# attributed to stale downstream products rather than diagnosed from scratch.
+stamp_layer_sources_fingerprint() {
+  current_fingerprint=$(cd "$repo_root" && layer_sources_fingerprint)
+  if [ -f "$layer_fingerprint_stamp" ] \
+    && [ "$(cat "$layer_fingerprint_stamp")" != "$current_fingerprint" ]; then
+    layer_sources_changed_since_last_gate=1
+  fi
+  mkdir -p "$(dirname "$layer_fingerprint_stamp")"
+  printf '%s' "$current_fingerprint" >"$layer_fingerprint_stamp"
+}
+
+print_stale_build_products_hint_if_applicable() {
+  hint_exit_code=$1
+  hint_log_file=$2
+  [ "$layer_sources_changed_since_last_gate" -eq 1 ] || return 0
+  if [ "$hint_exit_code" = 139 ] \
+    || grep -q -E 'signal code 11|SIGSEGV|Segmentation fault|Illegal instruction|signal code 4' \
+      "$hint_log_file" 2>/dev/null; then
+    >&2 echo ""
+    >&2 echo "HINT: a Primitives/Graph/Core source changed since the last gate and this step"
+    >&2 echo "      crashed by signal. Stale downstream SwiftPM products are the usual cause"
+    >&2 echo "      (a consumer compiled against a struct's previous layout). Purge them with:"
+    >&2 echo "        Scripts/purge_downstream_build_products.sh SwiftTUIGraph"
+    >&2 echo "      (or SwiftTUIPrimitives / SwiftTUICore for the layer that changed), then rerun."
+  fi
+}
+
 run_step() {
   title=$1
   workdir=$2
@@ -671,6 +715,7 @@ run_step() {
       failure_count=$(derive_failure_count "$log_file")
       status=FAIL
       >&2 echo "FAIL: $title"
+      print_stale_build_products_hint_if_applicable "$exit_code" "$log_file"
     fi
     rm -f "$status_file" "$timeout_file"
     any_failed=1
@@ -714,6 +759,7 @@ run_function_step() {
       failure_count=$(derive_failure_count "$log_file")
       status=FAIL
       >&2 echo "FAIL: $title"
+      print_stale_build_products_hint_if_applicable "$exit_code" "$log_file"
     fi
     rm -f "$status_file" "$timeout_file"
     any_failed=1
@@ -889,6 +935,10 @@ run_function_step \
   "Check fixture recording is disabled" \
   "env | rg '^(PARALLEL_RECORD_RENDERED_FIXTURES|SWIFTTUI_REGENERATE_CONFORMANCE_FIXTURES|SWIFTTUI_RECORD_RENDERED_TEXT_FIXTURES|SWIFTTUI_RENDERED_TEXT_FIXTURE_RECORDING_SCRIPT)='" \
   check_fixture_recording_environment_disabled
+
+if lane_needs_swift; then
+  stamp_layer_sources_fingerprint
+fi
 
 if [ "$clean_builds" -eq 1 ]; then
   run_function_step \

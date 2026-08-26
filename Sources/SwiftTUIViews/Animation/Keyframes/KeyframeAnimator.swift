@@ -68,6 +68,12 @@ where KeyframePath.Value == Value {
   private let mode: Mode
   private let content: @MainActor (Value) -> Content
   private let keyframes: @MainActor (Value) -> KeyframePath
+  /// The authoring context of the body that created `content`. The closure
+  /// is evaluated inside this animator's body, where the ambient context is
+  /// the animator's own; a `@State` the enclosing view owns must still read
+  /// through the enclosing owner (the ``EnvironmentReader`` shape), or it
+  /// mints a seed-valued location under the animator's node.
+  private let contentAuthoringContext: AuthoringContext?
 
   @State private var value: Value
   /// The trigger the last run started for. Archived with the view, so a
@@ -87,6 +93,7 @@ where KeyframePath.Value == Value {
     mode = .trigger(KeyframeTriggerKey(trigger))
     self.content = content
     self.keyframes = keyframes
+    contentAuthoringContext = currentAuthoringContext()
     _value = State(wrappedValue: initialValue)
   }
 
@@ -102,6 +109,7 @@ where KeyframePath.Value == Value {
     mode = .onAppear(repeating: repeating)
     self.content = content
     self.keyframes = keyframes
+    contentAuthoringContext = currentAuthoringContext()
     _value = State(wrappedValue: initialValue)
   }
 
@@ -142,7 +150,10 @@ where KeyframePath.Value == Value {
   /// any frame segment, so keyframe-driven slots never pick up an ancestor's
   /// animation.
   private var keyframeContent: some View {
-    content(value)
+    // Read this animator's own slot under its own context, then evaluate the
+    // enclosing view's closure under the context that authored it.
+    let current = value
+    return withAuthoringContext(contentAuthoringContext) { content(current) }
       .transaction { $0.disablesAnimations = true }
   }
 

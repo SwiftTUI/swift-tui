@@ -54,8 +54,19 @@ enum AnimationResolvedTreeDiffing {
   ) -> MatchedGeometryAnimationPlans {
     var animations: [MatchedGeometryAnimationPlan] = []
     var destinationIdentityByKey: [MatchedGeometryKey: Identity] = [:]
+    // A non-source that shares its key with a source *this frame* is
+    // co-present: the placed pass positions it onto the source every frame
+    // (adoption), so it never receives a swap. Without this skip an unrelated
+    // animated write planned a match from the source's rect to its own slot
+    // — the co-present instance flew in from its source — and the two
+    // channels would double-apply.
+    let keysWithSources = Set(
+      newMatchedConfigsByIdentity.values.lazy.filter(\.isSource).map(\.key))
     for (identity, config) in newMatchedConfigsByIdentity {
       let key = config.key
+      if !config.isSource, keysWithSources.contains(key) {
+        continue
+      }
       if let previousIdentity = previousMatchedKeyIdentities[key],
         previousIdentity == identity
       {

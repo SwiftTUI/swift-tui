@@ -152,6 +152,12 @@ package final class AnimationController: Sendable {
     get { previousFrame.matchedKeyIdentities }
     set { previousFrame.matchedKeyIdentities = newValue }
   }
+  /// Where each co-present non-source was drawn last frame, relative to its
+  /// baseline slot (``AnimationPlacedTreeCapture/adoptionOffsets``).
+  private var previousAdoptionOffsets: [Identity: PlacedAnimationOverlayOffset] {
+    get { previousFrame.adoptionOffsets }
+    set { previousFrame.adoptionOffsets = newValue }
+  }
   /// Parent identity, as walked from the previous frame's tree.
   private var previousParentByIdentity: [Identity: Identity] {
     get { previousFrame.parentByIdentity }
@@ -403,11 +409,24 @@ package final class AnimationController: Sendable {
   ///
   /// Called by the render pipeline after ``place`` runs.  When no
   /// removal overlays are pending this is a cheap reference copy.
-  package func capturePlacedTree(_ placed: PlacedNode) {
+  ///
+  /// Returns the tree's co-present adoption pairs so the same frame's
+  /// overlay sampling can reuse the walk (`placedAnimationOverlaySnapshot`'s
+  /// `adoption:`).
+  @discardableResult
+  package func capturePlacedTree(_ placed: PlacedNode) -> [MatchedGeometryAdoptionPair] {
     let capture = AnimationPlacedTreeCapture.capture(placed)
     previousPlacedRoot = capture.root
     previousMatchedGeometryBounds = capture.matchedBounds
     previousMatchedKeyIdentities = capture.matchedIdentities
+    previousAdoptionOffsets = capture.adoptionOffsets
+    return capture.adoptionPairs
+  }
+
+  /// The identities adopted onto a source in the previously captured placed
+  /// tree. Test hook.
+  package var previousAdoptedIdentities: Set<Identity> {
+    Set(previousAdoptionOffsets.keys)
   }
 
   /// Number of matched-geometry animations currently in flight.
@@ -493,10 +512,14 @@ package final class AnimationController: Sendable {
   /// This method still owns animation bookkeeping: custom animation
   /// state is advanced, completed keys are released, and batch
   /// completions can fire. The returned snapshot is pure data.
+  ///
+  /// - Parameter adoption: `tree`'s co-present pairs from this frame's
+  ///   ``capturePlacedTree(_:)``; `nil` pairs them here.
   package func placedAnimationOverlaySnapshot(
     for tree: PlacedNode,
     at timestamp: MonotonicInstant,
-    surfaceSize: CellSize? = nil
+    surfaceSize: CellSize? = nil,
+    adoption: [MatchedGeometryAdoptionPair]? = nil
   ) -> PlacedAnimationOverlaySnapshot {
     let result = PlacedAnimationOverlaySampling.sample(
       removingNodes: removingNodes,
@@ -504,7 +527,8 @@ package final class AnimationController: Sendable {
       registeredAnimations: registeredAnimations,
       tree: tree,
       timestamp: timestamp,
-      surfaceSize: surfaceSize
+      surfaceSize: surfaceSize,
+      adoption: adoption
     )
 
     for (viewNodeID, state) in result.removalCustomStates {
@@ -1711,12 +1735,20 @@ package final class AnimationController: Sendable {
     // If a previous placed tree is cached, look up the frozen
     // placed subtree for the same identity so the overlay can be
     // injected post-layout (draw-only, no layout-shift).
+    // The baseline is un-adopted; a departing co-present non-source was drawn
+    // at its source's rect, so its frozen clone takes last frame's adoption
+    // offset and the exit overlay starts where the node was drawn.
     let placedSnapshot: PlacedNode?
-    if let previousPlacedRoot {
-      placedSnapshot = AnimationTreeQueries.findPlacedSubtree(
+    if let previousPlacedRoot,
+      let frozen = AnimationTreeQueries.findPlacedSubtree(
         in: previousPlacedRoot,
         identity: injectionTarget
       )
+    {
+      placedSnapshot =
+        previousAdoptionOffsets.isEmpty
+        ? frozen
+        : translatePlacedNodesByIdentity(tree: frozen, offsets: previousAdoptionOffsets)
     } else {
       placedSnapshot = nil
     }

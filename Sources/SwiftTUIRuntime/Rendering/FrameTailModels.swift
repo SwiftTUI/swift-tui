@@ -25,10 +25,15 @@ struct FrameTailRetainedInput {
     placed: PlacedNode,
     animationOverlaySnapshot: PlacedAnimationOverlaySnapshot
   ) -> RetainedPhaseExtractionProof {
+    // Adoption-only decoration keeps the products reusable: the previous
+    // products were extracted from an equally adopted effective tree, the
+    // whole-tree signature below compares effective against effective, and
+    // an adopted subtree differs from its baseline index entry so the
+    // per-subtree path re-extracts it (conservative, sound).
     guard
       let previous = previousPhaseProducts,
       previous.proposal == proposal,
-      animationOverlaySnapshot.isEmpty
+      !animationOverlaySnapshot.hasTransientDecoration
     else {
       return .none
     }
@@ -245,6 +250,12 @@ struct FrameTailOutput {
   var placed: PlacedNode
   /// Canonical pre-overlay layout product retained for future layout reuse.
   var baselinePlaced: PlacedNode
+  /// Whether an animation sample (exit overlay, insertion or matched offset)
+  /// decorated `placed` this frame. The commit-side products gate keys on
+  /// this rather than on `placed == baselinePlaced`: co-present adoption
+  /// decorates every frame with the same layout identically, so its phase
+  /// products stay reusable.
+  var overlayHasTransientDecoration: Bool
   var semantics: SemanticSnapshot
   var draw: DrawNode
   var raster: RasterSurface

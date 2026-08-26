@@ -19,7 +19,7 @@ struct KeyframeAnimatorRuntimeTests {
   @Test("trigger mode does not animate on mount")
   func triggerModeIsQuietOnMount() async throws {
     let probe = KeyframeValueProbe()
-    let harness = try KeyframeAnimatorHarness {
+    let harness = try AnimatorRuntimeHarness {
       KeyframeTriggerFixture(probe: probe, duration: .milliseconds(200))
     }
     defer { harness.shutdown() }
@@ -31,7 +31,7 @@ struct KeyframeAnimatorRuntimeTests {
   @Test("one trigger change advances monotonically and lands on the end value exactly once")
   func oneTriggerRunsToTheEnd() async throws {
     let probe = KeyframeValueProbe()
-    let harness = try KeyframeAnimatorHarness {
+    let harness = try AnimatorRuntimeHarness {
       KeyframeTriggerFixture(probe: probe, duration: .milliseconds(800))
     }
     defer { harness.shutdown() }
@@ -53,7 +53,7 @@ struct KeyframeAnimatorRuntimeTests {
   @Test("a retrigger mid-flight restarts from the current interpolated value")
   func retriggerContinuesFromCurrentValue() async throws {
     let probe = KeyframeValueProbe()
-    let harness = try KeyframeAnimatorHarness {
+    let harness = try AnimatorRuntimeHarness {
       KeyframeTriggerFixture(probe: probe, duration: .milliseconds(1_200))
     }
     defer { harness.shutdown() }
@@ -76,7 +76,7 @@ struct KeyframeAnimatorRuntimeTests {
   @Test("a retrigger carries velocity into a leading cubic keyframe")
   func retriggerCarriesVelocity() async throws {
     let probe = KeyframeValueProbe()
-    let harness = try KeyframeAnimatorHarness {
+    let harness = try AnimatorRuntimeHarness {
       KeyframeCubicTriggerFixture(probe: probe)
     }
     defer { harness.shutdown() }
@@ -108,7 +108,7 @@ struct KeyframeAnimatorRuntimeTests {
   @Test("repeating mode wraps around and stays inside the keyframe range")
   func repeatingModeWraps() async throws {
     let probe = KeyframeValueProbe()
-    let harness = try KeyframeAnimatorHarness {
+    let harness = try AnimatorRuntimeHarness {
       KeyframeRepeatingFixture(probe: probe)
     }
     defer { harness.shutdown() }
@@ -126,7 +126,7 @@ struct KeyframeAnimatorRuntimeTests {
   @Test("coincident ancestor withAnimation and .animation(_:value:) do not animate keyframe slots")
   func ancestorAnimationsDoNotReachKeyframeSlots() async throws {
     let probe = KeyframeValueProbe()
-    let harness = try KeyframeAnimatorHarness {
+    let harness = try AnimatorRuntimeHarness {
       KeyframeAncestorAnimationFixture(probe: probe)
     }
     defer { harness.shutdown() }
@@ -150,7 +150,7 @@ struct KeyframeAnimatorRuntimeTests {
   @Test("leaving a tab stops the loop and returning with an unchanged trigger does not replay")
   func tabSwitchStopsAndReturnDoesNotReplay() async throws {
     let probe = KeyframeValueProbe()
-    let harness = try KeyframeAnimatorHarness(size: .init(width: 60, height: 10)) {
+    let harness = try AnimatorRuntimeHarness(size: .init(width: 60, height: 10)) {
       KeyframeTabFixture(probe: probe)
     }
     defer { harness.shutdown() }
@@ -177,12 +177,41 @@ struct KeyframeAnimatorRuntimeTests {
     )
   }
 
+  // MARK: - Enclosing state
+
+  @Test("content reads the enclosing view's @State through a run, not its seed")
+  func contentReadsEnclosingStateDuringRun() async throws {
+    // Plan 2026-08-25-003 P2 (plan 002 §12.1 #4): `content` is a closure
+    // captured at `init` and evaluated inside the animator's body; a
+    // `@State` owned by the *enclosing* view must read through that owner's
+    // binding, and a write from inside `content` must land on it.
+    let probe = KeyframeOuterStateProbe()
+    let harness = try AnimatorRuntimeHarness {
+      KeyframeOuterStateFixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    try harness.clickText(Self.bumpLabel)
+    try await harness.wait(until: { probe.samples.last?.value == 10 })
+
+    let duringRun = probe.samples.filter { $0.value > 0 }
+    #expect(duringRun.count > 2, "\(probe.samples)")
+    #expect(
+      duringRun.allSatisfy { $0.outer == 7 },
+      "content read the enclosing @State's seed during the run: \(duringRun)"
+    )
+    // `.onChange` inside `content` writes the enclosing view's counter; the
+    // next evaluation of `content` must see that write.
+    let ticksSeen = try #require(probe.samples.last?.ticks)
+    #expect(ticksSeen >= 2, "content never saw the counter it advances: \(probe.samples)")
+  }
+
   // MARK: - Reduce motion
 
   @Test("under reduce motion a trigger change snaps to the end value")
   func reduceMotionSnapsTriggerToEnd() async throws {
     let probe = KeyframeValueProbe()
-    let harness = try KeyframeAnimatorHarness(motion: .reduced) {
+    let harness = try AnimatorRuntimeHarness(motion: .reduced) {
       KeyframeTriggerFixture(probe: probe, duration: .milliseconds(400))
     }
     defer { harness.shutdown() }
@@ -196,7 +225,7 @@ struct KeyframeAnimatorRuntimeTests {
   @Test("under reduce motion repeating mode never writes")
   func reduceMotionRestsRepeatingMode() async throws {
     let probe = KeyframeValueProbe()
-    let harness = try KeyframeAnimatorHarness(motion: .reduced) {
+    let harness = try AnimatorRuntimeHarness(motion: .reduced) {
       KeyframeRepeatingFixture(probe: probe)
     }
     defer { harness.shutdown() }
@@ -322,209 +351,41 @@ private struct KeyframeTabFixture: View {
   }
 }
 
-// MARK: - Harness
+@MainActor
+private final class KeyframeOuterStateProbe {
+  struct Sample: Equatable {
+    var value: Double
+    var outer: Int
+    var ticks: Int
+  }
+
+  private(set) var samples: [Sample] = []
+
+  func record(value: Double, outer: Int, ticks: Int) {
+    samples.append(.init(value: value, outer: outer, ticks: ticks))
+  }
+}
 
 @MainActor
-private final class KeyframeAnimatorHarness<Content: View> {
-  private let terminal: KeyframeRecordingHost
-  let runLoop: SwiftTUIRuntime.RunLoop<Int, Content>
-  private let scheduler: FrameScheduler
-  private let rootIdentity = testIdentity("KeyframeAnimatorRoot")
-  private var renderedFrames = 0
-  private var didShutdown = false
-  private let schedulerWake = MainActorConditionSignal()
+private struct KeyframeOuterStateFixture: View {
+  let probe: KeyframeOuterStateProbe
+  @State private var bumps = 0
+  @State private var outerCounter = 0
+  @State private var ticks = 0
 
-  init(
-    size: CellSize = .init(width: 40, height: 6),
-    motion: RuntimeConfiguration.MotionMode = .normal,
-    @ViewBuilder content: @escaping () -> Content
-  ) throws {
-    let terminal = KeyframeRecordingHost(surfaceSize: size)
-    let scheduler = FrameScheduler()
-    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
-    let runLoop = SwiftTUIRuntime.RunLoop(
-      rootIdentity: rootIdentity,
-      presentationSurface: terminal,
-      inputReader: KeyframeEmptyKeyReader(),
-      signalReader: KeyframeEmptySignalReader(),
-      scheduler: scheduler,
-      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
-      focusTracker: focusTracker,
-      runtimeConfiguration: RuntimeConfiguration(motion: motion),
-      proposal: .init(width: size.width, height: size.height),
-      viewBuilder: ScopedMapper { _ in content() }
-    )
-    focusTracker.invalidator = scheduler
-    self.terminal = terminal
-    self.runLoop = runLoop
-    self.scheduler = scheduler
-
-    let schedulerWake = self.schedulerWake
-    scheduler.setWakeHandler {
-      Task { @MainActor in
-        schedulerWake.notify()
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("bump") {
+        bumps += 1
+        outerCounter = 7
+      }
+      KeyframeAnimator(initialValue: 0.0, trigger: bumps) { value in
+        let _ = probe.record(value: value, outer: outerCounter, ticks: ticks)
+        Text("v=\(Int(value.rounded())) o=\(outerCounter) t=\(ticks)")
+          .onChange(of: value) { ticks += 1 }
+      } keyframes: { _ in
+        LinearKeyframe(10.0, duration: .milliseconds(600))
       }
     }
-
-    scheduler.requestInvalidation(of: [rootIdentity])
-    _ = try render()
-  }
-
-  var frame: String { terminal.frames.last ?? "" }
-
-  var activeTaskCount: Int {
-    runLoop.lifecycleCoordinator.activeTaskCount
-  }
-
-  func shutdown() {
-    guard !didShutdown else { return }
-    didShutdown = true
-    scheduler.setWakeHandler(nil)
-    runLoop.lifecycleCoordinator.shutdown()
-  }
-
-  @discardableResult
-  func render() throws -> String {
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    return terminal.frames.last ?? ""
-  }
-
-  @discardableResult
-  func clickText(_ label: String) throws -> String {
-    let point = try #require(
-      terminal.centerOfText(label),
-      "could not find '\(label)' in frame:\n\(frame)"
-    )
-    #expect(
-      runLoop.handle(
-        RuntimeEvent.input(InputEvent.mouse(.init(kind: .down(.primary), location: point)))
-      ) == nil
-    )
-    _ = try render()
-    #expect(
-      runLoop.handle(
-        RuntimeEvent.input(InputEvent.mouse(.init(kind: .up(.primary), location: point)))
-      ) == nil
-    )
-    return try render()
-  }
-
-  /// Renders pending frames as they arrive until `condition` holds, failing
-  /// after `timeout` of wall clock so a stalled driver cannot hang the suite.
-  func wait(
-    until condition: @escaping @MainActor () -> Bool,
-    timeout: Duration = .seconds(8)
-  ) async throws {
-    let deadline = MonotonicInstant.now().advanced(by: timeout)
-    while !condition() {
-      let remaining = MonotonicInstant.now().duration(to: deadline)
-      guard remaining > .zero else {
-        throw KeyframeHarnessTimeout(frame: frame)
-      }
-      await awaitPendingFrame(within: remaining)
-      _ = try render()
-    }
-  }
-
-  /// Renders whatever arrives for `duration` of wall clock, then returns.
-  func hold(for duration: Duration) async throws {
-    let deadline = MonotonicInstant.now().advanced(by: duration)
-    while true {
-      let remaining = MonotonicInstant.now().duration(to: deadline)
-      guard remaining > .zero else { return }
-      await awaitPendingFrame(within: remaining)
-      _ = try render()
-    }
-  }
-
-  /// Suspends until the scheduler has a pending frame or `limit` elapses.
-  /// The wait is signal-driven (the scheduler's wake); the Support deadline
-  /// event is only the failure bound, and the signal resumes on cancellation.
-  private func awaitPendingFrame(within limit: Duration) async {
-    let deadline = AsyncEvent.firing(after: limit)
-    let waiter = KeyframeFrameSignalWaiter(wake: schedulerWake, scheduler: scheduler)
-    await withTaskGroup(of: Void.self) { group in
-      group.addTask { await waiter.awaitPendingFrame() }
-      group.addTask { await deadline.wait() }
-      await group.next()
-      group.cancelAll()
-    }
-  }
-}
-
-/// Non-generic, main-actor-isolated (so implicitly `Sendable`) waiter the
-/// harness hands to its task group: the generic harness itself carries a
-/// non-`Sendable` metatype that an isolated child task may not capture.
-@MainActor
-private final class KeyframeFrameSignalWaiter {
-  private let wake: MainActorConditionSignal
-  private let scheduler: FrameScheduler
-
-  init(wake: MainActorConditionSignal, scheduler: FrameScheduler) {
-    self.wake = wake
-    self.scheduler = scheduler
-  }
-
-  func awaitPendingFrame() async {
-    let scheduler = self.scheduler
-    await wake.wait(until: { scheduler.hasPendingFrame() })
-  }
-}
-
-private struct KeyframeHarnessTimeout: Error, CustomStringConvertible {
-  let frame: String
-
-  var description: String {
-    "timed out waiting for the keyframe condition; last frame:\n\(frame)"
-  }
-}
-
-private final class KeyframeRecordingHost: PresentationSurface {
-  let surfaceSize: CellSize
-  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
-  let appearance: TerminalAppearance = .fallback
-  private(set) var frames: [String] = []
-
-  init(surfaceSize: CellSize) {
-    self.surfaceSize = surfaceSize
-  }
-
-  func enableRawMode() throws {}
-  func disableRawMode() throws {}
-  func clearScreen() throws {}
-  func moveCursor(to _: CellPoint) throws {}
-
-  @discardableResult
-  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
-    let rendered = TerminalSurfaceRenderer(capabilityProfile: capabilityProfile).render(surface)
-    frames.append(rendered.replacingOccurrences(of: "\r\n", with: "\n"))
-    return .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
-  }
-
-  func write(_ output: String) throws {
-    frames.append(output.replacingOccurrences(of: "\r\n", with: "\n"))
-  }
-
-  func centerOfText(_ target: String) -> Point? {
-    guard let frame = frames.last else { return nil }
-    for (row, line) in frame.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
-      let text = String(line)
-      guard let range = text.range(of: target) else { continue }
-      let column = text.distance(from: text.startIndex, to: range.lowerBound)
-      return Point(CellPoint(x: column + target.count / 2, y: row))
-    }
-    return nil
-  }
-}
-
-private final class KeyframeEmptyKeyReader: InputReading {
-  func events() -> AsyncStream<KeyPress> {
-    AsyncStream { $0.finish() }
-  }
-}
-
-private final class KeyframeEmptySignalReader: SignalReading {
-  func events() -> AsyncStream<String> {
-    AsyncStream { $0.finish() }
   }
 }

@@ -220,6 +220,7 @@ struct FrameTailInlineStageRenderer: Sendable {
       measured: layout.measured,
       placed: placed,
       baselinePlaced: layout.baselinePlaced,
+      overlayHasTransientDecoration: animationOverlaySnapshot.hasTransientDecoration,
       semantics: semantics.semantics,
       draw: draw.draw,
       raster: raster.surface,

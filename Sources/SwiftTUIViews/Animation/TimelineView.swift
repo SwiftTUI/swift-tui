@@ -331,6 +331,10 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
   public let schedule: Schedule
   /// The closure that produces the content for a given context.
   public let content: @MainActor (TimelineViewContext) -> Content
+  /// The authoring context of the body that created `content`; the closure
+  /// is evaluated under it so an enclosing view's `@State` reads through its
+  /// own owner (see ``KeyframeAnimator``).
+  private let contentAuthoringContext: AuthoringContext?
 
   // Current instant being shown.  Seeded to `.now()` at construction
   // so the first body evaluation is meaningful even before the task
@@ -347,6 +351,7 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
   ) {
     self.schedule = schedule
     self.content = content
+    contentAuthoringContext = currentAuthoringContext()
   }
 
   public var body: some View {
@@ -364,7 +369,7 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
     // sure writes from inside `.task` persist on this instance rather
     // than the global seed.
     _ = hasAdvanced
-    content(context)
+    withAuthoringContext(contentAuthoringContext) { content(context) }
       .task(id: TaskKey(schedule: schedule, mode: mode)) {
         await run(mode: mode)
       }

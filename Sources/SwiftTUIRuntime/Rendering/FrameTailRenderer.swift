@@ -183,12 +183,14 @@ final class FrameTailRenderer: Sendable {
   func storeCommittedFrame(
     _ artifacts: FrameArtifacts,
     baselinePlacedTree: PlacedNode,
+    overlayHasTransientDecoration: Bool,
     proposal: ProposedSize
   ) {
     workerExecutor.sync {
       retainedState.storeCommittedFrame(
         artifacts,
         baselinePlacedTree: baselinePlacedTree,
+        overlayHasTransientDecoration: overlayHasTransientDecoration,
         proposal: proposal
       )
     }
