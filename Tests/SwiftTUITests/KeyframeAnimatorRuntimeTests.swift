@@ -113,9 +113,15 @@ struct KeyframeAnimatorRuntimeTests {
     }
     defer { harness.shutdown() }
 
+    // Wait for both halves of the claim, not just the wrap. A loaded runner
+    // drops enough frames that the first wrap can land on a three-entry run
+    // ([0, 10, 0]) — which satisfied a wrap-only predicate while failing the
+    // count below. Repeating mode keeps cycling, so the fourth distinct write
+    // costs another tick rather than a flake; the values that satisfy the
+    // expectations are unchanged.
     try await harness.wait(until: {
       let run = probe.distinctRun
-      return zip(run.dropFirst(), run).contains { $0 < $1 }
+      return run.count >= 4 && zip(run.dropFirst(), run).contains { $0 < $1 }
     })
     #expect(probe.values.allSatisfy { $0 >= 0 && $0 <= 10 }, "\(probe.values)")
     #expect(probe.distinctRun.count >= 4)
