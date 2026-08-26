@@ -38,6 +38,14 @@ env:
   # Full stress churn-loop iteration counts (plan 2026-08-25-001 Stage 2b):
   # the push gate runs the hot-path counts; this lane restores the full ones.
   SWIFTTUI_STRESS_FULL: "1"
+  # This is the most contended lane in the org: the whole suite in parallel, in
+  # release, with the full stress counts. Run-loop animation tests get a
+  # fraction of real time here, so bounds written for an interactive machine
+  # expire while the animation is still mid-flight — on 2026-08-26 that showed
+  # up as six `ContentTransition` roll pins reading a mid-roll frame and four
+  # animator waits timing out, all of which pass in release locally. The
+  # deadlines are what get stretched; every expectation still has to hold.
+  SWIFTTUI_TEST_TIMEOUT_SCALE: "4"
 
 jobs:
   changes:

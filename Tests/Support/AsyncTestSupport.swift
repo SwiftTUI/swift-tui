@@ -16,6 +16,19 @@ package enum AsyncTestTimeouts {
     return max(1, parsedValue)
   }
 
+  /// `duration` stretched by ``timeoutScale``, for deadlines expressed as a
+  /// `Duration` rather than a nanosecond count.
+  ///
+  /// Use it for any wall-clock bound a starved lane can miss without the code
+  /// being wrong — a run-loop harness waiting for an animation to reach a
+  /// state, say. The release soundness lane runs the whole suite in parallel,
+  /// in release, with `SWIFTTUI_STRESS_FULL=1`, so it delivers animation frames
+  /// at a fraction of real time; bounds written for an interactive machine time
+  /// out there while the same tests pass locally.
+  package static func scaled(_ duration: Duration) -> Duration {
+    duration * timeoutScale
+  }
+
   package static func scaledNanoseconds(_ nanoseconds: UInt64) -> UInt64 {
     let scaled = Double(nanoseconds) * timeoutScale
     guard scaled.isFinite else {

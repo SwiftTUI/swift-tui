@@ -111,9 +111,14 @@ final class AnimatorRuntimeHarness<Content: View> {
 
   /// Renders pending frames as they arrive until `condition` holds, failing
   /// after `timeout` of wall clock so a stalled driver cannot hang the suite.
+  ///
+  /// The default is scaled by `SWIFTTUI_TEST_TIMEOUT_SCALE`: eight seconds is
+  /// ample for an animation on an interactive machine and not always ample on
+  /// a lane running the whole suite in parallel, where the driver gets a
+  /// fraction of real time.
   func wait(
     until condition: @escaping @MainActor () -> Bool,
-    timeout: Duration = .seconds(8)
+    timeout: Duration = AsyncTestTimeouts.scaled(.seconds(8))
   ) async throws {
     let deadline = MonotonicInstant.now().advanced(by: timeout)
     while !condition() {

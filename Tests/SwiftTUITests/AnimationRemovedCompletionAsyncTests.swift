@@ -96,7 +96,7 @@ private final class RemovedCompletionInputReader: TerminalInputReading {
         let host = self.host
         await RemovedCompletionFrameWaiter(host: host) {
           host.frames.last?.contains("hide") == true
-        }.wait(within: .seconds(10))
+        }.wait(within: AsyncTestTimeouts.scaled(.seconds(10)))
         guard let point = host.centerOfText("hide") else {
           continuation.finish()
           return
@@ -105,7 +105,7 @@ private final class RemovedCompletionInputReader: TerminalInputReading {
         continuation.yield(.mouse(.init(kind: .up(.primary), location: point)))
         await RemovedCompletionFrameWaiter(host: host) {
           host.frames.last?.contains("removed=1") == true
-        }.wait(within: .seconds(10))
+        }.wait(within: AsyncTestTimeouts.scaled(.seconds(10)))
         self.frameCountAtExit = host.frames.count
         continuation.yield(.key(KeyPress(.character("c"), modifiers: .ctrl)))
         continuation.finish()
