@@ -8,9 +8,6 @@ builder:
         - SwiftTUI
         - SwiftTUIViews
         - SwiftTUIRuntime
-        - SwiftTUICore
-        - SwiftTUIGraph
-        - SwiftTUIPrimitives
         - SwiftTUIArguments
         - SwiftTUITerminalCLI
         - SwiftTUICLI
