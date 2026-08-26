@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-08-26
+
 ### Added
 
 - **`ContentTransition`.** `View.contentTransition(_:)` (and

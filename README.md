@@ -3,7 +3,7 @@
 **SwiftUI semantics, drawn in terminal cells.**
 
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
-![Status](https://img.shields.io/badge/beta-0.9.10-DAA520)
+![Status](https://img.shields.io/badge/beta-0.9.11-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
 SwiftTUI is a Swift framework for building terminal user interfaces on macOS,
@@ -86,7 +86,7 @@ Add the package, depend on its `SwiftTUI` product, and `swift run`:
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.9.10")),
+.package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.9.11")),
 // in your executable target:
 .product(name: "SwiftTUI", package: "swift-tui"),
 ```
