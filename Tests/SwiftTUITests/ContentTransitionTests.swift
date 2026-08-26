@@ -20,7 +20,6 @@ import Testing
 struct ContentTransitionTests {
   private static let bumpLabel = "bump"
   private static let duration: Duration = .milliseconds(600)
-  private static let settle: Duration = .milliseconds(900)
 
   // MARK: - numericText
 
@@ -31,7 +30,7 @@ struct ContentTransitionTests {
     }
     defer { harness.shutdown() }
 
-    let rows = try await Self.rowsAfterBump(harness)
+    let rows = try await Self.rowsAfterBump(harness, restingOn: "42")
     #expect(rows.last?.text == "42", "rows: \(rows.map(\.text))")
     #expect(Set(rows.map(\.text)).isSubset(of: ["41", "42"]), "rows: \(rows.map(\.text))")
     #expect(rows.contains { $0.text == "41" }, "the roll must start from the old string")
@@ -50,7 +49,7 @@ struct ContentTransitionTests {
     }
     defer { harness.shutdown() }
 
-    let digits = try await Self.rowsAfterBump(harness).map(\.text)
+    let digits = try await Self.rowsAfterBump(harness, restingOn: "0").map(\.text)
     Self.expectRun(digits, along: ["7", "8", "9", "0"])
     #expect(digits.contains("8") || digits.contains("9"), "no intermediate digit: \(digits)")
   }
@@ -62,7 +61,7 @@ struct ContentTransitionTests {
     }
     defer { harness.shutdown() }
 
-    let digits = try await Self.rowsAfterBump(harness).map(\.text)
+    let digits = try await Self.rowsAfterBump(harness, restingOn: "0").map(\.text)
     Self.expectRun(digits, along: ["7", "6", "5", "4", "3", "2", "1", "0"])
     #expect(digits.contains("6") || digits.contains("5"), "no intermediate digit: \(digits)")
   }
@@ -72,7 +71,7 @@ struct ContentTransitionTests {
     let down = try AnimatorRuntimeHarness {
       RollFixture(from: "7", to: "0", fromValue: 7, toValue: 0)
     }
-    let downDigits = try await Self.rowsAfterBump(down).map(\.text)
+    let downDigits = try await Self.rowsAfterBump(down, restingOn: "0").map(\.text)
     down.shutdown()
     Self.expectRun(downDigits, along: ["7", "6", "5", "4", "3", "2", "1", "0"])
     #expect(downDigits.contains("6") || downDigits.contains("5"), "digits: \(downDigits)")
@@ -81,7 +80,7 @@ struct ContentTransitionTests {
       RollFixture(from: "7", to: "0", fromValue: 7, toValue: 10)
     }
     defer { up.shutdown() }
-    let upDigits = try await Self.rowsAfterBump(up).map(\.text)
+    let upDigits = try await Self.rowsAfterBump(up, restingOn: "0").map(\.text)
     Self.expectRun(upDigits, along: ["7", "8", "9", "0"])
     #expect(upDigits.contains("8") || upDigits.contains("9"), "digits: \(upDigits)")
   }
@@ -93,7 +92,7 @@ struct ContentTransitionTests {
     }
     defer { harness.shutdown() }
 
-    let rows = try await Self.rowsAfterBump(harness).drop { $0.text == "99" }
+    let rows = try await Self.rowsAfterBump(harness, restingOn: "100").drop { $0.text == "99" }
     #expect(rows.last?.text == "100", "rows: \(rows.map(\.text))")
     #expect(
       rows.allSatisfy { $0.text.count == 3 && $0.text.first == "1" },
@@ -112,7 +111,7 @@ struct ContentTransitionTests {
     }
     defer { harness.shutdown() }
 
-    let rows = try await Self.rowsAfterBump(harness)
+    let rows = try await Self.rowsAfterBump(harness, restingOn: "2.5")
     #expect(rows.last?.text == "2.5", "rows: \(rows.map(\.text))")
     let separators = rows.map { String($0.text.dropFirst().prefix(1)) }
     Self.expectRun(separators, along: [",", "."])
@@ -130,7 +129,7 @@ struct ContentTransitionTests {
     }
     defer { harness.shutdown() }
 
-    let rows = try await Self.rowsAfterBump(harness)
+    let rows = try await Self.rowsAfterBump(harness, restingOn: "42")
     #expect(rows.last?.text == "42", "rows: \(rows.map(\.text))")
     Self.expectRun(rows.map(\.text), along: ["41", "42"])
     #expect(rows.contains { $0.text == "41" && $0.dimmed[0] && $0.dimmed[1] }, "old string dims: \(rows)")
@@ -145,7 +144,7 @@ struct ContentTransitionTests {
     }
     defer { harness.shutdown() }
 
-    let rows = try await Self.rowsAfterBump(harness)
+    let rows = try await Self.rowsAfterBump(harness, restingOn: "42")
     Self.expectRun(rows.map(\.text), along: ["41", "42"])
     #expect(rows.last?.text == "42", "rows: \(rows)")
     #expect(rows.allSatisfy { !$0.dimmed.contains(true) }, "a cut never dims: \(rows)")
@@ -158,7 +157,7 @@ struct ContentTransitionTests {
     }
     defer { harness.shutdown() }
 
-    let rows = try await Self.rowsAfterBump(harness)
+    let rows = try await Self.rowsAfterBump(harness, restingOn: "42")
     Self.expectRun(rows.map(\.text), along: ["41", "42"])
     #expect(rows.last?.text == "42", "rows: \(rows)")
     #expect(rows.allSatisfy { !$0.dimmed.contains(true) }, "a cut never dims: \(rows)")
@@ -171,7 +170,7 @@ struct ContentTransitionTests {
     }
     defer { harness.shutdown() }
 
-    let rows = try await Self.rowsAfterBump(harness)
+    let rows = try await Self.rowsAfterBump(harness, restingOn: "42")
     Self.expectRun(rows.map(\.text), along: ["41", "42"])
     #expect(rows.last?.text == "42", "rows: \(rows)")
     #expect(rows.allSatisfy { !$0.dimmed.contains(true) }, "a cut never dims: \(rows)")
@@ -181,12 +180,28 @@ struct ContentTransitionTests {
 
   /// Row 1 of every surface presented after the button write, as text plus a
   /// per-column "dimmed" flag against the reference row.
+  ///
+  /// The wait is on the transition's rest state — `restingOn` shown with no
+  /// column dimmed — rather than on a fixed span of wall clock. A starved
+  /// driver delivers fewer animation frames per millisecond than an idle one,
+  /// so a wall-clock hold returned mid-roll whenever the machine was busy (the
+  /// release soundness lane runs the whole suite in parallel; every roll pin
+  /// failed there while passing locally). A roll that never reaches rest now
+  /// raises the harness timeout, which names the stall instead of leaving a
+  /// half-finished frame to fail an unrelated expectation.
   private static func rowsAfterBump(
-    _ harness: AnimatorRuntimeHarness<RollFixture>
+    _ harness: AnimatorRuntimeHarness<RollFixture>,
+    restingOn finalText: String
   ) async throws -> [ObservedRow] {
     let before = harness.surfaces.count
     try harness.clickText(bumpLabel)
-    try await harness.hold(for: settle)
+    try await harness.wait(until: {
+      guard harness.surfaces.count > before, let last = harness.surfaces.last else {
+        return false
+      }
+      let row = ObservedRow(last)
+      return row.text == finalText && !row.dimmed.contains(true)
+    })
     let observed = harness.surfaces.dropFirst(before).map(ObservedRow.init)
     try #require(!observed.isEmpty, "no frame was presented after the write")
     return Array(observed)
