@@ -567,6 +567,46 @@ package final class AnimationController: Sendable {
     return result.snapshot
   }
 
+  /// `true` while the placed-overlay pass owns animation work that no other
+  /// pass can advance: an insertion offset, a matched-geometry travel, or an
+  /// exit overlay it has taken ownership of.
+  ///
+  /// ``placedAnimationOverlaySnapshot(for:at:surfaceSize:adoption:)`` is the
+  /// sole evaluator, custom-state advancer, and completer of all three — an
+  /// off-screen-elided frame runs the head tick but never reaches that pass,
+  /// and the head deliberately declines to touch them (double-sampling a
+  /// stateful `CustomAnimation` is the bug that split the ownership). Eliding
+  /// such a frame therefore does not defer the work, it freezes it: the sample
+  /// on screen never changes, so the animation never lands and never drains.
+  ///
+  /// The freeze is self-sustaining rather than transient, which is why this is
+  /// a hard blocker on off-screen elision rather than an input to the
+  /// `drawnIdentities` comparison. All three scopes move a node's placed rect,
+  /// so the frozen sample is precisely the one holding the node off the
+  /// surface, which keeps the identity out of `drawnIdentities`, which keeps
+  /// the next tick elidable. See
+  /// ``OffscreenFrameElision/shouldElide(causes:hasExplicitAnimationTransactions:redrawIdentities:drawnIdentities:hasPlacedPassOwnedAnimationWork:)``.
+  package var hasPlacedPassOwnedAnimationWork: Bool {
+    let hasPlacedGeometryScope = activeAnimations.values.contains { animation in
+      switch animation.kind {
+      case .insertionOffset, .matchedGeometry:
+        true
+      case .property:
+        false
+      }
+    }
+    if hasPlacedGeometryScope {
+      return true
+    }
+    // Mirrors `sampleRemovalOverlays`' ownership guard, and the matching skip
+    // in `applyInterpolations`, exactly: a removal the placed pass does NOT
+    // own still drains at the head, so it must not block elision.
+    return removingNodes.values.contains { entry in
+      entry.placedSnapshot != nil && entry.parentIdentity != nil
+        && entry.animationBox.map { registeredAnimations[$0] != nil } == true
+    }
+  }
+
   /// Number of insertion-offset animations currently in flight.
   /// Test hook so integration tests can pin the enqueue path
   /// without exposing the entire private map.
@@ -2373,11 +2413,14 @@ package final class AnimationController: Sendable {
           // removal interrupted a mid-flight insertion) toward the
           // removal modifiers.  Progress 0 == starting state,
           // progress 1 == fully removed.
+          // Resolved-level fallback: no placed rect exists for the departing
+          // subtree yet, so the surface is the only basis available (the
+          // documented fallback on `resolvedOffset(edgeBasis:)`).
           modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
             from: entry.startOpacity,
             to: entry.transition.removalModifiers(),
             progress: progress,
-            surfaceSize: surfaceSize
+            edgeBasis: surfaceSize
           )
         } else {
           animationComplete = true

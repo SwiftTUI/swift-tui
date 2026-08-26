@@ -24,6 +24,7 @@ package enum PlacedAnimationOverlaySampling {
     let insertionResult = sampleInsertionOffsets(
       activeAnimations: activeAnimations,
       registeredAnimations: registeredAnimations,
+      tree: tree,
       timestamp: timestamp,
       surfaceSize: effectiveSurfaceSize
     )
@@ -144,11 +145,14 @@ package enum PlacedAnimationOverlaySampling {
         continue
       }
 
+      // The departing view leaves across its OWN edge, so the frozen overlay's
+      // size is the basis — not the surface, which would fling a small view a
+      // whole screen away in the time it should take to clear its own frame.
       let modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
         from: entry.startOpacity,
         to: entry.transition.removalModifiers(),
         progress: progress,
-        surfaceSize: surfaceSize
+        edgeBasis: placedSnapshot.bounds.size
       )
       let matchedGeometryOffset = entry.matchedTravel.flatMap { travel in
         matchedRemovalOffset(
@@ -213,9 +217,14 @@ package enum PlacedAnimationOverlaySampling {
     )
   }
 
+  /// - Parameter surfaceSize: the fallback edge basis for an identity with no
+  ///   placed rect in `tree` (it resolved away, or the insertion is being
+  ///   sampled against a tree that does not contain it). The node's own placed
+  ///   size is preferred — see ``TransitionModifiers/resolvedOffset(edgeBasis:)``.
   private static func sampleInsertionOffsets(
     activeAnimations: [AnimationKey: ActiveAnimation],
     registeredAnimations: [AnimationBox: Animation],
+    tree: PlacedNode,
     timestamp: MonotonicInstant,
     surfaceSize: CellSize
   ) -> OffsetSamplingResult {
@@ -239,7 +248,12 @@ package enum PlacedAnimationOverlaySampling {
         continue
       }
 
-      let start = from.resolvedOffset(surfaceSize: surfaceSize)
+      // The arriving view crosses its OWN edge: it starts one view width (or
+      // height) outside the slot it is about to occupy and slides into it.
+      let edgeBasis =
+        AnimationTreeQueries.findBounds(in: tree, identity: key.identity)?.size
+        ?? surfaceSize
+      let start = from.resolvedOffset(edgeBasis: edgeBasis)
       result.offsets.append(
         .init(
           identity: key.identity,

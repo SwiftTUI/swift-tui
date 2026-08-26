@@ -29,29 +29,40 @@ package struct TransitionModifiers: Sendable, Equatable {
     offsetX != nil || offsetY != nil || moveEdge != nil
   }
 
-  package func resolvedOffset(surfaceSize: CellSize?) -> (x: Int, y: Int) {
+  /// Resolves an edge-relative `move` into a concrete cell delta.
+  ///
+  /// - Parameter edgeBasis: the box the edge is measured against. SwiftUI
+  ///   moves the view "towards the specified edge *of the view*", so this is
+  ///   the moving view's own placed size wherever the caller has it. Passing
+  ///   the render surface instead makes a small view start a whole screen
+  ///   away, which reads as a pop rather than a slide once anything clips it
+  ///   (and, inside a narrow container, is invisible until the final frames).
+  ///   The surface remains the documented fallback for the pre-layout
+  ///   resolved-level removal path, where the view has no placed rect yet.
+  ///   `nil` drops the edge component entirely.
+  package func resolvedOffset(edgeBasis: CellSize?) -> (x: Int, y: Int) {
     var x = offsetX ?? 0
     var y = offsetY ?? 0
 
-    if let moveEdge, let surfaceSize {
+    if let moveEdge, let edgeBasis {
       switch moveEdge {
       case .top:
-        y -= surfaceSize.height
+        y -= edgeBasis.height
       case .bottom:
-        y += surfaceSize.height
+        y += edgeBasis.height
       case .leading:
-        x -= surfaceSize.width
+        x -= edgeBasis.width
       case .trailing:
-        x += surfaceSize.width
+        x += edgeBasis.width
       }
     }
 
     return (x, y)
   }
 
-  package func resolvingEdgeOffset(surfaceSize: CellSize?) -> TransitionModifiers {
+  package func resolvingEdgeOffset(edgeBasis: CellSize?) -> TransitionModifiers {
     guard hasOffsetEffect else { return self }
-    let offset = resolvedOffset(surfaceSize: surfaceSize)
+    let offset = resolvedOffset(edgeBasis: edgeBasis)
     return TransitionModifiers(
       opacity: opacity,
       offsetX: offset.x,

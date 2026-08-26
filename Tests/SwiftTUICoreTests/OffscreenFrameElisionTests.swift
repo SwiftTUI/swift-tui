@@ -13,7 +13,8 @@ struct OffscreenFrameElisionTests {
       causes: [.deadline],
       hasExplicitAnimationTransactions: false,
       redrawIdentities: [testIdentity("1"), testIdentity("2")],
-      drawnIdentities: [testIdentity("3"), testIdentity("4")]
+      drawnIdentities: [testIdentity("3"), testIdentity("4")],
+      hasPlacedPassOwnedAnimationWork: false
     )
     #expect(result == true)
   }
@@ -24,7 +25,8 @@ struct OffscreenFrameElisionTests {
       causes: [.deadline],
       hasExplicitAnimationTransactions: false,
       redrawIdentities: [],
-      drawnIdentities: [testIdentity("3")]
+      drawnIdentities: [testIdentity("3")],
+      hasPlacedPassOwnedAnimationWork: false
     )
     #expect(result == true)
   }
@@ -35,7 +37,8 @@ struct OffscreenFrameElisionTests {
       causes: [.deadline],
       hasExplicitAnimationTransactions: false,
       redrawIdentities: [testIdentity("1")],
-      drawnIdentities: []
+      drawnIdentities: [],
+      hasPlacedPassOwnedAnimationWork: false
     )
     #expect(result == true)
   }
@@ -48,7 +51,8 @@ struct OffscreenFrameElisionTests {
       causes: [.deadline],
       hasExplicitAnimationTransactions: false,
       redrawIdentities: [testIdentity("1"), testIdentity("3")],
-      drawnIdentities: [testIdentity("3"), testIdentity("4")]
+      drawnIdentities: [testIdentity("3"), testIdentity("4")],
+      hasPlacedPassOwnedAnimationWork: false
     )
     #expect(result == false)
   }
@@ -62,7 +66,8 @@ struct OffscreenFrameElisionTests {
       causes: [.deadline, extra],
       hasExplicitAnimationTransactions: false,
       redrawIdentities: [testIdentity("1")],
-      drawnIdentities: [testIdentity("3")]
+      drawnIdentities: [testIdentity("3")],
+      hasPlacedPassOwnedAnimationWork: false
     )
     #expect(result == false)
   }
@@ -73,7 +78,25 @@ struct OffscreenFrameElisionTests {
       causes: [.deadline],
       hasExplicitAnimationTransactions: true,
       redrawIdentities: [testIdentity("1")],
-      drawnIdentities: [testIdentity("3")]
+      drawnIdentities: [testIdentity("3")],
+      hasPlacedPassOwnedAnimationWork: false
+    )
+    #expect(result == false)
+  }
+
+  @Test("Does not elide while the placed pass owns live animation work")
+  func doesNotElideWhilePlacedPassOwnsAnimationWork() {
+    // An insertion offset, a matched-geometry travel, or an exit overlay
+    // relocates a node's placed rect, so an identity that has never been drawn
+    // is exactly the one about to arrive on screen — and the placed pass that
+    // advances and completes it is the pass elision skips. Eliding here freezes
+    // the animation forever.
+    let result = OffscreenFrameElision.shouldElide(
+      causes: [.deadline],
+      hasExplicitAnimationTransactions: false,
+      redrawIdentities: [testIdentity("1")],
+      drawnIdentities: [testIdentity("3")],
+      hasPlacedPassOwnedAnimationWork: true
     )
     #expect(result == false)
   }
@@ -84,7 +107,8 @@ struct OffscreenFrameElisionTests {
       causes: [.deadline],
       hasExplicitAnimationTransactions: true,
       redrawIdentities: [testIdentity("1")],
-      drawnIdentities: [testIdentity("3")]
+      drawnIdentities: [testIdentity("3")],
+      hasPlacedPassOwnedAnimationWork: false
     )
     #expect(result == false)
   }

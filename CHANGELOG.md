@@ -39,6 +39,23 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- **An offset-only transition never played.** `.transition(.slide)`,
+  `.move(edge:)`, and `.offset(x:y:)` register a placed-level offset animation
+  that only the placed-overlay pass advances — the pass an off-screen-elided
+  frame skips. The arriving view starts outside the slot it is about to
+  occupy, so it had never been drawn, so every animation deadline read as
+  unable to reach the screen and elided; the frozen offset then held the view
+  off-screen and kept the next tick elidable. The insertion never appeared at
+  all until unrelated input forced a real frame, and a departing view's exit
+  overlay stranded off-screen with the frame pump re-arming forever. Elision
+  now treats placed-pass-owned work — insertion offsets, matched-geometry
+  travel, and exit overlays — as a hard blocker.
+- **`move(edge:)` measured its travel against the render surface.** An
+  edge-relative move now starts (and ends) one *view* width or height outside
+  the moving view's own frame, as SwiftUI does. Inside anything that clips —
+  a bordered box, a `ScrollView` page — a small view used to begin a whole
+  screen away and cross into view only on its last frame, which read as a pop
+  rather than a slide.
 - **A co-present non-source no longer flies in from its source** on an
   unrelated animated write: the controller plans no matched animation for a
   non-source whose key has a source in the same frame.

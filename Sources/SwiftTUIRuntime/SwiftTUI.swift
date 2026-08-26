@@ -585,13 +585,15 @@ public struct DefaultRenderer {
       guard !proposalChanged else {
         return false
       }
-      let tick = draft.animationDraft.controller.lastTickResult
+      let controller = draft.animationDraft.controller
+      let tick = controller.lastTickResult
       guard
         OffscreenFrameElision.shouldElide(
           causes: elisionCauses,
           hasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
           redrawIdentities: tick.redrawIdentities,
-          drawnIdentities: frameTailRenderer.previousDrawnIdentities
+          drawnIdentities: frameTailRenderer.previousDrawnIdentities,
+          hasPlacedPassOwnedAnimationWork: controller.hasPlacedPassOwnedAnimationWork
         )
       else {
         return false
@@ -626,7 +628,12 @@ public struct DefaultRenderer {
         causes: elisionCauses,
         hasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
         redrawIdentities: redrawIdentities,
-        drawnIdentities: frameTailRenderer.previousDrawnIdentities
+        drawnIdentities: frameTailRenderer.previousDrawnIdentities,
+        // Redundant with the eligibility gate above (which returns nil unless
+        // every active animation is a `.property` and nothing is removing), but
+        // stated rather than assumed: the pre-head tick only advances property
+        // scopes.
+        hasPlacedPassOwnedAnimationWork: animationController.hasPlacedPassOwnedAnimationWork
       )
     else {
       return false

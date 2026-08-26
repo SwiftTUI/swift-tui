@@ -8,18 +8,22 @@ enum AnimationTransitionOverlay {
   ///
   /// `progress == 0` means the removal is just starting from the displayed
   /// state; `progress == 1` means the removal reached the target modifiers.
+  /// - Parameter edgeBasis: the box an edge-relative `move` is measured
+  ///   against — the departing view's own frozen placed size on the placed
+  ///   path, the render surface on the pre-layout resolved fallback. See
+  ///   ``TransitionModifiers/resolvedOffset(edgeBasis:)``.
   static func interpolatedRemovalModifiers(
     from startOpacity: Double,
     to target: TransitionModifiers,
     progress: Double,
-    surfaceSize: CellSize? = nil
+    edgeBasis: CellSize? = nil
   ) -> TransitionModifiers {
     var result = TransitionModifiers.identity
     if let targetOpacity = target.opacity {
       result.opacity = startOpacity + (targetOpacity - startOpacity) * progress
     }
     if target.hasOffsetEffect {
-      let targetOffset = target.resolvedOffset(surfaceSize: surfaceSize)
+      let targetOffset = target.resolvedOffset(edgeBasis: edgeBasis)
       result.offsetX = Int(Double(targetOffset.x) * progress)
       result.offsetY = Int(Double(targetOffset.y) * progress)
     }

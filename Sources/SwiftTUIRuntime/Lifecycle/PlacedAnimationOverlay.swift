@@ -107,7 +107,10 @@ package func applyPlacedAnimationOverlaySnapshot(
     for removal in snapshot.removalOverlays {
       var clone = removal.snapshot
       applyPlacedOverlayModifiers(
-        removal.modifiers.resolvingEdgeOffset(surfaceSize: tree.bounds.size),
+        // Sampling already resolved the edge against the overlay's own size;
+        // this only catches a snapshot that still carries a raw `moveEdge`,
+        // and it resolves it on the same basis rather than the surface.
+        removal.modifiers.resolvingEdgeOffset(edgeBasis: removal.snapshot.bounds.size),
         to: &clone
       )
       if let travel = removal.matchedGeometryOffset {

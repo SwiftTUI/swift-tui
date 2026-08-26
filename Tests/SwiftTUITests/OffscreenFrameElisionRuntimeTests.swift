@@ -1157,6 +1157,14 @@ struct OffscreenFrameElisionRuntimeTests {
   /// a clipped LAYOUT animation is safely elided, not merely a clipped paint
   /// animation.
   ///
+  /// The argument below is scoped to `.property` animations. Work owned by the
+  /// placed-overlay pass — an insertion offset, a matched-geometry travel, or
+  /// an exit overlay — breaks its premise: it relocates the node itself across
+  /// the viewport boundary, from or to a position that `drawnIdentities` never
+  /// recorded. Those disqualify elision outright rather than relying on that
+  /// set. See ``offsetOnlyInsertionTransitionIsNeverElided()`` and
+  /// ``offsetOnlyRemovalTransitionDrainsOffScreen()``.
+  ///
   /// Sibling-near-viewport-edge variant NOT added — and it is unconstructible
   /// in this layout/clip model, not merely skipped. A `frameHeight` animation
   /// only ever mutates its OWN node's `layoutBehavior` and only inserts its OWN
@@ -1590,6 +1598,203 @@ struct OffscreenFrameElisionRuntimeTests {
     }
   }
 
+  // MARK: - Placed-level geometry animations
+
+  /// An offset-only insertion transition (`.slide`, `.move(edge:)`,
+  /// `.offset(x:y:)`) is the construction the `drawnIdentities` proxy cannot
+  /// express: the arriving view starts OUTSIDE the slot it is about to occupy,
+  /// so it has never been painted, so every deadline tick reads as "this redraw
+  /// cannot reach the surface". Eliding it skips the placed-overlay pass — the
+  /// sole owner of that animation's evaluation, advance, and completion — which
+  /// freezes the offset at its starting sample, which keeps the identity
+  /// off-surface, which keeps the next tick elidable. The view then never
+  /// appears at all: in the gallery's Transitions section the slide-in was
+  /// invisible until an unrelated click forced a real frame, and a late click
+  /// popped it straight to its final position.
+  ///
+  /// Guards the fix at the level that actually failed: frames must keep
+  /// rendering (nothing elides while the offset is live) and the text must be
+  /// on the presented raster by the time the curve ends, with no input at all.
+  @Test("an offset-only insertion transition is never elided and lands on screen")
+  func offsetOnlyInsertionTransitionIsNeverElided() async throws {
+    let terminalSize = CellSize(width: 20, height: 3)
+    let rootIdentity = testIdentity("ElisionSlideInsertion", "Root")
+    let terminal = ElisionProbeTerminalHost(surfaceSize: terminalSize)
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      terminalInputReader: ElisionEmptyInputReader(),
+      signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        SlideInsertionProbe()
+      }
+    )
+    // Virtual clock: the 300 ms curve is spent by ticks, not by setup cost.
+    let clock = VirtualFrameClock(MonotonicInstant.now())
+    runLoop.frameClock = { [clock] in clock.now }
+
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
+      // Synchronous mount + onAppear follow-up, for the determinism reasons the
+      // sibling tests document.
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      while scheduler.hasPendingFrame(at: clock.now) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+
+      let controller = runLoop.renderer.internalAnimationController
+      #expect(
+        controller.activeInsertionOffsetCount > 0,
+        "the insertion offset animation must be in flight before the ticks"
+      )
+      #expect(
+        controller.hasPlacedPassOwnedAnimationWork,
+        "an insertion offset is placed-pass-owned work"
+      )
+      #expect(
+        !Self.surfaceContains("slide", terminal),
+        "the arriving view starts outside its own slot, so it is not on screen yet"
+      )
+
+      let elidedBefore = runLoop.renderer.elidedFrameCount
+
+      // Deadline-only ticks, no input of any kind — exactly the situation the
+      // user is in while watching the animation.
+      var ticks = 0
+      while controller.activeInsertionOffsetCount > 0 && ticks < 40 {
+        scheduler.requestDeadline(clock.advance(by: .milliseconds(16)))
+        _ = try await runLoop.renderPendingFramesAsync(
+          renderedFrames: &renderedFrames,
+          eventPump: nil
+        )
+        ticks += 1
+      }
+
+      #expect(
+        controller.activeInsertionOffsetCount == 0,
+        "the insertion offset must run to completion on deadline ticks alone; ticks=\(ticks)"
+      )
+      #expect(
+        runLoop.renderer.elidedFrameCount == elidedBefore,
+        """
+        no frame may elide while a placed-level geometry animation is live; \
+        elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)
+        """
+      )
+      #expect(
+        Self.surfaceContains("slide", terminal),
+        """
+        the slid-in view must be on the presented raster with no input; last \
+        frame was:
+        \(terminal.lastSurface?.lines.joined(separator: "\n") ?? "(nothing presented)")
+        """
+      )
+    }
+  }
+
+  /// The exit half of the same ownership rule. A departing view with an
+  /// offset-only transition leaves the clipped viewport partway through its
+  /// curve, at which point its identity drops out of `drawnIdentities` — and
+  /// the placed pass that would finish the travel, fire the `.removed`
+  /// barrier, and purge the overlay is the pass elision skips. The head tick
+  /// deliberately declines to advance a placed-owned removal (it would
+  /// double-sample a stateful curve), so an elided frame strands the entry in
+  /// `removingNodes` forever: the exit never completes and the 33 ms pump it
+  /// keeps re-arming never quiesces.
+  @Test("an offset-only removal transition drains instead of stranding off-screen")
+  func offsetOnlyRemovalTransitionDrainsOffScreen() async throws {
+    let terminalSize = CellSize(width: 20, height: 3)
+    let rootIdentity = testIdentity("ElisionSlideRemoval", "Root")
+    let terminal = ElisionProbeTerminalHost(surfaceSize: terminalSize)
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      terminalInputReader: ElisionEmptyInputReader(),
+      signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        SlideRemovalProbe()
+      }
+    )
+    let clock = VirtualFrameClock(MonotonicInstant.now())
+    runLoop.frameClock = { [clock] in clock.now }
+
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      while scheduler.hasPendingFrame(at: clock.now) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+
+      let controller = runLoop.renderer.internalAnimationController
+      #expect(
+        !controller.debugStateSnapshot().removingIdentities.isEmpty,
+        "the exit transition must be in flight before the ticks"
+      )
+
+      var ticks = 0
+      while !controller.debugStateSnapshot().removingIdentities.isEmpty && ticks < 40 {
+        scheduler.requestDeadline(clock.advance(by: .milliseconds(16)))
+        _ = try await runLoop.renderPendingFramesAsync(
+          renderedFrames: &renderedFrames,
+          eventPump: nil
+        )
+        ticks += 1
+      }
+
+      #expect(
+        controller.debugStateSnapshot().removingIdentities.isEmpty,
+        "the exit overlay must drain on deadline ticks alone; ticks=\(ticks)"
+      )
+      #expect(
+        !controller.requiresContinuedAnimationFrames,
+        "a drained exit must let the animation pump quiesce"
+      )
+    }
+  }
+
+  private static func surfaceContains(
+    _ needle: String,
+    _ terminal: ElisionProbeTerminalHost
+  ) -> Bool {
+    terminal.lastSurface?.lines.contains { $0.contains(needle) } ?? false
+  }
+
   /// Builds a minimal one-shot `FrameHeadTransaction` (no abort checkpoints)
   /// wired to the given live animation controller via a real
   /// `AnimationFrameDraft`. One-shot mode is sufficient here: `commitElided()`
@@ -1907,6 +2112,9 @@ private final class ElisionProbeTerminalHost: PresentationSurface {
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private(set) var presentCount = 0
+  /// The most recent presented raster, so a test can assert on what the user
+  /// would actually be looking at rather than only on frame counts.
+  private(set) var lastSurface: RasterSurface?
 
   init(surfaceSize: CellSize) {
     self.surfaceSize = surfaceSize
@@ -1928,6 +2136,7 @@ private final class ElisionProbeTerminalHost: PresentationSurface {
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     presentCount += 1
+    lastSurface = surface
     return .init(
       bytesWritten: 0,
       linesTouched: surface.size.height,
@@ -1941,6 +2150,69 @@ private final class ElisionEmptyInputReader: TerminalInputReading {
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
       continuation.finish()
+    }
+  }
+}
+
+/// Slides a view in on appear with an offset-only transition, inside a clipping
+/// viewport — the gallery's shape, and the one that deadlocks.
+///
+/// `.slide` carries no opacity effect, so the insertion registers ONLY an
+/// `.insertionOffset` animation: the placed-level scope whose evaluation an
+/// elided frame skips. The clip is load-bearing for the repro. A node merely
+/// past the surface edge is still recorded in `drawnIdentities`, so its ticks
+/// stay non-disjoint and render anyway; a node clipped out by a viewport is
+/// correctly withheld from that set, which is what lets the gate mistake "has
+/// never been drawn" for "can never be drawn".
+private struct SlideInsertionProbe: View {
+  @State private var show = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("anchor")
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          if show {
+            Text("slide").transition(.slide)
+          }
+        }
+      }
+      .frame(width: 20, height: 1, alignment: .topLeading)
+    }
+    .frame(width: 20, height: 3, alignment: .topLeading)
+    .onAppear {
+      withAnimation(.linear(duration: .milliseconds(300))) {
+        show = true
+      }
+    }
+  }
+}
+
+/// Slides a view out on appear with an offset-only transition, inside a
+/// clipping viewport: the exit counterpart of ``SlideInsertionProbe``. The
+/// departing overlay leaves the viewport partway through its curve, dropping
+/// its identity out of `drawnIdentities` while the placed pass still owes it
+/// a completion and a purge.
+private struct SlideRemovalProbe: View {
+  @State private var show = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("anchor")
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          if show {
+            Text("slide").transition(.slide)
+          }
+        }
+      }
+      .frame(width: 20, height: 1, alignment: .topLeading)
+    }
+    .frame(width: 20, height: 3, alignment: .topLeading)
+    .onAppear {
+      withAnimation(.linear(duration: .milliseconds(300))) {
+        show = false
+      }
     }
   }
 }

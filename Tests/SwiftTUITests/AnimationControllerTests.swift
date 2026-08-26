@@ -767,10 +767,15 @@ struct AnimationPipelineIntegrationTests {
           proposal: proposal
         )
 
+        // `.slide` inserts across the view's OWN leading edge (SwiftUI's
+        // "the edge of the view"), so "hello" starts exactly its own width
+        // to the left of the slot it is about to occupy — not a whole
+        // surface away, which would leave it invisible until the final
+        // frames of any clipped container.
         let frame2TextBounds = Self.findTextBounds(frame2.placedTree, text: "hello")
         #expect(
-          frame2TextBounds?.origin.x == -surfaceSize.width,
-          "slide insertion should start a full surface width offscreen, got \(String(describing: frame2TextBounds?.origin.x))"
+          frame2TextBounds?.origin.x == -"hello".count,
+          "slide insertion should start one view width offscreen, got \(String(describing: frame2TextBounds?.origin.x))"
         )
 
         // Verify the insertion animation was enqueued on frame 2.
@@ -2008,19 +2013,20 @@ struct AnimationControllerPropertyTests {
       ]
     )
 
-    // Apply placed overlays at t0.  The move(edge: .leading) transition
-    // resolves against the 20-column surface. At progress 0, the
-    // leaf's bounds should be translated by (-20, 0) -> origin.x = -20.
+    // Apply placed overlays at t0. The move(edge: .leading) transition
+    // resolves against the LEAF's own 5-column frame (SwiftUI measures the
+    // move against the view, not the screen), so at progress 0 the leaf sits
+    // one width to the left of its slot: origin.x = -5.
     controller.applyPlacedOverlays(to: &placed, at: t0)
 
     let leafAtStart = placed.children.first
     #expect(leafAtStart != nil)
     #expect(
-      leafAtStart?.bounds.origin.x == -20,
+      leafAtStart?.bounds.origin.x == -5,
       "insertion at t=0 should translate leaf by the transition's initial offset, got \(String(describing: leafAtStart?.bounds.origin.x))"
     )
 
-    // Halfway through the animation, delta should be -10.
+    // Halfway through the animation, delta should be about half a width.
     var placedHalf = PlacedNode(
       identity: rootIdentity,
       kind: .view("Root"),
@@ -2039,10 +2045,8 @@ struct AnimationControllerPropertyTests {
     )
     let leafAtHalf = placedHalf.children.first
     #expect(
-      leafAtHalf?.bounds.origin.x ?? 0 == -10
-        || leafAtHalf?.bounds.origin.x ?? 0 == -9
-        || leafAtHalf?.bounds.origin.x ?? 0 == -11,
-      "insertion halfway should translate by approx -10, got \(String(describing: leafAtHalf?.bounds.origin.x))"
+      (-4...(-1)).contains(leafAtHalf?.bounds.origin.x ?? 0),
+      "insertion halfway should translate by approx -2 or -3, got \(String(describing: leafAtHalf?.bounds.origin.x))"
     )
 
     // Well past the animation end, delta should be 0 (final position).

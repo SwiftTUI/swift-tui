@@ -1841,7 +1841,8 @@ extension FrameworkStressFramePipelineTests {
         causes: [.deadline],
         hasExplicitAnimationTransactions: false,
         redrawIdentities: [departed],
-        drawnIdentities: latestDrawn
+        drawnIdentities: latestDrawn,
+        hasPlacedPassOwnedAnimationWork: false
       )
     )
     #expect(
@@ -1849,7 +1850,8 @@ extension FrameworkStressFramePipelineTests {
         causes: [.deadline],
         hasExplicitAnimationTransactions: false,
         redrawIdentities: [visible],
-        drawnIdentities: latestDrawn
+        drawnIdentities: latestDrawn,
+        hasPlacedPassOwnedAnimationWork: false
       )
     )
   }
