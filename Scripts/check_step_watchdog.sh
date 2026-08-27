@@ -48,6 +48,8 @@ run_case() {
   step_timeout_kill_grace_seconds=1
   step_absolute_timeout_seconds=$absolute_seconds
   step_output_probe_ticks=1
+  # Per-case override; the busy cases raise it to exercise the extension.
+  step_busy_extensions=${case_busy_extensions:-0}
 
   log_file=$work_dir/$case_name.log
   status_file=$work_dir/$case_name.status
@@ -85,6 +87,23 @@ run_case() {
   fi
 }
 
+# A step that burns CPU without printing anything — the block-buffered writer
+# shape. `swift test` writes to a pipe, so libc holds its output until a ~4 KB
+# buffer fills; the 2026-08-26 gallery seam step in swift-tui-examples delivered
+# 453 test lines in 14 bursts and its watchdog read the gap between two of them
+# as a hang. Bounded by wall clock rather than iteration count so the case costs
+# the same everywhere.
+busy_silent_step() {
+  busy_seconds=$1
+  busy_end=$(($(date +%s) + busy_seconds))
+  while [ "$(date +%s)" -lt "$busy_end" ]; do
+    busy_i=0
+    while [ "$busy_i" -lt 2000 ]; do
+      busy_i=$((busy_i + 1))
+    done
+  done
+}
+
 # A step that runs well past the idle bound but never goes quiet for it: the
 # entry-9 case. Emits every 0.4 s for ~4 s against a 2 s idle bound.
 chatty_slow_step() {
@@ -118,14 +137,14 @@ livelock_step() {
 
 . "$repo_root/Scripts/lib/step_watchdog.sh"
 
-echo "1/5 a slow but talking step survives an idle bound it far exceeds"
+echo "1/8 a slow but talking step survives an idle bound it far exceeds"
 run_case chatty_slow 2 0 chatty_slow_step
 if [ "$case_exit" != "0" ]; then
   fail "a step that kept emitting output was killed (exit=$case_exit, detail='$case_detail'). \
 This is the entry-9 regression: the watchdog is measuring wall clock again."
 fi
 
-echo "2/5 a step that parks after emitting output is killed"
+echo "2/8 a step that parks after emitting output is killed"
 run_case parks_after_output 2 0 parks_after_output_step
 if [ "$case_wedged" = "1" ]; then
   fail "the watchdog reported a timeout but never actually killed the step, so the \
@@ -139,7 +158,7 @@ case "$case_detail" in
 *) fail "parked step reported an unexpected timeout detail: '$case_detail'" ;;
 esac
 
-echo "3/5 a step that never emits anything is killed"
+echo "3/8 a step that never emits anything is killed"
 run_case silent 2 0 silent_step
 if [ "$case_wedged" = "1" ]; then
   fail "a silent step outlived the watchdog's kill."
@@ -148,7 +167,7 @@ if [ "$case_exit" != "124" ]; then
   fail "a silent step was not killed (exit=$case_exit)."
 fi
 
-echo "4/5 the absolute backstop kills a step that livelocks while printing"
+echo "4/8 the absolute backstop kills a step that livelocks while printing"
 run_case livelock 60 3 livelock_step
 if [ "$case_wedged" = "1" ]; then
   fail "a livelocking step outlived the watchdog's kill. A step that respawns \
@@ -163,11 +182,60 @@ case "$case_detail" in
 *) fail "livelock step reported an unexpected timeout detail: '$case_detail'" ;;
 esac
 
-echo "5/5 a disabled watchdog (0) never kills anything"
+echo "5/8 a disabled watchdog (0) never kills anything"
 run_case disabled 0 0 chatty_slow_step
 if [ "$case_exit" != "0" ]; then
   fail "a step ran with the watchdog disabled but still failed (exit=$case_exit)."
 fi
+
+echo "6/8 a silent step that is still burning CPU survives the idle bound"
+case_busy_extensions=3
+run_case busy_silent_survives 2 0 busy_silent_step 5
+case_busy_extensions=0
+if [ "$case_wedged" = "1" ]; then
+  fail "the busy-but-silent case never finished; the watchdog left it running."
+fi
+if [ "$case_exit" != "0" ]; then
+  fail "a silent step that was consuming CPU throughout was killed (exit=$case_exit, \
+detail='$case_detail'). Silence is not evidence: a block-buffered writer is quiet \
+until its buffer fills, and killing it turns a healthy lane red with a hang dump \
+that shows a working thread."
+fi
+
+echo "7/8 a silent, busy step still dies once its extensions run out"
+case_busy_extensions=1
+run_case busy_silent_exhausts 2 0 busy_silent_step 600
+case_busy_extensions=0
+if [ "$case_wedged" = "1" ]; then
+  fail "a livelocking silent step outlived the watchdog's kill."
+fi
+if [ "$case_exit" != "124" ]; then
+  fail "a silent step that burned CPU forever was never killed (exit=$case_exit); the \
+busy extension is unbounded, so a real livelock would only die at the absolute cap."
+fi
+case "$case_detail" in
+*"busy extensions"*) ;;
+*) fail "exhausted-extension step reported an unexpected detail: '$case_detail'" ;;
+esac
+
+echo "8/8 a busy-extension budget does not save a parked step"
+case_busy_extensions=3
+run_case parked_with_budget 2 0 parks_after_output_step
+case_busy_extensions=0
+if [ "$case_wedged" = "1" ]; then
+  fail "a parked step outlived the watchdog's kill when extensions were available."
+fi
+if [ "$case_exit" != "124" ]; then
+  fail "a parked step survived because extensions were available (exit=$case_exit). The \
+extension must require CPU to have advanced; a wedge consumes none."
+fi
+case "$case_detail" in
+*"busy extensions"*)
+  fail "a parked step was charged a busy extension: '$case_detail'. It consumed no CPU."
+  ;;
+*"no output"*) ;;
+*) fail "parked step with budget reported an unexpected detail: '$case_detail'" ;;
+esac
 
 if [ "$failures" -ne 0 ]; then
   >&2 echo ""

@@ -20,6 +20,11 @@ step_absolute_timeout_seconds=${SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS:-$((
 # How often the watchdog samples the step's log size. Sampling every tick would
 # stat a multi-megabyte log five times a second for no added resolution.
 step_output_probe_ticks=${SWIFTTUI_TEST_STEP_OUTPUT_PROBE_TICKS:-25}
+# Idle windows the watchdog forgives while the step's process tree is still
+# consuming CPU. Silence alone does not mean parked: `swift test` writes to a
+# pipe, so libc block-buffers it and a healthy binary is quiet until its buffer
+# fills. A wedge consumes no CPU, so it still dies at the first idle bound.
+step_busy_extensions=${SWIFTTUI_TEST_STEP_BUSY_EXTENSIONS:-3}
 soundness_trace_root=$repo_root/.build/soundness-trace
 soundness_quarantine_file=$repo_root/Scripts/soundness_quarantine.txt
 soundness_trace_invocation_index=0
