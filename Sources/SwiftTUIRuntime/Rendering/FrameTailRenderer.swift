@@ -184,14 +184,16 @@ final class FrameTailRenderer: Sendable {
     _ artifacts: FrameArtifacts,
     baselinePlacedTree: PlacedNode,
     overlayHasTransientDecoration: Bool,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    verifyIndexPatch: Bool
   ) {
     workerExecutor.sync {
       retainedState.storeCommittedFrame(
         artifacts,
         baselinePlacedTree: baselinePlacedTree,
         overlayHasTransientDecoration: overlayHasTransientDecoration,
-        proposal: proposal
+        proposal: proposal,
+        verifyIndexPatch: verifyIndexPatch
       )
     }
   }

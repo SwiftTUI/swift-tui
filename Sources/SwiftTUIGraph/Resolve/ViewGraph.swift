@@ -13,21 +13,23 @@ extension ViewGraph {
       frameCommit: frameCommit,
       nodeCheckpoints: nodeCheckpointImageStore.currentImages(of: nodesByNodeID)
     )
-    #if DEBUG
-      // Every capture under DEBUG, gated on the probe toggle so tests can
-      // explicitly opt out to observe fast-path behavior (the oracle's ungated
-      // restore bumps every generation, forcing full re-imaging next capture).
-      if SoundnessProbeConfiguration.isEnabled {
-        verifyCheckpointIsRestoreNoOp(checkpoint)
-      }
-    #else
-      // Release: verify the store-built checkpoint on sampled frames when the
-      // soundness probe is opted in. Off-sample captures keep the fast path
-      // (no restore, no snapshots).
-      if SoundnessProbeConfiguration.isSampledFrame {
-        verifyCheckpointIsRestoreNoOp(checkpoint)
-      }
-    #endif
+    // Verify the store-built checkpoint on sampled frames when the soundness
+    // probe is opted in. Off-sample captures keep the fast path: no restore,
+    // no snapshots.
+    //
+    // One arm rather than a DEBUG special case. `sampleEveryNFrames` defaults
+    // to 1 under DEBUG, so the debug default is unchanged — but the DEBUG arm
+    // used to read `isEnabled`, which meant `SWIFTTUI_SOUNDNESS_PROBE_SAMPLE`
+    // silently did not reach this oracle or its restore-side twin, the two
+    // most expensive in the system. SOUNDNESS-ORACLES.md already describes
+    // both rows as running on a "sampled checkpoint path"; this makes that
+    // true. It matters to consumers: a debug test suite pays two whole-graph
+    // snapshots plus an ungated restore plus a deep tree compare on every
+    // frame of every animation, measured at ~25% of the gallery example
+    // suite's CPU.
+    if SoundnessProbeConfiguration.isSampledFrame {
+      verifyCheckpointIsRestoreNoOp(checkpoint)
+    }
     return checkpoint
   }
 
@@ -80,15 +82,10 @@ extension ViewGraph {
       images: checkpoint.nodeCheckpoints,
       nodesByNodeID: checkpoint.index.nodesByNodeID
     )
-    #if DEBUG
-      if SoundnessProbeConfiguration.isEnabled {
-        verifyGatedRestoreMatchesUngated(checkpoint)
-      }
-    #else
-      if SoundnessProbeConfiguration.isSampledFrame {
-        verifyGatedRestoreMatchesUngated(checkpoint)
-      }
-    #endif
+    // Sampled in every configuration; see `makeCheckpoint()`.
+    if SoundnessProbeConfiguration.isSampledFrame {
+      verifyGatedRestoreMatchesUngated(checkpoint)
+    }
     return restoredNodeCount
   }
 

@@ -236,7 +236,11 @@ extension DefaultRenderer {
       artifacts,
       baselinePlacedTree: baselinePlacedTree,
       overlayHasTransientDecoration: overlayHasTransientDecoration,
-      proposal: draft.frameTailInput.proposal
+      proposal: draft.frameTailInput.proposal,
+      // Read here, on the main actor, and carried down: the index is built on
+      // the frame-tail worker and the probe is main-actor state. Same hop the
+      // raster shadow comparison makes.
+      verifyIndexPatch: SoundnessProbeConfiguration.isSampledFrame
     )
     storeCommittedPresentationPortalState()
   }

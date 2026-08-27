@@ -162,23 +162,38 @@ package struct RetainedFrameIndex: Sendable {
   /// pairing is only sound when identities are unique (the reverted
   /// paired-walk defect class; see proposal 2026-07-14-003 §Slice B).
   ///
-  /// In DEBUG every patched index is checked byte-equivalent against a full
+  /// In DEBUG a patched index is checked byte-equivalent against a full
   /// rebuild — the oracle this initializer carried, inert, until the patch
   /// path landed.
+  ///
+  /// `verifyingAgainstFullRebuild` is that oracle's sampling gate. It used to
+  /// have none: a raw `#if DEBUG`, so every shape-stable frame in every debug
+  /// build paid for the full rebuild this patch path exists to avoid, plus a
+  /// field-by-field comparison of both indexes. That is the only oracle in the
+  /// system that consulted no probe, and it is invisible in a consumer's test
+  /// suite. The frame tail passes
+  /// ``SoundnessProbeConfiguration/isSampledFrame`` down from the main actor —
+  /// the same hop `Rasterizer.rasterizeCollectingVisibleIdentities`'s
+  /// `verifyIncrementalRasterDamage` already makes, because this type is built
+  /// on the frame-tail worker and the probe is main-actor state. Direct
+  /// callers (tests) keep the oracle on by default.
   package init(
     patching previous: RetainedFrameIndex?,
-    with frame: FrameArtifacts
+    with frame: FrameArtifacts,
+    verifyingAgainstFullRebuild: Bool = true
   ) {
     if let previous,
       let patched = RetainedFrameIndex(patchingShapeStable: previous, frame: frame)
     {
       self = patched
       #if DEBUG
-        let rebuilt = RetainedFrameIndex(frame: frame)
-        if let divergence = byteDivergenceDescription(from: rebuilt) {
-          preconditionFailure(
-            "RetainedFrameIndex patch diverged from full rebuild: \(divergence)"
-          )
+        if verifyingAgainstFullRebuild {
+          let rebuilt = RetainedFrameIndex(frame: frame)
+          if let divergence = byteDivergenceDescription(from: rebuilt) {
+            preconditionFailure(
+              "RetainedFrameIndex patch diverged from full rebuild: \(divergence)"
+            )
+          }
         }
       #endif
     } else {

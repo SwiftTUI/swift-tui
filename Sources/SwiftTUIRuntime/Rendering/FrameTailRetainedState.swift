@@ -97,7 +97,8 @@ final class FrameTailRetainedState: Sendable {
     _ artifacts: FrameArtifacts,
     baselinePlacedTree: PlacedNode,
     overlayHasTransientDecoration: Bool? = nil,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    verifyIndexPatch: Bool = true
   ) {
     var indexable = artifacts
     indexable.placedTree = baselinePlacedTree
@@ -120,7 +121,8 @@ final class FrameTailRetainedState: Sendable {
     state.withLock { state in
       state.previousFrameIndex = .init(
         patching: state.previousFrameIndex,
-        with: indexable
+        with: indexable,
+        verifyingAgainstFullRebuild: verifyIndexPatch
       )
       state.previousDrawnIdentities = artifacts.drawnIdentities
       state.previousRasterSurface = artifacts.rasterSurface

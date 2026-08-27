@@ -34,6 +34,23 @@ one. Rows marked **sampled frame** run only when
 `isSampledFrame == true`. Rows marked **event** record every time their rare
 failure or diagnostic path executes while the configuration enables the probe.
 
+### Assertion-only oracles outside the counter map
+
+The map below is derived from the `record*` functions in
+`SoundnessProbeConfiguration`. One oracle has no recorder and therefore no row:
+`RetainedFrameIndex.init(patching:with:verifyingAgainstFullRebuild:)` checks a
+patched retained-frame index byte-for-byte against a full rebuild and traps with
+`preconditionFailure` on divergence. It is DEBUG-only and, until 2026-08-27,
+consulted no probe at all — a raw `#if DEBUG`, so every shape-stable frame in
+every debug build paid for the full rebuild the patch path exists to avoid.
+It now takes the sampling decision as a parameter, threaded down from the main
+actor by the frame tail (the index is built on the frame-tail worker, and the
+probe is main-actor state — the same hop
+`Rasterizer.rasterizeCollectingVisibleIdentities(verifyIncrementalRasterDamage:)`
+makes). Direct callers, which are tests, keep it on by default.
+
+If it ever grows a counter, it belongs in the map below under the usual rule.
+
 ## Current map
 
 Each table row carries a machine-readable `oracle-map` comment in its final
