@@ -4,6 +4,36 @@ import Testing
 @testable import TermUIPerf
 
 struct PerfRunConfigTests {
+  // `--configuration` labels the artifact; it cannot select a build, because
+  // the binary parsing it is already compiled. Letting the two diverge is how
+  // `.perf/runs/**/run.json` came to claim `release` for a debug binary.
+  @Test("a --configuration contradicting the binary is refused")
+  func configurationContradictingTheBinaryIsRefused() {
+    let wrong = PerfBuildConfiguration.detected == "debug" ? "release" : "debug"
+    #expect(
+      throws: PerfParseError.misdeclaredConfiguration(
+        requested: wrong,
+        detected: PerfBuildConfiguration.detected
+      )
+    ) {
+      try PerfCommandParser.parse([
+        "run", "--scenario", "gallery-animation-click", "--configuration", wrong,
+      ])
+    }
+  }
+
+  @Test("the recorded configuration defaults to the binary's own")
+  func recordedConfigurationDefaultsToTheBinarys() throws {
+    let command = try PerfCommandParser.parse([
+      "run", "--scenario", "gallery-animation-click",
+    ])
+    guard case .run(let config) = command else {
+      Issue.record("expected a run command")
+      return
+    }
+    #expect(config.configuration == PerfBuildConfiguration.detected)
+  }
+
   @Test("run command parses required scenario")
   func runCommandParsesRequiredScenario() throws {
     let command = try PerfCommandParser.parse([

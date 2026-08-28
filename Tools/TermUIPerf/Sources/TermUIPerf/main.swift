@@ -65,6 +65,10 @@ private func run(arguments: [String]) async throws {
         base: base.emissionLane,
         candidate: candidate.emissionLane
       )
+      try CompareCommand.requireMatchingBuildConfigurations(
+        base: base.configuration,
+        candidate: candidate.configuration
+      )
       // Either side may carry the envelope; the candidate's is preferred
       // because it was recorded on the code under test.
       let envelope =

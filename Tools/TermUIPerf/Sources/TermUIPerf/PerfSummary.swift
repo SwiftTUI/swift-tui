@@ -48,6 +48,9 @@ public struct PerfSummary: Codable, Equatable, Sendable {
   /// (`SWIFTTUI_PERF_EMISSION=1`). Lane-on and lane-off runs measure
   /// different pipelines; `compare` refuses to mix them.
   public var emissionLane: Bool
+  /// The build configuration the run was compiled with. `compare` refuses to
+  /// mix configurations: `-Onone` and `-O` measure different code.
+  public var configuration: String
   public var iterationCount: Int
   public var committedFrameCount: Int
   public var diagnosticFrameCount: Int
@@ -163,6 +166,7 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     scenario: String,
     renderMode: String,
     emissionLane: Bool = false,
+    configuration: String = PerfBuildConfiguration.detected,
     iterationCount: Int,
     committedFrameCount: Int,
     diagnosticFrameCount: Int,
@@ -230,6 +234,7 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     self.scenario = scenario
     self.renderMode = renderMode
     self.emissionLane = emissionLane
+    self.configuration = configuration
     self.iterationCount = iterationCount
     self.committedFrameCount = committedFrameCount
     self.diagnosticFrameCount = diagnosticFrameCount
@@ -293,6 +298,7 @@ public struct PerfSummary: Codable, Equatable, Sendable {
     case scenario
     case renderMode = "render_mode"
     case emissionLane = "emission_lane"
+    case configuration
     case iterationCount = "iteration_count"
     case committedFrameCount = "committed_frame_count"
     case diagnosticFrameCount = "diagnostic_frame_count"
@@ -364,6 +370,8 @@ public struct PerfSummary: Codable, Equatable, Sendable {
       // decodeIfPresent: a summary recorded before the lane existed is a
       // valid lane-off baseline.
       emissionLane: try container.decodeIfPresent(Bool.self, forKey: .emissionLane) ?? false,
+      configuration: try container.decodeIfPresent(String.self, forKey: .configuration)
+        ?? PerfBuildConfiguration.detected,
       iterationCount: try container.decode(Int.self, forKey: .iterationCount),
       committedFrameCount: try container.decode(Int.self, forKey: .committedFrameCount),
       diagnosticFrameCount: try container.decode(Int.self, forKey: .diagnosticFrameCount),

@@ -8,10 +8,28 @@ public enum TermUIPerfCommand: Equatable, Sendable {
   case listScenarios
 }
 
+/// The build configuration this binary was actually compiled with.
+///
+/// `--configuration` cannot select a configuration: it is parsed by an
+/// already-built binary, and the whole package graph — the harness and the
+/// framework under test — is fixed by the outer `swift run -c` invocation.
+/// Recording a caller-supplied string therefore let an artifact claim
+/// `release` for a `-Onone` build, which is how `.perf/runs/**/run.json` came
+/// to be labelled `release` while `perf:run` built for debugging. This reads
+/// the truth from the compiler instead, and `PerfRunConfig` refuses a
+/// `--configuration` that contradicts it.
+public enum PerfBuildConfiguration {
+  #if DEBUG
+    public static let detected = "debug"
+  #else
+    public static let detected = "release"
+  #endif
+}
+
 public struct PerfRunConfig: Equatable, Sendable {
   public static let defaultIterations = 20
   public static let defaultArtifactsRoot = ".perf/runs"
-  public static let defaultConfiguration = "release"
+  public static var defaultConfiguration: String { PerfBuildConfiguration.detected }
   public static let defaultModes: [RuntimeRenderMode] = [.async]
 
   public var scenario: PerfScenarioName
@@ -140,6 +158,7 @@ public enum PerfParseError: Error, Equatable, CustomStringConvertible {
   case invalidSigma(String)
   case invalidTerminalSize(String)
   case invalidTag(String)
+  case misdeclaredConfiguration(requested: String, detected: String)
 
   public var description: String {
     switch self {
@@ -173,6 +192,11 @@ public enum PerfParseError: Error, Equatable, CustomStringConvertible {
       return
         "invalid tag '\(value)'. Use letters, digits, '.', '_' or '-' — the tag "
         + "becomes part of a filename."
+    case .misdeclaredConfiguration(let requested, let detected):
+      return
+        "--configuration \(requested) contradicts this binary, which was built "
+        + "\(detected). The flag labels the artifact; it cannot select a build. "
+        + "Rebuild with `swift run -c \(requested)` or drop the flag."
     }
   }
 
@@ -246,7 +270,9 @@ public enum PerfCommandParser {
       case "--artifacts-root":
         artifactsRoot = try value(after: argument, in: arguments, at: &index)
       case "--configuration":
-        configuration = try value(after: argument, in: arguments, at: &index)
+        configuration = try validatedConfiguration(
+          value(after: argument, in: arguments, at: &index)
+        )
       case "--terminal-size":
         let value = try value(after: argument, in: arguments, at: &index)
         terminalSize = try parseTerminalSize(value)
@@ -297,7 +323,9 @@ public enum PerfCommandParser {
       case "--artifacts-root":
         artifactsRoot = try value(after: argument, in: arguments, at: &index)
       case "--configuration":
-        configuration = try value(after: argument, in: arguments, at: &index)
+        configuration = try validatedConfiguration(
+          value(after: argument, in: arguments, at: &index)
+        )
       case "--iterations":
         let value = try value(after: argument, in: arguments, at: &index)
         guard let parsedIterations = Int(value), parsedIterations > 0 else {
@@ -341,6 +369,19 @@ public enum PerfCommandParser {
       updateBaseline: updateBaseline,
       baselinePath: baselinePath
     )
+  }
+
+  /// Accepts a `--configuration` only when it names the configuration this
+  /// binary was actually built with. The flag is a label, not a selector, so
+  /// letting the two diverge mislabels every artifact the run writes.
+  private static func validatedConfiguration(_ value: String) throws -> String {
+    guard value == PerfBuildConfiguration.detected else {
+      throw PerfParseError.misdeclaredConfiguration(
+        requested: value,
+        detected: PerfBuildConfiguration.detected
+      )
+    }
+    return value
   }
 
   private static func parseCompare(_ arguments: [String]) throws -> PerfCompareConfig {

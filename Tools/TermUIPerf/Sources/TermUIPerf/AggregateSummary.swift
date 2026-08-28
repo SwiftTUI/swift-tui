@@ -83,6 +83,8 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
   /// (`SWIFTTUI_PERF_EMISSION=1`). The gate refuses to compare a lane-on
   /// aggregate against a lane-off one — they measure different pipelines.
   public var emissionLane: Bool
+  /// The build configuration every member run was compiled with.
+  public var configuration: String
   public var iterationCount: Int
   /// ISO-8601 instant this aggregate was written. Identity, not measurement:
   /// aggregate filenames are stable and overwrite in place, so without a stamp
@@ -137,6 +139,7 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     scenario: String,
     renderMode: String,
     emissionLane: Bool = false,
+    configuration: String = PerfBuildConfiguration.detected,
     iterationCount: Int,
     generatedAt: String? = nil,
     totalCPUSeconds: PerfStat,
@@ -167,6 +170,7 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     self.scenario = scenario
     self.renderMode = renderMode
     self.emissionLane = emissionLane
+    self.configuration = configuration
     self.iterationCount = iterationCount
     self.generatedAt = generatedAt
     self.totalCPUSeconds = totalCPUSeconds
@@ -199,6 +203,7 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
     case scenario
     case renderMode = "render_mode"
     case emissionLane = "emission_lane"
+    case configuration
     case iterationCount = "iteration_count"
     case generatedAt = "generated_at"
     case totalCPUSeconds = "total_cpu_seconds"
@@ -238,6 +243,8 @@ public struct PerfAggregateSummary: Codable, Equatable, Sendable {
       // decodeIfPresent: an aggregate recorded before the lane existed is a
       // valid lane-off baseline.
       emissionLane: try container.decodeIfPresent(Bool.self, forKey: .emissionLane) ?? false,
+      configuration: try container.decodeIfPresent(String.self, forKey: .configuration)
+        ?? PerfBuildConfiguration.detected,
       iterationCount: try container.decode(Int.self, forKey: .iterationCount),
       generatedAt: try container.decodeIfPresent(String.self, forKey: .generatedAt),
       totalCPUSeconds: try container.decode(PerfStat.self, forKey: .totalCPUSeconds),
@@ -338,6 +345,7 @@ public enum AggregateReducer {
       scenario: first.scenario,
       renderMode: first.renderMode,
       emissionLane: first.emissionLane,
+      configuration: first.configuration,
       iterationCount: summaries.count,
       totalCPUSeconds: PerfStat(values: summaries.map(\.totalCPUSeconds)),
       committedFrameCount: PerfStat(values: summaries.map { Double($0.committedFrameCount) }),

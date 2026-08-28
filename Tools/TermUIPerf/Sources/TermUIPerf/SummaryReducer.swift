@@ -31,6 +31,7 @@ public enum SummaryReducer {
       scenario: metadata.scenario,
       renderMode: metadata.renderMode,
       emissionLane: metadata.emissionLane,
+      configuration: metadata.configuration,
       iterationCount: metadata.iterationCount,
       committedFrameCount: committedFrameCount,
       diagnosticFrameCount: diagnosticFrameCount,

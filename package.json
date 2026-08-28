@@ -6,9 +6,9 @@
   "scripts": {
     "perf:bench": "swiftly run swift run -c release --package-path Tools/TermUIPerf termui-perf bench",
     "perf:bench:update-baseline": "swiftly run swift run -c release --package-path Tools/TermUIPerf termui-perf bench --update-baseline",
-    "perf:compare": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf compare",
+    "perf:compare": "swiftly run swift run -c release --package-path Tools/TermUIPerf termui-perf compare",
     "perf:list": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf list-scenarios",
-    "perf:run": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf run",
+    "perf:run": "swiftly run swift run -c release --package-path Tools/TermUIPerf termui-perf run",
     "test": "sh ./Scripts/test_gate.sh",
     "test:gate": "sh ./Scripts/test_gate.sh",
     "test:clean": "sh ./Scripts/test_gate.sh --clean",

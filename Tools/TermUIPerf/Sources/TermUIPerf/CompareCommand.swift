@@ -62,6 +62,11 @@ public enum PerfCompareError: Error, Equatable, CustomStringConvertible {
   /// between them is the lane, not the code under test.
   case mixedEmissionLane(base: Bool, candidate: Bool)
 
+  /// One side was built `-Onone` and the other `-O`. Optimization changes
+  /// which calls are specialized and inlined, so the two sides measure
+  /// different code and any delta between them is the compiler.
+  case mixedBuildConfiguration(base: String, candidate: String)
+
   public var description: String {
     switch self {
     case .mixedEmissionLane(let base, let candidate):
@@ -70,6 +75,11 @@ public enum PerfCompareError: Error, Equatable, CustomStringConvertible {
         + "candidate emission_lane=\(candidate)). The emission-visible lane "
         + "adds real planner+emission cost; rerun both sides with the same "
         + "SWIFTTUI_PERF_EMISSION setting."
+    case .mixedBuildConfiguration(let base, let candidate):
+      return
+        "cannot compare across build configurations (base \(base), candidate "
+        + "\(candidate)). Optimization decides what is specialized and "
+        + "inlined; rerun both sides with the same `swift run -c` setting."
     }
   }
 }
@@ -92,6 +102,10 @@ public enum CompareCommand {
       base: base.emissionLane,
       candidate: candidate.emissionLane
     )
+    try requireMatchingBuildConfigurations(
+      base: base.configuration,
+      candidate: candidate.configuration
+    )
     return compare(base: base, candidate: candidate)
   }
 
@@ -103,6 +117,17 @@ public enum CompareCommand {
   ) throws {
     guard base == candidate else {
       throw PerfCompareError.mixedEmissionLane(base: base, candidate: candidate)
+    }
+  }
+
+  /// Refuses a debug-vs-release comparison. Called by every compare entry
+  /// point that loads recorded artifacts, alongside the emission-lane check.
+  public static func requireMatchingBuildConfigurations(
+    base: String,
+    candidate: String
+  ) throws {
+    guard base == candidate else {
+      throw PerfCompareError.mixedBuildConfiguration(base: base, candidate: candidate)
     }
   }
 

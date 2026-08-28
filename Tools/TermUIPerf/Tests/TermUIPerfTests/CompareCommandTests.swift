@@ -27,6 +27,24 @@ struct CompareCommandTests {
     }
   }
 
+  @Test("compare refuses mixed build configurations")
+  func compareRefusesMixedBuildConfigurations() {
+    #expect(
+      throws: PerfCompareError.mixedBuildConfiguration(base: "debug", candidate: "release")
+    ) {
+      try CompareCommand.requireMatchingBuildConfigurations(
+        base: "debug",
+        candidate: "release"
+      )
+    }
+    #expect(throws: Never.self) {
+      try CompareCommand.requireMatchingBuildConfigurations(
+        base: "release",
+        candidate: "release"
+      )
+    }
+  }
+
   @Test("compare classifies latency win with CPU cost")
   func compareClassifiesLatencyWinWithCPUCost() {
     let comparison = CompareCommand.compare(

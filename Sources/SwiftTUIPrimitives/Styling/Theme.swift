@@ -235,13 +235,32 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
     self.cellPixelMetrics = cellPixelMetrics
   }
 
+  /// Equality as the reuse gate consumes it, via `EnvironmentSnapshot.==`.
+  ///
+  /// The boxed-identity check elides only the *heavy* comparison. It must not
+  /// short-circuit the light fields: two snapshots share a box whenever
+  /// `EnvironmentValues.applying(to:reuseStyle:)` takes its reuse branch, and
+  /// that branch fires for every non-style key — including `cellPixelMetrics`,
+  /// which `ResolveContext.isStyleKeyPath` does not name and which has a public
+  /// setter. Answering `true` there let a serve keep a subtree whose metrics
+  /// had changed.
+  ///
+  /// Deliberately *not* paired with shared boxed storage. Memoizing the box so
+  /// equal appearance/theme pairs yield one instance does what it claims —
+  /// measured on `gallery-tab-switch`, box mints 1,548 -> 1, identity hits
+  /// 63% -> 100%, and slow-path comparisons 4,521 -> 0, every one of which had
+  /// found the heavy fields equal — and still moved no wall clock: the gallery
+  /// example suite ran 22.63 s median before and 22.30 s after, inside its own
+  /// 0.93 s run-to-run spread. The comparison is not on the critical path, so
+  /// the sharing is not worth its global mutable slot.
   public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.heavyFields === rhs.heavyFields
-      || (lhs.appearance == rhs.appearance
-        && lhs.theme == rhs.theme
-        && lhs.foregroundStyle == rhs.foregroundStyle
-        && lhs.tintStyle == rhs.tintStyle
-        && lhs.isEnabled == rhs.isEnabled
-        && lhs.cellPixelMetrics == rhs.cellPixelMetrics)
+    let heavyFieldsAreEqual =
+      lhs.heavyFields === rhs.heavyFields
+      || (lhs.appearance == rhs.appearance && lhs.theme == rhs.theme)
+    return heavyFieldsAreEqual
+      && lhs.foregroundStyle == rhs.foregroundStyle
+      && lhs.tintStyle == rhs.tintStyle
+      && lhs.isEnabled == rhs.isEnabled
+      && lhs.cellPixelMetrics == rhs.cellPixelMetrics
   }
 }
