@@ -586,6 +586,19 @@ func resolveView<V: View>(
     }
     if shouldCaptureMemoViewValue(view) {
       graphNode?.memoViewValue = view
+    } else if graphNode?.memoViewValue != nil {
+      // Not capturing must CLEAR, not leave the previous value standing. This
+      // node's committed output now belongs to the view resolved this frame,
+      // so a value stashed by an earlier frame is no longer a witness for it:
+      // a later frame whose value compares equal to that stale witness would
+      // pass the memo gate and be served this frame's foreign committed
+      // snapshot. Under a stable `.id` alternating between an unplannable and
+      // a plannable body that is exactly what happened — the unplannable frame
+      // left the plannable frame's value in place, and the next plannable
+      // frame matched it and was served the unplannable frame's output.
+      // Guarded on non-nil so the common never-captured node pays no
+      // checkpoint mutation.
+      graphNode?.memoViewValue = nil
     }
     return resolved
   }
@@ -609,6 +622,9 @@ func resolveView<V: View>(
 /// `memoViewValue` nil and the gate bails at its first guard — keeping the
 /// gate near-free on trees the memo layer cannot serve. The plan is built and
 /// cached here (the cold, once-per-type site); the gate path is lookup-only.
+/// The caller CLEARS the slot when this returns false, so "no plan" always
+/// means "no witness" — leaving an earlier frame's value standing would let a
+/// later equal-comparing frame be served this node's intervening output.
 ///
 /// The memo shadow oracle (``MemoSkipTrace``) measures the *full* reflective
 /// addressable population on sampled frames, so it captures every value,

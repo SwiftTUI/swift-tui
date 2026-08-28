@@ -381,6 +381,75 @@ extension FrameworkStressRenderReconciliationTests {
   }
 }
 
+// MARK: - Attempt 008b: Stable-ID payload swap with the memo observer off
+
+extension FrameworkStressRenderReconciliationTests {
+  /// Attempt 008 reproduces only in release configuration, so the debug repo
+  /// gate cannot protect its fix. The reason is the memo shadow observer:
+  /// `shouldCaptureMemoViewValue` captures EVERY view value while
+  /// `MemoSkipTrace` is observing, and the observer samples every frame in
+  /// debug but 1-in-256 in release. With it off, a frame that does not capture
+  /// used to leave the PREVIOUS frame's value standing in `memoViewValue`, so
+  /// the next frame whose value compared equal to that stale witness passed the
+  /// memo gate and was served the intervening frame's committed output — the
+  /// Canvas payload surviving the swap to Text under a stable `.id`.
+  ///
+  /// Turning the observer off reproduces the release behavior in debug, which
+  /// is what makes this a gate-visible regression test. The suite is
+  /// `.serialized` and this test is synchronous, so the override never spans a
+  /// suspension point another suite could observe.
+  @Test("stress render reconciliation 008b payload swap holds with the memo observer off")
+  func renderReconciliation008bPayloadSwapWithMemoObserverOff() {
+    struct Marker: CanvasDrawing, Equatable {
+      func draw(into context: inout CanvasContext) {
+        context.setCell(at: .zero, character: "K", foreground: .green)
+      }
+    }
+
+    struct Root: View {
+      let showCanvas: Bool
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Header")
+          if showCanvas {
+            Canvas(Marker())
+              .frame(width: 12, height: 1)
+              .id("render-reconciliation-008b-payload")
+          } else {
+            Text("Text payload")
+              .frame(width: 12, height: 1, alignment: .leading)
+              .id("render-reconciliation-008b-payload")
+          }
+          Text("Footer")
+        }
+      }
+    }
+
+    let wasObserving = MemoSkipTrace.isEnabled
+    MemoSkipTrace.isEnabled = false
+    defer { MemoSkipTrace.isEnabled = wasObserving }
+
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootIdentity = testIdentity("RenderReconciliation008b")
+
+    for generation in 0..<16 {
+      let showCanvas = generation.isMultiple(of: 2)
+      let root = Root(showCanvas: showCanvas)
+      let retained = renderer.render(
+        root,
+        context: .init(
+          identity: rootIdentity,
+          invalidatedIdentities: generation == 0 ? [] : [rootIdentity]
+        )
+      )
+      let fresh = DefaultRenderer().render(root, context: .init(identity: rootIdentity))
+      #expect(retained.rasterSurface == fresh.rasterSurface)
+      #expect(renderStressText(retained).contains(showCanvas ? "K" : "Text payload"))
+    }
+  }
+}
+
 // MARK: - Attempt 009: Line-limit cache churn
 
 extension FrameworkStressRenderReconciliationTests {

@@ -8,6 +8,19 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A memoized body could be served another view's output in release builds.**
+  A node that resolved a view the memo layer cannot plan for kept the previous
+  frame's captured view value instead of clearing it, so a later frame whose
+  value compared equal to that stale witness passed the memo gate and was
+  served the intervening frame's committed output. Under a stable `.id`
+  alternating between two bodies — a `Canvas` and a `Text` in the reproducer —
+  the first body's content survived the swap and stayed on screen. Debug builds
+  were unaffected: the memo shadow observer captures every view value on the
+  frames it observes, and it observes every frame in debug but 1-in-256 in
+  release, so the stale comparison could not arise there.
+
 ## [0.9.11] - 2026-08-26
 
 ### Added
