@@ -121,6 +121,19 @@ jobs:
         shell: bash
         env:
           SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "1200"
+          # Worst-case kill = 1200 idle + 900 grace + 10 kill grace = 2110 s,
+          # inside the 4500 s cap declared below, so a wedge anywhere in the
+          # first ~40 minutes is dumped and named. It could not fire at all
+          # before 2026-08-29: the grace was three forgiven windows of the idle
+          # bound, i.e. 3600 s, for an earliest kill of 4810 s against a 4500 s
+          # cap. Every macOS wedge burned the whole job and left no diagnostic.
+          SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS: "900"
+          # The livelock-while-printing backstop has to fit the cap too, or it
+          # is decoration: the default (4x the idle bound) is 4800 s.
+          SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS: "3300"
+          # This job's `timeout-minutes` in seconds. The gate refuses to start
+          # if the watchdog could not fire inside it — keep the two in step.
+          SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "4500"
           SWIFTTUI_SKIP_PUBLIC_API_BASELINE: "1"
           SWIFTTUI_SKIP_TERMUIPERF: "1"
           # The nightly/tag lane runs the stress churn loops at their full

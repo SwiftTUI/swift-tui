@@ -433,6 +433,7 @@ cmd_test() {
     export BUN_INSTALL=/root/.bun
     export PATH=\"\$BUN_INSTALL/bin:\$PATH\"
     export SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS=$(printf '%q' "${SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS:-1200}")
+    export SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS=$(printf '%q' "${SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS:-600}")
     export SWIFTTUI_SKIP_PUBLIC_API_BASELINE=$(printf '%q' "${SWIFTTUI_SKIP_PUBLIC_API_BASELINE:-1}")
     export SWIFTTUI_SKIP_TERMUIPERF=$(printf '%q' "${SWIFTTUI_SKIP_TERMUIPERF:-1}")
     sh ./Scripts/test_gate.sh --skip-bun-install

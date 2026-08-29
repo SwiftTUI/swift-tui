@@ -17,14 +17,36 @@ step_timeout_kill_grace_seconds=${SWIFTTUI_TEST_TIMEOUT_KILL_GRACE_SECONDS:-10}
 # Backstop for the one case silence cannot catch: a step that livelocks *while*
 # printing. Defaults to 4x the idle bound; 0 disables it.
 step_absolute_timeout_seconds=${SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS:-$((step_timeout_seconds * 4))}
-# How often the watchdog samples the step's log size. Sampling every tick would
-# stat a multi-megabyte log five times a second for no added resolution.
+# How often the watchdog samples the step's log size and clock. Sampling every
+# tick would stat a multi-megabyte log five times a second for no added
+# resolution.
 step_output_probe_ticks=${SWIFTTUI_TEST_STEP_OUTPUT_PROBE_TICKS:-25}
-# Idle windows the watchdog forgives while the step's process tree is still
-# consuming CPU. Silence alone does not mean parked: `swift test` writes to a
-# pipe, so libc block-buffers it and a healthy binary is quiet until its buffer
-# fills. A wedge consumes no CPU, so it still dies at the first idle bound.
-step_busy_extensions=${SWIFTTUI_TEST_STEP_BUSY_EXTENSIONS:-3}
+# Total quiet-but-busy time the watchdog forgives across one step. Silence alone
+# does not mean parked: `swift test` writes to a pipe, so libc block-buffers it
+# and a healthy binary is quiet until its buffer fills (measured at 274 s on a
+# CI runner). A wedge consumes no CPU, so it still dies at the first idle bound.
+#
+# Spelled in SECONDS on purpose. This was a count of forgiven windows, each
+# costing another whole idle bound, so the real worst case was
+# `(1 + count) * bound` — 4800 s at this file's defaults, past every job cap the
+# gate runs under. Worst-case kill is now just `bound + grace + kill grace`.
+step_busy_grace_seconds=${SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS:-$((step_timeout_seconds / 2))}
+# Average CPU across the silent window that counts as "working". A bare
+# "consumed any CPU at all" test is tripped by a parked tree's signal and timer
+# wakeups; the shapes this has to separate measured 0% and 107%.
+step_busy_min_cpu_percent=${SWIFTTUI_TEST_STEP_BUSY_MIN_CPU_PERCENT:-25}
+# This job's own wall-clock cap, when it has one (CI sets it from the workflow's
+# `timeout-minutes`). The watchdog refuses to start if it could not fire inside
+# it, because a job that dies at its cap leaves no TIMEOUT line and no dump.
+step_watchdog_deadline_seconds=${SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS:-0}
+
+if [ -n "${SWIFTTUI_TEST_STEP_BUSY_EXTENSIONS:-}" ]; then
+  >&2 echo "SWIFTTUI_TEST_STEP_BUSY_EXTENSIONS was replaced by"
+  >&2 echo "SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS, which is a budget in seconds rather"
+  >&2 echo "than a count of idle windows. Setting the old name has no effect; unset it"
+  >&2 echo "and set the new one so the worst-case kill time stays visible."
+  exit 1
+fi
 soundness_trace_root=$repo_root/.build/soundness-trace
 soundness_quarantine_file=$repo_root/Scripts/soundness_quarantine.txt
 soundness_trace_invocation_index=0
@@ -273,6 +295,14 @@ seconds. This bounds SILENCE, not total runtime: the watchdog fires when a step
 has produced no output for that long, so a lane running slowly under contention
 is not killed like one that parked, while a genuinely wedged lane still dies.
 Set it to 0 to disable the per-step watchdog for local diagnosis.
+A step that is quiet but whose process tree still averages at least
+SWIFTTUI_TEST_STEP_BUSY_MIN_CPU_PERCENT (default 25) of a core is treated as
+working — the block-buffered-writer case — for up to
+SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS (default: half the idle bound) in total.
+The worst-case kill time is therefore the sum of those two plus
+SWIFTTUI_TEST_TIMEOUT_KILL_GRACE_SECONDS, and setting
+SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS to the job's own cap makes the
+runner refuse to start if that sum could not fire inside it.
 SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS (default: 4x the idle bound, 0 to
 disable) is the backstop for a step that livelocks while still printing.
 After a timeout, the runner sends SIGTERM to the step's process tree, waits

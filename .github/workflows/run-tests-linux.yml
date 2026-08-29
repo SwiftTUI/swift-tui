@@ -62,8 +62,23 @@ env:
   BUN_VERSION: "1.3.14"
   # Per-step silence bound for the gate's watchdog. Every step is now ≤ ~10
   # minutes and prints continuously (per-file compile lines, per-test lines),
-  # so 600 s of silence is a wedge, not a slow runner. The absolute cap is 4×.
+  # so 600 s of silence is a wedge, not a slow runner.
+  #
+  # These four are sized together against the 30-minute cap the core and
+  # runtime jobs carry; the policy job has a tighter cap and overrides them.
+  # Worst-case kill = 600 idle + 300 grace + 10 kill grace = 910 s. It was
+  # 2410 s until 2026-08-29 — the grace was a COUNT of three forgiven windows,
+  # each costing another whole idle bound — so the watchdog could not fire
+  # inside any job here, and a wedged lane died at its cap with no TIMEOUT
+  # line and no gdb dump. That is not a macOS-only defect; it was every lane.
   SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "600"
+  SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS: "300"
+  # The livelock-while-printing backstop has to fit the cap too, or it is
+  # decoration: the default (4x the idle bound) is 2400 s against 1800 s.
+  SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS: "1500"
+  # `timeout-minutes` in seconds, for the jobs that run the gate. The gate
+  # refuses to start if the watchdog could not fire inside it — keep in step.
+  SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "1800"
   SWIFTTUI_HANG_DIAGNOSTICS: "1"
   # Covered by the path-filtered Public API Baseline and TermUIPerf workflows.
   SWIFTTUI_SKIP_PUBLIC_API_BASELINE: "1"
@@ -74,6 +89,17 @@ jobs:
     name: Policy lane
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      # This lane's cap is a third of the others', so the workflow-level
+      # watchdog budget (910 s worst case, 1500 s absolute) could never fire
+      # inside it. Tightened to fit: 300 + 180 + 10 = 490 s. The lane is shell
+      # policy checks and one traced build, all of which print continuously —
+      # a step silent for five minutes here was going to blow the 600 s cap
+      # anyway, and firing first is what buys the hang dump.
+      SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "300"
+      SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS: "180"
+      SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS: "540"
+      SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "600"
 
     steps:
       - name: Checkout
