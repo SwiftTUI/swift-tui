@@ -41,7 +41,7 @@ struct CaptureBindingLiveStateTests {
 
     private func stash() {
       #if DEBUG
-        log.stashObservations.append(String(describing: _text.captureSlotForTesting))
+        log.stashObservations.append(_text.captureSlotForTesting == nil ? "unbound" : "bound")
       #endif
       log.read = { text }
     }

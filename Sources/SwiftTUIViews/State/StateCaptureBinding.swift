@@ -42,18 +42,6 @@ package struct StateCaptureBinding: Sendable {
   }
 }
 
-/// A wrapper copy's capture state. Tri-state because class containers bind
-/// through shared memory: a struct copy is private to its mount (overwriting
-/// is always correct), but one class instance mounted at several identities
-/// shares this slot, and last-writer-wins would collapse every mount onto
-/// one owner — the demotion latch keeps those instances on the ambient
-/// ladder instead.
-package enum StateCaptureSlot: Sendable {
-  case unbound
-  case bound(StateCaptureBinding)
-  case conflicted
-}
-
 /// Framework-internal in-place capture binding. Deliberately package-scoped:
 /// third parties cannot conform, so `DynamicProperty.update`'s nonmutating
 /// contract ("a plain value mutation cannot be silently applied to an
@@ -62,14 +50,10 @@ package enum StateCaptureSlot: Sendable {
 /// actually consumes.
 @MainActor
 package protocol CaptureBindableDynamicProperty {
-  /// `sharedMutableContainer` is true when the container is a class
-  /// instance: overwriting a *different, still-live* owner then demotes the
-  /// slot to `.conflicted` instead of last-writer-wins. Overwriting a dead
-  /// owner (identity churn, teardown) is a normal re-bind.
-  mutating func bindCapture(
-    _ binding: StateCaptureBinding,
-    sharedMutableContainer: Bool
-  )
+  /// Overwrites this copy's capture. Always correct: the container is a
+  /// value type, so the copy the pass writes through is private to one
+  /// mount and one evaluation (plan 2026-08-29-001).
+  mutating func bindCapture(_ binding: StateCaptureBinding)
 }
 
 /// Census over capture binding and imperative-state resolution: which bind
@@ -83,7 +67,6 @@ package enum StateCaptureCensus {
     case bindBound = "state.captureBind.bound"
     case bindSkippedTier = "state.captureBind.skippedTier"
     case bindNoOwner = "state.captureBind.noOwner"
-    case classConflictDemoted = "state.captureBind.classConflictDemoted"
     // Imperative read-path rungs (plan Stage 0 ladder census + capture rungs).
     case captureHit = "state.capture.hit"
     case captureRefreshedOwner = "state.capture.refreshedOwner"
@@ -111,8 +94,8 @@ package enum StateCaptureCensus {
       switch event {
       case .captureHit, .captureRefreshedOwner, .bindBound:
         return
-      case .bindSkippedTier, .bindNoOwner, .classConflictDemoted, .captureMiss,
-        .ladderExactOwner, .seedFallback:
+      case .bindSkippedTier, .bindNoOwner, .captureMiss, .ladderExactOwner,
+        .seedFallback:
         DebugLogRouter.emit(
           "[STATE-CENSUS] \(event.rawValue)\n",
           toFileAt: censusFilePath

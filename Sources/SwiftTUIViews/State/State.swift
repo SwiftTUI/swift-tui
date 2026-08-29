@@ -206,11 +206,10 @@ public struct State<Value> {
   /// The owner this copy was bound to by the capture-bind pass (plan
   /// 2026-08-20-001) — written in place into the exact container copy body
   /// evaluation consumes, so closures created in the body carry their state
-  /// owner. `.unbound` until a bind pass runs; `.conflicted` latches a
-  /// shared class instance mounted at several identities back onto the
-  /// ambient ladder. Per-copy by struct value semantics: distinct mounts
-  /// bind distinct copies.
-  private var capture: StateCaptureSlot = .unbound
+  /// owner. `nil` until a bind pass runs. Per-copy by value semantics:
+  /// authored containers are value types (plan 2026-08-29-001), so distinct
+  /// mounts always bind distinct copies.
+  private var capture: StateCaptureBinding?
 
   /// Creates state with the supplied initial wrapped value.
   public init(
@@ -311,7 +310,7 @@ public struct State<Value> {
       box.rememberedOwnerCount
     }
 
-    package var captureSlotForTesting: StateCaptureSlot {
+    package var captureSlotForTesting: StateCaptureBinding? {
       capture
     }
   #endif
@@ -383,7 +382,7 @@ public struct State<Value> {
   /// ambient ladder; it re-addresses dispatch, never mints storage on a
   /// foreign graph.
   private func captureLocation() -> DynamicStateLocation<Value>? {
-    guard case .bound(let binding) = capture else {
+    guard let binding = capture else {
       return nil
     }
     if LiveViewGraphRegistry.node(for: binding.owner) != nil {
@@ -580,32 +579,12 @@ private func reportImperativeSeedFallback(slotOrdinal: Int, reason: String) {
 }
 
 extension State: CaptureBindableDynamicProperty {
-  /// Writes the bind pass's owner into this copy. Struct copies are private
-  /// to their mount, so overwriting is always correct there. A shared class
-  /// instance mounted at several live identities would collapse every mount
-  /// onto the last writer — that shape demotes to `.conflicted` (permanent
-  /// ambient-ladder fallback for the instance) instead. Overwriting a dead
-  /// owner is a normal re-bind: identity churn and teardown must not latch.
-  package mutating func bindCapture(
-    _ binding: StateCaptureBinding,
-    sharedMutableContainer: Bool
-  ) {
-    switch capture {
-    case .conflicted:
-      return
-    case .bound(let existing):
-      if sharedMutableContainer,
-        existing.owner != binding.owner,
-        LiveViewGraphRegistry.node(for: existing.owner) != nil
-      {
-        capture = .conflicted
-        StateCaptureCensus.record(.classConflictDemoted)
-        return
-      }
-      capture = .bound(binding)
-    case .unbound:
-      capture = .bound(binding)
-    }
+  /// Writes the bind pass's owner into this copy. An unconditional
+  /// overwrite: copies are private to their mount, because authored
+  /// containers are value types (plan 2026-08-29-001). Every fresh
+  /// evaluation rebinds, and no two mounts can reach the same slot.
+  package mutating func bindCapture(_ binding: StateCaptureBinding) {
+    capture = binding
   }
 }
 

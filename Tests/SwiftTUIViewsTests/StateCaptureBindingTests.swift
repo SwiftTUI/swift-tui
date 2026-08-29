@@ -145,8 +145,7 @@ struct StateCaptureBindingTests {
 
       var state = State(wrappedValue: "seed")
       state.bindCapture(
-        binding(owner: owner, identity: identity, scope: graph.stateGraphScopeID),
-        sharedMutableContainer: false
+        binding(owner: owner, identity: identity, scope: graph.stateGraphScopeID)
       )
 
       state.wrappedValue = "typed"
@@ -170,8 +169,7 @@ struct StateCaptureBindingTests {
 
       var state = State(wrappedValue: "seed")
       state.bindCapture(
-        binding(owner: deadOwner, identity: identity, scope: graph.stateGraphScopeID),
-        sharedMutableContainer: false
+        binding(owner: deadOwner, identity: identity, scope: graph.stateGraphScopeID)
       )
 
       state.wrappedValue = "refreshed"
@@ -197,8 +195,7 @@ struct StateCaptureBindingTests {
       // foreign graph.
       var crossScope = State(wrappedValue: "seed")
       crossScope.bindCapture(
-        binding(owner: deadOwner, identity: identity, scope: deadScope),
-        sharedMutableContainer: false
+        binding(owner: deadOwner, identity: identity, scope: deadScope)
       )
       #expect(crossScope.wrappedValue == "seed")
 
@@ -210,8 +207,7 @@ struct StateCaptureBindingTests {
           owner: deadOwner,
           identity: testIdentity("NeverResolved"),
           scope: graph.stateGraphScopeID
-        ),
-        sharedMutableContainer: false
+        )
       )
       #expect(removed.wrappedValue == "seed")
       #if DEBUG
@@ -249,21 +245,14 @@ struct StateCaptureBindingTests {
       let scope = graph.stateGraphScopeID
 
       var state = State(wrappedValue: "seed")
-      state.bindCapture(
-        binding(owner: ownerA, identity: identityA, scope: scope),
-        sharedMutableContainer: false
-      )
-      state.bindCapture(
-        binding(owner: ownerB, identity: identityB, scope: scope),
-        sharedMutableContainer: false
-      )
+      state.bindCapture(binding(owner: ownerA, identity: identityA, scope: scope))
+      state.bindCapture(binding(owner: ownerB, identity: identityB, scope: scope))
       #if DEBUG
-        guard case .bound(let bound) = state.captureSlotForTesting else {
+        guard let bound = state.captureSlotForTesting else {
           Issue.record("expected the second bind to overwrite")
           return
         }
         #expect(bound.owner == ownerB)
-        #expect(StateCaptureCensus.count(of: .classConflictDemoted) == 0)
       #endif
     }
   }

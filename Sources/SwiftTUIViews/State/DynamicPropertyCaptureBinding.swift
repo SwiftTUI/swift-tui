@@ -19,6 +19,11 @@ import SwiftTUIGraph
 // every fresh evaluation overwrites — and reuse serves never run it (no body
 // runs on a serve; previously registered closures keep their captures, and
 // reuse preserves the owner's node).
+//
+// The overwrite is unconditional because authored containers are value types
+// (plan 2026-08-29-001): the pass writes through a copy private to one mount
+// and one evaluation, so no two mounts can reach the same wrapper slot. That
+// invariant is what removed the shared-container tier this pass used to carry.
 
 /// One field's bind operation, bound once per container type: either writes
 /// the capture into a `CaptureBindableDynamicProperty` field, or recurses
@@ -34,16 +39,11 @@ import SwiftTUIGraph
   /// them here under an appended path would name a different slot than the
   /// forwarded update claims).
   package let index: Int
-  package let apply:
-    @MainActor (UnsafeMutableRawPointer, StateCaptureBinding, _ sharedMutableContainer: Bool)
-      -> Void
+  package let apply: @MainActor (UnsafeMutableRawPointer, StateCaptureBinding) -> Void
 
   package init(
     index: Int,
-    apply:
-      @escaping @MainActor (
-        UnsafeMutableRawPointer, StateCaptureBinding, _ sharedMutableContainer: Bool
-      ) -> Void
+    apply: @escaping @MainActor (UnsafeMutableRawPointer, StateCaptureBinding) -> Void
   ) {
     unsafe self.index = index
     unsafe self.apply = apply
@@ -51,14 +51,15 @@ import SwiftTUIGraph
 }
 
 /// How the bind pass reaches one container type's bindable fields.
+///
+/// Two tiers only: authored containers are value types (plan 2026-08-29-001),
+/// so a bindable container is always a struct whose private copy the pass
+/// owns. Enum and existential shapes fall to `.none`.
 @unsafe package enum DynamicPropertyCaptureBindPlan {
   /// Nothing to bind — the pass returns the value untouched.
   case none
   /// Struct container: bind through a private mutable copy's field offsets.
   case structFields([DynamicPropertyCaptureFieldBinder])
-  /// Native class container: bind in place through the instance's field
-  /// offsets. Shared memory — binders run with the conflict-demotion guard.
-  case classFields([DynamicPropertyCaptureFieldBinder])
 }
 
 /// Reflect-once-per-type cache of ``DynamicPropertyCaptureBindPlan``s.
@@ -91,12 +92,7 @@ package enum DynamicPropertyCaptureBindPlanCache {
       // time. See ValueTypeAuthoringInvariant.
       ValueTypeAuthoringInvariant.rejectClassContainer(type)
     }
-    let isStruct = kind == RuntimeFieldReflection.structureKind
-    // Kind 0 is a native Swift class (the runtime's MetadataKind.Class);
-    // foreign/ObjC class kinds stay out — their field offsets are not
-    // guaranteed by the Swift runtime's reflection entry points.
-    let isNativeClass = kind == 0
-    guard isStruct || isNativeClass else {
+    guard kind == RuntimeFieldReflection.structureKind else {
       return unsafe .none
     }
     var binders: [DynamicPropertyCaptureFieldBinder] = unsafe []
@@ -120,7 +116,7 @@ package enum DynamicPropertyCaptureBindPlanCache {
     guard unsafe !binders.isEmpty else {
       return unsafe .none
     }
-    return unsafe isStruct ? .structFields(binders) : .classFields(binders)
+    return unsafe .structFields(binders)
   }
 
   /// Rebinds the shim's generic parameter to `fieldType` so the conditional
@@ -241,10 +237,9 @@ private func rootCaptureBinding(for scope: AuthoringContext) -> StateCaptureBind
   )
 }
 
-/// Plan-dispatched core: struct containers bind a private copy; native class
-/// containers bind in place through the shared instance (with the
-/// conflict-demotion guard). Everything else — existential containers,
-/// foreign classes, enum shapes — returns unchanged and counts
+/// Plan-dispatched core: a struct container binds a private copy — the only
+/// bindable tier, because authored containers are value types. Everything
+/// else (existential containers, enum shapes) returns unchanged and counts
 /// `state.captureBind.skippedTier`.
 @MainActor
 private func boundCopy<V>(
@@ -258,7 +253,6 @@ private func boundCopy<V>(
       switch unsafe plan {
       case .none: StateCaptureBindTraceProbe.onVisit?(concreteType, "none")
       case .structFields: StateCaptureBindTraceProbe.onVisit?(concreteType, "struct")
-      case .classFields: StateCaptureBindTraceProbe.onVisit?(concreteType, "class")
       }
     }
   #endif
@@ -287,28 +281,11 @@ private func boundCopy<V>(
         binders,
         atBase: UnsafeMutableRawPointer(base),
         binding: binding,
-        sharedMutableContainer: false,
         excludingFieldsOwnedBy: traversalOwner
       )
     }
     StateCaptureCensus.record(.bindBound)
     return copy
-  case .classFields(let binders):
-    guard let binding = makeBinding() else {
-      StateCaptureCensus.record(.bindNoOwner)
-      return view
-    }
-    let object = view as AnyObject
-    let base = unsafe Unmanaged.passUnretained(object).toOpaque()
-    unsafe applyCaptureBinders(
-      binders,
-      atBase: base,
-      binding: binding,
-      sharedMutableContainer: true,
-      excludingFieldsOwnedBy: traversalOwner
-    )
-    StateCaptureCensus.record(.bindBound)
-    return view
   }
 }
 
@@ -317,7 +294,6 @@ private func applyCaptureBinders(
   _ binders: [DynamicPropertyCaptureFieldBinder],
   atBase base: UnsafeMutableRawPointer,
   binding: StateCaptureBinding,
-  sharedMutableContainer: Bool,
   excludingFieldsOwnedBy owner: (any AdditionalDynamicPropertyUpdating)? = nil
 ) {
   // Index loop on purpose: `for unsafe x in` is mangled by swift-format
@@ -329,13 +305,12 @@ private func applyCaptureBinders(
     {
       continue
     }
-    unsafe binders[index].apply(base, binding, sharedMutableContainer)
+    unsafe binders[index].apply(base, binding)
   }
 }
 
-/// Recurses into one nested container value in place. Struct-typed nested
-/// containers continue at the field's memory; class-typed nested containers
-/// re-enter through the reference with shared-container semantics.
+/// Recurses into one nested container value in place, at the field's memory.
+/// A nested container is a `DynamicProperty`, so it too is a value type.
 @MainActor
 private func bindNestedCaptures<T>(
   at pointer: UnsafeMutablePointer<T>,
@@ -351,17 +326,6 @@ private func bindNestedCaptures<T>(
       binders,
       atBase: UnsafeMutableRawPointer(pointer),
       binding: binding,
-      sharedMutableContainer: false,
-      excludingFieldsOwnedBy: traversalOwner
-    )
-  case .classFields(let binders):
-    let object = unsafe pointer.pointee as AnyObject
-    let base = unsafe Unmanaged.passUnretained(object).toOpaque()
-    unsafe applyCaptureBinders(
-      binders,
-      atBase: base,
-      binding: binding,
-      sharedMutableContainer: true,
       excludingFieldsOwnedBy: traversalOwner
     )
   }
@@ -391,12 +355,8 @@ where T: CaptureBindableDynamicProperty {
   static func captureBinder(atOffset offset: Int, index: Int)
     -> DynamicPropertyCaptureFieldBinder
   {
-    unsafe DynamicPropertyCaptureFieldBinder(index: index) {
-      base, binding, sharedMutableContainer in
-      unsafe (base + offset).assumingMemoryBound(to: T.self).pointee.bindCapture(
-        binding,
-        sharedMutableContainer: sharedMutableContainer
-      )
+    unsafe DynamicPropertyCaptureFieldBinder(index: index) { base, binding in
+      unsafe (base + offset).assumingMemoryBound(to: T.self).pointee.bindCapture(binding)
     }
   }
 }
@@ -405,7 +365,7 @@ extension CaptureBinderFieldShim: CaptureRecursableFieldBinding where T: Dynamic
   static func nestedCaptureBinder(atOffset offset: Int, index: Int)
     -> DynamicPropertyCaptureFieldBinder
   {
-    unsafe DynamicPropertyCaptureFieldBinder(index: index) { base, binding, _ in
+    unsafe DynamicPropertyCaptureFieldBinder(index: index) { base, binding in
       // A nested wrapper's own fields bind under the container's field path —
       // the same qualification `updateDynamicProperty` gives the nested
       // update walk — so composed-wrapper instances keep distinct slots.
