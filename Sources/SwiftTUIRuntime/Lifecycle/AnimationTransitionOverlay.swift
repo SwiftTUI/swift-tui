@@ -27,6 +27,12 @@ enum AnimationTransitionOverlay {
       result.offsetX = Int(Double(targetOffset.x) * progress)
       result.offsetY = Int(Double(targetOffset.y) * progress)
     }
+    if let targetScale = target.scale {
+      result.scale = TransitionScaleEffect(
+        scale: 1.0 + (targetScale.scale - 1.0) * progress,
+        anchor: targetScale.anchor
+      )
+    }
     return result
   }
 

@@ -4,10 +4,11 @@ package import SwiftTUIViews
 package struct PlacedAnimationOverlaySnapshot: Sendable {
   package var removalOverlays: [PlacedRemovalOverlaySnapshot]
   package var insertionOffsets: [PlacedAnimationOverlayOffset]
+  package var insertionScales: [PlacedAnimationOverlayScale]
   package var matchedGeometryOffsets: [PlacedAnimationOverlayOffset]
   /// Co-present matched-geometry adoption: the deltas that render each
   /// `isSource: false` instance at its source's rect (plan 2026-08-25-003
-  /// Stage A). Unlike the three channels above this one is steady-state —
+  /// Stage A). Unlike the four channels above this one is steady-state —
   /// a deterministic function of the layout, not an animation sample — so
   /// it is applied first and does not count as transient decoration.
   package var adoptionOffsets: [PlacedAnimationOverlayOffset]
@@ -15,11 +16,13 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
   package init(
     removalOverlays: [PlacedRemovalOverlaySnapshot] = [],
     insertionOffsets: [PlacedAnimationOverlayOffset] = [],
+    insertionScales: [PlacedAnimationOverlayScale] = [],
     matchedGeometryOffsets: [PlacedAnimationOverlayOffset] = [],
     adoptionOffsets: [PlacedAnimationOverlayOffset] = []
   ) {
     self.removalOverlays = removalOverlays
     self.insertionOffsets = insertionOffsets
+    self.insertionScales = insertionScales
     self.matchedGeometryOffsets = matchedGeometryOffsets
     self.adoptionOffsets = adoptionOffsets
   }
@@ -30,13 +33,15 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
   }
 
   /// Whether an animation *sample* decorates the tree this frame: an exit
-  /// overlay, an insertion offset, or a matched-geometry offset. These are
-  /// the channels the retained-products and incremental-raster gates must
-  /// barrier on; an adoption-only snapshot decorates the tree the same way
-  /// on every frame with the same layout and takes the incremental path.
+  /// overlay, an insertion offset or scale, or a matched-geometry offset.
+  /// These are the channels the retained-products and incremental-raster
+  /// gates must barrier on; an adoption-only snapshot decorates the tree the
+  /// same way on every frame with the same layout and takes the incremental
+  /// path.
   package var hasTransientDecoration: Bool {
     !removalOverlays.isEmpty
       || !insertionOffsets.isEmpty
+      || !insertionScales.isEmpty
       || !matchedGeometryOffsets.isEmpty
   }
 }
@@ -87,6 +92,22 @@ package struct PlacedAnimationOverlayOffset: Sendable {
   }
 }
 
+package struct PlacedAnimationOverlayScale: Sendable {
+  package var identity: Identity
+  package var scale: Double
+  package var anchor: UnitPoint
+
+  package init(
+    identity: Identity,
+    scale: Double,
+    anchor: UnitPoint
+  ) {
+    self.identity = identity
+    self.scale = scale
+    self.anchor = anchor
+  }
+}
+
 package func applyPlacedAnimationOverlaySnapshot(
   _ snapshot: PlacedAnimationOverlaySnapshot,
   to tree: inout PlacedNode
@@ -106,11 +127,14 @@ package func applyPlacedAnimationOverlaySnapshot(
     var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
     for removal in snapshot.removalOverlays {
       var clone = removal.snapshot
+      let modifiers = removal.modifiers.resolvingEdgeOffset(
+        edgeBasis: removal.snapshot.bounds.size
+      )
       applyPlacedOverlayModifiers(
         // Sampling already resolved the edge against the overlay's own size;
         // this only catches a snapshot that still carries a raw `moveEdge`,
         // and it resolves it on the same basis rather than the surface.
-        removal.modifiers.resolvingEdgeOffset(edgeBasis: removal.snapshot.bounds.size),
+        modifiers,
         to: &clone
       )
       if let travel = removal.matchedGeometryOffset {
@@ -121,6 +145,9 @@ package func applyPlacedAnimationOverlaySnapshot(
           tree: clone,
           offsets: [travel.identity: travel]
         )
+      }
+      if let scale = modifiers.scale {
+        applyScale(scale, to: &clone)
       }
       injections[removal.parentIdentity, default: []].append(
         (childIndex: removal.childIndex, snapshot: clone)
@@ -142,6 +169,13 @@ package func applyPlacedAnimationOverlaySnapshot(
     tree = translatePlacedNodesByIdentity(
       tree: tree,
       offsets: matchedGeometryOffsets
+    )
+  }
+
+  if !snapshot.insertionScales.isEmpty {
+    tree = scalePlacedNodesByIdentity(
+      tree: tree,
+      scales: snapshot.insertionScales
     )
   }
 }
@@ -200,6 +234,68 @@ private func resizeBounds(
   let original = node.bounds
   let target = CellRect(origin: original.origin, size: size)
   resizeCoextensive(&node, from: original, to: target)
+}
+
+private func scalePlacedNodesByIdentity(
+  tree: PlacedNode,
+  scales: [PlacedAnimationOverlayScale]
+) -> PlacedNode {
+  var result = tree
+  for scale in scales {
+    result = scalePlacedNodeByIdentity(tree: result, scale: scale)
+  }
+  return result
+}
+
+private func scalePlacedNodeByIdentity(
+  tree: PlacedNode,
+  scale: PlacedAnimationOverlayScale
+) -> PlacedNode {
+  var node = tree
+  if node.identity == scale.identity {
+    applyScale(
+      TransitionScaleEffect(scale: scale.scale, anchor: scale.anchor),
+      to: &node
+    )
+    return node
+  }
+  node.children = node.children.map { child in
+    scalePlacedNodeByIdentity(tree: child, scale: scale)
+  }
+  return node
+}
+
+private func applyScale(
+  _ scale: TransitionScaleEffect,
+  to node: inout PlacedNode
+) {
+  let target = scaledTransitionRect(node.bounds, scale: scale.scale, anchor: scale.anchor)
+  translateBounds(
+    &node,
+    dx: target.origin.x - node.bounds.origin.x,
+    dy: target.origin.y - node.bounds.origin.y
+  )
+  resizeBounds(&node, to: target.size)
+}
+
+package func scaledTransitionRect(
+  _ rect: CellRect,
+  scale: Double,
+  anchor: UnitPoint
+) -> CellRect {
+  guard scale.isFinite else { return rect }
+  let magnitude = abs(scale)
+  let width = max(Int((Double(rect.size.width) * magnitude).rounded()), 0)
+  let height = max(Int((Double(rect.size.height) * magnitude).rounded()), 0)
+  let anchorX = Double(rect.origin.x) + anchor.x * Double(rect.size.width)
+  let anchorY = Double(rect.origin.y) + anchor.y * Double(rect.size.height)
+  return CellRect(
+    origin: CellPoint(
+      x: Int((anchorX - anchor.x * Double(width)).rounded()),
+      y: Int((anchorY - anchor.y * Double(height)).rounded())
+    ),
+    size: CellSize(width: width, height: height)
+  )
 }
 
 private func resizeCoextensive(

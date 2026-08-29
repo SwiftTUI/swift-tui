@@ -64,6 +64,8 @@ package struct AnimationKey: Hashable, Sendable {
     case property(AnimatableSlot)
     /// A transition-driven insertion offset animation (placed level).
     case insertionOffset
+    /// A transition-driven insertion scale animation (placed level).
+    case insertionScale
     /// A matched-geometry translation animation (placed level).
     case matchedGeometry
   }

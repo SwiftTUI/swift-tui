@@ -476,10 +476,9 @@ package final class AnimationController: Sendable {
     )
   }
 
-  /// Runs the placed-level animation pass after layout: injects any
-  /// pending removal overlays and translates any active insertion
-  /// offsets.  Called between place and semantics in the render
-  /// pipeline.
+  /// Runs the placed-level animation pass after layout: injects pending
+  /// removal overlays and applies active insertion geometry. Called between
+  /// place and semantics in the render pipeline.
   ///
   /// Overlays injected this way never flow through measure or place,
   /// so sibling layout is not disturbed when the removed view lived
@@ -489,7 +488,8 @@ package final class AnimationController: Sendable {
   /// Insertion offsets translate the bounds of in-tree placed nodes
   /// by an interpolated delta so `.transition(.move(edge:))` and
   /// friends work on intrinsic-layout leaves (where `applyValue`
-  /// can't rewrite the layoutBehavior).
+  /// can't rewrite the layoutBehavior). Insertion scales resize and clip the
+  /// placed bounds around their anchor without changing layout.
   package func applyPlacedOverlays(
     to tree: inout PlacedNode,
     at timestamp: MonotonicInstant,
@@ -568,11 +568,11 @@ package final class AnimationController: Sendable {
   }
 
   /// `true` while the placed-overlay pass owns animation work that no other
-  /// pass can advance: an insertion offset, a matched-geometry travel, or an
-  /// exit overlay it has taken ownership of.
+  /// pass can advance: an insertion offset or scale, a matched-geometry
+  /// travel, or an exit overlay it has taken ownership of.
   ///
   /// ``placedAnimationOverlaySnapshot(for:at:surfaceSize:adoption:)`` is the
-  /// sole evaluator, custom-state advancer, and completer of all three — an
+  /// sole evaluator, custom-state advancer, and completer of all four — an
   /// off-screen-elided frame runs the head tick but never reaches that pass,
   /// and the head deliberately declines to touch them (double-sampling a
   /// stateful `CustomAnimation` is the bug that split the ownership). Eliding
@@ -581,7 +581,7 @@ package final class AnimationController: Sendable {
   ///
   /// The freeze is self-sustaining rather than transient, which is why this is
   /// a hard blocker on off-screen elision rather than an input to the
-  /// `drawnIdentities` comparison. All three scopes move a node's placed rect,
+  /// `drawnIdentities` comparison. All four scopes change a node's placed rect,
   /// so the frozen sample is precisely the one holding the node off the
   /// surface, which keeps the identity out of `drawnIdentities`, which keeps
   /// the next tick elidable. See
@@ -589,7 +589,7 @@ package final class AnimationController: Sendable {
   package var hasPlacedPassOwnedAnimationWork: Bool {
     let hasPlacedGeometryScope = activeAnimations.values.contains { animation in
       switch animation.kind {
-      case .insertionOffset, .matchedGeometry:
+      case .insertionOffset, .insertionScale, .matchedGeometry:
         true
       case .property:
         false
@@ -612,6 +612,11 @@ package final class AnimationController: Sendable {
   /// without exposing the entire private map.
   package var activeInsertionOffsetCount: Int {
     activeAnimations.keys.lazy.filter { $0.scope == .insertionOffset }.count
+  }
+
+  /// Number of insertion-scale animations currently in flight.
+  package var activeInsertionScaleCount: Int {
+    activeAnimations.keys.lazy.filter { $0.scope == .insertionScale }.count
   }
 
   /// Number of in-tree (drawMetadata / layoutBehavior) animations
@@ -1333,8 +1338,8 @@ package final class AnimationController: Sendable {
 
     // Process insertions: kick off willAppear -> identity animations.
     // A matched-geometry swap does not suppress the arriving instance's
-    // transition: the match owns the geometry (a placed-level translate and
-    // resize) and the transition owns opacity and offset, and the two
+    // transition: the match owns its geometry (a placed-level translate and
+    // resize) and the transition owns opacity, offset, and scale, and the two
     // compose — `.transition(.opacity)` fades the arriving instance in
     // along the matched path while the departing instance's exit overlay
     // travels the same path (`planRemovalOverlay`), the cross-fade SwiftUI
@@ -1662,6 +1667,22 @@ package final class AnimationController: Sendable {
         batchID: batchID
       )
     }
+    // Like offsets, transition scale is a post-layout visual transform: it
+    // changes the rendered bounds around an anchor without participating in
+    // measurement or moving siblings.
+    if let scale = modifiers.scale {
+      let scaleKey = AnimationKey(identity: identity, scope: .insertionScale)
+      if let existing = activeAnimations[scaleKey] {
+        releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)
+      }
+      retainBatch(batchID)
+      activeAnimations[scaleKey] = ActiveAnimation(
+        kind: .insertionScale(from: scale),
+        animationBox: box,
+        startTime: timestamp,
+        batchID: batchID
+      )
+    }
   }
 
   /// Plans one removal overlay: resolves the injection point, captures the
@@ -1750,8 +1771,9 @@ package final class AnimationController: Sendable {
     // Supersede any in-flight animations on identities that are being
     // re-injected from the removed subtree.  The unified activeAnimations
     // map means this filter is scope-agnostic: property animations,
-    // insertion-offset animations, and matched-geometry animations are
-    // all swept together.  Any withAnimation completion closures ref-
+    // insertion-offset animations, insertion-scale animations, and
+    // matched-geometry animations are all swept together. Any withAnimation
+    // completion closures ref-
     // counted by these entries fire immediately here (via releaseBatch
     // below), rather than at each animation's natural curve completion —
     // matching SwiftUI's interrupt semantics where a removal supersedes
@@ -2277,7 +2299,7 @@ package final class AnimationController: Sendable {
     // Walk every active animation regardless of scope.  Property
     // scopes are sampled here and write into ``interpolated`` for
     // application by ``applyInterpolatedValues`` below.  Placed-level
-    // scopes (insertion offset, matched geometry) only need the run
+    // scopes (insertion offset/scale, matched geometry) only need the run
     // loop to keep ticking on this pass — their actual evaluation +
     // translation runs inside ``applyPlacedOverlays``, and we must
     // not double-evaluate stateful CustomAnimation curves here.
@@ -2324,7 +2346,7 @@ package final class AnimationController: Sendable {
           hasPendingWork = true
         }
 
-      case .insertionOffset, .matchedGeometry:
+      case .insertionOffset, .insertionScale, .matchedGeometry:
         // Placed-level scopes don't read or write the resolved tree
         // here.  Their kind payload only mutates the placed tree
         // inside ``applyPlacedOverlays``, which advances the
@@ -2367,8 +2389,9 @@ package final class AnimationController: Sendable {
       // solely by the placed overlay pass (`sampleRemovalOverlays`). Evaluating
       // the curve here too double-samples a stateful `CustomAnimation` once per
       // frame — the resolved tick and the placed overlay would each call
-      // `evaluate` (016). Mirror the insertion-offset / matched-geometry placed
-      // scopes handled in the active-animation loop above: keep the frame
+      // `evaluate` (016). Mirror the insertion-offset / insertion-scale /
+      // matched-geometry placed scopes handled in the active-animation loop
+      // above: keep the frame
       // ticking so the scheduler reaches the placed pass, but do not evaluate,
       // advance custom state, build modifiers, or purge here — the placed pass
       // owns the single evaluation and the completion/purge. The condition
@@ -2598,7 +2621,7 @@ package final class AnimationController: Sendable {
   /// Samples the current interpolated value of a property-scoped
   /// animation at `timestamp`, discarding the advanced custom state.
   /// Returns `nil` for non-property kinds — the placed-level scopes
-  /// (insertion offset, matched geometry) produce translation deltas
+  /// (insertion offset/scale, matched geometry) produce placed transforms
   /// rather than ``AnyAnimatable`` values and don't participate in the
   /// property retarget path.
   ///

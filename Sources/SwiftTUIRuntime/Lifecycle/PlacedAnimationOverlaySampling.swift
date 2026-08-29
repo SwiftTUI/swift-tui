@@ -28,6 +28,11 @@ package enum PlacedAnimationOverlaySampling {
       timestamp: timestamp,
       surfaceSize: effectiveSurfaceSize
     )
+    let insertionScaleResult = sampleInsertionScales(
+      activeAnimations: activeAnimations,
+      registeredAnimations: registeredAnimations,
+      timestamp: timestamp
+    )
     let matchedResult = sampleMatchedGeometryOffsets(
       activeAnimations: activeAnimations,
       registeredAnimations: registeredAnimations,
@@ -39,6 +44,9 @@ package enum PlacedAnimationOverlaySampling {
     for (key, state) in matchedResult.customStates {
       activeCustomStates[key] = state
     }
+    for (key, state) in insertionScaleResult.customStates {
+      activeCustomStates[key] = state
+    }
 
     // Adoption follows a source that is itself in flight: a source with a
     // live matched or insertion offset is drawn away from its baseline rect
@@ -46,19 +54,22 @@ package enum PlacedAnimationOverlaySampling {
     let adoptionOffsets = sampleAdoption(
       tree: tree,
       pairs: adoption,
-      liveOffsets: insertionResult.offsets + matchedResult.offsets
+      liveOffsets: insertionResult.offsets + matchedResult.offsets,
+      liveScales: insertionScaleResult.scales
     )
 
     return PlacedAnimationOverlaySamplingResult(
       snapshot: PlacedAnimationOverlaySnapshot(
         removalOverlays: removalResult.overlays,
         insertionOffsets: insertionResult.offsets,
+        insertionScales: insertionScaleResult.scales,
         matchedGeometryOffsets: matchedResult.offsets,
         adoptionOffsets: adoptionOffsets
       ),
       removalCustomStates: removalResult.customStates,
       activeAnimationCustomStates: activeCustomStates,
-      completedAnimationKeys: insertionResult.completedKeys + matchedResult.completedKeys,
+      completedAnimationKeys: insertionResult.completedKeys + insertionScaleResult.completedKeys
+        + matchedResult.completedKeys,
       completedRemovalNodeIDs: removalResult.completedNodeIDs
     )
   }
@@ -69,20 +80,30 @@ package enum PlacedAnimationOverlaySampling {
   package static func sampleAdoption(
     tree: PlacedNode,
     pairs: [MatchedGeometryAdoptionPair]? = nil,
-    liveOffsets: [PlacedAnimationOverlayOffset] = []
+    liveOffsets: [PlacedAnimationOverlayOffset] = [],
+    liveScales: [PlacedAnimationOverlayScale] = []
   ) -> [PlacedAnimationOverlayOffset] {
     let pairs = pairs ?? MatchedGeometryAdoption.pairs(in: tree)
     guard !pairs.isEmpty else { return [] }
     var overrides: [Identity: CellRect] = [:]
-    if !liveOffsets.isEmpty {
-      let sources = Set(pairs.map(\.source))
-      for offset in liveOffsets where sources.contains(offset.identity) {
-        guard let baseline = pairs.first(where: { $0.source == offset.identity })?.sourceBounds
-        else { continue }
-        overrides[offset.identity] = CellRect(
-          origin: CellPoint(x: baseline.origin.x + offset.dx, y: baseline.origin.y + offset.dy),
-          size: offset.size ?? baseline.size
-        )
+    if !liveOffsets.isEmpty || !liveScales.isEmpty {
+      for pair in pairs {
+        var rect = pair.sourceBounds
+        var changed = false
+        for offset in liveOffsets where offset.identity == pair.source {
+          rect = CellRect(
+            origin: CellPoint(x: rect.origin.x + offset.dx, y: rect.origin.y + offset.dy),
+            size: offset.size ?? rect.size
+          )
+          changed = true
+        }
+        for scale in liveScales where scale.identity == pair.source {
+          rect = scaledTransitionRect(rect, scale: scale.scale, anchor: scale.anchor)
+          changed = true
+        }
+        if changed {
+          overrides[pair.source] = rect
+        }
       }
     }
     return MatchedGeometryAdoption.offsets(for: pairs, sourceRectOverrides: overrides)
@@ -96,6 +117,12 @@ package enum PlacedAnimationOverlaySampling {
 
   private struct OffsetSamplingResult {
     var offsets: [PlacedAnimationOverlayOffset] = []
+    var customStates: [AnimationKey: AnimationState] = [:]
+    var completedKeys: [AnimationKey] = []
+  }
+
+  private struct ScaleSamplingResult {
+    var scales: [PlacedAnimationOverlayScale] = []
     var customStates: [AnimationKey: AnimationState] = [:]
     var completedKeys: [AnimationKey] = []
   }
@@ -316,6 +343,43 @@ package enum PlacedAnimationOverlaySampling {
           dx: rect.origin.x - toBounds.origin.x,
           dy: rect.origin.y - toBounds.origin.y,
           size: properties.contains(.size) ? rect.size : nil
+        )
+      )
+    }
+
+    return result
+  }
+
+  private static func sampleInsertionScales(
+    activeAnimations: [AnimationKey: ActiveAnimation],
+    registeredAnimations: [AnimationBox: Animation],
+    timestamp: MonotonicInstant
+  ) -> ScaleSamplingResult {
+    var result = ScaleSamplingResult()
+
+    for (key, entry) in activeAnimations {
+      guard key.scope == .insertionScale else { continue }
+      guard case .insertionScale(let from) = entry.kind else { continue }
+      guard let animation = registeredAnimations[entry.animationBox] else {
+        result.completedKeys.append(key)
+        continue
+      }
+
+      let elapsed = entry.startTime.duration(to: timestamp)
+      var state = entry.customState
+      let evaluated = animation.evaluate(elapsed: elapsed, state: &state)
+      result.customStates[key] = state
+
+      guard let progress = evaluated else {
+        result.completedKeys.append(key)
+        continue
+      }
+
+      result.scales.append(
+        .init(
+          identity: key.identity,
+          scale: from.scale + (1.0 - from.scale) * progress,
+          anchor: from.anchor
         )
       )
     }

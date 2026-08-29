@@ -1,26 +1,37 @@
 public import SwiftTUICore
 
-/// The set of property effects a transition can apply during a single
-/// phase.
-///
-/// The built-in transition surface intentionally exposes only opacity and
-/// offset effects.
+/// A scale effect carried by one phase of a transition.
+package struct TransitionScaleEffect: Sendable, Equatable {
+  package var scale: Double
+  package var anchor: UnitPoint
+
+  package init(scale: Double, anchor: UnitPoint) {
+    self.scale = scale
+    self.anchor = anchor
+  }
+}
+
+/// The set of property and geometry effects a transition can apply during a
+/// single phase.
 package struct TransitionModifiers: Sendable, Equatable {
   package var opacity: Double?
   package var offsetX: Int?
   package var offsetY: Int?
   package var moveEdge: Edge?
+  package var scale: TransitionScaleEffect?
 
   package init(
     opacity: Double? = nil,
     offsetX: Int? = nil,
     offsetY: Int? = nil,
-    moveEdge: Edge? = nil
+    moveEdge: Edge? = nil,
+    scale: TransitionScaleEffect? = nil
   ) {
     self.opacity = opacity
     self.offsetX = offsetX
     self.offsetY = offsetY
     self.moveEdge = moveEdge
+    self.scale = scale
   }
 
   package static let identity = TransitionModifiers()
@@ -66,7 +77,8 @@ package struct TransitionModifiers: Sendable, Equatable {
     return TransitionModifiers(
       opacity: opacity,
       offsetX: offset.x,
-      offsetY: offset.y
+      offsetY: offset.y,
+      scale: scale
     )
   }
 
@@ -77,15 +89,16 @@ package struct TransitionModifiers: Sendable, Equatable {
       opacity: other.opacity ?? opacity,
       offsetX: other.offsetX ?? offsetX,
       offsetY: other.offsetY ?? offsetY,
-      moveEdge: other.moveEdge ?? moveEdge
+      moveEdge: other.moveEdge ?? moveEdge,
+      scale: other.scale ?? scale
     )
   }
 }
 
 /// A type-erased transition wrapper.
 ///
-/// Compose the built-in opacity and offset effects with ``combined(with:)``
-/// and ``asymmetric(insertion:removal:)``.
+/// Compose the built-in opacity, offset, and scale effects with
+/// ``combined(with:)`` and ``asymmetric(insertion:removal:)``.
 public struct AnyTransition: Sendable {
   package let insertionModifiers: @Sendable () -> TransitionModifiers
   package let removalModifiers: @Sendable () -> TransitionModifiers
@@ -125,6 +138,42 @@ public struct AnyTransition: Sendable {
     insertion: .move(edge: .leading),
     removal: .move(edge: .trailing)
   )
+
+  /// Scales from and to a nearly collapsed view around its center.
+  ///
+  /// SwiftUI uses a small nonzero factor instead of zero so the active
+  /// transform remains nonsingular.
+  public static let scale = AnyTransition(
+    insertion: {
+      TransitionModifiers(
+        scale: TransitionScaleEffect(scale: 1e-5, anchor: .center)
+      )
+    },
+    removal: {
+      TransitionModifiers(
+        scale: TransitionScaleEffect(scale: 1e-5, anchor: .center)
+      )
+    }
+  )
+
+  /// Scales from and to `scale` around `anchor` without changing layout.
+  public static func scale(
+    scale: Double,
+    anchor: UnitPoint = .center
+  ) -> AnyTransition {
+    AnyTransition(
+      insertion: {
+        TransitionModifiers(
+          scale: TransitionScaleEffect(scale: scale, anchor: anchor)
+        )
+      },
+      removal: {
+        TransitionModifiers(
+          scale: TransitionScaleEffect(scale: scale, anchor: anchor)
+        )
+      }
+    )
+  }
 
   /// Fixed offset shift.
   public static func offset(x: Int = 0, y: Int = 0) -> AnyTransition {

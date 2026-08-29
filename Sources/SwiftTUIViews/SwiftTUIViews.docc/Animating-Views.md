@@ -145,17 +145,20 @@ struct SavedBanner: View {
 }
 ```
 
-``AnyTransition`` ships `.opacity`, `.move(edge:)`, `.slide`,
-`.offset(x:y:)`, `.push(from:)`, and `.identity`. An edge-relative move is
-measured against the moving view's own frame, as in SwiftUI: a view entering
-from `.leading` starts exactly its own width to the left of the slot it is
-about to occupy, so the travel reads as a slide inside whatever clips it
-rather than a jump across the screen. Compose them with
-``AnyTransition/combined(with:)`` and, for different enter and exit
-behavior, ``AnyTransition/asymmetric(insertion:removal:)``. The built-in
-surface is intentionally opacity- and offset-based — scaling glyphs has no
-meaning on a cell grid. While a removal transition plays, the departing view
-is display-only: it no longer participates in layout, focus, or input.
+``AnyTransition`` ships `.opacity`, `.move(edge:)`, `.slide`, `.scale`,
+`.scale(scale:anchor:)`, `.offset(x:y:)`, `.push(from:)`, and `.identity`.
+An edge-relative move is measured against the moving view's own frame, as in
+SwiftUI: a view entering from `.leading` starts exactly its own width to the
+left of the slot it is about to occupy, so the travel reads as a slide inside
+whatever clips it rather than a jump across the screen. A scale transition
+preserves layout while its placed frame grows from or shrinks toward the
+specified factor around its `UnitPoint` anchor; the parameterless form uses
+SwiftUI's near-zero centered factor. On the cell grid the interpolated frame
+rounds to whole cells and clips the content already laid out inside it.
+Compose transitions with ``AnyTransition/combined(with:)`` and, for different
+enter and exit behavior, ``AnyTransition/asymmetric(insertion:removal:)``.
+While a removal transition plays, the departing view is display-only: it no
+longer participates in layout, focus, or input.
 
 ## Roll A Number When It Changes
 

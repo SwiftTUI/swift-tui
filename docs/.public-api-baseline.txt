@@ -3148,6 +3148,8 @@ SwiftTUIViews.AnyTransition.move(edge:)
 SwiftTUIViews.AnyTransition.offset(x:y:)
 SwiftTUIViews.AnyTransition.opacity
 SwiftTUIViews.AnyTransition.push(from:)
+SwiftTUIViews.AnyTransition.scale
+SwiftTUIViews.AnyTransition.scale(scale:anchor:)
 SwiftTUIViews.AnyTransition.slide
 SwiftTUIViews.AnyView
 SwiftTUIViews.AnyView.body

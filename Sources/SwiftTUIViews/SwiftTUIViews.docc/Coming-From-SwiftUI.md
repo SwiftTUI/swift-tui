@@ -203,7 +203,7 @@ current status of each.
 | No `scrollPosition(_:)` identity abstraction | `ScrollViewReader` (its proxy's `scrollTo` returns `Bool`, so check it) or `ScrollView(position:)` with a raw `ScrollCellOffset` |
 | `Color` vocabulary: `alpha:` not `opacity:`, `mixed(with:amount:method:)` not `mix(with:by:)`, no `Color.accentColor` | Prefer semantic roles (`.primary`, `.secondary`, `.tint`) resolved through the host theme; they are the intended currency |
 | No `ScenePhase` | None; a session is one full-canvas scene |
-| Transitions are opacity and offset only; no `.scale`; `matchedGeometryEffect` interpolates position only | Compose opacity and offset; a matched pair that changes size snaps to the destination size |
+| Scale transitions and matched size changes use placed bounds and clipping rather than re-layout or bitmap scaling | Expect whole-cell steps; content keeps its destination layout while the interpolated frame clips it |
 | `Menu` anchors top-leading, not at its source control | None; noted so it is not mistaken for a layout bug |
 | The lazy path requires a single direct `ForEach` | Restructure heterogeneous content into one indexed source; the eager fallback reports a runtime issue past a few hundred rows |
 | No `addArc`, no general `clipShape(_:)`, no animatable path morphing | Analytic primitives plus parameter animation; see <doc:Shapes> and <doc:AspectCorrectShapes> |

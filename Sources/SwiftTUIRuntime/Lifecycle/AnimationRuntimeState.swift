@@ -23,6 +23,9 @@ package enum AnimationKind: Sendable {
   /// the starting delta; edge-relative moves are resolved against the
   /// render surface during placed sampling.
   case insertionOffset(from: TransitionModifiers)
+  /// A transition-driven insertion scale applied after layout. The active
+  /// factor interpolates from `from.scale` to identity around its anchor.
+  case insertionScale(from: TransitionScaleEffect)
   /// A matched-geometry animation between two placed bounds.  At
   /// progress 0 the target identity renders at `fromBounds` (the
   /// `properties` it tracks, measured around `anchor`); at progress 1 it

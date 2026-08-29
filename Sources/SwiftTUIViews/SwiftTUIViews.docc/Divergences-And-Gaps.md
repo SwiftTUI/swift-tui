@@ -621,9 +621,11 @@ are omitted even when SwiftUI exposes a corresponding API.
   content's own nodes and follows their transaction, where SwiftUI scopes it
   too.
 - **Custom `Transition` bodies are not exposed.** *Ratified.* SwiftTUI ships
-  the built-in `AnyTransition` opacity, move, offset, combined, and asymmetric
-  effects. It does not accept an arbitrary view body and then silently discard
-  unsupported modifiers. A built-in `.scale` transition remains a *Gap*.
+  the built-in `AnyTransition` opacity, move, offset, scale, combined, and
+  asymmetric effects. Scale preserves layout and changes placed bounds around
+  its `UnitPoint` anchor; cell extents round to whole cells and clip content
+  laid out at its identity size. SwiftTUI does not accept an arbitrary view
+  body and then silently discard unsupported modifiers.
 - **Content transitions roll per digit column; `.interpolate` is not
   offered.** *Ratified.* `View.contentTransition(_:)` and
   `EnvironmentValues.contentTransition` carry a `ContentTransition` to every
