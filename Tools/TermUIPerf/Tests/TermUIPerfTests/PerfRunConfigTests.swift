@@ -50,7 +50,7 @@ struct PerfRunConfigTests {
             modes: [.async],
             iterations: 20,
             artifactsRoot: ".perf/runs",
-            configuration: "release"
+            configuration: PerfBuildConfiguration.detected
           )))
   }
 
