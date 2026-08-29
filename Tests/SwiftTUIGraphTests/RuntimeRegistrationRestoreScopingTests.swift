@@ -150,7 +150,8 @@ struct RuntimeRegistrationRestoreScopingTests {
 
     let graphDraft = ViewGraphFrameDraft(
       liveRegistrations: liveRegistrations,
-      checkpoint: nil
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
     )
     let customNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[authored]!
     graphDraft.recordDirtyEvaluationPlan(
@@ -337,6 +338,226 @@ struct RuntimeRegistrationRestoreScopingTests {
     #expect(
       liveRegistrations.defaultFocusRegistry?.snapshot()
         == fullRebuild.defaultFocusRegistry?.snapshot()
+    )
+  }
+
+  @Test("scoped restore withdraws a live owner's dropped registration (F04)")
+  func scopedRestoreWithdrawsALiveOwnersDroppedRegistration() {
+    // The node axis the identity-prefix reset cannot see. The publisher stays
+    // alive and simply stops recording its registration, at an identity that
+    // sits outside every frontier root — so the reset never covers it, and the
+    // restore, which only writes, never removes it. A full rebuild drops it
+    // (it republishes from live node records only), so the entry lingering
+    // here is a handler still dispatchable that no rebuild can re-derive.
+    let rootIdentity = testIdentity("Root")
+    let authored = testIdentity("Root", "Custom")
+    let pinned = testIdentity("Detached", "pinned")
+    // Ballast siblings. A frontier covering half the live tree escalates to
+    // the fingerprint-delta body, which resets — so a two-node fixture never
+    // reaches the scoped restore this pins at all.
+    let ballast = (0..<4).map { testIdentity("Root", "Ballast\($0)") }
+
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let customNode = graph.beginEvaluation(identity: authored, invalidator: nil)
+    customNode.beginRegistrationCapture()
+    ViewNodeContext.withValue(customNode) {
+      customNode.recordActionRegistration(
+        identity: pinned,
+        handler: { true },
+        followUpInvalidationIdentity: nil
+      )
+      customNode.recordKeyPressHandlerRegistration(identity: pinned, ordinal: 0) { _ in true }
+    }
+    customNode.endRegistrationCapture()
+    graph.finishEvaluation(
+      customNode,
+      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      accessedStateSlots: 0
+    )
+    for identity in ballast {
+      let node = graph.beginEvaluation(identity: identity, invalidator: nil)
+      graph.finishEvaluation(
+        node,
+        resolved: ResolvedNode(identity: identity, kind: .view("Ballast")),
+        accessedStateSlots: 0
+      )
+    }
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [ResolvedNode(identity: authored, kind: .view("Custom"))]
+          + ballast.map { ResolvedNode(identity: $0, kind: .view("Ballast")) }
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved0 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved0, placed: nil)
+
+    // The first commit through a draft is always a full publication (a fresh
+    // registration target has no committed fingerprint to diff), so it is what
+    // establishes the target the scoped frame below can then narrow against.
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let seedDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    seedDraft.recordDirtyEvaluationPlan(nil)
+    #expect(seedDraft.commitRuntimeRegistrations(from: graph).publication.publicationMode == "all")
+    #expect(liveRegistrations.actionRegistry?.hasHandler(identity: pinned) == true)
+
+    // Frame 2: the same live node re-evaluates and records nothing. The
+    // capture session is what withdraws the registration — a node that
+    // re-evaluates always resets its record, whether or not it re-registers.
+    graph.beginFrame()
+    let custom2 = graph.beginEvaluation(identity: authored, invalidator: nil)
+    custom2.beginRegistrationCapture()
+    custom2.endRegistrationCapture()
+    graph.finishEvaluation(
+      custom2,
+      resolved: ResolvedNode(identity: authored, kind: .view("Custom")),
+      accessedStateSlots: 0
+    )
+    let resolved2 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved2, placed: nil)
+
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    let customNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[authored]!
+    graphDraft.recordDirtyEvaluationPlan(
+      .init(frontierNodeIDs: [customNodeID], frontierIdentities: [authored])
+    )
+    let diagnostics = graphDraft.commitRuntimeRegistrations(from: graph)
+    // The whole point is the SCOPED path: the rebuilding branches reset first
+    // and cannot leave a withdrawn registration behind.
+    #expect(diagnostics.publication.publicationMode == "subtrees")
+
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+
+    #expect(fullRebuild.actionRegistry?.hasHandler(identity: pinned) == false)
+    #expect(liveRegistrations.actionRegistry?.hasHandler(identity: pinned) == false)
+    #expect(liveRegistrations.keyHandlerRegistry?.snapshotKeyPressHandlers()[pinned] == nil)
+  }
+
+  @Test("scoped restore drops a departed owner's stacked handler bucket (F04)")
+  func scopedRestoreDropsADepartedOwnersStackedHandlerBucket() {
+    // The measured `live=2 rebuilt=1` shape. Two siblings register key press
+    // handlers at ONE pinned identity — the shape an `.id(_:)`-re-rooted
+    // control produces when its node re-mints while its registration identity
+    // stays put. The first sibling then departs. Its bucket sits outside every
+    // frontier root, so the identity-prefix reset cannot reach it, and the
+    // arriving sibling's restore stacks a second bucket on top of it.
+    let rootIdentity = testIdentity("Root")
+    let departingIdentity = testIdentity("Root", "Departing")
+    let arrivingIdentity = testIdentity("Root", "Arriving")
+    let pinned = testIdentity("Detached", "pinned")
+    let ballast = (0..<4).map { testIdentity("Root", "Ballast\($0)") }
+
+    func seedBallast() {
+      for identity in ballast {
+        let node = graph.beginEvaluation(identity: identity, invalidator: nil)
+        graph.finishEvaluation(
+          node,
+          resolved: ResolvedNode(identity: identity, kind: .view("Ballast")),
+          accessedStateSlots: 0
+        )
+      }
+    }
+
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let departingNode = graph.beginEvaluation(identity: departingIdentity, invalidator: nil)
+    departingNode.beginRegistrationCapture()
+    ViewNodeContext.withValue(departingNode) {
+      departingNode.recordKeyPressHandlerRegistration(identity: pinned, ordinal: 0) { _ in true }
+    }
+    departingNode.endRegistrationCapture()
+    graph.finishEvaluation(
+      departingNode,
+      resolved: ResolvedNode(identity: departingIdentity, kind: .view("Departing")),
+      accessedStateSlots: 0
+    )
+    seedBallast()
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [ResolvedNode(identity: departingIdentity, kind: .view("Departing"))]
+          + ballast.map { ResolvedNode(identity: $0, kind: .view("Ballast")) }
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved0 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved0, placed: nil)
+
+    // As above: the first commit establishes the registration target.
+    let liveRegistrations = RuntimeRegistrationSet.scratch()
+    let seedDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    seedDraft.recordDirtyEvaluationPlan(nil)
+    #expect(seedDraft.commitRuntimeRegistrations(from: graph).publication.publicationMode == "all")
+
+    // Frame 2: the publisher is replaced by a sibling registering at the SAME
+    // pinned identity, and the root re-lists its children without it.
+    graph.beginFrame()
+    let root2 = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let arrivingNode = graph.beginEvaluation(identity: arrivingIdentity, invalidator: nil)
+    arrivingNode.beginRegistrationCapture()
+    ViewNodeContext.withValue(arrivingNode) {
+      arrivingNode.recordKeyPressHandlerRegistration(identity: pinned, ordinal: 0) { _ in true }
+    }
+    arrivingNode.endRegistrationCapture()
+    graph.finishEvaluation(
+      arrivingNode,
+      resolved: ResolvedNode(identity: arrivingIdentity, kind: .view("Arriving")),
+      accessedStateSlots: 0
+    )
+    seedBallast()
+    graph.finishEvaluation(
+      root2,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [ResolvedNode(identity: arrivingIdentity, kind: .view("Arriving"))]
+          + ballast.map { ResolvedNode(identity: $0, kind: .view("Ballast")) }
+      ),
+      accessedStateSlots: 0
+    )
+    let resolved2 = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved2, placed: nil)
+
+    let graphDraft = ViewGraphFrameDraft(
+      liveRegistrations: liveRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: true
+    )
+    let arrivingNodeID = graph.debugTotalStateSnapshot().nodeIDByIdentity[arrivingIdentity]!
+    graphDraft.recordDirtyEvaluationPlan(
+      .init(frontierNodeIDs: [arrivingNodeID], frontierIdentities: [arrivingIdentity])
+    )
+    let diagnostics = graphDraft.commitRuntimeRegistrations(from: graph)
+    #expect(diagnostics.publication.publicationMode == "subtrees")
+
+    let fullRebuild = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
+
+    #expect(fullRebuild.keyHandlerRegistry?.snapshotKeyPressHandlers()[pinned]?.count == 1)
+    #expect(
+      liveRegistrations.keyHandlerRegistry?.snapshotKeyPressHandlers()[pinned]?.count
+        == fullRebuild.keyHandlerRegistry?.snapshotKeyPressHandlers()[pinned]?.count
     )
   }
 

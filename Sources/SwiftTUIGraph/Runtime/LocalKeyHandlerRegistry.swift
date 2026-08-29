@@ -320,6 +320,49 @@ package final class LocalKeyHandlerRegistry: Equatable {
     pruneOwnerMap()
   }
 
+  /// The node axis of teardown — see
+  /// ``RuntimeRegistry/removeUnjustifiedRegistrations(_:)``. The stacked
+  /// families check per CONTRIBUTED BUCKET, not per identity: one identity's
+  /// handlers can be contributed by several nodes (stacked modifier levels),
+  /// and the residual this closes is precisely a bucket whose owner no longer
+  /// backs it standing beside one whose owner does.
+  package func removeUnjustifiedRegistrations(
+    _ record: (ViewNodeID) -> NodeHandlers?
+  ) {
+    removeUnjustifiedContributions(&keyPressHandlers) { viewNodeID, identity in
+      record(viewNodeID)?.keyHandler.keyPress.handlers[identity] != nil
+    }
+    removeUnjustifiedContributions(&pasteHandlers) { viewNodeID, identity in
+      record(viewNodeID)?.keyHandler.paste.handlers[identity] != nil
+    }
+    pruneOwnerMap()
+  }
+
+  private func removeUnjustifiedContributions<H>(
+    _ contributions: inout [Identity: ContributedHandlers<H>],
+    _ isJustified: (ViewNodeID, Identity) -> Bool
+  ) {
+    for (identity, contribution) in contributions {
+      let surviving = contribution.byOwner.filter { owner, _ in
+        // An entry restored without an owner carries no node claim to check.
+        guard let viewNodeID = owner.viewNodeID else {
+          return true
+        }
+        return isJustified(viewNodeID, identity)
+      }
+      guard surviving.count != contribution.byOwner.count else {
+        continue
+      }
+      if surviving.isEmpty {
+        contributions.removeValue(forKey: identity)
+      } else {
+        var pruned = contribution
+        pruned.byOwner = surviving
+        contributions[identity] = pruned
+      }
+    }
+  }
+
   private func pruneContributions<H>(
     _ contributions: inout [Identity: ContributedHandlers<H>],
     keeping liveNodeIDs: Set<ViewNodeID>

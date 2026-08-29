@@ -56,6 +56,26 @@ package struct IdentityKeyedRegistryStorage<Value> {
     }
   }
 
+  /// Drops every entry that `isJustified` rejects (F04).
+  ///
+  /// The caller's predicate asks the entry's OWNER NODE whether it still
+  /// records this registration. That is the node axis of teardown, and it is
+  /// the one ``removeSubtrees(rootedAt:)`` above cannot see: that selects on
+  /// the registration KEY's identity prefix, so an entry whose identity sits
+  /// outside the removed roots survives however dead it is. Both halves of
+  /// the measured residual are that gap — a departed owner's entry standing
+  /// after its node is gone, and a live owner's entry standing after it
+  /// stopped recording it.
+  package mutating func removeUnjustified(
+    _ isJustified: (Identity, RuntimeRegistrationOwnerKey) -> Bool
+  ) {
+    for (identity, owner) in ownersByIdentity
+    where values[identity] != nil && !isJustified(identity, owner) {
+      values.removeValue(forKey: identity)
+      ownersByIdentity.removeValue(forKey: identity)
+    }
+  }
+
   /// Overlays `snapshot` onto the live map (replace-per-identity), taking
   /// each restored entry's owner from `restoredOwners` when present and
   /// deriving it from the identity otherwise. Empty snapshots are a no-op

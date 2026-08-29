@@ -50,6 +50,30 @@ extension RuntimeRegistrationSet {
     }
   }
 
+  /// The scoped publication's node-axis teardown (F04): drops every
+  /// registration that no live node record justifies.
+  ///
+  /// A full rebuild gets this for free — `resetAll()` empties the registries
+  /// and the rebuild republishes from live node records only, so neither a
+  /// departed owner's entry nor a withdrawn one can survive it. The scoped
+  /// path has no such guarantee: its removal selects registration-KEY
+  /// identity prefixes and its restore only writes, so anything registered
+  /// under an identity outside the removed roots is unreachable from both.
+  /// This closes that gap in place, so a scoped restore lands where the
+  /// rebuild it stands in for would have.
+  ///
+  /// Deliberately NOT the `prune(keeping:)` fan-out: that one also reaches
+  /// the pointer/gesture/gesture-state trio, whose ordering against
+  /// `RunLoop.processFocusSyncIteration`'s paired-region pass is load-bearing
+  /// (F101). The families reached here hold no interaction state.
+  package func removeUnjustifiedRegistrations(
+    _ record: (ViewNodeID) -> NodeHandlers?
+  ) {
+    for registry in allRegistries {
+      registry.removeUnjustifiedRegistrations(record)
+    }
+  }
+
   package func pruneOrphanedGestures(
     keeping liveNodeIDs: Set<ViewNodeID>
   ) {

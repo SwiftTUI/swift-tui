@@ -135,7 +135,19 @@ extension ViewGraph {
           .navigationSurface(let source):
           return nodeIfExists(for: source) != nil
         case .entityHome:
-          return true
+          // NOT durable (F91). The reachability census deliberately refuses to
+          // seed entity homes — an entity route qualifies local teardown
+          // decisions, it does not make a detached node a census root
+          // (`LifetimeRelationCensus`) — and the frame barrier withdraws the
+          // route the moment the entity goes inactive or its home leaves the
+          // live set (`releaseInactiveEntityRoutes`). Accepting it here left a
+          // dropped `ForEach`/`List` element carrying an entity route as its
+          // ONLY claim: the barrier stripped that claim and the node was
+          // stranded, anchorless and unreachable, for the rest of the graph's
+          // life. It still gets the detached-hosted anchor below, which the
+          // census does honour and which the RC-3 supersession sweep retires
+          // once the declaring host stops re-declaring it.
+          return false
         }
       }
       if hasOtherDurableAnchor {

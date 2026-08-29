@@ -20,6 +20,28 @@ package func mergeKeepingCurrent<Value>(_ current: Value, _ departing: Value) ->
   current
 }
 
+/// Re-points every entry of an identity-keyed owner map that still names the
+/// `departing` node at the `adopter` (F04).
+///
+/// Adoption transfers ownership of a departing node's records to the node
+/// that absorbed its committed value, so the owner keys must follow. An owner
+/// key is not decoration: the publication path's owner-liveness sweep proves
+/// departure from `viewNodeID` alone, so an adopted registration still keyed
+/// to the absorbed node reads as stale and is torn down even though a live
+/// node now carries its record.
+package func rehomeAdoptedOwnerKeys<Key>(
+  _ owners: inout [Key: RuntimeRegistrationOwnerKey],
+  from departing: ViewNodeID,
+  to adopter: ViewNodeID
+) {
+  for (key, owner) in owners where owner.viewNodeID == departing {
+    owners[key] = RuntimeRegistrationOwnerKey(
+      viewNodeID: adopter,
+      identity: owner.identity
+    )
+  }
+}
+
 package struct ActionNodeRecord: RuntimeNodeRecord {
   package var registrations: [Identity: LocalActionRegistry.Registration] = [:]
   package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
@@ -33,6 +55,13 @@ package struct ActionNodeRecord: RuntimeNodeRecord {
   package mutating func absorbAdopted(_ departing: ActionNodeRecord) {
     registrations.merge(departing.registrations, uniquingKeysWith: mergeKeepingCurrent)
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
+  }
+
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    rehomeAdoptedOwnerKeys(&owners, from: departing, to: adopter)
   }
 
   @MainActor
@@ -70,6 +99,13 @@ package struct ContributedHandlerNodeRecord<Handler>: RuntimeNodeRecord {
     ordinals.merge(departing.ordinals, uniquingKeysWith: mergeKeepingCurrent)
   }
 
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    rehomeAdoptedOwnerKeys(&owners, from: departing, to: adopter)
+  }
+
   @MainActor
   package mutating func record(
     identity: Identity,
@@ -98,6 +134,15 @@ package struct KeyHandlerNodeRecord: RuntimeNodeRecord {
     keyPress.absorbAdopted(departing.keyPress)
     paste.absorbAdopted(departing.paste)
   }
+
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    rehomeAdoptedOwnerKeys(&owners, from: departing, to: adopter)
+    keyPress.rehomeAdoptedOwners(from: departing, to: adopter)
+    paste.rehomeAdoptedOwners(from: departing, to: adopter)
+  }
 }
 
 package struct TerminationNodeRecord: RuntimeNodeRecord {
@@ -113,6 +158,13 @@ package struct TerminationNodeRecord: RuntimeNodeRecord {
   package mutating func absorbAdopted(_ departing: TerminationNodeRecord) {
     handlers.merge(departing.handlers, uniquingKeysWith: mergeKeepingCurrent)
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
+  }
+
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    rehomeAdoptedOwnerKeys(&owners, from: departing, to: adopter)
   }
 
   @MainActor
@@ -176,6 +228,14 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
       departing.hoverStructuralRoutes,
       uniquingKeysWith: mergeKeepingCurrent
     )
+  }
+
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    rehomeAdoptedOwnerKeys(&handlerOwners, from: departing, to: adopter)
+    rehomeAdoptedOwnerKeys(&hoverOwners, from: departing, to: adopter)
   }
 
   @MainActor
@@ -243,12 +303,7 @@ package struct GestureNodeRecord: RuntimeNodeRecord {
     from departing: ViewNodeID,
     to adopter: ViewNodeID
   ) {
-    for (identity, owner) in owners where owner.viewNodeID == departing {
-      owners[identity] = RuntimeRegistrationOwnerKey(
-        viewNodeID: adopter,
-        identity: owner.identity
-      )
-    }
+    rehomeAdoptedOwnerKeys(&owners, from: departing, to: adopter)
   }
 
   package mutating func absorbAdopted(_ departing: GestureNodeRecord) {
@@ -294,6 +349,13 @@ package struct GestureStateNodeRecord: RuntimeNodeRecord {
   package mutating func absorbAdopted(_ departing: GestureStateNodeRecord) {
     bindings.merge(departing.bindings, uniquingKeysWith: mergeKeepingCurrent)
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
+  }
+
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    rehomeAdoptedOwnerKeys(&owners, from: departing, to: adopter)
   }
 
   @MainActor
@@ -393,6 +455,13 @@ package struct TaskNodeRecord: RuntimeNodeRecord {
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
   }
 
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    rehomeAdoptedOwnerKeys(&owners, from: departing, to: adopter)
+  }
+
   @MainActor
   package mutating func record(
     identity: Identity,
@@ -479,6 +548,13 @@ extension CommandRegistrySnapshot: RuntimeNodeRecord {
     ownersByScope.merge(departing.ownersByScope, uniquingKeysWith: mergeKeepingCurrent)
   }
 
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    rehomeAdoptedOwnerKeys(&ownersByScope, from: departing, to: adopter)
+  }
+
   @MainActor
   package mutating func record(_ registration: CommandRegistrySnapshot) {
     for (identity, commands) in registration.keyCommandsByScope {
@@ -497,6 +573,13 @@ extension DropDestinationRegistrySnapshot: RuntimeNodeRecord {
   package mutating func absorbAdopted(_ departing: DropDestinationRegistrySnapshot) {
     handlersByScope.merge(departing.handlersByScope, uniquingKeysWith: mergeKeepingCurrent)
     ownersByScope.merge(departing.ownersByScope, uniquingKeysWith: mergeKeepingCurrent)
+  }
+
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    rehomeAdoptedOwnerKeys(&ownersByScope, from: departing, to: adopter)
   }
 
   @MainActor
@@ -537,48 +620,88 @@ package struct NodeHandlers {
   private struct RecordField {
     let isEmpty: @MainActor (NodeHandlers) -> Bool
     let absorb: @MainActor (inout NodeHandlers, NodeHandlers) -> Void
+    /// Re-points this family's adopted owner keys from the departing node to
+    /// the adopter, or `nil` for a family that keeps no owner keys. Nil is a
+    /// declaration, not an omission: a family that grows an owner map without
+    /// filling this in loses the F04 ownership invariant silently.
+    let rehomeOwners: (@MainActor (inout NodeHandlers, ViewNodeID, ViewNodeID) -> Void)?
   }
 
   private static let allRecordFields: [RecordField] = [
-    .init(isEmpty: { $0.action.isEmpty }, absorb: { $0.action.absorbAdopted($1.action) }),
     .init(
-      isEmpty: { $0.keyHandler.isEmpty }, absorb: { $0.keyHandler.absorbAdopted($1.keyHandler) }
+      isEmpty: { $0.action.isEmpty },
+      absorb: { $0.action.absorbAdopted($1.action) },
+      rehomeOwners: { $0.action.rehomeAdoptedOwners(from: $1, to: $2) }
     ),
     .init(
-      isEmpty: { $0.termination.isEmpty }, absorb: { $0.termination.absorbAdopted($1.termination) }
+      isEmpty: { $0.keyHandler.isEmpty },
+      absorb: { $0.keyHandler.absorbAdopted($1.keyHandler) },
+      rehomeOwners: { $0.keyHandler.rehomeAdoptedOwners(from: $1, to: $2) }
     ),
-    .init(isEmpty: { $0.pointer.isEmpty }, absorb: { $0.pointer.absorbAdopted($1.pointer) }),
-    .init(isEmpty: { $0.gesture.isEmpty }, absorb: { $0.gesture.absorbAdopted($1.gesture) }),
+    .init(
+      isEmpty: { $0.termination.isEmpty },
+      absorb: { $0.termination.absorbAdopted($1.termination) },
+      rehomeOwners: { $0.termination.rehomeAdoptedOwners(from: $1, to: $2) }
+    ),
+    .init(
+      isEmpty: { $0.pointer.isEmpty },
+      absorb: { $0.pointer.absorbAdopted($1.pointer) },
+      rehomeOwners: { $0.pointer.rehomeAdoptedOwners(from: $1, to: $2) }
+    ),
+    .init(
+      isEmpty: { $0.gesture.isEmpty },
+      absorb: { $0.gesture.absorbAdopted($1.gesture) },
+      rehomeOwners: { $0.gesture.rehomeAdoptedOwners(from: $1, to: $2) }
+    ),
     .init(
       isEmpty: { $0.gestureState.isEmpty },
-      absorb: { $0.gestureState.absorbAdopted($1.gestureState) }
+      absorb: { $0.gestureState.absorbAdopted($1.gestureState) },
+      rehomeOwners: { $0.gestureState.rehomeAdoptedOwners(from: $1, to: $2) }
     ),
     .init(
       isEmpty: { $0.defaultFocus.isEmpty },
-      absorb: { $0.defaultFocus.absorbAdopted($1.defaultFocus) }
+      absorb: { $0.defaultFocus.absorbAdopted($1.defaultFocus) },
+      rehomeOwners: nil
     ),
     .init(
       isEmpty: { $0.focusBinding.isEmpty },
-      absorb: { $0.focusBinding.absorbAdopted($1.focusBinding) }
+      absorb: { $0.focusBinding.absorbAdopted($1.focusBinding) },
+      rehomeOwners: nil
     ),
     .init(
       isEmpty: { $0.focusedValues.isEmpty },
-      absorb: { $0.focusedValues.absorbAdopted($1.focusedValues) }
+      absorb: { $0.focusedValues.absorbAdopted($1.focusedValues) },
+      rehomeOwners: nil
     ),
     .init(
       isEmpty: { $0.scrollPosition.isEmpty },
-      absorb: { $0.scrollPosition.absorbAdopted($1.scrollPosition) }
+      absorb: { $0.scrollPosition.absorbAdopted($1.scrollPosition) },
+      rehomeOwners: nil
     ),
-    .init(isEmpty: { $0.lifecycle.isEmpty }, absorb: { $0.lifecycle.absorbAdopted($1.lifecycle) }),
-    .init(isEmpty: { $0.task.isEmpty }, absorb: { $0.task.absorbAdopted($1.task) }),
+    .init(
+      isEmpty: { $0.lifecycle.isEmpty },
+      absorb: { $0.lifecycle.absorbAdopted($1.lifecycle) },
+      rehomeOwners: nil
+    ),
+    .init(
+      isEmpty: { $0.task.isEmpty },
+      absorb: { $0.task.absorbAdopted($1.task) },
+      rehomeOwners: { $0.task.rehomeAdoptedOwners(from: $1, to: $2) }
+    ),
     .init(
       isEmpty: { $0.preferenceObservation.isEmpty },
-      absorb: { $0.preferenceObservation.absorbAdopted($1.preferenceObservation) }
+      absorb: { $0.preferenceObservation.absorbAdopted($1.preferenceObservation) },
+      rehomeOwners: nil
     ),
-    .init(isEmpty: { $0.command.isEmpty }, absorb: { $0.command.absorbAdopted($1.command) }),
+    .init(
+      isEmpty: { $0.command.isEmpty },
+      absorb: { $0.command.absorbAdopted($1.command) },
+      rehomeOwners: { $0.command.rehomeAdoptedOwners(from: $1, to: $2) }
+    ),
     .init(
       isEmpty: { $0.dropDestination.isEmpty },
-      absorb: { $0.dropDestination.absorbAdopted($1.dropDestination) }
+      absorb: { $0.dropDestination.absorbAdopted($1.dropDestination) },
+      rehomeOwners: { $0.dropDestination.rehomeAdoptedOwners(from: $1, to: $2) }
     ),
   ]
 
@@ -599,6 +722,22 @@ package struct NodeHandlers {
   package mutating func absorbAdopted(_ departing: NodeHandlers) {
     for field in Self.allRecordFields {
       field.absorb(&self, departing)
+    }
+  }
+
+  /// Re-points every adopted owner key from `departing` onto `adopter`
+  /// (F04). Adoption transfers ownership of the departing node's records, and
+  /// an owner key is what the publication path's owner-liveness sweep reads:
+  /// a key left naming the absorbed node makes a live, adopted registration
+  /// look like a stale one and it is torn down. Previously only the gesture
+  /// family did this, for exactly that reason; the sweep now reaches every
+  /// owner-keyed family, so the rehome does too.
+  package mutating func rehomeAdoptedOwners(
+    from departing: ViewNodeID,
+    to adopter: ViewNodeID
+  ) {
+    for field in Self.allRecordFields {
+      field.rehomeOwners?(&self, departing, adopter)
     }
   }
 

@@ -248,6 +248,20 @@ package final class ViewGraphFrameDraft {
       viewGraph.republishAllEffectRegistrations(into: liveRegistrations)
       usedScopedRestore = true
     }
+    // Every scoped restore is blind on one axis, and BOTH branches above take
+    // one (the fingerprint-delta body restores its delta's roots). The resets
+    // select registration-KEY identity prefixes and the restores only write,
+    // so an entry registered under an identity outside those roots survives
+    // both however dead it is — the `.id(_:)`-re-rooted control whose
+    // registration identity is pinned while its node re-mints, and the live
+    // node that stopped recording a registration it once made. A full rebuild
+    // can produce neither: it resets, then republishes from live node records
+    // only. Withdrawing them here is what makes a scoped restore equal the
+    // rebuild it stands in for — which is exactly what the oracle below then
+    // asserts.
+    if usedScopedRestore {
+      viewGraph.removeUnjustifiedRuntimeRegistrations(from: liveRegistrations)
+    }
     // F04 publication oracle: on sampled probe frames, a scoped restore must
     // leave the live registries equal (keys + stacked-handler counts) to a
     // scratch full rebuild of the current frame's registrations. The scratch

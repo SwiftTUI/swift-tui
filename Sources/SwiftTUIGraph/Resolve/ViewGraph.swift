@@ -3668,6 +3668,22 @@ package final class ViewGraph {
     )
   }
 
+  /// Runs the publication path's node-axis teardown against this graph's
+  /// records — see
+  /// ``RuntimeRegistrationSet/removeUnjustifiedRegistrations(_:)``. A node
+  /// that has left the graph resolves to nil, which withdraws everything it
+  /// owned.
+  package func removeUnjustifiedRuntimeRegistrations(
+    from registrations: RuntimeRegistrationSet
+  ) {
+    registrations.removeUnjustifiedRegistrations { viewNodeID in
+      guard liveNodeIDs.contains(viewNodeID) else {
+        return nil
+      }
+      return nodesByNodeID[viewNodeID]?.registeredHandlers
+    }
+  }
+
   package func restoreCurrentFrameRuntimeRegistrations(
     into registrations: RuntimeRegistrationSet
   ) {

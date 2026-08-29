@@ -215,14 +215,32 @@ extension ResolvedNode {
   ) -> ResolvedNode {
     var copy = self
     let debugValue = "\(style.snapshotLabel):\(style.placement)"
+    // The reconcile below runs in the late-preference stage, off the resolve
+    // stack, so `ResolveLifetimeScopeContext.current` is nil there and every
+    // node it mints (`…/toolbar-scope` and its interior) is reported to no
+    // scope and left with NO lifetime anchor at all — stranded and unreachable
+    // the moment its declaring host stops committing it (F91). Capture the
+    // declaring host here, where `ViewNodeContext.current` still names it, and
+    // reinstall it around the reconcile exactly as delayed indexed-child
+    // realization does for its own out-of-stack mints.
+    let latePreferenceHost = ViewNodeContext.current
     copy.layoutMetadata = copy.layoutMetadata.settingLayoutValue(
       ToolbarLatePreferenceHostDescriptor(
         debugValue: debugValue,
-        reconcile: { node, items in
-          node.reconciledToolbarHost(
-            items: items,
-            style: style,
-            context: context
+        reconcile: { [weak latePreferenceHost] node, items in
+          let reconcile = {
+            node.reconciledToolbarHost(
+              items: items,
+              style: style,
+              context: context
+            )
+          }
+          guard let viewGraph = context.viewGraph else {
+            return reconcile()
+          }
+          return viewGraph.withCapturedResolveLifetimeScope(
+            hostedBy: latePreferenceHost,
+            reconcile
           )
         }
       ),

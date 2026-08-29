@@ -147,6 +147,35 @@ package protocol RuntimeRegistry: AnyObject {
   /// sequencing.
   func prune(keeping liveNodeIDs: Set<ViewNodeID>)
 
+  /// Drops registrations no live node record justifies, on the publication
+  /// path itself (F04). `record` returns the owning node's current
+  /// registration record, or nil when that node has left the graph.
+  ///
+  /// This is the NODE axis of teardown, and nothing else on the scoped
+  /// publication path has it. `removeSubtrees(rootedAt:)` selects on the
+  /// registration KEY's identity prefix; the scoped restore selects the nodes
+  /// to republish and only ever WRITES. The two miss the same population from
+  /// opposite sides: a registration whose identity sits outside the removed
+  /// roots survives the reset no matter what happened to the node that
+  /// published it. Measured, that is an `.id(_:)`-re-rooted control whose
+  /// registration identity is pinned while its node re-mints (a stale bucket
+  /// stacked under the arriving one), and a live node that stopped recording
+  /// a registration it once made (a handler no rebuild can re-derive, still
+  /// dispatchable). A full rebuild has neither, because it resets and then
+  /// republishes from live node records only — so without this the scoped
+  /// restore is not the rebuild it stands in for.
+  ///
+  /// Implemented by the owner-keyed families that hold no interaction state:
+  /// the key registry and everything on ``IdentityKeyedRegistryStorage``. The
+  /// pointer/gesture/gesture-state trio deliberately does NOT implement it.
+  /// Their node-liveness cleanup is `pruneOrphanedGestures` followed by
+  /// `RunLoop.processFocusSyncIteration`'s paired-region pass, whose ordering
+  /// is load-bearing (F101): releasing a mid-interaction capture here would
+  /// destroy exactly what the re-key path exists to preserve.
+  func removeUnjustifiedRegistrations(
+    _ record: (ViewNodeID) -> NodeHandlers?
+  )
+
   /// Contributes this registry's keyed contents to the publication oracle
   /// fingerprint. Every family must project each registration into at least
   /// one `registry|key` bucket (with stacked-handler counts where handlers
@@ -162,4 +191,8 @@ extension RuntimeRegistry {
   package func normalizeOrderByIdentity() {}
 
   package func prune(keeping liveNodeIDs: Set<ViewNodeID>) {}
+
+  package func removeUnjustifiedRegistrations(
+    _ record: (ViewNodeID) -> NodeHandlers?
+  ) {}
 }

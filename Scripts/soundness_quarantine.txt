@@ -128,6 +128,68 @@
 # never were: a full macOS `bun run test` and the arm64 Linux container lane
 # (worktree source mode) each report 64 and 174 exactly.
 #
+#
+# BURNED DOWN AGAIN 2026-08-29, and one row RETIRED. Both remaining classes had
+# a genuine defect behind them this time -- no measurement artifact.
+#
+# 1. registration-publication 64 -> 0, ROW REMOVED. One invariant was missing:
+#    an owner key must name the LIVE node whose record justifies the entry.
+#    The scoped publication had no node axis at all -- its reset selects
+#    registration-KEY identity prefixes and its restore only writes -- so any
+#    entry registered under an identity outside the reset roots survived both,
+#    however dead it was. Measured, that was 58 stacked duplicates from an
+#    `.id(_:)`-re-rooted control whose registration identity is pinned while
+#    its node re-mints (`live=2 rebuilt=1`: one bucket per owner, one owner
+#    dead), and 6 entries whose still-live owner had stopped recording them
+#    (`live=1 rebuilt=0`: a handler still dispatchable that no rebuild can
+#    re-derive). Fix: `removeUnjustifiedRegistrations` on the publication path
+#    asks each entry's owner node whether it still records that registration,
+#    across the owner-keyed families that hold no interaction state (the
+#    pointer/gesture/gesture-state trio is deliberately excluded -- its
+#    node-liveness cleanup is `pruneOrphanedGestures` plus the paired-region
+#    pass, and that ordering is load-bearing, F101). It runs for BOTH scoped
+#    paths -- the `.subtrees` branch and the fingerprint-delta body, which
+#    also restores scoped; the delta path carried the last 10.
+#    Prerequisite: `NodeHandlers.rehomeAdoptedOwners` now runs for EVERY
+#    owner-keyed family on adoption, not the gesture family alone. Adoption
+#    transfers ownership, and an owner key left naming the absorbed node makes
+#    a live adopted registration read as stale -- the exact hazard the gesture
+#    rehome was written for. It is joined to the `allRecordFields` totality
+#    fold, so a new family cannot skip it silently.
+#    Pinned by RuntimeRegistrationRestoreScopingTests'
+#    scopedRestoreDropsADepartedOwnersStackedHandlerBucket and
+#    scopedRestoreWithdrawsALiveOwnersDroppedRegistration. BOTH tests need
+#    ballast siblings and a prior full commit: a frontier covering half the
+#    live tree escalates to the delta body, and the FIRST commit into a fresh
+#    registration target is always `.all`, so a small single-commit fixture
+#    never reaches the scoped restore and passes with the fix neutered.
+#
+# 2. teardown-coherence-leak 174 -> 67. Two independent strand roots closed:
+#    * An entity home is NOT a durable lifetime owner, and
+#      `closeResolveLifetimeScope` was treating it as one. The reachability
+#      census deliberately refuses to seed entity homes
+#      (`LifetimeRelationCensus` zeroes `liveEntityHomeByIdentity`), and the
+#      frame barrier withdraws the route as soon as the entity goes inactive
+#      (`releaseInactiveEntityRoutes`). A dropped ForEach/List element always
+#      carries one, so it was classified as already-owned, never given its
+#      `hostedDetached` anchor, and stranded anchorless the moment the barrier
+#      released the route. Every anchor-less strand root measured in the
+#      StateIdentity/CollectionLayout/StressLL008 populations was emptied by
+#      that exact call.
+#    * The late-preference toolbar reconcile runs off the resolve stack, where
+#      `ResolveLifetimeScopeContext.current` is nil, so every node it minted
+#      (`…/toolbar-scope` and its interior) was reported to no scope and left
+#      with NO anchor at all. It now reinstalls its declaring host the way
+#      delayed indexed-child realization does.
+#
+# What survives is named in the row below and in the "Quarantined residuals"
+# section of docs/SOUNDNESS-ORACLES.md, with the forensic signature that
+# identifies each shape.
+#
+# Coverage control for this re-measurement: the sharded runtime lane reported
+# 178 / 834 / 2362 tests before AND after, so neither figure moved through
+# coverage.
+#
 # Re-measured 2026-08-25 on the sharded gate (plan 2026-08-25-001 Stages 1-2):
 # the runtime surface now runs as three serialized shard launches (A/B/C,
 # Scripts/data/runtime-shards.txt) both locally (`--lane all`) and in CI
@@ -138,5 +200,4 @@
 # 10), action-dispatch-miss 1, handler-resolution-gesture 0. The counts are
 # per-test, not per-process; the partition does not move them. First CI
 # merged scan pending (Linux cross-check).
-registration-publication 2026-08-28 oracle-membership-mirror count=64 over-publication residual only: a scoped removal fails to clear an entry, leaving 58 stacked duplicates (live=2 rebuilt=1, key+paste pairs on text controls and a ScrollView key trio) and 6 stale survivors of a departed node (live=1 rebuilt=0); re-measured 1199 -> 64 after the publication oracle stopped comparing a sparse live target against an all-member scratch
-teardown-coherence-leak 2026-08-28 seam-fixture-anchor-fidelity count=174 existing unreachable-node residual (under-removal arm), now the runtime lane's F91 class alone; re-measured 499 -> 174 after the generated seam-case islands took the hostedDetached anchor production records for them
+teardown-coherence-leak 2026-08-29 registration-owner-axis-and-entity-home-durability count=67 unreachable-node residual (under-removal arm), now two shapes only: a departed .id-generation's entity-routed ForEach/List element that lost its structural anchors while unvisited and was then stripped of its entity home by releaseInactiveEntityRoutes, and a Picker option Group whose hostedDetached edge the removal walk strips BEFORE deciding to spare it; re-measured 174 -> 67

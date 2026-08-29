@@ -1921,11 +1921,13 @@ package final class ViewNode {
     registeredHandlers.absorbAdopted(departing.registeredHandlers)
     // Adoption transfers ownership, so the adopted records' owner keys must
     // stop naming the departing node. They are restored verbatim into the live
-    // registries, whose owner-liveness legs (`prune(keeping:)`) prove departure
-    // from the key's `viewNodeID` alone — an adopted recognizer keyed to the
+    // registries, whose owner-liveness legs (`prune(keeping:)`, and the
+    // publication path's `removeUnjustifiedRegistrations`) prove departure
+    // from the key's `viewNodeID` alone — an adopted registration keyed to the
     // absorbed node is torn down on the next pass even though a live node now
-    // carries its record.
-    registeredHandlers.gesture.rehomeAdoptedOwners(
+    // carries its record. This ran for the gesture family alone until the
+    // sweep reached every owner-keyed family (F04).
+    registeredHandlers.rehomeAdoptedOwners(
       from: departing.viewNodeID,
       to: viewNodeID
     )

@@ -177,4 +177,18 @@ package final class CommandRegistry: Equatable {
   package func removeSubtrees(rootedAt roots: [Identity]) {
     store.removeSubtrees(rootedAt: roots)
   }
+
+  /// The node axis of teardown — see
+  /// ``RuntimeRegistry/removeUnjustifiedRegistrations(_:)``.
+  package func removeUnjustifiedRegistrations(
+    _ record: (ViewNodeID) -> NodeHandlers?
+  ) {
+    store.removeUnjustified { identity, owner in
+      // An entry restored without an owner carries no node claim to check.
+      guard let viewNodeID = owner.viewNodeID else {
+        return true
+      }
+      return record(viewNodeID)?.command.keyCommandsByScope[identity] != nil
+    }
+  }
 }

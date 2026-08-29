@@ -53,33 +53,58 @@ struct ResolveLifetimeScopeTests {
     )
   }
 
-  @Test("entity and navigation ownership avoid redundant hosted anchors")
+  @Test("navigation ownership avoids a redundant hosted anchor")
   func durableOwnershipAvoidsRedundantHosting() throws {
     let graph = ViewGraph()
     let host = evaluateStoredNode(graph, named: "Host")
-    let entityOwned = evaluateStoredNode(graph, named: "Entity")
     let navigationOwned = evaluateStoredNode(graph, named: "Navigation")
-    graph.lifetimeAnchors.insert(
-      anchor: .entityHome(EntityIdentity("row")),
-      for: entityOwned.viewNodeID
-    )
     graph.lifetimeAnchors.insert(
       anchor: .navigationSurface(host.viewNodeID),
       for: navigationOwned.viewNodeID
     )
 
     graph.withResolveLifetimeScope(hostedBy: host) {
-      graph.reportResolvedLifetimeNode(entityOwned)
       graph.reportResolvedLifetimeNode(navigationOwned)
     }
 
     #expect(
-      !graph.lifetimeAnchors.anchors(for: entityOwned.viewNodeID)
-        .contains(.hostedDetached(host.viewNodeID))
-    )
-    #expect(
       !graph.lifetimeAnchors.anchors(for: navigationOwned.viewNodeID)
         .contains(.hostedDetached(host.viewNodeID))
+    )
+  }
+
+  @Test("an entity home is not a durable owner — the node still takes a hosted anchor (F91)")
+  func entityHomeIsNotADurableOwner() throws {
+    // An entity route is not a lifetime root. The reachability census refuses
+    // to seed entity homes (`LifetimeRelationCensus`), and the frame barrier
+    // withdraws the route as soon as the entity goes inactive or its home
+    // leaves the live set (`releaseInactiveEntityRoutes`). Treating it as
+    // durable here left a dropped `ForEach`/`List` element — which always
+    // carries one — with that route as its ONLY claim, so the barrier stripped
+    // it and stranded the node anchorless and unreachable for the rest of the
+    // graph's life. That was the whole measured `teardown-coherence-leak`
+    // population's strand root.
+    let graph = ViewGraph()
+    let host = evaluateStoredNode(graph, named: "Host")
+    let entityOwned = evaluateStoredNode(graph, named: "Entity")
+    graph.lifetimeAnchors.insert(
+      anchor: .entityHome(EntityIdentity("row")),
+      for: entityOwned.viewNodeID
+    )
+
+    graph.withResolveLifetimeScope(hostedBy: host) {
+      graph.reportResolvedLifetimeNode(entityOwned)
+    }
+
+    #expect(
+      graph.lifetimeAnchors.anchors(for: entityOwned.viewNodeID)
+        .contains(.hostedDetached(host.viewNodeID))
+    )
+    // Releasing the entity route must now leave the node owned, not stranded.
+    graph.lifetimeAnchors.removeEntityHome(for: entityOwned.viewNodeID)
+    #expect(
+      graph.lifetimeAnchors.anchors(for: entityOwned.viewNodeID)
+        == [.hostedDetached(host.viewNodeID)]
     )
   }
 

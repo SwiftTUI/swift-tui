@@ -63,11 +63,11 @@ cell. Keep the comment's kind, recorder, and counter spellings exact.
 | `checkpoint-store` — stored node images remain coherent with owner generations and membership | Capture/store verification in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail. DEBUG zero-census assertion | Sampled checkpoint path | Assertion, trace scan, serialized snapshot delta | `NodeCheckpointImageStoreTests`, `SoundnessAssertPromotionTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: checkpoint-store ; recordCheckpointStoreViolation ; checkpointStoreViolationCount --> |
 | `raster-damage` — incremental damage equals a fresh raster | [`DefaultRendererFrameTailCoordinator.swift`](../Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameTailCoordinator.swift) reports the fresh-raster shadow comparison from `Rasterizer` | T-fail. The renderer repairs the mismatch before publication | Every DEBUG raster with a shadow comparison. Sampled release raster | Trace scan and serialized snapshot delta | `SoundnessProbeConfigurationTests`, `SoundnessFailureChannelTests`, raster stress fixtures | None. Repair preserves output but does not excuse the alarm  <!-- oracle-map: raster-damage ; recordRasterDamageMismatch ; rasterDamageMismatchCount --> |
 | `teardown-coherence` — no committed node is over-removed | Post-finalize reachability audit in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail. DEBUG call-site assertion | Sampled frame | Assertion, trace scan, serialized snapshot delta | teardown/presentation/framework stress suites, `SoundnessFailureChannelTests` | None  <!-- oracle-map: teardown-coherence ; recordTeardownCoherenceViolation ; teardownCoherenceViolationCount --> |
-| `teardown-coherence-leak` — no stored node is unreachable from the committed root | Under-removal arm of the same reachability audit | T-ratchet | Sampled frame | Exact-count trace scan. Leak census currency | `SoundnessProbeConfigurationTests`, framework lifecycle stress suites, `SoundnessFailureChannelTests` | Quarantined at 174 (re-measured 2026-08-28 after the generated seam-case islands took the `hostedDetached` anchor production records for them, which retired the graph lane's entire 325-line contribution; 499 before that, 478 at `Program-5-S0`). Also updates combined teardown count and `lastTeardownLeakUnreachableCount`  <!-- oracle-map: teardown-coherence-leak ; recordTeardownCoherenceLeak ; teardownCoherenceViolationCount,teardownCoherenceLeakCount,lastTeardownLeakUnreachableCount --> |
+| `teardown-coherence-leak` — no stored node is unreachable from the committed root | Under-removal arm of the same reachability audit | T-ratchet | Sampled frame | Exact-count trace scan. Leak census currency | `SoundnessProbeConfigurationTests`, framework lifecycle stress suites, `SoundnessFailureChannelTests` | Quarantined at 67 (re-measured 2026-08-29 after entity homes stopped counting as durable lifetime owners in `closeResolveLifetimeScope` and the late-preference toolbar reconcile started reinstalling its declaring host; 174 before that, 499 before the 2026-08-28 seam-fixture anchor fix, 478 at `Program-5-S0`). Also updates combined teardown count and `lastTeardownLeakUnreachableCount`  <!-- oracle-map: teardown-coherence-leak ; recordTeardownCoherenceLeak ; teardownCoherenceViolationCount,teardownCoherenceLeakCount,lastTeardownLeakUnreachableCount --> |
 | `teardown-barrier-non-convergence` — teardown reaches a fixed point within its derived bound | Fixed-point barrier in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `TeardownBarrierFixedPointTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: teardown-barrier-non-convergence ; recordBarrierNonConvergence ; barrierNonConvergenceCount --> |
 | `automatic-lifetime-anchor` — detached results requiring inferred durable ownership | Resolve-scope classification in [`ResolveLifetimeScope.swift`](../Sources/SwiftTUIGraph/Resolve/ResolveLifetimeScope.swift) | T-info. Counter only | Event | Snapshot/reporting only. Deliberately no trace | `ResolveLifetimeScopeTests`, `SoundnessProbeConfigurationTests` | Informational adoption currency, not a violation  <!-- oracle-map: automatic-lifetime-anchor ; recordAutomaticLifetimeAnchor ; automaticLifetimeAnchorCount --> |
 | `resolve-lifetime-scope-unclassified` — every observed live resolved node has a durable lifetime classification | Resolve-scope close audit in [`ResolveLifetimeScope.swift`](../Sources/SwiftTUIGraph/Resolve/ResolveLifetimeScope.swift) | T-fail. DEBUG scope assertion | Event | Assertion, trace scan, serialized snapshot delta | `ResolveLifetimeScopeTests`, `DroppedElementAnchoringTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: resolve-lifetime-scope-unclassified ; recordUnclassifiedResolvedNode ; unclassifiedResolvedNodeCount --> |
-| `registration-publication` — scoped registry publication matches a scratch full rebuild | Publication fingerprint comparison in [`ViewGraphFrameDraft.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphFrameDraft.swift) | T-ratchet | Sampled frame | Exact-count trace scan | `RuntimeRegistrationRestoreScopingTests`, `GesturePairedRouteLivenessTests`, `SoundnessFailureChannelTests` | Quarantined at 64 (re-measured 2026-08-28 after the scratch stopped being built with all fifteen registries regardless of the live target's membership; 1,199 before that). The scratch now mirrors the target (`RuntimeRegistrationSet.scratch(mirroringMembershipOf:)`) — comparing a sparse live target against an all-member rebuild reported every registration in the graph as `live=0 rebuilt=1`  <!-- oracle-map: registration-publication ; recordRegistrationPublicationViolation ; registrationPublicationViolationCount --> |
+| `registration-publication` — scoped registry publication matches a scratch full rebuild | Publication fingerprint comparison in [`ViewGraphFrameDraft.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphFrameDraft.swift) | T-fail | Sampled frame | Exact-count trace scan | `RuntimeRegistrationRestoreScopingTests`, `GesturePairedRouteLivenessTests`, `SoundnessFailureChannelTests` | None — burned down to zero and **unquarantined** on 2026-08-29, so any recurrence fails the scan as "is not quarantined". The last 64 were the publication path having no NODE axis: its reset selects registration-key identity prefixes and its restore only writes, so an entry registered under an identity outside the reset roots survived both however dead its owner was. `removeUnjustifiedRegistrations` now asks each entry's owner node whether it still records it, on both scoped paths  <!-- oracle-map: registration-publication ; recordRegistrationPublicationViolation ; registrationPublicationViolationCount --> |
 | `memo-unsound-skip` — a memo candidate never skips when fresh output differs in content | Shadow recomputation in [`MemoSkipTrace.swift`](../Sources/SwiftTUIGraph/Resolve/MemoSkipTrace.swift) | T-fail. DEBUG zero-census assertion | Sampled frame | Assertion, trace scan, serialized snapshot delta | `MemoSoundnessAlarmTests`, `EquatableViewReuseTests`, `SoundnessAssertPromotionTests` | None  <!-- oracle-map: memo-unsound-skip ; recordMemoUnsoundSkip ; memoUnsoundSkipCount --> |
 | `duplicate-registration` — one capture session does not overwrite a single-slot identity | Registration capture guard in [`ViewNode.swift`](../Sources/SwiftTUIGraph/Resolve/ViewNode.swift) | T-fail | Sampled frame | Trace scan and serialized snapshot delta | `DuplicateRegistrationProbeTests`, `SoundnessFailureChannelTests` | Key-command carry-over is an intentional exemption tested at HEAD  <!-- oracle-map: duplicate-registration ; recordDuplicateRegistrationOverwrite ; duplicateRegistrationOverwriteCount --> |
 | `planner-targetless-frontier` — dirty work is never silently discarded for lack of a stitchable evaluator | Root-escalation alarm in [`ViewGraphDirtyEvaluationPlanning.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphDirtyEvaluationPlanning.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `FrameworkStressGraphPlanningAndRoutingTests`, `SoundnessFailureChannelTests` | Safe root fallback preserves output. Alarm still fails  <!-- oracle-map: planner-targetless-frontier ; recordPlannerTargetlessFrontierEscalation ; plannerTargetlessFrontierEscalationCount --> |
@@ -105,23 +105,102 @@ update combined and class-specific counters, as teardown leak does.
 
 ## Quarantined residuals
 
-Two kinds carry a ledger row and are therefore ratcheted rather than failing
-outright. This section is their durable tracking reference. Before this section
-existed, a stage tag (`Program-5-S0`) in
+**One** kind carries a ledger row and is therefore ratcheted rather than
+failing outright. This section is its durable tracking reference. Before this
+section existed, a stage tag (`Program-5-S0`) in
 [`soundness_quarantine.txt`](../Scripts/soundness_quarantine.txt) was the only
-record of *why* the team quarantined them. The tag names a program but does not
-explain the reason.
+record of *why* the team quarantined a class. The tag names a program but does
+not explain the reason.
 
-| Kind | Baseline | Measured 2026-08-28 | Provenance | What the residual is | Burn-down expectation |
+| Kind | Baseline | Measured 2026-08-29 | Provenance | What the residual is | Burn-down expectation |
 | --- | --: | --: | --- | --- | --- |
-| `registration-publication` | 64 | 64 | `Program-5-S0`, re-measured `runtime-lane-unmasked`, reduced by `toolbar-strip-follow-up` (2026-08-22) and by `oracle-membership-mirror` (2026-08-28) | Entirely the OVER-publication arm — a scoped removal fails to clear an entry, in two shapes: 58 stacked duplicates (`live=2 rebuilt=1`, key+paste pairs on text controls and a ScrollView key trio) and 6 stale survivors of a departed node (`live=1 rebuilt=0`) | Fix the removal/restore axis mismatch. The removal matches registration-KEY identity prefixes while the restore selects by NODE identity, so a control registering under an identity outside the removal cover keeps its old entry and the restore adds a second on top |
-| `teardown-coherence-leak` | 174 | 174 | `Program-5-S0`, re-measured `runtime-lane-unmasked`, reduced by `seam-fixture-anchor-fidelity` (2026-08-28) | Existing unreachable-node residual (under-removal arm), now the runtime lane's F91 class alone: `.id`-rebound owners and List/lazy content that land with `anchors=[]`, hosted-detached nodes whose host chain does not reach the root, and entity-routed nodes the census deliberately refuses to seed (`liveEntityHomeByIdentity` is zeroed before the walk) | Reduce with teardown-lifetime work. See the leak census currency |
+| `teardown-coherence-leak` | 67 | 67 | `Program-5-S0`, re-measured `runtime-lane-unmasked`, reduced by `seam-fixture-anchor-fidelity` (2026-08-28) and by `registration-owner-axis-and-entity-home-durability` (2026-08-29) | Unreachable-node residual (under-removal arm), now **two** shapes, both in `FrameworkStressAdditional` (40) and `FrameworkStressExpansion` (26) plus one `ScopedAnyViewButton` line. **(a)** A departed `.id`-generation's entity-routed `ForEach` element (`…/owner/N/…/ID[0]`): committed in an earlier frame, so the resolve scope classified it on its `.parent` anchor; the owner's replacement then stripped `.parent`/`.committedValue` while the element itself was NOT re-visited, so no scope re-reported it; the frame barrier later withdrew its entity home and left it anchorless. Forensic signature: `anchors=[] parent=nil`, unvisited, with the entity route gone. **(b)** `…/control/PickerOptions/Group[N]`: `ViewGraphSubtreeRemoval` strips every `hostedDetached(node)` edge in one pass *before* the pass that decides whether to spare each target, so a target it then skips (already entered, or spared as a visited descendant) is left with no anchor | **(a)** the entity-routed removal deferral must hand the node a durable owner — or re-queue its teardown — when it releases the route, instead of dropping the last claim with nothing behind it; **(b)** remove the `hostedDetached` edge per target *inside* the spare/remove decision, not in a separate pass ahead of it |
 
-The two zero rows are gone. `action-dispatch-miss` and
-`handler-resolution-gesture` were burned down on 2026-08-28 and their rows
-removed; both kinds are back to plain `T-fail`, and a recurrence fails the scan
-as "is not quarantined" — the same hard error a `count=0` row produced as
-"exceeds baseline=0".
+`registration-publication`'s row is gone: it was burned down to zero on
+2026-08-29 (see below). So are the two zero rows —`action-dispatch-miss` and
+`handler-resolution-gesture`, retired on 2026-08-28. All three kinds are back
+to plain `T-fail`, and a recurrence fails the scan as "is not quarantined" —
+the same hard error a `count=0` row produced as "exceeds baseline=0".
+
+### The 2026-08-29 burn-down: a missing invariant, not a missing measurement
+
+`registration-publication` fell **64 → 0** and `teardown-coherence-leak`
+**174 → 67**. Unlike the previous burn-down these were real defects, and the
+lane coverage control says so: the sharded runtime lane reported
+`178 / 834 / 2362` tests before and after, so nothing moved through coverage.
+
+**An owner key must name the live node whose record justifies the entry.** The
+scoped publication had no node axis at all. Its reset
+(`removeSubtrees(rootedAt:)`) selects registration-**key** identity prefixes;
+its restore selects **nodes** and only ever writes. An entry registered under an
+identity outside the reset roots is therefore unreachable from both, however
+dead it is — and a full rebuild has no such gap, because it resets and then
+republishes from live node records only. The whole measured population was that
+one hole, in two shapes:
+
+- **58 stacked duplicates** (`live=2 rebuilt=1`): an `.id(_:)`-re-rooted control
+  — `TextField(…).id(FocusContextFirstTitle)` and the ScrollView indicator trio
+  — holds its registration identity fixed while its registering node re-mints.
+  The key registry buckets handlers per contributing owner, so the departed
+  node's bucket survived the reset and the arriving node's bucket landed beside
+  it. The diagnostic that settled it read
+  `node=ViewNodeID(1012)/live=false | node=ViewNodeID(1034)/live=true` under one
+  identity.
+- **6 stale survivors** (`live=1 rebuilt=0`): a still-**live** owner that
+  stopped recording a registration it once made. Its record is empty
+  (`declares=false`), so the rebuild produces nothing — the live entry is a
+  handler still dispatchable that no rebuild can re-derive.
+
+`removeUnjustifiedRegistrations` closes both: on the publication path each entry
+asks its owner node whether it still records that registration, and a departed
+owner resolves to nil, which withdraws everything it owned. It reaches the
+owner-keyed families that hold no interaction state — the key registry and
+everything on `IdentityKeyedRegistryStorage`. The pointer/gesture/gesture-state
+trio deliberately does not implement it: their node-liveness cleanup is
+`pruneOrphanedGestures` followed by `RunLoop.processFocusSyncIteration`'s
+paired-region pass, and that ordering is load-bearing (F101). It runs for
+**both** scoped paths — the `.subtrees` branch and the fingerprint-delta body,
+which also restores scoped and carried the last 10 divergences after the first
+fix.
+
+That fix has a prerequisite. `NodeHandlers.rehomeAdoptedOwners` now runs for
+**every** owner-keyed family on adoption, where it previously ran for the
+gesture family alone. Adoption transfers ownership of a departing node's
+records, and an owner key left naming the absorbed node makes a live, adopted
+registration read as stale — the exact hazard the gesture rehome was written to
+prevent, spelled out in its own comment. It is joined to the `allRecordFields`
+totality fold, so a family cannot gain an owner map and skip the rehome
+silently.
+
+**An entity home is not a durable lifetime owner.** Two passes disagreed about
+what an entity route means, and the disagreement was the whole
+`teardown-coherence-leak` strand root. `closeResolveLifetimeScope` counted
+`.entityHome` as a durable anchor and therefore skipped recording the
+`hostedDetached` anchor a detached mint otherwise gets; the reachability census
+refuses to seed entity homes at all (`LifetimeRelationCensus` zeroes
+`liveEntityHomeByIdentity` — "entity routes qualify local teardown decisions;
+they do not turn a detached node into a committed-root census seed"). A dropped
+`ForEach`/`List` element always carries an entity route, so its **only** lifetime
+claim was one the census does not accept — and `releaseInactiveEntityRoutes`
+withdraws that claim at the frame barrier as soon as the entity goes inactive or
+its home leaves the live set. Instrumenting which call site emptied each
+strand root's anchor set returned a single answer, 72 times out of 72:
+`releaseInactiveEntityRoutes`. Entity homes are no longer durable, so these
+elements take the host anchor the census does honour, and the RC-3 supersession
+sweep retires them once the declaring host stops re-declaring them.
+
+**A mint made off the resolve stack is anchored by nobody.** The late-preference
+toolbar reconcile (`Toolbar.swift`) runs outside any `resolveView` call, so
+`ResolveLifetimeScopeContext.current` is nil and every node it minted —
+`…/toolbar-scope` and its interior — was reported to no scope and left with no
+anchor at all (`emptiedBy=never`). It now reinstalls its declaring host around
+the reconcile, exactly as delayed indexed-child realization already does for its
+own out-of-stack mints.
+
+Standing lesson from this pass, alongside the two from 2026-08-28: when two
+passes read the same fact, **check that they agree on what it means**. Both
+halves here were one pass treating a claim as durable that another pass had
+already decided was not a lifetime root at all.
 
 ### The 2026-08-28 burn-down: two whole classes were measurement artifacts
 
@@ -189,7 +268,8 @@ Both new figures are confirmed on two platforms — a full macOS `bun run test`
 and the arm64 Linux container lane in worktree source mode each report 64 and
 174 exactly — which the 2026-08-14 pair never were.
 
-The current scan:
+The scan on that day (superseded by the 2026-08-29 burn-down above, which
+retired the first row entirely):
 
 ```
 WARNING: registration-publication count=64 matches baseline=64
@@ -257,10 +337,10 @@ expected rather than a defect. The report is a **pre-S1** census. The ledger is
 The S0 columns below are a **dated snapshot** and are kept as history. Only the
 last column is current:
 
-| Kind | S0 raw | S0 injected | S0 residual | Ledger post-S1 | Measured 2026-07-30 | 2026-08-14 | 2026-08-22 | **Ledger and measured 2026-08-28** |
-| --- | --: | --: | --: | --: | --: | --: | --: | --: |
-| `registration-publication` | 1,197 | 1 | 1,196 | 1194 | 1122 | 1237 | 1194 | **64** |
-| `teardown-coherence-leak` | 479 | 1 | 478 | 478 | 478 | 499 | 499 | **174** |
+| Kind | S0 raw | S0 injected | S0 residual | Ledger post-S1 | Measured 2026-07-30 | 2026-08-14 | 2026-08-22 | 2026-08-28 | **Ledger and measured 2026-08-29** |
+| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: |
+| `registration-publication` | 1,197 | 1 | 1,196 | 1194 | 1122 | 1237 | 1194 | 64 | **0 (unquarantined)** |
+| `teardown-coherence-leak` | 479 | 1 | 478 | 478 | 478 | 499 | 499 | 174 | **67** |
 
 Read that 2026-07-30 column as a *floor observed under partial coverage*, not as
 a truth the later figures contradict. `registration-publication`'s apparent
@@ -279,8 +359,14 @@ row recorded as "post-suppression scoped-restore residual".
 
 The 2026-08-28 column is a different kind of movement again, and the largest:
 neither coverage nor a reconciliation fix, but two measurement artifacts being
-removed from the apparatus — see the burn-down section above. Read every earlier
-column as a population that was mostly not defects.
+removed from the apparatus — see the 2026-08-28 burn-down section above. Read
+every earlier column as a population that was mostly not defects.
+
+The 2026-08-29 column is the fourth kind, and the only one so far that is
+neither coverage nor apparatus: genuine reconciliation fixes against a
+population that really was defects. That is why `registration-publication`
+reaches zero rather than a smaller residual — a missing invariant was supplied,
+not a miscount corrected.
 
 **No document here is the authority. Only a fresh trace-armed full-gate run
 is.** The S0 report is a dated snapshot and is not maintained. The ledger is a
