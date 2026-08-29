@@ -90,9 +90,20 @@ extension ViewGraph {
         let stampedNode = nodeIfExists(for: stampedNodeID)
       {
         visitedSources.insert(stampedNodeID)
+        // A `.id`-re-rooted node keeps a STALE `parent` back-reference to the
+        // generation that last committed it as a child. When that generation
+        // departs, the back-reference names an unstored (or aliased) object,
+        // the adjacency test below rejects, and the node gets no
+        // committed-value edge at all — even though the accepted tree really
+        // does carry it under `nearestStampedAncestor`. Being in the accepted
+        // committed value tree IS the claim, so a stale back-reference must
+        // not veto it.
+        let parentBackReferenceIsStale =
+          stampedNode.parent.map { nodeIfExists(for: $0.viewNodeID) !== $0 } ?? false
         if let nearestStampedAncestor = source,
           nearestStampedAncestor != stampedNodeID,
           stampedNode.parent?.viewNodeID == nearestStampedAncestor
+            || parentBackReferenceIsStale
             || (crossedValueOnlyLayer
               && (stampedNode.evaluationHost != nil
                 || lifetimeAnchors.anchors(for: stampedNodeID).contains { anchor in

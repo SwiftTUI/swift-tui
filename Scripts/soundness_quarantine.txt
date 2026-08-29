@@ -18,12 +18,13 @@
 # not hypothetical: through 2026-07-30 registration-publication measured 1122
 # against a 1194 baseline, 72 too high, and the gate printed "is below baseline;
 # reduce the ledger" inside every passing run for weeks without anyone acting on
-# it. Every row below currently sits EXACTLY on its baseline; if one starts
-# printing "is below baseline", reduce it with the next change that touches
-# that area rather than letting the slack accumulate.
+# it. There are NO rows below as of 2026-08-29: every kind is enforced at plain
+# T-fail. If a row is ever added again and starts printing "is below baseline",
+# reduce it with the next change that touches that area rather than letting the
+# slack accumulate.
 #
-# See "Quarantined residuals" in docs/SOUNDNESS-ORACLES.md for each row's
-# provenance, what its residual actually is, its burn-down expectation, and its
+# See "Quarantined residuals" in docs/SOUNDNESS-ORACLES.md for the provenance
+# of every row this ledger has carried, what each residual actually was, and the
 # reconciliation against the Program-5-S0 findings census (whose published
 # figures are pre-S1).
 # Re-measured 2026-08-14 after the detached-subtree @State fix. All four rows
@@ -200,4 +201,132 @@
 # 10), action-dispatch-miss 1, handler-resolution-gesture 0. The counts are
 # per-test, not per-process; the partition does not move them. First CI
 # merged scan pending (Linux cross-check).
-teardown-coherence-leak 2026-08-29 registration-owner-axis-and-entity-home-durability count=67 unreachable-node residual (under-removal arm), now two shapes only: a departed .id-generation's entity-routed ForEach/List element that lost its structural anchors while unvisited and was then stripped of its entity home by releaseInactiveEntityRoutes, and a Picker option Group whose hostedDetached edge the removal walk strips BEFORE deciding to spare it; re-measured 174 -> 67
+#
+#
+# BURNED DOWN TO EMPTY 2026-08-29, a second pass on the same day, and the LAST
+# row is retired: teardown-coherence-leak 67 -> 0. This ledger now carries no
+# active row at all. Every soundness kind in docs/SOUNDNESS-ORACLES.md is back
+# to plain T-fail, and a single trace line of any kind fails the scan as "is
+# not quarantined".
+#
+# Three independent fixes did it, each with its own pinning test and each
+# correcting a different seam. Measured in the merged tree, every run
+# --no-parallel, with identical test-count controls (the two stress suites stay
+# at 2 tests / 75 cases; AnyViewResilience moves 9 -> 10 only because fix C
+# adds a test):
+#
+#     HEAD baseline (re-measured)   stress 66 + AnyViewResilience 1 = 67
+#     B + C                         stress 30 + AnyViewResilience 0 = 30
+#     B + C + A (merged)            stress  0 + AnyViewResilience 0 =  0
+#
+# The HEAD re-measurement reproduces the retired row's published split (40 in
+# FrameworkStressAdditional plus 26 in FrameworkStressExpansion, plus the one
+# ScopedAnyViewButton line), so the 67 burned down here is the same 67 the row
+# pinned.
+#
+# B. ViewGraphSubtreeRemoval: a parent-detached keep justified only by LIVENESS
+#    PROXIES now enqueues barrier work. The keep-guard spared a node because it
+#    owned nodeIDByIdentity[node.identity] or [node.resolvedIdentity], or was an
+#    entity route's home -- and, unlike the visited-descendant spare directly
+#    above it, enqueued NO barrier work. The node landed in
+#    walk.enteredNodeIDs, and the same departing source's relation-target loop
+#    then severed parent, committedValue, and hostedDetached and skipped it as
+#    already entered, leaving it stored with anchors=[] and unreachable. Such a
+#    keep now calls enqueueTeardownWork(.sparedVisitedDescent, ...) and defers
+#    the verdict to the teardown barrier, whose criterion IS the leak census's
+#    criterion, so it cannot over-remove. A keep justified by a durable anchor
+#    outside the cascade still returns unchanged. Pinned by
+#    ParentDetachedKeepGuardBarrierTests in both directions; the reclaim test
+#    fails on all three of its assertions with the enqueue neutered. 66 -> 30.
+#
+# C. ViewGraphChainCollapse: new adoptAbsorbedDetachedHostedRoots(from:),
+#    called from pruneAbsorbedShadowedNodes immediately after
+#    adoptAbsorbedRuntimeRegistrations(from:). A transparent collapse chain
+#    hosts each level on the one above it, so an interior mint's hostedDetached
+#    edge is the ONLY structural anchor its surviving content has.
+#    pruneAbsorbedShadowedNodes reclaimed that mint as a shadow while the
+#    content itself was spared as visited-this-frame, and re-homed the shadow's
+#    runtime REGISTRATIONS but never its lifetime ANCHOR. Hosting now transfers
+#    with the reclaim, guarded on visitedThisFrame -- an unvisited target is
+#    genuinely departing and the cascade must still reach it. Cold-render only;
+#    invisible from frame 2. Forensic signature:
+#    anchors=[entityHome(X)] parent=nil evalHost=nil, visited this frame, with
+#    the entity route still PRESENT, which is what distinguishes it from the
+#    retired shape (a), where the route was gone. Pinned by
+#    AnyViewResilienceTests'
+#    scopedAnyViewContentKeepsALifetimeAnchorWhenItsHostIsAbsorbed. This is the
+#    "plus one ScopedAnyViewButton line" the retired row never assigned to
+#    either named shape: it was never a member of (a) or (b).
+#
+# A. ViewGraphLifetimeRelation: replaceCommittedValueAnchors(in:) no longer
+#    lets a STALE parent back-reference veto a committed-value edge (11 lines).
+#    It proved a stamped node's adjacency to nearestStampedAncestor via
+#    stampedNode.parent?.viewNodeID == nearestStampedAncestor. An
+#    .id(_:)-re-rooted control keeps a stale parent back-reference to the
+#    generation that last committed it; once that generation departs, the
+#    reference names an unstored object, the adjacency test rejects, and NO
+#    committed-value edge is projected at all -- leaving a live control
+#    (visited, index-owning, route-owning, present in the committed value tree)
+#    anchored by nothing but an entity home the census refuses to seed, along
+#    with its whole ButtonBody styling island. This is an UNDER-ANCHORING bug
+#    on the arriving side, not an under-removal bug. Membership in the accepted
+#    committed value tree is now the claim. Pinned by
+#    ReRootedControlCommittedValueAnchorTests, verified failing (rc=1, 8 trace
+#    lines) when neutered. It REQUIRES fix B to be present. 30 -> 0.
+#
+# Not a false zero. Reverting only A returned 30 and restoring it returned 0,
+# both in freshly built binaries. No other soundness kind emitted a single line
+# at HEAD or merged, and the zero-tolerance over-removal oracles
+# (teardown-coherence, stranded-listing, teardown-barrier-non-convergence)
+# stayed at 0 throughout -- the control that says these fixes removed leaks
+# rather than trading them for over-removals. SwiftTUIGraphTests passes 487
+# tests in 69 suites.
+#
+# One earlier candidate was written and then REVERTED as redundant: a fix in
+# ViewGraphEntityRouting.swift having releaseInactiveEntityRoutes drop the last
+# claim post-barrier. Fix B removes the same nodes upstream and strictly
+# dominates it, because B also catches nodes whose entity stays ACTIVE, which a
+# !activeEntities.contains(entity) predicate structurally cannot express. The
+# retired row's two named shapes, (a) and (b), were one mechanism seen from
+# opposite ends.
+#
+# THE UNIFYING INVARIANT, reached independently by all three fixes:
+#
+#     A lifetime claim recorded against a source that the same frame destroys
+#     is not a claim.
+#
+# That is the same failure shape as this ledger's first 2026-08-29 pass
+# (dafc72e3, entity homes are not durable lifetime owners), and it is the
+# standing lesson of this one.
+#
+# MEASUREMENT TRAP -- read this before re-measuring anything here.
+# SoundnessProbeConfiguration.isSampledFrame is a PROCESS GLOBAL latched by
+# beginFrame. Under a parallel `swift test`, interleaved graphs clobber each
+# other's sampling decision and the scan reports ZERO trace lines for EVERY
+# kind -- at HEAD too, against a true count of 67. Only --no-parallel
+# reproduces this ledger. That is what the runtime lane's serialization
+# requirement (Scripts/check_serialized_execution.sh) protects. Anyone casually
+# re-measuring a ratchet without it gets a silent false green: the coverage
+# truncations above understate a count, and this one erases it entirely.
+#
+# LATENT DIVERGENCE, found here and deliberately NOT fixed.
+# pruneSparedVisitedDescentStrands builds its reachability context WITHOUT
+# zeroing liveEntityHomeByIdentity, while lifetimeReachabilitySnapshot zeroes it
+# explicitly. A node anchored by nothing but an entity home is therefore judged
+# REACHABLE by the barrier and UNREACHABLE by the census -- the same "two
+# passes disagree about entity homes" class dafc72e3 closed in
+# closeResolveLifetimeScope. Fix A removed the population that exercised it, so
+# it measures nothing today, but the divergence itself remains. Naively zeroing
+# the barrier's seeds would reclaim genuinely live nodes, so closing it needs a
+# real distinction rather than a one-line change.
+#
+# CORRECTION TO THE RETIRED ROW. Its published description of shape (b) was
+# WRONG, and that matters because the next reader trusts these descriptions. It
+# blamed a bulk hostedDetached strip in ViewGraphSubtreeRemoval running ahead of
+# the spare/remove decision, and prescribed moving the strip inside that
+# decision. Forensic instrumentation showed the anchors were emptied by the
+# relation-target removeRemovalEdges pass, not by the bulk strip; and the
+# prescribed remedy was applied EXPERIMENTALLY and changed nothing, because
+# removeRemovalEdges takes the edge a few statements later and removeNode
+# follows behind it. No ordering of the strip can save a target whose host is
+# deleted in the same cascade.

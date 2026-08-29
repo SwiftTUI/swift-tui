@@ -258,13 +258,36 @@ extension ViewGraph {
             context: context
           )
         } ?? false)
-      if hasDurableAnchorOutsideCascade
-        || nodeIDByIdentity[node.identity] == node.viewNodeID
+      if hasDurableAnchorOutsideCascade {
+        return
+      }
+      if nodeIDByIdentity[node.identity] == node.viewNodeID
         || nodeIDByIdentity[node.resolvedIdentity] == node.viewNodeID
         || entityRoutingTable.entityByNodeID[node.viewNodeID].map({ entity in
           entityRoutingTable.route(entity) == node.viewNodeID
         }) ?? false
       {
+        // Index ownership and an entity route are LIVENESS PROXIES, not
+        // lifetime anchors, so this keep is provisional in exactly the way the
+        // visited-descendant spare above is — and for the same reason: the
+        // cascade is not finished. Every remaining stage of it still severs
+        // edges, and the ones that name THIS node are severed with no second
+        // look, because a node already in `enteredNodeIDs` is skipped by both
+        // the hosted-detached and the relation-target loops of every later
+        // source. A picker's detached `PickerOptions/Group[i]` nodes are the
+        // measured shape: the descent reaches one through the departing
+        // control, keeps it here on its identity-index entry, and the control's
+        // own relation loop then removes `parent`/`committedValue`/
+        // `hostedDetached` to it and skips it as already-entered — leaving it
+        // stored, anchorless and unreachable for the census to report.
+        // Defer to the teardown barrier instead, where every apply and every
+        // edge has settled: `pruneSparedVisitedDescentStrands` keeps a node the
+        // census reachability walk can still reach (a genuine mid-frame
+        // re-adoption acquires a durable anchor by then) and reclaims one it
+        // cannot. The proxies still do their job — they stop the removal HERE,
+        // mid-cascade, which is what protects a live re-rooted control — they
+        // just no longer stand in for a settled verdict.
+        enqueueTeardownWork(.sparedVisitedDescent, for: node.viewNodeID)
         return
       }
     }

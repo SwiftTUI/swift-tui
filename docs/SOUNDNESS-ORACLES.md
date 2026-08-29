@@ -17,7 +17,11 @@ and makes drift fail the repository policy phase.
 - **T-ratchet** means the committed
   [`soundness_quarantine.txt`](../Scripts/soundness_quarantine.txt) pins an
   exact residual count. Growth fails. An exact baseline warns. Shrinkage
-  prompts reducing the ledger.
+  prompts reducing the ledger. **No probe row uses it at HEAD.** The ledger has
+  carried no active row since 2026-08-29, so every row in the map below is
+  T-fail or T-info. The tier stays defined because the next accepted residual
+  will need it, and because the layout branching ledger is enforced in this
+  style.
 - **T-info** records measurements rather than violations. It has no trace kind
   and cannot fail the gate by itself.
 
@@ -63,7 +67,7 @@ cell. Keep the comment's kind, recorder, and counter spellings exact.
 | `checkpoint-store` — stored node images remain coherent with owner generations and membership | Capture/store verification in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail. DEBUG zero-census assertion | Sampled checkpoint path | Assertion, trace scan, serialized snapshot delta | `NodeCheckpointImageStoreTests`, `SoundnessAssertPromotionTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: checkpoint-store ; recordCheckpointStoreViolation ; checkpointStoreViolationCount --> |
 | `raster-damage` — incremental damage equals a fresh raster | [`DefaultRendererFrameTailCoordinator.swift`](../Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameTailCoordinator.swift) reports the fresh-raster shadow comparison from `Rasterizer` | T-fail. The renderer repairs the mismatch before publication | Every DEBUG raster with a shadow comparison. Sampled release raster | Trace scan and serialized snapshot delta | `SoundnessProbeConfigurationTests`, `SoundnessFailureChannelTests`, raster stress fixtures | None. Repair preserves output but does not excuse the alarm  <!-- oracle-map: raster-damage ; recordRasterDamageMismatch ; rasterDamageMismatchCount --> |
 | `teardown-coherence` — no committed node is over-removed | Post-finalize reachability audit in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail. DEBUG call-site assertion | Sampled frame | Assertion, trace scan, serialized snapshot delta | teardown/presentation/framework stress suites, `SoundnessFailureChannelTests` | None  <!-- oracle-map: teardown-coherence ; recordTeardownCoherenceViolation ; teardownCoherenceViolationCount --> |
-| `teardown-coherence-leak` — no stored node is unreachable from the committed root | Under-removal arm of the same reachability audit | T-ratchet | Sampled frame | Exact-count trace scan. Leak census currency | `SoundnessProbeConfigurationTests`, framework lifecycle stress suites, `SoundnessFailureChannelTests` | Quarantined at 67 (re-measured 2026-08-29 after entity homes stopped counting as durable lifetime owners in `closeResolveLifetimeScope` and the late-preference toolbar reconcile started reinstalling its declaring host; 174 before that, 499 before the 2026-08-28 seam-fixture anchor fix, 478 at `Program-5-S0`). Also updates combined teardown count and `lastTeardownLeakUnreachableCount`  <!-- oracle-map: teardown-coherence-leak ; recordTeardownCoherenceLeak ; teardownCoherenceViolationCount,teardownCoherenceLeakCount,lastTeardownLeakUnreachableCount --> |
+| `teardown-coherence-leak` — no stored node is unreachable from the committed root | Under-removal arm of the same reachability audit | T-fail | Sampled frame | Exact-count trace scan. Leak census currency | `SoundnessProbeConfigurationTests`, `ParentDetachedKeepGuardBarrierTests`, `ReRootedControlCommittedValueAnchorTests`, `AnyViewResilienceTests`, framework lifecycle stress suites, `SoundnessFailureChannelTests` | None — burned down to zero and **unquarantined** on 2026-08-29, so any recurrence fails the scan as "is not quarantined" (67 before that day's second pass, 174 before its first, 499 before the 2026-08-28 seam-fixture anchor fix, 478 at `Program-5-S0`). The last 67 were three under-anchoring seams that each recorded a lifetime claim against a source the same frame destroyed: a parent-detached keep justified only by liveness proxies that enqueued no barrier work, an absorbed collapse-chain mint whose `hostedDetached` hosting was not transferred with its registrations, and a stale `parent` back-reference vetoing a re-rooted control's committed-value edge. Also updates combined teardown count and `lastTeardownLeakUnreachableCount`  <!-- oracle-map: teardown-coherence-leak ; recordTeardownCoherenceLeak ; teardownCoherenceViolationCount,teardownCoherenceLeakCount,lastTeardownLeakUnreachableCount --> |
 | `teardown-barrier-non-convergence` — teardown reaches a fixed point within its derived bound | Fixed-point barrier in [`ViewGraph.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraph.swift) | T-fail | Event | Trace scan and serialized snapshot delta | `TeardownBarrierFixedPointTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: teardown-barrier-non-convergence ; recordBarrierNonConvergence ; barrierNonConvergenceCount --> |
 | `automatic-lifetime-anchor` — detached results requiring inferred durable ownership | Resolve-scope classification in [`ResolveLifetimeScope.swift`](../Sources/SwiftTUIGraph/Resolve/ResolveLifetimeScope.swift) | T-info. Counter only | Event | Snapshot/reporting only. Deliberately no trace | `ResolveLifetimeScopeTests`, `SoundnessProbeConfigurationTests` | Informational adoption currency, not a violation  <!-- oracle-map: automatic-lifetime-anchor ; recordAutomaticLifetimeAnchor ; automaticLifetimeAnchorCount --> |
 | `resolve-lifetime-scope-unclassified` — every observed live resolved node has a durable lifetime classification | Resolve-scope close audit in [`ResolveLifetimeScope.swift`](../Sources/SwiftTUIGraph/Resolve/ResolveLifetimeScope.swift) | T-fail. DEBUG scope assertion | Event | Assertion, trace scan, serialized snapshot delta | `ResolveLifetimeScopeTests`, `DroppedElementAnchoringTests`, `SoundnessFailureChannelTests` | None  <!-- oracle-map: resolve-lifetime-scope-unclassified ; recordUnclassifiedResolvedNode ; unclassifiedResolvedNodeCount --> |
@@ -103,26 +107,157 @@ an entry for every current recorder and counter. One recorder can serve
 several kinds, as the five interactive handler families do. One class can
 update combined and class-specific counters, as teardown leak does.
 
-## Quarantined residuals
+## Quarantined residuals (none at HEAD)
 
-**One** kind carries a ledger row and is therefore ratcheted rather than
-failing outright. This section is its durable tracking reference. Before this
-section existed, a stage tag (`Program-5-S0`) in
-[`soundness_quarantine.txt`](../Scripts/soundness_quarantine.txt) was the only
-record of *why* the team quarantined a class. The tag names a program but does
-not explain the reason.
+**No** kind carries a ledger row.
+[`soundness_quarantine.txt`](../Scripts/soundness_quarantine.txt) has held no
+active row since 2026-08-29, so every probe in the map above fails outright
+rather than ratcheting. This section stays as the durable tracking reference
+for the rows the ledger *has* carried: before it existed, a stage tag
+(`Program-5-S0`) in that file was the only record of *why* the team quarantined
+a class, and a tag names a program without explaining the reason.
 
-| Kind | Baseline | Measured 2026-08-29 | Provenance | What the residual is | Burn-down expectation |
-| --- | --: | --: | --- | --- | --- |
-| `teardown-coherence-leak` | 67 | 67 | `Program-5-S0`, re-measured `runtime-lane-unmasked`, reduced by `seam-fixture-anchor-fidelity` (2026-08-28) and by `registration-owner-axis-and-entity-home-durability` (2026-08-29) | Unreachable-node residual (under-removal arm), now **two** shapes, both in `FrameworkStressAdditional` (40) and `FrameworkStressExpansion` (26) plus one `ScopedAnyViewButton` line. **(a)** A departed `.id`-generation's entity-routed `ForEach` element (`…/owner/N/…/ID[0]`): committed in an earlier frame, so the resolve scope classified it on its `.parent` anchor; the owner's replacement then stripped `.parent`/`.committedValue` while the element itself was NOT re-visited, so no scope re-reported it; the frame barrier later withdrew its entity home and left it anchorless. Forensic signature: `anchors=[] parent=nil`, unvisited, with the entity route gone. **(b)** `…/control/PickerOptions/Group[N]`: `ViewGraphSubtreeRemoval` strips every `hostedDetached(node)` edge in one pass *before* the pass that decides whether to spare each target, so a target it then skips (already entered, or spared as a visited descendant) is left with no anchor | **(a)** the entity-routed removal deferral must hand the node a durable owner — or re-queue its teardown — when it releases the route, instead of dropping the last claim with nothing behind it; **(b)** remove the `hostedDetached` edge per target *inside* the spare/remove decision, not in a separate pass ahead of it |
+The four retired rows, newest first:
 
-`registration-publication`'s row is gone: it was burned down to zero on
-2026-08-29 (see below). So are the two zero rows —`action-dispatch-miss` and
-`handler-resolution-gesture`, retired on 2026-08-28. All three kinds are back
-to plain `T-fail`, and a recurrence fails the scan as "is not quarantined" —
-the same hard error a `count=0` row produced as "exceeds baseline=0".
+| Kind | Retired | Last baseline | Why it reached zero |
+| --- | --- | --: | --- |
+| `teardown-coherence-leak` | 2026-08-29, second pass | 67 | Three under-anchoring seams sharing one invariant |
+| `registration-publication` | 2026-08-29, first pass | 64 | The scoped publication path had no owner-node axis |
+| `action-dispatch-miss` | 2026-08-28 | 1 | A deliberate negative probe, never a defect |
+| `handler-resolution-gesture` | 2026-08-28 | 0 | A zero row, which the scanner enforces identically to no row |
 
-### The 2026-08-29 burn-down: a missing invariant, not a missing measurement
+All four kinds are back to plain `T-fail`, and a recurrence fails the scan as
+"is not quarantined" — the same hard error a `count=0` row produced as "exceeds
+baseline=0". A row returns only by recording a residual the team has decided to
+accept for now, with its provenance written here.
+
+### The 2026-08-29 second pass: the last row retired, and a correction
+
+`teardown-coherence-leak` fell **67 → 0**, which empties the ledger. Three
+independent fixes did it, measured in the merged tree with every run
+`--no-parallel` and with identical test-count controls — the two stress suites
+stay at 2 tests / 75 cases, and `AnyViewResilienceTests` moves 9 → 10 only
+because fix C adds a test:
+
+| Configuration | Stress suites | `AnyViewResilience` | Total |
+| --- | --: | --: | --: |
+| HEAD baseline, re-measured | 66 | 1 | 67 |
+| B + C | 30 | 0 | 30 |
+| B + C + A, merged | **0** | **0** | **0** |
+
+The HEAD re-measurement reproduces the retired row's published split — 40 in
+`FrameworkStressAdditional`, 26 in `FrameworkStressExpansion`, plus the one
+`ScopedAnyViewButton` line — so the 67 burned down here is the 67 the row
+pinned.
+
+**A lifetime claim recorded against a source that the same frame destroys is
+not a claim.** All three fixes arrived at that sentence independently from
+three different seams. It is also the shape of the first pass below
+(`dafc72e3`: an entity home is not a durable lifetime owner), and it is the
+standing lesson of the day.
+
+**B — a keep justified by a liveness proxy owes the barrier a verdict.**
+[`ViewGraphSubtreeRemoval.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphSubtreeRemoval.swift)'s
+parent-detached keep-guard spared a node when it owned
+`nodeIDByIdentity[node.identity]` or `[node.resolvedIdentity]`, or was an entity
+route's home — and, unlike the visited-descendant spare directly above it,
+enqueued no barrier work at all. The node landed in `walk.enteredNodeIDs`; the
+same departing source's relation-target loop then severed `parent`,
+`committedValue`, and `hostedDetached`, and skipped it as already entered,
+leaving it stored with `anchors=[]` and unreachable. Such a keep now calls
+`enqueueTeardownWork(.sparedVisitedDescent, …)` and hands the verdict to the
+teardown barrier, whose criterion *is* the leak census's criterion — so
+deferring cannot over-remove. A keep justified by a durable anchor outside the
+cascade still returns unchanged. `ParentDetachedKeepGuardBarrierTests` pins
+both directions, and its reclaim test fails on all three assertions with the
+enqueue neutered. 66 → 30.
+
+**C — hosting must transfer with a reclaim, not just registrations.** A
+transparent collapse chain hosts each level on the one above it, so an interior
+mint's `hostedDetached` edge is the only structural anchor its surviving
+content has. `pruneAbsorbedShadowedNodes` reclaimed that mint as a shadow while
+the content itself was spared as visited-this-frame, and re-homed the shadow's
+runtime *registrations* while leaving its lifetime *anchor* behind. The new
+`adoptAbsorbedDetachedHostedRoots(from:)` in
+[`ViewGraphChainCollapse.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphChainCollapse.swift)
+runs immediately after `adoptAbsorbedRuntimeRegistrations(from:)` and transfers
+hosting, guarded on `visitedThisFrame` — an unvisited target is genuinely
+departing and the cascade must still reach it. The shape is cold-render only
+and invisible from frame 2. Its forensic signature —
+`anchors=[entityHome(X)] parent=nil evalHost=nil`, visited this frame, entity
+route still **present** — is what separates it from retired shape (a), where
+the route was gone. Pinned by
+`AnyViewResilienceTests.scopedAnyViewContentKeepsALifetimeAnchorWhenItsHostIsAbsorbed`.
+This is the "plus one `ScopedAnyViewButton` line" the retired row never
+assigned to either named shape: it belonged to neither.
+
+**A — a stale back-reference is not evidence of non-adjacency.** This one is an
+**under-anchoring** bug on the arriving side rather than an under-removal bug,
+and it carried the larger half of the count.
+`replaceCommittedValueAnchors(in:)` in
+[`ViewGraphLifetimeRelation.swift`](../Sources/SwiftTUIGraph/Resolve/ViewGraphLifetimeRelation.swift)
+proved a stamped node's adjacency to `nearestStampedAncestor` through
+`stampedNode.parent?.viewNodeID == nearestStampedAncestor`. An
+`.id(_:)`-re-rooted control keeps a stale `parent` back-reference to the
+generation that last committed it; once that generation departs the reference
+names an unstored object, the adjacency test rejects, and **no** committed-value
+edge is projected at all. That leaves a live control — visited, index-owning,
+route-owning, present in the accepted committed value tree — anchored by
+nothing but an entity home the census refuses to seed, and takes its whole
+`ButtonBody` styling island with it. Membership in the accepted committed value
+tree is now the claim, and a stale back-reference no longer vetoes it (11
+lines). `ReRootedControlCommittedValueAnchorTests` pins it and was verified
+failing (`rc=1`, 8 trace lines) with the fix neutered. It **requires** fix B to
+be present. 30 → 0.
+
+**Not a false zero.** Reverting only A returned 30 and restoring it returned 0,
+both in freshly built binaries. No other soundness kind emitted a single line
+at HEAD or merged, and the zero-tolerance over-removal oracles —
+`teardown-coherence`, `stranded-listing`, `teardown-barrier-non-convergence` —
+stayed at 0 throughout, which is the control that says these fixes removed
+leaks rather than trading them for over-removals. `SwiftTUIGraphTests` passes
+487 tests in 69 suites.
+
+One candidate fix was written and then **reverted as redundant**: having
+`releaseInactiveEntityRoutes` drop the last claim post-barrier in
+`ViewGraphEntityRouting.swift`. Fix B removes the same nodes upstream and
+strictly dominates it, because B also catches nodes whose entity stays
+**active**, which a `!activeEntities.contains(entity)` predicate structurally
+cannot express.
+
+#### Correcting the record on shapes (a) and (b)
+
+The retired row named two shapes. They were **one mechanism seen from opposite
+ends**, and the published description of (b) was **wrong**. That is worth
+saying plainly, because this document's own standing lesson is that these
+descriptions get trusted later by someone who cannot cheaply re-derive them.
+
+(b) was published as `ViewGraphSubtreeRemoval` stripping every `hostedDetached`
+edge in one bulk pass *before* the pass that decides whether to spare each
+target, with the prescribed remedy of moving the strip inside that decision.
+Neither half held. Forensic instrumentation showed the anchors were emptied by
+the relation-target `removeRemovalEdges` pass, not by the bulk strip. And the
+prescribed remedy was applied **experimentally and changed nothing**:
+`removeRemovalEdges` takes the edge a few statements later and `removeNode`
+follows behind it. No ordering of the strip can save a target whose host is
+deleted in the same cascade. What closed both shapes was B — the missing
+barrier enqueue — with A for the re-rooted arrivals underneath them.
+
+#### A latent divergence, found and left open
+
+`pruneSparedVisitedDescentStrands` builds its reachability context **without**
+zeroing `liveEntityHomeByIdentity`, while `lifetimeReachabilitySnapshot` zeroes
+it explicitly. A node anchored by nothing but an entity home is therefore judged
+**reachable** by the barrier and **unreachable** by the census — the same "two
+passes disagree about what an entity home means" class that `dafc72e3` closed in
+`closeResolveLifetimeScope` in the first pass below. Fix A removed the
+population that exercised it, so it measures nothing at HEAD, but the divergence
+itself remains. Naively zeroing the barrier's seeds would reclaim genuinely live
+nodes, so closing it needs a real distinction rather than a one-line change.
+Recorded here so the next reader who trips over it does not have to rediscover
+it.
+
+### The 2026-08-29 first pass: a missing invariant, not a missing measurement
 
 `registration-publication` fell **64 → 0** and `teardown-coherence-leak`
 **174 → 67**. Unlike the previous burn-down these were real defects, and the
@@ -268,8 +403,8 @@ Both new figures are confirmed on two platforms — a full macOS `bun run test`
 and the arm64 Linux container lane in worktree source mode each report 64 and
 174 exactly — which the 2026-08-14 pair never were.
 
-The scan on that day (superseded by the 2026-08-29 burn-down above, which
-retired the first row entirely):
+The scan on that day (superseded by the two 2026-08-29 passes above, which
+retired both rows):
 
 ```
 WARNING: registration-publication count=64 matches baseline=64
@@ -306,6 +441,21 @@ An unguarded subscript after a bounds `#expect` is the specific hazard: Swift
 Testing's `#expect` does not stop execution, so the next line runs anyway and
 one failing test becomes a lane-wide coverage hole.
 
+### A parallel `swift test` reports ZERO for every kind — read this too
+
+Coverage truncation makes a count read low. This one erases it.
+`SoundnessProbeConfiguration.isSampledFrame` is a **process global**, latched by
+`beginFrame`. Under a parallel `swift test` the interleaved graphs clobber each
+other's sampling decision, and the scan then reports **zero** trace lines for
+every kind — including against a HEAD whose true count was 67. Only
+`--no-parallel` reproduces a ledger figure.
+
+This is what the runtime lane's serialization requirement
+([`check_serialized_execution.sh`](../Scripts/check_serialized_execution.sh))
+protects, and it is why a casual re-measurement outside the gate is worse than
+no measurement: it does not read low, it reads clean. A re-measure that returns
+zero across *every* kind at once is showing you its launch, not the code.
+
 ### What a green scan does and does not prove
 
 Other documents describe the ledger as "exact-count". Read that carefully,
@@ -337,10 +487,10 @@ expected rather than a defect. The report is a **pre-S1** census. The ledger is
 The S0 columns below are a **dated snapshot** and are kept as history. Only the
 last column is current:
 
-| Kind | S0 raw | S0 injected | S0 residual | Ledger post-S1 | Measured 2026-07-30 | 2026-08-14 | 2026-08-22 | 2026-08-28 | **Ledger and measured 2026-08-29** |
-| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: |
-| `registration-publication` | 1,197 | 1 | 1,196 | 1194 | 1122 | 1237 | 1194 | 64 | **0 (unquarantined)** |
-| `teardown-coherence-leak` | 479 | 1 | 478 | 478 | 478 | 499 | 499 | 174 | **67** |
+| Kind | S0 raw | S0 injected | S0 residual | Ledger post-S1 | Measured 2026-07-30 | 2026-08-14 | 2026-08-22 | 2026-08-28 | 2026-08-29 pass 1 | **Ledger and measured 2026-08-29 pass 2** |
+| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
+| `registration-publication` | 1,197 | 1 | 1,196 | 1194 | 1122 | 1237 | 1194 | 64 | 0 | **0 (unquarantined)** |
+| `teardown-coherence-leak` | 479 | 1 | 478 | 478 | 478 | 499 | 499 | 174 | 67 | **0 (unquarantined)** |
 
 Read that 2026-07-30 column as a *floor observed under partial coverage*, not as
 a truth the later figures contradict. `registration-publication`'s apparent
@@ -362,11 +512,11 @@ neither coverage nor a reconciliation fix, but two measurement artifacts being
 removed from the apparatus — see the 2026-08-28 burn-down section above. Read
 every earlier column as a population that was mostly not defects.
 
-The 2026-08-29 column is the fourth kind, and the only one so far that is
-neither coverage nor apparatus: genuine reconciliation fixes against a
-population that really was defects. That is why `registration-publication`
-reaches zero rather than a smaller residual — a missing invariant was supplied,
-not a miscount corrected.
+The two 2026-08-29 columns are the fourth kind, and the only one so far that
+is neither coverage nor apparatus: genuine reconciliation fixes against a
+population that really was defects. That is why both kinds reach zero rather
+than a smaller residual — in each case a missing invariant was supplied, not a
+miscount corrected. Pass 2 emptied the ledger.
 
 **No document here is the authority. Only a fresh trace-armed full-gate run
 is.** The S0 report is a dated snapshot and is not maintained. The ledger is a

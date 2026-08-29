@@ -85,10 +85,61 @@ extension ViewGraph {
       // dropped and its committed tasks never start ("no task registration at
       // commit", the F43 start-skip).
       adoptAbsorbedRuntimeRegistrations(from: node)
+      adoptAbsorbedDetachedHostedRoots(from: node)
       removeSubtree(
         rootedAt: node,
         policy: .absorbingIntoCollapse
       )
+    }
+  }
+
+  /// Re-homes a reclaimed shadow's LIVE hosted-detached roots onto the
+  /// shadow's own declaring host before the reclaim strips the edge.
+  ///
+  /// A collapse chain hosts each level on the one above it, so an interior
+  /// mint's hosting claim can be the ONLY structural anchor its surviving
+  /// content has: an `AnyView` payload whose content re-roots through
+  /// `.id(_:)` converges on the interior `…/Content` node, and the enclosing
+  /// `…/ScopedAnyViewContent` mint that hosts it is exactly the shadow this
+  /// reclaim removes. Every path out of `removeSubtree` then drops that edge
+  /// — the pre-decision `hostedDetached` strip, `removeRemovalEdges` for the
+  /// relation targets, and finally `removeNode` — while the target itself is
+  /// SPARED as visited-this-frame. What survives is anchored only by its
+  /// entity home, and an entity home is not a lifetime owner: the F91
+  /// reachability census deliberately refuses to seed one
+  /// (`LifetimeRelationCensus` zeroes `liveEntityHomeByIdentity`), so the live
+  /// content and its whole subtree read as stored-but-unreachable for the rest
+  /// of the frame.
+  ///
+  /// Hosting is transitive under collapse. When the shadow is itself a
+  /// detached root of a live host, that host becomes the declaring host of
+  /// whatever the shadow was hosting — the same transitive re-home
+  /// ``adoptAbsorbedRuntimeRegistrations`` performs for the interior's
+  /// bookkeeping. Only targets visited this frame move: an unvisited target is
+  /// genuinely departing with the shadow and the cascade must still reach it.
+  func adoptAbsorbedDetachedHostedRoots(from node: ViewNode) {
+    let hostNodeID = lifetimeAnchors.anchors(for: node.viewNodeID)
+      .compactMap { anchor -> ViewNodeID? in
+        guard case .hostedDetached(let host) = anchor,
+          host != node.viewNodeID,
+          nodeIfExists(for: host) != nil
+        else {
+          return nil
+        }
+        return host
+      }
+      .min()
+    guard let hostNodeID else {
+      return
+    }
+    for targetNodeID in lifetimeAnchors.targets(of: .hostedDetached(node.viewNodeID)).sorted()
+    where targetNodeID != hostNodeID {
+      guard let target = nodeIfExists(for: targetNodeID),
+        target.visitedThisFrame(currentFrameID)
+      else {
+        continue
+      }
+      recordDetachedHostedNode(targetNodeID, hostedByNodeID: hostNodeID)
     }
   }
 

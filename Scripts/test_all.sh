@@ -1160,8 +1160,9 @@ check_runtime_lane_log() {
 # traces against one ledger (Scripts/soundness_quarantine.txt). Measured
 # 2026-08-25: the three-shard `all` run reproduces the single-process
 # ledger to the unit (registration-publication 1199, teardown-coherence-leak
-# 499; 64 and 174 after the 2026-08-28 burn-down; 0 and 67 after the
-# 2026-08-29 one, which unquarantined the first kind) — the counts are
+# 499; 64 and 174 after the 2026-08-28 burn-down; 0 and 67 after the first
+# 2026-08-29 pass, which unquarantined the first kind; 0 and 0 after the
+# second, which emptied the ledger) — the counts are
 # per-test, not per-process, so the partition does not
 # move them; keeping the shapes identical removes the question rather than
 # answering it every time. SWIFTTUI_RUNTIME_LANE_SHAPE=single restores the

@@ -3094,6 +3094,13 @@ package final class ViewGraph {
   /// exactly the node the leak census would flag and is removed.
   /// Descendants spared by the reclaim's own descent re-enqueue through the
   /// same reason, so the fixed-point iteration drains the whole island.
+  ///
+  /// The parent-detached keep-guard in ``removeSubtree(rootedAt:committedSnapshot:policy:isSubtreeDescent:walk:)``
+  /// is the second producer of this reason, for the same reason: it keeps a
+  /// node on a LIVENESS PROXY (identity-index ownership, an entity route)
+  /// rather than a lifetime anchor, and the rest of the cascade goes on
+  /// severing edges that name it without re-examining a node already in the
+  /// walk's entered set.
   private func pruneSparedVisitedDescentStrands(
     candidateRootID: ViewNodeID,
     activeEntities: Set<EntityIdentity>

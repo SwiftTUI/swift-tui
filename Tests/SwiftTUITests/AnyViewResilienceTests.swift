@@ -142,6 +142,43 @@ struct AnyViewResilienceTests {
     #expect(updated.resolvedTree.descendant(withText: "Scoped count 1") != nil)
   }
 
+  /// F91 pinning (teardown-coherence leak, under-removal arm). The scoped
+  /// `AnyView` collapse chain hosts each level on the one above it:
+  /// `…/ScopedAnyViewContent` (the `AnyView` mint) hosts
+  /// `…/AnyViewPayload<…>/Content`, which is where the `.id(_:)` re-root
+  /// converges the live `ScopedAnyViewButton` owner. On the COLD render the
+  /// chain collapse absorbs the two shadow mints, and the barrier's
+  /// absorbed-shadow reclaim removes the hosting one — stripping the only
+  /// structural anchor the surviving content has, whichever removal path gets
+  /// there first. What is left anchors the live button and its whole
+  /// `ButtonBody` subtree on an entity home alone, and an entity home is not a
+  /// lifetime owner: the reachability census refuses to seed one, so the
+  /// census reports eight stored-but-unreachable nodes. Assert on the FIRST
+  /// render — the warm render re-anchors the content, so the strand is
+  /// invisible from the second frame onward.
+  @Test("scoped AnyView content keeps a lifetime anchor when its host is absorbed")
+  func scopedAnyViewContentKeepsALifetimeAnchorWhenItsHostIsAbsorbed() {
+    let renderer = DefaultRenderer()
+
+    _ = renderer.render(
+      ScopedAnyViewActionOwner(),
+      context: .init(
+        identity: testIdentity("ScopedOwner"),
+        localActionRegistry: LocalActionRegistry(),
+        applyEnvironmentValues: true
+      )
+    )
+
+    let violation = renderer.viewGraph.debugTeardownCoherenceViolation()
+    #expect(
+      violation == nil,
+      """
+      the absorbed scoped-AnyView host stranded stored node(s): \
+      \(violation?.detail ?? "")
+      """
+    )
+  }
+
   @Test("focusable descendant inside AnyView remains reachable")
   func focusableDescendantInsideAnyViewRemainsReachable() throws {
     let recorder = AnyViewEventRecorder()
