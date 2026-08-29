@@ -607,6 +607,108 @@ struct RuntimeRegistrationRestoreScopingTests {
     #expect(violationDetail.contains("roots=1"))
   }
 
+  @Test("a scoped restore into a target missing a registry does not trip the oracle")
+  func sparseLiveTargetDoesNotTripPublicationOracle() {
+    // The F04 oracle compares a scoped restore against a scratch full rebuild.
+    // Registry members are OPTIONAL: a host installs the registries it needs,
+    // and a bare `ResolveContext` — every `DefaultRenderer` stress render —
+    // installs none. An unconditional fifteen-member scratch therefore
+    // reported every registration of every ABSENT registry as
+    // `live=0 rebuilt=1` with no scoped restore at fault: publishing into a
+    // registry the target does not have is a no-op by construction, so there
+    // is nothing a scoped restore can get wrong there. That artifact was 995
+    // of the runtime lane's quarantined `registration-publication` residual.
+    // The scratch now mirrors the target's membership.
+    let rootIdentity = testIdentity("Root")
+    let itemIdentities = ["A", "B", "C"].map { testIdentity("Root", $0) }
+
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    var children: [ResolvedNode] = []
+    var itemNodes: [ViewNode] = []
+    for identity in itemIdentities {
+      let node = graph.beginEvaluation(identity: identity, invalidator: nil)
+      node.recordActionRegistration(
+        identity: identity,
+        handler: { true },
+        followUpInvalidationIdentity: nil
+      )
+      let resolvedChild = ResolvedNode(identity: identity, kind: .view("Item"))
+      graph.finishEvaluation(node, resolved: resolvedChild, accessedStateSlots: 0)
+      children.append(resolvedChild)
+      itemNodes.append(node)
+    }
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(identity: rootIdentity, kind: .root, children: children),
+      accessedStateSlots: 0
+    )
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    // A target with no action registry at all, while every node record carries
+    // an action registration.
+    let sparseRegistrations = RuntimeRegistrationSet(
+      lifecycleRegistry: LocalLifecycleRegistry()
+    )
+    #expect(sparseRegistrations.allRegistries.count == 1)
+    #expect(
+      RuntimeRegistrationSet.scratch(mirroringMembershipOf: sparseRegistrations)
+        .allRegistries.count == 1,
+      "the mirrored scratch must carry exactly the target's member shape"
+    )
+    #expect(RuntimeRegistrationSet.scratch().allRegistries.count > 1)
+
+    let initialDraft = ViewGraphFrameDraft(
+      liveRegistrations: sparseRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: false
+    )
+    initialDraft.recordDirtyEvaluationPlan(nil)
+    _ = initialDraft.commitRuntimeRegistrations(from: graph)
+
+    let probeEnabled = SoundnessProbeConfiguration.isEnabled
+    let traceEnabled = SoundnessProbeConfiguration.isTraceEnabled
+    let probeLatch = SoundnessProbeConfiguration.isSampledFrame
+    let violationCount = SoundnessProbeConfiguration.registrationPublicationViolationCount
+    let detail = SoundnessProbeConfiguration.lastViolationDetail
+    let detailsByKind = SoundnessProbeConfiguration.lastViolationDetailByKind
+    defer {
+      SoundnessProbeConfiguration.isEnabled = probeEnabled
+      SoundnessProbeConfiguration.isTraceEnabled = traceEnabled
+      SoundnessProbeConfiguration.isSampledFrame = probeLatch
+      SoundnessProbeConfiguration.registrationPublicationViolationCount = violationCount
+      SoundnessProbeConfiguration.lastViolationDetail = detail
+      SoundnessProbeConfiguration.lastViolationDetailByKind = detailsByKind
+    }
+    SoundnessProbeConfiguration.isEnabled = true
+    SoundnessProbeConfiguration.isTraceEnabled = false
+    SoundnessProbeConfiguration.isSampledFrame = true
+
+    let scopedDraft = ViewGraphFrameDraft(
+      liveRegistrations: sparseRegistrations,
+      checkpoint: nil,
+      publicationDiagnosticsEnabled: false
+    )
+    scopedDraft.recordDirtyEvaluationPlan(
+      DirtyEvaluationPlan(
+        frontierNodeIDs: [itemNodes[0].viewNodeID],
+        frontierIdentities: [itemIdentities[0]]
+      ),
+      diagnostics: DirtyEvaluationPlanDiagnostics(result: "formed", frontierRootCount: 1)
+    )
+    _ = scopedDraft.commitRuntimeRegistrations(from: graph)
+
+    #expect(
+      SoundnessProbeConfiguration.registrationPublicationViolationCount == violationCount,
+      """
+      a registry the target does not have cannot carry a publication \
+      divergence: \(SoundnessProbeConfiguration.lastViolationDetail ?? "-")
+      """
+    )
+  }
+
   @Test("in-place action refresh escalates a plan-less commit's publication")
   func inPlaceActionRefreshEscalatesPlanlessCommitPublication() {
     let rootIdentity = testIdentity("Root")
@@ -1067,6 +1169,11 @@ struct RuntimeRegistrationRestoreScopingTests {
       resolved: ResolvedNode(identity: islandIdentity, kind: .view("Island")),
       accessedStateSlots: 0
     )
+    // Production anchors a capture-hosted island to its declaring host; see
+    // ``anchorSeededIsland(_:hostedBy:in:)``. Without it the island lands with
+    // no lifetime anchor and the finalize-barrier census reports this fixture
+    // as an unreachable stored node.
+    anchorSeededIsland(islandNode, hostedBy: rootNode, in: graph)
     graph.finishEvaluation(
       rootNode,
       resolved: ResolvedNode(identity: rootIdentity, kind: .view("Root")),
@@ -1761,24 +1868,27 @@ struct RuntimeRegistrationRestoreScopingTests {
     graph.beginFrame()
     let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
 
+    var siblingNodes: [ViewNode] = []
     for sibling in siblings {
-      seedBroadRegistrationNode(
-        identity: sibling.identity,
-        label: sibling.label,
-        marker: sibling.marker,
-        in: graph,
-        namespace: namespace,
-        probe: probe
+      siblingNodes.append(
+        seedBroadRegistrationNode(
+          identity: sibling.identity,
+          label: sibling.label,
+          marker: sibling.marker,
+          in: graph,
+          namespace: namespace,
+          probe: probe
+        )
       )
     }
 
-    for sibling in siblings {
+    for (sibling, siblingNode) in zip(siblings, siblingNodes) {
       guard let islandIdentity = shape.kind.islandIdentity(for: sibling),
         let islandLabel = shape.kind.islandLabel
       else {
         continue
       }
-      seedBroadRegistrationNode(
+      let islandNode = seedBroadRegistrationNode(
         identity: islandIdentity,
         label: islandLabel,
         marker: "\(sibling.marker)-\(islandLabel)-0",
@@ -1786,6 +1896,7 @@ struct RuntimeRegistrationRestoreScopingTests {
         namespace: namespace,
         probe: probe
       )
+      anchorSeededIsland(islandNode, hostedBy: siblingNode, in: graph)
     }
 
     let siblingResolvedNodes = siblings.map {
@@ -1824,6 +1935,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
   }
 
+  @discardableResult
   private func seedBroadRegistrationNode(
     identity: Identity,
     label: String,
@@ -1831,7 +1943,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     in graph: ViewGraph,
     namespace: MatchedGeometryNamespace,
     probe: RuntimeRegistrationProbeSink
-  ) {
+  ) -> ViewNode {
     let node = graph.beginEvaluation(identity: identity, invalidator: nil)
     recordBroadRegistrations(
       on: node,
@@ -1845,6 +1957,33 @@ struct RuntimeRegistrationRestoreScopingTests {
       resolved: ResolvedNode(identity: identity, kind: .view(label)),
       accessedStateSlots: 0
     )
+    return node
+  }
+
+  /// Anchors one seeded capture island to its declaring sibling, the way
+  /// production does.
+  ///
+  /// An island here models a live capture-hosted descendant — a lazy tab body,
+  /// a presentation-portal attachment, a lazy viewport entry — which resolves
+  /// outside any frontier root and is therefore never a committed child. In
+  /// the framework such a node is kept alive by a `hostedDetached` lifetime
+  /// anchor its host's resolve-lifetime scope records
+  /// (``ViewGraph/reportDetachedResolvedLifetimeResult(_:)`` and the scope
+  /// close in `ResolveLifetimeScope.swift`). This fixture drives
+  /// `beginEvaluation` directly, so without this the islands land with
+  /// `anchors=[]` and the finalize-barrier teardown census counts every one of
+  /// them as an unreachable stored node — 325 of the graph lane's quarantined
+  /// `teardown-coherence-leak` residual was this fixture, not a framework
+  /// under-removal.
+  private func anchorSeededIsland(
+    _ island: ViewNode,
+    hostedBy host: ViewNode,
+    in graph: ViewGraph
+  ) {
+    graph.recordDetachedHostedNode(
+      island.viewNodeID,
+      hostedByNodeID: host.viewNodeID
+    )
   }
 
   private func reEvaluateBroadRegistrationSibling(
@@ -1854,7 +1993,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     namespace: MatchedGeometryNamespace,
     probe: RuntimeRegistrationProbeSink
   ) {
-    seedBroadRegistrationNode(
+    let siblingNode = seedBroadRegistrationNode(
       identity: sibling.identity,
       label: sibling.label,
       marker: "\(sibling.marker)-1",
@@ -1867,7 +2006,7 @@ struct RuntimeRegistrationRestoreScopingTests {
     else {
       return
     }
-    seedBroadRegistrationNode(
+    let islandNode = seedBroadRegistrationNode(
       identity: islandIdentity,
       label: islandLabel,
       marker: "\(sibling.marker)-\(islandLabel)-1",
@@ -1875,6 +2014,10 @@ struct RuntimeRegistrationRestoreScopingTests {
       namespace: namespace,
       probe: probe
     )
+    // The host re-declared its detached content this frame, exactly as a
+    // re-evaluating capture host does; without the re-record the barrier's
+    // stale-detached-hosted-root sweep would retire the island.
+    anchorSeededIsland(islandNode, hostedBy: siblingNode, in: graph)
   }
 
   @MainActor

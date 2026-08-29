@@ -23,6 +23,24 @@ struct RuntimeRegistrationKindTotalityTests {
     #expect(Set(kinds) == Set(RuntimeRegistrationKind.allCases))
   }
 
+  @Test("a membership-mirrored scratch of a full set covers every kind exactly once")
+  func mirroredScratchOfFullSetCoversEveryKindExactlyOnce() {
+    // `scratch(mirroringMembershipOf:)` enumerates the fifteen members by hand,
+    // so a family added to `RuntimeRegistrationSet` but forgotten there would
+    // silently drop out of the publication oracle's comparison scratch — the
+    // oracle would then be blind to that family's scoped-restore divergences
+    // instead of reporting them. Mirroring a full scratch must reproduce a full
+    // scratch.
+    let mirrored = RuntimeRegistrationSet.scratch(
+      mirroringMembershipOf: RuntimeRegistrationSet.scratch()
+    )
+    let kinds = mirrored.allRegistries.map { registry in
+      type(of: registry).kind
+    }
+    #expect(kinds.count == RuntimeRegistrationKind.allCases.count)
+    #expect(Set(kinds) == Set(RuntimeRegistrationKind.allCases))
+  }
+
   @Test(
     "each family round-trips node record -> restore -> fingerprint and raises its blocker",
     arguments: RuntimeRegistrationKind.allCases

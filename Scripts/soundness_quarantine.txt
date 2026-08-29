@@ -7,6 +7,12 @@
 # fails above count=N, warns at the exact baseline, and warns below it so this
 # ledger is reduced with the next fix.
 #
+# A kind with NO row is not unprotected: any count > 0 fails the scan as
+# "is not quarantined". A row pinned at count=0 is therefore equivalent to
+# no row at all, and a burned-down class should lose its row rather than
+# keep a zero one (2026-08-28: action-dispatch-miss and
+# handler-resolution-gesture both did).
+#
 # Enforcement is asymmetric, so a green gate proves only count <= N -- NOT that
 # N is current. A baseline left too high after a fix merely warns, and that is
 # not hypothetical: through 2026-07-30 registration-publication measured 1122
@@ -59,6 +65,69 @@
 # cross-check. Take a baseline only from a full `bun run test`
 # (it clears .build/soundness-trace first); a standalone scan reads whatever
 # ad-hoc `swift test` runs have accumulated there and reports inflated counts.
+# BURNED DOWN 2026-08-28. Two whole classes of these counts were measurement
+# artifacts rather than defects, and removing them retired two rows outright:
+#
+# 1. registration-publication 1199 -> 64. `RuntimeRegistrationSet`'s member
+#    registries are OPTIONAL, and the F04 oracle built its comparison scratch
+#    with `RuntimeRegistrationSet.scratch()`, which always constructs all
+#    fifteen. A host installs the registries it needs, and a bare
+#    `ResolveContext` -- every `DefaultRenderer` stress render -- installs
+#    none, so the oracle compared an EMPTY live target against a fully
+#    populated rebuild and reported every registration in the graph as
+#    `live=0 rebuilt=1`. Publishing into a registry the target does not have
+#    is a no-op by construction; no scoped restore was ever at fault. The
+#    scratch now mirrors the target's membership
+#    (`RuntimeRegistrationSet.scratch(mirroringMembershipOf:)`), pinned by
+#    `RuntimeRegistrationRestoreScopingTests.sparseLiveTargetDoesNotTripPublicationOracle`.
+#    What survives is entirely the OPPOSITE arm, and it is a real defect: a
+#    scoped removal that fails to clear an entry, leaving 58 stacked
+#    duplicates (`live=2 rebuilt=1` on key+paste pairs and a ScrollView key
+#    trio) and 6 stale survivors of a departed node (`live=1 rebuilt=0`).
+#    The removal matches registration-KEY identity prefixes while the
+#    restore selects by NODE identity; a control registering outside the
+#    removal cover keeps its old entry and the restore adds a second.
+#
+# 2. teardown-coherence-leak 499 -> 174. The graph lane's entire
+#    contribution (325) was `RuntimeRegistrationRestoreScopingTests`' generated
+#    seam cases: they seed capture-island nodes (Portal/Overlay/LazyTab/
+#    SheetCaptured/LazyViewport/IdentityReroot) that are deliberately committed
+#    in no children array, but never recorded the `hostedDetached` lifetime
+#    anchor that production's resolve-lifetime scope records for exactly that
+#    shape. The islands landed with `anchors=[]` and the finalize-barrier
+#    census correctly called every one of them unreachable. The fixture now
+#    anchors them to their declaring sibling host. The census was right; the
+#    fixture was unfaithful. What survives is the runtime lane's genuine F91
+#    residual (List/lazy content strands whose `ID[i]` host carries no anchor,
+#    plus entity-routed nodes the census deliberately refuses to seed).
+#
+# 3. action-dispatch-miss 1 -> 0, ROW REMOVED. The single line came from
+#    `DormantTabStateTests.nestedTabViewRejoinsArchivedPayloadLifetimes`
+#    asserting `!actions.dispatch(...)` -- a deliberate negative probe. The
+#    test was never failing: `LocalActionRegistry.dispatch` records the alarm
+#    on a lookup MISS, so the probe fired exactly when the assertion PASSED.
+#    The assertion now reads `hasHandler`, which is also what it claims to
+#    test (`dispatch` conflates "no handler" with "handler returned false").
+#    The recorder keeps its owning coverage in
+#    `CommittedHandlerResolutionOracleTests.actionDispatchMissRecordsFailedLookupOnly`,
+#    which suppresses tracing while proving the counter.
+#
+# 4. handler-resolution-gesture 0 -> ROW REMOVED. It had already measured 0 on
+#    both platforms since 2026-08-22. A row at count=0 and no row at all are
+#    ENFORCED IDENTICALLY by the scanner -- both fail on any recurrence, one
+#    as "exceeds baseline=0" and the other as "is not quarantined" -- so the
+#    row bought nothing but a WARNING line and the false implication that the
+#    class is a formally accepted defect. Removing it is the burn-down.
+#
+# Standing lesson, now demonstrated twice over: before treating a quarantined
+# count as a defect population, check that the ORACLE and its comparison
+# subject are actually comparable, and that the FIXTURE models the production
+# shape it claims to. Coverage is not the only way these numbers lie.
+#
+# Both new figures are confirmed on TWO platforms, which the 2026-08-14 pair
+# never were: a full macOS `bun run test` and the arm64 Linux container lane
+# (worktree source mode) each report 64 and 174 exactly.
+#
 # Re-measured 2026-08-25 on the sharded gate (plan 2026-08-25-001 Stages 1-2):
 # the runtime surface now runs as three serialized shard launches (A/B/C,
 # Scripts/data/runtime-shards.txt) both locally (`--lane all`) and in CI
@@ -69,7 +138,5 @@
 # 10), action-dispatch-miss 1, handler-resolution-gesture 0. The counts are
 # per-test, not per-process; the partition does not move them. First CI
 # merged scan pending (Linux cross-check).
-registration-publication 2026-08-24 legacy-keyevent-removal count=1199 scoped-restore residual re-measured 1194 -> 1199 after the bare-KeyEvent strand deletion: five stress-fixture control registrations moved into the contributed key-press strand, whose per-owner restore the oracle can observe (the deleted flat-union restore overwrote across owners invisibly); confirmed on full macOS and Linux container gates
-teardown-coherence-leak 2026-08-14 runtime-lane-unmasked count=499 existing unreachable-node residual re-measured on a runtime lane completing all 3247 tests
-action-dispatch-miss 2026-08-14 runtime-lane-unmasked count=1 DormantIncrement-inner-B has no published handler; first observable once the lane completed
-handler-resolution-gesture 2026-08-22 toolbar-strip-follow-up count=0 GestureScroll026 residual measured 0 on macOS and the Linux container lane after the toolbar-strip host follow-up frame; row held at 0 so a recurrence fails
+registration-publication 2026-08-28 oracle-membership-mirror count=64 over-publication residual only: a scoped removal fails to clear an entry, leaving 58 stacked duplicates (live=2 rebuilt=1, key+paste pairs on text controls and a ScrollView key trio) and 6 stale survivors of a departed node (live=1 rebuilt=0); re-measured 1199 -> 64 after the publication oracle stopped comparing a sparse live target against an all-member scratch
+teardown-coherence-leak 2026-08-28 seam-fixture-anchor-fidelity count=174 existing unreachable-node residual (under-removal arm), now the runtime lane's F91 class alone; re-measured 499 -> 174 after the generated seam-case islands took the hostedDetached anchor production records for them

@@ -251,10 +251,14 @@ package final class ViewGraphFrameDraft {
     // F04 publication oracle: on sampled probe frames, a scoped restore must
     // leave the live registries equal (keys + stacked-handler counts) to a
     // scratch full rebuild of the current frame's registrations. The scratch
-    // set receives the same effect republication the live set got so the two
-    // constructions are comparable.
+    // set MIRRORS the live set's member shape and receives the same effect
+    // republication the live set got, so the two constructions are comparable:
+    // registry members are optional, and an unconditional 15-member scratch
+    // reports every registration of every registry the live target lacks as
+    // `live=0 rebuilt=1` — a comparison artifact, not a scoped-restore defect
+    // (publication into an absent registry is a no-op by construction).
     if usedScopedRestore, SoundnessProbeConfiguration.isSampledFrame {
-      let scratch = RuntimeRegistrationSet.scratch()
+      let scratch = RuntimeRegistrationSet.scratch(mirroringMembershipOf: liveRegistrations)
       viewGraph.restoreCurrentFrameRuntimeRegistrations(into: scratch)
       viewGraph.republishAllEffectRegistrations(into: scratch)
       let live = liveRegistrations.publicationOracleFingerprint()

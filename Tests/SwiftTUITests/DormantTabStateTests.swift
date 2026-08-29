@@ -600,7 +600,7 @@ struct DormantTabStateTests {
     #expect(!surfaceText(outerB).contains("inner-"))
     #expect(probe.bodyEvaluations == evaluationsBeforeOuterDeparture)
     #expect(
-      !outerBActions.dispatch(identity: testIdentity("DormantIncrement-inner-B")),
+      !outerBActions.hasHandler(identity: testIdentity("DormantIncrement-inner-B")),
       "the dormant nested payload must not retain its action registration"
     )
 

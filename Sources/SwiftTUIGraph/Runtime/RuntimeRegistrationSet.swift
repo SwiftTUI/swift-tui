@@ -220,6 +220,49 @@ package struct RuntimeRegistrationSet {
     )
   }
 
+  /// A scratch whose member shape mirrors `target`: a member is present here
+  /// exactly where `target` has one.
+  ///
+  /// The publication oracle compares a scoped restore against a scratch full
+  /// rebuild, and that comparison is only meaningful over registries the live
+  /// target actually has. Members are optional — a host installs the
+  /// registries it needs, and a bare `ResolveContext` (every `DefaultRenderer`
+  /// stress render) installs none — while ``scratch()`` always builds all
+  /// fifteen. Comparing a sparse target against a full scratch reports every
+  /// registration of every absent kind as `live=0 rebuilt=1`, which is not a
+  /// publication defect: publishing into a registry the target does not have
+  /// is a no-op by construction, so a scoped restore cannot diverge there.
+  /// Mirroring the membership keeps the oracle strict over the registries that
+  /// exist and silent about the ones that cannot.
+  @MainActor
+  package static func scratch(
+    mirroringMembershipOf target: RuntimeRegistrationSet
+  ) -> RuntimeRegistrationSet {
+    RuntimeRegistrationSet(
+      actionRegistry: target.actionRegistry.map { _ in LocalActionRegistry() },
+      keyHandlerRegistry: target.keyHandlerRegistry.map { _ in LocalKeyHandlerRegistry() },
+      terminationRegistry: target.terminationRegistry.map { _ in LocalTerminationRegistry() },
+      pointerHandlerRegistry: target.pointerHandlerRegistry.map { _ in
+        LocalPointerHandlerRegistry()
+      },
+      gestureRegistry: target.gestureRegistry.map { _ in LocalGestureRegistry() },
+      gestureStateRegistry: target.gestureStateRegistry.map { _ in LocalGestureStateRegistry() },
+      defaultFocusRegistry: target.defaultFocusRegistry.map { _ in LocalDefaultFocusRegistry() },
+      focusBindingRegistry: target.focusBindingRegistry.map { _ in LocalFocusBindingRegistry() },
+      focusedValuesRegistry: target.focusedValuesRegistry.map { _ in LocalFocusedValuesRegistry() },
+      scrollPositionRegistry: target.scrollPositionRegistry.map { _ in
+        LocalScrollPositionRegistry()
+      },
+      lifecycleRegistry: target.lifecycleRegistry.map { _ in LocalLifecycleRegistry() },
+      taskRegistry: target.taskRegistry.map { _ in LocalTaskRegistry() },
+      preferenceObservationRegistry: target.preferenceObservationRegistry.map { _ in
+        LocalPreferenceObservationRegistry()
+      },
+      commandRegistry: target.commandRegistry.map { _ in CommandRegistry() },
+      dropDestinationRegistry: target.dropDestinationRegistry.map { _ in DropDestinationRegistry() }
+    )
+  }
+
   package var targetIdentity: RuntimeRegistrationTargetIdentity {
     RuntimeRegistrationTargetIdentity(registries: allRegistries)
   }
