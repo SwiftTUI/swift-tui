@@ -42,26 +42,6 @@ struct StateCaptureBindingTests {
   }
 
   @MainActor
-  private final class ClassCaptureHost: View {
-    @State private var value = "seed"
-    let log: ClosureLog
-
-    init(log: ClosureLog) {
-      self.log = log
-    }
-
-    var body: some View {
-      let _ = stash()
-      Text(value)
-    }
-
-    private func stash() {
-      log.read = { [self] in value }
-      log.write = { [self] in value = $0 }
-    }
-  }
-
-  @MainActor
   private struct ComposedStorage: DynamicProperty {
     @State private var storage = "seed"
 
@@ -241,76 +221,19 @@ struct StateCaptureBindingTests {
     }
   }
 
-  @Test("a shared container bind over a different live owner demotes to conflicted")
-  func sharedContainerConflictDemotes() throws {
-    try withCaptureBinding(enabled: false) {
-      let graph = ViewGraph()
-      graph.beginFrame()
-      let identityA = testIdentity("SharedMountA")
-      let identityB = testIdentity("SharedMountB")
-      let ownerA = try makeLiveOwner(in: graph, identity: identityA)
-      let ownerB = try makeLiveOwner(in: graph, identity: identityB)
-      let scope = graph.stateGraphScopeID
-
-      var state = State(wrappedValue: "seed")
-      state.bindCapture(
-        binding(owner: ownerA, identity: identityA, scope: scope),
-        sharedMutableContainer: true
-      )
-      state.bindCapture(
-        binding(owner: ownerB, identity: identityB, scope: scope),
-        sharedMutableContainer: true
-      )
-      #if DEBUG
-        guard case .conflicted = state.captureSlotForTesting else {
-          Issue.record("expected .conflicted, got \(state.captureSlotForTesting)")
-          return
+  @Test("the bind plan builder traps on a class container")
+  func classContainerTrapsOnBindPlanBuild() async {
+    // The capture-bind pass's half of the value-type invariant's runtime
+    // floor (plan 2026-08-29-001 §3.3). No conformance is needed to reach
+    // the builder — and none is possible: the authoring protocols reject
+    // class conformers at compile time.
+    await #expect(processExitsWith: .failure) {
+      await MainActor.run {
+        @MainActor final class ClassContainer {
+          @State var value = "seed"
         }
-        #expect(StateCaptureCensus.count(of: .classConflictDemoted) == 1)
-      #endif
-
-      // The latch holds: a later bind cannot resurrect the capture, and
-      // rung 2 stays skipped (no ambient context ⇒ authored seed).
-      state.bindCapture(
-        binding(owner: ownerA, identity: identityA, scope: scope),
-        sharedMutableContainer: true
-      )
-      #if DEBUG
-        guard case .conflicted = state.captureSlotForTesting else {
-          Issue.record("the conflict latch must persist")
-          return
-        }
-      #endif
-      #expect(state.wrappedValue == "seed")
-    }
-  }
-
-  @Test("re-binding a shared container over a dead owner is not a conflict")
-  func deadPriorOwnerRebindDoesNotDemote() throws {
-    try withCaptureBinding(enabled: false) {
-      let graph = ViewGraph()
-      graph.beginFrame()
-      let identity = testIdentity("SharedRebind")
-      let liveOwner = try makeLiveOwner(in: graph, identity: identity)
-      let (deadOwner, deadScope) = try makeDeadOwner()
-
-      var state = State(wrappedValue: "seed")
-      state.bindCapture(
-        binding(owner: deadOwner, identity: identity, scope: deadScope),
-        sharedMutableContainer: true
-      )
-      state.bindCapture(
-        binding(owner: liveOwner, identity: identity, scope: graph.stateGraphScopeID),
-        sharedMutableContainer: true
-      )
-      #if DEBUG
-        guard case .bound(let bound) = state.captureSlotForTesting else {
-          Issue.record("expected a normal re-bind over the dead owner")
-          return
-        }
-        #expect(bound.owner == liveOwner)
-        #expect(StateCaptureCensus.count(of: .classConflictDemoted) == 0)
-      #endif
+        _ = unsafe DynamicPropertyCaptureBindPlanCache.plan(for: ClassContainer.self)
+      }
     }
   }
 
@@ -422,56 +345,6 @@ struct StateCaptureBindingTests {
       // slot resolve-time binding reads: a fresh body evaluation sees it.
       _ = Resolver().resolve(ComposedHost(log: log), in: makeContext(graph, identity: identity))
       #expect(log.bodyObserved.last == "typed")
-    }
-  }
-
-  @Test("a class container binds in place; a second live mount demotes it")
-  func classContainerBindsAndConflictDemotes() throws {
-    try withCaptureBinding(enabled: true) {
-      let graph = ViewGraph()
-      graph.beginFrame()
-      let log = ClosureLog()
-      let host = ClassCaptureHost(log: log)
-
-      // No writes in this test: the no-invalidator harness mirrors
-      // imperative writes into the box seed, which would mask the
-      // post-demotion contrast — routing is asserted through the census.
-      _ = Resolver().resolve(host, in: makeContext(graph, identity: testIdentity("ClassMountA")))
-      let read = try #require(log.read)
-      #expect(read() == "seed")
-      #if DEBUG
-        #expect(StateCaptureCensus.count(of: .captureHit) >= 1)
-        #expect(StateCaptureCensus.count(of: .seedFallback) == 0)
-        #expect(StateCaptureCensus.count(of: .classConflictDemoted) == 0)
-      #endif
-
-      // The SAME instance mounted at a second live identity shares one
-      // capture slot — last-writer-wins would collapse both mounts onto one
-      // owner, so the bind demotes instead and the instance keeps today's
-      // ambient behavior (here: no ambient ⇒ authored seed, loudly).
-      _ = Resolver().resolve(host, in: makeContext(graph, identity: testIdentity("ClassMountB")))
-      #if DEBUG
-        #expect(StateCaptureCensus.count(of: .classConflictDemoted) == 1)
-        StateCaptureCensus.resetForTesting()
-      #endif
-      // The deliberate post-demotion seed read fires the gate-on
-      // `state-seed-fallback` oracle by design: suppress its trace, prove
-      // the counter path, then restore the counter so a parallel stress
-      // test's `SoundnessGuard` window cannot observe this suite's
-      // deliberate growth (the oracle-reduction convention).
-      let savedTrace = SoundnessProbeConfiguration.isTraceEnabled
-      SoundnessProbeConfiguration.isTraceEnabled = false
-      let seedFallbacksBefore = SoundnessProbeConfiguration.stateSeedFallbackViolationCount
-      defer {
-        SoundnessProbeConfiguration.isTraceEnabled = savedTrace
-        SoundnessProbeConfiguration.stateSeedFallbackViolationCount = seedFallbacksBefore
-      }
-      #expect(read() == "seed")
-      #expect(SoundnessProbeConfiguration.stateSeedFallbackViolationCount > seedFallbacksBefore)
-      #if DEBUG
-        #expect(StateCaptureCensus.count(of: .captureHit) == 0)
-        #expect(StateCaptureCensus.count(of: .seedFallback) >= 1)
-      #endif
     }
   }
 

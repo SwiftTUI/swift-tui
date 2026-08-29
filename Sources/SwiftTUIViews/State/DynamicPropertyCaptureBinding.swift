@@ -85,6 +85,12 @@ package enum DynamicPropertyCaptureBindPlanCache {
 
   private static func buildPlan(for type: Any.Type) -> DynamicPropertyCaptureBindPlan {
     let kind = RuntimeFieldReflection.metadataKind(of: type)
+    if ValueTypeAuthoringInvariant.isClassKind(kind) {
+      // Unreachable from Swift source: every authoring protocol a container
+      // can reach this builder through rejects class conformers at compile
+      // time. See ValueTypeAuthoringInvariant.
+      ValueTypeAuthoringInvariant.rejectClassContainer(type)
+    }
     let isStruct = kind == RuntimeFieldReflection.structureKind
     // Kind 0 is a native Swift class (the runtime's MetadataKind.Class);
     // foreign/ObjC class kinds stay out — their field offsets are not

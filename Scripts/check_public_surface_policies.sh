@@ -12,9 +12,16 @@ fail() {
   failures=1
 }
 
+# The public View protocol's requirement list is an ALLOWLIST, not a
+# containment test: `body`, its associated type, and the value-type
+# conformance guard (plan 2026-08-29-001) are the only requirements authors
+# ever see. A second underscored requirement — a `_makeView`-shaped
+# resolution hook, say — must not slip in unreviewed, so anything outside the
+# list below fails this gate. The block ends at the protocol's own closing
+# brace, so the witness extensions that follow it are not part of it.
 view_protocol_block=$(awk '
-  /public protocol View \{/ { collecting = 1 }
-  /extension Never: View \{/ { collecting = 0 }
+  /^public protocol View \{/ { collecting = 1; next }
+  collecting && /^\}/ { collecting = 0 }
   collecting { print }
 ' Sources/SwiftTUIViews/Foundation/ViewProtocols.swift)
 
@@ -38,7 +45,51 @@ else
   case "$view_protocol_block" in
   *"resolveElements"*) fail "The public View protocol block must not expose resolveElements." ;;
   esac
+
+  unexpected_view_requirements=$(
+    printf '%s\n' "$view_protocol_block" |
+      sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' |
+      grep -v '^$' |
+      grep -v '^//' |
+      grep -vFx 'associatedtype Body: View' |
+      grep -vFx '@ViewBuilder @MainActor' |
+      grep -vFx 'var body: Body { get }' |
+      grep -vFx '@_documentation(visibility: internal)' |
+      grep -vFx 'static var _viewValueTypeWitness: Void { get }' ||
+      true
+  )
+
+  if [ -n "$unexpected_view_requirements" ]; then
+    fail "The public View protocol gained a requirement outside its allowlist (body, its associated type, and the value-type conformance guard):"
+    >&2 printf '  %s\n' "$unexpected_view_requirements"
+  fi
 fi
+
+# The value-type authoring invariant (plan 2026-08-29-001): each authoring
+# protocol carries a defaulted witness whose `Self: AnyObject` overload is
+# unavailable, so a class conformer fails to compile. This is the policy
+# lane's cheap tripwire — `Scripts/check_value_type_invariant.sh` is the lane
+# that actually compiles a class conformer and proves the diagnostic fires.
+while IFS= read -r entry; do
+  [ -z "$entry" ] && continue
+  protocol_name=${entry%%:*}
+  protocol_file=${entry#*:}
+  if ! rg -U -n -P --quiet -- \
+    "extension ${protocol_name} where Self: AnyObject \\{\\s*\\n\\s*\@_documentation\\(visibility: internal\\)\\s*\\n\\s*\@available\\(\\s*\\n?\\s*\\*, unavailable," \
+    "$protocol_file"; then
+    fail "${protocol_name} must keep its unavailable-for-classes value-type witness in ${protocol_file} (plan 2026-08-29-001)."
+  fi
+done <<'EOF'
+View:Sources/SwiftTUIViews/Foundation/ViewProtocols.swift
+ViewModifier:Sources/SwiftTUIViews/Foundation/ViewModifier.swift
+DynamicProperty:Sources/SwiftTUIGraph/Resolve/DynamicProperty.swift
+ButtonStyle:Sources/SwiftTUIViews/Controls/ButtonStyles.swift
+PickerStyle:Sources/SwiftTUIViews/Controls/PickerStyles.swift
+TextFieldStyle:Sources/SwiftTUIViews/Controls/TextFieldStyles.swift
+TabViewStyle:Sources/SwiftTUIViews/TabViews/TabViewStyles.swift
+Scene:Sources/SwiftTUIRuntime/Scenes/App.swift
+App:Sources/SwiftTUIRuntime/Scenes/App.swift
+EOF
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol View \{' \
   Sources/SwiftTUIViews/Foundation/ViewProtocols.swift; then

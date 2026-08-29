@@ -75,8 +75,12 @@ built-in wrappers (`@State`'s box, `@Environment`'s ambient lookup, or a
 
 SwiftUI permits a plain stored-property mutation to affect one evaluation's
 temporary working value. SwiftTUI 0.9 deliberately narrows that extension
-shape so supported struct, class, enum, existential, and resilient containers
-all have one honest contract.
+shape so supported struct, enum, existential, and resilient containers all
+have one honest contract.
+
+A conforming type is itself a value type — a struct or an enum. A class
+conformance does not compile; see <doc:Divergences-And-Gaps>. Class-typed
+*fields* are unaffected.
 
 ## Certify reuse explicitly
 

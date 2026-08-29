@@ -56,6 +56,32 @@ The canonical public surface is the API ordinary app code uses first:
 
 Document a feature on this surface first when the surface can express it.
 
+### The value-type conformance guard
+
+`View`, `ViewModifier`, `DynamicProperty`, `ButtonStyle`, `PickerStyle`,
+`TextFieldStyle`, `TabViewStyle`, `Scene`, and `App` each declare one
+underscored static requirement — `_viewValueTypeWitness` and its per-protocol
+siblings — defaulted on the unconstrained protocol extension and
+`@available(*, unavailable)` on the `Self: AnyObject` extension. A class
+conformer therefore fails to compile with a message naming the invariant;
+value-type conformers never see it, and it is never called.
+
+They are the first underscored requirements on `View` and its siblings.
+`Gesture` already carries two — `_makeRecognizer` and `_needsPointerCapture`
+— but those are real authoring hooks that a primitive gesture implements.
+The value-type witnesses are the opposite: package-owned conformance guards
+that no conformer ever implements, and that exist only to *reject* a shape.
+They are on the public surface only because the requirement must be visible
+to a conforming module — checklist item 4 below cannot be answered "yes".
+Underscored members do not reach `docs/.public-api-baseline.txt` (the symbol
+graph omits them), so the baseline cannot police this surface. `Scripts/check_public_surface_policies.sh` holds
+the `View` protocol to an allowlist so a second underscored requirement
+cannot land unreviewed, and `Scripts/check_value_type_invariant.sh` compiles
+a class conformer per protocol to prove each diagnostic still fires. The
+rationale and the invariant's consequences are the *Views, modifiers,
+styles, dynamic properties, scenes, and apps must be value types* entry in
+[Divergences-And-Gaps.md](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
+
 The framework intentionally exposes neither `NavigationLink` nor an
 environment dismiss command. The published rationale is the "Principled
 Omissions" section of the DocC article

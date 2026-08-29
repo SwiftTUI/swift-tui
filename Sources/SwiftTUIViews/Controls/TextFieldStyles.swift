@@ -10,6 +10,28 @@ public protocol TextFieldStyle: Sendable {
   func makeBody(
     configuration: TextFieldStyleConfiguration
   ) -> Body
+
+  /// Value-type conformance guard; never implement it. The unconstrained
+  /// extension below witnesses it for every struct and enum, and the
+  /// `Self: AnyObject` overload is unavailable, so a class conformance fails
+  /// to compile (plan 2026-08-29-001).
+  @_documentation(visibility: internal)
+  static var _textFieldStyleValueTypeWitness: Void { get }
+}
+
+extension TextFieldStyle {
+  @_documentation(visibility: internal)
+  public static var _textFieldStyleValueTypeWitness: Void { () }
+}
+
+extension TextFieldStyle where Self: AnyObject {
+  @_documentation(visibility: internal)
+  @available(
+    *, unavailable,
+    message:
+      "SwiftTUI text field styles must be value types (a struct or an enum); a class cannot conform to TextFieldStyle"
+  )
+  public static var _textFieldStyleValueTypeWitness: Void { () }
 }
 
 extension TextFieldStyle {

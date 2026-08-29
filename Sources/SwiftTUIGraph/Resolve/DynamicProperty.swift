@@ -59,6 +59,9 @@ public struct DynamicPropertyContext: Sendable {
 /// nonmutating, so a plain value mutation cannot be silently applied to an
 /// extracted copy. Compose built-in wrappers or keep evaluation-visible state
 /// in reference storage, and return an honest reuse certification.
+///
+/// A conforming type is a value type — a struct or an enum — like the views
+/// and modifiers that hold it. Class-typed *fields* stay unrestricted.
 @MainActor
 public protocol DynamicProperty {
   /// Refreshes the property's state before the enclosing body evaluates.
@@ -68,6 +71,13 @@ public protocol DynamicProperty {
   /// retained and memoized reuse.
   @MainActor
   func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult
+
+  /// Value-type conformance guard; never implement it. The unconstrained
+  /// extension below witnesses it for every struct and enum, and the
+  /// `Self: AnyObject` overload is unavailable, so a class conformance fails
+  /// to compile (plan 2026-08-29-001).
+  @_documentation(visibility: internal)
+  static var _dynamicPropertyValueTypeWitness: Void { get }
 }
 
 extension DynamicProperty {
@@ -75,6 +85,21 @@ extension DynamicProperty {
   public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
     .uncertified
   }
+}
+
+extension DynamicProperty {
+  @_documentation(visibility: internal)
+  public static var _dynamicPropertyValueTypeWitness: Void { () }
+}
+
+extension DynamicProperty where Self: AnyObject {
+  @_documentation(visibility: internal)
+  @available(
+    *, unavailable,
+    message:
+      "SwiftTUI dynamic properties must be value types (a struct or an enum); a class cannot conform to DynamicProperty"
+  )
+  public static var _dynamicPropertyValueTypeWitness: Void { () }
 }
 
 /// Framework-owned properties whose update never retains or fires the context

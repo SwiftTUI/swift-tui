@@ -15,12 +15,37 @@ public enum AppLaunchError: Error, Equatable, Sendable, CustomStringConvertible 
 }
 
 /// A scene declaration for terminal applications.
+///
+/// A scene is a value type — a struct or an enum — matching the authoring
+/// invariant ``View`` states.
 @MainActor
 public protocol Scene {
   associatedtype Body: Scene
 
   @MainActor
   var body: Body { get }
+
+  /// Value-type conformance guard; never implement it. The unconstrained
+  /// extension below witnesses it for every struct and enum, and the
+  /// `Self: AnyObject` overload is unavailable, so a class conformance fails
+  /// to compile (plan 2026-08-29-001).
+  @_documentation(visibility: internal)
+  static var _sceneValueTypeWitness: Void { get }
+}
+
+extension Scene {
+  @_documentation(visibility: internal)
+  public static var _sceneValueTypeWitness: Void { () }
+}
+
+extension Scene where Self: AnyObject {
+  @_documentation(visibility: internal)
+  @available(
+    *, unavailable,
+    message:
+      "SwiftTUI scenes must be value types (a struct or an enum); a class cannot conform to Scene"
+  )
+  public static var _sceneValueTypeWitness: Void { () }
 }
 
 /// A typed identifier for a terminal window scene.
@@ -178,6 +203,9 @@ extension WindowGroup: ActionScope {
 }
 
 /// A terminal application declaration composed of scenes.
+///
+/// An app is a value type — a struct or an enum — matching the authoring
+/// invariant ``View`` states.
 @MainActor
 public protocol App {
   associatedtype Body: Scene
@@ -186,6 +214,28 @@ public protocol App {
 
   @SceneBuilder @MainActor
   var body: Body { get }
+
+  /// Value-type conformance guard; never implement it. The unconstrained
+  /// extension below witnesses it for every struct and enum, and the
+  /// `Self: AnyObject` overload is unavailable, so a class conformance fails
+  /// to compile (plan 2026-08-29-001).
+  @_documentation(visibility: internal)
+  static var _appValueTypeWitness: Void { get }
+}
+
+extension App {
+  @_documentation(visibility: internal)
+  public static var _appValueTypeWitness: Void { () }
+}
+
+extension App where Self: AnyObject {
+  @_documentation(visibility: internal)
+  @available(
+    *, unavailable,
+    message:
+      "SwiftTUI apps must be value types (a struct or an enum); a class cannot conform to App"
+  )
+  public static var _appValueTypeWitness: Void { () }
 }
 
 private func normalizedWindowIdentifier(_ value: String) -> String {

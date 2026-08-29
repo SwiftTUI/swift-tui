@@ -14,10 +14,13 @@ package import SwiftTUIGraph
 // extractor closures bound once per type via `RuntimeFieldReflection` that
 // copy each wrapper straight out of the container's value memory, replacing
 // the per-instance `Mirror` walk (which allocated a mirror and boxed every
-// child per body evaluation). Exotic shapes (class or enum containers, and
-// fields whose *static* type does not conform — e.g. an existential- or
-// `Any`-typed field boxing a wrapper) keep the legacy `Mirror` walk, so
-// discovery semantics are unchanged; only the extraction mechanism differs.
+// child per body evaluation). Exotic shapes (enum containers, and fields
+// whose *static* type does not conform — e.g. an existential- or `Any`-typed
+// field boxing a wrapper) keep the legacy `Mirror` walk, so discovery
+// semantics are unchanged; only the extraction mechanism differs. A class
+// container is not an exotic shape but an invariant violation: authored
+// containers are value types, and the builder traps on one (see
+// `ValueTypeAuthoringInvariant`).
 //
 // The public contract is nonmutating and reference-backed, so extracting a
 // property value cannot silently discard a promised value mutation.
@@ -126,13 +129,10 @@ package enum DynamicPropertyDescriptorCache {
         key: key
       )
     case .class:
-      // Object fields offset from the object base, not a value pointer —
-      // out of the offset tier's scope (no class-shaped view or wrapper in
-      // the framework).
-      if descriptor.isEmpty {
-        return unsafe cachePlan(.empty, key: key)
-      }
-      return unsafe cachePlan(.mirrorWalk(descriptor), key: key)
+      // Unreachable from Swift source: every authoring protocol a container
+      // can reach this builder through rejects class conformers at compile
+      // time. See ValueTypeAuthoringInvariant.
+      ValueTypeAuthoringInvariant.rejectClassContainer(type(of: value))
     default:
       return descriptor.isEmpty ? unsafe .empty : unsafe .mirrorWalk(descriptor)
     }

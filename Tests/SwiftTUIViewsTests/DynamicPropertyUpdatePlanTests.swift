@@ -6,8 +6,9 @@ import Testing
 // Plan-tier pins for the dynamic-property update pass's offset plans: struct
 // containers with statically wrapper-typed fields take the offset tier;
 // shapes the static field metadata cannot prove (existential-typed fields,
-// class and enum containers) keep the per-instance `Mirror` walk with
-// identical discovery semantics. Behavioral equivalence of the two extraction
+// enum containers) keep the per-instance `Mirror` walk with identical
+// discovery semantics. A class container is neither tier — it violates the
+// value-type authoring invariant and traps. Behavioral equivalence of the two extraction
 // mechanisms is pinned here via update(in:) event logs; the pass's ordering,
 // nesting, and slot-identity contracts stay pinned by
 // `DynamicPropertyUpdatePassTests`.
@@ -81,15 +82,6 @@ private struct PlainFirstExistentialContainer {
 @MainActor
 private struct DynamicFirstExistentialContainer {
   var boxed: Any
-}
-
-@MainActor
-private final class ClassContainer {
-  @PlanRecorder var stored: String
-
-  init(log: PlanEventLog) {
-    _stored = PlanRecorder(log: log, tag: "class-stored")
-  }
 }
 
 @MainActor
@@ -196,15 +188,23 @@ struct DynamicPropertyUpdatePlanTests {
     #expect(log.events == ["update:dynamic-first", "update:dynamic-again"])
   }
 
-  @Test("a class container keeps the Mirror walk and still updates")
-  func classContainerFallsBackToMirrorWalk() {
-    let log = PlanEventLog()
-    let container = ClassContainer(log: log)
-    #expect(
-      DynamicPropertyDescriptorCache.diagnosticPlanKind(reflecting: container) == .mirrorWalk
-    )
-    runDynamicPropertyUpdatePass(on: container)
-    #expect(log.events == ["update:class-stored"])
+  @Test("a class container traps: authored containers are value types")
+  func classContainerTrapsOnPlanBuild() async {
+    // Unreachable from Swift source since plan 2026-08-29-001 — `View`,
+    // `ViewModifier`, the style protocols, `DynamicProperty`, `Scene`, and
+    // `App` all reject class conformers at compile time — so the fixture
+    // conforms to nothing and reaches the cold builder directly. This is the
+    // runtime floor beneath the compile-time contract, not a second contract.
+    await #expect(processExitsWith: .failure) {
+      await MainActor.run {
+        @MainActor final class ClassContainer {
+          @State var value = "seed"
+        }
+        _ = DynamicPropertyDescriptorCache.diagnosticPlanKind(
+          reflecting: ClassContainer()
+        )
+      }
+    }
   }
 
   @Test("enum containers are classified per value and never cached")

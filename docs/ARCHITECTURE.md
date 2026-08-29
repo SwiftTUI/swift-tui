@@ -114,7 +114,11 @@ and then `SwiftTUIRuntime`.
   so downstream `import SwiftTUICore` is unchanged. Foundation-free.
 - **`SwiftTUIViews`** — the authoring surface. The `View` protocol, view
   builders, containers, controls, layout, state, focus, gestures, modifiers,
-  and shapes. `View` is body-only and `@MainActor`-isolated. Lowering to
+  and shapes. `View` is body-only and `@MainActor`-isolated, and its
+  conformers — like those of `ViewModifier`, the style protocols, and
+  `DynamicProperty` — are value types: each protocol carries a defaulted
+  witness whose `Self: AnyObject` overload is unavailable, so a class
+  conformance fails to compile (plan 2026-08-29-001). Lowering to
   primitives is package-internal. `@State` ownership is bound at capture
   time: a pass at the body-evaluation seams (`resolveViewElements`' two
   branches, plus the composed-modifier and style-body forwarding seams)

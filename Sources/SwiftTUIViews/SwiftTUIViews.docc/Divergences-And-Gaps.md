@@ -128,6 +128,17 @@ are omitted even when SwiftUI exposes a corresponding API.
   `DynamicPropertyContext.invalidationLease` supplies a lifetime-scoped route
   for asynchronous storage; departed callbacks are inert. See
   <doc:Custom-Dynamic-Properties>.
+- **Views, modifiers, styles, dynamic properties, scenes, and apps must be
+  value types.** *Ratified.* SwiftUI's protocols admit classes; OpenSwiftUI
+  preconditions against them at first body evaluation; SwiftTUI rejects the
+  conformance at compile time, through a defaulted witness whose
+  `Self: AnyObject` overload is unavailable. The reason is the entry below:
+  ownership is bound into the private container copy each body evaluation
+  consumes, and a class instance mounted at two identities is shared memory
+  with no such per-mount copy. Class-typed *fields* — an `@Observable` model,
+  a resource handle, a closure log — stay unrestricted; only the authored
+  container is constrained. A cold-path precondition in the reflect-once
+  plan builders is the runtime floor beneath the compile-time contract.
 - **State ownership is bound at capture, with an identity-refresh tier.**
   *Ratified.* Closures created during body evaluation carry their `@State`
   owner — SwiftTUI's analog of SwiftUI's `_location` injection, adapted to

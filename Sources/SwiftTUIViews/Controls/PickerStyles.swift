@@ -18,6 +18,28 @@ public protocol PickerStyle: Sendable {
   func makeBody(
     configuration: PickerStyleConfiguration
   ) -> Body
+
+  /// Value-type conformance guard; never implement it. The unconstrained
+  /// extension below witnesses it for every struct and enum, and the
+  /// `Self: AnyObject` overload is unavailable, so a class conformance fails
+  /// to compile (plan 2026-08-29-001).
+  @_documentation(visibility: internal)
+  static var _pickerStyleValueTypeWitness: Void { get }
+}
+
+extension PickerStyle {
+  @_documentation(visibility: internal)
+  public static var _pickerStyleValueTypeWitness: Void { () }
+}
+
+extension PickerStyle where Self: AnyObject {
+  @_documentation(visibility: internal)
+  @available(
+    *, unavailable,
+    message:
+      "SwiftTUI picker styles must be value types (a struct or an enum); a class cannot conform to PickerStyle"
+  )
+  public static var _pickerStyleValueTypeWitness: Void { () }
 }
 
 extension PickerStyle {

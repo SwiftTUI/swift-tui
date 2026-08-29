@@ -1054,6 +1054,12 @@ if lane_runs_core; then
     "$repo_root" \
     "Scripts/check_foundation_free_layers.sh --trace-dir .build/debug" \
     Scripts/check_foundation_free_layers.sh --trace-dir .build/debug
+
+  run_step \
+    "Check the value-type authoring invariant (negative compile)" \
+    "$repo_root" \
+    "Scripts/check_value_type_invariant.sh" \
+    Scripts/check_value_type_invariant.sh
 fi
 
 if [ "$lane" = all ]; then

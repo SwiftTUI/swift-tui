@@ -8,6 +8,24 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- **Views, view modifiers, styles, dynamic properties, scenes, and apps must
+  now be value types.** Source-breaking. `View`, `ViewModifier`,
+  `DynamicProperty`, `ButtonStyle`, `PickerStyle`, `TextFieldStyle`,
+  `TabViewStyle`, `Scene`, and `App` each gained a defaulted, never-implemented
+  static witness whose class overload is unavailable, so a class conformance
+  no longer compiles: "SwiftTUI views must be value types (a struct or an
+  enum); a class cannot conform to View". Make the type a `struct` or an
+  `enum`. Class-typed *fields* are unaffected — an `@Observable` model, a
+  resource handle, or a closure log stored in a view stays exactly as it was.
+  The state passes bind each `@State` field's owner into the private container
+  copy a body evaluation consumes, and a class instance mounted at two
+  identities is shared memory with no such per-mount copy; the invariant makes
+  that shape unrepresentable rather than merely diagnosed. A cold-path
+  precondition in the reflect-once plan builders is the runtime floor beneath
+  the compile-time contract.
+
 ### Fixed
 
 - **A nested exact `.id` inside a multi-statement `ForEach` row was rebuilt on

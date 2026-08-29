@@ -248,6 +248,11 @@ carries its owner the way a `Binding` carries its accessors, instead of
 re-deriving ownership from whatever dispatch context happens to be ambient
 when it later fires.
 
+That copy is always well defined because authored containers are value
+types: views, modifiers, styles, and dynamic properties are structs or
+enums, enforced at compile time, so each mount binds its own copy and no two
+mounts can collapse onto one owner.
+
 An imperative access resolves in order: the resolve-pass ambient scope
 (inside a body), then the carried capture — served directly while the owner
 node is live, or re-addressed through a fire-time identity refresh when a
