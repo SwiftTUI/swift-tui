@@ -85,22 +85,33 @@ struct KeyframeAnimatorRuntimeTests {
     // Midway through a rest-to-rest cubic the velocity is at its peak.
     try await harness.wait(until: { (probe.values.last ?? 0) >= 4 })
     let countBefore = probe.distinctRun.count
+    let turningPoint = try #require(probe.distinctRun.last)
 
+    // The retrigger's keyframes turn around and head back to zero, which
+    // gives the inbound velocity a signature the frame rate cannot blur. A
+    // cubic restarted at rest leaves rest with zero slope, so it can only
+    // fall away from `turningPoint`; a seeded one has to carry on upward
+    // first and overshoot before it comes back. Comparing two frame-sampled
+    // deltas instead would measure frame spacing as much as velocity: their
+    // ratio is ~0.95 on an idle machine and ~0.35 on a loaded runner that
+    // drops four frames before the retrigger and none after it.
     try harness.clickText(Self.bumpLabel)
-    try await harness.wait(until: { probe.distinctRun.count >= countBefore + 3 })
+    try await harness.wait(until: { probe.values.last == 0 })
 
-    let run = probe.distinctRun
-    let deltasBefore = zip(run[..<countBefore].dropFirst(), run[..<countBefore]).map { $0 - $1 }
-    let deltasAfter = zip(run[countBefore...].dropFirst(), run[countBefore...]).map { $0 - $1 }
-    let lastBefore = try #require(deltasBefore.suffix(2).max())
-    let firstAfter = try #require(deltasAfter.prefix(2).max())
-    // A cubic restarted at rest would produce a near-zero first step (the
-    // Hermite curve leaves rest with zero slope); a seeded one keeps moving.
+    let after = Array(probe.distinctRun.dropFirst(countBefore))
+    let peak = try #require(after.max())
+    // Measured on this fixture: a restart at rest peaks 0.013 *below*
+    // `turningPoint` — it never rises at all — while a fully seeded restart
+    // peaks 1.49 above it and stays at least 0.25 above it for ~650ms, or 13
+    // consecutive writes at the animator's cadence. The threshold therefore
+    // sits ~6x under the seeded peak, and losing it takes 13 dropped frames
+    // in a row rather than the handful that skew a frame-sampled step. It
+    // pins magnitude and not just sign too: a seed scaled to less than ~30%
+    // of the inbound velocity peaks below 0.25.
     #expect(
-      firstAfter >= lastBefore * 0.35,
-      "velocity discontinuity at retrigger: before \(deltasBefore) after \(deltasAfter)"
+      peak >= turningPoint + 0.25,
+      "the retrigger did not carry velocity: peak \(peak) from \(turningPoint), after: \(after)"
     )
-    try await harness.wait(until: { probe.values.last == 10 })
   }
 
   // MARK: - Repeating mode
@@ -284,6 +295,10 @@ private struct KeyframeTriggerFixture: View {
   }
 }
 
+/// A single leading cubic that climbs from rest on the first trigger and
+/// turns around on any later one: a run that starts from a value already in
+/// flight heads back to zero. The turn is what makes a carried-over velocity
+/// observable as an overshoot rather than as a frame-spacing-sensitive step.
 @MainActor
 private struct KeyframeCubicTriggerFixture: View {
   let probe: KeyframeValueProbe
@@ -295,8 +310,8 @@ private struct KeyframeCubicTriggerFixture: View {
       KeyframeAnimator(initialValue: 0.0, trigger: bumps) { value in
         let _ = probe.record(value)
         Text("v=\(Int(value.rounded()))")
-      } keyframes: { _ in
-        CubicKeyframe(10.0, duration: .milliseconds(1_500))
+      } keyframes: { start in
+        CubicKeyframe(start > 0 ? 0.0 : 10.0, duration: .milliseconds(1_500))
       }
     }
   }
