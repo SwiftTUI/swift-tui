@@ -10,6 +10,20 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- **A nested exact `.id` inside a multi-statement `ForEach` row was rebuilt on
+  every frame.** A row builder with more than one statement — the segmented
+  picker's segment plus its conditional `Divider`, for instance — mints a
+  `Group` that is spliced out of the tree, so `ForEach` attaches its row entity
+  to the `Group`'s children rather than to the `Group` itself. That stamp
+  overwrote a child that had already claimed its own entity through `.id`,
+  which dropped the exact entity from the resolved tree (releasing its route at
+  the frame barrier) and left the child's committed value holding an entity
+  routed to the row's own node. The next frame read that foreign occupant,
+  evicted the child's subtree and minted a fresh node in its place. Such a row
+  lost its `@State`, re-ran `.onAppear`, and re-published every registration on
+  every frame, and its resolved shape alternated between two wrapper levels —
+  which a debug build reported as a resolved-tree skip-oracle assertion. The
+  row entity now rides only the siblings that own no entity of their own.
 - **A memoized body could be served another view's output in release builds.**
   A node that resolved a view the memo layer cannot plan for kept the previous
   frame's captured view value instead of clearing it, so a later frame whose

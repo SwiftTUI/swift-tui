@@ -252,7 +252,32 @@ extension ResolvedNode {
     at entityStructuralPath: StructuralPath
   ) {
     if kind == .view("Group") {
-      for index in children.indices {
+      // A multi-statement row builder mints a `Group` that
+      // `consumeDeclaredChild` splices into the parent's child list, so the row
+      // entity has to ride on the values that survive the splice rather than on
+      // the `Group` value itself.
+      //
+      // A child that already carries an entity claimed one during the row's own
+      // resolve — a nested identity boundary (`.id(exact)` on a row element, or
+      // a deeper `ForEach` row). Stamping the row entity over it drops that
+      // entity from the resolved tree entirely: `releaseInactiveEntityRoutes`
+      // then releases its route at the frame barrier, and the child's committed
+      // value is left holding an entity that routes to the row's own node (the
+      // outermost same-frame claim keeps the route — see `bindEntityIdentity`).
+      // Next frame `nodeForIdentity` finds no route, reads that foreign
+      // occupant, evicts the subtree and mints a fresh node — an every-frame
+      // identity churn. Its visible symptom is a wrapper-level shape flip:
+      // `ExactIdentityModifier` reads `entityOccupant` to decide whether to mint
+      // an `ExplicitIdentityHost`, and a node minted this frame answers with the
+      // route table (the exact entity, so no host) where a surviving node
+      // answers with its committed value (the row entity, so a host) — the two
+      // shapes the DEBUG skip oracle reports as an identity divergence between a
+      // reused and a processed tree (plan 2026-08-25-003 P3).
+      //
+      // Leave those children alone. The row entity still rides every sibling
+      // that owns none, and an unspliced row keeps its route on the row's own
+      // node regardless.
+      for index in children.indices where children[index].entityIdentity == nil {
         children[index].attachingEntityIdentity(
           entityIdentity,
           at: entityStructuralPath
