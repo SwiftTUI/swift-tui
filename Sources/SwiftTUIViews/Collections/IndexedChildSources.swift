@@ -447,18 +447,35 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
     }
   }
 
+  // The three frame-constant accessors read `private let` storage of Sendable
+  // type, fixed on the main actor during `init` and never written again, so
+  // they are genuinely nonisolated: the compiler proves the absence of a race
+  // rather than `withCheckedMainActorAccess` trapping on the absence of the
+  // main actor. That distinction is load-bearing, not cosmetic. The frame
+  // tail's layout worker legitimately holds the PREVIOUS frame's retained
+  // index, whose resolved nodes still reference live sources, and
+  // `RetainedInvalidationSummary` reads `identityRoot` off every one of them
+  // to decide which indexed subtrees an invalidation touches. Guarding an
+  // immutable read turned that legal, race-free access into a hard SIGTRAP
+  // on the worker queue (`_swift_task_checkIsolatedSwift`), which is what
+  // made `bun run perf:bench` die with no output at all.
+  //
+  // `HostedCollectionIndexedChildSource` already forwards these three to its
+  // base unguarded, so this also makes the two conformers agree.
+  //
+  // Everything below that touches `cache`, `elementsCache`, `content`, or the
+  // captured `mintHost` keeps the guard: those are the real off-main hazards,
+  // and the worker must never realize an element.
   nonisolated package var count: Int {
-    withCheckedMainActorAccess("IndexedChildSource.count") { countStorage }
+    countStorage
   }
 
   nonisolated package var identityRoot: Identity {
-    withCheckedMainActorAccess("IndexedChildSource.identityRoot") { identityRootStorage }
+    identityRootStorage
   }
 
   nonisolated package var measurementSignature: IndexedChildMeasurementSignature {
-    withCheckedMainActorAccess("IndexedChildSource.measurementSignature") {
-      measurementSignatureStorage
-    }
+    measurementSignatureStorage
   }
 
   nonisolated package func child(at index: Int) -> ResolvedNode {
