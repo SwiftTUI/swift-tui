@@ -151,28 +151,18 @@ the full platform-by-product matrix (including the Windows notes) is
 
 ## Documentation
 
-- [Authoring Views](Sources/SwiftTUIViews/SwiftTUIViews.docc/Authoring-Views.md)
-  · [State, Environment, and Focus](Sources/SwiftTUIViews/SwiftTUIViews.docc/State-Environment-And-Focus.md)
-  · [Running Apps](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Running-Apps.md)
-  — the first-hour guides; all of them, by task, at <https://swifttui.sh/guides/>.
-- [About SwiftTUI](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Vision.md) — why
-  it exists and what it optimizes for. Under the hood:
-  [Runtime Render Pipeline](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md).
+— the first-hour guides; all of them, by task, at <https://swifttui.sh/guides/>.
 - Questions? Join the community on [Discord](https://discord.gg/8j35kYDFxn).
-- **Working on SwiftTUI itself?** [docs/README.md](docs/README.md) indexes the
-  `HEAD`-state architecture docs; the codebase guide and build/test/release
-  process live in the
-  [`swift-tui-org` coordination repository](https://github.com/SwiftTUI/swift-tui-org/tree/main/docs/swift-tui).
 
 ## Contributing
 
+[Open an issue](https://github.com/SwiftTUI/swift-tui/issues/new/choose) for
+SwiftUI-style APIs you find missing or anything that gets in your way.
+
 Small, well-scoped issues and pull requests are easiest to review. The repo
 uses the pinned Swift 6.3.3 toolchain through `swiftly`: `swiftly run swift
-test` for the unit tests, `bun run test` for the repo gate. Read
-[CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for the build,
-test, style, and pull-request rules, and
-[open an issue](https://github.com/SwiftTUI/swift-tui/issues/new/choose) for
-SwiftUI-style APIs you find missing or anything that gets in your way.
+test` for the unit tests. Read [CONTRIBUTING.md](CONTRIBUTING.md)  
+Please join the [Discord](https://discord.gg/8j35kYDFxn) to discuss changes.
 
 ## License
 
