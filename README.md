@@ -151,7 +151,8 @@ the full platform-by-product matrix (including the Windows notes) is
 
 ## Documentation
 
-— the first-hour guides; all of them, by task, at <https://swifttui.sh/guides/>.
+- Introduction guides: <https://swifttui.sh/guides/>
+- DocC documentation: <https://swifttui.sh/docs/documentation/>
 - Questions? Join the community on [Discord](https://discord.gg/8j35kYDFxn).
 
 ## Contributing
