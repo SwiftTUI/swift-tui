@@ -220,18 +220,23 @@ package struct ModifierContentInputs<Base: View> {
       resolveContext: context,
       graphNode: graphNode
     )
+    // The prepared copy is what the nested central resolve must consume, so
+    // it is recorded with the certificate and substituted there (plan
+    // 2026-08-30-001 §3.5). `self` stays untouched: this value is a per-edge
+    // carrier, and the authored `base` is still the memo/reuse witness.
+    var prepared = base
     let result = EnvironmentValuesStorage.binding(context.environmentValues) {
       ViewNodeContext.withCurrentValue(graphNode) {
         withDynamicPropertyAuthoringScope(
           in: context,
           graphNode: graphNode
         ) {
-          runForwardedDynamicPropertyUpdates(on: base, in: forwardedContext)
+          runForwardedDynamicPropertyUpdates(on: &prepared, in: forwardedContext)
         }
       }
     }
     ForwardedDynamicPropertyPreparationScope.record(
-      base,
+      prepared,
       context: context,
       graphNode: graphNode,
       result: result
@@ -344,10 +349,13 @@ where Content: View, Modifier: ViewModifier {
     index == 0 || index == 1
   }
 
-  package func updateAdditionalDynamicProperties(
+  package mutating func updateAdditionalDynamicProperties(
     in context: AdditionalDynamicPropertyUpdateContext
   ) -> DynamicPropertyUpdateResult {
-    var result = runForwardedDynamicPropertyUpdates(on: modifier, in: context)
+    // In place: `body` reads `self.modifier`, and this value IS the working
+    // copy the body evaluation consumes, so a wrapper's stored mutation in a
+    // composed modifier is visible to the modifier body that runs next.
+    var result = runForwardedDynamicPropertyUpdates(on: &modifier, in: context)
     guard let primitive = modifier as? any PrimitiveViewModifier else {
       // A composed modifier may place Content anywhere in an arbitrary body,
       // so the outer wrapper cannot invent a preparation context. Deny outer

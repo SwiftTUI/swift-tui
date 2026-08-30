@@ -125,19 +125,19 @@ struct DynamicPropertyUpdatePlanTests {
   @Test("offset extraction updates every discovered field in declaration order")
   func offsetExtractionMatchesMirrorDiscovery() {
     let log = PlanEventLog()
-    let container = StaticallyTypedContainer(log: log)
-    runDynamicPropertyUpdatePass(on: container)
+    var container = StaticallyTypedContainer(log: log)
+    runDynamicPropertyUpdatePass(on: &container)
     #expect(log.events == ["update:first", "update:second"])
   }
 
   @Test("an existential-typed field boxing a wrapper keeps the Mirror walk")
   func existentialFieldFallsBackToMirrorWalk() {
     let log = PlanEventLog()
-    let container = ExistentiallyTypedContainer(log: log)
+    var container = ExistentiallyTypedContainer(log: log)
     #expect(
       DynamicPropertyDescriptorCache.diagnosticPlanKind(reflecting: container) == .mirrorWalk
     )
-    runDynamicPropertyUpdatePass(on: container)
+    runDynamicPropertyUpdatePass(on: &container)
     #expect(log.events == ["update:boxed"], "the fallback walk must still update the boxed wrapper")
   }
 
@@ -145,19 +145,17 @@ struct DynamicPropertyUpdatePlanTests {
   func plainFirstExistentialDoesNotCacheAnEmptyPlan() {
     let log = PlanEventLog()
 
-    runDynamicPropertyUpdatePass(
-      on: PlainFirstExistentialContainer(boxed: "plain")
-    )
+    var plainFirst = PlainFirstExistentialContainer(boxed: "plain")
+    runDynamicPropertyUpdatePass(on: &plainFirst)
     #expect(
       DynamicPropertyDescriptorCache.diagnosticPlanKind(
         reflecting: PlainFirstExistentialContainer(boxed: "plain")
       ) == .mirrorWalk
     )
-    runDynamicPropertyUpdatePass(
-      on: PlainFirstExistentialContainer(
-        boxed: PlanRecorder(log: log, tag: "plain-first-dynamic")
-      )
+    var plainFirstDynamic = PlainFirstExistentialContainer(
+      boxed: PlanRecorder(log: log, tag: "plain-first-dynamic")
     )
+    runDynamicPropertyUpdatePass(on: &plainFirstDynamic)
 
     #expect(log.events == ["update:plain-first-dynamic"])
     #expect(
@@ -171,19 +169,16 @@ struct DynamicPropertyUpdatePlanTests {
   func dynamicFirstExistentialPlanRemainsValueConditional() {
     let log = PlanEventLog()
 
-    runDynamicPropertyUpdatePass(
-      on: DynamicFirstExistentialContainer(
-        boxed: PlanRecorder(log: log, tag: "dynamic-first")
-      )
+    var dynamicFirst = DynamicFirstExistentialContainer(
+      boxed: PlanRecorder(log: log, tag: "dynamic-first")
     )
-    runDynamicPropertyUpdatePass(
-      on: DynamicFirstExistentialContainer(boxed: 17)
+    runDynamicPropertyUpdatePass(on: &dynamicFirst)
+    var plainValued = DynamicFirstExistentialContainer(boxed: 17)
+    runDynamicPropertyUpdatePass(on: &plainValued)
+    var dynamicAgain = DynamicFirstExistentialContainer(
+      boxed: PlanRecorder(log: log, tag: "dynamic-again")
     )
-    runDynamicPropertyUpdatePass(
-      on: DynamicFirstExistentialContainer(
-        boxed: PlanRecorder(log: log, tag: "dynamic-again")
-      )
-    )
+    runDynamicPropertyUpdatePass(on: &dynamicAgain)
 
     #expect(log.events == ["update:dynamic-first", "update:dynamic-again"])
   }
@@ -231,7 +226,9 @@ struct DynamicPropertyUpdatePlanTests {
   @Test("update results aggregate conservatively")
   func updateResultsAggregateConservatively() {
     let log = PlanEventLog()
-    #expect(runDynamicPropertyUpdatePass(on: ChangedContainer(log: log)) == .changed)
-    #expect(runDynamicPropertyUpdatePass(on: UncertifiedContainer()) == .uncertified)
+    var changed = ChangedContainer(log: log)
+    var uncertified = UncertifiedContainer()
+    #expect(runDynamicPropertyUpdatePass(on: &changed) == .changed)
+    #expect(runDynamicPropertyUpdatePass(on: &uncertified) == .uncertified)
   }
 }

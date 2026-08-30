@@ -55,10 +55,18 @@ public struct DynamicPropertyContext: Sendable {
 /// A stored property of a view (or of another dynamic property) that the
 /// framework updates before each body evaluation.
 ///
-/// Custom conformances are reference-backed: the update method is
-/// nonmutating, so a plain value mutation cannot be silently applied to an
-/// extracted copy. Compose built-in wrappers or keep evaluation-visible state
-/// in reference storage, and return an honest reuse certification.
+/// The framework runs ``update(in:)`` through the container copy that the
+/// *next body evaluation consumes*, so a plain stored mutation is visible to
+/// that body and to every closure it creates. Composed built-in wrappers and
+/// reference storage keep working exactly as before; a non-mutating
+/// implementation still satisfies the requirement.
+///
+/// The in-place guarantee holds for a dynamic property that is a strongly
+/// stored, statically typed field of a struct container — the shape every
+/// property wrapper declaration produces. In an enum container, or in a field
+/// whose *static* type is existential (`Any`, `any Protocol`), the framework
+/// updates a copy and a stored mutation is not written back; debug builds
+/// report such a discard as a soundness violation.
 ///
 /// A conforming type is a value type — a struct or an enum — like the views
 /// and modifiers that hold it. Class-typed *fields* stay unrestricted.
@@ -70,7 +78,7 @@ public protocol DynamicProperty {
   /// third-party storage that does not explicitly certify transparency denies
   /// retained and memoized reuse.
   @MainActor
-  func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult
+  mutating func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult
 
   /// Value-type conformance guard; never implement it. The unconstrained
   /// extension below witnesses it for every struct and enum, and the
@@ -82,7 +90,9 @@ public protocol DynamicProperty {
 
 extension DynamicProperty {
   @MainActor
-  public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+  public mutating func update(in context: DynamicPropertyContext)
+    -> DynamicPropertyUpdateResult
+  {
     .uncertified
   }
 }

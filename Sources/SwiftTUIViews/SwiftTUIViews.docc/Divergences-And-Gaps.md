@@ -118,16 +118,34 @@ are omitted even when SwiftUI exposes a corresponding API.
   `Binding.animation(_:)` write of an unchanged value consequently animates
   nothing: the write short-circuits before the transaction is read, which
   matches SwiftUI's observable behavior.
-- **`DynamicProperty` uses a narrower, reference-backed update contract.**
-  *Ratified.* SwiftUI mutates a temporary working value, so a plain stored
-  mutation is visible for one evaluation. SwiftTUI instead requires the
-  nonmutating `update(in:) -> DynamicPropertyUpdateResult`: evaluation-visible
-  custom state lives in reference storage or composed built-ins, and a plain
-  `mutating update()` fails to conform rather than being silently discarded.
-  The result explicitly certifies or denies retained and memoized reuse.
-  `DynamicPropertyContext.invalidationLease` supplies a lifetime-scoped route
-  for asynchronous storage; departed callbacks are inert. See
-  <doc:Custom-Dynamic-Properties>.
+- **`DynamicProperty` certifies reuse explicitly and leases its invalidation
+  route.** *Ratified.* SwiftUI's `mutating update()` returns nothing; SwiftTUI's
+  `mutating update(in:) -> DynamicPropertyUpdateResult` explicitly certifies or
+  denies retained and memoized reuse, and `DynamicPropertyContext.invalidationLease`
+  supplies a lifetime-scoped route for asynchronous storage whose departed
+  callbacks are inert. The *mutation* shape now matches SwiftUI: the framework
+  runs the update through the container copy the next body evaluation consumes,
+  so a plain stored mutation is visible for that evaluation. SwiftTUI states one
+  boundary SwiftUI does not — the write lands for a strongly stored, statically
+  typed field of a struct container, and an enum container or an
+  existential-typed field updates a copy, with the drop reported in debug builds
+  as `dynamic-property-mutation-discarded`. See <doc:Custom-Dynamic-Properties>.
+
+  *(Before 0.10 this entry read the other way: `update(in:)` was nonmutating and
+  evaluation-visible custom state had to be reference-backed. The value-type
+  authoring invariant made "the per-evaluation view copy" well defined, which is
+  what let the narrower contract be retired.)*
+- **A custom style's own dynamic properties are bound but never updated.**
+  *Gap.* A `@State`, `@Environment`, or custom wrapper stored in a
+  `ButtonStyle`, `PickerStyle`, `TextFieldStyle`, or `TabViewStyle` receives its
+  capture binding before `makeBody(configuration:)` runs, so imperative reads
+  route to the right owner — but no seam runs the dynamic-property *update* pass
+  over the style value itself. The style is a stored field of a modifier, and
+  the modifier's forwarded walk discovers only fields that themselves conform to
+  `DynamicProperty`; a style does not. So a style's wrapper never sees
+  `update(in:)`, and under the in-place contract a stored mutation in one never
+  happens at all. Views declared *inside* the style body are unaffected — they
+  resolve normally and get the full pass.
 - **Views, modifiers, styles, dynamic properties, scenes, and apps must be
   value types.** *Ratified.* SwiftUI's protocols admit classes; OpenSwiftUI
   preconditions against them at first body evaluation; SwiftTUI rejects the

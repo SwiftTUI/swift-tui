@@ -9,21 +9,32 @@ package import SwiftTUIGraph
 // observe. Wrapper-free types pay one dictionary lookup per evaluation and no
 // reflection after the first (the `.empty`-plan fast path).
 //
-// Per-evaluation extraction is plan-dispatched: struct containers whose
+// Per-evaluation application is plan-dispatched: struct containers whose
 // discovered fields are statically wrapper-typed get an *offset plan* —
-// extractor closures bound once per type via `RuntimeFieldReflection` that
-// copy each wrapper straight out of the container's value memory, replacing
-// the per-instance `Mirror` walk (which allocated a mirror and boxed every
-// child per body evaluation). Exotic shapes (enum containers, and fields
-// whose *static* type does not conform — e.g. an existential- or `Any`-typed
-// field boxing a wrapper) keep the legacy `Mirror` walk, so discovery
-// semantics are unchanged; only the extraction mechanism differs. A class
-// container is not an exotic shape but an invariant violation: authored
-// containers are value types, and the builder traps on one (see
-// `ValueTypeAuthoringInvariant`).
+// applicator closures bound once per type via `RuntimeFieldReflection` that
+// run each wrapper's update *in place*, at its byte offset inside the
+// container's own value memory, replacing the per-instance `Mirror` walk
+// (which allocated a mirror and boxed every child per body evaluation).
+// Exotic shapes (enum containers, and fields whose *static* type does not
+// conform — e.g. an existential- or `Any`-typed field boxing a wrapper) keep
+// the legacy `Mirror` walk, so discovery semantics are unchanged; only the
+// application mechanism differs. A class container is not an exotic shape but
+// an invariant violation: authored containers are value types, and the
+// builder traps on one (see `ValueTypeAuthoringInvariant`).
 //
-// The public contract is nonmutating and reference-backed, so extracting a
-// property value cannot silently discard a promised value mutation.
+// `DynamicProperty.update(in:)` is mutating (plan 2026-08-30-001). The pass
+// runs it through the container copy the *next body evaluation consumes* —
+// `resolveView` names that copy `prepared` and threads it into
+// `resolveViewElements`, where the capture-bind pass makes the final body
+// value from it. A stored mutation is therefore visible to the body and to
+// every closure the body creates.
+//
+// The `Mirror` tier cannot write back: a `Mirror` child is a copy and an enum
+// payload has no addressable field slot. That tier updates an extracted copy,
+// exactly as the whole pass did before, and DEBUG builds compare the wrapper's
+// bytes before and after to report a discarded mutation as the
+// `dynamic-property-mutation-discarded` soundness violation rather than losing
+// it silently.
 
 /// A type's discovered dynamic-property layout: the stored-property indices
 /// (in `Mirror` child order) whose values conform to ``DynamicProperty``.
@@ -45,24 +56,51 @@ package struct DynamicPropertyDescriptor: Sendable {
   package static let empty = DynamicPropertyDescriptor(fields: [])
 }
 
-/// Extracts a copy of one discovered dynamic-property field from its
-/// container's value memory. The field's concrete type and byte offset are
-/// bound at plan-build time; the closure body does no reflection.
+/// The container-scoped inputs one field applicator needs: the enclosing
+/// container's type (for the lease registration key and diagnostics) and the
+/// container's own discovered-property path. A field appends its index to that
+/// path for its *nested* wrappers' slots, while its own `update(in:)` runs
+/// under the container's path — a top-level built-in must keep the legacy
+/// unqualified slot identity.
+package struct DynamicPropertyFieldUpdateInputs {
+  package var containerType: Any.Type
+  package var containerPath: StateSlotPath
+
+  package init(containerType: Any.Type, containerPath: StateSlotPath) {
+    self.containerType = containerType
+    self.containerPath = containerPath
+  }
+}
+
+/// Updates one discovered dynamic-property field *in place*, at its byte
+/// offset inside the container's value memory. The field's concrete type and
+/// offset are bound at plan-build time; the closure body does no reflection.
 ///
-/// `@unsafe` because applying the extractor to a raw base pointer is the
+/// Replaces the extract-a-copy shape this tier used before plan
+/// 2026-08-30-001: `update(in:)` is mutating, so the write has to land in the
+/// container copy the body evaluation consumes, not in a temporary. Removing
+/// the extraction also removes an `any DynamicProperty` box per field per
+/// evaluation.
+///
+/// `@unsafe` because applying the applicator to a raw base pointer is the
 /// unsafe act; every application site spells `unsafe`.
-@unsafe package struct DynamicPropertyFieldExtractor {
+@unsafe package struct DynamicPropertyFieldApplicator {
   /// Position in `Mirror(reflecting:).children` order — the slot-path
   /// ordinal nested wrappers key their state identity on.
   package let index: Int
-  package let extract: @MainActor (UnsafeRawPointer) -> any DynamicProperty
+  package let apply:
+    @MainActor (UnsafeMutableRawPointer, DynamicPropertyFieldUpdateInputs) ->
+      DynamicPropertyUpdateResult
 
   package init(
     index: Int,
-    extract: @escaping @MainActor (UnsafeRawPointer) -> any DynamicProperty
+    apply:
+      @escaping @MainActor (
+        UnsafeMutableRawPointer, DynamicPropertyFieldUpdateInputs
+      ) -> DynamicPropertyUpdateResult
   ) {
     unsafe self.index = index
-    unsafe self.extract = extract
+    unsafe self.apply = apply
   }
 }
 
@@ -70,9 +108,9 @@ package struct DynamicPropertyDescriptor: Sendable {
 @unsafe package enum DynamicPropertyUpdatePlan {
   /// No discovered dynamic properties — the pass returns immediately.
   case empty
-  /// Struct container with statically wrapper-typed fields: extract each
-  /// through its bound offset extractor.
-  case offsets([DynamicPropertyFieldExtractor])
+  /// Struct container with statically wrapper-typed fields: update each in
+  /// place through its bound offset applicator.
+  case offsets([DynamicPropertyFieldApplicator])
   /// Correctness fallback for shapes the offset tier cannot prove
   /// (class/enum containers, existential-typed fields, weak storage): the
   /// legacy per-instance `Mirror` walk.
@@ -114,14 +152,21 @@ package enum DynamicPropertyDescriptorCache {
       return unsafe cached
     }
     let mirror = Mirror(reflecting: value)
-    let descriptor = descriptorIncludingValueDependentStorage(
+    let storage = valueDependentStorage(
       buildDescriptor(from: mirror),
       containerType: type(of: value)
     )
+    let descriptor = storage.descriptor
+    // A container with no dynamic properties but with opaque reference storage
+    // still needs a non-`.empty` plan: that is the whole fail-closed reuse
+    // signal (see `valueDependentStorage`). An empty-descriptor `.mirrorWalk`
+    // says "no update surface to walk, but do not certify me".
+    let vacuousPlan: DynamicPropertyUpdatePlan =
+      storage.hasOpaqueReferenceStorage ? unsafe .mirrorWalk(.empty) : unsafe .empty
     switch mirror.displayStyle {
     case .struct:
       if descriptor.isEmpty {
-        return unsafe cachePlan(.empty, key: key)
+        return unsafe cachePlan(vacuousPlan, key: key)
       }
       return unsafe cachePlan(
         offsetsPlan(for: type(of: value), descriptor: descriptor)
@@ -134,7 +179,7 @@ package enum DynamicPropertyDescriptorCache {
       // time. See ValueTypeAuthoringInvariant.
       ValueTypeAuthoringInvariant.rejectClassContainer(type(of: value))
     default:
-      return descriptor.isEmpty ? unsafe .empty : unsafe .mirrorWalk(descriptor)
+      return descriptor.isEmpty ? unsafe vacuousPlan : unsafe .mirrorWalk(descriptor)
     }
   }
 
@@ -178,17 +223,39 @@ package enum DynamicPropertyDescriptorCache {
     return DynamicPropertyDescriptor(fields: fields)
   }
 
-  /// Adds every stored field whose concrete value can change type and gain a
-  /// DynamicProperty conformance without changing the container type. The
-  /// resulting stable Mirror plan runtime-checks those fields each evaluation,
-  /// so both plain-first and DynamicProperty-first orderings are sound.
-  private static func descriptorIncludingValueDependentStorage(
+  /// Classifies a container's value-dependent stored fields. Two unrelated
+  /// jobs used to share one descriptor; they are separated here.
+  ///
+  /// **Discovery.** An existential field (`Any`, `any Protocol`) can carry a
+  /// later concrete value whose conformance differs from this instance's, so it
+  /// joins the descriptor: the resulting stable `Mirror` plan runtime-checks it
+  /// each evaluation, and both plain-first and DynamicProperty-first orderings
+  /// are sound.
+  ///
+  /// **Fail-closed reuse.** A class-typed field can no longer *gain* a
+  /// `DynamicProperty` conformance — a class cannot conform (plan
+  /// 2026-08-29-001) — but a plain stored reference is still not
+  /// value-verifiable: its visible output can change with no change to the view
+  /// value at all. A non-`.empty` plan is what makes
+  /// `hasDynamicPropertyUpdateSurface` deny reuse for that shape, so class
+  /// fields are reported as `hasOpaqueReferenceStorage` and the builder gives
+  /// such a container an empty-descriptor `.mirrorWalk`. Pinned by
+  /// `TabStripValueVerifiedSlotTests.storedReferenceContentRemainsFailClosed`.
+  ///
+  /// Keeping class fields *out* of the descriptor is what lets the common
+  /// shape — wrappers alongside an `@Observable` model, a closure log, a
+  /// resource handle — reach the in-place offsets tier. Listing them there
+  /// made `offsetsPlan` bail on a field it could never bind, demoting the
+  /// container to the copy-updating `Mirror` walk and silently dropping the
+  /// stored mutations plan 2026-08-30-001 promises.
+  private static func valueDependentStorage(
     _ descriptor: DynamicPropertyDescriptor,
     containerType: Any.Type
-  ) -> DynamicPropertyDescriptor {
+  ) -> (descriptor: DynamicPropertyDescriptor, hasOpaqueReferenceStorage: Bool) {
     var fieldsByIndex = Dictionary(
       uniqueKeysWithValues: descriptor.fields.map { ($0.index, $0) }
     )
+    var hasOpaqueReferenceStorage = false
     let fieldCount = RuntimeFieldReflection.fieldCount(of: containerType)
     for index in 0..<fieldCount {
       let field = RuntimeFieldReflection.fieldInfo(
@@ -196,17 +263,20 @@ package enum DynamicPropertyDescriptorCache {
         at: index
       )
       switch RuntimeFieldReflection.metadataKind(of: field.fieldType) {
-      case 0, 0x203, 0x303, 0x305:
-        // Native/foreign classes, existential storage (`Any`, `AnyObject`,
-        // protocol values), and Objective-C class wrappers can all carry a
-        // later concrete value whose conformance differs from this instance.
+      case 0x303:
         fieldsByIndex[index] = .init(index: index, label: field.name)
+      case 0, 0x203, 0x305:
+        // Native/foreign classes and Objective-C class wrappers.
+        hasOpaqueReferenceStorage = true
       default:
         continue
       }
     }
-    return DynamicPropertyDescriptor(
-      fields: fieldsByIndex.values.sorted { $0.index < $1.index }
+    return (
+      DynamicPropertyDescriptor(
+        fields: fieldsByIndex.values.sorted { $0.index < $1.index }
+      ),
+      hasOpaqueReferenceStorage
     )
   }
 
@@ -219,8 +289,8 @@ package enum DynamicPropertyDescriptorCache {
     descriptor: DynamicPropertyDescriptor
   ) -> DynamicPropertyUpdatePlan? {
     let fieldCount = RuntimeFieldReflection.fieldCount(of: containerType)
-    var extractors: [DynamicPropertyFieldExtractor] = unsafe []
-    unsafe extractors.reserveCapacity(descriptor.fields.count)
+    var applicators: [DynamicPropertyFieldApplicator] = unsafe []
+    unsafe applicators.reserveCapacity(descriptor.fields.count)
     for field in descriptor.fields {
       guard field.index < fieldCount else {
         return nil
@@ -233,28 +303,30 @@ package enum DynamicPropertyDescriptorCache {
         return nil
       }
       guard
-        let extracting = openedExtractorShim(boundTo: info.fieldType)
-          as? any DynamicPropertyFieldExtracting.Type
+        let updating = openedFieldShim(boundTo: info.fieldType)
+          as? any DynamicPropertyFieldUpdating.Type
       else {
         // The static field type does not conform (`any DynamicProperty`,
-        // `Any`, a supertype) even though this instance's value does.
+        // `Any`, a supertype) even though this instance's value does. There
+        // is no writable, statically typed slot to update through.
         return nil
       }
-      unsafe extractors.append(
-        unsafe extracting.extractor(atOffset: info.offset, index: field.index)
+      unsafe applicators.append(
+        unsafe updating.applicator(atOffset: info.offset, index: field.index)
       )
     }
-    return unsafe .offsets(extractors)
+    return unsafe .offsets(applicators)
   }
+}
 
-  /// Rebinds the shim's generic parameter to `fieldType` so the conditional
-  /// conformance (`where T: DynamicProperty`) can be tested at runtime.
-  private static func openedExtractorShim(boundTo fieldType: Any.Type) -> Any.Type {
-    func open<F>(_ concrete: F.Type) -> Any.Type {
-      DynamicPropertyFieldShim<F>.self
-    }
-    return _openExistential(fieldType, do: open)
+/// Rebinds the shim's generic parameter to `fieldType` so the conditional
+/// conformance (`where T: DynamicProperty`) can be tested at runtime.
+@MainActor
+private func openedFieldShim(boundTo fieldType: Any.Type) -> Any.Type {
+  func open<F>(_ concrete: F.Type) -> Any.Type {
+    DynamicPropertyFieldShim<F>.self
   }
+  return _openExistential(fieldType, do: open)
 }
 
 @MainActor
@@ -264,7 +336,10 @@ package protocol AdditionalDynamicPropertyUpdating {
   /// scope and path.
   func ownsDynamicPropertyTraversal(ofStoredFieldAt index: Int) -> Bool
 
-  func updateAdditionalDynamicProperties(
+  /// Mutating: a transparent container's forwarded payload is updated in
+  /// place, in the same working copy the body evaluation consumes (plan
+  /// 2026-08-30-001 §3.4).
+  mutating func updateAdditionalDynamicProperties(
     in context: AdditionalDynamicPropertyUpdateContext
   ) -> DynamicPropertyUpdateResult
 
@@ -315,6 +390,11 @@ package enum ForwardedDynamicPropertyPreparationScope {
     let valueType: ObjectIdentifier
     let context: ResolveContext
     let result: DynamicPropertyUpdateResult
+    /// The producer's prepared value, so the consumer resolves the copy whose
+    /// dynamic properties actually updated rather than its own unprepared one
+    /// (plan 2026-08-30-001 §3.5). `nil` for a container with no update
+    /// surface — the overwhelming majority — so that case boxes nothing.
+    let preparedValue: Any?
   }
 
   package struct Token {
@@ -355,9 +435,34 @@ package enum ForwardedDynamicPropertyPreparationScope {
         structuralPath: context.structuralPath,
         valueType: ObjectIdentifier(type(of: value)),
         context: context,
-        result: result
+        result: result,
+        preparedValue: carriesPreparation(value) ? value : nil
       )
     )
+  }
+
+  /// A cheap *sufficient* condition for "the producer may have mutated this
+  /// value": its own plan is non-empty, or it forwards a payload it may have
+  /// mutated. A wrapper-free view answers `false` from one dictionary lookup
+  /// and its entry boxes nothing.
+  ///
+  /// Deliberately not `hasDynamicPropertyUpdateSurface`, whose recursive answer
+  /// would walk a whole modifier chain once per chain edge — quadratic in the
+  /// chain length, for a question this only needs a conservative `true` for.
+  @MainActor
+  private static func carriesPreparation<V>(_ value: V) -> Bool {
+    if value is any AdditionalDynamicPropertyUpdating {
+      return true
+    }
+    let plan =
+      unsafe DynamicPropertyDescriptorCache.cachedUpdatePlan(for: type(of: value))
+      ?? DynamicPropertyDescriptorCache.updatePlan(reflecting: value)
+    switch unsafe plan {
+    case .empty:
+      return false
+    case .offsets, .mirrorWalk:
+      return true
+    }
   }
 
   package static func preparedContext<V>(
@@ -372,8 +477,12 @@ package enum ForwardedDynamicPropertyPreparationScope {
     )?.context
   }
 
+  /// Consumes the nearest matching ancestor preparation, substituting the
+  /// producer's prepared value for `value`. The entry match already requires
+  /// an identical concrete type (plus graph, node, identity, and structural
+  /// path) under strict LIFO, so the downcast cannot pick a foreign value.
   package static func take<V>(
-    _ value: V,
+    _ value: inout V,
     context: ResolveContext,
     graphNode: SwiftTUICore.ViewNode?
   ) -> DynamicPropertyUpdateResult? {
@@ -386,7 +495,11 @@ package enum ForwardedDynamicPropertyPreparationScope {
     else { return nil }
     // Strict LIFO is the occurrence proof for nested same-identity/same-type
     // transparent layers. Never search past a mismatching latest entry.
-    return frames[index].entries.removeLast().result
+    let entry = frames[index].entries.removeLast()
+    if let prepared = entry.preparedValue as? V {
+      value = prepared
+    }
+    return entry.result
   }
 
   private static func matchingProducerEntry<V>(
@@ -436,9 +549,16 @@ package enum ForwardedDynamicPropertyPreparationScope {
   }
 }
 
+/// Runs the update pass over the working copy `view`, in place.
+///
+/// `inout` is the whole point: `update(in:)` is mutating, and the copy this
+/// call writes through is the one `resolveView` hands to `resolveViewElements`
+/// and therefore to the body. The *authored* value stays untouched at the
+/// caller — memo comparison, value-verified reuse, the stored evaluator, and
+/// deferred descent all keep using it.
 @MainActor
 package func prepareDynamicProperties<V>(
-  of view: V,
+  of view: inout V,
   in context: ResolveContext,
   routeIdentity: EntityIdentity?,
   authoringContextOverride: AuthoringContext?
@@ -452,10 +572,11 @@ package func prepareDynamicProperties<V>(
     existingGraphNode = context.viewGraph?.nodeForIdentity(context.identity)
   }
   if let prepared = ForwardedDynamicPropertyPreparationScope.take(
-    view,
+    &view,
     context: context,
     graphNode: existingGraphNode
   ) {
+    // `take` also substituted the ancestor's prepared value into `view`.
     return prepared
   }
   let plan =
@@ -489,7 +610,7 @@ package func prepareDynamicProperties<V>(
   return EnvironmentValuesStorage.binding(context.environmentValues) {
     ViewNodeContext.withCurrentValue(graphNode) {
       withAuthoringContext(scope) {
-        runDynamicPropertyUpdates(on: view, in: additionalContext)
+        runDynamicPropertyUpdates(on: &view, in: additionalContext)
       }
     }
   }
@@ -500,20 +621,42 @@ package func prepareDynamicProperties<V>(
 /// Callers own graph preparation and the authoring scope.
 @MainActor
 package func runDynamicPropertyUpdates<V>(
-  on value: V,
+  on value: inout V,
   in context: AdditionalDynamicPropertyUpdateContext
 ) -> DynamicPropertyUpdateResult {
-  let additional = value as? any AdditionalDynamicPropertyUpdating
+  // Read-only: names the fields the container forwards itself, so the outer
+  // walk skips them. The forwarded update below is the mutating half.
+  let traversalOwner = value as? any AdditionalDynamicPropertyUpdating
   var result = runDynamicPropertyUpdatePass(
-    on: value,
-    excludingFieldsOwnedBy: additional
+    on: &value,
+    excludingFieldsOwnedBy: traversalOwner
   )
-  if let additional {
+  if traversalOwner != nil {
     result = result.merging(
-      additional.updateAdditionalDynamicProperties(in: context)
+      updateAdditionalDynamicPropertiesInPlace(of: &value, in: context)
     )
   }
   return result
+}
+
+/// Runs a transparent container's forwarded update through its own value
+/// memory. The conformance is bound once per container type by a shim, so the
+/// mutating call costs no existential box — `ModifiedContent` is on the warm
+/// path of every modified view.
+@MainActor
+private func updateAdditionalDynamicPropertiesInPlace<V>(
+  of value: inout V,
+  in context: AdditionalDynamicPropertyUpdateContext
+) -> DynamicPropertyUpdateResult {
+  unsafe withMutableConcreteValue(&value) { base, concreteType in
+    guard
+      let forwarding = openedAdditionalShim(boundTo: concreteType)
+        as? any AdditionalDynamicPropertyForwarding.Type
+    else {
+      return .unchanged
+    }
+    return unsafe forwarding.forwardUpdate(atBase: base, in: context)
+  }
 }
 
 /// Whether `value` has a direct or explicitly forwarded update surface.
@@ -545,40 +688,188 @@ package func hasDynamicPropertyUpdateSurface<V>(_ value: V) -> Bool {
 /// its own update after those nested properties.
 @MainActor
 package func runForwardedDynamicPropertyUpdates<V>(
-  on value: V,
+  on value: inout V,
   in context: AdditionalDynamicPropertyUpdateContext
 ) -> DynamicPropertyUpdateResult {
-  var result = runDynamicPropertyUpdates(on: value, in: context)
-  if let property = value as? any DynamicProperty {
-    result = result.merging(
-      updateDynamicPropertyValue(
-        property,
-        containerType: type(of: value),
-        propertyPath: .root,
-        updatePath: .root
-      )
-    )
+  let result = runDynamicPropertyUpdates(on: &value, in: context)
+  guard value is any DynamicProperty else {
+    return result
   }
-  return result
+  let ownResult = unsafe withMutableConcreteValue(&value) { base, concreteType in
+    guard
+      let updating = openedFieldShim(boundTo: concreteType)
+        as? any DynamicPropertyFieldUpdating.Type
+    else {
+      return .uncertified
+    }
+    return unsafe updating.updateRootValue(atBase: base, containerType: concreteType)
+  }
+  return result.merging(ownResult)
 }
 
 /// Conditional-conformance shim: `DynamicPropertyFieldShim<F>` conforms only
-/// when `F: DynamicProperty`, so an `as? any ...Extracting.Type` cast is the
+/// when `F: DynamicProperty`, so an `as? any ...Updating.Type` cast is the
 /// runtime conformance test — and inside the conformance, `T` is bound with
-/// its constraint so the load is statically typed.
-private protocol DynamicPropertyFieldExtracting {
-  @MainActor static func extractor(atOffset offset: Int, index: Int)
-    -> DynamicPropertyFieldExtractor
+/// its constraint so every access is statically typed and the mutating
+/// `update(in:)` is callable through a pointer.
+private protocol DynamicPropertyFieldUpdating {
+  /// The offset-bound applicator the `.offsets` plan stores.
+  @MainActor static func applicator(atOffset offset: Int, index: Int)
+    -> DynamicPropertyFieldApplicator
+
+  /// A transparently forwarded payload that is itself a dynamic property:
+  /// its own `update(in:)` at root paths, after its nested walk.
+  @MainActor static func updateRootValue(
+    atBase base: UnsafeMutableRawPointer,
+    containerType: Any.Type
+  ) -> DynamicPropertyUpdateResult
+
+  /// The `Mirror` tier's write-back-less path: update an extracted copy and
+  /// report whether the wrapper mutated itself, so the discard is loud.
+  @MainActor static func updateExtracted(
+    _ property: any DynamicProperty,
+    index: Int,
+    inputs: DynamicPropertyFieldUpdateInputs
+  ) -> (result: DynamicPropertyUpdateResult, mutated: Bool)
 }
 
 private enum DynamicPropertyFieldShim<T> {}
 
-extension DynamicPropertyFieldShim: DynamicPropertyFieldExtracting where T: DynamicProperty {
-  static func extractor(atOffset offset: Int, index: Int) -> DynamicPropertyFieldExtractor {
-    unsafe DynamicPropertyFieldExtractor(index: index) { base in
-      unsafe (base + offset).assumingMemoryBound(to: T.self).pointee
+extension DynamicPropertyFieldShim: DynamicPropertyFieldUpdating where T: DynamicProperty {
+  static func applicator(atOffset offset: Int, index: Int) -> DynamicPropertyFieldApplicator {
+    unsafe DynamicPropertyFieldApplicator(index: index) { base, inputs in
+      unsafe applyDynamicPropertyField(
+        at: (base + offset).assumingMemoryBound(to: T.self),
+        index: index,
+        inputs: inputs
+      )
     }
   }
+
+  static func updateRootValue(
+    atBase base: UnsafeMutableRawPointer,
+    containerType: Any.Type
+  ) -> DynamicPropertyUpdateResult {
+    unsafe updateDynamicPropertyValue(
+      at: base.assumingMemoryBound(to: T.self),
+      containerType: containerType,
+      propertyPath: .root,
+      updatePath: .root
+    )
+  }
+
+  static func updateExtracted(
+    _ property: any DynamicProperty,
+    index: Int,
+    inputs: DynamicPropertyFieldUpdateInputs
+  ) -> (result: DynamicPropertyUpdateResult, mutated: Bool) {
+    guard var copy = property as? T else {
+      return (.uncertified, false)
+    }
+    return unsafe withUnsafeMutablePointer(to: &copy) { pointer in
+      // Snapshot and compare at the SAME address: a value-witness copy into a
+      // second buffer leaves padding indeterminate, which would make the
+      // comparison report phantom mutations.
+      let detects = discardDetectionEnabled
+      let size = MemoryLayout<T>.size
+      let before: [UInt8]
+      if detects, size > 0 {
+        before = unsafe [UInt8](UnsafeRawBufferPointer(start: pointer, count: size))
+      } else {
+        before = []
+      }
+      let result = unsafe applyDynamicPropertyField(
+        at: pointer,
+        index: index,
+        inputs: inputs
+      )
+      guard detects, size > 0 else {
+        return (result, false)
+      }
+      let after = unsafe UnsafeRawBufferPointer(start: pointer, count: size)
+      return (result, unsafe !before.elementsEqual(after))
+    }
+  }
+}
+
+/// Conditional-conformance shim for the transparent-forwarding protocol, so a
+/// container's mutating forwarded update is reachable through its value memory
+/// without boxing the container into an existential.
+private protocol AdditionalDynamicPropertyForwarding {
+  @MainActor static func forwardUpdate(
+    atBase base: UnsafeMutableRawPointer,
+    in context: AdditionalDynamicPropertyUpdateContext
+  ) -> DynamicPropertyUpdateResult
+}
+
+private enum AdditionalDynamicPropertyShim<T> {}
+
+extension AdditionalDynamicPropertyShim: AdditionalDynamicPropertyForwarding
+where T: AdditionalDynamicPropertyUpdating {
+  static func forwardUpdate(
+    atBase base: UnsafeMutableRawPointer,
+    in context: AdditionalDynamicPropertyUpdateContext
+  ) -> DynamicPropertyUpdateResult {
+    unsafe base.assumingMemoryBound(to: T.self).pointee
+      .updateAdditionalDynamicProperties(in: context)
+  }
+}
+
+/// Rebinds the shim's generic parameter to `containerType` so the conditional
+/// conformance (`where T: AdditionalDynamicPropertyUpdating`) can be tested at
+/// runtime.
+@MainActor
+private func openedAdditionalShim(boundTo containerType: Any.Type) -> Any.Type {
+  func open<C>(_ concrete: C.Type) -> Any.Type {
+    AdditionalDynamicPropertyShim<C>.self
+  }
+  return _openExistential(containerType, do: open)
+}
+
+/// Whether the `Mirror` tier pays for discarded-mutation detection.
+///
+/// DEBUG only — the byte snapshot allocates. Deliberately *not* gated on
+/// `SoundnessProbeConfiguration.isEnabled` the way the hot-path oracles are:
+/// this tier is a rare correctness backstop, and a test that switches the probe
+/// off for tracing reasons would otherwise make the discard silent again.
+@MainActor
+private var discardDetectionEnabled: Bool {
+  #if DEBUG
+    return true
+  #else
+    return false
+  #endif
+}
+
+/// Runs `body` over `value`'s concrete value memory, mutably.
+///
+/// For a concrete `V` — every current caller — that is a pointer to `value`
+/// itself. For an existential `V` the boxed value is opened into a local,
+/// mutated, and written back: a pointer to `value` would address the box, not
+/// the value a plan's offsets describe.
+@MainActor
+private func withMutableConcreteValue<V>(
+  _ value: inout V,
+  _ body: (UnsafeMutableRawPointer, Any.Type) -> DynamicPropertyUpdateResult
+) -> DynamicPropertyUpdateResult {
+  let concreteType = type(of: value)
+  if V.self == concreteType {
+    return unsafe withUnsafeMutablePointer(to: &value) { pointer in
+      unsafe body(UnsafeMutableRawPointer(pointer), concreteType)
+    }
+  }
+  func open<P>(_ opened: P) -> (Any, DynamicPropertyUpdateResult) {
+    var copy = opened
+    let result = unsafe withUnsafeMutablePointer(to: &copy) { pointer in
+      unsafe body(UnsafeMutableRawPointer(pointer), P.self)
+    }
+    return (copy, result)
+  }
+  let (updated, result) = _openExistential(value as Any, do: open)
+  if let back = updated as? V {
+    value = back
+  }
+  return result
 }
 
 #if DEBUG
@@ -620,18 +911,19 @@ package enum DynamicPropertyPathScope {
 /// accesses will bind against (the ambient-wins rule).
 @MainActor
 @discardableResult
-package func runDynamicPropertyUpdatePass<V>(on view: V) -> DynamicPropertyUpdateResult {
-  runDynamicPropertyUpdatePass(on: view, excludingFieldsOwnedBy: nil)
+package func runDynamicPropertyUpdatePass<V>(on view: inout V) -> DynamicPropertyUpdateResult {
+  runDynamicPropertyUpdatePass(on: &view, excludingFieldsOwnedBy: nil)
 }
 
 @MainActor
 private func runDynamicPropertyUpdatePass<V>(
-  on view: V,
+  on view: inout V,
   excludingFieldsOwnedBy owner: (any AdditionalDynamicPropertyUpdating)?
 ) -> DynamicPropertyUpdateResult {
   // Plans key on the DYNAMIC type: for a concrete `V` (every current caller)
   // it equals `V.self`; an existential `V` boxes a differently-typed value,
-  // and its plan describes the boxed value's layout — see the offsets case.
+  // and its plan describes the boxed value's layout — `withMutableConcreteValue`
+  // opens it and writes the mutated value back.
   let concreteType = type(of: view)
   let plan =
     unsafe DynamicPropertyDescriptorCache.cachedUpdatePlan(for: concreteType)
@@ -640,29 +932,14 @@ private func runDynamicPropertyUpdatePass<V>(
   case .empty:
     return .unchanged
   case .offsets(let fields):
-    if V.self == concreteType {
-      return unsafe withUnsafePointer(to: view) { base in
-        unsafe updatePlannedDynamicProperties(
-          atBase: UnsafeRawPointer(base),
-          containerType: concreteType,
-          fields: fields,
-          path: .root,
-          excludingFieldsOwnedBy: owner
-        )
-      }
-    } else {
-      // Existential `V`: `withUnsafePointer(to: view)` would point at the
-      // existential BOX, not the boxed value the plan's offsets describe —
-      // open it first.
-      return unsafe withOpenedValue(view) { base, openedType in
-        unsafe updatePlannedDynamicProperties(
-          atBase: base,
-          containerType: openedType,
-          fields: fields,
-          path: .root,
-          excludingFieldsOwnedBy: owner
-        )
-      }
+    return unsafe withMutableConcreteValue(&view) { base, openedType in
+      unsafe updatePlannedDynamicProperties(
+        atBase: base,
+        containerType: openedType,
+        fields: fields,
+        path: .root,
+        excludingFieldsOwnedBy: owner
+      )
     }
   case .mirrorWalk(let descriptor):
     return updateDiscoveredDynamicProperties(
@@ -693,29 +970,108 @@ package func withDynamicPropertyUpdateScope<V, Result>(
 
 @MainActor
 private func updatePlannedDynamicProperties(
-  atBase base: UnsafeRawPointer,
+  atBase base: UnsafeMutableRawPointer,
   containerType: Any.Type,
-  fields: [DynamicPropertyFieldExtractor],
+  fields: [DynamicPropertyFieldApplicator],
   path: StateSlotPath,
   excludingFieldsOwnedBy owner: (any AdditionalDynamicPropertyUpdating)? = nil
 ) -> DynamicPropertyUpdateResult {
+  let inputs = DynamicPropertyFieldUpdateInputs(
+    containerType: containerType,
+    containerPath: path
+  )
   var result = DynamicPropertyUpdateResult.unchanged
-  for unsafe field in unsafe fields {
-    if owner?.ownsDynamicPropertyTraversal(ofStoredFieldAt: unsafe field.index) == true {
+  // Index loop on purpose: `for unsafe x in` is mangled by swift-format
+  // (see the env-cleanup 2026-08-10 lesson), so spell the unsafe access per
+  // element instead.
+  for index in 0..<(unsafe fields.count) {
+    if owner?.ownsDynamicPropertyTraversal(ofStoredFieldAt: unsafe fields[index].index)
+      == true
+    {
       continue
     }
-    let property = unsafe field.extract(base)
-    result = result.merging(
-      updateDynamicProperty(
-        property,
-        containerType: containerType,
-        containerPath: path,
-        fieldIndex: unsafe field.index
-      ))
+    result = result.merging(unsafe fields[index].apply(base, inputs))
   }
   return result
 }
 
+/// Updates one dynamic-property field in place: its nested wrappers first (so
+/// the field's own `update(in:)` observes live composed state), then the field
+/// itself.
+///
+/// The nested pass runs under this field's own path — that qualification is
+/// what gives two instances of one composed wrapper distinct nested slots. The
+/// field's own `update(in:)` runs under the CONTAINER's path: a top-level
+/// built-in must bind the legacy empty-path identity.
+@MainActor
+private func applyDynamicPropertyField<T: DynamicProperty>(
+  at pointer: UnsafeMutablePointer<T>,
+  index: Int,
+  inputs: DynamicPropertyFieldUpdateInputs
+) -> DynamicPropertyUpdateResult {
+  let fieldPath = inputs.containerPath.appending(index)
+  let nestedPlan =
+    unsafe DynamicPropertyDescriptorCache.cachedUpdatePlan(for: T.self)
+    ?? DynamicPropertyDescriptorCache.updatePlan(reflecting: unsafe pointer.pointee)
+  let nestedResult: DynamicPropertyUpdateResult
+  switch unsafe nestedPlan {
+  case .empty:
+    nestedResult = .unchanged
+  case .offsets(let fields):
+    nestedResult = unsafe updatePlannedDynamicProperties(
+      atBase: UnsafeMutableRawPointer(pointer),
+      containerType: T.self,
+      fields: fields,
+      path: fieldPath
+    )
+  case .mirrorWalk(let descriptor):
+    nestedResult = unsafe updateDiscoveredDynamicProperties(
+      of: pointer.pointee,
+      descriptor: descriptor,
+      path: fieldPath
+    )
+  }
+  let ownResult = unsafe updateDynamicPropertyValue(
+    at: pointer,
+    containerType: inputs.containerType,
+    propertyPath: fieldPath,
+    updatePath: inputs.containerPath
+  )
+  return nestedResult.merging(ownResult)
+}
+
+@MainActor
+private func updateDynamicPropertyValue<T: DynamicProperty>(
+  at pointer: UnsafeMutablePointer<T>,
+  containerType: Any.Type,
+  propertyPath: StateSlotPath,
+  updatePath: StateSlotPath
+) -> DynamicPropertyUpdateResult {
+  let result = DynamicPropertyPathScope.withPath(updatePath) {
+    let context: DynamicPropertyContext
+    if T.self is any DynamicPropertyLeaseIndependent.Type {
+      context = .leaseIndependent
+    } else {
+      context = DynamicPropertyContext.current(
+        containerType: containerType,
+        structuralPath: currentAuthoringContext()?.structuralPath.description ?? "",
+        fieldPath: propertyPath.description
+      )
+    }
+    return unsafe pointer.pointee.update(in: context)
+  }
+  #if DEBUG
+    DynamicPropertyUpdatePassProbe.onUpdate?(containerType, T.self)
+  #endif
+  return result
+}
+
+/// The `Mirror` correctness fallback: enum containers and existential-typed
+/// fields. A `Mirror` child is a copy and an enum payload has no addressable
+/// field slot, so this tier updates an extracted copy exactly as the whole
+/// pass did before plan 2026-08-30-001. Discovery semantics are identical to
+/// the offsets tier; only the write-back is missing, and
+/// `updateExtractedDynamicProperty` makes a dropped write loud.
 @MainActor
 private func updateDiscoveredDynamicProperties(
   of container: Any,
@@ -723,7 +1079,10 @@ private func updateDiscoveredDynamicProperties(
   path: StateSlotPath,
   excludingFieldsOwnedBy owner: (any AdditionalDynamicPropertyUpdating)? = nil
 ) -> DynamicPropertyUpdateResult {
-  let containerType = type(of: container)
+  let inputs = DynamicPropertyFieldUpdateInputs(
+    containerType: type(of: container),
+    containerPath: path
+  )
   let mirror = Mirror(reflecting: container)
   var result = DynamicPropertyUpdateResult.unchanged
   var fieldIterator = descriptor.fields.makeIterator()
@@ -741,11 +1100,10 @@ private func updateDiscoveredDynamicProperties(
       }
       if let property = child.value as? any DynamicProperty {
         result = result.merging(
-          updateDynamicProperty(
+          updateExtractedDynamicProperty(
             property,
-            containerType: containerType,
-            containerPath: path,
-            fieldIndex: field.index
+            index: field.index,
+            inputs: inputs
           ))
       }
       pendingField = fieldIterator.next()
@@ -756,92 +1114,25 @@ private func updateDiscoveredDynamicProperties(
 }
 
 @MainActor
-private func updateDynamicProperty(
+private func updateExtractedDynamicProperty(
   _ property: any DynamicProperty,
-  containerType: Any.Type,
-  containerPath: StateSlotPath,
-  fieldIndex: Int
+  index: Int,
+  inputs: DynamicPropertyFieldUpdateInputs
 ) -> DynamicPropertyUpdateResult {
-  // Nested dynamic properties update before their container so the
-  // container's own update(in:) observes live composed state. The nested pass
-  // runs under this property's own field path — that qualification is what
-  // gives two instances of one composed wrapper distinct nested slots. The
-  // property's own update(in:) runs under the CONTAINER's path: a top-level
-  // built-in must bind the legacy empty-path identity.
-  let nestedPlan =
-    unsafe DynamicPropertyDescriptorCache.cachedUpdatePlan(for: type(of: property))
-    ?? DynamicPropertyDescriptorCache.updatePlan(reflecting: property)
-  let nestedResult: DynamicPropertyUpdateResult
-  switch unsafe nestedPlan {
-  case .empty:
-    nestedResult = .unchanged
-  case .offsets(let fields):
-    let nestedPath = containerPath.appending(fieldIndex)
-    nestedResult = unsafe withOpenedValue(property) { base, concreteType in
-      unsafe updatePlannedDynamicProperties(
-        atBase: base,
-        containerType: concreteType,
-        fields: fields,
-        path: nestedPath
-      )
-    }
-  case .mirrorWalk(let descriptor):
-    nestedResult = updateDiscoveredDynamicProperties(
-      of: property,
-      descriptor: descriptor,
-      path: containerPath.appending(fieldIndex)
+  let propertyType = type(of: property)
+  guard
+    let updating = openedFieldShim(boundTo: propertyType)
+      as? any DynamicPropertyFieldUpdating.Type
+  else {
+    // The extracted value conforms, so the shim always binds. Answer
+    // conservatively rather than trapping if a future metadata shape differs.
+    return .uncertified
+  }
+  let outcome = updating.updateExtracted(property, index: index, inputs: inputs)
+  if outcome.mutated {
+    SoundnessProbeConfiguration.recordDynamicPropertyMutationDiscardedViolation(
+      "dynamic-property-mutation-discarded: \(propertyType) stored in \(inputs.containerType)"
     )
   }
-  let propertyPath = containerPath.appending(fieldIndex)
-  let ownResult = updateDynamicPropertyValue(
-    property,
-    containerType: containerType,
-    propertyPath: propertyPath,
-    updatePath: containerPath
-  )
-  return nestedResult.merging(ownResult)
-}
-
-@MainActor
-private func updateDynamicPropertyValue(
-  _ property: any DynamicProperty,
-  containerType: Any.Type,
-  propertyPath: StateSlotPath,
-  updatePath: StateSlotPath
-) -> DynamicPropertyUpdateResult {
-  let result = DynamicPropertyPathScope.withPath(updatePath) {
-    let context: DynamicPropertyContext
-    if property is any DynamicPropertyLeaseIndependent {
-      context = .leaseIndependent
-    } else {
-      context = DynamicPropertyContext.current(
-        containerType: containerType,
-        structuralPath: currentAuthoringContext()?.structuralPath.description ?? "",
-        fieldPath: propertyPath.description
-      )
-    }
-    return property.update(
-      in: context
-    )
-  }
-  #if DEBUG
-    DynamicPropertyUpdatePassProbe.onUpdate?(containerType, type(of: property))
-  #endif
-  return result
-}
-
-/// Opens the existential (or re-monomorphizes a generic value) so the offset
-/// walk gets the concrete value's base pointer — a pointer to an existential
-/// box would not match the plan's offsets.
-@MainActor
-private func withOpenedValue<V>(
-  _ value: V,
-  _ body: (UnsafeRawPointer, Any.Type) -> DynamicPropertyUpdateResult
-) -> DynamicPropertyUpdateResult {
-  func open<P>(_ concrete: P) -> DynamicPropertyUpdateResult {
-    unsafe withUnsafePointer(to: concrete) { pointer in
-      unsafe body(UnsafeRawPointer(pointer), P.self)
-    }
-  }
-  return _openExistential(value as Any, do: open)
+  return outcome.result
 }

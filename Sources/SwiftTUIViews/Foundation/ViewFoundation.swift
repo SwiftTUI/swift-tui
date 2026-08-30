@@ -372,12 +372,21 @@ func resolveView<V: View>(
     }
   }
   let routeIdentity = entityRouteIdentity(for: view, in: context)
+  // The update pass runs `update(in:)` in place (plan 2026-08-30-001), so it
+  // needs the copy the body will consume — not the authored `view`. Only the
+  // two `resolveViewElements` calls below take `prepared`; the reuse door, the
+  // memo witness, the stored evaluator, and deferred descent all keep `view`,
+  // because those compare or replay the value the author wrote.
+  var working = view
   let dynamicPropertyUpdateResult = prepareDynamicProperties(
-    of: view,
+    of: &working,
     in: context,
     routeIdentity: routeIdentity,
     authoringContextOverride: authoringContextOverride
   )
+  // Immutable from here so `resolveFresh` captures it by value rather than
+  // boxing a mutable capture.
+  let prepared = working
   context.viewGraph?.setSuppressesStructuralLifecycle(
     context.suppressesStructuralLifecycle,
     for: context.identity
@@ -516,13 +525,14 @@ func resolveView<V: View>(
             // owner rule the container's own update scope applies. Fresh
             // evaluations only by construction: reuse serves never reach
             // `resolveViewElements`, and the stored evaluator and
-            // deferred-descent closures capture the pre-bind `view` and
-            // re-bind on re-entry. `memoViewValue` below stashes the
-            // pre-bind `view` so memo comparison sees authored values,
-            // never captures.
+            // deferred-descent closures capture the authored `view` and
+            // re-prepare and re-bind on re-entry. `memoViewValue` below
+            // stashes that authored `view` so memo comparison sees authored
+            // values — never a capture, and never a dynamic property's
+            // in-place update (plan 2026-08-30-001).
             let resolve = {
               normalizeResolvedElements(
-                resolveViewElements(view, in: context),
+                resolveViewElements(prepared, in: context),
                 in: context
               )
             }
@@ -550,7 +560,7 @@ func resolveView<V: View>(
             )
           return withAuthoringContext(authoringContext) {
             let resolved = normalizeResolvedElements(
-              resolveViewElements(view, in: context),
+              resolveViewElements(prepared, in: context),
               in: context
             )
             accessedStateSlots = authoringContext.ordinalTracker.nextOrdinal

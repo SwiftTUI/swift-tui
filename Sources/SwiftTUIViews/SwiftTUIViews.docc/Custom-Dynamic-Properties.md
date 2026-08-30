@@ -31,6 +31,8 @@ struct Debounced: DynamicProperty {
   func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
     // Runs before every body evaluation of the enclosing view, after
     // this wrapper's own composed dynamic properties have updated.
+    // Nonmutating here because this wrapper's state lives in its composed
+    // `@State`; declare it `mutating` to write a stored property instead.
     return .unchanged
   }
 }
@@ -54,8 +56,8 @@ framework:
    lookup). Only *stored* properties participate; computed properties are
    invisible to discovery, as in SwiftUI.
 2. Recursively updates each property's own discovered dynamic properties
-   first, then calls the property's `update(in:)`, so your update always
-   observes live composed state.
+   first, then calls the property's `update(in:)` in place, so your update
+   always observes live composed state and its own writes reach the body.
 3. Uses the returned certification at the graph's reuse door, then evaluates
    the body only when reuse is declined.
 
@@ -64,23 +66,61 @@ implementations, framework primitives, and `ViewModifier` bodies) under the
 same ambient authoring scope the body observes. A certified enclosing subtree
 may be served without descending into its already-certified children.
 
-## The reference-backed contract
+## Evaluation-visible state in a plain stored property
 
-`update(in:)` is nonmutating. This deliberately makes the old plain-value
-`mutating update()` source shape fail to conform instead of accepting a
-mutation that an existential or resilient container cannot safely write back.
-Keep evaluation-visible custom state in reference storage or composed
-built-in wrappers (`@State`'s box, `@Environment`'s ambient lookup, or a
-`Binding`'s closures).
+`update(in:)` is `mutating`, and the framework runs it through the container
+copy that the *next body evaluation consumes*. A plain stored mutation is
+therefore visible to that body and to every closure the body creates:
 
-SwiftUI permits a plain stored-property mutation to affect one evaluation's
-temporary working value. SwiftTUI 0.9 deliberately narrows that extension
-shape so supported struct, enum, existential, and resilient containers all
-have one honest contract.
+```swift
+@propertyWrapper
+struct Ticking: DynamicProperty {
+  private var now: ContinuousClock.Instant = .now
+
+  var wrappedValue: ContinuousClock.Instant { now }
+
+  mutating func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
+    let sampled = ContinuousClock.now
+    guard sampled != now else { return .unchanged }
+    now = sampled
+    return .changed
+  }
+}
+```
+
+The copy is private to one mount and one evaluation. Two mounts of the same
+view *value* each prepare their own, so one mount's mutation is never visible
+to another, and the value you wrote in the initializer is what the graph keeps
+for reuse comparison.
+
+A non-mutating implementation still satisfies the requirement, so reference
+storage and composed built-in wrappers (`@State`'s box, `@Environment`'s
+ambient lookup, a `Binding`'s closures) keep working unchanged — and remain
+the right choice for anything that must outlive one evaluation, or that an
+asynchronous callback writes.
+
+### Where the in-place guarantee stops
+
+The write lands when the property is a **strongly stored, statically typed
+field of a struct container** — the shape a property-wrapper declaration always
+produces. Two authored shapes have no addressable field slot to write back
+through, and there the framework updates a copy:
+
+- an **enum container** (a `View` or `DynamicProperty` that is an enum), whose
+  payload `Mirror` can read but not address; and
+- a field whose **static type is existential** (`Any`, `any SomeProtocol`) even
+  though the value inside it conforms.
+
+A stored mutation in either shape is dropped. Debug builds report the drop as
+the `dynamic-property-mutation-discarded` soundness violation naming the
+property and its container, so it is loud rather than silent — but the fix is
+to declare the wrapper as a normal stored property, or to keep its
+evaluation-visible state in reference storage.
 
 A conforming type is itself a value type — a struct or an enum. A class
 conformance does not compile; see <doc:Divergences-And-Gaps>. Class-typed
-*fields* are unaffected.
+*fields* are unaffected: a view can store an `@Observable` model, a closure,
+or a resource handle and still get the in-place update for its wrappers.
 
 ## Certify reuse explicitly
 

@@ -37,6 +37,7 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
   package var strandedListingViolationCount: Int
   package var stateSeedFallbackViolationCount: Int
   package var stateCaptureMissViolationCount: Int
+  package var dynamicPropertyMutationDiscardedCount: Int
   package var layoutShadowDivergenceCount: Int
   package var layoutShadowWindowedExclusionCount: Int
   package var layoutShadowDepthExclusionCount: Int
@@ -88,6 +89,8 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
         SoundnessProbeConfiguration.stateSeedFallbackViolationCount,
       stateCaptureMissViolationCount:
         SoundnessProbeConfiguration.stateCaptureMissViolationCount,
+      dynamicPropertyMutationDiscardedCount:
+        SoundnessProbeConfiguration.dynamicPropertyMutationDiscardedCount,
       layoutShadowDivergenceCount:
         SoundnessProbeConfiguration.layoutShadowDivergenceCount,
       layoutShadowWindowedExclusionCount:
@@ -246,6 +249,12 @@ package struct SoundnessCounterSnapshot: Sendable, Equatable {
       to: &growth
     )
     appendGrowth(
+      kind: "dynamic-property-mutation-discarded",
+      previous: previous.dynamicPropertyMutationDiscardedCount,
+      current: dynamicPropertyMutationDiscardedCount,
+      to: &growth
+    )
+    appendGrowth(
       kind: "layout-shadow-divergence",
       previous: previous.layoutShadowDivergenceCount,
       current: layoutShadowDivergenceCount,
@@ -371,6 +380,11 @@ package enum SoundnessProbeConfiguration {
   package static var strandedListingViolationCount = 0
   package static var stateSeedFallbackViolationCount = 0
   package static var stateCaptureMissViolationCount = 0
+  /// One `update(in:)` whose stored mutation the framework could not write
+  /// back: the container is an enum, or the field's *static* type is
+  /// existential, so the update ran on an extracted copy (plan
+  /// 2026-08-30-001 §3.6). Detected in DEBUG only.
+  package static var dynamicPropertyMutationDiscardedCount = 0
   package static var layoutShadowDivergenceCount = 0
   /// T-info currency for the layout shadow oracle's windowed carve-out:
   /// subtrees under a windowed lazy/hosted product are excluded from the
@@ -634,6 +648,20 @@ package enum SoundnessProbeConfiguration {
   /// takes this path, so a hit means a closure outlived its subtree —
   /// expected to hold at zero across the suite and fuzzer campaigns;
   /// deliberate-removal tests suppress tracing while proving the counter.
+  /// Records one dynamic-property update whose stored mutation was discarded
+  /// because the container shape has no writable field slot — an enum
+  /// container, or a field whose static type is existential. The in-place
+  /// contract (plan 2026-08-30-001 §3.1) covers strongly stored, statically
+  /// typed fields of struct containers; this oracle makes the boundary loud
+  /// instead of silent. DEBUG-only detection.
+  package static func recordDynamicPropertyMutationDiscardedViolation(
+    _ detail: @autoclosure () -> String
+  ) {
+    dynamicPropertyMutationDiscardedCount += 1
+    recordViolationDetail(detail(), for: "dynamic-property-mutation-discarded")
+    emitTrace("dynamic-property-mutation-discarded")
+  }
+
   package static func recordStateCaptureMissViolation(
     _ detail: @autoclosure () -> String
   ) {
