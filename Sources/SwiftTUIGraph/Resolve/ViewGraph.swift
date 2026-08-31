@@ -726,16 +726,28 @@ package final class ViewGraph {
       // keep it whenever it is genuinely live (steady frames, G13 siblings,
       // re-homed controls).
       recordDetachedHostedNode(shadowedNodeID, hostedByNodeID: node.viewNodeID)
-      // A shadowed node AUTHORED at the claimed identity that holds state
+      // A shadowed node AUTHORED at the claimed identity that hosts state
       // slots is a single-child flattening's state owner, not a chain
       // interior: the child resolved onto its own node, then this wrapper's
       // one-element body normalized to that child element and claimed its
       // identity. Register the authored node so authoring-host resolution
       // keeps hosting the child's `@State`/`@FocusState` there instead of
       // re-seeding fresh slots on this absorber every later pass.
+      //
+      // "Hosts" means claimed OR materialized (`hostsAuthoredStateSlots`):
+      // the update pass claims every wrapper before the body runs, while a
+      // slot materializes only on the first graph read. A body whose only
+      // reads are deferred — a `GeometryReader` closure realized in the
+      // frame tail, an `.onChange` write — has claims but no slots at this
+      // reindex. Gating on materialized slots alone reclaimed such a node
+      // at the finalize barrier AFTER the tail had bound a `ScrollView`
+      // position binding to it and materialized the slot there: the
+      // registered closure then read a dead owner (the
+      // `state.imperativeSeedFallback` warning at present time) and the
+      // re-hosted slot re-seeded from the authored default.
       if let shadowed = nodesByNodeID[shadowedNodeID],
         shadowed.identity == node.resolvedIdentity,
-        !shadowed.stateSlots.isEmpty
+        shadowed.hostsAuthoredStateSlots
       {
         flattenedStateOwnerNodeIDByIdentity[node.resolvedIdentity] = shadowedNodeID
       }

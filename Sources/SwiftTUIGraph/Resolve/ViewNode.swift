@@ -587,11 +587,33 @@ package final class ViewNode {
   private var stateSlotClaimantsThisEvaluation: [StateSlotIdentifier: StateSlotClaimRecord] =
     [:]
 
+  /// Whether this node hosts authored dynamic-property state: a materialized
+  /// slot, or a slot claim any update pass has recorded on it. The update
+  /// pass claims every discovered `@State`/`@FocusState`/`@GestureState`
+  /// before the body runs, so a claim proves authored state even when no
+  /// body read has materialized the slot yet — a body whose only reads sit
+  /// in a layout-realized closure (`GeometryReader` content) or an action
+  /// (`.onChange`) materializes nothing until the frame tail. Consumers that
+  /// decide whether a node is an authored state owner (the single-child
+  /// flattening tiebreak in `ViewGraph.reindexIdentity`) must read this, not
+  /// `stateSlots.isEmpty`: the materialization proxy misclassified such a
+  /// node as a stranded chain interior and reclaimed it at the finalize
+  /// barrier after the tail had already bound bindings and materialized the
+  /// slot on it. Backed by the persistent `hostsAuthoredStateClaims` latch,
+  /// not the per-evaluation claim table: `beginEvaluation` clears that table
+  /// after the update pass, before the body, so it is empty by reindex time.
+  package var hostsAuthoredStateSlots: Bool {
+    !stateSlots.isEmpty || persistentState.hostsAuthoredStateClaims
+  }
+
   package func recordStateSlotClaim(
     _ identifier: StateSlotIdentifier,
     claimant: ObjectIdentifier,
     wrapperDescription: String
   ) {
+    if !persistentState.hostsAuthoredStateClaims {
+      persistentState.hostsAuthoredStateClaims = true
+    }
     guard let existing = stateSlotClaimantsThisEvaluation[identifier] else {
       stateSlotClaimantsThisEvaluation[identifier] = StateSlotClaimRecord(
         claimant: claimant,
@@ -2376,6 +2398,7 @@ extension ViewNode {
       nextDynamicPropertyLeaseOccurrenceOrdinal:
         frameState.nextDynamicPropertyLeaseOccurrenceOrdinal,
       dynamicPropertyLeaseTokens: persistentState.dynamicPropertyLeaseTokens,
+      hostsAuthoredStateClaims: persistentState.hostsAuthoredStateClaims,
       dependencyTracker: dependencyTracker.currentDependencies,
       registrationCaptureDepth: registrationCaptureDepth,
       runtimeRegistrationMutationGeneration: runtimeRegistrationMutationGeneration,

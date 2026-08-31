@@ -61,6 +61,7 @@ extension ViewNode {
     package var dynamicPropertyLeaseKeysSeenThisUpdate: Set<DynamicPropertyLeaseRegistrationKey>
     package var nextDynamicPropertyLeaseOccurrenceOrdinal: Int
     package var dynamicPropertyLeaseTokens: [DynamicPropertyLeaseRegistrationKey: UInt64]
+    package var hostsAuthoredStateClaims: Bool
     package var dependencyTracker: DependencySet
     package var registrationCaptureDepth: Int
     package var runtimeRegistrationMutationGeneration: UInt64

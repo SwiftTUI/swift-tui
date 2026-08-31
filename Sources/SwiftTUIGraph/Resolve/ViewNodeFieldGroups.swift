@@ -138,5 +138,14 @@ extension ViewNode {
     /// lives in checkpointed node state so rollback restores the prior lease
     /// and leaves every token issued by an aborted draft inert.
     package var dynamicPropertyLeaseTokens: [DynamicPropertyLeaseRegistrationKey: UInt64] = [:]
+    /// Latches once any `@State`/`@FocusState`/`@GestureState` wrapper claims
+    /// a slot on this node (`recordStateSlotClaim`), which the update pass
+    /// does before the body runs. Unlike `stateSlots`, which fills only on
+    /// the first graph read, this proves the node is an authored state owner
+    /// even when every read is deferred past resolve (a `GeometryReader`
+    /// closure, an `.onChange` write) — the signal the single-child
+    /// flattening tiebreak needs at reindex time. Never cleared: a node's
+    /// authored container does not change across its lifetime.
+    package var hostsAuthoredStateClaims: Bool = false
   }
 }
