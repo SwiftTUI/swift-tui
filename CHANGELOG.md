@@ -8,6 +8,20 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-08-30
+
+### Added
+
+- **`AnyTransition.scale`.** `.scale` and `.scale(scale:anchor:)` grow an
+  inserted view's placed frame from the given factor toward its natural size,
+  and shrink a removed one back toward it, around a `UnitPoint` anchor; the
+  parameterless form uses SwiftUI's near-zero centered factor. Layout is
+  preserved while the transition plays: the interpolated frame rounds to whole
+  cells and clips the content already laid out inside it, so the surrounding
+  views do not reflow. This closes a documented divergence — the built-in
+  transition surface was previously opacity- and offset-based, on the grounds
+  that scaling glyphs has no meaning on a cell grid.
+
 ### Changed
 
 - **Views, view modifiers, styles, dynamic properties, scenes, and apps must
@@ -25,6 +39,29 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   that shape unrepresentable rather than merely diagnosed. A cold-path
   precondition in the reflect-once plan builders is the runtime floor beneath
   the compile-time contract.
+- **`DynamicProperty.update(in:)` is now `mutating`, and runs through the
+  container copy that the body evaluation consumes.** A custom wrapper can hold
+  evaluation-visible state in a plain stored property instead of a reference
+  box, and the write is visible to that body and to every closure the body
+  creates. A non-mutating implementation still witnesses a `mutating`
+  requirement, so every existing conformer compiles unchanged; the break lands
+  on the framework's own call sites, which update each field through its bound
+  offset instead of extracting a copy — which also removes one
+  `any DynamicProperty` box per field per evaluation. The `Mirror` tier cannot
+  write back, because a mirror child is a copy and an enum payload has no
+  addressable slot, so an enum container and an existential-typed field still
+  update a copy. That boundary is stated in the contract and reported in DEBUG
+  as the new `dynamic-property-mutation-discarded` soundness oracle.
+- **The `state.imperativeSeedFallback` diagnostic names the declaring file.**
+  It previously reported only a line and column — the slot ordinal packs the
+  declaration's position, and nothing recorded the file — so a warning could
+  not be traced to a source without grepping every `@State` in the program.
+  `State.init(wrappedValue:)` and `init(initialValue:)` now take
+  `fileID: String = #fileID`, which a property wrapper's synthesized init
+  resolves at the wrapped property's declaration, and the message names the
+  site as `Module/File.swift:line:column`. `StateBox` carries the file as a
+  diagnostics-only field: slot identity stays line/column-keyed, so no `@State`
+  re-keys.
 
 ### Fixed
 
@@ -52,6 +89,36 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   were unaffected: the memo shadow observer captures every view value on the
   frames it observes, and it observes every frame in debug but 1-in-256 in
   release, so the stale comparison could not arise there.
+- **A `@State` that a body only handed out, and never read, could be reclaimed
+  mid-frame and re-seed from its authored default.** When a view resolves
+  through a single-child branch, the enclosing chain absorbs it and the
+  identity reindex shadows its node. The tiebreak that keeps such a shadowed
+  node as the identity's state owner was gated on the slot table being
+  non-empty, which is a *materialization* signal. A view that reads its state
+  only inside a `GeometryReader` closure — realized in the frame tail — and
+  writes it from `.onChange` has an empty slot table at reindex, so its node
+  was queued as an absorbed shadow and reclaimed during the preview and commit
+  barriers, after the tail had already bound a binding to it and materialized
+  the slot there. The registered closure then read a dead owner, and the
+  re-hosted slot re-seeded: the silent class the tiebreak exists to prevent.
+  Ownership now consults claims as well as materialized slots — the update pass
+  claims every `@State`, `@FocusState`, and `@GestureState` before the body
+  runs, and that claim latches on the persistent state.
+- **A frame-tail read of a `ForEach` child source trapped instead of
+  succeeding.** The three frame-constant accessors `count`, `identityRoot`, and
+  `measurementSignature` read `private let` storage of `Sendable` type, fixed
+  on the main actor during `init` and never written again, but they routed
+  through a release-checked main-actor guard. The layout worker legitimately
+  holds the previous frame's retained index and reads `identityRoot` off every
+  live source to decide which indexed subtrees an invalidation touches; that
+  read is race-free, and `IndexedChildSource` is declared `Sendable` precisely
+  so these values cross. The guard has trapped on it since 2026-06-27, which is
+  why `bun run perf:bench` died on SIGTRAP with no output. The three accessors
+  no longer take the guard, so the compiler proves the absence of a race rather
+  than a precondition trapping on the absence of the main actor; everything
+  that touches the caches, the content closure, or the captured mint host keeps
+  it, because realizing an element off the main actor is the hazard the guard
+  exists for.
 
 ## [0.9.11] - 2026-08-26
 
@@ -1248,7 +1315,7 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.9.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.9.12...HEAD
 [0.9.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.9.0
 [0.3.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.3.4
 [0.0.18]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.0.18
