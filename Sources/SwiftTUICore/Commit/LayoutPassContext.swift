@@ -92,6 +92,16 @@ package final class LayoutPassContext: Sendable {
     /// snapshot. Empty outside custom measurement, so placement-phase
     /// probes drop silently.
     var issuedProposalProbeFrames: [[Identity: [ProposedSize]]] = []
+    /// Per-pass answers of the custom-layout container hooks
+    /// (plan 2026-08-31-001): a container's declared outer spacing per
+    /// identity, and its explicit alignment answers per identity, proposal,
+    /// and guide. The stack engine asks for spacing from many sites per
+    /// parent measure and a parent reads a guide once per placement, so the
+    /// author hook runs once per question per pass. Living on the pass
+    /// context rather than on the layout proxy makes the memo's lifetime
+    /// exactly one pass — no stale answer can survive into a later frame.
+    var customLayoutSpacingMemo: [Identity: Spacing] = [:]
+    var customLayoutAlignmentMemo: [CustomLayoutAlignmentMemoKey: Int?] = [:]
     var workMetrics: LayoutWorkMetrics
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
     var layoutDependentRealizations: [LayoutDependentContentRealization]
@@ -366,6 +376,30 @@ package final class LayoutPassContext: Sendable {
     state.withLock { $0.issuedProposalProbeFrames.append([:]) }
   }
 
+  /// The memoized container-spacing answer for `identity` in this pass, if
+  /// the hook already ran (plan 2026-08-31-001).
+  package func customLayoutSpacingMemo(for identity: Identity) -> Spacing? {
+    state.withLock { $0.customLayoutSpacingMemo[identity] }
+  }
+
+  package func recordCustomLayoutSpacingMemo(_ spacing: Spacing, for identity: Identity) {
+    state.withLock { $0.customLayoutSpacingMemo[identity] = spacing }
+  }
+
+  /// The memoized explicit-alignment answer for `key` in this pass. The
+  /// outer optional is presence; the inner is the hook's answer (`nil` =
+  /// "use the guide's default").
+  package func customLayoutAlignmentMemo(for key: CustomLayoutAlignmentMemoKey) -> Int?? {
+    state.withLock { $0.customLayoutAlignmentMemo[key] }
+  }
+
+  package func recordCustomLayoutAlignmentMemo(
+    _ value: Int?,
+    for key: CustomLayoutAlignmentMemoKey
+  ) {
+    state.withLock { $0.customLayoutAlignmentMemo[key] = value }
+  }
+
   package func popIssuedProposalProbeFrame() {
     state.withLock {
       precondition(
@@ -619,6 +653,24 @@ package final class LayoutPassContext: Sendable {
 package enum CustomLayoutCompatibilityPhase: String, Sendable {
   case measurement
   case placement
+}
+
+/// Memo key for one custom container's explicit-alignment answer within a
+/// pass (plan 2026-08-31-001): the container identity, the proposal it was
+/// measured under (the answer may depend on it), the guide's axis, and the
+/// guide's identity key.
+package struct CustomLayoutAlignmentMemoKey: Hashable, Sendable {
+  package var identity: Identity
+  package var proposal: ProposedSize
+  package var axis: Axis
+  package var guide: ObjectIdentifier
+
+  package init(identity: Identity, proposal: ProposedSize, axis: Axis, guide: ObjectIdentifier) {
+    self.identity = identity
+    self.proposal = proposal
+    self.axis = axis
+    self.guide = guide
+  }
 }
 
 package struct WorkerCustomLayoutCacheUpdate: Sendable {

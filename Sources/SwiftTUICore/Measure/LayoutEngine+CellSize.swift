@@ -73,7 +73,8 @@ extension LayoutEngine {
       let alignmentMetrics = overlayAlignmentMetrics(
         for: resolved.children,
         childMeasurements: childMeasurements,
-        alignment: alignment
+        alignment: alignment,
+        passContext: passContext
       )
       return CellSize(
         width: alignmentMetrics.leading + alignmentMetrics.trailing,
@@ -87,14 +88,16 @@ extension LayoutEngine {
       let stackSpacings = resolvedStackSpacings(
         for: stackChildren,
         axis: .vertical,
-        spacingOverride: spacing
+        spacingOverride: spacing,
+        passContext: passContext
       )
       let crossMetrics = stackCrossMetrics(
         for: stackChildren,
         childMeasurements: childMeasurements,
         axis: .vertical,
         horizontalAlignment: horizontalAlignment,
-        verticalAlignment: .center
+        verticalAlignment: .center,
+        passContext: passContext
       )
       let contentHeight = childMeasurements.reduce(0) { $0 + $1.measuredSize.height }
       let totalSpacing = stackSpacings.reduce(0, +)
@@ -110,14 +113,16 @@ extension LayoutEngine {
       let stackSpacings = resolvedStackSpacings(
         for: stackChildren,
         axis: .vertical,
-        spacingOverride: spacing
+        spacingOverride: spacing,
+        passContext: passContext
       )
       let crossMetrics = stackCrossMetrics(
         for: stackChildren,
         childMeasurements: childMeasurements,
         axis: .vertical,
         horizontalAlignment: horizontalAlignment,
-        verticalAlignment: .center
+        verticalAlignment: .center,
+        passContext: passContext
       )
       let contentHeight = childMeasurements.reduce(0) { $0 + $1.measuredSize.height }
       let totalSpacing = stackSpacings.reduce(0, +)
@@ -133,14 +138,16 @@ extension LayoutEngine {
       let stackSpacings = resolvedStackSpacings(
         for: stackChildren,
         axis: .horizontal,
-        spacingOverride: spacing
+        spacingOverride: spacing,
+        passContext: passContext
       )
       let crossMetrics = stackCrossMetrics(
         for: stackChildren,
         childMeasurements: childMeasurements,
         axis: .horizontal,
         horizontalAlignment: .center,
-        verticalAlignment: verticalAlignment
+        verticalAlignment: verticalAlignment,
+        passContext: passContext
       )
       let totalWidth = childMeasurements.reduce(0) { $0 + $1.measuredSize.width }
       let totalSpacing = stackSpacings.reduce(0, +)
@@ -156,14 +163,16 @@ extension LayoutEngine {
       let stackSpacings = resolvedStackSpacings(
         for: stackChildren,
         axis: .horizontal,
-        spacingOverride: spacing
+        spacingOverride: spacing,
+        passContext: passContext
       )
       let crossMetrics = stackCrossMetrics(
         for: stackChildren,
         childMeasurements: childMeasurements,
         axis: .horizontal,
         horizontalAlignment: .center,
-        verticalAlignment: verticalAlignment
+        verticalAlignment: verticalAlignment,
+        passContext: passContext
       )
       let totalWidth = childMeasurements.reduce(0) { $0 + $1.measuredSize.width }
       let totalSpacing = stackSpacings.reduce(0, +)

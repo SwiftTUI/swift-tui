@@ -12,20 +12,23 @@ extension LayoutEngine {
     axis: Axis,
     spacing: Int?,
     horizontalAlignment: HorizontalAlignment,
-    verticalAlignment: VerticalAlignment
+    verticalAlignment: VerticalAlignment,
+    passContext: LayoutPassContext? = nil
   ) -> [PlacementRequest] {
     let stackChildren = stackChildren(for: resolved)
     let stackSpacings = resolvedStackSpacings(
       for: stackChildren,
       axis: axis,
-      spacingOverride: spacing
+      spacingOverride: spacing,
+      passContext: passContext
     )
     let crossMetrics = stackCrossMetrics(
       for: stackChildren,
       childMeasurements: measured.childMeasurements,
       axis: axis,
       horizontalAlignment: horizontalAlignment,
-      verticalAlignment: verticalAlignment
+      verticalAlignment: verticalAlignment,
+      passContext: passContext
     )
 
     switch axis {

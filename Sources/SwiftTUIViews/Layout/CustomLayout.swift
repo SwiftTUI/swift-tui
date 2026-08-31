@@ -6,6 +6,27 @@ public protocol LayoutValueKey {
   static var defaultValue: Value { get }
 }
 
+/// Container-level traits a ``Layout`` declares about itself.
+///
+/// A layout's traits are read at authoring time, before the container's
+/// children resolve, so children can adapt to the container the way they
+/// adapt to a built-in stack. Today the one trait is ``stackOrientation``.
+public struct LayoutProperties: Sendable, Equatable {
+  /// The axis this layout arranges its subviews along when it behaves like a
+  /// stack, or `nil` when it does not.
+  ///
+  /// Children read this exactly as they read a built-in stack's axis:
+  /// ``Spacer`` grows only along it and ``Divider`` draws across it. `nil`
+  /// means "not a stack" — a `Spacer` is then flexible on both axes, as it
+  /// is in a `ZStack`. ``HStackLayout`` declares `.horizontal` and
+  /// ``VStackLayout`` `.vertical`; the default is `nil`.
+  public var stackOrientation: Axis?
+
+  public init(stackOrientation: Axis? = nil) {
+    self.stackOrientation = stackOrientation
+  }
+}
+
 // `LayoutSubviewPlacementRecord`, `LayoutSubviewPlacementRecorder`,
 // `defaultPlacement`, and `placedOrigin` live in
 // `CustomLayoutPlacementGeometry.swift`.
@@ -47,11 +68,13 @@ public struct LayoutSubview {
   }
 
   /// The child's preferred surrounding spacing.
+  ///
+  /// For a child that is itself a custom-layout container this is the
+  /// container's declared ``Layout/spacing(subviews:cache:)`` (with any
+  /// modifier-carried spacing on top), so a layout that keeps the default
+  /// `spacing` composes nested declarations upward.
   public var spacing: ViewSpacing {
-    ViewSpacing(
-      horizontal: child.layoutMetadata.spacing.horizontal,
-      vertical: child.layoutMetadata.spacing.vertical
-    )
+    ViewSpacing(engine.effectiveSpacing(for: child, passContext: passContext))
   }
 
   public subscript<K: LayoutValueKey>(key: K.Type) -> K.Value {
@@ -298,6 +321,59 @@ public protocol Layout: Sendable {
     subviews: LayoutSubviews,
     cache: inout Cache
   )
+
+  // MARK: Container contract
+
+  /// Container-level traits of this layout — today its stack orientation.
+  ///
+  /// The declared orientation is installed before the container's children
+  /// resolve, so a `Spacer` or `Divider` inside a custom layout behaves as
+  /// it does inside the equivalent built-in stack. The default declares no
+  /// orientation, which clears any axis inherited from an enclosing stack.
+  static var layoutProperties: LayoutProperties { get }
+
+  /// The spacing this container prefers around itself, as seen by the
+  /// container's parent when it negotiates the gap to a sibling.
+  ///
+  /// The default returns the union of the subviews' ``LayoutSubview/spacing``
+  /// values: a container of ordinary views presents no preference of its
+  /// own, and a container that nests another custom layout passes that
+  /// layout's declaration upward. The engine asks once per layout pass. The
+  /// answer must be a function of `subviews` and of the layout's own fields
+  /// (include those fields in ``measurementReuseSignature``). `cache` is a
+  /// freshly made cache for this call; mutations to it are discarded.
+  func spacing(subviews: LayoutSubviews, cache: inout Cache) -> ViewSpacing
+
+  /// The container's own value for a horizontal alignment `guide`, or `nil`
+  /// to use the guide's default for the container's size.
+  ///
+  /// A parent that aligns this container by `guide` — a
+  /// `VStack(alignment:)`, a `.frame(alignment:)`, an overlay — reads this
+  /// answer before falling back to the default. `bounds` is the container's
+  /// own frame with a zero origin, so return the guide in the container's
+  /// coordinate space, exactly as an `alignmentGuide(_:computeValue:)`
+  /// closure does; `proposal` is the proposal the container was measured
+  /// under, and `cache` is the cache prepared for that proposal (mutations
+  /// are discarded). An `alignmentGuide` modifier applied to the container
+  /// takes precedence over this answer. The engine asks at most once per
+  /// guide per pass.
+  func explicitAlignment(
+    of guide: HorizontalAlignment,
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Cache
+  ) -> Int?
+
+  /// The container's own value for a vertical alignment `guide`, or `nil`
+  /// to use the guide's default. See the horizontal overload.
+  func explicitAlignment(
+    of guide: VerticalAlignment,
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Cache
+  ) -> Int?
 }
 
 extension Layout {
@@ -312,6 +388,38 @@ extension Layout {
     subviews: LayoutSubviews
   ) {
     cache = makeCache(subviews: subviews)
+  }
+
+  /// Layouts declare no stack orientation by default.
+  public static var layoutProperties: LayoutProperties { LayoutProperties() }
+
+  /// The union of the subviews' spacing preferences.
+  public func spacing(subviews: LayoutSubviews, cache _: inout Cache) -> ViewSpacing {
+    subviews.reduce(into: ViewSpacing()) { union, subview in
+      union.formUnion(subview.spacing)
+    }
+  }
+
+  /// Layouts answer no explicit horizontal guides by default.
+  public func explicitAlignment(
+    of _: HorizontalAlignment,
+    in _: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews _: LayoutSubviews,
+    cache _: inout Cache
+  ) -> Int? {
+    nil
+  }
+
+  /// Layouts answer no explicit vertical guides by default.
+  public func explicitAlignment(
+    of _: VerticalAlignment,
+    in _: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews _: LayoutSubviews,
+    cache _: inout Cache
+  ) -> Int? {
+    nil
   }
 
   @MainActor
@@ -389,6 +497,31 @@ public struct AnyLayout: Layout {
             contentMinimum: contentMinimum,
             passContext: passContext
           )
+        },
+        preferredSpacingHandler: { engine, node, passContext in
+          workerProxy.preferredSpacing(
+            engine: engine,
+            node: node,
+            passContext: passContext
+          )
+        },
+        explicitHorizontalAlignmentHandler: { engine, node, measured, guide, passContext in
+          workerProxy.explicitAlignment(
+            engine: engine,
+            node: node,
+            measured: measured,
+            horizontalGuide: guide,
+            passContext: passContext
+          )
+        },
+        explicitVerticalAlignmentHandler: { engine, node, measured, guide, passContext in
+          workerProxy.explicitAlignment(
+            engine: engine,
+            node: node,
+            measured: measured,
+            verticalGuide: guide,
+            passContext: passContext
+          )
         }
       )
     } else {
@@ -404,6 +537,52 @@ public struct AnyLayout: Layout {
   /// Forwards the erased layout's placement reuse signature.
   public var placementReuseSignature: String? {
     box.placementReuseSignature
+  }
+
+  /// The erased layout's traits. `AnyLayout`'s own static
+  /// ``Layout/layoutProperties`` stays the default because the traits are
+  /// only known per erased instance; `LayoutContainer` reads this instead.
+  package var resolvedLayoutProperties: LayoutProperties {
+    box.layoutProperties
+  }
+
+  /// Forwards the erased layout's preferred spacing.
+  public func spacing(subviews: LayoutSubviews, cache: inout Cache) -> ViewSpacing {
+    box.spacing(subviews: subviews, cache: &cache.storage)
+  }
+
+  /// Forwards the erased layout's explicit horizontal alignment answer.
+  public func explicitAlignment(
+    of guide: HorizontalAlignment,
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Cache
+  ) -> Int? {
+    box.explicitAlignment(
+      of: guide,
+      in: bounds,
+      proposal: proposal,
+      subviews: subviews,
+      cache: &cache.storage
+    )
+  }
+
+  /// Forwards the erased layout's explicit vertical alignment answer.
+  public func explicitAlignment(
+    of guide: VerticalAlignment,
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Cache
+  ) -> Int? {
+    box.explicitAlignment(
+      of: guide,
+      in: bounds,
+      proposal: proposal,
+      subviews: subviews,
+      cache: &cache.storage
+    )
   }
 
   // Widened from `fileprivate` to file-internal so `LayoutContainer` (in

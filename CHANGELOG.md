@@ -8,6 +8,29 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- **Custom `Layout` container contract.** `Layout` gains three defaulted
+  members that let a custom container participate in its *parent's* layout
+  the way built-in stacks do: `static var layoutProperties: LayoutProperties`
+  declares a stack orientation that `Spacer` and `Divider` children observe
+  (`HStackLayout` and `VStackLayout` now declare theirs, so
+  `HStackLayout { Text("a"); Spacer() }` behaves like `HStack`, and switching
+  an `AnyLayout` between the two flips the spacer's axis); `spacing(subviews:
+  cache:)` states the container's preferred outer spacing, which the parent
+  stack negotiates with (the default is the union of the subviews'
+  preferences, so nested declarations flow upward); and two
+  `explicitAlignment(of:in:proposal:subviews:cache:)` overloads answer a
+  horizontal or vertical guide for the container in its own zero-origin
+  bounds, honoured by `VStack(alignment:)`, `HStack(alignment:)`,
+  `frame(alignment:)`, and overlays, with an `alignmentGuide` modifier on the
+  container still taking precedence. `ViewSpacing` gains `zero`, `union(_:)`,
+  and `formUnion(_:)`. Every hook is carried through `AnyLayout` erasure and
+  runs on the frame-tail worker with the rest of the layout; answers are
+  memoized per pass. A layout that declares no orientation now clears an
+  axis inherited from an enclosing stack instead of leaking it into its
+  children.
+
 ## [0.9.12] - 2026-08-30
 
 ### Added

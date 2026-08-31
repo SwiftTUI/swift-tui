@@ -81,6 +81,7 @@ classifications:
     - SwiftTUIViews.Label
     - SwiftTUIViews.LabeledContent
     - SwiftTUIViews.Layout
+    - SwiftTUIViews.LayoutProperties
     - SwiftTUIViews.LayoutValueKey
     - SwiftTUIViews.LazyHStack
     - SwiftTUIViews.LazyVStack

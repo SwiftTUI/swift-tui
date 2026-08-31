@@ -47,7 +47,8 @@ extension LayoutEngine {
     let spacingBudget = resolvedStackSpacings(
       for: children,
       axis: axis,
-      spacingOverride: spacing
+      spacingOverride: spacing,
+      passContext: passContext
     ).reduce(0, +)
     let availableMain = max(0, proposedMain - spacingBudget)
 

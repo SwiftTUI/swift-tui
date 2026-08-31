@@ -79,6 +79,7 @@ Lowering helpers remain package-only implementation details.
 ### Layout
 
 - ``Layout``
+- ``LayoutProperties``
 - ``AnyLayout``
 - ``HStackLayout``
 - ``VStackLayout``

@@ -282,6 +282,38 @@ are omitted even when SwiftUI exposes a corresponding API.
   builds against a fresh `makeCache` pass
   (`layout.persistedCacheDivergence`). `SWIFTTUI_PERSISTENT_LAYOUT_CACHE=0`
   restores per-pass scratch wholesale.
+- **`LayoutProperties` carries `stackOrientation` only.** *Ratified.* A
+  custom `Layout` declares its axis through `static layoutProperties`, and
+  the container installs it before its children resolve, so `Spacer` and
+  `Divider` follow a custom container exactly as they follow a built-in
+  stack; `HStackLayout` and `VStackLayout` declare theirs. A layout that
+  declares no orientation clears an axis inherited from an enclosing stack —
+  a spacer inside a non-stack container is flexible on both axes. SwiftUI's
+  further properties have no terminal meaning yet and are omitted.
+- **`ViewSpacing` is per axis, not per edge.** *Provisional.* SwiftUI keeps a
+  preference per edge and resolves leading/trailing through layout direction;
+  SwiftTUI has no layout direction and the stack engine negotiates one value
+  per axis, so `Layout.spacing(subviews:cache:)` returns horizontal and
+  vertical preferences (`nil` = none; the engine then uses one cell between
+  horizontal neighbours and none between vertical ones). The default
+  implementation is the union of the subviews' preferences. The declaration
+  is read at the stack's direct child, so a `padding` or `frame` wrapper
+  around the container presents its own (empty) preference. A per-edge model
+  would be an additive change.
+- **Explicit alignment hooks are cache reads in zero-origin bounds.**
+  *Ratified.* `explicitAlignment(of:in:proposal:subviews:cache:)` receives
+  the container's own frame with a zero origin and returns the guide in the
+  container's coordinate space, like an `alignmentGuide` closure; the
+  `alignmentGuide` modifier on the container takes precedence. Both it and
+  `spacing` see the cache prepared for the measured proposal (spacing: a
+  fresh cache) and their mutations are discarded; the engine asks once per
+  question per pass. Built-in stacks report only their plain dimensions and
+  modifier guides to *their* parents — they do not aggregate child guides.
+- **`ZStack` inherits the enclosing stack's axis.** *Gap.* `ZStack` leaves the
+  stack axis untouched, so a `Spacer` directly inside a `ZStack` nested in a
+  `VStack` is flexible vertically only; SwiftUI treats it as flexible on both
+  axes. Custom layouts without a declared orientation now clear the axis;
+  `ZStack` is recorded, not changed.
 - **Engine re-entry nesting has a depth budget.** *Ratified.* A nested
   custom layout or hosted-collection (`List`/`Table`) windowing container
   re-enters the engine on the native call stack when measured, so nesting is

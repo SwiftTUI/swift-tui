@@ -75,7 +75,13 @@ Prefer the built-in containers. Lists, tables, outline groups, and lazy
 stacks are covered in <doc:Collections>, scrolling containers in
 <doc:Scrolling>, and split views and tab shells in <doc:Navigation-And-Tabs>.
 Reach for a custom ``Layout`` only for a reusable layout rule that stacks and
-frames cannot express clearly.
+frames cannot express clearly. A custom layout takes part in its parent's
+layout through three defaulted members: ``Layout/layoutProperties`` declares
+the axis its `Spacer` and `Divider` children follow,
+``Layout/spacing(subviews:cache:)`` states the spacing the parent stack keeps
+around the container, and the two `explicitAlignment(of:in:proposal:subviews:cache:)`
+overloads answer a horizontal or vertical alignment guide for the container as
+a whole.
 
 ## Style With Modifiers
 

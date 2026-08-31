@@ -258,7 +258,7 @@ extension Bindable: DynamicProperty {
 }
 
 /// The primary axis used by directional layout and scrolling APIs.
-public enum Axis {
+public enum Axis: Sendable {
   case horizontal
   case vertical
 
@@ -315,13 +315,60 @@ public struct ScrollCellOffset: Equatable, Sendable {
 }
 
 /// Preferred spacing metadata exchanged between layout participants.
+///
+/// A `nil` axis means "no preference": when a stack negotiates the gap
+/// between two siblings it substitutes its defaults — one cell between
+/// horizontal neighbours, none between vertical ones. Spacing is per axis
+/// rather than per edge; SwiftTUI has no layout direction, so there is no
+/// leading/trailing distinction to keep.
 public struct ViewSpacing: Sendable, Equatable {
   public var horizontal: Int?
   public var vertical: Int?
 
+  /// A spacing that asks for no gap on either axis.
+  public static let zero = ViewSpacing(horizontal: 0, vertical: 0)
+
   public init(horizontal: Int? = nil, vertical: Int? = nil) {
     self.horizontal = horizontal
     self.vertical = vertical
+  }
+
+  /// The core-layer spacing this value carries, or comes from.
+  package init(_ spacing: Spacing) {
+    self.init(horizontal: spacing.horizontal, vertical: spacing.vertical)
+  }
+
+  package var coreSpacing: Spacing {
+    Spacing(horizontal: horizontal, vertical: vertical)
+  }
+
+  /// The union of two preferences: on each axis, the larger of the two
+  /// requests, or the one that exists when only one side has a preference.
+  /// This is how a container combines its subviews' preferences into its own
+  /// (the default ``Layout/spacing(subviews:cache:)``).
+  public func union(_ other: ViewSpacing) -> ViewSpacing {
+    ViewSpacing(
+      horizontal: Self.unionAxis(horizontal, other.horizontal),
+      vertical: Self.unionAxis(vertical, other.vertical)
+    )
+  }
+
+  /// Replaces this value with its ``union(_:)`` with `other`.
+  public mutating func formUnion(_ other: ViewSpacing) {
+    self = union(other)
+  }
+
+  private static func unionAxis(_ lhs: Int?, _ rhs: Int?) -> Int? {
+    switch (lhs, rhs) {
+    case (let lhs?, let rhs?):
+      return max(lhs, rhs)
+    case (let lhs?, nil):
+      return lhs
+    case (nil, let rhs?):
+      return rhs
+    case (nil, nil):
+      return nil
+    }
   }
 
   /// Returns the preferred distance between this spacing value and the next

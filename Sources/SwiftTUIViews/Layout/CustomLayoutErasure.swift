@@ -29,6 +29,28 @@ protocol AnyLayoutBox: Sendable {
   var builtinLayoutBehavior: LayoutBehavior? { get }
   var measurementReuseSignature: String? { get }
   var placementReuseSignature: String? { get }
+  var layoutProperties: LayoutProperties { get }
+
+  func spacing(
+    subviews: LayoutSubviews,
+    cache: inout any Sendable
+  ) -> ViewSpacing
+
+  func explicitAlignment(
+    of guide: HorizontalAlignment,
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout any Sendable
+  ) -> Int?
+
+  func explicitAlignment(
+    of guide: VerticalAlignment,
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout any Sendable
+  ) -> Int?
 
   func makeCache(subviews: LayoutSubviews) -> any Sendable
 
@@ -68,6 +90,58 @@ struct ConcreteAnyLayoutBox<L: Layout>: AnyLayoutBox {
 
   var placementReuseSignature: String? {
     layout.placementReuseSignature
+  }
+
+  var layoutProperties: LayoutProperties {
+    L.layoutProperties
+  }
+
+  func spacing(
+    subviews: LayoutSubviews,
+    cache: inout any Sendable
+  ) -> ViewSpacing {
+    var typedCache = (cache as? L.Cache) ?? layout.makeCache(subviews: subviews)
+    let spacing = layout.spacing(subviews: subviews, cache: &typedCache)
+    cache = typedCache
+    return spacing
+  }
+
+  func explicitAlignment(
+    of guide: HorizontalAlignment,
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout any Sendable
+  ) -> Int? {
+    var typedCache = (cache as? L.Cache) ?? layout.makeCache(subviews: subviews)
+    let answer = layout.explicitAlignment(
+      of: guide,
+      in: bounds,
+      proposal: proposal,
+      subviews: subviews,
+      cache: &typedCache
+    )
+    cache = typedCache
+    return answer
+  }
+
+  func explicitAlignment(
+    of guide: VerticalAlignment,
+    in bounds: LayoutRect,
+    proposal: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout any Sendable
+  ) -> Int? {
+    var typedCache = (cache as? L.Cache) ?? layout.makeCache(subviews: subviews)
+    let answer = layout.explicitAlignment(
+      of: guide,
+      in: bounds,
+      proposal: proposal,
+      subviews: subviews,
+      cache: &typedCache
+    )
+    cache = typedCache
+    return answer
   }
 
   func makeCache(subviews: LayoutSubviews) -> any Sendable {
@@ -266,6 +340,175 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
         idealSize: idealMeasurement.measuredSize,
         contentMinimum: contentMinimum
       )
+  }
+
+  // MARK: Container contract (plan 2026-08-31-001)
+
+  /// The layout's declared outer spacing for `node`'s parent. Runs the
+  /// author's `spacing(subviews:cache:)` against a fresh cache — the hook
+  /// has no proposal to key a shared cache by, and the persistent store is
+  /// proposal-keyed — under the same accounting as `sizeThatFits`. The
+  /// handle memoizes the answer per pass, so this runs once per container
+  /// per pass when a pass context is present.
+  func preferredSpacing(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    passContext: LayoutPassContext?
+  ) -> Spacing {
+    withContainerHookScope(
+      engine: engine,
+      node: node,
+      passContext: passContext,
+      refused: Spacing()
+    ) { probeEngine in
+      let subviews = layoutSubviews(
+        for: node,
+        engine: probeEngine,
+        passContext: passContext
+      )
+      var cache = layout.makeCache(subviews: subviews)
+      layout.updateCache(&cache, subviews: subviews)
+      return layout.spacing(subviews: subviews, cache: &cache).coreSpacing
+    }
+  }
+
+  /// The layout's answer for a horizontal `guide` in its zero-origin
+  /// bounds, against the cache prepared for the proposal it was measured
+  /// under. Mutations to that cache are discarded — the hook is a read.
+  func explicitAlignment(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    horizontalGuide guide: HorizontalAlignment,
+    passContext: LayoutPassContext?
+  ) -> Int? {
+    explicitAlignmentAnswer(
+      engine: engine,
+      node: node,
+      measured: measured,
+      passContext: passContext
+    ) { layout, bounds, subviews, cache in
+      layout.explicitAlignment(
+        of: guide,
+        in: bounds,
+        proposal: measured.proposal,
+        subviews: subviews,
+        cache: &cache
+      )
+    }
+  }
+
+  /// The vertical counterpart of the horizontal `explicitAlignment`.
+  func explicitAlignment(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    verticalGuide guide: VerticalAlignment,
+    passContext: LayoutPassContext?
+  ) -> Int? {
+    explicitAlignmentAnswer(
+      engine: engine,
+      node: node,
+      measured: measured,
+      passContext: passContext
+    ) { layout, bounds, subviews, cache in
+      layout.explicitAlignment(
+        of: guide,
+        in: bounds,
+        proposal: measured.proposal,
+        subviews: subviews,
+        cache: &cache
+      )
+    }
+  }
+
+  private func explicitAlignmentAnswer(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    passContext: LayoutPassContext?,
+    _ ask: (L, CellRect, LayoutSubviews, inout L.Cache) -> Int?
+  ) -> Int? {
+    withContainerHookScope(
+      engine: engine,
+      node: node,
+      passContext: passContext,
+      refused: nil
+    ) { probeEngine in
+      let subviews = layoutSubviews(
+        for: node,
+        engine: probeEngine,
+        passContext: passContext
+      )
+      let prepared = preparedCache(
+        for: node,
+        proposal: measured.proposal,
+        subviews: subviews,
+        passContext: passContext
+      )
+      var cache = prepared.cache
+      let bounds = CellRect(origin: .zero, size: measured.measuredSize)
+      let answer = ask(layout, bounds, subviews, &cache)
+      #if DEBUG
+        // Divergence check, alignment leg (plan 2026-08-31-001, after the
+        // size and placement legs of plan 2026-08-11-004 Stage 2): a
+        // guide answered from a persisted cache must match the answer a
+        // fresh makeCache pass gives. Record-only, like the other legs.
+        if prepared.persisted {
+          var freshCache = layout.makeCache(subviews: subviews)
+          layout.updateCache(&freshCache, subviews: subviews)
+          let freshAnswer = ask(layout, bounds, subviews, &freshCache)
+          if freshAnswer != answer {
+            passContext?.recordRuntimeIssue(
+              RuntimeIssue(
+                severity: .error,
+                code: "layout.persistedCacheDivergence",
+                message:
+                  "a persisted Layout.Cache answered an explicit alignment guide "
+                  + "differently from a fresh makeCache pass; the author cache carries "
+                  + "pass-coupled state",
+                identity: node.identity,
+                source: debugName
+              )
+            )
+          }
+        }
+      #endif
+      return answer
+    }
+  }
+
+  /// Runs one container-contract hook under the accounting `sizeThatFits`
+  /// gets: a probe-graded engine (subview measures inside the hook are
+  /// author probes, not committed products), an isolated issued-proposal
+  /// frame so those probes never land in an enclosing container's
+  /// snapshot, and the compatibility depth boundary. A refused boundary
+  /// returns `refused` without running author code, matching
+  /// `measureContainer`'s truncation.
+  private func withContainerHookScope<Answer>(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    passContext: LayoutPassContext?,
+    refused: Answer,
+    _ body: (LayoutEngine) -> Answer
+  ) -> Answer {
+    guard
+      passContext?.enterCustomLayoutCompatibilityBoundary(
+        identity: node.identity,
+        debugName: debugName,
+        phase: .measurement
+      ) ?? true
+    else {
+      return refused
+    }
+    defer {
+      passContext?.exitCustomLayoutCompatibilityBoundary()
+    }
+    passContext?.pushIssuedProposalProbeFrame()
+    defer {
+      passContext?.popIssuedProposalProbeFrame()
+    }
+    return body(engine.withDefaultMeasurementGrade(.probe))
   }
 
   func placeSubviews(
@@ -599,6 +842,16 @@ struct LayoutContainer<Content: View>: PrimitiveView, ResolvableView {
   var content: Content
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    // The container's declared orientation reaches its children the way a
+    // built-in stack's does (plan 2026-08-31-001): `Spacer` and `Divider`
+    // read `\.stackAxis` at resolve time. Installed unconditionally — a
+    // layout that declares no orientation clears an axis inherited from an
+    // enclosing stack, so a spacer inside a non-stack layout is flexible on
+    // both axes rather than on whatever axis the parent happened to have.
+    let childContext = context.settingEnvironment(
+      \.stackAxis,
+      to: layout.resolvedLayoutProperties.stackOrientation.map(coreAxis)
+    )
     // AnyView policy: layout containers must flatten builder output at the
     // `resolveElements` layer, not after `normalizeResolvedElements`. If we
     // resolved each authored child as a single node, any direct child that
@@ -608,7 +861,7 @@ struct LayoutContainer<Content: View>: PrimitiveView, ResolvableView {
     let resolvedChildren = withAuthoringContext(authoringScope) {
       resolveDeclaredChildren(
         content,
-        in: context,
+        in: childContext,
         kindName: "Layout"
       )
     }
@@ -623,5 +876,15 @@ struct LayoutContainer<Content: View>: PrimitiveView, ResolvableView {
         layoutBehavior: layout.resolvedBehavior
       )
     ]
+  }
+}
+
+/// The core-layer axis for an authoring-layer `Axis`.
+private func coreAxis(_ axis: Axis) -> SwiftTUICore.Axis {
+  switch axis {
+  case .horizontal:
+    return .horizontal
+  case .vertical:
+    return .vertical
   }
 }

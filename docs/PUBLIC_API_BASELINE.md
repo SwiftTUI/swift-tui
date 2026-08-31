@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 317 | 1795 |
+| `SwiftTUIViews` | 318 | 1814 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -126,7 +126,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (317)
+### Canonical surface (318)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 6 members
@@ -139,7 +139,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnimationState` — struct — 2 members
 - `AnimationTimelineSchedule` — struct — 7 members
 - `AnyButtonStyle` — struct — 8 members
-- `AnyLayout` — struct — 10 members
+- `AnyLayout` — struct — 13 members
 - `AnyListStyle` — struct — 6 members
 - `AnyOutlineStyle` — struct — 6 members
 - `AnyPickerStyle` — struct — 8 members
@@ -239,7 +239,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `GroupBox` — struct — 3 members
 - `HorizontalAlignmentGuideModifier` — struct
 - `HStack` — struct — 3 members
-- `HStackLayout` — struct — 5 members
+- `HStackLayout` — struct — 6 members
 - `IDModifier` — struct
 - `IgnoreSafeAreaModifier` — struct
 - `Image` — struct — 9 members
@@ -264,8 +264,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `KeyPressModifier` — struct
 - `Label` — struct — 3 members
 - `LabeledContent` — struct — 3 members
-- `Layout` — protocol — 12 members
+- `Layout` — protocol — 20 members
 - `LayoutPoint` — typealias
+- `LayoutProperties` — struct — 2 members
 - `LayoutRect` — typealias
 - `LayoutSize` — typealias
 - `LayoutSubview` — struct — 8 members
@@ -434,10 +435,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member
-- `ViewSpacing` — struct — 4 members
+- `ViewSpacing` — struct — 7 members
 - `ViewThatFits` — struct — 2 members
 - `VStack` — struct — 3 members
-- `VStackLayout` — struct — 5 members
+- `VStackLayout` — struct — 6 members
 - `WarningToastStyle` — struct — 2 members
 - `withAnimation(_:_:)` — func
 - `withAnimation(_:completionCriteria:_:completion:)` — func

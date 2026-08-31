@@ -5,6 +5,11 @@ public struct HStackLayout: Layout, BuiltinLayoutBehaviorProviding {
   public var alignment: VerticalAlignment
   public var spacing: Int?
 
+  /// A horizontal stack: `Spacer` and `Divider` children follow the row.
+  public static var layoutProperties: LayoutProperties {
+    LayoutProperties(stackOrientation: .horizontal)
+  }
+
   /// Creates a horizontal stack layout.
   public init(
     alignment: VerticalAlignment = .center,
@@ -54,6 +59,11 @@ public struct HStackLayout: Layout, BuiltinLayoutBehaviorProviding {
 public struct VStackLayout: Layout, BuiltinLayoutBehaviorProviding {
   public var alignment: HorizontalAlignment
   public var spacing: Int?
+
+  /// A vertical stack: `Spacer` and `Divider` children follow the column.
+  public static var layoutProperties: LayoutProperties {
+    LayoutProperties(stackOrientation: .vertical)
+  }
 
   /// Creates a vertical stack layout.
   public init(

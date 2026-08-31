@@ -94,7 +94,8 @@ extension LayoutEngine {
         axis: .vertical,
         spacing: spacing,
         horizontalAlignment: horizontalAlignment,
-        verticalAlignment: .center
+        verticalAlignment: .center,
+        passContext: passContext
       )
     case .stack(
       axis: .horizontal, let spacing,
@@ -107,7 +108,8 @@ extension LayoutEngine {
         axis: .horizontal,
         spacing: spacing,
         horizontalAlignment: .center,
-        verticalAlignment: verticalAlignment
+        verticalAlignment: verticalAlignment,
+        passContext: passContext
       )
     case .lazyStack(
       axis: .vertical, let spacing, let horizontalAlignment,
@@ -272,10 +274,12 @@ extension LayoutEngine {
             for: child,
             measured: childMeasurement,
             in: bounds,
-            alignment: alignment
+            alignment: alignment,
+            passContext: passContext
           )
             ?? alignedOrigin(
-              for: viewDimensions(for: child, measured: childMeasurement),
+              for: viewDimensions(
+                for: child, measured: childMeasurement, passContext: passContext),
               in: bounds,
               alignment: alignment
             )

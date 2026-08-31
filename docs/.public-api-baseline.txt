@@ -3024,6 +3024,8 @@ SwiftTUIViews.AnyButtonStyle.plain
 SwiftTUIViews.AnyLayout
 SwiftTUIViews.AnyLayout.Cache
 SwiftTUIViews.AnyLayout.callAsFunction(content:)
+SwiftTUIViews.AnyLayout.explicitAlignment(of:in:proposal:subviews:cache:)
+SwiftTUIViews.AnyLayout.explicitAlignment(of:in:proposal:subviews:cache:)
 SwiftTUIViews.AnyLayout.init(_:)
 SwiftTUIViews.AnyLayout.init(_:)
 SwiftTUIViews.AnyLayout.makeCache(subviews:)
@@ -3031,6 +3033,7 @@ SwiftTUIViews.AnyLayout.measurementReuseSignature
 SwiftTUIViews.AnyLayout.placeSubviews(in:proposal:subviews:cache:)
 SwiftTUIViews.AnyLayout.placementReuseSignature
 SwiftTUIViews.AnyLayout.sizeThatFits(proposal:subviews:cache:)
+SwiftTUIViews.AnyLayout.spacing(subviews:cache:)
 SwiftTUIViews.AnyLayout.updateCache(_:subviews:)
 SwiftTUIViews.AnyListStyle
 SwiftTUIViews.AnyListStyle.automatic
@@ -3554,6 +3557,7 @@ SwiftTUIViews.HStack.spacing
 SwiftTUIViews.HStackLayout
 SwiftTUIViews.HStackLayout.alignment
 SwiftTUIViews.HStackLayout.init(alignment:spacing:)
+SwiftTUIViews.HStackLayout.layoutProperties
 SwiftTUIViews.HStackLayout.placeSubviews(in:proposal:subviews:cache:)
 SwiftTUIViews.HStackLayout.sizeThatFits(proposal:subviews:cache:)
 SwiftTUIViews.HStackLayout.spacing
@@ -3666,6 +3670,12 @@ SwiftTUIViews.LabeledContent.init(content:label:)
 SwiftTUIViews.Layout
 SwiftTUIViews.Layout.Cache
 SwiftTUIViews.Layout.callAsFunction(content:)
+SwiftTUIViews.Layout.explicitAlignment(of:in:proposal:subviews:cache:)
+SwiftTUIViews.Layout.explicitAlignment(of:in:proposal:subviews:cache:)
+SwiftTUIViews.Layout.explicitAlignment(of:in:proposal:subviews:cache:)
+SwiftTUIViews.Layout.explicitAlignment(of:in:proposal:subviews:cache:)
+SwiftTUIViews.Layout.layoutProperties
+SwiftTUIViews.Layout.layoutProperties
 SwiftTUIViews.Layout.makeCache(subviews:)
 SwiftTUIViews.Layout.makeCache(subviews:)
 SwiftTUIViews.Layout.measurementReuseSignature
@@ -3674,9 +3684,14 @@ SwiftTUIViews.Layout.placeSubviews(in:proposal:subviews:cache:)
 SwiftTUIViews.Layout.placementReuseSignature
 SwiftTUIViews.Layout.placementReuseSignature
 SwiftTUIViews.Layout.sizeThatFits(proposal:subviews:cache:)
+SwiftTUIViews.Layout.spacing(subviews:cache:)
+SwiftTUIViews.Layout.spacing(subviews:cache:)
 SwiftTUIViews.Layout.updateCache(_:subviews:)
 SwiftTUIViews.Layout.updateCache(_:subviews:)
 SwiftTUIViews.LayoutPoint
+SwiftTUIViews.LayoutProperties
+SwiftTUIViews.LayoutProperties.init(stackOrientation:)
+SwiftTUIViews.LayoutProperties.stackOrientation
 SwiftTUIViews.LayoutRect
 SwiftTUIViews.LayoutSize
 SwiftTUIViews.LayoutSubview
@@ -4524,6 +4539,7 @@ SwiftTUIViews.VStack.spacing
 SwiftTUIViews.VStackLayout
 SwiftTUIViews.VStackLayout.alignment
 SwiftTUIViews.VStackLayout.init(alignment:spacing:)
+SwiftTUIViews.VStackLayout.layoutProperties
 SwiftTUIViews.VStackLayout.placeSubviews(in:proposal:subviews:cache:)
 SwiftTUIViews.VStackLayout.sizeThatFits(proposal:subviews:cache:)
 SwiftTUIViews.VStackLayout.spacing
@@ -4725,9 +4741,12 @@ SwiftTUIViews.ViewModifierContent
 SwiftTUIViews.ViewModifierContent.body
 SwiftTUIViews.ViewSpacing
 SwiftTUIViews.ViewSpacing.distance(to:along:)
+SwiftTUIViews.ViewSpacing.formUnion(_:)
 SwiftTUIViews.ViewSpacing.horizontal
 SwiftTUIViews.ViewSpacing.init(horizontal:vertical:)
+SwiftTUIViews.ViewSpacing.union(_:)
 SwiftTUIViews.ViewSpacing.vertical
+SwiftTUIViews.ViewSpacing.zero
 SwiftTUIViews.ViewThatFits
 SwiftTUIViews.ViewThatFits.axes
 SwiftTUIViews.ViewThatFits.init(in:content:)

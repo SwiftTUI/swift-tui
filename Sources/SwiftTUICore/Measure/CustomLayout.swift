@@ -175,6 +175,20 @@ package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
 
 /// Reference wrapper used to carry a custom layout through the pipeline.
 package final class CustomLayoutHandle: CustomLayoutToken {
+  /// The container-contract hooks (plan 2026-08-31-001). Each answers one
+  /// question a *parent* asks about the container: its preferred outer
+  /// spacing, and its own value for a horizontal or vertical alignment
+  /// guide. The engine memoizes the answers on the pass context, so the
+  /// author hook behind a handler runs once per question per pass.
+  package typealias PreferredSpacingHandler =
+    @Sendable (LayoutEngine, ResolvedNode, LayoutPassContext?) -> Spacing
+  package typealias ExplicitHorizontalAlignmentHandler =
+    @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, HorizontalAlignment, LayoutPassContext?)
+    -> Int?
+  package typealias ExplicitVerticalAlignmentHandler =
+    @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, VerticalAlignment, LayoutPassContext?)
+    -> Int?
+
   package let proxy: any CustomLayoutProxy
   package let workerProxy: (any WorkerCustomLayoutProxy)?
   package let measurementReuseSignature: String?
@@ -188,6 +202,9 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     (
       @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Axis, Int, LayoutPassContext?) -> Int?
     )?
+  package let preferredSpacingHandler: PreferredSpacingHandler?
+  package let explicitHorizontalAlignmentHandler: ExplicitHorizontalAlignmentHandler?
+  package let explicitVerticalAlignmentHandler: ExplicitVerticalAlignmentHandler?
 
   package init(
     _ proxy: some CustomLayoutProxy,
@@ -200,6 +217,9 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     self.placementReuseSignature = placementReuseSignature
     placementHandler = nil
     stackMinimumMainSizeHandler = nil
+    preferredSpacingHandler = nil
+    explicitHorizontalAlignmentHandler = nil
+    explicitVerticalAlignmentHandler = nil
   }
 
   package init(
@@ -215,7 +235,10 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     stackMinimumMainSizeHandler:
       (
         @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Axis, Int, LayoutPassContext?) -> Int?
-      )? = nil
+      )? = nil,
+    preferredSpacingHandler: PreferredSpacingHandler? = nil,
+    explicitHorizontalAlignmentHandler: ExplicitHorizontalAlignmentHandler? = nil,
+    explicitVerticalAlignmentHandler: ExplicitVerticalAlignmentHandler? = nil
   ) {
     self.proxy = proxy
     self.measurementReuseSignature = measurementReuseSignature
@@ -223,6 +246,9 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     self.workerProxy = workerProxy
     self.placementHandler = placementHandler
     self.stackMinimumMainSizeHandler = stackMinimumMainSizeHandler
+    self.preferredSpacingHandler = preferredSpacingHandler
+    self.explicitHorizontalAlignmentHandler = explicitHorizontalAlignmentHandler
+    self.explicitVerticalAlignmentHandler = explicitVerticalAlignmentHandler
   }
 
   package var debugName: String {
@@ -348,6 +374,86 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     passContext: LayoutPassContext?
   ) -> Int? {
     stackMinimumMainSizeHandler?(engine, node, idealMeasurement, axis, contentMinimum, passContext)
+  }
+
+  // MARK: Container contract (plan 2026-08-31-001)
+
+  /// The layout's declared outer spacing, or `nil` when this handle carries
+  /// no spacing hook (a main-actor-only proxy built without one). Memoized
+  /// per identity on the pass context; without a pass context the hook runs
+  /// for every question (direct engine callers, the structural min/max
+  /// traversals).
+  package func preferredSpacing(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    passContext: LayoutPassContext?
+  ) -> Spacing? {
+    guard let preferredSpacingHandler else {
+      return nil
+    }
+    if let memo = passContext?.customLayoutSpacingMemo(for: node.identity) {
+      return memo
+    }
+    let spacing = preferredSpacingHandler(engine, node, passContext)
+    passContext?.recordCustomLayoutSpacingMemo(spacing, for: node.identity)
+    return spacing
+  }
+
+  /// Whether this handle can answer explicit alignment guides at all. A
+  /// `false` lets the alignment fast paths skip the hook without asking.
+  package var answersExplicitAlignment: Bool {
+    explicitHorizontalAlignmentHandler != nil || explicitVerticalAlignmentHandler != nil
+  }
+
+  /// The container's own value for `guide` in its zero-origin bounds, or
+  /// `nil` for the guide's default. Memoized per identity, proposal, and
+  /// guide on the pass context.
+  package func explicitAlignment(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    horizontalGuide guide: HorizontalAlignment,
+    passContext: LayoutPassContext?
+  ) -> Int? {
+    guard let explicitHorizontalAlignmentHandler else {
+      return nil
+    }
+    let key = CustomLayoutAlignmentMemoKey(
+      identity: node.identity,
+      proposal: measured.proposal,
+      axis: .horizontal,
+      guide: guide.key
+    )
+    if let memo = passContext?.customLayoutAlignmentMemo(for: key) {
+      return memo
+    }
+    let answer = explicitHorizontalAlignmentHandler(engine, node, measured, guide, passContext)
+    passContext?.recordCustomLayoutAlignmentMemo(answer, for: key)
+    return answer
+  }
+
+  package func explicitAlignment(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    verticalGuide guide: VerticalAlignment,
+    passContext: LayoutPassContext?
+  ) -> Int? {
+    guard let explicitVerticalAlignmentHandler else {
+      return nil
+    }
+    let key = CustomLayoutAlignmentMemoKey(
+      identity: node.identity,
+      proposal: measured.proposal,
+      axis: .vertical,
+      guide: guide.key
+    )
+    if let memo = passContext?.customLayoutAlignmentMemo(for: key) {
+      return memo
+    }
+    let answer = explicitVerticalAlignmentHandler(engine, node, measured, guide, passContext)
+    passContext?.recordCustomLayoutAlignmentMemo(answer, for: key)
+    return answer
   }
 }
 

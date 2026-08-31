@@ -54,29 +54,108 @@ extension LayoutEngine {
     for child: ResolvedNode,
     measured childMeasurement: MeasuredNode,
     in bounds: CellRect,
-    alignment: Alignment
+    alignment: Alignment,
+    passContext: LayoutPassContext? = nil
   ) -> CellPoint? {
+    // A custom-layout child may answer the requested guide itself (plan
+    // 2026-08-31-001). The fast path is exact only when neither the child's
+    // modifier metadata nor its layout has an answer, so ask the layout
+    // (memoized per pass) rather than blanket-routing custom children to
+    // the slow path — the two paths differ for oversize children.
+    let customHandle = customLayoutHandleAnsweringAlignment(for: child)
+    let hasExplicitHorizontalGuide =
+      child.layoutMetadata.hasExplicitHorizontalAlignmentGuide(alignment.horizontal)
+      || customHandle?.explicitAlignment(
+        engine: self,
+        node: child,
+        measured: childMeasurement,
+        horizontalGuide: alignment.horizontal,
+        passContext: passContext
+      ) != nil
+    let hasExplicitVerticalGuide =
+      child.layoutMetadata.hasExplicitVerticalAlignmentGuide(alignment.vertical)
+      || customHandle?.explicitAlignment(
+        engine: self,
+        node: child,
+        measured: childMeasurement,
+        verticalGuide: alignment.vertical,
+        passContext: passContext
+      ) != nil
     guard
       let x = simpleAlignedCoordinate(
         childSize: childMeasurement.measuredSize.width,
         availableSize: bounds.size.width,
         origin: bounds.origin.x,
         alignment: alignment.horizontal,
-        hasExplicitGuide: child.layoutMetadata.hasExplicitHorizontalAlignmentGuide(
-          alignment.horizontal)
+        hasExplicitGuide: hasExplicitHorizontalGuide
       ),
       let y = simpleAlignedCoordinate(
         childSize: childMeasurement.measuredSize.height,
         availableSize: bounds.size.height,
         origin: bounds.origin.y,
         alignment: alignment.vertical,
-        hasExplicitGuide: child.layoutMetadata.hasExplicitVerticalAlignmentGuide(alignment.vertical)
+        hasExplicitGuide: hasExplicitVerticalGuide
       )
     else {
       return nil
     }
 
     return .init(x: x, y: y)
+  }
+
+  /// The custom-layout handle behind `node` when its layout can answer
+  /// explicit alignment guides, else `nil`.
+  private func customLayoutHandleAnsweringAlignment(
+    for node: ResolvedNode
+  ) -> CustomLayoutHandle? {
+    guard case .custom(let token) = node.layoutBehavior,
+      let handle = token as? CustomLayoutHandle,
+      handle.answersExplicitAlignment
+    else {
+      return nil
+    }
+    return handle
+  }
+
+  /// A node's own dimensions before any wrapper propagation or modifier
+  /// guides: plain width/height, or — for a custom-layout container whose
+  /// layout answers explicit alignment (plan 2026-08-31-001) — width/height
+  /// with lazy guide providers that ask the layout. The providers run only
+  /// when a parent reads that guide, and the handle memoizes each answer on
+  /// the pass context.
+  private func ownDimensions(
+    for node: ResolvedNode,
+    measured: MeasuredNode,
+    passContext: LayoutPassContext?
+  ) -> ViewDimensions {
+    let plain = ViewDimensions(
+      width: measured.measuredSize.width,
+      height: measured.measuredSize.height
+    )
+    guard let handle = customLayoutHandleAnsweringAlignment(for: node) else {
+      return plain
+    }
+    let engine = self
+    return
+      plain
+      .overridingHorizontalGuides { guide in
+        handle.explicitAlignment(
+          engine: engine,
+          node: node,
+          measured: measured,
+          horizontalGuide: guide,
+          passContext: passContext
+        )
+      }
+      .overridingVerticalGuides { guide in
+        handle.explicitAlignment(
+          engine: engine,
+          node: node,
+          measured: measured,
+          verticalGuide: guide,
+          passContext: passContext
+        )
+      }
   }
 
   package func simpleAlignedCoordinate(
@@ -128,10 +207,11 @@ extension LayoutEngine {
   package func overlayAlignmentMetrics(
     for children: [ResolvedNode],
     childMeasurements: [MeasuredNode],
-    alignment: Alignment
+    alignment: Alignment,
+    passContext: LayoutPassContext? = nil
   ) -> (leading: Int, trailing: Int, top: Int, bottom: Int) {
     let dimensions = zip(children, childMeasurements).map { child, measurement in
-      viewDimensions(for: child, measured: measurement)
+      viewDimensions(for: child, measured: measurement, passContext: passContext)
     }
 
     let leading = dimensions.map { max(0, $0[alignment.horizontal]) }.max() ?? 0
@@ -144,7 +224,8 @@ extension LayoutEngine {
 
   package func viewDimensions(
     for resolved: ResolvedNode,
-    measured: MeasuredNode
+    measured: MeasuredNode,
+    passContext: LayoutPassContext? = nil
   ) -> ViewDimensions {
     // Iterative wrapper-chain walk. The previous per-level recursion copied
     // an inline `LayoutBehavior` (~1.6 kB) onto the stack at every hop and
@@ -262,9 +343,13 @@ extension LayoutEngine {
           )
         }
       } else {
-        baseDimensions = ViewDimensions(
-          width: levelMeasured.measuredSize.width,
-          height: levelMeasured.measuredSize.height
+        // The chain's innermost level: the node whose own dimensions the
+        // wrappers above propagate. A custom container answers its guides
+        // here (plan 2026-08-31-001).
+        baseDimensions = ownDimensions(
+          for: levelResolved,
+          measured: levelMeasured,
+          passContext: passContext
         )
       }
 

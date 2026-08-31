@@ -143,6 +143,6 @@ package struct LayoutEngine: Sendable {
     passContext: LayoutPassContext?
   ) -> ViewDimensions {
     let measured = measure(resolved, proposal: proposal, passContext: passContext)
-    return viewDimensions(for: resolved, measured: measured)
+    return viewDimensions(for: resolved, measured: measured, passContext: passContext)
   }
 }
