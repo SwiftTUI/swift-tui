@@ -11,6 +11,19 @@ name: Release Soundness Lane
 # not moved since its last green run (§6 guard), which also answers the
 # reason the earlier cron was removed: a red can only settle onto a commit
 # this lane has not yet passed, never re-fail one it already cleared.
+#
+# Shape (since 2026-08-31): the Repo Gate's shape, in release. One job per
+# part — `core` (SwiftTUICoreTests, the isolated SwiftTUITests launches, then
+# the signal-only flaky step) and one serialized SwiftTUITests shard each for
+# the rows of Scripts/data/runtime-shards.txt — plus the actor data-race
+# variant, every one in the swift-tui-linux image with gdb and SYS_PTRACE so
+# the per-launch silence watchdog can dump a wedge instead of burning the
+# cap. Each job builds release once and runs its launches with --skip-build;
+# `record` merges the parts' soundness traces, scans them once against the
+# exact-count ledger, and only then records the verdict. Until this the lane
+# ran all of SwiftTUITests in ONE parallel `swift test` — ~1,600 tests in
+# flight on a four-vCPU runner — and had not been green since 2026-08-04
+# (flake register entry 20 records the two failure shapes).
 
 on:
   workflow_dispatch:
@@ -34,18 +47,29 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SWIFTLY_VERSION: "1.1.3"
   # Full stress churn-loop iteration counts (plan 2026-08-25-001 Stage 2b):
   # the push gate runs the hot-path counts; this lane restores the full ones.
   SWIFTTUI_STRESS_FULL: "1"
-  # This is the most contended lane in the org: the whole suite in parallel, in
-  # release, with the full stress counts. Run-loop animation tests get a
-  # fraction of real time here, so bounds written for an interactive machine
-  # expire while the animation is still mid-flight — on 2026-08-26 that showed
-  # up as six `ContentTransition` roll pins reading a mid-roll frame and four
-  # animator waits timing out, all of which pass in release locally. The
-  # deadlines are what get stretched; every expectation still has to hold.
+  # Release, with the probe on every frame and the full stress counts, is
+  # still the heaviest configuration in the org even serialized. Run-loop
+  # animation tests get less real time here than on an interactive machine,
+  # so bounds written for one expire while the animation is still mid-flight
+  # — on 2026-08-26 that showed up as six `ContentTransition` roll pins
+  # reading a mid-roll frame and four animator waits timing out, all of
+  # which pass in release locally. The deadlines are what get stretched;
+  # every expectation still has to hold.
   SWIFTTUI_TEST_TIMEOUT_SCALE: "4"
+  # Per-launch silence watchdog (Scripts/lib/step_watchdog.sh), sized with
+  # the 60-minute cap the test jobs carry: worst-case kill of a silent launch
+  # = 600 idle + 300 busy grace + 10 kill grace = 910 s, and the
+  # livelock-while-printing backstop at 2400 s fits too. The release build
+  # runs outside the watchdog (its whole-module test compile is silent for
+  # ten-plus minutes while busy); the job cap bounds it.
+  SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "600"
+  SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS: "300"
+  SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS: "2400"
+  SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "3600"
+  SWIFTTUI_HANG_DIAGNOSTICS: "1"
 
 jobs:
   changes:
@@ -66,85 +90,70 @@ jobs:
           lane: release-soundness
 
   release-soundness:
-    name: Release soundness lane
+    name: Release soundness (${{ matrix.part }})
     runs-on: ubuntu-24.04
+    container:
+      # Tracks .swift-version — bump together (Scripts/prepare_ci_container.sh
+      # fails loud on drift).
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+      # The step watchdog's hang diagnostics attach gdb to a process that is
+      # not its descendant; yama ptrace_scope=1 refuses that without the
+      # capability, and the default container capability set omits it.
+      options: --cap-add=SYS_PTRACE
     needs: changes
     if: needs.changes.outputs.changed == 'true'
-    timeout-minutes: 90
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # `core` plus the shard ids of Scripts/data/runtime-shards.txt, in
+        # the manifest's order. Adding a shard row means adding it here.
+        part: [core, A, B, C]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Linux test dependencies
+      - name: Prepare container environment
         shell: bash
-        run: |
-          set -euo pipefail
-          Scripts/apt_get_retry.sh update
-          Scripts/apt_get_retry.sh install -y --no-install-recommends \
-            ca-certificates \
-            curl \
-            git \
-            jq \
-            libcurl4-openssl-dev \
-            python3 \
-            unzip
+        run: Scripts/prepare_ci_container.sh
 
-      - name: Cache Swiftly toolchain
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.local/share/swiftly
-            ~/.local/bin/swiftly
-          key: ${{ runner.os }}-amd64-swiftly-${{ env.SWIFTLY_VERSION }}-${{ hashFiles('.swift-version') }}
-          restore-keys: |
-            ${{ runner.os }}-amd64-swiftly-${{ env.SWIFTLY_VERSION }}-
-
-      - name: Install swiftly and Swift toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          export SWIFTLY_HOME_DIR="$HOME/.local/share/swiftly"
-          export SWIFTLY_BIN_DIR="$HOME/.local/bin"
-          mkdir -p "$SWIFTLY_BIN_DIR"
-          export PATH="$SWIFTLY_BIN_DIR:$PATH"
-
-          if ! command -v swiftly >/dev/null 2>&1 || [ ! -f "${SWIFTLY_HOME_DIR}/env.sh" ]; then
-            tmpdir="$(mktemp -d)"
-            trap 'rm -rf "$tmpdir"' EXIT
-            cd "$tmpdir"
-            swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz"
-            curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}"
-            tar -zxf "$swiftly_archive"
-            ./swiftly init --skip-install --quiet-shell-followup --assume-yes
-          fi
-
-          . "${SWIFTLY_HOME_DIR}/env.sh"
-          hash -r
-          swift_version="$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/.swift-version")"
-          swiftly install --use --assume-yes "$swift_version"
-          swiftly run swift --version
-          echo "$SWIFTLY_BIN_DIR" >> "$GITHUB_PATH"
-          echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> "$GITHUB_ENV"
-          echo "SWIFTLY_BIN_DIR=$SWIFTLY_BIN_DIR" >> "$GITHUB_ENV"
-
+      # Same key as the Repo Gate's lanes: dependency checkouts do not depend
+      # on the build configuration, so this reuses the gate's cache.
       - name: Cache SwiftPM
         uses: actions/cache@v6
         with:
-          path: |
-            ~/.cache/org.swift.swiftpm
-            ~/.swiftpm
-          key: ${{ runner.os }}-amd64-swiftpm-release-${{ hashFiles('Package.resolved') }}
+          path: ~/.cache/org.swift.swiftpm
+          key: ${{ runner.os }}-amd64-swiftpm-lane-${{ hashFiles('Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-amd64-swiftpm-release-
+            ${{ runner.os }}-amd64-swiftpm-lane-
 
-      - name: Release soundness lane
+      # Present in images built after 2026-08-25; installed here until then.
+      # Root in the container has no sudo.
+      - name: Ensure gdb for hang diagnostics
         shell: bash
         run: |
           set -euo pipefail
-          sh ./Scripts/release_soundness_lane.sh
+          if ! command -v gdb >/dev/null 2>&1; then
+            if [ "$(id -u)" -eq 0 ]; then
+              export APT_GET_RETRY_SUDO_BIN=""
+            fi
+            Scripts/apt_get_retry.sh update
+            Scripts/apt_get_retry.sh install -y --no-install-recommends gdb
+          fi
 
+      - name: Release soundness lane
+        shell: bash
+        env:
+          PART: ${{ matrix.part }}
+        run: |
+          set -euo pipefail
+          sh ./Scripts/release_soundness_lane.sh --part "$PART"
+
+      # The core part's build is the one this step reuses (same flags, so
+      # `swift build` is a no-op and every launch is `--skip-build`).
       - name: Load-flaky suites (signal only, never blocks)
+        if: matrix.part == 'core'
         continue-on-error: true
         shell: bash
         run: |
@@ -157,26 +166,104 @@ jobs:
             exit 1
           fi
 
-      # `inputs` is empty on schedule and tag runs; the variant runs unless a
-      # dispatch explicitly opts out.
+      # Only the parts feed the merged scan; the flaky step's traces are
+      # signal, like the step itself.
+      - name: Upload soundness traces
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: soundness-trace-release-${{ matrix.part }}
+          path: .build/soundness-trace/release-part-${{ matrix.part }}
+          if-no-files-found: error
+          retention-days: 1
+
+  # `inputs` is empty on schedule and tag runs; the variant runs unless a
+  # dispatch explicitly opts out. Its own job: the flag changes the build
+  # signature, so it is a second full release build either way, and in its
+  # own job that build runs beside the parts instead of after them.
+  race-checks:
+    name: Actor data-race checks variant
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+      options: --cap-add=SYS_PTRACE
+    needs: changes
+    if: needs.changes.outputs.changed == 'true' && (github.event_name != 'workflow_dispatch' || inputs.run_race_checks)
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Prepare container environment
+        shell: bash
+        run: Scripts/prepare_ci_container.sh
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/org.swift.swiftpm
+          key: ${{ runner.os }}-amd64-swiftpm-lane-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-amd64-swiftpm-lane-
+
+      - name: Ensure gdb for hang diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v gdb >/dev/null 2>&1; then
+            if [ "$(id -u)" -eq 0 ]; then
+              export APT_GET_RETRY_SUDO_BIN=""
+            fi
+            Scripts/apt_get_retry.sh update
+            Scripts/apt_get_retry.sh install -y --no-install-recommends gdb
+          fi
+
       - name: Actor data-race checks variant
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_race_checks }}
         shell: bash
         run: |
           set -euo pipefail
           sh ./Scripts/release_soundness_lane.sh --race-checks
 
+  # A verdict needs every part AND the race variant green: a dispatch that
+  # opted out of the variant leaves `race-checks` skipped, so this job is
+  # skipped too and nothing is recorded — the nightly then still owes this
+  # SHA a full run. The merged scan runs here, before the record, for the
+  # same reason the Repo Gate's aggregator scans: the ledger's counts are
+  # whole-surface, and a per-part scan could only ever see a fraction.
   record:
     name: Record green verdict
     runs-on: ubuntu-24.04
     needs:
       - changes
       - release-soundness
-    if: needs.changes.outputs.changed == 'true' && needs.release-soundness.result == 'success'
-    timeout-minutes: 5
+      - race-checks
+    if: needs.changes.outputs.changed == 'true' && needs.release-soundness.result == 'success' && needs.race-checks.result == 'success'
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # Each part's traces land in their own subdirectory (no merge-multiple:
+      # invocation indices collide across parts).
+      - name: Download soundness traces
+        uses: actions/download-artifact@v8
+        with:
+          path: .build/soundness-trace-merged
+          pattern: soundness-trace-release-*
+
+      - name: Scan merged soundness traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          parts="$(find .build/soundness-trace-merged -mindepth 1 -maxdepth 1 -type d -name 'soundness-trace-release-*' | sort)"
+          count="$(printf '%s\n' "$parts" | sed '/^$/d' | wc -l | tr -d ' ')"
+          printf 'merged trace parts (%s):\n%s\n' "$count" "$parts"
+          if [ "$count" -ne 4 ]; then
+            echo "::error::expected traces from exactly 4 parts (core, A, B, C); found $count — a part's upload is missing, so the ledger counts would be understated"
+            exit 1
+          fi
+          Scripts/scan_soundness_traces.sh .build/soundness-trace-merged Scripts/soundness_quarantine.txt
 
       - name: Record the lane verdict
         uses: ./.github/actions/lane-verdict-record
