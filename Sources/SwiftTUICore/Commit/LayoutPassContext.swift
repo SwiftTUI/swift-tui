@@ -483,14 +483,14 @@ package final class LayoutPassContext: Sendable {
     viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     bounds: CellRect,
-    namedCoordinateSpaceName: String?
+    namedCoordinateSpace: NamedCoordinateSpace?
   ) {
     state.withLock {
       $0.placedFrameTable.record(
         viewNodeID: viewNodeID,
         identity: identity,
         bounds: bounds,
-        namedCoordinateSpaceName: namedCoordinateSpaceName
+        namedCoordinateSpace: namedCoordinateSpace
       )
     }
   }
@@ -505,7 +505,7 @@ package final class LayoutPassContext: Sendable {
           viewNodeID: current.viewNodeID,
           identity: current.identity,
           bounds: current.bounds,
-          namedCoordinateSpaceName: current.semanticMetadata.namedCoordinateSpaceName
+          namedCoordinateSpace: current.semanticMetadata.namedCoordinateSpace
         )
         work.append(contentsOf: current.children.reversed())
       }

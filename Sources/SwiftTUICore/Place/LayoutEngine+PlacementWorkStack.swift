@@ -87,7 +87,7 @@ extension LayoutEngine {
       viewNodeID: node.viewNodeID,
       identity: node.identity,
       bounds: bounds,
-      namedCoordinateSpaceName: node.semanticMetadata.namedCoordinateSpaceName
+      namedCoordinateSpace: node.semanticMetadata.namedCoordinateSpace
     )
 
     let hasChildren =

@@ -266,7 +266,7 @@ extension View {
   public func coordinateSpace(_ name: NamedCoordinateSpace) -> some View {
     modifier(
       NamedCoordinateSpaceModifier(
-        name: name.name
+        name: name
       )
     )
   }
@@ -310,7 +310,7 @@ public struct ContentShapeModifier: PrimitiveViewModifier, Sendable, Equatable {
 
 @MainActor
 public struct NamedCoordinateSpaceModifier: PrimitiveViewModifier, Sendable, Equatable {
-  let name: String
+  let name: NamedCoordinateSpace
 
   package func resolve<Content: View>(
     content: ModifierContentInputs<Content>,
@@ -318,7 +318,7 @@ public struct NamedCoordinateSpaceModifier: PrimitiveViewModifier, Sendable, Equ
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.semanticMetadata = node.semanticMetadata.merging(
-      SemanticMetadata(namedCoordinateSpaceName: name)
+      SemanticMetadata(namedCoordinateSpace: name)
     )
     return [node]
   }

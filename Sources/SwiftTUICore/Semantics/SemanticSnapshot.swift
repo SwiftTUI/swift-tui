@@ -118,7 +118,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var scrollRoutes: [ScrollRoute]
   package var scrollTargets: [ScrollTarget]
   public var selectionRoutes: [SelectionRoute]
-  public var namedCoordinateSpaces: [String: CellRect]
+  public var namedCoordinateSpaces: [NamedCoordinateSpace: CellRect]
   public var accessibilityNodes: [AccessibilityNode]
   public var accessibilityAnnouncements: [AccessibilityAnnouncement]
   package var accessibilityWarnings: [AccessibilityWarning]
@@ -143,7 +143,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
     navigationRoutes: [NavigationRoute] = [],
     scrollRoutes: [ScrollRoute] = [],
     selectionRoutes: [SelectionRoute] = [],
-    namedCoordinateSpaces: [String: CellRect] = [:],
+    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:],
     accessibilityNodes: [AccessibilityNode] = [],
     accessibilityAnnouncements: [AccessibilityAnnouncement] = []
   ) {
@@ -167,7 +167,7 @@ public struct SemanticSnapshot: Equatable, Sendable {
     scrollRoutes: [ScrollRoute] = [],
     scrollTargets: [ScrollTarget] = [],
     selectionRoutes: [SelectionRoute] = [],
-    namedCoordinateSpaces: [String: CellRect] = [:],
+    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:],
     accessibilityNodes: [AccessibilityNode] = [],
     accessibilityAnnouncements: [AccessibilityAnnouncement] = [],
     accessibilityWarnings: [AccessibilityWarning],

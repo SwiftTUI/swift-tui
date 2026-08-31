@@ -181,15 +181,15 @@ package final class GeometryResolutionDiagnosticsRecorder: Sendable {
 package struct PlacedFrameTable: Equatable, Sendable {
   package private(set) var framesByNodeID: [ViewNodeID: CellRect]
   package private(set) var framesByIdentity: [Identity: CellRect]
-  package private(set) var namedCoordinateSpaces: [String: CellRect]
-  package private(set) var namedCoordinateSpaceIdentities: [String: Identity]
+  package private(set) var namedCoordinateSpaces: [NamedCoordinateSpace: CellRect]
+  package private(set) var namedCoordinateSpaceIdentities: [NamedCoordinateSpace: Identity]
   package let diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder?
 
   package init(
     framesByNodeID: [ViewNodeID: CellRect] = [:],
     framesByIdentity: [Identity: CellRect] = [:],
-    namedCoordinateSpaces: [String: CellRect] = [:],
-    namedCoordinateSpaceIdentities: [String: Identity] = [:],
+    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:],
+    namedCoordinateSpaceIdentities: [NamedCoordinateSpace: Identity] = [:],
     diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder? = nil
   ) {
     self.framesByNodeID = framesByNodeID
@@ -217,23 +217,23 @@ package struct PlacedFrameTable: Equatable, Sendable {
     viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     bounds: CellRect,
-    namedCoordinateSpaceName: String?
+    namedCoordinateSpace: NamedCoordinateSpace?
   ) {
     if let viewNodeID {
       framesByNodeID[viewNodeID] = bounds
     }
     framesByIdentity[identity] = bounds
 
-    if let namedCoordinateSpaceName {
-      if let existingIdentity = namedCoordinateSpaceIdentities[namedCoordinateSpaceName],
+    if let namedCoordinateSpace {
+      if let existingIdentity = namedCoordinateSpaceIdentities[namedCoordinateSpace],
         existingIdentity != identity
       {
         diagnosticsRecorder?.recordDuplicateNamedCoordinateSpace(
-          name: namedCoordinateSpaceName
+          name: namedCoordinateSpace.description
         )
       }
-      namedCoordinateSpaceIdentities[namedCoordinateSpaceName] = identity
-      namedCoordinateSpaces[namedCoordinateSpaceName] = bounds
+      namedCoordinateSpaceIdentities[namedCoordinateSpace] = identity
+      namedCoordinateSpaces[namedCoordinateSpace] = bounds
     }
   }
 
@@ -291,7 +291,7 @@ package struct PlacedFrameTable: Equatable, Sendable {
         viewNodeID: entry.viewNodeID,
         identity: entry.identity,
         bounds: translated(entry.bounds, by: fragment.translation),
-        namedCoordinateSpaceName: entry.namedCoordinateSpaceName
+        namedCoordinateSpace: entry.namedCoordinateSpace
       )
       count += 1
     }
@@ -316,18 +316,18 @@ package struct PlacedFrameTableEntry: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
   package var identity: Identity
   package var bounds: CellRect
-  package var namedCoordinateSpaceName: String?
+  package var namedCoordinateSpace: NamedCoordinateSpace?
 
   package init(
     viewNodeID: ViewNodeID? = nil,
     identity: Identity,
     bounds: CellRect,
-    namedCoordinateSpaceName: String?
+    namedCoordinateSpace: NamedCoordinateSpace?
   ) {
     self.viewNodeID = viewNodeID
     self.identity = identity
     self.bounds = bounds
-    self.namedCoordinateSpaceName = namedCoordinateSpaceName
+    self.namedCoordinateSpace = namedCoordinateSpace
   }
 }
 

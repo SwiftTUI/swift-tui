@@ -703,10 +703,10 @@ SwiftTUIGraph.SemanticMetadata.captureOnPress
 SwiftTUIGraph.SemanticMetadata.explicitInteractionPath
 SwiftTUIGraph.SemanticMetadata.explicitInteractionRect
 SwiftTUIGraph.SemanticMetadata.focusInteractions
-SwiftTUIGraph.SemanticMetadata.init(isFocusable:focusInteractions:participatesInPointerHitTesting:captureOnPress:allowsHitTesting:scrollRole:sectionRole:accessibilityRole:accessibilityLabel:accessibilityHint:accessibilityHidden:accessibilityLiveRegion:accessibilityVisualContent:selectionTag:tabItemLabel:explicitInteractionRect:explicitInteractionPath:namedCoordinateSpaceName:)
+SwiftTUIGraph.SemanticMetadata.init(isFocusable:focusInteractions:participatesInPointerHitTesting:captureOnPress:allowsHitTesting:scrollRole:sectionRole:accessibilityRole:accessibilityLabel:accessibilityHint:accessibilityHidden:accessibilityLiveRegion:accessibilityVisualContent:selectionTag:tabItemLabel:explicitInteractionRect:explicitInteractionPath:namedCoordinateSpace:)
 SwiftTUIGraph.SemanticMetadata.isFocusable
 SwiftTUIGraph.SemanticMetadata.merging(_:)
-SwiftTUIGraph.SemanticMetadata.namedCoordinateSpaceName
+SwiftTUIGraph.SemanticMetadata.namedCoordinateSpace
 SwiftTUIGraph.SemanticMetadata.participatesInPointerHitTesting
 SwiftTUIGraph.SemanticMetadata.scrollRole
 SwiftTUIGraph.SemanticMetadata.sectionRole
@@ -1498,6 +1498,11 @@ SwiftTUIPrimitives.MonotonicInstant.init(offset:)
 SwiftTUIPrimitives.MonotonicInstant.now()
 SwiftTUIPrimitives.MonotonicInstant.offset
 SwiftTUIPrimitives.MonotonicInstant.zero
+SwiftTUIPrimitives.NamedCoordinateSpace
+SwiftTUIPrimitives.NamedCoordinateSpace.==(_:_:)
+SwiftTUIPrimitives.NamedCoordinateSpace.description
+SwiftTUIPrimitives.NamedCoordinateSpace.hash(into:)
+SwiftTUIPrimitives.NamedCoordinateSpace.named(_:)
 SwiftTUIPrimitives.OklabColor
 SwiftTUIPrimitives.OklabColor.a
 SwiftTUIPrimitives.OklabColor.b
@@ -3792,9 +3797,7 @@ SwiftTUIViews.ModifiedContent.modifier
 SwiftTUIViews.MoveKeyframe
 SwiftTUIViews.MoveKeyframe.Body
 SwiftTUIViews.MoveKeyframe.init(_:)
-SwiftTUIViews.NamedCoordinateSpace
 SwiftTUIViews.NamedCoordinateSpace.coordinateSpace
-SwiftTUIViews.NamedCoordinateSpace.named(_:)
 SwiftTUIViews.NamedCoordinateSpaceModifier
 SwiftTUIViews.Namespace
 SwiftTUIViews.Namespace.ID

@@ -37,7 +37,7 @@ package struct SemanticExtractor: Sendable {
     var commandHostScopePaths: [[Identity]] = []
     var scrollRoutes: [ScrollRoute] = []
     var selectionRoutes: [SelectionRoute] = []
-    var namedCoordinateSpaces: [String: CellRect] = [:]
+    var namedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:]
     var hitTestOrder = 0
 
     walk(
@@ -66,8 +66,8 @@ package struct SemanticExtractor: Sendable {
 
         let participatesInTopLevelFocus = node.participatesInTopLevelFocus
 
-        if isEnabled, let name = node.semanticMetadata.namedCoordinateSpaceName {
-          namedCoordinateSpaces[name] = node.bounds
+        if isEnabled, let space = node.semanticMetadata.namedCoordinateSpace {
+          namedCoordinateSpaces[space] = node.bounds
         }
 
         // A command/chrome host (Role A) is a focus scope but not a focus

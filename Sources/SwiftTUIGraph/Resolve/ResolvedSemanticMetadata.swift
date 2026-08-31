@@ -32,7 +32,7 @@ public struct TabItemLabel: Equatable, Sendable, CustomStringConvertible {
 
 /// Marker for visual-only content that needs an accessibility label or hidden policy.
 ///
-/// Attach this value through ``SemanticMetadata/init(isFocusable:focusInteractions:participatesInPointerHitTesting:captureOnPress:allowsHitTesting:scrollRole:sectionRole:accessibilityRole:accessibilityLabel:accessibilityHint:accessibilityHidden:accessibilityLiveRegion:accessibilityVisualContent:selectionTag:tabItemLabel:explicitInteractionRect:explicitInteractionPath:namedCoordinateSpaceName:)``.
+/// Attach this value through ``SemanticMetadata/init(isFocusable:focusInteractions:participatesInPointerHitTesting:captureOnPress:allowsHitTesting:scrollRole:sectionRole:accessibilityRole:accessibilityLabel:accessibilityHint:accessibilityHidden:accessibilityLiveRegion:accessibilityVisualContent:selectionTag:tabItemLabel:explicitInteractionRect:explicitInteractionPath:namedCoordinateSpace:)``.
 /// Then accessibility renderers can diagnose visual views that reach users without a label.
 /// The `kind` names the visual family (for example
 /// `"BarChart"` or `"Image"`) in those diagnostics.
@@ -69,7 +69,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var tabItemLabel: TabItemLabel?
   public var explicitInteractionRect: CellRect?
   public var explicitInteractionPath: Path?
-  public var namedCoordinateSpaceName: String?
+  public var namedCoordinateSpace: NamedCoordinateSpace?
   package var interactionAvailability: InteractionAvailability
   /// Gesture-specific pointer precedence. Kept package-only because it is a
   /// routing product of gesture modifiers, not author-facing semantic data.
@@ -189,7 +189,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     tabItemLabel: TabItemLabel? = nil,
     explicitInteractionRect: CellRect? = nil,
     explicitInteractionPath: Path? = nil,
-    namedCoordinateSpaceName: String? = nil
+    namedCoordinateSpace: NamedCoordinateSpace? = nil
   ) {
     self.init(
       isFocusable: isFocusable,
@@ -213,7 +213,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       tabItemLabel: tabItemLabel,
       explicitInteractionRect: explicitInteractionRect,
       explicitInteractionPath: explicitInteractionPath,
-      namedCoordinateSpaceName: namedCoordinateSpaceName
+      namedCoordinateSpace: namedCoordinateSpace
     )
   }
 
@@ -242,7 +242,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     tabItemLabel: TabItemLabel? = nil,
     explicitInteractionRect: CellRect? = nil,
     explicitInteractionPath: Path? = nil,
-    namedCoordinateSpaceName: String? = nil,
+    namedCoordinateSpace: NamedCoordinateSpace? = nil,
     interactionAvailability: InteractionAvailability = .enabled,
     pointerGesturePriority: PointerGesturePriority = .ordinary,
     hostedCollectionContainer: HostedCollectionContainerMetadata? = nil,
@@ -275,7 +275,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.tabItemLabel = tabItemLabel
     self.explicitInteractionRect = explicitInteractionRect
     self.explicitInteractionPath = explicitInteractionPath
-    self.namedCoordinateSpaceName = namedCoordinateSpaceName
+    self.namedCoordinateSpace = namedCoordinateSpace
     self.interactionAvailability = interactionAvailability
     self.pointerGesturePriority = pointerGesturePriority
     self.hostedCollectionContainer = hostedCollectionContainer
@@ -313,7 +313,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       tabItemLabel: other.tabItemLabel ?? tabItemLabel,
       explicitInteractionRect: other.explicitInteractionRect ?? explicitInteractionRect,
       explicitInteractionPath: other.explicitInteractionPath ?? explicitInteractionPath,
-      namedCoordinateSpaceName: other.namedCoordinateSpaceName ?? namedCoordinateSpaceName,
+      namedCoordinateSpace: other.namedCoordinateSpace ?? namedCoordinateSpace,
       interactionAvailability: mergedInteractionAvailability(
         interactionAvailability,
         other.interactionAvailability

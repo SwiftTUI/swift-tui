@@ -31,6 +31,30 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   axis inherited from an enclosing stack instead of leaking it into its
   children.
 
+### Changed
+
+- **Named coordinate spaces are identified by their typed name, not by its
+  text.** Source-breaking. `CoordinateSpace.named(_:)` and
+  `NamedCoordinateSpace.named(_:)` collapsed the `Hashable & Sendable` name to
+  `String(describing:)`, so `.named(1)` and `.named("1")` — or two enum cases
+  from different enums that print alike — named one space: they resolved
+  against the same frame and tripped the duplicate-name diagnostic against
+  each other. A named space is now equal only to one built from the same name
+  type and value, and the typed value is the key at every step downstream
+  (placed-frame table, semantic snapshot, pointer events, gesture and
+  `GeometryProxy` resolution). `NamedCoordinateSpace` is declared in
+  `SwiftTUIPrimitives` (still reachable through `SwiftTUIViews`), is
+  `Hashable`, and exposes the name's text only as `description`, the spelling
+  frame diagnostics report. `CoordinateSpace.Kind.named` carries a
+  `NamedCoordinateSpace` instead of a `String`,
+  `SemanticSnapshot.namedCoordinateSpaces` is `[NamedCoordinateSpace: CellRect]`,
+  and `SemanticMetadata.namedCoordinateSpaceName: String?` is now
+  `namedCoordinateSpace: NamedCoordinateSpace?` (its public initializer label
+  changed with it). Code that only uses the `.named(_:)` factories and
+  `View.coordinateSpace(_:)` is unaffected; a string lookup such as
+  `namedCoordinateSpaces["board"]` becomes
+  `namedCoordinateSpaces[.named("board")]`.
+
 ## [0.9.12] - 2026-08-30
 
 ### Added

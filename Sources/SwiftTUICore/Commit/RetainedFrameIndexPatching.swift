@@ -224,7 +224,7 @@ extension RetainedFrameIndex {
         viewNodeID: new.viewNodeID,
         identity: new.identity,
         bounds: new.bounds,
-        namedCoordinateSpaceName: new.semanticMetadata.namedCoordinateSpaceName
+        namedCoordinateSpace: new.semanticMetadata.namedCoordinateSpace
       )
       byIdentity[new.identity] = new
       for index in new.children.indices.reversed() {

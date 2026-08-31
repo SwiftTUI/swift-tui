@@ -168,8 +168,8 @@ extension LayoutEngine {
         origin: primaryOrigin,
         size: measured.childMeasurements[primaryIndex].measuredSize
       ),
-      namedCoordinateSpaceName: resolved.children[primaryIndex]
-        .semanticMetadata.namedCoordinateSpaceName
+      namedCoordinateSpace: resolved.children[primaryIndex]
+        .semanticMetadata.namedCoordinateSpace
     )
 
     return measured.childMeasurements.enumerated().map { index, childMeasurement in

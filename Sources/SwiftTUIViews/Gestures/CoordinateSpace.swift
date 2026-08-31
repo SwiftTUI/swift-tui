@@ -6,16 +6,20 @@ public import SwiftTUICore
 /// `.local` has its origin at the target rectangle of the gesture.
 /// `.global` has its origin at the terminal canvas.
 /// `.named(_:)` identifies frames that ``View/coordinateSpace(_:)`` records.
+///
+/// A named space is identified by the typed value passed to ``named(_:)``,
+/// not by its text: `.named(1)` and `.named("1")` are different spaces. See
+/// `NamedCoordinateSpace`.
 public struct CoordinateSpace: Equatable, Sendable {
   public enum Kind: Equatable, Sendable {
     case local
     case global
-    case named(String)
+    case named(NamedCoordinateSpace)
   }
 
   public let kind: Kind
 
-  private init(kind: Kind) {
+  package init(kind: Kind) {
     self.kind = kind
   }
 
@@ -23,7 +27,7 @@ public struct CoordinateSpace: Equatable, Sendable {
   public static let global = CoordinateSpace(kind: .global)
 
   public static func named(_ name: some Hashable & Sendable) -> CoordinateSpace {
-    CoordinateSpace(kind: .named(String(describing: name)))
+    CoordinateSpace(kind: .named(.named(name)))
   }
 
   /// Resolves a terminal-global continuous point into this coordinate space,
@@ -44,7 +48,7 @@ public struct CoordinateSpace: Equatable, Sendable {
   package func resolve(
     terminalPoint: Point,
     targetRect: CellRect,
-    namedCoordinateSpaces: [String: CellRect]
+    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect]
   ) -> Point {
     resolve(
       terminalPoint: terminalPoint,
@@ -59,7 +63,7 @@ public struct CoordinateSpace: Equatable, Sendable {
   package func resolve(
     terminalPoint: Point,
     targetRect: CellRect,
-    namedCoordinateSpaces: [String: CellRect],
+    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect],
     diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder?
   ) -> Point {
     switch kind {
@@ -70,9 +74,9 @@ public struct CoordinateSpace: Equatable, Sendable {
       )
     case .global:
       return terminalPoint
-    case .named(let name):
-      guard let frame = namedCoordinateSpaces[name] else {
-        diagnosticsRecorder?.recordMissingNamedCoordinateSpace(name: name)
+    case .named(let space):
+      guard let frame = namedCoordinateSpaces[space] else {
+        diagnosticsRecorder?.recordMissingNamedCoordinateSpace(name: space.description)
         return terminalPoint
       }
       return Point(
@@ -87,7 +91,7 @@ public struct CoordinateSpace: Equatable, Sendable {
   package func resolve(
     terminalRect: Rect,
     targetRect: CellRect,
-    namedCoordinateSpaces: [String: CellRect]
+    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect]
   ) -> Rect {
     resolve(
       terminalRect: terminalRect,
@@ -102,7 +106,7 @@ public struct CoordinateSpace: Equatable, Sendable {
   package func resolve(
     terminalRect: Rect,
     targetRect: CellRect,
-    namedCoordinateSpaces: [String: CellRect],
+    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect],
     diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder?
   ) -> Rect {
     Rect(
@@ -117,24 +121,9 @@ public struct CoordinateSpace: Equatable, Sendable {
   }
 }
 
-/// A named reference frame established by ``View/coordinateSpace(_:)``.
-///
-/// Construct with ``named(_:)`` and resolve gesture locations against the
-/// frame via ``CoordinateSpace/named(_:)`` using the same name.
-public struct NamedCoordinateSpace: Equatable, Sendable {
-  package let name: String
-
-  private init(name: String) {
-    self.name = name
-  }
-
-  /// Creates a named coordinate space with the given name.
-  public static func named(_ name: some Hashable & Sendable) -> NamedCoordinateSpace {
-    NamedCoordinateSpace(name: String(describing: name))
-  }
-
+extension NamedCoordinateSpace {
   /// The equivalent gesture-resolution coordinate space.
   public var coordinateSpace: CoordinateSpace {
-    .named(name)
+    CoordinateSpace(kind: .named(self))
   }
 }

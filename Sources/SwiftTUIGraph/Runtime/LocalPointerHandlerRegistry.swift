@@ -30,7 +30,7 @@ package struct LocalPointerEvent: Equatable, Sendable {
   package var location: PointerLocation
   package var targetRect: CellRect
   package var scrollContext: LocalPointerScrollContext?
-  package var namedCoordinateSpaces: [String: CellRect]
+  package var namedCoordinateSpaces: [NamedCoordinateSpace: CellRect]
   package var timestamp: MonotonicInstant
 
   package init(
@@ -38,7 +38,7 @@ package struct LocalPointerEvent: Equatable, Sendable {
     location: PointerLocation,
     targetRect: CellRect,
     scrollContext: LocalPointerScrollContext? = nil,
-    namedCoordinateSpaces: [String: CellRect] = [:],
+    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:],
     timestamp: MonotonicInstant = .now()
   ) {
     self.kind = kind
@@ -57,7 +57,7 @@ package struct LocalPointerEvent: Equatable, Sendable {
     location: Point,
     targetRect: CellRect,
     scrollContext: LocalPointerScrollContext? = nil,
-    namedCoordinateSpaces: [String: CellRect] = [:],
+    namedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:],
     timestamp: MonotonicInstant = .now()
   ) {
     self.init(

@@ -103,8 +103,10 @@ unrelated descendant state change.
 ## Coordinate Spaces And Hit Testing
 
 Local and global coordinate spaces preserve fractional values. Named spaces are
-available with ``View/coordinateSpace(_:)``. Unresolved names fall back to
-global coordinates so authored code keeps working while views are refactored.
+available with ``View/coordinateSpace(_:)`` and are identified by their typed
+name: `.named(Section.header)` and `.named("header")` are different spaces.
+Unresolved names fall back to global coordinates so authored code keeps working
+while views are refactored.
 
 Use `View.contentShape(_:)` when a view's pointer target is not its full
 placed rectangle. Rectangular shapes remain cell-denominated through

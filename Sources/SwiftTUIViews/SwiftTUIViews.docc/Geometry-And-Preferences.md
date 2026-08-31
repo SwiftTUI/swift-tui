@@ -54,6 +54,12 @@ VStack(alignment: .leading) {
 }
 ```
 
+A name is a typed value, not a string. Two spaces are the same space only when
+their names have the same type and compare equal: `.named(1)` and `.named("1")`
+are different spaces, as are two enum cases from different enums that print
+alike, so a space named `.named(Section.header)` is not reached by
+`.named("header")`. The name's text is only its diagnostic spelling.
+
 Named coordinate-space names must be unique in a rendered frame. Duplicate
 names currently keep last-writer-wins behavior, and missing names fall back to
 global coordinates for compatibility with gesture resolution. Both cases are

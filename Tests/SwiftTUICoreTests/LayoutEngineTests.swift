@@ -1908,7 +1908,7 @@ struct LayoutEngineTests {
         leaf(
           "row-1",
           size: .init(width: 2, height: 1),
-          semanticMetadata: .init(namedCoordinateSpaceName: "middle-row")
+          semanticMetadata: .init(namedCoordinateSpace: .named("middle-row"))
         ),
         leaf("row-2", size: .init(width: 2, height: 1)),
       ]
@@ -1957,7 +1957,7 @@ struct LayoutEngineTests {
     #expect(shifted.children.map(\.bounds.origin.y) == [-1, 0, 1])
     #expect(passContext.placedFrameTable == placedFrameTable(for: shifted))
     #expect(
-      passContext.placedFrameTable.namedCoordinateSpaces["middle-row"]
+      passContext.placedFrameTable.namedCoordinateSpaces[.named("middle-row")]
         == shifted.children[1].bounds
     )
     #expect(passContext.workMetrics.placedNodesComputed == 0)
@@ -1971,17 +1971,17 @@ struct LayoutEngineTests {
     let resolved = stack(
       "container",
       axis: .vertical,
-      semanticMetadata: .init(namedCoordinateSpaceName: "shared"),
+      semanticMetadata: .init(namedCoordinateSpace: .named("shared")),
       children: [
         leaf(
           "row-0",
           size: .init(width: 3, height: 1),
-          semanticMetadata: .init(namedCoordinateSpaceName: "shared")
+          semanticMetadata: .init(namedCoordinateSpace: .named("shared"))
         ),
         leaf(
           "row-1",
           size: .init(width: 3, height: 1),
-          semanticMetadata: .init(namedCoordinateSpaceName: "row-one")
+          semanticMetadata: .init(namedCoordinateSpace: .named("row-one"))
         ),
       ]
     )
@@ -2019,11 +2019,11 @@ struct LayoutEngineTests {
 
     #expect(passContext.placedFrameTable == placedFrameTable(for: placed))
     #expect(
-      passContext.placedFrameTable.namedCoordinateSpaces["shared"]
+      passContext.placedFrameTable.namedCoordinateSpaces[.named("shared")]
         == placed.children[0].bounds
     )
     #expect(
-      passContext.placedFrameTable.namedCoordinateSpaces["row-one"]
+      passContext.placedFrameTable.namedCoordinateSpaces[.named("row-one")]
         == placed.children[1].bounds
     )
     #expect(passContext.workMetrics.placedNodesComputed == 0)
@@ -2075,7 +2075,7 @@ struct LayoutEngineTests {
       drawMetadata: initialDrawMetadata,
       semanticMetadata: .init(
         accessibilityLabel: "old",
-        namedCoordinateSpaceName: "old-space"
+        namedCoordinateSpace: .named("old-space")
       ),
       lifecycleMetadata: .init(appearHandlerIDs: ["old-appear"]),
       drawPayload: .text("Same")
@@ -2089,7 +2089,7 @@ struct LayoutEngineTests {
       drawMetadata: updatedDrawMetadata,
       semanticMetadata: .init(
         accessibilityLabel: "new",
-        namedCoordinateSpaceName: "new-space"
+        namedCoordinateSpace: .named("new-space")
       ),
       lifecycleMetadata: .init(appearHandlerIDs: ["new-appear"]),
       drawPayload: .text("Same")
@@ -2135,8 +2135,8 @@ struct LayoutEngineTests {
     #expect(passContext.workMetrics.placedNodesComputed == 0)
     #expect(passContext.workMetrics.placedNodesReused == 1)
     #expect(passContext.workMetrics.placedFrameTableEntriesReused == 0)
-    #expect(passContext.placedFrameTable.namedCoordinateSpaces["old-space"] == nil)
-    #expect(passContext.placedFrameTable.namedCoordinateSpaces["new-space"] == bounds)
+    #expect(passContext.placedFrameTable.namedCoordinateSpaces[.named("old-space")] == nil)
+    #expect(passContext.placedFrameTable.namedCoordinateSpaces[.named("new-space")] == bounds)
     #expect(placed.kind == updated.kind)
     #expect(placed.environmentSnapshot == environment)
     #expect(placed.layoutMetadata == layoutMetadata)
@@ -2309,7 +2309,7 @@ private func placedFrameTable(
       viewNodeID: current.viewNodeID,
       identity: current.identity,
       bounds: current.bounds,
-      namedCoordinateSpaceName: current.semanticMetadata.namedCoordinateSpaceName
+      namedCoordinateSpace: current.semanticMetadata.namedCoordinateSpace
     )
     work.append(contentsOf: current.children.reversed())
   }

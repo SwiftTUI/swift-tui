@@ -17,13 +17,13 @@ struct AnchorTypesTests {
     _ name: String,
     bounds: CellRect,
     nodeID: ViewNodeID? = nil,
-    space: String? = nil
+    space: NamedCoordinateSpace? = nil
   ) -> PlacedFrameTableEntry {
     PlacedFrameTableEntry(
       viewNodeID: nodeID,
       identity: testIdentity("Root", name),
       bounds: bounds,
-      namedCoordinateSpaceName: space
+      namedCoordinateSpace: space
     )
   }
 
@@ -80,7 +80,7 @@ struct AnchorTypesTests {
       viewNodeID: nodeID,
       identity: testIdentity("Root", "Owner"),
       bounds: rect(0, 0, 10, 1),
-      namedCoordinateSpaceName: nil
+      namedCoordinateSpace: nil
     )
     // A later same-identity record WITHOUT the node ID: identity map moves,
     // node-ID map keeps the original — the payload with the node ID must
@@ -89,7 +89,7 @@ struct AnchorTypesTests {
       viewNodeID: nil,
       identity: testIdentity("Root", "Owner"),
       bounds: rect(2, 2, 10, 1),
-      namedCoordinateSpaceName: nil
+      namedCoordinateSpace: nil
     )
 
     let byNode = table.frame(
@@ -126,18 +126,18 @@ struct AnchorTypesTests {
 
     table.record(
       identity: testIdentity("Root", "A"), bounds: rect(0, 0, 1, 1),
-      namedCoordinateSpaceName: "space"
+      namedCoordinateSpace: .named("space")
     )
     // Same identity re-recording the space (a later frame) is NOT a duplicate.
     table.record(
       identity: testIdentity("Root", "A"), bounds: rect(1, 1, 1, 1),
-      namedCoordinateSpaceName: "space"
+      namedCoordinateSpace: .named("space")
     )
     #expect(table.geometryResolutionDiagnostics.duplicateNamedCoordinateSpaceCount == 0)
 
     table.record(
       identity: testIdentity("Root", "B"), bounds: rect(2, 2, 1, 1),
-      namedCoordinateSpaceName: "space"
+      namedCoordinateSpace: .named("space")
     )
     let diagnostics = table.geometryResolutionDiagnostics
     #expect(diagnostics.duplicateNamedCoordinateSpaceCount == 1)
@@ -177,11 +177,11 @@ struct AnchorTypesTests {
     var recorded = PlacedFrameTable(diagnosticsRecorder: .init())
     plain.record(
       identity: testIdentity("Root", "A"), bounds: rect(0, 0, 1, 1),
-      namedCoordinateSpaceName: nil
+      namedCoordinateSpace: nil
     )
     recorded.record(
       identity: testIdentity("Root", "A"), bounds: rect(0, 0, 1, 1),
-      namedCoordinateSpaceName: nil
+      namedCoordinateSpace: nil
     )
     #expect(plain == recorded)
   }

@@ -85,6 +85,10 @@ cell-space values.
 - ``HoverPhase``
 - ``PointerPrecision``
 
+### Coordinate Spaces
+
+- ``NamedCoordinateSpace``
+
 ### Color And Style
 
 - ``Color``

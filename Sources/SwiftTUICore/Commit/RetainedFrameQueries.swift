@@ -386,7 +386,7 @@ package struct RetainedFrameIndex: Sendable {
         viewNodeID: node.viewNodeID,
         identity: node.identity,
         bounds: node.bounds,
-        namedCoordinateSpaceName: node.semanticMetadata.namedCoordinateSpaceName
+        namedCoordinateSpace: node.semanticMetadata.namedCoordinateSpace
       )
     )
     for child in node.children {

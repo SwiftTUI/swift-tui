@@ -105,7 +105,7 @@ final class DragGestureRecognizer: GestureRecognizer {
   private var startLocation: Point?
   private var startTime: MonotonicInstant?
   private var targetRect: CellRect = CellRect(origin: .zero, size: .zero)
-  private var namedCoordinateSpaces: [String: CellRect] = [:]
+  private var namedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:]
   private var samples: [Sample] = []
   private var lastValue: DragGesture.Value?
 

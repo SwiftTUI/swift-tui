@@ -520,6 +520,8 @@ classifications:
     - SwiftTUIViews.TabViewOverflowMenuPresentation
     - SwiftTUIViews.TabViewOverflowTriggerConfiguration
     - SwiftTUIViews.ScrollCellOffset
+    # Extension only: the `coordinateSpace` bridge onto the SwiftTUIPrimitives
+    # NamedCoordinateSpace struct (declared there since it became the typed key).
     - SwiftTUIViews.NamedCoordinateSpace
     - SwiftTUIViews.Axis
     - SwiftTUIViews.VerticalEdge
@@ -664,6 +666,10 @@ classifications:
     - SwiftTUICore.MeasurementCacheMetrics
     - SwiftTUIPrimitives.MixingMethod
     - SwiftTUIPrimitives.MonotonicInstant
+    # NamedCoordinateSpace moved down from SwiftTUIViews when it became the typed
+    # key for named coordinate-space frames; SwiftTUIViews still re-exports it
+    # through SwiftTUICore, so the authoring surface is unchanged.
+    - SwiftTUIPrimitives.NamedCoordinateSpace
     - SwiftTUICore.NavigationRoute
     - SwiftTUIGraph.NodeLifecycleInfo
     - SwiftTUIGraph.NodeSemanticInfo

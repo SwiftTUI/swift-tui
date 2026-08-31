@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 318 | 1814 |
+| `SwiftTUIViews` | 318 | 1813 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -34,7 +34,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 168 | 1464 |
+| `SwiftTUIPrimitives` | 169 | 1469 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 0 | 0 |
@@ -289,7 +289,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `MenuPickerStyle` — struct — 5 members
 - `ModifiedContent` — struct — 10 members
 - `MoveKeyframe` — struct — 2 members
-- `NamedCoordinateSpace` — struct — 2 members
+- `NamedCoordinateSpace` — extension — 1 member
 - `NamedCoordinateSpaceModifier` — struct
 - `Namespace` — struct — 4 members
 - `NavigationStack` — struct — 3 members
@@ -622,7 +622,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (167)
+### Canonical surface (168)
 
 - `adapt(_:to:method:)` — func
 - `Alignment` — struct — 16 members
@@ -705,6 +705,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `MeshGradient` — struct — 15 members
 - `MixingMethod` — enum — 7 members
 - `MonotonicInstant` — struct — 7 members
+- `NamedCoordinateSpace` — struct — 4 members
 - `OklabColor` — struct — 5 members
 - `OklchColor` — struct — 5 members
 - `OutlineStylePresentation` — struct — 10 members
