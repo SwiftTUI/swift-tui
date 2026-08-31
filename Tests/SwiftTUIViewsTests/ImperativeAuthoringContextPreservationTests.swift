@@ -166,8 +166,12 @@ struct ImperativeAuthoringContextPreservationTests {
     let issues = drainSeedFallbackIssues()
     #expect(issues.count == 1)
     #expect(issues.first?.severity == .warning)
+    // `#fileID` defaults at the probe's `State(initialValue:)` call, so the
+    // declaration site names this file with the probe's explicit line/column.
     #expect(
-      issues.first?.message.contains("line 0, column \(StateReadingProbe.flagColumn)") == true
+      issues.first?.message.contains(
+        "declared at \(#fileID):0:\(StateReadingProbe.flagColumn)."
+      ) == true
     )
   }
 
@@ -193,6 +197,13 @@ struct ImperativeAuthoringContextPreservationTests {
     let issues = drainSeedFallbackIssues()
     #expect(issues.count == 1)
     #expect(issues.first?.message.contains("no longer live") == true)
+    // The node-gone location closure captures the file by value: the box may
+    // already be released when it fires, so the site must not need it.
+    #expect(
+      issues.first?.message.contains(
+        "declared at \(#fileID):0:\(StateReadingProbe.flagColumn)."
+      ) == true
+    )
   }
 
   @Test("a never-bound box reads its seed without recording an issue")

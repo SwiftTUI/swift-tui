@@ -107,6 +107,10 @@ private final class StateBox<Value> {
   /// re-derived scratch that must stay out of it (`.transient`). Fixed at
   /// construction: the slot keeps the policy it was born with.
   let dormantPolicy: DormantStateSlotPolicy
+  /// The `#fileID` of the authoring declaration. Diagnostics only: slot
+  /// identity stays line/column-keyed (`slotOrdinal`), so the file never
+  /// participates in matching a box to its graph slot.
+  let declarationFileID: String
   private var seedValue: Value
   private var boundLocationsByOwner: [StateStorageOwner: DynamicStateLocation<Value>]
   private var retainedValuesByOwner: [StateStorageOwner: Value]
@@ -119,9 +123,11 @@ private final class StateBox<Value> {
   init(
     seedValue: Value,
     slotOrdinal: Int,
+    declarationFileID: String,
     dormantPolicy: DormantStateSlotPolicy = .persistent
   ) {
     self.slotOrdinal = slotOrdinal
+    self.declarationFileID = declarationFileID
     self.dormantPolicy = dormantPolicy
     self.seedValue = seedValue
     boundLocationsByOwner = [:]
@@ -212,8 +218,13 @@ public struct State<Value> {
   private var capture: StateCaptureBinding?
 
   /// Creates state with the supplied initial wrapped value.
+  ///
+  /// `fileID`, `line`, and `column` default to the declaration site. Line and
+  /// column key the slot identity; the file only names the declaration in
+  /// runtime diagnostics such as `state.imperativeSeedFallback`.
   public init(
     wrappedValue: Value,
+    fileID: String = #fileID,
     line: UInt = #line,
     column: UInt = #column
   ) {
@@ -222,12 +233,14 @@ public struct State<Value> {
       slotOrdinal: StateSlotOrdinals.authored(
         line: line,
         column: column
-      )
+      ),
+      declarationFileID: fileID
     )
   }
 
   public init(
     initialValue: Value,
+    fileID: String = #fileID,
     line: UInt = #line,
     column: UInt = #column
   ) {
@@ -236,7 +249,8 @@ public struct State<Value> {
       slotOrdinal: StateSlotOrdinals.authored(
         line: line,
         column: column
-      )
+      ),
+      declarationFileID: fileID
     )
   }
 
@@ -250,6 +264,7 @@ public struct State<Value> {
   package init(
     wrappedValue: Value,
     dormantPolicy: DormantStateSlotPolicy,
+    fileID: String = #fileID,
     line: UInt = #line,
     column: UInt = #column
   ) {
@@ -259,6 +274,7 @@ public struct State<Value> {
         line: line,
         column: column
       ),
+      declarationFileID: fileID,
       dormantPolicy: dormantPolicy
     )
   }
@@ -271,6 +287,7 @@ public struct State<Value> {
       if box.hasEverBeenGraphBound, ViewNodeContext.current == nil {
         reportImperativeSeedFallback(
           slotOrdinal: box.currentOrdinal,
+          declarationFileID: box.declarationFileID,
           reason: "no live state owner could be resolved from the dispatch context"
         )
       }
@@ -287,6 +304,7 @@ public struct State<Value> {
         if box.hasEverBeenGraphBound, ViewNodeContext.current == nil {
           reportImperativeSeedFallback(
             slotOrdinal: box.currentOrdinal,
+            declarationFileID: box.declarationFileID,
             reason:
               "no live state owner could be resolved from the dispatch context; "
               + "the write reached only the authored seed"
@@ -472,6 +490,7 @@ public struct State<Value> {
     // removal and leak writes into replacement identities.
     let authoredSeed = box.currentSeedValue()
     let slotOrdinal = box.currentOrdinal
+    let declarationFileID = box.declarationFileID
     let dormantPolicy = box.dormantPolicy
     return DynamicStateLocation(
       getValue: { [weak box] in
@@ -482,6 +501,7 @@ public struct State<Value> {
           if ViewNodeContext.current == nil {
             reportImperativeSeedFallback(
               slotOrdinal: slotOrdinal,
+              declarationFileID: declarationFileID,
               reason: "the state's owning node is no longer live and holds no retained value"
             )
           }
@@ -552,22 +572,27 @@ private func withDormantStateSlotPolicy<Result>(
 /// the warning is what makes that observable. Dispatch-time issues buffer in
 /// `ImperativeRuntimeIssueQueue` and surface at the next frame head.
 @MainActor
-private func reportImperativeSeedFallback(slotOrdinal: Int, reason: String) {
+private func reportImperativeSeedFallback(
+  slotOrdinal: Int,
+  declarationFileID: String,
+  reason: String
+) {
   StateCaptureCensus.record(.seedFallback)
+  let declarationSite = stateDeclarationSite(
+    slotOrdinal: slotOrdinal,
+    declarationFileID: declarationFileID
+  )
   if StateCaptureBindingConfiguration.isEnabled {
     // Oracle promotion (plan 2026-08-20-001 Stage 3): with captures live,
     // a seed fallback is a soundness failure, not merely a loud diagnostic.
     SoundnessProbeConfiguration.recordStateSeedFallbackViolation(
-      "state-seed-fallback: slot \(slotOrdinal): \(reason)"
+      "state-seed-fallback: \(declarationSite) (slot \(slotOrdinal)): \(reason)"
     )
   }
-  var message =
+  let message =
     "An imperative @State access fell back to the authored initial value: "
     + reason + ". The closure observed the seed, not the last written value."
-  if slotOrdinal >= 0 {
-    message +=
-      " The state is declared near line \(slotOrdinal >> 16), column \(slotOrdinal & 0xFFFF)."
-  }
+    + " The state is declared at \(declarationSite)."
   ImperativeRuntimeIssueQueue.record(
     RuntimeIssue(
       severity: .warning,
@@ -576,6 +601,20 @@ private func reportImperativeSeedFallback(slotOrdinal: Int, reason: String) {
       source: "@State"
     )
   )
+}
+
+/// The `file:line:column` a diagnostic names for an authored slot. Authored
+/// ordinals pack the declaration's line and column (`StateSlotOrdinals`);
+/// a framework-internal negative ordinal carries no authored position, so
+/// only the file is named.
+private func stateDeclarationSite(
+  slotOrdinal: Int,
+  declarationFileID: String
+) -> String {
+  guard slotOrdinal >= 0 else {
+    return declarationFileID
+  }
+  return "\(declarationFileID):\(slotOrdinal >> 16):\(slotOrdinal & 0xFFFF)"
 }
 
 extension State: CaptureBindableDynamicProperty {
