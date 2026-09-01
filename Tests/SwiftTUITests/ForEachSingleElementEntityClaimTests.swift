@@ -25,6 +25,12 @@ import Testing
 /// level deeper on every re-evaluation until the DEBUG skip oracle
 /// (`AnimationController.noteSkippedResolvedTreeProcessing`) trapped.
 ///
+/// Since then a lone `ForEach` element keeps the one-child `Group` its siblings
+/// would share (`normalizeResolvedElements`): the container is never the
+/// element's absorber, so growth inserts a sibling under an unchanged parent —
+/// no re-homing, no task cancel, no snapped animation. The entity-claim pins
+/// stay as regression coverage for the absorber paths.
+///
 /// The writes below render through `render()`, the frame the state write itself
 /// scheduled, on a harness created with `selectiveEvaluation: true` so that
 /// frame is the run loop's selective dirty-frontier frame, as production.
@@ -75,6 +81,8 @@ struct ForEachSingleElementEntityClaimTests {
     }
     defer { harness.shutdown() }
 
+    let lone = try backgroundShape(harness)
+    let loneHome = try elementNode(harness, elementSuffix: "ID[0]")
     let bumpFirst = try #require(ledger.bumps[0])
     bumpFirst()
     _ = try harness.render()
@@ -82,14 +90,25 @@ struct ForEachSingleElementEntityClaimTests {
     setCount(2)
     _ = try harness.render()
     let grown = try backgroundShape(harness)
+    let grownHome = try elementNode(harness, elementSuffix: "ID[0]")
     let bumpSecond = try #require(ledger.bumps[1])
     bumpSecond()
     _ = try harness.render()
     let afterWrite = try backgroundShape(harness)
 
+    // One element already has the `Group` two share, so growth inserts a
+    // sibling under an unchanged parent instead of re-rooting the container.
+    #expect(
+      lone == "Group[Rectangle@ID[0]]",
+      "a lone element resolved without its Group: \(lone)"
+    )
     #expect(
       grown == "Group[Rectangle@ID[0], Rectangle@ID[1]]",
       "the lone element's node was hijacked before the second element arrived: \(grown)"
+    )
+    #expect(
+      grownHome == loneHome,
+      "growth re-homed the first element: \(loneHome) -> \(grownHome)"
     )
     #expect(
       afterWrite == grown,
@@ -116,11 +135,12 @@ struct ForEachSingleElementEntityClaimTests {
     }
     defer { harness.shutdown() }
 
-    // The element's node is parentless and index-shadowed by its container
-    // (the flattening absorber), so its lifetime rests on its entity route and
-    // `lifetimeReachabilityContext`'s flattened-element fact. Without that fact
-    // the barrier reclaims the node as a stale absorbed shadow every frame and
-    // the next resolve mints a fresh one. Root re-renders are the harsher
+    // Flattened up as its container's value, the element's node was parentless
+    // and index-shadowed by the container, so its lifetime rested on its entity
+    // route and `lifetimeReachabilityContext`'s flattened-element fact; without
+    // that fact the barrier reclaimed it as a stale absorbed shadow every frame
+    // and the next resolve minted a fresh one. As a `Group` child it is an
+    // ordinary parented node; the pin stays. Root re-renders are the harsher
     // case here: every frame re-resolves the container.
     let initialHomes = try elementHomes(harness)
     #expect(initialHomes.count == 1, "expected one routed element: \(initialHomes)")
@@ -142,13 +162,12 @@ struct ForEachSingleElementEntityClaimTests {
 
   @Test("a lone ForEach element's container publishes appear and disappear once")
   func loneElementContainerPublishesLifecycleOnce() throws {
-    // The container node's committed value IS the element's resolved node,
+    // The container node's committed value WAS the element's resolved node,
     // handler IDs included, so a fresh container appeared — and a departing
     // one disappeared — with the element's handlers alongside the element's
     // own node: same handler ID under two identities, and the per-frame
-    // dedupe keyed on both missed it. A sibling under a stack, or two
-    // elements under a `Group`, never shared their handler IDs with the
-    // container.
+    // dedupe keyed on both missed it. Both the handler-ID dedupe and the
+    // one-child `Group` now stand between this test and that double.
     let ledger = ElementLedger()
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("LifecycleOnceRoot"),
@@ -210,26 +229,115 @@ struct ForEachSingleElementEntityClaimTests {
       grown.contains { $0.hasSuffix("/ID[1]#task") },
       "the second element's task did not start: \(grown)"
     )
-    // The task runner keys the lone element's task by the identity index
-    // owner — the container node, its flattening absorber — and that node
-    // cancels its previous resolved identity's tasks when its value changes
-    // from the lone element to a `Group`. The first element is still live,
-    // so its task must survive; today it is cancelled here and restarted
-    // from scratch only once the data shrinks back to one element. Task
-    // events are keyed by resolved identity (already deduplicated across the
-    // absorber and the element's own node), so the T171 handler-ID dedupe
-    // does not reach this: the surviving event is the absorber's, and the
-    // element node's own cancel carries no view node ID once the index entry
-    // has moved. Fix direction: key element task events by the entity route
-    // home.
-    withKnownIssue(
-      "org task T172: growing a lone ForEach element cancels the first element's .task"
+    // With the lone element flattened up as the container's value, the task
+    // runner keyed the element's task by the identity index owner — the
+    // container — and the container cancelled its previous resolved
+    // identity's tasks when its value changed from the lone element to a
+    // `Group` (org task T172). The one-element `Group` keeps the container's
+    // resolved identity its own, so the element owns its task throughout.
+    #expect(
+      grown.contains { $0.hasSuffix("/ID[0]#task") },
+      "the first element's task was cancelled by the container's growth: \(grown)"
+    )
+  }
+
+  @Test("growing a lone ForEach element to two keeps the first element's animation")
+  func loneElementGrowthKeepsTheFirstElementsAnimation() throws {
+    // The counter demo's ripple: the first ring's animation is in flight when
+    // the second ring arrives. Re-rooting the container from the lone element
+    // to a fresh `Group` restarted the first ring from its origin — the
+    // flicker — and cancelled its task (T172). The animated offset of the
+    // first element's marker must keep advancing through the growth frame.
+    let ledger = ElementLedger()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AnimatedGrowthRoot"),
+      size: .init(width: 40, height: 6),
+      selectiveEvaluation: true
     ) {
-      #expect(
-        grown.contains { $0.hasSuffix("/ID[0]#task") },
-        "the first element's task was cancelled by the container's growth: \(grown)"
-      )
+      AnimatedElementsFixture(ledger: ledger)
     }
+    defer { harness.shutdown() }
+    let controller = harness.runLoop.renderer.internalAnimationController
+    let clock = DeadlineDrivenFrameClock(harness: harness)
+
+    let animateFirst = try #require(ledger.animations[0])
+    try withAnimationSinks(controller) {
+      animateFirst()
+      _ = try harness.render()
+      try clock.advance(by: .milliseconds(800))
+      // The deadline chain's last frame lands just short of the target
+      // instant; sample a frame AT the instant the growth frame will use.
+      harness.runLoop.scheduler.requestExternalWake(reason: "sample")
+      _ = try harness.render()
+    }
+    let midway = try #require(markerColumn(in: harness.frame, row: 0))
+    #expect(midway > 0, "the marker never left its origin:\n\(harness.frame)")
+    #expect(
+      controller.activeAnimationCount == 1, "the first element's offset animation is in flight")
+
+    let setCount = try #require(ledger.setCount)
+    try withAnimationSinks(controller) {
+      setCount(2)
+      _ = try harness.render()
+    }
+    let grownAtSameInstant = markerColumn(in: harness.frame, row: 0)
+    #expect(
+      grownAtSameInstant == midway,
+      "the second element's arrival moved the first element's marker: \(midway) -> \(String(describing: grownAtSameInstant))\n\(harness.frame)"
+    )
+    #expect(controller.activeAnimationCount == 1, "growth cancelled or restarted the animation")
+
+    try withAnimationSinks(controller) {
+      try clock.advance(by: .milliseconds(400))
+    }
+    let later = try #require(markerColumn(in: harness.frame, row: 0))
+    #expect(
+      later > midway,
+      "the first element's animation stopped advancing after growth: \(midway) -> \(later)\n\(harness.frame)"
+    )
+    try withAnimationSinks(controller) {
+      try clock.advance(by: .milliseconds(1_000))
+    }
+    #expect(
+      markerColumn(in: harness.frame, row: 0) == 30, "the marker did not settle:\n\(harness.frame)")
+    #expect(
+      ledger.completions == 1, "the first element's completion fired \(ledger.completions) times")
+  }
+}
+
+/// Column of the first element's marker glyph in `row`, or nil when absent.
+private func markerColumn(in frame: String, row: Int) -> Int? {
+  let lines = frame.split(separator: "\n", omittingEmptySubsequences: false)
+  guard row < lines.count else { return nil }
+  return Array(lines[row]).firstIndex(of: "A")
+}
+
+/// Drives the harness through every deadline the controller arms: the frame
+/// instant is the armed deadline, so wall time only advances one frame per
+/// render and a probe must render each turn to reach a later instant.
+@MainActor
+private final class DeadlineDrivenFrameClock<Content: View> {
+  private let harness: StressRuntimeHarness<Content>
+  private(set) var now = MonotonicInstant.now()
+
+  init(harness: StressRuntimeHarness<Content>) {
+    self.harness = harness
+    harness.runLoop.frameClock = { [self] in now }
+  }
+
+  /// Advances the clock to `now + duration`, rendering every turn armed on
+  /// the way; stops early once no turn is pending.
+  func advance(by duration: Duration, maxTurns: Int = 2_000) throws {
+    let target = now.advanced(by: duration)
+    var turns = 0
+    while turns < maxTurns {
+      let scheduler = harness.runLoop.scheduler
+      guard let wake = scheduler.nextWakeInstant(after: now), wake <= target else { break }
+      now = wake
+      _ = try harness.render()
+      turns += 1
+    }
+    now = target
   }
 }
 
@@ -282,6 +390,25 @@ private func expectSelectiveElementFrame<V: View>(
     evaluatedAnElement,
     "the state write's frame evaluated no ForEach element: \(evaluatedPaths)"
   )
+}
+
+/// The view node ID and parent identity of the `ForEach` element whose
+/// identity ends in `elementSuffix`.
+@MainActor
+private func elementNode<V: View>(
+  _ harness: StressRuntimeHarness<V>,
+  elementSuffix: String
+) throws -> String {
+  let graph = harness.runLoop.renderer.debugRuntimeSubsystemSnapshot().viewGraph
+  let matches = graph.nodesByNodeID.filter { nodeID, _ in
+    graph.identityByNodeID[nodeID]?.path.hasSuffix("/" + elementSuffix) == true
+  }
+  let (nodeID, node) = try #require(matches.first, "no node for \(elementSuffix)")
+  #expect(
+    matches.count == 1,
+    "several nodes for \(elementSuffix): \(matches.keys.map(\.rawValue))"
+  )
+  return "\(nodeID.rawValue) under \(node.parentIdentity?.path ?? "nil")"
 }
 
 /// Every entity route must target an element's own node (an explicit-ID
@@ -364,6 +491,8 @@ private final class ElementLedger {
   var setShown: ((Bool) -> Void)?
   var appearances = 0
   var disappearances = 0
+  var animations: [Int: () -> Void] = [:]
+  var completions = 0
 }
 
 private struct StatelessLoneElementFixture: View {
@@ -424,6 +553,42 @@ private struct TaskedElementsFixture: View {
             .task { await suspendUntilCancelled() }
         }
       }
+  }
+}
+
+/// Lone-element container whose elements animate a marker's offset, the
+/// counter ripple's shape reduced to something the text frame can read.
+private struct AnimatedElementsFixture: View {
+  let ledger: ElementLedger
+  @State private var count = 1
+
+  var body: some View {
+    ledger.setCount = { count = $0 }
+    return Text("host")
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(alignment: .topLeading) {
+        ForEach(0..<count, id: \.self) { index in
+          AnimatedMarker(index: index, ledger: ledger)
+        }
+      }
+  }
+}
+
+private struct AnimatedMarker: View {
+  let index: Int
+  let ledger: ElementLedger
+  @State private var progress: Double = 0
+
+  var body: some View {
+    ledger.animations[index] = {
+      withAnimation(.linear(duration: .milliseconds(1_600))) {
+        progress = 1
+      } completion: {
+        ledger.completions += 1
+      }
+    }
+    return Text(index == 0 ? "A" : "B")
+      .offset(x: Int(progress * 30), y: index)
   }
 }
 

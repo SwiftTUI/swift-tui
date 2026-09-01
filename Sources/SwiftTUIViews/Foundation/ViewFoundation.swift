@@ -295,10 +295,34 @@ package func resolveViewElements<V: View & ResolvableView>(
   view.resolveElements(in: context)
 }
 
+/// Folds a composite's resolved elements into one node: none is an
+/// `EmptyView`, several share a `Group`, and one is normally that element
+/// itself.
+///
+/// `loneForEachElementKeepsGroup` applies to a composite's own body (the
+/// `resolveView` sites): a lone `ForEach` element then keeps the `Group` its
+/// siblings would share. The element's node carries the element's entity,
+/// `@State`, lifecycle handler IDs and task; handing it up as the composite's
+/// own value made the composite a "flattening absorber" that the identity
+/// index, the task runner and lifecycle publication all treated as the
+/// element — and growing the data to two re-rooted the composite from the
+/// element to a fresh `Group`, re-parenting the surviving element
+/// mid-animation (the counter demo's ripple: task cancelled, first ring's
+/// animation snapped to its end value; org tasks T171/T172). With the `Group`
+/// minted from one element on, a sibling's arrival is an ordinary child
+/// insertion under an unchanged parent. Non-`ForEach` lone children (a
+/// modifier's content, a conditional branch) keep flattening: their node IS
+/// the composite's value by construction, with no entity of its own to
+/// hijack. Scoped and portal payload hosting (`ScopedContentPayload.resolve`,
+/// `Portal`) leaves the flag off: one payload hosts exactly one element and
+/// the host reads the element's identity and entity off the payload's top
+/// node, which is what lets payload identities follow element IDs across a
+/// reorder.
 @MainActor
 package func normalizeResolvedElements(
   _ resolvedElements: [ResolvedNode],
-  in context: ResolveContext
+  in context: ResolveContext,
+  loneForEachElementKeepsGroup: Bool = false
 ) -> ResolvedNode {
   switch resolvedElements.count {
   case 0:
@@ -309,7 +333,9 @@ package func normalizeResolvedElements(
       transactionSnapshot: context.transaction,
       intrinsicSize: .zero
     )
-  case 1:
+  case 1
+  where !loneForEachElementKeepsGroup
+    || resolvedElements[0].entityIdentity?.isForEachScoped != true:
     return resolvedElements[0]
   default:
     var groupedChildren = resolvedElements
@@ -533,7 +559,8 @@ func resolveView<V: View>(
             let resolve = {
               normalizeResolvedElements(
                 resolveViewElements(prepared, in: context),
-                in: context
+                in: context,
+                loneForEachElementKeepsGroup: true
               )
             }
 
@@ -561,7 +588,8 @@ func resolveView<V: View>(
           return withAuthoringContext(authoringContext) {
             let resolved = normalizeResolvedElements(
               resolveViewElements(prepared, in: context),
-              in: context
+              in: context,
+              loneForEachElementKeepsGroup: true
             )
             accessedStateSlots = authoringContext.ordinalTracker.nextOrdinal
             return resolved
