@@ -120,7 +120,7 @@ struct ForEachSingleElementEntityClaimTests {
     // modifier content — on the unfixed tree as well, and only in that shape
     // (two elements fire once each; a lone element under `ZStack`/`VStack`
     // fires once). That is a separate lifecycle-publication defect tracked as
-    // T162 in the org root's `docs/TASKS.csv`; this test pins node stability
+    // T171 in the org root's `docs/TASKS.csv`; this test pins node stability
     // only, so the count is recorded but not asserted.
     _ = ledger.appearances
     try expectNoElementRoutesToTheContainer(harness)
