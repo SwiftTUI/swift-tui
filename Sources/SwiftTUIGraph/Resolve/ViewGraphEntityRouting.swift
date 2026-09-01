@@ -38,6 +38,9 @@ extension ViewGraph {
     for identity: Identity,
     entityIdentity: EntityIdentity? = nil
   ) -> ViewNode {
+
+
+
     if let entityIdentity,
       let routedNodeID = entityRoutingTable.route(entityIdentity)
     {
@@ -81,6 +84,28 @@ extension ViewGraph {
 
     if let existing = nodeIfExists(for: identity) {
       if let entityIdentity {
+        // Single-child flattening, entity-routed: the identity index resolves
+        // to the ABSORBER (the container whose committed value is this lone
+        // `ForEach` element, so `reindexIdentity` handed it the entry) and the
+        // absorber's committed value carries the element's stamp — so the
+        // occupant comparison below would adopt the container as the element's
+        // node. Mirror the no-entity tiebreak: authoring lands on the authored
+        // element node when it survived, and on a fresh node otherwise; the
+        // container keeps the index entry for planning and value stitching.
+        if entityIdentity.isForEachScoped, existing.identity != identity {
+          if let stateOwner = flattenedStateOwnerNode(for: identity),
+            stateOwner !== existing,
+            stateOwner.committed.entityIdentity
+              ?? entityRoutingTable.entityByNodeID[stateOwner.viewNodeID]
+              ?? stateOwner.lastHomedEntityIdentity == entityIdentity
+          {
+            bindEntityRoute(entityIdentity, to: stateOwner.viewNodeID)
+            return stateOwner
+          }
+          let element = mintFreshNode(identity: identity, installIdentityIndex: false)
+          bindEntityRoute(entityIdentity, to: element.viewNodeID)
+          return element
+        }
         let existingEntityIdentity =
           existing.committed.entityIdentity
           ?? entityRoutingTable.entityByNodeID[existing.viewNodeID]
@@ -232,6 +257,35 @@ extension ViewGraph {
     // enclosing claimer still on the evaluation stack, or next frame's
     // forwarded claim adopts the inner node cross-identity and aliases the
     // parent's committed child pairing.
+    // A `ForEach` element's entity-carrying value can also bubble ACROSS an
+    // identity boundary: a lone element is spliced up as its container's own
+    // resolved value (`normalizeResolvedElements` unwraps a single element
+    // instead of minting a `Group`), so the container at `…/background`
+    // applies a value whose identity is the element's `…/background/ID[x]`.
+    // Element entities never fold into an enclosing node — `ForEachIteration`
+    // routes them without preparing the enclosing node as their owner — so a
+    // claimant at another identity is always that flattening container, and
+    // letting it take the route re-homes the element onto the container next
+    // frame: its `@State` re-seeds there, writes made through body-created
+    // closures land on the orphaned element node, and once the data grows the
+    // hijacked element resolves ON the container mid-evaluation, where reuse
+    // serves the container's whole committed `Group` as that element (the
+    // counter-demo ripple wedge, 2026-09-01). The entity stays with the node
+    // that resolved the value's identity (see also `nodeForIdentity`'s absorber
+    // tiebreak and `lifetimeReachabilityContext`'s flattened-home fact).
+    //
+    // Exact and `.id()` entities are deliberately NOT covered: their hosts
+    // (`ExactIdentityModifier`'s `ExplicitIdentityHost`, `AnyView`'s payload
+    // content host) prepare the route on the enclosing node and fold the
+    // content in — a cross-identity claim by design. Refusing it leaves the
+    // content's node orphaned for a frame with its registrations live (the
+    // `anyView*KeyRebinds` stress cases count two key handlers).
+    if entityIdentity.isForEachScoped,
+      let claimant = nodeIfExists(for: viewNodeID),
+      claimant.identity != resolved.identity
+    {
+      return
+    }
     if let boundNodeID = entityRoutingTable.route(entityIdentity),
       boundNodeID != viewNodeID,
       let bound = nodeIfExists(for: boundNodeID),

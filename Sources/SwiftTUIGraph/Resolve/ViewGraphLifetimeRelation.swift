@@ -23,7 +23,9 @@ extension ViewGraph {
         routeOwnsNode: true,
         occurrence: entity.occurrence,
         resolvedIdentityIndexOwnsNode:
-          nodeIDByIdentity[node.resolvedIdentity] == nodeID
+          nodeIDByIdentity[node.resolvedIdentity] == nodeID,
+        flattenedForEachElement: entity.isForEachScoped
+          && isFlattenedIntoAbsorber(node)
       )
       if entityHomeQualifiesForLifetime(facts) {
         qualifiedHomes[entity] = nodeID
@@ -34,6 +36,23 @@ extension ViewGraph {
       activeEntityIdentities: activeEntities,
       liveEntityHomeByIdentity: qualifiedHomes
     )
+  }
+
+  /// Whether a single-child flattening absorber owns `node`'s identity index
+  /// entry: the index resolves the node's own (un-re-rooted) identity to a
+  /// different node whose committed root identity is that same identity — the
+  /// container that spliced this lone element up as its own resolved value.
+  /// The element is then parentless and index-shadowed by design, yet fully
+  /// live: the container re-resolves it every frame.
+  private func isFlattenedIntoAbsorber(_ node: ViewNode) -> Bool {
+    guard node.resolvedIdentity == node.identity,
+      let ownerID = nodeIDByIdentity[node.identity],
+      ownerID != node.viewNodeID,
+      let owner = nodeIfExists(for: ownerID)
+    else {
+      return false
+    }
+    return owner.resolvedIdentity == node.identity
   }
 
   package func replaceParentTargets(

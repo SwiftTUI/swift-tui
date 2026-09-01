@@ -905,6 +905,13 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
   package var occurrence: Int
   package var debugDescription: String
   package var isScopedExactIdentity: Bool
+  /// Whether this entity names a `ForEach` element (`init(forEachValue:…)`).
+  /// Element entities live on the element's own explicit-identity node and
+  /// never fold into an enclosing node, so a cross-identity claim on one is
+  /// always a container stealing a spliced lone element's route (see
+  /// `ViewGraph.bindEntityIdentity`). Derived from `value`, so it stays out of
+  /// `==`/`hash` like `isScopedExactIdentity`.
+  package var isForEachScoped: Bool
 
   package init<ID: Hashable & Sendable>(
     _ value: ID,
@@ -914,6 +921,7 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     self.occurrence = occurrence
     debugDescription = String(reflecting: value)
     isScopedExactIdentity = false
+    isForEachScoped = false
   }
 
   package init<ID: Hashable & Sendable>(
@@ -925,6 +933,7 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     self.occurrence = occurrence
     debugDescription = String(reflecting: value)
     isScopedExactIdentity = false
+    isForEachScoped = true
   }
 
   /// An exact identity scoped to the enclosing entity lifetime. Exact
@@ -941,18 +950,21 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     self.occurrence = occurrence
     debugDescription = String(reflecting: identity)
     isScopedExactIdentity = true
+    isForEachScoped = false
   }
 
   private init(
     value: AnyID,
     occurrence: Int,
     debugDescription: String,
-    isScopedExactIdentity: Bool
+    isScopedExactIdentity: Bool,
+    isForEachScoped: Bool
   ) {
     self.value = value
     self.occurrence = occurrence
     self.debugDescription = debugDescription
     self.isScopedExactIdentity = isScopedExactIdentity
+    self.isForEachScoped = isForEachScoped
   }
 
   package func withOccurrence(_ occurrence: Int) -> Self {
@@ -960,7 +972,8 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
       value: value,
       occurrence: occurrence,
       debugDescription: debugDescription,
-      isScopedExactIdentity: isScopedExactIdentity
+      isScopedExactIdentity: isScopedExactIdentity,
+      isForEachScoped: isForEachScoped
     )
   }
 

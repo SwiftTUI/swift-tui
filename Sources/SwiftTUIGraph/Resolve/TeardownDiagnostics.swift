@@ -158,17 +158,24 @@ package struct EntityHomeLifetimeFacts: Equatable, Sendable {
   package var routeOwnsNode: Bool
   package var occurrence: Int
   package var resolvedIdentityIndexOwnsNode: Bool
+  /// The home is a lone `ForEach` element whose container spliced it up as
+  /// its own resolved value: a single-child flattening absorber owns the
+  /// element's identity index entry (`reindexIdentity`), so the home cannot
+  /// own it — yet it is the element's live node, re-resolved every frame.
+  package var flattenedForEachElement: Bool
 
   package init(
     entityIsActive: Bool,
     routeOwnsNode: Bool,
     occurrence: Int,
-    resolvedIdentityIndexOwnsNode: Bool
+    resolvedIdentityIndexOwnsNode: Bool,
+    flattenedForEachElement: Bool = false
   ) {
     self.entityIsActive = entityIsActive
     self.routeOwnsNode = routeOwnsNode
     self.occurrence = occurrence
     self.resolvedIdentityIndexOwnsNode = resolvedIdentityIndexOwnsNode
+    self.flattenedForEachElement = flattenedForEachElement
   }
 }
 
@@ -177,7 +184,9 @@ package func entityHomeQualifiesForLifetime(
 ) -> Bool {
   facts.entityIsActive
     && facts.routeOwnsNode
-    && (facts.occurrence > 0 || facts.resolvedIdentityIndexOwnsNode)
+    && (facts.occurrence > 0
+      || facts.resolvedIdentityIndexOwnsNode
+      || facts.flattenedForEachElement)
 }
 
 /// Test-only injection vocabulary for exercising the barrier trace and
