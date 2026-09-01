@@ -2153,16 +2153,10 @@ package final class ViewGraph {
       if emitsOwnLifecycleEvents,
         !node.lifecycleMetadata.appearHandlerIDs.isEmpty
       {
-        let event = LifecycleEvent(
+        appendStructuralAppearEvent(
           identity: node.identity,
-          operation: .appear(handlerIDs: node.lifecycleMetadata.appearHandlerIDs)
+          handlerIDs: node.lifecycleMetadata.appearHandlerIDs
         )
-        // Idempotent per frame: the chunked resolve driver's drain-and-rerun
-        // fixpoint finishes an appearing node more than once in one frame;
-        // re-appending would double-dispatch its appear handlers.
-        if !structuralAppearEvents.contains(event) {
-          structuralAppearEvents.append(event)
-        }
       }
       if emitsOwnLifecycleEvents {
         for task in node.lifecycleMetadata.tasks {
@@ -2176,6 +2170,30 @@ package final class ViewGraph {
     }
     pruneLifecycleEvaluationOwners(ownedBy: node.identity)
     return node.committed
+  }
+
+  /// Publishes a node's appear handlers at most once per frame, keyed by the
+  /// handler IDs themselves rather than by the emitting node's identity. Two
+  /// producers legitimately reach here with the same IDs: the chunked resolve
+  /// driver's drain-and-rerun fixpoint finishes an appearing node more than
+  /// once in one frame, and a single-child flattening absorber commits a lone
+  /// `ForEach` element's resolved node — `lifecycleMetadata` included — as its
+  /// own value, so the container and the element's own node both arrive
+  /// carrying the element's IDs under different identities (org task T171:
+  /// `.onAppear` fired twice for a lone element resolved directly as modifier
+  /// content). A handler ID names one registration, so a second event for it
+  /// is always the same handler and never a second appearance.
+  private func appendStructuralAppearEvent(
+    identity: Identity,
+    handlerIDs: [String]
+  ) {
+    let operation = LifecycleCommitOperation.appear(handlerIDs: handlerIDs)
+    guard !structuralAppearEvents.contains(where: { $0.operation == operation }) else {
+      return
+    }
+    structuralAppearEvents.append(
+      LifecycleEvent(identity: identity, operation: operation)
+    )
   }
 
   /// A value-only child (a styling-wrapper ResolvedNode with no view node —
@@ -2590,16 +2608,10 @@ package final class ViewGraph {
       if emitsOwnLifecycleEvents,
         !node.lifecycleMetadata.appearHandlerIDs.isEmpty
       {
-        let event = LifecycleEvent(
+        appendStructuralAppearEvent(
           identity: node.identity,
-          operation: .appear(handlerIDs: node.lifecycleMetadata.appearHandlerIDs)
+          handlerIDs: node.lifecycleMetadata.appearHandlerIDs
         )
-        // Idempotent per frame: the chunked resolve driver's drain-and-rerun
-        // fixpoint finishes an appearing node more than once in one frame;
-        // re-appending would double-dispatch its appear handlers.
-        if !structuralAppearEvents.contains(event) {
-          structuralAppearEvents.append(event)
-        }
       }
       if emitsOwnLifecycleEvents {
         for task in node.lifecycleMetadata.tasks {

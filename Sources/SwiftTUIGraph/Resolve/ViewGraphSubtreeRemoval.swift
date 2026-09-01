@@ -450,14 +450,20 @@ extension ViewGraph {
     if emitsOwnLifecycleEvents,
       !lifecycleMetadata.disappearHandlerIDs.isEmpty
     {
-      structuralDisappearEvents.append(
-        .init(
-          identity: node.identity,
-          operation: .disappear(
-            handlerIDs: lifecycleMetadata.disappearHandlerIDs
-          )
-        )
+      // Keyed by the handler IDs, mirroring `appendStructuralAppearEvent`: a
+      // single-child flattening absorber and the lone `ForEach` element it
+      // committed both carry the element's disappear IDs, and a container
+      // teardown reaches both nodes (the element through its hosted-detached
+      // edge). Whichever the cascade reaches first publishes; the second is
+      // the same registration (org task T171).
+      let operation = LifecycleCommitOperation.disappear(
+        handlerIDs: lifecycleMetadata.disappearHandlerIDs
       )
+      if !structuralDisappearEvents.contains(where: { $0.operation == operation }) {
+        structuralDisappearEvents.append(
+          .init(identity: node.identity, operation: operation)
+        )
+      }
     }
 
     node.setLifecycleState(.disappearing)

@@ -4907,6 +4907,17 @@ final class StressRuntimeHarness<Content: View> {
     // `PointerInputCapabilities.supportsScrollPanning`), so a scenario that
     // exercises either has to say it is running on a touch-style host.
     pointerInputCapabilities: PointerInputCapabilities = .cellOnly,
+    // Production parity for frames after the first: `RunLoop.run` turns
+    // selective dirty evaluation on once the initial frame has established
+    // the tree and its evaluators, so a state write's own frame is the run
+    // loop's dirty-frontier frame. Off, every later frame here is a full
+    // root evaluation and selective-only symptoms cannot be reproduced —
+    // the lone-`ForEach`-element `Group` re-nesting showed in the counter
+    // demo's run loop but never in this harness (org task T170). Opt-in
+    // rather than the default: with it on for every scenario, 28 stress
+    // tests across the navigation/presentation/observation suites fail and
+    // one livelocks under this synchronous driver (org task T173).
+    selectiveEvaluation: Bool = false,
     @ViewBuilder content: @escaping () -> Content
   ) throws {
     let terminal = StressRecordingHost(
@@ -4933,6 +4944,9 @@ final class StressRuntimeHarness<Content: View> {
 
     scheduler.requestInvalidation(of: [rootIdentity])
     _ = try render()
+    if selectiveEvaluation {
+      runLoop.renderer.enableSelectiveEvaluation()
+    }
   }
 
   var frame: String {
@@ -5065,6 +5079,14 @@ final class StressRuntimeHarness<Content: View> {
   /// reads is an ordinary class property, so writing it invalidates nothing.
   /// Requesting the root's invalidation makes the observing render explicit
   /// instead of depending on a frame some earlier interaction left pending.
+  ///
+  /// Root invalidation disables selective evaluation for that frame
+  /// (`FrameResolveState.selectiveEvaluationDecision`, `.rootInvalidated`),
+  /// so this always renders a full root evaluation even on a harness created
+  /// with `selectiveEvaluation: true`. After a `@State` write — which
+  /// schedules its own frame — use `render()` instead: on such a harness
+  /// that frame is the run loop's selective dirty-frontier frame, the shape
+  /// production renders.
   @discardableResult
   func renderAfterExternalMutation() throws -> String {
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
