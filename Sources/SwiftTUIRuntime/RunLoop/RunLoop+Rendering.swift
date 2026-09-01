@@ -202,11 +202,29 @@ extension RunLoop {
   /// one, otherwise the reading it was consumed at. Deadline-triggered frames
   /// use the deadline so a frame that ran late still animates to the time it
   /// was scheduled for, rather than to the time it happened to be serviced.
+  ///
+  /// A non-deadline wake (a state write, input, or signal) is additionally
+  /// clamped to the nearest still-armed deadline when that deadline is
+  /// already due. On a loop running slower than the animation cadence the
+  /// deadline rule makes the armed chain lag the wall clock; sampling a
+  /// wake frame at the wall clock would then advance every in-flight
+  /// animation by the whole accumulated lag in one frame — a spring with a
+  /// second left to run completes on the spot, and its `.removed` barrier
+  /// fires right behind it (the gallery section 19 snap: a state write from
+  /// an early `.logicallyComplete` closure ended the spring it completed
+  /// for; org tracker T5). On a loop keeping cadence the nearest armed
+  /// deadline lies in the future and the clamp changes nothing.
   private func deriveFrameInstant(
     for scheduledFrame: ScheduledFrame,
     consumedAt: MonotonicInstant
   ) -> MonotonicInstant {
-    scheduledFrame.triggeredDeadline ?? consumedAt
+    if let triggeredDeadline = scheduledFrame.triggeredDeadline {
+      return triggeredDeadline
+    }
+    if let nextDeadline = scheduledFrame.nextDeadline, nextDeadline < consumedAt {
+      return nextDeadline
+    }
+    return consumedAt
   }
 
   /// Publishes this run loop's `currentFocusedValues` as the live

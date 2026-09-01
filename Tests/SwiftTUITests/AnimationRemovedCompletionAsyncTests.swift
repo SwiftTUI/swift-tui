@@ -173,7 +173,11 @@ private final class RemovedCompletionHost: PresentationSurface {
   @discardableResult
   nonisolated func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     let rendered = TerminalSurfaceRenderer(capabilityProfile: capabilityProfile).render(surface)
-    let text = String(rendered.filter { $0 != "\r" })
+    // Scalar-level strip: "\r\n" is one Character, so a Character-level
+    // filter would keep CRLF pairs and break the row/column arithmetic in
+    // `centerOfText` for any target below the first row (this fixture's
+    // "hide" sits on row 0, which masked the trap).
+    let text = String(String.UnicodeScalarView(rendered.unicodeScalars.filter { $0 != "\r" }))
     // The run loop presents on the MainActor; `assumeIsolated` bridges this
     // nonisolated witness to the isolated frame list and signal.
     MainActor.assumeIsolated {

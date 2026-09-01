@@ -55,6 +55,21 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   `namedCoordinateSpaces["board"]` becomes
   `namedCoordinateSpaces[.named("board")]`.
 
+### Fixed
+
+- **A state write no longer fast-forwards in-flight animations on a loaded
+  run loop.** Deadline frames deliberately animate to their *scheduled*
+  instants, so a loop running slower than the animation cadence lets the
+  armed deadline chain lag the wall clock. A frame woken by anything other
+  than a deadline — a state write, input, or signal — then sampled animations
+  at the wall clock, advancing them by the whole accumulated lag at once: a
+  spring with a second left to run completed on the spot and its `.removed`
+  completion fired right behind it. The visible shape was a state write from
+  an early `.logicallyComplete(after:)` closure appearing to snap the very
+  spring it completed for. Wake frames are now clamped to the nearest
+  still-armed deadline when that deadline is already due; a loop keeping
+  cadence is unaffected.
+
 ## [0.9.12] - 2026-08-30
 
 ### Added
