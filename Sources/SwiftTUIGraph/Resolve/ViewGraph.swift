@@ -1946,6 +1946,74 @@ package final class ViewGraph {
     teardownBarrierWork = .init()
     latestLifecycleEvents.removeAll(keepingCapacity: true)
     detachedHostedRootsRecordedThisFrame.removeAll(keepingCapacity: true)
+    preferenceDeltaEscalationRequested = false
+    preferenceDeltaNotesThisFrame.removeAll(keepingCapacity: true)
+  }
+
+  // MARK: - Preference delta escalation (selective frames)
+
+  /// Set when a node evaluated as a dirty-frontier root committed a
+  /// preference output that differs from its previous commit while an
+  /// ancestor above it was served from its committed snapshot. Transient
+  /// within one frame, like the deferred-resolve driver's queue: reset at
+  /// `beginFrame`, consumed by the frame head. Diagnostic notes record every
+  /// changed node and the decision taken for it.
+  private var preferenceDeltaEscalationRequested = false
+  package private(set) var preferenceDeltaNotesThisFrame: [String] = []
+
+  /// A dirty-frontier evaluation committed preferences that differ from the
+  /// node's previous commit. Its ancestors were served from committed
+  /// snapshots this frame — snapshots computed over the OLD child
+  /// preferences — so any ancestor that consumes preferences in its own
+  /// resolve (a `NavigationStack` reading destination declarations, an
+  /// `overlayPreferenceValue`, a toolbar or title host, the presentation
+  /// portal root reading the pop chain) is stale. Ancestors re-compose
+  /// preferences in their bodies (the framework never patches committed
+  /// values after the fact — see `DeferredResolveDriver`), and a changed
+  /// value propagates to the root unless some level clears its key, so the
+  /// frame escalates to the root evaluator: exactly a root frame's cost, paid
+  /// only on frames where a resolve-time preference actually changed (org
+  /// task T173: a `navigationDestination(isPresented:)` push whose write
+  /// invalidated only the modifier never re-resolved the stack, so the
+  /// destination did not render — in the asynchronous production driver as
+  /// well). A root or descent evaluation is excluded by construction: the
+  /// ancestor is then mid-evaluation and consumes the fresh value itself.
+  private func notePreferenceOutputChanged(for node: ViewNode) {
+    guard let ancestor = node.parent ?? node.evaluationHost else {
+      // No live link to whatever consumes this node: a pushed navigation
+      // destination's content is resolved out-of-band by its stack and is
+      // parented by neither a committed child nor a hosted-detached edge.
+      // Only the evaluation root legitimately has no ancestor, and a
+      // re-evaluated root left nothing served above it.
+      if node.viewNodeID == root?.viewNodeID {
+        preferenceDeltaNotesThisFrame.append("changed \(node.identity.path) -> root")
+        return
+      }
+      preferenceDeltaNotesThisFrame.append(
+        "changed \(node.identity.path) -> root escalation (no ancestor link)"
+      )
+      preferenceDeltaEscalationRequested = true
+      return
+    }
+    guard !ancestor.isEvaluating,
+      !evaluatedNodeIDsThisFrame.contains(ancestor.viewNodeID)
+    else {
+      preferenceDeltaNotesThisFrame.append(
+        "changed \(node.identity.path) -> \(ancestor.identity.path) is \(ancestor.isEvaluating ? "evaluating" : "evaluated")"
+      )
+      return
+    }
+    preferenceDeltaNotesThisFrame.append(
+      "changed \(node.identity.path) -> root escalation (\(ancestor.identity.path) was served)"
+    )
+    preferenceDeltaEscalationRequested = true
+  }
+
+  /// Whether a frontier evaluation left a served ancestor stale this frame;
+  /// clears the request so a root evaluation runs once.
+  package func takePreferenceDeltaEscalation() -> Bool {
+    defer { preferenceDeltaEscalationRequested = false }
+    return preferenceDeltaEscalationRequested
   }
 
   package func beginEvaluation(
@@ -2126,11 +2194,18 @@ package final class ViewGraph {
       for: node,
       resolved: resolved
     )
+    let previousPreferences =
+      node.wasPresentAtFrameStart ? node.committed.preferenceValues : nil
     applyResolvedNode(
       node,
       resolved: resolved,
       children: childNodes
     )
+    if let previousPreferences,
+      previousPreferences != node.committed.preferenceValues
+    {
+      notePreferenceOutputChanged(for: node)
+    }
     replaceCommittedValueAnchors(in: node.committed)
     reindexDependencies(
       for: node,

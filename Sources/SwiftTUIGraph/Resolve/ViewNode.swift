@@ -2053,6 +2053,18 @@ package final class ViewNode {
       return committed
     }
     var rebuilt = committed
+    // Preferences are the body's OUTPUT, not a fold over children: a
+    // `NavigationStack` clears the destination-declaration key and adds the
+    // pop chain it computed, `transformPreference` rewrites a value, a
+    // toolbar host absorbs its items. Re-assigning `children` below re-derives
+    // `preferenceValues` as the plain child aggregate and would erase that
+    // post-processing from a served ancestor — after any selective frame
+    // beneath a stack its rebuilt snapshot carried no pop entries, so Escape
+    // found nothing to pop (org task T173). Keep the committed output: a
+    // child whose preference output changed escalates the frame to the root
+    // evaluator (`ViewGraph.notePreferenceOutputChanged`), so a rebuilt
+    // ancestor's committed preferences are current by construction.
+    let bodyAuthoredPreferences = committed.preferenceValues
     if committed.children.count == children.count {
       // Positional pairing (the same pairing `apply` wrote both sides from).
       // A never-applied placeholder child must keep the PARENT's committed
@@ -2083,6 +2095,7 @@ package final class ViewNode {
       // launder freshness above.
       rebuilt.children = children.map { $0.snapshotRebuilding(entered: &entered) }
     }
+    rebuilt.preferenceValues = bodyAuthoredPreferences
     committed = rebuilt
     reuseState.freshness.snapshotRefreshed()
     return committed

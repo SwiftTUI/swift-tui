@@ -136,7 +136,14 @@ struct ViewGraphCheckpointTotalityTests {
     // checkpointed in frame commit state — plus `resolveDiagnostics`, the
     // per-frame anchor-projection tally box (serve-path plan 2026-08-12-003
     // counters): frame diagnostics, not graph state, drained once per frame
-    // head and deliberately not rewound by restore.
+    // head and deliberately not rewound by restore — plus the T173
+    // `preferenceDeltaEscalationRequested` flag and its
+    // `preferenceDeltaNotesThisFrame` diagnostic buffer: both reset in
+    // `beginFrame` (which every head attempt runs), the flag consumed once by
+    // the same head's `escalateForPreferenceDelta`, the notes read only by
+    // tests, so a discarded draft's leftovers are unobservable before the
+    // next attempt clears them — the same transient per-frame class as
+    // `frameRuntimeIssues`.
     let groupPropertyNames: Set<String> = [
       "index",
       "rootEvaluation",
@@ -158,6 +165,8 @@ struct ViewGraphCheckpointTotalityTests {
           "debugReachabilityContextBuildCount",
           "debugReuseCacheEvictionFlushCount",
           "resolveDiagnostics",
+          "preferenceDeltaEscalationRequested",
+          "preferenceDeltaNotesThisFrame",
         ])
     )
     // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.

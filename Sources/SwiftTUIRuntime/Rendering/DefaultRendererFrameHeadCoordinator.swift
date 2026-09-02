@@ -426,6 +426,34 @@ struct DefaultRendererFrameHeadCoordinator {
     return declaredSources.contains { !viewGraph.containsNode(for: $0) }
   }
 
+  /// Re-evaluates the frame from the root when a dirty-frontier evaluation
+  /// committed a changed preference output beneath a served ancestor
+  /// (`ViewGraph.notePreferenceOutputChanged`). The presentation portal has
+  /// its own escalation for the presentation declaration preference; this
+  /// covers the general preference channel — navigation destination
+  /// declarations and pop chains, `transformPreference`/
+  /// `overlayPreferenceValue` chains, toolbar and title hosts — whose
+  /// consumers otherwise re-stitch from snapshots computed over the previous
+  /// frame's values. Publication becomes root-rooted exactly as for a nil
+  /// plan. Returns whether the root evaluation ran.
+  private func escalateForPreferenceDelta(
+    graphDraft: ViewGraphFrameDraft,
+    resolveInputs: FrameResolveInputs
+  ) -> Bool {
+    guard viewGraph.takePreferenceDeltaEscalation() else {
+      return false
+    }
+    graphDraft.recordDirtyEvaluationPlan(
+      nil,
+      diagnostics: DirtyEvaluationPlanDiagnostics(
+        result: "nil_preference_delta",
+        invalidatedIdentityCount: resolveInputs.invalidatedIdentities.count
+      )
+    )
+    _ = viewGraph.evaluateDirtyNodes(using: nil)
+    return true
+  }
+
   private func escalateToPresentationPortalReconcile(
     portal: PresentationPortalPreparation,
     graphDraft: ViewGraphFrameDraft,
@@ -595,6 +623,7 @@ struct DefaultRendererFrameHeadCoordinator {
           // root within the same frame. The accumulated `.subtrees`
           // publication becomes root-rooted and routes onto the
           // fingerprint-delta commit body.
+          var portalEscalated = false
           if dirtyEvaluationPlan != nil,
             !portal.queuedRoot,
             presentationPortalRequiresReconcileEscalation(portal: portal)
@@ -604,6 +633,22 @@ struct DefaultRendererFrameHeadCoordinator {
               graphDraft: graphDraft,
               resolveInputs: resolveInputs
             )
+            portalEscalated = true
+          }
+          // The general preference channel: a portal-root re-resolve above
+          // already re-composed every consumer, so it also settles any delta
+          // the narrow plan committed (drain the request); otherwise a
+          // changed preference output beneath a served ancestor escalates
+          // the frame to the root evaluator.
+          if dirtyEvaluationPlan != nil {
+            if portalEscalated {
+              _ = viewGraph.takePreferenceDeltaEscalation()
+            } else {
+              _ = escalateForPreferenceDelta(
+                graphDraft: graphDraft,
+                resolveInputs: resolveInputs
+              )
+            }
           }
         }
       }
