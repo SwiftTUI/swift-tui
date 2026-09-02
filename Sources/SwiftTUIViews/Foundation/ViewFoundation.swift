@@ -487,21 +487,46 @@ func resolveView<V: View>(
     let capturedOverride = authoringContextOverride.map {
       rebasedAuthoringContext($0, viewNode: nil)
     }
+    // The enclosing entity route is a task-local the parent chain binds
+    // around this position (`withResolveEntityRoute`), and the re-run fires
+    // outside that binding. An exact `.id` below this node scopes its entity
+    // to the enclosing route's entity (`ExactIdentityModifier`), so without
+    // the capture a frontier re-run beneath a `.id(owner)` computed a
+    // DIFFERENT entity for the same control: the modifier then saw a foreign
+    // occupant on its slot node and hosted the content under an
+    // `ExplicitIdentityHost`, while the chain's forwarded claim had already
+    // bound the new entity to this wrapper node — the nested resolves
+    // re-entered this node cross-identity, folding the control onto its own
+    // `.frame` wrapper (a parent/child cycle: the DEBUG stamp-coherence
+    // oracle on a `Panel`-hosted `TextEditor`'s focus frame, a livelock on
+    // the next paste without it; org task T173). Scope only: a route bound
+    // at THIS position is the parent level's claim on this child (a
+    // `ForEach` iteration's element entity), consumed by that level's own
+    // resolve. Re-fired from the child's re-run, a `ForEach` row claimed its
+    // element entity at its own position while the row node's occupant was
+    // the exact-`.id` entity its body chain had collapsed onto it, so the
+    // claim evicted the row and re-minted it: a pre-churn closure kept
+    // reading the evicted node's state (`CaptureBindingChurnJourneyTests`).
+    // The same-frame deferred-descent continuation keeps the full route
+    // because it resumes the very resolve that bound it.
+    let capturedEntityRoute = ResolveEntityRouteStorage.current?.scopeOnly
     context.viewGraph?.setEvaluator(for: context.identity) {
-      if let capturedEnclosingScope, currentAuthoringContext() == nil {
-        withAuthoringContext(capturedEnclosingScope) {
+      withResolveEntityRoute(capturedEntityRoute) {
+        if let capturedEnclosingScope, currentAuthoringContext() == nil {
+          withAuthoringContext(capturedEnclosingScope) {
+            _ = resolveView(
+              view,
+              in: context,
+              authoringContextOverride: capturedOverride
+            )
+          }
+        } else {
           _ = resolveView(
             view,
             in: context,
             authoringContextOverride: capturedOverride
           )
         }
-      } else {
-        _ = resolveView(
-          view,
-          in: context,
-          authoringContextOverride: capturedOverride
-        )
       }
     }
   }

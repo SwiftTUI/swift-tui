@@ -10,6 +10,18 @@ package struct ResolveEntityRoute: Sendable {
   /// positional node and never claim, or be adopted for, an entity that
   /// belongs to re-rooted content inside it.
   package var escapesHostingBoundary: Bool
+  /// True for a route re-installed around a stored evaluator's re-run
+  /// (``ResolveEntityRoute/scopeOnly``). The route still names the enclosing
+  /// entity for everything that reads the current route's identity — an
+  /// exact `.id` scoping its entity, a tab or lifecycle host recording its
+  /// enclosing entity — but it no longer satisfies
+  /// ``currentEntityRouteIdentity(in:)``: the positional claim it carried
+  /// was consumed by the parent level's original resolve (a `ForEach`
+  /// iteration or identity modifier binding the route around one child
+  /// position), and a re-run of that child alone must resolve onto its own
+  /// node the way it always did, not re-claim the entity through a routing
+  /// table that may have moved on since.
+  package var isScopeOnly: Bool
 
   package init(
     identity: EntityIdentity,
@@ -19,6 +31,14 @@ package struct ResolveEntityRoute: Sendable {
     self.identity = identity
     self.structuralPath = structuralPath
     self.escapesHostingBoundary = escapesHostingBoundary
+    isScopeOnly = false
+  }
+
+  /// This route with its positional claim withdrawn (see ``isScopeOnly``).
+  package var scopeOnly: ResolveEntityRoute {
+    var route = self
+    route.isScopeOnly = true
+    return route
   }
 }
 
@@ -61,6 +81,7 @@ package func currentEntityRouteIdentity(
   in context: ResolveContext
 ) -> EntityIdentity? {
   guard let route = ResolveEntityRouteStorage.current,
+    !route.isScopeOnly,
     route.structuralPath == context.structuralPath,
     !(route.escapesHostingBoundary && context.entityHosting)
   else {

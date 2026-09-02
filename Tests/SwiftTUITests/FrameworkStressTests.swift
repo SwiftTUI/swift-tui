@@ -4913,17 +4913,18 @@ final class StressRuntimeHarness<Content: View> {
     // loop's dirty-frontier frame. Off, every later frame here is a full
     // root evaluation and selective-only symptoms cannot be reproduced —
     // the lone-`ForEach`-element `Group` re-nesting showed in the counter
-    // demo's run loop but never in this harness (org task T170). Still
-    // opt-in rather than the default: flipping it exposed five selective-
-    // path defect classes that are now fixed (preference consumers above
-    // the frontier, snapshot rebuilds erasing body preferences and
-    // parent-authored child decorations, scoped registration publication
-    // beneath an exact-`.id` host, gesture dispatch through a discarded
-    // frame draft — org task T173) and one that is not: a DEBUG
-    // stamp-coherence assertion (and, without it, a livelock) when a
-    // `Panel`-hosted `TextEditor` under a replaced `.id` owner takes focus
-    // (`directedAdditionalStressCase(panelTextEditorPasteRebinds)`; T173).
-    selectiveEvaluation: Bool = false,
+    // demo's run loop but never in this harness (org task T170). The
+    // default since org task T173 closed: flipping it exposed six
+    // selective-path defect classes, all fixed and pinned
+    // (`SelectivePreferenceRippleTests`, `SelectiveServedHostParityTests`):
+    // preference consumers above the frontier, snapshot rebuilds erasing
+    // body preferences and parent-authored child decorations, scoped
+    // registration publication beneath an exact-`.id` host, gesture
+    // dispatch through a discarded frame draft, and a frontier re-run
+    // dropping the enclosing entity route (an exact `.id` beneath a
+    // replaced `.id` owner changed entity on its focus frame). Pass `false`
+    // only for a scenario that deliberately measures root-frame behavior.
+    selectiveEvaluation: Bool = true,
     @ViewBuilder content: @escaping () -> Content
   ) throws {
     let terminal = StressRecordingHost(

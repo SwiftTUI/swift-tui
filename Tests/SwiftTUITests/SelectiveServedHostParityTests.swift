@@ -26,7 +26,15 @@ import Testing
 ///   mid-interaction recognizer and used to tear the re-authored record down
 ///   with it, and the pointer route dispatched through the discarded frame
 ///   draft that authored it. A root evaluation re-registered both on the next
-///   frame; a selective frame never did.
+///   frame; a selective frame never did;
+/// - an exact-`.id` control resolved beneath an exact-`.id` owner changed
+///   entity on a selective frame: the dirty-frontier evaluator re-ran outside
+///   the enclosing owner's entity-route binding, so the control's entity was
+///   scoped to its structural position instead of the owner's entity, the
+///   modifier saw a foreign occupant on its slot node, and the forwarded claim
+///   folded the control's node onto its `.frame` wrapper — a parent/child
+///   cycle that tripped the DEBUG stamp-coherence oracle on the focus frame
+///   and livelocked the next paste without it.
 ///
 /// Every scenario here runs on the run loop's selective default and compares
 /// against what a root evaluation produces.
@@ -191,9 +199,117 @@ struct SelectiveServedHostParityTests {
 
     #expect(taps.value == 1, "the tap added during the drag never dispatched")
   }
+
+  @Test("an exact-.id editor beneath an exact-.id owner keeps its entity on the focus frame")
+  func exactIDEditorBeneathExactIDOwnerKeepsItsEntityOnSelectiveFrames() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ServedHostPanelEditorRoot"),
+      size: .init(width: 60, height: 10),
+      selectiveEvaluation: true
+    ) {
+      ServedHostPanelEditorFixture()
+    }
+    defer { harness.shutdown() }
+
+    let graph = harness.runLoop.renderer.viewGraph
+    let controlIdentity = ServedHostPanelEditorFixture.controlIdentity
+
+    for generation in 0..<3 {
+      // The entity the owner's own resolve pass gave the editor (the initial
+      // root frame, then each rebuild frame, which re-resolves the `.id`
+      // chain inside the owner's route binding). The exact entity is scoped
+      // to the owner's entity, so it changes with every rebuild by design.
+      let referenceEntity = try #require(
+        graph.nodeForIdentity(controlIdentity)?.committed.entityIdentity,
+        "generation \(generation): the owner's frame resolved no entity for the editor"
+      )
+      // The focus write invalidates the editor precisely; the frontier lifts
+      // to its `.frame` wrapper, which re-resolves the `.id` chain outside
+      // the enclosing owner's resolve pass.
+      var frame = try harness.focus(controlIdentity)
+      #expect(harness.runLoop.focusTracker.currentFocusIdentity == controlIdentity)
+      let control = try #require(graph.nodeForIdentity(controlIdentity))
+      #expect(
+        control.committed.entityIdentity == referenceEntity,
+        "generation \(generation): the selective focus frame re-homed the editor under a different entity"
+      )
+      #expect(
+        graph.childCycleDescriptions().isEmpty,
+        "generation \(generation): parent/child cycle after the focus frame: \(graph.childCycleDescriptions())"
+      )
+
+      frame = try harness.paste("line-\(generation)\nnext")
+      #expect(
+        frame.contains("text line-\(generation)|next"),
+        "generation \(generation): the paste did not render:\n\(frame)"
+      )
+
+      frame = try harness.clickText("Rebuild Owner")
+      #expect(frame.contains("generation \(generation + 1)"), "the owner did not rebuild:\n\(frame)")
+      #expect(frame.contains("text empty"), "the rebuild did not reset the text:\n\(frame)")
+    }
+  }
+
+  @Test("an AnyView-hosted exact-.id control publishes its pointer handlers once per selective frame")
+  func anyViewHostedExactIDControlPublishesPointerHandlersOnce() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ServedHostAnyViewStepperRoot"),
+      size: .init(width: 60, height: 8),
+      selectiveEvaluation: true
+    ) {
+      ServedHostAnyViewStepperFixture()
+    }
+    defer { harness.shutdown() }
+
+    let controlIdentity = ServedHostAnyViewStepperFixture.controlIdentity
+    // The count a full publication produces: the control's own handler plus
+    // its two buttons. Every scoped restore below must land on the same
+    // number — the scoped reset and restore must cover the same node set.
+    let fullPublicationCount = harness.pointerHandlerCount
+    #expect(fullPublicationCount > 0)
+
+    for generation in 0..<3 {
+      _ = try harness.focus(controlIdentity)
+      #expect(
+        harness.pointerHandlerCount == fullPublicationCount,
+        "generation \(generation): \(harness.pointerHandlerCount) pointer handlers after the focus frame"
+      )
+      // The key write lands on the fixture root through the binding while the
+      // control itself re-resolves: a two-root selective frame whose scoped
+      // restore has to cover the out-of-band-hosted `.id` control by prefix.
+      let frame = try harness.pressKey(KeyPress(.arrowRight))
+      #expect(frame.contains("int \(generation + 1)"), "the key press did not step:\n\(frame)")
+      #expect(
+        harness.pointerHandlerCount == fullPublicationCount,
+        "generation \(generation): \(harness.pointerHandlerCount) pointer handlers after the key frame"
+      )
+      let rebuilt = try harness.clickText("Rebuild Owner")
+      #expect(rebuilt.contains("generation \(generation + 1)"), "the owner did not rebuild:\n\(rebuilt)")
+      #expect(
+        harness.pointerHandlerCount == fullPublicationCount,
+        "generation \(generation): \(harness.pointerHandlerCount) pointer handlers after the rebuild"
+      )
+    }
+  }
 }
 
 // MARK: - Support
+
+extension ViewGraph {
+  /// Every live parent/child edge whose child also lists the parent as a
+  /// child — the shape a cross-identity re-entrant adoption leaves behind.
+  fileprivate func childCycleDescriptions() -> [String] {
+    var cycles: [String] = []
+    for (_, node) in nodesByNodeID {
+      for child in node.children where child !== node {
+        if child.children.contains(where: { $0 === node }) {
+          cycles.append("\(node.identity.path) <-> \(child.identity.path)")
+        }
+      }
+    }
+    return cycles.sorted()
+  }
+}
 
 @MainActor
 private func baseFocusRegionPaths<V: View>(
@@ -370,5 +486,78 @@ private struct ServedHostAddedTapFixture: View {
         .frame(width: 24, height: 1, alignment: .leading)
         .gesture(DragGesture().onChanged { _ in installsTap = true })
     }
+  }
+}
+
+
+/// The T173 residual's shape: a `Panel`-hosted `TextEditor` with its own exact
+/// `.id`, under a `.frame` wrapper, inside an owner replaced by exact `.id`.
+private struct ServedHostPanelEditorFixture: View {
+  static let controlIdentity = testIdentity("ServedHostPanelEditor", "control")
+  static let scopeIdentity = testIdentity("ServedHostPanelEditor", "scope")
+
+  @State private var generation = 0
+  @State private var text = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rebuild Owner") {
+        generation += 1
+        text = ""
+      }
+      Text("generation \(generation) text \(displayText)")
+      ServedHostPanelEditorOwner(text: $text)
+        .id(testIdentity("ServedHostPanelEditor", "owner", "\(generation)"))
+    }
+    .frame(width: 60, height: 10, alignment: .topLeading)
+  }
+
+  private var displayText: String {
+    text.isEmpty
+      ? "empty"
+      : text.split(separator: "\n", omittingEmptySubsequences: false).joined(separator: "|")
+  }
+}
+
+private struct ServedHostPanelEditorOwner: View {
+  @Binding var text: String
+
+  var body: some View {
+    Panel(id: ServedHostPanelEditorFixture.scopeIdentity) {
+      TextEditor(text: $text)
+        .id(ServedHostPanelEditorFixture.controlIdentity)
+        .frame(width: 30, height: 3, alignment: .leading)
+    }
+  }
+}
+
+/// An exact-`.id` `Stepper` hosted out-of-band by an `AnyView` payload under
+/// a replaced `.id` owner: the scoped registration restore reaches the
+/// control only by identity prefix.
+private struct ServedHostAnyViewStepperFixture: View {
+  static let controlIdentity = testIdentity("ServedHostAnyViewStepper", "control")
+
+  @State private var generation = 0
+  @State private var intValue = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Rebuild Owner") { generation += 1 }
+      Text("generation \(generation) int \(intValue)")
+      ServedHostAnyViewStepperOwner(intValue: $intValue)
+        .id(testIdentity("ServedHostAnyViewStepper", "owner", "\(generation)"))
+    }
+    .frame(width: 60, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct ServedHostAnyViewStepperOwner: View {
+  @Binding var intValue: Int
+
+  var body: some View {
+    AnyView(
+      Stepper("AnyView Stepper", value: $intValue, in: 0...999)
+        .id(ServedHostAnyViewStepperFixture.controlIdentity)
+    )
   }
 }

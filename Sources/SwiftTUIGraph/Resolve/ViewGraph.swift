@@ -3939,6 +3939,20 @@ package final class ViewGraph {
     guard !roots.isEmpty else {
       return
     }
+    ViewGraphRuntimeRegistrationRestorer.restoreLiveIdentities(
+      runtimeRegistrationSubtreeNodeIDs(rootedAt: roots),
+      into: registrations,
+      nodesByNodeID: nodesByNodeID
+    )
+  }
+
+  /// The live nodes a scoped publication covers for `roots`: each root's
+  /// ViewNode subtree, plus every live node selected by identity prefix that
+  /// the walk cannot reach. Shared by the reset-root computation and the
+  /// restore so the two select the same node set by construction.
+  private func runtimeRegistrationSubtreeNodeIDs(
+    rootedAt roots: [Identity]
+  ) -> Set<ViewNodeID> {
     var nodeIDs: Set<ViewNodeID> = []
     for root in roots {
       guard let node = nodeIfExists(for: root) else {
@@ -3966,11 +3980,7 @@ package final class ViewGraph {
         nodeIDs.insert(nodeID)
       }
     }
-    ViewGraphRuntimeRegistrationRestorer.restoreLiveIdentities(
-      nodeIDs,
-      into: registrations,
-      nodesByNodeID: nodesByNodeID
-    )
+    return nodeIDs
   }
 
   /// The identity prefixes a scoped `.subtrees` reset must clear so that it
@@ -3988,23 +3998,40 @@ package final class ViewGraph {
   /// owner was published twice on every selective frame rooted at the owner
   /// (org task T173). Collect every re-root boundary in the cover so the reset
   /// and the restore agree on the same node set.
+  ///
+  /// The cover is the restore's own selection
+  /// (`runtimeRegistrationSubtreeNodeIDs`): the ViewNode walk PLUS the live
+  /// nodes selected by identity prefix, which the walk cannot reach across a
+  /// capture-host seam. A cover taken from the walk alone missed exactly those
+  /// nodes — an `AnyView` payload's exact-`.id` control is hosted out-of-band,
+  /// so its re-rooted identity never joined the reset roots while the restore
+  /// still selected it by structural prefix, and every key beneath the control
+  /// (its own pointer handler, a `Stepper`'s buttons, a `Slider`'s track, a
+  /// `Picker`'s options) survived the reset to be published a second time on
+  /// every selective key-press frame (org task T173). Each re-root boundary
+  /// added can select further nodes by prefix, so iterate to the fixed point.
   package func runtimeRegistrationResetRoots(
     for roots: [Identity]
   ) -> [Identity] {
     var resetRoots = roots
-    var traversedNodes: Set<ObjectIdentifier> = []
-    var work: [ViewNode] = roots.compactMap { nodeIfExists(for: $0) }
-    while let node = work.popLast() {
-      guard traversedNodes.insert(ObjectIdentifier(node)).inserted else {
-        continue
+    var coveredNodeIDs: Set<ViewNodeID> = []
+    while true {
+      let added = runtimeRegistrationSubtreeNodeIDs(rootedAt: resetRoots)
+        .subtracting(coveredNodeIDs)
+      guard !added.isEmpty else {
+        return resetRoots
       }
-      for identity in [node.identity, node.resolvedIdentity]
-      where !resetRoots.contains(where: { identity == $0 || identity.isDescendant(of: $0) }) {
-        resetRoots.append(identity)
+      coveredNodeIDs.formUnion(added)
+      for nodeID in added.sorted() {
+        guard let node = nodesByNodeID[nodeID] else {
+          continue
+        }
+        for identity in [node.identity, node.resolvedIdentity]
+        where !resetRoots.contains(where: { identity == $0 || identity.isDescendant(of: $0) }) {
+          resetRoots.append(identity)
+        }
       }
-      work.append(contentsOf: node.children)
     }
-    return resetRoots
   }
 
   private func collectRuntimeRegistrationSubtreeNodeIDs(
