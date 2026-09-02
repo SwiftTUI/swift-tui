@@ -165,6 +165,11 @@ struct ResolveContextStorageTotalityTests {
         "documented: focus arrivals must reach the arbitrating live instance"
       )
     ),
+    "liveGestureRegistry": equated(
+      draft: .survives(
+        "documented: gesture dispatch must reach the live instance that preserves and replaces mid-interaction recognizers"
+      )
+    ),
     "invalidationProxy": notEquated(
       "live-state invalidator seam, stable across frames within a session",
       draft: .survives("drafts must keep invalidating through the live seam")
@@ -357,6 +362,7 @@ struct ResolveContextStorageTotalityTests {
     let initialTracker = try #require(context.resolveWorkTracker)
     let liveScroll = LocalScrollPositionRegistry()
     let liveFocus = LocalFocusBindingRegistry()
+    let liveGesture = LocalGestureRegistry()
     let proxy = ResolveInvalidationProxy()
     let bridge = ObservationBridge()
     let graph = ViewGraph()
@@ -369,6 +375,7 @@ struct ResolveContextStorageTotalityTests {
     )
     context.liveScrollPositionRegistry = liveScroll
     context.liveFocusBindingRegistry = liveFocus
+    context.liveGestureRegistry = liveGesture
     context.invalidationProxy = proxy
     context.observationBridge = bridge
     context.viewGraph = graph
@@ -418,6 +425,8 @@ struct ResolveContextStorageTotalityTests {
           #expect(unwrappedObject(value) === liveScroll, "\(name) must survive the draft swap")
         case "liveFocusBindingRegistry":
           #expect(unwrappedObject(value) === liveFocus, "\(name) must survive the draft swap")
+        case "liveGestureRegistry":
+          #expect(unwrappedObject(value) === liveGesture, "\(name) must survive the draft swap")
         case "invalidationProxy":
           #expect(unwrappedObject(value) === proxy, "\(name) must survive the draft swap")
         case "observationBridge":

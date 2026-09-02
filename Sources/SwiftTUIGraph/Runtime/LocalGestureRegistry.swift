@@ -56,6 +56,29 @@ package final class LocalGestureRegistry: Equatable {
   /// ``GestureNodeRecord/structuralKeys``).
   private var structuralKeysByIdentity: [Identity: Identity] = [:]
 
+  /// A committed record authored AFTER the identity's live recognizer began
+  /// its interaction, held until that interaction ends.
+  ///
+  /// `restore` must not replace a mid-interaction recognizer (the capture it
+  /// holds would be lost), so it adopts the record's callbacks and keeps the
+  /// live entry — including the live entry's SHAPE. A gesture stacked onto,
+  /// or removed from, the same identity during an active drag therefore
+  /// reaches the live registry only when a later restore finds the entry
+  /// inactive. A root evaluation re-authors and restores every frame, so
+  /// that happens on the next frame; a selective frame restores only the
+  /// nodes it re-evaluated, and nothing re-evaluates a chain whose state
+  /// write already happened — the live entry kept a removed tap that fired
+  /// on the next click, and never gained an added one (org task T173).
+  /// Holding the authoritative record here and installing it the moment the
+  /// interaction is over (on the next lookup, restore, or snapshot) makes the
+  /// selective path converge where the root path converged by brute force.
+  private struct PendingReplacement {
+    var recognizer: AnyGestureRecognizer
+    var owner: RuntimeRegistrationOwnerKey
+  }
+
+  private var pendingReplacements: [Identity: PendingReplacement] = [:]
+
   package func register(
     identity: Identity,
     structuralKey: Identity? = nil,
@@ -188,7 +211,8 @@ package final class LocalGestureRegistry: Equatable {
   }
 
   package func recognizer(for identity: Identity) -> AnyGestureRecognizer? {
-    recognizers[identity]
+    settlePendingReplacement(for: identity)
+    return recognizers[identity]
   }
 
   package func hasRecognizer(for identity: Identity) -> Bool {
@@ -214,6 +238,12 @@ package final class LocalGestureRegistry: Equatable {
     // Preserve active recognizers across reset; tear down the rest.
     // Subtree teardown (`removeSubtrees`) remains aggressive: if the
     // owning view genuinely disappears, its recognizer should die.
+    // A full resolve re-authors every record, so a held record is superseded
+    // by the one this frame restores.
+    for pending in pendingReplacements.values {
+      pending.recognizer.tearDown()
+    }
+    pendingReplacements.removeAll(keepingCapacity: true)
     var preserved: [Identity: AnyGestureRecognizer] = [:]
     var preservedOwners: [Identity: RuntimeRegistrationOwnerKey] = [:]
     for (identity, recognizer) in recognizers {
@@ -266,6 +296,7 @@ package final class LocalGestureRegistry: Equatable {
       ownersByIdentity.removeValue(forKey: identity)
       passAuthoredRecognizers.removeValue(forKey: identity)
       structuralKeysByIdentity.removeValue(forKey: identity)
+      discardPendingReplacement(for: identity)
     }
   }
 
@@ -285,6 +316,7 @@ package final class LocalGestureRegistry: Equatable {
       ownersByIdentity.removeValue(forKey: identity)
       passAuthoredRecognizers.removeValue(forKey: identity)
       structuralKeysByIdentity.removeValue(forKey: identity)
+      discardPendingReplacement(for: identity)
     }
   }
 
@@ -299,6 +331,7 @@ package final class LocalGestureRegistry: Equatable {
     }) {
       recognizers.removeValue(forKey: identity)?.tearDown()
       ownersByIdentity.removeValue(forKey: identity)
+      discardPendingReplacement(for: identity)
     }
   }
 
@@ -306,7 +339,8 @@ package final class LocalGestureRegistry: Equatable {
   /// Used during cache-hit frames where resolve doesn't run but
   /// registrations must still be live.
   package func snapshot() -> [Identity: AnyGestureRecognizer] {
-    recognizers
+    settlePendingReplacements()
+    return recognizers
   }
 
   package func restore(
@@ -314,6 +348,7 @@ package final class LocalGestureRegistry: Equatable {
     ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
   ) {
     guard !snapshot.isEmpty else { return }
+    settlePendingReplacements()
     for (identity, recognizer) in snapshot {
       if let existing = recognizers[identity] {
         if existing.isActive {
@@ -327,12 +362,24 @@ package final class LocalGestureRegistry: Equatable {
             // mint gate keeps a stale record re-published on a cache-hit
             // frame from regressing callbacks backward, and makes the
             // per-frame double restore idempotent.
-            if recognizer.carriedAuthoredMintGeneration > existing.carriedAuthoredMintGeneration,
-              existing.adoptAuthoredCallbacks(from: recognizer)
-            {
+            let recordIsFresher =
+              recognizer.carriedAuthoredMintGeneration > existing.carriedAuthoredMintGeneration
+            if recordIsFresher, existing.adoptAuthoredCallbacks(from: recognizer) {
               existing.noteCarriedAuthoredMint(recognizer.carriedAuthoredMintGeneration)
             }
-            recognizer.tearDown()
+            // Adoption refreshes callbacks, never shape: hold a fresher
+            // record as the entry to install once the interaction ends (see
+            // `PendingReplacement`). A stale record is torn down as before.
+            if recordIsFresher || pendingReplacements[identity]?.recognizer === recognizer {
+              holdPendingReplacement(
+                recognizer,
+                for: identity,
+                owner: ownersByIdentity[identity] ?? self.ownersByIdentity[identity]
+                  ?? .init(identity: identity)
+              )
+            } else {
+              recognizer.tearDown()
+            }
           }
           // Triple fallback, unique in the registry family (F100): when the
           // incoming snapshot carries no owner for an ACTIVE recognizer, keep
@@ -352,15 +399,58 @@ package final class LocalGestureRegistry: Equatable {
           existing.tearDown()
         }
       }
+      if pendingReplacements[identity]?.recognizer === recognizer {
+        pendingReplacements.removeValue(forKey: identity)
+      } else {
+        discardPendingReplacement(for: identity)
+      }
       recognizers[identity] = recognizer
       self.ownersByIdentity[identity] = ownersByIdentity[identity] ?? .init(identity: identity)
     }
   }
 
+  private func holdPendingReplacement(
+    _ recognizer: AnyGestureRecognizer,
+    for identity: Identity,
+    owner: RuntimeRegistrationOwnerKey
+  ) {
+    if let held = pendingReplacements[identity], held.recognizer !== recognizer {
+      held.recognizer.tearDown()
+    }
+    pendingReplacements[identity] = PendingReplacement(recognizer: recognizer, owner: owner)
+  }
+
+  private func discardPendingReplacement(for identity: Identity) {
+    pendingReplacements.removeValue(forKey: identity)?.recognizer.tearDown()
+  }
+
+  /// Installs every held record whose live recognizer has finished its
+  /// interaction. Cheap when nothing is held (a dictionary emptiness read).
+  private func settlePendingReplacements() {
+    guard !pendingReplacements.isEmpty else { return }
+    for identity in Array(pendingReplacements.keys) {
+      settlePendingReplacement(for: identity)
+    }
+  }
+
+  private func settlePendingReplacement(for identity: Identity) {
+    guard let pending = pendingReplacements[identity] else { return }
+    if let existing = recognizers[identity] {
+      guard !existing.isActive else { return }
+      if existing !== pending.recognizer {
+        existing.tearDown()
+      }
+    }
+    pendingReplacements.removeValue(forKey: identity)
+    recognizers[identity] = pending.recognizer
+    ownersByIdentity[identity] = pending.owner
+  }
+
   /// Iterates all active recognizers. Called from the RunLoop to drain
   /// deadlines when the scheduler fires `.deadline`.
   package func activeRecognizers() -> [(Identity, AnyGestureRecognizer)] {
-    recognizers.map { ($0.key, $0.value) }
+    settlePendingReplacements()
+    return recognizers.map { ($0.key, $0.value) }
   }
 }
 

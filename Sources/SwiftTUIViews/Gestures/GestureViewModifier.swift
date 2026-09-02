@@ -181,7 +181,11 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
     // recognizer resolved here on one resolve may end up being kept
     // across the next, and we must route events to whichever wins.
     let routeID = runtimePrimaryRouteID(for: routeIdentity)
-    let gestureRegistryRef = gestureRegistry
+    // Dispatch through the LIVE registry, not this frame's draft: the draft
+    // is discarded at commit while this closure outlives it, and the live
+    // entry can later differ from what the draft authored (see
+    // `ResolveContext.gestureDispatchRegistry`).
+    let gestureRegistryRef = context.gestureDispatchRegistry ?? gestureRegistry
     let handlerIdentity = routeIdentity
     pointerRegistry.register(routeID: routeID, structuralKey: node.identity) { event in
       guard let current = gestureRegistryRef.recognizer(for: handlerIdentity) else {

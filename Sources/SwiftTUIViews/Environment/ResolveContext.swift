@@ -160,6 +160,24 @@ public struct ResolveContext: Equatable, Sendable {
   package var focusArrivalRegistry: LocalFocusBindingRegistry? {
     liveFocusBindingRegistry ?? localFocusBindingRegistry
   }
+  /// Gesture DISPATCH must reach the live registry: a pointer route closure
+  /// looks its recognizer up at event time, frames after the draft that
+  /// registered it was discarded. Looking up in that draft answers with the
+  /// recognizer the draft authored, which diverges from the live entry
+  /// whenever the live registry preserved a mid-interaction recognizer and
+  /// later replaced it (see `LocalGestureRegistry.PendingReplacement`) — on
+  /// a selective frame no re-registration ever re-pointed the route, so a
+  /// gesture stacked or removed during an active drag never reached
+  /// dispatch (org task T173). Registration writes stay on
+  /// ``localGestureRegistry``.
+  package var liveGestureRegistry: LocalGestureRegistry? {
+    get { propagated.liveGestureRegistry }
+    set { propagated.liveGestureRegistry = newValue }
+  }
+  /// The registry pointer routes should dispatch gesture events through.
+  package var gestureDispatchRegistry: LocalGestureRegistry? {
+    liveGestureRegistry ?? localGestureRegistry
+  }
 
   /// The pre-draft registries a frame head must carry across the draft swap.
   ///
@@ -176,13 +194,15 @@ public struct ResolveContext: Equatable, Sendable {
   package struct DraftSurvivingRegistries {
     fileprivate var scrollPosition: LocalScrollPositionRegistry?
     fileprivate var focusBinding: LocalFocusBindingRegistry?
+    fileprivate var gesture: LocalGestureRegistry?
   }
 
   /// Captures the registries that must outlive the frame head's draft swap.
   package func capturingDraftSurvivingRegistries() -> DraftSurvivingRegistries {
     DraftSurvivingRegistries(
       scrollPosition: localScrollPositionRegistry,
-      focusBinding: localFocusBindingRegistry
+      focusBinding: localFocusBindingRegistry,
+      gesture: localGestureRegistry
     )
   }
 
@@ -200,6 +220,9 @@ public struct ResolveContext: Equatable, Sendable {
     }
     if seeded.liveFocusBindingRegistry == nil {
       seeded.liveFocusBindingRegistry = captured.focusBinding
+    }
+    if seeded.liveGestureRegistry == nil {
+      seeded.liveGestureRegistry = captured.gesture
     }
     return seeded
   }
@@ -724,6 +747,9 @@ extension ResolveContext {
     /// See ``ResolveContext/liveFocusBindingRegistry``. Same draft-survival
     /// contract as `liveScrollPositionRegistry`.
     package var liveFocusBindingRegistry: LocalFocusBindingRegistry?
+    /// See ``ResolveContext/liveGestureRegistry``. Same draft-survival
+    /// contract as `liveScrollPositionRegistry`.
+    package var liveGestureRegistry: LocalGestureRegistry?
     package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry?
     package var commandRegistry: CommandRegistry?
     package var dropDestinationRegistry: DropDestinationRegistry?
@@ -948,6 +974,7 @@ extension ResolveContext {
       && lhs.localScrollPositionRegistry == rhs.localScrollPositionRegistry
       && lhs.liveScrollPositionRegistry == rhs.liveScrollPositionRegistry
       && lhs.liveFocusBindingRegistry == rhs.liveFocusBindingRegistry
+      && lhs.liveGestureRegistry == rhs.liveGestureRegistry
       && lhs.localPreferenceObservationRegistry == rhs.localPreferenceObservationRegistry
       && lhs.localKeyHandlerRegistry == rhs.localKeyHandlerRegistry
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry

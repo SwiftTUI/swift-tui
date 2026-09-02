@@ -20,7 +20,13 @@ import Testing
 ///   restore walked the root's ViewNode subtree, so beneath an exact-`.id`
 ///   host (whose descendants key their registrations under the RESOLVED
 ///   identity) the restore republished still-live entries on top of
-///   themselves.
+///   themselves;
+/// - a gesture stacked onto, or removed from, an identity DURING an active
+///   drag never reached dispatch: the live gesture registry keeps a
+///   mid-interaction recognizer and used to tear the re-authored record down
+///   with it, and the pointer route dispatched through the discarded frame
+///   draft that authored it. A root evaluation re-registered both on the next
+///   frame; a selective frame never did.
 ///
 /// Every scenario here runs on the run loop's selective default and compares
 /// against what a root evaluation produces.
@@ -141,6 +147,49 @@ struct SelectiveServedHostParityTests {
         "generation \(generation): \(snapshot.candidates.count) default-focus candidates published"
       )
     }
+  }
+
+  @Test("a tap removed during an active drag is gone once the drag ends")
+  func tapRemovedDuringActiveDragIsGoneAfterTheDrag() throws {
+    let taps = ServedHostCounterBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ServedHostRemovedTapRoot"),
+      size: .init(width: 44, height: 7),
+      selectiveEvaluation: true
+    ) {
+      ServedHostRemovedTapFixture(taps: taps)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Shrinking gesture stack"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 3, y: start.y))
+    _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 3, y: start.y))
+    _ = try harness.clickText("Shrinking gesture stack")
+
+    #expect(taps.value == 0, "the tap removed during the drag still fired")
+    #expect(harness.gestureRecognizerCount == 1)
+  }
+
+  @Test("a tap added during an active drag dispatches once the drag ends")
+  func tapAddedDuringActiveDragDispatchesAfterTheDrag() throws {
+    let taps = ServedHostCounterBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ServedHostAddedTapRoot"),
+      size: .init(width: 44, height: 6),
+      selectiveEvaluation: true
+    ) {
+      ServedHostAddedTapFixture(taps: taps)
+    }
+    defer { harness.shutdown() }
+
+    let start = try #require(harness.point(forText: "Dynamic gesture"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    _ = try harness.sendMouse(.dragged(.primary), at: Point(x: start.x + 4, y: start.y))
+    _ = try harness.sendMouse(.up(.primary), at: Point(x: start.x + 4, y: start.y))
+    _ = try harness.clickText("Dynamic gesture")
+
+    #expect(taps.value == 1, "the tap added during the drag never dispatched")
   }
 }
 
@@ -269,5 +318,57 @@ private struct ServedHostDefaultFocusOwner: View {
         .prefersDefaultFocus(in: namespace)
     }
     .focusScope(namespace)
+  }
+}
+
+private final class ServedHostCounterBox {
+  var value: Int
+  init(_ value: Int) { self.value = value }
+}
+
+/// The drag's first change flips the branch over the same `.id`, dropping
+/// the stacked tap while the drag is still active.
+private struct ServedHostRemovedTapFixture: View {
+  static let identity = testIdentity("ServedHostRemovedTap", "Target")
+
+  let taps: ServedHostCounterBox
+  @State private var includesTap = true
+
+  var body: some View {
+    if includesTap {
+      Text("Shrinking gesture stack")
+        .id(Self.identity)
+        .frame(width: 28, height: 1, alignment: .leading)
+        .gesture(DragGesture().onChanged { _ in includesTap = false })
+        .onTapGesture { taps.value += 1 }
+    } else {
+      Text("Shrinking gesture stack")
+        .id(Self.identity)
+        .frame(width: 28, height: 1, alignment: .leading)
+        .gesture(DragGesture().onChanged { _ in })
+    }
+  }
+}
+
+/// The mirror: the drag's first change stacks a tap onto the same `.id`.
+private struct ServedHostAddedTapFixture: View {
+  static let identity = testIdentity("ServedHostAddedTap", "Gesture")
+
+  let taps: ServedHostCounterBox
+  @State private var installsTap = false
+
+  var body: some View {
+    if installsTap {
+      Text("Dynamic gesture")
+        .id(Self.identity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(DragGesture().onChanged { _ in })
+        .onTapGesture { taps.value += 1 }
+    } else {
+      Text("Dynamic gesture")
+        .id(Self.identity)
+        .frame(width: 24, height: 1, alignment: .leading)
+        .gesture(DragGesture().onChanged { _ in installsTap = true })
+    }
   }
 }

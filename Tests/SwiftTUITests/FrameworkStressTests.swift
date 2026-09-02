@@ -4914,14 +4914,15 @@ final class StressRuntimeHarness<Content: View> {
     // root evaluation and selective-only symptoms cannot be reproduced —
     // the lone-`ForEach`-element `Group` re-nesting showed in the counter
     // demo's run loop but never in this harness (org task T170). Still
-    // opt-in rather than the default: flipping it exposed four selective-
+    // opt-in rather than the default: flipping it exposed five selective-
     // path defect classes that are now fixed (preference consumers above
     // the frontier, snapshot rebuilds erasing body preferences and
     // parent-authored child decorations, scoped registration publication
-    // beneath an exact-`.id` host — org task T173) and, with those fixed,
-    // three more that are not (a gesture stacked or removed during an
-    // active drag on a selective frame, and a DEBUG stamp-coherence
-    // assertion under a `Panel`-hosted `TextEditor` paste; see T173).
+    // beneath an exact-`.id` host, gesture dispatch through a discarded
+    // frame draft — org task T173) and one that is not: a DEBUG
+    // stamp-coherence assertion (and, without it, a livelock) when a
+    // `Panel`-hosted `TextEditor` under a replaced `.id` owner takes focus
+    // (`directedAdditionalStressCase(panelTextEditorPasteRebinds)`; T173).
     selectiveEvaluation: Bool = false,
     @ViewBuilder content: @escaping () -> Content
   ) throws {

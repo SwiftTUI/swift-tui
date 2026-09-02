@@ -27,8 +27,10 @@ struct ResolveContextDraftSurvivalTests {
     var context = ResolveContext(identity: testIdentity("DraftSurvival", "Seed"))
     let liveScroll = LocalScrollPositionRegistry()
     let liveFocus = LocalFocusBindingRegistry()
+    let liveGesture = LocalGestureRegistry()
     context.localScrollPositionRegistry = liveScroll
     context.localFocusBindingRegistry = liveFocus
+    context.localGestureRegistry = liveGesture
 
     let captured = context.capturingDraftSurvivingRegistries()
     let swapped =
@@ -39,9 +41,11 @@ struct ResolveContextDraftSurvivalTests {
     // The draft swap installed fresh registration instances...
     #expect(swapped.localScrollPositionRegistry !== liveScroll)
     #expect(swapped.localFocusBindingRegistry !== liveFocus)
+    #expect(swapped.localGestureRegistry !== liveGesture)
     // ...while the live companions still point at the pre-draft instances.
     #expect(swapped.liveScrollPositionRegistry === liveScroll)
     #expect(swapped.liveFocusBindingRegistry === liveFocus)
+    #expect(swapped.liveGestureRegistry === liveGesture)
   }
 
   @Test("imperative accessors prefer the live instance over the draft")
@@ -49,8 +53,10 @@ struct ResolveContextDraftSurvivalTests {
     var context = ResolveContext(identity: testIdentity("DraftSurvival", "Accessor"))
     let liveScroll = LocalScrollPositionRegistry()
     let liveFocus = LocalFocusBindingRegistry()
+    let liveGesture = LocalGestureRegistry()
     context.localScrollPositionRegistry = liveScroll
     context.localFocusBindingRegistry = liveFocus
+    context.localGestureRegistry = liveGesture
 
     let captured = context.capturingDraftSurvivingRegistries()
     let swapped =
@@ -63,6 +69,7 @@ struct ResolveContextDraftSurvivalTests {
     // commit publishes into, not the draft that is about to be discarded.
     #expect(swapped.scrollCommandRegistry === liveScroll)
     #expect(swapped.focusArrivalRegistry === liveFocus)
+    #expect(swapped.gestureDispatchRegistry === liveGesture)
   }
 
   @Test("seeding never displaces an already-captured live instance")
@@ -72,10 +79,13 @@ struct ResolveContextDraftSurvivalTests {
     var context = ResolveContext(identity: testIdentity("DraftSurvival", "Nested"))
     let outerScroll = LocalScrollPositionRegistry()
     let outerFocus = LocalFocusBindingRegistry()
+    let outerGesture = LocalGestureRegistry()
     context.liveScrollPositionRegistry = outerScroll
     context.liveFocusBindingRegistry = outerFocus
+    context.liveGestureRegistry = outerGesture
     context.localScrollPositionRegistry = LocalScrollPositionRegistry()
     context.localFocusBindingRegistry = LocalFocusBindingRegistry()
+    context.localGestureRegistry = LocalGestureRegistry()
 
     let seeded = context.seedingDraftSurvivingRegistries(
       from: context.capturingDraftSurvivingRegistries()
@@ -83,6 +93,7 @@ struct ResolveContextDraftSurvivalTests {
 
     #expect(seeded.liveScrollPositionRegistry === outerScroll)
     #expect(seeded.liveFocusBindingRegistry === outerFocus)
+    #expect(seeded.liveGestureRegistry === outerGesture)
   }
 
   @Test("every live registry is covered by capture, seeding, and an accessor")
@@ -100,7 +111,8 @@ struct ResolveContextDraftSurvivalTests {
     }
 
     #expect(
-      liveMembers.sorted() == ["liveFocusBindingRegistry", "liveScrollPositionRegistry"],
+      liveMembers.sorted()
+        == ["liveFocusBindingRegistry", "liveGestureRegistry", "liveScrollPositionRegistry"],
       """
       the draft-surviving roster changed (\(liveMembers.sorted())). A new live \
       registry needs: a field in ResolveContext.DraftSurvivingRegistries, a \
