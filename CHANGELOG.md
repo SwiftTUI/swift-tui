@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-02
+
 ### Added
 
 - **Custom `Layout` container contract.** `Layout` gains three defaulted
@@ -69,6 +71,75 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   spring it completed for. Wake frames are now clamped to the nearest
   still-armed deadline when that deadline is already due; a loop keeping
   cadence is unaffected.
+- **A `ForEach` with a single element no longer hands that element's node up
+  as its container's own value.** A one-element `ForEach` resolved to the
+  element's node while two elements resolved to a `Group`, so the identity
+  index, the task runner, and lifecycle publication all treated the container
+  as the element: the element's `@State` re-seeded on the container, an
+  imperative write made from a body-created closure (the counter demo's ripple
+  `.task`) landed on an orphaned node and the ripple never animated, and
+  growing the data to two elements re-rooted the container mid-animation,
+  cancelling the surviving element's `.task` and snapping its animation to the
+  end value; a second growth could trap a debug build's skip oracle. A lone
+  `ForEach`-scoped element now keeps the one-child `Group` its siblings would
+  share, so growth is an ordinary child insertion under an unchanged parent.
+  Stacks splice that `Group` exactly as they splice a two-child one and
+  nothing renders differently; a modifier's content or a conditional branch
+  still flattens as before.
+- **`.onAppear` and `.onDisappear` handlers run once per frame.** A container
+  that spliced a lone `ForEach` element up as its own resolved value carried
+  the element's handler IDs in its committed value and published them under
+  two identities, so the per-frame dedupe keyed on identity never matched and
+  the handler ran twice. The appear and disappear buffers now dedupe on the
+  handler ID alone: an ID names one registration.
+- **A changed preference reaches every consumer above it on a selective
+  frame.** Selective evaluation re-runs only the dirty frontier and serves the
+  ancestors from their committed snapshots, so a frame whose re-evaluated node
+  committed a changed preference output left every consumer above it stale: a
+  `navigationDestination(isPresented:)` push whose write invalidated only the
+  modifier rendered nothing, and after any selective frame beneath a
+  `NavigationStack` the rebuilt stack carried no pop chain, so Escape found
+  nothing to pop. A frame that changes a preference at resolve time now
+  escalates to the root evaluator (a root frame's cost, paid only then), and a
+  served ancestor's rebuilt snapshot keeps its committed preferences instead
+  of re-deriving the plain child aggregate.
+- **Presentation overlays keep their modal gate and focus boundary on
+  selective frames.** A selective frame rebuilds a served ancestor from its
+  children's committed values, and it is a presentation stack's copy of the
+  hosted base that carries the modal-overlay interaction gate and the absorbed
+  focus-scope boundary, so after a press frame beneath a served stack the
+  base's focus and pointer regions were emitted under an open sheet: a click
+  behind the sheet reached the base action, and an action-bearing popover tip
+  left the base focusable. Both decorations are re-applied on rebuild. In the
+  same change, the scoped registration reset beneath an exact `.id` host
+  removed nothing (keys live under the resolved identity while the reset
+  selected by structural prefix), so a `prefersDefaultFocus` candidate was
+  published twice per frame; the reset and the restore now select from one
+  node set.
+- **A gesture added or removed during an active drag takes effect.** A resolve
+  pass registers gestures into the frame head's draft, which meets the live
+  registry only at publication; the restore kept the active live recognizer,
+  adopted the record's callbacks, and tore the re-authored record down, while
+  the pointer route still dispatched through the discarded draft. A root frame
+  repaired this on the next frame, but a selective frame never re-evaluated
+  the chain, so a tap removed during a drag kept firing and a tap added during
+  one never dispatched. The restore now holds the fresher record over the
+  active entry and installs it the moment the interaction ends, and the
+  pointer route dispatches through the live registry.
+- **An exact `.id` beneath another `.id` owner keeps its entity when its node
+  re-runs on its own.** A node's stored evaluator re-runs its body from the
+  frame head, outside the enclosing resolve pass, and re-installed the
+  captured authoring context but not the enclosing entity route, so a re-run
+  beneath a `.id(owner)` computed a different entity for the same control and
+  re-entered its wrapper across identities: a `Panel`-hosted `TextEditor`
+  taking focus tripped the debug stamp-coherence oracle, and without the
+  oracle the next paste livelocked. The route is captured with the evaluator
+  and re-installed, scope only, on re-run. In the same change, an
+  `AnyView`-hosted exact-`.id` control's registrations (its own pointer
+  handler, a `Stepper`'s buttons, a `Slider`'s track, a `Picker`'s options)
+  were published a second time on every selective key-press frame because the
+  out-of-band host never joined the reset roots; reset and restore now share
+  one node set.
 
 ## [0.9.12] - 2026-08-30
 
@@ -1377,7 +1448,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.9.12...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.10.0...HEAD
+[0.10.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.10.0
 [0.9.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.9.0
 [0.3.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.3.4
 [0.0.18]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.0.18
