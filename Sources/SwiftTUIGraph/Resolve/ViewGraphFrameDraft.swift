@@ -229,9 +229,15 @@ package final class ViewGraphFrameDraft {
       if publicationDiagnosticsEnabled {
         restoredNodeCount = viewGraph.runtimeRegistrationSubtreeNodeCount(rootedAt: roots)
       }
-      liveRegistrations.removeSubtrees(rootedAt: roots)
+      // The reset and the restore must select the same identity prefixes,
+      // including the resolved-identity space beneath an exact-`.id` host in
+      // the cover (`ViewGraph.runtimeRegistrationResetRoots`); a reset by the
+      // frontier roots alone left those entries in place for the restore to
+      // publish a second time.
+      let resetRoots = viewGraph.runtimeRegistrationResetRoots(for: roots)
+      liveRegistrations.removeSubtrees(rootedAt: resetRoots)
       viewGraph.restoreRuntimeRegistrationSubtrees(
-        rootedAt: roots,
+        rootedAt: resetRoots,
         into: liveRegistrations
       )
       // The scoped restore re-appends the changed subtree's focus registrations

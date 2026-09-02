@@ -3973,6 +3973,40 @@ package final class ViewGraph {
     )
   }
 
+  /// The identity prefixes a scoped `.subtrees` reset must clear so that it
+  /// covers exactly the nodes the paired restore
+  /// (`restoreRuntimeRegistrationSubtrees`) republishes.
+  ///
+  /// The restore walks each root's ViewNode subtree, but the reset selects
+  /// registration KEYS by identity prefix — and beneath an exact-`.id` host
+  /// the two identity spaces part ways: the host's structural identity is the
+  /// frontier root while its descendants extend its RESOLVED identity (the
+  /// `.id` value), which is the prefix every registration they record is
+  /// keyed under. A reset by the structural prefix alone cleared nothing
+  /// there, so the restore republished the surviving entries on top of
+  /// themselves: a `prefersDefaultFocus` candidate under a replaced `.id`
+  /// owner was published twice on every selective frame rooted at the owner
+  /// (org task T173). Collect every re-root boundary in the cover so the reset
+  /// and the restore agree on the same node set.
+  package func runtimeRegistrationResetRoots(
+    for roots: [Identity]
+  ) -> [Identity] {
+    var resetRoots = roots
+    var traversedNodes: Set<ObjectIdentifier> = []
+    var work: [ViewNode] = roots.compactMap { nodeIfExists(for: $0) }
+    while let node = work.popLast() {
+      guard traversedNodes.insert(ObjectIdentifier(node)).inserted else {
+        continue
+      }
+      for identity in [node.identity, node.resolvedIdentity]
+      where !resetRoots.contains(where: { identity == $0 || identity.isDescendant(of: $0) }) {
+        resetRoots.append(identity)
+      }
+      work.append(contentsOf: node.children)
+    }
+    return resetRoots
+  }
+
   private func collectRuntimeRegistrationSubtreeNodeIDs(
     _ node: ViewNode,
     into nodeIDs: inout Set<ViewNodeID>

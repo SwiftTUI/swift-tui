@@ -597,13 +597,39 @@ extension ResolvedNode {
   /// one frame with zero row regions, which clears focus and silently re-seats
   /// it on row 0 (swift-tui issue #4).
   ///
+  /// The presentation overlay stack decorates ITS copy of the hosted base the
+  /// same way: a modal entry disables the base's interaction
+  /// (`.disabled(reason: .modalOverlay)` — no other author writes that
+  /// reason), and the stack absorbs the base's focus-scope boundary by naming
+  /// the base's identity as its own scope (`focusScopeIdentity`, again written
+  /// by no other author). After a selective frame evaluated only the trigger
+  /// and the overlay entry, the served stack's rebuild pulled the base's own
+  /// committed value and dropped both: the semantics walk then emitted the
+  /// base's focus and pointer regions beneath an open sheet, so a click
+  /// behind a modal reached the base action, the focus tracker never
+  /// recorded a modal restoration, and an action-bearing popover tip left
+  /// the base focusable (org task T173).
+  ///
   /// Only parent-authored decorations are carried: a child never writes its own
-  /// `hostedCollectionItem`, so the parent's slice is authoritative for it, and
-  /// positional pairing keeps it attached to the same row.
-  package mutating func carryParentAuthoredSemantics(from slice: ResolvedNode) {
-    guard let hostedCollectionItem = slice.semanticMetadata.hostedCollectionItem else {
-      return
+  /// `hostedCollectionItem`, `.modalOverlay` gate, or absorbed scope, so the
+  /// parent's slice is authoritative for them, and positional pairing keeps
+  /// each attached to the same child. `host` is the parent's committed value.
+  package mutating func carryParentAuthoredSemantics(
+    from slice: ResolvedNode,
+    host: ResolvedNode
+  ) {
+    if let hostedCollectionItem = slice.semanticMetadata.hostedCollectionItem {
+      semanticMetadata.hostedCollectionItem = hostedCollectionItem
     }
-    semanticMetadata.hostedCollectionItem = hostedCollectionItem
+    if slice.semanticMetadata.interactionAvailability == .disabled(reason: .modalOverlay) {
+      semanticMetadata = semanticMetadata.merging(
+        SemanticMetadata(interactionAvailability: .disabled(reason: .modalOverlay))
+      )
+    }
+    if host.semanticMetadata.focusScopeBoundary,
+      host.semanticMetadata.focusScopeIdentity == slice.identity
+    {
+      semanticMetadata.focusScopeBoundary = false
+    }
   }
 }

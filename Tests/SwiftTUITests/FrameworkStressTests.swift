@@ -4913,10 +4913,15 @@ final class StressRuntimeHarness<Content: View> {
     // loop's dirty-frontier frame. Off, every later frame here is a full
     // root evaluation and selective-only symptoms cannot be reproduced —
     // the lone-`ForEach`-element `Group` re-nesting showed in the counter
-    // demo's run loop but never in this harness (org task T170). Opt-in
-    // rather than the default: with it on for every scenario, 28 stress
-    // tests across the navigation/presentation/observation suites fail and
-    // one livelocks under this synchronous driver (org task T173).
+    // demo's run loop but never in this harness (org task T170). Still
+    // opt-in rather than the default: flipping it exposed four selective-
+    // path defect classes that are now fixed (preference consumers above
+    // the frontier, snapshot rebuilds erasing body preferences and
+    // parent-authored child decorations, scoped registration publication
+    // beneath an exact-`.id` host — org task T173) and, with those fixed,
+    // three more that are not (a gesture stacked or removed during an
+    // active drag on a selective frame, and a DEBUG stamp-coherence
+    // assertion under a `Panel`-hosted `TextEditor` paste; see T173).
     selectiveEvaluation: Bool = false,
     @ViewBuilder content: @escaping () -> Content
   ) throws {

@@ -2077,16 +2077,18 @@ package final class ViewNode {
       // parent's committed slice is always the freshest truth for it.
       // An applied child's own committed value is the freshest content, but
       // it never carries the decorations only this node authors for it (a
-      // hosted collection's row stamps); carry those forward from the
-      // committed slice or the rebuild erases them until this node's next
-      // apply (swift-tui issue #4: one stampless frame dropped every row
-      // focus region and re-seated focus on row 0).
+      // hosted collection's row stamps, a presentation overlay stack's modal
+      // gate and absorbed focus scope on its base); carry those forward from
+      // the committed slice or the rebuild erases them until this node's
+      // next apply (swift-tui issue #4: one stampless frame dropped every
+      // row focus region and re-seated focus on row 0; org task T173: a
+      // click behind an open sheet reached the base action).
       rebuilt.children = zip(committed.children, children).map { valueChild, nodeChild in
         guard nodeChild.hasEverApplied else {
           return valueChild
         }
         var rebuiltChild = nodeChild.snapshotRebuilding(entered: &entered)
-        rebuiltChild.carryParentAuthoredSemantics(from: valueChild)
+        rebuiltChild.carryParentAuthoredSemantics(from: valueChild, host: committed)
         return rebuiltChild
       }
     } else {
