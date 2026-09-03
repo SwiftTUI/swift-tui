@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-09-03
+
 ### Changed
 
 - **`ZStack` no longer hands its children the enclosing stack's axis.** A
@@ -1464,7 +1466,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.10.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.10.1...HEAD
+[0.10.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.10.1
 [0.10.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.10.0
 [0.9.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.9.0
 [0.3.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.3.4
