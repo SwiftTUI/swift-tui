@@ -132,6 +132,19 @@ Every example runs from a fresh clone of
 Try `swift run --package-path gallery gallery-demo` for the gallery of SwiftTUI's interactive functionality. 
 (See more in the [showcase](https://swifttui.sh/showcase/))
 
+## Projects using SwiftTUI
+
+Building something with SwiftTUI? Add it to this list. Open a pull request
+that appends one line below with the project's name, a link, and a short
+description; the
+[edit button on this file](https://github.com/SwiftTUI/swift-tui/edit/main/README.md)
+turns that into a pull request in one step. Closed-source projects are
+welcome too: link a homepage, a screenshot, or a write-up.
+
+<!-- One project per line, alphabetical: **Name** (link) — one sentence. -->
+
+- _No entries yet. Yours could be the first._
+
 ## Beyond the terminal
 
 Terminal first, not terminal only. The same `App` also runs in a browser —
@@ -159,6 +172,8 @@ the full platform-by-product matrix (including the Windows notes) is
 
 [Open an issue](https://github.com/SwiftTUI/swift-tui/issues/new/choose) for
 SwiftUI-style APIs you find missing or anything that gets in your way.
+Shipping something with SwiftTUI? Add it to
+[Projects using SwiftTUI](#projects-using-swifttui) so others can find it.
 
 Small, well-scoped issues and pull requests are easiest to review. The repo
 uses the pinned Swift 6.3.3 toolchain through `swiftly`: `swiftly run swift
