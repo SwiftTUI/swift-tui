@@ -134,16 +134,11 @@ Try `swift run --package-path gallery gallery-demo` for the gallery of SwiftTUI'
 
 ## Projects using SwiftTUI
 
-Building something with SwiftTUI? Add it to this list. Open a pull request
+Building something with SwiftTUI? Add it here. Open a pull request
 that appends one line below with the project's name, a link, and a short
-description; the
-[edit button on this file](https://github.com/SwiftTUI/swift-tui/edit/main/README.md)
-turns that into a pull request in one step. Closed-source projects are
-welcome too: link a homepage, a screenshot, or a write-up.
+description.
 
 <!-- One project per line, alphabetical: **Name** (link) — one sentence. -->
-
-- _No entries yet. Yours could be the first._
 
 ## Beyond the terminal
 
