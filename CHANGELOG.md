@@ -8,6 +8,22 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- **`ZStack` no longer hands its children the enclosing stack's axis.** A
+  `ZStack` resolves its children with no stack axis, the same context that
+  `ZStackLayout {}` and a custom `Layout` without a declared orientation
+  already install, so the two spellings of a z-stack agree. A `Spacer` directly
+  inside a `ZStack` now reserves its `minLength` on both axes rather than on
+  whichever axis the enclosing `HStack` or `VStack` used, and a `Divider`
+  directly inside follows the proposal's longer side. Sizing is unchanged: a
+  `Spacer` beside other children stays layout-neutral and the `ZStack` hugs
+  them, which is SwiftUI's behaviour as well. The divergence register's
+  `ZStack` entry, which had recorded SwiftUI as making such a spacer flexible
+  on both axes, was corrected after measuring against the macOS SDK; the
+  per-axis `ViewSpacing` stance is now *Ratified* and the absence of a
+  `LayoutSubviews` collection type is recorded as a deliberate omission.
+
 ## [0.10.0] - 2026-09-02
 
 ### Added

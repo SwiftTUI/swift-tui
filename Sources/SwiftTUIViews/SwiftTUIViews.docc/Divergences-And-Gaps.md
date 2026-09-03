@@ -48,6 +48,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   `Binding<[Route]>` path form ships.
 - **No `NavigationSplitView`.** *Provisional.* Out of scope for the current
   navigation surface.
+- **No `LayoutSubviews` collection type.** *Ratified.* `LayoutSubviews` is the
+  alias `[LayoutSubview]`, and a custom `Layout` receives a plain array. SwiftUI's
+  dedicated `RandomAccessCollection` earns its place by carrying the layout
+  direction and by slicing to itself; SwiftTUI has no layout direction, and an
+  `ArraySlice` already carries a stable subselection to a helper. Replacing the
+  alias on its own would be source churn for every conformer with nothing new
+  to carry. A wrapper would arrive together with a layout direction.
 - **`Text(_:)` is permanently literal.** *Ratified.* A string is content, not
   a localization key. `Text(verbatim:)` is an explicit alias of `Text(_:)`,
   not a compatibility hedge for silently changing that initializer later.
@@ -290,7 +297,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   declares no orientation clears an axis inherited from an enclosing stack —
   a spacer inside a non-stack container is flexible on both axes. SwiftUI's
   further properties have no terminal meaning yet and are omitted.
-- **`ViewSpacing` is per axis, not per edge.** *Provisional.* SwiftUI keeps a
+- **`ViewSpacing` is per axis, not per edge.** *Ratified.* SwiftUI keeps a
   preference per edge and resolves leading/trailing through layout direction;
   SwiftTUI has no layout direction and the stack engine negotiates one value
   per axis, so `Layout.spacing(subviews:cache:)` returns horizontal and
@@ -298,8 +305,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   horizontal neighbours and none between vertical ones). The default
   implementation is the union of the subviews' preferences. The declaration
   is read at the stack's direct child, so a `padding` or `frame` wrapper
-  around the container presents its own (empty) preference. A per-edge model
-  would be an additive change.
+  around the container presents its own (empty) preference. Ratified rather
+  than extended because a per-edge preference only differs from a per-axis
+  one once leading and trailing can differ, which needs a layout direction;
+  on the cell grid every built-in reports symmetric spacing, and
+  `spacing(subviews:cache:)` is the sole author-facing writer. A per-edge
+  model stays an additive change and would arrive with a layout direction,
+  not before it.
 - **Explicit alignment hooks are cache reads in zero-origin bounds.**
   *Ratified.* `explicitAlignment(of:in:proposal:subviews:cache:)` receives
   the container's own frame with a zero origin and returns the guide in the
@@ -309,11 +321,19 @@ are omitted even when SwiftUI exposes a corresponding API.
   fresh cache) and their mutations are discarded; the engine asks once per
   question per pass. Built-in stacks report only their plain dimensions and
   modifier guides to *their* parents — they do not aggregate child guides.
-- **`ZStack` inherits the enclosing stack's axis.** *Gap.* `ZStack` leaves the
-  stack axis untouched, so a `Spacer` directly inside a `ZStack` nested in a
-  `VStack` is flexible vertically only; SwiftUI treats it as flexible on both
-  axes. Custom layouts without a declared orientation now clear the axis;
-  `ZStack` is recorded, not changed.
+- **`ZStack` is not a stack for its children.** *Ratified (parity).* `ZStack`
+  resolves its children with no stack axis — the same context `ZStackLayout {}`
+  and a custom layout without a declared orientation install — so a `Spacer`
+  directly inside reserves its minimum on both axes and a `Divider` follows
+  the proposal's longer side, whichever stack encloses the `ZStack`. Sizing is
+  unchanged and matches SwiftUI's headline rule, measured against the macOS
+  SDK: a `Spacer` beside other children is layout-neutral and the `ZStack`
+  hugs them. Two residues stay *Provisional*: SwiftUI also ignores such a
+  spacer's `minLength` and lets a spacer-only `ZStack` fill its proposal,
+  where SwiftTUI reserves the minimum and gives a spacer-only `ZStack` no
+  size; and a `Divider` inside a `ZStack` under an `HStack` can draw
+  vertically when the proposal is taller than wide, where SwiftUI always
+  draws a divider outside a stack horizontally.
 - **Engine re-entry nesting has a depth budget.** *Ratified.* A nested
   custom layout or hosted-collection (`List`/`Table`) windowing container
   re-enters the engine on the native call stack when measured, so nesting is

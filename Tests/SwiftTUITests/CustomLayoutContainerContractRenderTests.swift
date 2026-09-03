@@ -58,6 +58,83 @@ struct CustomLayoutContainerContractRenderTests {
     #expect(inStack.intrinsicSize == .init(width: 0, height: 2))
   }
 
+  @Test("ZStack {} clears the enclosing stack's axis exactly like ZStackLayout {}")
+  func zStackClearsInheritedAxisLikeZStackLayout() {
+    // Built-in parity (org T11): the ZStack view and the ZStackLayout
+    // container must hand their children the same axis — none. Before the
+    // fix a Spacer inside `VStack { ZStack { … } }` kept the column axis and
+    // reserved its minimum on one axis only; inside `HStack { ZStack { … } }`
+    // the row axis. Measured against SwiftUI (macOS 15 SDK): a ZStack is
+    // "not a stack" for both `Spacer` and `Divider`.
+    let artifacts = DefaultRenderer().render(
+      VStack {
+        HStack {
+          ZStack {
+            Spacer(minLength: 2)
+          }
+          ZStackLayout {
+            Spacer(minLength: 2)
+          }
+          Spacer(minLength: 2)
+        }
+        ZStack {
+          Spacer(minLength: 2)
+        }
+      },
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    let row = artifacts.resolvedTree.children[0]
+    let inZStackUnderRow = row.children[0].children[0]
+    let inZStackLayoutUnderRow = row.children[1].children[0]
+    let inRow = row.children[2]
+    let inZStackUnderColumn = artifacts.resolvedTree.children[1].children[0]
+
+    #expect(inZStackUnderRow.drawMetadata.leafStackAxis == nil)
+    #expect(inZStackUnderRow.intrinsicSize == .init(width: 2, height: 2))
+    #expect(inZStackLayoutUnderRow.drawMetadata.leafStackAxis == nil)
+    #expect(inZStackLayoutUnderRow.intrinsicSize == .init(width: 2, height: 2))
+    #expect(inZStackUnderColumn.drawMetadata.leafStackAxis == nil)
+    #expect(inZStackUnderColumn.intrinsicSize == .init(width: 2, height: 2))
+    // The row's own spacer keeps the row axis: the clearing is scoped to
+    // the ZStack's children, not leaked to its siblings.
+    #expect(inRow.drawMetadata.leafStackAxis == .horizontal)
+    #expect(inRow.intrinsicSize == .init(width: 2, height: 0))
+  }
+
+  @Test("a Spacer beside siblings stays layout-neutral in a ZStack under either stack")
+  func zStackSpacerBesideSiblingsStaysLayoutNeutral() throws {
+    // SwiftUI ignores a Spacer for sizing when a ZStack has other children
+    // (probe: `ZStack { Spacer(); Text("[X]") }` answers the text's size under
+    // an 800×100 proposal, nested in a VStack or an HStack). The axis change
+    // must not disturb that: the bordered ZStack still hugs `[X]`.
+    for nestInRow in [false, true] {
+      let probe: AnyView =
+        nestInRow
+        ? AnyView(
+          HStack(alignment: .top, spacing: 0) {
+            Text("h")
+            ZStack { Spacer(); Text("[X]") }.border(.separator, placement: .outset)
+          })
+        : AnyView(
+          VStack(alignment: .leading, spacing: 0) {
+            Text("h")
+            ZStack { Spacer(); Text("[X]") }.border(.separator, placement: .outset)
+          })
+      let surface = DefaultRenderer().render(
+        probe,
+        context: .init(identity: testIdentity("Root", nestInRow ? "row" : "column")),
+        proposal: .init(width: 40, height: 8)
+      ).rasterSurface
+      let joined = surface.lines.joined(separator: "\n")
+      let boxLine = try #require(surface.lines.first { $0.contains("[X]") }, "\(joined)")
+      // `│[X]│` — the outset border hugs the three text cells.
+      #expect(boxLine.contains("│[X]│"), "\(joined)")
+      let borderedRows = surface.lines.filter { $0.contains("│") || $0.contains("╭") || $0.contains("╰") }
+      #expect(borderedRows.count == 3, "\(joined)")
+    }
+  }
+
   @Test("HStackLayout {} and HStack {} give a Spacer the same axis")
   func builtinLayoutParityForSpacer() {
     let viaLayout = DefaultRenderer().render(
