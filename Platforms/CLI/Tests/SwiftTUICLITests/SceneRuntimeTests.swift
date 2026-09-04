@@ -127,7 +127,7 @@
         runtime.shutdown()
       }
 
-      guard let slavePath = runtime.sceneInfo.ptyPath else {
+      guard let slavePath = runtime.attachPtyPath else {
         throw RuntimeTestError.missingSlavePath
       }
       #expect(runtime.lifecycle.state == .created)
