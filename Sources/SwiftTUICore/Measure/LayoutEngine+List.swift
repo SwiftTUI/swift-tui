@@ -81,18 +81,6 @@ extension LayoutEngine {
     payload.style.measuredListIdealSize(for: payload)
   }
 
-  package func resolvedListDimension(
-    _ ideal: Int,
-    proposal: ProposedDimension
-  ) -> Int {
-    switch proposal {
-    case .unspecified, .infinity:
-      return ideal
-    case .finite(let value):
-      return min(max(ideal, 0), value)
-    }
-  }
-
   package func resolvedExpandingListDimension(
     _ ideal: Int,
     proposal: ProposedDimension
