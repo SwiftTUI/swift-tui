@@ -122,6 +122,8 @@ Lowering helpers remain package-only implementation details.
 - <doc:Navigation-And-Tabs>
 - <doc:Dismissal-Is-Data>
 - <doc:Styling-And-Theming>
+- <doc:Authoring-Styles>
+- <doc:Testing-Styles>
 - <doc:Animating-Views>
 - <doc:Geometry-And-Preferences>
 - <doc:Shapes>

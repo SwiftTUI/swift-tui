@@ -144,6 +144,10 @@ public struct TabViewStyleItemConfiguration: Sendable {
   public var isFocused: Bool
   package var controlIdentity: Identity?
 
+  /// A fixture configuration for tests (see <doc:Testing-Styles>): it
+  /// carries no control identity, so ``route(content:)`` and
+  /// ``overflowRoute(content:)`` render their content and install no
+  /// pointer target. The framework constructs live items itself.
   public init(
     index: Int,
     label: TabItemLabel,
@@ -171,13 +175,22 @@ public struct TabViewStyleItemConfiguration: Sendable {
     self.controlIdentity = controlIdentity
   }
 
+  /// Installs this item's pointer route around `content` so a click on it
+  /// selects the tab. Install it once per item; a repeated installation in
+  /// one style body reports `style.duplicateRoute` and the first one wins.
+  /// Omitting it removes only the pointer target — keyboard navigation is
+  /// the tab view's own. See <doc:Authoring-Styles>.
   @ViewBuilder @MainActor
   public func route<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
     if let controlIdentity {
-      PointerRouteView(
-        identity: tabItemIdentity(for: controlIdentity, index: index),
+      StyleRouteView(
+        target: .init(
+          identity: tabItemIdentity(for: controlIdentity, index: index),
+          family: "TabViewStyle",
+          role: "item"
+        ),
         content: content()
       )
     } else {
@@ -185,13 +198,19 @@ public struct TabViewStyleItemConfiguration: Sendable {
     }
   }
 
+  /// Installs this item's overflow-menu pointer route around `content`. The
+  /// same once-per-configuration rule as ``route(content:)`` applies.
   @ViewBuilder @MainActor
   public func overflowRoute<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
     if let controlIdentity {
-      PointerRouteView(
-        identity: tabOverflowItemIdentity(for: controlIdentity, index: index),
+      StyleRouteView(
+        target: .init(
+          identity: tabOverflowItemIdentity(for: controlIdentity, index: index),
+          family: "TabViewStyle",
+          role: "overflow item"
+        ),
         content: content()
       )
     } else {
@@ -213,6 +232,9 @@ public struct TabViewOverflowTriggerConfiguration: Sendable {
   public var leadingWidth: Int
   package var controlIdentity: Identity?
 
+  /// A fixture configuration for tests (see <doc:Testing-Styles>): it
+  /// carries no control identity, so ``route(content:)`` renders its
+  /// content and installs no pointer target.
   public init(
     label: String,
     isSelected: Bool,
@@ -248,13 +270,20 @@ public struct TabViewOverflowTriggerConfiguration: Sendable {
     self.controlIdentity = controlIdentity
   }
 
+  /// Installs the overflow trigger's pointer route around `content` so a
+  /// click on it toggles the overflow menu. The same once-per-configuration
+  /// rule as ``TabViewStyleItemConfiguration/route(content:)`` applies.
   @ViewBuilder @MainActor
   public func route<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
     if let controlIdentity {
-      PointerRouteView(
-        identity: tabOverflowTriggerIdentity(for: controlIdentity),
+      StyleRouteView(
+        target: .init(
+          identity: tabOverflowTriggerIdentity(for: controlIdentity),
+          family: "TabViewStyle",
+          role: "overflow trigger"
+        ),
         content: content()
       )
     } else {
@@ -406,6 +435,28 @@ public struct TabViewStyleBodyConfiguration: Sendable {
       self.dormantArchiveLocatorSink = dormantArchiveLocatorSink
     }
 
+    /// An empty content slot for a fixture-constructed configuration: it
+    /// resolves to nothing.
+    @_spi(StyleFixtures)
+    public init() {
+      self.init(payload: nil)
+    }
+
+    /// A content slot showing `content` for a fixture-constructed
+    /// configuration. It resolves as an ordinary active tab body with no
+    /// declaring tab view, so no dormant-state archive is involved.
+    @_spi(StyleFixtures)
+    public init<V: View>(
+      @ViewBuilder content: @escaping @MainActor () -> V
+    ) {
+      self.init(
+        payload: LazySubviewPayload(
+          tabBody: ScopedContentPayload(content: content),
+          debugName: "TabBodyFixture"
+        )
+      )
+    }
+
     package func resolveElements(
       in context: ResolveContext
     ) -> [ResolvedNode] {
@@ -501,7 +552,11 @@ public struct TabViewStyleBodyConfiguration: Sendable {
   public var overflowTrigger: TabViewOverflowTriggerConfiguration?
   public var content: Content
 
-  package init(
+  /// The framework's construction path, exposed to test targets through
+  /// `@_spi(StyleFixtures)` so a style resolves against a fixture without a
+  /// live `TabView` (see <doc:Testing-Styles>).
+  @_spi(StyleFixtures)
+  public init(
     styleConfiguration: TabViewStyleConfiguration,
     presentation: TabViewStylePresentation,
     items: [TabViewStyleItemConfiguration],

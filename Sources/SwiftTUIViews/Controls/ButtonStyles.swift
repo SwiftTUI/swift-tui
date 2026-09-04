@@ -66,6 +66,15 @@ public struct ButtonStyleConfiguration: Sendable {
       )
     }
 
+    /// Captures `content` as the authored label of a fixture-constructed
+    /// configuration (see <doc:Testing-Styles>).
+    @_spi(StyleFixtures)
+    public init<V: View>(
+      @ViewBuilder content: @escaping @MainActor () -> V
+    ) {
+      payload = CapturedSubviewPayload(content: content)
+    }
+
     public var body: some View {
       CapturedSubviewView(payload: payload)
     }
@@ -85,7 +94,11 @@ public struct ButtonStyleConfiguration: Sendable {
     isFocused && showsFocusEffect
   }
 
-  package init(
+  /// The framework's construction path, exposed to test targets through
+  /// `@_spi(StyleFixtures)` so a style resolves against a fixture without a
+  /// live render (see <doc:Testing-Styles>).
+  @_spi(StyleFixtures)
+  public init(
     label: Label,
     role: ButtonRole?,
     isEnabled: Bool,
@@ -352,6 +365,7 @@ private struct ConcreteAnyButtonStyleBox<S: ButtonStyle>: AnyButtonStyleBox {
   ) -> ResolvedNode {
     resolveStyleBody(
       bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
+      styleLabel: style.snapshotLabel,
       in: context
     )
   }

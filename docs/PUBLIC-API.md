@@ -8,8 +8,10 @@ A machine-generated enumeration of every public symbol lives in
 `PUBLIC_API_BASELINE.md` (grouped) and `.public-api-baseline.txt` (flat). The
 `.spi-api-baseline.txt` file separately tracks the `@_spi` surface. Its most
 important part is `@_spi(Runners)`, the host contract for the swiftui/web/android
-host repos. Thus, an SPI break creates a reviewable diff instead of a silent
-downstream failure. The inventory script generates and compares all
+host repos; `@_spi(StyleFixtures)` is the style-library testing contract (the
+fixture initializers on every style configuration, captured slot, and
+presentation value — see the `Testing-Styles` DocC article). Thus, an SPI
+break creates a reviewable diff instead of a silent downstream failure. The inventory script generates and compares all
 three files:
 `Scripts/generate_public_api_inventory.sh`; see
 [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md#public-api-baseline). Those files answer "is

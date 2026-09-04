@@ -54,6 +54,15 @@ public struct TextFieldStyleConfiguration: Sendable {
       )
     }
 
+    /// Captures `content` as the authored label of a fixture-constructed
+    /// configuration (see <doc:Testing-Styles>).
+    @_spi(StyleFixtures)
+    public init<V: View>(
+      @ViewBuilder content: @escaping @MainActor () -> V
+    ) {
+      payload = CapturedSubviewPayload(content: content)
+    }
+
     public var body: some View {
       CapturedSubviewView(payload: payload)
     }
@@ -80,6 +89,18 @@ public struct TextFieldStyleConfiguration: Sendable {
       self.caretAnchor = caretAnchor
     }
 
+    /// Field content for a fixture-constructed configuration: it shows
+    /// `displayText` with no selection, owning field, or caret.
+    @_spi(StyleFixtures)
+    nonisolated public init(displayText: String) {
+      self.init(
+        displayText: displayText,
+        displayRuns: nil,
+        ownerIdentity: nil,
+        caretAnchor: nil
+      )
+    }
+
     public var body: some View {
       TextInputContent(
         displayText: displayText,
@@ -100,7 +121,11 @@ public struct TextFieldStyleConfiguration: Sendable {
   public var focusActive: Bool
   public var styleEnvironment: StyleEnvironmentSnapshot
 
-  package init(
+  /// The framework's construction path, exposed to test targets through
+  /// `@_spi(StyleFixtures)` so a style resolves against a fixture without a
+  /// live render (see <doc:Testing-Styles>).
+  @_spi(StyleFixtures)
+  public init(
     displayText: String,
     fieldContent: FieldContent? = nil,
     isShowingPrompt: Bool,
@@ -277,6 +302,7 @@ private struct ConcreteAnyTextFieldStyleBox<S: TextFieldStyle>: AnyTextFieldStyl
   ) -> ResolvedNode {
     resolveStyleBody(
       bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
+      styleLabel: style.snapshotLabel,
       in: context
     )
   }

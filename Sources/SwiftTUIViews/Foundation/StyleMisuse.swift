@@ -23,6 +23,10 @@ enum StyleMisuse {
   /// issue-code filtering stays stable as families are added.
   static let invalidPresentationCode = "style.invalidPresentation"
 
+  /// The issue code for a route wrapper installed more than once in one
+  /// style-body resolve (see `StyleRouteView`).
+  static let duplicateRouteCode = "style.duplicateRoute"
+
   /// Returns `presentation` unchanged when `problems` is empty; otherwise
   /// reports one issue describing every problem and returns `fallback()` —
   /// the family's automatic presentation — for this resolve.
@@ -65,6 +69,27 @@ enum StyleMisuse {
         + problems.joined(separator: "; ")
         + ". The automatic presentation was rendered for this resolve. "
         + "Return valid values from the style's resolvePresentation(for:).",
+      identity: identity,
+      source: family
+    )
+  }
+
+  /// One warning for a route wrapper the style body installed again within
+  /// the same resolve. The first installation stays the pointer target; the
+  /// repeated one rendered its content without a route.
+  static func duplicateRouteIssue(
+    family: String,
+    role: String,
+    styleLabel: String,
+    identity: Identity
+  ) -> RuntimeIssue {
+    RuntimeIssue(
+      severity: .warning,
+      code: duplicateRouteCode,
+      message:
+        "\(family) \(styleLabel) installed its \(role) route more than once in one body "
+        + "resolve. The first installation is the pointer target; the later one rendered "
+        + "its content without a route. Install each route wrapper once per configuration.",
       identity: identity,
       source: family
     )

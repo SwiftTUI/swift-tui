@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUIViews
+@_spi(StyleFixtures) @testable import SwiftTUIViews
 
 @MainActor
 @Suite("Spinner styles")

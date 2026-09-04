@@ -8,6 +8,34 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- **Style fixtures for tests: `@_spi(StyleFixtures)`.** Every shipped style
+  family's configuration (`ButtonStyleConfiguration`,
+  `TextFieldStyleConfiguration`, `PickerStyleConfiguration`,
+  `ListStyleConfiguration`, `OutlineStyleConfiguration`,
+  `TableStyleConfiguration`, `SpinnerStyleConfiguration`,
+  `SheetStyleConfiguration`, `ToastStyleConfiguration`,
+  `TabViewStyleBodyConfiguration`) and captured slot (the `Label` slots,
+  `TextFieldStyleConfiguration.FieldContent`,
+  `TabViewStyleBodyConfiguration.Content`) now has a public initializer
+  behind `@_spi(StyleFixtures) import SwiftTUIViews`, so a style library's
+  test target can construct a configuration with fixture state and resolve
+  its style's body or presentation value without a live render. Application
+  code never sees the construction surface. The tab-view item and
+  overflow-trigger configurations keep their existing public initializers as
+  the fixture path. New DocC articles `Authoring-Styles` and `Testing-Styles`
+  document the contract and the workflow.
+- **Shared route-wrapper contract.** The tab-view route wrappers
+  (`TabViewStyleItemConfiguration.route(content:)`,
+  `overflowRoute(content:)`, `TabViewOverflowTriggerConfiguration.route(content:)`)
+  now run through one package seam that every later interactive family
+  reuses: installing the same route more than once in one style body emits a
+  `style.duplicateRoute` runtime issue and the first installation stays the
+  pointer target; omitting an optional route removes only the pointer target
+  and leaves keyboard interaction, which the primitive owns, untouched; and
+  routes on a fixture-constructed configuration are inert. Nothing traps.
+
 ## [0.10.1] - 2026-09-03
 
 ### Changed

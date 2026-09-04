@@ -159,8 +159,12 @@ Styles must be `Sendable`; `makeBody(configuration:)` runs on the main
 actor. Conformances can also override `resolvedProminence(base:)` to raise
 control prominence the way `.borderedProminent` does. The other families
 mirror this shape — a protocol, a public configuration, an `Any*Style`
-eraser, and a scoping modifier; see <doc:Divergences-And-Gaps> for how far
-the styling contract currently extends.
+eraser, and a scoping modifier. <doc:Authoring-Styles> covers the contract
+in full, including the presentation-value families and the route wrappers
+interactive configurations expose; <doc:Testing-Styles> shows how a style
+library unit-tests its styles without a live render; and
+<doc:Divergences-And-Gaps> records how far the styling contract currently
+extends.
 
 ## Themes are host-selected
 

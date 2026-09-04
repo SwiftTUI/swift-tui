@@ -32,7 +32,11 @@ public struct TableStyleConfiguration: Sendable {
   public var showsFocusEffect: Bool
   public var styleEnvironment: StyleEnvironmentSnapshot
 
-  package init(
+  /// The framework's construction path, exposed to test targets through
+  /// `@_spi(StyleFixtures)` so a style resolves against a fixture without a
+  /// live render (see <doc:Testing-Styles>).
+  @_spi(StyleFixtures)
+  public init(
     columnCount: Int,
     showsHeaders: Bool,
     isSelectable: Bool,

@@ -57,14 +57,21 @@ func styleValuesAreEqualForReuse<S: Sendable>(
 ///   invalidation, stale retained reuse. This is the seam the `8ace32a5`
 ///   regression wedged on, where tab-hosted scroll panes silently lost
 ///   input-driven `@State` writes.
+///
+/// The resolve also opens the style's route ledger (`StyleRoute.swift`), so a
+/// route wrapper the body installs twice is reported once under
+/// `styleLabel` and the first installation wins.
 @MainActor
 func resolveStyleBody<Body: View>(
   _ body: Body,
+  styleLabel: String,
   in context: ResolveContext
 ) -> ResolvedNode {
-  resolveView(
-    body,
-    in: context,
-    authoringContextOverride: currentAuthoringContext()
-  )
+  withStyleRouteInstallationLedger(styleLabel: styleLabel) {
+    resolveView(
+      body,
+      in: context,
+      authoringContextOverride: currentAuthoringContext()
+    )
+  }
 }

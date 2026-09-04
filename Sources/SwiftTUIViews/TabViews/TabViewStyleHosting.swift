@@ -41,6 +41,7 @@ struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
     // reason `resolveStyleBody` rebases rather than mints a fresh scope.
     resolveStyleBody(
       bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
+      styleLabel: style.snapshotLabel,
       in: context
     )
   }

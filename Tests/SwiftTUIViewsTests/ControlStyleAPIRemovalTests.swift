@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUIViews
+@_spi(StyleFixtures) @testable import SwiftTUIViews
 
 /// Compile fixtures for the Phase A break inventory (control-style plan
 /// 2026-08-12-002). Each case is a *positive* fixture: it compiles only

@@ -86,7 +86,11 @@ public struct ToastStyleConfiguration: Sendable {
   public var terminalSize: CellSize
   public var styleEnvironment: StyleEnvironmentSnapshot
 
-  package init(
+  /// The framework's construction path, exposed to test targets through
+  /// `@_spi(StyleFixtures)` so a style resolves against a fixture without a
+  /// live render (see <doc:Testing-Styles>).
+  @_spi(StyleFixtures)
+  public init(
     stackIndex: Int,
     stackCount: Int,
     terminalSize: CellSize,
