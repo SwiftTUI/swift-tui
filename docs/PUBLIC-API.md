@@ -38,7 +38,7 @@ The canonical public surface is the API ordinary app code uses first:
 - Property wrappers and environment plumbing: `@State`, `@Binding`,
   `@Environment`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and the
   repo-owned `@Bindable`. Custom wrappers conform to `DynamicProperty`
-  through the reference-backed
+  through its
   `update(in:) -> DynamicPropertyUpdateResult` contract. The context carries
   a lifetime-scoped invalidation lease for asynchronous storage, and the
   result explicitly certifies or denies reuse. The complete authoring contract
