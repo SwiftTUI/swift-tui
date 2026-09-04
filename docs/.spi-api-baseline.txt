@@ -275,6 +275,7 @@ SwiftTUIViews.ButtonStyleConfiguration.init(label:role:isEnabled:isFocused:shows
 SwiftTUIViews.ListStyleConfiguration.init(isSelectable:isEnabled:isFocused:showsFocusEffect:styleEnvironment:)
 SwiftTUIViews.OutlineStyleConfiguration.init(styleEnvironment:)
 SwiftTUIViews.PickerStyleConfiguration.Label.init(content:)
+SwiftTUIViews.PickerStyleConfiguration.Option.init(index:label:isSelected:isEnabled:)
 SwiftTUIViews.PickerStyleConfiguration.init(controlIdentity:label:options:selectedIndex:isFocused:isActiveNavigation:showsFocusEffect:isEnabled:styleEnvironment:viewportLineCount:lineWidth:)
 SwiftTUIViews.SheetStyleConfiguration.init(defaultPresentation:terminalSize:controlProminence:styleEnvironment:)
 SwiftTUIViews.SpinnerStyleConfiguration.init(stage:accessibilityReduceMotion:styleEnvironment:)

@@ -3868,8 +3868,12 @@ SwiftTUIViews.PickerStyleConfiguration
 SwiftTUIViews.PickerStyleConfiguration.Label
 SwiftTUIViews.PickerStyleConfiguration.Label.body
 SwiftTUIViews.PickerStyleConfiguration.Option
+SwiftTUIViews.PickerStyleConfiguration.Option.index
 SwiftTUIViews.PickerStyleConfiguration.Option.init(label:)
+SwiftTUIViews.PickerStyleConfiguration.Option.isEnabled
+SwiftTUIViews.PickerStyleConfiguration.Option.isSelected
 SwiftTUIViews.PickerStyleConfiguration.Option.label
+SwiftTUIViews.PickerStyleConfiguration.Option.route(content:)
 SwiftTUIViews.PickerStyleConfiguration.controlIdentity
 SwiftTUIViews.PickerStyleConfiguration.isActiveNavigation
 SwiftTUIViews.PickerStyleConfiguration.isEnabled
@@ -3880,6 +3884,7 @@ SwiftTUIViews.PickerStyleConfiguration.options
 SwiftTUIViews.PickerStyleConfiguration.selectedIndex
 SwiftTUIViews.PickerStyleConfiguration.showsFocusEffect
 SwiftTUIViews.PickerStyleConfiguration.styleEnvironment
+SwiftTUIViews.PickerStyleConfiguration.trigger(content:)
 SwiftTUIViews.PickerStyleConfiguration.viewportLineCount
 SwiftTUIViews.PlaceholderContentView
 SwiftTUIViews.PlainButtonStyle

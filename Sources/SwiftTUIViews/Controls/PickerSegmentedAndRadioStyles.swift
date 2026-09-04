@@ -29,7 +29,6 @@ package struct SegmentedPickerStyleBody: View {
         ForEach(0..<configuration.options.count) { index in
           segmentedSegmentView(
             option: configuration.options[index],
-            index: index,
             configuration: configuration
           )
           if index < configuration.options.count - 1 {
@@ -70,19 +69,18 @@ package struct RadioGroupPickerStyleBody: View {
         .foregroundStyle(.terminalBorder(.accent))
       VStack(alignment: .leading, spacing: 0) {
         ForEach(0..<configuration.options.count) { index in
-          radioGroupRow(
-            label: configuration.options[index].label,
-            isSelected: index == configuration.selectedIndex,
-            isFocused: configuration.isActiveNavigation
-              && configuration.showsFocusEffect
-              && index == configuration.selectedIndex,
-            isEnabled: configuration.isEnabled,
-            styleEnvironment: configuration.styleEnvironment,
-            routeIdentity: pickerOptionIdentity(
-              for: configuration.controlIdentity,
-              index: index
+          let option = configuration.options[index]
+          option.route {
+            radioGroupRow(
+              label: option.label,
+              isSelected: option.isSelected,
+              isFocused: configuration.isActiveNavigation
+                && configuration.showsFocusEffect
+                && option.isSelected,
+              isEnabled: option.isEnabled,
+              styleEnvironment: configuration.styleEnvironment
             )
-          )
+          }
         }
       }
       .padding(.init(horizontal: 1, vertical: 1))
@@ -111,37 +109,31 @@ package struct RadioGroupPickerStyleBody: View {
 @MainActor
 private func segmentedSegmentView(
   option: PickerStyleConfiguration.Option,
-  index: Int,
   configuration: PickerStyleConfiguration
 ) -> some View {
-  let isSelected = index == configuration.selectedIndex
+  let isSelected = option.isSelected
   let segmentChrome = configuration.styleEnvironment.controlChrome(
     isEnabled: configuration.isEnabled,
     isFocused: configuration.isActiveNavigation && configuration.showsFocusEffect && isSelected,
     isSelected: isSelected
   )
-  return Text(option.label)
-    .lineLimit(1)
-    .background {
-      if isSelected {
-        Rectangle().fill(.tint)
-      } else if configuration.isActiveNavigation && configuration.showsFocusEffect {
-        Rectangle().inset(by: 1).fill(
-          segmentChrome.backgroundStyle
-        )
+  return option.route {
+    Text(option.label)
+      .lineLimit(1)
+      .background {
+        if isSelected {
+          Rectangle().fill(.tint)
+        } else if configuration.isActiveNavigation && configuration.showsFocusEffect {
+          Rectangle().inset(by: 1).fill(
+            segmentChrome.backgroundStyle
+          )
+        }
       }
-    }
-    .foregroundStyle(
-      isSelected ? segmentChrome.contentBackgroundStyle : segmentChrome.foregroundStyle
-    )
-    .drawMetadata(.init(opacity: segmentChrome.opacity))
-    .id(
-      pickerOptionIdentity(
-        for: configuration.controlIdentity,
-        index: index
+      .foregroundStyle(
+        isSelected ? segmentChrome.contentBackgroundStyle : segmentChrome.foregroundStyle
       )
-    )
-    .semanticMetadata(.init(participatesInPointerHitTesting: true))
+      .drawMetadata(.init(opacity: segmentChrome.opacity))
+  }
 }
 
 @MainActor
@@ -151,8 +143,7 @@ private func radioGroupRow(
   isSelected: Bool,
   isFocused: Bool,
   isEnabled: Bool,
-  styleEnvironment: StyleEnvironmentSnapshot,
-  routeIdentity: Identity? = nil
+  styleEnvironment: StyleEnvironmentSnapshot
 ) -> some View {
   let rowChrome = styleEnvironment.rowChrome(
     isEnabled: isEnabled,
@@ -182,12 +173,5 @@ private func radioGroupRow(
   }
   .drawMetadata(.init(opacity: rowChrome.opacity))
 
-  if let routeIdentity {
-    PointerRouteView(
-      identity: routeIdentity,
-      content: row
-    )
-  } else {
-    row
-  }
+  row
 }

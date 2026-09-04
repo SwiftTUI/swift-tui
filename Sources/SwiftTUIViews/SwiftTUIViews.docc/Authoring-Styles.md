@@ -127,7 +127,7 @@ synthetic pointer hit target the primitive owns. A route wrapper takes the
 view you compose for that target and installs the pointer route around it;
 the framework populates the identities, so a style never handles raw
 identities, selection tags, or handler closures. Built-in styles use the
-same wrappers as third-party styles. Today ``TabViewStyle`` ships them:
+same wrappers as third-party styles. ``TabViewStyle`` ships these wrappers:
 ``TabViewStyleItemConfiguration/route(content:)`` selects the item,
 ``TabViewStyleItemConfiguration/overflowRoute(content:)`` selects it from
 the overflow menu, and
@@ -174,6 +174,45 @@ Every route wrapper follows the same rules, and none of them traps:
   their content and install nothing, which is what lets a style body
   resolve in a test with no presentation coordinator or input pipeline (see
   <doc:Testing-Styles>).
+
+### Picker options and menu triggers
+
+``PickerStyleConfiguration/Option`` exposes `index`, `label`, `isSelected`,
+and `isEnabled`. Wrap an option's composed row in `option.route { … }` to
+select it by occurrence, including when two labels have the same text.
+The picker owns selection tags, bounds, disabled handling, and the binding.
+
+```swift
+struct CompactPickerStyle: PickerStyle {
+  func selectionDelta(for event: KeyEvent) -> Int? {
+    switch event {
+    case .arrowUp: -1
+    case .arrowDown: 1
+    default: nil
+    }
+  }
+
+  func makeBody(configuration: PickerStyleConfiguration) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      configuration.label
+      ForEach(configuration.options, id: \.index) { option in
+        option.route {
+          Text(option.isSelected ? "[\(option.label)]" : option.label)
+        }
+      }
+    }
+  }
+}
+```
+
+A menu style returns `true` from `wantsTriggerPointerRoute`, wraps its
+trigger in ``PickerStyleConfiguration/trigger(content:)``, and shows its
+options when `configuration.isActiveNavigation` is true. Pointer activation
+toggles expansion; keyboard activation toggles it, Escape closes it, and
+an arrow handled by `selectionDelta(for:)` reopens it while navigating.
+Focus entry retains the default menu's expanded-on-focus behavior. Leaving
+focus or disabling the picker resets the explicit expansion choice.
+Omitting the trigger wrapper preserves all of those keyboard behaviors.
 
 ## What a style may change
 

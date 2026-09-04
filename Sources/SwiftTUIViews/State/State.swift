@@ -33,6 +33,7 @@ package enum StateSlotOrdinals {
   private static let tabOptionSignatureBase = -7_000_000
   private static let collectionScrollAnchorBase = -8_000_000
   private static let tabDormantArchiveBase = -9_000_000
+  package static let pickerMenuExpansion = -10_000_000
 
   package static func authored(
     line: UInt,

@@ -42,13 +42,11 @@ package struct MenuPickerStyleBody: View {
     }
     .foregroundStyle(triggerChrome.foregroundStyle)
     .drawMetadata(.init(opacity: triggerChrome.opacity))
-    .id(pickerTriggerIdentity(for: configuration.controlIdentity))
-    .semanticMetadata(.init(participatesInPointerHitTesting: true))
 
     VStack(alignment: .leading, spacing: 0) {
       configuration.label
         .foregroundStyle(.terminalBorder(.accent))
-      triggerRow
+      configuration.trigger { triggerRow }
 
       if configuration.isActiveNavigation {
         MenuPickerOptionList(configuration: configuration)
@@ -72,18 +70,17 @@ private struct MenuPickerOptionList: View {
     let rowLineWidth = inlineRowIntrinsicLineWidth(for: configuration.options)
     return VStack(alignment: .leading, spacing: 0) {
       ForEach(0..<configuration.options.count) { index in
-        pickerRow(
-          label: configuration.options[index].label,
-          isSelected: index == configuration.selectedIndex,
-          isActiveNavigation: configuration.showsFocusEffect,
-          isEnabled: configuration.isEnabled,
-          styleEnvironment: configuration.styleEnvironment,
-          lineWidth: rowLineWidth,
-          routeIdentity: pickerOptionIdentity(
-            for: configuration.controlIdentity,
-            index: index
+        let option = configuration.options[index]
+        option.route {
+          pickerRow(
+            label: option.label,
+            isSelected: option.isSelected,
+            isActiveNavigation: configuration.showsFocusEffect,
+            isEnabled: option.isEnabled,
+            styleEnvironment: configuration.styleEnvironment,
+            lineWidth: rowLineWidth
           )
-        )
+        }
       }
     }
     .padding(.init(leading: 1))

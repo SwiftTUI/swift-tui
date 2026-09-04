@@ -10,6 +10,12 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- **Public picker interaction routes.** Custom picker styles receive option
+  indices, selection and enabled state, `option.route { … }`, and
+  `configuration.trigger { … }`. Every built-in uses these wrappers. Picker
+  fixture routes are inert, including when an older fixture supplies a raw
+  control identity. Menu triggers now toggle expansion; keyboard activation
+  toggles, Escape closes, and an arrow reopens the list while navigating.
 - **Style fixtures for tests: `@_spi(StyleFixtures)`.** Every shipped style
   family's configuration (`ButtonStyleConfiguration`,
   `TextFieldStyleConfiguration`, `PickerStyleConfiguration`,

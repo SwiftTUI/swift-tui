@@ -156,7 +156,7 @@ configuration is SPI-gated like the other families.
 | --- | --- |
 | ``ButtonStyle`` | ``ButtonStyleConfiguration`` and its `Label` slot |
 | ``TextFieldStyle`` | ``TextFieldStyleConfiguration``, its `Label` slot, and `FieldContent` |
-| ``PickerStyle`` | ``PickerStyleConfiguration`` and its `Label` slot |
+| ``PickerStyle`` | ``PickerStyleConfiguration``, its `Label` slot, and `Option` fixtures; option and trigger routes are inert |
 | ``ListStyle`` | ``ListStyleConfiguration`` |
 | ``OutlineStyle`` | ``OutlineStyleConfiguration`` |
 | ``TableStyle`` | ``TableStyleConfiguration`` |
@@ -172,6 +172,13 @@ public initializers because styles construct them. Families added later
 follow the same rule as they ship. SPI symbols do not appear in the
 reference documentation; the initializers mirror the configuration's
 documented stored properties in declaration order.
+
+Picker fixtures can omit `controlIdentity`. The older initializer spelling
+with an explicit identity remains available, but neither form enables
+routes. The parent configuration derives option indices, selection, and
+enabled state from its option order and control state. To test one option
+independently, the SPI also provides
+`PickerStyleConfiguration.Option(index:label:isSelected:isEnabled:)`.
 
 ## Keeping the seam honest
 

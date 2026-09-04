@@ -826,7 +826,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   presentation value is constructible from a test target through
   `@_spi(StyleFixtures)`, and route wrappers share one misuse rule (a
   repeated installation reports `style.duplicateRoute` and the first wins;
-  fixture routes are inert). Toast deliberately keeps its declaration-scoped style
+  fixture routes are inert). Picker options expose occurrence, selected, and
+  enabled state with public option and menu-trigger wrappers; every built-in
+  picker uses that same interaction seam. Toast deliberately keeps its declaration-scoped style
   argument, and palette rendering stays internal until the public
   `PaletteStyle` family ships. The other listed surfaces retain hard-coded
   chrome with no independently replaceable style seam; completing them is

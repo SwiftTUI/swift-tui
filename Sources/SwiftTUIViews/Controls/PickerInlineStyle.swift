@@ -15,7 +15,7 @@ import SwiftTUICore
 
 private enum InlinePickerRow {
   case marker(String?)
-  case option(index: Int, label: String, isSelected: Bool)
+  case option(PickerStyleConfiguration.Option)
 }
 
 package struct InlinePickerStyleBody: View {
@@ -46,7 +46,6 @@ package struct InlinePickerStyleBody: View {
         ForEach(0..<rows.count) { index in
           inlineRowView(
             rows[index],
-            controlIdentity: configuration.controlIdentity,
             isActiveNavigation: configuration.isActiveNavigation && configuration.showsFocusEffect,
             isEnabled: configuration.isEnabled,
             styleEnvironment: configuration.styleEnvironment,
@@ -115,11 +114,7 @@ private func inlineRows(
 
   for option in rowOptions {
     rows.append(
-      .option(
-        index: option.offset,
-        label: option.element.label,
-        isSelected: option.offset == selectedIndex
-      )
+      .option(option.element)
     )
   }
 
@@ -134,7 +129,6 @@ private func inlineRows(
 @ViewBuilder
 private func inlineRowView(
   _ row: InlinePickerRow,
-  controlIdentity: Identity,
   isActiveNavigation: Bool,
   isEnabled: Bool,
   styleEnvironment: StyleEnvironmentSnapshot,
@@ -143,19 +137,17 @@ private func inlineRowView(
   switch row {
   case .marker(let text):
     pickerMarkerLine(text, lineWidth: lineWidth)
-  case .option(let index, let label, let isSelected):
-    pickerRow(
-      label: label,
-      isSelected: isSelected,
-      isActiveNavigation: isActiveNavigation,
-      isEnabled: isEnabled,
-      styleEnvironment: styleEnvironment,
-      lineWidth: lineWidth,
-      routeIdentity: pickerOptionIdentity(
-        for: controlIdentity,
-        index: index
+  case .option(let option):
+    option.route {
+      pickerRow(
+        label: option.label,
+        isSelected: option.isSelected,
+        isActiveNavigation: isActiveNavigation,
+        isEnabled: isEnabled,
+        styleEnvironment: styleEnvironment,
+        lineWidth: lineWidth
       )
-    )
+    }
   }
 }
 

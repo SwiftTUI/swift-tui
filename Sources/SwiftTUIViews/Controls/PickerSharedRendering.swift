@@ -35,8 +35,7 @@ func pickerRow(
   isActiveNavigation: Bool,
   isEnabled: Bool,
   styleEnvironment: StyleEnvironmentSnapshot,
-  lineWidth: Int?,
-  routeIdentity: Identity? = nil
+  lineWidth: Int?
 ) -> some View {
   let rowChrome = styleEnvironment.rowChrome(
     isEnabled: isEnabled,
@@ -79,12 +78,5 @@ func pickerRow(
     }
     .drawMetadata(.init(opacity: rowChrome.opacity))
 
-  if let routeIdentity {
-    PointerRouteView(
-      identity: routeIdentity,
-      content: row
-    )
-  } else {
-    row
-  }
+  row
 }

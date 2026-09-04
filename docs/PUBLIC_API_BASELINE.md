@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 318 | 1813 |
+| `SwiftTUIViews` | 318 | 1818 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -311,7 +311,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `PhaseAnimator` — struct — 3 members
 - `Picker` — struct — 3 members
 - `PickerStyle` — protocol — 8 members
-- `PickerStyleConfiguration` — struct — 16 members
+- `PickerStyleConfiguration` — struct — 21 members
 - `PlaceholderContentView` — struct
 - `PlainButtonStyle` — struct — 3 members
 - `PlainListStyle` — struct — 3 members

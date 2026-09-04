@@ -1,5 +1,16 @@
 import SwiftTUICore
 
+@MainActor
+private func setPickerMenuExpanded(
+  _ expanded: Bool, in ownerNode: SwiftTUICore.ViewNode?, identity: Identity
+) {
+  ownerNode?.setStateSlot(
+    ordinal: StateSlotOrdinals.pickerMenuExpansion,
+    value: expanded as Bool?,
+    invalidationIdentity: identity
+  )
+}
+
 /// Selects one value from a set of tagged options.
 public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: PrimitiveView,
   ResolvableView
@@ -64,6 +75,21 @@ extension Picker {
       == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
+    let wantsTrigger = pickerStyle.wantsTriggerPointerRoute
+    let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
+    let expansion =
+      ownerNode?.stateSlot(
+        ordinal: StateSlotOrdinals.pickerMenuExpansion,
+        seed: nil as Bool?
+      ) ?? nil
+    if !isFocused || !isEnabled || !wantsTrigger, expansion != nil {
+      ownerNode?.setStateSlotSilently(
+        ordinal: StateSlotOrdinals.pickerMenuExpansion,
+        value: nil as Bool?
+      )
+    }
+    // Until explicitly toggled, preserve the menu's expanded-on-focus default.
+    let isActiveNavigation = isFocused && isEnabled && (!wantsTrigger || (expansion ?? true))
     let resolvedOptions = resolvedOptions(
       in: context.child(component: .named("PickerOptions"))
     )
@@ -85,11 +111,18 @@ extension Picker {
         guard keyPress.modifiers.isEmpty else {
           return false
         }
+        if wantsTrigger, keyPress.key == .escape, isActiveNavigation {
+          setPickerMenuExpanded(false, in: ownerNode, identity: context.identity)
+          return true
+        }
         let delta = pickerStyle.selectionDelta(for: keyPress.key)
         guard let delta, !options.isEmpty else {
           return false
         }
 
+        if wantsTrigger {
+          setPickerMenuExpanded(true, in: ownerNode, identity: context.identity)
+        }
         return stepBoundSelection(
           binding,
           orderedTags: options.map(\.tag),
@@ -133,29 +166,42 @@ extension Picker {
         }
       }
 
-      if pickerStyle.wantsTriggerPointerRoute {
+      if wantsTrigger {
+        intake.registerAction(identity: context.identity) {
+          setPickerMenuExpanded(!isActiveNavigation, in: ownerNode, identity: context.identity)
+          return true
+        }
         let triggerRouteID = runtimePrimaryRouteID(
           for: pickerTriggerIdentity(for: context.identity)
         )
-        intake.registerPointerHandler(routeID: triggerRouteID) { _ in
-          .ignored
+        intake.registerPointerHandler(routeID: triggerRouteID) { event in
+          switch event.kind {
+          case .down(.primary):
+            setPickerMenuExpanded(!isActiveNavigation, in: ownerNode, identity: context.identity)
+            return .claimed
+          case .up(.primary):
+            return .claimed
+          default:
+            return .ignored
+          }
         }
       }
     }
 
-    let configuration = PickerStyleConfiguration(
+    var configuration = PickerStyleConfiguration(
       controlIdentity: context.identity,
       label: .init(authoringContext: authoringScope) { label },
       options: options.map { .init(label: $0.label) },
       selectedIndex: selectedIndex,
       isFocused: isFocused,
-      isActiveNavigation: isFocused,
+      isActiveNavigation: isActiveNavigation,
       showsFocusEffect: showsFocusEffect,
       isEnabled: isEnabled,
       styleEnvironment: styleEnvironment,
       viewportLineCount: context.environmentValues.pickerViewportLineCount,
       lineWidth: context.environmentValues.pickerLineWidth
     )
+    configuration.bindRoutes(to: context.identity)
     let child = pickerStyle.resolveBody(
       configuration: configuration,
       in: context.child(component: .named("PickerBody"))

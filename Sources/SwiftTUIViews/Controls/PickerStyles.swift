@@ -11,6 +11,8 @@ public protocol PickerStyle: Sendable {
     for event: KeyEvent
   ) -> Int?
 
+  /// Enables the primitive's menu expansion actions. Compose the trigger with
+  /// `configuration.trigger` and show options while `isActiveNavigation` is true.
   @MainActor
   var wantsTriggerPointerRoute: Bool { get }
 
@@ -89,12 +91,53 @@ public struct PickerStyleConfiguration: Sendable {
   }
 
   public struct Option: Sendable {
+    /// The option's position in the picker, independent of its display label.
+    public var index: Int
     public var label: String
+    /// Whether this occurrence matches the current selection binding.
+    public var isSelected: Bool
+    /// Whether the picker currently accepts input.
+    public var isEnabled: Bool
+    private var routeIdentity: Identity?
 
     public init(
       label: String
     ) {
+      index = 0
       self.label = label
+      isSelected = false
+      isEnabled = true
+      routeIdentity = nil
+    }
+
+    /// Creates an option fixture whose route renders content without a hit target.
+    @_spi(StyleFixtures)
+    public init(index: Int, label: String, isSelected: Bool, isEnabled: Bool) {
+      self.index = index
+      self.label = label
+      self.isSelected = isSelected
+      self.isEnabled = isEnabled
+      routeIdentity = nil
+    }
+
+    /// Routes a click on `content` to this option's selection. Install once
+    /// per option; duplicates report `style.duplicateRoute` and the first wins.
+    @ViewBuilder @MainActor
+    public func route<Content: View>(
+      @ViewBuilder content: () -> Content
+    ) -> some View {
+      if let routeIdentity {
+        StyleRouteView(
+          target: .init(identity: routeIdentity, family: "PickerStyle", role: "option"),
+          content: content()
+        )
+      } else {
+        content()
+      }
+    }
+
+    mutating func bindRoute(to identity: Identity) {
+      routeIdentity = identity
     }
   }
 
@@ -109,13 +152,13 @@ public struct PickerStyleConfiguration: Sendable {
   public var styleEnvironment: StyleEnvironmentSnapshot
   public var viewportLineCount: Int?
   public var lineWidth: Int?
+  private var triggerIdentity: Identity?
 
-  /// The framework's construction path, exposed to test targets through
-  /// `@_spi(StyleFixtures)` so a style resolves against a fixture without a
-  /// live render (see <doc:Testing-Styles>).
+  /// Creates a fixture with inert option and trigger routes. `controlIdentity`
+  /// is retained for source compatibility; it does not activate fixture routes.
   @_spi(StyleFixtures)
   public init(
-    controlIdentity: Identity,
+    controlIdentity: Identity = Identity(components: ["PickerStyleFixture"]),
     label: Label,
     options: [Option],
     selectedIndex: Int?,
@@ -129,7 +172,14 @@ public struct PickerStyleConfiguration: Sendable {
   ) {
     self.controlIdentity = controlIdentity
     self.label = label
-    self.options = options
+    self.options = options.enumerated().map { index, option in
+      Option(
+        index: index,
+        label: option.label,
+        isSelected: index == selectedIndex,
+        isEnabled: isEnabled
+      )
+    }
     self.selectedIndex = selectedIndex
     self.isFocused = isFocused
     self.isActiveNavigation = isActiveNavigation
@@ -138,6 +188,31 @@ public struct PickerStyleConfiguration: Sendable {
     self.styleEnvironment = styleEnvironment
     self.viewportLineCount = viewportLineCount
     self.lineWidth = lineWidth
+    triggerIdentity = nil
+  }
+
+  /// Routes a click on `content` to menu expansion. Menu styles opt in with
+  /// `wantsTriggerPointerRoute`; keyboard interaction survives omission of
+  /// this wrapper. Fixture configurations never install a pointer target.
+  @ViewBuilder @MainActor
+  public func trigger<Content: View>(
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    if let triggerIdentity {
+      StyleRouteView(
+        target: .init(identity: triggerIdentity, family: "PickerStyle", role: "trigger"),
+        content: content()
+      )
+    } else {
+      content()
+    }
+  }
+
+  mutating func bindRoutes(to identity: Identity) {
+    triggerIdentity = pickerTriggerIdentity(for: identity)
+    for index in options.indices {
+      options[index].bindRoute(to: pickerOptionIdentity(for: identity, index: index))
+    }
   }
 }
 
