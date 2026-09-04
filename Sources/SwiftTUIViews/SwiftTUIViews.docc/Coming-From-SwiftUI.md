@@ -174,10 +174,11 @@ surprise. Each links back to its register section by name.
 - **Equal-value `@State` writes are inert.** Writing an unchanged value does
   not invalidate the owner, so a `Binding.animation(_:)` write of an equal
   value animates nothing.
-- **`DynamicProperty` is reference-backed.** Its nonmutating
-  `update(in:) -> DynamicPropertyUpdateResult` rejects plain-value mutation,
-  carries an invalidation lease for asynchronous storage, and makes custom
-  reuse certification explicit (<doc:Custom-Dynamic-Properties>).
+- **`DynamicProperty` runs its update in place.** Its `mutating`
+  `update(in:) -> DynamicPropertyUpdateResult` writes through the container
+  copy the next body evaluation consumes (matching SwiftUI), carries an
+  invalidation lease for asynchronous storage, and makes custom reuse
+  certification explicit (<doc:Custom-Dynamic-Properties>).
 - **Composed wrappers need `DynamicProperty`.** Property wrappers composed
   inside a helper type that does *not* conform to `DynamicProperty` share
   storage by declaration site, surfaced by the `state.duplicateSlotClaim`
