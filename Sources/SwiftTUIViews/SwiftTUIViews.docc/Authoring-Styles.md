@@ -14,7 +14,9 @@ data, plus the render state a style legitimately needs. A type-erased
 `Any*Style` value (``AnyButtonStyle``, ``AnyListStyle``, …) is what the
 environment stores. And a lower-camel-cased modifier (`buttonStyle(_:)`,
 `listStyle(_:)`, …) scopes a style to one control, a subtree, or the whole
-app. The nearest modifier wins, so a style set on a container applies to
+app. ``ToastStyle`` instead takes its value on the individual
+`toast(..., style:)` declaration. For environment-scoped families, the nearest
+modifier wins, so a style set on a container applies to
 every descendant unless a closer modifier overrides it:
 
 ```swift

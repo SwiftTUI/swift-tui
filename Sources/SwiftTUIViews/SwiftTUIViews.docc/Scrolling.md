@@ -129,6 +129,22 @@ ScrollView([.vertical, .horizontal]) {
 .scrollIndicators(.hidden, axes: .horizontal)
 ```
 
+Use ``ScrollViewStyle`` to change indicator and container appearance:
+
+```swift
+ScrollView {
+  logContents
+}
+.scrollViewStyle(.minimal)
+.frame(height: 8)
+```
+
+The automatic style reserves indicator tracks outside the clipped content
+viewport. The minimal style overlays the indicators on that viewport. Both
+obey `scrollIndicators`, and neither changes the host's panning policy.
+Custom styles can supply content insets, single-cell indicator glyphs, paint,
+and opacity; <doc:Authoring-Styles> describes the presentation contract.
+
 ## Keyboard And Focus
 
 A scroll view is itself focusable: Tab traversal reaches it like any control.

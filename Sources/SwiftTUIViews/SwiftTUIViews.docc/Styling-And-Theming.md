@@ -98,7 +98,7 @@ Rectangle()
 
 ## Applying built-in control styles
 
-Every style family has a lower-camel-cased modifier that stores a
+Environment-scoped style families have a lower-camel-cased modifier that stores a
 type-erased style in the environment, so a style set on a container applies
 to the whole subtree. Buttons ship with `.automatic`, `.plain`, `.bordered`,
 `.borderedProminent`, and `.link`; text fields with `.automatic`, `.plain`,
@@ -119,6 +119,24 @@ VStack(alignment: .leading, spacing: 1) {
     .textFieldStyle(.roundedBorder)
 }
 ```
+
+The same scope rule covers the remaining control families:
+
+| Surface | Style protocol |
+| --- | --- |
+| Labels and labeled containers | ``LabelStyle``, ``LabeledContentStyle``, ``GroupBoxStyle`` |
+| Bound controls and progress | ``ToggleStyle``, ``DisclosureGroupStyle``, ``TextEditorStyle``, ``ProgressViewStyle`` |
+| Numeric controls | ``SliderStyle``, ``StepperStyle`` |
+| Menus and grouped controls | ``MenuStyle``, ``ControlGroupStyle`` |
+| Alerts and confirmation dialogs | ``PromptStyle`` |
+| Covers and anchored popovers | ``FullScreenCoverStyle``, ``PopoverStyle`` |
+| Command palettes | ``PaletteStyle`` |
+| Scroll containers and links | ``ScrollViewStyle``, ``LinkStyle`` |
+
+``ToastStyle`` is passed to an individual `toast(..., style:)` declaration.
+``Panel`` supplies structural action scoping and has no style family.
+<doc:Authoring-Styles> explains each family's composition or presentation
+contract, including the interaction routes that remain owned by the control.
 
 ## Writing a custom button style
 
