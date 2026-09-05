@@ -443,6 +443,8 @@ for style_enum in $public_style_enums; do
   case "$style_enum" in
   AnyShapeStyle) ;;
   LineChartSeriesStyle) ;;
+  # Presentation-field vocabulary; LinkStyle itself remains an open protocol.
+  LinkUnderlineStyle) ;;
   *)
     fail "New public enum-backed *Style surface appeared: $style_enum. Authoring-facing style APIs should prefer public extensible style protocols."
     ;;
