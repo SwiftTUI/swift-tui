@@ -319,6 +319,25 @@ struct RasterizerTranslationBlitTests {
     }
   }
 
+  @Test("new flank ink repaints even when the previous flank was row-invariant")
+  func changedFlankDemotesRow() throws {
+    let previous = Self.drawTree(firstDataset: 10, selectedDataset: 13)
+    let current = Self.drawTree(firstDataset: 11, selectedDataset: 14, flankMarkRow: 8)
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
+    let previousSurface = rasterizer.rasterize(previous, minimumSize: Self.surfaceSize)
+    let plan = FrameTailPresentationDamageResolver.translationPlan(
+      candidate: Self.candidate(), surfaceSize: Self.surfaceSize,
+      previousDraw: previous, currentDraw: current)
+    #expect(plan == nil || plan?.repaintRows.contains(8) == true)
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      current, minimumSize: Self.surfaceSize, previousSurface: previousSurface,
+      damage: PresentationDamage(dirtyRows: Set(1..<13)),
+      verifyIncrementalRasterDamage: true, translation: plan)
+    #expect(result.path == .incrementalTranslated || result.path == .incremental)
+    #expect(result.surface == rasterizer.rasterize(current, minimumSize: Self.surfaceSize))
+    #expect(result.surface.cells[8][0].character == "X")
+  }
+
   @Test("the walk and twin check survive deep trees on an explicit stack")
   func deepTreeSafety() throws {
     let depth = 800

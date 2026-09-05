@@ -35,7 +35,7 @@ extension FrameTailPresentationDamageResolver {
     let dy = clamped.dy
     let bandRows = band.origin.y..<band.maxY
 
-    var taint = TranslationTaint(band: band, dy: dy)
+    var taint = TranslationTaint(band: band, dy: dy, surfaceWidth: surfaceSize.width)
 
     var stack: [(previous: DrawNode, current: DrawNode)] = [(previousDraw, currentDraw)]
     while let (previous, current) = stack.popLast() {
@@ -134,18 +134,21 @@ extension FrameTailPresentationDamageResolver {
   /// Row-taint accumulator. A non-translated contribution taints the band
   /// rows its current ink covers and the band rows its previous ink is
   /// carried to by the blit (`previous rows + dy`), each dilated one row for
-  /// the half-block reach doctrine. Contributions whose columns lie outside
-  /// the band cannot ink band cells and are ignored — their correctness under
-  /// a full-row blit is the rasterizer's flank verification.
+  /// the half-block reach doctrine. Changed contributions in flanking columns
+  /// also taint rows: the blit copies whole buffers, and raster flank checks
+  /// compare only previous-frame cells, so they cannot detect new flank ink.
+  /// Unchanged flank commands retain the row-invariance shortcut below.
   private struct TranslationTaint {
     var rows: Set<Int> = []
     private let bandRows: Range<Int>
     private let bandColumns: Range<Int>
+    private let surfaceColumns: Range<Int>
     private let dy: Int
 
-    init(band: CellRect, dy: Int) {
+    init(band: CellRect, dy: Int, surfaceWidth: Int) {
       bandRows = band.origin.y..<band.maxY
       bandColumns = band.origin.x..<band.maxX
+      surfaceColumns = 0..<surfaceWidth
       self.dy = dy
     }
 
@@ -233,7 +236,7 @@ extension FrameTailPresentationDamageResolver {
       columns: Range<Int>
     ) {
       guard !rectRows.isEmpty, !columns.isEmpty,
-        columns.overlaps(bandColumns)
+        columns.overlaps(surfaceColumns)
       else {
         return
       }

@@ -17,10 +17,10 @@ package struct ScrollTranslationCandidate: Equatable, Sendable {
   ///
   /// For hosted collections (list, table) this is the drawn-content rect
   /// (chrome and overflow-indicator lines excluded). For a plain `ScrollView`
-  /// it is the node's bounds, which still contain the trailing
-  /// scroll-indicator overlay column (and the bottom indicator row when a
-  /// horizontal indicator is shown). Cell-for-cell verification stays sound
-  /// either way; the distinction only moves a consumer's fallback rate.
+  /// it is the content viewport, excluding content insets and reserved
+  /// indicator tracks. Overlaid indicators can still lie inside that viewport.
+  /// Consumers verify both translated content and any flanking cells moved by
+  /// a whole-row copy before serving the candidate.
   package var band: CellRect
   /// Screen-space rows the band's content moved: negative when the user
   /// scrolled down (offset increased, content slid up), positive when the
