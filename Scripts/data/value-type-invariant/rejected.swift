@@ -12,6 +12,23 @@
 import SwiftTUIRuntime
 import SwiftTUIViews
 
+final class RejectedToggleStyle: ToggleStyle {
+  func makeBody(configuration: ToggleStyleConfiguration) -> some View { Text("test") }
+}
+
+final class RejectedDisclosureGroupStyle: DisclosureGroupStyle {
+  func makeBody(configuration: DisclosureGroupStyleConfiguration) -> some View { Text("test") }
+}
+
+final class RejectedTextEditorStyle: TextEditorStyle {
+  func makeBody(configuration: TextEditorStyleConfiguration) -> some View { Text("test") }
+}
+
+final class RejectedProgressViewStyle: ProgressViewStyle {
+  func makeBody(configuration: ProgressViewStyleConfiguration) -> some View { Text("test") }
+}
+
+
 final class RejectedLabelStyle: LabelStyle {
   func makeBody(configuration: LabelStyleConfiguration) -> some View {
     configuration.title

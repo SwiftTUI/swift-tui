@@ -101,6 +101,190 @@ private struct Boundary<Content: View>: View, Equatable {
 @MainActor
 @Suite("Reader-scoped environment reuse")
 struct ReaderScopedEnvironmentReuseTests {
+  @Test("toggle style unread change is tolerated")
+  func toggleStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyToggleStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }.toggleStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerToggleStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerToggleStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("toggle style reader restyles")
+  func toggleStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyToggleStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Toggle("Switch", isOn: .constant(false)))
+          Text(dynamic)
+        }.toggleStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerToggleStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerToggleStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(!toleratedBoundary(in: renderer))
+    #expect(rendered.contains("NewStyle"))
+    #expect(!rendered.contains("OldStyle"))
+  }
+
+  @Test("disclosureGroup style unread change is tolerated")
+  func disclosureGroupStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyDisclosureGroupStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }.disclosureGroupStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("disclosureGroup style reader restyles")
+  func disclosureGroupStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyDisclosureGroupStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: DisclosureGroup("Details", isExpanded: .constant(true)) { Text("Child") })
+          Text(dynamic)
+        }.disclosureGroupStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(!toleratedBoundary(in: renderer))
+    #expect(rendered.contains("NewStyle"))
+    #expect(!rendered.contains("OldStyle"))
+  }
+
+  @Test("textEditor style unread change is tolerated")
+  func textEditorStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyTextEditorStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }.textEditorStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerTextEditorStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerTextEditorStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("textEditor style reader restyles")
+  func textEditorStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyTextEditorStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: TextEditor(text: .constant("Text")))
+          Text(dynamic)
+        }.textEditorStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerTextEditorStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerTextEditorStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(!toleratedBoundary(in: renderer))
+    #expect(rendered.contains("NewStyle"))
+    #expect(!rendered.contains("OldStyle"))
+  }
+
+  @Test("progressView style unread change is tolerated")
+  func progressViewStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyProgressViewStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }.progressViewStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerProgressViewStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerProgressViewStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("progressView style reader restyles")
+  func progressViewStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyProgressViewStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: ProgressView(value: 0.5))
+          Text(dynamic)
+        }.progressViewStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerProgressViewStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerProgressViewStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(!toleratedBoundary(in: renderer))
+    #expect(rendered.contains("NewStyle"))
+    #expect(!rendered.contains("OldStyle"))
+  }
+
 
   @Test("a label-style change over a reader-free subtree is tolerated")
   func labelStyleUnreadChangeIsTolerated() {

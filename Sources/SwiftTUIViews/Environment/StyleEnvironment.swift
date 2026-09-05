@@ -36,6 +36,22 @@ private enum ButtonStyleKey: EnvironmentKey {
   static let defaultValue = AnyButtonStyle.automatic
 }
 
+private enum ToggleStyleKey: EnvironmentKey {
+  static let defaultValue = AnyToggleStyle.automatic
+}
+
+private enum DisclosureGroupStyleKey: EnvironmentKey {
+  static let defaultValue = AnyDisclosureGroupStyle.automatic
+}
+
+private enum TextEditorStyleKey: EnvironmentKey {
+  static let defaultValue = AnyTextEditorStyle.automatic
+}
+
+private enum ProgressViewStyleKey: EnvironmentKey {
+  static let defaultValue = AnyProgressViewStyle.automatic
+}
+
 private enum LabelStyleKey: EnvironmentKey {
   static let defaultValue = AnyLabelStyle.automatic
 }
@@ -137,6 +153,30 @@ private enum RuntimeFocusSideFieldReadKey {}
 private enum RuntimeFocusTargetScopedReadKey {}
 
 extension EnvironmentValues {
+  package var toggleStyle: AnyToggleStyle {
+    get { self[ToggleStyleKey.self] }
+    set { self[ToggleStyleKey.self] = newValue }
+  }
+
+
+  package var disclosureGroupStyle: AnyDisclosureGroupStyle {
+    get { self[DisclosureGroupStyleKey.self] }
+    set { self[DisclosureGroupStyleKey.self] = newValue }
+  }
+
+
+  package var textEditorStyle: AnyTextEditorStyle {
+    get { self[TextEditorStyleKey.self] }
+    set { self[TextEditorStyleKey.self] = newValue }
+  }
+
+
+  package var progressViewStyle: AnyProgressViewStyle {
+    get { self[ProgressViewStyleKey.self] }
+    set { self[ProgressViewStyleKey.self] = newValue }
+  }
+
+
   package static var runtimeFocusStateDependencyKeys: Set<ObjectIdentifier> {
     [
       ObjectIdentifier(FocusedIdentityKey.self),

@@ -302,6 +302,29 @@ classifications:
 
     # ─── View style protocols + concrete styles ────────────────────────────
     - SwiftTUIViews.AnyLabelStyle
+    - SwiftTUIViews.AnyToggleStyle
+    - SwiftTUIViews.ToggleStyle
+    - SwiftTUIViews.ToggleStyleConfiguration
+    - SwiftTUIViews.AutomaticToggleStyle
+    - SwiftTUIViews.CheckboxToggleStyle
+    - SwiftTUIViews.ButtonToggleStyle
+    - SwiftTUIViews.AnyDisclosureGroupStyle
+    - SwiftTUIViews.DisclosureGroupStyle
+    - SwiftTUIViews.DisclosureGroupStyleConfiguration
+    - SwiftTUIViews.AutomaticDisclosureGroupStyle
+    - SwiftTUIViews.CompactDisclosureGroupStyle
+    - SwiftTUIViews.AnyTextEditorStyle
+    - SwiftTUIViews.TextEditorStyle
+    - SwiftTUIViews.TextEditorStyleConfiguration
+    - SwiftTUIViews.AutomaticTextEditorStyle
+    - SwiftTUIViews.PlainTextEditorStyle
+    - SwiftTUIViews.RoundedBorderTextEditorStyle
+    - SwiftTUIViews.AnyProgressViewStyle
+    - SwiftTUIViews.ProgressViewStyle
+    - SwiftTUIViews.ProgressViewStyleConfiguration
+    - SwiftTUIViews.AutomaticProgressViewStyle
+    - SwiftTUIViews.LinearProgressViewStyle
+    - SwiftTUIViews.CircularProgressViewStyle
     - SwiftTUIViews.LabelStyle
     - SwiftTUIViews.LabelStyleConfiguration
     - SwiftTUIViews.AutomaticLabelStyle

@@ -10,6 +10,18 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- **Bound-control and editor styles.** `ToggleStyle`, `DisclosureGroupStyle`,
+  `TextEditorStyle`, and `ProgressViewStyle` expose captured content and current
+  render state through public configurations and environment modifiers. Toggle
+  and disclosure bindings retain primitive ownership. Editor styles surround
+  protected editing content; caret movement follows the styled viewport width.
+  New treatments include checkbox and button toggles, compact disclosures,
+  plain editors, and circular progress using the nearest spinner style.
+  Toggle and disclosure focus rails now honor `focusEffectDisabled`, matching
+  their other focus chrome.
+- **Semantic control chrome for custom styles.** `StyleEnvironmentSnapshot`
+  publicly resolves `controlChrome` and `rowChrome`, keeping theme, focus,
+  pressed, and disabled treatments consistent with built-in styles.
 - **Label and grouping styles.** `LabelStyle`, `LabeledContentStyle`, and
   `GroupBoxStyle` add environment-scoped composition with public captured
   slots, erased storage, and testing fixtures. Automatic styles preserve

@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 336 | 1930 |
+| `SwiftTUIViews` | 359 | 2088 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -34,7 +34,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 169 | 1469 |
+| `SwiftTUIPrimitives` | 169 | 1471 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 0 | 0 |
@@ -126,7 +126,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (336)
+### Canonical surface (359)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 6 members
@@ -139,6 +139,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnimationState` — struct — 2 members
 - `AnimationTimelineSchedule` — struct — 7 members
 - `AnyButtonStyle` — struct — 8 members
+- `AnyDisclosureGroupStyle` — struct — 5 members
 - `AnyGroupBoxStyle` — struct — 6 members
 - `AnyLabeledContentStyle` — struct — 5 members
 - `AnyLabelStyle` — struct — 7 members
@@ -146,26 +147,33 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnyListStyle` — struct — 6 members
 - `AnyOutlineStyle` — struct — 6 members
 - `AnyPickerStyle` — struct — 8 members
+- `AnyProgressViewStyle` — struct — 6 members
 - `AnySheetStyle` — struct — 6 members
 - `AnySpinnerStyle` — struct — 41 members
 - `AnyTableStyle` — struct — 6 members
 - `AnyTabViewStyle` — struct — 7 members
+- `AnyTextEditorStyle` — struct — 6 members
 - `AnyTextFieldStyle` — struct — 6 members
 - `AnyToastStyle` — struct — 7 members
+- `AnyToggleStyle` — struct — 6 members
 - `AnyToolbarStyle` — struct — 5 members
 - `AnyTransition` — struct — 10 members
 - `AnyView` — struct — 2 members
 - `AppearLifecycleModifier` — struct
 - `AutomaticButtonStyle` — struct — 3 members
+- `AutomaticDisclosureGroupStyle` — struct — 3 members
 - `AutomaticGroupBoxStyle` — struct — 3 members
 - `AutomaticLabeledContentStyle` — struct — 3 members
 - `AutomaticLabelStyle` — struct — 3 members
 - `AutomaticListStyle` — struct — 3 members
 - `AutomaticOutlineStyle` — struct — 3 members
 - `AutomaticPickerStyle` — struct — 4 members
+- `AutomaticProgressViewStyle` — struct — 3 members
 - `AutomaticTableStyle` — struct — 3 members
 - `AutomaticTabViewStyle` — struct — 4 members
+- `AutomaticTextEditorStyle` — struct — 3 members
 - `AutomaticTextFieldStyle` — struct — 3 members
+- `AutomaticToggleStyle` — struct — 3 members
 - `Axis` — enum — 3 members
 - `BackgroundModifier` — struct
 - `Bindable` — struct — 6 members
@@ -184,13 +192,17 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `Button` — struct — 4 members
 - `ButtonStyle` — protocol — 6 members
 - `ButtonStyleConfiguration` — struct — 12 members
+- `ButtonToggleStyle` — struct — 3 members
 - `Canvas` — struct — 7 members
 - `CanvasClosureDrawing` — struct — 3 members
 - `CanvasInputDrawing` — struct — 4 members
 - `Capsule` — struct — 2 members
 - `ChangeLifecycleModifier` — struct
+- `CheckboxToggleStyle` — struct — 3 members
 - `Circle` — struct — 2 members
+- `CircularProgressViewStyle` — struct — 3 members
 - `ClipboardWriteAction` — struct — 4 members
+- `CompactDisclosureGroupStyle` — struct — 3 members
 - `ConditionalContent` — struct — 4 members
 - `ContentShapeModifier` — struct
 - `ContentTransition` — struct — 4 members
@@ -204,6 +216,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `DefaultTopToolbarStyle` — struct — 4 members
 - `DisappearLifecycleModifier` — struct
 - `DisclosureGroup` — struct — 3 members
+- `DisclosureGroupStyle` — protocol — 6 members
+- `DisclosureGroupStyleConfiguration` — struct — 13 members
 - `Divider` — struct — 2 members
 - `DragGesture` — struct — 16 members
 - `DrawMetadataModifier` — struct
@@ -291,6 +305,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `LazyVStack` — struct — 3 members
 - `LinearGradient` — extension — 1 member
 - `LinearKeyframe` — struct — 2 members
+- `LinearProgressViewStyle` — struct — 3 members
 - `Link` — struct — 2 members
 - `LinkButtonStyle` — struct — 3 members
 - `List` — struct — 18 members
@@ -331,6 +346,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `PlainGroupBoxStyle` — struct — 3 members
 - `PlainListStyle` — struct — 3 members
 - `PlainOutlineStyle` — struct — 3 members
+- `PlainTextEditorStyle` — struct — 3 members
 - `PlainTextFieldStyle` — struct — 3 members
 - `PointerHoverModifier` — struct
 - `PointerPath` — struct — 9 members
@@ -346,6 +362,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `PreferenceWritingModifier` — struct
 - `PreferredDefaultFocusModifier` — struct
 - `ProgressView` — struct — 10 members
+- `ProgressViewStyle` — protocol — 7 members
+- `ProgressViewStyleConfiguration` — struct — 12 members
 - `ProposedViewSize` — typealias
 - `RadialGradient` — extension — 1 member
 - `RadioGroupPickerStyle` — struct — 4 members
@@ -353,6 +371,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `RequestTerminationAction` — struct — 4 members
 - `ResetFocusAction` — struct — 5 members
 - `ResolveContext` — struct — 9 members
+- `RoundedBorderTextEditorStyle` — struct — 3 members
 - `RoundedBorderTextFieldStyle` — struct — 3 members
 - `RoundedOutlineStyle` — struct — 3 members
 - `RoundedRectangle` — struct — 3 members
@@ -417,6 +436,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TerminationRequestModifier` — struct
 - `Text` — struct — 35 members
 - `TextEditor` — struct — 2 members
+- `TextEditorStyle` — protocol — 7 members
+- `TextEditorStyleConfiguration` — struct — 8 members
 - `TextField` — struct — 2 members
 - `TextFieldStyle` — protocol — 4 members
 - `TextFieldStyleConfiguration` — struct — 13 members
@@ -432,6 +453,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ToastStyleConfiguration` — struct — 4 members
 - `ToastStylePresentation` — struct — 11 members
 - `Toggle` — struct — 2 members
+- `ToggleStyle` — protocol — 7 members
+- `ToggleStyleConfiguration` — struct — 11 members
 - `ToolbarItemConfig` — struct — 11 members
 - `ToolbarItemContributionModifier` — struct
 - `ToolbarModifier` — struct
@@ -449,7 +472,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `VariadicView` — struct — 1 member
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 175 members
+- `View` — protocol — 183 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member
@@ -767,7 +790,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `Size` — struct — 4 members
 - `Spacing` — struct — 4 members
 - `StrokeStyle` — struct — 16 members
-- `StyleEnvironmentSnapshot` — struct — 8 members
+- `StyleEnvironmentSnapshot` — struct — 10 members
 - `TableBorderGlyphs` — struct — 18 members
 - `TableCellAlignment` — enum — 4 members
 - `TableCellPayload` — struct — 5 members

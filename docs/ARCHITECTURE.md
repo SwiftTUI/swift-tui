@@ -206,6 +206,14 @@ through the shared `Foundation/StyleBoxing.swift` seam. Environment keys and
 modifiers remain in `Environment/StyleEnvironment.swift` and
 `Modifiers/StyleModifiers.swift`.
 
+`Controls/ToggleStyles.swift`, `DisclosureGroupStyles.swift`, and
+`ProgressViewStyles.swift` own their style families. `BoundControlStyleRow.swift`
+shares pure row composition. Toggle and disclosure primitives retain activation,
+enablement guards, and semantic roles. `Input/TextEditorStyles.swift` surrounds
+the editor's protected content; `TextEditor.swift` owns the binding, selection,
+scroll position, and viewport-width probe used for wrapped caret navigation.
+Circular indeterminate progress composes the environment-styled `Spinner`.
+
 ```
 Sources/
   SwiftTUIPrimitives/  Geometry, Support, Pointer, Styling (values), Content

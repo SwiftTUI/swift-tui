@@ -99,6 +99,14 @@ package enum EnvironmentKeyReuseClassification {
     // chrome is folded into the descriptor the portal coordinator
     // consumes; nothing re-reads the key downstream.
     "SheetStyleKey",
+    // One tracked read in each primitive's resolve; style output travels
+    // through a captured body node, with no downstream environment reread.
+    // Dedicated unread/reader boundary tests and the full memo oracle pin
+    // both toleration and invalidation for these four families.
+    "ToggleStyleKey",
+    "DisclosureGroupStyleKey",
+    "TextEditorStyleKey",
+    "ProgressViewStyleKey",
   ]
 
   package static func isReaderAttributedOnly(_ keyType: Any.Type) -> Bool {

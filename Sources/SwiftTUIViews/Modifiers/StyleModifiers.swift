@@ -1,6 +1,46 @@
 public import SwiftTUICore
 
 extension View {
+  /// Sets the Toggle composition for this subtree.
+  public func toggleStyle(_ style: AnyToggleStyle) -> some View {
+    environment(\.toggleStyle, style)
+  }
+
+  public func toggleStyle<S: ToggleStyle>(_ style: S) -> some View {
+    toggleStyle(AnyToggleStyle(style))
+  }
+
+
+  /// Sets the DisclosureGroup composition for this subtree.
+  public func disclosureGroupStyle(_ style: AnyDisclosureGroupStyle) -> some View {
+    environment(\.disclosureGroupStyle, style)
+  }
+
+  public func disclosureGroupStyle<S: DisclosureGroupStyle>(_ style: S) -> some View {
+    disclosureGroupStyle(AnyDisclosureGroupStyle(style))
+  }
+
+
+  /// Sets the TextEditor composition for this subtree.
+  public func textEditorStyle(_ style: AnyTextEditorStyle) -> some View {
+    environment(\.textEditorStyle, style)
+  }
+
+  public func textEditorStyle<S: TextEditorStyle>(_ style: S) -> some View {
+    textEditorStyle(AnyTextEditorStyle(style))
+  }
+
+
+  /// Sets the ProgressView composition for this subtree.
+  public func progressViewStyle(_ style: AnyProgressViewStyle) -> some View {
+    environment(\.progressViewStyle, style)
+  }
+
+  public func progressViewStyle<S: ProgressViewStyle>(_ style: S) -> some View {
+    progressViewStyle(AnyProgressViewStyle(style))
+  }
+
+
   /// Sets the composition of labels in this subtree.
   public func labelStyle(_ style: AnyLabelStyle) -> some View {
     environment(\.labelStyle, style)

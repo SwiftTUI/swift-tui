@@ -44,13 +44,7 @@ extension Toggle {
       context.environmentValues.pressedIdentity(comparedAgainst: [context.identity])
       == context.identity
     let isEnabled = context.environmentValues.isEnabled
-    let isSelected = isOn.wrappedValue
-    let chrome = styleEnvironment.rowChrome(
-      isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect,
-      isPressed: isPressed,
-      isSelected: false
-    )
+    let binding = isOn
 
     if isEnabled {
       let binding = isOn
@@ -64,13 +58,18 @@ extension Toggle {
       }
     }
 
-    let child = toggleBody(
-      isOn: isSelected,
+    let configuration = ToggleStyleConfiguration(
+      label: .init(authoringContext: authoringScope) { label },
+      isOn: enabledStyleBinding(binding, isEnabled: isEnabled),
+      isMixed: false,
+      isEnabled: isEnabled,
       isFocused: isFocused,
+      showsFocusEffect: showsFocusEffect,
       isPressed: isPressed,
-      chrome: chrome
-    ).resolve(
-      in: context.child(component: .named("ToggleBody"))
+      styleEnvironment: styleEnvironment
+    )
+    let child = context.environmentValues.toggleStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("ToggleBody"))
     )
 
     return ResolvedNode(
@@ -86,32 +85,6 @@ extension Toggle {
     )
   }
 
-  @ViewBuilder
-  private func toggleBody(
-    isOn: Bool,
-    isFocused: Bool,
-    isPressed: Bool,
-    chrome: ControlChrome
-  ) -> some View {
-    let indicatorStyle =
-      isOn
-      ? chrome.borderStyle
-      : AnyShapeStyle(.separator)
-    let rowContent = controlFocusRow(
-      showsRail: isFocused,
-      railStyle: chrome.borderStyle,
-      isHighlighted: isFocused || isPressed,
-      backgroundStyle: chrome.backgroundStyle,
-      reservesRailSpaceWhenHidden: true
-    ) {
-      Text(isOn ? "◉" : "○")
-        .foregroundStyle(indicatorStyle)
-      label
-    }
-    .foregroundStyle(chrome.foregroundStyle)
-    .drawMetadata(.init(opacity: chrome.opacity))
-    rowContent
-  }
 }
 
 /// Edits a single-line string binding using terminal keyboard input.
@@ -288,11 +261,7 @@ extension DisclosureGroup {
       == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let expanded = isExpanded.wrappedValue
-    let chrome = styleEnvironment.rowChrome(
-      isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect,
-      isPressed: isPressed
-    )
+    let binding = isExpanded
 
     if isEnabled {
       let binding = isExpanded
@@ -306,13 +275,20 @@ extension DisclosureGroup {
       }
     }
 
-    let child = disclosureBody(
-      isExpanded: expanded,
+    let configuration = DisclosureGroupStyleConfiguration(
+      label: .init(authoringContext: authoringScope) { label },
+      content: .init(authoringContext: authoringScope) {
+        if expanded { content }
+      },
+      isExpanded: enabledStyleBinding(binding, isEnabled: isEnabled),
+      isEnabled: isEnabled,
       isFocused: isFocused,
+      showsFocusEffect: showsFocusEffect,
       isPressed: isPressed,
-      chrome: chrome
-    ).resolve(
-      in: context.child(component: .named("DisclosureBody"))
+      styleEnvironment: styleEnvironment
+    )
+    let child = context.environmentValues.disclosureGroupStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("DisclosureBody"))
     )
 
     return ResolvedNode(
@@ -328,36 +304,4 @@ extension DisclosureGroup {
     )
   }
 
-  @ViewBuilder
-  private func disclosureBody(
-    isExpanded: Bool,
-    isFocused: Bool,
-    isPressed: Bool,
-    chrome: ControlChrome
-  ) -> some View {
-    let indicatorStyle =
-      isExpanded
-      ? AnyShapeStyle(.tint)
-      : AnyShapeStyle(.separator)
-    let labelRow = controlFocusRow(
-      showsRail: isFocused,
-      railStyle: chrome.borderStyle,
-      isHighlighted: isFocused || isPressed,
-      backgroundStyle: chrome.backgroundStyle,
-      reservesRailSpaceWhenHidden: true
-    ) {
-      Text(isExpanded ? "▾" : "▸")
-        .foregroundStyle(indicatorStyle)
-      label
-    }
-    .foregroundStyle(chrome.foregroundStyle)
-    .drawMetadata(.init(opacity: chrome.opacity))
-    VStack(alignment: .leading, spacing: 0) {
-      labelRow
-      if isExpanded {
-        content
-          .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 0))
-      }
-    }
-  }
 }

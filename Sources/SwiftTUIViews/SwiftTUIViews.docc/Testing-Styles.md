@@ -158,6 +158,10 @@ configuration is SPI-gated like the other families.
 | ``LabelStyle`` | ``LabelStyleConfiguration`` and its `Title` and `Icon` slots |
 | ``LabeledContentStyle`` | ``LabeledContentStyleConfiguration`` and its `Label` and `Content` slots |
 | ``GroupBoxStyle`` | ``GroupBoxStyleConfiguration`` and its `Label` and `Content` slots; pass `nil` for an absent label |
+| ``ToggleStyle`` | ``ToggleStyleConfiguration`` and its `Label` slot; supply a constant or write-counted binding |
+| ``DisclosureGroupStyle`` | ``DisclosureGroupStyleConfiguration`` and its `Label` and `Content` slots |
+| ``TextEditorStyle`` | ``TextEditorStyleConfiguration`` and `EditorContent(displayText:)`; the editor fixture is inert |
+| ``ProgressViewStyle`` | ``ProgressViewStyleConfiguration`` and optional `Label` and `CurrentValueLabel` slots; `indeterminatePhase` defaults to zero |
 | ``TextFieldStyle`` | ``TextFieldStyleConfiguration``, its `Label` slot, and `FieldContent` |
 | ``PickerStyle`` | ``PickerStyleConfiguration``, its `Label` slot, and `Option` fixtures; option and trigger routes are inert |
 | ``ListStyle`` | ``ListStyleConfiguration`` |

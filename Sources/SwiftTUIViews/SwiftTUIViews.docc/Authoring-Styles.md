@@ -243,7 +243,8 @@ At `HEAD` the environment-scoped families are ``ButtonStyle``,
 ``TextFieldStyle``, ``PickerStyle``, ``ListStyle``, ``OutlineStyle``,
 ``TableStyle``, ``SpinnerStyle``, ``SheetStyle``, ``ToolbarStyle``, and
 ``TabViewStyle``, together with ``LabelStyle``, ``LabeledContentStyle``, and
-``GroupBoxStyle``. ``ToastStyle`` is deliberately declaration-scoped: a
+``GroupBoxStyle``, ``ToggleStyle``, ``DisclosureGroupStyle``, ``TextEditorStyle``,
+and ``ProgressViewStyle``. ``ToastStyle`` is deliberately declaration-scoped: a
 toast's tone is per-toast data, so `.toast(..., style:)` keeps its
 parameter and no toast environment key exists. The remaining styleable
 surfaces, and the order they gain families, are recorded in
@@ -292,3 +293,29 @@ Each modifier accepts either a concrete style or an `Any…Style` value. The
 nearest modifier wins, including a modifier on a single descendant of a
 styled container. Style authoring uses an ordinary `import SwiftTUIViews`;
 only fixture construction opts into the testing SPI.
+
+## Bound controls and protected editing content
+
+``ToggleStyleConfiguration/isOn`` and
+``DisclosureGroupStyleConfiguration/isExpanded`` write through to the original
+binding. Their projected bindings can be passed to child views but cannot be
+replaced. The owning primitive retains keyboard and pointer activation, disabled
+handling, and its semantic role. A collapsed disclosure supplies empty content.
+
+``TextEditorStyle`` surrounds `configuration.editorContent`. The protected slot
+retains text editing, selection, scrolling, and input behavior. Its measured
+viewport drives wrapped caret navigation, including when a custom style adds
+padding. The built-in `.automatic` style aliases `.roundedBorder`; `.plain`
+removes the surrounding chrome.
+
+``ProgressViewStyleConfiguration/fractionCompleted`` is `nil` for indeterminate
+progress. Its `indeterminatePhase` is a deterministic rendering seed for moving
+tracks. `.automatic` aliases `.linear`. `.circular` renders determinate progress
+as a ring and composes ``Spinner`` for indeterminate progress, inheriting the
+nearest spinner style. Reduced motion and stable output use static status
+labels and schedule no spinner task.
+
+For theme-consistent custom composition, the style-environment snapshot exposes
+`controlChrome(isEnabled:isFocused:isPressed:isSelected:prominence:role:)` and
+`rowChrome(isEnabled:isFocused:isPressed:isSelected:role:)`. These return semantic
+paints and opacity; they do not install interaction.

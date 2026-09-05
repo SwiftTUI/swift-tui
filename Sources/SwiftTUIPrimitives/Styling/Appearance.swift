@@ -547,7 +547,8 @@ extension StyleEnvironmentSnapshot {
     theme.style(for: role)
   }
 
-  package func controlChrome(
+  /// Resolves semantic chrome for a styled control using this snapshot's palette.
+  public func controlChrome(
     isEnabled: Bool,
     isFocused: Bool,
     isPressed: Bool = false,
@@ -616,7 +617,8 @@ extension StyleEnvironmentSnapshot {
     )
   }
 
-  package func rowChrome(
+  /// Resolves semantic chrome for a styled interactive row.
+  public func rowChrome(
     isEnabled: Bool,
     isFocused: Bool,
     isPressed: Bool = false,

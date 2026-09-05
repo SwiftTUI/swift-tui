@@ -1,25 +1,16 @@
 import SwiftTUICore
 
-// Shared control chrome: the focus rail, highlighted rows, and the text-editor
-// body.
+// Shared control chrome: the focus rail and highlighted rows.
 //
 // `controlFocusRail` draws (or reserves space for) the leading focus-indicator
 // glyph; `highlightedControlRow` fills a row background when selected;
 // `controlFocusRow` composes the two into the standard interactive-row layout
-// used by lists, menus, pickers, and tab strips. `textEditorBody` is the
-// shared scrollable text-editor surface.
+// used by lists, menus, pickers, and tab strips.
 //
 // Split out of `SelectionAndValueSupport.swift` so that file's remaining
 // concerns are not mixed with the shared row chrome.
 
 package let controlFocusRailGlyph = "▌"
-
-/// Total horizontal cells `textEditorBody` reserves for its chrome — the
-/// `.padding(.init(horizontal: 1, …))` below contributes one cell on each side.
-/// The editor threads this into its movement layout map so vertical (Up/Down)
-/// caret motion wraps at the same visible width the inner `Text` renders at.
-/// Keep in sync with the padding literal in ``textEditorBody(…)``.
-package let textEditorContentHorizontalReserve = 2
 
 @MainActor
 @ViewBuilder
@@ -80,42 +71,4 @@ package func controlFocusRow<Content: View>(
     isHighlighted: isHighlighted,
     backgroundStyle: backgroundStyle
   )
-}
-
-@MainActor
-package func textEditorBody(
-  displayText: String,
-  displayRuns: [TextInputDisplayRun]? = nil,
-  ownerIdentity: Identity? = nil,
-  caretAnchor: CellPoint? = nil,
-  chrome: ControlChrome,
-  scrollPosition: Binding<ScrollCellOffset>,
-  focusActive: Bool = false
-) -> some View {
-  ScrollView(.vertical, position: scrollPosition) {
-    VStack(alignment: .leading, spacing: 0) {
-      TextInputContent(
-        displayText: displayText,
-        displayRuns: displayRuns,
-        ownerIdentity: ownerIdentity,
-        caretAnchor: caretAnchor
-      )
-      .fixedSize(horizontal: false, vertical: true)
-      .foregroundStyle(chrome.foregroundStyle)
-      .drawMetadata(.init(opacity: chrome.opacity))
-    }
-  }
-  .padding(.init(horizontal: 1, vertical: 1))
-  .focusable(false)
-  .background {
-    RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(chrome.backgroundStyle)
-  }
-  .overlay {
-    RoundedRectangle(cornerRadius: 1).strokeBorder(
-      chrome.borderStyle,
-      style: focusActive ? .heavy : .init(),
-      background: chrome.borderBackgroundStyle
-    )
-  }
-  .layoutMetadata(.init(minimumHeight: 3))
 }

@@ -140,13 +140,15 @@ extensible style protocols rather than closed public enums.
 - **Protocol-backed style families today** are `ShapeStyle`, `ToolbarStyle`,
   `ButtonStyle`, `TextFieldStyle`, `PickerStyle`, `ListStyle`, `OutlineStyle`,
   `TableStyle`, `SpinnerStyle`, `SheetStyle`, `ToastStyle`, `TabViewStyle`,
-  `LabelStyle`, `LabeledContentStyle`, and `GroupBoxStyle`.
+  `LabelStyle`, `LabeledContentStyle`, `GroupBoxStyle`, `ToggleStyle`,
+  `DisclosureGroupStyle`, `TextEditorStyle`, and `ProgressViewStyle`.
 - **Type-erased style storage** provides concrete values where environment or
   modifier plumbing needs a non-generic stored style. The types are
   `AnyShapeStyle`, `AnyButtonStyle`, `AnyTextFieldStyle`, `AnyPickerStyle`,
   `AnyListStyle`, `AnyOutlineStyle`, `AnyTableStyle`, `AnySpinnerStyle`,
   `AnySheetStyle`, `AnyToolbarStyle`, `AnyToastStyle`, `AnyTabViewStyle`,
-  `AnyLabelStyle`, `AnyLabeledContentStyle`, and `AnyGroupBoxStyle`.
+  `AnyLabelStyle`, `AnyLabeledContentStyle`, `AnyGroupBoxStyle`, `AnyToggleStyle`,
+  `AnyDisclosureGroupStyle`, `AnyTextEditorStyle`, and `AnyProgressViewStyle`.
 - Built-in styles are concrete values conforming to those protocols.
 - `TabViewStyle` is a full-body container style. Styles receive routeable tab
   item configurations, a routeable overflow trigger, routeable overflow item

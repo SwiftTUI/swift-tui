@@ -9,6 +9,23 @@
 import SwiftTUIRuntime
 import SwiftTUIViews
 
+struct AcceptedToggleStyle: ToggleStyle {
+  func makeBody(configuration: ToggleStyleConfiguration) -> some View { Text("test") }
+}
+
+struct AcceptedDisclosureGroupStyle: DisclosureGroupStyle {
+  func makeBody(configuration: DisclosureGroupStyleConfiguration) -> some View { Text("test") }
+}
+
+struct AcceptedTextEditorStyle: TextEditorStyle {
+  func makeBody(configuration: TextEditorStyleConfiguration) -> some View { Text("test") }
+}
+
+struct AcceptedProgressViewStyle: ProgressViewStyle {
+  func makeBody(configuration: ProgressViewStyleConfiguration) -> some View { Text("test") }
+}
+
+
 struct AcceptedLabelStyle: LabelStyle {
   func makeBody(configuration: LabelStyleConfiguration) -> some View {
     configuration.title

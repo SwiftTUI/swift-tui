@@ -83,33 +83,38 @@ extension TextEditor {
       width: nil
     )
 
-    let child = textEditorBody(
-      displayText: presentation.displayText,
-      displayRuns: presentation.displayRuns,
-      ownerIdentity: context.identity,
-      caretAnchor: presentation.caretAnchor,
-      chrome: chrome,
-      scrollPosition: $scrollPosition,
-      focusActive: isFocused && showsFocusEffect
+    let ownerIdentity = context.identity
+    let position = $scrollPosition
+    let configuration = TextEditorStyleConfiguration(
+      editorContent: .init(authoringContext: authoringScope) {
+        ScrollView(.vertical, position: position) {
+          VStack(alignment: .leading, spacing: 0) {
+            TextInputContent(
+              displayText: presentation.displayText,
+              displayRuns: presentation.displayRuns,
+              ownerIdentity: ownerIdentity,
+              caretAnchor: presentation.caretAnchor
+            )
+            .fixedSize(horizontal: false, vertical: true)
+            .foregroundStyle(chrome.foregroundStyle)
+            .opacity(chrome.opacity)
+          }
+        }
+        .focusable(false)
+        // Wrapping, scrolling, and the caret map remain one protected slot.
+        // Measuring this viewport directly also handles arbitrary style padding.
+        .ambientTextAttributesReset()
+        .background {
+          TextEditorContentWidthProbe(measuredContentWidth: measuredContentWidth)
+        }
+      },
+      isEnabled: isEnabled,
+      isFocused: isFocused,
+      showsFocusEffect: showsFocusEffect,
+      styleEnvironment: styleEnvironment
     )
-    // The editor performs its own wrapping (the movement layout map at
-    // `TextInputLayoutMap` wraps at the measured content width), so ambient
-    // text-layout attributes must not reach the inner `Text` — an inherited
-    // `lineLimit` would clamp the visible text while the caret map still
-    // addresses every logical line. Matches SwiftUI, where `TextEditor`
-    // ignores an ancestor `lineLimit`.
-    .ambientTextAttributesReset()
-    .background {
-      // A layout-neutral probe: sized to the editor body but drawing nothing,
-      // it records the placed content width (body width − horizontal chrome)
-      // into `measuredContentWidth` during the layout-realization pass.
-      TextEditorContentWidthProbe(
-        measuredContentWidth: measuredContentWidth,
-        horizontalReserve: textEditorContentHorizontalReserve
-      )
-    }
-    .resolve(
-      in: context.child(component: .named("TextEditorBody"))
+    let child = context.environmentValues.textEditorStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("TextEditorBody"))
     )
 
     var metadata = focusableControlMetadata(
@@ -151,22 +156,18 @@ final class TextEditorMeasuredContentWidth: Sendable {
 }
 
 /// A zero-output view that measures the width it is placed at and records the
-/// editor's content width (placed width − horizontal chrome) into
+/// editor's content width into
 /// `measuredContentWidth`. Attached as a `.background`, it is sized to the
-/// editor body without influencing the body's own layout, and it draws
+/// protected viewport without influencing its layout, and it draws
 /// nothing. This is the channel that carries the realized wrap width back to
 /// the movement layout map.
 private struct TextEditorContentWidthProbe: PrimitiveView, ResolvableView {
   let measuredContentWidth: TextEditorMeasuredContentWidth
-  let horizontalReserve: Int
 
   func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let realizer = TextEditorContentWidthRealizer(
-      measuredContentWidth: measuredContentWidth,
-      horizontalReserve: horizontalReserve
-    )
+    let realizer = TextEditorContentWidthRealizer(measuredContentWidth: measuredContentWidth)
     let boundary = LayoutRealizedContentBoundary(
       identity: context.identity,
       sizingPolicy: .fillsProposal(unspecifiedIdeal: CellSize(width: 0, height: 0)),
@@ -192,20 +193,17 @@ private struct TextEditorContentWidthProbe: PrimitiveView, ResolvableView {
 private final class TextEditorContentWidthRealizer: LayoutDependentContentRealizer {
   let debugName = "TextEditorContentWidthProbe"
   private let measuredContentWidth: TextEditorMeasuredContentWidth
-  private let horizontalReserve: Int
 
   init(
-    measuredContentWidth: TextEditorMeasuredContentWidth,
-    horizontalReserve: Int
+    measuredContentWidth: TextEditorMeasuredContentWidth
   ) {
     self.measuredContentWidth = measuredContentWidth
-    self.horizontalReserve = horizontalReserve
   }
 
   func realize(
     in context: LayoutRealizationContext
   ) -> [ResolvedNode] {
-    measuredContentWidth.value = max(0, context.bounds.size.width - horizontalReserve)
+    measuredContentWidth.value = max(0, context.bounds.size.width)
     return []
   }
 }

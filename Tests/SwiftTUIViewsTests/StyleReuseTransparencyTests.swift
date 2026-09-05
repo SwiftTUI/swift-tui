@@ -20,6 +20,49 @@ import Testing
 /// goes through value equality.
 @MainActor
 struct StyleReuseTransparencyTests {
+  @Test("Toggle styles preserve reuse equality")
+  func toggleStylesAreReuseTransparent() {
+    #expect(AnyToggleStyle.automatic.isEqualForReuse(to: AnyToggleStyle.automatic))
+    #expect(AnyToggleStyle.checkbox.isEqualForReuse(to: AnyToggleStyle.checkbox))
+    #expect(AnyToggleStyle.button.isEqualForReuse(to: AnyToggleStyle.button))
+    #expect(!AnyToggleStyle.automatic.isEqualForReuse(to: AnyToggleStyle.checkbox))
+    #expect(AnyToggleStyle(EquatableToggleStyle(value: 1)).isEqualForReuse(to: AnyToggleStyle(EquatableToggleStyle(value: 1))))
+    #expect(!AnyToggleStyle(EquatableToggleStyle(value: 1)).isEqualForReuse(to: AnyToggleStyle(EquatableToggleStyle(value: 2))))
+    #expect(!AnyToggleStyle(OpaqueToggleStyle()).isEqualForReuse(to: AnyToggleStyle(OpaqueToggleStyle())))
+  }
+
+  @Test("DisclosureGroup styles preserve reuse equality")
+  func disclosureGroupStylesAreReuseTransparent() {
+    #expect(AnyDisclosureGroupStyle.automatic.isEqualForReuse(to: AnyDisclosureGroupStyle.automatic))
+    #expect(AnyDisclosureGroupStyle.compact.isEqualForReuse(to: AnyDisclosureGroupStyle.compact))
+    #expect(!AnyDisclosureGroupStyle.automatic.isEqualForReuse(to: AnyDisclosureGroupStyle.compact))
+    #expect(AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 1)).isEqualForReuse(to: AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 1))))
+    #expect(!AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 1)).isEqualForReuse(to: AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 2))))
+    #expect(!AnyDisclosureGroupStyle(OpaqueDisclosureGroupStyle()).isEqualForReuse(to: AnyDisclosureGroupStyle(OpaqueDisclosureGroupStyle())))
+  }
+
+  @Test("TextEditor styles preserve reuse equality")
+  func textEditorStylesAreReuseTransparent() {
+    #expect(AnyTextEditorStyle.automatic.isEqualForReuse(to: AnyTextEditorStyle.automatic))
+    #expect(AnyTextEditorStyle.plain.isEqualForReuse(to: AnyTextEditorStyle.plain))
+    #expect(AnyTextEditorStyle.roundedBorder.isEqualForReuse(to: AnyTextEditorStyle.roundedBorder))
+    #expect(!AnyTextEditorStyle.automatic.isEqualForReuse(to: AnyTextEditorStyle.plain))
+    #expect(AnyTextEditorStyle(EquatableTextEditorStyle(value: 1)).isEqualForReuse(to: AnyTextEditorStyle(EquatableTextEditorStyle(value: 1))))
+    #expect(!AnyTextEditorStyle(EquatableTextEditorStyle(value: 1)).isEqualForReuse(to: AnyTextEditorStyle(EquatableTextEditorStyle(value: 2))))
+    #expect(!AnyTextEditorStyle(OpaqueTextEditorStyle()).isEqualForReuse(to: AnyTextEditorStyle(OpaqueTextEditorStyle())))
+  }
+
+  @Test("ProgressView styles preserve reuse equality")
+  func progressViewStylesAreReuseTransparent() {
+    #expect(AnyProgressViewStyle.automatic.isEqualForReuse(to: AnyProgressViewStyle.automatic))
+    #expect(AnyProgressViewStyle.linear.isEqualForReuse(to: AnyProgressViewStyle.linear))
+    #expect(AnyProgressViewStyle.circular.isEqualForReuse(to: AnyProgressViewStyle.circular))
+    #expect(!AnyProgressViewStyle.automatic.isEqualForReuse(to: AnyProgressViewStyle.linear))
+    #expect(AnyProgressViewStyle(EquatableProgressViewStyle(value: 1)).isEqualForReuse(to: AnyProgressViewStyle(EquatableProgressViewStyle(value: 1))))
+    #expect(!AnyProgressViewStyle(EquatableProgressViewStyle(value: 1)).isEqualForReuse(to: AnyProgressViewStyle(EquatableProgressViewStyle(value: 2))))
+    #expect(!AnyProgressViewStyle(OpaqueProgressViewStyle()).isEqualForReuse(to: AnyProgressViewStyle(OpaqueProgressViewStyle())))
+  }
+
   @Test("passive composition built-ins are reuse-transparent")
   func passiveBuiltInsAreReuseTransparent() {
     #expect(AnyLabelStyle.automatic.isEqualForReuse(to: AnyLabelStyle.automatic))
@@ -147,6 +190,10 @@ struct StyleReuseTransparencyTests {
 /// to be revisited whenever one is added.
 struct StyleReuseTransparencyRosterTests {
   private static let wrapperFactoryCounts = [
+    "Sources/SwiftTUIViews/Controls/ToggleStyles.swift": 3,
+    "Sources/SwiftTUIViews/Controls/DisclosureGroupStyles.swift": 2,
+    "Sources/SwiftTUIViews/Input/TextEditorStyles.swift": 3,
+    "Sources/SwiftTUIViews/Controls/ProgressViewStyles.swift": 3,
     "Sources/SwiftTUIViews/Primitives/LabelStyles.swift": 4,
     "Sources/SwiftTUIViews/Primitives/LabeledContentStyles.swift": 2,
     "Sources/SwiftTUIViews/Primitives/GroupBoxStyles.swift": 3,
@@ -157,6 +204,10 @@ struct StyleReuseTransparencyRosterTests {
   ]
 
   private static let markerConformanceFiles = [
+    "Sources/SwiftTUIViews/Controls/ToggleStyles.swift",
+    "Sources/SwiftTUIViews/Controls/DisclosureGroupStyles.swift",
+    "Sources/SwiftTUIViews/Input/TextEditorStyles.swift",
+    "Sources/SwiftTUIViews/Controls/ProgressViewStyles.swift",
     "Sources/SwiftTUIViews/Primitives/LabelStyles.swift",
     "Sources/SwiftTUIViews/Primitives/LabeledContentStyles.swift",
     "Sources/SwiftTUIViews/Primitives/GroupBoxStyles.swift",
@@ -207,6 +258,38 @@ struct StyleReuseTransparencyRosterTests {
 }
 
 // MARK: - Test styles
+
+private struct EquatableToggleStyle: ToggleStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: ToggleStyleConfiguration) -> some View { Text("test") }
+}
+private struct OpaqueToggleStyle: ToggleStyle {
+  func makeBody(configuration: ToggleStyleConfiguration) -> some View { Text("test") }
+}
+
+private struct EquatableDisclosureGroupStyle: DisclosureGroupStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: DisclosureGroupStyleConfiguration) -> some View { Text("test") }
+}
+private struct OpaqueDisclosureGroupStyle: DisclosureGroupStyle {
+  func makeBody(configuration: DisclosureGroupStyleConfiguration) -> some View { Text("test") }
+}
+
+private struct EquatableTextEditorStyle: TextEditorStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: TextEditorStyleConfiguration) -> some View { Text("test") }
+}
+private struct OpaqueTextEditorStyle: TextEditorStyle {
+  func makeBody(configuration: TextEditorStyleConfiguration) -> some View { Text("test") }
+}
+
+private struct EquatableProgressViewStyle: ProgressViewStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: ProgressViewStyleConfiguration) -> some View { Text("test") }
+}
+private struct OpaqueProgressViewStyle: ProgressViewStyle {
+  func makeBody(configuration: ProgressViewStyleConfiguration) -> some View { Text("test") }
+}
 
 private struct TintedTestButtonStyle: ButtonStyle, Equatable {
   let tint: Int

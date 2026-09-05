@@ -8,9 +8,11 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
   public private(set) var isIndeterminate: Bool
   private var label: Label
   private var currentValueLabel: CurrentValueLabel
+  private let authoringScope: AuthoringContext?
 
   /// Creates an indeterminate progress view with no label.
   public init(barWidth: Int = 12) where Label == EmptyView, CurrentValueLabel == EmptyView {
+    authoringScope = currentAuthoringContext()
     value = 0
     total = 0
     self.barWidth = barWidth
@@ -24,6 +26,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     _ title: S,
     barWidth: Int = 12
   ) where Label == Text, CurrentValueLabel == EmptyView {
+    authoringScope = currentAuthoringContext()
     value = 0
     total = 0
     self.barWidth = barWidth
@@ -37,6 +40,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     barWidth: Int = 12,
     @ViewBuilder label: () -> Label
   ) where CurrentValueLabel == EmptyView {
+    authoringScope = currentAuthoringContext()
     value = 0
     total = 0
     self.barWidth = barWidth
@@ -50,6 +54,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     total: Double = 1,
     barWidth: Int = 12
   ) where Label == EmptyView, CurrentValueLabel == Text {
+    authoringScope = currentAuthoringContext()
     self.value = value
     self.total = total
     self.barWidth = barWidth
@@ -64,6 +69,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     total: Double = 1,
     barWidth: Int = 12
   ) where Label == Text, CurrentValueLabel == Text {
+    authoringScope = currentAuthoringContext()
     self.value = value
     self.total = total
     self.barWidth = barWidth
@@ -79,6 +85,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     @ViewBuilder label: () -> Label,
     @ViewBuilder currentValueLabel: () -> CurrentValueLabel
   ) {
+    authoringScope = currentAuthoringContext()
     self.value = value
     self.total = total
     self.barWidth = barWidth
@@ -90,97 +97,31 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    if isIndeterminate {
-      if context.environmentValues.renderingReduceMotion {
-        return progressStatusView(
-          label: label,
-          summary: EmptyView()
-        ).resolveElements(in: context)
-      }
-
-      return indeterminateProgressView(
-        label: label,
-        barWidth: barWidth,
-        phaseSeed: context.transaction.debugSignature,
-        accentStyle: AnyShapeStyle(.tint)
-      ).resolveElements(in: context)
-    }
-
-    if context.environmentValues.renderingReduceMotion {
-      return progressStatusView(
-        label: label,
-        summary: currentValueLabel
-      ).resolveElements(in: context)
-    }
-
-    return metricTrackView(
-      label: label,
-      trailing: currentValueLabel,
-      fraction: progressFraction(value: value, total: total),
-      barWidth: barWidth,
-      accentStyle: AnyShapeStyle(.tint)
-    ).resolveElements(in: context)
+    let fraction = progressFraction(value: value, total: total)
+    let phase = isIndeterminate
+      ? context.transaction.debugSignature.unicodeScalars.reduce(into: UInt64(0)) { seed, scalar in
+        seed = seed &* 31 &+ UInt64(scalar.value)
+      } : 0
+    let configuration = ProgressViewStyleConfiguration(
+      fractionCompleted: isIndeterminate ? nil : (fraction.isFinite ? fraction : 0),
+      label: isEmptyView(label) ? nil : .init(authoringContext: authoringScope) { label },
+      currentValueLabel: isEmptyView(currentValueLabel)
+        ? nil : .init(authoringContext: authoringScope) { currentValueLabel },
+      barWidth: max(1, barWidth),
+      indeterminatePhase: phase,
+      accessibilityReduceMotion: context.environmentValues.renderingReduceMotion,
+      styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
+    )
+    let child = context.environmentValues.progressViewStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("ProgressViewBody")))
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("ProgressView"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction
+      )
+    ]
   }
-}
-
-@MainActor
-private func progressStatusView<Label: View, Summary: View>(
-  label: Label,
-  summary: Summary
-) -> some View {
-  metricChartHeader(label: label, summary: summary)
-}
-
-@MainActor
-private func indeterminateProgressView<Label: View>(
-  label: Label,
-  barWidth: Int,
-  phaseSeed: String,
-  accentStyle: AnyShapeStyle
-) -> some View {
-  let track = indeterminateProgressTrack(
-    barWidth: barWidth,
-    phaseSeed: phaseSeed
-  )
-
-  return VStack(alignment: .leading, spacing: 0) {
-    metricChartHeader(label: label, summary: EmptyView())
-    HStack(alignment: .center, spacing: 0) {
-      Text(track.leading)
-        .foregroundStyle(.separator)
-      Text(track.band)
-        .foregroundStyle(accentStyle)
-      Text(track.trailing)
-        .foregroundStyle(.separator)
-    }
-  }
-}
-
-private func indeterminateProgressTrack(
-  barWidth: Int,
-  phaseSeed: String
-) -> (leading: String, band: String, trailing: String) {
-  let segmentCount = max(1, barWidth)
-  let bandCount = max(1, (segmentCount + 2) / 3)
-  let travelCount = max(1, segmentCount - bandCount + 1)
-  let offset = stableTrackPhase(for: phaseSeed, modulo: travelCount)
-  return (
-    leading: String(repeating: "─", count: offset),
-    band: String(repeating: "█", count: bandCount),
-    trailing: String(repeating: "─", count: segmentCount - offset - bandCount)
-  )
-}
-
-private func stableTrackPhase(
-  for seed: String,
-  modulo: Int
-) -> Int {
-  guard modulo > 0 else {
-    return 0
-  }
-
-  let hash = seed.unicodeScalars.reduce(into: UInt64(0)) { partialResult, scalar in
-    partialResult = partialResult &* 31 &+ UInt64(scalar.value)
-  }
-  return Int(hash % UInt64(modulo))
 }

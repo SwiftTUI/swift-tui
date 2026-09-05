@@ -14,6 +14,38 @@ import Testing
 /// fuzzer case-139).
 @MainActor
 struct StyleBodyViewNodeTests {
+  @Test("Toggle style bodies have their own applied nodes", arguments: [0, 1, 2])
+  func toggleStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnyToggleStyle] = [.automatic, .checkbox, .button]
+    let result = resolveWithGraph(
+      Toggle("Switch", isOn: .constant(false)).toggleStyle(styles[index]), root: "ToggleStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "Toggle", bodyComponent: "ToggleBody")
+  }
+
+  @Test("DisclosureGroup style bodies have their own applied nodes", arguments: [0, 1])
+  func disclosureGroupStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnyDisclosureGroupStyle] = [.automatic, .compact]
+    let result = resolveWithGraph(
+      DisclosureGroup("Details", isExpanded: .constant(true)) { Text("Child") }.disclosureGroupStyle(styles[index]), root: "DisclosureGroupStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "DisclosureGroup", bodyComponent: "DisclosureBody")
+  }
+
+  @Test("TextEditor style bodies have their own applied nodes", arguments: [0, 1, 2])
+  func textEditorStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnyTextEditorStyle] = [.automatic, .plain, .roundedBorder]
+    let result = resolveWithGraph(
+      TextEditor(text: .constant("Text")).textEditorStyle(styles[index]), root: "TextEditorStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "TextEditor", bodyComponent: "TextEditorBody")
+  }
+
+  @Test("ProgressView style bodies have their own applied nodes", arguments: [0, 1, 2])
+  func progressViewStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnyProgressViewStyle] = [.automatic, .linear, .circular]
+    let result = resolveWithGraph(
+      ProgressView(value: 0.5).progressViewStyle(styles[index]), root: "ProgressViewStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "ProgressView", bodyComponent: "ProgressViewBody")
+  }
+
   @Test("label style bodies have their own applied nodes", arguments: [0, 1, 2, 3])
   func labelStyleBodyHasOwnNode(_ index: Int) throws {
     let styles: [AnyLabelStyle] = [.automatic, .titleAndIcon, .titleOnly, .iconOnly]
