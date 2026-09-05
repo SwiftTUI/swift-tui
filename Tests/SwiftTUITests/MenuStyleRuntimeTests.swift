@@ -92,7 +92,7 @@ struct MenuStyleRuntimeTests {
       identity: testIdentity("Root"), localActionRegistry: actions,
       applyEnvironmentValues: true)
     _ = renderer.render(view, context: context)
-    #expect(!actions.dispatch(identity: id))
+    #expect(!actions.hasHandler(identity: id))
     probe.configuration?.isPresented = true
     #expect(probe.configuration?.isPresented == false)
     #expect(

@@ -105,7 +105,7 @@ struct ControlGroupRelocationTests {
     #expect(!harness.frame.contains("Count"))
     #expect(!harness.runLoop.focusTracker.focusRegions.contains { $0.identity == counterID })
     #expect(!harness.runLoop.focusTracker.focusRegions.contains { $0.identity == editorID })
-    #expect(!harness.runLoop.localActionRegistry.dispatch(identity: counterID))
+    #expect(!harness.runLoop.localActionRegistry.hasHandler(identity: counterID))
     #expect(probe.disappearances == 1)
 
     _ = try harness.clickText("Commands")
@@ -139,7 +139,7 @@ struct ControlGroupRelocationTests {
     _ = try harness.pressKey(KeyPress(.escape))
     #expect(!harness.frame.contains("Count"))
     #expect(!harness.runLoop.focusTracker.focusRegions.contains { $0.identity == counterID })
-    #expect(!harness.runLoop.localActionRegistry.dispatch(identity: counterID))
+    #expect(!harness.runLoop.localActionRegistry.hasHandler(identity: counterID))
     _ = try harness.clickText("Commands")
     #expect(harness.frame.contains("Count 3"))
     #expect(harness.frame.contains("seed!"))

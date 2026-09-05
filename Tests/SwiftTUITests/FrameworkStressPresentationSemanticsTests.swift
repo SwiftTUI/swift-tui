@@ -107,6 +107,10 @@ extension FrameworkStressPresentationSemanticsTests {
 
     #expect(!frame.contains("Transient overlay item"))
     #expect(stressPresentationEntryCount(in: harness) == 0)
+    #expect(
+      !harness.runLoop.localPointerHandlerRegistry.snapshot().keys.contains {
+        $0.identity.path.contains("MenuTrigger")
+      })
   }
 }
 
@@ -149,11 +153,19 @@ extension FrameworkStressPresentationSemanticsTests {
 
     _ = try harness.clickText("Reinsertable menu")
     _ = try harness.clickText("Toggle menu source")
+    #expect(
+      !harness.runLoop.localPointerHandlerRegistry.snapshot().keys.contains {
+        $0.identity.path.contains("MenuTrigger")
+      })
     let frame = try harness.clickText("Toggle menu source")
 
     #expect(frame.contains("Reinsertable menu"))
     #expect(!frame.contains("Reinserted overlay item"))
     #expect(stressPresentationEntryCount(in: harness) == 0)
+    #expect(
+      harness.runLoop.localPointerHandlerRegistry.snapshot().keys.filter {
+        $0.identity.path.contains("MenuTrigger")
+      }.count == 1)
   }
 }
 
@@ -339,6 +351,10 @@ extension FrameworkStressPresentationSemanticsTests {
 
     _ = try harness.clickText("Disable-aware menu")
     _ = try harness.clickText("Disable menu")
+    #expect(
+      !harness.runLoop.localPointerHandlerRegistry.snapshot().keys.contains {
+        $0.identity.path.contains("MenuTrigger")
+      })
     _ = try harness.clickText("Disabled overlay action")
 
     #expect(probe.markers.isEmpty)
@@ -388,6 +404,10 @@ extension FrameworkStressPresentationSemanticsTests {
     #expect(frame.contains("Identity menu 1"))
     #expect(!frame.contains("Old identity overlay"))
     #expect(stressPresentationEntryCount(in: harness) == 0)
+    #expect(
+      harness.runLoop.localPointerHandlerRegistry.snapshot().keys.filter {
+        $0.identity.path.contains("MenuTrigger")
+      }.count == 1)
   }
 }
 
