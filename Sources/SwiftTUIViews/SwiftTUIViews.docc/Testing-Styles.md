@@ -63,7 +63,7 @@ struct BadgeButtonStyleTests {
 }
 ```
 
-``StyleEnvironmentSnapshot`` has a public initializer whose defaults are the
+`StyleEnvironmentSnapshot` has a public initializer whose defaults are the
 fallback terminal appearance and the theme synthesized from it; pass an
 explicit `theme:` to test a palette. The text-field configuration's
 `FieldContent` slot and the tab-view body configuration's `Content` slot

@@ -55,7 +55,7 @@ struct BadgeButtonStyle: ButtonStyle {
 The configuration exposes the authored subviews as nested public views —
 ``ButtonStyleConfiguration/Label`` here — and read-only render state:
 `isEnabled`, `isFocused`, `isPressed`, `showsFocusEffect`, `role`, the
-control prominence, and a ``StyleEnvironmentSnapshot`` whose `theme`
+control prominence, and a `StyleEnvironmentSnapshot` whose `theme`
 supplies the semantic palette built-in styles use. Read
 ``ButtonStyleConfiguration/focusActive`` rather than combining `isFocused`
 and `showsFocusEffect` yourself, and never infer focus from colors.
@@ -332,7 +332,7 @@ surfaces, and the order they gain families, are recorded in
 ## Label and grouping composition
 
 These three families receive captured authored slots and a
-``StyleEnvironmentSnapshot``. The slots keep their authoring scope when the
+`StyleEnvironmentSnapshot`. The slots keep their authoring scope when the
 style places them in its body. Styling introduces no focus stop or action of
 its own; controls inside the slots retain their normal behavior.
 
@@ -342,7 +342,7 @@ its own; controls inside the slots retain their normal behavior.
 | ``LabeledContentStyle`` | `.automatic` places a muted label and trailing content on one baseline with a flexible spacer; `.stacked` puts the content below the muted label | `label`, `content` |
 | ``GroupBoxStyle`` | `.automatic` is a fixed alias of `.bordered`, with rounded chrome and one cell of interior padding; `.plain` renders the label and content without border or padding | optional `label`, `content` |
 
-The group-box configuration also carries ``ControlProminence``. A missing
+The group-box configuration also carries `ControlProminence`. A missing
 label is `nil`; an explicitly authored `EmptyView` label is a present slot.
 The bordered style derives its foreground from the snapshot and uses a
 neutral border, or an accent border for increased prominence.
