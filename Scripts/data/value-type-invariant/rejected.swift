@@ -12,6 +12,24 @@
 import SwiftTUIRuntime
 import SwiftTUIViews
 
+final class RejectedLabelStyle: LabelStyle {
+  func makeBody(configuration: LabelStyleConfiguration) -> some View {
+    configuration.title
+  }
+}
+
+final class RejectedLabeledContentStyle: LabeledContentStyle {
+  func makeBody(configuration: LabeledContentStyleConfiguration) -> some View {
+    configuration.content
+  }
+}
+
+final class RejectedGroupBoxStyle: GroupBoxStyle {
+  func makeBody(configuration: GroupBoxStyleConfiguration) -> some View {
+    configuration.content
+  }
+}
+
 @MainActor
 final class RejectedView: View {
   var body: some View { Text("no") }

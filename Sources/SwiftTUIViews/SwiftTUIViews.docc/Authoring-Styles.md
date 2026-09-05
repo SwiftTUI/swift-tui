@@ -242,8 +242,53 @@ do not branch on it.
 At `HEAD` the environment-scoped families are ``ButtonStyle``,
 ``TextFieldStyle``, ``PickerStyle``, ``ListStyle``, ``OutlineStyle``,
 ``TableStyle``, ``SpinnerStyle``, ``SheetStyle``, ``ToolbarStyle``, and
-``TabViewStyle``. ``ToastStyle`` is deliberately declaration-scoped: a
+``TabViewStyle``, together with ``LabelStyle``, ``LabeledContentStyle``, and
+``GroupBoxStyle``. ``ToastStyle`` is deliberately declaration-scoped: a
 toast's tone is per-toast data, so `.toast(..., style:)` keeps its
 parameter and no toast environment key exists. The remaining styleable
 surfaces, and the order they gain families, are recorded in
 <doc:Divergences-And-Gaps>.
+
+## Label and grouping composition
+
+These three families receive captured authored slots and a
+``StyleEnvironmentSnapshot``. The slots keep their authoring scope when the
+style places them in its body. Styling introduces no focus stop or action of
+its own; controls inside the slots retain their normal behavior.
+
+| Family | Built-ins | Configuration slots |
+| --- | --- | --- |
+| ``LabelStyle`` | `.automatic` is a fixed alias of `.titleAndIcon`, with the icon first and one cell of spacing; `.titleOnly` and `.iconOnly` omit the other slot | `title`, `icon` |
+| ``LabeledContentStyle`` | `.automatic` places a muted label and trailing content on one baseline with a flexible spacer; `.stacked` puts the content below the muted label | `label`, `content` |
+| ``GroupBoxStyle`` | `.automatic` is a fixed alias of `.bordered`, with rounded chrome and one cell of interior padding; `.plain` renders the label and content without border or padding | optional `label`, `content` |
+
+The group-box configuration also carries ``ControlProminence``. A missing
+label is `nil`; an explicitly authored `EmptyView` label is a present slot.
+The bordered style derives its foreground from the snapshot and uses a
+neutral border, or an accent border for increased prominence.
+
+```swift
+struct CaptionLabelStyle: LabelStyle {
+  func makeBody(configuration: LabelStyleConfiguration) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      configuration.icon
+      configuration.title.foregroundStyle(.secondary)
+    }
+  }
+}
+
+struct Details: View {
+  var body: some View {
+    GroupBox("Account") {
+      LabeledContent("Name", value: "Ada")
+    }
+    .labeledContentStyle(.stacked)
+    .groupBoxStyle(.plain)
+  }
+}
+```
+
+Each modifier accepts either a concrete style or an `Any…Style` value. The
+nearest modifier wins, including a modifier on a single descendant of a
+styled container. Style authoring uses an ordinary `import SwiftTUIViews`;
+only fixture construction opts into the testing SPI.

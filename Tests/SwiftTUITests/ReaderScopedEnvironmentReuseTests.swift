@@ -101,6 +101,188 @@ private struct Boundary<Content: View>: View, Equatable {
 @MainActor
 @Suite("Reader-scoped environment reuse")
 struct ReaderScopedEnvironmentReuseTests {
+
+  @Test("a label-style change over a reader-free subtree is tolerated")
+  func labelStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyLabelStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }
+        .labelStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: AnyLabelStyle(ConsumerLabelStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(style: AnyLabelStyle(ConsumerLabelStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("a label-style change with a reader restyles the subtree")
+  func labelStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyLabelStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Label("Title") { Text("*") })
+          Text(dynamic)
+        }
+        .labelStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: AnyLabelStyle(ConsumerLabelStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(style: AnyLabelStyle(ConsumerLabelStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(!toleratedBoundary(in: renderer))
+    #expect(rendered.contains("NewStyle"))
+    #expect(!rendered.contains("OldStyle"))
+  }
+
+  @Test("a labeledContent-style change over a reader-free subtree is tolerated")
+  func labeledContentStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyLabeledContentStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }
+        .labeledContentStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(
+        style: AnyLabeledContentStyle(ConsumerLabeledContentStyle(prefix: "OldStyle")),
+        dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(
+        style: AnyLabeledContentStyle(ConsumerLabeledContentStyle(prefix: "NewStyle")),
+        dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("a labeledContent-style change with a reader restyles the subtree")
+  func labeledContentStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyLabeledContentStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: LabeledContent("Name", value: "Ada"))
+          Text(dynamic)
+        }
+        .labeledContentStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(
+        style: AnyLabeledContentStyle(ConsumerLabeledContentStyle(prefix: "OldStyle")),
+        dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(
+        style: AnyLabeledContentStyle(ConsumerLabeledContentStyle(prefix: "NewStyle")),
+        dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(!toleratedBoundary(in: renderer))
+    #expect(rendered.contains("NewStyle"))
+    #expect(!rendered.contains("OldStyle"))
+  }
+
+  @Test("a groupBox-style change over a reader-free subtree is tolerated")
+  func groupBoxStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyGroupBoxStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }
+        .groupBoxStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: AnyGroupBoxStyle(ConsumerGroupBoxStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(style: AnyGroupBoxStyle(ConsumerGroupBoxStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("a groupBox-style change with a reader restyles the subtree")
+  func groupBoxStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyGroupBoxStyle
+      let dynamic: String
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: GroupBox("Group") { Text("Value") })
+          Text(dynamic)
+        }
+        .groupBoxStyle(style)
+      }
+    }
+
+    _ = renderer.render(
+      Root(style: AnyGroupBoxStyle(ConsumerGroupBoxStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(style: AnyGroupBoxStyle(ConsumerGroupBoxStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(!toleratedBoundary(in: renderer))
+    #expect(rendered.contains("NewStyle"))
+    #expect(!rendered.contains("OldStyle"))
+  }
   private let rootIdentity = testIdentity("Root")
   /// Every fixture below puts `Boundary` in the root stack's first slot, so the
   /// boundary under test always resolves here.

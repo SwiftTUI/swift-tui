@@ -811,8 +811,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   an application, and retained-reuse participation — is the framework's
   intended styling contract for every styleable surface, not only the
   families that have it today. The destination extends that contract to
-  `Toggle`, `ProgressView`, `Label`, `Menu`, `Slider`, `Stepper`,
-  `DisclosureGroup`, `GroupBox`, `ControlGroup`, `LabeledContent`,
+  `Toggle`, `ProgressView`, `Menu`, `Slider`, `Stepper`,
+  `DisclosureGroup`, `ControlGroup`,
   `TextEditor`, `ScrollView`, and `Link`, and to the
   alert/confirmation-dialog, sheet,
   full-screen-cover, popover, palette, and toolbar presentation surfaces —
@@ -822,13 +822,15 @@ are omitted even when SwiftUI exposes a corresponding API.
   configuration and routing contract available to third-party styles. At
   `HEAD`, environment-scoped families exist for `Button`, `TextField`,
   `Picker`, `List`, `OutlineGroup`, `Table`, `Spinner`, `Sheet`, `Toolbar`,
-  and `TabView`; every shipped configuration, captured slot, and
+  `TabView`, `Label`, `LabeledContent`, and `GroupBox`; every shipped configuration, captured slot, and
   presentation value is constructible from a test target through
   `@_spi(StyleFixtures)`, and route wrappers share one misuse rule (a
   repeated installation reports `style.duplicateRoute` and the first wins;
   fixture routes are inert). Picker options expose occurrence, selected, and
   enabled state with public option and menu-trigger wrappers; every built-in
-  picker uses that same interaction seam. Toast deliberately keeps its declaration-scoped style
+  picker uses that same interaction seam. Label and grouping styles compose
+  captured authored slots; their automatic styles preserve the original
+  layouts and chrome. Toast deliberately keeps its declaration-scoped style
   argument, and palette rendering stays internal until the public
   `PaletteStyle` family ships. The other listed surfaces retain hard-coded
   chrome with no independently replaceable style seam; completing them is

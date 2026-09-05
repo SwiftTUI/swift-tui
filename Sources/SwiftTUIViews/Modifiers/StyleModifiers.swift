@@ -1,6 +1,33 @@
 public import SwiftTUICore
 
 extension View {
+  /// Sets the composition of labels in this subtree.
+  public func labelStyle(_ style: AnyLabelStyle) -> some View {
+    environment(\.labelStyle, style)
+  }
+
+  public func labelStyle<S: LabelStyle>(_ style: S) -> some View {
+    labelStyle(AnyLabelStyle(style))
+  }
+
+  /// Sets the label and value layout of labeled content in this subtree.
+  public func labeledContentStyle(_ style: AnyLabeledContentStyle) -> some View {
+    environment(\.labeledContentStyle, style)
+  }
+
+  public func labeledContentStyle<S: LabeledContentStyle>(_ style: S) -> some View {
+    labeledContentStyle(AnyLabeledContentStyle(style))
+  }
+
+  /// Sets the chrome and composition of group boxes in this subtree.
+  public func groupBoxStyle(_ style: AnyGroupBoxStyle) -> some View {
+    environment(\.groupBoxStyle, style)
+  }
+
+  public func groupBoxStyle<S: GroupBoxStyle>(_ style: S) -> some View {
+    groupBoxStyle(AnyGroupBoxStyle(style))
+  }
+
   public func controlProminence(
     _ prominence: ControlProminence
   ) -> some View {

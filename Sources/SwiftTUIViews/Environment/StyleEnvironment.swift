@@ -36,6 +36,18 @@ private enum ButtonStyleKey: EnvironmentKey {
   static let defaultValue = AnyButtonStyle.automatic
 }
 
+private enum LabelStyleKey: EnvironmentKey {
+  static let defaultValue = AnyLabelStyle.automatic
+}
+
+private enum LabeledContentStyleKey: EnvironmentKey {
+  static let defaultValue = AnyLabeledContentStyle.automatic
+}
+
+private enum GroupBoxStyleKey: EnvironmentKey {
+  static let defaultValue = AnyGroupBoxStyle.automatic
+}
+
 private enum TextFieldStyleKey: EnvironmentKey {
   static let defaultValue = AnyTextFieldStyle.automatic
 }
@@ -189,6 +201,21 @@ extension EnvironmentValues {
   package var buttonStyle: AnyButtonStyle {
     get { self[ButtonStyleKey.self] }
     set { self[ButtonStyleKey.self] = newValue }
+  }
+
+  package var labelStyle: AnyLabelStyle {
+    get { self[LabelStyleKey.self] }
+    set { self[LabelStyleKey.self] = newValue }
+  }
+
+  package var labeledContentStyle: AnyLabeledContentStyle {
+    get { self[LabeledContentStyleKey.self] }
+    set { self[LabeledContentStyleKey.self] = newValue }
+  }
+
+  package var groupBoxStyle: AnyGroupBoxStyle {
+    get { self[GroupBoxStyleKey.self] }
+    set { self[GroupBoxStyleKey.self] = newValue }
   }
 
   package var textFieldStyle: AnyTextFieldStyle {

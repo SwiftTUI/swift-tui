@@ -10,6 +10,11 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- **Label and grouping styles.** `LabelStyle`, `LabeledContentStyle`, and
+  `GroupBoxStyle` add environment-scoped composition with public captured
+  slots, erased storage, and testing fixtures. Automatic styles preserve
+  existing rendering. New treatments include title-only and icon-only labels,
+  stacked labeled content, and plain group boxes.
 - **Public picker interaction routes.** Custom picker styles receive option
   indices, selection and enabled state, `option.route { … }`, and
   `configuration.trigger { … }`. Every built-in uses these wrappers. Picker

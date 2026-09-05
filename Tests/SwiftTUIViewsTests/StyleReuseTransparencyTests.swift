@@ -20,6 +20,53 @@ import Testing
 /// goes through value equality.
 @MainActor
 struct StyleReuseTransparencyTests {
+  @Test("passive composition built-ins are reuse-transparent")
+  func passiveBuiltInsAreReuseTransparent() {
+    #expect(AnyLabelStyle.automatic.isEqualForReuse(to: AnyLabelStyle.automatic))
+    #expect(AnyLabelStyle.titleAndIcon.isEqualForReuse(to: AnyLabelStyle.titleAndIcon))
+    #expect(AnyLabelStyle.titleOnly.isEqualForReuse(to: AnyLabelStyle.titleOnly))
+    #expect(AnyLabelStyle.iconOnly.isEqualForReuse(to: AnyLabelStyle.iconOnly))
+    #expect(AnyLabeledContentStyle.automatic.isEqualForReuse(to: AnyLabeledContentStyle.automatic))
+    #expect(AnyLabeledContentStyle.stacked.isEqualForReuse(to: AnyLabeledContentStyle.stacked))
+    #expect(AnyGroupBoxStyle.automatic.isEqualForReuse(to: AnyGroupBoxStyle.automatic))
+    #expect(AnyGroupBoxStyle.bordered.isEqualForReuse(to: AnyGroupBoxStyle.bordered))
+    #expect(AnyGroupBoxStyle.plain.isEqualForReuse(to: AnyGroupBoxStyle.plain))
+    #expect(!AnyLabelStyle.titleOnly.isEqualForReuse(to: AnyLabelStyle.iconOnly))
+    #expect(!AnyLabeledContentStyle.automatic.isEqualForReuse(to: AnyLabeledContentStyle.stacked))
+    #expect(!AnyGroupBoxStyle.bordered.isEqualForReuse(to: AnyGroupBoxStyle.plain))
+  }
+
+  @Test("passive composition custom styles use value equality or conservatively invalidate")
+  func passiveCustomStyleEquality() {
+    #expect(
+      AnyLabelStyle(EquatableLabelStyle(value: 1)).isEqualForReuse(
+        to: AnyLabelStyle(EquatableLabelStyle(value: 1))))
+    #expect(
+      !AnyLabelStyle(EquatableLabelStyle(value: 1)).isEqualForReuse(
+        to: AnyLabelStyle(EquatableLabelStyle(value: 2))))
+    #expect(
+      !AnyLabelStyle(OpaqueLabelStyle()).isEqualForReuse(
+        to: AnyLabelStyle(OpaqueLabelStyle())))
+    #expect(
+      AnyLabeledContentStyle(EquatableLabeledContentStyle(value: 1)).isEqualForReuse(
+        to: AnyLabeledContentStyle(EquatableLabeledContentStyle(value: 1))))
+    #expect(
+      !AnyLabeledContentStyle(EquatableLabeledContentStyle(value: 1)).isEqualForReuse(
+        to: AnyLabeledContentStyle(EquatableLabeledContentStyle(value: 2))))
+    #expect(
+      !AnyLabeledContentStyle(OpaqueLabeledContentStyle()).isEqualForReuse(
+        to: AnyLabeledContentStyle(OpaqueLabeledContentStyle())))
+    #expect(
+      AnyGroupBoxStyle(EquatableGroupBoxStyle(value: 1)).isEqualForReuse(
+        to: AnyGroupBoxStyle(EquatableGroupBoxStyle(value: 1))))
+    #expect(
+      !AnyGroupBoxStyle(EquatableGroupBoxStyle(value: 1)).isEqualForReuse(
+        to: AnyGroupBoxStyle(EquatableGroupBoxStyle(value: 2))))
+    #expect(
+      !AnyGroupBoxStyle(OpaqueGroupBoxStyle()).isEqualForReuse(
+        to: AnyGroupBoxStyle(OpaqueGroupBoxStyle())))
+  }
+
   @Test("builtin button styles are interchangeable across instances")
   func builtinButtonStylesAreReuseTransparent() {
     #expect(AnyButtonStyle.automatic.isEqualForReuse(to: AnyButtonStyle.automatic))
@@ -100,6 +147,9 @@ struct StyleReuseTransparencyTests {
 /// to be revisited whenever one is added.
 struct StyleReuseTransparencyRosterTests {
   private static let wrapperFactoryCounts = [
+    "Sources/SwiftTUIViews/Primitives/LabelStyles.swift": 4,
+    "Sources/SwiftTUIViews/Primitives/LabeledContentStyles.swift": 2,
+    "Sources/SwiftTUIViews/Primitives/GroupBoxStyles.swift": 3,
     "Sources/SwiftTUIViews/Controls/ButtonStyles.swift": 5,
     "Sources/SwiftTUIViews/Controls/PickerStyles.swift": 5,
     "Sources/SwiftTUIViews/Controls/TextFieldStyles.swift": 3,
@@ -107,6 +157,9 @@ struct StyleReuseTransparencyRosterTests {
   ]
 
   private static let markerConformanceFiles = [
+    "Sources/SwiftTUIViews/Primitives/LabelStyles.swift",
+    "Sources/SwiftTUIViews/Primitives/LabeledContentStyles.swift",
+    "Sources/SwiftTUIViews/Primitives/GroupBoxStyles.swift",
     "Sources/SwiftTUIViews/Controls/ButtonStyles.swift",
     "Sources/SwiftTUIViews/Controls/PickerStyles.swift",
     "Sources/SwiftTUIViews/Controls/TextFieldStyles.swift",
@@ -196,4 +249,43 @@ private func repositoryRoot() throws -> URL {
 
 private enum StyleRosterParseError: Error {
   case missingPackageRoot
+}
+
+private struct EquatableLabelStyle: LabelStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: LabelStyleConfiguration) -> some View {
+    configuration.title
+  }
+}
+
+private struct OpaqueLabelStyle: LabelStyle {
+  func makeBody(configuration: LabelStyleConfiguration) -> some View {
+    configuration.title
+  }
+}
+
+private struct EquatableLabeledContentStyle: LabeledContentStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: LabeledContentStyleConfiguration) -> some View {
+    configuration.content
+  }
+}
+
+private struct OpaqueLabeledContentStyle: LabeledContentStyle {
+  func makeBody(configuration: LabeledContentStyleConfiguration) -> some View {
+    configuration.content
+  }
+}
+
+private struct EquatableGroupBoxStyle: GroupBoxStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: GroupBoxStyleConfiguration) -> some View {
+    configuration.content
+  }
+}
+
+private struct OpaqueGroupBoxStyle: GroupBoxStyle {
+  func makeBody(configuration: GroupBoxStyleConfiguration) -> some View {
+    configuration.content
+  }
 }

@@ -14,6 +14,33 @@ import Testing
 /// fuzzer case-139).
 @MainActor
 struct StyleBodyViewNodeTests {
+  @Test("label style bodies have their own applied nodes", arguments: [0, 1, 2, 3])
+  func labelStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnyLabelStyle] = [.automatic, .titleAndIcon, .titleOnly, .iconOnly]
+    let result = resolveWithGraph(
+      Label("Title") { Text("*") }.labelStyle(styles[index]), root: "LabelStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "Label", bodyComponent: "LabelBody")
+  }
+
+  @Test("labeled-content style bodies have their own applied nodes", arguments: [false, true])
+  func labeledContentStyleBodyHasOwnNode(_ stacked: Bool) throws {
+    let result = resolveWithGraph(
+      LabeledContent("Name", value: "Ada").labeledContentStyle(stacked ? .stacked : .automatic),
+      root: "LabeledContentStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(
+      result, controlKind: "LabeledContent", bodyComponent: "LabeledContentBody")
+  }
+
+  @Test("group-box style bodies have their own applied nodes", arguments: [0, 1, 2])
+  func groupBoxStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnyGroupBoxStyle] = [.automatic, .bordered, .plain]
+    let result = resolveWithGraph(
+      GroupBox("Group") { Text("Value") }.groupBoxStyle(styles[index]),
+      root: "GroupBoxStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(
+      result, controlKind: "GroupBox", bodyComponent: "GroupBoxBody")
+  }
+
   private struct GraphResolveResult {
     let graph: ViewGraph
     let resolved: ResolvedNode

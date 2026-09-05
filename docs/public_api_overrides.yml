@@ -301,6 +301,24 @@ classifications:
     - SwiftTUIViews.UnitCurve
 
     # ─── View style protocols + concrete styles ────────────────────────────
+    - SwiftTUIViews.AnyLabelStyle
+    - SwiftTUIViews.LabelStyle
+    - SwiftTUIViews.LabelStyleConfiguration
+    - SwiftTUIViews.AutomaticLabelStyle
+    - SwiftTUIViews.TitleAndIconLabelStyle
+    - SwiftTUIViews.TitleOnlyLabelStyle
+    - SwiftTUIViews.IconOnlyLabelStyle
+    - SwiftTUIViews.AnyLabeledContentStyle
+    - SwiftTUIViews.LabeledContentStyle
+    - SwiftTUIViews.LabeledContentStyleConfiguration
+    - SwiftTUIViews.AutomaticLabeledContentStyle
+    - SwiftTUIViews.StackedLabeledContentStyle
+    - SwiftTUIViews.AnyGroupBoxStyle
+    - SwiftTUIViews.GroupBoxStyle
+    - SwiftTUIViews.GroupBoxStyleConfiguration
+    - SwiftTUIViews.AutomaticGroupBoxStyle
+    - SwiftTUIViews.BorderedGroupBoxStyle
+    - SwiftTUIViews.PlainGroupBoxStyle
     - SwiftTUIViews.AnyButtonStyle
     - SwiftTUIViews.AnyListStyle
     - SwiftTUIViews.AnySheetStyle

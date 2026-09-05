@@ -9,6 +9,24 @@
 import SwiftTUIRuntime
 import SwiftTUIViews
 
+struct AcceptedLabelStyle: LabelStyle {
+  func makeBody(configuration: LabelStyleConfiguration) -> some View {
+    configuration.title
+  }
+}
+
+struct AcceptedLabeledContentStyle: LabeledContentStyle {
+  func makeBody(configuration: LabeledContentStyleConfiguration) -> some View {
+    configuration.content
+  }
+}
+
+struct AcceptedGroupBoxStyle: GroupBoxStyle {
+  func makeBody(configuration: GroupBoxStyleConfiguration) -> some View {
+    configuration.content
+  }
+}
+
 // A plain struct view.
 struct AcceptedStruct: View {
   var body: some View { Text("ok") }

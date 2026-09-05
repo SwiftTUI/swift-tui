@@ -155,6 +155,9 @@ configuration is SPI-gated like the other families.
 | Family | Fixture-constructible |
 | --- | --- |
 | ``ButtonStyle`` | ``ButtonStyleConfiguration`` and its `Label` slot |
+| ``LabelStyle`` | ``LabelStyleConfiguration`` and its `Title` and `Icon` slots |
+| ``LabeledContentStyle`` | ``LabeledContentStyleConfiguration`` and its `Label` and `Content` slots |
+| ``GroupBoxStyle`` | ``GroupBoxStyleConfiguration`` and its `Label` and `Content` slots; pass `nil` for an absent label |
 | ``TextFieldStyle`` | ``TextFieldStyleConfiguration``, its `Label` slot, and `FieldContent` |
 | ``PickerStyle`` | ``PickerStyleConfiguration``, its `Label` slot, and `Option` fixtures; option and trigger routes are inert |
 | ``ListStyle`` | ``ListStyleConfiguration`` |
@@ -181,6 +184,21 @@ independently, the SPI also provides
 `PickerStyleConfiguration.Option(index:label:isSelected:isEnabled:)`.
 
 ## Keeping the seam honest
+
+For example, a label-style test supplies both authored slots without a live
+control:
+
+```swift
+let configuration = LabelStyleConfiguration(
+  title: .init { Text("Save") },
+  icon: .init { Text("*") },
+  styleEnvironment: StyleEnvironmentSnapshot()
+)
+let body = TitleOnlyLabelStyle().makeBody(configuration: configuration)
+let artifacts = DefaultRenderer().render(body, proposal: .init(width: 12, height: 1))
+#expect(artifacts.rasterSurface.lines[0].contains("Save"))
+#expect(!artifacts.rasterSurface.lines[0].contains("*"))
+```
 
 Assert on what the style resolved, not on framework internals: raster
 lines, presentation fields, and the presence or absence of your own

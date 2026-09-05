@@ -76,7 +76,7 @@ accepted="$fixture_dir/accepted.swift"
 
 # Every protocol the invariant covers, in declaration order. Each must produce
 # its own diagnostic in the rejected fixture.
-protocols="View ViewModifier DynamicProperty ButtonStyle PickerStyle TextFieldStyle TabViewStyle Scene App"
+protocols="View ViewModifier DynamicProperty ButtonStyle PickerStyle TextFieldStyle TabViewStyle LabelStyle LabeledContentStyle GroupBoxStyle Scene App"
 
 for module in SwiftTUIViews SwiftTUIRuntime SwiftTUIGraph; do
   if [ ! -e "$modules_dir/$module.swiftmodule" ]; then

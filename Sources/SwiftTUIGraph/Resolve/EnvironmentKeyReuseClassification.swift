@@ -65,6 +65,11 @@ package enum EnvironmentKeyReuseClassification {
     // Read only by `Button`'s resolve (tracked); the style body it selects
     // is resolved output, and the draw phase never consults the key.
     "ButtonStyleKey",
+    // Passive composition styles are read only by their primitive's resolve;
+    // captured slots and style bodies carry the resulting composition forward.
+    "LabelStyleKey",
+    "LabeledContentStyleKey",
+    "GroupBoxStyleKey",
     // Read only by `ScrollView`/`List`/`Table` resolve (tracked); the draw
     // phase consumes the resolved `drawMetadata.scrollIndicatorAxes` stamp,
     // never the environment.

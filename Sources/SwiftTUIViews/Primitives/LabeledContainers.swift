@@ -4,11 +4,13 @@ import SwiftTUICore
 public struct Label<Title: View, Icon: View>: PrimitiveView, ResolvableView {
   private var title: Title
   private var icon: Icon
+  private let authoringScope: AuthoringContext?
 
   public init(
     @ViewBuilder title: () -> Title,
     @ViewBuilder icon: () -> Icon
   ) {
+    authoringScope = currentAuthoringContext()
     self.title = title()
     self.icon = icon()
   }
@@ -17,6 +19,7 @@ public struct Label<Title: View, Icon: View>: PrimitiveView, ResolvableView {
     _ title: S,
     @ViewBuilder icon: () -> Icon
   ) where Title == Text {
+    authoringScope = currentAuthoringContext()
     self.title = Text(String(title))
     self.icon = icon()
   }
@@ -25,6 +28,7 @@ public struct Label<Title: View, Icon: View>: PrimitiveView, ResolvableView {
     _ title: S,
     image: Image
   ) where Title == Text, Icon == Image {
+    authoringScope = currentAuthoringContext()
     self.title = Text(String(title))
     icon = image
   }
@@ -40,11 +44,20 @@ extension Label {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    HStack(alignment: .center, spacing: 1) {
-      icon
-      title
-    }
-    .resolve(in: context)
+    let configuration = LabelStyleConfiguration(
+      title: .init(authoringContext: authoringScope) { title },
+      icon: .init(authoringContext: authoringScope) { icon },
+      styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
+    )
+    let child = context.environmentValues.labelStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("LabelBody")))
+    return ResolvedNode(
+      identity: context.identity,
+      kind: .view("Label"),
+      children: [child],
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction
+    )
   }
 }
 
@@ -52,11 +65,13 @@ extension Label {
 public struct LabeledContent<Label: View, Content: View>: PrimitiveView, ResolvableView {
   private var label: Label
   private var content: Content
+  private let authoringScope: AuthoringContext?
 
   public init(
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
+    authoringScope = currentAuthoringContext()
     self.label = label()
     self.content = content()
   }
@@ -65,6 +80,7 @@ public struct LabeledContent<Label: View, Content: View>: PrimitiveView, Resolva
     _ title: S,
     @ViewBuilder content: () -> Content
   ) where Label == Text {
+    authoringScope = currentAuthoringContext()
     label = Text(String(title))
     self.content = content()
   }
@@ -73,6 +89,7 @@ public struct LabeledContent<Label: View, Content: View>: PrimitiveView, Resolva
     _ title: S1,
     value: S2
   ) where Label == Text, Content == Text {
+    authoringScope = currentAuthoringContext()
     label = Text(String(title))
     content = Text(String(value))
   }
@@ -88,13 +105,20 @@ extension LabeledContent {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    HStack(alignment: .firstTextBaseline, spacing: 1) {
-      label
-        .foregroundStyle(.separator)
-      Spacer()
-      content
-    }
-    .resolve(in: context)
+    let configuration = LabeledContentStyleConfiguration(
+      label: .init(authoringContext: authoringScope) { label },
+      content: .init(authoringContext: authoringScope) { content },
+      styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
+    )
+    let child = context.environmentValues.labeledContentStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("LabeledContentBody")))
+    return ResolvedNode(
+      identity: context.identity,
+      kind: .view("LabeledContent"),
+      children: [child],
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction
+    )
   }
 }
 
@@ -154,10 +178,12 @@ public struct GroupBox<Label: View, Content: View>: PrimitiveView, ResolvableVie
   private var showsLabel: Bool
   private var label: Label
   private var content: Content
+  private let authoringScope: AuthoringContext?
 
   public init(
     @ViewBuilder content: () -> Content
   ) where Label == EmptyView {
+    authoringScope = currentAuthoringContext()
     showsLabel = false
     label = EmptyView()
     self.content = content()
@@ -167,6 +193,7 @@ public struct GroupBox<Label: View, Content: View>: PrimitiveView, ResolvableVie
     _ title: S,
     @ViewBuilder content: () -> Content
   ) where Label == Text {
+    authoringScope = currentAuthoringContext()
     showsLabel = true
     label = Text(String(title))
     self.content = content()
@@ -176,6 +203,7 @@ public struct GroupBox<Label: View, Content: View>: PrimitiveView, ResolvableVie
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
+    authoringScope = currentAuthoringContext()
     showsLabel = true
     self.label = label()
     self.content = content()
@@ -184,38 +212,22 @@ public struct GroupBox<Label: View, Content: View>: PrimitiveView, ResolvableVie
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    composedView().resolveElements(in: context)
-  }
-
-  @ViewBuilder
-  private func composedView() -> some View {
-    EnvironmentReader(\.styleEnvironmentSnapshot) { styleEnvironment in
-      EnvironmentReader(\.controlProminence) { prominence in
-        let chrome = styleEnvironment.groupBoxChrome(prominence: prominence)
-        VStack(alignment: .leading, spacing: 0) {
-          if showsLabel {
-            label.foregroundStyle(.separator)
-          }
-          groupBoxContent()
-            .padding(.init(horizontal: 1, vertical: 1))
-            .overlay {
-              RoundedRectangle(cornerRadius: 1).strokeBorder(chrome.borderStyle)
-            }
-            .foregroundStyle(chrome.foregroundStyle)
-        }
-        .layoutMetadata(
-          .init(
-            minimumHeight: (showsLabel ? 1 : 0) + 3
-          )
-        )
-      }
-    }
-  }
-
-  @ViewBuilder
-  private func groupBoxContent() -> some View {
-    VStack(alignment: .leading, spacing: 0) {
-      content
-    }
+    let configuration = GroupBoxStyleConfiguration(
+      label: showsLabel ? .init(authoringContext: authoringScope) { label } : nil,
+      content: .init(authoringContext: authoringScope) { content },
+      controlProminence: context.environmentValues.controlProminence,
+      styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
+    )
+    let child = context.environmentValues.groupBoxStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("GroupBoxBody")))
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("GroupBox"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction
+      )
+    ]
   }
 }

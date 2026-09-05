@@ -198,6 +198,14 @@ Use `SwiftTUICLI` directly for a terminal-only graph.
 
 ## Source layout
 
+The passive composition families live beside their primitives in
+`SwiftTUIViews/Primitives/`: `LabeledContainers.swift` captures authored slots,
+and `LabelStyles.swift`, `LabeledContentStyles.swift`, and `GroupBoxStyles.swift`
+own their public configurations, erasers, and built-in bodies. They resolve
+through the shared `Foundation/StyleBoxing.swift` seam. Environment keys and
+modifiers remain in `Environment/StyleEnvironment.swift` and
+`Modifiers/StyleModifiers.swift`.
+
 ```
 Sources/
   SwiftTUIPrimitives/  Geometry, Support, Pointer, Styling (values), Content
