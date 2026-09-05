@@ -56,6 +56,7 @@ package struct DrawMetadata: Equatable, Sendable {
     var scrollIndicatorAxes: AxisSet?
     var focusedScrollIndicatorAxes: AxisSet?
     var scrollIndicatorForegroundStyle: AnyShapeStyle?
+    var scrollIndicatorAppearance: ScrollIndicatorAppearance? = nil
     var listStyle: ListStyleMetadata?
     /// The content transition a `Text` node resolved with, or `nil` for
     /// `.identity`. Stamped at resolve; read by the animation controller.
@@ -104,6 +105,8 @@ package struct DrawMetadata: Equatable, Sendable {
         other.focusedScrollIndicatorAxes ?? focusedScrollIndicatorAxes
       merged.scrollIndicatorForegroundStyle =
         other.scrollIndicatorForegroundStyle ?? scrollIndicatorForegroundStyle
+      merged.scrollIndicatorAppearance =
+        other.scrollIndicatorAppearance ?? scrollIndicatorAppearance
       merged.contentTransition = other.contentTransition ?? contentTransition
       merged.textRoll = other.textRoll ?? textRoll
       merged.listStyle =
@@ -322,6 +325,11 @@ package struct DrawMetadata: Equatable, Sendable {
   package var scrollIndicatorForegroundStyle: AnyShapeStyle? {
     get { heavyFields.value.scrollIndicatorForegroundStyle }
     set { heavyFields.value.scrollIndicatorForegroundStyle = newValue }
+  }
+
+  package var scrollIndicatorAppearance: ScrollIndicatorAppearance? {
+    get { heavyFields.value.scrollIndicatorAppearance }
+    set { heavyFields.value.scrollIndicatorAppearance = newValue }
   }
 
   package var listStyle: ListStyleMetadata? {

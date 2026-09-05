@@ -391,14 +391,15 @@ extension DrawExtractor {
       )
     }
 
-    commands.append(
-      contentsOf: scrollIndicatorCommands(
-        bounds: bounds,
-        drawMetadata: drawMetadata,
-        children: children,
-        effectiveOpacity: effectiveOpacity
-      )
+    let indicatorCommands = scrollIndicatorCommands(
+      bounds: bounds,
+      drawMetadata: drawMetadata,
+      children: children,
+      effectiveOpacity: effectiveOpacity
     )
+    if drawMetadata.scrollIndicatorAppearance?.reservesSpace != false {
+      commands.append(contentsOf: indicatorCommands)
+    }
 
     if let borderShapeStyle = drawMetadata.borderShapeStyle, !drawsRule {
       commands.append(
@@ -422,6 +423,10 @@ extension DrawExtractor {
     // `postCommands` so the rasterizer's paint walk visits them after
     // the subtree has been fully drawn.
     var postCommands: [DrawCommand] = []
+    if drawMetadata.scrollIndicatorAppearance?.reservesSpace == false {
+      // An overlaid thumb paints after content so text cannot erase it.
+      postCommands.append(contentsOf: indicatorCommands)
+    }
     if case .border(
       let set,
       let placement,
@@ -472,6 +477,19 @@ extension DrawExtractor {
       }
     }
 
+    var clippedChildNodes = childNodes
+    if drawMetadata.scrollIndicatorAppearance != nil,
+      let contentClip = placed.scrollViewportRect
+    {
+      // Reserved tracks are outside the content viewport. Clip the content
+      // to that same rect so horizontal overflow cannot erase either thumb.
+      for index in clippedChildNodes.indices {
+        clippedChildNodes[index].clipBounds =
+          clippedChildNodes[index].clipBounds.map {
+            $0.intersection(contentClip) ?? .init(origin: contentClip.origin, size: .zero)
+          } ?? contentClip
+      }
+    }
     return DrawNode(
       viewNodeID: projection.viewNodeID,
       identity: identity,
@@ -487,7 +505,7 @@ extension DrawExtractor {
         isInBackgroundSubtree: isInBackgroundSubtree
       ),
       postCommands: postCommands,
-      children: childNodes
+      children: clippedChildNodes
     )
   }
 

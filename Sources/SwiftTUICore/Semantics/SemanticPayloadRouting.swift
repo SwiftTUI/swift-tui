@@ -76,10 +76,12 @@ extension SemanticExtractor {
     for axis in [ScrollIndicatorAxis.vertical, .horizontal] {
       guard
         let metrics = resolvedScrollIndicatorMetrics(
-          viewportRect: node.bounds,
+          viewportRect: node.drawMetadata.scrollIndicatorAppearance?.insetBounds(node.bounds)
+            ?? node.bounds,
           contentBounds: node.contentBounds,
           axes: axes,
-          axis: axis
+          axis: axis,
+          reservesSpace: node.drawMetadata.scrollIndicatorAppearance?.reservesSpace ?? true
         ),
         let clippedRect = clippedRect(for: metrics.rect, clippedTo: clipRect)
       else {

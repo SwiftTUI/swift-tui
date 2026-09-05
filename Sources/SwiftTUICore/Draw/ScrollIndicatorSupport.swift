@@ -144,8 +144,10 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
 package func resolvedScrollIndicatorInsets(
   viewportRect: CellRect,
   contentBounds: CellRect,
-  axes: AxisSet
+  axes: AxisSet,
+  reservesSpace: Bool = true
 ) -> ScrollIndicatorInsets {
+  guard reservesSpace else { return .init() }
   var trailing = 0
   var bottom = 0
 
@@ -170,12 +172,14 @@ package func resolvedScrollIndicatorMetrics(
   viewportRect: CellRect,
   contentBounds: CellRect,
   axes: AxisSet,
-  axis: ScrollIndicatorAxis
+  axis: ScrollIndicatorAxis,
+  reservesSpace: Bool = true
 ) -> ScrollIndicatorMetrics? {
   let insets = resolvedScrollIndicatorInsets(
     viewportRect: viewportRect,
     contentBounds: contentBounds,
-    axes: axes
+    axes: axes,
+    reservesSpace: reservesSpace
   )
 
   switch axis {

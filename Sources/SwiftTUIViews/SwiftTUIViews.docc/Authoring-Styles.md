@@ -99,7 +99,8 @@ declarations.
 A presentation-value style returns `Sendable` rendering data and leaves the
 composition to the framework. ``ListStyle``, ``OutlineStyle``,
 ``TableStyle``, ``SpinnerStyle``, ``SheetStyle``, ``PromptStyle``,
-``FullScreenCoverStyle``, ``PopoverStyle``, and ``ToastStyle`` take
+``FullScreenCoverStyle``, ``PopoverStyle``, ``ToastStyle``, ``ScrollViewStyle``,
+and ``LinkStyle`` take
 this form because the primitive must keep an invariant an arbitrary
 replacement body could break — table virtualization, spinner cadence, sheet
 modality. ``ToolbarStyle`` is the same idea for a strip: it supplies the
@@ -164,6 +165,35 @@ An invalid presentation value — empty spinner frames, a non-positive
 cadence, active frames of mixed cell width — never traps. The surface emits
 one `style.invalidPresentation` runtime issue naming the family and the
 style, and renders the family's automatic presentation for that resolve.
+Scroll styling validates each indicator glyph independently: each must be one
+grapheme occupying one terminal cell. Invalid glyphs, insets, or opacity fall
+back to their automatic field values while retaining other valid fields.
+
+### Scroll and link appearance
+
+``ScrollViewStyle`` controls content insets, indicator glyphs and paint,
+background, opacity, and whether indicators reserve a track. `.automatic`
+reserves tracks; `.minimal` overlays the thumb on content. Visibility still
+follows `.scrollIndicators(...)`, and a style cannot enable panning unsupported
+by the host. Configuration supplies the permitted and focused indicator axes,
+host capability, enabled state, and `showsFocusEffect`, which distinguishes the
+theme focus treatment from the semantic tint fallback. The primitive retains
+clipping, offset bindings, wheel and key commands, and indicator dragging.
+
+``LinkStyle`` applies to both standalone links and links interpolated into Text.
+The renderer merges containing-text styling, then the link presentation, then
+the link label's explicit styling. It stamps destination and identity last,
+keeping one rich-text payload for rendering and semantic regions. Optional
+foreground and background inherit when `nil`; emphasis accumulates; explicit
+opacity multiplies the containing text's opacity. ``LinkUnderlineStyle``
+distinguishes `.inherited`, `.hidden`, and `.visible(...)`, including an explicit
+label-level removal. `.automatic` preserves theme treatment, `.underlined`
+uses semantic link color, and `.plain` inherits foreground and removes the
+underline. Focus, activation, disabled behavior, and accessibility stay with
+the link primitive. Only unmodified Link values create inline links in
+`Text.RichContent`. A modified Link cannot interpolate into that rich type;
+an unconstrained string expression may instead use ordinary String formatting.
+Apply `.linkStyle(...)` to the containing Text to retain link semantics.
 
 ## Route wrappers
 

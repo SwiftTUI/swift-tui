@@ -137,9 +137,11 @@ private struct ResolvedRichTextBuilder {
     for text: Text,
     inheritedStyle: TextStyle
   ) -> [RichTextRun] {
-    let effectiveStyle = inheritedStyle.merging(
+    var effectiveStyle = inheritedStyle.merging(
       inlineTextStyle(from: text.drawMetadata)
     )
+    if text.underlineExplicitlyCleared { effectiveStyle.underlineStyle = nil }
+    if text.strikethroughExplicitlyCleared { effectiveStyle.strikethroughStyle = nil }
 
     switch text.storage {
     case .plain(let content):
@@ -212,11 +214,11 @@ private struct ResolvedRichTextBuilder {
     inlineIdentifier: String?,
     linkIdentity: Identity
   ) -> [RichTextRun] {
-    let linkStyle = inheritedStyle.merging(
-      linkTextStyle(
-        for: linkIdentity,
-        in: context
-      )
+    let linkStyle = linkTextStyle(
+      for: linkIdentity,
+      isInline: inlineIdentifier != nil,
+      inheritedStyle: inheritedStyle,
+      in: context
     )
 
     let labeledRuns = runs(
@@ -255,31 +257,31 @@ private struct ResolvedRichTextBuilder {
 @MainActor
 private func linkTextStyle(
   for identity: Identity,
+  isInline: Bool,
+  inheritedStyle: TextStyle,
   in context: ResolveContext
 ) -> TextStyle {
   let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
   let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [identity]) == identity
   let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
   let isPressed = context.environmentValues.pressedIdentity(comparedAgainst: [identity]) == identity
-  let chrome = resolvedLinkButtonChrome(
-    styleEnvironment: styleEnvironment,
-    isEnabled: context.environmentValues.isEnabled,
-    isFocused: isFocused,
-    showsFocusEffect: showsFocusEffect,
-    isPressed: isPressed
+  let presentation = context.environmentValues.linkStyle.presentation(
+    for: .init(
+      isInline: isInline, isEnabled: context.environmentValues.isEnabled,
+      isFocused: isFocused, showsFocusEffect: showsFocusEffect, isPressed: isPressed,
+      styleEnvironment: styleEnvironment)
   )
-
-  var style = TextStyle(
-    foregroundStyle: chrome.foregroundStyle,
-    emphasis: [],
-    underlineStyle: .init(pattern: .solid),
-    opacity: chrome.opacity
+  var style = inheritedStyle.merging(
+    TextStyle(
+      foregroundStyle: presentation.foregroundStyle,
+      backgroundStyle: presentation.backgroundStyle,
+      emphasis: presentation.emphasis, opacity: presentation.opacity)
   )
-
-  if (isFocused && showsFocusEffect) || isPressed {
-    style.backgroundStyle = chrome.backgroundStyle
+  switch presentation.underline {
+  case .inherited: break
+  case .hidden: style.underlineStyle = nil
+  case .visible(let underline): style.underlineStyle = underline
   }
-
   return style
 }
 

@@ -26,6 +26,8 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
   var axes: Axis.Set
   var position: ScrollCellOffset
   var indicatorAxes: Axis.Set
+  var contentInsets: EdgeInsets = .zero
+  var reservesIndicatorSpace: Bool = true
   /// The previous frame's converged indicator insets, derived from the
   /// retained container measurement (scroll-latency R1.3). Optimization seed
   /// only: `measuredContent` verifies it with a real measurement and falls
@@ -51,9 +53,9 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     // vertical scroll view wraps it.
     switch axis {
     case .horizontal:
-      return axes.contains(.horizontal) ? nil : contentMinimum
+      return axes.contains(.horizontal) ? nil : contentMinimum + contentInsets.horizontal
     case .vertical:
-      return axes.contains(.vertical) ? nil : contentMinimum
+      return axes.contains(.vertical) ? nil : contentMinimum + contentInsets.vertical
     }
   }
 
@@ -75,13 +77,13 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
         childSize.width,
         proposal: proposal.width,
         scrollsAlong: axes.contains(.horizontal),
-        reserved: indicatorInsets.trailing
+        reserved: indicatorInsets.trailing + contentInsets.horizontal
       ),
       height: viewportDimension(
         childSize.height,
         proposal: proposal.height,
         scrollsAlong: axes.contains(.vertical),
-        reserved: indicatorInsets.bottom
+        reserved: indicatorInsets.bottom + contentInsets.vertical
       )
     )
   }
@@ -126,10 +128,10 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     .init(
       width: axes.contains(.horizontal)
         ? .unspecified
-        : reducedDimension(proposal.width, by: indicatorInsets.trailing),
+        : reducedDimension(proposal.width, by: indicatorInsets.trailing + contentInsets.horizontal),
       height: axes.contains(.vertical)
         ? .unspecified
-        : reducedDimension(proposal.height, by: indicatorInsets.bottom)
+        : reducedDimension(proposal.height, by: indicatorInsets.bottom + contentInsets.vertical)
     )
   }
 
@@ -219,12 +221,12 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
   ) -> MeasureViewportHint? {
     let width: Int =
       switch proposal.width {
-      case .finite(let value): max(0, value - indicatorInsets.trailing)
+      case .finite(let value): max(0, value - indicatorInsets.trailing - contentInsets.horizontal)
       case .unspecified, .infinity: 0
       }
     let height: Int =
       switch proposal.height {
-      case .finite(let value): max(0, value - indicatorInsets.bottom)
+      case .finite(let value): max(0, value - indicatorInsets.bottom - contentInsets.vertical)
       case .unspecified, .infinity: 0
       }
     guard width > 0 || height > 0 else {
@@ -242,19 +244,19 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     proposal: ProposedViewSize,
     currentInsets: IndicatorInsets
   ) -> IndicatorInsets {
-    guard !indicatorAxes.isEmpty else {
+    guard reservesIndicatorSpace, !indicatorAxes.isEmpty else {
       return .init()
     }
 
     let contentViewportWidth = viewportValue(
       for: proposal.width,
       fallback: childSize.width,
-      reserved: currentInsets.trailing
+      reserved: currentInsets.trailing + contentInsets.horizontal
     )
     let contentViewportHeight = viewportValue(
       for: proposal.height,
       fallback: childSize.height,
-      reserved: currentInsets.bottom
+      reserved: currentInsets.bottom + contentInsets.vertical
     )
 
     return .init(
@@ -295,10 +297,11 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     indicatorInsets: IndicatorInsets
   ) -> LayoutRect {
     .init(
-      origin: bounds.origin,
+      origin: .init(
+        x: bounds.origin.x + contentInsets.leading, y: bounds.origin.y + contentInsets.top),
       size: .init(
-        width: max(0, bounds.size.width - indicatorInsets.trailing),
-        height: max(0, bounds.size.height - indicatorInsets.bottom)
+        width: max(0, bounds.size.width - indicatorInsets.trailing - contentInsets.horizontal),
+        height: max(0, bounds.size.height - indicatorInsets.bottom - contentInsets.vertical)
       )
     )
   }
@@ -372,11 +375,13 @@ extension ScrollViewLayout: RetainedMeasurementSeedableLayout {
 }
 
 extension ScrollViewLayout {
-  var measurementReuseSignature: String? {
-    "ScrollViewLayout:\(axes.rawValue):\(indicatorAxes.rawValue)"
+  private var reuseSignature: String {
+    "ScrollViewLayout:\(axes.rawValue):\(indicatorAxes.rawValue):\(contentInsets.top):\(contentInsets.leading):\(contentInsets.bottom):\(contentInsets.trailing):\(reservesIndicatorSpace)"
   }
 
+  var measurementReuseSignature: String? { reuseSignature }
+
   var placementReuseSignature: String? {
-    "ScrollViewLayout:\(axes.rawValue):\(indicatorAxes.rawValue):\(position.x):\(position.y)"
+    "\(reuseSignature):\(position.x):\(position.y)"
   }
 }

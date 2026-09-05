@@ -80,12 +80,14 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           focusedIndicatorAxes.insert(.horizontal)
         }
       }
-      // The scroll view container itself should not show a focus ring —
-      // only the scroll indicator highlights when the scroll view is focused.
-      let containerChrome = styleEnvironment.controlChrome(
-        isEnabled: context.environmentValues.isEnabled,
-        isFocused: false
-      )
+      let style = context.environmentValues.scrollViewStyle
+      let configuration = ScrollViewStyleConfiguration(
+        axes: axes, visibleIndicatorAxes: indicatorAxes, focusedIndicatorAxes: focusedIndicatorAxes,
+        allowsDirectManipulation: allowsPanning, isEnabled: context.environmentValues.isEnabled,
+        showsFocusEffect: showsFocusEffect, styleEnvironment: styleEnvironment)
+      let presentation = validatedScrollPresentation(
+        style.presentation(for: configuration), configuration: configuration,
+        styleLabel: style.description, identity: context.identity)
       if context.environmentValues.isEnabled {
         let binding = position
         let intake = HandlerDescriptorIntake(
@@ -104,7 +106,8 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           bindingSourceID: binding.bindingSourceID
         )
         let scrollCommandRegistry = context.scrollCommandRegistry
-        let registerScrollKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
+        let registerScrollKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = {
+          identity, targetAxis in
           intake.registerKeyPressHandler(identity: identity) { keyPress in
             guard keyPress.modifiers.isEmpty else {
               return false
@@ -188,13 +191,18 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
       let child = withAuthoringContext(contentAuthoringScope.authoringContext) {
         content.resolve(in: context.child(component: .named("ScrollContent")))
       }
-      let indicatorFocusStyle =
-        showsFocusEffect && !focusedIndicatorAxes.isEmpty
-        ? styleEnvironment.controlChrome(
-          isEnabled: context.environmentValues.isEnabled,
-          isFocused: true
-        ).borderStyle
-        : nil
+      var drawMetadata = DrawMetadata(
+        backgroundStyle: presentation.backgroundStyle,
+        scrollIndicatorAxes: indicatorAxes.isEmpty ? nil : indicatorAxes,
+        focusedScrollIndicatorAxes: focusedIndicatorAxes.isEmpty ? nil : focusedIndicatorAxes,
+        opacity: presentation.opacity, clipsToBounds: true)
+      drawMetadata.scrollIndicatorAppearance = .init(
+        contentInsets: presentation.contentInsets,
+        verticalGlyph: presentation.verticalIndicatorGlyph,
+        horizontalGlyph: presentation.horizontalIndicatorGlyph,
+        foregroundStyle: presentation.indicatorStyle,
+        focusedForegroundStyle: presentation.focusedIndicatorStyle,
+        reservesSpace: presentation.reservesIndicatorSpace)
 
       return [
         ResolvedNode(
@@ -207,16 +215,12 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
             ScrollViewLayout(
               axes: axes,
               position: position.wrappedValue,
-              indicatorAxes: indicatorAxes
+              indicatorAxes: indicatorAxes,
+              contentInsets: presentation.contentInsets,
+              reservesIndicatorSpace: presentation.reservesIndicatorSpace
             )
           ).resolvedBehavior,
-          drawMetadata: .init(
-            scrollIndicatorAxes: indicatorAxes.isEmpty ? nil : indicatorAxes,
-            focusedScrollIndicatorAxes: focusedIndicatorAxes.isEmpty ? nil : focusedIndicatorAxes,
-            scrollIndicatorForegroundStyle: indicatorFocusStyle,
-            opacity: containerChrome.opacity,
-            clipsToBounds: true
-          ),
+          drawMetadata: drawMetadata,
           semanticMetadata: scrollViewMetadata(
             accessibilityRole: indicatorAxes.isEmpty
               ? .scrollView : .scrollViewWithIndicators,
@@ -368,17 +372,19 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
     return { event in
       switch event.kind {
       case .down(.primary), .dragged(.primary), .up(.primary):
-        guard
-          let scrollContext = event.scrollContext,
-          let metrics = resolvedScrollIndicatorMetrics(
-            viewportRect: scrollContext.viewportRect,
-            contentBounds: scrollContext.contentBounds,
-            axes: axes,
-            axis: axis
-          )
-        else {
-          return .ignored
-        }
+        guard let scrollContext = event.scrollContext else { return .ignored }
+        // The route publishes the layout's content viewport. The hit region
+        // already supplies the indicator track; do not deduct its reservation
+        // again when mapping a pointer position to the shared scroll range.
+        let viewportLength =
+          axis == .vertical
+          ? scrollContext.viewportRect.size.height : scrollContext.viewportRect.size.width
+        let contentLength =
+          axis == .vertical
+          ? scrollContext.contentBounds.size.height : scrollContext.contentBounds.size.width
+        let metrics = ScrollIndicatorMetrics(
+          axis: axis, rect: event.targetRect, maxOffset: max(0, contentLength - viewportLength),
+          viewportLength: viewportLength, contentLength: contentLength)
         let current = binding.wrappedValue
         var next = current
         switch axis {

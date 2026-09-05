@@ -227,6 +227,17 @@ presented source lifetime; `DefaultPaletteRendering.swift` supplies the public
 default's fuzzy filtering, identity-based selection, and twelve-row window.
 The dropdown portal continues to own placement, focus, Escape, and dismissal.
 
+`ScrollView/ScrollViewStyles.swift` supplies indicator and container appearance.
+`ScrollViewLayout.swift` measures insets and optional reserved tracks; the inert
+`ScrollIndicatorAppearance` metadata carries those choices into core placement,
+semantics, and draw extraction. These phases share the content viewport, while
+the scroll primitive retains offset bindings, indicator dragging, and host-gated
+panning. Reserved tracks are outside the content clip; overlay indicators paint
+after content. `Controls/LinkStyles.swift` supplies rich-text appearance to
+`Link.swift`, which merges inherited text, style presentation, and label styling
+before stamping link identity and destination. Existing link action and focus
+routing consume that same payload.
+
 `Controls/MenuStyles.swift` owns menu composition and its public trigger and
 portal wrappers. `Menu.swift` owns activation and expansion on a dedicated child
 node, so replacing a compact menu with inline content retires its expansion.

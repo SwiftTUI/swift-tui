@@ -9,6 +9,24 @@ extension View {
     paletteStyle(AnyPaletteStyle(style))
   }
 
+  /// Sets the indicator and container appearance of scroll views in this subtree.
+  public func scrollViewStyle(_ style: AnyScrollViewStyle) -> some View {
+    environment(\.scrollViewStyle, style)
+  }
+
+  public func scrollViewStyle<S: ScrollViewStyle>(_ style: S) -> some View {
+    scrollViewStyle(AnyScrollViewStyle(style))
+  }
+
+  /// Sets the presentation of standalone and interpolated links in this subtree.
+  public func linkStyle(_ style: AnyLinkStyle) -> some View {
+    environment(\.linkStyle, style)
+  }
+
+  public func linkStyle<S: LinkStyle>(_ style: S) -> some View {
+    linkStyle(AnyLinkStyle(style))
+  }
+
   /// Sets the Slider composition for this subtree.
   public func sliderStyle(_ style: AnySliderStyle) -> some View {
     environment(\.sliderStyle, style)

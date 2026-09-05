@@ -115,6 +115,10 @@ package enum EnvironmentKeyReuseClassification {
     // captured style body; route placement carries resolved semantics forward.
     "SliderStyleKey",
     "StepperStyleKey",
+    // Presentation-value styles are read during scroll resolution and rich
+    // text construction; later phases consume their inert resolved values.
+    "ScrollViewStyleKey",
+    "LinkStyleKey",
     // The menu/group primitives read these at resolve. Captured bodies and
     // presentation descriptors carry the result into later host phases.
     "MenuStyleKey",

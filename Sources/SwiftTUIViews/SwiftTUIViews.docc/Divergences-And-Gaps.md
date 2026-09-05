@@ -804,15 +804,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   `TextFieldStyle`, `PickerStyle`, `ListStyle`, `TabViewStyle`, and peers are
   public, extensible protocols with `Any*Style` erasers, including families
   SwiftUI keeps closed.
-- **Styling is not yet uniformly overridable; an environment-scoped style
-  system across the full surface is the intended destination.** *Gap.* The
+- **Styleable surfaces use public, environment-scoped style protocols.**
+  *Ratified.* The
   open-protocol model above — a public style protocol, a public
   configuration carrying the authored subviews and the render state a style
   legitimately needs, an `Any*Style` eraser stored in the environment, a
   lower-camel-cased modifier scoping a style to one control, a subtree, or
   an application, and retained-reuse participation — is the framework's
-  intended styling contract for every styleable surface, not only the
-  families that have it today. The destination extends that contract to
+  styling contract for every styleable surface. It applies to
   `Toggle`, `ProgressView`, `Menu`, `Slider`, `Stepper`,
   `DisclosureGroup`, `ControlGroup`,
   `TextEditor`, `ScrollView`, and `Link`, and to the
@@ -826,7 +825,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   `Picker`, `List`, `OutlineGroup`, `Table`, `Spinner`, `Sheet`, `Toolbar`,
   `TabView`, `Label`, `LabeledContent`, `GroupBox`, `Toggle`, `DisclosureGroup`,
   `TextEditor`, `ProgressView`, `Slider`, `Stepper`, `Menu`, `ControlGroup`,
-  `Prompt`, `FullScreenCover`, `Popover`, and `Palette`;
+  `Prompt`, `FullScreenCover`, `Popover`, `Palette`, `ScrollView`, and `Link`;
   every shipped configuration, captured slot, and
   presentation value is constructible from a test target through
   `@_spi(StyleFixtures)`, and route wrappers share one misuse rule (a
@@ -843,9 +842,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   activation routes; the default preserves fuzzy ranking and keyboard selection.
   Prompt, cover, and popover presentation values resolve through fixed surfaces
   while their declarations retain modality, focus, and dismissal. Toast keeps
-  its declaration-scoped style argument. ScrollView and Link retain hard-coded
-  chrome with no independently replaceable style seam; completing them is
-  additive Phase B work on the burndown to 1.0.0.
+  its declaration-scoped style argument. Scroll styles supply indicator and
+  container appearance while preserving clipping and host input policy. Link
+  styles merge into standalone and inline rich-text runs without replacing
+  their action or semantic identities. Structural Panel remains unstyled.
 - **`Color` vocabulary differs.** *Gap.* Initializers use `alpha:` where
   SwiftUI uses `opacity:`, and mixing is `mixed(with:amount:method:)` rather
   than `mix(with:by:)`.

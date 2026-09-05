@@ -1,5 +1,13 @@
 public import SwiftTUICore
 
+private enum LinkStyleKey: EnvironmentKey {
+  static let defaultValue = AnyLinkStyle.automatic
+}
+
+private enum ScrollViewStyleKey: EnvironmentKey {
+  static let defaultValue = AnyScrollViewStyle.automatic
+}
+
 private enum SliderStyleKey: EnvironmentKey {
   static let defaultValue = AnySliderStyle.automatic
 }
@@ -185,6 +193,16 @@ private enum RuntimeFocusSideFieldReadKey {}
 private enum RuntimeFocusTargetScopedReadKey {}
 
 extension EnvironmentValues {
+  package var scrollViewStyle: AnyScrollViewStyle {
+    get { self[ScrollViewStyleKey.self] }
+    set { self[ScrollViewStyleKey.self] = newValue }
+  }
+
+  package var linkStyle: AnyLinkStyle {
+    get { self[LinkStyleKey.self] }
+    set { self[LinkStyleKey.self] = newValue }
+  }
+
   package var sliderStyle: AnySliderStyle {
     get { self[SliderStyleKey.self] }
     set { self[SliderStyleKey.self] = newValue }

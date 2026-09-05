@@ -301,6 +301,20 @@ classifications:
     - SwiftTUIViews.UnitCurve
 
     # ─── View style protocols + concrete styles ────────────────────────────
+    - SwiftTUIViews.AnyScrollViewStyle
+    - SwiftTUIViews.ScrollViewStyle
+    - SwiftTUIViews.ScrollViewStyleConfiguration
+    - SwiftTUIViews.ScrollViewStylePresentation
+    - SwiftTUIViews.AutomaticScrollViewStyle
+    - SwiftTUIViews.MinimalScrollViewStyle
+    - SwiftTUIViews.AnyLinkStyle
+    - SwiftTUIViews.LinkStyle
+    - SwiftTUIViews.LinkStyleConfiguration
+    - SwiftTUIViews.LinkStylePresentation
+    - SwiftTUIViews.LinkUnderlineStyle
+    - SwiftTUIViews.AutomaticLinkStyle
+    - SwiftTUIViews.UnderlinedLinkStyle
+    - SwiftTUIViews.PlainLinkStyle
     - SwiftTUIViews.AnyPaletteStyle
     - SwiftTUIViews.PaletteStyle
     - SwiftTUIViews.PaletteStyleConfiguration

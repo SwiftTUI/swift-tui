@@ -264,43 +264,40 @@ extension DrawExtractor {
       return []
     }
 
-    let indicatorInsets = resolvedScrollIndicatorInsets(
-      viewportRect: bounds,
-      contentBounds: content.contentBounds,
-      axes: axes
-    )
-    guard indicatorInsets.trailing > 0 || indicatorInsets.bottom > 0 else {
-      return []
-    }
-
-    let offsetX = max(0, bounds.origin.x - content.bounds.origin.x)
-    let offsetY = max(0, bounds.origin.y - content.bounds.origin.y)
+    let appearance = drawMetadata.scrollIndicatorAppearance
+    let viewportBounds = appearance?.insetBounds(bounds) ?? bounds
+    let offsetX = max(0, viewportBounds.origin.x - content.bounds.origin.x)
+    let offsetY = max(0, viewportBounds.origin.y - content.bounds.origin.y)
     var commands: [DrawCommand] = []
     if let metrics = resolvedScrollIndicatorMetrics(
-      viewportRect: bounds,
+      viewportRect: viewportBounds,
       contentBounds: content.contentBounds,
       axes: axes,
-      axis: .vertical
+      axis: .vertical,
+      reservesSpace: appearance?.reservesSpace ?? true
     ) {
       commands.append(
         contentsOf: verticalScrollIndicatorCommands(
           metrics: metrics,
           offset: offsetY,
+          glyph: appearance?.verticalGlyph ?? "▐",
           style: scrollIndicatorStyle(
             for: .vertical, drawMetadata: drawMetadata, effectiveOpacity: effectiveOpacity)
         )
       )
     }
     if let metrics = resolvedScrollIndicatorMetrics(
-      viewportRect: bounds,
+      viewportRect: viewportBounds,
       contentBounds: content.contentBounds,
       axes: axes,
-      axis: .horizontal
+      axis: .horizontal,
+      reservesSpace: appearance?.reservesSpace ?? true
     ) {
       commands.append(
         contentsOf: horizontalScrollIndicatorCommands(
           metrics: metrics,
           offset: offsetX,
+          glyph: appearance?.horizontalGlyph ?? "▂",
           style: scrollIndicatorStyle(
             for: .horizontal, drawMetadata: drawMetadata, effectiveOpacity: effectiveOpacity)
         )
@@ -317,8 +314,9 @@ extension DrawExtractor {
     let indicatorAxis: AxisSet = axis == .vertical ? .vertical : .horizontal
     let foregroundStyle =
       drawMetadata.focusedScrollIndicatorAxes?.contains(indicatorAxis) == true
-      ? (drawMetadata.scrollIndicatorForegroundStyle ?? .semantic(.tint))
-      : .semantic(.muted)
+      ? (drawMetadata.scrollIndicatorAppearance?.focusedForegroundStyle
+        ?? drawMetadata.scrollIndicatorForegroundStyle ?? .semantic(.tint))
+      : (drawMetadata.scrollIndicatorAppearance?.foregroundStyle ?? .semantic(.muted))
     // The cascade product; equals `drawMetadata.opacity` with no faded
     // ancestor.
     return .init(foregroundStyle: foregroundStyle, opacity: effectiveOpacity)
@@ -327,6 +325,7 @@ extension DrawExtractor {
   private func verticalScrollIndicatorCommands(
     metrics: ScrollIndicatorMetrics,
     offset: Int,
+    glyph: String,
     style: TextStyle
   ) -> [DrawCommand] {
     let bounds = metrics.rect
@@ -341,13 +340,14 @@ extension DrawExtractor {
 
     let x = bounds.origin.x + bounds.size.width - 1
     return thumbRange.flatMap { y in
-      singleCellIndicatorCommand(x: x, y: y, glyph: "▐", style: style)
+      singleCellIndicatorCommand(x: x, y: y, glyph: glyph, style: style)
     }
   }
 
   private func horizontalScrollIndicatorCommands(
     metrics: ScrollIndicatorMetrics,
     offset: Int,
+    glyph: String,
     style: TextStyle
   ) -> [DrawCommand] {
     let bounds = metrics.rect
@@ -362,7 +362,7 @@ extension DrawExtractor {
 
     let y = bounds.origin.y + bounds.size.height - 1
     return thumbRange.flatMap { x in
-      singleCellIndicatorCommand(x: x, y: y, glyph: "▂", style: style)
+      singleCellIndicatorCommand(x: x, y: y, glyph: glyph, style: style)
     }
   }
 

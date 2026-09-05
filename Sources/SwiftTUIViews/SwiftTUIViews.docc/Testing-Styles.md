@@ -177,15 +177,17 @@ configuration is SPI-gated like the other families.
 | ``PromptStyle`` | ``PromptStyleConfiguration`` with message/action presence and the declaration's baseline |
 | ``FullScreenCoverStyle`` | ``FullScreenCoverStyleConfiguration`` |
 | ``PopoverStyle`` | ``PopoverStyleConfiguration`` |
+| ``ScrollViewStyle`` | ``ScrollViewStyleConfiguration`` with axes, permitted indicators, host capability, and focus state |
+| ``LinkStyle`` | ``LinkStyleConfiguration`` with inline, enabled, focused, and pressed state |
 | ``ToastStyle`` | ``ToastStyleConfiguration`` |
 | ``TabViewStyle`` | ``TabViewStyleBodyConfiguration`` and its `Content` slot; the item, trigger, and strip configurations through their public initializers |
 
 Presentation values (``AnchoredSurfaceStylePresentation``, ``SpinnerStylePresentation``,
 ``SheetSurfaceStylePresentation``, ``PromptSurfaceStylePresentation``,
 ``FullScreenSurfaceStylePresentation``, ``ToastStylePresentation``,
-``TabViewStylePresentation``, and the collection presentations) already have
-public initializers because styles construct them. Families added later
-follow the same rule as they ship. SPI symbols do not appear in the
+``TabViewStylePresentation``, ``ScrollViewStylePresentation``,
+``LinkStylePresentation``, and the collection presentations) have public
+initializers because styles construct them. SPI symbols do not appear in the
 reference documentation; the initializers mirror the configuration's
 documented stored properties in declaration order.
 

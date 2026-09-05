@@ -101,6 +101,68 @@ private struct Boundary<Content: View>: View, Equatable {
 @MainActor
 @Suite("Reader-scoped environment reuse")
 struct ReaderScopedEnvironmentReuseTests {
+  @Test("scroll and link style unread changes are tolerated", arguments: [false, true])
+  func scrollLinkStyleUnread(link: Bool) {
+    struct Root: View {
+      let changed: Bool
+      let link: Bool
+      var body: some View {
+        VStack {
+          Boundary(content: Text("plain"))
+          Text(changed ? "new" : "old")
+        }
+        .linkStyle(ConsumerLinkStyle(foreground: .color(link && changed ? .green : .red)))
+        .scrollViewStyle(ConsumerScrollViewStyle(verticalGlyph: !link && changed ? "Y" : "X"))
+      }
+    }
+    let renderer = makeRenderer()
+    _ = renderer.render(Root(changed: false, link: link), context: .init(identity: rootIdentity))
+    _ = renderer.render(
+      Root(changed: true, link: link),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("scroll and link style readers restyle", arguments: [false, true])
+  func scrollLinkStyleReader(link: Bool) {
+    struct Root: View {
+      let changed: Bool
+      let link: Bool
+      var body: some View {
+        VStack {
+          if link {
+            Boundary(content: Link("Docs", destination: "https://example.com"))
+          } else {
+            Boundary(
+              content: ScrollView {
+                VStack(spacing: 0) { ForEach(0..<20) { Text("Row \($0)") } }
+              }.frame(width: 10, height: 4))
+          }
+        }
+        .linkStyle(ConsumerLinkStyle(foreground: .color(changed ? .green : .red)))
+        .scrollViewStyle(
+          ConsumerScrollViewStyle(
+            insets: .zero, reservesSpace: true,
+            verticalGlyph: changed ? "Y" : "X"))
+      }
+    }
+    let renderer = makeRenderer()
+    _ = renderer.render(
+      Root(changed: false, link: link), context: .init(identity: rootIdentity),
+      proposal: .init(width: 20, height: 8))
+    let frame = renderer.render(
+      Root(changed: true, link: link),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]),
+      proposal: .init(width: 20, height: 8))
+    #expect(!toleratedBoundary(in: renderer))
+    if link {
+      #expect(frame.rasterSurface.styleRuns.contains { $0.style.foregroundColor == .green })
+    } else {
+      #expect(frame.rasterSurface.lines.joined().contains("Y"))
+      #expect(!frame.rasterSurface.lines.joined().contains("X"))
+    }
+  }
+
   @Test("prompt declarations read style even while closed", arguments: [false, true])
   func promptStyleReaderIsDenied(presented: Bool) {
     let renderer = makeRenderer()

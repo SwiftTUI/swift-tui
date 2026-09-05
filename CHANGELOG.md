@@ -10,6 +10,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- **Scroll and link styles.** `ScrollViewStyle` supplies insets, indicator
+  glyphs and paint, opacity, and reserved or overlay tracks. `LinkStyle`
+  styles standalone and interpolated links, with explicit underline
+  inheritance or removal. Both have generic and erased modifiers and inert
+  configuration fixtures. Scrolling, indicator policy, and link actions remain
+  primitive-owned. Scroll content now clips to its content viewport so it
+  cannot erase reserved indicator tracks.
 - **Public palette styles.** `PaletteStyle` composes command data through
   public pointer routes, `perform()`, and coordinated dismissal. Opaque command
   identities follow contribution structure, preserving selection across label

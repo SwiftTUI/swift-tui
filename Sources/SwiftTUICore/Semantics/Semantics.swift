@@ -365,11 +365,14 @@ extension SemanticExtractor {
           )
         )
 
+        let contentClip = frame.node.drawMetadata.scrollIndicatorAppearance.map {
+          frame.node.scrollViewportRect ?? $0.insetBounds(frame.node.bounds)
+        }
         let childContext = VisitContext(
           scopePath: nodeScopePath,
           sectionIdentity: nodeSectionIdentity,
           modalFocusScopePath: nodeModalFocusScopePath,
-          clipRect: nodeClipRect,
+          clipRect: combinedClipRect(inherited: nodeClipRect, next: contentClip),
           sealingParentOnChain: frame.context.sealingParentOnChain
             || frame.node.semanticMetadata.sealsFocusDescendants,
           interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain
