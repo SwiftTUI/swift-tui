@@ -15,7 +15,7 @@ struct MenuStyleRuntimeTests {
     _ = renderer.render(
       Menu("Commands") { Text("Item") }
         .menuStyle(InspectMenuStyle(probe: probe)).id(id), context: context)
-    weak var owner = renderer.viewGraph.nodeForIdentity(id.child(.named("MenuState")))
+    weak let owner = renderer.viewGraph.nodeForIdentity(id.child(.named("MenuState")))
     #expect(owner != nil)
     let binding = try #require(probe.configuration?.$isPresented)
     binding.wrappedValue = true
