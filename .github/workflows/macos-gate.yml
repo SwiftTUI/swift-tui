@@ -1,13 +1,12 @@
 name: macOS Gate
 
-# The macOS repo gate, off the push path (swift-tui-org plan 2026-08-25-001,
-# Stage 1e): the push verdict is Linux-only and under 20 minutes; macOS —
-# the primary user platform — is verified nightly, on every release tag, and
-# on demand. The nightly run skips itself when `main` has not moved since
-# its last green run (§6 skip-if-unchanged guard), so an idle repo costs
-# nothing. Run it before a release: `gh workflow run macos-gate.yml`.
+# The macOS repo gate runs on pull requests, pushes to main, release tags,
+# nightly, and on demand. Only the nightly run skips itself when `main` has
+# not moved since its last green run. Run it before a release:
+# `gh workflow run macos-gate.yml`.
 
 on:
+  pull_request:
   workflow_dispatch:
   push:
     branches:
