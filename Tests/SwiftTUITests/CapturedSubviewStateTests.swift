@@ -13,7 +13,7 @@ struct CapturedSubviewStateTests {
     let context = ResolveContext(identity: testIdentity("RetainedReference"))
     _ = renderer.render(ReferenceGroup(hidden: false, probe: probe), context: context)
     probe.binding?.wrappedValue = RetainedReference(7)
-    weak var retained = probe.binding?.wrappedValue
+    weak let retained = probe.binding?.wrappedValue
     let hidden = renderer.render(ReferenceGroup(hidden: true, probe: probe), context: context)
     #expect(hidden.diagnostics.runtime.issues.isEmpty)
     #expect(retained != nil)
