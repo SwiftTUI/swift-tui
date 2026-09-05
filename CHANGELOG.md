@@ -10,6 +10,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- Scroll body hit regions follow the styled content viewport, preserving
+  direct sub-cell panning alongside separately routed indicator tracks.
 - **Scroll and link styles.** `ScrollViewStyle` supplies insets, indicator
   glyphs and paint, opacity, and reserved or overlay tracks. `LinkStyle`
   styles standalone and interpolated links, with explicit underline

@@ -153,6 +153,7 @@ struct ScrollLinkStyleTests {
       viewportRect: route.viewportRect, contentBounds: route.contentBounds)
     let body = try #require(
       snapshot.semanticSnapshot.interactionRegions.first { $0.identity == identity })
+    #expect(body.rect == route.viewportRect)
     #expect(
       registry.dispatch(
         routeID: body.routeID,
