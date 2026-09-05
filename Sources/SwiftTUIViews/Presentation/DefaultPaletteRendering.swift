@@ -1,4 +1,4 @@
-public import SwiftTUICore
+import SwiftTUICore
 
 /// A fuzzy filter, keyboard selection, and up to twelve visible command rows.
 public struct DefaultPaletteStyle: PaletteStyle {
