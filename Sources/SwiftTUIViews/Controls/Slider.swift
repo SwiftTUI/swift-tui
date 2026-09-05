@@ -9,6 +9,7 @@ public struct Slider<Label: View>: PrimitiveView, ResolvableView {
 
   private var valueStorage: ValueStorage
   private var label: Label
+  private let authoringScope: AuthoringContext?
 
   public init<S: StringProtocol>(
     _ title: S,
@@ -22,6 +23,7 @@ public struct Slider<Label: View>: PrimitiveView, ResolvableView {
       step: Int.sanitizedControlStep(step)
     )
     label = Text(String(title))
+    authoringScope = currentAuthoringContext()
   }
 
   public init<S: StringProtocol>(
@@ -36,6 +38,7 @@ public struct Slider<Label: View>: PrimitiveView, ResolvableView {
       step: step.map(Double.sanitizedControlStep)
     )
     label = Text(String(title))
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -50,6 +53,7 @@ public struct Slider<Label: View>: PrimitiveView, ResolvableView {
       step: Int.sanitizedControlStep(step)
     )
     self.label = label()
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -64,6 +68,7 @@ public struct Slider<Label: View>: PrimitiveView, ResolvableView {
       step: step.map(Double.sanitizedControlStep)
     )
     self.label = label()
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
@@ -117,23 +122,12 @@ extension Slider {
       == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let currentValue = clampedControlValue(binding.wrappedValue, to: bounds)
-    let chrome = styleEnvironment.rowChrome(
-      isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect,
-      isPressed: isPressed
-    )
-    let contentChrome = styleEnvironment.controlChrome(
-      isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect,
-      isPressed: isPressed
-    )
-
     if isEnabled {
       let bounds = bounds
       let adjustmentStep = adjustmentStep
       let intake = HandlerDescriptorIntake(
         context: context,
-        fallbackAuthoringScope: nil
+        fallbackAuthoringScope: authoringScope
       )
       intake.registerAction(identity: context.identity) {
         let next = steppedControlValue(
@@ -219,19 +213,22 @@ extension Slider {
       }
     }
 
-    let child = sliderBody(
-      controlIdentity: context.identity,
-      value: currentValue,
-      bounds: bounds,
-      step: trackStep,
-      showsFocusRail: isFocused && showsFocusEffect,
-      isHighlighted: (isFocused && showsFocusEffect) || isPressed,
-      isActiveNavigation: (isFocused && showsFocusEffect) || isPressed,
-      chrome: chrome,
-      contentChrome: contentChrome
-    ).resolve(
-      in: context.child(component: .named("SliderBody"))
-    )
+    let formatted = formattedControlValue(currentValue, bounds: bounds, step: trackStep)
+    var configuration = SliderStyleConfiguration(
+      label: .init(authoringContext: authoringScope) { label },
+      valueLabel: .init(authoringContext: authoringScope) { Text(formatted) },
+      fractionCompleted: sliderFraction(value: currentValue, bounds: bounds),
+      trackCellCount: 8,
+      isEnabled: isEnabled,
+      isFocused: isFocused,
+      showsFocusEffect: showsFocusEffect,
+      isPressed: isPressed,
+      canDecrement: stepperCanAdjust(currentValue, delta: -1, step: adjustmentStep, bounds: bounds),
+      canIncrement: stepperCanAdjust(currentValue, delta: 1, step: adjustmentStep, bounds: bounds),
+      styleEnvironment: styleEnvironment)
+    configuration.bindRoutes(to: context.identity)
+    let child = context.environmentValues.sliderStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("SliderBody")))
 
     return ResolvedNode(
       identity: context.identity,
@@ -244,56 +241,5 @@ extension Slider {
         accessibilityRole: .slider
       )
     )
-  }
-
-  @ViewBuilder
-  private func sliderBody<Value: AdjustableControlValue>(
-    controlIdentity: Identity,
-    value: Value,
-    bounds: ClosedRange<Value>,
-    step: Value,
-    showsFocusRail: Bool,
-    isHighlighted: Bool,
-    isActiveNavigation: Bool,
-    chrome: ControlChrome,
-    contentChrome: ControlChrome
-  ) -> some View {
-    let track = sliderTrack(value: value, bounds: bounds)
-    let trackStyle =
-      isActiveNavigation
-      ? contentChrome.borderStyle
-      : AnyShapeStyle(.separator)
-    let valueStyle =
-      isActiveNavigation
-      ? contentChrome.foregroundStyle
-      : chrome.foregroundStyle
-    let trackView = Text(track)
-      .foregroundStyle(trackStyle)
-      .id(sliderTrackIdentity(for: controlIdentity))
-      .semanticMetadata(.init(participatesInPointerHitTesting: true, captureOnPress: true))
-    let controls = HStack(alignment: .center, spacing: 1) {
-      trackView
-      Text(formattedControlValue(value, bounds: bounds, step: step))
-        .foregroundStyle(valueStyle)
-    }
-    .drawMetadata(.init(opacity: contentChrome.opacity))
-    let controlsView = highlightedControlRow(
-      controls,
-      isHighlighted: isActiveNavigation,
-      backgroundStyle: contentChrome.backgroundStyle
-    )
-    let row = controlFocusRow(
-      showsRail: showsFocusRail,
-      railStyle: chrome.borderStyle,
-      isHighlighted: isHighlighted,
-      backgroundStyle: chrome.backgroundStyle,
-      reservesRailSpaceWhenHidden: true
-    ) {
-      label
-        .foregroundStyle(.terminalBorder(.accent))
-      controlsView
-    }
-    .drawMetadata(.init(opacity: chrome.opacity))
-    row
   }
 }

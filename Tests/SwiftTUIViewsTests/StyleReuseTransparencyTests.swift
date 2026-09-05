@@ -20,6 +20,26 @@ import Testing
 /// goes through value equality.
 @MainActor
 struct StyleReuseTransparencyTests {
+  @Test("Slider styles preserve reuse equality")
+  func sliderStylesAreReuseTransparent() {
+    #expect(AnySliderStyle.automatic.isEqualForReuse(to: AnySliderStyle.automatic))
+    #expect(AnySliderStyle.linear.isEqualForReuse(to: AnySliderStyle.linear))
+    #expect(!AnySliderStyle.automatic.isEqualForReuse(to: AnySliderStyle.linear))
+    #expect(AnySliderStyle(EquatableSliderStyle(value: 1)).isEqualForReuse(to: AnySliderStyle(EquatableSliderStyle(value: 1))))
+    #expect(!AnySliderStyle(EquatableSliderStyle(value: 1)).isEqualForReuse(to: AnySliderStyle(EquatableSliderStyle(value: 2))))
+    #expect(!AnySliderStyle(OpaqueSliderStyle()).isEqualForReuse(to: AnySliderStyle(OpaqueSliderStyle())))
+  }
+
+  @Test("Stepper styles preserve reuse equality")
+  func stepperStylesAreReuseTransparent() {
+    #expect(AnyStepperStyle.automatic.isEqualForReuse(to: AnyStepperStyle.automatic))
+    #expect(AnyStepperStyle.compact.isEqualForReuse(to: AnyStepperStyle.compact))
+    #expect(!AnyStepperStyle.automatic.isEqualForReuse(to: AnyStepperStyle.compact))
+    #expect(AnyStepperStyle(EquatableStepperStyle(value: 1)).isEqualForReuse(to: AnyStepperStyle(EquatableStepperStyle(value: 1))))
+    #expect(!AnyStepperStyle(EquatableStepperStyle(value: 1)).isEqualForReuse(to: AnyStepperStyle(EquatableStepperStyle(value: 2))))
+    #expect(!AnyStepperStyle(OpaqueStepperStyle()).isEqualForReuse(to: AnyStepperStyle(OpaqueStepperStyle())))
+  }
+
   @Test("Toggle styles preserve reuse equality")
   func toggleStylesAreReuseTransparent() {
     #expect(AnyToggleStyle.automatic.isEqualForReuse(to: AnyToggleStyle.automatic))
@@ -190,6 +210,8 @@ struct StyleReuseTransparencyTests {
 /// to be revisited whenever one is added.
 struct StyleReuseTransparencyRosterTests {
   private static let wrapperFactoryCounts = [
+    "Sources/SwiftTUIViews/Controls/SliderStyles.swift": 2,
+    "Sources/SwiftTUIViews/Controls/StepperStyles.swift": 2,
     "Sources/SwiftTUIViews/Controls/ToggleStyles.swift": 3,
     "Sources/SwiftTUIViews/Controls/DisclosureGroupStyles.swift": 2,
     "Sources/SwiftTUIViews/Input/TextEditorStyles.swift": 3,
@@ -204,6 +226,8 @@ struct StyleReuseTransparencyRosterTests {
   ]
 
   private static let markerConformanceFiles = [
+    "Sources/SwiftTUIViews/Controls/SliderStyles.swift",
+    "Sources/SwiftTUIViews/Controls/StepperStyles.swift",
     "Sources/SwiftTUIViews/Controls/ToggleStyles.swift",
     "Sources/SwiftTUIViews/Controls/DisclosureGroupStyles.swift",
     "Sources/SwiftTUIViews/Input/TextEditorStyles.swift",
@@ -258,6 +282,22 @@ struct StyleReuseTransparencyRosterTests {
 }
 
 // MARK: - Test styles
+
+private struct EquatableSliderStyle: SliderStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: SliderStyleConfiguration) -> some View { Text("test") }
+}
+private struct OpaqueSliderStyle: SliderStyle {
+  func makeBody(configuration: SliderStyleConfiguration) -> some View { Text("test") }
+}
+
+private struct EquatableStepperStyle: StepperStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: StepperStyleConfiguration) -> some View { Text("test") }
+}
+private struct OpaqueStepperStyle: StepperStyle {
+  func makeBody(configuration: StepperStyleConfiguration) -> some View { Text("test") }
+}
 
 private struct EquatableToggleStyle: ToggleStyle, Equatable {
   let value: Int

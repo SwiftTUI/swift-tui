@@ -307,26 +307,15 @@ func formattedControlValue<Value: AdjustableControlValue>(
   )
 }
 
-func sliderTrack<Value: AdjustableControlValue>(
+func sliderFraction<Value: AdjustableControlValue>(
   value: Value,
   bounds: ClosedRange<Value>
-) -> String {
-  let segmentCount = 8
+) -> Double {
   let lower = bounds.lowerBound.controlDoubleValue
   let upper = bounds.upperBound.controlDoubleValue
   let span = max(leastMeaningfulControlDelta, upper - lower)
-  let normalized = (value.controlDoubleValue - lower) / span
-  let position = min(
-    max(0, Int((normalized * Double(segmentCount - 1)).rounded())),
-    segmentCount - 1
-  )
-
-  var characters = Array(repeating: Character("─"), count: segmentCount)
-  for index in 0..<position {
-    characters[index] = Character("━")
-  }
-  characters[position] = Character("●")
-  return String(characters)
+  let fraction = (value.controlDoubleValue - lower) / span
+  return fraction.isFinite ? min(max(fraction, 0), 1) : 0
 }
 
 private let leastMeaningfulControlDelta = 1e-12

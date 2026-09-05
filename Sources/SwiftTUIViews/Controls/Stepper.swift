@@ -128,17 +128,6 @@ extension Stepper {
       step: step,
       bounds: bounds
     )
-    let chrome = styleEnvironment.rowChrome(
-      isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect,
-      isPressed: isPressed
-    )
-    let contentChrome = styleEnvironment.controlChrome(
-      isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect,
-      isPressed: isPressed
-    )
-
     if isEnabled {
       let bounds = bounds
       let step = step
@@ -243,21 +232,20 @@ extension Stepper {
       }
     }
 
-    let child = stepperBody(
-      controlIdentity: context.identity,
-      value: currentValue,
-      step: step,
-      bounds: bounds,
+    let formatted = formattedControlValue(currentValue, bounds: bounds, step: step)
+    var configuration = StepperStyleConfiguration(
+      label: .init(authoringContext: authoringScope) { label },
+      valueLabel: .init(authoringContext: authoringScope) { Text(formatted) },
       canDecrement: canDecrement,
       canIncrement: canIncrement,
-      showsFocusRail: isFocused && showsFocusEffect,
-      isHighlighted: (isFocused && showsFocusEffect) || isPressed,
-      isActiveNavigation: (isFocused && showsFocusEffect) || isPressed,
-      chrome: chrome,
-      contentChrome: contentChrome
-    ).resolve(
-      in: context.child(component: .named("StepperBody"))
-    )
+      isEnabled: isEnabled,
+      isFocused: isFocused,
+      showsFocusEffect: showsFocusEffect,
+      isPressed: isPressed,
+      styleEnvironment: styleEnvironment)
+    configuration.bindRoutes(to: context.identity)
+    let child = context.environmentValues.stepperStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("StepperBody")))
 
     return ResolvedNode(
       identity: context.identity,
@@ -270,63 +258,5 @@ extension Stepper {
         accessibilityRole: .stepper
       )
     )
-  }
-
-  @ViewBuilder
-  private func stepperBody<Value: AdjustableControlValue>(
-    controlIdentity: Identity,
-    value: Value,
-    step: Value,
-    bounds: ClosedRange<Value>?,
-    canDecrement: Bool,
-    canIncrement: Bool,
-    showsFocusRail: Bool,
-    isHighlighted: Bool,
-    isActiveNavigation: Bool,
-    chrome: ControlChrome,
-    contentChrome: ControlChrome
-  ) -> some View {
-    let inactiveStyle = AnyShapeStyle(.placeholder)
-    let controlForeground =
-      isActiveNavigation
-      ? contentChrome.foregroundStyle
-      : chrome.foregroundStyle
-    let controlAccent =
-      isActiveNavigation
-      ? contentChrome.borderStyle
-      : AnyShapeStyle(.separator)
-    let decrementControl = Text(canDecrement ? "◀" : "◁")
-      .foregroundStyle(canDecrement ? controlAccent : inactiveStyle)
-      .id(stepperDecrementIdentity(for: controlIdentity))
-      .semanticMetadata(.init(participatesInPointerHitTesting: true))
-    let incrementControl = Text(canIncrement ? "▶" : "▷")
-      .foregroundStyle(canIncrement ? controlAccent : inactiveStyle)
-      .id(stepperIncrementIdentity(for: controlIdentity))
-      .semanticMetadata(.init(participatesInPointerHitTesting: true))
-    let controls = HStack(alignment: .center, spacing: 1) {
-      decrementControl
-      Text(formattedControlValue(value, bounds: bounds, step: step))
-        .foregroundStyle(controlForeground)
-      incrementControl
-    }
-    .drawMetadata(.init(opacity: contentChrome.opacity))
-    let controlsView = highlightedControlRow(
-      controls,
-      isHighlighted: isActiveNavigation,
-      backgroundStyle: contentChrome.backgroundStyle
-    )
-    let row = controlFocusRow(
-      showsRail: showsFocusRail,
-      railStyle: chrome.borderStyle,
-      isHighlighted: isHighlighted,
-      backgroundStyle: chrome.backgroundStyle,
-      reservesRailSpaceWhenHidden: true
-    ) {
-      label
-        .foregroundStyle(.terminalBorder(.accent))
-      controlsView
-    }
-    .drawMetadata(.init(opacity: chrome.opacity))
-    row
   }
 }

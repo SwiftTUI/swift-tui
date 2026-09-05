@@ -10,6 +10,7 @@ import SwiftTUICore
 struct PointerRouteView<Content: View>: PrimitiveView, ResolvableView {
   var identity: Identity
   var content: Content
+  var captureOnPress = false
 
   package func resolveElements(
     in context: ResolveContext
@@ -25,7 +26,8 @@ struct PointerRouteView<Content: View>: PrimitiveView, ResolvableView {
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
-        semanticMetadata: .init(participatesInPointerHitTesting: true)
+        semanticMetadata: .init(
+          participatesInPointerHitTesting: true, captureOnPress: captureOnPress)
       )
     ]
   }

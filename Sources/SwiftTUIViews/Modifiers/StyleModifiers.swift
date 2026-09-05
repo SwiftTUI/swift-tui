@@ -1,6 +1,22 @@
 public import SwiftTUICore
 
 extension View {
+  /// Sets the Slider composition for this subtree.
+  public func sliderStyle(_ style: AnySliderStyle) -> some View {
+    environment(\.sliderStyle, style)
+  }
+  public func sliderStyle<S: SliderStyle>(_ style: S) -> some View {
+    sliderStyle(AnySliderStyle(style))
+  }
+
+  /// Sets the Stepper composition for this subtree.
+  public func stepperStyle(_ style: AnyStepperStyle) -> some View {
+    environment(\.stepperStyle, style)
+  }
+  public func stepperStyle<S: StepperStyle>(_ style: S) -> some View {
+    stepperStyle(AnyStepperStyle(style))
+  }
+
   /// Sets the Toggle composition for this subtree.
   public func toggleStyle(_ style: AnyToggleStyle) -> some View {
     environment(\.toggleStyle, style)

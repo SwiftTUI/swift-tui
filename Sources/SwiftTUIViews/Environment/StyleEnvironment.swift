@@ -1,5 +1,13 @@
 public import SwiftTUICore
 
+private enum SliderStyleKey: EnvironmentKey {
+  static let defaultValue = AnySliderStyle.automatic
+}
+
+private enum StepperStyleKey: EnvironmentKey {
+  static let defaultValue = AnyStepperStyle.automatic
+}
+
 enum ThemeKey: EnvironmentKey {
   static let defaultValue: Theme? = nil
 }
@@ -153,6 +161,16 @@ private enum RuntimeFocusSideFieldReadKey {}
 private enum RuntimeFocusTargetScopedReadKey {}
 
 extension EnvironmentValues {
+  package var sliderStyle: AnySliderStyle {
+    get { self[SliderStyleKey.self] }
+    set { self[SliderStyleKey.self] = newValue }
+  }
+
+  package var stepperStyle: AnyStepperStyle {
+    get { self[StepperStyleKey.self] }
+    set { self[StepperStyleKey.self] = newValue }
+  }
+
   package var toggleStyle: AnyToggleStyle {
     get { self[ToggleStyleKey.self] }
     set { self[ToggleStyleKey.self] = newValue }

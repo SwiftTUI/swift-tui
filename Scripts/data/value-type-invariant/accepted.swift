@@ -9,6 +9,15 @@
 import SwiftTUIRuntime
 import SwiftTUIViews
 
+struct AcceptedSliderStyle: SliderStyle {
+  func makeBody(configuration: SliderStyleConfiguration) -> some View { Text("test") }
+}
+
+struct AcceptedStepperStyle: StepperStyle {
+  func makeBody(configuration: StepperStyleConfiguration) -> some View { Text("test") }
+}
+
+
 struct AcceptedToggleStyle: ToggleStyle {
   func makeBody(configuration: ToggleStyleConfiguration) -> some View { Text("test") }
 }

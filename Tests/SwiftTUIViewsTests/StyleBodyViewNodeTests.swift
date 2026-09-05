@@ -14,6 +14,22 @@ import Testing
 /// fuzzer case-139).
 @MainActor
 struct StyleBodyViewNodeTests {
+  @Test("Slider style bodies have their own applied nodes", arguments: [0, 1])
+  func sliderStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnySliderStyle] = [.automatic, .linear]
+    let result = resolveWithGraph(
+      Slider("Level", value: .constant(5), in: 0...10).sliderStyle(styles[index]), root: "SliderStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "Slider", bodyComponent: "SliderBody")
+  }
+
+  @Test("Stepper style bodies have their own applied nodes", arguments: [0, 1])
+  func stepperStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnyStepperStyle] = [.automatic, .compact]
+    let result = resolveWithGraph(
+      Stepper("Count", value: .constant(5), in: 0...10).stepperStyle(styles[index]), root: "StepperStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "Stepper", bodyComponent: "StepperBody")
+  }
+
   @Test("Toggle style bodies have their own applied nodes", arguments: [0, 1, 2])
   func toggleStyleBodyHasOwnNode(_ index: Int) throws {
     let styles: [AnyToggleStyle] = [.automatic, .checkbox, .button]

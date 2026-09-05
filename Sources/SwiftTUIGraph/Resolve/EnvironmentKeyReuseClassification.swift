@@ -107,6 +107,10 @@ package enum EnvironmentKeyReuseClassification {
     "DisclosureGroupStyleKey",
     "TextEditorStyleKey",
     "ProgressViewStyleKey",
+    // The value-control primitives read these once while constructing the
+    // captured style body; route placement carries resolved semantics forward.
+    "SliderStyleKey",
+    "StepperStyleKey",
   ]
 
   package static func isReaderAttributedOnly(_ keyType: Any.Type) -> Bool {

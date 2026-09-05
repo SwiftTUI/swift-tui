@@ -38,15 +38,19 @@ package struct StyleRouteTarget: Sendable, Equatable {
   package var family: String
   /// The route's name within the family (`"item"`, `"overflow trigger"`).
   package var role: String
+  /// Keeps a drag on this route even after the pointer leaves its bounds.
+  package var captureOnPress: Bool
 
   package init(
     identity: Identity,
     family: String,
-    role: String
+    role: String,
+    captureOnPress: Bool = false
   ) {
     self.identity = identity
     self.family = family
     self.role = role
+    self.captureOnPress = captureOnPress
   }
 }
 
@@ -125,7 +129,8 @@ package struct StyleRouteView<Content: View>: PrimitiveView, ResolvableView {
     }
     return PointerRouteView(
       identity: target.identity,
-      content: content
+      content: content,
+      captureOnPress: target.captureOnPress
     )
     .resolveElements(in: context)
   }

@@ -66,10 +66,10 @@ struct FrameworkStressControlInteractionAuthoringTests {
     #expect(value == 10)
   }
 
-  @Test("stress control interaction 019 zero-span slider track keeps one marker")
-  func controlInteraction019ZeroSpanSliderTrackKeepsOneMarker() {
-    // Hypothesis: a zero-span range can yield NaN and either trap or drop the authored marker.
-    #expect(sliderTrack(value: 5, bounds: 5...5) == "●───────")
+  @Test("stress control interaction 019 zero-span slider normalizes to the lower bound")
+  func controlInteraction019ZeroSpanSliderNormalizesToLowerBound() {
+    // The style fixture battery separately pins the single authored marker.
+    #expect(sliderFraction(value: 5, bounds: 5...5) == 0)
   }
 
   @Test("stress control interaction 020 selection delta gives vertical motion precedence")

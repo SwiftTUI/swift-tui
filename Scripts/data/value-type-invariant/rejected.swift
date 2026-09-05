@@ -12,6 +12,15 @@
 import SwiftTUIRuntime
 import SwiftTUIViews
 
+final class RejectedSliderStyle: SliderStyle {
+  func makeBody(configuration: SliderStyleConfiguration) -> some View { Text("test") }
+}
+
+final class RejectedStepperStyle: StepperStyle {
+  func makeBody(configuration: StepperStyleConfiguration) -> some View { Text("test") }
+}
+
+
 final class RejectedToggleStyle: ToggleStyle {
   func makeBody(configuration: ToggleStyleConfiguration) -> some View { Text("test") }
 }

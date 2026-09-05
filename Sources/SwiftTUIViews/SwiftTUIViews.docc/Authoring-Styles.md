@@ -244,7 +244,8 @@ At `HEAD` the environment-scoped families are ``ButtonStyle``,
 ``TableStyle``, ``SpinnerStyle``, ``SheetStyle``, ``ToolbarStyle``, and
 ``TabViewStyle``, together with ``LabelStyle``, ``LabeledContentStyle``, and
 ``GroupBoxStyle``, ``ToggleStyle``, ``DisclosureGroupStyle``, ``TextEditorStyle``,
-and ``ProgressViewStyle``. ``ToastStyle`` is deliberately declaration-scoped: a
+``ProgressViewStyle``, ``SliderStyle``, and ``StepperStyle``.
+``ToastStyle`` is deliberately declaration-scoped: a
 toast's tone is per-toast data, so `.toast(..., style:)` keeps its
 parameter and no toast environment key exists. The remaining styleable
 surfaces, and the order they gain families, are recorded in
@@ -319,3 +320,24 @@ For theme-consistent custom composition, the style-environment snapshot exposes
 `controlChrome(isEnabled:isFocused:isPressed:isSelected:prominence:role:)` and
 `rowChrome(isEnabled:isFocused:isPressed:isSelected:role:)`. These return semantic
 paints and opacity; they do not install interaction.
+
+## Value-control routes
+
+``SliderStyleConfiguration/track(content:)`` installs the bounds used for
+pointer mapping and keeps a drag captured when it leaves those bounds. The
+configuration supplies a normalized fraction and the preferred track cell count;
+`valueLabel` is already formatted for the primitive's Int or Double storage.
+The primitive keeps clamping, step rounding, arrow keys, wheel input, and Space
+activation. `.automatic` is a fixed alias of `.linear`.
+
+``StepperStyleConfiguration/decrement(content:)`` and
+``StepperStyleConfiguration/increment(content:)`` install the independent
+action targets. Their content receives the appropriate disabled state. At a
+numeric bound the route still claims its press and release, so a disabled
+decrement cannot fall through to the primitive's increment action. The automatic
+treatment uses triangle controls; `.compact` uses minus/plus without a focus rail.
+
+Install each wrapper once. Omitting one removes that pointer target while
+keyboard interaction remains available. Repeated wrappers emit
+`style.duplicateRoute` and keep the first installation. Fixture-constructed
+routes remain inert.

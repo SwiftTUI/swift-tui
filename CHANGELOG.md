@@ -10,6 +10,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- **Slider and stepper styles.** `SliderStyle` and `StepperStyle` expose
+  captured labels, framework-formatted values, and public track/action routes.
+  Numeric storage, clamping, step rounding, keyboard input, and wheel handling
+  remain primitive-owned. Track routes preserve pointer capture during drags;
+  stepper routes claim bound presses without activating the opposite action.
+  Automatic slider is a fixed linear alias; compact stepper uses minus/plus
+  controls without a reserved focus rail. Fixture routes are inert.
 - **Bound-control and editor styles.** `ToggleStyle`, `DisclosureGroupStyle`,
   `TextEditorStyle`, and `ProgressViewStyle` expose captured content and current
   render state through public configurations and environment modifiers. Toggle

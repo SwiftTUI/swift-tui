@@ -101,6 +101,98 @@ private struct Boundary<Content: View>: View, Equatable {
 @MainActor
 @Suite("Reader-scoped environment reuse")
 struct ReaderScopedEnvironmentReuseTests {
+  @Test("slider style unread change is tolerated")
+  func sliderStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnySliderStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }.sliderStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerSliderStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerSliderStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("slider style reader restyles")
+  func sliderStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnySliderStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Slider("Level", value: .constant(5), in: 0...10))
+          Text(dynamic)
+        }.sliderStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerSliderStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerSliderStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(!toleratedBoundary(in: renderer))
+    #expect(rendered.contains("NewStyle"))
+    #expect(!rendered.contains("OldStyle"))
+  }
+
+  @Test("stepper style unread change is tolerated")
+  func stepperStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyStepperStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Text("plain"))
+          Text(dynamic)
+        }.stepperStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerStepperStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerStepperStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("stepper style reader restyles")
+  func stepperStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let style: AnyStepperStyle
+      let dynamic: String
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Boundary(content: Stepper("Count", value: .constant(5), in: 0...10))
+          Text(dynamic)
+        }.stepperStyle(style)
+      }
+    }
+    _ = renderer.render(Root(style: .init(ConsumerStepperStyle(prefix: "OldStyle")), dynamic: "v1"),
+      context: .init(identity: rootIdentity))
+    let frame = renderer.render(Root(style: .init(ConsumerStepperStyle(prefix: "NewStyle")), dynamic: "v2"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let rendered = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("v2"))
+    #expect(!toleratedBoundary(in: renderer))
+    #expect(rendered.contains("NewStyle"))
+    #expect(!rendered.contains("OldStyle"))
+  }
+
   @Test("toggle style unread change is tolerated")
   func toggleStyleUnreadChangeIsTolerated() {
     let renderer = makeRenderer()

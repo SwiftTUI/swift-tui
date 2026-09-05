@@ -302,6 +302,16 @@ classifications:
 
     # ─── View style protocols + concrete styles ────────────────────────────
     - SwiftTUIViews.AnyLabelStyle
+    - SwiftTUIViews.AnySliderStyle
+    - SwiftTUIViews.SliderStyle
+    - SwiftTUIViews.SliderStyleConfiguration
+    - SwiftTUIViews.AutomaticSliderStyle
+    - SwiftTUIViews.LinearSliderStyle
+    - SwiftTUIViews.AnyStepperStyle
+    - SwiftTUIViews.StepperStyle
+    - SwiftTUIViews.StepperStyleConfiguration
+    - SwiftTUIViews.AutomaticStepperStyle
+    - SwiftTUIViews.CompactStepperStyle
     - SwiftTUIViews.AnyToggleStyle
     - SwiftTUIViews.ToggleStyle
     - SwiftTUIViews.ToggleStyleConfiguration

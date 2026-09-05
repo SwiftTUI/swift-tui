@@ -214,6 +214,13 @@ the editor's protected content; `TextEditor.swift` owns the binding, selection,
 scroll position, and viewport-width probe used for wrapped caret navigation.
 Circular indeterminate progress composes the environment-styled `Spinner`.
 
+`Controls/SliderStyles.swift` and `StepperStyles.swift` own the value-control
+style contracts and built-ins. `ValueControlStyleRow.swift` shares pure row
+composition. Numeric normalization, formatting, and typed updates remain in
+`ControlValueMath.swift`, the slider/stepper primitives, and
+`AdjustableControlValueSupport.swift`. The shared `Foundation/StyleRoute.swift`
+wrapper forwards optional pointer capture to `Controls/PointerRouteView.swift`.
+
 ```
 Sources/
   SwiftTUIPrimitives/  Geometry, Support, Pointer, Styling (values), Content

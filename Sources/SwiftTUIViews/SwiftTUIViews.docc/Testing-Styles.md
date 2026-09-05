@@ -162,6 +162,8 @@ configuration is SPI-gated like the other families.
 | ``DisclosureGroupStyle`` | ``DisclosureGroupStyleConfiguration`` and its `Label` and `Content` slots |
 | ``TextEditorStyle`` | ``TextEditorStyleConfiguration`` and `EditorContent(displayText:)`; the editor fixture is inert |
 | ``ProgressViewStyle`` | ``ProgressViewStyleConfiguration`` and optional `Label` and `CurrentValueLabel` slots; `indeterminatePhase` defaults to zero |
+| ``SliderStyle`` | ``SliderStyleConfiguration`` and `Label`/`ValueLabel` slots; the track route is inert |
+| ``StepperStyle`` | ``StepperStyleConfiguration`` and `Label`/`ValueLabel` slots; both action routes are inert |
 | ``TextFieldStyle`` | ``TextFieldStyleConfiguration``, its `Label` slot, and `FieldContent` |
 | ``PickerStyle`` | ``PickerStyleConfiguration``, its `Label` slot, and `Option` fixtures; option and trigger routes are inert |
 | ``ListStyle`` | ``ListStyleConfiguration`` |
