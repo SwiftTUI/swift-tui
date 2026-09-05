@@ -1,13 +1,13 @@
 name: Release Soundness Lane
 
-# F05: the only release-configuration test executions in the repo. Never a
-# push/PR gate: release builds are slow, and the lane's flaky-suite step
+# F05: the only release-configuration test executions in the repo.
+# The lane's non-blocking flaky-suite step
 # intentionally exercises the load-flaky run-loop suites
 # (swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md #1) where an intermittent
 # red is signal, not a merge blocker.
 #
-# Runs nightly, on every release tag, and on demand (swift-tui-org plan
-# 2026-08-25-001 Stages 1e/5). The nightly run skips itself when `main` has
+# Runs on pull requests, nightly, on every release tag, and on demand.
+# Only the nightly run skips itself when `main` has
 # not moved since its last green run (§6 guard), which also answers the
 # reason the earlier cron was removed: a red can only settle onto a commit
 # this lane has not yet passed, never re-fail one it already cleared.
@@ -26,6 +26,7 @@ name: Release Soundness Lane
 # (flake register entry 20 records the two failure shapes).
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       run_race_checks:

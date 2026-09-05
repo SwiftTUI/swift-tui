@@ -23,14 +23,12 @@ name: Windows Build
 # Windows on the child repo's native `swift build` while per-repo version
 # drift lands.
 #
-# Off the push path since swift-tui-org plan 2026-08-25-001 Stage 1e: the
-# lane demonstrably finds platform-guard breaks (two on 2026-08-25 alone),
-# but at ~35 minutes × 2 architectures per push its pre-emptions were the
-# most expensive kind. It now runs nightly — skipping itself when `main` has
-# not moved since its last green run (§6 guard) — on every release tag, and
-# on demand. The push verdict stays Linux-only.
+# Runs on pull requests, nightly, on every release tag, and on demand.
+# Only the nightly run skips itself when `main` has not moved since its
+# last green run.
 
 on:
+  pull_request:
   workflow_dispatch:
   push:
     tags:
