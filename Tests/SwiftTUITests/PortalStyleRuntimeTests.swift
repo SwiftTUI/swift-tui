@@ -29,7 +29,7 @@ struct PortalStyleRuntimeTests {
       _ = try harness.pressKey(KeyPress(.escape))
       #expect(!harness.frame.contains("Presented body"))
       #expect(harness.runLoop.focusTracker.currentFocusIdentity == portalLauncherID)
-      #expect(!harness.runLoop.localActionRegistry.dispatch(identity: portalRunID))
+      #expect(!harness.runLoop.localActionRegistry.hasHandler(identity: portalRunID))
       #expect(probe.dismissals == cycle)
       #expect(probe.appearances == cycle)
       #expect(probe.disappearances == cycle)
