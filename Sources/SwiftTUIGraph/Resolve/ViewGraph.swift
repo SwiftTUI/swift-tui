@@ -3918,7 +3918,7 @@ package final class ViewGraph {
   /// subtrees' registrations remain valid in place — so re-publishing the whole
   /// tree (the former behavior) is redundant O(tree) work.
   ///
-  /// The restore is a **union** of two coverages:
+  /// The restore is a **union** of three coverages:
   ///
   /// 1. Each root's live ViewNode subtree (the original behavior). This reaches
   ///    nodes through the live tree — including registrations whose effective
@@ -3932,6 +3932,9 @@ package final class ViewGraph {
   ///    so without this a seam-hosted node's registrations — e.g. a lazy tab's
   ///    button action handler — were removed but never restored, leaving the
   ///    control dead until the next full publication.
+  /// 3. Plus the recording owners of pointer/hover routes selected by those
+  ///    prefixes. A style wrapper's synthetic resolved identity can select a
+  ///    route recorded by an ancestor outside the wrapper's subtree.
   package func restoreRuntimeRegistrationSubtrees(
     rootedAt roots: [Identity],
     into registrations: RuntimeRegistrationSet
@@ -3947,9 +3950,9 @@ package final class ViewGraph {
   }
 
   /// The live nodes a scoped publication covers for `roots`: each root's
-  /// ViewNode subtree, plus every live node selected by identity prefix that
-  /// the walk cannot reach. Shared by the reset-root computation and the
-  /// restore so the two select the same node set by construction.
+  /// ViewNode subtree, plus every live node selected by identity or pointer
+  /// owner prefix that the walk cannot reach. Shared by reset-root computation
+  /// and restoration so both select the same node set by construction.
   private func runtimeRegistrationSubtreeNodeIDs(
     rootedAt roots: [Identity]
   ) -> Set<ViewNodeID> {
@@ -3976,7 +3979,16 @@ package final class ViewGraph {
       if roots.contains(where: { root in
         identity == root || identity.isDescendant(of: root)
           || resolvedIdentity == root || resolvedIdentity.isDescendant(of: root)
+      }) || node.registeredHandlers.pointer.handlerOwners.values.contains(where: {
+        $0.matchesAnySubtreeRoot(roots)
+      }) || node.registeredHandlers.pointer.hoverOwners.values.contains(where: {
+        $0.matchesAnySubtreeRoot(roots)
       }) {
+        // A style route wrapper resolves to a synthetic pointer identity
+        // whose handlers belong to an ancestor control. Reset-root expansion
+        // includes that route, so restoration must include its recording
+        // owner too. The fixed-point reset then covers the owner's other
+        // registrations before they are restored together.
         nodeIDs.insert(nodeID)
       }
     }

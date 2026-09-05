@@ -925,6 +925,7 @@ extension FrameworkStressTabCommandTests {
   func stressTabCommand017OpenPaletteRemovesDepartedCommandAndAction() throws {
     // Hypothesis: an open palette may keep a departed command in its absorbed
     // snapshot or shift the next command onto the departed action closure.
+    let publicationBaseline = SoundnessProbeConfiguration.registrationPublicationViolationCount
     let probe = TabCommandStressProbe()
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressTC017", "Root"),
@@ -950,6 +951,9 @@ extension FrameworkStressTabCommandTests {
 
     _ = try harness.clickText("C surviving command")
     #expect(probe.events == ["c"])
+    #expect(
+      SoundnessProbeConfiguration.registrationPublicationViolationCount == publicationBaseline,
+      "\(SoundnessProbeConfiguration.lastViolationDetail ?? "no publication detail")")
   }
 }
 
@@ -990,6 +994,7 @@ extension FrameworkStressTabCommandTests {
   func stressTabCommand018DuplicatePaletteNamesFollowCurrentOwners() throws {
     // Hypothesis: identical command metadata may allow an open sheet to reuse
     // the first row while preserving the action from its previous source owner.
+    let publicationBaseline = SoundnessProbeConfiguration.registrationPublicationViolationCount
     let probe = TabCommandStressProbe()
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressTC018", "Root"),
@@ -1015,6 +1020,9 @@ extension FrameworkStressTabCommandTests {
     // discriminator: `b` can only fire if the reversal reached the open
     // palette. This assertion is therefore its own non-vacuity guard.
     #expect(probe.events == ["b"])
+    #expect(
+      SoundnessProbeConfiguration.registrationPublicationViolationCount == publicationBaseline,
+      "\(SoundnessProbeConfiguration.lastViolationDetail ?? "no publication detail")")
   }
 }
 

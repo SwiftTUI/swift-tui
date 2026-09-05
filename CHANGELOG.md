@@ -24,6 +24,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   changes and distinguishing duplicates. `DefaultPaletteStyle` retains fuzzy
   ranking, keyboard navigation, and the twelve-row window. Generic and erased
   modifiers preserve `ActionScope`; fixture construction is available by SPI.
+  Scoped publication preserves control-owned pointer and hover handlers when
+  only their styled route wrappers re-evaluate.
 - **Portal presentation styles.** `PromptStyle` shares appearance between
   alerts and confirmation dialogs; `FullScreenCoverStyle` controls cover insets
   and paint; `PopoverStyle` resolves the anchored surface shared with Menu.
