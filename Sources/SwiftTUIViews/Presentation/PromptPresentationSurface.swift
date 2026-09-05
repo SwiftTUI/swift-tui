@@ -134,7 +134,8 @@ package struct PromptPresentationSurface: View, ActionScope {
     case .menu:
       AnchoredContentPortalSurface(
         content: menuContentBody,
-        presentation: item.descriptor.anchoredPresentation ?? .init(),
+        presentation: item.descriptor.anchoredPresentation
+          ?? .init(borderStroke: item.descriptor.borderStyle),
         semanticMetadata: presentationSemanticMetadata
       )
     case .dropdown:
