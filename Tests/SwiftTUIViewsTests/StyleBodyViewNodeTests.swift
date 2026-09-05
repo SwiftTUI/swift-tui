@@ -14,6 +14,18 @@ import Testing
 /// fuzzer case-139).
 @MainActor
 struct StyleBodyViewNodeTests {
+  @Test("Palette styles have a dedicated host and applied body node")
+  func paletteStyleBodyHasOwnNode() throws {
+    let result = resolveWithGraph(
+      PaletteStyleHost(
+        style: .automatic, title: "Commands", commands: [],
+        terminalSize: .init(width: 60, height: 24), prominence: .standard,
+        styleEnvironment: .init(), isPresented: { true }, dismiss: {}),
+      root: "PaletteStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(
+      result, controlKind: "PaletteStyleHost", bodyComponent: "PaletteBody")
+  }
+
   @Test("Menu style bodies have their own applied nodes", arguments: [0, 1, 2, 3])
   func menuStyleBodyHasOwnNode(_ index: Int) throws {
     let styles: [AnyMenuStyle] = [.automatic, .button, .borderlessButton, .inline]

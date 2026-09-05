@@ -825,7 +825,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   `HEAD`, environment-scoped families exist for `Button`, `TextField`,
   `Picker`, `List`, `OutlineGroup`, `Table`, `Spinner`, `Sheet`, `Toolbar`,
   `TabView`, `Label`, `LabeledContent`, `GroupBox`, `Toggle`, `DisclosureGroup`,
-  `TextEditor`, `ProgressView`, `Slider`, `Stepper`, `Menu`, and `ControlGroup`;
+  `TextEditor`, `ProgressView`, `Slider`, `Stepper`, `Menu`, `ControlGroup`,
+  `Prompt`, `FullScreenCover`, `Popover`, and `Palette`;
   every shipped configuration, captured slot, and
   presentation value is constructible from a test target through
   `@_spi(StyleFixtures)`, and route wrappers share one misuse rule (a
@@ -838,9 +839,11 @@ are omitted even when SwiftUI exposes a corresponding API.
   text-editor styles surround protected editing content, and circular progress
   inherits the nearest spinner style. Value-control styles use public track and
   action wrappers while the primitives retain typed numeric behavior.
-  Toast deliberately keeps its declaration-scoped style
-  argument, and palette rendering stays internal until the public
-  `PaletteStyle` family ships. The other listed surfaces retain hard-coded
+  Palette styles compose command data with contribution identities and public
+  activation routes; the default preserves fuzzy ranking and keyboard selection.
+  Prompt, cover, and popover presentation values resolve through fixed surfaces
+  while their declarations retain modality, focus, and dismissal. Toast keeps
+  its declaration-scoped style argument. ScrollView and Link retain hard-coded
   chrome with no independently replaceable style seam; completing them is
   additive Phase B work on the burndown to 1.0.0.
 - **`Color` vocabulary differs.** *Gap.* Initializers use `alpha:` where

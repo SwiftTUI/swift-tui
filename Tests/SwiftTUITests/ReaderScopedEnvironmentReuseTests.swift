@@ -252,6 +252,57 @@ struct ReaderScopedEnvironmentReuseTests {
     #expect(toleratedBoundary(in: renderer))
   }
 
+  @Test("palette style unread change is tolerated")
+  func paletteStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      var body: some View {
+        VStack {
+          Boundary(content: Text("plain"))
+          Text(tag)
+        }.paletteStyle(ConsumerPaletteStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(Root(tag: "OldStyle"), context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(tag: "NewStyle"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(frame.rasterSurface.lines.joined().contains("NewStyle"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("palette declaration reads its style while open or closed", arguments: [false, true])
+  func paletteStyleReaderRestyles(presented: Bool) {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      let presented: Bool
+      var body: some View {
+        VStack {
+          Boundary(
+            content:
+              Panel(id: "Palette") { Text("Base") }
+              .paletteSheet("Palette", isPresented: .constant(presented)))
+          Text("tail")
+        }.paletteStyle(ConsumerPaletteStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(
+      Root(tag: "OldStyle", presented: presented), context: .init(identity: rootIdentity),
+      proposal: .init(width: 64, height: 24))
+    let frame = renderer.render(
+      Root(tag: "NewStyle", presented: presented),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]),
+      proposal: .init(width: 64, height: 24))
+    #expect(!toleratedBoundary(in: renderer))
+    if presented {
+      let text = frame.rasterSurface.lines.joined()
+      #expect(text.contains("NewStyle"))
+      #expect(!text.contains("OldStyle"))
+    }
+  }
+
   @Test("menu style reader restyles")
   func menuStyleReaderRestyles() {
     let renderer = makeRenderer()

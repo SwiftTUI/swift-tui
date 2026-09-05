@@ -1,27 +1,22 @@
 public import SwiftTUICore
 
-/// A palette-command contribution carried via
-/// `PaletteCommandsPreferenceKey` and absorbed by `.paletteSheet(...)`
-/// at the nearest enclosing `ActionScope`. The absorbing scope passes
-/// the snapshot from its subtree into the sheet content closure.
-/// A palette-command contribution.
-///
-/// Deliberately `package`, not public: a palette is a declaration plus
-/// command data plus the framework's own rendering, so no consumer ever
-/// receives this type. The public `PaletteStyle` protocol that would hand
-/// command data to an application is Phase B work.
+/// A contribution absorbed by the nearest palette declaration and projected
+/// into public command data with primitive-owned activation routes.
 package struct ActivePaletteCommand: Sendable {
+  package let identity: Identity
   package let name: String
   package let description: String?
   package let isEnabled: Bool
   package let action: @MainActor @Sendable () -> Void
 
   package init(
+    identity: Identity,
     name: String,
     description: String?,
     isEnabled: Bool,
     action: @escaping @MainActor @Sendable () -> Void
   ) {
+    self.identity = identity
     self.name = name
     self.description = description
     self.isEnabled = isEnabled
@@ -32,8 +27,8 @@ package struct ActivePaletteCommand: Sendable {
 /// Preference key that accumulates `paletteCommand` contributions from
 /// every descendant in a scope's subtree. Consumed and cleared at the
 /// nearest `ActionScope` host with a `.paletteSheet(...)` modifier
-/// (i.e. the `ActionScope`-scoped overload), which passes the absorbed
-/// snapshot into the sheet content closure. Mirrors
+/// (i.e. the `ActionScope`-scoped overload), which passes command data to its
+/// style. Mirrors
 /// `ToolbarItemsPreferenceKey`.
 package enum PaletteCommandsPreferenceKey: PreferenceKey {
   package static var defaultValue: [ActivePaletteCommand] { [] }
@@ -49,8 +44,7 @@ package enum PaletteCommandsPreferenceKey: PreferenceKey {
 extension ActionScope where Self: View & Sendable {
   /// Declares a searchable, consumer-invocable command. Contributions
   /// bubble up to the nearest enclosing `.paletteSheet(...)` (an
-  /// `ActionScope`), which absorbs them and passes the snapshot into
-  /// its content closure. Mirrors `.toolbarItem(...)` ↔ `.toolbar()`.
+  /// `ActionScope`), which absorbs them and supplies its palette style.
   @MainActor
   public func paletteCommand(
     name: String,
@@ -95,12 +89,16 @@ public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendabl
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
+    // Each modifier is a contribution site. Give its base a structural child
+    // edge so repeated modifiers on the same chain have distinct identities
+    // without deriving identity from labels or mutable preference cardinality.
+    var node = content.resolve(in: context.child(component: .named("PaletteCommandContent")))
     let intake = HandlerDescriptorIntake(
       context: context,
       preferringSnapshot: authoringContext
     )
     let contribution = ActivePaletteCommand(
+      identity: context.identity,
       name: name,
       description: description,
       isEnabled: isEnabled,

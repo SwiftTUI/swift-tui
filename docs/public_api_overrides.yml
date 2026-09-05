@@ -301,6 +301,10 @@ classifications:
     - SwiftTUIViews.UnitCurve
 
     # ─── View style protocols + concrete styles ────────────────────────────
+    - SwiftTUIViews.AnyPaletteStyle
+    - SwiftTUIViews.PaletteStyle
+    - SwiftTUIViews.PaletteStyleConfiguration
+    - SwiftTUIViews.DefaultPaletteStyle
     - SwiftTUIViews.AnyPromptStyle
     - SwiftTUIViews.PromptStyle
     - SwiftTUIViews.PromptStyleConfiguration
@@ -931,8 +935,8 @@ classifications:
     # Retired by the control-style A5 palette break: `paletteSheet` is
     # contentless and the framework renders the absorbed commands, so no
     # consumer receives the command payload. The type survives as `package`
-    # for the internal default rendering; a public palette command surface
-    # returns with the Phase B `PaletteStyle` protocol.
+    # for contribution transport; styles consume the public data-only
+    # PaletteStyleConfiguration.Command projection.
     - SwiftTUIViews.ActivePaletteCommand
     - SwiftTUIViews.GroupedListStyle
     - SwiftTUIViews.InsetListStyle

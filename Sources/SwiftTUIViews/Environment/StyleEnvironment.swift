@@ -76,6 +76,10 @@ private enum MenuStyleKey: EnvironmentKey {
   static let defaultValue = AnyMenuStyle.automatic
 }
 
+private enum PaletteStyleKey: EnvironmentKey {
+  static let defaultValue = AnyPaletteStyle.automatic
+}
+
 private enum GroupBoxStyleKey: EnvironmentKey {
   static let defaultValue = AnyGroupBoxStyle.automatic
 }
@@ -295,6 +299,11 @@ extension EnvironmentValues {
   package var menuStyle: AnyMenuStyle {
     get { self[MenuStyleKey.self] }
     set { self[MenuStyleKey.self] = newValue }
+  }
+
+  package var paletteStyle: AnyPaletteStyle {
+    get { self[PaletteStyleKey.self] }
+    set { self[PaletteStyleKey.self] = newValue }
   }
 
   package var groupBoxStyle: AnyGroupBoxStyle {

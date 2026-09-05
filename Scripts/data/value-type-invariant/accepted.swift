@@ -9,6 +9,10 @@
 import SwiftTUIRuntime
 import SwiftTUIViews
 
+struct AcceptedPaletteStyle: PaletteStyle {
+  func makeBody(configuration: PaletteStyleConfiguration) -> some View { Text(configuration.title) }
+}
+
 struct AcceptedMenuStyle: MenuStyle {
   func makeBody(configuration: MenuStyleConfiguration) -> some View { configuration.label }
 }

@@ -185,7 +185,9 @@ The full ActionScope/commands surface is public:
 - `Panel<ID, Content>` plus `.panel(id:)` and `.panel()`.
 - `.keyCommand(...)` with shallowest-wins dispatch along the focus chain.
   Modifier-less bindings are framework-reserved.
-- `.paletteCommand(...)` plus `EnvironmentValues.activePaletteCommands`.
+- `.paletteCommand(...)`, contentless `.paletteSheet(...)`, and `.paletteStyle(...)`.
+  `PaletteStyleConfiguration` supplies opaque command identities, public pointer
+  routes, guarded activation, and coordinated dismissal.
 - `.toolbar()`, `.toolbarStyle(...)`, and `.toolbarItem(...)`.
 - `Scene` and the presentation modifiers (`.alert`, `.confirmationDialog`,
   `.sheet`, `.fullScreenCover`, `.popover`, `.popoverTip`, `.toast`) conform

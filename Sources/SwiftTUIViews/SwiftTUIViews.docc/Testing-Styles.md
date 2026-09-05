@@ -166,6 +166,7 @@ configuration is SPI-gated like the other families.
 | ``StepperStyle`` | ``StepperStyleConfiguration`` and `Label`/`ValueLabel` slots; both action routes are inert |
 | ``MenuStyle`` | ``MenuStyleConfiguration`` and `Label`/`Content` slots; trigger and portal wrappers are inert |
 | ``ControlGroupStyle`` | ``ControlGroupStyleConfiguration`` and optional `Label` plus `Content` slots |
+| ``PaletteStyle`` | ``PaletteStyleConfiguration`` and `Command(id:name:description:isEnabled:)`; command routes, activation, and dismissal are inert |
 | ``TextFieldStyle`` | ``TextFieldStyleConfiguration``, its `Label` slot, and `FieldContent` |
 | ``PickerStyle`` | ``PickerStyleConfiguration``, its `Label` slot, and `Option` fixtures; option and trigger routes are inert |
 | ``ListStyle`` | ``ListStyleConfiguration`` |

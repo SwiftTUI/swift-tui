@@ -77,6 +77,23 @@ layout. Its compact built-in composes a public ``Menu``. The declaring group
 owns retained child state across inline and compact hosts. Omitted content
 has no live focus targets or control actions.
 
+``PaletteStyle`` creates views from command data instead of captured content.
+Its configuration supplies the declaration title, commands, terminal size,
+prominence, and source style environment. Each command has an opaque contribution
+ID: duplicate labels stay distinct, and changing a name or description preserves
+identity. Use `command.route { ... }` for a pointer target and `command.perform()`
+for a keyboard affordance. Both invoke the enabled contribution and dismiss the
+palette; modifying displayed command data cannot enable a disabled contribution.
+`configuration.dismiss()` supports Cancel buttons. The declaration continues to
+own dropdown placement, focus gating, Escape, stacking, and lifetime.
+
+``DefaultPaletteStyle`` implements `.automatic`: fuzzy subsequence filtering,
+selection by command identity, and a window of at most twelve rows. A custom
+style may implement a different filter, row layout, or sizing. Apply
+`.paletteStyle(...)` outside `.paletteSheet(...)` to style that declaration.
+The constrained modifier overload also preserves `ActionScope` for later scope
+declarations.
+
 ## Presentation-value styles
 
 A presentation-value style returns `Sendable` rendering data and leaves the

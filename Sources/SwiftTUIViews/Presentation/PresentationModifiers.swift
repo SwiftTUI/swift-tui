@@ -354,8 +354,7 @@ package struct MenuStylePresentationModifier<MenuContent: View>: PrimitiveViewMo
 
 /// Sheet variant that absorbs `paletteCommand` contributions from the
 /// enclosing scope's subtree via `PaletteCommandsPreferenceKey` and
-/// passes the snapshot into the sheet content closure. Mirrors the
-/// `.toolbar()` absorption pattern.
+/// projects the snapshot into its palette style. Mirrors `.toolbar()` absorption.
 public struct BuiltinPaletteSheetPresentationModifier: PrimitiveViewModifier {
   package let title: String
   package let isPresented: Binding<Bool>
@@ -390,6 +389,12 @@ public struct BuiltinPaletteSheetPresentationModifier: PrimitiveViewModifier {
       authoringContext: onDismissAuthoringContext
     )
     let spec = palettePromptPresentationSpec()
+    // Read while closed too, so a retained declaration observes style changes
+    // before its next opening. The body itself resolves only when presented.
+    let style = context.environmentValues.paletteStyle
+    let terminalSize = context.environmentValues.terminalSize
+    let prominence = context.environmentValues.controlProminence
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     // Absorbed `paletteCommand(...)` contributions are captured off the
     // background before they are cleared, so they reach the palette body
     // even when the background is reused (toggle-only frames) rather than
@@ -407,6 +412,13 @@ public struct BuiltinPaletteSheetPresentationModifier: PrimitiveViewModifier {
     ) { background, triggerIdentity in
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(for: background, token: spec.token)
+      let dismiss: @MainActor @Sendable () -> Void = {
+        [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
+        withAuthoringContext(dismissAuthoringContext) {
+          isPresented.wrappedValue = false
+        }
+        requestPresentationDismissReconcile(dismissInvalidator, triggerIdentity: triggerIdentity)
+      }
       let item = PromptPresentationItem(
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
@@ -416,23 +428,17 @@ public struct BuiltinPaletteSheetPresentationModifier: PrimitiveViewModifier {
         messagePayloads: [],
         contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
           portalAttachmentDeclaredBuilderChildren(
-            from: DefaultPaletteBody(
-              commands: absorbed,
-              isPresented: isPresented,
-              dismissAuthoringContext: dismissAuthoringContext
-            ),
+            from: PaletteStyleHost(
+              style: style, title: title, commands: absorbed,
+              terminalSize: terminalSize, prominence: prominence,
+              styleEnvironment: styleEnvironment,
+              isPresented: { [isPresented, dismissAuthoringContext] in
+                withAuthoringContext(dismissAuthoringContext) { isPresented.wrappedValue }
+              }, dismiss: dismiss),
             portalEntryID: portalEntryID
           )
         },
-        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity] in
-          withAuthoringContext(dismissAuthoringContext) {
-            isPresented.wrappedValue = false
-          }
-          requestPresentationDismissReconcile(
-            dismissInvalidator,
-            triggerIdentity: triggerIdentity
-          )
-        },
+        dismiss: dismiss,
         onDismiss: onDismiss
       )
 

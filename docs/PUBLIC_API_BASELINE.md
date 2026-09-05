@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 398 | 2358 |
+| `SwiftTUIViews` | 402 | 2390 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -126,10 +126,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (398)
+### Canonical surface (402)
 
 - `AccessibilityAnnouncer` — enum — 1 member
-- `ActionScope` — extension — 6 members
+- `ActionScope` — extension — 7 members
 - `AnchoredSurfaceStylePresentation` — struct — 8 members
 - `AnchorPreferenceTransformModifier` — struct
 - `AnchorPreferenceWritingModifier` — struct
@@ -150,6 +150,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnyListStyle` — struct — 6 members
 - `AnyMenuStyle` — struct — 7 members
 - `AnyOutlineStyle` — struct — 6 members
+- `AnyPaletteStyle` — struct — 4 members
 - `AnyPickerStyle` — struct — 8 members
 - `AnyPopoverStyle` — struct — 4 members
 - `AnyProgressViewStyle` — struct — 6 members
@@ -234,6 +235,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `DangerToastStyle` — struct — 2 members
 - `DefaultBottomToolbarStyle` — struct — 4 members
 - `DefaultFocusScopeModifier` — struct
+- `DefaultPaletteStyle` — struct — 3 members
 - `DefaultTopToolbarStyle` — struct — 4 members
 - `DisappearLifecycleModifier` — struct
 - `DisclosureGroup` — struct — 3 members
@@ -364,6 +366,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `OverlayModifier` — struct
 - `PaddingModifier` — struct
 - `PaletteCommandRegistrationModifier` — struct
+- `PaletteStyle` — protocol — 5 members
+- `PaletteStyleConfiguration` — struct — 13 members
 - `Panel` — struct — 3 members
 - `PeriodicTimelineSchedule` — struct — 7 members
 - `PhaseAnimator` — struct — 3 members
@@ -511,7 +515,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 197 members
+- `View` — protocol — 199 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member

@@ -118,6 +118,7 @@ package enum EnvironmentKeyReuseClassification {
     // The menu/group primitives read these at resolve. Captured bodies and
     // presentation descriptors carry the result into later host phases.
     "MenuStyleKey",
+    "PaletteStyleKey",
     "ControlGroupStyleKey",
   ]
 

@@ -1,61 +1,26 @@
-// The framework's default palette rendering.
-//
-// Moved verbatim from the gallery's `CommandPaletteList` (control-style
-// A5). It is deliberately INTERNAL: at 0.9.0 a palette is a declaration
-// plus command data plus this rendering, and the public `PaletteStyle`
-// protocol that would let an application replace it is Phase B work.
-//
-// The fuzzy score at the bottom of this file is normative by fixture —
-// the gallery's cell-for-cell battery pins its observable ranking, so a
-// later refactor cannot silently reorder results.
+public import SwiftTUICore
 
-
-/// A fuzzy-filterable command-palette list used inside the Gallery's
-/// palette sheet. The outer wrapper intentionally returns a
-/// single-child `Group` so the stateful body becomes a DECLARED child
-/// instead of the deferred payload's root view. In the graph-backed
-/// runtime path, declared children are resolved through `resolveView`,
-/// which gives the child its own `viewNode` and therefore safe local
-/// `@State` / `@FocusState` storage.
-///
-/// Commands are passed in by the framework — `.paletteSheet`'s content
-/// closure receives the snapshot of `paletteCommand` contributions
-/// absorbed from the host scope's subtree (mirroring how
-/// `.toolbar()` absorbs toolbar items).
-struct DefaultPaletteBody: View {
-  let commands: [ActivePaletteCommand]
-  /// Stored as the binding plus its authoring context rather than a
-  /// pre-built closure: a closure minted on every declaration evaluation
-  /// makes this view value differ each resolve.
-  let isPresented: Binding<Bool>
-  let dismissAuthoringContext: AuthoringContext?
-
-  private var dismiss: @MainActor @Sendable () -> Void {
-    { [isPresented, dismissAuthoringContext] in
-      withAuthoringContext(dismissAuthoringContext) {
-        isPresented.wrappedValue = false
-      }
-    }
-  }
-
-  var body: some View {
-    Group {
-      DefaultPaletteBodyContent(
-        commands: commands,
-        dismiss: dismiss
-      )
-    }
+/// A fuzzy filter, keyboard selection, and up to twelve visible command rows.
+public struct DefaultPaletteStyle: PaletteStyle {
+  public init() {}
+  public var snapshotLabel: String { "AnyPaletteStyle.automatic" }
+  @MainActor public func makeBody(configuration: PaletteStyleConfiguration) -> some View {
+    DefaultPaletteStyleBody(configuration: configuration)
   }
 }
+extension PaletteStyle where Self == DefaultPaletteStyle {
+  public static var automatic: Self { .init() }
+}
+extension DefaultPaletteStyle: ReuseTransparentStyle {}
 
-private struct DefaultPaletteBodyContent: View {
+private struct DefaultPaletteStyleBody: View {
   private static let maximumVisibleRows = 12
 
-  let commands: [ActivePaletteCommand]
-  let dismiss: @MainActor @Sendable () -> Void
+  let configuration: PaletteStyleConfiguration
+  private var commands: [PaletteStyleConfiguration.Command] { configuration.commands }
 
   @State private var query = ""
-  @State private var selectedCommandKey: DefaultPaletteCommandKey?
+  @State private var selectedCommandKey: AnyID?
   @FocusState private var isQueryFocused: Bool
   @Namespace private var filterFocusNamespace
 
@@ -118,7 +83,7 @@ private struct DefaultPaletteBodyContent: View {
     }
   }
 
-  private var matchKeys: [DefaultPaletteCommandKey] {
+  private var matchKeys: [AnyID] {
     matches.map(\.key)
   }
 
@@ -147,35 +112,34 @@ private struct DefaultPaletteBodyContent: View {
   }
 
   private func row(
-    for command: ActivePaletteCommand,
+    for command: PaletteStyleConfiguration.Command,
     isSelected: Bool
   ) -> some View {
-    Button {
-      perform(command)
-    } label: {
-      HStack(spacing: 1) {
-        Text(isSelected ? ">" : " ")
-          .foregroundStyle(isSelected ? .tint : .background)
-        Text(command.name)
-        if let description = command.description {
-          Spacer()
-          Text(description).foregroundStyle(.separator)
+    command.route {
+      Button {
+        command.perform()
+      } label: {
+        HStack(spacing: 1) {
+          Text(isSelected ? ">" : " ")
+            .foregroundStyle(isSelected ? .tint : .background)
+          Text(command.name)
+          if let description = command.description {
+            Spacer()
+            Text(description).foregroundStyle(.separator)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+          if isSelected {
+            Rectangle().fill(.selection)
+          }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background {
-        if isSelected {
-          Rectangle().fill(.selection)
-        }
-      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(command.name)
+      .focusable(false)
+      .disabled(!command.isEnabled)
     }
-    .buttonStyle(.plain)
-    .accessibilityLabel(command.name)
-    .focusable(false)
-    .onTapGesture {
-      perform(command)
-    }
-    .disabled(!command.isEnabled)
   }
 
   private func handleFilterKeyPress(_ keyPress: KeyPress) -> KeyPressResult {
@@ -225,16 +189,10 @@ private struct DefaultPaletteBodyContent: View {
 
     let command = rows[selected].command
     guard command.isEnabled else { return }
-    perform(command)
+    command.perform()
   }
 
-  private func perform(_ command: ActivePaletteCommand) {
-    guard command.isEnabled else { return }
-    command.action()
-    dismiss()
-  }
-
-  private func reconcileSelection(for keys: [DefaultPaletteCommandKey]) {
+  private func reconcileSelection(for keys: [AnyID]) {
     guard !keys.isEmpty else {
       selectedCommandKey = nil
       return
@@ -247,21 +205,11 @@ private struct DefaultPaletteBodyContent: View {
   }
 }
 
-private struct DefaultPaletteCommandKey: Equatable, Hashable {
-  var name: String
-  var description: String?
-}
-
 private struct DefaultPaletteMatch {
-  let command: ActivePaletteCommand
+  let command: PaletteStyleConfiguration.Command
   let score: Int
 
-  var key: DefaultPaletteCommandKey {
-    DefaultPaletteCommandKey(
-      name: command.name,
-      description: command.description
-    )
-  }
+  var key: AnyID { command.id }
 }
 
 /// Returns a fuzzy-match score for `query` against `candidate`, or

@@ -52,6 +52,10 @@ final class RejectedMenuStyle: MenuStyle {
   func makeBody(configuration: MenuStyleConfiguration) -> some View { configuration.label }
 }
 
+final class RejectedPaletteStyle: PaletteStyle {
+  func makeBody(configuration: PaletteStyleConfiguration) -> some View { Text(configuration.title) }
+}
+
 final class RejectedControlGroupStyle: ControlGroupStyle {
   func makeBody(configuration: ControlGroupStyleConfiguration) -> some View {
     configuration.content

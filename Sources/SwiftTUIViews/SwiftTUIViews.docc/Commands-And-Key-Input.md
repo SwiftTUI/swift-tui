@@ -174,12 +174,19 @@ struct RootView: View {
 }
 ```
 
-The framework owns the palette body: a filter field with fuzzy matching,
+The automatic ``DefaultPaletteStyle`` supplies a filter field with fuzzy matching,
 Up/Down (or Tab and Shift+Tab) to move the selection, and Return to run
 the selected command. The command snapshot is recomputed as your subtree
 changes, so an open palette stays in sync. The sheet dismisses the way
 any presentation does — by clearing the `isPresented` binding — so
 Escape closes it; see <doc:Dismissal-Is-Data>.
+
+Apply `.paletteStyle(MyPaletteStyle())` after the declaration to customize its
+content. ``PaletteStyleConfiguration`` provides the title and command data,
+including stable opaque IDs that distinguish duplicate names. A style uses
+`command.route { ... }` for pointer activation, `command.perform()` for keyboard
+activation, and `configuration.dismiss()` for Cancel. Command execution and
+dismissal stay with the declaration. See <doc:Authoring-Styles>.
 
 ## Own the Exit Keys
 

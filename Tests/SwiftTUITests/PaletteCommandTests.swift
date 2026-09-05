@@ -7,6 +7,50 @@ import Testing
 @MainActor
 @Suite
 struct PaletteCommandTests {
+  @Test("duplicate labels have distinct structural contribution identities")
+  func duplicateIdentities() {
+    let view = Panel(id: "editor") { EmptyView() }
+      .paletteCommand(name: "Same", description: "Same", action: {})
+      .paletteCommand(name: "Same", description: "Same", action: {})
+    let resolved = Resolver().resolve(
+      AnyView(view), in: .init(identity: testIdentity("Contributions")))
+    let commands = resolved.preferenceValues[PaletteCommandsPreferenceKey.self]
+    #expect(commands.count == 2)
+    #expect(Set(commands.map(\.identity)).count == 2)
+  }
+
+  @Test("renaming commands preserves their contribution identities")
+  func renamedIdentities() {
+    func commands(_ name: String) -> [ActivePaletteCommand] {
+      let view = Panel(id: "editor") { EmptyView() }
+        .paletteCommand(name: name, description: name, action: {})
+        .paletteCommand(name: "Other", action: {})
+      return Resolver().resolve(AnyView(view), in: .init(identity: testIdentity("Contributions")))
+        .preferenceValues[PaletteCommandsPreferenceKey.self]
+    }
+    #expect(commands("Before").map(\.identity) == commands("After").map(\.identity))
+  }
+
+  @Test("changing a contribution's conditional branch changes its identity")
+  func branchIdentity() {
+    func commands(_ firstBranch: Bool) -> [ActivePaletteCommand] {
+      let view = Panel(id: "editor") {
+        if firstBranch {
+          Panel(id: "same") { Text("Base") }
+            .paletteCommand(name: "Same", action: {})
+        } else {
+          Panel(id: "same") { Text("Base") }
+            .paletteCommand(name: "Same", action: {})
+        }
+      }
+      return Resolver().resolve(AnyView(view), in: .init(identity: testIdentity("Contributions")))
+        .preferenceValues[PaletteCommandsPreferenceKey.self]
+    }
+    #expect(commands(true).count == 1)
+    #expect(commands(false).count == 1)
+    #expect(commands(true).map(\.identity) != commands(false).map(\.identity))
+  }
+
   @Test("paletteCommand contributes a value to PaletteCommandsPreferenceKey")
   func paletteCommandContributes() {
     let view = Panel(id: "editor") { EmptyView() }

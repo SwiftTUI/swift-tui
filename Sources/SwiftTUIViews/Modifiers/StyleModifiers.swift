@@ -1,6 +1,14 @@
 public import SwiftTUICore
 
 extension View {
+  /// Sets the command palette composition for this subtree.
+  public func paletteStyle(_ style: AnyPaletteStyle) -> some View {
+    environment(\.paletteStyle, style)
+  }
+  public func paletteStyle<S: PaletteStyle>(_ style: S) -> some View {
+    paletteStyle(AnyPaletteStyle(style))
+  }
+
   /// Sets the Slider composition for this subtree.
   public func sliderStyle(_ style: AnySliderStyle) -> some View {
     environment(\.sliderStyle, style)
@@ -511,6 +519,18 @@ extension View {
         )
       )
     )
+  }
+}
+
+extension ActionScope where Self: View {
+  /// Sets palette composition while preserving the action-scope contract.
+  @MainActor
+  public func paletteStyle(_ style: AnyPaletteStyle) -> some View & ActionScope {
+    modifier(EnvironmentWritingModifier(keyPath: \.paletteStyle, value: style))
+  }
+  @MainActor
+  public func paletteStyle<S: PaletteStyle>(_ style: S) -> some View & ActionScope {
+    paletteStyle(AnyPaletteStyle(style))
   }
 }
 

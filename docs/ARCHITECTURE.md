@@ -221,6 +221,12 @@ composition. Numeric normalization, formatting, and typed updates remain in
 `AdjustableControlValueSupport.swift`. The shared `Foundation/StyleRoute.swift`
 wrapper forwards optional pointer capture to `Controls/PointerRouteView.swift`.
 
+`Presentation/PaletteStyles.swift` defines data-only command configurations and
+typed style erasure. `PaletteStyleHost.swift` owns activation routes beneath the
+presented source lifetime; `DefaultPaletteRendering.swift` supplies the public
+default's fuzzy filtering, identity-based selection, and twelve-row window.
+The dropdown portal continues to own placement, focus, Escape, and dismissal.
+
 `Controls/MenuStyles.swift` owns menu composition and its public trigger and
 portal wrappers. `Menu.swift` owns activation and expansion on a dedicated child
 node, so replacing a compact menu with inline content retires its expansion.
