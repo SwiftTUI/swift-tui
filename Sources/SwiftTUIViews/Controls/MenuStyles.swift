@@ -341,7 +341,10 @@ private struct InlineMenuStyleBody: View {
 }
 
 package func menuTriggerIdentity(for control: Identity) -> Identity {
-  control.child(.named("MenuTrigger"))
+  // The dedicated state host records this handler. Keep the route beneath
+  // that owner so scoped publication withdraws it when the owner departs or
+  // stops recording the enabled trigger.
+  control.child(.named("MenuState")).child(.named("MenuTrigger"))
 }
 
 package enum MenuStyleUsagePreferenceKey: PreferenceKey {
