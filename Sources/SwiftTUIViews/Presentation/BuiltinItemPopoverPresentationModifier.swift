@@ -28,6 +28,7 @@ package struct BuiltinItemPopoverPresentationModifier<
       authoringContext: onDismissAuthoringContext
     )
     let dismissInvalidator = context.invalidationProxy?.invalidator
+    let presentation = context.resolvedPopoverPresentation()
     return resolveItemPresentationModifier(
       content: content,
       item: itemBinding,
@@ -46,6 +47,7 @@ package struct BuiltinItemPopoverPresentationModifier<
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,
         modalPolicy: .disablesBaseInteraction,
+        presentation: presentation,
         contentPayloads: withAuthoringContext(popoverContentAuthoringContext) {
           portalAttachmentDeclaredBuilderChildren(
             from: popoverContent(currentItem),
@@ -123,6 +125,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
     )
     let dismissedTipID = $dismissedTipID
     let dismissInvalidator = context.invalidationProxy?.invalidator
+    let presentation = context.resolvedPopoverPresentation()
     let isActive: @MainActor @Sendable () -> Bool
     if suppressed {
       isActive = { false }
@@ -177,6 +180,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,
         modalPolicy: tipActions.isEmpty ? .nonModal : .disablesBaseInteraction,
+        presentation: presentation,
         contentPayloads: portalAttachmentDeclaredBuilderChildren(
           from: PopoverTipContent(
             title: tip.title,
@@ -256,7 +260,7 @@ package struct HostedPopoverPresentation: View {
         attachmentAnchor: item.attachmentAnchor,
         arrowEdge: item.arrowEdge
       ) {
-        PromptPresentationSurface(item: item.surfaceItem)
+        PortalSurfaceRoot(item: item.surfaceItem)
           .fixedSize(horizontal: true, vertical: true)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -325,6 +329,7 @@ func popoverPresentationItem(
   attachmentAnchor: PopoverAttachmentAnchor,
   arrowEdge: Edge?,
   modalPolicy: PortalModalPolicy,
+  presentation: AnchoredSurfaceStylePresentation,
   contentPayloads: [PortalAttachmentPayload],
   dismiss: @escaping @MainActor @Sendable () -> Void,
   onDismiss: (@MainActor @Sendable () -> Void)? = nil
@@ -333,9 +338,11 @@ func popoverPresentationItem(
     id: id,
     portalEntryID: portalEntryID,
     title: "",
-    descriptor: popoverPromptPresentationDescriptor(
-      createsFocusScope: modalPolicy == .disablesBaseInteraction
-    ),
+    surface: PreparedPortalSurface { _, _ in
+      anchoredSurfacePresentation(
+        presentation, accessibilityRole: .popover,
+        createsFocusScope: modalPolicy == .disablesBaseInteraction)
+    },
     actionPayloads: [],
     messagePayloads: [],
     contentPayloads: contentPayloads,
@@ -350,27 +357,6 @@ func popoverPresentationItem(
     arrowEdge: arrowEdge,
     modalPolicy: modalPolicy,
     surfaceItem: surfaceItem
-  )
-}
-
-private func popoverPromptPresentationDescriptor(
-  createsFocusScope: Bool
-) -> PromptPresentationDescriptor {
-  PromptPresentationDescriptor(
-    alignment: .topLeading,
-    accessibilityRole: .popover,
-    backdropOpacity: 0,
-    defaultDismissTitle: "Close",
-    headerTone: .accent,
-    minWidth: 0,
-    scrollMinHeight: 1,
-    scrollIdealHeight: 8,
-    scrollMaxHeight: 32,
-    bodyMode: .contentOnly,
-    chrome: .menu,
-    borderStyle: StrokeStyle(),
-    contentSizing: .intrinsic,
-    createsFocusScope: createsFocusScope
   )
 }
 

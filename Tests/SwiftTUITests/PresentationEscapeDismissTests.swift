@@ -22,7 +22,8 @@ struct PresentationEscapeDismissTests {
       PromptPresentationItem(
         id: "sheet#1",
         title: "",
-        descriptor: sheetPromptPresentationSpec().descriptor,
+        surface: sheetPromptPresentationSpec().prepareSurface(
+          .init(identity: testIdentity("ImperativePresentation"))),
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: [],
@@ -47,7 +48,8 @@ struct PresentationEscapeDismissTests {
       PromptPresentationItem(
         id: "sheet#1",
         title: "",
-        descriptor: sheetPromptPresentationSpec().descriptor,
+        surface: sheetPromptPresentationSpec().prepareSurface(
+          .init(identity: testIdentity("ImperativePresentation"))),
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: [],
@@ -58,7 +60,8 @@ struct PresentationEscapeDismissTests {
       PromptPresentationItem(
         id: "alert#1",
         title: "",
-        descriptor: alertPromptPresentationSpec().descriptor,
+        surface: alertPromptPresentationSpec().prepareSurface(
+          .init(identity: testIdentity("ImperativePresentation"))),
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: [],

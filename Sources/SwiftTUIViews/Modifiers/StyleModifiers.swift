@@ -195,6 +195,33 @@ extension View {
     sheetStyle(AnySheetStyle(style))
   }
 
+  /// Sets the shared appearance of alerts and confirmation dialogs.
+  public func promptStyle(_ style: AnyPromptStyle) -> some View {
+    environment(\.promptStyle, style)
+  }
+
+  public func promptStyle<S: PromptStyle>(_ style: S) -> some View {
+    promptStyle(AnyPromptStyle(style))
+  }
+
+  /// Sets the insets and background of full-screen covers in this subtree.
+  public func fullScreenCoverStyle(_ style: AnyFullScreenCoverStyle) -> some View {
+    environment(\.fullScreenCoverStyle, style)
+  }
+
+  public func fullScreenCoverStyle<S: FullScreenCoverStyle>(_ style: S) -> some View {
+    fullScreenCoverStyle(AnyFullScreenCoverStyle(style))
+  }
+
+  /// Sets the anchored surface appearance of popovers in this subtree.
+  public func popoverStyle(_ style: AnyPopoverStyle) -> some View {
+    environment(\.popoverStyle, style)
+  }
+
+  public func popoverStyle<S: PopoverStyle>(_ style: S) -> some View {
+    popoverStyle(AnyPopoverStyle(style))
+  }
+
   /// Sets the toolbar style for this view's subtree. A toolbar host reads
   /// the nearest value, so this may sit on the host or on any ancestor.
   public func toolbarStyle(

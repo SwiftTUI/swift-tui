@@ -3,6 +3,8 @@ import SwiftTUICore
 /// Destination-owned content payload for portal-hosted UI.
 @MainActor
 package struct PortalAttachmentContentPayload: Sendable {
+  /// Declaration presence, without evaluating an opaque view body at the host.
+  package let hasDeclaredContent: Bool
   private let resolveElementsClosure:
     @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
 
@@ -17,15 +19,18 @@ package struct PortalAttachmentContentPayload: Sendable {
     let output = withAuthoringContext(authoringContext) {
       content()
     }
+    hasDeclaredContent = !(output is EmptyView)
     resolveElementsClosure = { context, _ in
       [resolveView(output, in: context)]
     }
   }
 
   package init(
+    hasDeclaredContent: Bool = true,
     resolveElements:
       @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
   ) {
+    self.hasDeclaredContent = hasDeclaredContent
     resolveElementsClosure = resolveElements
   }
 
@@ -67,6 +72,8 @@ package struct PortalAttachmentEdge: Sendable, Equatable {
 package struct PortalAttachmentPayload: Sendable {
   package var edge: PortalAttachmentEdge?
   private var payload: PortalAttachmentContentPayload
+
+  package var hasDeclaredContent: Bool { payload.hasDeclaredContent }
 
   package init(
     _ payload: PortalAttachmentContentPayload,
@@ -200,9 +207,11 @@ package struct PortalAttachmentSequenceView: PrimitiveView, ResolvableView,
     )
     nextIndex += 1
     children.append(
-      PortalAttachmentContentPayload(resolveElements: { _, placementRoot in
-        resolveElements(in: sequenceContext.applying(to: placementRoot))
-      })
+      PortalAttachmentContentPayload(
+        hasDeclaredContent: payloads.contains { $0.hasDeclaredContent },
+        resolveElements: { _, placementRoot in
+          resolveElements(in: sequenceContext.applying(to: placementRoot))
+        })
     )
   }
 

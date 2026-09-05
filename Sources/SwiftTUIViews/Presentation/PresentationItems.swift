@@ -1,117 +1,52 @@
 import SwiftTUICore
 
-// MARK: - Built-In Item Models
-
-/// Visual chrome treatment applied to a prompt presentation's surface.
-///
-/// Sheets, alerts, and confirmation dialogs share one rendering path.
-/// This enum selects how the chrome around the content is drawn.
-///
-/// Deliberately `package`, not public: sheet chrome is selected through the
-/// public `SheetStyle` family (`SheetSurfaceContainer`). The `menu` case has
-/// no public style family yet — `MenuStyle` arrives in a later stage — so
-/// the internal representation keeps it until then.
-package enum PresentationChrome: Equatable, Sendable {
-  /// Default: rounded inset surface with a foreground-tint stroke on
-  /// every side. Used by alerts, confirmation dialogs, and standard
-  /// sheets.
-  case surface
-
-  /// Flat, edge-to-edge strip with no side or top border and a single
-  /// soft divider along the bottom that reads like a shadow under the
-  /// content. Used for command-palette dropdowns and similar banners
-  /// that appear as part of the window chrome rather than a
-  /// floating card.
-  case dropdown
-
-  /// Compact, intrinsic-width bordered box with no header: the
-  /// rendering used by `Menu` to float its expanded content above the
-  /// surrounding layout without reflowing siblings.
-  /// This chrome is smaller than `.surface` and has no title row or close button.
-  /// It anchors at the presentation `alignment` and sizes to its
-  /// content rather than expanding to fill.
-  case menu
+/// The declaration captures its style environment before the presentation
+/// trigger is evaluated. Even a closed declaration therefore records its
+/// style read and cannot retain a stale style across an environment change.
+package struct PreparedPortalSurface: Sendable {
+  package var make:
+    @MainActor @Sendable (_ hasMessage: Bool, _ hasActions: Bool) -> PortalSurfacePresentation
 }
 
-/// Controls how a prompt presentation surface accepts the full-screen
-/// portal overlay proposal.
-package enum PromptPresentationContentSizing: Equatable, Sendable {
-  /// Let the surface consume the host proposal. This preserves the
-  /// existing sheet/dropdown behavior where content can expand to the
-  /// available presentation area.
-  case fillAvailable
-
-  /// Measure the surface at its intrinsic size before placing it in the
-  /// full-screen portal overlay. Used by compact floating presentations
-  /// such as menus, where internal spacers must not stretch rows to the
-  /// terminal width.
-  case intrinsic
-}
-
-/// Internal rendering mode for prompt-family presentation surfaces.
-package enum PromptPresentationSurfaceMode: Equatable, Sendable {
-  case standard
-  case fullScreen
-}
-
-package struct PromptPresentationDescriptor: Equatable, Sendable {
-  package enum BodyMode: Equatable, Sendable {
-    case contentOnly
-    case messageAndActions
-  }
-
+/// Placement and a typed surface resolver selected by the declaration.
+/// No originating-kind, body-mode, or chrome discriminator crosses this seam.
+package struct PortalSurfacePresentation: Sendable {
   package var alignment: Alignment
-  package var accessibilityRole: AccessibilityRole
   package var backdropOpacity: Double
-  package var defaultDismissTitle: String
-  package var headerTone: TerminalTone
-  package var minWidth: Int
-  package var maxWidth: Int?
-  package var scrollMinHeight: Int
-  package var scrollIdealHeight: Int
-  package var scrollMaxHeight: Int
-  package var bodyMode: BodyMode
-  package var chrome: PresentationChrome
-  package var borderStyle: StrokeStyle
-  package var contentSizing: PromptPresentationContentSizing
+  package var hostInsets: EdgeInsets
+  package var isIntrinsic: Bool
+  package var accessibilityRole: AccessibilityRole
   package var createsFocusScope: Bool
-  package var surfaceMode: PromptPresentationSurfaceMode
-  package var anchoredPresentation: AnchoredSurfaceStylePresentation?
+  private var resolveBody:
+    @MainActor @Sendable (PromptPresentationItem, ResolveContext) -> ResolvedNode
 
-  package init(
+  package init<Content: View>(
     alignment: Alignment,
+    backdropOpacity: Double = 0,
+    hostInsets: EdgeInsets = .zero,
+    isIntrinsic: Bool = false,
     accessibilityRole: AccessibilityRole,
-    backdropOpacity: Double,
-    defaultDismissTitle: String,
-    headerTone: TerminalTone,
-    minWidth: Int,
-    maxWidth: Int? = nil,
-    scrollMinHeight: Int,
-    scrollIdealHeight: Int,
-    scrollMaxHeight: Int,
-    bodyMode: BodyMode,
-    chrome: PresentationChrome = .surface,
-    borderStyle: StrokeStyle = StrokeStyle(borderSet: .innerHalfBlock, placement: .outset),
-    contentSizing: PromptPresentationContentSizing = .fillAvailable,
     createsFocusScope: Bool = true,
-    surfaceMode: PromptPresentationSurfaceMode = .standard
+    @ViewBuilder content: @escaping @MainActor @Sendable (PromptPresentationItem) -> Content
   ) {
     self.alignment = alignment
-    self.accessibilityRole = accessibilityRole
     self.backdropOpacity = backdropOpacity
-    self.defaultDismissTitle = defaultDismissTitle
-    self.headerTone = headerTone
-    self.minWidth = minWidth
-    self.maxWidth = maxWidth
-    self.scrollMinHeight = scrollMinHeight
-    self.scrollIdealHeight = scrollIdealHeight
-    self.scrollMaxHeight = scrollMaxHeight
-    self.bodyMode = bodyMode
-    self.chrome = chrome
-    self.borderStyle = borderStyle
-    self.contentSizing = contentSizing
+    self.hostInsets = hostInsets
+    self.isIntrinsic = isIntrinsic
+    self.accessibilityRole = accessibilityRole
     self.createsFocusScope = createsFocusScope
-    self.surfaceMode = surfaceMode
+    self.resolveBody = { item, context in resolveView(content(item), in: context) }
+  }
+
+  @MainActor
+  package func resolve(_ item: PromptPresentationItem, in context: ResolveContext) -> ResolvedNode {
+    resolveBody(item, context)
+  }
+
+  package var semanticMetadata: SemanticMetadata {
+    let metadata = SemanticMetadata(accessibilityRole: accessibilityRole)
+    return createsFocusScope
+      ? metadata.merging(focusStructureMetadata(scopeBoundary: true)) : metadata
   }
 }
 
@@ -124,7 +59,7 @@ package struct PromptPresentationItem: PortalPresentationItem {
   package var id: String
   package var portalEntryID: PortalEntryID
   package var title: String
-  package var descriptor: PromptPresentationDescriptor
+  package var surface: PortalSurfacePresentation
   package var actionPayloads: [PortalAttachmentPayload]
   package var messagePayloads: [PortalAttachmentPayload]
   package var contentPayloads: [PortalAttachmentPayload]
@@ -140,7 +75,7 @@ package struct PromptPresentationItem: PortalPresentationItem {
     id: String,
     portalEntryID: PortalEntryID? = nil,
     title: String,
-    descriptor: PromptPresentationDescriptor,
+    surface: PreparedPortalSurface,
     actionPayloads: [PortalAttachmentPayload],
     messagePayloads: [PortalAttachmentPayload],
     contentPayloads: [PortalAttachmentPayload],
@@ -152,7 +87,9 @@ package struct PromptPresentationItem: PortalPresentationItem {
     self.id = id
     self.portalEntryID = portalEntryID
     self.title = title
-    self.descriptor = descriptor
+    self.surface = surface.make(
+      messagePayloads.contains { $0.hasDeclaredContent },
+      actionPayloads.contains { $0.hasDeclaredContent })
     self.actionPayloads = actionPayloads.map { $0.attachingEdgeIfMissing(edge) }
     self.messagePayloads = messagePayloads.map { $0.attachingEdgeIfMissing(edge) }
     self.contentPayloads = contentPayloads.map { $0.attachingEdgeIfMissing(edge) }

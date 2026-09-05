@@ -101,6 +101,136 @@ private struct Boundary<Content: View>: View, Equatable {
 @MainActor
 @Suite("Reader-scoped environment reuse")
 struct ReaderScopedEnvironmentReuseTests {
+  @Test("prompt declarations read style even while closed", arguments: [false, true])
+  func promptStyleReaderIsDenied(presented: Bool) {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      let presented: Bool
+      var body: some View {
+        VStack {
+          Boundary(content: Text("anchor").alert("Title", isPresented: .constant(presented)))
+          Text(tag)
+        }
+        .promptStyle(TaggedPortalStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(
+      Root(tag: "a", presented: presented), context: .init(identity: rootIdentity))
+    _ = renderer.render(
+      Root(tag: "b", presented: presented),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
+  @Test("fullScreenCover declarations read style even while closed", arguments: [false, true])
+  func fullScreenCoverStyleReaderIsDenied(presented: Bool) {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      let presented: Bool
+      var body: some View {
+        VStack {
+          Boundary(
+            content: Text("anchor").fullScreenCover(isPresented: .constant(presented)) {
+              Text("Cover")
+            })
+          Text(tag)
+        }
+        .fullScreenCoverStyle(TaggedPortalStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(
+      Root(tag: "a", presented: presented), context: .init(identity: rootIdentity))
+    _ = renderer.render(
+      Root(tag: "b", presented: presented),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
+  @Test("popover declarations read style even while closed", arguments: [false, true])
+  func popoverStyleReaderIsDenied(presented: Bool) {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      let presented: Bool
+      var body: some View {
+        VStack {
+          Boundary(
+            content: Text("anchor").popover(isPresented: .constant(presented)) { Text("Details") })
+          Text(tag)
+        }
+        .popoverStyle(TaggedPortalStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(
+      Root(tag: "a", presented: presented), context: .init(identity: rootIdentity))
+    _ = renderer.render(
+      Root(tag: "b", presented: presented),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
+  @Test("prompt style unread change is tolerated")
+  func promptStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      var body: some View {
+        VStack {
+          Boundary(content: Text("plain"))
+          Text(tag)
+        }
+        .promptStyle(TaggedPortalStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(Root(tag: "a"), context: .init(identity: rootIdentity))
+    _ = renderer.render(
+      Root(tag: "b"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("fullScreenCover style unread change is tolerated")
+  func fullScreenCoverStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      var body: some View {
+        VStack {
+          Boundary(content: Text("plain"))
+          Text(tag)
+        }
+        .fullScreenCoverStyle(TaggedPortalStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(Root(tag: "a"), context: .init(identity: rootIdentity))
+    _ = renderer.render(
+      Root(tag: "b"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("popover style unread change is tolerated")
+  func popoverStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      var body: some View {
+        VStack {
+          Boundary(content: Text("plain"))
+          Text(tag)
+        }
+        .popoverStyle(TaggedPortalStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(Root(tag: "a"), context: .init(identity: rootIdentity))
+    _ = renderer.render(
+      Root(tag: "b"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
   @Test("menu style unread change is tolerated")
   func menuStyleUnreadChangeIsTolerated() {
     let renderer = makeRenderer()

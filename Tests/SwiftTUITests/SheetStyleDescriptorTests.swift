@@ -4,29 +4,26 @@ import Testing
 @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
-/// A4's core acceptance: `.automatic` reproduces the current sheet
-/// descriptor exactly, so the `PresentationChrome` removal is
-/// output-preserving, and `.dropdown` reproduces the treatment the removed
-/// `chrome: .dropdown` argument produced.
+/// The sheet's automatic baseline and its within-family dropdown choice.
 @MainActor
 @Suite
 struct SheetStyleDescriptorTests {
   private func resolved(
     _ style: AnySheetStyle,
-    baseline: PromptPresentationDescriptor
-  ) -> PromptPresentationDescriptor {
+    baseline: SheetSurfaceStylePresentation
+  ) -> SheetSurfaceStylePresentation {
     var environment = EnvironmentValues()
     environment.sheetStyle = style
     let context = ResolveContext(
       identity: testIdentity("SheetStyleDescriptor"),
       environmentValues: environment
     )
-    return context.resolvedSheetDescriptor(baseline: baseline)
+    return context.resolvedSheetPresentation(baseline: baseline)
   }
 
   @Test("the automatic style returns the declaration's baseline unchanged")
   func automaticReproducesBaseline() {
-    let baseline = sheetPromptPresentationSpec().descriptor
+    let baseline = SheetSurfaceStylePresentation()
     #expect(resolved(.automatic, baseline: baseline) == baseline)
     // `.automatic` is a documented fixed alias of `.surface`.
     #expect(resolved(.surface, baseline: baseline) == baseline)
@@ -34,14 +31,11 @@ struct SheetStyleDescriptorTests {
 
   @Test("the dropdown style reproduces the former dropdown chrome descriptor")
   func dropdownReproducesFormerChromeDescriptor() {
-    // The removed API spelled this `sheetPromptPresentationSpec(chrome:)`;
-    // the surviving package builder still expresses the same baseline, so
-    // the style path must land on an identical descriptor.
-    let former = sheetPromptPresentationSpec(chrome: .dropdown).descriptor
-    let styled = resolved(.dropdown, baseline: sheetPromptPresentationSpec().descriptor)
-    #expect(styled.chrome == former.chrome)
-    #expect(styled.alignment == former.alignment)
-    #expect(styled.minWidth == former.minWidth)
+    // Container selection changes the primitive; the shared chrome fields stay intact.
+    let former = SheetSurfaceStylePresentation(container: .dropdown, minimumWidth: 0)
+    let styled = resolved(.dropdown, baseline: SheetSurfaceStylePresentation())
+    #expect(styled.container == former.container)
+    #expect(styled.minimumWidth == former.minimumWidth)
     #expect(styled == former)
   }
 
@@ -56,9 +50,9 @@ struct SheetStyleDescriptorTests {
         return presentation
       }
     }
-    let baseline = sheetPromptPresentationSpec().descriptor
+    let baseline = SheetSurfaceStylePresentation()
     let styled = resolved(AnySheetStyle(WideSheetStyle()), baseline: baseline)
-    #expect(styled.minWidth == 44)
+    #expect(styled.minimumWidth == 44)
     // Everything the style did not touch is preserved.
     #expect(styled.headerTone == baseline.headerTone)
     #expect(styled.scrollIdealHeight == baseline.scrollIdealHeight)

@@ -60,7 +60,7 @@ and `showsFocusEffect` yourself, and never infer focus from colors.
 
 State that a control models on a binding is exposed SwiftUI-style, as a
 projected binding a style reads and writes; the binding itself cannot be
-replaced. `makeBody(configuration:)` runs on the main actor. Styles are
+replaced. `makeBody(configuration:)` runs on the main actor. Body-producing styles are
 `Sendable` value types: a class cannot conform.
 
 ``MenuStyle`` receives both `trigger { ... }` and
@@ -81,11 +81,15 @@ has no live focus targets or control actions.
 
 A presentation-value style returns `Sendable` rendering data and leaves the
 composition to the framework. ``ListStyle``, ``OutlineStyle``,
-``TableStyle``, ``SpinnerStyle``, ``SheetStyle``, and ``ToastStyle`` take
+``TableStyle``, ``SpinnerStyle``, ``SheetStyle``, ``PromptStyle``,
+``FullScreenCoverStyle``, ``PopoverStyle``, and ``ToastStyle`` take
 this form because the primitive must keep an invariant an arbitrary
 replacement body could break — table virtualization, spinner cadence, sheet
 modality. ``ToolbarStyle`` is the same idea for a strip: it supplies the
 `Layout` that arranges toolbar items and a placement.
+
+These presentation-value protocols require `Sendable`; the authored-container
+value-type witness applies to body-producing styles.
 
 ```swift
 struct DotsSpinnerStyle: SpinnerStyle {
@@ -128,6 +132,16 @@ struct WideSheetStyle: SheetStyle {
   }
 }
 ```
+
+``PromptStyle`` serves both alerts and confirmation dialogs. Its configuration
+reports whether message and action content is present and supplies that
+declaration's baseline. The style does not select alignment, accessibility
+role, action order, or dismissal behavior. ``FullScreenCoverStyle`` exposes
+only insets and background paint because a cover always fills the terminal
+and has no framework header. ``PopoverStyle`` resolves
+``AnchoredSurfaceStylePresentation``; popovers retain their rounded border
+baseline and their own modal policy. Boolean and item declarations read the
+same style, including while closed, so a later opening uses the current value.
 
 An invalid presentation value — empty spinner frames, a non-positive
 cadence, active frames of mixed cell width — never traps. The surface emits
@@ -258,7 +272,8 @@ At `HEAD` the environment-scoped families are ``ButtonStyle``,
 ``TableStyle``, ``SpinnerStyle``, ``SheetStyle``, ``ToolbarStyle``, and
 ``TabViewStyle``, together with ``LabelStyle``, ``LabeledContentStyle``, and
 ``GroupBoxStyle``, ``ToggleStyle``, ``DisclosureGroupStyle``, ``TextEditorStyle``,
-``ProgressViewStyle``, ``SliderStyle``, and ``StepperStyle``.
+``ProgressViewStyle``, ``SliderStyle``, ``StepperStyle``, ``MenuStyle``,
+``ControlGroupStyle``, ``PromptStyle``, ``FullScreenCoverStyle``, and ``PopoverStyle``.
 ``ToastStyle`` is deliberately declaration-scoped: a
 toast's tone is per-toast data, so `.toast(..., style:)` keeps its
 parameter and no toast environment key exists. The remaining styleable

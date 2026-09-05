@@ -267,7 +267,8 @@ struct PopoverPresentationEscapeDismissTests {
         surfaceItem: PromptPresentationItem(
           id: "popover#1",
           title: "",
-          descriptor: sheetPromptPresentationSpec().descriptor,
+          surface: sheetPromptPresentationSpec().prepareSurface(
+            .init(identity: testIdentity("ImperativePresentation"))),
           actionPayloads: [],
           messagePayloads: [],
           contentPayloads: [],

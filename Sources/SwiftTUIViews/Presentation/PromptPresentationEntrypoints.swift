@@ -2,192 +2,185 @@ import SwiftTUICore
 
 package struct PromptPresentationSpec: Sendable {
   package var token: String
-  package var descriptor: PromptPresentationDescriptor
+  package var defaultDismissTitle: String
+  package var prepareSurface: @MainActor @Sendable (ResolveContext) -> PreparedPortalSurface
   package var reconcile:
-    @MainActor @Sendable (
-      PresentationCoordinatorRegistry,
-      Identity,
-      PromptPresentationItem
-    ) -> Void
-
-  package init(
-    token: String,
-    descriptor: PromptPresentationDescriptor,
-    reconcile:
-      @escaping @MainActor @Sendable (
-        PresentationCoordinatorRegistry,
-        Identity,
-        PromptPresentationItem
-      ) -> Void
-  ) {
-    self.token = token
-    self.descriptor = descriptor
-    self.reconcile = reconcile
-  }
+    @MainActor @Sendable (PresentationCoordinatorRegistry, Identity, PromptPresentationItem) -> Void
 }
 
 package func alertPromptPresentationSpec() -> PromptPresentationSpec {
-  PromptPresentationSpec(
-    token: "alert",
-    descriptor: .init(
-      alignment: .center,
-      accessibilityRole: .alert,
-      backdropOpacity: 0,
-      defaultDismissTitle: "Dismiss",
-      headerTone: .neutral,
-      minWidth: 24,
-      maxWidth: 48,
-      scrollMinHeight: 2,
-      scrollIdealHeight: 6,
-      scrollMaxHeight: 10,
-      bodyMode: .messageAndActions,
-      borderStyle: .single
-    ),
-    reconcile: { registry, sourceIdentity, item in
-      registry.alert.sync(
-        sourceIdentity: sourceIdentity,
-        items: [item]
-      )
-    }
-  )
+  promptPresentationSpec(
+    token: "alert", alignment: .center, accessibilityRole: .alert,
+    defaultDismissTitle: "Dismiss", baseline: .init(),
+    reconcile: { registry, identity, item in
+      registry.alert.sync(sourceIdentity: identity, items: [item])
+    })
 }
 
 package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpec {
-  PromptPresentationSpec(
-    token: "confirmationDialog",
-    descriptor: .init(
-      alignment: .bottomLeading,
-      accessibilityRole: .confirmationDialog,
-      backdropOpacity: 0,
-      defaultDismissTitle: "Cancel",
-      headerTone: .accent,
-      minWidth: 20,
-      scrollMinHeight: 3,
-      scrollIdealHeight: 4,
-      scrollMaxHeight: 6,
-      bodyMode: .messageAndActions,
-      borderStyle: .single
-    ),
-    reconcile: { registry, sourceIdentity, item in
-      registry.confirmationDialog.sync(
-        sourceIdentity: sourceIdentity,
-        items: [item]
-      )
-    }
-  )
+  promptPresentationSpec(
+    token: "confirmationDialog", alignment: .bottomLeading, accessibilityRole: .confirmationDialog,
+    defaultDismissTitle: "Cancel",
+    baseline: .init(
+      headerTone: .accent, minimumWidth: 20, maximumWidth: nil,
+      scrollMinimumHeight: 3, scrollIdealHeight: 4, scrollMaximumHeight: 6),
+    reconcile: { registry, identity, item in
+      registry.confirmationDialog.sync(sourceIdentity: identity, items: [item])
+    })
 }
 
-/// Spec for `Menu`'s expanded content. Menus use a dedicated non-modal
-/// portal entry with a unique `"menu"` token (so menu attachment IDs never
-/// collide with sheet attachment IDs on the same source identity) and `.menu`
-/// chrome (so the rendering surface is a compact, intrinsic-width bordered box
-/// with no header).
+private func promptPresentationSpec(
+  token: String,
+  alignment: Alignment,
+  accessibilityRole: AccessibilityRole,
+  defaultDismissTitle: String,
+  baseline: PromptSurfaceStylePresentation,
+  reconcile:
+    @escaping @MainActor @Sendable (
+      PresentationCoordinatorRegistry, Identity, PromptPresentationItem
+    ) -> Void
+) -> PromptPresentationSpec {
+  .init(
+    token: token, defaultDismissTitle: defaultDismissTitle,
+    prepareSurface: { context in
+      let style = context.environmentValues.promptStyle
+      let terminalSize = context.environmentValues.terminalSize
+      let prominence = context.environmentValues.controlProminence
+      let environment = context.environmentValues.styleEnvironmentSnapshot
+      let identity = context.identity
+      return PreparedPortalSurface { hasMessage, hasActions in
+        let resolved = style.presentation(
+          for: .init(
+            hasMessage: hasMessage, hasActions: hasActions, defaultPresentation: baseline,
+            terminalSize: terminalSize, controlProminence: prominence, styleEnvironment: environment
+          ))
+        let presentation = StyleMisuse.validatedPresentation(
+          resolved, problems: resolved.validationProblems, family: "PromptStyle",
+          styleLabel: style.description, identity: identity,
+          report: ImperativeRuntimeIssueQueue.record, fallback: { baseline })
+        return PortalSurfacePresentation(
+          alignment: alignment, backdropOpacity: presentation.backdropOpacity,
+          hostInsets: .init(horizontal: 1, vertical: 1), accessibilityRole: accessibilityRole
+        ) { item in
+          PromptActionPortalSurface(item: item, presentation: presentation)
+        }
+      }
+    }, reconcile: reconcile)
+}
+
 package func menuPromptPresentationSpec(
   presentation: AnchoredSurfaceStylePresentation = .init()
 ) -> PromptPresentationSpec {
-  var spec = PromptPresentationSpec(
-    token: "menu",
-    descriptor: .init(
-      alignment: .topLeading,
-      accessibilityRole: .menu,
-      backdropOpacity: 0,
-      defaultDismissTitle: "Close",
-      headerTone: .accent,
-      minWidth: 0,
-      // Menus auto-size to content; the scroll bounds below act only as
-      // a safety cap if a menu's content grows past the visible area.
-      scrollMinHeight: 1,
-      scrollIdealHeight: 8,
-      scrollMaxHeight: 32,
-      bodyMode: .contentOnly,
-      chrome: .menu,
-      contentSizing: .intrinsic
-    ),
-    reconcile: { registry, sourceIdentity, item in
-      registry.menu.sync(
-        sourceIdentity: sourceIdentity,
-        items: [item]
-      )
-    }
-  )
-  spec.descriptor.anchoredPresentation = presentation
-  return spec
+  .init(
+    token: "menu", defaultDismissTitle: "Close",
+    prepareSurface: { _ in
+      PreparedPortalSurface { _, _ in
+        anchoredSurfacePresentation(
+          presentation, accessibilityRole: .menu,
+          hostInsets: .init(top: 0, leading: 1, bottom: 0, trailing: 0))
+      }
+    },
+    reconcile: { registry, identity, item in
+      registry.menu.sync(sourceIdentity: identity, items: [item])
+    })
 }
 
 package func sheetPromptPresentationSpec(
   backdropOpacity: Double = 0,
-  chrome: PresentationChrome = .surface
+  container: SheetSurfaceContainer = .standard
 ) -> PromptPresentationSpec {
-  // Dropdown-chromed sheets want to land flush against the window
-  // edge (top, full width) rather than floating centered; override
-  // the layout defaults so callers don't have to restate them.
-  let alignment: Alignment =
-    switch chrome {
-    case .surface: .center
-    case .dropdown: .topLeading
-    // .menu is dispatched through `menuPromptPresentationSpec()`; if a
-    // caller manually plumbs it through this sheet builder, fall back
-    // to the dropdown-flavored top-leading anchoring.
-    case .menu: .topLeading
-    }
-  let minWidth: Int =
-    switch chrome {
-    case .surface: 20
-    case .dropdown: 0
-    case .menu: 0
-    }
-  return PromptPresentationSpec(
-    token: "sheet",
-    descriptor: .init(
-      alignment: alignment,
-      accessibilityRole: .sheet,
-      backdropOpacity: backdropOpacity,
-      defaultDismissTitle: "Close",
-      headerTone: .accent,
-      minWidth: minWidth,
-      scrollMinHeight: 4,
-      scrollIdealHeight: 12,
-      scrollMaxHeight: 20,
-      bodyMode: .contentOnly,
-      chrome: chrome,
-      // Surface-chromed sheets render a thin single-line border on a
-      // full-bleed surface fill (see `PromptPresentationSurface`). Dropdown
-      // chrome ignores this and draws its own bottom divider instead.
-      borderStyle: .single
-    ),
-    reconcile: { registry, sourceIdentity, item in
-      registry.sheet.sync(
-        sourceIdentity: sourceIdentity,
-        items: [item]
-      )
-    }
-  )
+  let baseline = SheetSurfaceStylePresentation(
+    container: container, backdropOpacity: backdropOpacity,
+    minimumWidth: container == .dropdown ? 0 : 20)
+  return .init(
+    token: "sheet", defaultDismissTitle: "Close",
+    prepareSurface: { context in
+      let presentation = context.resolvedSheetPresentation(baseline: baseline)
+      return PreparedPortalSurface { _, _ in sheetSurfacePresentation(presentation) }
+    },
+    reconcile: { registry, identity, item in
+      registry.sheet.sync(sourceIdentity: identity, items: [item])
+    })
+}
+
+/// Palette declarations keep their fixed dropdown surface until their own
+/// data-driven style supplies its presentation; SheetStyle does not govern them.
+package func palettePromptPresentationSpec() -> PromptPresentationSpec {
+  .init(
+    token: "sheet", defaultDismissTitle: "Close",
+    prepareSurface: { _ in
+      PreparedPortalSurface { _, _ in
+        PortalSurfacePresentation(alignment: .topLeading, accessibilityRole: .sheet) { item in
+          DropdownContentPortalSurface(
+            item: item, presentation: .init(container: .dropdown, minimumWidth: 0))
+        }
+      }
+    },
+    reconcile: { registry, identity, item in
+      registry.sheet.sync(sourceIdentity: identity, items: [item])
+    })
+}
+
+@MainActor
+private func sheetSurfacePresentation(_ presentation: SheetSurfaceStylePresentation)
+  -> PortalSurfacePresentation
+{
+  switch presentation.container {
+  case .standard:
+    PortalSurfacePresentation(
+      alignment: .center, backdropOpacity: presentation.backdropOpacity,
+      hostInsets: .init(horizontal: 1, vertical: 1), accessibilityRole: .sheet
+    ) { item in StandardContentPortalSurface(item: item, presentation: presentation) }
+  case .dropdown:
+    PortalSurfacePresentation(
+      alignment: .topLeading, backdropOpacity: presentation.backdropOpacity,
+      accessibilityRole: .sheet
+    ) { item in DropdownContentPortalSurface(item: item, presentation: presentation) }
+  }
 }
 
 package func fullScreenCoverPromptPresentationSpec() -> PromptPresentationSpec {
-  PromptPresentationSpec(
-    token: "fullScreenCover",
-    descriptor: .init(
-      alignment: .topLeading,
-      accessibilityRole: .sheet,
-      backdropOpacity: 0,
-      defaultDismissTitle: "Close",
-      headerTone: .accent,
-      minWidth: 0,
-      scrollMinHeight: 0,
-      scrollIdealHeight: 0,
-      scrollMaxHeight: 0,
-      bodyMode: .contentOnly,
-      contentSizing: .fillAvailable,
-      surfaceMode: .fullScreen
-    ),
-    reconcile: { registry, sourceIdentity, item in
-      registry.sheet.sync(
-        sourceIdentity: sourceIdentity,
-        items: [item]
-      )
-    }
-  )
+  .init(
+    token: "fullScreenCover", defaultDismissTitle: "Close",
+    prepareSurface: { context in
+      let baseline = FullScreenSurfaceStylePresentation()
+      let style = context.environmentValues.fullScreenCoverStyle
+      let resolved = style.presentation(
+        for: .init(
+          defaultPresentation: baseline, terminalSize: context.environmentValues.terminalSize,
+          controlProminence: context.environmentValues.controlProminence,
+          styleEnvironment: context.environmentValues.styleEnvironmentSnapshot))
+      let presentation = StyleMisuse.validatedPresentation(
+        resolved, problems: resolved.validationProblems, family: "FullScreenCoverStyle",
+        styleLabel: style.description, identity: context.identity,
+        report: ImperativeRuntimeIssueQueue.record, fallback: { baseline })
+      return PreparedPortalSurface { _, _ in
+        PortalSurfacePresentation(alignment: .topLeading, accessibilityRole: .sheet) { item in
+          FullScreenContentPortalSurface(item: item, presentation: presentation)
+        }
+      }
+    },
+    reconcile: { registry, identity, item in
+      registry.sheet.sync(sourceIdentity: identity, items: [item])
+    })
+}
+
+@MainActor
+package func anchoredSurfacePresentation(
+  _ presentation: AnchoredSurfaceStylePresentation,
+  accessibilityRole: AccessibilityRole,
+  createsFocusScope: Bool = true,
+  hostInsets: EdgeInsets = .zero
+) -> PortalSurfacePresentation {
+  PortalSurfacePresentation(
+    alignment: .topLeading, hostInsets: hostInsets, isIntrinsic: true,
+    accessibilityRole: accessibilityRole, createsFocusScope: createsFocusScope
+  ) { item in
+    AnchoredContentPortalSurface(
+      content: VStack(alignment: .leading, spacing: 0) {
+        PortalAttachmentSequenceView(payloads: item.contentPayloads)
+      }, presentation: presentation, semanticMetadata: item.surface.semanticMetadata)
+  }
 }
 
 extension View {
@@ -204,7 +197,7 @@ extension View {
         isPresented: isPresented,
         spec: spec,
         actions: defaultPresentationActions(
-          defaultDismissTitle: spec.descriptor.defaultDismissTitle,
+          defaultDismissTitle: spec.defaultDismissTitle,
           isPresented: isPresented,
           dismissAuthoringContext: makePortalAttachmentAuthoringContext()
         ),
@@ -257,7 +250,7 @@ extension View {
         spec: spec,
         actions: { _ in
           defaultItemPresentationActions(
-            defaultDismissTitle: spec.descriptor.defaultDismissTitle,
+            defaultDismissTitle: spec.defaultDismissTitle,
             item: item,
             dismissAuthoringContext: dismissAuthoringContext
           )
@@ -314,7 +307,7 @@ extension View {
         isPresented: isPresented,
         spec: spec,
         actions: defaultPresentationActions(
-          defaultDismissTitle: spec.descriptor.defaultDismissTitle,
+          defaultDismissTitle: spec.defaultDismissTitle,
           isPresented: isPresented,
           dismissAuthoringContext: makePortalAttachmentAuthoringContext()
         ),
@@ -367,7 +360,7 @@ extension View {
         spec: spec,
         actions: { _ in
           defaultItemPresentationActions(
-            defaultDismissTitle: spec.descriptor.defaultDismissTitle,
+            defaultDismissTitle: spec.defaultDismissTitle,
             item: item,
             dismissAuthoringContext: dismissAuthoringContext
           )

@@ -23,6 +23,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
       onDismiss,
       authoringContext: onDismissAuthoringContext
     )
+    let surface = spec.prepareSurface(context)
     return resolvePresentationModifier(
       content: content,
       isPresented: isPresented,
@@ -34,7 +35,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
         title: title,
-        descriptor: spec.descriptor,
+        surface: surface,
         actionPayloads: withAuthoringContext(actionsAuthoringContext) {
           portalAttachmentDeclaredBuilderChildren(
             from: actions,
@@ -94,6 +95,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
       onDismiss,
       authoringContext: onDismissAuthoringContext
     )
+    let surface = spec.prepareSurface(context)
     return resolvePresentationModifier(
       content: content,
       isPresented: isPresented,
@@ -105,7 +107,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
         title: title,
-        descriptor: context.resolvedSheetDescriptor(baseline: spec.descriptor),
+        surface: surface,
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
@@ -167,6 +169,7 @@ package struct BuiltinItemPromptPresentationModifier<
       onDismiss,
       authoringContext: onDismissAuthoringContext
     )
+    let surface = spec.prepareSurface(context)
     return resolveItemPresentationModifier(
       content: content,
       item: itemBinding,
@@ -181,7 +184,7 @@ package struct BuiltinItemPromptPresentationModifier<
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
         title: title,
-        descriptor: spec.descriptor,
+        surface: surface,
         actionPayloads: withAuthoringContext(actionsAuthoringContext) {
           portalAttachmentDeclaredBuilderChildren(
             from: actions(currentItem),
@@ -241,6 +244,7 @@ package struct BuiltinItemSheetPresentationModifier<
       onDismiss,
       authoringContext: onDismissAuthoringContext
     )
+    let surface = spec.prepareSurface(context)
     return resolveItemPresentationModifier(
       content: content,
       item: itemBinding,
@@ -255,7 +259,7 @@ package struct BuiltinItemSheetPresentationModifier<
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
         title: title,
-        descriptor: spec.descriptor,
+        surface: surface,
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
@@ -300,6 +304,7 @@ package struct MenuStylePresentationModifier<MenuContent: View>: PrimitiveViewMo
   ) -> [ResolvedNode] {
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let spec = menuPromptPresentationSpec(presentation: presentation)
+    let surface = spec.prepareSurface(context)
     return resolvePresentationModifier(
       content: content,
       isPresented: isPresented,
@@ -311,7 +316,7 @@ package struct MenuStylePresentationModifier<MenuContent: View>: PrimitiveViewMo
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
         title: "",
-        descriptor: spec.descriptor,
+        surface: surface,
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: withAuthoringContext(menuContentAuthoringContext) {
@@ -384,12 +389,13 @@ public struct BuiltinPaletteSheetPresentationModifier: PrimitiveViewModifier {
       onDismiss,
       authoringContext: onDismissAuthoringContext
     )
-    let spec = sheetPromptPresentationSpec(chrome: .dropdown)
+    let spec = palettePromptPresentationSpec()
     // Absorbed `paletteCommand(...)` contributions are captured off the
     // background before they are cleared, so they reach the palette body
     // even when the background is reused (toggle-only frames) rather than
     // re-resolved.
     var absorbed: [ActivePaletteCommand] = []
+    let surface = spec.prepareSurface(context)
     return resolvePresentationModifier(
       content: content,
       isPresented: isPresented,
@@ -405,7 +411,7 @@ public struct BuiltinPaletteSheetPresentationModifier: PrimitiveViewModifier {
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
         title: title,
-        descriptor: spec.descriptor,
+        surface: surface,
         actionPayloads: [],
         messagePayloads: [],
         contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {

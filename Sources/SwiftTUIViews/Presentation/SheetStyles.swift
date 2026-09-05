@@ -27,8 +27,12 @@ public struct SheetSurfaceStylePresentation: Sendable, Equatable {
   public var scrollMinimumHeight: Int
   public var scrollIdealHeight: Int
   public var scrollMaximumHeight: Int
+  public var contentInsets: EdgeInsets
+  public var backgroundStyle: AnyShapeStyle?
+  public var borderStyle: AnyShapeStyle?
   public var borderStroke: StrokeStyle
 
+  /// Constructs the established sheet baseline with default insets and paint.
   public init(
     container: SheetSurfaceContainer = .standard,
     backdropOpacity: Double = 0,
@@ -40,6 +44,29 @@ public struct SheetSurfaceStylePresentation: Sendable, Equatable {
     scrollMaximumHeight: Int = 20,
     borderStroke: StrokeStyle = .single
   ) {
+    self.init(
+      container: container, backdropOpacity: backdropOpacity, headerTone: headerTone,
+      minimumWidth: minimumWidth, maximumWidth: maximumWidth,
+      scrollMinimumHeight: scrollMinimumHeight, scrollIdealHeight: scrollIdealHeight,
+      scrollMaximumHeight: scrollMaximumHeight, borderStroke: borderStroke,
+      contentInsets: .init(horizontal: 1, vertical: 1))
+  }
+
+  /// Constructs sheet chrome with explicit content insets and optional paint.
+  public init(
+    container: SheetSurfaceContainer = .standard,
+    backdropOpacity: Double = 0,
+    headerTone: TerminalTone = .accent,
+    minimumWidth: Int = 20,
+    maximumWidth: Int? = nil,
+    scrollMinimumHeight: Int = 4,
+    scrollIdealHeight: Int = 12,
+    scrollMaximumHeight: Int = 20,
+    borderStroke: StrokeStyle = .single,
+    contentInsets: EdgeInsets,
+    backgroundStyle: AnyShapeStyle? = nil,
+    borderStyle: AnyShapeStyle? = nil
+  ) {
     self.container = container
     self.backdropOpacity = backdropOpacity
     self.headerTone = headerTone
@@ -49,6 +76,9 @@ public struct SheetSurfaceStylePresentation: Sendable, Equatable {
     self.scrollIdealHeight = scrollIdealHeight
     self.scrollMaximumHeight = scrollMaximumHeight
     self.borderStroke = borderStroke
+    self.contentInsets = contentInsets
+    self.backgroundStyle = backgroundStyle
+    self.borderStyle = borderStyle
   }
 }
 
@@ -227,58 +257,20 @@ extension SheetStyle where Self == DropdownSheetStyle {
 extension SurfaceSheetStyle: ReuseTransparentStyle {}
 extension DropdownSheetStyle: ReuseTransparentStyle {}
 
-extension PromptPresentationDescriptor {
-  /// The declaring modifier's own constants, expressed as a style baseline.
-  package var sheetStyleBaseline: SheetSurfaceStylePresentation {
-    SheetSurfaceStylePresentation(
-      container: chrome == .dropdown ? .dropdown : .standard,
-      backdropOpacity: backdropOpacity,
-      headerTone: headerTone,
-      minimumWidth: minWidth,
-      maximumWidth: maxWidth,
-      scrollMinimumHeight: scrollMinHeight,
-      scrollIdealHeight: scrollIdealHeight,
-      scrollMaximumHeight: scrollMaxHeight,
-      borderStroke: borderStyle
-    )
-  }
-
-  /// Folds a resolved sheet presentation back into the descriptor the
-  /// portal coordinator consumes. Alignment follows the container, since a
-  /// dropdown lands flush at the top edge — that is modifier-owned
-  /// semantics rather than a style value.
-  package func applyingSheetStyle(
-    _ presentation: SheetSurfaceStylePresentation
-  ) -> Self {
-    var descriptor = self
-    descriptor.chrome = presentation.container == .dropdown ? .dropdown : .surface
-    descriptor.alignment = presentation.container == .dropdown ? .topLeading : .center
-    descriptor.backdropOpacity = presentation.backdropOpacity
-    descriptor.headerTone = presentation.headerTone
-    descriptor.minWidth = presentation.minimumWidth
-    descriptor.maxWidth = presentation.maximumWidth
-    descriptor.scrollMinHeight = presentation.scrollMinimumHeight
-    descriptor.scrollIdealHeight = presentation.scrollIdealHeight
-    descriptor.scrollMaxHeight = presentation.scrollMaximumHeight
-    descriptor.borderStyle = presentation.borderStroke
-    return descriptor
-  }
-}
-
 extension ResolveContext {
-  /// Resolves the nearest sheet style against a declaration's baseline.
   @MainActor
-  package func resolvedSheetDescriptor(
-    baseline descriptor: PromptPresentationDescriptor
-  ) -> PromptPresentationDescriptor {
-    let resolved = environmentValues.sheetStyle.presentation(
-      for: SheetStyleConfiguration(
-        defaultPresentation: descriptor.sheetStyleBaseline,
-        terminalSize: environmentValues.terminalSize,
+  package func resolvedSheetPresentation(
+    baseline: SheetSurfaceStylePresentation
+  ) -> SheetSurfaceStylePresentation {
+    let style = environmentValues.sheetStyle
+    let resolved = style.presentation(
+      for: .init(
+        defaultPresentation: baseline, terminalSize: environmentValues.terminalSize,
         controlProminence: environmentValues.controlProminence,
-        styleEnvironment: environmentValues.styleEnvironmentSnapshot
-      )
-    )
-    return descriptor.applyingSheetStyle(resolved)
+        styleEnvironment: environmentValues.styleEnvironmentSnapshot))
+    return StyleMisuse.validatedPresentation(
+      resolved, problems: resolved.validationProblems, family: "SheetStyle",
+      styleLabel: style.description, identity: identity,
+      report: ImperativeRuntimeIssueQueue.record, fallback: { baseline })
   }
 }

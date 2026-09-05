@@ -153,7 +153,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   `update(in:)`, and under the in-place contract a stored mutation in one never
   happens at all. Views declared *inside* the style body are unaffected — they
   resolve normally and get the full pass.
-- **Views, modifiers, styles, dynamic properties, scenes, and apps must be
+- **Views, modifiers, body-producing styles, dynamic properties, scenes, and apps must be
   value types.** *Ratified.* SwiftUI's protocols admit classes; OpenSwiftUI
   preconditions against them at first body evaluation; SwiftTUI rejects the
   conformance at compile time, through a defaulted witness whose
@@ -164,6 +164,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   a resource handle, a closure log — stay unrestricted; only the authored
   container is constrained. A cold-path precondition in the reflect-once
   plan builders is the runtime floor beneath the compile-time contract.
+  Presentation-value style protocols require `Sendable` and do not carry this
+  authored-container witness.
 - **State ownership is bound at capture, with an identity-refresh tier.**
   *Ratified.* Closures created during body evaluation carry their `@State`
   owner — SwiftTUI's analog of SwiftUI's `_location` injection, adapted to

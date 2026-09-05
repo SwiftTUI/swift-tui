@@ -12,12 +12,12 @@ struct StackedPresentationTests {
   func sheetCoordinatorEmitsEveryActiveItem() throws {
     let registry = PresentationCoordinatorRegistry()
     registry.sheet.present(
-      stackedPromptItem(id: "sheet-a", descriptor: sheetPromptPresentationSpec().descriptor)
+      stackedPromptItem(id: "sheet-a", spec: sheetPromptPresentationSpec())
     )
     registry.sheet.present(
       stackedPromptItem(
         id: "cover-b",
-        descriptor: fullScreenCoverPromptPresentationSpec().descriptor
+        spec: fullScreenCoverPromptPresentationSpec()
       )
     )
 
@@ -48,10 +48,10 @@ struct StackedPresentationTests {
   func menuCoordinatorEmitsEveryActiveItem() {
     let registry = PresentationCoordinatorRegistry()
     registry.menu.present(
-      stackedPromptItem(id: "menu-a", descriptor: menuPromptPresentationSpec().descriptor)
+      stackedPromptItem(id: "menu-a", spec: menuPromptPresentationSpec())
     )
     registry.menu.present(
-      stackedPromptItem(id: "menu-b", descriptor: menuPromptPresentationSpec().descriptor)
+      stackedPromptItem(id: "menu-b", spec: menuPromptPresentationSpec())
     )
 
     let entries = registry.overlayEntries().filter { $0.kindName == "MenuPresentation" }
@@ -63,10 +63,10 @@ struct StackedPresentationTests {
   func alertCoordinatorExposesOldestActiveItem() {
     let registry = PresentationCoordinatorRegistry()
     registry.alert.present(
-      stackedPromptItem(id: "alert-a", descriptor: alertPromptPresentationSpec().descriptor)
+      stackedPromptItem(id: "alert-a", spec: alertPromptPresentationSpec())
     )
     registry.alert.present(
-      stackedPromptItem(id: "alert-b", descriptor: alertPromptPresentationSpec().descriptor)
+      stackedPromptItem(id: "alert-b", spec: alertPromptPresentationSpec())
     )
 
     let entries = registry.overlayEntries().filter { $0.kindName == "AlertPresentation" }
@@ -80,13 +80,13 @@ struct StackedPresentationTests {
     registry.confirmationDialog.present(
       stackedPromptItem(
         id: "confirmation-a",
-        descriptor: confirmationDialogPromptPresentationSpec().descriptor
+        spec: confirmationDialogPromptPresentationSpec()
       )
     )
     registry.confirmationDialog.present(
       stackedPromptItem(
         id: "confirmation-b",
-        descriptor: confirmationDialogPromptPresentationSpec().descriptor
+        spec: confirmationDialogPromptPresentationSpec()
       )
     )
 
@@ -115,21 +115,21 @@ struct StackedPresentationTests {
     registry.alert.present(
       stackedPromptItem(
         id: "alert-a",
-        descriptor: alertPromptPresentationSpec().descriptor,
+        spec: alertPromptPresentationSpec(),
         dismiss: { dismissals.append("alert-a") }
       )
     )
     registry.sheet.present(
       stackedPromptItem(
         id: "sheet-b",
-        descriptor: sheetPromptPresentationSpec().descriptor,
+        spec: sheetPromptPresentationSpec(),
         dismiss: { dismissals.append("sheet-b") }
       )
     )
     registry.alert.present(
       stackedPromptItem(
         id: "alert-c",
-        descriptor: alertPromptPresentationSpec().descriptor,
+        spec: alertPromptPresentationSpec(),
         dismiss: { dismissals.append("alert-c") }
       )
     )
@@ -343,13 +343,13 @@ private struct StackedAlertQueueFixture: View {
 @MainActor
 private func stackedPromptItem(
   id: String,
-  descriptor: PromptPresentationDescriptor,
+  spec: PromptPresentationSpec,
   dismiss: @escaping @MainActor @Sendable () -> Void = {}
 ) -> PromptPresentationItem {
   PromptPresentationItem(
     id: id,
     title: id,
-    descriptor: descriptor,
+    surface: spec.prepareSurface(.init(identity: testIdentity("StackedImperative", id))),
     actionPayloads: [],
     messagePayloads: [],
     contentPayloads: [],
@@ -363,7 +363,7 @@ private func stackedPopoverItem(
 ) -> PopoverPresentationItem {
   let surfaceItem = stackedPromptItem(
     id: id,
-    descriptor: sheetPromptPresentationSpec().descriptor
+    spec: sheetPromptPresentationSpec()
   )
   return PopoverPresentationItem(
     id: id,

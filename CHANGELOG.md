@@ -10,6 +10,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- **Portal presentation styles.** `PromptStyle` shares appearance between
+  alerts and confirmation dialogs; `FullScreenCoverStyle` controls cover insets
+  and paint; `PopoverStyle` resolves the anchored surface shared with Menu.
+  Automatic styles preserve each declaration's baseline. Sheet presentation
+  values add content insets and optional background and border paint, while
+  retaining the existing initializer. Item-based sheets now honor SheetStyle.
+  Five fixed surfaces retain primitive-owned modality, focus, and dismissal.
 - **Menu and control-group styles.** `MenuStyle` exposes trigger and portal
   composition while Menu owns activation, expansion, and dismissal. Anchored
   presentation values control insets, bounds, and paints, including scrolling

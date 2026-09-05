@@ -597,7 +597,7 @@ private struct RenderTimePresentationMutationProbe: PrimitiveView, ResolvableVie
           token: spec.token
         ),
         title: "Illegal mutation",
-        descriptor: spec.descriptor,
+        surface: spec.prepareSurface(context),
         actionPayloads: portalAttachmentDeclaredBuilderChildren(
           from: Button("Dismiss") {},
           edge: nil

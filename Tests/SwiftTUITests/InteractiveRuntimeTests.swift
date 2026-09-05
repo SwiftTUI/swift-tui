@@ -1278,7 +1278,9 @@ struct InteractiveRuntimeTests {
     )
 
     #expect(actionRegistry.dispatch(identity: testIdentity("Root", "Harness[0]")))
-    #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), keyPress: KeyPress(.return)))
+    #expect(
+      keyRegistry.dispatch(
+        identity: testIdentity("Root", "Harness[0]"), keyPress: KeyPress(.return)))
     #expect(recorder.actionCount == 1)
     #expect(recorder.keyEvents == [.return])
 
@@ -1294,7 +1296,9 @@ struct InteractiveRuntimeTests {
     )
 
     #expect(actionRegistry.dispatch(identity: testIdentity("Root", "Harness[0]")))
-    #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), keyPress: KeyPress(.space)))
+    #expect(
+      keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), keyPress: KeyPress(.space))
+    )
     #expect(recorder.actionCount == 2)
     #expect(recorder.keyEvents == [.return, .space])
   }
@@ -6017,7 +6021,8 @@ private struct ImperativeAlertPresentationHarnessView: View {
             PromptPresentationItem(
               id: "imperative-alert",
               title: "Imperative alert",
-              descriptor: alertPromptPresentationSpec().descriptor,
+              surface: alertPromptPresentationSpec().prepareSurface(
+                .init(identity: testIdentity("ImperativePresentation"))),
               actionPayloads: portalAttachmentDeclaredBuilderChildren(
                 from: Button("Dismiss") {},
                 edge: nil

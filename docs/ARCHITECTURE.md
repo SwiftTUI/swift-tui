@@ -237,6 +237,16 @@ content. Runtime captures those slots before departure and publishes them only
 with an accepted commit. Runtime registrations and presentation hosts depart
 normally. Lazy tabs retain their separate value-only dormancy contract.
 
+Portal declarations capture their style environment before evaluating the
+presentation trigger. `PromptPresentationEntrypoints.swift` selects one of five
+fixed surfaces: prompt actions, standard sheet content, dropdown content,
+full-screen content, or anchored content. A prepared typed resolver carries
+that selection into the coordinator host. No surface-kind or body-mode switch
+crosses the host boundary. Alert and confirmation share PromptStyle; cover and
+popover have independent presentation-value families. Boolean and item sheet
+declarations both resolve SheetStyle. Coordinators retain focus, modal policy,
+stacking, Escape, action scopes, and committed dismissal observers.
+
 ```
 Sources/
   SwiftTUIPrimitives/  Geometry, Support, Pointer, Styling (values), Content

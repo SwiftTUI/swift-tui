@@ -301,6 +301,20 @@ classifications:
     - SwiftTUIViews.UnitCurve
 
     # ─── View style protocols + concrete styles ────────────────────────────
+    - SwiftTUIViews.AnyPromptStyle
+    - SwiftTUIViews.PromptStyle
+    - SwiftTUIViews.PromptStyleConfiguration
+    - SwiftTUIViews.AutomaticPromptStyle
+    - SwiftTUIViews.AnyFullScreenCoverStyle
+    - SwiftTUIViews.FullScreenCoverStyle
+    - SwiftTUIViews.FullScreenCoverStyleConfiguration
+    - SwiftTUIViews.AutomaticFullScreenCoverStyle
+    - SwiftTUIViews.AnyPopoverStyle
+    - SwiftTUIViews.PopoverStyle
+    - SwiftTUIViews.PopoverStyleConfiguration
+    - SwiftTUIViews.AutomaticPopoverStyle
+    - SwiftTUIViews.PromptSurfaceStylePresentation
+    - SwiftTUIViews.FullScreenSurfaceStylePresentation
     - SwiftTUIViews.AnyMenuStyle
     - SwiftTUIViews.MenuStyle
     - SwiftTUIViews.MenuStyleConfiguration

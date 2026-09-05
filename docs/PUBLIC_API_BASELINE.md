@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 384 | 2272 |
+| `SwiftTUIViews` | 398 | 2358 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -126,7 +126,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (384)
+### Canonical surface (398)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 6 members
@@ -142,6 +142,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnyButtonStyle` — struct — 8 members
 - `AnyControlGroupStyle` — struct — 7 members
 - `AnyDisclosureGroupStyle` — struct — 5 members
+- `AnyFullScreenCoverStyle` — struct — 4 members
 - `AnyGroupBoxStyle` — struct — 6 members
 - `AnyLabeledContentStyle` — struct — 5 members
 - `AnyLabelStyle` — struct — 7 members
@@ -150,7 +151,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnyMenuStyle` — struct — 7 members
 - `AnyOutlineStyle` — struct — 6 members
 - `AnyPickerStyle` — struct — 8 members
+- `AnyPopoverStyle` — struct — 4 members
 - `AnyProgressViewStyle` — struct — 6 members
+- `AnyPromptStyle` — struct — 4 members
 - `AnySheetStyle` — struct — 6 members
 - `AnySliderStyle` — struct — 5 members
 - `AnySpinnerStyle` — struct — 41 members
@@ -168,6 +171,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AutomaticButtonStyle` — struct — 3 members
 - `AutomaticControlGroupStyle` — struct — 3 members
 - `AutomaticDisclosureGroupStyle` — struct — 3 members
+- `AutomaticFullScreenCoverStyle` — struct — 3 members
 - `AutomaticGroupBoxStyle` — struct — 3 members
 - `AutomaticLabeledContentStyle` — struct — 3 members
 - `AutomaticLabelStyle` — struct — 3 members
@@ -175,7 +179,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AutomaticMenuStyle` — struct — 3 members
 - `AutomaticOutlineStyle` — struct — 3 members
 - `AutomaticPickerStyle` — struct — 4 members
+- `AutomaticPopoverStyle` — struct — 3 members
 - `AutomaticProgressViewStyle` — struct — 3 members
+- `AutomaticPromptStyle` — struct — 3 members
 - `AutomaticSliderStyle` — struct — 3 members
 - `AutomaticStepperStyle` — struct — 3 members
 - `AutomaticTableStyle` — struct — 3 members
@@ -260,6 +266,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ForEachBindingElement` — struct
 - `ForeignSurface` — struct — 2 members
 - `FrameModifier` — struct
+- `FullScreenCoverStyle` — protocol — 4 members
+- `FullScreenCoverStyleConfiguration` — struct — 4 members
+- `FullScreenSurfaceStylePresentation` — struct — 3 members
 - `GeometryProxy` — struct — 7 members
 - `GeometryReader` — struct — 1 member
 - `Gesture` — protocol — 10 members
@@ -371,6 +380,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `PointerHoverModifier` — struct
 - `PointerPath` — struct — 9 members
 - `PopoverAttachmentAnchor` — enum — 2 members
+- `PopoverStyle` — protocol — 4 members
+- `PopoverStyleConfiguration` — struct — 4 members
 - `PopoverTip` — protocol — 9 members
 - `PopoverTipAction` — struct — 3 members
 - `PositionModifier` — struct
@@ -384,6 +395,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ProgressView` — struct — 10 members
 - `ProgressViewStyle` — protocol — 7 members
 - `ProgressViewStyleConfiguration` — struct — 12 members
+- `PromptStyle` — protocol — 4 members
+- `PromptStyleConfiguration` — struct — 6 members
+- `PromptSurfaceStylePresentation` — struct — 12 members
 - `ProposedViewSize` — typealias
 - `RadialGradient` — extension — 1 member
 - `RadioGroupPickerStyle` — struct — 4 members
@@ -414,7 +428,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `SheetStyle` — protocol — 6 members
 - `SheetStyleConfiguration` — struct — 4 members
 - `SheetSurfaceContainer` — enum — 2 members
-- `SheetSurfaceStylePresentation` — struct — 10 members
+- `SheetSurfaceStylePresentation` — struct — 14 members
 - `SimultaneousGesture` — struct — 9 members
 - `Slider` — struct — 4 members
 - `SliderStyle` — protocol — 6 members
@@ -497,7 +511,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 191 members
+- `View` — protocol — 197 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member

@@ -101,6 +101,7 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
       authoringContext: onDismissAuthoringContext
     )
     let dismissInvalidator = context.invalidationProxy?.invalidator
+    let presentation = context.resolvedPopoverPresentation()
     return resolvePresentationModifier(
       content: content,
       isPresented: isPresented,
@@ -116,6 +117,7 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
         attachmentAnchor: attachmentAnchor,
         arrowEdge: arrowEdge,
         modalPolicy: .disablesBaseInteraction,
+        presentation: presentation,
         contentPayloads: withAuthoringContext(popoverContentAuthoringContext) {
           portalAttachmentDeclaredBuilderChildren(
             from: popoverContent,

@@ -95,10 +95,14 @@ package enum EnvironmentKeyReuseClassification {
     // preference reconciliation replays through that same host rather than
     // re-reading the environment.
     "ToolbarStyleKey",
-    // Read once at the sheet declaration's resolve, where the resolved
-    // chrome is folded into the descriptor the portal coordinator
-    // consumes; nothing re-reads the key downstream.
+    // Read at declaration resolve, including closed declarations. The
+    // prepared typed surface carries values through portal composition;
+    // no downstream phase reads these keys. Paired unread/reader tests
+    // cover open and closed declarations before certification.
     "SheetStyleKey",
+    "PromptStyleKey",
+    "FullScreenCoverStyleKey",
+    "PopoverStyleKey",
     // One tracked read in each primitive's resolve; style output travels
     // through a captured body node, with no downstream environment reread.
     // Dedicated unread/reader boundary tests and the full memo oracle pin

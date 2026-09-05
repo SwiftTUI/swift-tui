@@ -131,21 +131,23 @@ extension ForEach: DeclaredChildrenView {
       let id = ids[offset]
       let occurrence = occurrences[offset]
       children.append(
-        PortalAttachmentContentPayload(resolveElements: { _, placementRoot in
-          let baseContext = slotContext.applying(to: placementRoot)
-          let iteration = makeForEachIteration(
-            element: element,
-            id: id,
-            offset: currentOffset,
-            occurrence: occurrence,
-            in: baseContext,
-            authoringScope: iterationAuthoringScope
-          )
-          return iteration.resolveElements(
-            content: content,
-            consumingAs: .declaredChildren
-          )
-        })
+        PortalAttachmentContentPayload(
+          hasDeclaredContent: Content.self != EmptyView.self,
+          resolveElements: { _, placementRoot in
+            let baseContext = slotContext.applying(to: placementRoot)
+            let iteration = makeForEachIteration(
+              element: element,
+              id: id,
+              offset: currentOffset,
+              occurrence: occurrence,
+              in: baseContext,
+              authoringScope: iterationAuthoringScope
+            )
+            return iteration.resolveElements(
+              content: content,
+              consumingAs: .declaredChildren
+            )
+          })
       )
       offset += 1
     }

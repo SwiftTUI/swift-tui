@@ -108,6 +108,18 @@ private enum SheetStyleKey: EnvironmentKey {
   static let defaultValue = AnySheetStyle.automatic
 }
 
+private enum PromptStyleKey: EnvironmentKey {
+  static let defaultValue = AnyPromptStyle.automatic
+}
+
+private enum FullScreenCoverStyleKey: EnvironmentKey {
+  static let defaultValue = AnyFullScreenCoverStyle.automatic
+}
+
+private enum PopoverStyleKey: EnvironmentKey {
+  static let defaultValue = AnyPopoverStyle.automatic
+}
+
 private enum TabViewStyleKey: EnvironmentKey {
   static let defaultValue = AnyTabViewStyle.automatic
 }
@@ -323,6 +335,21 @@ extension EnvironmentValues {
   package var sheetStyle: AnySheetStyle {
     get { self[SheetStyleKey.self] }
     set { self[SheetStyleKey.self] = newValue }
+  }
+
+  package var promptStyle: AnyPromptStyle {
+    get { self[PromptStyleKey.self] }
+    set { self[PromptStyleKey.self] = newValue }
+  }
+
+  package var fullScreenCoverStyle: AnyFullScreenCoverStyle {
+    get { self[FullScreenCoverStyleKey.self] }
+    set { self[FullScreenCoverStyleKey.self] = newValue }
+  }
+
+  package var popoverStyle: AnyPopoverStyle {
+    get { self[PopoverStyleKey.self] }
+    set { self[PopoverStyleKey.self] = newValue }
   }
 
   package var tabViewStyle: AnyTabViewStyle {
