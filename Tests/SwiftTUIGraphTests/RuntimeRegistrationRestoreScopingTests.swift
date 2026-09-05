@@ -12,6 +12,40 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct RuntimeRegistrationRestoreScopingTests {
+  @Test("a routed descendant restores pointer handlers recorded by its ancestor")
+  func routedDescendantIncludesRecordingOwner() {
+    let rootIdentity = testIdentity("Root")
+    let ownerIdentity = testIdentity("Root", "Host")
+    let wrapperIdentity = testIdentity("Root", "Host", "Body", "RouteWrapper")
+    let routeIdentity = testIdentity("Root", "Host", "Command")
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let root = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let owner = graph.beginEvaluation(identity: ownerIdentity, invalidator: nil)
+    ViewNodeContext.withValue(owner) {
+      RegistrationKindDriver.record(.pointerHandler, on: owner, identity: routeIdentity)
+    }
+    let wrapper = graph.beginEvaluation(identity: wrapperIdentity, invalidator: nil)
+    let routed = ResolvedNode(identity: routeIdentity, kind: .view("RouteWrapper"))
+    graph.finishEvaluation(wrapper, resolved: routed, accessedStateSlots: 0)
+    let hosted = ResolvedNode(identity: ownerIdentity, kind: .view("Host"), children: [routed])
+    graph.finishEvaluation(owner, resolved: hosted, accessedStateSlots: 0)
+    graph.finishEvaluation(
+      root, resolved: ResolvedNode(identity: rootIdentity, kind: .root, children: [hosted]),
+      accessedStateSlots: 0)
+    let resolved = graph.snapshot(rootIdentity: rootIdentity)
+    _ = graph.finalizeFrame(rootIdentity: rootIdentity, resolved: resolved, placed: nil)
+
+    let live = RuntimeRegistrationSet.scratch()
+    graph.restoreCurrentFrameRuntimeRegistrations(into: live)
+    let expected = live.publicationOracleFingerprint()
+    #expect(!expected.isEmpty)
+    let roots = graph.runtimeRegistrationResetRoots(for: [wrapperIdentity])
+    live.removeSubtrees(rootedAt: roots)
+    graph.restoreRuntimeRegistrationSubtrees(rootedAt: roots, into: live)
+    #expect(live.publicationOracleFingerprint() == expected)
+  }
+
   @Test("scoped .subtrees restore is byte-identical to a full rebuild (focus order)")
   func scopedSubtreeRestoreMatchesFullRebuild() {
     let rootIdentity = testIdentity("Root")
