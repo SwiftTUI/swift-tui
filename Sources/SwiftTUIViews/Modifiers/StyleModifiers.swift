@@ -26,7 +26,6 @@ extension View {
     toggleStyle(AnyToggleStyle(style))
   }
 
-
   /// Sets the DisclosureGroup composition for this subtree.
   public func disclosureGroupStyle(_ style: AnyDisclosureGroupStyle) -> some View {
     environment(\.disclosureGroupStyle, style)
@@ -35,7 +34,6 @@ extension View {
   public func disclosureGroupStyle<S: DisclosureGroupStyle>(_ style: S) -> some View {
     disclosureGroupStyle(AnyDisclosureGroupStyle(style))
   }
-
 
   /// Sets the TextEditor composition for this subtree.
   public func textEditorStyle(_ style: AnyTextEditorStyle) -> some View {
@@ -46,7 +44,6 @@ extension View {
     textEditorStyle(AnyTextEditorStyle(style))
   }
 
-
   /// Sets the ProgressView composition for this subtree.
   public func progressViewStyle(_ style: AnyProgressViewStyle) -> some View {
     environment(\.progressViewStyle, style)
@@ -55,7 +52,6 @@ extension View {
   public func progressViewStyle<S: ProgressViewStyle>(_ style: S) -> some View {
     progressViewStyle(AnyProgressViewStyle(style))
   }
-
 
   /// Sets the composition of labels in this subtree.
   public func labelStyle(_ style: AnyLabelStyle) -> some View {
@@ -73,6 +69,23 @@ extension View {
 
   public func labeledContentStyle<S: LabeledContentStyle>(_ style: S) -> some View {
     labeledContentStyle(AnyLabeledContentStyle(style))
+  }
+
+  /// Sets the arrangement of authored controls in this subtree.
+  public func controlGroupStyle(_ style: AnyControlGroupStyle) -> some View {
+    environment(\.controlGroupStyle, style)
+  }
+
+  public func controlGroupStyle<S: ControlGroupStyle>(_ style: S) -> some View {
+    controlGroupStyle(AnyControlGroupStyle(style))
+  }
+
+  public func menuStyle(_ style: AnyMenuStyle) -> some View {
+    environment(\.menuStyle, style)
+  }
+
+  public func menuStyle<S: MenuStyle>(_ style: S) -> some View {
+    menuStyle(AnyMenuStyle(style))
   }
 
   /// Sets the chrome and composition of group boxes in this subtree.

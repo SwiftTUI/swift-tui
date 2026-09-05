@@ -127,10 +127,12 @@ public struct ControlGroup<Label: View, Content: View>: PrimitiveView, Resolvabl
   private var showsLabel: Bool
   private var label: Label
   private var content: Content
+  private let authoringScope: AuthoringContext?
 
   public init(
     @ViewBuilder content: () -> Content
   ) where Label == EmptyView {
+    authoringScope = currentAuthoringContext()
     showsLabel = false
     label = EmptyView()
     self.content = content()
@@ -140,6 +142,7 @@ public struct ControlGroup<Label: View, Content: View>: PrimitiveView, Resolvabl
     _ title: S,
     @ViewBuilder content: () -> Content
   ) where Label == Text {
+    authoringScope = currentAuthoringContext()
     showsLabel = true
     label = Text(String(title))
     self.content = content()
@@ -149,6 +152,7 @@ public struct ControlGroup<Label: View, Content: View>: PrimitiveView, Resolvabl
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
+    authoringScope = currentAuthoringContext()
     showsLabel = true
     self.label = label()
     self.content = content()
@@ -157,19 +161,22 @@ public struct ControlGroup<Label: View, Content: View>: PrimitiveView, Resolvabl
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    composedView().resolveElements(in: context)
-  }
-
-  @ViewBuilder
-  private func composedView() -> some View {
-    VStack(alignment: .leading, spacing: 0) {
-      if showsLabel {
-        label.foregroundStyle(.separator)
-      }
-      HStack(spacing: 1) {
-        content
-      }
+    var configuration = ControlGroupStyleConfiguration(
+      label: showsLabel ? .init(authoringContext: authoringScope) { label } : nil,
+      content: .init(authoringContext: authoringScope) { content },
+      styleEnvironment: context.environmentValues.styleEnvironmentSnapshot)
+    let owner = ViewNodeContext.current?.stateOwnerHandle
+    if let owner {
+      configuration.content.retention = CapturedSubviewRetention(
+        owner: owner, identity: context.identity.child(.named("ControlGroupContent")))
     }
+    let child = context.environmentValues.controlGroupStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("ControlGroupBody")))
+    var node = ResolvedNode(
+      identity: context.identity, kind: .view("ControlGroup"), children: [child],
+      environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
+    if let owner { node.preferenceValues[CapturedSubviewOwnersPreferenceKey.self].insert(owner) }
+    return [node]
   }
 }
 

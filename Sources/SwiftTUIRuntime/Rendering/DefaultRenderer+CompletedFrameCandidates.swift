@@ -20,6 +20,8 @@ extension DefaultRenderer {
         DormantTabArchiveRefreshPreferenceKey.self
       ]
     )
+    let capturedSubviewArchiveRefreshes = captureCapturedSubviewArchiveCommitRefreshes(
+      in: viewGraph, resolved: tailOutput.frameTailInput.canonicalResolved)
     let workerTimings = CommittedFrameArtifactBuilder.workerTimings(
       draft: draft,
       tailOutput: tailOutput
@@ -51,6 +53,7 @@ extension DefaultRenderer {
       resolved: resolved,
       workerTimings: workerTimings,
       dormantTabArchiveRefreshes: dormantTabArchiveRefreshes,
+      capturedSubviewArchiveRefreshes: capturedSubviewArchiveRefreshes,
       previewArtifacts: artifacts,
       previewLifecyclePlan: preview.lifecyclePlan,
       eligibility: eligibility,
@@ -127,6 +130,7 @@ extension DefaultRenderer {
       semantics: tail.semantics,
       workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates,
       dormantTabArchiveRefreshes: candidate.dormantTabArchiveRefreshes,
+      capturedSubviewArchiveRefreshes: candidate.capturedSubviewArchiveRefreshes,
       preview: (
         lifecyclePlan: candidate.previewLifecyclePlan,
         commitPlan: candidate.previewArtifacts.commitPlan
@@ -171,6 +175,7 @@ extension DefaultRenderer {
     semantics: SemanticSnapshot,
     workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate],
     dormantTabArchiveRefreshes: [DormantTabArchiveCommitRefresh] = [],
+    capturedSubviewArchiveRefreshes: [CapturedSubviewArchiveCommitRefresh]? = nil,
     preview: (lifecyclePlan: ViewGraphFrameLifecycleEventPlan, commitPlan: CommitPlan)? = nil
   ) -> CommittedFrameEffects {
     var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
@@ -179,6 +184,11 @@ extension DefaultRenderer {
         dormantTabArchiveRefreshes,
         in: viewGraph
       )
+      applyCapturedSubviewArchiveCommitRefreshes(
+        capturedSubviewArchiveRefreshes
+          ?? captureCapturedSubviewArchiveCommitRefreshes(
+            in: viewGraph, resolved: canonicalResolved,
+            fallbacks: draft.capturedSubviewFallbacks), in: viewGraph)
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.graphRootIdentity,
         resolved: canonicalResolved,

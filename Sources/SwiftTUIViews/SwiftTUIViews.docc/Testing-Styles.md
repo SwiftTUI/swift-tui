@@ -164,6 +164,8 @@ configuration is SPI-gated like the other families.
 | ``ProgressViewStyle`` | ``ProgressViewStyleConfiguration`` and optional `Label` and `CurrentValueLabel` slots; `indeterminatePhase` defaults to zero |
 | ``SliderStyle`` | ``SliderStyleConfiguration`` and `Label`/`ValueLabel` slots; the track route is inert |
 | ``StepperStyle`` | ``StepperStyleConfiguration`` and `Label`/`ValueLabel` slots; both action routes are inert |
+| ``MenuStyle`` | ``MenuStyleConfiguration`` and `Label`/`Content` slots; trigger and portal wrappers are inert |
+| ``ControlGroupStyle`` | ``ControlGroupStyleConfiguration`` and optional `Label` plus `Content` slots |
 | ``TextFieldStyle`` | ``TextFieldStyleConfiguration``, its `Label` slot, and `FieldContent` |
 | ``PickerStyle`` | ``PickerStyleConfiguration``, its `Label` slot, and `Option` fixtures; option and trigger routes are inert |
 | ``ListStyle`` | ``ListStyleConfiguration`` |
@@ -174,7 +176,7 @@ configuration is SPI-gated like the other families.
 | ``ToastStyle`` | ``ToastStyleConfiguration`` |
 | ``TabViewStyle`` | ``TabViewStyleBodyConfiguration`` and its `Content` slot; the item, trigger, and strip configurations through their public initializers |
 
-Presentation values (``SpinnerStylePresentation``,
+Presentation values (``AnchoredSurfaceStylePresentation``, ``SpinnerStylePresentation``,
 ``SheetSurfaceStylePresentation``, ``ToastStylePresentation``,
 ``TabViewStylePresentation``, and the collection presentations) already have
 public initializers because styles construct them. Families added later

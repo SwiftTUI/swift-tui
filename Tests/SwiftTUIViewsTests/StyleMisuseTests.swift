@@ -44,7 +44,7 @@ struct StyleMisuseTests {
     #expect(issue.message.contains("active frames are empty"))
     #expect(issue.message.contains("interval is not positive"))
     #expect(issue.message.contains("automatic presentation"))
-    #expect(issue.message.contains("resolvePresentation(for:)"))
+    #expect(issue.message.contains("valid presentation values"))
   }
 
   @Test("The issue carries the resolving surface's identity")

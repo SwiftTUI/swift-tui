@@ -14,11 +14,34 @@ import Testing
 /// fuzzer case-139).
 @MainActor
 struct StyleBodyViewNodeTests {
+  @Test("Menu style bodies have their own applied nodes", arguments: [0, 1, 2, 3])
+  func menuStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnyMenuStyle] = [.automatic, .button, .borderlessButton, .inline]
+    let result = resolveWithGraph(
+      Menu("Commands") { Text("Item") }.menuStyle(styles[index]), root: "MenuStyleNodeRoot")
+    let menu = try #require(firstNode(ofKind: "Menu", in: result.resolved))
+    let body = try #require(result.graph.nodeForIdentity(menu.identity.child(.named("MenuBody"))))
+    #expect(body.committed.viewNodeID == body.viewNodeID)
+    #expect(!body.committed.children.isEmpty)
+  }
+
+  @Test("ControlGroup style bodies have their own applied nodes", arguments: [0, 1, 2, 3])
+  func controlGroupStyleBodyHasOwnNode(_ index: Int) throws {
+    let styles: [AnyControlGroupStyle] = [.automatic, .horizontal, .vertical, .compactMenu]
+    let result = resolveWithGraph(
+      ControlGroup("Commands") { Text("Item") }.controlGroupStyle(styles[index]),
+      root: "ControlGroupStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(
+      result,
+      controlKind: "ControlGroup", bodyComponent: "ControlGroupBody")
+  }
+
   @Test("Slider style bodies have their own applied nodes", arguments: [0, 1])
   func sliderStyleBodyHasOwnNode(_ index: Int) throws {
     let styles: [AnySliderStyle] = [.automatic, .linear]
     let result = resolveWithGraph(
-      Slider("Level", value: .constant(5), in: 0...10).sliderStyle(styles[index]), root: "SliderStyleNodeRoot")
+      Slider("Level", value: .constant(5), in: 0...10).sliderStyle(styles[index]),
+      root: "SliderStyleNodeRoot")
     try expectStyleBodyHasOwnAppliedNode(result, controlKind: "Slider", bodyComponent: "SliderBody")
   }
 
@@ -26,15 +49,18 @@ struct StyleBodyViewNodeTests {
   func stepperStyleBodyHasOwnNode(_ index: Int) throws {
     let styles: [AnyStepperStyle] = [.automatic, .compact]
     let result = resolveWithGraph(
-      Stepper("Count", value: .constant(5), in: 0...10).stepperStyle(styles[index]), root: "StepperStyleNodeRoot")
-    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "Stepper", bodyComponent: "StepperBody")
+      Stepper("Count", value: .constant(5), in: 0...10).stepperStyle(styles[index]),
+      root: "StepperStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(
+      result, controlKind: "Stepper", bodyComponent: "StepperBody")
   }
 
   @Test("Toggle style bodies have their own applied nodes", arguments: [0, 1, 2])
   func toggleStyleBodyHasOwnNode(_ index: Int) throws {
     let styles: [AnyToggleStyle] = [.automatic, .checkbox, .button]
     let result = resolveWithGraph(
-      Toggle("Switch", isOn: .constant(false)).toggleStyle(styles[index]), root: "ToggleStyleNodeRoot")
+      Toggle("Switch", isOn: .constant(false)).toggleStyle(styles[index]),
+      root: "ToggleStyleNodeRoot")
     try expectStyleBodyHasOwnAppliedNode(result, controlKind: "Toggle", bodyComponent: "ToggleBody")
   }
 
@@ -42,16 +68,20 @@ struct StyleBodyViewNodeTests {
   func disclosureGroupStyleBodyHasOwnNode(_ index: Int) throws {
     let styles: [AnyDisclosureGroupStyle] = [.automatic, .compact]
     let result = resolveWithGraph(
-      DisclosureGroup("Details", isExpanded: .constant(true)) { Text("Child") }.disclosureGroupStyle(styles[index]), root: "DisclosureGroupStyleNodeRoot")
-    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "DisclosureGroup", bodyComponent: "DisclosureBody")
+      DisclosureGroup("Details", isExpanded: .constant(true)) { Text("Child") }
+        .disclosureGroupStyle(styles[index]), root: "DisclosureGroupStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(
+      result, controlKind: "DisclosureGroup", bodyComponent: "DisclosureBody")
   }
 
   @Test("TextEditor style bodies have their own applied nodes", arguments: [0, 1, 2])
   func textEditorStyleBodyHasOwnNode(_ index: Int) throws {
     let styles: [AnyTextEditorStyle] = [.automatic, .plain, .roundedBorder]
     let result = resolveWithGraph(
-      TextEditor(text: .constant("Text")).textEditorStyle(styles[index]), root: "TextEditorStyleNodeRoot")
-    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "TextEditor", bodyComponent: "TextEditorBody")
+      TextEditor(text: .constant("Text")).textEditorStyle(styles[index]),
+      root: "TextEditorStyleNodeRoot")
+    try expectStyleBodyHasOwnAppliedNode(
+      result, controlKind: "TextEditor", bodyComponent: "TextEditorBody")
   }
 
   @Test("ProgressView style bodies have their own applied nodes", arguments: [0, 1, 2])
@@ -59,7 +89,8 @@ struct StyleBodyViewNodeTests {
     let styles: [AnyProgressViewStyle] = [.automatic, .linear, .circular]
     let result = resolveWithGraph(
       ProgressView(value: 0.5).progressViewStyle(styles[index]), root: "ProgressViewStyleNodeRoot")
-    try expectStyleBodyHasOwnAppliedNode(result, controlKind: "ProgressView", bodyComponent: "ProgressViewBody")
+    try expectStyleBodyHasOwnAppliedNode(
+      result, controlKind: "ProgressView", bodyComponent: "ProgressViewBody")
   }
 
   @Test("label style bodies have their own applied nodes", arguments: [0, 1, 2, 3])

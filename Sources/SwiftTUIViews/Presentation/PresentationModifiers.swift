@@ -287,18 +287,19 @@ package struct BuiltinItemSheetPresentationModifier<
   }
 }
 
-package struct BuiltinMenuPresentationModifier<MenuContent: View>: PrimitiveViewModifier {
+package struct MenuStylePresentationModifier<MenuContent: View>: PrimitiveViewModifier {
   var isPresented: Binding<Bool>
   var menuContent: MenuContent
   var menuContentAuthoringContext: AuthoringContext?
   var dismissAuthoringContext: AuthoringContext?
+  var presentation: AnchoredSurfaceStylePresentation
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let spec = menuPromptPresentationSpec()
+    let spec = menuPromptPresentationSpec(presentation: presentation)
     return resolvePresentationModifier(
       content: content,
       isPresented: isPresented,

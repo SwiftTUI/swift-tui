@@ -82,8 +82,10 @@ package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpe
 /// collide with sheet attachment IDs on the same source identity) and `.menu`
 /// chrome (so the rendering surface is a compact, intrinsic-width bordered box
 /// with no header).
-package func menuPromptPresentationSpec() -> PromptPresentationSpec {
-  PromptPresentationSpec(
+package func menuPromptPresentationSpec(
+  presentation: AnchoredSurfaceStylePresentation = .init()
+) -> PromptPresentationSpec {
+  var spec = PromptPresentationSpec(
     token: "menu",
     descriptor: .init(
       alignment: .topLeading,
@@ -108,6 +110,8 @@ package func menuPromptPresentationSpec() -> PromptPresentationSpec {
       )
     }
   )
+  spec.descriptor.anchoredPresentation = presentation
+  return spec
 }
 
 package func sheetPromptPresentationSpec(

@@ -20,7 +20,6 @@ final class RejectedStepperStyle: StepperStyle {
   func makeBody(configuration: StepperStyleConfiguration) -> some View { Text("test") }
 }
 
-
 final class RejectedToggleStyle: ToggleStyle {
   func makeBody(configuration: ToggleStyleConfiguration) -> some View { Text("test") }
 }
@@ -37,7 +36,6 @@ final class RejectedProgressViewStyle: ProgressViewStyle {
   func makeBody(configuration: ProgressViewStyleConfiguration) -> some View { Text("test") }
 }
 
-
 final class RejectedLabelStyle: LabelStyle {
   func makeBody(configuration: LabelStyleConfiguration) -> some View {
     configuration.title
@@ -46,6 +44,16 @@ final class RejectedLabelStyle: LabelStyle {
 
 final class RejectedLabeledContentStyle: LabeledContentStyle {
   func makeBody(configuration: LabeledContentStyleConfiguration) -> some View {
+    configuration.content
+  }
+}
+
+final class RejectedMenuStyle: MenuStyle {
+  func makeBody(configuration: MenuStyleConfiguration) -> some View { configuration.label }
+}
+
+final class RejectedControlGroupStyle: ControlGroupStyle {
+  func makeBody(configuration: ControlGroupStyleConfiguration) -> some View {
     configuration.content
   }
 }

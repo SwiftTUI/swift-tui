@@ -34,6 +34,9 @@ package enum StateSlotOrdinals {
   private static let collectionScrollAnchorBase = -8_000_000
   private static let tabDormantArchiveBase = -9_000_000
   package static let pickerMenuExpansion = -10_000_000
+  package static let capturedSubviewArchive = -11_000_000
+  package static let capturedSubviewLocator = capturedSubviewArchive - 1
+  package static let menuExpansion = -12_000_000
 
   package static func authored(
     line: UInt,

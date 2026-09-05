@@ -76,6 +76,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
   package var contentSizing: PromptPresentationContentSizing
   package var createsFocusScope: Bool
   package var surfaceMode: PromptPresentationSurfaceMode
+  package var anchoredPresentation: AnchoredSurfaceStylePresentation?
 
   package init(
     alignment: Alignment,

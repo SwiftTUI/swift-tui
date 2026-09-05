@@ -47,6 +47,9 @@ struct DefaultRendererFrameHeadCoordinator {
       frameHeadTimingRecorder.record(.prepare, since: prepareStart)
     }
     let renderGeneration = renderGenerationSequencer.next()
+    let capturedSubviewFallbacks =
+      mode == .oneShot
+      ? captureCapturedSubviewHeadFallbacks(in: viewGraph) : []
 
     var resolveContext = preparedResolveContext(context)
     let registrationDraft = FrameHeadRegistrationDraft()
@@ -167,7 +170,8 @@ struct DefaultRendererFrameHeadCoordinator {
       frameTailInput: frameProducts.frameTailInput,
       runtimeIssues: [],
       animationTimestamp: frameInstant,
-      resolveDuration: resolvedHead.resolveDuration
+      resolveDuration: resolvedHead.resolveDuration,
+      capturedSubviewFallbacks: capturedSubviewFallbacks
     )
   }
 

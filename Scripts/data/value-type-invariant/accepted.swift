@@ -9,6 +9,16 @@
 import SwiftTUIRuntime
 import SwiftTUIViews
 
+struct AcceptedMenuStyle: MenuStyle {
+  func makeBody(configuration: MenuStyleConfiguration) -> some View { configuration.label }
+}
+
+struct AcceptedControlGroupStyle: ControlGroupStyle {
+  func makeBody(configuration: ControlGroupStyleConfiguration) -> some View {
+    configuration.content
+  }
+}
+
 struct AcceptedSliderStyle: SliderStyle {
   func makeBody(configuration: SliderStyleConfiguration) -> some View { Text("test") }
 }
@@ -16,7 +26,6 @@ struct AcceptedSliderStyle: SliderStyle {
 struct AcceptedStepperStyle: StepperStyle {
   func makeBody(configuration: StepperStyleConfiguration) -> some View { Text("test") }
 }
-
 
 struct AcceptedToggleStyle: ToggleStyle {
   func makeBody(configuration: ToggleStyleConfiguration) -> some View { Text("test") }
@@ -33,7 +42,6 @@ struct AcceptedTextEditorStyle: TextEditorStyle {
 struct AcceptedProgressViewStyle: ProgressViewStyle {
   func makeBody(configuration: ProgressViewStyleConfiguration) -> some View { Text("test") }
 }
-
 
 struct AcceptedLabelStyle: LabelStyle {
   func makeBody(configuration: LabelStyleConfiguration) -> some View {

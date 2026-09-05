@@ -823,7 +823,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   `HEAD`, environment-scoped families exist for `Button`, `TextField`,
   `Picker`, `List`, `OutlineGroup`, `Table`, `Spinner`, `Sheet`, `Toolbar`,
   `TabView`, `Label`, `LabeledContent`, `GroupBox`, `Toggle`, `DisclosureGroup`,
-  `TextEditor`, `ProgressView`, `Slider`, and `Stepper`; every shipped configuration, captured slot, and
+  `TextEditor`, `ProgressView`, `Slider`, `Stepper`, `Menu`, and `ControlGroup`;
+  every shipped configuration, captured slot, and
   presentation value is constructible from a test target through
   `@_spi(StyleFixtures)`, and route wrappers share one misuse rule (a
   repeated installation reports `style.duplicateRoute` and the first wins;

@@ -101,6 +101,94 @@ private struct Boundary<Content: View>: View, Equatable {
 @MainActor
 @Suite("Reader-scoped environment reuse")
 struct ReaderScopedEnvironmentReuseTests {
+  @Test("menu style unread change is tolerated")
+  func menuStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      var body: some View {
+        VStack {
+          Boundary(content: Text("plain"))
+          Text(tag)
+        }
+        .menuStyle(TaggedMenuStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(Root(tag: "OldStyle"), context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(tag: "NewStyle"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(frame.rasterSurface.lines.joined(separator: "\n").contains("NewStyle"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("menu style reader restyles")
+  func menuStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      var body: some View {
+        VStack {
+          Boundary(content: Menu("Commands") { Text("Item") })
+          Text("tail")
+        }
+        .menuStyle(TaggedMenuStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(Root(tag: "OldStyle"), context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(tag: "NewStyle"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let text = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(text.contains("NewStyle"))
+    #expect(!text.contains("OldStyle"))
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
+  @Test("control group style unread change is tolerated")
+  func controlGroupStyleUnreadChangeIsTolerated() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      var body: some View {
+        VStack {
+          Boundary(content: Text("plain"))
+          Text(tag)
+        }
+        .controlGroupStyle(TaggedControlGroupStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(Root(tag: "OldStyle"), context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(tag: "NewStyle"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    #expect(frame.rasterSurface.lines.joined(separator: "\n").contains("NewStyle"))
+    #expect(toleratedBoundary(in: renderer))
+  }
+
+  @Test("control group style reader restyles")
+  func controlGroupStyleReaderRestyles() {
+    let renderer = makeRenderer()
+    struct Root: View {
+      let tag: String
+      var body: some View {
+        VStack {
+          Boundary(content: ControlGroup { Text("Item") })
+          Text("tail")
+        }
+        .controlGroupStyle(TaggedControlGroupStyle(tag: tag))
+      }
+    }
+    _ = renderer.render(Root(tag: "OldStyle"), context: .init(identity: rootIdentity))
+    let frame = renderer.render(
+      Root(tag: "NewStyle"),
+      context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
+    let text = frame.rasterSurface.lines.joined(separator: "\n")
+    #expect(text.contains("NewStyle"))
+    #expect(!text.contains("OldStyle"))
+    #expect(!toleratedBoundary(in: renderer))
+  }
+
   @Test("slider style unread change is tolerated")
   func sliderStyleUnreadChangeIsTolerated() {
     let renderer = makeRenderer()
@@ -114,9 +202,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.sliderStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerSliderStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerSliderStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerSliderStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerSliderStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -136,9 +226,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.sliderStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerSliderStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerSliderStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerSliderStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerSliderStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -160,9 +252,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.stepperStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerStepperStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerStepperStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerStepperStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerStepperStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -182,9 +276,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.stepperStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerStepperStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerStepperStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerStepperStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerStepperStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -206,9 +302,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.toggleStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerToggleStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerToggleStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerToggleStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerToggleStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -228,9 +326,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.toggleStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerToggleStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerToggleStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerToggleStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerToggleStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -252,9 +352,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.disclosureGroupStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -269,14 +371,17 @@ struct ReaderScopedEnvironmentReuseTests {
       let dynamic: String
       var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-          Boundary(content: DisclosureGroup("Details", isExpanded: .constant(true)) { Text("Child") })
+          Boundary(
+            content: DisclosureGroup("Details", isExpanded: .constant(true)) { Text("Child") })
           Text(dynamic)
         }.disclosureGroupStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerDisclosureGroupStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -298,9 +403,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.textEditorStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerTextEditorStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerTextEditorStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerTextEditorStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerTextEditorStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -320,9 +427,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.textEditorStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerTextEditorStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerTextEditorStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerTextEditorStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerTextEditorStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -344,9 +453,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.progressViewStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerProgressViewStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerProgressViewStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerProgressViewStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerProgressViewStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -366,9 +477,11 @@ struct ReaderScopedEnvironmentReuseTests {
         }.progressViewStyle(style)
       }
     }
-    _ = renderer.render(Root(style: .init(ConsumerProgressViewStyle(prefix: "OldStyle")), dynamic: "v1"),
+    _ = renderer.render(
+      Root(style: .init(ConsumerProgressViewStyle(prefix: "OldStyle")), dynamic: "v1"),
       context: .init(identity: rootIdentity))
-    let frame = renderer.render(Root(style: .init(ConsumerProgressViewStyle(prefix: "NewStyle")), dynamic: "v2"),
+    let frame = renderer.render(
+      Root(style: .init(ConsumerProgressViewStyle(prefix: "NewStyle")), dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity]))
     let rendered = frame.rasterSurface.lines.joined(separator: "\n")
     #expect(rendered.contains("v2"))
@@ -376,7 +489,6 @@ struct ReaderScopedEnvironmentReuseTests {
     #expect(rendered.contains("NewStyle"))
     #expect(!rendered.contains("OldStyle"))
   }
-
 
   @Test("a label-style change over a reader-free subtree is tolerated")
   func labelStyleUnreadChangeIsTolerated() {

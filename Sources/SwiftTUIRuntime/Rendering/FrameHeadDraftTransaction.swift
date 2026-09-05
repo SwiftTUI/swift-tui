@@ -308,6 +308,7 @@ package struct FrameHeadDraft {
   var runtimeIssues: [RuntimeIssue]
   var animationTimestamp: MonotonicInstant
   var resolveDuration: Duration
+  var capturedSubviewFallbacks: [CapturedSubviewArchiveCommitRefresh]
 
   /// This frame's resolved tree.
   ///

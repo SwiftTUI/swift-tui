@@ -68,7 +68,7 @@ enum StyleMisuse {
         "\(family) \(styleLabel) resolved an invalid presentation: "
         + problems.joined(separator: "; ")
         + ". The automatic presentation was rendered for this resolve. "
-        + "Return valid values from the style's resolvePresentation(for:).",
+        + "Supply valid presentation values from the style.",
       identity: identity,
       source: family
     )

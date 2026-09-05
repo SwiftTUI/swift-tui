@@ -8,6 +8,8 @@ package struct ScopedContentPayload: Sendable {
     @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
   private let resolveEntityRoutedElementsClosure:
     @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
+  private let resolveDeclaredElementsClosure:
+    @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
 
   package init<V: View>(
     authoringContext: AuthoringContext? = currentAuthoringContext(),
@@ -27,6 +29,11 @@ package struct ScopedContentPayload: Sendable {
     resolveEntityRoutedElementsClosure = { context, _ in
       [resolveView(builder, in: context)]
     }
+    resolveDeclaredElementsClosure = { context, _ in
+      withAuthoringContext(authoringContext) {
+        [resolveView(builder.build(), in: context)]
+      }
+    }
   }
 
   package init(
@@ -35,6 +42,16 @@ package struct ScopedContentPayload: Sendable {
   ) {
     resolveElementsClosure = resolveElements
     resolveEntityRoutedElementsClosure = resolveElements
+    resolveDeclaredElementsClosure = resolveElements
+  }
+
+  /// Resolves a declared child through its own central seam, including its
+  /// authored entity route before dynamic properties are prepared. Unlike a
+  /// capture-slot wrapper, the declaration itself owns this graph position.
+  package func resolveDeclaredElements(
+    in context: ResolveContext, placementRoot: ResolveContext
+  ) -> [ResolvedNode] {
+    resolveDeclaredElementsClosure(context, placementRoot)
   }
 
   package func resolveElements(

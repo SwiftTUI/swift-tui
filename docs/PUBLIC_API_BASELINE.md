@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 369 | 2169 |
+| `SwiftTUIViews` | 384 | 2272 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 6 | 28 |
@@ -126,10 +126,11 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (369)
+### Canonical surface (384)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 6 members
+- `AnchoredSurfaceStylePresentation` — struct — 8 members
 - `AnchorPreferenceTransformModifier` — struct
 - `AnchorPreferenceWritingModifier` — struct
 - `Animation` — struct — 23 members
@@ -139,12 +140,14 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnimationState` — struct — 2 members
 - `AnimationTimelineSchedule` — struct — 7 members
 - `AnyButtonStyle` — struct — 8 members
+- `AnyControlGroupStyle` — struct — 7 members
 - `AnyDisclosureGroupStyle` — struct — 5 members
 - `AnyGroupBoxStyle` — struct — 6 members
 - `AnyLabeledContentStyle` — struct — 5 members
 - `AnyLabelStyle` — struct — 7 members
 - `AnyLayout` — struct — 13 members
 - `AnyListStyle` — struct — 6 members
+- `AnyMenuStyle` — struct — 7 members
 - `AnyOutlineStyle` — struct — 6 members
 - `AnyPickerStyle` — struct — 8 members
 - `AnyProgressViewStyle` — struct — 6 members
@@ -163,11 +166,13 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `AnyView` — struct — 2 members
 - `AppearLifecycleModifier` — struct
 - `AutomaticButtonStyle` — struct — 3 members
+- `AutomaticControlGroupStyle` — struct — 3 members
 - `AutomaticDisclosureGroupStyle` — struct — 3 members
 - `AutomaticGroupBoxStyle` — struct — 3 members
 - `AutomaticLabeledContentStyle` — struct — 3 members
 - `AutomaticLabelStyle` — struct — 3 members
 - `AutomaticListStyle` — struct — 3 members
+- `AutomaticMenuStyle` — struct — 3 members
 - `AutomaticOutlineStyle` — struct — 3 members
 - `AutomaticPickerStyle` — struct — 4 members
 - `AutomaticProgressViewStyle` — struct — 3 members
@@ -189,11 +194,13 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `BorderedGroupBoxStyle` — struct — 3 members
 - `BorderedProminentButtonStyle` — struct — 4 members
 - `BorderedTableStyle` — struct — 3 members
+- `BorderlessButtonMenuStyle` — struct — 3 members
 - `BorderModifier` — struct
 - `BuiltinPaletteSheetPresentationModifier` — struct
 - `BuiltinPromptPresentationModifier` — struct
 - `BuiltinSheetPresentationModifier` — struct
 - `Button` — struct — 4 members
+- `ButtonMenuStyle` — struct — 3 members
 - `ButtonStyle` — protocol — 6 members
 - `ButtonStyleConfiguration` — struct — 12 members
 - `ButtonToggleStyle` — struct — 3 members
@@ -207,11 +214,14 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `CircularProgressViewStyle` — struct — 3 members
 - `ClipboardWriteAction` — struct — 4 members
 - `CompactDisclosureGroupStyle` — struct — 3 members
+- `CompactMenuControlGroupStyle` — struct — 3 members
 - `CompactStepperStyle` — struct — 3 members
 - `ConditionalContent` — struct — 4 members
 - `ContentShapeModifier` — struct
 - `ContentTransition` — struct — 4 members
 - `ControlGroup` — struct — 3 members
+- `ControlGroupStyle` — protocol — 8 members
+- `ControlGroupStyleConfiguration` — struct — 7 members
 - `CoordinateSpace` — struct — 9 members
 - `CubicKeyframe` — struct — 2 members
 - `CustomAnimation` — protocol — 5 members
@@ -266,6 +276,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `GroupBoxStyle` — protocol — 7 members
 - `GroupBoxStyleConfiguration` — struct — 8 members
 - `HorizontalAlignmentGuideModifier` — struct
+- `HorizontalControlGroupStyle` — struct — 3 members
 - `HStack` — struct — 3 members
 - `HStackLayout` — struct — 6 members
 - `IconOnlyLabelStyle` — struct — 3 members
@@ -273,6 +284,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `IgnoreSafeAreaModifier` — struct
 - `Image` — struct — 9 members
 - `InfoToastStyle` — struct — 2 members
+- `InlineMenuStyle` — struct — 3 members
 - `InlinePickerStyle` — struct — 4 members
 - `InsetGroupedListStyle` — struct — 3 members
 - `InsetShape` — struct — 6 members
@@ -322,6 +334,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `MatchedGeometryModifier` — struct
 - `Menu` — struct — 2 members
 - `MenuPickerStyle` — struct — 5 members
+- `MenuStyle` — protocol — 8 members
+- `MenuStyleConfiguration` — struct — 15 members
 - `ModifiedContent` — struct — 10 members
 - `MoveKeyframe` — struct — 2 members
 - `NamedCoordinateSpace` — extension — 1 member
@@ -481,8 +495,9 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ValueNavigationDestinationModifier` — struct
 - `VariadicView` — struct — 1 member
 - `VerticalAlignmentGuideModifier` — struct
+- `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 187 members
+- `View` — protocol — 191 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member

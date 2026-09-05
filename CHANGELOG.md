@@ -10,6 +10,12 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Added
 
+- **Menu and control-group styles.** `MenuStyle` exposes trigger and portal
+  composition while Menu owns activation, expansion, and dismissal. Anchored
+  presentation values control insets, bounds, and paints, including scrolling
+  for a finite height. `ControlGroupStyle` supplies horizontal, vertical, and
+  compact-menu treatments with declaring-owner retention for captured child
+  state. The automatic menu's focus rail now honors `focusEffectDisabled`.
 - **Slider and stepper styles.** `SliderStyle` and `StepperStyle` expose
   captured labels, framework-formatted values, and public track/action routes.
   Numeric storage, clamping, step rounding, keyboard input, and wheel handling

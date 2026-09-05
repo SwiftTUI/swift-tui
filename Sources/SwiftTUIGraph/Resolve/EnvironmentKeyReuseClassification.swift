@@ -111,6 +111,10 @@ package enum EnvironmentKeyReuseClassification {
     // captured style body; route placement carries resolved semantics forward.
     "SliderStyleKey",
     "StepperStyleKey",
+    // The menu/group primitives read these at resolve. Captured bodies and
+    // presentation descriptors carry the result into later host phases.
+    "MenuStyleKey",
+    "ControlGroupStyleKey",
   ]
 
   package static func isReaderAttributedOnly(_ keyType: Any.Type) -> Bool {

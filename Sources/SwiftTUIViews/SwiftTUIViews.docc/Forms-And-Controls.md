@@ -222,6 +222,18 @@ corner rather than at the trigger — a recorded gap; see
 <doc:Divergences-And-Gaps>. For Escape's wider dismissal contract
 across sheets and other presentations, see <doc:Dismissal-Is-Data>.
 
+Use `.menuStyle(.button)`, `.borderlessButton`, or `.inline` to change the
+treatment. A custom ``MenuStyle`` composes the captured label with
+`configuration.trigger { ... }`. For floating content, wrap that inline anchor
+in `configuration.portal(presentation: .init()) { ... }`; the portal presents
+`configuration.content` and Menu retains activation and Escape handling.
+An inline style includes `configuration.content` when `isPresented` is true.
+
+``ControlGroup`` uses `.automatic` or `.horizontal` for a labeled row,
+`.vertical` for a column, and `.compactMenu` for a Menu containing the authored
+controls. Switching these styles preserves child identity and persistent state.
+Closed compact content has no focus targets or active control actions.
+
 ## See Also
 
 - <doc:Focus>

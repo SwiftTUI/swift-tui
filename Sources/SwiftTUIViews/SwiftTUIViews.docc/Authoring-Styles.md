@@ -63,6 +63,20 @@ projected binding a style reads and writes; the binding itself cannot be
 replaced. `makeBody(configuration:)` runs on the main actor. Styles are
 `Sendable` value types: a class cannot conform.
 
+``MenuStyle`` receives both `trigger { ... }` and
+`portal(presentation:content:)`. The portal's closure is the inline anchor;
+the configuration's captured `content` becomes its floating body. A style that
+chooses inline presentation includes that content when `isPresented` is true.
+If a presented style omits both content and the portal wrapper, Menu reports
+`style.missingRequiredRoute` and renders its automatic body for that resolve.
+``AnchoredSurfaceStylePresentation`` bounds the outer width and the content
+viewport height before insets; an unbounded height preserves intrinsic layout.
+
+``ControlGroupStyle`` composes the optional label and captured content in any
+layout. Its compact built-in composes a public ``Menu``. The declaring group
+owns retained child state across inline and compact hosts. Omitted content
+has no live focus targets or control actions.
+
 ## Presentation-value styles
 
 A presentation-value style returns `Sendable` rendering data and leaves the

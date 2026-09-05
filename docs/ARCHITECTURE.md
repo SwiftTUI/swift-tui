@@ -221,6 +221,22 @@ composition. Numeric normalization, formatting, and typed updates remain in
 `AdjustableControlValueSupport.swift`. The shared `Foundation/StyleRoute.swift`
 wrapper forwards optional pointer capture to `Controls/PointerRouteView.swift`.
 
+`Controls/MenuStyles.swift` owns menu composition and its public trigger and
+portal wrappers. `Menu.swift` owns activation and expansion on a dedicated child
+node, so replacing a compact menu with inline content retires its expansion.
+`Presentation/AnchoredSurfaceStylePresentation.swift` supplies insets, bounds,
+and paints to the shared presentation host. A finite viewport uses one scroll
+content host and keeps short content intrinsic.
+
+`Primitives/ControlGroupStyles.swift` composes horizontal, vertical, and compact
+menu hosts. `Foundation/CapturedSubviewSequenceView.swift` expands authored
+children separately while `CapturedSubviewRetention.swift` keeps their logical
+identity under the declaring group. Graph's `Resolve/RetainedSubviewState.swift`
+retains persistent slots, including authored reference values, for omitted
+content. Runtime captures those slots before departure and publishes them only
+with an accepted commit. Runtime registrations and presentation hosts depart
+normally. Lazy tabs retain their separate value-only dormancy contract.
+
 ```
 Sources/
   SwiftTUIPrimitives/  Geometry, Support, Pointer, Styling (values), Content

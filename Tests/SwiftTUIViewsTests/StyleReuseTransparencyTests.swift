@@ -20,14 +20,53 @@ import Testing
 /// goes through value equality.
 @MainActor
 struct StyleReuseTransparencyTests {
+  @Test("Menu styles preserve reuse equality")
+  func menuStylesAreReuseTransparent() {
+    #expect(AnyMenuStyle.automatic.isEqualForReuse(to: AnyMenuStyle.automatic))
+    #expect(AnyMenuStyle.button.isEqualForReuse(to: AnyMenuStyle.button))
+    #expect(AnyMenuStyle.borderlessButton.isEqualForReuse(to: AnyMenuStyle.borderlessButton))
+    #expect(AnyMenuStyle.inline.isEqualForReuse(to: AnyMenuStyle.inline))
+    #expect(!AnyMenuStyle.automatic.isEqualForReuse(to: AnyMenuStyle.inline))
+    #expect(
+      AnyMenuStyle(EquatableMenuStyle(value: 1)).isEqualForReuse(
+        to: AnyMenuStyle(EquatableMenuStyle(value: 1))))
+    #expect(
+      !AnyMenuStyle(EquatableMenuStyle(value: 1)).isEqualForReuse(
+        to: AnyMenuStyle(EquatableMenuStyle(value: 2))))
+    #expect(!AnyMenuStyle(OpaqueMenuStyle()).isEqualForReuse(to: AnyMenuStyle(OpaqueMenuStyle())))
+  }
+
+  @Test("ControlGroup styles preserve reuse equality")
+  func controlGroupStylesAreReuseTransparent() {
+    #expect(AnyControlGroupStyle.automatic.isEqualForReuse(to: AnyControlGroupStyle.automatic))
+    #expect(AnyControlGroupStyle.horizontal.isEqualForReuse(to: AnyControlGroupStyle.horizontal))
+    #expect(AnyControlGroupStyle.vertical.isEqualForReuse(to: AnyControlGroupStyle.vertical))
+    #expect(AnyControlGroupStyle.compactMenu.isEqualForReuse(to: AnyControlGroupStyle.compactMenu))
+    #expect(!AnyControlGroupStyle.horizontal.isEqualForReuse(to: AnyControlGroupStyle.vertical))
+    #expect(
+      AnyControlGroupStyle(EquatableControlGroupStyle(value: 1)).isEqualForReuse(
+        to: AnyControlGroupStyle(EquatableControlGroupStyle(value: 1))))
+    #expect(
+      !AnyControlGroupStyle(EquatableControlGroupStyle(value: 1)).isEqualForReuse(
+        to: AnyControlGroupStyle(EquatableControlGroupStyle(value: 2))))
+    #expect(
+      !AnyControlGroupStyle(OpaqueControlGroupStyle()).isEqualForReuse(
+        to: AnyControlGroupStyle(OpaqueControlGroupStyle())))
+  }
+
   @Test("Slider styles preserve reuse equality")
   func sliderStylesAreReuseTransparent() {
     #expect(AnySliderStyle.automatic.isEqualForReuse(to: AnySliderStyle.automatic))
     #expect(AnySliderStyle.linear.isEqualForReuse(to: AnySliderStyle.linear))
     #expect(!AnySliderStyle.automatic.isEqualForReuse(to: AnySliderStyle.linear))
-    #expect(AnySliderStyle(EquatableSliderStyle(value: 1)).isEqualForReuse(to: AnySliderStyle(EquatableSliderStyle(value: 1))))
-    #expect(!AnySliderStyle(EquatableSliderStyle(value: 1)).isEqualForReuse(to: AnySliderStyle(EquatableSliderStyle(value: 2))))
-    #expect(!AnySliderStyle(OpaqueSliderStyle()).isEqualForReuse(to: AnySliderStyle(OpaqueSliderStyle())))
+    #expect(
+      AnySliderStyle(EquatableSliderStyle(value: 1)).isEqualForReuse(
+        to: AnySliderStyle(EquatableSliderStyle(value: 1))))
+    #expect(
+      !AnySliderStyle(EquatableSliderStyle(value: 1)).isEqualForReuse(
+        to: AnySliderStyle(EquatableSliderStyle(value: 2))))
+    #expect(
+      !AnySliderStyle(OpaqueSliderStyle()).isEqualForReuse(to: AnySliderStyle(OpaqueSliderStyle())))
   }
 
   @Test("Stepper styles preserve reuse equality")
@@ -35,9 +74,15 @@ struct StyleReuseTransparencyTests {
     #expect(AnyStepperStyle.automatic.isEqualForReuse(to: AnyStepperStyle.automatic))
     #expect(AnyStepperStyle.compact.isEqualForReuse(to: AnyStepperStyle.compact))
     #expect(!AnyStepperStyle.automatic.isEqualForReuse(to: AnyStepperStyle.compact))
-    #expect(AnyStepperStyle(EquatableStepperStyle(value: 1)).isEqualForReuse(to: AnyStepperStyle(EquatableStepperStyle(value: 1))))
-    #expect(!AnyStepperStyle(EquatableStepperStyle(value: 1)).isEqualForReuse(to: AnyStepperStyle(EquatableStepperStyle(value: 2))))
-    #expect(!AnyStepperStyle(OpaqueStepperStyle()).isEqualForReuse(to: AnyStepperStyle(OpaqueStepperStyle())))
+    #expect(
+      AnyStepperStyle(EquatableStepperStyle(value: 1)).isEqualForReuse(
+        to: AnyStepperStyle(EquatableStepperStyle(value: 1))))
+    #expect(
+      !AnyStepperStyle(EquatableStepperStyle(value: 1)).isEqualForReuse(
+        to: AnyStepperStyle(EquatableStepperStyle(value: 2))))
+    #expect(
+      !AnyStepperStyle(OpaqueStepperStyle()).isEqualForReuse(
+        to: AnyStepperStyle(OpaqueStepperStyle())))
   }
 
   @Test("Toggle styles preserve reuse equality")
@@ -46,19 +91,31 @@ struct StyleReuseTransparencyTests {
     #expect(AnyToggleStyle.checkbox.isEqualForReuse(to: AnyToggleStyle.checkbox))
     #expect(AnyToggleStyle.button.isEqualForReuse(to: AnyToggleStyle.button))
     #expect(!AnyToggleStyle.automatic.isEqualForReuse(to: AnyToggleStyle.checkbox))
-    #expect(AnyToggleStyle(EquatableToggleStyle(value: 1)).isEqualForReuse(to: AnyToggleStyle(EquatableToggleStyle(value: 1))))
-    #expect(!AnyToggleStyle(EquatableToggleStyle(value: 1)).isEqualForReuse(to: AnyToggleStyle(EquatableToggleStyle(value: 2))))
-    #expect(!AnyToggleStyle(OpaqueToggleStyle()).isEqualForReuse(to: AnyToggleStyle(OpaqueToggleStyle())))
+    #expect(
+      AnyToggleStyle(EquatableToggleStyle(value: 1)).isEqualForReuse(
+        to: AnyToggleStyle(EquatableToggleStyle(value: 1))))
+    #expect(
+      !AnyToggleStyle(EquatableToggleStyle(value: 1)).isEqualForReuse(
+        to: AnyToggleStyle(EquatableToggleStyle(value: 2))))
+    #expect(
+      !AnyToggleStyle(OpaqueToggleStyle()).isEqualForReuse(to: AnyToggleStyle(OpaqueToggleStyle())))
   }
 
   @Test("DisclosureGroup styles preserve reuse equality")
   func disclosureGroupStylesAreReuseTransparent() {
-    #expect(AnyDisclosureGroupStyle.automatic.isEqualForReuse(to: AnyDisclosureGroupStyle.automatic))
+    #expect(
+      AnyDisclosureGroupStyle.automatic.isEqualForReuse(to: AnyDisclosureGroupStyle.automatic))
     #expect(AnyDisclosureGroupStyle.compact.isEqualForReuse(to: AnyDisclosureGroupStyle.compact))
     #expect(!AnyDisclosureGroupStyle.automatic.isEqualForReuse(to: AnyDisclosureGroupStyle.compact))
-    #expect(AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 1)).isEqualForReuse(to: AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 1))))
-    #expect(!AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 1)).isEqualForReuse(to: AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 2))))
-    #expect(!AnyDisclosureGroupStyle(OpaqueDisclosureGroupStyle()).isEqualForReuse(to: AnyDisclosureGroupStyle(OpaqueDisclosureGroupStyle())))
+    #expect(
+      AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 1)).isEqualForReuse(
+        to: AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 1))))
+    #expect(
+      !AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 1)).isEqualForReuse(
+        to: AnyDisclosureGroupStyle(EquatableDisclosureGroupStyle(value: 2))))
+    #expect(
+      !AnyDisclosureGroupStyle(OpaqueDisclosureGroupStyle()).isEqualForReuse(
+        to: AnyDisclosureGroupStyle(OpaqueDisclosureGroupStyle())))
   }
 
   @Test("TextEditor styles preserve reuse equality")
@@ -67,9 +124,15 @@ struct StyleReuseTransparencyTests {
     #expect(AnyTextEditorStyle.plain.isEqualForReuse(to: AnyTextEditorStyle.plain))
     #expect(AnyTextEditorStyle.roundedBorder.isEqualForReuse(to: AnyTextEditorStyle.roundedBorder))
     #expect(!AnyTextEditorStyle.automatic.isEqualForReuse(to: AnyTextEditorStyle.plain))
-    #expect(AnyTextEditorStyle(EquatableTextEditorStyle(value: 1)).isEqualForReuse(to: AnyTextEditorStyle(EquatableTextEditorStyle(value: 1))))
-    #expect(!AnyTextEditorStyle(EquatableTextEditorStyle(value: 1)).isEqualForReuse(to: AnyTextEditorStyle(EquatableTextEditorStyle(value: 2))))
-    #expect(!AnyTextEditorStyle(OpaqueTextEditorStyle()).isEqualForReuse(to: AnyTextEditorStyle(OpaqueTextEditorStyle())))
+    #expect(
+      AnyTextEditorStyle(EquatableTextEditorStyle(value: 1)).isEqualForReuse(
+        to: AnyTextEditorStyle(EquatableTextEditorStyle(value: 1))))
+    #expect(
+      !AnyTextEditorStyle(EquatableTextEditorStyle(value: 1)).isEqualForReuse(
+        to: AnyTextEditorStyle(EquatableTextEditorStyle(value: 2))))
+    #expect(
+      !AnyTextEditorStyle(OpaqueTextEditorStyle()).isEqualForReuse(
+        to: AnyTextEditorStyle(OpaqueTextEditorStyle())))
   }
 
   @Test("ProgressView styles preserve reuse equality")
@@ -78,9 +141,15 @@ struct StyleReuseTransparencyTests {
     #expect(AnyProgressViewStyle.linear.isEqualForReuse(to: AnyProgressViewStyle.linear))
     #expect(AnyProgressViewStyle.circular.isEqualForReuse(to: AnyProgressViewStyle.circular))
     #expect(!AnyProgressViewStyle.automatic.isEqualForReuse(to: AnyProgressViewStyle.linear))
-    #expect(AnyProgressViewStyle(EquatableProgressViewStyle(value: 1)).isEqualForReuse(to: AnyProgressViewStyle(EquatableProgressViewStyle(value: 1))))
-    #expect(!AnyProgressViewStyle(EquatableProgressViewStyle(value: 1)).isEqualForReuse(to: AnyProgressViewStyle(EquatableProgressViewStyle(value: 2))))
-    #expect(!AnyProgressViewStyle(OpaqueProgressViewStyle()).isEqualForReuse(to: AnyProgressViewStyle(OpaqueProgressViewStyle())))
+    #expect(
+      AnyProgressViewStyle(EquatableProgressViewStyle(value: 1)).isEqualForReuse(
+        to: AnyProgressViewStyle(EquatableProgressViewStyle(value: 1))))
+    #expect(
+      !AnyProgressViewStyle(EquatableProgressViewStyle(value: 1)).isEqualForReuse(
+        to: AnyProgressViewStyle(EquatableProgressViewStyle(value: 2))))
+    #expect(
+      !AnyProgressViewStyle(OpaqueProgressViewStyle()).isEqualForReuse(
+        to: AnyProgressViewStyle(OpaqueProgressViewStyle())))
   }
 
   @Test("passive composition built-ins are reuse-transparent")
@@ -210,6 +279,8 @@ struct StyleReuseTransparencyTests {
 /// to be revisited whenever one is added.
 struct StyleReuseTransparencyRosterTests {
   private static let wrapperFactoryCounts = [
+    "Sources/SwiftTUIViews/Controls/MenuStyles.swift": 4,
+    "Sources/SwiftTUIViews/Primitives/ControlGroupStyles.swift": 4,
     "Sources/SwiftTUIViews/Controls/SliderStyles.swift": 2,
     "Sources/SwiftTUIViews/Controls/StepperStyles.swift": 2,
     "Sources/SwiftTUIViews/Controls/ToggleStyles.swift": 3,
@@ -226,6 +297,8 @@ struct StyleReuseTransparencyRosterTests {
   ]
 
   private static let markerConformanceFiles = [
+    "Sources/SwiftTUIViews/Controls/MenuStyles.swift",
+    "Sources/SwiftTUIViews/Primitives/ControlGroupStyles.swift",
     "Sources/SwiftTUIViews/Controls/SliderStyles.swift",
     "Sources/SwiftTUIViews/Controls/StepperStyles.swift",
     "Sources/SwiftTUIViews/Controls/ToggleStyles.swift",
@@ -282,6 +355,21 @@ struct StyleReuseTransparencyRosterTests {
 }
 
 // MARK: - Test styles
+
+private struct EquatableMenuStyle: MenuStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: MenuStyleConfiguration) -> some View { Text("test") }
+}
+private struct OpaqueMenuStyle: MenuStyle {
+  func makeBody(configuration: MenuStyleConfiguration) -> some View { Text("test") }
+}
+private struct EquatableControlGroupStyle: ControlGroupStyle, Equatable {
+  let value: Int
+  func makeBody(configuration: ControlGroupStyleConfiguration) -> some View { Text("test") }
+}
+private struct OpaqueControlGroupStyle: ControlGroupStyle {
+  func makeBody(configuration: ControlGroupStyleConfiguration) -> some View { Text("test") }
+}
 
 private struct EquatableSliderStyle: SliderStyle, Equatable {
   let value: Int

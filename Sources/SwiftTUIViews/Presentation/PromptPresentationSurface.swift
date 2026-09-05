@@ -121,8 +121,7 @@ package struct PromptPresentationSurface: View, ActionScope {
 
     // Each container is its own primitive surface rather than a branch of
     // one catch-all body. `.standard` and `.dropdown` are what `SheetStyle`
-    // selects between; `.menu` has no public style family until `MenuStyle`
-    // ships, so it keeps an internal primitive of its own.
+    // selects between; MenuStyle supplies the anchored surface presentation.
     switch item.descriptor.chrome {
     case .surface:
       StandardContentPortalSurface(
@@ -135,7 +134,7 @@ package struct PromptPresentationSurface: View, ActionScope {
     case .menu:
       AnchoredContentPortalSurface(
         content: menuContentBody,
-        borderStyle: item.descriptor.borderStyle,
+        presentation: item.descriptor.anchoredPresentation ?? .init(),
         semanticMetadata: presentationSemanticMetadata
       )
     case .dropdown:
@@ -235,10 +234,9 @@ package struct PromptPresentationSurface: View, ActionScope {
     )
   }
 
-  /// Menu rendering body — intrinsic-sized VStack of items with no
-  /// scrolling chrome. The menu sizes to its longest item; the
-  /// `scrollMaxHeight` from the descriptor is ignored intentionally so
-  /// short menus don't reserve extra empty rows below their last item.
+  /// Menu declarations expand into a VStack of independent items. The anchored
+  /// surface applies the style's optional viewport cap around this content;
+  /// short menus retain their intrinsic height.
   ///
   /// Expands payloads through a transparent sequence rather than an indexed
   /// `ForEach`. The sequence gives the VStack separate children to lay out
@@ -315,26 +313,96 @@ private struct DropdownContentPortalSurface<Content: View>: View {
   }
 }
 
-/// The compact intrinsic-width box a `Menu` floats above its layout.
-/// Retained as an internal primitive until `MenuStyle` gives it a public
-/// family.
+/// The anchored surface shared by menu and popover presentation values.
 private struct AnchoredContentPortalSurface<Content: View>: View {
   let content: Content
-  let borderStyle: StrokeStyle
+  let presentation: AnchoredSurfaceStylePresentation
   let semanticMetadata: SemanticMetadata
 
   var body: some View {
-    content
-      .padding(.init(horizontal: 1, vertical: 1))
+    sizedContent
       .background {
-        Rectangle().fill(.terminalSurfaceBackground)
+        Rectangle().fill(presentation.backgroundStyle)
       }
       .overlay {
         Rectangle().strokeBorder(
-          .terminalBorder(.accent),
-          style: borderStyle
+          presentation.borderStyle ?? AnyShapeStyle(.terminalBorder(.accent)),
+          style: presentation.borderStroke
         )
       }
       .semanticMetadata(semanticMetadata)
+  }
+
+  @ViewBuilder private var sizedContent: some View {
+    if presentation.minimumWidth > 0 || presentation.maximumWidth != nil {
+      AnchoredWidthLayout(minimum: presentation.minimumWidth, maximum: presentation.maximumWidth) {
+        viewport.padding(presentation.contentInsets)
+      }
+    } else {
+      viewport.padding(presentation.contentInsets)
+    }
+  }
+
+  @ViewBuilder private var viewport: some View {
+    if presentation.maximumHeight == .max {
+      content
+    } else {
+      AnchoredViewportLayout(maximumHeight: presentation.maximumHeight) {
+        ScrollView(.vertical) { content }.focusable(false)
+      }
+    }
+  }
+}
+
+/// Width bounds clamp intrinsic content rather than replacing its ideal size.
+/// Chrome is applied outside this layout so it covers the constrained surface.
+private struct AnchoredWidthLayout: Layout {
+  let minimum: Int
+  let maximum: Int?
+
+  func sizeThatFits(
+    proposal: ProposedViewSize, subviews: LayoutSubviews,
+    cache: inout Void
+  ) -> LayoutSize {
+    guard let child = subviews.first else { return .zero }
+    let ideal = child.sizeThatFits(proposal)
+    let width = min(max(minimum, ideal.width), maximum ?? .max)
+    guard width != ideal.width else { return ideal }
+    let resized = child.sizeThatFits(.init(width: .finite(width), height: proposal.height))
+    return .init(width: width, height: resized.height)
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect, proposal: ProposedViewSize,
+    subviews: LayoutSubviews, cache: inout Void
+  ) {
+    subviews.first?.place(
+      at: bounds.origin, anchor: .topLeading,
+      proposal: .init(width: bounds.size.width, height: bounds.size.height))
+  }
+}
+
+/// Measures the scrolling content at its intrinsic height before capping the
+/// viewport. This avoids reserving the cap for short menus, and resolves the
+/// authored content exactly once regardless of whether it needs scrolling.
+private struct AnchoredViewportLayout: Layout {
+  let maximumHeight: Int
+
+  func sizeThatFits(
+    proposal: ProposedViewSize, subviews: LayoutSubviews,
+    cache: inout Void
+  ) -> LayoutSize {
+    guard let child = subviews.first else { return .zero }
+    let ideal = child.sizeThatFits(.init(width: proposal.width, height: .unspecified))
+    return .init(width: ideal.width, height: min(ideal.height, maximumHeight))
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect, proposal: ProposedViewSize,
+    subviews: LayoutSubviews, cache: inout Void
+  ) {
+    subviews.first?.place(
+      at: bounds.origin, anchor: .topLeading,
+      proposal: .init(width: bounds.size.width, height: bounds.size.height))
   }
 }

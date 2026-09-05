@@ -301,6 +301,21 @@ classifications:
     - SwiftTUIViews.UnitCurve
 
     # ─── View style protocols + concrete styles ────────────────────────────
+    - SwiftTUIViews.AnyMenuStyle
+    - SwiftTUIViews.MenuStyle
+    - SwiftTUIViews.MenuStyleConfiguration
+    - SwiftTUIViews.AutomaticMenuStyle
+    - SwiftTUIViews.ButtonMenuStyle
+    - SwiftTUIViews.BorderlessButtonMenuStyle
+    - SwiftTUIViews.InlineMenuStyle
+    - SwiftTUIViews.AnchoredSurfaceStylePresentation
+    - SwiftTUIViews.AnyControlGroupStyle
+    - SwiftTUIViews.ControlGroupStyle
+    - SwiftTUIViews.ControlGroupStyleConfiguration
+    - SwiftTUIViews.AutomaticControlGroupStyle
+    - SwiftTUIViews.HorizontalControlGroupStyle
+    - SwiftTUIViews.VerticalControlGroupStyle
+    - SwiftTUIViews.CompactMenuControlGroupStyle
     - SwiftTUIViews.AnyLabelStyle
     - SwiftTUIViews.AnySliderStyle
     - SwiftTUIViews.SliderStyle

@@ -68,6 +68,14 @@ private enum LabeledContentStyleKey: EnvironmentKey {
   static let defaultValue = AnyLabeledContentStyle.automatic
 }
 
+private enum ControlGroupStyleKey: EnvironmentKey {
+  static let defaultValue = AnyControlGroupStyle.automatic
+}
+
+private enum MenuStyleKey: EnvironmentKey {
+  static let defaultValue = AnyMenuStyle.automatic
+}
+
 private enum GroupBoxStyleKey: EnvironmentKey {
   static let defaultValue = AnyGroupBoxStyle.automatic
 }
@@ -176,24 +184,20 @@ extension EnvironmentValues {
     set { self[ToggleStyleKey.self] = newValue }
   }
 
-
   package var disclosureGroupStyle: AnyDisclosureGroupStyle {
     get { self[DisclosureGroupStyleKey.self] }
     set { self[DisclosureGroupStyleKey.self] = newValue }
   }
-
 
   package var textEditorStyle: AnyTextEditorStyle {
     get { self[TextEditorStyleKey.self] }
     set { self[TextEditorStyleKey.self] = newValue }
   }
 
-
   package var progressViewStyle: AnyProgressViewStyle {
     get { self[ProgressViewStyleKey.self] }
     set { self[ProgressViewStyleKey.self] = newValue }
   }
-
 
   package static var runtimeFocusStateDependencyKeys: Set<ObjectIdentifier> {
     [
@@ -269,6 +273,16 @@ extension EnvironmentValues {
   package var labeledContentStyle: AnyLabeledContentStyle {
     get { self[LabeledContentStyleKey.self] }
     set { self[LabeledContentStyleKey.self] = newValue }
+  }
+
+  package var controlGroupStyle: AnyControlGroupStyle {
+    get { self[ControlGroupStyleKey.self] }
+    set { self[ControlGroupStyleKey.self] = newValue }
+  }
+
+  package var menuStyle: AnyMenuStyle {
+    get { self[MenuStyleKey.self] }
+    set { self[MenuStyleKey.self] = newValue }
   }
 
   package var groupBoxStyle: AnyGroupBoxStyle {
