@@ -169,15 +169,6 @@ final class SceneRuntime {
     var attachPtyPath: String? {
       ptyPair?.slavePath
     }
-
-    var sceneInfo: SceneInfo {
-      SceneInfo(
-        id: selection.identifier.rawValue,
-        title: selection.title,
-        ptyPath: ptyPair?.slavePath,
-        isAttached: lifecycle.state == .rendering
-      )
-    }
   #endif
 
   func run(

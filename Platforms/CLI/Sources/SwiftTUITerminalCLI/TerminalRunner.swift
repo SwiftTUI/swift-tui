@@ -104,44 +104,6 @@ public enum TerminalRunner {
   }
 
   @MainActor
-  static func run<S: Scene>(
-    scene: S,
-    sessionName: String,
-    presentationSurface: any PresentationSurface,
-    inputReader: any InputReading,
-    signalReader: (any SignalReading)? = nil,
-    scheduler: any FrameScheduling = FrameScheduler()
-  ) async throws -> RunLoopResult<SceneSessionState> {
-    let selections = collectWindowSceneSelections(from: scene)
-    guard !selections.isEmpty else {
-      throw AppLaunchError.noScenes
-    }
-    guard selections.count == 1 else {
-      throw SingleSceneRuntimeError.multipleScenesUnsupported(count: selections.count)
-    }
-    let selection = selections[0]
-    let terminalInputReader: any TerminalInputReading =
-      if let terminalInputReader = inputReader as? any TerminalInputReading {
-        terminalInputReader
-      } else {
-        KeyboardOnlyInputAdapter(inputReader: inputReader)
-      }
-
-    let resources = SceneSessionResources(
-      presentationSurface: presentationSurface,
-      terminalInputReader: terminalInputReader,
-      signalReader: signalReader,
-      scheduler: scheduler
-    )
-    resources.runtimeIssueSink = .standardError
-    return try await runSelectedScene(
-      selection: selection,
-      sessionName: sessionName,
-      resources: resources
-    )
-  }
-
-  @MainActor
   private static func launchApp(
     selections: [SelectedWindowScene],
     sessionName: String,
@@ -251,34 +213,6 @@ public enum TerminalRunner {
       }
       group.cancelAll()
     }
-  }
-
-  @MainActor
-  private static func runSelectedScene(
-    selection: SelectedWindowScene,
-    sessionName: String,
-    resources: SceneSessionResources
-  ) async throws -> RunLoopResult<SceneSessionState> {
-    let stateContainer = StateContainer(
-      initialState: SceneSessionState(),
-      invalidationIdentities: [selection.rootIdentity]
-    )
-    let focusTracker = FocusTracker(
-      invalidationIdentities: [selection.rootIdentity]
-    )
-
-    defer {
-      if let inProcessSignalReader = resources.signalReader as? InProcessSignalReader {
-        inProcessSignalReader.finish()
-      }
-    }
-
-    return try await selection.run(
-      sessionName: sessionName,
-      resources: resources,
-      stateContainer: stateContainer,
-      focusTracker: focusTracker
-    )
   }
 
   #if os(macOS) || os(iOS) || os(Linux) || os(Android)
@@ -576,17 +510,6 @@ private struct SceneAttachUnavailableError: Error, CustomStringConvertible {
   }
 }
 
-private enum SingleSceneRuntimeError: Error, Equatable, Sendable, CustomStringConvertible {
-  case multipleScenesUnsupported(count: Int)
-
-  var description: String {
-    switch self {
-    case .multipleScenesUnsupported(let count):
-      return "Expected exactly one scene, but received \(count)."
-    }
-  }
-}
-
 // The `App.main()` terminal launch entry points (and their `exitLaunch`
 // failure path) live in `App+TerminalLaunch.swift`.
 
@@ -599,30 +522,6 @@ public enum TerminalRunnerError: Error, Equatable, Sendable, CustomStringConvert
       return "--web requires the opt-in WebHost runner, but this executable was built with "
         + "terminal-only SwiftTUICLI. Link the SwiftTUI" + "WebHostCLI product and call "
         + "WebHostCLIRunner.run(...), or remove --web."
-    }
-  }
-}
-
-private final class KeyboardOnlyInputAdapter: TerminalInputReading {
-  private let inputReader: any InputReading
-
-  init(inputReader: any InputReading) {
-    self.inputReader = inputReader
-  }
-
-  func inputEvents() -> AsyncStream<InputEvent> {
-    AsyncStream { continuation in
-      let keyEvents = inputReader.events()
-      let task = Task {
-        for await keyPress in keyEvents {
-          continuation.yield(.key(keyPress))
-        }
-        continuation.finish()
-      }
-
-      continuation.onTermination = { _ in
-        task.cancel()
-      }
     }
   }
 }
