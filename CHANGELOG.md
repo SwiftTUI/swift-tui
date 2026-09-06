@@ -6,7 +6,15 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
-## [Unreleased]
+## [0.11.1] - 2026-09-06
+
+### Fixed
+
+- Primitive modifiers now reject direct body evaluation before capture binding.
+  This avoids a Swift 6.3.3 optimizer crash when release builds enable actor
+  data-race checks, while preserving the normal primitive resolution path.
+
+## [0.11.0] - 2026-09-06
 
 ### Added
 

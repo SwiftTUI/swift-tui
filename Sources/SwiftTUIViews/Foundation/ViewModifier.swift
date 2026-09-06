@@ -323,6 +323,12 @@ public struct ModifiedContent<Content, Modifier> {
 
 extension ModifiedContent: View where Content: View, Modifier: ViewModifier {
   public var body: some View {
+    // Primitive modifiers resolve their content directly and have no body to
+    // bind. Trap before capture binding: Swift 6.3.3 crashes while optimizing
+    // that unreachable path for some variadic content with actor checks on.
+    if Modifier.Body.self == Never.self {
+      fatalError("A primitive modifier does not expose a composed body.")
+    }
     // Capture-bind pass (plan 2026-08-20-001): the modifier is a forwarded
     // payload — `updateAdditionalDynamicProperties` runs its `@State` as its
     // own root with root-relative paths — so it binds as its own root here,
