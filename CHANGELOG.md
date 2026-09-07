@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-09-07
+
 ### Fixed
 
 - **Bordered group boxes and rounded-border editors are content-sized again.**
@@ -31,6 +33,37 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 - Slider and stepper route wrappers hand their content the documented disabled
   state on the fixture path too, and a continuous slider over a subnormal span
   no longer hangs deriving its steps.
+- **`ForEach` rows over observable models render the current model.** Under
+  selective updates, an element whose content read an observable model could
+  replay its captured text on the next frame while the model advanced. Element
+  evaluators now replay their concrete builders under the current frame inputs
+  and their live construction owner, and equal-output reuse refreshes the
+  producer through its entity route. Eager, enumerated, indexed, scoped,
+  portal, and flattened `Group` paths are pinned, along with repeated updates,
+  removal, and identity and state stability.
+- **Observation registrations survive discarded drafts and checkpoint
+  restores.** Recording epochs are monotonic, so a discarded or rolled-back
+  draft can no longer be mistaken for a live one, and one synchronized mailbox
+  classifies callbacks, holds draft changes, and promotes publication
+  atomically. Every body read that shares one identity within a pass remains a
+  dependency.
+- **Releasing a renderer releases its graph.** Resolve and authoring contexts
+  borrow their graph and node owners instead of retaining them, and stored
+  evaluators capture the resolver without its coordinator, so a `Resolver`, a
+  `DefaultRenderer`, and a removed sheet node release with their owner. A
+  fixture that keeps calling handlers after dropping the renderer must retain
+  the owner instead.
+- **A task cancelled before its first actor turn never runs its operation**,
+  and releasing the task owner cancels every retained handle synchronously,
+  which covers manually driven runtimes as well as explicit shutdown. Phase and
+  keyframe animators seed their trigger history in mounted state, so a trigger
+  change that lands between mount and the first task turn is preserved, and
+  `Spinner` stops after a cancelled sleep before it touches retired view state.
+- **Deep grids no longer pay for a stale measurement witness.** A measurement
+  cache hit refreshes its comparison witness only when the traversal certifies
+  exact discriminator equality throughout the tree; wildcard-compatible hits
+  keep the original witness. A schedule-seeded grid had measured its heavy
+  frames at nearly twice the cost of an otherwise identical tree.
 
 ### Changed
 
@@ -42,6 +75,20 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   large to add to a terminal extent. `LinkStyle` validates an opacity outside
   the unit range and reports it. Scroll-style and missing-route reports use
   the shared misuse message shape.
+- **Event intake is amortized constant-time.** The pump's pending batches are
+  a deque, the pointer-batch eligibility check reads one event instead of
+  rescanning a growing batch, and one buffered wake token points at the event
+  and work queues. No input event, coalescing boundary, or finish signal is
+  dropped.
+- **Host-wire hyperlink interning is linear.** URL indexes come from a
+  dictionary lookup that preserves first-seen order and run layout; a 160×60
+  document with 4,800 distinct targets reconstructs all 9,600 cell
+  destinations.
+- **WebHost browser bundle re-vendored at `swift-tui-web` 0.11.2.**
+  Incremental Canvas painting clips to the damage union, decoded images have
+  retention budgets with visible-set pinning and explicit disposal, images
+  whose identifiers exceed the payload-recovery limit are pinned rather than
+  evicted, and glyph ink is clipped to its declared cell span.
 
 ## [0.11.1] - 2026-09-06
 
@@ -1600,7 +1647,10 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.10.1...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.11.2...HEAD
+[0.11.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.2
+[0.11.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.1
+[0.11.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.0
 [0.10.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.10.1
 [0.10.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.10.0
 [0.9.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.9.0
