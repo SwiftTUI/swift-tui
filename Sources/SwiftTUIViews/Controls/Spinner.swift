@@ -160,8 +160,30 @@ public struct Spinner: View {
 
 /// Task-scoped cadence dependency; production uses the continuous clock.
 package enum SpinnerTaskClock {
-  @TaskLocal package static var sleep: @Sendable (Duration) async throws -> Void = { duration in
+  /// The cadence dependency as a nominal type. A task-local whose value type
+  /// is an `async` function type crashed release builds inside
+  /// `swift_task_localValuePush` with null value-type metadata (Swift 6.3.3,
+  /// macOS and Linux); a struct's metadata is static, so the binding is sound.
+  package struct Sleep: Sendable {
+    private let sleep: @Sendable (Duration) async throws -> Void
+
+    package init(_ sleep: @escaping @Sendable (Duration) async throws -> Void) {
+      self.sleep = sleep
+    }
+
+    package func callAsFunction(_ duration: Duration) async throws {
+      try await sleep(duration)
+    }
+  }
+
+  @TaskLocal package static var sleep = Sleep { duration in
     try await Task.sleep(for: duration)
+  }
+
+  /// Binds `sleep` around the synchronous `operation`, so a task started
+  /// inside it inherits the binding. Tests bind through here.
+  package static func withSleep(_ sleep: Sleep, perform operation: () throws -> Void) rethrows {
+    try $sleep.withValue(sleep, operation: operation)
   }
 }
 

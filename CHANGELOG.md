@@ -8,6 +8,22 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-09-07
+
+A re-cut of 0.11.2 with the same framework behaviour. The 0.11.2 tag's
+release-configuration test lane crashed in a test harness, so the org's
+release contract could not close on that tag; 0.11.3 carries the repair below
+and nothing else.
+
+### Fixed
+
+- **The spinner cadence seam is a nominal type.** `SpinnerTaskClock.sleep`,
+  the package-visible task-local that tests use to drive `Spinner` ticks, held
+  an `async` function value. Binding it in a release build crashed in
+  `swift_task_localValuePush` with null value-type metadata on macOS and Linux
+  (Swift 6.3.3; debug builds were unaffected). It now holds a `Sleep` struct
+  with `callAsFunction`, and tests bind it through `withSleep(_:perform:)`.
+
 ## [0.11.2] - 2026-09-07
 
 ### Fixed
@@ -1647,7 +1663,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.11.2...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.11.3...HEAD
+[0.11.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.3
 [0.11.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.2
 [0.11.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.1
 [0.11.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.0

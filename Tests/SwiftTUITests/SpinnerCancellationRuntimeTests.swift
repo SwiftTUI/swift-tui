@@ -100,11 +100,13 @@ private final class SpinnerCancellationHarness {
       registry.registration(for: entry.identity, descriptor: descriptor))
     // TaskRunner inherits this task-local dependency into the registered
     // Spinner operation; no replacement operation stands in for the view.
-    return SpinnerTaskClock.$sleep.withValue({ duration in
+    var task: Task<Void, Never>?
+    SpinnerTaskClock.withSleep(.init { duration in
       try await sleeper.suspendTick(duration: duration)
     }) {
-      runner.start(viewNodeID: nodeID, identity: entry.identity, registration: registration)
+      task = runner.start(viewNodeID: nodeID, identity: entry.identity, registration: registration)
     }
+    return try #require(task)
   }
 
   func renderGlyph() -> String {
