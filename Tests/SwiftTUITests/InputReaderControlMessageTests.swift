@@ -216,6 +216,47 @@
           .key(.character("q")),
         ])
     }
+
+    @Test("the event stream ends only after its read source is cancelled")
+    func inputStreamEndsAfterSourceCancellation() async throws {
+      var descriptors: [Int32] = [0, 0]
+      #expect(unsafe pipe(&descriptors) == 0)
+
+      let readDescriptor = descriptors[0]
+      let writeDescriptor = descriptors[1]
+      var didCloseWriteDescriptor = false
+      defer {
+        _ = close(readDescriptor)
+        if !didCloseWriteDescriptor {
+          _ = close(writeDescriptor)
+        }
+      }
+
+      let currentFlags = fcntl(readDescriptor, F_GETFL)
+      #expect(currentFlags >= 0)
+      #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
+
+      let inputReader = InputReader(fileDescriptor: readDescriptor)
+      let eventsTask = Task {
+        var events: [InputEvent] = []
+        for await event in inputReader.inputEvents() {
+          events.append(event)
+        }
+        return events
+      }
+
+      try writeAllBytes(Array("q".utf8), to: writeDescriptor)
+      _ = close(writeDescriptor)
+      didCloseWriteDescriptor = true
+
+      let events = await eventsTask.value
+      // libdispatch forbids closing a descriptor while a read source is still
+      // registered on it. The reader finishes its stream from the source's
+      // cancel handler, so once the loop ends the source is unregistered and
+      // the deferred close above cannot race the manager thread.
+      #expect(inputReader.liveReadSourceCount == 0)
+      #expect(events == [.key(.character("q"))])
+    }
   }
 
   private func writeAllBytes(

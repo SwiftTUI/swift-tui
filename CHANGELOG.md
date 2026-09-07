@@ -12,10 +12,18 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 A re-cut of 0.11.2 with the same framework behaviour. The 0.11.2 tag's
 release-configuration test lane crashed in a test harness, so the org's
-release contract could not close on that tag; 0.11.3 carries the repair below
-and nothing else.
+release contract could not close on that tag; 0.11.3 carries the two repairs
+below and nothing else.
 
 ### Fixed
+
+- **Input readers finish their event streams only after the descriptor's read
+  source is cancelled.** The POSIX reader finished its stream from the event
+  handler and cancelled the dispatch source afterwards, so a consumer that
+  closed the descriptor as soon as its loop ended could race libdispatch's
+  deregistration and crash the manager thread (seen on the Linux release
+  soundness lane). Both reader variants now finish from the cancel handler,
+  and `liveReadSourceCount` lets tests assert the ordering.
 
 - **The spinner cadence seam is a nominal type.** `SpinnerTaskClock.sleep`,
   the package-visible task-local that tests use to drive `Spinner` ticks, held

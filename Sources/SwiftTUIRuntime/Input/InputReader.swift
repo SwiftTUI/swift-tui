@@ -43,6 +43,13 @@ public final class InputReader: InputReading, TerminalInputReading,
         _ = registry.sources.removeValue(forKey: id)
       }
     }
+
+    /// Read sources still registered on the descriptor. Zero once every
+    /// stream this reader produced has finished, because a source is
+    /// unregistered from its cancel handler before its stream finishes.
+    package var liveReadSourceCount: Int {
+      suspendableSources.withLockUnchecked { registry in registry.sources.count }
+    }
   #endif
 
   #if canImport(ucrt)
@@ -491,8 +498,6 @@ extension InputReader {
           if drainResult.failureErrno != nil {
             scheduledEscapeFlush?.cancel()
             scheduledEscapeFlush = nil
-            flushPendingMouseEvents()
-            continuation.finish()
             source.cancel()
             return
           }
@@ -519,12 +524,15 @@ extension InputReader {
           if drainResult.shouldFinish {
             scheduledEscapeFlush?.cancel()
             scheduledEscapeFlush = nil
-            flushPendingMouseEvents()
-            continuation.finish()
             source.cancel()
           }
         }
 
+        // The stream finishes only here, once libdispatch has deregistered
+        // the descriptor and no event handler can run again. A consumer that
+        // closes the descriptor after its loop ends is then safe; finishing
+        // from the event handler let that close race the manager thread's
+        // deregistration and crash it (Linux release soundness lane).
         source.setCancelHandler {
           self.unregisterSuspendableSource(suspendableID)
           scheduledFlush?.cancel()
@@ -596,7 +604,6 @@ extension InputReader {
           if drainResult.failureErrno != nil {
             scheduledEscapeFlush?.cancel()
             scheduledEscapeFlush = nil
-            continuation.finish()
             source.cancel()
             return
           }
@@ -616,11 +623,11 @@ extension InputReader {
           if drainResult.shouldFinish {
             scheduledEscapeFlush?.cancel()
             scheduledEscapeFlush = nil
-            continuation.finish()
             source.cancel()
           }
         }
 
+        // Finish only after deregistration; see the input-event stream above.
         source.setCancelHandler {
           self.unregisterSuspendableSource(suspendableID)
           scheduledEscapeFlush?.cancel()
