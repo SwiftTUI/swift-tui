@@ -31,8 +31,12 @@ struct ScenarioSmokeTests {
         #expect(model.counters == (0..<8).map { tick &+ $0 })
         let expected = (0..<8).map { "c\($0) \(tick &+ $0)" }.joined(separator: " ")
         do {
+          // The silence window re-arms on every presented frame; the hard cap
+          // is a hang guard for a debug build under gate load, not a latency
+          // assertion. A storm frame can take seconds when the gate runs its
+          // parallel lanes on the same machine.
           let frame = try await driver.waitForFrame(
-            afterFrame: before, timeout: .seconds(5), hardCap: .seconds(5),
+            afterFrame: before, timeout: .seconds(10), hardCap: .seconds(30),
             description: expected,
             matching: { frame in
               frame.text.split(separator: "\n").contains { line in

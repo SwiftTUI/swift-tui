@@ -2186,7 +2186,7 @@ class CanvasSurfacePainter {
     this.visibleImageIds = new Set((frame?.images ?? []).filter(isPaintableSurfaceImage).map((image) => image.id));
     this.inactiveDecodedImageIds.clear();
     for (const [id, cached] of this.imageCache) {
-      if (cached.image && !this.visibleImageIds.has(id)) {
+      if (cached.image && !this.visibleImageIds.has(id) && isWebHostImageRecoveryId(id)) {
         this.inactiveDecodedImageIds.add(id);
       }
     }

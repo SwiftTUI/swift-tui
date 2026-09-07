@@ -18,6 +18,7 @@ import Testing
 ///    `state.imperativeSeedFallback` runtime issue instead of failing
 ///    silently.
 @MainActor
+@Suite(.serialized)
 struct ImperativeAuthoringContextPreservationTests {
   @MainActor
   final class CapturedSnapshot {
@@ -66,10 +67,21 @@ struct ImperativeAuthoringContextPreservationTests {
     return (graph, ownerIdentity, snapshot)
   }
 
+  /// Drains this file's seed-fallback issues. The queue is process-global and
+  /// other suites run in the same parallel lane: their seed fallbacks return
+  /// to the queue, so a foreign issue can neither satisfy nor break the
+  /// assertions here, and this suite cannot swallow theirs.
   private func drainSeedFallbackIssues() -> [RuntimeIssue] {
-    ImperativeRuntimeIssueQueue.drain().filter { issue in
-      issue.code == "state.imperativeSeedFallback"
+    var owned: [RuntimeIssue] = []
+    for issue in ImperativeRuntimeIssueQueue.drain()
+    where issue.code == "state.imperativeSeedFallback" {
+      if issue.message.contains(#fileID) {
+        owned.append(issue)
+      } else {
+        ImperativeRuntimeIssueQueue.record(issue)
+      }
     }
+    return owned
   }
 
   /// The deliberate seed-fallback shapes below fire the gate-on
