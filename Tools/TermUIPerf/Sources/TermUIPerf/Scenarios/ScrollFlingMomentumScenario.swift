@@ -61,7 +61,7 @@ public struct ScrollFlingMomentumScenario: PerfScenario {
       )
       // Momentum re-arms a deadline every 33 ms until it decays to rest; the
       // quiescence window is what "exhaustion" means here.
-      await driver.waitForQuiescence(idle: .milliseconds(500), timeout: .seconds(60))
+      try await driver.waitForQuiescence(idle: .milliseconds(500), timeout: .seconds(60))
       let settled = driver.terminalHost.presentedFrames.last
 
       return [

@@ -75,13 +75,13 @@ public struct ScrollDocumentMixedScenario: PerfScenario {
       }
 
       let burstDispatch = monotonicSeconds()
-      await driver.driveScroll(
+      try await driver.driveScroll(
         cadence: .microseconds(16_600),
         notches: openLoopNotches,
         at: scrollCell,
         deltaY: -1
       )
-      await driver.waitForQuiescence(idle: .milliseconds(400), timeout: .seconds(60))
+      try await driver.waitForQuiescence(idle: .milliseconds(400), timeout: .seconds(60))
       let burstSettled = driver.terminalHost.presentedFrames.last
       events.append(
         PerfEventRecord(

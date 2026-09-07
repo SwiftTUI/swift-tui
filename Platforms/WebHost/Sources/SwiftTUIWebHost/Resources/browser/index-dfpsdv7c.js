@@ -768,14 +768,17 @@ function isWebHostSurfaceFrame(value) {
     return false;
   }
   const frame = value;
-  return (frame.version === 1 || frame.version === 2) && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.rows) && frame.rows.every(isWebHostSurfaceRow) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+  return (frame.version === 1 || frame.version === 2) && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.rows) && frame.rows.every(isWebHostSurfaceRow) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
 }
 function isWebHostSurfaceDeltaFrame(value) {
   if (!value || typeof value !== "object") {
     return false;
   }
   const frame = value;
-  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && typeof frame.width === "number" && typeof frame.height === "number" && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && isOptionalSafeInteger(frame.baselineGen) && isOptionalSafeInteger(frame.stylesBase) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && isOptionalSafeInteger(frame.baselineGen) && isOptionalSafeInteger(frame.stylesBase) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+}
+function isSurfaceGridDimension(value) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 2147483647;
 }
 function hasValidAdditiveFrameFields(frame) {
   return isOptionalSafeInteger(frame.epoch) && isOptionalSafeInteger(frame.gen) && (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
@@ -2120,6 +2123,8 @@ function registerDomSurfacePainterConformanceControl(painter, control) {
 var MAX_IMAGE_DECODE_ATTEMPTS = 3;
 var MAX_UNRESOLVED_IMAGE_CACHE_ENTRIES = 256;
 var MAX_UNRESOLVED_IMAGE_PAYLOAD_CHARACTERS = 64 * 1024 * 1024;
+var MAX_DECODED_IMAGE_CACHE_ENTRIES = 256;
+var MAX_DECODED_IMAGE_CACHE_BYTES = 64 * 1024 * 1024;
 
 class CanvasSurfacePainter {
   imageCache = new Map;
@@ -2127,6 +2132,13 @@ class CanvasSurfacePainter {
   unresolvedImagePayloadCharacters = 0;
   imageDecoder;
   onImagePayloadMiss;
+  maxDecodedImageCacheEntries;
+  maxDecodedImageCacheBytes;
+  decodedImageCount = 0;
+  decodedImageBytes = 0;
+  visibleImageIds = new Set;
+  inactiveDecodedImageIds = new Set;
+  disposed = false;
   canvas;
   requestRedraw = () => {};
   lastEpoch;
@@ -2135,22 +2147,28 @@ class CanvasSurfacePainter {
   constructor(options = {}) {
     this.imageDecoder = options.decodeImage ?? decodeImage;
     this.onImagePayloadMiss = options.onImagePayloadMiss ?? (() => {});
+    this.maxDecodedImageCacheEntries = cacheLimit(options.maxDecodedImageCacheEntries, MAX_DECODED_IMAGE_CACHE_ENTRIES);
+    this.maxDecodedImageCacheBytes = cacheLimit(options.maxDecodedImageCacheBytes, MAX_DECODED_IMAGE_CACHE_BYTES);
     registerCanvasSurfacePainterConformanceControl(this, {
       evictImages: (ids) => {
         for (const id of ids) {
-          this.removeUnresolvedImage(id);
-          this.imageCache.delete(id);
-          this.pendingImagePayloadMissIds.delete(id);
+          this.removeCachedImage(id);
         }
       },
       visibleImageIDs: (images) => [...new Set(images.filter(isPaintableSurfaceImage).filter((image) => this.imageCache.get(image.id)?.image !== undefined).map((image) => image.id))].sort()
     });
   }
   attach(canvas, requestRedraw) {
+    if (this.disposed) {
+      return;
+    }
     this.canvas = canvas;
     this.requestRedraw = requestRedraw;
   }
   paint(metrics, frame, damage, recoveredImagePayloadIds = []) {
+    if (this.disposed) {
+      return;
+    }
     const canvas = this.canvas;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) {
@@ -2165,6 +2183,14 @@ class CanvasSurfacePainter {
       }
     }
     this.sweepUnresolvedImages(frame?.images);
+    this.visibleImageIds = new Set((frame?.images ?? []).filter(isPaintableSurfaceImage).map((image) => image.id));
+    this.inactiveDecodedImageIds.clear();
+    for (const [id, cached] of this.imageCache) {
+      if (cached.image && !this.visibleImageIds.has(id)) {
+        this.inactiveDecodedImageIds.add(id);
+      }
+    }
+    this.trimDecodedImages();
     const dirtyRegion = frame ? this.dirtyRegionForDamage(damage, frame, metrics) : undefined;
     const recoveredPayloadIds = new Set(recoveredImagePayloadIds);
     if (dirtyRegion?.rects.length === 0) {
@@ -2187,8 +2213,36 @@ class CanvasSurfacePainter {
     if (!frame) {
       return;
     }
-    this.drawRows(context, frame, metrics, dirtyRegion);
-    this.drawImages(context, frame.images ?? [], metrics, dirtyRegion, recoveredPayloadIds);
+    if (dirtyRegion) {
+      context.save();
+      context.beginPath();
+      for (const rect of dirtyRegion.rects) {
+        context.rect(rect.x, rect.y, rect.width, rect.height);
+      }
+      context.clip();
+    }
+    try {
+      this.drawRows(context, frame, metrics, dirtyRegion);
+      this.drawImages(context, frame.images ?? [], metrics, dirtyRegion, recoveredPayloadIds);
+    } finally {
+      if (dirtyRegion) {
+        context.restore();
+      }
+    }
+  }
+  dispose() {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.canvas = undefined;
+    this.requestRedraw = () => {};
+    for (const id of this.imageCache.keys()) {
+      this.removeCachedImage(id);
+    }
+    this.visibleImageIds.clear();
+    this.inactiveDecodedImageIds.clear();
+    this.pendingImagePayloadMissIds.clear();
   }
   drawRows(context, frame, metrics, dirtyRegion) {
     if (dirtyRegion) {
@@ -2255,8 +2309,13 @@ class CanvasSurfacePainter {
     context.restore();
   }
   cachedImage(image, missingPayloadIds, recoveredPayloadIds) {
+    if (!isSupportedImageFormat(image.format)) {
+      return;
+    }
     let cached = this.imageCache.get(image.id);
     if (cached?.image) {
+      this.imageCache.delete(image.id);
+      this.imageCache.set(image.id, cached);
       return cached.image;
     }
     const beginsRecoveredGeneration = image.dataBase64 !== undefined && recoveredPayloadIds.delete(image.id);
@@ -2304,10 +2363,16 @@ class CanvasSurfacePainter {
       promise.then((decodedImage) => {
         const latest = this.imageCache.get(image.id);
         if (latest?.promise !== promise) {
+          closeDecodedImage(decodedImage);
           return;
         }
         this.removeUnresolvedImage(image.id);
-        this.imageCache.set(image.id, { image: decodedImage });
+        const decodedBytes = estimatedDecodedImageBytes(decodedImage);
+        this.imageCache.delete(image.id);
+        this.imageCache.set(image.id, { image: decodedImage, decodedBytes });
+        this.decodedImageCount += 1;
+        this.decodedImageBytes += decodedBytes;
+        this.trimDecodedImages();
         this.requestRedraw();
       }).catch(() => {
         const latest = this.imageCache.get(image.id);
@@ -2331,6 +2396,26 @@ class CanvasSurfacePainter {
     const existingPayloadCharacters = existing?.image ? 0 : existing?.payload?.length ?? 0;
     const nextPayloadCharacters = this.unresolvedImagePayloadCharacters - existingPayloadCharacters + (payload?.length ?? 0);
     return (this.unresolvedImageIds.has(id) || this.unresolvedImageIds.size < MAX_UNRESOLVED_IMAGE_CACHE_ENTRIES) && nextPayloadCharacters <= MAX_UNRESOLVED_IMAGE_PAYLOAD_CHARACTERS;
+  }
+  removeCachedImage(id) {
+    const cached = this.imageCache.get(id);
+    if (cached?.image) {
+      this.decodedImageCount -= 1;
+      this.decodedImageBytes -= cached.decodedBytes ?? 0;
+      closeDecodedImage(cached.image);
+    }
+    this.removeUnresolvedImage(id);
+    this.imageCache.delete(id);
+    this.inactiveDecodedImageIds.delete(id);
+    this.pendingImagePayloadMissIds.delete(id);
+  }
+  trimDecodedImages() {
+    for (const id of this.inactiveDecodedImageIds) {
+      if (this.decodedImageCount <= this.maxDecodedImageCacheEntries && this.decodedImageBytes <= this.maxDecodedImageCacheBytes) {
+        break;
+      }
+      this.removeCachedImage(id);
+    }
   }
   setUnresolvedImage(id, cached) {
     const existing = this.imageCache.get(id);
@@ -2382,6 +2467,9 @@ class CanvasSurfacePainter {
     this.imagePayloadMissScheduled = true;
     queueMicrotask(() => {
       this.imagePayloadMissScheduled = false;
+      if (this.disposed) {
+        return;
+      }
       const ids = [...this.pendingImagePayloadMissIds].sort();
       this.pendingImagePayloadMissIds.clear();
       if (ids.length > 0) {
@@ -2410,22 +2498,32 @@ class CanvasSurfacePainter {
       context.fillStyle = background;
       context.fillRect(rectX, rectY, width, metrics.cellHeight);
     }
-    if (text !== " ") {
-      context.globalAlpha = opacity;
-      context.fillStyle = foreground;
-      context.strokeStyle = foreground;
-      if (!canRenderBoxDrawing(text) || !drawBoxDrawing(context, text, {
-        x: rectX,
-        y: rectY,
-        width,
-        height: metrics.cellHeight
-      })) {
-        context.font = fontForStyle(metrics.style, style);
-        context.fillText(text, rectX, rectY + Math.floor((metrics.cellHeight + metrics.style.fontSize) / 2) - 2);
+    if (text !== " " || style?.underline || style?.strikethrough) {
+      context.save();
+      context.beginPath();
+      context.rect(rectX, rectY, width, metrics.cellHeight);
+      context.clip();
+      try {
+        context.globalAlpha = opacity;
+        if (text !== " ") {
+          context.fillStyle = foreground;
+          context.strokeStyle = foreground;
+          if (!canRenderBoxDrawing(text) || !drawBoxDrawing(context, text, {
+            x: rectX,
+            y: rectY,
+            width,
+            height: metrics.cellHeight
+          })) {
+            context.font = fontForStyle(metrics.style, style);
+            context.fillText(text, rectX, rectY + Math.floor((metrics.cellHeight + metrics.style.fontSize) / 2) - 2);
+          }
+        }
+        this.drawTextLine(context, metrics, rectX, rectY, width, style?.underline, "underline", foreground);
+        this.drawTextLine(context, metrics, rectX, rectY, width, style?.strikethrough, "strike", foreground);
+      } finally {
+        context.restore();
       }
     }
-    this.drawTextLine(context, metrics, rectX, rectY, width, style?.underline, "underline", foreground);
-    this.drawTextLine(context, metrics, rectX, rectY, width, style?.strikethrough, "strike", foreground);
     context.globalAlpha = 1;
   }
   dirtyRegionForDamage(damage, frame, metrics) {
@@ -2479,6 +2577,22 @@ class CanvasSurfacePainter {
     context.stroke();
     context.setLineDash([]);
   }
+}
+function cacheLimit(value, fallback) {
+  return value !== undefined && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
+}
+function estimatedDecodedImageBytes(image) {
+  const dimensions = image;
+  const width = dimensions.naturalWidth ?? dimensions.width;
+  const height = dimensions.naturalHeight ?? dimensions.height;
+  if (typeof width !== "number" || typeof height !== "number" || !Number.isFinite(width) || !Number.isFinite(height) || width < 0 || height < 0) {
+    return 0;
+  }
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.ceil(width) * Math.ceil(height) * 4);
+}
+function closeDecodedImage(image) {
+  const closable = image;
+  closable.close?.();
 }
 function normalizedImageOpacity(opacity) {
   if (opacity === undefined || !Number.isFinite(opacity)) {
@@ -2673,6 +2787,16 @@ class DomSurfacePainter {
     this.lastImageRecoveryFrame = frame;
     this.reconcileImages(frame.images ?? [], metrics, allowRecoveryRequests);
     this.hasRenderedFrame = true;
+  }
+  dispose() {
+    this.root?.replaceChildren();
+    this.root = undefined;
+    this.rowsLayer = undefined;
+    this.imagesLayer = undefined;
+    this.rowElements = [];
+    this.renderedImages.clear();
+    this.reportedMissingImageIds.clear();
+    this.lastImageRecoveryFrame = undefined;
   }
   rebuildRow(y, frame, metrics) {
     const rowElement = this.ensureRowElement(y, metrics);
@@ -3528,6 +3652,7 @@ class WebHostSceneRuntime {
     this.onInput(chunk);
   }
   dispose() {
+    this.painter.dispose();
     this.detachInputHandlers?.();
     this.detachPointerParadigmObserver?.();
     this.resizeObserver?.disconnect();

@@ -76,8 +76,9 @@ where KeyframePath.Value == Value {
   private let contentAuthoringContext: AuthoringContext?
 
   @State private var value: Value
-  /// The trigger the last run started for. Archived with the view, so a
-  /// dormant-tab re-mount whose trigger did not change does not replay.
+  /// The initial trigger or the trigger the last run started for. Archived
+  /// with the view, so a dormant-tab re-mount whose trigger did not change
+  /// does not replay.
   @State private var lastRunTrigger: KeyframeTriggerKey?
   /// The timeline in flight, for retrigger continuity.
   @State private var flight: KeyframeFlight<Value>?
@@ -90,11 +91,16 @@ where KeyframePath.Value == Value {
     @KeyframesBuilder<Value> keyframes: @escaping @MainActor (Value) -> KeyframePath
   ) {
     self.initialValue = initialValue
-    mode = .trigger(KeyframeTriggerKey(trigger))
+    let triggerKey = KeyframeTriggerKey(trigger)
+    mode = .trigger(triggerKey)
     self.content = content
     self.keyframes = keyframes
     contentAuthoringContext = currentAuthoringContext()
     _value = State(wrappedValue: initialValue)
+    // Mount must establish the baseline before its task can be cancelled by
+    // a trigger change. Existing graph state still wins on body re-evaluation
+    // and dormant-tab restoration.
+    _lastRunTrigger = State(wrappedValue: triggerKey)
   }
 
   /// Creates an animator that starts on appearance and, when `repeating`,
@@ -162,7 +168,7 @@ where KeyframePath.Value == Value {
   @MainActor
   private func runTriggered(_ trigger: KeyframeTriggerKey, reduceMotion: Bool) async {
     guard let previous = lastRunTrigger else {
-      // The initial appearance records the trigger and does not animate.
+      // Defensively establish a baseline for uninitialized trigger history.
       lastRunTrigger = trigger
       return
     }

@@ -70,6 +70,37 @@ package struct DeclaredChildConsumptionPolicy: Sendable, Equatable {
   )
 }
 
+/// The structural contribution a declared child makes to its consuming parent.
+package enum DeclaredChildShape: Sendable, Equatable {
+  case single
+  case empty
+  case group
+}
+
+/// The live declaration owner that must re-consume a producer's structural output.
+/// A lifetime identifier keeps delayed replay from retaining or targeting a replaced owner.
+package struct DeclaredChildReplayBoundary: Sendable {
+  package let ownerLifetimeID: NodeOwnerLifetimeID
+  package let resolvedUnder: Identity
+}
+
+package func declaredChildShape(
+  _ resolved: ResolvedNode,
+  under identity: Identity
+) -> DeclaredChildShape {
+  guard resolved.identity == identity else {
+    return .single
+  }
+  switch resolved.kind {
+  case .view("EmptyView"):
+    return .empty
+  case .view("Group"):
+    return .group
+  default:
+    return .single
+  }
+}
+
 /// Consumes one resolved declared child, returning what the enclosing
 /// container should splice into its children.
 ///
@@ -84,22 +115,18 @@ package func consumeDeclaredChild(
   in viewGraph: ViewGraph?,
   policy: DeclaredChildConsumptionPolicy
 ) -> [ResolvedNode] {
-  guard resolved.identity == identity else {
-    return [resolved]
-  }
-
-  switch resolved.kind {
-  case .view("EmptyView"):
+  switch declaredChildShape(resolved, under: identity) {
+  case .empty:
     if policy.reportsDroppedEmpty {
       viewGraph?.reportDetachedResolvedLifetimeResult(resolved)
     }
     return []
-  case .view("Group"):
+  case .group:
     if policy.reportsSplicedGroup {
       viewGraph?.reportDetachedResolvedLifetimeResult(resolved)
     }
     return resolved.children
-  default:
+  case .single:
     return [resolved]
   }
 }

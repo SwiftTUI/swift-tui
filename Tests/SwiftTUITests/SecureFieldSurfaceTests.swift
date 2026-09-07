@@ -20,7 +20,9 @@ struct SecureFieldSurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("SecretField")
 
-    let focusedArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let focusedArtifacts = renderer.render(
       SecureField(
         "Password",
         text: Binding(
@@ -92,7 +94,9 @@ struct SecureFieldSurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       SecureField(
         "Password",
         text: Binding(

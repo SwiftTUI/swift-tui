@@ -1503,6 +1503,16 @@ package final class ViewGraph {
     )
   }
 
+  /// Queues exact live evaluation owners without consulting value-identity
+  /// aliases, which may refer to a flattening absorber instead.
+  package func queueDirtyEvaluationOwners(_ owners: Set<NodeOwnerLifetimeID>) {
+    ViewGraphInvalidationPlanner.queueDirty(
+      Set(owners.compactMap { nodesByOwnerLifetimeID[$0]?.viewNodeID }),
+      graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
+      nodesByNodeID: nodesByNodeID
+    )
+  }
+
   /// Records state-slot mutation currency for checkpoint overlays without
   /// scheduling any reader. Runtime synchronization paths use this when their
   /// own value-level policy decides whether and where to invalidate.
@@ -1948,6 +1958,24 @@ package final class ViewGraph {
     detachedHostedRootsRecordedThisFrame.removeAll(keepingCapacity: true)
     preferenceDeltaEscalationRequested = false
     preferenceDeltaNotesThisFrame.removeAll(keepingCapacity: true)
+    declaredChildRecompositionOwners.removeAll(keepingCapacity: true)
+  }
+
+  /// Resolve-local requests, drained by the frame head before publication.
+  /// A discarded head cannot carry them into another attempt: beginFrame
+  /// clears them before any evaluator runs.
+  private var declaredChildRecompositionOwners: Set<NodeOwnerLifetimeID> = []
+
+  package func requestDeclaredChildRecomposition(owner: NodeOwnerLifetimeID) {
+    guard let node = nodesByOwnerLifetimeID[owner], !node.isEvaluating else {
+      return
+    }
+    declaredChildRecompositionOwners.insert(owner)
+  }
+
+  package func takeDeclaredChildRecompositionRequests() -> Set<NodeOwnerLifetimeID> {
+    defer { declaredChildRecompositionOwners.removeAll(keepingCapacity: true) }
+    return declaredChildRecompositionOwners.filter { nodesByOwnerLifetimeID[$0] != nil }
   }
 
   // MARK: - Preference delta escalation (selective frames)
@@ -3979,11 +4007,14 @@ package final class ViewGraph {
       if roots.contains(where: { root in
         identity == root || identity.isDescendant(of: root)
           || resolvedIdentity == root || resolvedIdentity.isDescendant(of: root)
-      }) || node.registeredHandlers.pointer.handlerOwners.values.contains(where: {
-        $0.matchesAnySubtreeRoot(roots)
-      }) || node.registeredHandlers.pointer.hoverOwners.values.contains(where: {
-        $0.matchesAnySubtreeRoot(roots)
-      }) {
+      })
+        || node.registeredHandlers.pointer.handlerOwners.values.contains(where: {
+          $0.matchesAnySubtreeRoot(roots)
+        })
+        || node.registeredHandlers.pointer.hoverOwners.values.contains(where: {
+          $0.matchesAnySubtreeRoot(roots)
+        })
+      {
         // A style route wrapper resolves to a synthetic pointer identity
         // whose handlers belong to an ancestor control. Reset-root expansion
         // includes that route, so restoration must include its recording

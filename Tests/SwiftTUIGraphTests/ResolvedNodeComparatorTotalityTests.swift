@@ -71,7 +71,7 @@ struct ResolvedNodeComparatorTotalityTests {
       "supportsRetainedReuse": "reuse-machinery flag, not placed output",
       "handlerInventory": "registration bookkeeping, not placed output or geometry",
     ],
-    "isEquivalentForMeasurement": [
+    "measurementEquivalence": [
       "viewNodeID": "measurement cache key: node stamps cannot change measured size",
       "identity": "measurement cache key: identity cannot change measured size",
       "structuralEdgeRole": "measurement cache key: edge role cannot change measured size",
@@ -160,7 +160,7 @@ struct ResolvedNodeComparatorTotalityTests {
     "every stored field is compared or explicitly exempted, per comparator",
     arguments: [
       "==", "memoReuseEquivalent", "memoUnsoundContentDivergence",
-      "placementEquivalence", "isEquivalentForMeasurement", "isEquivalentForPlacement",
+      "placementEquivalence", "measurementEquivalence", "isEquivalentForPlacement",
     ])
   func comparatorIsFieldTotal(comparator: String) throws {
     let fields = try comparableFieldNames()
@@ -185,6 +185,14 @@ struct ResolvedNodeComparatorTotalityTests {
         "\(comparator) both consults and exempts ResolvedNode.\(field) — the manifest has drifted from the body; remove the stale exemption."
       )
     }
+  }
+
+  @Test("the Boolean measurement wrapper delegates to the field-total comparator")
+  func measurementWrapperDelegatesToFieldTotalComparator() throws {
+    let source = try SourceParsingTestSupport.sourceText(relativePath: Self.equivalencePath)
+    let body = SourceParsingTestSupport.functionBodyText(
+      named: "isEquivalentForMeasurement", in: source)
+    #expect(body.contains("measurementEquivalence(to: other).isCompatible"))
   }
 
   @Test("exemption manifests only name real stored fields (no stale entries)")

@@ -94,7 +94,8 @@ struct ImperativeAuthoringContextPreservationTests {
   func nilSnapshotPreservesAmbientContext() throws {
     let captured = CapturedSnapshot()
     let probe = StateReadingProbe(captured: captured)
-    let (_, ownerIdentity, snapshot) = try resolve(probe, captured: captured)
+    let (graph, ownerIdentity, snapshot) = try resolve(probe, captured: captured)
+    defer { withExtendedLifetime(graph) {} }
 
     withImperativeAuthoringContext(snapshot) {
       #expect(currentAuthoringContext()?.viewIdentity == ownerIdentity)
@@ -109,7 +110,8 @@ struct ImperativeAuthoringContextPreservationTests {
   func nilSnapshotPreservesAmbientContextAsync() async throws {
     let captured = CapturedSnapshot()
     let probe = StateReadingProbe(captured: captured)
-    let (_, ownerIdentity, snapshot) = try resolve(probe, captured: captured)
+    let (graph, ownerIdentity, snapshot) = try resolve(probe, captured: captured)
+    defer { withExtendedLifetime(graph) {} }
 
     // Explicit async closure values bind the async overloads — a plain
     // trailing closure with no awaits resolves to the sync ones and the
@@ -128,10 +130,12 @@ struct ImperativeAuthoringContextPreservationTests {
   func nestedNilDispatchReadsLiveState() throws {
     let captured = CapturedSnapshot()
     let probe = StateReadingProbe(captured: captured)
-    let (_, _, snapshot) = try resolve(probe, captured: captured)
+    let (graph, _, snapshot) = try resolve(probe, captured: captured)
+    defer { withExtendedLifetime(graph) {} }
 
-    withImperativeAuthoringContext(snapshot) { probe.flagWriter()(true) }
     _ = drainSeedFallbackIssues()
+    withImperativeAuthoringContext(snapshot) { probe.flagWriter()(true) }
+    #expect(drainSeedFallbackIssues().isEmpty, "the fixture must retain a live state owner")
 
     // The onSubmit shape: a user closure registered with a nil snapshot fires
     // nested inside the control's established dispatch context. The read must
@@ -151,11 +155,13 @@ struct ImperativeAuthoringContextPreservationTests {
   func contextlessReadOnBoundBoxRecordsSeedFallback() throws {
     let captured = CapturedSnapshot()
     let probe = StateReadingProbe(captured: captured)
-    let (_, _, snapshot) = try resolve(probe, captured: captured)
+    let (graph, _, snapshot) = try resolve(probe, captured: captured)
+    defer { withExtendedLifetime(graph) {} }
 
     // Bind the box through a legitimate imperative access first.
-    _ = withImperativeAuthoringContext(snapshot) { probe.flagReader()() }
     _ = drainSeedFallbackIssues()
+    _ = withImperativeAuthoringContext(snapshot) { probe.flagReader()() }
+    #expect(drainSeedFallbackIssues().isEmpty, "the fixture must retain a live state owner")
 
     // A context-free read on the bound box degrades to the seed — silently,
     // before this warning existed.
@@ -180,6 +186,7 @@ struct ImperativeAuthoringContextPreservationTests {
     let captured = CapturedSnapshot()
     let probe = StateReadingProbe(captured: captured)
     let (graph, ownerIdentity, snapshot) = try resolve(probe, captured: captured)
+    defer { withExtendedLifetime(graph) {} }
 
     // Bind through the live owner, then retire the subtree so the captured
     // handle no longer resolves (the identity-churn shape: list reshapes,

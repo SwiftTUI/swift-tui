@@ -186,7 +186,7 @@ extension ForEach: DeclaredChildrenView {
     for iteration in iterations {
       let view = iteration.makeView(content)
       visitor(view, iteration.context) {
-        iteration.resolve(view)
+        iteration.resolve(view, rebuilding: content)
       }
     }
   }

@@ -12,9 +12,10 @@ import Testing
 struct ScrollDriveModelTests {
   // MARK: - T-10
 
-  @Test("Open-loop drive emits every notch in order without awaiting a settle")
+  @Test(
+    "Open-loop drive emits every notch in order without awaiting a settle", arguments: [12, 180])
   @MainActor
-  func openLoopDriveEmitsEveryNotchInOrder() async throws {
+  func openLoopDriveEmitsEveryNotchInOrder(notches: Int) async throws {
     let reader = PerfScriptedInputReader()
     let driver = PerfScenarioDriver(
       inputReader: reader,
@@ -24,9 +25,9 @@ struct ScrollDriveModelTests {
     // Open the stream first: `finish()` drops anything still staged, and the
     // point of this case is that the drive does not wait for a consumer.
     let stream = reader.inputEvents()
-    await driver.driveScroll(
+    try await driver.driveScroll(
       cadence: .milliseconds(1),
-      notches: 12,
+      notches: notches,
       at: CellPoint(x: 4, y: 4),
       deltaY: 1
     )
@@ -37,7 +38,7 @@ struct ScrollDriveModelTests {
       received.append(event)
     }
 
-    #expect(received.count == 12)
+    #expect(received.count == notches)
     for event in received {
       guard case .mouse(let mouseEvent) = event,
         case .scrolled(let deltaX, let deltaY) = mouseEvent.kind

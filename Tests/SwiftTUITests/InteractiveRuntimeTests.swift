@@ -1304,6 +1304,43 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test(
+    "scripted lifecycle input cancellation releases its entry wait without emitting input",
+    arguments: [false, true]
+  )
+  func scriptedLifecycleInputCancellationReleasesEntryWait(cancelBeforeStart: Bool) async {
+    let recorder = RuntimeLifecycleRecorder()
+    let entryWaitRegistered = AsyncEvent()
+    let waitResult = LockedBox<Bool?>(nil)
+    let delivered = LockedBox<[Int]>([])
+    let finishCalls = LockedBox(0)
+    let script = runFrameGatedScript(
+      [TimedRuntimeEvent(value: 1)],
+      frameSignal: MainActorConditionSignal(),
+      frameCount: { 1 },
+      beforeEvents: {
+        let observed = await recorder.waitForEvent(
+          "taskStart:never",
+          onWaiting: { entryWaitRegistered.fire() }
+        )
+        waitResult.withLock { $0 = observed }
+      },
+      yield: { value in delivered.withLock { $0.append(value) } },
+      finish: { finishCalls.withLock { $0 += 1 } }
+    )
+
+    if !cancelBeforeStart {
+      await entryWaitRegistered.wait()
+    }
+    script.cancel()
+    await script.value
+
+    #expect(waitResult.value == false)
+    #expect(delivered.value.isEmpty)
+    #expect(finishCalls.value == 1)
+  }
+
+  @MainActor
   @Test("run loop applies lifecycle callbacks only after a frame is committed")
   func runLoopAppliesLifecycleCallbacksOnlyAfterCommit() async throws {
     let recorder = RuntimeLifecycleRecorder()
@@ -4735,23 +4772,44 @@ struct InteractiveRuntimeTests {
       )
     )
 
-    let result = try await runTerminalInputHarness(
-      terminal: terminal,
-      events: [
-        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRect)))
-      ],
-      rootIdentity: rootIdentity,
-      terminalSize: terminalSize,
-      viewBuilder: { view }
+    let inputReader = InjectedTerminalInputReader()
+    let runTask = Task {
+      try await runTerminalInputHarness(
+        terminal: terminal,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize,
+        inputReader: inputReader,
+        viewBuilder: { view }
+      )
+    }
+    defer {
+      inputReader.finish()
+      runTask.cancel()
+    }
+
+    // A committed frame schedules its tasks but does not guarantee that they
+    // have entered user code. Prove entry before scrolling removes row 0.
+    #expect(await recorder.waitForEvent("taskStart:row-0"))
+    #expect(await recorder.waitForEvent("taskStart:row-1"))
+    inputReader.send(
+      .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRect)))
     )
 
-    #expect(result.exitReason == .inputEnded)
-    #expect(await recorder.waitForEvent("appear:row-0"))
-    #expect(await recorder.waitForEvent("appear:row-1"))
-    #expect(await recorder.waitForEvent("appear:row-2"))
-    #expect(await recorder.waitForEvent("disappear:row-0"))
+    // Keep the input stream open until the viewport transition starts row 2
+    // and cancels row 0. EOF is allowed to cancel a task before it ever enters;
+    // cancellation after EOF would not prove viewport-driven cancellation.
     #expect(await recorder.waitForEvent("taskStart:row-2"))
     #expect(await recorder.waitForEvent("taskCancel:row-0"))
+    inputReader.finish()
+    let result = try await runTask.value
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(recorder.orderedEvents.contains("appear:row-0"))
+    #expect(recorder.orderedEvents.contains("appear:row-1"))
+    #expect(recorder.orderedEvents.contains("appear:row-2"))
+    #expect(recorder.orderedEvents.contains("disappear:row-0"))
+    #expect(recorder.orderedEvents.contains("taskStart:row-2"))
+    #expect(recorder.orderedEvents.contains("taskCancel:row-0"))
     #expect(!recorder.events(matchingPrefix: "appear:").contains("appear:row-3"))
   }
 }
@@ -5476,10 +5534,14 @@ private func runFrameGatedScript<Value: Sendable>(
   _ events: [TimedRuntimeEvent<Value>],
   frameSignal: MainActorConditionSignal,
   frameCount: @escaping @MainActor () -> Int,
+  beforeEvents: (@Sendable () async -> Void)? = nil,
   yield: @escaping @Sendable (Value) -> Void,
   finish: @escaping @Sendable () -> Void
 ) -> Task<Void, Never> {
   Task { @MainActor in
+    defer { finish() }
+    await beforeEvents?()
+    guard !Task.isCancelled else { return }
     for (index, event) in events.enumerated() {
       // Event `i` is delivered once the host has committed at least `i + 1`
       // frames. An *absolute* target (rather than "one more than last time")
@@ -5488,9 +5550,9 @@ private func runFrameGatedScript<Value: Sendable>(
       // loop will not produce.
       let target = index + 1
       await frameSignal.wait(until: { frameCount() >= target })
+      guard !Task.isCancelled else { return }
       yield(event.value)
     }
-    finish()
   }
 }
 
@@ -5499,17 +5561,20 @@ private final class TimedInputReader: InputReading {
   private let frameSignal: MainActorConditionSignal
   private let frameCount: @MainActor () -> Int
   private let finishAfterEvents: Bool
+  private let beforeEvents: (@Sendable () async -> Void)?
 
   init(
     events: [TimedRuntimeEvent<KeyPress>],
     frameSignal: MainActorConditionSignal,
     frameCount: @escaping @MainActor () -> Int,
-    finishAfterEvents: Bool = true
+    finishAfterEvents: Bool = true,
+    beforeEvents: (@Sendable () async -> Void)? = nil
   ) {
     scriptedEvents = events
     self.frameSignal = frameSignal
     self.frameCount = frameCount
     self.finishAfterEvents = finishAfterEvents
+    self.beforeEvents = beforeEvents
   }
 
   convenience init(
@@ -5533,6 +5598,7 @@ private final class TimedInputReader: InputReading {
         scriptedEvents,
         frameSignal: frameSignal,
         frameCount: frameCount,
+        beforeEvents: beforeEvents,
         yield: { continuation.yield($0) },
         finish: {
           if finishAfterEvents {
@@ -5551,15 +5617,18 @@ private final class TimedSignalReader: SignalReading {
   private let scriptedSignals: [TimedRuntimeEvent<String>]
   private let frameSignal: MainActorConditionSignal
   private let frameCount: @MainActor () -> Int
+  private let beforeEvents: (@Sendable () async -> Void)?
 
   init(
     signals: [TimedRuntimeEvent<String>],
     frameSignal: MainActorConditionSignal,
-    frameCount: @escaping @MainActor () -> Int
+    frameCount: @escaping @MainActor () -> Int,
+    beforeEvents: (@Sendable () async -> Void)? = nil
   ) {
     scriptedSignals = signals
     self.frameSignal = frameSignal
     self.frameCount = frameCount
+    self.beforeEvents = beforeEvents
   }
 
   func events() -> AsyncStream<String> {
@@ -5568,6 +5637,7 @@ private final class TimedSignalReader: SignalReading {
         scriptedSignals,
         frameSignal: frameSignal,
         frameCount: frameCount,
+        beforeEvents: beforeEvents,
         yield: { continuation.yield($0) },
         finish: { continuation.finish() }
       )
@@ -5620,13 +5690,31 @@ private final class RuntimeLifecycleRecorder: Sendable {
     state.withLock { $0.orderedEvents.filter { $0.hasPrefix(prefix) } }
   }
 
-  /// Suspends until `event` has been recorded, re-evaluated only on each
-  /// `record` (`eventSignal.notify()`) rather than on a clock. Always returns
-  /// `true`: a never-recorded event leaves the caller suspended (a hang the
-  /// CI job timeout surfaces) rather than failing on a wall-clock budget.
-  func waitForEvent(_ event: String) async -> Bool {
-    await eventSignal.wait(until: { self.contains(event) })
-    return true
+  /// Waits for a recorded event without polling, returning `false` if cancelled.
+  /// Cancellation makes only this waiter's predicate true, so the signal's
+  /// normal notification path removes and resumes it without retaining a task.
+  /// `onWaiting` acknowledges a false predicate under the signal's registration
+  /// lock: a concurrent cancellation notification must wait for registration.
+  func waitForEvent(
+    _ event: String,
+    onWaiting: (@Sendable () -> Void)? = nil
+  ) async -> Bool {
+    let cancelled = LockedBox(Task.isCancelled)
+    return await withTaskCancellationHandler {
+      await eventSignal.wait(until: {
+        let shouldResume = cancelled.value || self.contains(event)
+        if !shouldResume {
+          onWaiting?()
+        }
+        return shouldResume
+      })
+      return !cancelled.value
+    } onCancel: {
+      cancelled.withLock { $0 = true }
+      // Release the flag lock before notifying: predicates take the locks in
+      // the opposite direction (signal, then flag).
+      self.eventSignal.notify()
+    }
   }
 
   func runUntilCancelled(
@@ -5882,6 +5970,12 @@ private func makeLifecycleRuntimeHarness(
   events: [TimedRuntimeEvent<KeyPress>],
   signals: [TimedRuntimeEvent<String>] = []
 ) async throws -> RunLoopResult<LifecycleRuntimeState> {
+  // These fixtures assert cancellation of an entered operation. A frame alone
+  // is not an entry barrier, and even an empty script must wait before EOF.
+  let taskStartEvent = "taskStart:\(testIdentity("LifecycleRuntimeRoot", "RuntimeRoot[0]"))"
+  let waitForTaskEntry: @Sendable () async -> Void = {
+    _ = await recorder.waitForEvent(taskStartEvent)
+  }
   let runLoop = RunLoop(
     rootIdentity: testIdentity("LifecycleRuntimeRoot"),
     presentationSurface: terminal,
@@ -5889,12 +5983,14 @@ private func makeLifecycleRuntimeHarness(
       events: events,
       frameSignal: terminal.frameSignal,
       frameCount: { terminal.frames.count },
-      finishAfterEvents: signals.isEmpty
+      finishAfterEvents: signals.isEmpty,
+      beforeEvents: waitForTaskEntry
     ),
     signalReader: TimedSignalReader(
       signals: signals,
       frameSignal: terminal.frameSignal,
-      frameCount: { terminal.frames.count }
+      frameCount: { terminal.frames.count },
+      beforeEvents: waitForTaskEntry
     ),
     scheduler: FrameScheduler(),
     stateContainer: StateContainer(
@@ -6103,10 +6199,11 @@ private func mountedMomentumRunLoop<V: View>(
 @MainActor
 private func runTerminalInputHarness<V: View>(
   terminal: RecordingTerminalHost,
-  events: [InputEvent],
+  events: [InputEvent] = [],
   rootIdentity: Identity,
   terminalSize: CellSize,
   configureEnvironmentValues: ((inout EnvironmentValues) -> Void)? = nil,
+  inputReader: (any TerminalInputReading)? = nil,
   viewBuilder: @escaping () -> V
 ) async throws -> RunLoopResult<Int> {
   var environmentValues = EnvironmentValues()
@@ -6117,7 +6214,7 @@ private func runTerminalInputHarness<V: View>(
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
     presentationSurface: terminal,
-    terminalInputReader: ScriptedTerminalInputReader(events: events),
+    terminalInputReader: inputReader ?? ScriptedTerminalInputReader(events: events),
     signalReader: EmptySignalReader(),
     scheduler: FrameScheduler(),
     stateContainer: StateContainer(

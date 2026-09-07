@@ -1,15 +1,31 @@
 @_spi(Testing) import SwiftTUIPrimitives
 
 extension ResolvedNode {
+  package struct MeasurementEquivalence: Sendable {
+    package let isCompatible: Bool
+    package let canRefreshWitness: Bool
+  }
+
   package func isEquivalentForMeasurement(
     to other: Self
   ) -> Bool {
+    measurementEquivalence(to: other).isCompatible
+  }
+
+  /// Checks measurement compatibility and whether the current tree can replace
+  /// the cache's comparison witness. A legacy nil discriminator is compatible
+  /// with any concrete type, but that relation is not transitive: replacing a
+  /// typed witness with nil would let a different concrete type reuse it later.
+  package func measurementEquivalence(
+    to other: Self
+  ) -> MeasurementEquivalence {
     // Node-hosted collections preserve authored row subtrees instead of
     // collapsing them into draw payloads. Those trees can exceed the frame-tail
     // worker's deliberately-small stack, and recursive equivalence previously
     // overflowed it before the cache could reject or accept the entry. Keep the
     // exact same field contract while moving the traversal storage to the heap.
     var pending: [(Self, Self)] = [(self, other)]
+    var canRefreshWitness = true
     while let (lhs, rhs) = pending.popLast() {
       guard
         lhs.structuralPath == rhs.structuralPath,
@@ -30,13 +46,15 @@ extension ResolvedNode {
           == rhs.indexedChildSource?.measurementSignature,
         lhs.children.count == rhs.children.count
       else {
-        return false
+        return .init(isCompatible: false, canRefreshWitness: false)
       }
+      canRefreshWitness =
+        canRefreshWitness && lhs.typeDiscriminator == rhs.typeDiscriminator
       for index in lhs.children.indices.reversed() {
         pending.append((lhs.children[index], rhs.children[index]))
       }
     }
-    return true
+    return .init(isCompatible: true, canRefreshWitness: canRefreshWitness)
   }
 
   /// Stricter equivalence check used by the retained layout placement cache.

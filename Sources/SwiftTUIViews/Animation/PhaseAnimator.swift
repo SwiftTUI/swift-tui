@@ -102,9 +102,14 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
     self.phases = phases
     self.content = content
     self.animation = animation
-    self.trigger = PhaseAnimatorTriggerKey(base: trigger)
+    let triggerKey = PhaseAnimatorTriggerKey(base: trigger)
+    self.trigger = triggerKey
     contentAuthoringContext = currentAuthoringContext()
     _currentPhase = State(wrappedValue: phases[0])
+    // Mount must establish the baseline before its task can be cancelled by
+    // a trigger change. Existing graph state still wins on body re-evaluation
+    // and dormant-tab restoration.
+    _lastRunTrigger = State(wrappedValue: triggerKey)
   }
 
   public var body: some View {
@@ -131,8 +136,8 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
         .task(id: trigger) { @MainActor in
           // .task(id:) fires on initial appearance and on every re-mount
           // (a dormant tab returning), not only on trigger changes. Run a
-          // cycle only for a trigger the animator has not run yet; the
-          // first sighting records the value without animating.
+          // cycle only for a trigger the animator has not run yet. Defensively
+          // establish a baseline if the trigger history is uninitialized.
           guard let lastRunTrigger else {
             self.lastRunTrigger = trigger
             return

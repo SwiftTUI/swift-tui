@@ -132,7 +132,8 @@ struct DynamicPropertySlotIdentityTests {
   @Test("two instances of one composed wrapper hold distinct storage")
   func composedWrapperInstancesGetDistinctStorage() throws {
     let capture = SlotIdentityCapture()
-    _ = resolve(QualifiedHost(capture: capture), identity: testIdentity("DistinctSlots"))
+    let graph = resolve(QualifiedHost(capture: capture), identity: testIdentity("DistinctSlots"))
+    defer { withExtendedLifetime(graph) {} }
     let snapshot = try #require(capture.snapshot)
 
     withImperativeAuthoringContext(snapshot) {
@@ -154,6 +155,7 @@ struct DynamicPropertySlotIdentityTests {
     let capture = SlotIdentityCapture()
     let identity = testIdentity("DistinctSlotsRoundTrip")
     let graph = resolve(QualifiedHost(capture: capture), identity: identity)
+    defer { withExtendedLifetime(graph) {} }
     let snapshot = try #require(capture.snapshot)
 
     withImperativeAuthoringContext(snapshot) {
@@ -187,10 +189,11 @@ struct DynamicPropertySlotIdentityTests {
     defer { UndiscoveredSlotCapture.current = nil }
     let plainHost = UndiscoveredHost()
     let graph = resolve(plainHost, identity: testIdentity("DuplicateClaim"))
-    _ = resolve(
+    let storageGraph = resolve(
       CapturedUndiscoveredHost(),
       identity: testIdentity("DuplicateClaimStorageProof")
     )
+    defer { withExtendedLifetime(storageGraph) {} }
     #expect(
       DynamicPropertyDescriptorCache.diagnosticPlanKind(reflecting: plainHost) == .empty,
       "a concrete non-DynamicProperty struct must remain outside descriptor discovery"

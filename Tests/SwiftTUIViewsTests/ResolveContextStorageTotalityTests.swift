@@ -177,9 +177,9 @@ struct ResolveContextStorageTotalityTests {
     "observationBridge": equated(
       draft: .survives("observation wiring is per-pass, not a frame-draft registration")
     ),
-    "viewGraph": notEquated(
-      "the live graph engine; contexts under one renderer share the reference",
-      draft: .survives("engine reference, not a registration")
+    "graphReference": notEquated(
+      "the borrowed graph binding; derived contexts share its fixed-target box",
+      draft: .survives("graph binding, not a registration")
     ),
     "imageAssetResolver": notEquated(
       "closure — not equatable; session-stable environment service",
@@ -273,12 +273,26 @@ struct ResolveContextStorageTotalityTests {
       )
     }
     for (name, classification) in Self.propagatedMembers.sorted(by: { $0.key < $1.key }) {
-      let compared = mentionsMember(body, "lhs.\(name)")
+      let compared = mentionsMember(body, "lhs.\(Self.comparisonMember(for: name))")
       #expect(
         compared == classification.equated,
         "== \(compared ? "compares" : "omits") \(name) but the manifest classifies it as \(classification.equated ? "equated" : "not equated") — reconcile the manifest with the ==."
       )
     }
+  }
+
+  private static func comparisonMember(for storedMember: String) -> String {
+    storedMember == "graphReference" ? "viewGraph" : storedMember
+  }
+
+  @Test("the graph binding classification covers its forwarding getter")
+  func graphBindingComparisonAlias() {
+    #expect(
+      mentionsMember(
+        "lhs.viewGraph === rhs.viewGraph",
+        "lhs.\(Self.comparisonMember(for: "graphReference"))"
+      )
+    )
   }
 
   @Test(
@@ -393,6 +407,11 @@ struct ResolveContextStorageTotalityTests {
     let replacement = RuntimeRegistrationSet.scratch()
     let replaced = context.replacingRuntimeRegistrations(replacement)
 
+    let initialMembers = Dictionary(
+      uniqueKeysWithValues: Mirror(reflecting: context.propagated).children.compactMap {
+        child in child.label.map { ($0, child.value) }
+      }
+    )
     let members = Dictionary(
       uniqueKeysWithValues: Mirror(reflecting: replaced.propagated).children.compactMap {
         child in child.label.map { ($0, child.value) }
@@ -431,8 +450,12 @@ struct ResolveContextStorageTotalityTests {
           #expect(unwrappedObject(value) === proxy, "\(name) must survive the draft swap")
         case "observationBridge":
           #expect(unwrappedObject(value) === bridge, "\(name) must survive the draft swap")
-        case "viewGraph":
-          #expect(unwrappedObject(value) === graph, "\(name) must survive the draft swap")
+        case "graphReference":
+          #expect(replaced.viewGraph === graph, "the borrowed graph must survive the draft swap")
+          #expect(
+            unwrappedObject(value) === initialMembers[name].flatMap(unwrappedObject),
+            "the shared graph binding must survive the draft swap"
+          )
         case "frameInputs":
           #expect(unwrappedObject(value) === inputBox, "\(name) must survive the draft swap")
         case "animationSegments":

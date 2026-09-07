@@ -188,6 +188,7 @@ package struct HostWireFrameModel {
   /// span already covers them.
   package func linkTable() -> (rows: [LinkRow], targets: [String]) {
     var linkTargets: [String] = []
+    var targetIndices: [String: Int] = [:]
     var linkRows: [LinkRow] = []
     for (y, row) in surface.cells.enumerated() {
       var runs: [LinkRun] = []
@@ -210,11 +211,12 @@ package struct HostWireFrameModel {
           continue
         }
         let target: Int
-        if let existing = linkTargets.firstIndex(of: hyperlink) {
+        if let existing = targetIndices[hyperlink] {
           target = existing
         } else {
+          target = linkTargets.count
+          targetIndices[hyperlink] = target
           linkTargets.append(hyperlink)
-          target = linkTargets.count - 1
         }
         let span = max(1, cell.spanWidth)
         if runSpan > 0, runTarget == target, runStart + runSpan == x {

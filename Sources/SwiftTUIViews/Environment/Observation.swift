@@ -2,183 +2,142 @@ import Observation
 import SwiftTUICore
 import Synchronization
 
-/// One marshaled observation change: the payload `onChange` records from
-/// whatever executor mutated the observed property (F162).
 private struct PendingObservationChange: Sendable {
   var identity: Identity
   var pass: UInt64
 }
 
-/// Weak, thread-safety-narrowed handle to the attached invalidator so an
-/// off-main `onChange` can wake a sleeping run loop immediately. The
-/// production `FrameScheduler` opts into ``ThreadSafeInvalidating``; a
-/// main-actor-only test invalidator simply has no off-main wake (its
-/// changes still drain at the next frame head).
 private struct WeakSendableInvalidator: Sendable {
   weak var value: (any ThreadSafeInvalidating)?
+}
+
+/// All callback-visible registration state shares one lock. A fire racing
+/// publication either joins the draft's held changes or the published queue;
+/// it cannot append to a draft after its promotion has already drained.
+private struct ObservationMailbox {
+  struct Draft {
+    var records: [Identity: ObservationPassRecord] = [:]
+    var heldChanges: [Identity: PendingObservationChange] = [:]
+  }
+
+  var published: [Identity: ObservationPassRecord] = [:]
+  var drafts: [UInt64: Draft] = [:]
+  var pendingChanges: [Identity: PendingObservationChange] = [:]
+
+  mutating func enqueue(identity: Identity, pass: UInt64) -> Bool {
+    let change = PendingObservationChange(identity: identity, pass: pass)
+    if published[identity]?.pass == pass {
+      pendingChanges[identity] = change
+      return true
+    }
+    if drafts[pass]?.records[identity]?.pass == pass {
+      drafts[pass]?.heldChanges[identity] = change
+    }
+    // Unknown tokens belong to superseded, discarded, or pruned registrations.
+    return false
+  }
 }
 
 @MainActor
 package final class ObservationBridge: Equatable {
   private var currentPass: UInt64 = 0
-  /// The published pass registrations, lock-held (not MainActor state) so
-  /// the fire-time staleness filter in `enqueueChange` can run on whatever
-  /// executor mutated the observed property (F162). Written on the main
-  /// actor only (track/publish/prune); read under the lock at fire time.
-  private nonisolated let passRecords = Mutex<[Identity: ObservationPassRecord]>([:])
+  // Pass identities are lifetime currency, not checkpoint state. Never rewind
+  // when a speculative frame is discarded or a checkpoint is restored.
+  private var nextPass: UInt64 = 0
+  private nonisolated let mailbox = Mutex(ObservationMailbox())
   private weak var invalidator: (any Invalidating)?
   private weak var viewGraph: ViewGraph?
   private weak var activeDraft: ObservationBridgeDraft?
-  /// Held fires from registrations armed by a still-unpublished draft (their
-  /// pass is newer than anything published — the frame's async tail is in
-  /// flight). Promoted to real invalidations when their draft publishes,
-  /// suppressed when it discards. Losing these outright deafens the identity
-  /// permanently: the fire consumed the one-shot, so without the promoted
-  /// invalidation no frame ever re-arms tracking (the amd64 stack-lean
-  /// cadence stall — frame latency ≥ writer cadence puts every next write
-  /// inside the window).
-  private nonisolated let draftWindowChanges = Mutex<[PendingObservationChange]>([])
-
-  /// Off-main change marshaling (F162): `onChange` appends here from any
-  /// executor; the MainActor bookkeeping (pass-staleness filter + dirty
-  /// queueing) drains at the next frame head via ``drainPendingChanges()``.
-  private nonisolated let pendingChanges = Mutex<[PendingObservationChange]>([])
   private nonisolated let wakeInvalidator = Mutex<WeakSendableInvalidator>(.init())
 
   package init() {}
 
-  nonisolated package static func == (
-    lhs: ObservationBridge,
-    rhs: ObservationBridge
-  ) -> Bool {
+  nonisolated package static func == (lhs: ObservationBridge, rhs: ObservationBridge) -> Bool {
     lhs === rhs
   }
 
-  package func attachInvalidator(
-    _ invalidator: (any Invalidating)?
-  ) {
+  package func attachInvalidator(_ invalidator: (any Invalidating)?) {
     self.invalidator = invalidator
-    wakeInvalidator.withLock { box in
-      box.value = invalidator as? any ThreadSafeInvalidating
-    }
+    wakeInvalidator.withLock { $0.value = invalidator as? any ThreadSafeInvalidating }
   }
 
-  package func attachViewGraph(
-    _ viewGraph: ViewGraph?
-  ) {
+  package func attachViewGraph(_ viewGraph: ViewGraph?) {
     self.viewGraph = viewGraph
   }
 
-  package func beginTrackingPass() {
-    currentPass &+= 1
+  private func issuePass() -> UInt64 {
+    precondition(nextPass < .max, "Observation pass identity exhausted")
+    nextPass += 1
+    return nextPass
   }
 
-  package func makeDraft(
-    attaching viewGraph: ViewGraph?
-  ) -> ObservationBridgeDraft {
+  package func beginTrackingPass() {
+    currentPass = issuePass()
+  }
+
+  package func makeDraft(attaching viewGraph: ViewGraph?) -> ObservationBridgeDraft {
     drainPendingChanges()
     precondition(activeDraft == nil)
-    let draft = ObservationBridgeDraft(
-      bridge: self,
-      viewGraph: viewGraph,
-      pass: currentPass &+ 1
-    )
+    let pass = issuePass()
+    mailbox.withLock { $0.drafts[pass] = .init() }
+    let draft = ObservationBridgeDraft(bridge: self, viewGraph: viewGraph, pass: pass)
     activeDraft = draft
     return draft
   }
 
-  package func track<T>(
-    identity: Identity,
-    _ apply: () -> T
-  ) -> T {
-    let viewNodeID = ViewNodeContext.current?.viewNodeID
-    let pass: UInt64
-    if let activeDraft {
-      pass = activeDraft.recordObserved(identity, viewNodeID: viewNodeID)
-    } else {
-      pass = currentPass
-      passRecords.withLock { records in
-        records[identity] = .init(viewNodeID: viewNodeID, pass: pass)
+  package func track<T>(identity: Identity, _ apply: () -> T) -> T {
+    let draft = activeDraft
+    let pass = draft?.pass ?? currentPass
+    let record = ObservationPassRecord(
+      viewNodeID: ViewNodeContext.current?.viewNodeID,
+      pass: pass
+    )
+    if draft != nil {
+      mailbox.withLock { mailbox in
+        precondition(mailbox.drafts[pass] != nil)
+        mailbox.drafts[pass]?.records[identity] = record
       }
+    } else {
+      mailbox.withLock { $0.published[identity] = record }
     }
 
+    // Collapsed custom bodies can record several dependency sets at the same
+    // identity. Every read in this pass remains live until a newer pass replaces
+    // it; per-call replacement would silently drop enclosing bodies' reads.
     return withObservationTracking {
       apply()
-    } onChange: {
-      // `onChange` fires synchronously on whatever executor mutates the
-      // observed property — not necessarily the main actor. This previously
-      // trapped off-main (release-checked); SwiftUI permits background-task
-      // model writes, so marshal instead (F162): the staleness filter and
-      // the scheduler wake run at fire time from any executor (the pass
-      // records are lock-held and `requestInvalidation` is thread-safe on
-      // `ThreadSafeInvalidating` conformers); only the graph dirty queueing
-      // is MainActor-bound, and it drains at the next frame head — the next
-      // consumer of dirty marks either way, so ordering with same-frame
-      // main-actor writes is unchanged.
-      self.enqueueChange(identity: identity, pass: pass)
+    } onChange: { [weak self] in
+      self?.enqueueChange(identity: identity, pass: pass)
     }
   }
 
+  // Observation invokes this on the mutating executor. Only the synchronized
+  // mailbox and a thread-safe invalidator are touched until the main-actor drain.
   private nonisolated func enqueueChange(
     identity: Identity,
     pass: UInt64
   ) {
-    // The stale-callback filter runs at FIRE time, exactly like the old
-    // synchronous path — but it must discriminate by pass ORDER, not bare
-    // equality. An OLDER-than-published pass is a superseded registration
-    // (re-rendered, or an aborted lineage): no wake, no invalidation — pass
-    // suppression is what keeps aborted drafts and repeated re-renders from
-    // looping the scheduler. A NEWER-than-published pass (or an identity
-    // with no published record yet) is a registration armed by a draft
-    // still in flight: the fire consumed the one-shot, so the change must
-    // be HELD for the draft's commit/discard decision — dropping it here
-    // deafens the identity permanently once the draft publishes.
-    enum FireDisposition {
-      case current
-      case draftWindow
-      case superseded
+    let shouldWake = mailbox.withLock {
+      $0.enqueue(identity: identity, pass: pass)
     }
-    let disposition = passRecords.withLock { records -> FireDisposition in
-      guard let published = records[identity]?.pass else {
-        return .draftWindow
-      }
-      if pass == published {
-        return .current
-      }
-      return pass > published ? .draftWindow : .superseded
-    }
-    switch disposition {
-    case .superseded:
-      return
-    case .draftWindow:
-      draftWindowChanges.withLock { pen in
-        pen.append(.init(identity: identity, pass: pass))
-      }
-    case .current:
-      pendingChanges.withLock { pending in
-        pending.append(.init(identity: identity, pass: pass))
-      }
+    if shouldWake {
       wakeInvalidator.withLock { $0.value }?.requestInvalidation(of: [identity])
     }
   }
 
-  /// Applies marshaled changes' MainActor bookkeeping — the graph dirty
-  /// queueing. The invalidation request and the staleness filter already ran
-  /// at fire time; the filter re-runs here because a resolve between fire
-  /// and drain may have advanced the registration (the change is then
-  /// already absorbed by that re-resolve). Runs at the frame head, before a
-  /// new tracking draft begins.
+  /// Marks the graph at frame head, discarding fires already absorbed by a
+  /// newer evaluation and coalescing all remaining fires for each identity.
   package func drainPendingChanges() {
-    let changes = pendingChanges.withLock { pending -> [PendingObservationChange] in
-      let drained = pending
-      pending.removeAll(keepingCapacity: true)
-      return drained
-    }
-    for change in changes {
-      let isCurrent = passRecords.withLock { $0[change.identity]?.pass == change.pass }
-      if isCurrent {
-        viewGraph?.queueDirtyForObservationChange(observedBy: change.identity)
+    let identities = mailbox.withLock { mailbox -> [Identity] in
+      let identities = mailbox.pendingChanges.values.compactMap { change in
+        mailbox.published[change.identity]?.pass == change.pass
+          ? change.identity : nil
       }
+      mailbox.pendingChanges.removeAll(keepingCapacity: true)
+      return identities
+    }
+    for identity in identities {
+      viewGraph?.queueDirtyForObservationChange(observedBy: identity)
     }
   }
 
@@ -190,101 +149,58 @@ package final class ObservationBridge: Equatable {
     prune(keepingIdentities: nil, liveNodeIDs: liveNodeIDs)
   }
 
-  private func prune(
-    keepingIdentities identities: Set<Identity>?,
-    liveNodeIDs: Set<ViewNodeID>?
-  ) {
-    passRecords.withLock { records in
-      guard !records.isEmpty else {
-        return
-      }
-
-      // Collect stale keys in a plain array rather than `filter` — the
-      // dictionary filter materializes a full `[Identity: Record]` copy on
-      // every call, and this runs once per committed frame in the common
-      // nothing-departed case where the array stays empty.
-      var staleIdentities: [Identity] = []
-      for (identity, record) in records {
-        let isStale: Bool
+  private func prune(keepingIdentities identities: Set<Identity>?, liveNodeIDs: Set<ViewNodeID>?) {
+    mailbox.withLock { mailbox in
+      var stale: [Identity] = []
+      for (identity, record) in mailbox.published {
+        let isLive: Bool
         if let liveNodeIDs {
-          if let viewNodeID = record.viewNodeID {
-            isStale = !liveNodeIDs.contains(viewNodeID)
-          } else {
-            isStale = true
-          }
-        } else if let identities {
-          isStale = !identities.contains(identity)
+          isLive = record.viewNodeID.map { liveNodeIDs.contains($0) } ?? false
         } else {
-          isStale = true
+          isLive = identities?.contains(identity) ?? false
         }
-        if isStale {
-          staleIdentities.append(identity)
-        }
+        if !isLive { stale.append(identity) }
       }
-      for identity in staleIdentities {
-        records.removeValue(forKey: identity)
+      for identity in stale {
+        mailbox.published.removeValue(forKey: identity)
+        mailbox.pendingChanges.removeValue(forKey: identity)
       }
     }
   }
 
-  fileprivate func finishRecording(
-    _ draft: ObservationBridgeDraft
-  ) {
-    if activeDraft === draft {
-      activeDraft = nil
-    }
+  fileprivate func finishRecording(_ draft: ObservationBridgeDraft) {
+    if activeDraft === draft { activeDraft = nil }
   }
 
-  fileprivate func resumeRecording(
-    _ draft: ObservationBridgeDraft
-  ) {
+  fileprivate func resumeRecording(_ draft: ObservationBridgeDraft) {
     precondition(activeDraft == nil || activeDraft === draft)
     activeDraft = draft
   }
 
-  fileprivate func publish(
-    _ draft: ObservationBridgeDraft
-  ) {
+  fileprivate func publish(_ draft: ObservationBridgeDraft) {
     finishRecording(draft)
     currentPass = draft.pass
-    passRecords.withLock { records in
-      for (identity, record) in draft.observedPasses {
-        records[identity] = record
-      }
-    }
     viewGraph = draft.viewGraph
-    promoteDraftWindowChanges(publishedPass: draft.pass)
+    let promoted = mailbox.withLock { mailbox -> Set<Identity> in
+      guard let pendingDraft = mailbox.drafts.removeValue(forKey: draft.pass) else {
+        preconditionFailure("Cannot publish a retired observation draft")
+      }
+      for (identity, record) in pendingDraft.records {
+        mailbox.published[identity] = record
+      }
+      var promoted: Set<Identity> = []
+      for (identity, change) in pendingDraft.heldChanges
+      where mailbox.published[identity]?.pass == change.pass {
+        mailbox.pendingChanges[identity] = change
+        promoted.insert(identity)
+      }
+      return promoted
+    }
+    if !promoted.isEmpty { invalidator?.requestInvalidation(of: promoted) }
   }
 
-  /// Held window fires whose draft just published become real invalidations:
-  /// the write raced the frame's async tail, its one-shot is consumed, and
-  /// only this promotion re-arms the identity (the next frame's resolve
-  /// re-tracks). Entries older than the published pass can never match a
-  /// future draft (passes only advance at publish) and are dropped; newer
-  /// entries belong to drafts still in flight and stay held.
-  private func promoteDraftWindowChanges(publishedPass: UInt64) {
-    let promoted = draftWindowChanges.withLock { pen -> [PendingObservationChange] in
-      let matching = pen.filter { $0.pass == publishedPass }
-      pen.removeAll { $0.pass <= publishedPass }
-      return matching
-    }
-    guard !promoted.isEmpty else {
-      return
-    }
-    pendingChanges.withLock { pending in
-      pending.append(contentsOf: promoted)
-    }
-    invalidator?.requestInvalidation(of: Set(promoted.map(\.identity)))
-  }
-
-  /// Discard-side twin of ``promoteDraftWindowChanges(publishedPass:)``: an
-  /// aborted draft's held window fires must produce no wake and no
-  /// invalidation (the load-bearing F162 suppression) — the aborted intent's
-  /// replay re-resolves and re-arms tracking independently.
   fileprivate nonisolated func discardDraftWindowChanges(forPass pass: UInt64) {
-    draftWindowChanges.withLock { pen in
-      pen.removeAll { $0.pass == pass }
-    }
+    _ = mailbox.withLock { $0.drafts.removeValue(forKey: pass) }
   }
 }
 
@@ -293,27 +209,17 @@ package final class ObservationBridgeDraft {
   private let bridge: ObservationBridge
   fileprivate weak var viewGraph: ViewGraph?
   fileprivate let pass: UInt64
-  fileprivate var observedPasses: [Identity: ObservationPassRecord] = [:]
   private var didCommit = false
   private var didDiscard = false
 
-  fileprivate init(
-    bridge: ObservationBridge,
-    viewGraph: ViewGraph?,
-    pass: UInt64
-  ) {
+  fileprivate init(bridge: ObservationBridge, viewGraph: ViewGraph?, pass: UInt64) {
     self.bridge = bridge
     self.viewGraph = viewGraph
     self.pass = pass
   }
 
-  fileprivate func recordObserved(
-    _ identity: Identity,
-    viewNodeID: ViewNodeID?
-  ) -> UInt64 {
-    precondition(!didCommit && !didDiscard)
-    observedPasses[identity] = .init(viewNodeID: viewNodeID, pass: pass)
-    return pass
+  deinit {
+    bridge.discardDraftWindowChanges(forPass: pass)
   }
 
   package func commit() {
@@ -351,7 +257,7 @@ extension ObservationBridge {
   package func makeCheckpoint() -> Checkpoint {
     Checkpoint(
       currentPass: currentPass,
-      observedPasses: passRecords.withLock { $0 },
+      observedPasses: mailbox.withLock { $0.published },
       invalidator: invalidator,
       viewGraph: viewGraph
     )
@@ -359,12 +265,16 @@ extension ObservationBridge {
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
     currentPass = checkpoint.currentPass
-    passRecords.withLock { $0 = checkpoint.observedPasses }
-    // Held window fires reference passes from the rolled-back lineage; pass
-    // numbers can be re-minted after the restore, so stale holds must not
-    // survive to falsely match a future draft's publish.
-    draftWindowChanges.withLock { $0.removeAll() }
-    invalidator = checkpoint.invalidator
+    nextPass = max(nextPass, currentPass)
+    mailbox.withLock { mailbox in
+      mailbox.published = checkpoint.observedPasses
+      mailbox.drafts.removeAll()
+      mailbox.pendingChanges = mailbox.pendingChanges.filter { identity, change in
+        mailbox.published[identity]?.pass == change.pass
+      }
+    }
+    activeDraft = nil
+    attachInvalidator(checkpoint.invalidator)
     viewGraph = checkpoint.viewGraph
   }
 }
@@ -373,10 +283,7 @@ package struct ObservationPassRecord: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
   package var pass: UInt64
 
-  package init(
-    viewNodeID: ViewNodeID?,
-    pass: UInt64
-  ) {
+  package init(viewNodeID: ViewNodeID?, pass: UInt64) {
     self.viewNodeID = viewNodeID
     self.pass = pass
   }

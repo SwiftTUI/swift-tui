@@ -487,6 +487,38 @@ struct DefaultRendererFrameHeadCoordinator {
     _ = viewGraph.evaluateDirtyNodes(using: escalation.plan)
   }
 
+  /// A declared-child consumer must re-run its own splice/drop operation when
+  /// a selectively evaluated producer changes that shape. Wait until the
+  /// frontier has unwound, then include every additional evaluator in this
+  /// draft's registration publication, just as for the initial frontier.
+  private func recomposeDeclaredChildren(graphDraft: ViewGraphFrameDraft) {
+    var evaluatedOwners: Set<NodeOwnerLifetimeID> = []
+    var rounds = 0
+    while true {
+      let owners = viewGraph.takeDeclaredChildRecompositionRequests()
+      guard !owners.isEmpty else { return }
+      let requiresRoot = !owners.isDisjoint(with: evaluatedOwners) || rounds >= 16
+      evaluatedOwners.formUnion(owners)
+      rounds += 1
+      if requiresRoot, let root = viewGraph.root {
+        // A repeated request cannot converge by repeating the same narrow
+        // work. Let normal root descent perform every consumption once.
+        viewGraph.queueDirtyEvaluationOwners([root.ownerLifetimeID])
+      } else {
+        viewGraph.queueDirtyEvaluationOwners(owners)
+      }
+      let evaluation = viewGraph.selectiveDirtyEvaluationPlanWithDiagnostics(
+        invalidatedIdentities: []
+      )
+      graphDraft.recordDirtyEvaluationPlan(evaluation.plan, diagnostics: evaluation.diagnostics)
+      _ = viewGraph.evaluateDirtyNodes(using: evaluation.plan)
+      if requiresRoot {
+        _ = viewGraph.takeDeclaredChildRecompositionRequests()
+        return
+      }
+    }
+  }
+
   private func installPresentationPortalEvaluator<V: View>(
     _ root: V,
     resolveContext: ResolveContext,
@@ -504,6 +536,9 @@ struct DefaultRendererFrameHeadCoordinator {
       portalState: presentationPortalDraft,
       contentRootIdentity: resolveContext.identity
     )
+    // Capture the stateless resolver, not this coordinator: the coordinator
+    // owns the graph that stores these escaping evaluators.
+    let resolver = resolver
     viewGraph.setRootEvaluator(rootIdentity: presentationPortalContext.identity) {
       _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
     }
@@ -619,6 +654,7 @@ struct DefaultRendererFrameHeadCoordinator {
           _ = viewGraph.evaluateDirtyNodes(
             using: dirtyEvaluationPlan
           )
+          recomposeDeclaredChildren(graphDraft: graphDraft)
           // Portal reconcile escalation: a narrow plan cannot consume the
           // presentation declaration preference (only the portal root's own
           // resolve reconciles it), so when this frame's emitter

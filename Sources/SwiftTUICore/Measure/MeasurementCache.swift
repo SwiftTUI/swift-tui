@@ -84,7 +84,8 @@ package final class MeasurementCache: Sendable {
       // Verify equivalence before touching LRU bookkeeping.  If the cached
       // entry is stale we evict it here so subsequent lookups don't keep
       // re-fetching and re-rejecting the same mismatching cache line.
-      guard cached.resolved.isEquivalentForMeasurement(to: resolved) else {
+      let equivalence = cached.resolved.measurementEquivalence(to: resolved)
+      guard equivalence.isCompatible else {
         nodeStorage.entries.removeValue(forKey: proposal)
         storage.entryCount -= 1
         if nodeStorage.entries.isEmpty {
@@ -98,7 +99,10 @@ package final class MeasurementCache: Sendable {
 
       let generation = nextGeneration(in: &storage)
       nodeStorage.entries[proposal] = .init(
-        resolved: cached.resolved,
+        // Keep equivalent current snapshots so subsequent hits can use their
+        // shared-storage fast paths. Wildcard type compatibility cannot safely
+        // replace the original witness, even though this lookup may reuse it.
+        resolved: equivalence.canRefreshWitness ? resolved : cached.resolved,
         node: cached.node,
         generation: generation
       )

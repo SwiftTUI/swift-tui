@@ -17,10 +17,11 @@ struct TextInputSubmitTests {
     identity: Identity,
     registry: LocalKeyHandlerRegistry,
     @ViewBuilder content: @MainActor (Binding<String>) -> some View
-  ) {
+  ) -> DefaultRenderer {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    _ = renderer.render(
       content(
         Binding(
           get: { log.text },
@@ -34,6 +35,7 @@ struct TextInputSubmitTests {
         applyEnvironmentValues: true
       )
     )
+    return renderer
   }
 
   @Test("Return in a TextField runs the enclosing onSubmit action and is consumed")
@@ -41,12 +43,13 @@ struct TextInputSubmitTests {
     let log = SubmitLog()
     let identity = testIdentity("SubmitTextField")
     let registry = LocalKeyHandlerRegistry()
-    renderField(log, identity: identity, registry: registry) { text in
+    let renderer = renderField(log, identity: identity, registry: registry) { text in
       TextField("Name", text: text)
         .id(identity)
         .textFieldStyle(.plain)
         .onSubmit { log.events.append("submit") }
     }
+    defer { withExtendedLifetime(renderer) {} }
 
     #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.character("a"))))
     #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.return)))
@@ -61,7 +64,7 @@ struct TextInputSubmitTests {
     let log = SubmitLog()
     let identity = testIdentity("NestedSubmitField")
     let registry = LocalKeyHandlerRegistry()
-    renderField(log, identity: identity, registry: registry) { text in
+    let renderer = renderField(log, identity: identity, registry: registry) { text in
       VStack {
         TextField("Name", text: text)
           .id(identity)
@@ -70,6 +73,7 @@ struct TextInputSubmitTests {
       }
       .onSubmit { log.events.append("outer") }
     }
+    defer { withExtendedLifetime(renderer) {} }
 
     #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.return)))
     #expect(log.events == ["inner", "outer"])
@@ -80,7 +84,7 @@ struct TextInputSubmitTests {
     let log = SubmitLog()
     let identity = testIdentity("ScopedSubmitField")
     let registry = LocalKeyHandlerRegistry()
-    renderField(log, identity: identity, registry: registry) { text in
+    let renderer = renderField(log, identity: identity, registry: registry) { text in
       VStack {
         TextField("Name", text: text)
           .id(identity)
@@ -90,6 +94,7 @@ struct TextInputSubmitTests {
       }
       .onSubmit { log.events.append("outer") }
     }
+    defer { withExtendedLifetime(renderer) {} }
 
     #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.return)))
     #expect(log.events == ["inner"])
@@ -100,7 +105,7 @@ struct TextInputSubmitTests {
     let log = SubmitLog()
     let identity = testIdentity("PassthroughScopeField")
     let registry = LocalKeyHandlerRegistry()
-    renderField(log, identity: identity, registry: registry) { text in
+    let renderer = renderField(log, identity: identity, registry: registry) { text in
       VStack {
         TextField("Name", text: text)
           .id(identity)
@@ -109,6 +114,7 @@ struct TextInputSubmitTests {
       }
       .onSubmit { log.events.append("outer") }
     }
+    defer { withExtendedLifetime(renderer) {} }
 
     #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.return)))
     #expect(log.events == ["outer"])
@@ -119,12 +125,13 @@ struct TextInputSubmitTests {
     let log = SubmitLog()
     let identity = testIdentity("SubmitSecureField")
     let registry = LocalKeyHandlerRegistry()
-    renderField(log, identity: identity, registry: registry) { text in
+    let renderer = renderField(log, identity: identity, registry: registry) { text in
       SecureField("Password", text: text)
         .id(identity)
         .textFieldStyle(.plain)
         .onSubmit { log.events.append("submit") }
     }
+    defer { withExtendedLifetime(renderer) {} }
 
     #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.return)))
     #expect(log.events == ["submit"])
@@ -136,11 +143,12 @@ struct TextInputSubmitTests {
     log.text = "line"
     let identity = testIdentity("SubmitTextEditor")
     let registry = LocalKeyHandlerRegistry()
-    renderField(log, identity: identity, registry: registry) { text in
+    let renderer = renderField(log, identity: identity, registry: registry) { text in
       TextEditor(text: text)
         .id(identity)
         .onSubmit { log.events.append("submit") }
     }
+    defer { withExtendedLifetime(renderer) {} }
 
     #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.return)))
     #expect(log.events.isEmpty)
@@ -152,11 +160,12 @@ struct TextInputSubmitTests {
     let log = SubmitLog()
     let identity = testIdentity("PlainTextField")
     let registry = LocalKeyHandlerRegistry()
-    renderField(log, identity: identity, registry: registry) { text in
+    let renderer = renderField(log, identity: identity, registry: registry) { text in
       TextField("Name", text: text)
         .id(identity)
         .textFieldStyle(.plain)
     }
+    defer { withExtendedLifetime(renderer) {} }
 
     #expect(!registry.dispatch(identity: identity, keyPress: KeyPress(.return)))
   }
@@ -166,12 +175,13 @@ struct TextInputSubmitTests {
     let log = SubmitLog()
     let identity = testIdentity("ModifiedReturnField")
     let registry = LocalKeyHandlerRegistry()
-    renderField(log, identity: identity, registry: registry) { text in
+    let renderer = renderField(log, identity: identity, registry: registry) { text in
       TextField("Name", text: text)
         .id(identity)
         .textFieldStyle(.plain)
         .onSubmit { log.events.append("submit") }
     }
+    defer { withExtendedLifetime(renderer) {} }
 
     #expect(
       !registry.dispatch(

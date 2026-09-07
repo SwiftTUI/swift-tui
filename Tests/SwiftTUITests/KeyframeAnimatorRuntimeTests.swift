@@ -36,6 +36,8 @@ struct KeyframeAnimatorRuntimeTests {
     }
     defer { harness.shutdown() }
 
+    // Intentionally keep mount, click, and render synchronous. The initial
+    // mount task is cancelled before entry; the first change must still run.
     try harness.clickText(Self.bumpLabel)
     try await harness.wait(until: { probe.values.last == 10 })
     // Let a few more ticks' worth of wall clock pass: nothing else may write.

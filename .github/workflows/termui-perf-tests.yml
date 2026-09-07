@@ -9,6 +9,10 @@ on:
       - ".swift-version"
       - "Package.resolved"
       - "Package.swift"
+      - "Sources/**"
+      - "Platforms/**"
+      - "Tests/**"
+      - "Scripts/**"
       - "Tools/TermUIPerf/**"
   pull_request:
     paths:
@@ -16,6 +20,10 @@ on:
       - ".swift-version"
       - "Package.resolved"
       - "Package.swift"
+      - "Sources/**"
+      - "Platforms/**"
+      - "Tests/**"
+      - "Scripts/**"
       - "Tools/TermUIPerf/**"
   workflow_dispatch:
 

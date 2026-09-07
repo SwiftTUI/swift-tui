@@ -1,10 +1,90 @@
 import Foundation
+@_spi(Runners) import SwiftTUI
 import Testing
 
 @testable import TermUIPerf
 
 @Suite(.serialized)
 struct ScenarioSmokeTests {
+  @Test(
+    "runtime storm observation re-arms between exact counter frames",
+    arguments: [RuntimeRenderMode.sync, .async])
+  @MainActor
+  func stormRuntimeTracksRepeatedCounterUpdates(mode: RuntimeRenderMode) async throws {
+    let artifactRoot = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-perf-storm-stepper-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: artifactRoot) }
+    let model = PerfStormModel()
+    _ = try await PerfScenarioRunner.runWindow(
+      scenario: BenchStormScenario(),
+      options: PerfScenarioRunOptions(
+        renderMode: mode, iterations: 1, artifactRoot: artifactRoot,
+        configuration: "debug", cpuSampleInterval: .milliseconds(5), memoryIdleWindow: .zero
+      )
+    ) {
+      PerfStormView(model: model, rowCount: BenchStormScenario.rowCount)
+    } drive: { driver in
+      _ = try await driver.waitForFrame(containing: "wrow 0")
+      for tick in [1, 2, 25] {
+        let before = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
+        model.advance(tick)
+        #expect(model.counters == (0..<8).map { tick &+ $0 })
+        let expected = (0..<8).map { "c\($0) \(tick &+ $0)" }.joined(separator: " ")
+        do {
+          let frame = try await driver.waitForFrame(
+            afterFrame: before, timeout: .seconds(5), hardCap: .seconds(5),
+            description: expected,
+            matching: { frame in
+              frame.text.split(separator: "\n").contains { line in
+                line.split(whereSeparator: \.isWhitespace).joined(separator: " ") == expected
+              }
+            }
+          )
+          print(
+            "[storm-runtime] mode=\(mode) tick=\(tick) model=\(model.counters) frame=\(frame.frameNumber)"
+          )
+        } catch {
+          let latest = driver.terminalHost.presentedFrames.last
+          print(
+            "[storm-runtime] mode=\(mode) tick=\(tick) model=\(model.counters) "
+              + "latest-size=\(String(describing: latest?.surface.size))\n\(latest?.text ?? "<none>")"
+          )
+          throw error
+        }
+      }
+      return []
+    }
+  }
+
+  @Test("async storm records one final rendered workload and accounts for reduced input")
+  @MainActor
+  func asyncStormCompletesWithExactWorkload() async throws {
+    let artifactRoot = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-perf-storm-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: artifactRoot) }
+    let result = try await BenchStormScenario().run(
+      options: PerfScenarioRunOptions(
+        renderMode: .async, iterations: 1, artifactRoot: artifactRoot,
+        configuration: "debug", cpuSampleInterval: .milliseconds(5), memoryIdleWindow: .zero
+      ),
+      writerTicks: 25,
+      notchCount: 12
+    )
+    let event = try #require(result.events.first)
+    #expect(result.events.count == 1)
+    #expect(event.eventID == "bench-storm-burst")
+    #expect(event.expectedVisualMarker.contains("c0 25 c1 26 c2 27 c3 28 c4 29 c5 30 c6 31 c7 32"))
+    #expect(event.firstMatchingFrame == event.finalSettledFrame)
+    #expect(try #require(event.finalSettledTimeSeconds) >= event.dispatchTimeSeconds)
+    let frames = try PerfFrameDiagnosticsTSVReader.read(
+      from: result.runDirectory.appendingPathComponent("frames.tsv"), presentedFrames: []
+    )
+    #expect(frames.map(\.answeredInputCount).reduce(0, +) == 12)
+    #expect(frames.contains { $0.frameNumber == event.finalSettledFrame })
+    #expect(fileExists("events.tsv", in: result.runDirectory))
+    #expect(fileExists("summary.json", in: result.runDirectory))
+  }
+
   /// Comma-separated `PerfScenarioName` raw values quarantined from the smoke
   /// sweep. Only CI lanes with a registered flake set this — see
   /// swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md for the active entries;

@@ -1,5 +1,22 @@
 public import SwiftTUICore
 
+/// One non-retaining graph binding shared by derived value contexts. The target
+/// is never reassigned: rebinding a context replaces its box, so sibling copies
+/// keep their original graph. Only ARC's weak zeroing changes the stored value.
+private final class ResolveGraphReference: Sendable {
+  private struct Storage: Sendable {
+    weak var value: ViewGraph?
+  }
+
+  private let storage: Storage
+
+  init(_ graph: ViewGraph) {
+    storage = Storage(value: graph)
+  }
+
+  var value: ViewGraph? { storage.value }
+}
+
 // The resolve context.
 //
 // `ResolveContext` is the per-pass configuration threaded through view
@@ -755,7 +772,17 @@ extension ResolveContext {
     package var dropDestinationRegistry: DropDestinationRegistry?
     package var invalidationProxy: ResolveInvalidationProxy?
     package var observationBridge: ObservationBridge?
-    package var viewGraph: ViewGraph?
+    // A resolve context borrows the runtime's graph. Evaluators and lazy child
+    // sources retain contexts on graph-owned nodes, so owning the graph here
+    // would keep the entire runtime alive after its renderer is released.
+    // The weak storage lives in one fixed-target box rather than in this value
+    // aggregate: child context copies share its binding without copying and
+    // destroying a weak reference for every derived context.
+    private var graphReference: ResolveGraphReference?
+    package var viewGraph: ViewGraph? {
+      get { graphReference?.value }
+      set { graphReference = newValue.map(ResolveGraphReference.init) }
+    }
     package var imageAssetResolver: ImageAssetResolver?
     package var frameInputs: FrameResolveInputBox?
     package var animationSegments: [AnimationInvalidationSegment]
@@ -852,7 +879,7 @@ extension ResolveContext {
       self.dropDestinationRegistry = dropDestinationRegistry
       self.invalidationProxy = invalidationProxy
       self.observationBridge = observationBridge
-      self.viewGraph = viewGraph
+      self.graphReference = viewGraph.map(ResolveGraphReference.init)
       self.imageAssetResolver = imageAssetResolver
       self.frameInputs = frameInputs
       self.animationSegments = animationSegments

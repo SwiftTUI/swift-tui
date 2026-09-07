@@ -143,7 +143,9 @@ struct ViewGraphCheckpointTotalityTests {
     // the same head's `escalateForPreferenceDelta`, the notes read only by
     // tests, so a discarded draft's leftovers are unobservable before the
     // next attempt clears them — the same transient per-frame class as
-    // `frameRuntimeIssues`.
+    // `frameRuntimeIssues`. `declaredChildRecompositionOwners` uses the same
+    // within-head lifetime: drained before publication and cleared by every
+    // beginFrame, including the first attempt after a discarded draft.
     let groupPropertyNames: Set<String> = [
       "index",
       "rootEvaluation",
@@ -167,6 +169,7 @@ struct ViewGraphCheckpointTotalityTests {
           "resolveDiagnostics",
           "preferenceDeltaEscalationRequested",
           "preferenceDeltaNotesThisFrame",
+          "declaredChildRecompositionOwners",
         ])
     )
     // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.

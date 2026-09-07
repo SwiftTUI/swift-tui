@@ -30,7 +30,10 @@ package struct AuthoringContext {
   var structuralIdentity: Identity
   var structuralPath: StructuralPath
   var focusedValues: FocusedValues
-  var viewNode: SwiftTUICore.ViewNode?
+  // Captured authoring scopes identify an owner; they do not own its lifetime.
+  // Controls stored in a node's evaluator may capture an ancestor's scope.
+  // The graph owns live nodes and stateOwnerHandle rejects retired owners.
+  weak var viewNode: SwiftTUICore.ViewNode?
   var ownerNodeID: SwiftTUICore.ViewNodeID?
   /// Stable graph + authored-owner lifetime address for stateful property
   /// wrappers. Unlike `ownerNodeID`, this never rewinds through checkpoint

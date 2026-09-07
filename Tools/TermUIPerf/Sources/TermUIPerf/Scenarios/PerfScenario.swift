@@ -58,6 +58,7 @@ public enum PerfScenarioError: Error, Equatable, CustomStringConvertible {
   case markerTimedOut(String)
   case markerHasNoCell(String)
   case markerUnexpectedlyPresent(String)
+  case quiescenceTimedOut
   case environmentUnavailable
 
   public var description: String {
@@ -72,6 +73,8 @@ public enum PerfScenarioError: Error, Equatable, CustomStringConvertible {
       return "marker '\(marker)' was not found in the latest frame."
     case .markerUnexpectedlyPresent(let marker):
       return "marker '\(marker)' was already present before its scripted input."
+    case .quiescenceTimedOut:
+      return "timed out before the presented frames became quiescent."
     case .environmentUnavailable:
       return "environment mutation is unavailable on this platform."
     }
@@ -203,6 +206,27 @@ public struct PerfScenarioDriver {
   public let terminalHost: PerfTerminalHost
 
   @MainActor
+  func waitForFrame(
+    afterFrame frameNumber: Int,
+    timeout: Duration,
+    hardCap: Duration,
+    description: String,
+    matching predicate: (PerfPresentedFrame) -> Bool
+  ) async throws -> PerfPresentedFrame {
+    let clock = ContinuousClock()
+    return try await PerfScenarioRunner.waitForFrameMatching(
+      in: terminalHost,
+      afterFrame: frameNumber,
+      timeout: timeout,
+      hardCap: hardCap,
+      timeoutMarker: description,
+      now: { clock.now },
+      sleep: { try await Task.sleep(for: .milliseconds(1)) },
+      matches: predicate
+    )
+  }
+
+  @MainActor
   public func waitForFrame(
     containing marker: String,
     afterFrame frameNumber: Int = 0,
@@ -301,8 +325,9 @@ public struct PerfScenarioDriver {
     throw PerfScenarioError.markerTimedOut("<frame after \(frameNumber)>")
   }
 
-  /// Injects `notches` wheel steps on a fixed cadence **without awaiting a
-  /// settle between them**.
+  /// Injects `notches` wheel steps with a delay after each send, without
+  /// awaiting a settle. Actor scheduling adds to the requested delay; this
+  /// does not guarantee fixed-rate arrival under backlog.
   ///
   /// This is the open loop, and it is the whole point of the cadence
   /// scenarios: a closed loop can only ever measure a runtime that is keeping
@@ -316,10 +341,27 @@ public struct PerfScenarioDriver {
     notches: Int,
     at cell: CellPoint,
     deltaY: Int = 1
-  ) async {
+  ) async throws {
+    try await driveScroll(
+      cadence: cadence, notches: notches, at: cell, deltaY: deltaY,
+      sleep: { try await Task.sleep(for: $0) }
+    )
+  }
+
+  @MainActor
+  func driveScroll(
+    cadence: Duration,
+    notches: Int,
+    at cell: CellPoint,
+    deltaY: Int = 1,
+    sleep: (Duration) async throws -> Void
+  ) async throws {
+    try Task.checkCancellation()
     for _ in 0..<notches {
+      try Task.checkCancellation()
       sendScroll(deltaY: deltaY, at: cell)
-      try? await Task.sleep(for: cadence)
+      try await sleep(cadence)
+      try Task.checkCancellation()
     }
   }
 
@@ -376,18 +418,39 @@ public struct PerfScenarioDriver {
   public func waitForQuiescence(
     idle: Duration = .milliseconds(300),
     timeout: Duration = .seconds(30)
-  ) async {
+  ) async throws {
     let clock = ContinuousClock()
-    let hardDeadline = clock.now.advanced(by: timeout)
+    try await waitForQuiescence(
+      idle: idle, timeout: timeout,
+      now: { clock.now },
+      sleep: { try await Task.sleep(for: .milliseconds(1)) }
+    )
+  }
+
+  @MainActor
+  func waitForQuiescence(
+    idle: Duration,
+    timeout: Duration,
+    now: () -> ContinuousClock.Instant,
+    sleep: () async throws -> Void
+  ) async throws {
+    let startedAt = now()
+    let hardDeadline = startedAt.advanced(by: timeout)
     var newest = terminalHost.presentedFrames.last?.frameNumber ?? 0
-    var idleUntil = clock.now.advanced(by: idle)
-    while clock.now < hardDeadline, clock.now < idleUntil {
-      try? await Task.sleep(nanoseconds: 1_000_000)
+    var idleUntil = startedAt.advanced(by: idle)
+    while true {
+      try Task.checkCancellation()
+      let currentTime = now()
       let latest = terminalHost.presentedFrames.last?.frameNumber ?? 0
       if latest > newest {
         newest = latest
-        idleUntil = clock.now.advanced(by: idle)
+        idleUntil = currentTime.advanced(by: idle)
       }
+      guard currentTime < hardDeadline else {
+        throw PerfScenarioError.quiescenceTimedOut
+      }
+      if currentTime >= idleUntil { return }
+      try await sleep()
     }
   }
 
@@ -651,12 +714,22 @@ public enum PerfScenarioRunner {
     let hardDeadline = now().advanced(by: hardCap)
     var deadline = now().advanced(by: timeout)
     var newestObserved = terminalHost.presentedFrames.last?.frameNumber ?? 0
+    var inspectedFrameCount = 0
     while now() < hardDeadline {
-      if let frame = terminalHost.presentedFrames.last(where: {
-        $0.frameNumber > frameNumber && matches($0)
-      }) {
-        return frame
+      try Task.checkCancellation()
+      // Presented frames are immutable and append-only, and these predicates
+      // depend only on their frame. Inspect each new batch newest-first once;
+      // repeated polls must not repeatedly parse the entire frame history.
+      let frameCount = terminalHost.presentedFrames.count
+      var index = frameCount
+      while index > inspectedFrameCount {
+        index -= 1
+        let frame = terminalHost.presentedFrames[index]
+        if frame.frameNumber > frameNumber, matches(frame) {
+          return frame
+        }
       }
+      inspectedFrameCount = frameCount
       // Progress-gated deadline (never fixed wall-clock): while the run loop
       // keeps presenting new frames the scenario is advancing — just slowly,
       // e.g. on a loaded CI runner — so re-arm the idle window. The hard cap

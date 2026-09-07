@@ -30,10 +30,61 @@ struct StructuralEquivalenceLockTests {
     )
 
     #expect(original.isEquivalentForMeasurement(to: reidentified))
+    #expect(original.measurementEquivalence(to: reidentified).canRefreshWitness)
     #expect(original.isEquivalentForPlacement(to: reidentified))
     // Geometry/metadata gate passes; only the runtime identity differs, so the
     // placed bounds are reusable but the metadata mirror must re-sync.
     #expect(original.placementEquivalence(to: reidentified) == .geometryReusable)
+  }
+
+  @Test("measurement witness refresh requires exact type discriminators")
+  func witnessRefreshRequiresExactDiscriminators() {
+    typealias Pair = (
+      left: ObjectIdentifier?, right: ObjectIdentifier?, compatible: Bool, refresh: Bool
+    )
+    let typedA = ObjectIdentifier(Int.self)
+    let typedB = ObjectIdentifier(String.self)
+    let pairs: [Pair] = [
+      (typedA, typedA, true, true),
+      (nil, nil, true, true),
+      (typedA, nil, true, false),
+      (nil, typedA, true, false),
+      (typedA, typedB, false, false),
+    ]
+
+    for pair in pairs {
+      let left = ResolvedNode(
+        identity: testIdentity("Root"), kind: .view("Legacy"), typeDiscriminator: pair.left)
+      var right = left
+      right.typeDiscriminator = pair.right
+
+      let equivalence = left.measurementEquivalence(to: right)
+      #expect(equivalence.isCompatible == pair.compatible)
+      #expect(equivalence.canRefreshWitness == pair.refresh)
+      #expect(left.isEquivalentForMeasurement(to: right) == pair.compatible)
+    }
+  }
+
+  @Test("a nested wildcard denies witness refresh without denying measurement reuse")
+  func nestedWildcardDeniesWitnessRefresh() {
+    let original = ResolvedNode(
+      identity: testIdentity("Root"),
+      kind: .view("Container"),
+      typeDiscriminator: ObjectIdentifier(String.self),
+      children: [
+        ResolvedNode(
+          identity: testIdentity("Root", "Child"),
+          kind: .view("Legacy"),
+          typeDiscriminator: ObjectIdentifier(Int.self)
+        )
+      ]
+    )
+    var wildcard = original
+    wildcard.children[0].typeDiscriminator = nil
+
+    let equivalence = original.measurementEquivalence(to: wildcard)
+    #expect(equivalence.isCompatible)
+    #expect(!equivalence.canRefreshWitness)
   }
 
   @Test("a structural-slot move with the same identity is divergent")
@@ -76,5 +127,6 @@ struct StructuralEquivalenceLockTests {
     let original = nestedTree()
     let repeated = nestedTree()
     #expect(original.isEquivalentForMeasurement(to: repeated))
+    #expect(original.measurementEquivalence(to: repeated).canRefreshWitness)
   }
 }

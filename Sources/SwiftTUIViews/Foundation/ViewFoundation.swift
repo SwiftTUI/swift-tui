@@ -352,6 +352,123 @@ package func normalizeResolvedElements(
   }
 }
 
+/// Construction ownership is distinct from the node serving a reused value:
+/// flattening can index that value onto an inner authored node.
+struct ViewEvaluationProducer<Content: View> {
+  let entityIdentity: EntityIdentity
+  let structuralPath: StructuralPath
+  var declaredChildReplayBoundary: DeclaredChildReplayBoundary? = nil
+  let makeView: @MainActor (ResolveContext) -> Content
+}
+
+@MainActor
+private func installViewEvaluator<V: View>(
+  for view: V,
+  in context: ResolveContext,
+  on graphNode: SwiftTUICore.ViewNode,
+  authoringContextOverride: AuthoringContext?,
+  rebuilding: ViewEvaluationProducer<V>?
+) {
+  // A dirty-frontier re-run invokes this evaluator OUTSIDE the enclosing
+  // resolve pass, so the enclosing view's authoring context (a task-local)
+  // is absent. Container registration code that snapshots
+  // `currentAuthoringContext()` at resolve time (List/Menu/Stepper row
+  // actions' mutation scopes and follow-up owners) would capture nil and
+  // re-register DEGRADED handlers whose imperative `@State` writes land in
+  // the detached seed box — silently, with no invalidation. Full-root
+  // frames masked this by re-running the enclosing body; selective
+  // frontiers must reinstall the captured enclosing scope instead (the
+  // same capture the lazy-subview and portal-attachment seams use).
+  let capturedEnclosingScope = makeCapturedAuthoringContext()
+  // The re-run must carry the same authoring-scope override the original
+  // resolve used: a node-backed style body re-resolved without it would
+  // re-root a fresh scope onto the style-body island and re-register
+  // degraded (seed-backed) owners — the wedge this override exists to
+  // prevent. Strip the override's live `viewNode` before the long-lived
+  // evaluator closure captures it: the node's stored evaluator retaining an
+  // ancestor node forms an ARC cycle (ancestor's children already retain
+  // this node), and every fire site rebases onto its own fresh graph node
+  // anyway, so the captured `viewNode` would never be read.
+  let capturedOverride = authoringContextOverride.map {
+    rebasedAuthoringContext($0, viewNode: nil)
+  }
+  // The enclosing entity route is a task-local the parent chain binds
+  // around this position (`withResolveEntityRoute`), and the re-run fires
+  // outside that binding. An exact `.id` below this node scopes its entity
+  // to the enclosing route's entity (`ExactIdentityModifier`), so without
+  // the capture a frontier re-run beneath a `.id(owner)` computed a
+  // DIFFERENT entity for the same control: the modifier then saw a foreign
+  // occupant on its slot node and hosted the content under an
+  // `ExplicitIdentityHost`, while the chain's forwarded claim had already
+  // bound the new entity to this wrapper node — the nested resolves
+  // re-entered this node cross-identity, folding the control onto its own
+  // `.frame` wrapper (a parent/child cycle: the DEBUG stamp-coherence
+  // oracle on a `Panel`-hosted `TextEditor`'s focus frame, a livelock on
+  // the next paste without it; org task T173). Scope only: a route bound
+  // at THIS position is the parent level's claim on this child (a
+  // `ForEach` iteration's element entity), consumed by that level's own
+  // resolve. Re-fired from the child's re-run, a `ForEach` row claimed its
+  // element entity at its own position while the row node's occupant was
+  // the exact-`.id` entity its body chain had collapsed onto it, so the
+  // claim evicted the row and re-minted it: a pre-churn closure kept
+  // reading the evicted node's state (`CaptureBindingChurnJourneyTests`).
+  // The same-frame deferred-descent continuation keeps the full route
+  // because it resumes the very resolve that bound it.
+  let capturedEntityRoute = ResolveEntityRouteStorage.current?.scopeOnly
+  let capturedOwnerLifetimeID = graphNode.ownerLifetimeID
+  graphNode.setEvaluator {
+    withResolveEntityRoute(capturedEntityRoute) {
+      let replay = {
+        let currentContext = context.applyingCurrentFrameResolveInputs()
+        let currentView: V
+        let previousResolved: ResolvedNode?
+        if let rebuilding {
+          // A ForEach builder can read Observation before producing a View.
+          // Replay that producer under its live owner without starting a new
+          // registration capture (which would clear existing handlers).
+          // Flattening can index the authored identity onto its absorber.
+          // Observation belongs to the exact owner whose evaluator is firing.
+          guard
+            let owner = currentContext.viewGraph?.nodeForOwnerLifetimeID(capturedOwnerLifetimeID)
+          else {
+            return
+          }
+          previousResolved = owner.committed
+          currentView = ViewNodeContext.withCurrentValue(owner) {
+            rebuilding.makeView(currentContext)
+          }
+        } else {
+          previousResolved = nil
+          currentView = view
+        }
+        let resolved = resolveView(
+          currentView,
+          in: currentContext,
+          authoringContextOverride: capturedOverride,
+          rebuilding: rebuilding
+        )
+        if let boundary = rebuilding?.declaredChildReplayBoundary,
+          let previousResolved,
+          declaredChildShape(previousResolved, under: boundary.resolvedUnder) != .single
+            || declaredChildShape(resolved, under: boundary.resolvedUnder) != .single
+        {
+          // A snapshot replacement cannot re-run the declaring container's
+          // empty/group consumption. Request that owner after this frontier
+          // unwinds; the frame head expands registration publication with it.
+          currentContext.viewGraph?.requestDeclaredChildRecomposition(
+            owner: boundary.ownerLifetimeID
+          )
+        }
+      }
+      if let capturedEnclosingScope, currentAuthoringContext() == nil {
+        withAuthoringContext(capturedEnclosingScope, replay)
+      } else {
+        replay()
+      }
+    }
+  }
+}
+
 @MainActor
 package func resolveView<V: View>(
   _ view: V,
@@ -369,7 +486,8 @@ func resolveView<V: View>(
   _ view: V,
   in context: ResolveContext,
   authoringContextOverride: AuthoringContext?,
-  structuralChildCutEligible: Bool = false
+  structuralChildCutEligible: Bool = false,
+  rebuilding: ViewEvaluationProducer<V>? = nil
 ) -> ResolvedNode {
   let forwardedPreparation = ForwardedDynamicPropertyPreparationScope.begin()
   defer {
@@ -394,12 +512,17 @@ func resolveView<V: View>(
         _ = resolveView(
           view,
           in: context,
-          authoringContextOverride: authoringContextOverride
+          authoringContextOverride: authoringContextOverride,
+          rebuilding: rebuilding
         )
       }
     }
   }
-  let routeIdentity = entityRouteIdentity(for: view, in: context)
+  // The producer owns the iteration's outer resolve. A forwarded exact-ID
+  // modifier below it must not redirect a replay onto its inner state owner.
+  // The ambient route remains scope-only, so interior claims retain their
+  // ordinary ownership rules.
+  let routeIdentity = rebuilding?.entityIdentity ?? entityRouteIdentity(for: view, in: context)
   // The update pass runs `update(in:)` in place (plan 2026-08-30-001), so it
   // needs the copy the body will consume — not the authored `view`. Only the
   // two `resolveViewElements` calls below take `prepared`; the reuse door, the
@@ -454,6 +577,21 @@ func resolveView<V: View>(
     ),
     viewValue: view
   ) {
+    // Even equal output may have come from a new producer/model. Keep that
+    // producer current on reuse, while collapsed inner resolves leave the
+    // outer evaluation owner's closure intact.
+    if let rebuilding,
+      let graphNode = context.viewGraph?.nodeForEntityIdentity(rebuilding.entityIdentity),
+      !graphNode.isEvaluating
+    {
+      installViewEvaluator(
+        for: view,
+        in: context,
+        on: graphNode,
+        authoringContextOverride: authoringContextOverride,
+        rebuilding: rebuilding
+      )
+    }
     let served = decision.servedSubtree
     context.recordResolvedReuse(count: served.subtreeNodeCount)
     return served
@@ -466,71 +604,13 @@ func resolveView<V: View>(
     suppressesStructuralLifecycle: context.suppressesStructuralLifecycle
   )
   if let graphNode, graphNode.isAtOutermostEvaluationDepth {
-    // A dirty-frontier re-run invokes this evaluator OUTSIDE the enclosing
-    // resolve pass, so the enclosing view's authoring context (a task-local)
-    // is absent. Container registration code that snapshots
-    // `currentAuthoringContext()` at resolve time (List/Menu/Stepper row
-    // actions' mutation scopes and follow-up owners) would capture nil and
-    // re-register DEGRADED handlers whose imperative `@State` writes land in
-    // the detached seed box — silently, with no invalidation. Full-root
-    // frames masked this by re-running the enclosing body; selective
-    // frontiers must reinstall the captured enclosing scope instead (the
-    // same capture the lazy-subview and portal-attachment seams use).
-    let capturedEnclosingScope = makeCapturedAuthoringContext()
-    // The re-run must carry the same authoring-scope override the original
-    // resolve used: a node-backed style body re-resolved without it would
-    // re-root a fresh scope onto the style-body island and re-register
-    // degraded (seed-backed) owners — the wedge this override exists to
-    // prevent. Strip the override's live `viewNode` before the long-lived
-    // evaluator closure captures it: the node's stored evaluator retaining an
-    // ancestor node forms an ARC cycle (ancestor's children already retain
-    // this node), and every fire site rebases onto its own fresh graph node
-    // anyway, so the captured `viewNode` would never be read.
-    let capturedOverride = authoringContextOverride.map {
-      rebasedAuthoringContext($0, viewNode: nil)
-    }
-    // The enclosing entity route is a task-local the parent chain binds
-    // around this position (`withResolveEntityRoute`), and the re-run fires
-    // outside that binding. An exact `.id` below this node scopes its entity
-    // to the enclosing route's entity (`ExactIdentityModifier`), so without
-    // the capture a frontier re-run beneath a `.id(owner)` computed a
-    // DIFFERENT entity for the same control: the modifier then saw a foreign
-    // occupant on its slot node and hosted the content under an
-    // `ExplicitIdentityHost`, while the chain's forwarded claim had already
-    // bound the new entity to this wrapper node — the nested resolves
-    // re-entered this node cross-identity, folding the control onto its own
-    // `.frame` wrapper (a parent/child cycle: the DEBUG stamp-coherence
-    // oracle on a `Panel`-hosted `TextEditor`'s focus frame, a livelock on
-    // the next paste without it; org task T173). Scope only: a route bound
-    // at THIS position is the parent level's claim on this child (a
-    // `ForEach` iteration's element entity), consumed by that level's own
-    // resolve. Re-fired from the child's re-run, a `ForEach` row claimed its
-    // element entity at its own position while the row node's occupant was
-    // the exact-`.id` entity its body chain had collapsed onto it, so the
-    // claim evicted the row and re-minted it: a pre-churn closure kept
-    // reading the evicted node's state (`CaptureBindingChurnJourneyTests`).
-    // The same-frame deferred-descent continuation keeps the full route
-    // because it resumes the very resolve that bound it.
-    let capturedEntityRoute = ResolveEntityRouteStorage.current?.scopeOnly
-    context.viewGraph?.setEvaluator(for: context.identity) {
-      withResolveEntityRoute(capturedEntityRoute) {
-        if let capturedEnclosingScope, currentAuthoringContext() == nil {
-          withAuthoringContext(capturedEnclosingScope) {
-            _ = resolveView(
-              view,
-              in: context,
-              authoringContextOverride: capturedOverride
-            )
-          }
-        } else {
-          _ = resolveView(
-            view,
-            in: context,
-            authoringContextOverride: capturedOverride
-          )
-        }
-      }
-    }
+    installViewEvaluator(
+      for: view,
+      in: context,
+      on: graphNode,
+      authoringContextOverride: authoringContextOverride,
+      rebuilding: rebuilding
+    )
   }
   // The cut is only sound on structural child edges, where the parent
   // consumes the returned node verbatim. A modifier-content or style-body
@@ -548,7 +628,8 @@ func resolveView<V: View>(
       graph: graph,
       graphNode: graphNode,
       routeIdentity: routeIdentity,
-      authoringContextOverride: authoringContextOverride
+      authoringContextOverride: authoringContextOverride,
+      rebuilding: rebuilding
     )
   {
     return deferred
@@ -625,6 +706,15 @@ func resolveView<V: View>(
       }
     }
     assignEntityIdentityOccurrences(to: &resolved._storedChildren)
+    if let rebuilding {
+      // Commit the same entity metadata used by initial ForEach consumption.
+      // Applying it before finishEvaluation also updates child routes when
+      // the produced value is a Group.
+      resolved.attachResolvedForEachEntity(
+        rebuilding.entityIdentity,
+        at: rebuilding.structuralPath
+      )
+    }
     if case .uncertified = dynamicPropertyUpdateResult {
       // Direct certification is authoritative input to the subtree summary;
       // layout and child recomputes cannot launder it back to reusable.
@@ -836,7 +926,8 @@ private func deferResolveDescent<V: View>(
   graph: ViewGraph,
   graphNode: SwiftTUICore.ViewNode,
   routeIdentity: EntityIdentity?,
-  authoringContextOverride: AuthoringContext?
+  authoringContextOverride: AuthoringContext?,
+  rebuilding: ViewEvaluationProducer<V>?
 ) -> ResolvedNode? {
   // Entity-routed children resolve inline: the `.id` claim machinery
   // (route bindings, occurrence claims, cross-identity adoption, co-resident
@@ -908,14 +999,16 @@ private func deferResolveDescent<V: View>(
               _ = resolveView(
                 view,
                 in: context,
-                authoringContextOverride: capturedOverride
+                authoringContextOverride: capturedOverride,
+                rebuilding: rebuilding
               )
             }
           } else {
             _ = resolveView(
               view,
               in: context,
-              authoringContextOverride: capturedOverride
+              authoringContextOverride: capturedOverride,
+              rebuilding: rebuilding
             )
           }
         }

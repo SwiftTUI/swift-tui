@@ -5,6 +5,8 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
+. "$repo_root/Scripts/lib/repo_result_records.sh"
+
 runner_name=${SWIFTTUI_TEST_RUNNER_NAME:-test-all}
 # The per-step watchdog measures *silence*, not wall clock. A fixed wall-clock
 # cap cannot tell a lane that parked from one that is merely running 5x slower
@@ -67,70 +69,6 @@ runtime_shard=""
 # back to back on one machine with different flags — recompiles the whole
 # module graph, the exact cost the trace reuse exists to remove.
 emit_module_trace=0
-
-write_full_log_report() {
-  body_log=$1
-  results_report=$2
-  full_log_path=$3
-  command_text=$4
-  exit_code=$5
-
-  generated_at=$(date '+%Y-%m-%d %H:%M:%S %z')
-  marker_file=$(mktemp "/tmp/swift-tui-$runner_name-markers.XXXXXX")
-
-  awk '
-    /^==> / {
-      title = substr($0, 5)
-      if (!(title in seen)) {
-        seen[title] = 1
-        print title "|" NR
-      }
-    }
-  ' "$body_log" >"$marker_file"
-
-  result_count=$(awk 'END { print NR + 0 }' "$results_report" 2>/dev/null || echo 0)
-  failure_count=$(awk -F '|' '$2 == "FAIL" || $2 == "TIMEOUT" { count += 1 } END { print count + 0 }' \
-    "$results_report" 2>/dev/null || echo 0)
-  line_offset=$((6 + result_count + failure_count + 2))
-
-  {
-    echo "swift-tui test log"
-    echo "Generated: $generated_at"
-    echo "Command: $command_text"
-    echo "Exit status: $exit_code"
-    echo ""
-    echo "Sub-suite summary:"
-
-    while IFS='|' read -r title status step_exit step_failures rerun_command log_file detail; do
-      body_line=$(awk -F '|' -v title="$title" '$1 == title { print $2; exit }' "$marker_file")
-      if [ -n "$body_line" ]; then
-        report_line=$((line_offset + body_line))
-      else
-        report_line="?"
-      fi
-
-      printf '  %-4s  exit=%-3s  failures=%-3s  log=line %-5s  %s' \
-        "$status" "$step_exit" "$step_failures" "$report_line" "$title"
-      if [ "$status" = "SKIP" ] && [ -n "$detail" ]; then
-        printf ' (%s)' "$detail"
-      fi
-      if [ "$status" = "TIMEOUT" ] && [ -n "$detail" ]; then
-        printf ' (%s)' "$detail"
-      fi
-      printf '\n'
-
-      if [ "$status" = "FAIL" ] || [ "$status" = "TIMEOUT" ]; then
-        printf '        rerun: %s\n' "$rerun_command"
-      fi
-    done <"$results_report"
-
-    echo ""
-    echo "Raw run log:"
-    cat "$body_log"
-  } >"$full_log_path"
-
-  rm -f "$marker_file"
-}
 
 if [ "${SWIFTTUI_TEST_ALL_CAPTURED:-0}" != "1" ]; then
   timestamp=$(date '+%Y%m%d-%H%M%S')
@@ -316,20 +254,6 @@ Set SWIFTTUI_SKIP_PUBLIC_API_BASELINE=1 when the public API baseline is covered 
 the separate CI workflow. Set SWIFTTUI_SKIP_TERMUIPERF=1 when Tools/TermUIPerf is
 covered by its path-filtered or scheduled workflow.
 EOF
-}
-
-record_result() {
-  title=$1
-  status=$2
-  exit_code=$3
-  failure_count=$4
-  rerun_command=$5
-  log_file=$6
-  detail=$7
-
-  printf '%s|%s|%s|%s|%s|%s|%s\n' \
-    "$title" "$status" "$exit_code" "$failure_count" "$rerun_command" "$log_file" "$detail" \
-    >>"$results_file"
 }
 
 . "$repo_root/Scripts/lib/step_watchdog.sh"
@@ -833,66 +757,6 @@ clean_swift_build_directories() {
   done
 }
 
-print_failure_logs() {
-  while IFS='|' read -r title status exit_code failure_count rerun_command log_file detail; do
-    [ "$status" = "FAIL" ] || [ "$status" = "TIMEOUT" ] || continue
-
-    >&2 echo ""
-    >&2 echo "===== $title (exit $exit_code) ====="
-    if [ -f "$log_file" ]; then
-      cat "$log_file" >&2
-    else
-      >&2 echo "Missing captured log: $log_file"
-    fi
-  done <"$results_file"
-}
-
-print_summary() {
-  echo ""
-  echo "Repo test summary:"
-
-  while IFS='|' read -r title status exit_code failure_count rerun_command log_file detail; do
-    case "$status" in
-    PASS)
-      printf '  %-4s  exit=%-3s  failures=%-3s  %s\n' \
-        "$status" "$exit_code" "$failure_count" "$title"
-      ;;
-    FAIL)
-      printf '  %-4s  exit=%-3s  failures=%-3s  %s\n' \
-        "$status" "$exit_code" "$failure_count" "$title"
-      printf '        rerun: %s\n' "$rerun_command"
-      ;;
-    TIMEOUT)
-      printf '  %-4s  exit=%-3s  failures=%-3s  %s' \
-        "$status" "$exit_code" "$failure_count" "$title"
-      if [ -n "$detail" ]; then
-        printf ' (%s)' "$detail"
-      fi
-      printf '\n'
-      printf '        rerun: %s\n' "$rerun_command"
-      ;;
-    SKIP)
-      printf '  %-4s  exit=%-3s  failures=%-3s  %s' \
-        "$status" "$exit_code" "$failure_count" "$title"
-      if [ -n "$detail" ]; then
-        printf ' (%s)' "$detail"
-      fi
-      printf '\n'
-      ;;
-    esac
-  done <"$results_file"
-
-  if [ -n "${SWIFTTUI_TEST_ALL_FINAL_LOG:-}" ]; then
-    echo "Full log: $SWIFTTUI_TEST_ALL_FINAL_LOG"
-  fi
-
-  if [ "$any_failed" -eq 0 ]; then
-    echo "Result: PASS"
-  else
-    echo "Result: FAIL"
-  fi
-}
-
 if lane_needs_swift; then
   require_command swiftly
 fi
@@ -960,6 +824,12 @@ if lane_runs_policy; then
     "$repo_root" \
     "Scripts/check_layout_work_stack_guardrails.sh" \
     Scripts/check_layout_work_stack_guardrails.sh
+
+  run_step \
+    "Self-test gate result records" \
+    "$repo_root" \
+    "sh Scripts/test_repo_result_records.sh" \
+    sh Scripts/test_repo_result_records.sh
 
   run_step \
     "Self-test step watchdog" \

@@ -1,5 +1,23 @@
 # Shared policy-check phase for the local repo gate and the CI policy job.
 
+run_staged_prek_hooks() {
+  # Even with an empty index, prek stashes and restores unstaged files before
+  # discovering that every hook has no inputs. Avoid rewriting a live checkout
+  # merely to perform that no-op. Inspection failures must still fail the gate.
+  if git -C "$1" diff --cached --quiet --exit-code --; then
+    echo "[check_repo_policy_phase] no staged changes — skipping prek run"
+    return 0
+  else
+    index_status=$?
+    if [ "$index_status" -ne 1 ]; then
+      return "$index_status"
+    fi
+  fi
+  (
+    cd "$1" && prek run
+  )
+}
+
 run_repo_policy_check() {
   mode=$1
   repo_root=$2
@@ -72,12 +90,19 @@ run_repo_policy_phase() {
       "$repo_root" \
       "Run prek hooks (staged change)" \
       "prek run" \
-      prek run
+      run_staged_prek_hooks "$repo_root"
   else
     echo "[check_repo_policy_phase] prek not on PATH — skipping prek run"
     echo "  install it from https://prek.j178.dev to catch policy"
     echo "  violations during the gate rather than at commit time."
   fi
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Test staged hook scope" \
+    "sh Scripts/check_prek_scope.sh" \
+    sh Scripts/check_prek_scope.sh
 
   run_repo_policy_check \
     "$mode" \
@@ -127,6 +152,27 @@ run_repo_policy_phase() {
     "Check CI test matrix summary" \
     "./Scripts/check_ci_test_matrix_summary.sh" \
     ./Scripts/check_ci_test_matrix_summary.sh
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Check delegated performance workflow coverage" \
+    "bun Scripts/check_perf_workflow_contract.ts" \
+    bun Scripts/check_perf_workflow_contract.ts
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Test delegated performance workflow coverage" \
+    "bun test Scripts/check_perf_workflow_contract.test.ts" \
+    bun test Scripts/check_perf_workflow_contract.test.ts
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Test performance smoke failure propagation" \
+    "sh Scripts/check_perf_smoke.sh" \
+    sh Scripts/check_perf_smoke.sh
 
   run_repo_policy_check \
     "$mode" \

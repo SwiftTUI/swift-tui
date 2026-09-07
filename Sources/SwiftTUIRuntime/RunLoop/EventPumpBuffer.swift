@@ -1,3 +1,4 @@
+import DequeModule
 import SwiftTUICore
 import Synchronization
 
@@ -17,7 +18,7 @@ import Synchronization
 /// across that isolation boundary (see `RunLoop+EventPump.swift`).
 package final class EventPumpBuffer: Sendable {
   private struct BufferState {
-    var pendingBatches: [[PumpedEvent]] = []
+    var pendingBatches: Deque<[PumpedEvent]> = []
     var nextArrivalID: UInt64 = 0
   }
 
@@ -37,9 +38,7 @@ package final class EventPumpBuffer: Sendable {
       let arrival = InputArrival(id: state.nextArrivalID, arrival: arrivalInstant)
       state.nextArrivalID &+= 1
 
-      if let lastBatch = state.pendingBatches.last,
-        canAppendToBatch(event, batch: lastBatch)
-      {
+      if canAppendToLastBatch(event, batches: state.pendingBatches) {
         let batchIndex = state.pendingBatches.count - 1
         if let lastEntry = state.pendingBatches[batchIndex].last,
           let mergedEvent = mergedEvent(lastEntry.event, with: event)
@@ -64,10 +63,7 @@ package final class EventPumpBuffer: Sendable {
 
   func drain() -> [PumpedEvent] {
     state.withLock { state in
-      guard !state.pendingBatches.isEmpty else {
-        return []
-      }
-      return state.pendingBatches.removeFirst()
+      state.pendingBatches.popFirst() ?? []
     }
   }
 
@@ -90,13 +86,17 @@ package final class EventPumpBuffer: Sendable {
     }
   }
 
-  private func canAppendToBatch(
+  private func canAppendToLastBatch(
     _ event: RuntimeEvent,
-    batch: [PumpedEvent]
+    batches: Deque<[PumpedEvent]>
   ) -> Bool {
     isCoalesciblePointerEvent(event)
-      && !batch.isEmpty
-      && batch.allSatisfy { isCoalesciblePointerEvent($0.event) }
+      // A batch starts with one event and admits only coalescible pointer
+      // events afterward. Its first event proves the invariant in O(1), even
+      // when alternating pointer kinds prevent adjacent events from merging.
+      // Read in this helper so no copied last-batch array remains alive when
+      // enqueue mutates it and accidentally forces copy-on-write per event.
+      && batches.last?.first.map { isCoalesciblePointerEvent($0.event) } == true
   }
 
   private func isCoalesciblePointerEvent(

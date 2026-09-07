@@ -19,7 +19,9 @@ struct TextEditorSurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    let focusedArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let focusedArtifacts = renderer.render(
       TextEditor(
         text: Binding(
           get: { box.value },
@@ -81,7 +83,9 @@ struct TextEditorSurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       TextEditor(
         text: Binding(
           get: { box.value },
@@ -116,7 +120,9 @@ struct TextEditorSurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       TextEditor(
         text: Binding(
           get: { box.value },
@@ -150,7 +156,9 @@ struct TextEditorSurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       TextEditor(
         text: Binding(
           get: { box.value },

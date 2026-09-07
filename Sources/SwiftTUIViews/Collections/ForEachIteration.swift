@@ -25,17 +25,20 @@ package struct ForEachIteration<Element> {
   package let authoringContext: AuthoringContext?
 
   package func makeView<Content: View>(
-    _ content: @MainActor (Element) -> Content
+    _ content: @MainActor (Element) -> Content,
+    in currentContext: ResolveContext? = nil
   ) -> Content {
     withAuthoringContext(authoringContext) {
-      context.trackingObservableAccess {
+      (currentContext ?? context).trackingObservableAccess {
         content(element)
       }
     }
   }
 
   package func resolve<Content: View>(
-    _ view: Content
+    _ view: Content,
+    rebuilding content: @escaping @MainActor (Element) -> Content,
+    declaredChildReplayBoundary: DeclaredChildReplayBoundary? = nil
   ) -> ResolvedNode {
     let route = ResolveEntityRoute(
       identity: entityIdentity,
@@ -43,7 +46,19 @@ package struct ForEachIteration<Element> {
     )
     var resolved = withAuthoringContext(authoringContext) {
       withResolveEntityRoute(route) {
-        resolveView(view, in: context)
+        resolveView(
+          view,
+          in: context,
+          authoringContextOverride: nil,
+          rebuilding: ViewEvaluationProducer(
+            entityIdentity: entityIdentity,
+            structuralPath: context.structuralPath,
+            declaredChildReplayBoundary: declaredChildReplayBoundary,
+            makeView: { currentContext in
+              makeView(content, in: currentContext)
+            }
+          )
+        )
       }
     }
     resolved.attachResolvedForEachEntity(
@@ -55,16 +70,39 @@ package struct ForEachIteration<Element> {
   }
 
   package func resolve<Content: View>(
-    content: @MainActor (Element) -> Content
+    content: @escaping @MainActor (Element) -> Content,
+    declaredChildReplayBoundary: DeclaredChildReplayBoundary? = nil
   ) -> ResolvedNode {
-    resolve(makeView(content))
+    resolve(
+      makeView(content),
+      rebuilding: content,
+      declaredChildReplayBoundary: declaredChildReplayBoundary
+    )
   }
 
   package func resolveElements<Content: View>(
-    content: @MainActor (Element) -> Content,
+    content: @escaping @MainActor (Element) -> Content,
     consumingAs mode: ConsumptionMode
   ) -> [ResolvedNode] {
-    consume(resolve(content: content), as: mode)
+    let boundary: DeclaredChildReplayBoundary?
+    switch mode {
+    case .normalizedNode:
+      boundary = nil
+    case .declaredChildren:
+      // Capture the declaration owner before the row installs its own ambient
+      // node. Authoring state owners and post-splice parent links name different
+      // relationships and cannot recover this consumption boundary later.
+      boundary = ViewNodeContext.current.map {
+        DeclaredChildReplayBoundary(
+          ownerLifetimeID: $0.ownerLifetimeID,
+          resolvedUnder: context.identity
+        )
+      }
+    }
+    return consume(
+      resolve(content: content, declaredChildReplayBoundary: boundary),
+      as: mode
+    )
   }
 
   package func consume(

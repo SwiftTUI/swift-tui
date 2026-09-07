@@ -187,10 +187,13 @@ struct StateInvalidationDependencyTests {
   }
 
   /// Resolves the probe in a fresh graph, then locates the actual `@State` slot
-  /// from the dependency index and returns the owner node holding it plus the
-  /// slot's ordinal. Driving off the recorded key (rather than a guessed
+  /// from the dependency index and returns its graph, owner node, and ordinal.
+  /// The caller must retain the graph that owns the reader index while writing.
+  /// Driving off the recorded key (rather than a guessed
   /// ordinal) makes the write target exactly the slot the reader depends on.
-  private func resolvedStateSlot() -> (owner: SwiftTUICore.ViewNode, ordinal: Int)? {
+  private func resolvedStateSlot() -> (
+    graph: ViewGraph, owner: SwiftTUICore.ViewNode, ordinal: Int
+  )? {
     let graph = ViewGraph()
     graph.beginFrame()
     var context = ResolveContext(
@@ -208,12 +211,13 @@ struct StateInvalidationDependencyTests {
     else {
       return nil
     }
-    return (owner, key.ordinal)
+    return (graph, owner, key.ordinal)
   }
 
   @Test("a @State WRITE invalidates the genuine reader, not the owner")
   func writeInvalidatesReader() throws {
     let slot = try #require(resolvedStateSlot())
+    defer { withExtendedLifetime(slot.graph) {} }
     let spy = StateWriteRecordingInvalidator()
     slot.owner.invalidator = spy
 

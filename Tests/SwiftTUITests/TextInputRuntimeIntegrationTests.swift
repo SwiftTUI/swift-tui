@@ -19,7 +19,9 @@ struct TextInputRuntimeIntegrationTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       TextField(
         "Name",
         text: Binding(
@@ -57,7 +59,9 @@ struct TextInputRuntimeIntegrationTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       SecureField(
         "Password",
         text: Binding(

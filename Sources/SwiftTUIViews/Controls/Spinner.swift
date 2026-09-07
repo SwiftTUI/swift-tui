@@ -104,7 +104,8 @@ public struct Spinner: View {
           switch stage {
           case .active:
             while !Task.isCancelled {
-              try? await Task.sleep(for: presentation.interval)
+              try? await SpinnerTaskClock.sleep(presentation.interval)
+              guard !Task.isCancelled else { return }
               let max = presentation.activeFrames.count
               var newIteration = iteration + 1
               newIteration %= max
@@ -154,6 +155,13 @@ public struct Spinner: View {
       case .finished: "finished"
       }
     }
+  }
+}
+
+/// Task-scoped cadence dependency; production uses the continuous clock.
+package enum SpinnerTaskClock {
+  @TaskLocal package static var sleep: @Sendable (Duration) async throws -> Void = { duration in
+    try await Task.sleep(for: duration)
   }
 }
 

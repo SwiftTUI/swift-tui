@@ -34,6 +34,8 @@ struct PhaseAnimatorRuntimeTests {
     }
     defer { harness.shutdown() }
 
+    // Intentionally keep mount, click, and render synchronous. The initial
+    // mount task is cancelled before entry; the first change must still run.
     try harness.clickText(Self.bumpLabel)
     try await harness.wait(until: { probe.completedCycles == 1 })
     try await harness.hold(for: .milliseconds(300))

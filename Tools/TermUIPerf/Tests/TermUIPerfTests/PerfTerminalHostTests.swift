@@ -5,6 +5,40 @@ import Testing
 @_spi(Runners) @testable import TermUIPerf
 
 struct PerfTerminalHostTests {
+  @Test("frame predicates visit each new frame once and choose the newest match")
+  @MainActor
+  func predicateWorkIsBoundedByNewFrames() async throws {
+    let host = PerfTerminalHost(size: PerfTerminalSize(columns: 8, rows: 1))
+    func present(_ text: String) throws {
+      _ = try host.present(RasterSurface(size: CellSize(width: 8, height: 1), lines: [text]))
+    }
+    try present("old hit")
+    try present("miss")
+    var now = ContinuousClock().now
+    var sleeps = 0
+    var visits: [Int: Int] = [:]
+    let result = try await PerfScenarioRunner.waitForFrameMatching(
+      in: host, afterFrame: 1, timeout: .milliseconds(2), hardCap: .milliseconds(10),
+      timeoutMarker: "hit", now: { now },
+      sleep: {
+        sleeps += 1
+        now = now.advanced(by: .milliseconds(1))
+        if sleeps == 2 { try present("miss") }
+        if sleeps == 4 {
+          try present("hit")
+          try present("new hit")
+        }
+      },
+      matches: {
+        visits[$0.frameNumber, default: 0] += 1
+        return $0.text.contains("hit")
+      }
+    )
+    #expect(result.frameNumber == 5)
+    #expect(sleeps == 4)
+    #expect(visits == [2: 1, 3: 1, 5: 1])
+  }
+
   @Test("frame arriving during the final idle sleep is still observed")
   @MainActor
   func frameArrivingDuringFinalIdleSleepIsObserved() async throws {

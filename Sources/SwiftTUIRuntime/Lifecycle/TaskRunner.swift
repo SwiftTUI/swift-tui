@@ -17,11 +17,20 @@ final class TaskRunner {
   private var activeTasks: [ActiveTaskKey: ActiveTask] = [:]
   private var nextGeneration = 0
 
+  deinit {
+    // Owner release is also shutdown: dropping unstructured task handles
+    // alone does not cancel the work that they represent.
+    for activeTask in activeTasks.values {
+      activeTask.task.cancel()
+    }
+  }
+
+  @discardableResult
   func start(
     viewNodeID: ViewNodeID,
     identity: Identity,
     registration: TaskRegistration
-  ) {
+  ) -> Task<Void, Never> {
     let descriptor = registration.descriptor
     let key = ActiveTaskKey(viewNodeID: viewNodeID, descriptorID: descriptor.id)
     cancel(viewNodeID: viewNodeID, matching: descriptor)
@@ -45,8 +54,11 @@ final class TaskRunner {
     nextGeneration += 1
     let generation = nextGeneration
     let task = Task(priority: taskPriority(for: descriptor.priority)) { [weak self] in
+      defer { self?.finish(key: key, generation: generation) }
+      // Removal or shutdown can cancel this task before its first actor turn.
+      // A retired operation must not enter user code and read released state.
+      guard !Task.isCancelled else { return }
       await registration.run()
-      self?.finish(key: key, generation: generation)
     }
 
     activeTasks[key] = ActiveTask(
@@ -55,6 +67,7 @@ final class TaskRunner {
       generation: generation,
       task: task
     )
+    return task
   }
 
   func cancel(

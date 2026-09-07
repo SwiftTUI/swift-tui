@@ -29,7 +29,9 @@ extension RunLoop {
     var signalTask: Task<Void, Never>?
     let deadlineState = DeadlineWakeState()
 
-    let stream = AsyncStream<Void> { continuation in
+    // The buffer and scheduler own the work; wake tokens carry no payload.
+    // One pending wake suffices, including bursts during an in-flight frame.
+    let stream = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
       deadlineState.setContinuation(continuation)
 
       #if os(Android)

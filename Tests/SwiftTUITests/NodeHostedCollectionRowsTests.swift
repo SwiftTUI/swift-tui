@@ -15,7 +15,9 @@ struct NodeHostedCollectionRowsTests {
 
     let box = Box()
     let actions = LocalActionRegistry()
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       List(selection: .constant(1)) {
         Button("Tap") {
           box.taps += 1
@@ -43,7 +45,9 @@ struct NodeHostedCollectionRowsTests {
 
     let box = Box()
     let actions = LocalActionRegistry()
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Table(selection: .constant(1), columns: [.init("Action", width: 12)]) {
         TableRow {
           Button("Run") {
@@ -119,7 +123,9 @@ struct NodeHostedCollectionRowsTests {
 
     let box = Box()
     let actions = LocalActionRegistry()
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       List(
         selection: Binding(
           get: { box.value },
@@ -152,7 +158,9 @@ struct NodeHostedCollectionRowsTests {
 
     let box = Box()
     let actions = LocalActionRegistry()
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       List(
         selection: Binding(
           get: { box.values },
@@ -287,7 +295,9 @@ struct NodeHostedCollectionRowsTests {
     let fieldIdentity = testIdentity("HostedListControls", "Field")
     var environment = EnvironmentValues()
     environment.focusedIdentity = fieldIdentity
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       List(selection: .constant(1)) {
         HStack(spacing: 1) {
           Toggle(
@@ -344,7 +354,9 @@ struct NodeHostedCollectionRowsTests {
         .tag(1)
       }
     }
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       root,
       context: .init(
         identity: testIdentity("HostedCollectionLifecycle"),

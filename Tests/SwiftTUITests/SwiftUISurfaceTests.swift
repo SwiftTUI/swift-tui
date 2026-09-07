@@ -1096,7 +1096,9 @@ struct SwiftUISurfaceTests {
     let localActionRegistry = LocalActionRegistry()
     let view = BodyBasedStatefulCounter()
 
-    let initialArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let initialArtifacts = renderer.render(
       view,
       context: .init(
         identity: testIdentity("Root"),
@@ -1124,7 +1126,9 @@ struct SwiftUISurfaceTests {
     let localKeyHandlerRegistry = LocalKeyHandlerRegistry()
     let view = BodyBasedStatefulField()
 
-    let initialArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let initialArtifacts = renderer.render(
       view,
       context: .init(
         identity: testIdentity("Root"),
@@ -2349,7 +2353,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("AccentToggle")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Toggle(
         "Accent Preview",
         isOn: Binding(
@@ -2386,7 +2392,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("CountStepper")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Stepper(
         "Count",
         value: Binding(
@@ -2429,7 +2437,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("ValueSlider")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Slider(
         "Value",
         value: Binding(
@@ -2474,7 +2484,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("DoubleSlider")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       VStack(alignment: .leading, spacing: 1) {
         Stepper(
           "Amount",
@@ -2531,7 +2543,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("ContinuousSlider")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Slider(
         "Opacity",
         value: Binding(
@@ -2591,7 +2605,9 @@ struct SwiftUISurfaceTests {
     let controlIdentity = testIdentity("PreciseSlider")
     var context = ResolveContext(identity: testIdentity("Root"))
     context.localPointerHandlerRegistry = pointerRegistry
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       Slider(
         "Precision",
         value: Binding(
@@ -2747,7 +2763,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("NameField")
 
-    let focusedArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let focusedArtifacts = renderer.render(
       TextField(
         "Name",
         text: Binding(
@@ -2793,7 +2811,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       TextField(
         "Name",
         text: Binding(
@@ -2828,7 +2848,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       TextField(
         "Name",
         text: Binding(
@@ -2863,7 +2885,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = identity
 
-    _ = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
       TextField(
         "Name",
         text: Binding(
@@ -2954,7 +2978,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("Disclosure")
 
-    let collapsedArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let collapsedArtifacts = renderer.render(
       DisclosureGroup(
         "Options",
         isExpanded: Binding(
@@ -3057,7 +3083,9 @@ struct SwiftUISurfaceTests {
     .id(testIdentity("PresetPicker"))
     .pickerStyle(.inline)
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       root,
       context: .init(
         identity: testIdentity("Root"),
@@ -3085,7 +3113,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("ModePicker")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Picker(
         "Mode",
         selection: Binding(
@@ -3122,7 +3152,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("RadioPicker")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Picker(
         "Mode",
         selection: Binding(
@@ -3219,7 +3251,9 @@ struct SwiftUISurfaceTests {
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("MenuPicker")
-    let expandedArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let expandedArtifacts = renderer.render(
       Picker(
         "Mode",
         selection: Binding(
@@ -3355,7 +3389,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("PresetList")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       List(
         selection: Binding(
           get: { box.value },
@@ -3662,7 +3698,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("MetricsTable")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Table(
         selection: Binding(
           get: { box.value },
@@ -3952,7 +3990,9 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("ReadOnlyTable")
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Table(
         columns: [
           .init("Metric", width: 6),
@@ -4459,7 +4499,9 @@ struct SwiftUISurfaceTests {
       .id(scrollIdentity)
       .frame(width: 5, height: 3, alignment: .topLeading)
 
-    _ = DefaultRenderer().render(view, context: context)
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(view, context: context)
 
     #expect(keyRegistry.dispatch(identity: scrollIdentity, keyPress: KeyPress(.end)))
     #expect(box.position == .init(x: 0, y: 5))
@@ -4693,7 +4735,9 @@ struct SwiftUISurfaceTests {
     .id(testIdentity("Scrollable"))
     .frame(width: 6, height: 3, alignment: .topLeading)
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       view,
       context: .init(
         identity: testIdentity("Root"),
@@ -4738,7 +4782,9 @@ struct SwiftUISurfaceTests {
       .id(testIdentity("Scrollable"))
       .frame(width: 5, height: 2, alignment: .topLeading)
 
-    let initialArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let initialArtifacts = renderer.render(
       view,
       context: .init(
         identity: testIdentity("Root"),
@@ -4835,7 +4881,9 @@ struct SwiftUISurfaceTests {
     let tapBox = TapBox()
     let actionRegistry = LocalActionRegistry()
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Button(
         role: .destructive,
         action: {
@@ -4888,7 +4936,9 @@ struct SwiftUISurfaceTests {
     }
     let tapBox = TapBox()
     let actionRegistry = LocalActionRegistry()
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Button("Delete", role: .destructive) {
         tapBox.didTap = true
       }
@@ -4929,7 +4979,9 @@ struct SwiftUISurfaceTests {
     let tapBox = TapBox()
     let actionRegistry = LocalActionRegistry()
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Button("Docs") {
         tapBox.didTap = true
       }
@@ -4994,7 +5046,9 @@ struct SwiftUISurfaceTests {
       return true
     }
 
-    let artifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let artifacts = renderer.render(
       Link("Docs", destination: "https://example.com")
         .id(testIdentity("DocsLink")),
       context: .init(

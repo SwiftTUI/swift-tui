@@ -58,10 +58,10 @@ public struct ScrollCadence60HzScenario: PerfScenario {
       let scrollCell = try driver.cell(containing: "srow 2")
 
       let dispatch = monotonicSeconds()
-      await driver.driveScroll(cadence: cadence, notches: notchCount, at: scrollCell)
+      try await driver.driveScroll(cadence: cadence, notches: notchCount, at: scrollCell)
       // The settle tail: everything the burst left queued lands here, and it
       // is part of the cost, so it is inside the measured window.
-      await driver.waitForQuiescence(idle: .milliseconds(400), timeout: .seconds(60))
+      try await driver.waitForQuiescence(idle: .milliseconds(400), timeout: .seconds(60))
       let settled = driver.terminalHost.presentedFrames.last
 
       return [
