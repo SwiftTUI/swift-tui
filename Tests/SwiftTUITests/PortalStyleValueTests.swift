@@ -55,6 +55,35 @@ struct PortalStyleValueTests {
   }
 }
 
+extension PortalStyleValueTests {
+  @Test("one oversized inset is rejected and a presented surface falls back without trapping")
+  func oversizedInsets() {
+    var oversized = AnchoredSurfaceStylePresentation()
+    oversized.contentInsets.leading = Int.max - 1
+    #expect(!oversized.validationProblems.isEmpty)
+    #expect(!AnchoredSurfaceStylePresentation(minimumWidth: Int.max).validationProblems.isEmpty)
+    // Larger than any terminal is still a representable count, not misuse.
+    #expect(AnchoredSurfaceStylePresentation(contentInsets: .init(all: 200)).validationProblems.isEmpty)
+    let frame = DefaultRenderer().render(
+      Text("Base").popover(isPresented: .constant(true)) { Text("Body") }
+        .popoverStyle(OversizedInsetPopoverStyle()),
+      context: .init(identity: testIdentity("Root")), proposal: .init(width: 40, height: 16))
+    #expect(
+      frame.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+    #expect(frame.rasterSurface.lines.joined().contains("Body"))
+  }
+}
+
+private struct OversizedInsetPopoverStyle: PopoverStyle {
+  func resolvePresentation(for configuration: PopoverStyleConfiguration)
+    -> AnchoredSurfaceStylePresentation
+  {
+    var presentation = configuration.defaultPresentation
+    presentation.contentInsets.leading = Int.max - 1
+    return presentation
+  }
+}
+
 @MainActor
 private final class PortalConfigurationProbe {
   var prompts: [PromptStyleConfiguration] = []

@@ -11,9 +11,10 @@ import SwiftTUICore
 // no invalid value reaches layout, where it could corrupt realized bounds.
 //
 // This is the channel only. Each family owns its validation predicate and its
-// automatic fallback; consumers merge the issue into their node's
-// `RuntimeIssuePreferenceKey` preferences (the `image.unresolvedSource`
-// idiom) or an equivalent resolve-time route.
+// automatic fallback. Every family records through
+// `ImperativeRuntimeIssueQueue`, which the frame head drains into that frame's
+// issue channel after the graph resolves, so a resolve-time report surfaces
+// on the same frame.
 
 /// Constructs and routes the runtime issues shared by every style family's
 /// presentation validation.
@@ -26,6 +27,11 @@ enum StyleMisuse {
   /// The issue code for a route wrapper installed more than once in one
   /// style-body resolve (see `StyleRouteView`).
   static let duplicateRouteCode = "style.duplicateRoute"
+
+  /// The issue code for a style body that omitted a wrapper the primitive
+  /// needs while the control is in a state that requires it (a presented
+  /// menu without its portal or inline content).
+  static let missingRequiredRouteCode = "style.missingRequiredRoute"
 
   /// Returns `presentation` unchanged when `problems` is empty; otherwise
   /// reports one issue describing every problem and returns `fallback()` —
@@ -69,6 +75,48 @@ enum StyleMisuse {
         + problems.joined(separator: "; ")
         + ". The automatic presentation was rendered for this resolve. "
         + "Supply valid presentation values from the style.",
+      identity: identity,
+      source: family
+    )
+  }
+
+  /// One warning for a presentation whose invalid fields fell back
+  /// individually while the valid fields were kept — the per-field form
+  /// families use when a value carries independent fields (scroll glyphs,
+  /// link opacity).
+  static func partiallyInvalidPresentationIssue(
+    family: String,
+    styleLabel: String,
+    problems: [String],
+    identity: Identity?
+  ) -> RuntimeIssue {
+    RuntimeIssue(
+      severity: .warning,
+      code: invalidPresentationCode,
+      message:
+        "\(family) \(styleLabel) resolved an invalid presentation: "
+        + problems.joined(separator: "; ")
+        + ". Invalid fields use their automatic values for this resolve. "
+        + "Supply valid presentation values from the style.",
+      identity: identity,
+      source: family
+    )
+  }
+
+  /// One warning for a style body that omitted a required wrapper. The
+  /// automatic body was rendered for this resolve.
+  static func missingRequiredRouteIssue(
+    family: String,
+    role: String,
+    styleLabel: String,
+    identity: Identity
+  ) -> RuntimeIssue {
+    RuntimeIssue(
+      severity: .warning,
+      code: missingRequiredRouteCode,
+      message:
+        "\(family) \(styleLabel) omitted its \(role) while presented. "
+        + "The automatic style body was rendered for this resolve.",
       identity: identity,
       source: family
     )

@@ -258,19 +258,12 @@ extension SurfaceSheetStyle: ReuseTransparentStyle {}
 extension DropdownSheetStyle: ReuseTransparentStyle {}
 
 extension ResolveContext {
+  /// The eager form, for callers that need the value at resolve time.
   @MainActor
   package func resolvedSheetPresentation(
     baseline: SheetSurfaceStylePresentation
   ) -> SheetSurfaceStylePresentation {
-    let style = environmentValues.sheetStyle
-    let resolved = style.presentation(
-      for: .init(
-        defaultPresentation: baseline, terminalSize: environmentValues.terminalSize,
-        controlProminence: environmentValues.controlProminence,
-        styleEnvironment: environmentValues.styleEnvironmentSnapshot))
-    return StyleMisuse.validatedPresentation(
-      resolved, problems: resolved.validationProblems, family: "SheetStyle",
-      styleLabel: style.description, identity: identity,
-      report: ImperativeRuntimeIssueQueue.record, fallback: { baseline })
+    PortalStyleResolveInputs(self).resolvedSheetPresentation(
+      style: environmentValues.sheetStyle, baseline: baseline)
   }
 }

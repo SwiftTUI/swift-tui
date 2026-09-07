@@ -9,8 +9,9 @@ A machine-generated enumeration of every public symbol lives in
 `.spi-api-baseline.txt` file separately tracks the `@_spi` surface. Its most
 important part is `@_spi(Runners)`, the host contract for the swiftui/web/android
 host repos; `@_spi(StyleFixtures)` is the style-library testing contract (the
-fixture initializers on every style configuration, captured slot, and
-presentation value — see the `Testing-Styles` DocC article). Thus, an SPI
+fixture initializers on every style configuration and captured slot;
+presentation values keep ordinary public initializers because styles
+construct them — see the `Testing-Styles` DocC article). Thus, an SPI
 break creates a reviewable diff instead of a silent downstream failure. The inventory script generates and compares all
 three files:
 `Scripts/generate_public_api_inventory.sh`; see

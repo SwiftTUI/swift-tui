@@ -106,6 +106,7 @@ extension View {
     controlGroupStyle(AnyControlGroupStyle(style))
   }
 
+  /// Sets the trigger and portal composition of menus in this subtree.
   public func menuStyle(_ style: AnyMenuStyle) -> some View {
     environment(\.menuStyle, style)
   }

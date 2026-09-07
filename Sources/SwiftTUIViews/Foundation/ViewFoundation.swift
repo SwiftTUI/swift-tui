@@ -52,27 +52,29 @@ package func appendDeclaredChildNodes<V: View>(
   )
   nextIndex += 1
 
-  if context.viewGraph != nil {
-    let resolvedNode = resolveView(
-      view,
-      in: childContext,
-      authoringContextOverride: nil,
-      structuralChildCutEligible: true
-    )
-    resolved.append(
-      contentsOf: consumeDeclaredChild(
-        resolvedNode,
-        resolvedUnder: childContext.identity,
-        in: context.viewGraph,
-        policy: .declaredBuilder
+  resolvingStyleRouteAlternative {
+    if context.viewGraph != nil {
+      let resolvedNode = resolveView(
+        view,
+        in: childContext,
+        authoringContextOverride: nil,
+        structuralChildCutEligible: true
       )
-    )
-    return
-  }
+      resolved.append(
+        contentsOf: consumeDeclaredChild(
+          resolvedNode,
+          resolvedUnder: childContext.identity,
+          in: context.viewGraph,
+          policy: .declaredBuilder
+        )
+      )
+      return
+    }
 
-  let elements = resolveViewElements(view, in: childContext)
-  childContext.recordResolvedComputation(count: elements.count)
-  resolved.append(contentsOf: elements)
+    let elements = resolveViewElements(view, in: childContext)
+    childContext.recordResolvedComputation(count: elements.count)
+    resolved.append(contentsOf: elements)
+  }
 }
 
 @MainActor

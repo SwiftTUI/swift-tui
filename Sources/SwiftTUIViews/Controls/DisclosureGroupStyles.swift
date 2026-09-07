@@ -149,7 +149,7 @@ public struct AutomaticDisclosureGroupStyle: DisclosureGroupStyle {
 
   @MainActor
   public func makeBody(configuration: DisclosureGroupStyleConfiguration) -> some View {
-    AutomaticDisclosureGroupStyleBody(configuration: configuration)
+    DisclosureGroupStyleBody(configuration: configuration, compact: false)
   }
 }
 
@@ -166,7 +166,7 @@ public struct CompactDisclosureGroupStyle: DisclosureGroupStyle {
 
   @MainActor
   public func makeBody(configuration: DisclosureGroupStyleConfiguration) -> some View {
-    CompactDisclosureGroupStyleBody(configuration: configuration)
+    DisclosureGroupStyleBody(configuration: configuration, compact: true)
   }
 }
 
@@ -204,42 +204,22 @@ private struct ConcreteAnyDisclosureGroupStyleBox<S: DisclosureGroupStyle>:
   }
 }
 
-private struct AutomaticDisclosureGroupStyleBody: View {
+/// The automatic and compact treatments: a disclosure glyph before the label,
+/// with the content indented beneath. Compact drops the focus rail and relies
+/// on the row highlight alone.
+private struct DisclosureGroupStyleBody: View {
   let configuration: DisclosureGroupStyleConfiguration
+  let compact: Bool
 
   var body: some View {
     let chrome = configuration.styleEnvironment.rowChrome(
       isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
       isPressed: configuration.isPressed)
     VStack(alignment: .leading, spacing: 0) {
-      BoundControlStyleRow(
+      ControlStyleRow(
         chrome: chrome, focusActive: configuration.focusActive,
-        isHighlighted: configuration.focusActive || configuration.isPressed
-      ) {
-        Text(configuration.isExpanded ? "▾" : "▸")
-          .foregroundStyle(
-            configuration.isExpanded ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator))
-        configuration.label
-      }
-      if configuration.isExpanded {
-        configuration.content.padding(.leading, 1)
-      }
-    }
-  }
-}
-
-private struct CompactDisclosureGroupStyleBody: View {
-  let configuration: DisclosureGroupStyleConfiguration
-
-  var body: some View {
-    let chrome = configuration.styleEnvironment.rowChrome(
-      isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
-      isPressed: configuration.isPressed)
-    VStack(alignment: .leading, spacing: 0) {
-      BoundControlStyleRow(
-        chrome: chrome, focusActive: false,
         isHighlighted: configuration.focusActive || configuration.isPressed,
-        reservesRail: false
+        reservesRail: !compact
       ) {
         Text(configuration.isExpanded ? "▾" : "▸")
           .foregroundStyle(

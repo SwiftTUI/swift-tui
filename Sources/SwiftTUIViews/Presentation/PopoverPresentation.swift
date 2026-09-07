@@ -101,12 +101,14 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
       authoringContext: onDismissAuthoringContext
     )
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let presentation = context.resolvedPopoverPresentation()
+    let popoverStyle = context.environmentValues.popoverStyle
+    let styleInputs = PortalStyleResolveInputs(context)
     return resolvePresentationModifier(
       content: content,
       isPresented: isPresented,
       in: context
     ) { background, triggerIdentity in
+      let presentation = styleInputs.resolvedPopoverPresentation(style: popoverStyle)
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(for: background, token: "popover")
       let itemID = portalEntryID.description

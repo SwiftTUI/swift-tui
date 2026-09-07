@@ -148,7 +148,9 @@ let artifacts = DefaultRenderer().render(
 
 The tab-view item and overflow-trigger configurations predate the SPI and
 keep ordinary public initializers as their fixture path; the body
-configuration is SPI-gated like the other families.
+configuration is SPI-gated like the other families. So does
+`PickerStyleConfiguration.Option(label:)`, a single inert option; the parent
+configuration and its indexed option fixture are SPI-gated.
 
 ## What the fixture surface covers
 

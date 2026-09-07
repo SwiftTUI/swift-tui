@@ -28,6 +28,45 @@ struct ValueControlStyleTests {
     let point = try #require(harness.point(forText: "Level"))
     _ = try harness.scrollPointer(at: point, deltaY: 1)
     #expect(value.value == 8)
+    // The track route handles the wheel too, not only the root route.
+    let track = try #require(harness.point(forText: index == 3 ? "========" : "━"))
+    _ = try harness.scrollPointer(at: track, deltaY: 1)
+    #expect(value.value == 7)
+  }
+
+  @Test("the track route keeps a drag captured after the pointer leaves its bounds")
+  func sliderTrackCapture() throws {
+    let value = ValueStyleBox(0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("Root"), size: .init(width: 48, height: 10)
+    ) {
+      Slider("Level", value: value.binding, in: 0...10).sliderStyle(ConsumerSliderStyle())
+    }
+    defer { harness.shutdown() }
+    let start = try #require(harness.point(forText: "========"))
+    _ = try harness.sendMouse(.down(.primary), at: start)
+    let pressed = value.value
+    // Without capture the runtime drops a drag that leaves the armed route's
+    // bounds and only the release would write, so the value is read before
+    // the release: the drag itself must have moved it.
+    _ = try harness.sendMouse(.dragged(.primary), at: .init(x: 44, y: start.y + 2))
+    #expect(value.value == 10)
+    #expect(value.value != pressed)
+    _ = try harness.sendMouse(.up(.primary), at: .init(x: 44, y: start.y + 2))
+    #expect(value.value == 10)
+  }
+
+  @Test("action route content receives the half's disabled state at a numeric bound")
+  func boundActionContentIsDisabled() {
+    let frame = render(
+      Stepper("Count", value: .constant(0), in: 0...2).stepperStyle(EnabledStateStepperStyle()))
+    let text = frame.rasterSurface.lines.joined()
+    #expect(text.contains("less:off"))
+    #expect(text.contains("more:on"))
+    let disabled = render(
+      Slider("Level", value: .constant(5), in: 0...10).sliderStyle(EnabledStateSliderStyle())
+        .disabled(true))
+    #expect(disabled.rasterSurface.lines.joined().contains("track:off"))
   }
 
   @Test("custom slider routes retain Double snapping and formatted values")
@@ -157,6 +196,14 @@ struct ValueControlStyleTests {
         frame.semanticSnapshot.interactionRegions.filter { $0.identity == issue.identity }.count
           == 1)
     }
+    // Each issue names its family, its role, and the offending style.
+    let sliderIssues = issues.filter { $0.source == "SliderStyle" }
+    let stepperIssues = issues.filter { $0.source == "StepperStyle" }
+    #expect(sliderIssues.count == 1 && stepperIssues.count == 2)
+    #expect(sliderIssues.allSatisfy { $0.message.contains("track route") })
+    #expect(stepperIssues.contains { $0.message.contains("decrement route") })
+    #expect(stepperIssues.contains { $0.message.contains("increment route") })
+    #expect(issues.allSatisfy { $0.message.contains("ConsumerS") })
   }
 
   @Test(
@@ -190,6 +237,29 @@ struct ValueControlStyleTests {
   private func render<V: View>(_ view: V) -> RenderSnapshot {
     DefaultRenderer().render(
       view, context: .init(identity: testIdentity("Root")), proposal: .init(width: 48, height: 14))
+  }
+}
+
+/// Renders the enabled state its route content is resolved under.
+struct EnabledStateText: View {
+  let name: String
+  @Environment(\.isEnabled) private var isEnabled
+  var body: some View { Text("\(name):\(isEnabled ? "on" : "off")") }
+}
+
+struct EnabledStateStepperStyle: StepperStyle {
+  func makeBody(configuration: StepperStyleConfiguration) -> some View {
+    HStack(spacing: 1) {
+      configuration.decrement { EnabledStateText(name: "less") }
+      configuration.valueLabel
+      configuration.increment { EnabledStateText(name: "more") }
+    }
+  }
+}
+
+struct EnabledStateSliderStyle: SliderStyle {
+  func makeBody(configuration: SliderStyleConfiguration) -> some View {
+    configuration.track { EnabledStateText(name: "track") }
   }
 }
 

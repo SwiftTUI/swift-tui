@@ -227,9 +227,8 @@ private struct BorderedGroupBoxStyleBody: View {
   let configuration: GroupBoxStyleConfiguration
 
   var body: some View {
-    let environment = configuration.styleEnvironment
-    let foreground = environment.foregroundStyle ?? environment.theme.style(for: .foreground)
-    let tone: TerminalTone = configuration.controlProminence == .increased ? .accent : .neutral
+    let chrome = configuration.styleEnvironment.groupBoxChrome(
+      prominence: configuration.controlProminence)
     VStack(alignment: .leading, spacing: 0) {
       if let label = configuration.label {
         label.foregroundStyle(.separator)
@@ -239,11 +238,14 @@ private struct BorderedGroupBoxStyleBody: View {
       }
       .padding(.init(horizontal: 1, vertical: 1))
       .overlay {
-        RoundedRectangle(cornerRadius: 1).strokeBorder(AnyShapeStyle(.terminalBorder(tone)))
+        RoundedRectangle(cornerRadius: 1).strokeBorder(chrome.borderStyle)
       }
-      .foregroundStyle(foreground)
+      .foregroundStyle(chrome.foregroundStyle)
     }
-    .frame(minHeight: .finite((configuration.label == nil ? 0 : 1) + 3), alignment: .topLeading)
+    // A stack-minimum hint, not a flexible frame: a flexible frame fills any
+    // finite height proposal, so a group box beside a centered sibling or
+    // under a fixed-height parent would grow past its chrome.
+    .layoutMetadata(.init(minimumHeight: (configuration.label == nil ? 0 : 1) + 3))
   }
 }
 

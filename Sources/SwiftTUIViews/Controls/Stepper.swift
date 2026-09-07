@@ -193,43 +193,31 @@ extension Stepper {
         )
         return handled ? .claimed : .ignored
       }
-      intake.registerPointerHandler(routeID: decrementRouteID) { event in
-        switch event.kind {
-        case .down(.primary):
-          // Claim the press whether or not the value can move. A click on the
-          // decrement affordance is an interaction owned by this route even
-          // at a bound.
-          _ = updateBoundControlValue(
-            binding,
-            delta: -1,
-            step: step,
-            bounds: bounds
-          )
-          return .claimed
-        case .up(.primary):
-          // The action is press-driven, but the same route owns the release.
-          // Claim it so the Stepper's root activation action cannot increment.
-          return .claimed
-        default:
-          return .ignored
+      // Each half claims its press whether or not the value can move: a click
+      // on the affordance is an interaction owned by that route even at a
+      // bound. The action is press-driven, but the same route owns the
+      // release, so the Stepper's root activation action cannot fire the
+      // opposite half on the `.up`.
+      func registerActionHalf(routeID: RouteID, delta: Int) {
+        intake.registerPointerHandler(routeID: routeID) { event in
+          switch event.kind {
+          case .down(.primary):
+            _ = updateBoundControlValue(
+              binding,
+              delta: delta,
+              step: step,
+              bounds: bounds
+            )
+            return .claimed
+          case .up(.primary):
+            return .claimed
+          default:
+            return .ignored
+          }
         }
       }
-      intake.registerPointerHandler(routeID: incrementRouteID) { event in
-        switch event.kind {
-        case .down(.primary):
-          _ = updateBoundControlValue(
-            binding,
-            delta: 1,
-            step: step,
-            bounds: bounds
-          )
-          return .claimed
-        case .up(.primary):
-          return .claimed
-        default:
-          return .ignored
-        }
-      }
+      registerActionHalf(routeID: decrementRouteID, delta: -1)
+      registerActionHalf(routeID: incrementRouteID, delta: 1)
     }
 
     let formatted = formattedControlValue(currentValue, bounds: bounds, step: step)

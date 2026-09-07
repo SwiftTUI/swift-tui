@@ -47,6 +47,41 @@ struct StyleMisuseTests {
     #expect(issue.message.contains("valid presentation values"))
   }
 
+  @Test("A missing required route names the family, the role, and the style")
+  func missingRequiredRouteIssue() {
+    let identity = testIdentity("menu")
+    let issue = StyleMisuse.missingRequiredRouteIssue(
+      family: "MenuStyle",
+      role: "portal wrapper",
+      styleLabel: "MyApp.BareMenuStyle",
+      identity: identity
+    )
+    #expect(issue.code == StyleMisuse.missingRequiredRouteCode)
+    #expect(issue.code == "style.missingRequiredRoute")
+    #expect(issue.severity == .warning)
+    #expect(issue.source == "MenuStyle")
+    #expect(issue.identity == identity)
+    #expect(issue.message.contains("MyApp.BareMenuStyle"))
+    #expect(issue.message.contains("portal wrapper"))
+    #expect(issue.message.contains("automatic style body"))
+  }
+
+  @Test("A partially invalid presentation keeps the shared code and says which fields fell back")
+  func partiallyInvalidPresentationIssue() {
+    let issue = StyleMisuse.partiallyInvalidPresentationIssue(
+      family: "ScrollViewStyle",
+      styleLabel: "MyApp.ThinScrollStyle",
+      problems: ["opacity must be finite"],
+      identity: nil
+    )
+    #expect(issue.code == StyleMisuse.invalidPresentationCode)
+    #expect(issue.severity == .warning)
+    #expect(issue.source == "ScrollViewStyle")
+    #expect(issue.message.contains("MyApp.ThinScrollStyle"))
+    #expect(issue.message.contains("opacity must be finite"))
+    #expect(issue.message.contains("Invalid fields use their automatic values"))
+  }
+
   @Test("The issue carries the resolving surface's identity")
   func issueCarriesIdentity() {
     let identity = testIdentity("gallery", "spinner")

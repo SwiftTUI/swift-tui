@@ -14,11 +14,16 @@ public struct ViewThatFits<Content: View>: PrimitiveView, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let resolvedChildren = resolveDeclaredChildren(
-      content,
-      in: context,
-      kindName: "ViewThatFits"
-    )
+    // Every candidate resolves; layout places one. A style body that offers
+    // the same route in two candidates installs it once per placed slot, so
+    // each candidate claims on its own alternative of the route ledger.
+    let resolvedChildren = withStyleRouteAlternatives {
+      resolveDeclaredChildren(
+        content,
+        in: context,
+        kindName: "ViewThatFits"
+      )
+    }
     return [
       ResolvedNode(
         identity: context.identity,

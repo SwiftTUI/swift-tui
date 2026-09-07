@@ -99,14 +99,20 @@ extension TextEditor {
             .foregroundStyle(chrome.foregroundStyle)
             .opacity(chrome.opacity)
           }
+          // The caret map must wrap at the width the text is placed at. The
+          // scroll body proposes its viewport minus a reserved indicator
+          // track and any scroll-style insets, which the ScrollView's own
+          // width does not reflect, so the probe sits on the content and
+          // the content fills that proposal.
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background {
+            TextEditorContentWidthProbe(measuredContentWidth: measuredContentWidth)
+          }
         }
         .focusable(false)
         // Wrapping, scrolling, and the caret map remain one protected slot.
-        // Measuring this viewport directly also handles arbitrary style padding.
+        // Measuring inside the viewport also handles arbitrary style padding.
         .ambientTextAttributesReset()
-        .background {
-          TextEditorContentWidthProbe(measuredContentWidth: measuredContentWidth)
-        }
       },
       isEnabled: isEnabled,
       isFocused: isFocused,

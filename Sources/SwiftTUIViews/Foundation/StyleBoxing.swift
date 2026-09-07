@@ -2,12 +2,11 @@ import SwiftTUICore
 
 // The two rules every erased style box obeys.
 //
-// Four style families — button, picker, text-field, tab-view — each store a
-// concrete style behind a per-family existential box. What the boxes forward
-// genuinely differs (prominence, selection deltas, pointer routing, strip
-// presentation), but they agreed on these two rules by copy-and-paste, with the
-// rationale for `resolveStyleBody` living as a comment in `ButtonStyles` that
-// the other three pointed at by name. A fifth family had to rediscover both.
+// Every style family stores a concrete style behind a per-family existential
+// box. What the boxes forward genuinely differs (prominence, selection deltas,
+// pointer routing, strip presentation, presentation values), but the reuse
+// rule and the body-resolve rule are the same for all of them, so they live
+// here rather than being rediscovered per family.
 
 /// A style whose instances carry no configuration.
 ///

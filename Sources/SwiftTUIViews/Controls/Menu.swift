@@ -13,8 +13,10 @@ private func menuIsExpanded(in ownerNode: SwiftTUICore.ViewNode?) -> Bool {
 /// The automatic trigger row (`Label ▾` / `Label ▴`) renders inline at
 /// the menu's site in the layout, taking exactly one cell of height.
 /// When active, a nonmodal portal entry hosts the user-supplied `content`.
-/// The entry uses `.menu` chrome.
-/// This chrome is a compact bordered box with intrinsic width at the top-leading of the portal root.
+/// The automatic entry is a compact bordered box with intrinsic width at the
+/// top-leading of the portal root; a ``MenuStyle`` supplies its own
+/// ``AnchoredSurfaceStylePresentation`` (insets, bounds, border, paint) or
+/// composes the content inline instead.
 ///
 /// **Current presentation behavior:**
 /// - Anchoring is at the presentation host's top-leading rather than
@@ -98,6 +100,10 @@ extension Menu {
       context.environmentValues.pressedIdentity(comparedAgainst: [context.identity])
       == context.identity
     let isEnabled = context.environmentValues.isEnabled
+    // A disabled menu keeps its expansion: disabling one while it is
+    // presented leaves the content visible with its actions disabled (pinned
+    // by the presentation-semantics stress suite), and it can be dismissed
+    // again once re-enabled.
     let isExpanded = menuIsExpanded(in: ownerNode)
     let owner = ownerNode?.stateOwnerHandle
     let controlIdentity = context.identity
@@ -157,12 +163,9 @@ extension Menu {
       !child.preferenceValues[MenuStyleUsagePreferenceKey.self].contains(context.identity)
     else { return child }
     ImperativeRuntimeIssueQueue.record(
-      RuntimeIssue(
-        severity: .warning, code: "style.missingRequiredRoute",
-        message:
-          "MenuStyle \(style.snapshotLabel) omitted its portal wrapper and inline content while presented. "
-          + "The automatic style body was rendered for this resolve.",
-        identity: context.identity, source: "MenuStyle"))
+      StyleMisuse.missingRequiredRouteIssue(
+        family: "MenuStyle", role: "portal wrapper and inline content",
+        styleLabel: style.snapshotLabel, identity: context.identity))
     return AnyMenuStyle.automatic.resolveBody(configuration: configuration, in: bodyContext)
   }
 }

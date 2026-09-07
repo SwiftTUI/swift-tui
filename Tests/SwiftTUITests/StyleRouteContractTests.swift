@@ -5,7 +5,9 @@ import Testing
 @_spi(StyleFixtures) @testable import SwiftTUIViews
 
 /// The shared route-wrapper contract (control-style plan 2026-08-12-002,
-/// stage B0), pinned on the one family that ships route wrappers today.
+/// stage B0), pinned on the tab-view wrappers; every later family's wrappers
+/// run through the same seam and pin their own behaviour in their family
+/// suites.
 ///
 /// Three rules, none of which may trap:
 ///
@@ -96,6 +98,84 @@ struct StyleRouteContractTests {
         ) == 1
       )
     }
+  }
+
+  @Test("each alternative of a ViewThatFits installs the route once without a duplicate report")
+  func alternativesShareOneRoute() {
+    let selectionBox = SelectionBox()
+    let tabsIdentity = testIdentity("Tabs")
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    var context = ResolveContext(identity: testIdentity("Root"))
+    context.localPointerHandlerRegistry = pointerRegistry
+
+    let artifacts = DefaultRenderer().render(
+      contractTabView(selection: selectionBox.binding)
+        .tabViewStyle(AlternativesConsumerTabViewStyle())
+        .id(tabsIdentity),
+      context: context,
+      proposal: .init(width: 40, height: 4)
+    )
+
+    #expect(artifacts.diagnostics.runtime.issues.filter { $0.code.hasPrefix("style.") }.isEmpty)
+    for index in 0..<3 {
+      let routeIdentity = tabItemIdentity(for: tabsIdentity, index: index)
+      // Every candidate resolves with its route; layout places one of them,
+      // so exactly one hit target exists per item.
+      #expect(artifacts.resolvedTree.pointerRouteCount(for: routeIdentity) == 2)
+      #expect(
+        artifacts.semanticSnapshot.interactionRegions.filter { $0.identity == routeIdentity }
+          .count == 1)
+    }
+    let routeID = primaryRouteID(for: tabItemIdentity(for: tabsIdentity, index: 2))
+    #expect(
+      pointerRegistry.dispatch(routeID: routeID, event: primaryPointerDownEvent())
+        .wantsPointerStream)
+    #expect(selectionBox.value == "logs")
+  }
+
+  @Test(
+    "a duplicate inside one alternative, or after the alternatives, still reports",
+    arguments: [true, false])
+  func duplicatesAroundAlternativesReport(insideCandidate: Bool) {
+    let selectionBox = SelectionBox()
+    let tabsIdentity = testIdentity("Tabs")
+    let artifacts = DefaultRenderer().render(
+      contractTabView(selection: selectionBox.binding)
+        .tabViewStyle(DuplicateAroundAlternativesTabViewStyle(insideCandidate: insideCandidate))
+        .id(tabsIdentity),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 48, height: 4)
+    )
+    let issues = artifacts.diagnostics.runtime.issues.filter { $0.code == "style.duplicateRoute" }
+    #expect(issues.count == 3, "one issue per item")
+    for index in 0..<3 {
+      #expect(
+        artifacts.resolvedTree.pointerRouteCount(
+          for: tabItemIdentity(for: tabsIdentity, index: index)) == 1)
+    }
+  }
+
+  @Test("a control nested in a style body claims routes on its own ledger")
+  func nestedControlRoutesDoNotCollide() {
+    let artifacts = DefaultRenderer().render(
+      TabView(selection: .constant("home")) {
+        Tab("Home", value: "home") {
+          Picker("Pick", selection: .constant(0)) {
+            Text("A").tag(0)
+            Text("B").tag(1)
+          }
+          .pickerStyle(.segmented)
+        }
+        Tab("Logs", value: "logs") {
+          Text("Logs content")
+        }
+      }
+      .tabViewStyle(RouteOncePerItemTabViewStyle())
+      .id(testIdentity("Tabs")),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 40, height: 6)
+    )
+    #expect(artifacts.diagnostics.runtime.issues.filter { $0.code.hasPrefix("style.") }.isEmpty)
   }
 
   @Test("omitting the item route removes the pointer target and leaves keyboard navigation intact")
@@ -338,6 +418,81 @@ private struct RouteOncePerItemTabViewStyle: TabViewStyle {
           item.route {
             Text(item.isSelected ? "[\(item.label.displayText)]" : item.label.displayText)
           }
+        }
+      }
+      configuration.content
+    }
+  }
+}
+
+/// Offers each item route in two layout alternatives; one is placed.
+private struct AlternativesConsumerTabViewStyle: TabViewStyle {
+  var snapshotLabel: String {
+    "AlternativesConsumerTabViewStyle"
+  }
+
+  @MainActor
+  func presentation(
+    for configuration: TabViewStyleConfiguration
+  ) -> TabViewStylePresentation {
+    FlatStripPresentation.presentation(for: configuration)
+  }
+
+  @MainActor
+  func makeBody(
+    configuration: TabViewStyleBodyConfiguration
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top, spacing: 1) {
+        ForEach(Array(configuration.items.indices), id: \.self) { index in
+          let item = configuration.items[index]
+          ViewThatFits(in: .horizontal) {
+            item.route {
+              Text("[\(item.label.displayText) tab]")
+            }
+            item.route {
+              Text(item.label.displayText)
+            }
+          }
+        }
+      }
+      configuration.content
+    }
+  }
+}
+
+/// Installs an item route twice inside one alternative, or once in the
+/// alternative and once more after it: both are the misuse the shared rule
+/// reports, and the issue queue folds equal reports into one per item.
+private struct DuplicateAroundAlternativesTabViewStyle: TabViewStyle {
+  let insideCandidate: Bool
+
+  var snapshotLabel: String {
+    "DuplicateAroundAlternativesTabViewStyle"
+  }
+
+  @MainActor
+  func presentation(
+    for configuration: TabViewStyleConfiguration
+  ) -> TabViewStylePresentation {
+    FlatStripPresentation.presentation(for: configuration)
+  }
+
+  @MainActor
+  func makeBody(
+    configuration: TabViewStyleBodyConfiguration
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top, spacing: 1) {
+        ForEach(Array(configuration.items.indices), id: \.self) { index in
+          let item = configuration.items[index]
+          ViewThatFits(in: .horizontal) {
+            HStack(spacing: 1) {
+              item.route { Text(item.label.displayText) }
+              if insideCandidate { item.route { Text("again") } }
+            }
+          }
+          if !insideCandidate { item.route { Text("after") } }
         }
       }
       configuration.content

@@ -32,6 +32,10 @@ public struct AnchoredSurfaceStylePresentation: Sendable, Equatable {
 }
 
 extension AnchoredSurfaceStylePresentation {
+  /// The largest cell count a presentation field may carry and still add to
+  /// any terminal extent without overflowing.
+  package static let representableCellCount = Int.max / 4
+
   package var validationProblems: [String] {
     var problems: [String] = []
     if minimumWidth < 0 { problems.append("minimumWidth must not be negative") }
@@ -45,10 +49,12 @@ extension AnchoredSurfaceStylePresentation {
     if insets.contains(where: { $0 < 0 }) {
       problems.append("contentInsets must not be negative")
     }
-    if contentInsets.leading.addingReportingOverflow(contentInsets.trailing).overflow
-      || contentInsets.top.addingReportingOverflow(contentInsets.bottom).overflow
+    // Layout adds an inset to a content extent or origin without a check,
+    // so one huge inset can overflow even when the opposing pair fits.
+    if insets.contains(where: { $0 > Self.representableCellCount })
+      || minimumWidth > Self.representableCellCount
     {
-      problems.append("contentInsets must fit within the cell coordinate range")
+      problems.append("contentInsets and minimumWidth must be representable cell counts")
     }
     return problems
   }

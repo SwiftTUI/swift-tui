@@ -102,24 +102,31 @@ public struct StepperStyleConfiguration: Sendable {
   /// Installs the primitive's decrement pointer target. Install once; fixture routes are inert.
   @ViewBuilder @MainActor
   public func decrement<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    if let decrementIdentity {
-      StyleRouteView(
-        target: .init(identity: decrementIdentity, family: "StepperStyle", role: "decrement"),
-        content: content().disabled(!isEnabled || !canDecrement))
-    } else {
-      content()
-    }
+    actionRoute(
+      identity: decrementIdentity, role: "decrement", canAdjust: canDecrement, content: content)
   }
 
   /// Installs the primitive's increment pointer target. Install once; fixture routes are inert.
   @ViewBuilder @MainActor
   public func increment<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    if let incrementIdentity {
+    actionRoute(
+      identity: incrementIdentity, role: "increment", canAdjust: canIncrement, content: content)
+  }
+
+  /// One action half. The content receives the half's disabled state on both
+  /// the live and the fixture path, so a style body that reads `isEnabled`
+  /// renders the same way under test as it does in a live control.
+  @ViewBuilder @MainActor
+  private func actionRoute<Content: View>(
+    identity: Identity?, role: String, canAdjust: Bool, content: () -> Content
+  ) -> some View {
+    let content = content().disabled(!isEnabled || !canAdjust)
+    if let identity {
       StyleRouteView(
-        target: .init(identity: incrementIdentity, family: "StepperStyle", role: "increment"),
-        content: content().disabled(!isEnabled || !canIncrement))
+        target: .init(identity: identity, family: "StepperStyle", role: role),
+        content: content)
     } else {
-      content()
+      content
     }
   }
 
@@ -210,7 +217,7 @@ private struct StepperStyleRow: View {
       isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
       isPressed: configuration.isPressed)
     let accent = active ? contentChrome.borderStyle : AnyShapeStyle(.separator)
-    ValueControlStyleRow(
+    ControlStyleRow(
       chrome: chrome, focusActive: configuration.focusActive,
       isHighlighted: active, reservesRail: !compact
     ) {

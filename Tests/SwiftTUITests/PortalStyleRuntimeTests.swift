@@ -48,6 +48,40 @@ struct PortalStyleRuntimeTests {
       $0.code == "style.invalidPresentation"
     }
     #expect(issues.count == 1)
+    #expect(issues.first?.message.contains("invalid-fixture") == true)
+  }
+
+  @Test(
+    "a closed declaration reports nothing for an invalid style until it presents",
+    arguments: [PortalTestFamily.alert, .confirmation, .sheet, .cover, .popover])
+  func closedDeclarationsAreSilent(family: PortalTestFamily) {
+    // The style is read while closed, so a later opening uses the current
+    // value; the call and its validation wait for the surface, so nothing
+    // that never renders can fall back or warn.
+    let closed = portalStyleFrame(family: family, invalid: true, presented: false)
+    #expect(
+      closed.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.isEmpty)
+    let open = portalStyleFrame(family: family, invalid: true, presented: true)
+    #expect(
+      open.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+  }
+
+  @Test(
+    "a style set while the declaration is closed applies on its next opening",
+    arguments: [false, true])
+  func styleChangeWhileClosed(itemBased: Bool) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("Root"), size: .init(width: 60, height: 24)
+    ) { PortalStyleSwapFixture(itemBased: itemBased) }
+    defer { harness.shutdown() }
+    let first = try harness.clickText("Open portal")
+    #expect(first.contains("Presented body"))
+    _ = try harness.pressKey(KeyPress(.escape))
+    #expect(!harness.frame.contains("Presented body"))
+    _ = try harness.clickText("Restyle")
+    let second = try harness.clickText("Open portal")
+    #expect(second.contains("Presented body"))
+    #expect(second != first)
   }
 }
 
@@ -145,33 +179,57 @@ private struct PortalStyleJourney: View {
 }
 
 @MainActor
-private func portalStyleFrame(family: PortalTestFamily, invalid: Bool) -> RenderSnapshot {
+private func portalStyleFrame(
+  family: PortalTestFamily, invalid: Bool, presented: Bool = true
+) -> RenderSnapshot {
   DefaultRenderer().render(
-    InvalidPortalStyleFixture(family: family, invalid: invalid),
+    InvalidPortalStyleFixture(family: family, invalid: invalid, presented: presented),
     context: .init(identity: testIdentity("Root")), proposal: .init(width: 50, height: 20))
 }
 
 private struct InvalidPortalStyleFixture: View {
   let family: PortalTestFamily
   let invalid: Bool
+  var presented = true
   @ViewBuilder var body: some View {
     switch family {
     case .alert:
-      Text("Base").alert("Title", isPresented: .constant(true))
+      Text("Base").alert("Title", isPresented: .constant(presented))
         .promptStyle(InvalidPortalStyle(invalid: invalid))
     case .confirmation:
-      Text("Base").confirmationDialog("Title", isPresented: .constant(true))
+      Text("Base").confirmationDialog("Title", isPresented: .constant(presented))
         .promptStyle(InvalidPortalStyle(invalid: invalid))
     case .sheet, .dropdown:
-      Text("Base").sheet("Title", isPresented: .constant(true)) { Text("Body") }
+      Text("Base").sheet("Title", isPresented: .constant(presented)) { Text("Body") }
         .sheetStyle(InvalidPortalStyle(invalid: invalid))
     case .cover:
-      Text("Base").fullScreenCover(isPresented: .constant(true)) { Text("Body") }
+      Text("Base").fullScreenCover(isPresented: .constant(presented)) { Text("Body") }
         .fullScreenCoverStyle(InvalidPortalStyle(invalid: invalid))
     case .popover:
-      Text("Base").popover(isPresented: .constant(true)) { Text("Body") }
+      Text("Base").popover(isPresented: .constant(presented)) { Text("Body") }
         .popoverStyle(InvalidPortalStyle(invalid: invalid))
     }
+  }
+}
+
+private struct PortalStyleSwapFixture: View {
+  let itemBased: Bool
+  @State private var presented = false
+  @State private var item: PortalStyleJourney.Item?
+  @State private var restyled = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Restyle") { restyled.toggle() }
+      if itemBased {
+        Button("Open portal") { item = .init() }
+          .sheet("Title", item: $item) { _ in Text("Presented body") }
+      } else {
+        Button("Open portal") { presented = true }
+          .sheet("Title", isPresented: $presented) { Text("Presented body") }
+      }
+    }
+    .sheetStyle(restyled ? AnySheetStyle(ConsumerPortalSheetStyle()) : .automatic)
   }
 }
 

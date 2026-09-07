@@ -130,7 +130,7 @@ public struct AutomaticToggleStyle: ToggleStyle {
 
   @MainActor
   public func makeBody(configuration: ToggleStyleConfiguration) -> some View {
-    AutomaticToggleStyleBody(configuration: configuration)
+    GlyphToggleStyleBody(configuration: configuration, glyphs: .radio)
   }
 }
 
@@ -147,7 +147,7 @@ public struct CheckboxToggleStyle: ToggleStyle {
 
   @MainActor
   public func makeBody(configuration: ToggleStyleConfiguration) -> some View {
-    CheckboxToggleStyleBody(configuration: configuration)
+    GlyphToggleStyleBody(configuration: configuration, glyphs: .checkbox)
   }
 }
 
@@ -200,36 +200,30 @@ private struct ConcreteAnyToggleStyleBox<S: ToggleStyle>: AnyToggleStyleBox {
   }
 }
 
-private struct AutomaticToggleStyleBody: View {
-  let configuration: ToggleStyleConfiguration
+/// The off, on, and mixed glyphs of a glyph-led toggle row.
+private struct ToggleGlyphs {
+  let off: String
+  let on: String
+  let mixed: String
 
-  var body: some View {
-    let chrome = configuration.styleEnvironment.rowChrome(
-      isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
-      isPressed: configuration.isPressed)
-    BoundControlStyleRow(
-      chrome: chrome, focusActive: configuration.focusActive,
-      isHighlighted: configuration.focusActive || configuration.isPressed
-    ) {
-      Text(configuration.isMixed ? "◐" : configuration.isOn ? "◉" : "○")
-        .foregroundStyle(configuration.isOn ? chrome.borderStyle : AnyShapeStyle(.separator))
-      configuration.label
-    }
-  }
+  static let radio = ToggleGlyphs(off: "○", on: "◉", mixed: "◐")
+  static let checkbox = ToggleGlyphs(off: "☐", on: "☑", mixed: "⊟")
 }
 
-private struct CheckboxToggleStyleBody: View {
+/// The automatic and checkbox treatments: a state glyph before the label.
+private struct GlyphToggleStyleBody: View {
   let configuration: ToggleStyleConfiguration
+  let glyphs: ToggleGlyphs
 
   var body: some View {
     let chrome = configuration.styleEnvironment.rowChrome(
       isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
       isPressed: configuration.isPressed)
-    BoundControlStyleRow(
+    ControlStyleRow(
       chrome: chrome, focusActive: configuration.focusActive,
       isHighlighted: configuration.focusActive || configuration.isPressed
     ) {
-      Text(configuration.isMixed ? "⊟" : configuration.isOn ? "☑" : "☐")
+      Text(configuration.isMixed ? glyphs.mixed : configuration.isOn ? glyphs.on : glyphs.off)
         .foregroundStyle(configuration.isOn ? chrome.borderStyle : AnyShapeStyle(.separator))
       configuration.label
     }
@@ -244,7 +238,7 @@ private struct ButtonToggleStyleBody: View {
     let chrome = configuration.styleEnvironment.rowChrome(
       isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
       isPressed: configuration.isPressed, isSelected: selected)
-    BoundControlStyleRow(
+    ControlStyleRow(
       chrome: chrome, focusActive: configuration.focusActive,
       isHighlighted: configuration.focusActive || configuration.isPressed || selected
     ) {

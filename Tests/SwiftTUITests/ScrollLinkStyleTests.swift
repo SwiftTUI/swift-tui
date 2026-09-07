@@ -59,6 +59,10 @@ struct ScrollLinkStyleTests {
     )
     let issues = frame.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }
     #expect(issues.count == 1)
+    // The report rides the shared misuse channel and names the offender.
+    #expect(issues.first?.source == "ScrollViewStyle")
+    #expect(issues.first?.message.contains("ConsumerScrollViewStyle") == true)
+    #expect(issues.first?.message.contains("automatic values") == true)
     let text = frame.rasterSurface.lines.joined()
     #expect(text.contains("▐"))
     #expect(text.contains("="))
@@ -317,6 +321,79 @@ struct ScrollLinkStyleTests {
     #expect(probe.destinations == ["https://example.com", "https://example.com"])
     _ = try harness.clickText("Disabled")
     #expect(probe.destinations.count == 2)
+  }
+
+  @Test("standalone links inherit ambient decorations unless the style or the label clears them")
+  func standaloneLinkDecorations() throws {
+    let frame = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        // An inheriting underline shows the ambient one; no style sets a
+        // strikethrough, so that decoration is ambient in every arm.
+        Link("Inherit", destination: "https://example.com")
+          .linkStyle(ConsumerLinkStyle(underline: .inherited))
+        Link("Plain", destination: "https://example.com").linkStyle(.plain)
+        Link(Text("Cleared").underline(false), destination: "https://example.com")
+          .linkStyle(ConsumerLinkStyle(underline: .inherited))
+      }
+      .underline().strikethrough(),
+      context: .init(identity: testIdentity("Ambient")), proposal: .init(width: 20, height: 4))
+    let runs = allLinkRuns(in: frame.resolvedTree)
+    let inherit = try #require(runs.first { $0.text == "Inherit" })
+    #expect(inherit.style.underlineStyle == .init(pattern: .solid))
+    #expect(inherit.style.strikethroughStyle == .init(pattern: .solid))
+    let plain = try #require(runs.first { $0.text == "Plain" })
+    #expect(plain.style.underlineStyle == nil)
+    #expect(plain.style.strikethroughStyle == .init(pattern: .solid))
+    let cleared = try #require(runs.first { $0.text == "Cleared" })
+    #expect(cleared.style.underlineStyle == nil)
+    #expect(cleared.style.strikethroughStyle == .init(pattern: .solid))
+  }
+
+  @Test("an out-of-range link opacity falls back to inheritance and reports once")
+  func invalidLinkOpacity() throws {
+    let context = ResolveContext(identity: testIdentity("Opacity"))
+    let invalid = DefaultRenderer().render(
+      Text("See \(Link("Docs", destination: "https://example.com"))")
+        .linkStyle(ConsumerLinkStyle(opacity: 4)),
+      context: context)
+    let run = try #require(allLinkRuns(in: invalid.resolvedTree).first)
+    #expect(run.style.opacity == 1)
+    let issues = invalid.diagnostics.runtime.issues.filter {
+      $0.code == "style.invalidPresentation"
+    }
+    #expect(issues.count == 1)
+    #expect(issues.first?.source == "LinkStyle")
+    #expect(issues.first?.message.contains("opacity") == true)
+    let valid = DefaultRenderer().render(
+      Text("See \(Link("Docs", destination: "https://example.com"))")
+        .linkStyle(ConsumerLinkStyle(opacity: 0.5)),
+      context: context)
+    #expect(try #require(allLinkRuns(in: valid.resolvedTree).first).style.opacity == 0.5)
+    #expect(
+      valid.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.isEmpty)
+  }
+
+  @Test("collection bodies keep their full hit region; a scroll body excludes its reserved track")
+  func collectionHitRegions() throws {
+    let listID = testIdentity("List")
+    let list = DefaultRenderer().render(
+      List { ForEach(0..<12, id: \.self) { Text("Row \($0)") } }.listStyle(.insetGrouped)
+        .id(listID),
+      context: .init(identity: testIdentity("Root")), proposal: .init(width: 20, height: 6))
+    let listRegion = try #require(
+      list.semanticSnapshot.interactionRegions.first { $0.identity == listID })
+    // The border ring has no route of its own: a wheel or press there is
+    // the list's, while its scroll route still clamps to the content.
+    #expect(listRegion.rect == CellRect(origin: .zero, size: .init(width: 20, height: 6)))
+    let route = try #require(list.semanticSnapshot.scrollRoutes.first { $0.identity == listID })
+    #expect(route.viewportRect == CellRect(origin: .init(x: 1, y: 1), size: .init(width: 18, height: 4)))
+    let scrollID = testIdentity("Scroll")
+    let scroll = DefaultRenderer().render(
+      ScrollView { Text(String(repeating: "content\n", count: 20)) }.id(scrollID),
+      context: .init(identity: testIdentity("Root")), proposal: .init(width: 12, height: 6))
+    let scrollRegion = try #require(
+      scroll.semanticSnapshot.interactionRegions.first { $0.identity == scrollID })
+    #expect(scrollRegion.rect == CellRect(origin: .zero, size: .init(width: 11, height: 6)))
   }
 
   private func allLinkRuns(in node: ResolvedNode) -> [RichTextRun] {

@@ -221,6 +221,8 @@ private struct RoundedBorderTextEditorStyleBody: View {
           focusChrome.borderStyle,
           style: configuration.focusActive ? .heavy : .init())
       }
-      .frame(minHeight: 3, alignment: .topLeading)
+      // A stack-minimum hint keeps the editor content-sized under a finite
+      // proposal; a flexible frame would fill it.
+      .layoutMetadata(.init(minimumHeight: 3))
   }
 }

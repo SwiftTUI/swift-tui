@@ -44,20 +44,10 @@ private func promptPresentationSpec(
     token: token, defaultDismissTitle: defaultDismissTitle,
     prepareSurface: { context in
       let style = context.environmentValues.promptStyle
-      let terminalSize = context.environmentValues.terminalSize
-      let prominence = context.environmentValues.controlProminence
-      let environment = context.environmentValues.styleEnvironmentSnapshot
-      let identity = context.identity
+      let inputs = PortalStyleResolveInputs(context)
       return PreparedPortalSurface { hasMessage, hasActions in
-        let resolved = style.presentation(
-          for: .init(
-            hasMessage: hasMessage, hasActions: hasActions, defaultPresentation: baseline,
-            terminalSize: terminalSize, controlProminence: prominence, styleEnvironment: environment
-          ))
-        let presentation = StyleMisuse.validatedPresentation(
-          resolved, problems: resolved.validationProblems, family: "PromptStyle",
-          styleLabel: style.description, identity: identity,
-          report: ImperativeRuntimeIssueQueue.record, fallback: { baseline })
+        let presentation = inputs.resolvedPromptPresentation(
+          style: style, baseline: baseline, hasMessage: hasMessage, hasActions: hasActions)
         return PortalSurfacePresentation(
           alignment: alignment, backdropOpacity: presentation.backdropOpacity,
           hostInsets: .init(horizontal: 1, vertical: 1), accessibilityRole: accessibilityRole
@@ -95,8 +85,11 @@ package func sheetPromptPresentationSpec(
   return .init(
     token: "sheet", defaultDismissTitle: "Close",
     prepareSurface: { context in
-      let presentation = context.resolvedSheetPresentation(baseline: baseline)
-      return PreparedPortalSurface { _, _ in sheetSurfacePresentation(presentation) }
+      let style = context.environmentValues.sheetStyle
+      let inputs = PortalStyleResolveInputs(context)
+      return PreparedPortalSurface { _, _ in
+        sheetSurfacePresentation(inputs.resolvedSheetPresentation(style: style, baseline: baseline))
+      }
     },
     reconcile: { registry, identity, item in
       registry.sheet.sync(sourceIdentity: identity, items: [item])
@@ -143,19 +136,13 @@ package func fullScreenCoverPromptPresentationSpec() -> PromptPresentationSpec {
   .init(
     token: "fullScreenCover", defaultDismissTitle: "Close",
     prepareSurface: { context in
-      let baseline = FullScreenSurfaceStylePresentation()
       let style = context.environmentValues.fullScreenCoverStyle
-      let resolved = style.presentation(
-        for: .init(
-          defaultPresentation: baseline, terminalSize: context.environmentValues.terminalSize,
-          controlProminence: context.environmentValues.controlProminence,
-          styleEnvironment: context.environmentValues.styleEnvironmentSnapshot))
-      let presentation = StyleMisuse.validatedPresentation(
-        resolved, problems: resolved.validationProblems, family: "FullScreenCoverStyle",
-        styleLabel: style.description, identity: context.identity,
-        report: ImperativeRuntimeIssueQueue.record, fallback: { baseline })
+      let inputs = PortalStyleResolveInputs(context)
       return PreparedPortalSurface { _, _ in
-        PortalSurfacePresentation(alignment: .topLeading, accessibilityRole: .sheet) { item in
+        let presentation = inputs.resolvedFullScreenCoverPresentation(
+          style: style, baseline: FullScreenSurfaceStylePresentation())
+        return PortalSurfacePresentation(alignment: .topLeading, accessibilityRole: .sheet) {
+          item in
           FullScreenContentPortalSurface(item: item, presentation: presentation)
         }
       }

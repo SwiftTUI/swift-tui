@@ -110,20 +110,3 @@ extension PopoverStyle where Self == AutomaticPopoverStyle {
 
 extension AutomaticPopoverStyle: ReuseTransparentStyle {}
 
-extension ResolveContext {
-  @MainActor
-  package func resolvedPopoverPresentation() -> AnchoredSurfaceStylePresentation {
-    // Popovers keep their rounded stroke; Menu's shared value has its own baseline.
-    let baseline = AnchoredSurfaceStylePresentation(borderStroke: StrokeStyle())
-    let style = environmentValues.popoverStyle
-    let resolved = style.presentation(
-      for: .init(
-        defaultPresentation: baseline, terminalSize: environmentValues.terminalSize,
-        controlProminence: environmentValues.controlProminence,
-        styleEnvironment: environmentValues.styleEnvironmentSnapshot))
-    return StyleMisuse.validatedPresentation(
-      resolved, problems: resolved.validationProblems, family: "PopoverStyle",
-      styleLabel: style.description, identity: identity,
-      report: ImperativeRuntimeIssueQueue.record, fallback: { baseline })
-  }
-}

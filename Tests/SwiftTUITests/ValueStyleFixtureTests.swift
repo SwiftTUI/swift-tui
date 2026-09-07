@@ -53,6 +53,44 @@ struct ValueStyleFixtureTests {
     #expect(repeated.diagnostics.runtime.issues.isEmpty)
   }
 
+  @Test("fixture routes hand their content the same disabled state as a live control")
+  func fixtureRouteContentState() {
+    let stepper = StepperStyleConfiguration(
+      label: .init { Text("Count") }, valueLabel: .init { Text("0") },
+      canDecrement: false, canIncrement: true,
+      isEnabled: true, isFocused: false, showsFocusEffect: true, isPressed: false,
+      styleEnvironment: .init())
+    let text = render(EnabledStateStepperStyle().makeBody(configuration: stepper))
+      .rasterSurface.lines.joined()
+    #expect(text.contains("less:off"))
+    #expect(text.contains("more:on"))
+    let slider = SliderStyleConfiguration(
+      label: .init { Text("Level") }, valueLabel: .init { Text("5") },
+      fractionCompleted: 0.5, trackCellCount: 8,
+      isEnabled: false, isFocused: false, showsFocusEffect: true, isPressed: false,
+      canDecrement: true, canIncrement: true, styleEnvironment: .init())
+    #expect(
+      render(EnabledStateSliderStyle().makeBody(configuration: slider)).rasterSurface.lines
+        .joined().contains("track:off"))
+  }
+
+  @Test("the compact stepper draws no focus rail and keeps its width when focused")
+  func compactStepperFocus() {
+    var configuration = StepperStyleConfiguration(
+      label: .init { Text("Count") }, valueLabel: .init { Text("0") },
+      canDecrement: true, canIncrement: true,
+      isEnabled: true, isFocused: false, showsFocusEffect: true, isPressed: false,
+      styleEnvironment: .init())
+    let unfocused = render(CompactStepperStyle().makeBody(configuration: configuration))
+    configuration.isFocused = true
+    let focused = render(CompactStepperStyle().makeBody(configuration: configuration))
+    #expect(!focused.rasterSurface.lines.joined().contains("▌"))
+    #expect(focused.rasterSurface.lines == unfocused.rasterSurface.lines)
+    #expect(focused.rasterSurface.lines.joined().contains("− 0 +"))
+    let automatic = render(AutomaticStepperStyle().makeBody(configuration: configuration))
+    #expect(automatic.rasterSurface.lines.joined().contains("▌"))
+  }
+
   private func render<V: View>(_ view: V) -> RenderSnapshot {
     DefaultRenderer().render(
       view, context: .init(identity: Identity(components: ["Fixture"])),

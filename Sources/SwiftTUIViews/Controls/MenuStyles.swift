@@ -209,7 +209,9 @@ public struct AutomaticMenuStyle: MenuStyle {
   public init() {}
   public var snapshotLabel: String { "AnyMenuStyle.automatic" }
   @MainActor public func makeBody(configuration: MenuStyleConfiguration) -> some View {
-    AutomaticMenuStyleBody(configuration: configuration)
+    FloatingMenuStyleBody(configuration: configuration) {
+      MenuAutomaticTrigger(configuration: configuration)
+    }
   }
 }
 extension MenuStyle where Self == AutomaticMenuStyle {
@@ -222,7 +224,12 @@ public struct ButtonMenuStyle: MenuStyle {
   public init() {}
   public var snapshotLabel: String { "AnyMenuStyle.button" }
   @MainActor public func makeBody(configuration: MenuStyleConfiguration) -> some View {
-    ButtonMenuStyleBody(configuration: configuration)
+    FloatingMenuStyleBody(configuration: configuration) {
+      MenuButtonTrigger(configuration: configuration)
+        .padding(.horizontal, 1)
+        .border(
+          menuTriggerChrome(for: configuration).borderStyle, set: .rounded, placement: .outset)
+    }
   }
 }
 extension MenuStyle where Self == ButtonMenuStyle {
@@ -235,7 +242,9 @@ public struct BorderlessButtonMenuStyle: MenuStyle {
   public init() {}
   public var snapshotLabel: String { "AnyMenuStyle.borderlessButton" }
   @MainActor public func makeBody(configuration: MenuStyleConfiguration) -> some View {
-    BorderlessButtonMenuStyleBody(configuration: configuration)
+    FloatingMenuStyleBody(configuration: configuration) {
+      MenuButtonTrigger(configuration: configuration)
+    }
   }
 }
 extension MenuStyle where Self == BorderlessButtonMenuStyle {
@@ -256,23 +265,37 @@ extension MenuStyle where Self == InlineMenuStyle {
 }
 extension InlineMenuStyle: ReuseTransparentStyle {}
 
-private struct AutomaticMenuStyleBody: View {
+/// The floating treatments: the configuration's portal around its pointer
+/// trigger, differing only in the trigger they compose.
+private struct FloatingMenuStyleBody<Trigger: View>: View {
   let configuration: MenuStyleConfiguration
+  let trigger: Trigger
+
+  init(configuration: MenuStyleConfiguration, @ViewBuilder trigger: () -> Trigger) {
+    self.configuration = configuration
+    self.trigger = trigger()
+  }
+
   var body: some View {
     configuration.portal(presentation: .init()) {
-      configuration.trigger { MenuAutomaticTrigger(configuration: configuration) }
+      configuration.trigger { trigger }
     }
   }
+}
+
+/// The control chrome every built-in trigger derives from its configuration.
+private func menuTriggerChrome(for configuration: MenuStyleConfiguration) -> ControlChrome {
+  configuration.styleEnvironment.controlChrome(
+    isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
+    isPressed: configuration.isPressed)
 }
 
 private struct MenuAutomaticTrigger: View {
   let configuration: MenuStyleConfiguration
   var body: some View {
-    let chrome = configuration.styleEnvironment.controlChrome(
-      isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
-      isPressed: configuration.isPressed)
+    let chrome = menuTriggerChrome(for: configuration)
     VStack(alignment: .leading, spacing: 0) {
-      BoundControlStyleRow(
+      ControlStyleRow(
         chrome: chrome, focusActive: configuration.focusActive,
         isHighlighted: configuration.focusActive || configuration.isPressed
       ) {
@@ -284,38 +307,10 @@ private struct MenuAutomaticTrigger: View {
   }
 }
 
-private struct ButtonMenuStyleBody: View {
-  let configuration: MenuStyleConfiguration
-  var body: some View {
-    configuration.portal(presentation: .init()) {
-      configuration.trigger {
-        MenuButtonTrigger(configuration: configuration)
-          .padding(.horizontal, 1)
-          .border(
-            configuration.styleEnvironment.controlChrome(
-              isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
-              isPressed: configuration.isPressed
-            ).borderStyle, set: .rounded, placement: .outset)
-      }
-    }
-  }
-}
-
-private struct BorderlessButtonMenuStyleBody: View {
-  let configuration: MenuStyleConfiguration
-  var body: some View {
-    configuration.portal(presentation: .init()) {
-      configuration.trigger { MenuButtonTrigger(configuration: configuration) }
-    }
-  }
-}
-
 private struct MenuButtonTrigger: View {
   let configuration: MenuStyleConfiguration
   var body: some View {
-    let chrome = configuration.styleEnvironment.controlChrome(
-      isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
-      isPressed: configuration.isPressed)
+    let chrome = menuTriggerChrome(for: configuration)
     HStack(spacing: 1) {
       configuration.label
       Text(configuration.isPresented ? "▴" : "▾")

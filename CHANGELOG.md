@@ -6,6 +6,43 @@ All notable changes to SwiftTUI are documented here. The format is based on
 SwiftTUI is pre-1.0: while the public surface is being proven, minor releases
 may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
+## [Unreleased]
+
+### Fixed
+
+- **Bordered group boxes and rounded-border editors are content-sized again.**
+  0.11.0 replaced their stack-minimum height hint with a flexible frame, which
+  fills any finite height proposal: beside a centered sibling or under a
+  fixed-height parent the chrome grew past its content. The hint is back and
+  both are pinned against measured heights.
+- **The editor caret map wraps at the width its content is placed at.** The
+  probe measured the ScrollView, not the content the scroll body proposes one
+  cell narrower when it reserves an indicator track, or narrower still under
+  scroll-style insets, so vertical caret moves drifted a column in overflowing
+  editors.
+- **List and Table bodies keep their full hit region.** The 0.11.0 scroll-body
+  change also narrowed collection bodies to their content bounds, so a wheel or
+  press on a bordered list's border fell through to an ancestor.
+- **Standalone links inherit ambient decorations.** An ancestor `underline()`
+  or `strikethrough()` reached inline links but not a `Link` view.
+- **A `ViewThatFits` in a style body no longer reports false duplicate routes.**
+  Every candidate resolves and one is placed; each candidate now claims routes
+  on its own ledger, so the placed candidate keeps its pointer target.
+- Slider and stepper route wrappers hand their content the documented disabled
+  state on the fixture path too, and a continuous slider over a subnormal span
+  no longer hangs deriving its steps.
+
+### Changed
+
+- **Portal styles are called when the surface presents.** Sheet, cover, and
+  popover declarations still read the nearest style while closed, but call and
+  validate it only on presentation, like prompts already did, so a closed
+  declaration with an invalid style no longer warns on every frame. Anchored,
+  sheet, and prompt presentations reject a single inset or minimum width too
+  large to add to a terminal extent. `LinkStyle` validates an opacity outside
+  the unit range and reports it. Scroll-style and missing-route reports use
+  the shared misuse message shape.
+
 ## [0.11.1] - 2026-09-06
 
 ### Fixed

@@ -70,7 +70,8 @@ package func captureCapturedSubviewHeadFallbacks(
   guard let root = graph.root else { return [] }
   let owners = root.committed.preferenceValues[CapturedSubviewOwnersPreferenceKey.self]
   return owners.compactMap { owner in
-    guard let node = graph.nodeForOwnerLifetimeID(owner.ownerLifetime),
+    guard owner.graphScope == graph.stateGraphScopeID,
+      let node = graph.nodeForOwnerLifetimeID(owner.ownerLifetime),
       let locator = node.stateSlotStorage(ordinal: StateSlotOrdinals.capturedSubviewLocator)?
         .value(as: DormantStateArchiveLocator.self), !locator.nodeIDs.isEmpty
     else { return nil }

@@ -203,6 +203,34 @@ struct PassiveCompositionStyleTests {
     }
   }
 
+  @Test("a bordered group box stays content-sized under a finite proposal")
+  func groupBoxMeasuredHeight() {
+    // A flexible frame would fill the proposal; the box must report its
+    // chrome height so a centered sibling lands beside it, not four rows down.
+    let lone = render(GroupBox { Text("A") })
+    #expect(lone.measuredTree.measuredSize.height == 3)
+    let labeled = render(GroupBox("Group") { Text("A") })
+    #expect(labeled.measuredTree.measuredSize.height == 4)
+    let row = render(
+      HStack(alignment: .center) {
+        GroupBox { Text("A") }
+        Text("B")
+      })
+    #expect(row.rasterSurface.lines[1].contains("B"))
+  }
+
+  @Test("an explicitly authored empty label is a present slot")
+  func emptyLabelIsPresent() {
+    let probe = PassiveStyleEnvironmentProbe()
+    _ = render(
+      VStack {
+        GroupBox { Text("Value") }
+        GroupBox(content: { Text("Value") }, label: { EmptyView() })
+      }
+      .groupBoxStyle(InspectingGroupBoxStyle(probe: probe)))
+    #expect(probe.hasLabel == [false, true])
+  }
+
   private func expectSameSurface<A: View, B: View>(
     _ actual: A, _ expected: B, width: Int = 24
   ) {

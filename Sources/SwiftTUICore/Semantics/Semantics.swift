@@ -504,7 +504,13 @@ extension SemanticExtractor {
     // A scroll body's hit target is its content viewport. Indicator tracks
     // have separate routes, and the direct-pan guard compares this target
     // with the published scroll viewport to distinguish an inner control.
-    let semanticBounds = node.scrollViewportRect ?? semanticBounds(for: node)
+    // Lists and tables publish a viewport too, for their scroll routes, but
+    // their border ring has no route of its own: a wheel or press there
+    // belongs to the collection, so their hit target stays the full bounds.
+    let semanticBounds =
+      node.drawMetadata.scrollIndicatorAppearance != nil
+      ? node.scrollViewportRect ?? semanticBounds(for: node)
+      : semanticBounds(for: node)
     guard let clipRect else {
       return semanticBounds.isEmpty ? nil : semanticBounds
     }

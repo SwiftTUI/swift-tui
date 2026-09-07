@@ -104,15 +104,20 @@ public struct SliderStyleConfiguration: Sendable {
   }
 
   /// Installs the primitive's track pointer target. Install once; fixture routes are inert.
+  ///
+  /// The content receives the slider's enabled state on both the live and
+  /// the fixture path, so a style body that reads `isEnabled` renders the
+  /// same way under test as it does in a live control.
   @ViewBuilder @MainActor
   public func track<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    let content = content().disabled(!isEnabled)
     if let trackIdentity {
       StyleRouteView(
         target: .init(
           identity: trackIdentity, family: "SliderStyle", role: "track", captureOnPress: true),
-        content: content().disabled(!isEnabled))
+        content: content)
     } else {
-      content()
+      content
     }
   }
 
@@ -200,7 +205,7 @@ private struct LinearSliderStyleBody: View {
       configuration.fractionCompleted.isFinite
       ? min(max(configuration.fractionCompleted, 0), 1) : 0
     let position = min(width - 1, max(0, Int((fraction * Double(width - 1)).rounded())))
-    ValueControlStyleRow(
+    ControlStyleRow(
       chrome: chrome, focusActive: configuration.focusActive, isHighlighted: active
     ) {
       configuration.label.foregroundStyle(.terminalBorder(.accent))

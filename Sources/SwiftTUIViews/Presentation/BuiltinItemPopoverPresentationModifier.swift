@@ -28,12 +28,14 @@ package struct BuiltinItemPopoverPresentationModifier<
       authoringContext: onDismissAuthoringContext
     )
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let presentation = context.resolvedPopoverPresentation()
+    let popoverStyle = context.environmentValues.popoverStyle
+    let styleInputs = PortalStyleResolveInputs(context)
     return resolveItemPresentationModifier(
       content: content,
       item: itemBinding,
       in: context
     ) { background, triggerIdentity, currentItem in
+      let presentation = styleInputs.resolvedPopoverPresentation(style: popoverStyle)
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(
         for: background,
@@ -125,7 +127,8 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
     )
     let dismissedTipID = $dismissedTipID
     let dismissInvalidator = context.invalidationProxy?.invalidator
-    let presentation = context.resolvedPopoverPresentation()
+    let popoverStyle = context.environmentValues.popoverStyle
+    let styleInputs = PortalStyleResolveInputs(context)
     let isActive: @MainActor @Sendable () -> Bool
     if suppressed {
       isActive = { false }
@@ -144,6 +147,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
       guard !suppressed, let tip else {
         return .init(declarations: [])
       }
+      let presentation = styleInputs.resolvedPopoverPresentation(style: popoverStyle)
       let sourceIdentity = background.identity
       let portalEntryID = presentationAttachment(
         for: background,

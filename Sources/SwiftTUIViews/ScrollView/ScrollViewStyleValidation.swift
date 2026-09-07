@@ -9,7 +9,15 @@ func validatedScrollPresentation(
 ) -> ScrollViewStylePresentation {
   var result = proposed
   var problems: [String] = []
-  let automatic = AutomaticScrollViewStyle().resolvePresentation(for: configuration)
+  // Each invalid field falls back on its own; the automatic presentation is
+  // resolved only once a field needs it.
+  var automaticPresentation: ScrollViewStylePresentation?
+  var automatic: ScrollViewStylePresentation {
+    if let automaticPresentation { return automaticPresentation }
+    let resolved = AutomaticScrollViewStyle().resolvePresentation(for: configuration)
+    automaticPresentation = resolved
+    return resolved
+  }
   func isCell(_ glyph: String) -> Bool {
     glyph.count == 1 && glyph.first.map { cellWidth(of: $0) == 1 } == true
       && glyph.unicodeScalars.allSatisfy {
@@ -38,11 +46,9 @@ func validatedScrollPresentation(
   }
   if !problems.isEmpty {
     ImperativeRuntimeIssueQueue.record(
-      .init(
-        severity: .warning, code: "style.invalidPresentation",
-        message: "ScrollViewStyle \(styleLabel): " + problems.joined(separator: "; ")
-          + ". Invalid fields use their automatic values for this resolve.",
-        identity: identity, source: "ScrollViewStyle"))
+      StyleMisuse.partiallyInvalidPresentationIssue(
+        family: "ScrollViewStyle", styleLabel: styleLabel, problems: problems,
+        identity: identity))
   }
   return result
 }

@@ -128,7 +128,46 @@ struct MenuStyleRuntimeTests {
     #expect(actions.dispatch(identity: id))
     let frame = renderer.render(view, context: context, proposal: .init(width: 40, height: 12))
     #expect(frame.rasterSurface.lines.joined().contains("Presented child"))
-    #expect(frame.diagnostics.runtime.issues.contains { $0.code == "style.missingRequiredRoute" })
+    let issues = frame.diagnostics.runtime.issues.filter { $0.code == "style.missingRequiredRoute" }
+    #expect(issues.count == 1)
+    #expect(issues.first?.source == "MenuStyle")
+    #expect(issues.first?.message.contains("MissingMenuContentStyle") == true)
+    #expect(issues.first?.message.contains("portal wrapper") == true)
+  }
+
+  @Test(
+    "a presented menu disabled in place keeps its content visible with its actions disabled",
+    arguments: [0, 1])
+  func disabledWhilePresented(styleIndex: Int) throws {
+    let styles: [AnyMenuStyle] = [.automatic, .inline]
+    let probe = MenuActionProbe()
+    let id = testIdentity("Menu")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("Root"), size: .init(width: 40, height: 12)
+    ) {
+      MenuDisableFixture(style: styles[styleIndex], probe: probe).id(id)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Commands")
+    #expect(harness.frame.contains("Run command"))
+    // The established rule for the floating treatment (presentation
+    // semantics stress 008) holds for the inline one too: the expansion is
+    // kept, the commands and the trigger reject activation.
+    _ = try harness.clickText("Disable")
+    #expect(harness.frame.contains("Run command"))
+    _ = try harness.clickText("Run command")
+    #expect(probe.activations == 0)
+    if styleIndex == 1 {
+      // The floating portal covers its own trigger row; the inline trigger
+      // stays visible and rejects the toggle while disabled.
+      _ = try harness.clickText("Commands")
+      #expect(harness.frame.contains("Run command"))
+    }
+    _ = try harness.clickText("Enable")
+    _ = try harness.clickText("Run command")
+    #expect(probe.activations == 1)
+    _ = try harness.pressKey(KeyPress(.escape))
+    #expect(!harness.frame.contains("Run command"))
   }
 
   @Test("invalid anchored sizing falls back to the automatic presentation")
@@ -170,6 +209,21 @@ struct MenuStyleRuntimeTests {
 }
 
 @MainActor private final class MenuActionProbe { var activations = 0 }
+
+private struct MenuDisableFixture: View {
+  let style: AnyMenuStyle
+  let probe: MenuActionProbe
+  @State private var disabled = false
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Menu("Commands") { Button("Run command") { probe.activations += 1 } }
+        .menuStyle(style).disabled(disabled)
+      Spacer()
+      // Below the floating portal's reach, so it stays clickable while open.
+      Button(disabled ? "Enable" : "Disable") { disabled.toggle() }
+    }
+  }
+}
 private func menuRouteCount(_ node: ResolvedNode, identity: Identity) -> Int {
   let own = node.kind == .view("PointerRoute") && node.identity == identity ? 1 : 0
   return own + node.children.reduce(0) { $0 + menuRouteCount($1, identity: identity) }

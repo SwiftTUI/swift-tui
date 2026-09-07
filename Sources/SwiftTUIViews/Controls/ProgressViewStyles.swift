@@ -248,10 +248,10 @@ private struct LinearProgressViewStyleBody: View {
         ProgressStyleHeader(configuration: configuration)
         if let fraction = configuration.fractionCompleted {
           let normalized = fraction.isFinite ? min(max(fraction, 0), 1) : 0
-          let filled = min(width, max(0, Int((normalized * Double(width)).rounded())))
+          let track = metricTrackString(fraction: normalized, barWidth: width)
           HStack(alignment: .center, spacing: 0) {
-            Text(String(repeating: "█", count: filled)).foregroundStyle(.tint)
-            Text(String(repeating: "─", count: width - filled)).foregroundStyle(.separator)
+            Text(track.filled).foregroundStyle(.tint)
+            Text(track.empty).foregroundStyle(.separator)
           }
         } else {
           let band = max(1, width / 3 + (width % 3 == 0 ? 0 : 1))

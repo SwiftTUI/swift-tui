@@ -101,10 +101,21 @@ package func resolvedRichTextPayload(
     context: context,
     rootIdentity: context.identity
   )
+  // A standalone link is its own rich-text root, so it seeds the ambient
+  // decorations the same way `Text` does; the link presentation then merges
+  // over them and the label's own clears still win.
+  let decorations = ambientTextDecorations(in: context)
+  var inheritedStyle = TextStyle()
+  if !link.label.underlineExplicitlyCleared {
+    inheritedStyle.underlineStyle = decorations.underline
+  }
+  if !link.label.strikethroughExplicitlyCleared {
+    inheritedStyle.strikethroughStyle = decorations.strikethrough
+  }
   let payload = RichTextPayload(
     runs: builder.runs(
       for: link,
-      inheritedStyle: .init(),
+      inheritedStyle: inheritedStyle,
       inlineIdentifier: nil,
       linkIdentity: context.identity
     )
@@ -265,12 +276,22 @@ private func linkTextStyle(
   let isFocused = context.environmentValues.focusedIdentity(comparedAgainst: [identity]) == identity
   let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
   let isPressed = context.environmentValues.pressedIdentity(comparedAgainst: [identity]) == identity
-  let presentation = context.environmentValues.linkStyle.presentation(
+  let linkStyle = context.environmentValues.linkStyle
+  var presentation = linkStyle.presentation(
     for: .init(
       isInline: isInline, isEnabled: context.environmentValues.isEnabled,
       isFocused: isFocused, showsFocusEffect: showsFocusEffect, isPressed: isPressed,
       styleEnvironment: styleEnvironment)
   )
+  // The only field the run merge would pass through unchecked: an opacity
+  // outside the unit range bakes an unbounded factor into the cell color.
+  if let opacity = presentation.opacity, !opacity.isFinite || !(0...1).contains(opacity) {
+    ImperativeRuntimeIssueQueue.record(
+      StyleMisuse.partiallyInvalidPresentationIssue(
+        family: "LinkStyle", styleLabel: linkStyle.description,
+        problems: ["opacity must be finite and between zero and one"], identity: identity))
+    presentation.opacity = nil
+  }
   var style = inheritedStyle.merging(
     TextStyle(
       foregroundStyle: presentation.foregroundStyle,

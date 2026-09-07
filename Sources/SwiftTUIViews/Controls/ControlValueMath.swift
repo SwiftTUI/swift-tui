@@ -280,11 +280,14 @@ package func continuousSliderSteps(
   for bounds: ClosedRange<Double>
 ) -> (track: Double, adjustment: Double) {
   let span = bounds.upperBound - bounds.lowerBound
-  guard span.isFinite, span > 0 else {
+  let target = span / 100
+  // A subnormal target underflows the quantum to zero in the first loop,
+  // and `0 * 10 <= target` then never exits the second. Treat such a span
+  // as degenerate, like a non-positive one.
+  guard span.isFinite, span > 0, target.isNormal else {
     return (track: 1, adjustment: 1)
   }
 
-  let target = span / 100
   var quantum = 1.0
   while quantum > target {
     quantum /= 10

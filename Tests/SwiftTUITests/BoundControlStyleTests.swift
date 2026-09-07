@@ -141,6 +141,9 @@ struct BoundControlStyleTests {
       ProgressView("Working").progressViewStyle(.circular).spinnerStyle(.lineCompass),
       context: context, proposal: .init(width: 24, height: 8))
     #expect(normal.rasterSurface.lines.joined().contains("Working"))
+    // The composed Spinner reads the nearest spinner style: the compass
+    // treatment's first frame, not the automatic spinner's.
+    #expect(normal.rasterSurface.lines.joined().contains("│"))
     #expect(!tasks.snapshot().isEmpty)
     let reducedTasks = LocalTaskRegistry()
     environment.accessibilityReduceMotion = true
@@ -152,6 +155,82 @@ struct BoundControlStyleTests {
       proposal: .init(width: 24, height: 8))
     #expect(reduced.rasterSurface.lines.joined().contains("Working"))
     #expect(reducedTasks.snapshot().isEmpty)
+  }
+
+  @Test("a rounded-border editor stays content-sized under a finite proposal")
+  func editorMeasuredHeight() {
+    let lone = render(TextEditor(text: .constant("A")))
+    #expect(lone.measuredTree.measuredSize.height == 3)
+    let row = render(
+      HStack(alignment: .center) {
+        TextEditor(text: .constant("A"))
+        Text("B")
+      })
+    #expect(row.rasterSurface.lines[1].contains("B"))
+  }
+
+  @Test(
+    "caret movement follows the width the editor content is placed at",
+    arguments: [EditorWrapCase.reservedTrack, .styledInsets])
+  func editorWrapFollowsPlacedWidth(_ wrapCase: EditorWrapCase) throws {
+    let text = String(repeating: "ABCDEFGHIJ", count: 6)
+    let value = BoundStyleValue(text)
+    let editorID = testIdentity("Editor")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("Root"), size: .init(width: 20, height: 8)
+    ) {
+      TextEditor(text: value.binding).id(editorID)
+        .scrollViewStyle(
+          wrapCase == .styledInsets
+            ? AnyScrollViewStyle(ConsumerScrollViewStyle(insets: .init(horizontal: 2, vertical: 0)))
+            : .automatic
+        )
+        .frame(width: 14, height: 5, alignment: .topLeading)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.focus(editorID)
+    _ = try harness.pressKey(KeyPress(.arrowUp))
+    _ = try harness.pressKey(KeyPress(.character("!")))
+    #expect(value.writes == 1)
+    let inserted = try #require(value.value.firstIndex(of: "!"))
+    let actual = TextOffset(value.value.distance(from: value.value.startIndex, to: inserted))
+    // The editor's inner width is 12 (the frame minus its border). The scroll
+    // body proposes the content one cell narrower for the reserved track, or
+    // four narrower for the styled insets. The framework's own map predicts
+    // where an upward move from the end lands at each width; the runtime
+    // must agree with the content width, and the two widths must disagree,
+    // or the test would pass with a map wrapped at the ScrollView's width.
+    let scrollWidth = 12
+    let contentWidth = wrapCase == .reservedTrack ? 11 : 8
+    func predicted(width: Int) -> TextOffset {
+      TextInputPresentation(
+        value: .init(text: text, selection: .caret(at: TextOffset(text.count))),
+        traits: .multiline, prompt: nil, isFocused: true, cursorFollowsFocus: false, width: width
+      )
+      .layoutMap
+      .verticalOffset(from: TextOffset(text.count), delta: -1, preferredVisualColumn: nil).offset
+    }
+    #expect(predicted(width: contentWidth) != predicted(width: scrollWidth))
+    #expect(actual == predicted(width: contentWidth))
+  }
+
+  @Test("toggle and disclosure rails honor focusEffectDisabled through the primitive")
+  func focusEffectDisabledRails() {
+    let identity = testIdentity("Root")
+    var environment = EnvironmentValues()
+    environment.focusedIdentity = identity
+    let context = ResolveContext(
+      identity: identity, environmentValues: environment, applyEnvironmentValues: true)
+    func text<V: View>(_ view: V) -> String {
+      DefaultRenderer().render(view, context: context, proposal: .init(width: 28, height: 6))
+        .rasterSurface.lines.joined()
+    }
+    let toggle = Toggle("Switch", isOn: .constant(true))
+    #expect(text(toggle).contains("▌"))
+    #expect(!text(toggle.focusEffectDisabled()).contains("▌"))
+    let group = DisclosureGroup("Details", isExpanded: .constant(false)) { Text("Child") }
+    #expect(text(group).contains("▌"))
+    #expect(!text(group.focusEffectDisabled()).contains("▌"))
   }
 
   private func same<A: View, B: View>(_ actual: A, _ expected: B) {
@@ -167,6 +246,8 @@ struct BoundControlStyleTests {
       proposal: .init(width: 28, height: 8))
   }
 }
+
+enum EditorWrapCase { case reservedTrack, styledInsets }
 
 @MainActor
 private final class BoundStyleValue<Value: Sendable> {

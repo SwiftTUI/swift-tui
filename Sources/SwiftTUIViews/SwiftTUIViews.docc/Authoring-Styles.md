@@ -73,6 +73,13 @@ If a presented style omits both content and the portal wrapper, Menu reports
 `style.missingRequiredRoute` and renders its automatic body for that resolve.
 ``AnchoredSurfaceStylePresentation`` bounds the outer width and the content
 viewport height before insets; an unbounded height preserves intrinsic layout.
+A disabled menu keeps its expansion: disabling one while it is presented
+leaves the content visible with its commands and trigger disabled, and it
+can be dismissed again once re-enabled (a floating portal's own Escape still
+dismisses it while disabled).
+A style change that moves the captured content between an inline and a
+floating host re-hosts it, so state inside the content does not survive that
+move; ``ControlGroupStyle`` retains its captured children across hosts.
 
 ``ControlGroupStyle`` composes the optional label and captured content in any
 layout. Its compact built-in composes a public ``Menu``. The declaring group
@@ -131,7 +138,9 @@ Spinner().spinnerStyle(DotsSpinnerStyle())
 Presentation fields follow one naming rule: a field typed `AnyShapeStyle`
 is a paint and is named `…Style`; a field typed `StrokeStyle` is stroke
 geometry and is named `…Stroke`. Where a border is styleable the
-presentation carries both, and a `nil` paint means theme-derived.
+presentation carries both. Sheet and prompt paints are optional, and a `nil`
+paint means theme-derived; cover and popover surfaces carry a concrete
+background paint whose default is the theme's surface background.
 
 Portal families give the style the declaring modifier's own baseline rather
 than making it restate the constants: ``SheetStyleConfiguration`` carries
@@ -153,6 +162,12 @@ struct WideSheetStyle: SheetStyle {
 }
 ```
 
+The sheet's `.standard` container honors every field of its presentation.
+The `.dropdown` container is a full-width surface without header chrome: it
+honors the scroll heights, `contentInsets` (applied inside its scroll body),
+`backdropOpacity`, `backgroundStyle`, and `borderStyle` (as its bottom rule),
+and ignores `minimumWidth`, `maximumWidth`, `headerTone`, and `borderStroke`.
+
 ``PromptStyle`` serves both alerts and confirmation dialogs. Its configuration
 reports whether message and action content is present and supplies that
 declaration's baseline. The style does not select alignment, accessibility
@@ -164,12 +179,17 @@ baseline and their own modal policy. Boolean and item declarations read the
 same style, including while closed, so a later opening uses the current value.
 
 An invalid presentation value — empty spinner frames, a non-positive
-cadence, active frames of mixed cell width — never traps. The surface emits
-one `style.invalidPresentation` runtime issue naming the family and the
-style, and renders the family's automatic presentation for that resolve.
-Scroll styling validates each indicator glyph independently: each must be one
-grapheme occupying one terminal cell. Invalid glyphs, insets, or opacity fall
-back to their automatic field values while retaining other valid fields.
+cadence, active frames of mixed cell width, an inset too large to add to a
+terminal extent — never traps. The surface emits one
+`style.invalidPresentation` runtime issue naming the family and the style,
+and renders the family's automatic presentation for that resolve. Two
+families whose values carry independent fields fall back per field instead:
+scroll styling validates each indicator glyph (one grapheme in one terminal
+cell), the insets, and the opacity on their own, and link styling validates
+its optional opacity, so an invalid field uses its automatic value while the
+valid fields are kept. A closed portal declaration reads its style, so a
+later opening uses the current value, but does not call it: nothing that
+never renders falls back or reports.
 
 ### Scroll and link appearance
 
@@ -251,6 +271,11 @@ Every route wrapper follows the same rules, and none of them traps:
   their content and install nothing, which is what lets a style body
   resolve in a test with no presentation coordinator or input pipeline (see
   <doc:Testing-Styles>).
+- **A route offered in several candidates of a `ViewThatFits` is one
+  installation per placed candidate.** Every candidate resolves and layout
+  places one, so each candidate claims its routes on its own ledger: no
+  duplicate is reported across candidates, and the placed candidate keeps
+  its pointer target. A duplicate inside one candidate still reports.
 
 ### Picker options and menu triggers
 
@@ -322,7 +347,8 @@ At `HEAD` the environment-scoped families are ``ButtonStyle``,
 ``TabViewStyle``, together with ``LabelStyle``, ``LabeledContentStyle``, and
 ``GroupBoxStyle``, ``ToggleStyle``, ``DisclosureGroupStyle``, ``TextEditorStyle``,
 ``ProgressViewStyle``, ``SliderStyle``, ``StepperStyle``, ``MenuStyle``,
-``ControlGroupStyle``, ``PromptStyle``, ``FullScreenCoverStyle``, and ``PopoverStyle``.
+``ControlGroupStyle``, ``PromptStyle``, ``FullScreenCoverStyle``, ``PopoverStyle``,
+``PaletteStyle``, ``ScrollViewStyle``, and ``LinkStyle``.
 ``ToastStyle`` is deliberately declaration-scoped: a
 toast's tone is per-toast data, so `.toast(..., style:)` keeps its
 parameter and no toast environment key exists. The remaining styleable
@@ -334,7 +360,10 @@ surfaces, and the order they gain families, are recorded in
 These three families receive captured authored slots and a
 `StyleEnvironmentSnapshot`. The slots keep their authoring scope when the
 style places them in its body. Styling introduces no focus stop or action of
-its own; controls inside the slots retain their normal behavior.
+its own; controls inside the slots retain their normal behavior. Unlike
+``ControlGroupStyle``, these families do not retain a slot's child state
+when a style hosts the slot elsewhere or omits it, so keep a slot in the body
+when its content owns state.
 
 | Family | Built-ins | Configuration slots |
 | --- | --- | --- |
@@ -388,7 +417,10 @@ padding. The built-in `.automatic` style aliases `.roundedBorder`; `.plain`
 removes the surrounding chrome.
 
 ``ProgressViewStyleConfiguration/fractionCompleted`` is `nil` for indeterminate
-progress. Its `indeterminatePhase` is a deterministic rendering seed for moving
+progress. Its optional label slots are `nil` for an absent label and for an
+explicitly authored `EmptyView`, because the unlabeled initializers author
+one; the group-box rule that an authored `EmptyView` is a present slot does
+not apply here. Its `indeterminatePhase` is a deterministic rendering seed for moving
 tracks. `.automatic` aliases `.linear`. `.circular` renders determinate progress
 as a ring and composes ``Spinner`` for indeterminate progress, inheriting the
 nearest spinner style. Reduced motion and stable output use static status
