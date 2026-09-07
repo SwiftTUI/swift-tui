@@ -30,3 +30,9 @@ isolated|AsyncFrameTailRenderingTests
 isolated|TaskReadsUnbodiedStateTests
 isolated|PerTickPresentCadenceTests
 isolated|ObservationDraftWindowRuntimeTests
+# Isolated for the duration ratchet rather than for contention: the three
+# lab-mirror journeys are linear harness journeys with no iteration count to
+# read from stressIterations(full:hotPath:), and the longest sits at the 20 s
+# hard bound on the amd64 runner class (19.99-20.22 s across the 0.11.1 and
+# 0.11.2 gate runs; T174). The core lane has no per-test duration bound.
+isolated|PresentationOverlayCoexistenceTests

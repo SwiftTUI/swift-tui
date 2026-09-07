@@ -985,6 +985,16 @@ if lane_runs_core; then
     "Run SwiftTUI observation draft-window tests" \
     "$(swift_command_text test --filter SwiftTUITests.ObservationDraftWindowRuntimeTests)" \
     run_swift test --filter SwiftTUITests.ObservationDraftWindowRuntimeTests
+
+  # Isolated for the duration ratchet, not for contention: the three
+  # lab-mirror journeys are linear harness journeys with no iteration count
+  # to ratchet, and the longest sits at the 20 s hard bound on the amd64
+  # runner class (19.99-20.22 s across the 0.11.1 and 0.11.2 gate runs;
+  # T174). The core lane has no per-test duration bound.
+  run_function_step \
+    "Run SwiftTUI presentation overlay coexistence tests" \
+    "$(swift_command_text test --filter SwiftTUITests.PresentationOverlayCoexistenceTests)" \
+    run_swift test --filter SwiftTUITests.PresentationOverlayCoexistenceTests
 fi
 
 # --- Runtime lane: the serialized SwiftTUITests surface --------------------
