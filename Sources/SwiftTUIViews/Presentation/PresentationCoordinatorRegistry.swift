@@ -237,12 +237,15 @@ package final class PresentationCoordinatorRegistry {
   package let menu = PresentationCoordinatorBox<MenuPresentationCoordinator>()
   package let toast = PresentationCoordinatorBox<ToastPresentationCoordinator>()
   private lazy var allBoxes = [
-    AnyPresentationCoordinatorBox(alert),
-    AnyPresentationCoordinatorBox(confirmationDialog),
+    // A reconcile activates newly declared families in priority order.
+    // Simultaneous prompts therefore cover stacking surfaces; a descendant
+    // discovered by the next composition pass still activates above its parent.
+    AnyPresentationCoordinatorBox(toast),
+    AnyPresentationCoordinatorBox(menu),
     AnyPresentationCoordinatorBox(sheet),
     AnyPresentationCoordinatorBox(popover),
-    AnyPresentationCoordinatorBox(menu),
-    AnyPresentationCoordinatorBox(toast),
+    AnyPresentationCoordinatorBox(confirmationDialog),
+    AnyPresentationCoordinatorBox(alert),
   ]
 
   /// The declaration mint generations observed by the most recent

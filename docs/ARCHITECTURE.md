@@ -263,6 +263,10 @@ crosses the host boundary. Alert and confirmation share PromptStyle; cover and
 popover have independent presentation-value families. Boolean and item sheet
 declarations both resolve SheetStyle. Coordinators retain focus, modal policy,
 stacking, Escape, action scopes, and committed dismissal observers.
+Painting and Escape share cross-family activation order, and the topmost modal
+suppresses routes in all earlier surfaces. Popover content resolves eagerly;
+its custom layout reads the source's current rendered frame during placement,
+so nested declarations reach presentation reconciliation before layout.
 
 ```
 Sources/

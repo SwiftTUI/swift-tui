@@ -12,7 +12,7 @@ package struct DismissStack {
     entries
       .filter(\.acceptsEscape)
       .max { lhs, rhs in
-        portalDismissRecencyPrecedes(lhs.ordering, rhs.ordering)
+        portalOrderingPrecedes(lhs.ordering, rhs.ordering)
       }?
       .dismiss
   }

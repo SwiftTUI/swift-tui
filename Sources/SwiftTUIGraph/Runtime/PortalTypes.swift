@@ -74,9 +74,9 @@ package enum PortalModalPolicy: Equatable, Sendable {
   case disablesBaseInteraction
 }
 
-/// Deterministic ordering key for overlay entries. Drawing stacks by
-/// ``portalOrderingPrecedes`` (z-index first); Escape dismissal unwinds by
-/// ``portalDismissRecencyPrecedes`` (activation recency first).
+/// Shared ordering key for painting, hit testing, and Escape dismissal.
+/// Activation recency crosses family boundaries so a nested presentation
+/// appears above its presenter. Family priority breaks activation ties.
 package struct PortalOrdering: Equatable, Sendable {
   package var zIndex: Int
   package var activationOrdinal: Int
@@ -97,11 +97,11 @@ package func portalOrderingPrecedes(
   _ lhs: PortalOrdering,
   _ rhs: PortalOrdering
 ) -> Bool {
-  if lhs.zIndex != rhs.zIndex {
-    return lhs.zIndex < rhs.zIndex
-  }
   if lhs.activationOrdinal != rhs.activationOrdinal {
     return lhs.activationOrdinal < rhs.activationOrdinal
+  }
+  if lhs.zIndex != rhs.zIndex {
+    return lhs.zIndex < rhs.zIndex
   }
   return lhs.stableTieBreaker < rhs.stableTieBreaker
 }
@@ -111,22 +111,6 @@ package func portalOrderingIsAbove(
   _ rhs: PortalOrdering
 ) -> Bool {
   portalOrderingPrecedes(rhs, lhs)
-}
-
-/// Escape-dismissal order: the most recently activated entry unwinds first,
-/// regardless of which family's z-band it paints in. Z-index only breaks
-/// ties between entries activated in the same reconcile.
-package func portalDismissRecencyPrecedes(
-  _ lhs: PortalOrdering,
-  _ rhs: PortalOrdering
-) -> Bool {
-  if lhs.activationOrdinal != rhs.activationOrdinal {
-    return lhs.activationOrdinal < rhs.activationOrdinal
-  }
-  if lhs.zIndex != rhs.zIndex {
-    return lhs.zIndex < rhs.zIndex
-  }
-  return lhs.stableTieBreaker < rhs.stableTieBreaker
 }
 
 /// Dismiss route for an overlay entry.

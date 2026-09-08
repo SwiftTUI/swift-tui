@@ -72,7 +72,17 @@ border, or implicit close button.
 When multiple presentation sources are active, SwiftTUI preserves each
 source's own binding, mounted state, tasks, and dismissal callback. Sheets,
 full-screen covers, popovers, and menus remain mounted as separate surfaces.
-The most recently activated surface is drawn above earlier surfaces.
+The most recently activated surface is drawn above earlier surfaces across
+families: a menu opened inside a sheet or popover appears above its presenter,
+and a sheet subsequently opened from that menu appears above the menu.
+Painting, pointer hit testing, and Escape share this order. The topmost modal
+blocks interaction with the base and earlier surfaces while keeping their
+content mounted. Later nonmodal surfaces remain interactive.
+
+When several families first activate in the same reconciliation pass, their
+priority from bottom to top is toast, menu, sheet/full-screen cover, popover,
+confirmation dialog, then alert. Presentations activated in a later pass appear
+above them regardless of family.
 
 Alerts and confirmation dialogs instead form first-in, first-out queues. Only
 the oldest active prompt is visible. A waiting prompt's source remains active,

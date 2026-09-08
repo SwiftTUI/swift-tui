@@ -137,6 +137,53 @@ struct StackedPresentationTests {
     registry.dismissStack().topmostEscapeDismissAction()?()
 
     #expect(dismissals == ["sheet-b"])
+    #expect(registry.overlayEntries().map { $0.portalEntryID?.token } == ["alert-a", "sheet-b"])
+  }
+
+  @Test("simultaneous families use priority and preserve order through refresh and rollback")
+  func simultaneousFamilyPriority() {
+    let registry = PresentationCoordinatorRegistry()
+    let source = testIdentity("SimultaneousPresentations")
+    let declarations: [PresentationCoordinatorDeclaration] = [
+      .init(sourceIdentity: source) { registry in
+        registry.alert.sync(
+          sourceIdentity: source,
+          items: [
+            stackedPromptItem(id: "alert", spec: alertPromptPresentationSpec())
+          ])
+        registry.confirmationDialog.sync(
+          sourceIdentity: source,
+          items: [
+            stackedPromptItem(id: "dialog", spec: confirmationDialogPromptPresentationSpec())
+          ])
+        registry.sheet.sync(
+          sourceIdentity: source,
+          items: [
+            stackedPromptItem(id: "sheet", spec: sheetPromptPresentationSpec())
+          ])
+        registry.popover.sync(sourceIdentity: source, items: [stackedPopoverItem(id: "popover")])
+        registry.menu.sync(
+          sourceIdentity: source,
+          items: [
+            stackedPromptItem(id: "menu", spec: menuPromptPresentationSpec())
+          ])
+        registry.toast.sync(sourceIdentity: source, items: [stackedToastItem(id: "toast")])
+      }
+    ]
+    registry.reconcile(declarations)
+    #expect(
+      registry.overlayEntries().map(\.kindName) == [
+        "ToastPresentation", "MenuPresentation", "SheetPresentation", "PopoverPresentation",
+        "ConfirmationDialogPresentation", "AlertPresentation",
+      ])
+    let order = registry.overlayEntries().map(\.ordering)
+    let checkpoint = registry.makeCheckpoint()
+    registry.reconcile(declarations)
+    #expect(registry.overlayEntries().map(\.ordering) == order)
+    registry.menu.present(stackedPromptItem(id: "later-menu", spec: menuPromptPresentationSpec()))
+    #expect(registry.overlayEntries().last?.portalEntryID?.token == "later-menu")
+    registry.restoreCheckpoint(checkpoint)
+    #expect(registry.overlayEntries().map(\.ordering) == order)
   }
 
   @Test("covered sheet state and task ownership survive a newer sheet")

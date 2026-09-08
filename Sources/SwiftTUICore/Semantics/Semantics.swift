@@ -330,7 +330,7 @@ extension SemanticExtractor {
           ? frame.node.identity
           : frame.context.sectionIdentity
         let nodeModalFocusScopePath =
-          isModalPresentationRole(frame.node.semanticMetadata.accessibilityRole)
+          isModalPresentationScope(frame.node.semanticMetadata)
           ? nodeScopePath
           : frame.context.modalFocusScopePath
         let nodeClipRect = combinedClipRect(
@@ -425,12 +425,16 @@ extension SemanticExtractor {
     }
   }
 
-  private func isModalPresentationRole(
-    _ role: AccessibilityRole?
+  private func isModalPresentationScope(
+    _ metadata: SemanticMetadata
   ) -> Bool {
-    switch role {
+    switch metadata.accessibilityRole {
     case .alert, .confirmationDialog, .sheet:
       true
+    case .popover:
+      // Interactive popovers create a scope; read-only tips do not. Keep
+      // return-focus bookkeeping aligned with that presentation policy.
+      metadata.focusScopeBoundary
     default:
       false
     }

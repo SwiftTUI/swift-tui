@@ -2,8 +2,8 @@ import SwiftTUICore
 
 // MARK: - Shared Item Storage
 
-/// Monotonic cross-family mint for presentation activation ordinals. Escape
-/// dismissal unwinds by activation recency across coordinator families
+/// Monotonic cross-family mint for presentation activation ordinals. Painting
+/// and dismissal share activation recency across coordinator families
 /// (menu vs popover vs sheet), so ordinals must be comparable between
 /// families — a per-store counter would tie every family's first entry.
 @MainActor

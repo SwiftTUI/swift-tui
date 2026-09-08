@@ -38,9 +38,9 @@ struct OverlayStackTests {
     #expect(base.semanticMetadata.interactionAvailability == .disabled(reason: .modalOverlay))
     #expect(
       overlays.children.map(\.identity.path) == [
+        "\(rootIdentity.path)/PortalHost/overlays/entry:top",
         "\(rootIdentity.path)/PortalHost/overlays/entry:earlier-low",
         "\(rootIdentity.path)/PortalHost/overlays/entry:later-low",
-        "\(rootIdentity.path)/PortalHost/overlays/entry:top",
       ])
   }
 

@@ -67,6 +67,14 @@ public struct LayoutSubview {
     child.layoutMetadata.fixedSizeVertical
   }
 
+  /// The current pass's rendered frame for an already placed source. Layouts
+  /// using this cross-subtree input must leave `placementReuseSignature` nil.
+  /// Reading at placement keeps geometry-dependent positioning separate from
+  /// content resolution and its preferences, state, and lifecycle ownership.
+  package func renderedFrame(for identity: Identity) -> CellRect? {
+    passContext?.placedFrameTable.renderedFrame(for: identity)
+  }
+
   /// The child's preferred surrounding spacing.
   ///
   /// For a child that is itself a custom-layout container this is the

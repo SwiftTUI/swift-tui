@@ -252,29 +252,23 @@ package struct HostedPopoverPresentation: View {
   }
 
   package var body: some View {
-    GeometryReader { proxy in
-      // The rendered extent, not the wrapper's own recorded frame: the
-      // popover source may sit under a descendant-translating modifier
-      // (`.offset`), whose wrapper rect never moves while the content
-      // renders translated. Anchoring must follow where the source draws.
-      let sourceFrame = proxy.placedFrameTable.renderedFrame(for: item.sourceIdentity)
-      PopoverPlacementLayout(
-        containerSize: proxy.size,
-        sourceFrame: sourceFrame,
-        attachmentAnchor: item.attachmentAnchor,
-        arrowEdge: item.arrowEdge
-      ) {
-        PortalSurfaceRoot(item: item.surfaceItem)
-          .fixedSize(horizontal: true, vertical: true)
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    // Only positioning needs geometry. Resolve the surface in the normal
+    // portal pass so nested presentation declarations participate in that
+    // pass's activation, refresh, and dismissal reconciliation.
+    PopoverPlacementLayout(
+      sourceIdentity: item.sourceIdentity,
+      attachmentAnchor: item.attachmentAnchor,
+      arrowEdge: item.arrowEdge
+    ) {
+      PortalSurfaceRoot(item: item.surfaceItem)
+        .fixedSize(horizontal: true, vertical: true)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 
 private struct PopoverPlacementLayout: Layout {
-  var containerSize: CellSize
-  var sourceFrame: CellRect?
+  var sourceIdentity: Identity
   var attachmentAnchor: PopoverAttachmentAnchor
   var arrowEdge: Edge?
 
@@ -284,8 +278,8 @@ private struct PopoverPlacementLayout: Layout {
     cache _: inout Void
   ) -> LayoutSize {
     LayoutSize(
-      width: resolvedLength(proposal.width, fallback: containerSize.width),
-      height: resolvedLength(proposal.height, fallback: containerSize.height)
+      width: resolvedLength(proposal.width, fallback: 10),
+      height: resolvedLength(proposal.height, fallback: 10)
     )
   }
 
@@ -307,9 +301,11 @@ private struct PopoverPlacementLayout: Layout {
         height: max(0, bounds.size.height)
       )
     )
+    // Read the rendered extent after the source has been placed, including
+    // offsets on its descendants. The default nil placement reuse signature
+    // ensures a moving anchor is consulted on every placement pass.
     let source = attachmentAnchor.attachmentRect(
-      in: sourceFrame ?? fallbackSourceFrame(in: container)
-    )
+      in: surface.renderedFrame(for: sourceIdentity) ?? fallbackSourceFrame(in: container))
     let origin = popoverOrigin(
       for: surfaceSize,
       source: source,

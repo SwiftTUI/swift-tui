@@ -144,14 +144,21 @@ private struct OverlayStackOverlayHost: PrimitiveView, ResolvableView {
   var entries: [OverlayStackEntry]
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let children = entries.map { entry in
+    // A modal blocks every earlier surface, including other portal entries.
+    // Later nonmodal descendants (menus and tips) remain interactive above it.
+    // Keep blocked entries mounted so state, tasks, and restoration survive.
+    let topmostModalIndex = entries.lastIndex { $0.modalPolicy == .disablesBaseInteraction }
+    let children = entries.enumerated().map { index, entry in
       let entryContext = context.child(
         component: .init(
           rawValue: PresentationOverlayEntryIdentityScheme.entryComponent(id: "\(entry.id)")
         )
       )
       return resolveView(
-        OverlayStackEntryHost(entry: entry),
+        OverlayStackEntryHost(
+          entry: entry,
+          interactionBlocked: topmostModalIndex.map { index < $0 } ?? false
+        ),
         in: entryContext
       )
     }
@@ -177,6 +184,7 @@ private struct OverlayStackOverlayHost: PrimitiveView, ResolvableView {
 @MainActor
 private struct OverlayStackEntryHost: PrimitiveView, ResolvableView {
   var entry: OverlayStackEntry
+  var interactionBlocked: Bool
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var bodyContext = context.child(component: .named("body"))
@@ -200,6 +208,9 @@ private struct OverlayStackEntryHost: PrimitiveView, ResolvableView {
         role: .detachedOverlayEntry,
         stableKey: entry.surfaceStableKey,
         invalidationScope: .fullSurfaceDiff
+      ),
+      semanticMetadata: .init(
+        interactionAvailability: interactionBlocked ? .disabled(reason: .modalOverlay) : .enabled
       )
     )
     if let onDismiss = entry.onDismiss {
