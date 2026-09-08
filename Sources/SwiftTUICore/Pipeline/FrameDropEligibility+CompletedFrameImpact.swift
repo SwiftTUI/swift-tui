@@ -24,7 +24,8 @@ extension FrameDropEligibility {
     package init(blocker: Blocker) {
       self.init()
       switch blocker {
-      case .lifecycleAppear, .lifecycleDisappear, .lifecycleChange, .taskStart, .taskCancel:
+      case .lifecycleAppear, .lifecycleDisappear, .lifecycleChange, .taskStart, .taskCancel,
+        .taskTransfer:
         lifecycle = true
       case .handlerInstallations:
         runtimeRegistrations = true

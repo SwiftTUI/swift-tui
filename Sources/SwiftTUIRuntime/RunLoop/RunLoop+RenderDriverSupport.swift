@@ -125,8 +125,9 @@ extension RunLoop {
     guard !carryForward.isEmpty else {
       return
     }
-    let retainedCurrent = lifecycle.filter { !carryForward.contains($0) }
-    lifecycle = carryForward + retainedCurrent
+    var merged = carryForward
+    LifecycleCarryForward.append(lifecycle, to: &merged, deduplicatingWithinEntries: false)
+    lifecycle = merged
   }
 
   /// Drains gesture recognizer deadlines for a frame woken by a `.deadline`

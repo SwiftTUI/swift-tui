@@ -5,6 +5,21 @@ import Testing
 
 @Suite("FrameDropEligibility")
 struct FrameDropEligibilityTests {
+  @Test("task ownership transfers must commit even without visible effects")
+  func taskTransferMustCommit() {
+    let artifacts = makeArtifacts(lifecycle: [
+      .init(
+        viewNodeID: ViewNodeID(rawValue: 42), identity: testIdentity("Row"),
+        operation: .taskTransfer(
+          from: ViewNodeID(rawValue: 41), descriptor: .init(id: "load", priority: .medium)))
+    ])
+    let eligibility = FrameDropEligibility.classify(
+      .init(
+        artifacts: artifacts, hasCompleteBarrierSignals: true))
+    #expect(eligibility.decision == .mustCommit(blockers: [.taskTransfer]))
+    #expect(eligibility.impact.lifecycle)
+  }
+
   @Test("an empty frame falls back to the unobservable blocker")
   func emptyFrameFallsBackToUnobservable() {
     let artifacts = makeArtifacts()

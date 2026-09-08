@@ -37,6 +37,8 @@ package struct CommitPlanner {
         .taskStart(descriptor)
       case .taskCancel(let descriptor):
         .taskCancel(descriptor)
+      case .taskTransfer(let source, let descriptor):
+        .taskTransfer(from: source, descriptor: descriptor)
       }
 
     return .init(

@@ -127,9 +127,7 @@ extension RunLoop {
     _ lifecycle: [LifecycleCommitEntry],
     into carryForward: inout [LifecycleCommitEntry]
   ) {
-    for entry in lifecycle where !carryForward.contains(entry) {
-      carryForward.append(entry)
-    }
+    LifecycleCarryForward.append(lifecycle, to: &carryForward)
   }
 
   /// Shared body of single-pass focus-sync. Applies the side effects that must

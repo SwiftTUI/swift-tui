@@ -11,6 +11,8 @@ extension FrameDropBlocker {
       .taskStart
     case .taskCancel:
       .taskCancel
+    case .taskTransfer:
+      .taskTransfer
     case .handlerInstallations:
       .handlerInstallations
     }

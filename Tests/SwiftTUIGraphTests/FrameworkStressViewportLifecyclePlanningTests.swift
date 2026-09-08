@@ -5,6 +5,103 @@ import Testing
 @MainActor
 @Suite("SwiftTUIGraph viewport lifecycle planning stress behavior", .serialized)
 struct FrameworkStressViewportLifecyclePlanningTests {
+  @Test("T266: unchanged tasks transfer while changed descriptors replace under the new node")
+  func t266PartialTaskMigration() {
+    let identity = testIdentity("Row")
+    let oldID = ViewNodeID(rawValue: 41)
+    let newID = ViewNodeID(rawValue: 42)
+    let stable = lifecycleTask("stable")
+    let oldTask = lifecycleTask("load", priority: .low)
+    let newTask = lifecycleTask("load", priority: .high)
+    let previous = lifecycleStateNode(
+      nodeID: oldID, identity: identity, disappear: ["old"], tasks: [oldTask, stable])
+    let plan = lifecyclePlan(
+      visible: [
+        lifecycleSummary(
+          identity,
+          metadata: .init(
+            appearHandlerIDs: ["appear"], disappearHandlerIDs: ["new"], tasks: [stable, newTask]))
+      ],
+      previous: [.viewNode(oldID): previous], order: [.viewNode(oldID)],
+      nodeIDs: [identity: newID])
+    #expect(
+      plan.events.map(\.operation) == [
+        .taskCancel(oldTask), .taskTransfer(from: oldID, descriptor: stable), .taskStart(newTask),
+      ])
+    #expect(plan.events.map(\.viewNodeID) == [oldID, newID, newID])
+    let departed = lifecyclePlan(
+      visible: [], previous: plan.viewportLifecycleNodesByKey,
+      order: plan.viewportLifecycleOrder)
+    #expect(
+      departed.events.map(\.operation) == [
+        .taskCancel(stable), .taskCancel(newTask), .disappear(handlerIDs: ["new"]),
+      ])
+    #expect(departed.events.allSatisfy { $0.viewNodeID == newID })
+  }
+
+  @Test("T266: an identity fallback retains task ownership until the node index returns")
+  func t266ReverseKeyMigration() {
+    let identity = testIdentity("Row")
+    let oldID = ViewNodeID(rawValue: 41)
+    let newID = ViewNodeID(rawValue: 42)
+    let task = lifecycleTask("load")
+    let previous = lifecycleStateNode(nodeID: oldID, identity: identity, tasks: [task])
+    let visible = [lifecycleSummary(identity, metadata: .init(tasks: [task]))]
+    let fallback = lifecyclePlan(
+      visible: visible, previous: [.viewNode(oldID): previous], order: [.viewNode(oldID)])
+    #expect(fallback.events.isEmpty)
+    #expect(fallback.viewportLifecycleNodesByKey[.identity(identity)]?.viewNodeID == oldID)
+    let remapped = lifecyclePlan(
+      visible: visible, previous: fallback.viewportLifecycleNodesByKey,
+      order: fallback.viewportLifecycleOrder, nodeIDs: [identity: newID])
+    #expect(remapped.events.map(\.operation) == [.taskTransfer(from: oldID, descriptor: task)])
+    #expect(remapped.events.map(\.viewNodeID) == [newID])
+  }
+
+  @Test("T266: duplicate prior identities do not pick an arbitrary task owner")
+  func t266AmbiguousIdentityDoesNotMigrate() {
+    let identity = testIdentity("Duplicate")
+    let firstID = ViewNodeID(rawValue: 41)
+    let secondID = ViewNodeID(rawValue: 42)
+    let newID = ViewNodeID(rawValue: 43)
+    let task = lifecycleTask("load")
+    let previous: [ViewportLifecycleKey: LifecycleStateNode] = [
+      .viewNode(firstID): lifecycleStateNode(nodeID: firstID, identity: identity, tasks: [task]),
+      .viewNode(secondID): lifecycleStateNode(nodeID: secondID, identity: identity, tasks: [task]),
+    ]
+    let plan = lifecyclePlan(
+      visible: [lifecycleSummary(identity, metadata: .init(tasks: [task]))],
+      previous: previous, order: [.viewNode(firstID), .viewNode(secondID)],
+      nodeIDs: [identity: newID])
+    #expect(
+      plan.events.map(\.operation) == [.taskCancel(task), .taskCancel(task), .taskStart(task)])
+    #expect(plan.events.map(\.viewNodeID) == [secondID, firstID, newID])
+    let exact = lifecyclePlan(
+      visible: [lifecycleSummary(identity, metadata: .init(tasks: [task]))],
+      previous: previous, order: [.viewNode(firstID), .viewNode(secondID)],
+      nodeIDs: [identity: secondID])
+    #expect(exact.events.map(\.operation) == [.taskCancel(task)])
+    #expect(exact.events.map(\.viewNodeID) == [firstID])
+  }
+
+  @Test("T266: backing node migration does not synthesize reentry")
+  func t266NodeSwapDoesNotSynthesizeReentry() {
+    let identity = testIdentity("Row")
+    let oldID = ViewNodeID(rawValue: 41)
+    let newID = ViewNodeID(rawValue: 42)
+    let metadata = LifecycleMetadata(
+      appearHandlerIDs: ["appear"], disappearHandlerIDs: ["disappear"])
+    let previous = lifecycleStateNode(
+      nodeID: oldID, identity: identity, appear: ["appear"], disappear: ["disappear"])
+    let plan = lifecyclePlan(
+      visible: [lifecycleSummary(identity, metadata: metadata)],
+      previous: [.viewNode(oldID): previous], order: [.viewNode(oldID)],
+      nodeIDs: [identity: newID])
+    #expect(plan.events.isEmpty)
+    #expect(plan.viewportLifecycleOrder == [.viewNode(newID)])
+    #expect(Set(plan.viewportLifecycleNodesByKey.keys) == [.viewNode(newID)])
+  }
+
   @Test("stress viewport lifecycle 001 duplicate stable cancel is emitted once")
   func viewportLifecycle001DuplicateStableCancelIsEmittedOnce() {
     let task = lifecycleTask("load")

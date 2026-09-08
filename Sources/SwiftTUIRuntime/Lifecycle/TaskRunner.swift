@@ -12,6 +12,17 @@ final class TaskRunner {
     var descriptor: TaskDescriptor
     var generation: Int
     var task: Task<Void, Never>
+    var ownership: TaskOwnership
+  }
+
+  /// Completion follows the current owner while the generation guards replacements.
+  @MainActor
+  private final class TaskOwnership {
+    var key: ActiveTaskKey
+
+    init(key: ActiveTaskKey) {
+      self.key = key
+    }
   }
 
   private var activeTasks: [ActiveTaskKey: ActiveTask] = [:]
@@ -33,7 +44,7 @@ final class TaskRunner {
   ) -> Task<Void, Never> {
     let descriptor = registration.descriptor
     let key = ActiveTaskKey(viewNodeID: viewNodeID, descriptorID: descriptor.id)
-    cancel(viewNodeID: viewNodeID, matching: descriptor)
+    cancel(key: key)
 
     // A node's viewNodeID can churn — a fresh id for the *same* identity on
     // re-evaluation (e.g. a `TimelineView` re-attaching its `.task` each tick).
@@ -53,8 +64,9 @@ final class TaskRunner {
 
     nextGeneration += 1
     let generation = nextGeneration
+    let ownership = TaskOwnership(key: key)
     let task = Task(priority: taskPriority(for: descriptor.priority)) { [weak self] in
-      defer { self?.finish(key: key, generation: generation) }
+      defer { self?.finish(key: ownership.key, generation: generation) }
       // Removal or shutdown can cancel this task before its first actor turn.
       // A retired operation must not enter user code and read released state.
       guard !Task.isCancelled else { return }
@@ -65,9 +77,33 @@ final class TaskRunner {
       identity: identity,
       descriptor: descriptor,
       generation: generation,
-      task: task
+      task: task,
+      ownership: ownership
     )
     return task
+  }
+
+  func transfer(
+    from source: ViewNodeID,
+    to destination: ViewNodeID,
+    identity: Identity,
+    matching descriptor: TaskDescriptor
+  ) {
+    guard source != destination else { return }
+    let sourceKey = ActiveTaskKey(viewNodeID: source, descriptorID: descriptor.id)
+    let destinationKey = ActiveTaskKey(viewNodeID: destination, descriptorID: descriptor.id)
+    guard let activeTask = activeTasks[sourceKey],
+      activeTask.identity == identity, activeTask.descriptor == descriptor
+    else { return }
+    // A newer destination operation wins. Retire the displaced source rather
+    // than overwriting a live handle or leaving work under an obsolete owner.
+    guard activeTasks[destinationKey] == nil else {
+      cancel(key: sourceKey)
+      return
+    }
+    activeTasks.removeValue(forKey: sourceKey)
+    activeTask.ownership.key = destinationKey
+    activeTasks[destinationKey] = activeTask
   }
 
   func cancel(

@@ -252,6 +252,10 @@ package final class LifecycleCoordinator {
         return
       }
       taskRunner.cancel(viewNodeID: viewNodeID, matching: descriptor)
+    case .taskTransfer(let source, let descriptor):
+      guard let destination = entry.viewNodeID else { return }
+      taskRunner.transfer(
+        from: source, to: destination, identity: entry.identity, matching: descriptor)
     }
   }
 

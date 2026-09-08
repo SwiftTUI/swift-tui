@@ -265,6 +265,14 @@ content. Runtime captures those slots before departure and publishes them only
 with an accepted commit. Runtime registrations and presentation hosts depart
 normally. Lazy tabs retain their separate value-only dormancy contract.
 
+Viewport lifecycle carry follows a uniquely matched visible identity when its
+backing node changes. `ViewGraphLifecyclePlanning.swift` emits task transfers
+for unchanged descriptors and keeps replacements keyed to their old cancel and
+new start owners. `LifecycleCoordinator` applies these transfers at commit;
+`TaskRunner` moves the existing handle and its completion owner together.
+`Lifecycle/LifecycleCarryForward.swift` preserves transfer order through deferred
+commits, and the `taskTransfer` frame-drop blocker prevents dropping that work.
+
 Portal declarations capture their style environment before evaluating the
 presentation trigger. `PromptPresentationEntrypoints.swift` selects one of five
 fixed surfaces: prompt actions, standard sheet content, dropdown content,
