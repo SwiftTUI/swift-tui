@@ -630,7 +630,7 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
           passContext: passContext
         )
       }
-      return engine.place(
+      var placed = engine.place(
         child,
         measured: childMeasurement,
         in: LayoutRect(
@@ -644,6 +644,12 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
         viewportContext: placement.viewportContext,
         passContext: passContext
       )
+      if let viewport = placement.viewportContext?.viewportRect {
+        var metadata = placed.placementMetadata
+        metadata.parentScrollViewportRect = viewport
+        placed.placementMetadata = metadata
+      }
+      return placed
     }
   }
 

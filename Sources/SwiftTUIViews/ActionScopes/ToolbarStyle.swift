@@ -81,7 +81,7 @@ extension ToolbarStyle where Self == DefaultBottomToolbarStyle {
 extension DefaultTopToolbarStyle: ReuseTransparentStyle {}
 extension DefaultBottomToolbarStyle: ReuseTransparentStyle {}
 
-private protocol AnyToolbarStyleBox: Sendable {
+private protocol AnyToolbarStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   var placement: ToolbarPlacement { get }
   /// The *concrete* item layout's reuse signature.
@@ -96,11 +96,9 @@ private protocol AnyToolbarStyleBox: Sendable {
 
   @MainActor
   func itemLayout() -> AnyLayout
-  func isEqualForReuse(to other: any AnyToolbarStyleBox) -> Bool
 }
 
-private struct ConcreteToolbarStyleBox<S: ToolbarStyle>: AnyToolbarStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnyToolbarStyleBox where S: ToolbarStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
@@ -119,12 +117,6 @@ private struct ConcreteToolbarStyleBox<S: ToolbarStyle>: AnyToolbarStyleBox {
     AnyLayout(style.itemLayout)
   }
 
-  func isEqualForReuse(to other: any AnyToolbarStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// A type-erased toolbar style.
@@ -140,7 +132,7 @@ public struct AnyToolbarStyle: Sendable, CustomStringConvertible, CustomDebugStr
   public init<S: ToolbarStyle>(
     _ style: S
   ) {
-    box = ConcreteToolbarStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public static var defaultTop: Self {

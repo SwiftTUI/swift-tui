@@ -27,6 +27,11 @@ explicitly opted-in test code. Use the attribute in test targets only.
 
 ## Resolving a body-producing style
 
+To test a style's stored dynamic properties, apply it to a real control through
+its style modifier. Framework resolution prepares those properties before
+`makeBody`. Calling `makeBody` directly is an ordinary Swift call and does not
+run that preparation pass.
+
 Build the configuration, hand it to your style, and render the body with a
 renderer from `SwiftTUIRuntime`. The captured slots take a view builder:
 

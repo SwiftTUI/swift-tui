@@ -80,7 +80,12 @@ package struct SemanticExtractor: Sendable {
           commandHostScopePaths.append(scopePath)
         }
 
-        if participatesInTopLevelFocus, interactionsEnabled, !sealingParentOnChain {
+        let focusEnabled =
+          interactionsEnabled
+          || (node.semanticMetadata.allowsFocusWhenDisabled
+            && !interactionsDisabledOnChain
+            && node.semanticMetadata.interactionAvailability.isEnabled)
+        if participatesInTopLevelFocus, focusEnabled, !sealingParentOnChain {
           focusRegions.append(
             FocusRegion(
               identity: node.identity,

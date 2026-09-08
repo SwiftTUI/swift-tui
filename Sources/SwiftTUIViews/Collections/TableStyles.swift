@@ -55,17 +55,15 @@ public struct TableStyleConfiguration: Sendable {
   }
 }
 
-private protocol AnyTableStyleBox: Sendable {
+private protocol AnyTableStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   var debugDescription: String { get }
 
   @MainActor
   func presentation(for configuration: TableStyleConfiguration) -> TableStylePresentation
-  func isEqualForReuse(to other: any AnyTableStyleBox) -> Bool
 }
 
-private struct ConcreteTableStyleBox<S: TableStyle>: AnyTableStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnyTableStyleBox where S: TableStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
@@ -82,12 +80,6 @@ private struct ConcreteTableStyleBox<S: TableStyle>: AnyTableStyleBox {
     return presentation
   }
 
-  func isEqualForReuse(to other: any AnyTableStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// A type-erased table style.
@@ -97,7 +89,7 @@ public struct AnyTableStyle: Sendable, CustomStringConvertible, CustomDebugStrin
   public init<S: TableStyle>(
     _ style: S
   ) {
-    box = ConcreteTableStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public static var automatic: Self {

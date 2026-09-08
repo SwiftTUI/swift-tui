@@ -148,7 +148,7 @@ public struct AnyControlGroupStyle: Sendable, CustomStringConvertible,
 
   public init<S: ControlGroupStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyControlGroupStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String { snapshotLabel }
@@ -221,8 +221,7 @@ extension ControlGroupStyle where Self == VerticalControlGroupStyle {
 
 extension VerticalControlGroupStyle: ReuseTransparentStyle {}
 
-private protocol AnyControlGroupStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyControlGroupStyleBox) -> Bool
+private protocol AnyControlGroupStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(
@@ -231,24 +230,16 @@ private protocol AnyControlGroupStyleBox: Sendable {
   ) -> ResolvedNode
 }
 
-private struct ConcreteAnyControlGroupStyleBox<S: ControlGroupStyle>: AnyControlGroupStyleBox {
-  let style: S
-
-  func isEqualForReuse(to other: any AnyControlGroupStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyControlGroupStyleBox where S: ControlGroupStyle {
 
   @MainActor
   func resolveBody(
     configuration: ControlGroupStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel,
-      in: context
-    )
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

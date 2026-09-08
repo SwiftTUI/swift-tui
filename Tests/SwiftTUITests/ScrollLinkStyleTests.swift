@@ -129,6 +129,7 @@ struct ScrollLinkStyleTests {
       configuration: configuration, styleLabel: "invalid", identity: testIdentity("InvalidFields"))
     let issues = ImperativeRuntimeIssueQueue.drain()
     #expect(issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+    #expect(issues.first?.message.contains("presentation: invalid") == true)
     #expect(presentation.contentInsets == .zero)
     #expect(presentation.opacity == 1)
     #expect(presentation.verticalIndicatorGlyph == "|")

@@ -274,7 +274,8 @@ extension DrawExtractor {
       contentBounds: content.contentBounds,
       axes: axes,
       axis: .vertical,
-      reservesSpace: appearance?.reservesSpace ?? true
+      reservesSpace: appearance?.reservesSpace ?? true,
+      contentViewportRect: content.placementMetadata.parentScrollViewportRect
     ) {
       commands.append(
         contentsOf: verticalScrollIndicatorCommands(
@@ -291,7 +292,8 @@ extension DrawExtractor {
       contentBounds: content.contentBounds,
       axes: axes,
       axis: .horizontal,
-      reservesSpace: appearance?.reservesSpace ?? true
+      reservesSpace: appearance?.reservesSpace ?? true,
+      contentViewportRect: content.placementMetadata.parentScrollViewportRect
     ) {
       commands.append(
         contentsOf: horizontalScrollIndicatorCommands(

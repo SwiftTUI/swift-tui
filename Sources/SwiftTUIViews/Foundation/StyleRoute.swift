@@ -162,6 +162,17 @@ package func withStyleRouteInstallationLedger<Result>(
   }
 }
 
+/// Shared live/fixture composition. Keeping the conditional shape here makes
+/// optional routes inert without adding a view node or changing content state.
+@ViewBuilder @MainActor
+func styleRoute<Content: View>(target: StyleRouteTarget?, content: Content) -> some View {
+  if let target {
+    StyleRouteView(target: target, content: content)
+  } else {
+    content
+  }
+}
+
 /// The view a route wrapper returns for a live target.
 ///
 /// A first installation resolves exactly as `PointerRouteView` does. A

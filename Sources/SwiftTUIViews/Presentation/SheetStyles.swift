@@ -132,18 +132,16 @@ extension SheetStyle {
   }
 }
 
-private protocol AnySheetStyleBox: Sendable {
+private protocol AnySheetStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
 
   @MainActor
   func presentation(
     for configuration: SheetStyleConfiguration
   ) -> SheetSurfaceStylePresentation
-  func isEqualForReuse(to other: any AnySheetStyleBox) -> Bool
 }
 
-private struct ConcreteSheetStyleBox<S: SheetStyle>: AnySheetStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnySheetStyleBox where S: SheetStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
@@ -156,12 +154,6 @@ private struct ConcreteSheetStyleBox<S: SheetStyle>: AnySheetStyleBox {
     style.resolvePresentation(for: configuration)
   }
 
-  func isEqualForReuse(to other: any AnySheetStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// A type-erased sheet style.
@@ -171,7 +163,7 @@ public struct AnySheetStyle: Sendable, CustomStringConvertible, CustomDebugStrin
   public init<S: SheetStyle>(
     _ style: S
   ) {
-    box = ConcreteSheetStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   /// A documented *fixed* alias of ``surface``.

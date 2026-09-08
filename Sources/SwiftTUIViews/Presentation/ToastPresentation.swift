@@ -9,7 +9,7 @@ public struct AnyToastStyle: Sendable, CustomStringConvertible, CustomDebugStrin
 
   public init<S: ToastStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyToastStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public static var info: Self {
@@ -201,16 +201,14 @@ extension SuccessToastStyle: ReuseTransparentStyle {}
 extension WarningToastStyle: ReuseTransparentStyle {}
 extension DangerToastStyle: ReuseTransparentStyle {}
 
-private protocol AnyToastStyleBox: Sendable {
+private protocol AnyToastStyleBox: AnyStyleBox {
   @MainActor
   func presentation(
     for configuration: ToastStyleConfiguration
   ) -> ToastStylePresentation
-  func isEqualForReuse(to other: any AnyToastStyleBox) -> Bool
 }
 
-private struct ConcreteAnyToastStyleBox<S: ToastStyle>: AnyToastStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnyToastStyleBox where S: ToastStyle {
 
   @MainActor
   func presentation(
@@ -219,12 +217,6 @@ private struct ConcreteAnyToastStyleBox<S: ToastStyle>: AnyToastStyleBox {
     style.resolvePresentation(for: configuration)
   }
 
-  func isEqualForReuse(to other: any AnyToastStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 private func semanticToastStylePresentation(

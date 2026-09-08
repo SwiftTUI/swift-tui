@@ -65,13 +65,10 @@ public struct PaletteStyleConfiguration: Sendable {
     /// Marks content as this command's pointer activation target.
     @ViewBuilder @MainActor
     public func route<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-      if let routeIdentity {
-        StyleRouteView(
-          target: .init(identity: routeIdentity, family: "PaletteStyle", role: "command"),
-          content: content())
-      } else {
-        content()
-      }
+      styleRoute(
+        target: routeIdentity.map { routeIdentity in
+          StyleRouteTarget(identity: routeIdentity, family: "PaletteStyle", role: "command")
+        }, content: content())
     }
 
     /// Invokes the enabled contribution and requests coordinated dismissal.
@@ -117,7 +114,7 @@ public struct AnyPaletteStyle: Sendable, CustomStringConvertible, CustomDebugStr
 
   public init<S: PaletteStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyPaletteStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
   public var description: String { snapshotLabel }
   public var debugDescription: String { snapshotLabel }
@@ -138,24 +135,18 @@ extension AnyPaletteStyle: TypedReuseEqualityProviding {
   }
 }
 
-private protocol AnyPaletteStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyPaletteStyleBox) -> Bool
+private protocol AnyPaletteStyleBox: AnyStyleBox {
   @MainActor func resolveBody(configuration: PaletteStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
 }
 
-private struct ConcreteAnyPaletteStyleBox<S: PaletteStyle>: AnyPaletteStyleBox {
-  let style: S
-  func isEqualForReuse(to other: any AnyPaletteStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyPaletteStyleBox where S: PaletteStyle {
   @MainActor
   func resolveBody(configuration: PaletteStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
   {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel, in: context)
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }

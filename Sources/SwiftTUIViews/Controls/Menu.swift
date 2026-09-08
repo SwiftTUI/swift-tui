@@ -54,6 +54,10 @@ public struct Menu<Label: View, Content: View>: PrimitiveView, ResolvableView {
       MenuStateHost(menu: self, controlIdentity: context.identity),
       in: context.child(component: .named("MenuState")))
     var metadata = focusableControlMetadata(focusInteractions: .activate, accessibilityRole: .menu)
+    // The open menu remains a keyboard dismissal target after disablement.
+    // Its commands and pointer routes still obey the disabled environment.
+    metadata.allowsFocusWhenDisabled = menuIsExpanded(
+      in: context.viewGraph?.nodeForIdentity(context.identity.child(.named("MenuState"))))
     // Keep geometric evidence that the keyboard action has no pointer area.
     // Merely omitting its region permits the runtime's ancestor-action fallback.
     metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
@@ -78,13 +82,14 @@ extension Menu {
     let controlIdentity: Identity
 
     func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+      let owner = ViewNodeContext.current?.stateOwnerHandle
       let body = menu.resolvedBody(
         in: context.replacingIdentity(with: controlIdentity), ownerNode: ViewNodeContext.current)
-      return [
-        ResolvedNode(
-          identity: context.identity, kind: .view("MenuState"), children: [body],
-          environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
-      ]
+      var node = ResolvedNode(
+        identity: context.identity, kind: .view("MenuState"), children: [body],
+        environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
+      if let owner { node.preferenceValues[CapturedSubviewOwnersPreferenceKey.self].insert(owner) }
+      return [node]
     }
   }
 
@@ -102,8 +107,8 @@ extension Menu {
     let isEnabled = context.environmentValues.isEnabled
     // A disabled menu keeps its expansion: disabling one while it is
     // presented leaves the content visible with its actions disabled (pinned
-    // by the presentation-semantics stress suite), and it can be dismissed
-    // again once re-enabled.
+    // by the presentation-semantics stress suite). Dismissal remains available
+    // while disabled, just as it does for a floating portal.
     let isExpanded = menuIsExpanded(in: ownerNode)
     let owner = ownerNode?.stateOwnerHandle
     let controlIdentity = context.identity
@@ -115,12 +120,12 @@ extension Menu {
           invalidationIdentity: controlIdentity)
       })
 
+    let binding = expansionBinding
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      fallbackAuthoringScope: authoringScope
+    )
     if isEnabled {
-      let binding = expansionBinding
-      let intake = HandlerDescriptorIntake(
-        context: context,
-        fallbackAuthoringScope: authoringScope
-      )
       intake.registerAction(identity: context.identity) {
         binding.wrappedValue.toggle()
         return true
@@ -136,6 +141,8 @@ extension Menu {
         default: return .ignored
         }
       }
+    }
+    if isExpanded {
       let dismissOnEscape: @MainActor (KeyPress) -> Bool = { key in
         guard key.modifiers.isEmpty, key.key == .escape, binding.wrappedValue else { return false }
         binding.wrappedValue = false
@@ -156,6 +163,10 @@ extension Menu {
       isEnabled: isEnabled, isFocused: isFocused, showsFocusEffect: showsFocusEffect,
       isPressed: isPressed, styleEnvironment: styleEnvironment)
     configuration.bindRoutes(to: context.identity, presentation: expansionBinding)
+    if let owner {
+      configuration.content.retention = CapturedSubviewRetention(
+        owner: owner, identity: context.identity.child(.named("MenuContent")))
+    }
     let style = context.environmentValues.menuStyle
     let bodyContext = context.child(component: .named("MenuBody"))
     let child = style.resolveBody(configuration: configuration, in: bodyContext)

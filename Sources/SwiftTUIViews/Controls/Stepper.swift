@@ -153,24 +153,7 @@ extension Stepper {
       intake.registerAction(identity: context.identity) {
         adjust(1)
       }
-      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
-        guard keyPress.modifiers.isEmpty else {
-          return false
-        }
-        let deltaCount: Int
-        switch keyPress.key {
-        case .arrowLeft:
-          deltaCount = -1
-        case .arrowRight:
-          deltaCount = 1
-        default:
-          return false
-        }
-
-        return adjust(deltaCount)
-      }
-
-      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+      registerValueAdjustmentInput(intake: intake, identity: context.identity, adjust: adjust)
       let decrementRouteID = runtimePrimaryRouteID(
         for: stepperDecrementIdentity(for: context.identity)
       )
@@ -178,16 +161,6 @@ extension Stepper {
         for: stepperIncrementIdentity(for: context.identity)
       )
 
-      intake.registerPointerHandler(routeID: rootRouteID) { event in
-        guard case .scrolled(let deltaX, let deltaY) = event.kind,
-          let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY)
-        else {
-          return .ignored
-        }
-
-        let handled = adjust(wheelDelta)
-        return handled ? .claimed : .ignored
-      }
       // Each half claims its press whether or not the value can move: a click
       // on the affordance is an interaction owned by that route even at a
       // bound. The action is press-driven, but the same route owns the

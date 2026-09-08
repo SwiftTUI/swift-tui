@@ -118,17 +118,15 @@ public struct GlyphSpinnerStyle: SpinnerStyle, Equatable, Sendable {
   }
 }
 
-private protocol AnySpinnerStyleBox: Sendable {
+private protocol AnySpinnerStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   var debugDescription: String { get }
 
   @MainActor
   func presentation(for configuration: SpinnerStyleConfiguration) -> SpinnerStylePresentation
-  func isEqualForReuse(to other: any AnySpinnerStyleBox) -> Bool
 }
 
-private struct ConcreteSpinnerStyleBox<S: SpinnerStyle>: AnySpinnerStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnySpinnerStyleBox where S: SpinnerStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
@@ -143,12 +141,6 @@ private struct ConcreteSpinnerStyleBox<S: SpinnerStyle>: AnySpinnerStyleBox {
     style.resolvePresentation(for: configuration)
   }
 
-  func isEqualForReuse(to other: any AnySpinnerStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// A type-erased spinner style.
@@ -158,7 +150,7 @@ public struct AnySpinnerStyle: Sendable, CustomStringConvertible, CustomDebugStr
   public init<S: SpinnerStyle>(
     _ style: S
   ) {
-    box = ConcreteSpinnerStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String {

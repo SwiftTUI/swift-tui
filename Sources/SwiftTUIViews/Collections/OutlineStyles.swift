@@ -36,17 +36,15 @@ public struct OutlineStyleConfiguration: Sendable {
   }
 }
 
-private protocol AnyOutlineStyleBox: Sendable {
+private protocol AnyOutlineStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   var debugDescription: String { get }
 
   @MainActor
   func presentation(for configuration: OutlineStyleConfiguration) -> OutlineStylePresentation
-  func isEqualForReuse(to other: any AnyOutlineStyleBox) -> Bool
 }
 
-private struct ConcreteOutlineStyleBox<S: OutlineStyle>: AnyOutlineStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnyOutlineStyleBox where S: OutlineStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
@@ -63,12 +61,6 @@ private struct ConcreteOutlineStyleBox<S: OutlineStyle>: AnyOutlineStyleBox {
     return presentation
   }
 
-  func isEqualForReuse(to other: any AnyOutlineStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// A type-erased outline style.
@@ -78,7 +70,7 @@ public struct AnyOutlineStyle: Sendable, CustomStringConvertible, CustomDebugStr
   public init<S: OutlineStyle>(
     _ style: S
   ) {
-    box = ConcreteOutlineStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public static var automatic: Self {

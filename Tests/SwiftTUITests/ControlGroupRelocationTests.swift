@@ -9,6 +9,28 @@ import Testing
 // acceptance boundary for moving authored controls into a compact menu.
 @MainActor
 struct ControlGroupRelocationTests {
+  @Test("discarding a candidate that restores content leaves its retained archive available")
+  func discardedRestoration() async {
+    let probe = CapturedValueProbe()
+    let renderer = DefaultRenderer()
+    let context = ResolveContext(identity: testIdentity("DiscardedRestoration"))
+    _ = renderer.render(CapturedValueFixture(hidden: false, probe: probe), context: context)
+    probe.binding?.wrappedValue = 42
+    _ = renderer.render(CapturedValueFixture(hidden: false, probe: probe), context: context)
+    _ = renderer.render(CapturedValueFixture(hidden: true, probe: probe), context: context)
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      CapturedValueFixture(hidden: false, probe: probe), context: context)
+    let dropped = await renderer.discardPreparedFrameTailForReconciliationTesting(
+      draft,
+      decision: .dropVisualOnly(
+        eligibility: FrameDropEligibility(decision: .canDropVisualOnly)))
+    #expect(dropped)
+    _ = renderer.render(CapturedValueFixture(hidden: true, probe: probe), context: context)
+    let restored = renderer.render(
+      CapturedValueFixture(hidden: false, probe: probe), context: context)
+    #expect(restored.rasterSurface.lines.joined().contains("Retained 42"))
+  }
+
   @Test("replacing an identified child while dormant starts fresh state")
   func dormantReplacement() {
     let probe = CapturedValueProbe()
@@ -138,6 +160,9 @@ struct ControlGroupRelocationTests {
     _ = try harness.clickText("Commands")
     _ = try harness.pressKey(KeyPress(.escape))
     #expect(!harness.frame.contains("Count"))
+    #expect(
+      harness.runLoop.focusTracker.currentFocusIdentity
+        == (try harness.focusIdentity(forText: "Commands")))
     #expect(!harness.runLoop.focusTracker.focusRegions.contains { $0.identity == counterID })
     #expect(!harness.runLoop.localActionRegistry.hasHandler(identity: counterID))
     _ = try harness.clickText("Commands")

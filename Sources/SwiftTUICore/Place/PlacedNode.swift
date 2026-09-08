@@ -132,13 +132,16 @@ package struct PlacedNodePlacementMetadata: Equatable, Sendable {
   package var lazyStackAllocationSnapshot: LazyStackAllocationSnapshot?
   package var hostedCollectionTableColumnWidths: [Int]?
   package var scrollViewportRect: CellRect?
+  /// Viewport explicitly chosen by the parent layout for this content child.
+  package var parentScrollViewportRect: CellRect?
   package var hostedListVisibleLayout: ListVisibleLayout?
   package var hostedTableVisibleLayout: TableVisibleLayout?
 
   package var isEmpty: Bool {
     lazyChildScrollEstimates == nil && lazyStackAllocationSnapshot == nil
       && hostedCollectionTableColumnWidths == nil
-      && scrollViewportRect == nil && hostedListVisibleLayout == nil
+      && scrollViewportRect == nil && parentScrollViewportRect == nil
+      && hostedListVisibleLayout == nil
       && hostedTableVisibleLayout == nil
   }
 }

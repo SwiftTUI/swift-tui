@@ -39,16 +39,14 @@ extension PopoverStyle {
   public var snapshotLabel: String { String(reflecting: Self.self) }
 }
 
-private protocol AnyPopoverStyleBox: Sendable {
+private protocol AnyPopoverStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   @MainActor
   func presentation(for configuration: PopoverStyleConfiguration)
     -> AnchoredSurfaceStylePresentation
-  func isEqualForReuse(to other: any AnyPopoverStyleBox) -> Bool
 }
 
-private struct ConcretePopoverStyleBox<S: PopoverStyle>: AnyPopoverStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnyPopoverStyleBox where S: PopoverStyle {
   var snapshotLabel: String { style.snapshotLabel }
 
   @MainActor
@@ -58,10 +56,6 @@ private struct ConcretePopoverStyleBox<S: PopoverStyle>: AnyPopoverStyleBox {
     style.resolvePresentation(for: configuration)
   }
 
-  func isEqualForReuse(to other: any AnyPopoverStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// An erased popover style with typed reuse comparison.
@@ -69,7 +63,7 @@ public struct AnyPopoverStyle: Sendable, CustomStringConvertible, CustomDebugStr
   private let box: any AnyPopoverStyleBox
 
   public init<S: PopoverStyle>(_ style: S) {
-    box = ConcretePopoverStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public static var automatic: Self { Self(AutomaticPopoverStyle()) }
@@ -109,4 +103,3 @@ extension PopoverStyle where Self == AutomaticPopoverStyle {
 }
 
 extension AutomaticPopoverStyle: ReuseTransparentStyle {}
-

@@ -10,8 +10,9 @@ struct ValueStyleFixtureTests {
     var configuration = SliderStyleConfiguration(
       label: .init { Text("Level") }, valueLabel: .init { Text("5") },
       fractionCompleted: 0.5, trackCellCount: 8,
+      canDecrement: true, canIncrement: true,
       isEnabled: true, isFocused: false, showsFocusEffect: true, isPressed: false,
-      canDecrement: true, canIncrement: true, styleEnvironment: .init())
+      styleEnvironment: .init())
     let automatic = render(AutomaticSliderStyle().makeBody(configuration: configuration))
     let linear = render(LinearSliderStyle().makeBody(configuration: configuration))
     #expect(automatic.rasterSurface == linear.rasterSurface)

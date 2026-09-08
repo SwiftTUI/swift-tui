@@ -92,7 +92,7 @@ public struct AnyToggleStyle: Sendable, CustomStringConvertible, CustomDebugStri
 
   public init<S: ToggleStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyToggleStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String { snapshotLabel }
@@ -174,29 +174,22 @@ extension ToggleStyle where Self == ButtonToggleStyle {
 
 extension ButtonToggleStyle: ReuseTransparentStyle {}
 
-private protocol AnyToggleStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyToggleStyleBox) -> Bool
+private protocol AnyToggleStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(configuration: ToggleStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
 }
 
-private struct ConcreteAnyToggleStyleBox<S: ToggleStyle>: AnyToggleStyleBox {
-  let style: S
-
-  func isEqualForReuse(to other: any AnyToggleStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyToggleStyleBox where S: ToggleStyle {
 
   @MainActor
   func resolveBody(configuration: ToggleStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
   {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel, in: context)
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

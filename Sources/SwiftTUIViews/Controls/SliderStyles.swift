@@ -75,6 +75,21 @@ public struct SliderStyleConfiguration: Sendable {
   private var trackIdentity: Identity?
 
   /// Constructs an inert configuration for a style test.
+  /// Adjustment availability precedes interaction state, as in Stepper fixtures.
+  @_spi(StyleFixtures)
+  public init(
+    label: Label, valueLabel: ValueLabel, fractionCompleted: Double, trackCellCount: Int,
+    canDecrement: Bool, canIncrement: Bool, isEnabled: Bool, isFocused: Bool,
+    showsFocusEffect: Bool, isPressed: Bool, styleEnvironment: StyleEnvironmentSnapshot
+  ) {
+    self.init(
+      label: label, valueLabel: valueLabel, fractionCompleted: fractionCompleted,
+      trackCellCount: trackCellCount, isEnabled: isEnabled, isFocused: isFocused,
+      showsFocusEffect: showsFocusEffect, isPressed: isPressed,
+      canDecrement: canDecrement, canIncrement: canIncrement, styleEnvironment: styleEnvironment)
+  }
+
+  /// The original fixture argument order remains available to existing tests.
   @_spi(StyleFixtures)
   public init(
     label: Label,
@@ -111,14 +126,11 @@ public struct SliderStyleConfiguration: Sendable {
   @ViewBuilder @MainActor
   public func track<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     let content = content().disabled(!isEnabled)
-    if let trackIdentity {
-      StyleRouteView(
-        target: .init(
-          identity: trackIdentity, family: "SliderStyle", role: "track", captureOnPress: true),
-        content: content)
-    } else {
-      content
-    }
+    styleRoute(
+      target: trackIdentity.map { trackIdentity in
+        StyleRouteTarget(
+          identity: trackIdentity, family: "SliderStyle", role: "track", captureOnPress: true)
+      }, content: content)
   }
 
   mutating func bindRoutes(to identity: Identity) {
@@ -132,7 +144,7 @@ public struct AnySliderStyle: Sendable, CustomStringConvertible, CustomDebugStri
   private let box: any AnySliderStyleBox
   public init<S: SliderStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnySliderStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
   public var description: String { snapshotLabel }
   public var debugDescription: String { snapshotLabel }
@@ -228,24 +240,18 @@ private struct LinearSliderStyleBody: View {
   }
 }
 
-private protocol AnySliderStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnySliderStyleBox) -> Bool
+private protocol AnySliderStyleBox: AnyStyleBox {
   @MainActor
   func resolveBody(configuration: SliderStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
 }
-private struct ConcreteAnySliderStyleBox<S: SliderStyle>: AnySliderStyleBox {
-  let style: S
-  func isEqualForReuse(to other: any AnySliderStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnySliderStyleBox where S: SliderStyle {
   @MainActor
   func resolveBody(configuration: SliderStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
   {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel, in: context)
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }

@@ -89,7 +89,7 @@ public struct AnyTextEditorStyle: Sendable, CustomStringConvertible, CustomDebug
 
   public init<S: TextEditorStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyTextEditorStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String { snapshotLabel }
@@ -171,29 +171,22 @@ extension TextEditorStyle where Self == RoundedBorderTextEditorStyle {
 
 extension RoundedBorderTextEditorStyle: ReuseTransparentStyle {}
 
-private protocol AnyTextEditorStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyTextEditorStyleBox) -> Bool
+private protocol AnyTextEditorStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(configuration: TextEditorStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
 }
 
-private struct ConcreteAnyTextEditorStyleBox<S: TextEditorStyle>: AnyTextEditorStyleBox {
-  let style: S
-
-  func isEqualForReuse(to other: any AnyTextEditorStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyTextEditorStyleBox where S: TextEditorStyle {
 
   @MainActor
   func resolveBody(configuration: TextEditorStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
   {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel, in: context)
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

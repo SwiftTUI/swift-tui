@@ -101,7 +101,7 @@ public struct AnyLabelStyle: Sendable, CustomStringConvertible, CustomDebugStrin
 
   public init<S: LabelStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyLabelStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String { snapshotLabel }
@@ -211,8 +211,7 @@ extension LabelStyle where Self == IconOnlyLabelStyle {
 
 extension IconOnlyLabelStyle: ReuseTransparentStyle {}
 
-private protocol AnyLabelStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyLabelStyleBox) -> Bool
+private protocol AnyLabelStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(
@@ -221,24 +220,16 @@ private protocol AnyLabelStyleBox: Sendable {
   ) -> ResolvedNode
 }
 
-private struct ConcreteAnyLabelStyleBox<S: LabelStyle>: AnyLabelStyleBox {
-  let style: S
-
-  func isEqualForReuse(to other: any AnyLabelStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyLabelStyleBox where S: LabelStyle {
 
   @MainActor
   func resolveBody(
     configuration: LabelStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel,
-      in: context
-    )
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

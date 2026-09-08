@@ -52,6 +52,7 @@ public struct MenuStyleConfiguration: Sendable {
   public struct Content: View, Sendable {
     package let payloads: [ScopedContentPayload]
     package var usageIdentity: Identity?
+    package var retention: CapturedSubviewRetention? = nil
 
     package init<V: View>(
       authoringContext: AuthoringContext?,
@@ -69,8 +70,16 @@ public struct MenuStyleConfiguration: Sendable {
     }
 
     public var body: some View {
+      if let retention {
+        contentBody.id(retention.identity.child(.named("host")))
+      } else {
+        contentBody
+      }
+    }
+
+    private var contentBody: some View {
       VStack(alignment: .leading, spacing: 0) {
-        CapturedSubviewSequenceView(payloads: payloads)
+        CapturedSubviewSequenceView(payloads: payloads, retention: retention)
       }
       .background { MenuStyleUsageMarker(identity: usageIdentity) }
     }
@@ -109,14 +118,12 @@ public struct MenuStyleConfiguration: Sendable {
   /// available even when a style omits this wrapper.
   @ViewBuilder @MainActor
   public func trigger<Trigger: View>(@ViewBuilder content: () -> Trigger) -> some View {
-    if let controlIdentity {
-      StyleRouteView(
-        target: .init(
+    styleRoute(
+      target: controlIdentity.map { controlIdentity in
+        StyleRouteTarget(
           identity: menuTriggerIdentity(for: controlIdentity),
-          family: "MenuStyle", role: "trigger"), content: content())
-    } else {
-      content()
-    }
+          family: "MenuStyle", role: "trigger")
+      }, content: content())
   }
 
   /// Uses `content` as the inline anchor and this configuration's captured
@@ -149,7 +156,7 @@ public struct AnyMenuStyle: Sendable, CustomStringConvertible, CustomDebugString
 
   public init<S: MenuStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyMenuStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
   public var description: String { snapshotLabel }
   public var debugDescription: String { snapshotLabel }
@@ -181,26 +188,20 @@ extension AnyMenuStyle: TypedReuseEqualityProviding {
   }
 }
 
-private protocol AnyMenuStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyMenuStyleBox) -> Bool
+private protocol AnyMenuStyleBox: AnyStyleBox {
   @MainActor
   func resolveBody(configuration: MenuStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
 }
 
-private struct ConcreteAnyMenuStyleBox<S: MenuStyle>: AnyMenuStyleBox {
-  let style: S
-  func isEqualForReuse(to other: any AnyMenuStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyMenuStyleBox where S: MenuStyle {
   @MainActor
   func resolveBody(configuration: MenuStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
   {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel, in: context)
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

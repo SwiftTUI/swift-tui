@@ -47,15 +47,13 @@ extension PromptStyle {
   public var snapshotLabel: String { String(reflecting: Self.self) }
 }
 
-private protocol AnyPromptStyleBox: Sendable {
+private protocol AnyPromptStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   @MainActor
   func presentation(for configuration: PromptStyleConfiguration) -> PromptSurfaceStylePresentation
-  func isEqualForReuse(to other: any AnyPromptStyleBox) -> Bool
 }
 
-private struct ConcretePromptStyleBox<S: PromptStyle>: AnyPromptStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnyPromptStyleBox where S: PromptStyle {
   var snapshotLabel: String { style.snapshotLabel }
 
   @MainActor
@@ -63,10 +61,6 @@ private struct ConcretePromptStyleBox<S: PromptStyle>: AnyPromptStyleBox {
     style.resolvePresentation(for: configuration)
   }
 
-  func isEqualForReuse(to other: any AnyPromptStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// An erased prompt style with typed reuse comparison.
@@ -74,7 +68,7 @@ public struct AnyPromptStyle: Sendable, CustomStringConvertible, CustomDebugStri
   private let box: any AnyPromptStyleBox
 
   public init<S: PromptStyle>(_ style: S) {
-    box = ConcretePromptStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public static var automatic: Self { Self(AutomaticPromptStyle()) }

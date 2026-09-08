@@ -65,30 +65,24 @@ extension LinkStyle {
   public var snapshotLabel: String { String(reflecting: Self.self) }
 }
 
-private protocol AnyLinkStyleBox: Sendable {
+private protocol AnyLinkStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   @MainActor
   func presentation(for configuration: LinkStyleConfiguration) -> LinkStylePresentation
-  func isEqualForReuse(to other: any AnyLinkStyleBox) -> Bool
 }
 
-private struct ConcreteAnyLinkStyleBox<S: LinkStyle>: AnyLinkStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnyLinkStyleBox where S: LinkStyle {
   var snapshotLabel: String { style.snapshotLabel }
   @MainActor
   func presentation(for configuration: LinkStyleConfiguration) -> LinkStylePresentation {
     style.resolvePresentation(for: configuration)
-  }
-  func isEqualForReuse(to other: any AnyLinkStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
   }
 }
 
 /// Type-erased link styling with comparison of its concrete style value.
 public struct AnyLinkStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   private let box: any AnyLinkStyleBox
-  public init<S: LinkStyle>(_ style: S) { box = ConcreteAnyLinkStyleBox(style: style) }
+  public init<S: LinkStyle>(_ style: S) { box = ConcreteStyleBox(style: style) }
   public var description: String { box.snapshotLabel }
   public var debugDescription: String { description }
   public static var automatic: Self { Self(AutomaticLinkStyle()) }

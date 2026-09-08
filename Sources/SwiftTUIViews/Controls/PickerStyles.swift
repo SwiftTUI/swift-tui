@@ -126,14 +126,10 @@ public struct PickerStyleConfiguration: Sendable {
     public func route<Content: View>(
       @ViewBuilder content: () -> Content
     ) -> some View {
-      if let routeIdentity {
-        StyleRouteView(
-          target: .init(identity: routeIdentity, family: "PickerStyle", role: "option"),
-          content: content()
-        )
-      } else {
-        content()
-      }
+      styleRoute(
+        target: routeIdentity.map { routeIdentity in
+          StyleRouteTarget(identity: routeIdentity, family: "PickerStyle", role: "option")
+        }, content: content())
     }
 
     mutating func bindRoute(to identity: Identity) {
@@ -198,14 +194,10 @@ public struct PickerStyleConfiguration: Sendable {
   public func trigger<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
-    if let triggerIdentity {
-      StyleRouteView(
-        target: .init(identity: triggerIdentity, family: "PickerStyle", role: "trigger"),
-        content: content()
-      )
-    } else {
-      content()
-    }
+    styleRoute(
+      target: triggerIdentity.map { triggerIdentity in
+        StyleRouteTarget(identity: triggerIdentity, family: "PickerStyle", role: "trigger")
+      }, content: content())
   }
 
   mutating func bindRoutes(to identity: Identity) {
@@ -225,7 +217,7 @@ public struct AnyPickerStyle: Sendable, CustomStringConvertible, CustomDebugStri
     _ style: S
   ) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyPickerStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String {
@@ -444,8 +436,7 @@ public struct MenuPickerStyle: Sendable, PickerStyle {
   }
 }
 
-private protocol AnyPickerStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyPickerStyleBox) -> Bool
+private protocol AnyPickerStyleBox: AnyStyleBox {
 
   @MainActor
   func selectionDelta(
@@ -462,15 +453,7 @@ private protocol AnyPickerStyleBox: Sendable {
   ) -> ResolvedNode
 }
 
-private struct ConcreteAnyPickerStyleBox<S: PickerStyle>: AnyPickerStyleBox {
-  let style: S
-
-  func isEqualForReuse(to other: any AnyPickerStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyPickerStyleBox where S: PickerStyle {
 
   @MainActor
   func selectionDelta(
@@ -489,11 +472,9 @@ private struct ConcreteAnyPickerStyleBox<S: PickerStyle>: AnyPickerStyleBox {
     configuration: PickerStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel,
-      in: context
-    )
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

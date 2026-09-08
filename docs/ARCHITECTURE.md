@@ -216,6 +216,9 @@ own their public configurations, erasers, and built-in bodies. They resolve
 through the shared `Foundation/StyleBoxing.swift` seam. Environment keys and
 modifiers remain in `Environment/StyleEnvironment.swift` and
 `Modifiers/StyleModifiers.swift`.
+All 28 erasers use `ConcreteStyleBox` for storage and reuse comparison.
+Body-producing families share its body resolver; styles with dynamic properties
+use a prepared concrete working copy under the body's rebased authoring scope.
 
 `Controls/ToggleStyles.swift`, `DisclosureGroupStyles.swift`, and
 `ProgressViewStyles.swift` own their style families. The shared
@@ -248,10 +251,17 @@ after content. `Controls/LinkStyles.swift` supplies rich-text appearance to
 `Link.swift`, which merges inherited text, style presentation, and label styling
 before stamping link identity and destination. Existing link action and focus
 routing consume that same payload.
+Custom placement records the chosen viewport on its content child. Core
+publication, drawing, and indicator hit testing consume that exact rectangle
+instead of independently solving the indicator insets again. Overlay tracks
+reserve their shared corner for the vertical indicator without shrinking the
+scrollable content viewport.
 
 `Controls/MenuStyles.swift` owns menu composition and its public trigger and
 portal wrappers. `Menu.swift` owns activation and expansion on a dedicated child
 node, so replacing a compact menu with inline content retires its expansion.
+Captured menu content has a declaration-owned entity host, preserving state
+and running tasks across inline/floating style changes.
 `Presentation/AnchoredSurfaceStylePresentation.swift` supplies insets, bounds,
 and paints to the shared presentation host. A finite viewport uses one scroll
 content host and keeps short content intrinsic.
@@ -264,6 +274,8 @@ retains persistent slots, including authored reference values, for omitted
 content. Runtime captures those slots before departure and publishes them only
 with an accepted commit. Runtime registrations and presentation hosts depart
 normally. Lazy tabs retain their separate value-only dormancy contract.
+Retained archives project into nested `DormantStateSlotSnapshot` records at
+that boundary; reference-valued archives still fail the recursive value audit.
 
 Viewport lifecycle carry follows a uniquely matched visible identity when its
 backing node changes. `ViewGraphLifecyclePlanning.swift` emits task transfers

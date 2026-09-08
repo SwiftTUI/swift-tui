@@ -1,5 +1,64 @@
 import SwiftTUICore
 
+/// Common storage and reuse proof for every erased style family. Family
+/// conformances forward only the requirements specific to their protocol.
+protocol AnyStyleBox: Sendable {
+  func isEqualForReuse(to other: any AnyStyleBox) -> Bool
+}
+
+struct ConcreteStyleBox<S: Sendable>: AnyStyleBox {
+  let style: S
+
+  func isEqualForReuse(to other: any AnyStyleBox) -> Bool {
+    guard let other = other as? Self else { return false }
+    return styleValuesAreEqualForReuse(style, other.style)
+  }
+
+  @MainActor
+  func resolveBody<Configuration: Sendable, Body: View>(
+    configuration: Configuration,
+    styleLabel: String,
+    in context: ResolveContext,
+    makeBody: @escaping @MainActor @Sendable (S, Configuration) -> Body
+  ) -> ResolvedNode {
+    if hasDynamicPropertyUpdateSurface(style) {
+      return resolveStyleBody(
+        DynamicStyleBody(style: style, configuration: configuration, makeBody: makeBody),
+        styleLabel: styleLabel, in: context)
+    }
+    return resolveStyleBody(
+      makeBody(bindingForwardedDynamicPropertyCaptures(style), configuration),
+      styleLabel: styleLabel, in: context)
+  }
+}
+
+/// A style carrying wrappers participates in the same preparation and reuse
+/// contract as a composed modifier. Update its concrete working copy before
+/// evaluating the body, under the style body's rebased authoring scope.
+private struct DynamicStyleBody<S: Sendable, Configuration: Sendable, Body: View>: View,
+  AdditionalDynamicPropertyUpdating
+{
+  var style: S
+  let configuration: Configuration
+  let makeBody: @MainActor @Sendable (S, Configuration) -> Body
+
+  var body: Body {
+    makeBody(bindingForwardedDynamicPropertyCaptures(style), configuration)
+  }
+
+  func ownsDynamicPropertyTraversal(ofStoredFieldAt index: Int) -> Bool { index == 0 }
+
+  mutating func updateAdditionalDynamicProperties(
+    in context: AdditionalDynamicPropertyUpdateContext
+  ) -> DynamicPropertyUpdateResult {
+    runForwardedDynamicPropertyUpdates(on: &style, in: context)
+  }
+
+  func hasAdditionalDynamicPropertyUpdateSurface() -> Bool {
+    hasDynamicPropertyUpdateSurface(style)
+  }
+}
+
 // The two rules every erased style box obeys.
 //
 // Every style family stores a concrete style behind a per-family existential

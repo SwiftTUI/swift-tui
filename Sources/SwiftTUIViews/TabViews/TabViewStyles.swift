@@ -7,7 +7,7 @@ public struct AnyTabViewStyle: Sendable, CustomStringConvertible, CustomDebugStr
 
   public init<S: TabViewStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyTabViewStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String {
@@ -184,18 +184,14 @@ public struct TabViewStyleItemConfiguration: Sendable {
   public func route<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
-    if let controlIdentity {
-      StyleRouteView(
-        target: .init(
+    styleRoute(
+      target: controlIdentity.map { controlIdentity in
+        StyleRouteTarget(
           identity: tabItemIdentity(for: controlIdentity, index: index),
           family: "TabViewStyle",
           role: "item"
-        ),
-        content: content()
-      )
-    } else {
-      content()
-    }
+        )
+      }, content: content())
   }
 
   /// Installs this item's overflow-menu pointer route around `content`. The
@@ -204,18 +200,14 @@ public struct TabViewStyleItemConfiguration: Sendable {
   public func overflowRoute<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
-    if let controlIdentity {
-      StyleRouteView(
-        target: .init(
+    styleRoute(
+      target: controlIdentity.map { controlIdentity in
+        StyleRouteTarget(
           identity: tabOverflowItemIdentity(for: controlIdentity, index: index),
           family: "TabViewStyle",
           role: "overflow item"
-        ),
-        content: content()
-      )
-    } else {
-      content()
-    }
+        )
+      }, content: content())
   }
 }
 
@@ -277,18 +269,14 @@ public struct TabViewOverflowTriggerConfiguration: Sendable {
   public func route<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
-    if let controlIdentity {
-      StyleRouteView(
-        target: .init(
+    styleRoute(
+      target: controlIdentity.map { controlIdentity in
+        StyleRouteTarget(
           identity: tabOverflowTriggerIdentity(for: controlIdentity),
           family: "TabViewStyle",
           role: "overflow trigger"
-        ),
-        content: content()
-      )
-    } else {
-      content()
-    }
+        )
+      }, content: content())
   }
 }
 

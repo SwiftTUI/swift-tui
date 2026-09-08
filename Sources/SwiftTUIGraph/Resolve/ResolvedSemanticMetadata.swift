@@ -117,6 +117,13 @@ public struct SemanticMetadata: Equatable, Sendable {
     set { setFlag(Self.isCommandHostFlag, to: newValue) }
   }
 
+  /// Keeps a keyboard dismissal target reachable when its commands become
+  /// disabled. Pointer regions and activation remain subject to enablement.
+  package var allowsFocusWhenDisabled: Bool {
+    get { flag(Self.allowsFocusWhenDisabledFlag) }
+    set { setFlag(Self.allowsFocusWhenDisabledFlag, to: newValue) }
+  }
+
   public var participatesInPointerHitTesting: Bool {
     get { flag(Self.participatesInPointerHitTestingFlag) }
     set { setFlag(Self.participatesInPointerHitTestingFlag, to: newValue) }
@@ -327,6 +334,7 @@ public struct SemanticMetadata: Equatable, Sendable {
         || other.isHostedCollectionRowBoundary
     )
     merged.explicitRouteIdentity = other.explicitRouteIdentity ?? explicitRouteIdentity
+    merged.allowsFocusWhenDisabled = allowsFocusWhenDisabled || other.allowsFocusWhenDisabled
     return merged
   }
 
@@ -340,6 +348,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   private static let allowsHitTestingFlag: UInt16 = 1 << 7
   private static let accessibilityHiddenFlag: UInt16 = 1 << 8
   private static let isCommandHostFlag: UInt16 = 1 << 9
+  private static let allowsFocusWhenDisabledFlag: UInt16 = 1 << 10
 
   private func flag(_ bit: UInt16) -> Bool {
     flags & bit != 0
