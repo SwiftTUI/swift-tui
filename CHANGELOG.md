@@ -1742,7 +1742,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.11.3...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.12.0...HEAD
+[0.12.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.0
 [0.11.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.3
 [0.11.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.2
 [0.11.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.1
