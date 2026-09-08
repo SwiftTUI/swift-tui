@@ -74,17 +74,22 @@ If a presented style omits both content and the portal wrapper, Menu reports
 ``AnchoredSurfaceStylePresentation`` bounds the outer width and the content
 viewport height before insets; an unbounded height preserves intrinsic layout.
 A disabled menu keeps its expansion: disabling one while it is presented
-leaves the content visible with its commands and trigger disabled, and it
-can be dismissed again once re-enabled (a floating portal's own Escape still
-dismisses it while disabled).
-A style change that moves the captured content between an inline and a
-floating host re-hosts it, so state inside the content does not survive that
-move; ``ControlGroupStyle`` retains its captured children across hosts.
+leaves the content visible with its commands and trigger disabled. Its Escape
+dismissal handler remains installed while disabled, for inline and floating
+styles. An open menu keeps a keyboard focus target for dismissal even when its
+commands become disabled. Closing removes that exception; modal suppression
+and sealed focus hosts still apply. Keyboard bubbling follows the focused
+control's scope.
+The menu declaration owns its captured content across inline and floating
+hosts. A same-frame move preserves state and running tasks. Closing the menu
+retains persistent state and cancels tasks; reopening restarts tasks.
 
 ``ControlGroupStyle`` composes the optional label and captured content in any
 layout. Its compact built-in composes a public ``Menu``. The declaring group
 owns retained child state across inline and compact hosts. Omitted content
 has no live focus targets or control actions.
+Value-only retained archives also survive dormancy of an enclosing lazy tab.
+Reference-valued archives obey the tab's existing rejection-and-restart rule.
 
 ``PaletteStyle`` creates views from command data instead of captured content.
 Its configuration supplies the declaration title, commands, terminal size,
@@ -420,8 +425,8 @@ removes the surrounding chrome.
 progress. Its optional label slots are `nil` for an absent label and for an
 explicitly authored `EmptyView`, because the unlabeled initializers author
 one; the group-box rule that an authored `EmptyView` is a present slot does
-not apply here. Its `indeterminatePhase` is a deterministic rendering seed for moving
-tracks. `.automatic` aliases `.linear`. `.circular` renders determinate progress
+not apply here. Its `indeterminatePhase` is a live phase the primitive advances on a
+cadence for moving tracks. `.automatic` aliases `.linear`. `.circular` renders determinate progress
 as a ring and composes ``Spinner`` for indeterminate progress, inheriting the
 nearest spinner style. Reduced motion and stable output use static status
 labels and schedule no spinner task.

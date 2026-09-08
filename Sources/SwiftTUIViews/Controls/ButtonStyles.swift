@@ -130,7 +130,7 @@ public struct AnyButtonStyle: Sendable, CustomStringConvertible, CustomDebugStri
     _ style: S
   ) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyButtonStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String {
@@ -326,8 +326,7 @@ public struct LinkButtonStyle: Sendable, ButtonStyle {
   }
 }
 
-private protocol AnyButtonStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyButtonStyleBox) -> Bool
+private protocol AnyButtonStyleBox: AnyStyleBox {
 
   @MainActor
   func resolvedProminence(
@@ -341,15 +340,7 @@ private protocol AnyButtonStyleBox: Sendable {
   ) -> ResolvedNode
 }
 
-private struct ConcreteAnyButtonStyleBox<S: ButtonStyle>: AnyButtonStyleBox {
-  let style: S
-
-  func isEqualForReuse(to other: any AnyButtonStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyButtonStyleBox where S: ButtonStyle {
 
   @MainActor
   func resolvedProminence(
@@ -363,11 +354,9 @@ private struct ConcreteAnyButtonStyleBox<S: ButtonStyle>: AnyButtonStyleBox {
     configuration: ButtonStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel,
-      in: context
-    )
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

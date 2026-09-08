@@ -39,17 +39,14 @@ extension FullScreenCoverStyle {
   public var snapshotLabel: String { String(reflecting: Self.self) }
 }
 
-private protocol AnyFullScreenCoverStyleBox: Sendable {
+private protocol AnyFullScreenCoverStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   @MainActor
   func presentation(for configuration: FullScreenCoverStyleConfiguration)
     -> FullScreenSurfaceStylePresentation
-  func isEqualForReuse(to other: any AnyFullScreenCoverStyleBox) -> Bool
 }
 
-private struct ConcreteFullScreenCoverStyleBox<S: FullScreenCoverStyle>: AnyFullScreenCoverStyleBox
-{
-  let style: S
+extension ConcreteStyleBox: AnyFullScreenCoverStyleBox where S: FullScreenCoverStyle {
   var snapshotLabel: String { style.snapshotLabel }
 
   @MainActor
@@ -59,10 +56,6 @@ private struct ConcreteFullScreenCoverStyleBox<S: FullScreenCoverStyle>: AnyFull
     style.resolvePresentation(for: configuration)
   }
 
-  func isEqualForReuse(to other: any AnyFullScreenCoverStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// An erased full-screen cover style with typed reuse comparison.
@@ -72,7 +65,7 @@ public struct AnyFullScreenCoverStyle: Sendable, CustomStringConvertible,
   private let box: any AnyFullScreenCoverStyleBox
 
   public init<S: FullScreenCoverStyle>(_ style: S) {
-    box = ConcreteFullScreenCoverStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public static var automatic: Self { Self(AutomaticFullScreenCoverStyle()) }

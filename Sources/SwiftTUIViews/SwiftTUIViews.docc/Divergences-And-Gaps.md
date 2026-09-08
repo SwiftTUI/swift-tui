@@ -142,17 +142,15 @@ are omitted even when SwiftUI exposes a corresponding API.
   evaluation-visible custom state had to be reference-backed. The value-type
   authoring invariant made "the per-evaluation view copy" well defined, which is
   what let the narrower contract be retired.)*
-- **A custom style's own dynamic properties are bound but never updated.**
-  *Gap.* A `@State`, `@Environment`, or custom wrapper stored in a
-  `ButtonStyle`, `PickerStyle`, `TextFieldStyle`, or `TabViewStyle` receives its
-  capture binding before `makeBody(configuration:)` runs, so imperative reads
-  route to the right owner — but no seam runs the dynamic-property *update* pass
-  over the style value itself. The style is a stored field of a modifier, and
-  the modifier's forwarded walk discovers only fields that themselves conform to
-  `DynamicProperty`; a style does not. So a style's wrapper never sees
-  `update(in:)`, and under the in-place contract a stored mutation in one never
-  happens at all. Views declared *inside* the style body are unaffected — they
-  resolve normally and get the full pass.
+- **Body-producing styles participate in dynamic-property preparation.**
+  *Ratified.* A `@State`, `@Environment`, or custom wrapper stored in a style
+  receives capture binding and the dynamic-property update pass before
+  `makeBody(configuration:)`. Updates mutate the concrete working copy consumed
+  by the body and its escaped actions. Each styled control owns its style's
+  state, even when controls inherit the same environment style value. The
+  ordinary statically typed field and reuse-certification rules apply, as they
+  do for composed view modifiers. Wrapper-free styles retain the direct body
+  path. Presentation-value styles remain plain data producers.
 - **Views, modifiers, body-producing styles, dynamic properties, scenes, and apps must be
   value types.** *Ratified.* SwiftUI's protocols admit classes; OpenSwiftUI
   preconditions against them at first body evaluation; SwiftTUI rejects the
@@ -206,13 +204,22 @@ are omitted even when SwiftUI exposes a corresponding API.
   collection conformances stay positional.** *Ratified.*
   `ForEach(_:content:)` and `ForEach(_:id:content:)` accept a `Binding` to a
   mutable collection and hand each row a `Binding` to its element. Row
-  bindings verify identity on every access: after a reorder a write
-  relocates by ID (occurrence-aware for duplicate IDs), and a write whose
-  element has left the collection is dropped with a
+  bindings address the current occurrence of an ID, counting duplicates from
+  zero in collection order. Inserting an earlier duplicate changes which
+  element that occurrence names; unique IDs provide stable element identity.
+  After a reorder a write relocates by ID and occurrence, and a write whose
+  occurrence has left the collection is dropped with a
   `forEach.staleElementBindingWrite` runtime issue, where SwiftUI writes
   through the captured index and can corrupt a neighbor or trap. A read of a
-  departed element traps with a diagnostic, matching the optional-base
-  unwrap precedent. Swift drops the contextual isolation from
+  departed occurrence traps with a diagnostic, matching the optional-base
+  unwrap precedent. State-backed `Array`, `ArraySlice`, and `ContiguousArray`
+  values with inline stored IDs share an occurrence index for each stored
+  value: construction and rebuilding are O(n), and subsequent row lookups
+  are expected O(1). Arbitrary getter/setter bindings, custom collections,
+  reference elements and computed ID paths use a current-data O(n) scan per
+  access because they can change without a tracked value store. Repeated
+  full-list reads of those sources can therefore be O(n²).
+  Swift drops the contextual isolation from
   property-wrapper closure parameters, so SwiftUI's bare `{ $item in ... }`
   spelling does not compile against the isolated builder closure: the plain
   parameter is already the element binding (member access projects field

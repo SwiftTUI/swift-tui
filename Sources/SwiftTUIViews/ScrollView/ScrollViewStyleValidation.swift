@@ -47,7 +47,8 @@ func validatedScrollPresentation(
   if !problems.isEmpty {
     ImperativeRuntimeIssueQueue.record(
       StyleMisuse.partiallyInvalidPresentationIssue(
-        family: "ScrollViewStyle", styleLabel: styleLabel, problems: problems,
+        family: "ScrollViewStyle",
+        styleLabel: "\(styleLabel) (presentation: \(proposed.snapshotLabel))", problems: problems,
         identity: identity))
   }
   return result

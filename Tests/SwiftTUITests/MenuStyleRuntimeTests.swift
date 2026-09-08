@@ -6,6 +6,44 @@ import Testing
 
 @MainActor
 struct MenuStyleRuntimeTests {
+  @Test("a focused inline menu disabled while open still dismisses through the run loop")
+  func disabledEscapeThroughRunLoop() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("DisabledInlineMenuRuntime"), size: .init(width: 40, height: 12)
+    ) { DisablingInlineMenuFixture() }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Commands")
+    #expect(harness.frame.contains("Run command"))
+    _ = try harness.pressKey(KeyPress(.character("d"), modifiers: .ctrl))
+    #expect(harness.frame.contains("Run command"))
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(harness.frame.contains("Run command"))
+    _ = try harness.pressKey(KeyPress(.escape))
+    #expect(!harness.frame.contains("Run command"))
+  }
+
+  @Test("a disabled inline menu keeps its Escape dismissal handler")
+  func disabledEscape() throws {
+    let actions = LocalActionRegistry()
+    let keys = LocalKeyHandlerRegistry()
+    let renderer = DefaultRenderer()
+    let identity = testIdentity("DisabledInlineMenu")
+    let context = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actions, localKeyHandlerRegistry: keys, applyEnvironmentValues: true)
+    func frame(disabled: Bool) -> RenderSnapshot {
+      renderer.render(
+        Menu("Commands") { Button("Run command") {} }
+          .menuStyle(.inline).disabled(disabled).id(identity), context: context,
+        proposal: .init(width: 40, height: 12))
+    }
+    _ = frame(disabled: false)
+    #expect(actions.dispatch(identity: identity))
+    #expect(frame(disabled: true).rasterSurface.lines.joined().contains("Run command"))
+    #expect(keys.dispatch(identity: identity, keyPress: KeyPress(.escape)))
+    #expect(!frame(disabled: true).rasterSurface.lines.joined().contains("Run command"))
+  }
+
   @Test("retaining a style binding does not retain or reactivate a departed menu owner")
   func bindingLifetime() throws {
     let probe = MenuConfigurationProbe()
@@ -205,6 +243,18 @@ struct MenuStyleRuntimeTests {
     #expect(!frame.rasterSurface.lines.joined().contains("Secret content"))
     #expect(frame.semanticSnapshot.interactionRegions.isEmpty)
     #expect(frame.diagnostics.runtime.issues.isEmpty)
+  }
+}
+
+private struct DisablingInlineMenuFixture: View {
+  @State private var disabled = false
+
+  var body: some View {
+    Menu("Commands") { Button("Run command") {} }
+      .menuStyle(.inline)
+      .disabled(disabled)
+      .panel(id: "disabled-inline-menu")
+      .keyCommand("Disable menu", key: .character("d"), modifiers: .ctrl) { disabled = true }
   }
 }
 

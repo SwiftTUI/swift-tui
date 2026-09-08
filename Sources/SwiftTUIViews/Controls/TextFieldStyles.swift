@@ -183,7 +183,7 @@ public struct AnyTextFieldStyle: Sendable, CustomStringConvertible, CustomDebugS
     _ style: S
   ) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyTextFieldStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String {
@@ -275,8 +275,7 @@ public struct RoundedBorderTextFieldStyle: Sendable, TextFieldStyle {
   }
 }
 
-private protocol AnyTextFieldStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyTextFieldStyleBox) -> Bool
+private protocol AnyTextFieldStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(
@@ -285,26 +284,16 @@ private protocol AnyTextFieldStyleBox: Sendable {
   ) -> ResolvedNode
 }
 
-private struct ConcreteAnyTextFieldStyleBox<S: TextFieldStyle>: AnyTextFieldStyleBox {
-  let style: S
-
-  func isEqualForReuse(to other: any AnyTextFieldStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyTextFieldStyleBox where S: TextFieldStyle {
 
   @MainActor
   func resolveBody(
     configuration: TextFieldStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel,
-      in: context
-    )
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

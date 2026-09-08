@@ -103,7 +103,7 @@ public struct AnyLabeledContentStyle: Sendable, CustomStringConvertible,
 
   public init<S: LabeledContentStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyLabeledContentStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String { snapshotLabel }
@@ -169,8 +169,7 @@ extension LabeledContentStyle where Self == StackedLabeledContentStyle {
 
 extension StackedLabeledContentStyle: ReuseTransparentStyle {}
 
-private protocol AnyLabeledContentStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyLabeledContentStyleBox) -> Bool
+private protocol AnyLabeledContentStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(
@@ -179,25 +178,16 @@ private protocol AnyLabeledContentStyleBox: Sendable {
   ) -> ResolvedNode
 }
 
-private struct ConcreteAnyLabeledContentStyleBox<S: LabeledContentStyle>: AnyLabeledContentStyleBox
-{
-  let style: S
-
-  func isEqualForReuse(to other: any AnyLabeledContentStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyLabeledContentStyleBox where S: LabeledContentStyle {
 
   @MainActor
   func resolveBody(
     configuration: LabeledContentStyleConfiguration,
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel,
-      in: context
-    )
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

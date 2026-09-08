@@ -121,13 +121,10 @@ public struct StepperStyleConfiguration: Sendable {
     identity: Identity?, role: String, canAdjust: Bool, content: () -> Content
   ) -> some View {
     let content = content().disabled(!isEnabled || !canAdjust)
-    if let identity {
-      StyleRouteView(
-        target: .init(identity: identity, family: "StepperStyle", role: role),
-        content: content)
-    } else {
-      content
-    }
+    styleRoute(
+      target: identity.map { identity in
+        StyleRouteTarget(identity: identity, family: "StepperStyle", role: role)
+      }, content: content)
   }
 
   mutating func bindRoutes(to identity: Identity) {
@@ -142,7 +139,7 @@ public struct AnyStepperStyle: Sendable, CustomStringConvertible, CustomDebugStr
   private let box: any AnyStepperStyleBox
   public init<S: StepperStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyStepperStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
   public var description: String { snapshotLabel }
   public var debugDescription: String { snapshotLabel }
@@ -242,24 +239,18 @@ private struct StepperStyleRow: View {
   }
 }
 
-private protocol AnyStepperStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyStepperStyleBox) -> Bool
+private protocol AnyStepperStyleBox: AnyStyleBox {
   @MainActor
   func resolveBody(configuration: StepperStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
 }
-private struct ConcreteAnyStepperStyleBox<S: StepperStyle>: AnyStepperStyleBox {
-  let style: S
-  func isEqualForReuse(to other: any AnyStepperStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyStepperStyleBox where S: StepperStyle {
   @MainActor
   func resolveBody(configuration: StepperStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
   {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel, in: context)
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }

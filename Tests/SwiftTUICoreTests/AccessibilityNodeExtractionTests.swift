@@ -5,6 +5,34 @@ import Testing
 
 @Suite
 struct AccessibilityNodeExtractionTests {
+  @Test("disabled dismissal focus never enables pointer routing or crosses a sealed host")
+  func disabledDismissalFocus() {
+    let identity = testIdentity("DismissalTarget")
+    var metadata = SemanticMetadata(
+      isFocusable: true, participatesInPointerHitTesting: true, accessibilityRole: .button)
+    var placed = placedNode(identity: identity, semanticMetadata: metadata)
+    placed.environmentSnapshot.style.isEnabled = false
+    #expect(SemanticExtractor().extract(from: placed).focusRegions.isEmpty)
+
+    metadata.allowsFocusWhenDisabled = true
+    placed.semanticMetadata = metadata.merging(.init(accessibilityLabel: "Dismiss"))
+    let snapshot = SemanticExtractor().extract(from: placed)
+    #expect(snapshot.focusRegions.map(\.identity) == [identity])
+    #expect(snapshot.interactionRegions.isEmpty)
+    #expect(!placed.environmentSnapshot.style.isEnabled)
+
+    var parentMetadata = SemanticMetadata()
+    parentMetadata.sealsFocusDescendants = true
+    let sealed = placedNode(
+      identity: testIdentity("Sealed"), semanticMetadata: parentMetadata, children: [placed])
+    #expect(SemanticExtractor().extract(from: sealed).focusRegions.isEmpty)
+    parentMetadata.sealsFocusDescendants = false
+    parentMetadata.interactionAvailability = .disabled(reason: .modalOverlay)
+    let suppressed = placedNode(
+      identity: testIdentity("Suppressed"), semanticMetadata: parentMetadata, children: [placed])
+    #expect(SemanticExtractor().extract(from: suppressed).focusRegions.isEmpty)
+  }
+
   @Test("Button role emits a node with label inferred from rendered text")
   func buttonRoleEmitsInferredTextLabel() throws {
     let buttonID = testIdentity("Button")

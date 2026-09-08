@@ -1,7 +1,6 @@
 @_spi(Testing) import SwiftTUICore
 
-protocol AnyTabViewStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyTabViewStyleBox) -> Bool
+protocol AnyTabViewStyleBox: AnyStyleBox {
 
   @MainActor
   func presentation(
@@ -15,15 +14,7 @@ protocol AnyTabViewStyleBox: Sendable {
   ) -> ResolvedNode
 }
 
-struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
-  let style: S
-
-  func isEqualForReuse(to other: any AnyTabViewStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyTabViewStyleBox where S: TabViewStyle {
 
   @MainActor
   func presentation(
@@ -39,11 +30,9 @@ struct ConcreteAnyTabViewStyleBox<S: TabViewStyle>: AnyTabViewStyleBox {
   ) -> ResolvedNode {
     // TabBody is the seam the `8ace32a5` regression wedged on, and so the
     // reason `resolveStyleBody` rebases rather than mints a fresh scope.
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel,
-      in: context
-    )
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

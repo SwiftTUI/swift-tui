@@ -3,6 +3,85 @@ import Testing
 @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
+extension ForEachBindingTests {
+  @Test("T250: duplicate row bindings follow the current occurrence", arguments: [0, 1, 2])
+  func duplicateBindingsFollowOccurrence(change: Int) throws {
+    let store = PeopleStore([
+      Person(id: "x", name: "Other"),
+      Person(id: "a", name: "Ada"),
+      Person(id: "a", name: "Brian"),
+      Person(id: "a", name: "Cora"),
+    ])
+    let capture = OccurrenceRowCapture()
+    _ = Resolver().resolve(
+      ForEach(store.binding()) { person in
+        CapturingOccurrenceRow(person: person, capture: capture)
+      },
+      in: .init(
+        identity: testIdentity("T250"), environmentValues: .init(), applyEnvironmentValues: true)
+    )
+    let secondDuplicate = try #require(capture.rows.dropFirst(2).first)
+    switch change {
+    case 0: store.people.insert(Person(id: "z", name: "Inserted"), at: 0)
+    case 1: store.people.removeFirst()
+    default: store.people.insert(Person(id: "a", name: "New duplicate"), at: 0)
+    }
+    let expectedIndex = store.people.indices.filter { store.people[$0].id == "a" }[1]
+    #expect(secondDuplicate.wrappedValue.name == store.people[expectedIndex].name)
+    let before = store.people
+    secondDuplicate.wrappedValue.name = "Edited"
+    #expect(store.people[expectedIndex].name == "Edited")
+    for index in store.people.indices where index != expectedIndex {
+      #expect(store.people[index] == before[index])
+    }
+  }
+
+  @Test("T250: a removed duplicate occurrence cannot write another occurrence")
+  func missingDuplicateWriteIsDropped() throws {
+    let store = PeopleStore([
+      Person(id: "x", name: "Other"),
+      Person(id: "a", name: "Ada"),
+      Person(id: "a", name: "Brian"),
+      Person(id: "a", name: "Cora"),
+    ])
+    let capture = OccurrenceRowCapture()
+    _ = Resolver().resolve(
+      ForEach(store.binding()) { person in
+        CapturingOccurrenceRow(person: person, capture: capture)
+      },
+      in: .init(
+        identity: testIdentity("T250", "Removed"), environmentValues: .init(),
+        applyEnvironmentValues: true)
+    )
+    let thirdDuplicate = try #require(capture.rows.last)
+    store.people = [
+      Person(id: "x", name: "Other"), Person(id: "y", name: "New"), store.people[1],
+      store.people[2],
+    ]
+    let before = store.people
+    thirdDuplicate.wrappedValue = Person(id: "a", name: "Invalid write")
+    #expect(store.people == before)
+    #expect(store.collectionWrites == 0)
+  }
+}
+
+@MainActor
+private final class OccurrenceRowCapture {
+  var rows: [Binding<Person>] = []
+}
+
+private struct CapturingOccurrenceRow: View {
+  let person: Binding<Person>
+
+  @MainActor
+  init(person: Binding<Person>, capture: OccurrenceRowCapture) {
+    self.person = person
+    capture.rows.append(person)
+  }
+
+  var body: some View { Text(person.wrappedValue.name) }
+}
+
 private struct Person: Identifiable, Equatable {
   var id: String
   var name: String
@@ -117,10 +196,11 @@ struct ForEachBindingTests {
 
     store.people.swapAt(0, 1)
     capture.rows["a"]?.wrappedValue = Person(id: "a", name: "Ada L.")
-    #expect(store.people == [
-      Person(id: "b", name: "Brian"),
-      Person(id: "a", name: "Ada L."),
-    ])
+    #expect(
+      store.people == [
+        Person(id: "b", name: "Brian"),
+        Person(id: "a", name: "Ada L."),
+      ])
   }
 
   @Test("a write after the element left the collection is dropped and reported")

@@ -51,17 +51,15 @@ public struct ListStyleConfiguration: Sendable {
   }
 }
 
-private protocol AnyListStyleBox: Sendable {
+private protocol AnyListStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   var debugDescription: String { get }
 
   @MainActor
   func presentation(for configuration: ListStyleConfiguration) -> ListStylePresentation
-  func isEqualForReuse(to other: any AnyListStyleBox) -> Bool
 }
 
-private struct ConcreteListStyleBox<S: ListStyle>: AnyListStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnyListStyleBox where S: ListStyle {
 
   var snapshotLabel: String {
     style.snapshotLabel
@@ -78,12 +76,6 @@ private struct ConcreteListStyleBox<S: ListStyle>: AnyListStyleBox {
     return presentation
   }
 
-  func isEqualForReuse(to other: any AnyListStyleBox) -> Bool {
-    guard let other = other as? Self else {
-      return false
-    }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// A type-erased list style.
@@ -93,7 +85,7 @@ public struct AnyListStyle: Sendable, CustomStringConvertible, CustomDebugString
   public init<S: ListStyle>(
     _ style: S
   ) {
-    box = ConcreteListStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public static var automatic: Self {

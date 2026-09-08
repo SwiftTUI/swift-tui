@@ -114,7 +114,7 @@ public struct AnyDisclosureGroupStyle: Sendable, CustomStringConvertible,
 
   public init<S: DisclosureGroupStyle>(_ style: S) {
     snapshotLabel = style.snapshotLabel
-    box = ConcreteAnyDisclosureGroupStyleBox(style: style)
+    box = ConcreteStyleBox(style: style)
   }
 
   public var description: String { snapshotLabel }
@@ -176,31 +176,22 @@ extension DisclosureGroupStyle where Self == CompactDisclosureGroupStyle {
 
 extension CompactDisclosureGroupStyle: ReuseTransparentStyle {}
 
-private protocol AnyDisclosureGroupStyleBox: Sendable {
-  func isEqualForReuse(to other: any AnyDisclosureGroupStyleBox) -> Bool
+private protocol AnyDisclosureGroupStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(configuration: DisclosureGroupStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
 }
 
-private struct ConcreteAnyDisclosureGroupStyleBox<S: DisclosureGroupStyle>:
-  AnyDisclosureGroupStyleBox
-{
-  let style: S
-
-  func isEqualForReuse(to other: any AnyDisclosureGroupStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
+extension ConcreteStyleBox: AnyDisclosureGroupStyleBox where S: DisclosureGroupStyle {
 
   @MainActor
   func resolveBody(configuration: DisclosureGroupStyleConfiguration, in context: ResolveContext)
     -> ResolvedNode
   {
-    resolveStyleBody(
-      bindingForwardedDynamicPropertyCaptures(style).makeBody(configuration: configuration),
-      styleLabel: style.snapshotLabel, in: context)
+    resolveBody(
+      configuration: configuration, styleLabel: style.snapshotLabel, in: context,
+      makeBody: { style, configuration in style.makeBody(configuration: configuration) })
   }
 }
 

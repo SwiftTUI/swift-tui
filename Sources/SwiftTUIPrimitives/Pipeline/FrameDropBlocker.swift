@@ -6,6 +6,7 @@ public enum FrameDropBlocker: String, Sendable, CaseIterable, Hashable {
   case lifecycleChange
   case taskStart
   case taskCancel
+  case taskTransfer
   case handlerInstallations
   case customLayoutFallback
   case focusGraph

@@ -8,6 +8,26 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Body-producing styles update stored dynamic properties before evaluating
+  `makeBody`, including mutations captured by actions and per-control state.
+- Closed ControlGroups with value-only state survive enclosing lazy-tab
+  dormancy. Menu content retains state and running tasks across style changes;
+  omitted content cancels tasks and restarts them on return.
+- Scroll drawing and hit testing use the viewport chosen by layout. Overlay
+  indicators no longer compete for the corner cell, and inline menus keep
+  their Escape handler and keyboard dismissal focus when disabled.
+
+### Changed
+
+- All style erasers share storage and reuse comparison. Body resolution,
+  optional routes, and slider/stepper key and wheel registration share their
+  respective implementations.
+- Scroll validation reports the presentation variant as well as its style.
+  Slider fixture SPI adds the same argument ordering as Stepper fixtures,
+  retaining the existing initializer.
+
 ## [0.11.3] - 2026-09-07
 
 A re-cut of 0.11.2 with the same framework behaviour. The 0.11.2 tag's

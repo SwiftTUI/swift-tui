@@ -142,49 +142,15 @@ extension Slider {
         binding.wrappedValue = next
         return true
       }
-      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
-        guard keyPress.modifiers.isEmpty else {
-          return false
-        }
-        let deltaCount: Int
-        switch keyPress.key {
-        case .arrowLeft:
-          deltaCount = -1
-        case .arrowRight:
-          deltaCount = 1
-        default:
-          return false
-        }
-
-        return updateBoundControlValue(
-          binding,
-          delta: deltaCount,
-          step: adjustmentStep,
-          bounds: bounds
-        )
+      let adjust: @MainActor @Sendable (Int) -> Bool = { delta in
+        updateBoundControlValue(binding, delta: delta, step: adjustmentStep, bounds: bounds)
       }
-
-      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+      registerValueAdjustmentInput(intake: intake, identity: context.identity, adjust: adjust)
       let trackRouteID = runtimePrimaryRouteID(
         for: sliderTrackIdentity(for: context.identity)
       )
 
       let trackStep = trackStep
-      intake.registerPointerHandler(routeID: rootRouteID) { event in
-        guard case .scrolled(let deltaX, let deltaY) = event.kind,
-          let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY)
-        else {
-          return .ignored
-        }
-
-        let handled = updateBoundControlValue(
-          binding,
-          delta: wheelDelta,
-          step: adjustmentStep,
-          bounds: bounds
-        )
-        return handled ? .claimed : .ignored
-      }
       intake.registerPointerHandler(routeID: trackRouteID) { event in
         switch event.kind {
         case .down(.primary), .dragged(.primary), .up(.primary):
@@ -195,18 +161,8 @@ extension Slider {
             step: trackStep
           )
           return .claimed
-        case .scrolled(let deltaX, let deltaY):
-          guard let wheelDelta = pointerValueDelta(deltaX: deltaX, deltaY: deltaY) else {
-            return .ignored
-          }
-
-          let handled = updateBoundControlValue(
-            binding,
-            delta: wheelDelta,
-            step: adjustmentStep,
-            bounds: bounds
-          )
-          return handled ? .claimed : .ignored
+        case .scrolled:
+          return valueAdjustmentWheelOutcome(event, adjust: adjust)
         default:
           return .ignored
         }

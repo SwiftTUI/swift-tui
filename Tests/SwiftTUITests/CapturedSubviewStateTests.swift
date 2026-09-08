@@ -6,6 +6,56 @@ import Testing
 
 @MainActor
 struct CapturedSubviewStateTests {
+  @Test("a closed retained group survives its enclosing lazy tab becoming dormant")
+  func closedGroupInDormantTab() {
+    let probe = IndexedStateProbe()
+    let renderer = DefaultRenderer()
+    let context = ResolveContext(identity: testIdentity("RetainedGroupTabs"))
+    func frame(tab: Int, hidden: Bool) -> RenderSnapshot {
+      renderer.render(
+        TabView(selection: .constant(tab)) {
+          Tab("Group", value: 0) {
+            NestedGroup(outerHidden: hidden, innerHidden: hidden, probe: probe)
+          }
+          Tab("Other", value: 1) { Text("Other tab") }
+        }, context: context, proposal: .init(width: 50, height: 12))
+    }
+    _ = frame(tab: 0, hidden: false)
+    probe.bindings[1]?.wrappedValue = 42
+    #expect(frame(tab: 0, hidden: false).rasterSurface.lines.joined().contains("Item 1:42"))
+    _ = frame(tab: 0, hidden: true)
+    let dormant = frame(tab: 1, hidden: true)
+    #expect(
+      !dormant.diagnostics.runtime.issues.contains {
+        $0.code == "tab.dormantStateUnsupportedValue"
+      })
+    _ = frame(tab: 0, hidden: true)
+    #expect(frame(tab: 0, hidden: false).rasterSurface.lines.joined().contains("Item 1:42"))
+  }
+
+  @Test("sibling closed groups restore their own archives independently")
+  func siblingOmission() {
+    let first = IndexedStateProbe()
+    let second = IndexedStateProbe()
+    let renderer = DefaultRenderer()
+    let context = ResolveContext(identity: testIdentity("SiblingRetention"))
+    func frame(hidden: Bool) -> RenderSnapshot {
+      renderer.render(
+        VStack {
+          IndexedGroup(hidden: hidden, ids: [1], probe: first)
+          IndexedGroup(hidden: hidden, ids: [2], probe: second)
+        }, context: context)
+    }
+    _ = frame(hidden: false)
+    first.bindings[1]?.wrappedValue = 11
+    second.bindings[2]?.wrappedValue = 22
+    _ = frame(hidden: false)
+    _ = frame(hidden: true)
+    let restored = frame(hidden: false).rasterSurface.lines.joined()
+    #expect(restored.contains("Item 1:11"))
+    #expect(restored.contains("Item 2:22"))
+  }
+
   @Test("reference-valued state survives omission and is released with its declaring group")
   func referenceState() {
     let probe = ReferenceStateProbe()

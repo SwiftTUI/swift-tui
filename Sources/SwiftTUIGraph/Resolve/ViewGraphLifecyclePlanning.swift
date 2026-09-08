@@ -20,6 +20,7 @@ enum ViewGraphLifecyclePlanner {
     )
     let (
       viewportTaskCancels,
+      viewportTaskTransfers,
       viewportDisappears,
       viewportAppears,
       viewportChanges,
@@ -39,6 +40,7 @@ enum ViewGraphLifecyclePlanner {
         input.stableTaskCancelEvents
         + input.structuralTaskCancelEvents
         + viewportTaskCancels
+        + viewportTaskTransfers
         + input.structuralDisappearEvents
         + viewportDisappears
         + input.structuralAppearEvents
@@ -59,6 +61,8 @@ enum ViewGraphLifecyclePlanner {
     seenKeys: inout Set<ViewportLifecycleKey>,
     order: inout [ViewportLifecycleKey],
     nodeIDByIdentity: [Identity: ViewNodeID],
+    previousKeyByIdentity: [Identity: ViewportLifecycleKey],
+    taskTransfers: inout [LifecycleEvent],
     taskCancels: inout [LifecycleEvent],
     appears: inout [LifecycleEvent],
     taskStarts: inout [LifecycleEvent]
@@ -72,6 +76,8 @@ enum ViewGraphLifecyclePlanner {
         seenKeys: &seenKeys,
         nodeIDByIdentity: nodeIDByIdentity,
         order: &order,
+        previousKeyByIdentity: previousKeyByIdentity,
+        taskTransfers: &taskTransfers,
         taskCancels: &taskCancels,
         appears: &appears,
         taskStarts: &taskStarts
@@ -89,6 +95,8 @@ enum ViewGraphLifecyclePlanner {
         seenKeys: &seenKeys,
         order: &order,
         nodeIDByIdentity: nodeIDByIdentity,
+        previousKeyByIdentity: previousKeyByIdentity,
+        taskTransfers: &taskTransfers,
         taskCancels: &taskCancels,
         appears: &appears,
         taskStarts: &taskStarts
@@ -103,9 +111,22 @@ enum ViewGraphLifecyclePlanner {
     previousViewportLifecycleOrder: [ViewportLifecycleKey],
     nodeIDByIdentity: [Identity: ViewNodeID]
   ) -> ViewGraphViewportLifecycleEventPlan {
+    var previousKeyByIdentity: [Identity: ViewportLifecycleKey] = [:]
+    var ambiguousIdentities: Set<Identity> = []
+    // Build once, rather than scanning all prior rows for every visible row.
+    // A duplicate identity cannot establish which old owner should migrate.
+    for (key, node) in previousViewportLifecycleNodesByKey {
+      if previousKeyByIdentity.updateValue(key, forKey: node.identity) != nil {
+        ambiguousIdentities.insert(node.identity)
+      }
+    }
+    for identity in ambiguousIdentities {
+      previousKeyByIdentity.removeValue(forKey: identity)
+    }
     var nodesByKey = previousViewportLifecycleNodesByKey
     var seenKeys: Set<ViewportLifecycleKey> = []
     var order: [ViewportLifecycleKey] = []
+    var taskTransfers: [LifecycleEvent] = []
     var taskCancels: [LifecycleEvent] = []
     var disappears: [LifecycleEvent] = []
     var appears: [LifecycleEvent] = []
@@ -118,6 +139,8 @@ enum ViewGraphLifecyclePlanner {
       seenKeys: &seenKeys,
       order: &order,
       nodeIDByIdentity: nodeIDByIdentity,
+      previousKeyByIdentity: previousKeyByIdentity,
+      taskTransfers: &taskTransfers,
       taskCancels: &taskCancels,
       appears: &appears,
       taskStarts: &taskStarts
@@ -149,7 +172,7 @@ enum ViewGraphLifecyclePlanner {
     }
 
     return ViewGraphViewportLifecycleEventPlan(
-      events: taskCancels + disappears + appears + taskStarts,
+      events: taskCancels + taskTransfers + disappears + appears + taskStarts,
       nodesByKey: nodesByKey,
       order: order
     )
@@ -159,11 +182,13 @@ enum ViewGraphLifecyclePlanner {
     _ events: [LifecycleEvent]
   ) -> (
     taskCancels: [LifecycleEvent],
+    taskTransfers: [LifecycleEvent],
     disappears: [LifecycleEvent],
     appears: [LifecycleEvent],
     changes: [LifecycleEvent],
     taskStarts: [LifecycleEvent]
   ) {
+    var taskTransfers: [LifecycleEvent] = []
     var taskCancels: [LifecycleEvent] = []
     var disappears: [LifecycleEvent] = []
     var appears: [LifecycleEvent] = []
@@ -174,6 +199,8 @@ enum ViewGraphLifecyclePlanner {
       switch event.operation {
       case .taskCancel:
         taskCancels.append(event)
+      case .taskTransfer:
+        taskTransfers.append(event)
       case .disappear:
         disappears.append(event)
       case .appear:
@@ -187,6 +214,7 @@ enum ViewGraphLifecyclePlanner {
 
     return (
       taskCancels,
+      taskTransfers,
       disappears,
       appears,
       changes,
@@ -200,6 +228,8 @@ enum ViewGraphLifecyclePlanner {
     seenKeys: inout Set<ViewportLifecycleKey>,
     nodeIDByIdentity: [Identity: ViewNodeID],
     order: inout [ViewportLifecycleKey],
+    previousKeyByIdentity: [Identity: ViewportLifecycleKey],
+    taskTransfers: inout [LifecycleEvent],
     taskCancels: inout [LifecycleEvent],
     appears: inout [LifecycleEvent],
     taskStarts: inout [LifecycleEvent]
@@ -211,7 +241,7 @@ enum ViewGraphLifecyclePlanner {
         } else {
           .identity(node.identity)
         }
-      let currentNode = LifecycleStateNode(
+      var currentNode = LifecycleStateNode(
         viewNodeID: nodeIDByIdentity[node.identity],
         identity: node.identity,
         appearHandlerIDs: node.lifecycleMetadata.appearHandlerIDs,
@@ -219,18 +249,34 @@ enum ViewGraphLifecyclePlanner {
         tasks: node.lifecycleMetadata.tasks
       )
       let previousNode: LifecycleStateNode?
-      if case .viewNode = key,
-        viewportLifecycleNodesByKey[key] == nil,
-        let identityNode = viewportLifecycleNodesByKey.removeValue(
-          forKey: .identity(node.identity)
-        )
+      if viewportLifecycleNodesByKey[key] == nil,
+        let previousKey = previousKeyByIdentity[node.identity],
+        !seenKeys.contains(previousKey),
+        viewportLifecycleNodesByKey[previousKey]?.identity == node.identity,
+        let carriedNode = viewportLifecycleNodesByKey.removeValue(forKey: previousKey)
       {
-        previousNode = identityNode
+        previousNode = carriedNode
       } else {
         previousNode = viewportLifecycleNodesByKey[key]
       }
-      seenKeys.insert(key)
-      order.append(key)
+      // The identity index can temporarily disappear during flattening. Keep
+      // the last concrete task owner until a new one is available.
+      if currentNode.viewNodeID == nil {
+        currentNode.viewNodeID = previousNode?.viewNodeID
+      }
+      if seenKeys.insert(key).inserted {
+        order.append(key)
+      }
+      if let previousNode, let source = previousNode.viewNodeID,
+        let destination = currentNode.viewNodeID, source != destination
+      {
+        for task in previousNode.tasks where currentNode.tasks.contains(task) {
+          taskTransfers.append(
+            .init(
+              viewNodeID: destination, identity: currentNode.identity,
+              operation: .taskTransfer(from: source, descriptor: task)))
+        }
+      }
 
       if previousNode == nil, !currentNode.appearHandlerIDs.isEmpty {
         appears.append(
@@ -241,9 +287,8 @@ enum ViewGraphLifecyclePlanner {
           )
         )
       }
-      // Viewport keying is stable by construction (`ViewportLifecycleKey`
-      // tracks the node, not its current resolved identity), so there is no
-      // identity-change boundary to pass into the shared diff policy.
+      // Carry migration preserves the mounted identity; only changed task
+      // descriptors cancel and restart. Cancels still address the old owner.
       let diff = TaskLifecycleDiff.between(
         previous: previousNode?.tasks ?? [],
         current: currentNode.tasks
@@ -251,7 +296,7 @@ enum ViewGraphLifecyclePlanner {
       for task in diff.cancels {
         taskCancels.append(
           .init(
-            viewNodeID: currentNode.viewNodeID,
+            viewNodeID: previousNode?.viewNodeID,
             identity: currentNode.identity,
             operation: .taskCancel(task)
           )
@@ -277,6 +322,8 @@ enum ViewGraphLifecyclePlanner {
         seenKeys: &seenKeys,
         nodeIDByIdentity: nodeIDByIdentity,
         order: &order,
+        previousKeyByIdentity: previousKeyByIdentity,
+        taskTransfers: &taskTransfers,
         taskCancels: &taskCancels,
         appears: &appears,
         taskStarts: &taskStarts

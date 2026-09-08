@@ -26,6 +26,8 @@ package enum LifecycleCommitOperation: Equatable, Sendable {
   case change(handlerIDs: [String])
   case taskStart(TaskDescriptor)
   case taskCancel(TaskDescriptor)
+  /// Retains a running task when a visible identity acquires a new backing node.
+  case taskTransfer(from: ViewNodeID, descriptor: TaskDescriptor)
 
   package var commitEffectCategory: CommitEffectCategory {
     switch self {
@@ -39,6 +41,8 @@ package enum LifecycleCommitOperation: Equatable, Sendable {
       .taskStart
     case .taskCancel:
       .taskCancel
+    case .taskTransfer:
+      .taskTransfer
     }
   }
 }
@@ -76,5 +80,6 @@ package enum CommitEffectCategory: CaseIterable, Sendable {
   case lifecycleChange
   case taskStart
   case taskCancel
+  case taskTransfer
   case handlerInstallations
 }

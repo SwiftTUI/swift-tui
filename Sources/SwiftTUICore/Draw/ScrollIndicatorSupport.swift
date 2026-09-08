@@ -173,14 +173,21 @@ package func resolvedScrollIndicatorMetrics(
   contentBounds: CellRect,
   axes: AxisSet,
   axis: ScrollIndicatorAxis,
-  reservesSpace: Bool = true
+  reservesSpace: Bool = true,
+  contentViewportRect: CellRect? = nil
 ) -> ScrollIndicatorMetrics? {
-  let insets = resolvedScrollIndicatorInsets(
-    viewportRect: viewportRect,
-    contentBounds: contentBounds,
-    axes: axes,
-    reservesSpace: reservesSpace
-  )
+  let insets =
+    contentViewportRect.map { content in
+      ScrollIndicatorInsets(
+        trailing: max(0, viewportRect.size.width - content.size.width),
+        bottom: max(0, viewportRect.size.height - content.size.height))
+    }
+    ?? resolvedScrollIndicatorInsets(
+      viewportRect: viewportRect,
+      contentBounds: contentBounds,
+      axes: axes,
+      reservesSpace: reservesSpace
+    )
 
   switch axis {
   case .vertical:
@@ -206,12 +213,18 @@ package func resolvedScrollIndicatorMetrics(
       contentLength: contentBounds.size.height
     )
   case .horizontal:
-    let trackWidth = max(0, viewportRect.size.width - insets.trailing)
+    let viewportWidth = max(0, viewportRect.size.width - insets.trailing)
+    // Overlay indicators do not shrink the content viewport, but the corner
+    // cell still belongs exclusively to the vertical track.
+    let hasVerticalTrack =
+      axes.contains(.vertical)
+      && contentBounds.size.height > max(0, viewportRect.size.height - insets.bottom)
+    let trackWidth = max(0, viewportWidth - (!reservesSpace && hasVerticalTrack ? 1 : 0))
     guard axes.contains(.horizontal), trackWidth > 0, viewportRect.size.height > 0 else {
       return nil
     }
 
-    let maxOffset = max(0, contentBounds.size.width - trackWidth)
+    let maxOffset = max(0, contentBounds.size.width - viewportWidth)
     guard maxOffset > 0 else {
       return nil
     }
@@ -224,7 +237,7 @@ package func resolvedScrollIndicatorMetrics(
         size: .init(width: trackWidth, height: 1)
       ),
       maxOffset: maxOffset,
-      viewportLength: trackWidth,
+      viewportLength: viewportWidth,
       contentLength: contentBounds.size.width
     )
   }

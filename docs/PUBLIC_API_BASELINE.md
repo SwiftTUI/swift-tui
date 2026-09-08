@@ -34,7 +34,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 169 | 1471 |
+| `SwiftTUIPrimitives` | 169 | 1472 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 0 | 0 |
@@ -772,7 +772,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `FocusInteractions` — enum — 3 members
 - `ForeignGrid` — struct — 4 members
 - `ForeignSurfacePayload` — protocol — 1 member
-- `FrameDropBlocker` — enum — 24 members
+- `FrameDropBlocker` — enum — 25 members
 - `GamutMappingPolicy` — enum — 8 members
 - `Gradient` — struct — 14 members
 - `GridSample` — struct — 4 members

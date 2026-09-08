@@ -43,16 +43,20 @@ extension LayoutEngine {
       // Including the outer inset or indicator track in the viewport would
       // make wheel, key, and pointer clamping stop before the final cells.
       node.contentBounds = content.contentBounds
-      let innerBounds = appearance.insetBounds(bounds)
-      let insets = resolvedScrollIndicatorInsets(
-        viewportRect: innerBounds, contentBounds: content.contentBounds,
-        axes: resolved.drawMetadata.scrollIndicatorAxes ?? [],
-        reservesSpace: appearance.reservesSpace)
-      node.scrollViewportRect = .init(
-        origin: innerBounds.origin,
-        size: .init(
-          width: max(0, innerBounds.size.width - insets.trailing),
-          height: max(0, innerBounds.size.height - insets.bottom)))
+      if let viewport = content.placementMetadata.parentScrollViewportRect {
+        node.scrollViewportRect = viewport
+      } else {
+        let innerBounds = appearance.insetBounds(bounds)
+        let insets = resolvedScrollIndicatorInsets(
+          viewportRect: innerBounds, contentBounds: content.contentBounds,
+          axes: resolved.drawMetadata.scrollIndicatorAxes ?? [],
+          reservesSpace: appearance.reservesSpace)
+        node.scrollViewportRect = .init(
+          origin: innerBounds.origin,
+          size: .init(
+            width: max(0, innerBounds.size.width - insets.trailing),
+            height: max(0, innerBounds.size.height - insets.bottom)))
+      }
     }
     if case .list(let payload) = resolved.drawPayload,
       resolved.semanticMetadata.hostedCollectionContainer?.kind == .list

@@ -29,6 +29,8 @@ public struct ScrollViewStyleConfiguration: Sendable {
 
 /// Indicator and container appearance; scrolling, clipping, and visibility stay primitive-owned.
 public struct ScrollViewStylePresentation: Sendable, Equatable {
+  /// Identifies the chosen presentation variant in invalid-field diagnostics,
+  /// alongside the concrete style's label.
   public var snapshotLabel: String
   public var contentInsets: EdgeInsets
   public var verticalIndicatorGlyph: String
@@ -71,31 +73,25 @@ extension ScrollViewStyle {
   public var snapshotLabel: String { String(reflecting: Self.self) }
 }
 
-private protocol AnyScrollViewStyleBox: Sendable {
+private protocol AnyScrollViewStyleBox: AnyStyleBox {
   var snapshotLabel: String { get }
   @MainActor
   func presentation(for configuration: ScrollViewStyleConfiguration) -> ScrollViewStylePresentation
-  func isEqualForReuse(to other: any AnyScrollViewStyleBox) -> Bool
 }
 
-private struct ConcreteAnyScrollViewStyleBox<S: ScrollViewStyle>: AnyScrollViewStyleBox {
-  let style: S
+extension ConcreteStyleBox: AnyScrollViewStyleBox where S: ScrollViewStyle {
   var snapshotLabel: String { style.snapshotLabel }
   @MainActor
   func presentation(for configuration: ScrollViewStyleConfiguration) -> ScrollViewStylePresentation
   {
     style.resolvePresentation(for: configuration)
   }
-  func isEqualForReuse(to other: any AnyScrollViewStyleBox) -> Bool {
-    guard let other = other as? Self else { return false }
-    return styleValuesAreEqualForReuse(style, other.style)
-  }
 }
 
 /// Type-erased scroll styling with comparison of its concrete style value.
 public struct AnyScrollViewStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   private let box: any AnyScrollViewStyleBox
-  public init<S: ScrollViewStyle>(_ style: S) { box = ConcreteAnyScrollViewStyleBox(style: style) }
+  public init<S: ScrollViewStyle>(_ style: S) { box = ConcreteStyleBox(style: style) }
   public var description: String { box.snapshotLabel }
   public var debugDescription: String { description }
   public static var automatic: Self { Self(AutomaticScrollViewStyle()) }

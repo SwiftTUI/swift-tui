@@ -81,7 +81,9 @@ extension SemanticExtractor {
           contentBounds: node.contentBounds,
           axes: axes,
           axis: axis,
-          reservesSpace: node.drawMetadata.scrollIndicatorAppearance?.reservesSpace ?? true
+          reservesSpace: node.drawMetadata.scrollIndicatorAppearance?.reservesSpace ?? true,
+          contentViewportRect: node.drawMetadata.scrollIndicatorAppearance != nil
+            ? node.scrollViewportRect : nil
         ),
         let clippedRect = clippedRect(for: metrics.rect, clippedTo: clipRect)
       else {

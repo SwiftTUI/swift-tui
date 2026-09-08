@@ -308,6 +308,7 @@ SwiftTUIViews.ScrollViewStyleConfiguration.init(axes:visibleIndicatorAxes:focuse
 SwiftTUIViews.SheetStyleConfiguration.init(defaultPresentation:terminalSize:controlProminence:styleEnvironment:)
 SwiftTUIViews.SliderStyleConfiguration.Label.init(content:)
 SwiftTUIViews.SliderStyleConfiguration.ValueLabel.init(content:)
+SwiftTUIViews.SliderStyleConfiguration.init(label:valueLabel:fractionCompleted:trackCellCount:canDecrement:canIncrement:isEnabled:isFocused:showsFocusEffect:isPressed:styleEnvironment:)
 SwiftTUIViews.SliderStyleConfiguration.init(label:valueLabel:fractionCompleted:trackCellCount:isEnabled:isFocused:showsFocusEffect:isPressed:canDecrement:canIncrement:styleEnvironment:)
 SwiftTUIViews.SpinnerStyleConfiguration.init(stage:accessibilityReduceMotion:styleEnvironment:)
 SwiftTUIViews.StepperStyleConfiguration.Label.init(content:)

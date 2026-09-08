@@ -39,6 +39,31 @@ package struct DormantStateSlotSnapshot {
   fileprivate var valueType: Any.Type
 }
 
+/// Framework containers may project live persistent storage into an equivalent
+/// value-only envelope. The result still passes the normal recursive audit.
+package protocol DormantStateProjecting {
+  @MainActor func dormantStateProjection() -> Self?
+}
+
+extension Optional: DormantStateProjecting where Wrapped: DormantStateProjecting {
+  package func dormantStateProjection() -> Self? {
+    switch self {
+    case .none: return .some(.none)
+    case .some(let value):
+      guard let projected = value.dormantStateProjection() else { return nil }
+      return .some(.some(projected))
+    }
+  }
+}
+
+/// Identity of one stored value, independent of its `Equatable` semantics.
+/// Copies/checkpoints retain the token; every store creates a fresh token, so
+/// restoring a checkpoint and then writing cannot collide with a discarded
+/// branch. This certifies replacement of the value, not mutations of referents.
+package final class StateValueIdentity: Sendable {
+  package init() {}
+}
+
 package struct AnyStateSlot {
   private enum Storage {
     case uninitialized
@@ -46,6 +71,7 @@ package struct AnyStateSlot {
   }
 
   private var storage: Storage
+  package private(set) var valueIdentity = StateValueIdentity()
   package let dormantPolicy: DormantStateSlotPolicy
 
   package init() {
@@ -146,13 +172,20 @@ package struct AnyStateSlot {
   /// contain a class, task handle, binding closure, or another live runtime
   /// edge. Such values remain transient instead of leaking that edge through
   /// a dormant archive.
-  package func dormantSnapshot() -> DormantStateSlotSnapshot? {
+  @MainActor package func dormantSnapshot() -> DormantStateSlotSnapshot? {
     guard dormantPolicy == .persistent,
-      case .value(let value, let valueType, _) = storage,
-      Self.isDormantValueOnly(value)
+      case .value(let storedValue, let valueType, _) = storage
     else {
       return nil
     }
+    let value: Any
+    if let container = storedValue as? any DormantStateProjecting {
+      guard let projected = container.dormantStateProjection() else { return nil }
+      value = projected
+    } else {
+      value = storedValue
+    }
+    guard Self.isDormantValueOnly(value) else { return nil }
     return DormantStateSlotSnapshot(value: value, valueType: valueType)
   }
 
@@ -322,6 +355,7 @@ package struct AnyStateSlot {
     // fixed at initial-store time and must not be reset to the
     // non-Equatable always-false comparator when the value updates.
     storage = .value(value, valueType, equals)
+    valueIdentity = StateValueIdentity()
     return didChange
   }
 

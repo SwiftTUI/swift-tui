@@ -11,6 +11,41 @@ package struct RetainedSubviewState {
   }
 
   package var records: [Record]
+  private var dormantArchive: DormantStateArchive? = nil
+
+  package init(records: [Record]) { self.records = records }
+
+  package var restorationRecords: [Record] {
+    guard let dormantArchive else { return records }
+    return dormantArchive.records.map {
+      Record(
+        identity: $0.identity, entityIdentity: $0.entityIdentity,
+        slots: $0.stateSlots.mapValues { AnyStateSlot(restoringDormant: $0) })
+    }
+  }
+}
+
+extension RetainedSubviewState: DormantStateProjecting {
+  package func dormantStateProjection() -> Self? {
+    if dormantArchive != nil { return self }
+    var projected: [DormantStateArchive.NodeRecord] = []
+    for record in records {
+      var slots: [StateSlotIdentifier: DormantStateSlotSnapshot] = [:]
+      for (identifier, slot) in record.slots {
+        // Preserve the lazy-tab value-only boundary, including for nested
+        // retained groups. Reference-valued archives still report and restart.
+        guard let snapshot = slot.dormantSnapshot() else { return nil }
+        slots[identifier] = snapshot
+      }
+      projected.append(
+        .init(
+          identity: record.identity, entityIdentity: record.entityIdentity,
+          stateSlots: slots))
+    }
+    var result = Self(records: [])
+    result.dormantArchive = DormantStateArchive(records: projected)
+    return result
+  }
 }
 
 extension ViewGraph {
@@ -31,7 +66,7 @@ extension ViewGraph {
   /// structural identity. Authored resolution claims the matching entity;
   /// normal frame teardown reclaims records no longer present in the content.
   package func restoreRetainedSubviewState(_ state: RetainedSubviewState) {
-    for record in state.records {
+    for record in state.restorationRecords {
       let node: ViewNode
       if let entity = record.entityIdentity {
         node = prepareEntityRoutedOwnerPreservingCoResidentIdentity(

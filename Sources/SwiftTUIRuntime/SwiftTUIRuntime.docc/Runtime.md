@@ -124,11 +124,15 @@ slot also contains semantic handler-installation work.
 - A task also starts when a stable runtime node gains a task descriptor
 - A task survives ordinary frame updates when the runtime node and task
   descriptor are unchanged
+- A task also survives a backing-node migration when its identity uniquely
+  matches a single incoming runtime node and its task descriptor is
+  unchanged; its running handle is transferred to the new owner
 - A task restarts when the descriptor changes on the same runtime node
 - A task also restarts when explicit identity replacement creates a new
   runtime lifetime, even if the descriptor compares equal
-- A task cancels when its runtime node disappears, when its descriptor is
-  replaced, or when the runtime shuts down
+- A task cancels when its runtime node disappears with no uniquely matched
+  replacement, when its descriptor is replaced, or when the runtime shuts
+  down
 - Selective dirty evaluation must re-run the graph node that authored lifecycle
   metadata before it commits a descendant update that can drop that
   metadata. The lifecycle identity remains the resolved node identity. The
