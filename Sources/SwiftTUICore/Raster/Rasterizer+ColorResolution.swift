@@ -215,33 +215,6 @@ extension Rasterizer {
     return cells[y][x].style?.backgroundColor
   }
 
-  internal func resolveTextStyle(
-    _ style: TextStyle,
-    environment: StyleEnvironmentSnapshot,
-    bounds: CellRect,
-    sampleX: Int,
-    sampleY: Int,
-    width: Int,
-    currentCellBackground: Color? = nil
-  ) -> ResolvedTextStyle {
-    let modes = resolvedTextColorModes(
-      for: style,
-      environment: environment,
-      bounds: bounds
-    )
-    return resolveTextStyle(
-      style,
-      foregroundMode: modes.foreground,
-      backgroundMode: modes.background,
-      environment: environment,
-      bounds: bounds,
-      sampleX: sampleX,
-      sampleY: sampleY,
-      width: width,
-      currentCellBackground: currentCellBackground
-    )
-  }
-
   internal func resolvedTextColorModes(
     for style: TextStyle,
     environment: StyleEnvironmentSnapshot,
