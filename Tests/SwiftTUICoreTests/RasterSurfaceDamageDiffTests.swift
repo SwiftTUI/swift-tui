@@ -253,21 +253,21 @@ struct RasterSurfaceDamageDiffTests {
     // grid (compared cell by cell above), so sidecar churn alone must not
     // produce damage — including it unioned every glyph's bounds into damage
     // on each incremental frame (F36).
-    let previous = RasterSurface(
+    var previous = RasterSurface(
       size: .init(width: 4, height: 1),
-      lines: ["ABCD"],
-      presentationLayers: [
-        cellLayer(order: 0, x: 0, width: 2),
-        cellLayer(order: 1, x: 2, width: 2),
-      ]
+      lines: ["ABCD"]
     )
-    let current = RasterSurface(
+    previous.presentationLayers = [
+      cellLayer(order: 0, x: 0, width: 2),
+      cellLayer(order: 1, x: 2, width: 2),
+    ]
+    var current = RasterSurface(
       size: .init(width: 4, height: 1),
-      lines: ["ABCD"],
-      presentationLayers: [
-        cellLayer(order: 5, x: 0, width: 4)
-      ]
+      lines: ["ABCD"]
     )
+    current.presentationLayers = [
+      cellLayer(order: 5, x: 0, width: 4)
+    ]
 
     #expect(
       RasterSurfaceDamageDiff.diff(previous: previous, current: current)
@@ -284,24 +284,24 @@ struct RasterSurfaceDamageDiffTests {
       bounds: bounds,
       source: .path("image.png")
     )
-    let previous = RasterSurface(
+    var previous = RasterSurface(
       size: .init(width: 1, height: 1),
       lines: ["A"],
-      imageAttachments: [image],
-      presentationLayers: [
-        RasterPresentationLayer(order: 0, bounds: bounds, content: .image(image)),
-        cellLayer(order: 1, x: 0, width: 1),
-      ]
+      imageAttachments: [image]
     )
-    let current = RasterSurface(
+    previous.presentationLayers = [
+      RasterPresentationLayer(order: 0, bounds: bounds, content: .image(image)),
+      cellLayer(order: 1, x: 0, width: 1),
+    ]
+    var current = RasterSurface(
       size: .init(width: 1, height: 1),
       lines: ["A"],
-      imageAttachments: [image],
-      presentationLayers: [
-        RasterPresentationLayer(order: 7, bounds: bounds, content: .image(image)),
-        cellLayer(order: 9, x: 0, width: 1),
-      ]
+      imageAttachments: [image]
     )
+    current.presentationLayers = [
+      RasterPresentationLayer(order: 7, bounds: bounds, content: .image(image)),
+      cellLayer(order: 9, x: 0, width: 1),
+    ]
 
     #expect(
       RasterSurfaceDamageDiff.diff(previous: previous, current: current)
@@ -312,29 +312,29 @@ struct RasterSurfaceDamageDiffTests {
   @Test("diff bounds effect-layer topology changes to the affected layers")
   func diffBoundsEffectLayerTopologyChangesToAffectedLayers() {
     let effectBounds = CellRect(origin: .init(x: 0, y: 1), size: .init(width: 2, height: 1))
-    let previous = RasterSurface(
+    var previous = RasterSurface(
       size: .init(width: 4, height: 3),
-      lines: ["aaaa", "bbbb", "cccc"],
-      presentationLayers: [
-        cellLayer(order: 0, x: 0, width: 4),
-        cellLayer(order: 1, x: 0, width: 4, y: 1),
-        cellLayer(order: 2, x: 0, width: 4, y: 2),
-      ]
+      lines: ["aaaa", "bbbb", "cccc"]
     )
-    let current = RasterSurface(
+    previous.presentationLayers = [
+      cellLayer(order: 0, x: 0, width: 4),
+      cellLayer(order: 1, x: 0, width: 4, y: 1),
+      cellLayer(order: 2, x: 0, width: 4, y: 2),
+    ]
+    var current = RasterSurface(
       size: .init(width: 4, height: 3),
-      lines: ["aaaa", "bbbb", "cccc"],
-      presentationLayers: [
-        cellLayer(order: 0, x: 0, width: 4),
-        RasterPresentationLayer(
-          order: 1,
-          bounds: effectBounds,
-          content: .cells(RasterSurfaceFragment(bounds: effectBounds, cells: [])),
-          effects: [.blendMode(.screen)]
-        ),
-        cellLayer(order: 2, x: 0, width: 4, y: 2),
-      ]
+      lines: ["aaaa", "bbbb", "cccc"]
     )
+    current.presentationLayers = [
+      cellLayer(order: 0, x: 0, width: 4),
+      RasterPresentationLayer(
+        order: 1,
+        bounds: effectBounds,
+        content: .cells(RasterSurfaceFragment(bounds: effectBounds, cells: [])),
+        effects: [.blendMode(.screen)]
+      ),
+      cellLayer(order: 2, x: 0, width: 4, y: 2),
+    ]
 
     // The blended fragment appearing is a topology change, but the damage is
     // its own bounds — not the union of every layer on the surface.
@@ -367,18 +367,18 @@ struct RasterSurfaceDamageDiffTests {
       bounds: imageBounds,
       content: .image(image)
     )
-    let previous = RasterSurface(
+    var previous = RasterSurface(
       size: .init(width: 3, height: 1),
       lines: ["ABC"],
-      imageAttachments: [image],
-      presentationLayers: [effectLayer, imageLayer]
+      imageAttachments: [image]
     )
-    let current = RasterSurface(
+    previous.presentationLayers = [effectLayer, imageLayer]
+    var current = RasterSurface(
       size: .init(width: 3, height: 1),
       lines: ["ABC"],
-      imageAttachments: [image],
-      presentationLayers: [imageLayer, effectLayer]
+      imageAttachments: [image]
     )
+    current.presentationLayers = [imageLayer, effectLayer]
 
     #expect(
       RasterSurfaceDamageDiff.diff(previous: previous, current: current)

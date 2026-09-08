@@ -130,23 +130,6 @@ public struct RasterSurface: Equatable, Sendable {
     self.presentationLayers = []
   }
 
-  package init(
-    size: CellSize = .zero,
-    lines: [String],
-    styleRuns: [RasterStyleRun] = [],
-    attachments: [String] = [],
-    imageAttachments: [RasterImageAttachment] = [],
-    metadata: [String: String] = [:],
-    presentationLayers: [RasterPresentationLayer] = []
-  ) {
-    self.size = size
-    self.cells = Self.makeCells(size: size, lines: lines, styleRuns: styleRuns)
-    self.attachments = attachments
-    self.imageAttachments = imageAttachments
-    self.metadata = metadata
-    self.presentationLayers = presentationLayers
-  }
-
   public static func == (lhs: RasterSurface, rhs: RasterSurface) -> Bool {
     lhs.size == rhs.size
       && lhs.cells == rhs.cells
