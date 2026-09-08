@@ -50,13 +50,6 @@ package func runtimePrimaryRouteID(
   )
 }
 
-package func childRouteID(
-  parent: Identity,
-  component: IdentityComponent
-) -> RouteID {
-  primaryRouteID(for: parent.child(component))
-}
-
 package func sliderTrackIdentity(
   for controlIdentity: Identity
 ) -> Identity {
@@ -123,20 +116,6 @@ package func listRowIndex(
     return nil
   }
   return builtinRouteRowIndex(in: component, kind: "ListRow")
-}
-
-/// The row index encoded in `identity`, when it is `container`'s table-row
-/// identity. The inverse of ``tableRowIdentity(for:rowIndex:)``.
-package func tableRowIndex(
-  parsedFrom identity: Identity,
-  container: Identity
-) -> Int? {
-  guard identity.parent == container,
-    let component = identity.lastComponent
-  else {
-    return nil
-  }
-  return builtinRouteRowIndex(in: component, kind: "TableRow")
 }
 
 private func builtinRouteRowIndex(

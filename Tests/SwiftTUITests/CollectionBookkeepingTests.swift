@@ -71,7 +71,6 @@ struct CollectionBookkeepingTests {
     }
     for row in [0, 5, 512] {
       let identity = tableRowIdentity(for: container, rowIndex: row)
-      #expect(tableRowIndex(parsedFrom: identity, container: container) == row)
       #expect(
         listRowIndex(parsedFrom: identity, container: container) == nil,
         "a table row must not parse as a list row"
