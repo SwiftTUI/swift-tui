@@ -430,11 +430,12 @@ private func rasterImageSurface(
 private func rasterTopologySurface(
   layers: [RasterPresentationLayer]
 ) -> RasterSurface {
-  RasterSurface(
+  var surface = RasterSurface(
     size: .init(width: 8, height: 4),
-    lines: ["........", "........", "........", "........"],
-    presentationLayers: layers
+    lines: ["........", "........", "........", "........"]
   )
+  surface.presentationLayers = layers
+  return surface
 }
 
 private func rasterImage(
