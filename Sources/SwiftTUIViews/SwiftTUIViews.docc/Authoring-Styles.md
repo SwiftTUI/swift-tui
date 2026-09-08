@@ -425,8 +425,8 @@ removes the surrounding chrome.
 progress. Its optional label slots are `nil` for an absent label and for an
 explicitly authored `EmptyView`, because the unlabeled initializers author
 one; the group-box rule that an authored `EmptyView` is a present slot does
-not apply here. Its `indeterminatePhase` is a deterministic rendering seed for moving
-tracks. `.automatic` aliases `.linear`. `.circular` renders determinate progress
+not apply here. Its `indeterminatePhase` is a live phase the primitive advances on a
+cadence for moving tracks. `.automatic` aliases `.linear`. `.circular` renders determinate progress
 as a ring and composes ``Spinner`` for indeterminate progress, inheriting the
 nearest spinner style. Reduced motion and stable output use static status
 labels and schedule no spinner task.
