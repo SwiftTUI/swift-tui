@@ -234,8 +234,8 @@ struct TextInputLayoutMapTests {
       width: nil
     )
 
-    #expect(!presentation.shouldDrawSyntheticCaret)
     #expect(presentation.displayText == "hello")
+    #expect(!presentation.shouldDrawSyntheticCaret)
     #expect(presentation.displayRuns.map(\.text).joined() == "hello")
     #expect(presentation.displayRuns.map(\.isSelected) == [false, true, false])
   }
@@ -280,9 +280,33 @@ struct TextInputLayoutMapTests {
       width: nil
     )
 
-    #expect(presentation.displayText == String(repeating: "\u{2022}", count: 4) + "_")
+    #expect(presentation.displayText == String(repeating: "\u{2022}", count: 4))
+    #expect(presentation.shouldDrawSyntheticCaret)
+    #expect(presentation.displayRuns.filter(\.isSelected).map(\.text) == ["•"])
     #expect(presentation.layoutMap.caretPoint(for: TextOffset(2)) == CellPoint(x: 2, y: 0))
     #expect(presentation.caretAnchor == CellPoint(x: 2, y: 0))
+  }
+
+  @Test("T244: a mid-text caret preserves text and its display coordinates")
+  func midTextCaretDoesNotAppendMarker() {
+    for (text, caretGlyph) in [("abc", "b"), ("a界b", "界")] {
+      let presentation = TextInputPresentation(
+        value: TextInputValue(text: text, selection: .caret(at: TextOffset(1))),
+        traits: .singleLine, prompt: nil, isFocused: true, cursorFollowsFocus: false, width: nil)
+      #expect(presentation.displayText == text)
+      #expect(presentation.caretAnchor == CellPoint(x: 1, y: 0))
+      #expect(presentation.shouldDrawSyntheticCaret)
+      #expect(presentation.displayRuns.filter(\.isSelected).map(\.text) == [caretGlyph])
+    }
+  }
+
+  @Test("T244: a newline caret uses its own line")
+  func newlineCaretUsesItsOwnLine() {
+    let presentation = TextInputPresentation(
+      value: TextInputValue(text: "a\nb", selection: .caret(at: TextOffset(1))),
+      traits: .singleLine, prompt: nil, isFocused: true, cursorFollowsFocus: false, width: nil)
+    #expect(presentation.displayText == "a_\nb")
+    #expect(presentation.caretAnchor == CellPoint(x: 1, y: 0))
   }
 
   @Test("synthetic caret is suppressed when cursor follows focus")

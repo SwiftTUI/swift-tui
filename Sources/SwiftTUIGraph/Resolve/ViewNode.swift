@@ -1771,6 +1771,8 @@ package final class ViewNode {
   package func recordScrollPositionRegistration(
     _ registration: ScrollPositionRegistrationSnapshot
   ) {
+    var registration = registration
+    registration.ownerViewNodeID = registration.ownerViewNodeID ?? viewNodeID
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordScrollPosition(registration)
   }

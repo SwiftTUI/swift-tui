@@ -153,7 +153,8 @@ extension LayoutEngine {
 
     let primaryDimensions = viewDimensions(
       for: resolved.children[primaryIndex],
-      measured: measured.childMeasurements[primaryIndex]
+      measured: measured.childMeasurements[primaryIndex],
+      passContext: passContext
     )
     let primaryOrigin = alignedOrigin(
       for: primaryDimensions,
@@ -175,7 +176,8 @@ extension LayoutEngine {
     return measured.childMeasurements.enumerated().map { index, childMeasurement in
       let childDimensions = viewDimensions(
         for: resolved.children[index],
-        measured: childMeasurement
+        measured: childMeasurement,
+        passContext: passContext
       )
       let childOrigin = alignedOrigin(
         for: childDimensions,

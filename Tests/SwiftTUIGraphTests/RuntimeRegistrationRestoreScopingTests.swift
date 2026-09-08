@@ -513,6 +513,8 @@ struct RuntimeRegistrationRestoreScopingTests {
     departingNode.beginRegistrationCapture()
     ViewNodeContext.withValue(departingNode) {
       departingNode.recordKeyPressHandlerRegistration(identity: pinned, ordinal: 0) { _ in true }
+      departingNode.recordScrollPositionRegistration(
+        .init(identity: departingIdentity, currentOffset: { .zero }, applyOffset: { _ in }))
     }
     departingNode.endRegistrationCapture()
     graph.finishEvaluation(
@@ -552,6 +554,8 @@ struct RuntimeRegistrationRestoreScopingTests {
     arrivingNode.beginRegistrationCapture()
     ViewNodeContext.withValue(arrivingNode) {
       arrivingNode.recordKeyPressHandlerRegistration(identity: pinned, ordinal: 0) { _ in true }
+      arrivingNode.recordScrollPositionRegistration(
+        .init(identity: arrivingIdentity, currentOffset: { .zero }, applyOffset: { _ in }))
     }
     arrivingNode.endRegistrationCapture()
     graph.finishEvaluation(
@@ -589,6 +593,13 @@ struct RuntimeRegistrationRestoreScopingTests {
     graph.restoreCurrentFrameRuntimeRegistrations(into: fullRebuild)
 
     #expect(fullRebuild.keyHandlerRegistry?.snapshotKeyPressHandlers()[pinned]?.count == 1)
+    // T242: the departed ScrollView's own identity is outside the arriving
+    // frontier too. Scoped publication must match the full rebuild.
+    let rebuiltScroll = fullRebuild.scrollPositionRegistry?.snapshot().map(\.identity).sorted()
+    #expect(rebuiltScroll == [arrivingIdentity])
+    #expect(
+      liveRegistrations.scrollPositionRegistry?.snapshot().map(\.identity).sorted() == rebuiltScroll
+    )
     #expect(
       liveRegistrations.keyHandlerRegistry?.snapshotKeyPressHandlers()[pinned]?.count
         == fullRebuild.keyHandlerRegistry?.snapshotKeyPressHandlers()[pinned]?.count

@@ -141,6 +141,8 @@ package struct RemovalEntry: Sendable {
   /// from the value currently on screen instead of snapping back
   /// to full opacity.
   package var startOpacity: Double = 1.0
+  /// Sampled insertion scale at interruption, before the insertion is retired.
+  package var startScale: TransitionScaleEffect? = nil
   /// Batch retained by this visual exit until its selected completion barrier.
   package var completionBatchID: AnimationBatchID? = nil
   /// The curve has reached its final value. The final overlay remains for one

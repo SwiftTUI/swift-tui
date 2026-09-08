@@ -168,6 +168,44 @@ extension KeyframesBuilder where Value: Animatable {
     Value, Value, KeyframeTrackContentSequence<Value>
   >
 
+  /// Conditional bare keyframes remain segments of the enclosing track.
+  public static func buildOptional(
+    _ component: WholeValueTrack?
+  ) -> KeyframeTrackContentSequence<Value> {
+    component?.content ?? KeyframeTrackContentSequence(entries: [])
+  }
+
+  public static func buildEither(
+    first component: WholeValueTrack
+  ) -> KeyframeTrackContentSequence<Value> {
+    component.content
+  }
+
+  public static func buildEither(
+    second component: WholeValueTrack
+  ) -> KeyframeTrackContentSequence<Value> {
+    component.content
+  }
+
+  /// A switch with more than two cases nests the conditional lowering.
+  public static func buildEither(
+    first component: KeyframeTrackContentSequence<Value>
+  ) -> KeyframeTrackContentSequence<Value> {
+    component
+  }
+
+  public static func buildEither(
+    second component: KeyframeTrackContentSequence<Value>
+  ) -> KeyframeTrackContentSequence<Value> {
+    component
+  }
+
+  public static func buildArray(
+    _ components: [WholeValueTrack]
+  ) -> KeyframeTrackContentSequence<Value> {
+    KeyframeTrackContentSequence(entries: components.flatMap { $0.content.entries })
+  }
+
   /// Accepts a bare keyframe for an ``Animatable`` value.
   public static func buildExpression<Content: KeyframeTrackContent>(
     _ expression: Content

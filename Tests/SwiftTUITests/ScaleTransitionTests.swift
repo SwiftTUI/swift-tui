@@ -17,6 +17,19 @@ struct ScaleTransitionTests {
     size: CellSize(width: 8, height: 4)
   )
 
+  @Test("T240: toggling a scaling view through RunLoop does not flash full size")
+  func interruptedScaleThroughInput() throws {
+    let harness = try AnimatorRuntimeHarness(size: .init(width: 20, height: 8)) {
+      InterruptedScaleView()
+    }
+    defer { harness.shutdown() }
+    try harness.clickText("Toggle")
+    let insertedCount = harness.frame.filter { $0 == "░" }.count
+    #expect(insertedCount == 8)
+    try harness.clickText("Toggle")
+    #expect(harness.frame.filter { $0 == "░" }.count == insertedCount)
+  }
+
   @Test("built-ins match SwiftUI's default and parameterized phase modifiers")
   func builtinContracts() throws {
     let defaultInsertion = try #require(AnyTransition.scale.insertionModifiers().scale)
@@ -154,6 +167,55 @@ struct ScaleTransitionTests {
     )
     #expect(completed.insertionScales.isEmpty)
     #expect(controller.activeInsertionScaleCount == 0)
+  }
+
+  @Test("T240: removal continues an interrupted insertion scale")
+  func removalContinuesInterruptedInsertionScale() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(1))
+    controller.register(animation)
+    let start = MonotonicInstant(offset: .seconds(550))
+    let empty = ResolvedNode(identity: Self.rootIdentity, kind: .view("Root"))
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(empty, transaction: .init(), timestamp: start)
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: Self.leafIdentity, viewNodeID: Self.leafNodeID,
+      transition: AnyTransition.scale(scale: 0.5, anchor: .bottomTrailing))
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      ResolvedNode(
+        identity: Self.rootIdentity, kind: .view("Root"),
+        children: [
+          ResolvedNode(
+            viewNodeID: Self.leafNodeID, identity: Self.leafIdentity, kind: .view("Leaf"))
+        ]),
+      transaction: transaction, timestamp: start)
+    controller.capturePlacedTree(Self.placedTree(includingLeaf: true))
+
+    let removalTime = start.advanced(by: .milliseconds(400))
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(empty, transaction: transaction, timestamp: removalTime)
+    #expect(controller.activeInsertionScaleCount == 0)
+    let live = Self.placedTree(includingLeaf: false)
+    for (elapsed, expectedScale) in [(0, 0.7), (500, 0.6)] {
+      let snapshot = controller.placedAnimationOverlaySnapshot(
+        for: live, at: removalTime.advanced(by: .milliseconds(elapsed)))
+      let scale = try #require(snapshot.removalOverlays.first?.modifiers.scale)
+      #expect(abs(scale.scale - expectedScale) < 0.001)
+      var tree = live
+      applyPlacedAnimationOverlaySnapshot(snapshot, to: &tree)
+      let overlay = try #require(Self.node(Self.leafIdentity, in: tree))
+      #expect(
+        overlay.bounds
+          == scaledTransitionRect(Self.leafBounds, scale: expectedScale, anchor: .bottomTrailing))
+      #expect(overlay.isTransient)
+    }
   }
 
   @Test("removal shrinks the frozen transient overlay toward its anchor")
@@ -307,5 +369,24 @@ struct ScaleTransitionTests {
       }
     }
     return nil
+  }
+}
+
+private struct InterruptedScaleView: View {
+  @State private var shown = false
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Button("Toggle") {
+        withAnimation(.linear(duration: .seconds(60))) { shown.toggle() }
+      }
+      ZStack {
+        if shown {
+          Rectangle().fill(TileStyle(.lightShade, foreground: .white))
+            .frame(width: 8, height: 4)
+            .transition(.scale(scale: 0.5))
+        }
+      }
+    }
   }
 }

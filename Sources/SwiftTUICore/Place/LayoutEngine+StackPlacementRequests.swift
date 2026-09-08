@@ -43,7 +43,8 @@ extension LayoutEngine {
         }
         let dimensions = viewDimensions(
           for: stackChildren[index],
-          measured: childMeasurement
+          measured: childMeasurement,
+          passContext: passContext
         )
         return PlacementRequest(
           resolved: stackChildren[index],
@@ -68,7 +69,8 @@ extension LayoutEngine {
         }
         let dimensions = viewDimensions(
           for: stackChildren[index],
-          measured: childMeasurement
+          measured: childMeasurement,
+          passContext: passContext
         )
         return PlacementRequest(
           resolved: stackChildren[index],
@@ -235,7 +237,8 @@ extension LayoutEngine {
         let childMeasurement = measured.childMeasurements[index]
         let dimensions = viewDimensions(
           for: stackChildren[index],
-          measured: childMeasurement
+          measured: childMeasurement,
+          passContext: passContext
         )
         return PlacementRequest(
           resolved: stackChildren[index],
@@ -254,7 +257,8 @@ extension LayoutEngine {
         let childMeasurement = measured.childMeasurements[index]
         let dimensions = viewDimensions(
           for: stackChildren[index],
-          measured: childMeasurement
+          measured: childMeasurement,
+          passContext: passContext
         )
         return PlacementRequest(
           resolved: stackChildren[index],
@@ -443,7 +447,8 @@ extension LayoutEngine {
     for child in placementChildren {
       let dimensions = viewDimensions(
         for: child.resolved,
-        measured: child.measured
+        measured: child.measured,
+        passContext: passContext
       )
       let mainOffset = refinedOffsets[child.index] ?? snapshot.childMainOffsets[child.index]
 

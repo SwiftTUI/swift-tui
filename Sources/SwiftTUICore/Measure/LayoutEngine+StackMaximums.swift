@@ -201,11 +201,15 @@ extension LayoutEngine {
     case .intrinsic:
       return boundedMaximum(of: childMaximums) ?? idealMain
     case .overlay:
-      // Overlay's first child is the content; overlays are pinned to it.
-      guard let content = childMaximums.first else {
-        return idealMain
+      // A ZStack sizes to all its children, while direct Spacers contribute
+      // only their ideal size. Decorations have a separate primary-child rule.
+      var maximum = idealMain
+      for (child, childMaximum) in zip(stackChildren, childMaximums) {
+        guard !isSpacer(child) else { continue }
+        guard let childMaximum else { return nil }
+        maximum = max(maximum, childMaximum)
       }
-      return content
+      return maximum
     case .offset, .position, .safeAreaIgnoring:
       guard let content = childMaximums.first else {
         return idealMain

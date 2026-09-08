@@ -20,6 +20,46 @@ struct KeyframeTimelineTests {
 
   // MARK: - Linear
 
+  @Test("T245: bare keyframes preserve sequential timing through control flow")
+  func bareKeyframeControlFlow() {
+    for included in [false, true] {
+      let timeline = KeyframeTimeline(initialValue: 0.0) {
+        LinearKeyframe(1, duration: .seconds(1))
+        if included {
+          LinearKeyframe(2, duration: .seconds(1))
+        }
+        if included {
+          LinearKeyframe(3, duration: .seconds(1))
+        } else {
+          LinearKeyframe(4, duration: .seconds(1))
+        }
+        for value in [5.0, 6.0] {
+          LinearKeyframe(value, duration: .seconds(1))
+        }
+        switch included ? 1 : 2 {
+        case 0: MoveKeyframe(0)
+        case 1: MoveKeyframe(7)
+        default: MoveKeyframe(8)
+        }
+      }
+      #expect(timeline.duration == .seconds(included ? 5 : 4))
+      #expect(timeline.value(time: .seconds(1)) == 1)
+      #expect(timeline.value(time: .seconds(2)) == (included ? 2 : 4))
+      #expect(timeline.value(time: .seconds(10)) == (included ? 7 : 8))
+    }
+  }
+
+  @Test("T245: an empty bare-keyframe loop contributes no duration")
+  func emptyBareKeyframeLoop() {
+    let timeline = KeyframeTimeline(initialValue: 2.0) {
+      for value in [Double]() {
+        LinearKeyframe(value, duration: .seconds(1))
+      }
+    }
+    #expect(timeline.duration == .zero)
+    #expect(timeline.value(time: .seconds(1)) == 2)
+  }
+
   @Test("a single linear track reaches `to` at its duration and holds it after")
   func linearTrackReachesTarget() {
     let timeline = KeyframeTimeline(initialValue: 0.0) {

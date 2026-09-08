@@ -15,6 +15,7 @@ package struct ScrollOffset: Equatable, Sendable {
 
 package struct ScrollPositionRegistrationSnapshot {
   package var identity: Identity
+  package var ownerViewNodeID: ViewNodeID?
   package var currentOffset: @MainActor () -> ScrollOffset
   package var applyOffset: @MainActor (ScrollOffset) -> Void
   /// The authored binding's source token, when its producer supplies one.
@@ -38,12 +39,14 @@ package struct ScrollPositionRegistrationSnapshot {
 
   package init(
     identity: Identity,
+    ownerViewNodeID: ViewNodeID? = nil,
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
     revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil
   ) {
     self.identity = identity
+    self.ownerViewNodeID = ownerViewNodeID
     self.currentOffset = currentOffset
     self.applyOffset = applyOffset
     self.bindingSourceID = bindingSourceID
@@ -97,6 +100,7 @@ package final class LocalScrollPositionRegistry: Equatable {
   ) {
     let registration = ScrollPositionRegistrationSnapshot(
       identity: identity,
+      ownerViewNodeID: ViewNodeContext.current?.viewNodeID,
       currentOffset: currentOffset,
       applyOffset: applyOffset,
       bindingSourceID: bindingSourceID,
@@ -439,6 +443,14 @@ package final class LocalScrollPositionRegistry: Equatable {
     latestScrollTargets.removeAll {
       identityMatchesAnySubtreeRoot($0.identity, roots: roots)
         || identityMatchesAnySubtreeRoot($0.scrollIdentity, roots: roots)
+    }
+  }
+
+  package func removeUnjustifiedRegistrations(_ record: (ViewNodeID) -> NodeHandlers?) {
+    registrations = registrations.filter { identity, registration in
+      guard let owner = registration.ownerViewNodeID else { return true }
+      return record(owner)?.scrollPosition.registrations.contains { $0.identity == identity }
+        == true
     }
   }
 

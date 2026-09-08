@@ -14,6 +14,7 @@ enum AnimationTransitionOverlay {
   ///   ``TransitionModifiers/resolvedOffset(edgeBasis:)``.
   static func interpolatedRemovalModifiers(
     from startOpacity: Double,
+    startScale: TransitionScaleEffect? = nil,
     to target: TransitionModifiers,
     progress: Double,
     edgeBasis: CellSize? = nil
@@ -27,10 +28,17 @@ enum AnimationTransitionOverlay {
       result.offsetX = Int(Double(targetOffset.x) * progress)
       result.offsetY = Int(Double(targetOffset.y) * progress)
     }
-    if let targetScale = target.scale {
+    if let targetScale = target.scale
+      ?? startScale.map({
+        TransitionScaleEffect(scale: 1.0, anchor: $0.anchor)
+      })
+    {
+      let initial = startScale ?? TransitionScaleEffect(scale: 1.0, anchor: targetScale.anchor)
       result.scale = TransitionScaleEffect(
-        scale: 1.0 + (targetScale.scale - 1.0) * progress,
-        anchor: targetScale.anchor
+        scale: initial.scale + (targetScale.scale - initial.scale) * progress,
+        anchor: UnitPoint(
+          x: initial.anchor.x + (targetScale.anchor.x - initial.anchor.x) * progress,
+          y: initial.anchor.y + (targetScale.anchor.y - initial.anchor.y) * progress)
       )
     }
     return result

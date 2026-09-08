@@ -48,9 +48,10 @@ package struct TextInputPresentation: Equatable, Sendable {
       : nil
     var displayRuns = Self.displayRuns(
       for: projectedClusters,
-      selectedRange: selectedRange
+      selectedRange: selectedRange,
+      caretOffset: shouldDrawSyntheticCaret ? value.selection.head : nil
     )
-    if shouldDrawSyntheticCaret {
+    if shouldDrawSyntheticCaret && value.selection.head.rawValue == value.text.count {
       displayRuns.append(TextInputDisplayRun(text: "_", isSelected: false))
     }
     let displayText = displayRuns.map(\.text).joined()
@@ -107,12 +108,20 @@ package struct TextInputPresentation: Equatable, Sendable {
 
   private static func displayRuns(
     for clusters: [TextInputProjectedCluster],
-    selectedRange: TextRange?
+    selectedRange: TextRange?,
+    caretOffset: TextOffset?
   ) -> [TextInputDisplayRun] {
     var runs: [TextInputDisplayRun] = []
 
     for cluster in clusters {
-      let isSelected = selectedRange?.intersects(cluster.textRange) ?? false
+      let isCaret = caretOffset == cluster.textRange.lowerBound
+      // Highlight the existing glyph without shifting later text. At a line
+      // break there is no glyph, so supply the empty caret cell before it.
+      if isCaret && cluster.isNewline {
+        runs.append(TextInputDisplayRun(text: "_", isSelected: false))
+      }
+      let isSelected =
+        (selectedRange?.intersects(cluster.textRange) ?? false) || (isCaret && !cluster.isNewline)
       if let lastIndex = runs.indices.last,
         runs[lastIndex].isSelected == isSelected
       {

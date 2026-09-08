@@ -40,10 +40,10 @@ struct RuntimeRegistrationOwnerPathTests {
     )
   }
 
-  @Test("the owner-key family map is closed and contains exactly nine families")
+  @Test("the owner-key family map is closed and contains exactly ten families")
   func ownerFamilyTotality() {
     let mapped = RuntimeRegistrationKind.allCases.compactMap(\.ownerFamily)
-    #expect(mapped.count == 9)
+    #expect(mapped.count == 10)
     #expect(Set(mapped) == Set(RuntimeRegistrationOwnerFamily.allCases))
   }
 
@@ -96,6 +96,9 @@ struct RuntimeRegistrationOwnerPathTests {
 
   @Test("drop-destination removal follows its explicit runtime owner")
   func dropDestinationOwner() { assertIdentityOwnedRemoval(.dropDestination) }
+
+  @Test("scroll-position removal follows its explicit runtime owner")
+  func scrollPositionOwner() { assertIdentityOwnedRemoval(.scrollPosition) }
 
   @Test("the deleted structural-path leg cannot return through production source")
   func ownerSourceHasNoStructuralPathLeg() throws {

@@ -177,6 +177,7 @@ package enum PlacedAnimationOverlaySampling {
       // whole screen away in the time it should take to clear its own frame.
       let modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
         from: entry.startOpacity,
+        startScale: entry.startScale,
         to: entry.transition.removalModifiers(),
         progress: progress,
         edgeBasis: placedSnapshot.bounds.size

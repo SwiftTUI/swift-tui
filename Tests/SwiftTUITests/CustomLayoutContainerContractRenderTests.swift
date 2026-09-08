@@ -114,12 +114,18 @@ struct CustomLayoutContainerContractRenderTests {
         ? AnyView(
           HStack(alignment: .top, spacing: 0) {
             Text("h")
-            ZStack { Spacer(); Text("[X]") }.border(.separator, placement: .outset)
+            ZStack {
+              Spacer()
+              Text("[X]")
+            }.border(.separator, placement: .outset)
           })
         : AnyView(
           VStack(alignment: .leading, spacing: 0) {
             Text("h")
-            ZStack { Spacer(); Text("[X]") }.border(.separator, placement: .outset)
+            ZStack {
+              Spacer()
+              Text("[X]")
+            }.border(.separator, placement: .outset)
           })
       let surface = DefaultRenderer().render(
         probe,
@@ -130,8 +136,33 @@ struct CustomLayoutContainerContractRenderTests {
       let boxLine = try #require(surface.lines.first { $0.contains("[X]") }, "\(joined)")
       // `│[X]│` — the outset border hugs the three text cells.
       #expect(boxLine.contains("│[X]│"), "\(joined)")
-      let borderedRows = surface.lines.filter { $0.contains("│") || $0.contains("╭") || $0.contains("╰") }
+      let borderedRows = surface.lines.filter {
+        $0.contains("│") || $0.contains("╭") || $0.contains("╰")
+      }
       #expect(borderedRows.count == 3, "\(joined)")
+    }
+  }
+
+  @Test("T241: a spacer-only ZStack does not strand an enclosing stack's surplus")
+  func spacerOnlyOverlayDoesNotStrandSurplus() throws {
+    for useLayout in [false, true] {
+      let surface = DefaultRenderer().render(
+        VStack(spacing: 0) {
+          HStack {
+            Text("a")
+            if useLayout {
+              ZStackLayout { Spacer() }
+            } else {
+              ZStack { Spacer() }
+            }
+          }.border(.separator, placement: .outset)
+          Spacer()
+          Text("b")
+        },
+        context: .init(identity: testIdentity("T241")),
+        proposal: .init(width: 6, height: 20)
+      ).rasterSurface
+      #expect(surface.lines.firstIndex(where: { $0.contains("b") }) == 19)
     }
   }
 

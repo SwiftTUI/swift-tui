@@ -6,6 +6,24 @@ import Testing
 
 @Suite
 struct LayoutEngineTests {
+  @Test("T246: a flexible safe-area inset expands when its stack cross axis grows")
+  func safeAreaInsetExpandsWithStackCrossAxis() {
+    let engine = LayoutEngine()
+    let inset = flexibleWidthFrame(
+      "inset", maxWidth: .infinity, child: leaf("inset-text", size: .init(width: 1, height: 1)))
+    let safeArea = ResolvedNode(
+      identity: testIdentity("safe-area"), kind: .view("SafeAreaInset"),
+      children: [leaf("base", size: .init(width: 1, height: 1)), inset],
+      layoutBehavior: .safeAreaInset(edge: .top, alignment: .center, spacing: 0, safeArea: .init()))
+    let column = stack(
+      "column", axis: .vertical,
+      children: [safeArea, leaf("wide", size: .init(width: 5, height: 1))])
+    let measured = engine.measure(column)
+    #expect(measured.measuredSize.width == 5)
+    #expect(measured.childMeasurements[0].measuredSize.width == 5)
+    #expect(measured.childMeasurements[0].childMeasurements[1].measuredSize.width == 5)
+  }
+
   @Test("measure leaf node with intrinsic size")
   func measureLeafWithIntrinsicSize() {
     let engine = LayoutEngine()

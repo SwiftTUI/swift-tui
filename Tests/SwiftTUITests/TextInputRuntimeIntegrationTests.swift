@@ -7,6 +7,51 @@ import Testing
 @MainActor
 @Suite
 struct TextInputRuntimeIntegrationTests {
+  @Test("T244: fallback caret stays on its glyph through real key input")
+  func fallbackCaretHasNoTrailingMarker() throws {
+    let box = PasteTextBox()
+    box.value = "abc"
+    let harness = try AnimatorRuntimeHarness {
+      PasteTextFieldFixture(box: box).frame(width: 10, height: 1)
+    }
+    defer { harness.shutdown() }
+    _ = harness.runLoop.focusTracker.setFocus(to: testIdentity("PasteTextField"))
+    try harness.render()
+    #expect(!harness.runLoop.usesTerminalCursorForTextInput)
+    #expect(harness.frame.contains("abc"))
+    #expect(harness.runLoop.handle(.input(.key(.arrowLeft))) == nil)
+    try harness.render()
+    #expect(harness.frame.contains("abc"))
+    #expect(!harness.frame.contains("_"))
+    let surface = try #require(harness.surfaces.last)
+    let caretGlyphs = surface.cells.flatMap { $0 }.filter {
+      $0.style?.emphasis.contains(.reverse) == true && !$0.isContinuation
+    }.map(\.character)
+    #expect(caretGlyphs == ["c"])
+    #expect(harness.runLoop.handle(.input(.key(.character("X")))) == nil)
+    #expect(box.value == "abXc")
+  }
+
+  @Test("T244: moving the runtime caret removes the unrelated trailing marker")
+  func movedCaretHasNoTrailingMarker() throws {
+    let box = PasteTextBox()
+    box.value = "abc"
+    let runtime = makeTextInputRunLoop { PasteTextFieldFixture(box: box) }
+    defer { runtime.runLoop.lifecycleCoordinator.shutdown() }
+    try renderInitial(runtime.runLoop)
+    _ = runtime.runLoop.focusTracker.setFocus(to: testIdentity("PasteTextField"))
+    try renderPending(runtime.runLoop)
+    #expect(surfaceText(runtime.host).contains("abc"))
+    let endCursor = try #require(runtime.host.movedCursorPoints.last)
+    #expect(runtime.runLoop.handleKeyPress(KeyPress(.arrowLeft)) == nil)
+    try renderPending(runtime.runLoop)
+    #expect(surfaceText(runtime.host).contains("abc"))
+    #expect(!surfaceText(runtime.host).contains("_"))
+    #expect(runtime.host.movedCursorPoints.last == CellPoint(x: endCursor.x - 1, y: endCursor.y))
+    #expect(runtime.runLoop.handleKeyPress(KeyPress(.character("X"))) == nil)
+    #expect(box.value == "abXc")
+  }
+
   @Test("TextField key press dispatch edits around a moved caret")
   func textFieldKeyPressDispatchEditsAroundMovedCaret() {
     final class TextBox {

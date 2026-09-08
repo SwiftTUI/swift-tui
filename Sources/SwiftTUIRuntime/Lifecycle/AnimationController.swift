@@ -1768,6 +1768,21 @@ package final class AnimationController: Sendable {
       }
     }
 
+    var initialScale: TransitionScaleEffect?
+    let scaleKey = AnimationKey(identity: identity, scope: .insertionScale)
+    if let entry = activeAnimations[scaleKey],
+      case .insertionScale(let from) = entry.kind,
+      let animation = registeredAnimations[entry.animationBox]
+    {
+      var state = entry.customState
+      if let progress = animation.evaluate(
+        elapsed: entry.startTime.duration(to: timestamp), state: &state)
+      {
+        initialScale = TransitionScaleEffect(
+          scale: from.scale + (1.0 - from.scale) * progress, anchor: from.anchor)
+      }
+    }
+
     // Supersede any in-flight animations on identities that are being
     // re-injected from the removed subtree.  The unified activeAnimations
     // map means this filter is scope-agnostic: property animations,
@@ -1833,6 +1848,7 @@ package final class AnimationController: Sendable {
       animationBox: removalTransaction.animationRequest.animationBoxIfAny,
       startTime: timestamp,
       startOpacity: initialOpacity,
+      startScale: initialScale,
       completionBatchID: completionBatchID,
       placedSnapshot: placedSnapshot,
       matchedTravel: matchedTravel
@@ -2441,6 +2457,7 @@ package final class AnimationController: Sendable {
           // documented fallback on `resolvedOffset(edgeBasis:)`).
           modifiers = AnimationTransitionOverlay.interpolatedRemovalModifiers(
             from: entry.startOpacity,
+            startScale: entry.startScale,
             to: entry.transition.removalModifiers(),
             progress: progress,
             edgeBasis: surfaceSize

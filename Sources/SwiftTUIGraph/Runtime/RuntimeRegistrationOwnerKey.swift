@@ -70,6 +70,7 @@ package enum RuntimeRegistrationOwnerFamily: CaseIterable, Hashable, Sendable {
   case task
   case command
   case dropDestination
+  case scrollPosition
 }
 
 extension RuntimeRegistrationKind {
@@ -84,7 +85,8 @@ extension RuntimeRegistrationKind {
     case .task: .task
     case .command: .command
     case .dropDestination: .dropDestination
-    case .defaultFocus, .focusBinding, .focusedValues, .scrollPosition, .lifecycle,
+    case .scrollPosition: .scrollPosition
+    case .defaultFocus, .focusBinding, .focusedValues, .lifecycle,
       .preferenceObservation:
       nil
     }

@@ -428,6 +428,12 @@ package struct ScrollPositionNodeRecord: RuntimeNodeRecord {
     registrations.append(contentsOf: departing.registrations)
   }
 
+  package mutating func rehomeAdoptedOwners(from departing: ViewNodeID, to adopter: ViewNodeID) {
+    for index in registrations.indices where registrations[index].ownerViewNodeID == departing {
+      registrations[index].ownerViewNodeID = adopter
+    }
+  }
+
   @MainActor
   package mutating func record(_ registration: ScrollPositionRegistrationSnapshot) {
     if let existingIndex = registrations.firstIndex(where: {
@@ -676,7 +682,7 @@ package struct NodeHandlers {
     .init(
       isEmpty: { $0.scrollPosition.isEmpty },
       absorb: { $0.scrollPosition.absorbAdopted($1.scrollPosition) },
-      rehomeOwners: nil
+      rehomeOwners: { $0.scrollPosition.rehomeAdoptedOwners(from: $1, to: $2) }
     ),
     .init(
       isEmpty: { $0.lifecycle.isEmpty },

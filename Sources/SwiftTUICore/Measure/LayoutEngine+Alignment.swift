@@ -62,13 +62,19 @@ extension LayoutEngine {
     // modifier metadata nor its layout has an answer, so ask the layout
     // (memoized per pass) rather than blanket-routing custom children to
     // the slow path — the two paths differ for oversize children.
-    let customHandle = customLayoutHandleAnsweringAlignment(for: child)
+    var guideNode = child
+    var guideMeasurement = childMeasurement
+    while let next = alignmentPropagationChild(for: guideNode, measured: guideMeasurement) {
+      guideNode = next.0
+      guideMeasurement = next.1
+    }
+    let customHandle = customLayoutHandleAnsweringAlignment(for: guideNode)
     let hasExplicitHorizontalGuide =
       child.layoutMetadata.hasExplicitHorizontalAlignmentGuide(alignment.horizontal)
       || customHandle?.explicitAlignment(
         engine: self,
-        node: child,
-        measured: childMeasurement,
+        node: guideNode,
+        measured: guideMeasurement,
         horizontalGuide: alignment.horizontal,
         passContext: passContext
       ) != nil
@@ -76,8 +82,8 @@ extension LayoutEngine {
       child.layoutMetadata.hasExplicitVerticalAlignmentGuide(alignment.vertical)
       || customHandle?.explicitAlignment(
         engine: self,
-        node: child,
-        measured: childMeasurement,
+        node: guideNode,
+        measured: guideMeasurement,
         verticalGuide: alignment.vertical,
         passContext: passContext
       ) != nil
@@ -222,6 +228,28 @@ extension LayoutEngine {
     return (leading, trailing, top, bottom)
   }
 
+  /// The child whose guides a wrapper propagates. Both alignment paths must
+  /// follow this same chain, including a decoration's selected primary child.
+  private func alignmentPropagationChild(
+    for node: ResolvedNode,
+    measured: MeasuredNode
+  ) -> (ResolvedNode, MeasuredNode)? {
+    let index: Int
+    switch node.layoutBehavior {
+    case .padding, .safeAreaIgnoring, .safeAreaInset, .border, .frame,
+      .flexibleFrame, .offset:
+      index = 0
+    case .decoration(let primaryIndex, _):
+      index = primaryIndex
+    default:
+      return nil
+    }
+    guard node.children.indices.contains(index),
+      measured.childMeasurements.indices.contains(index)
+    else { return nil }
+    return (node.children[index], measured.childMeasurements[index])
+  }
+
   package func viewDimensions(
     for resolved: ResolvedNode,
     measured: MeasuredNode,
@@ -242,27 +270,7 @@ extension LayoutEngine {
     var currentResolved = resolved
     var currentMeasured = measured
     while true {
-      var next: (ResolvedNode, MeasuredNode)?
-      switch currentResolved.layoutBehavior {
-      case .padding, .safeAreaIgnoring, .safeAreaInset, .border, .frame,
-        .flexibleFrame, .offset:
-        if let child = currentResolved.children.first,
-          let childMeasurement = currentMeasured.childMeasurements.first
-        {
-          next = (child, childMeasurement)
-        }
-      case .decoration(let primaryIndex, _):
-        if currentResolved.children.indices.contains(primaryIndex),
-          currentMeasured.childMeasurements.indices.contains(primaryIndex)
-        {
-          next = (
-            currentResolved.children[primaryIndex],
-            currentMeasured.childMeasurements[primaryIndex]
-          )
-        }
-      default:
-        next = nil
-      }
+      let next = alignmentPropagationChild(for: currentResolved, measured: currentMeasured)
       chain.append(Level(resolved: currentResolved, measured: currentMeasured))
       guard let (nextResolved, nextMeasured) = next else {
         break

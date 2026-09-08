@@ -64,12 +64,14 @@ extension LayoutEngine {
       let alignmentMetrics = overlayAlignmentMetrics(
         for: resolved.children,
         childMeasurements: measured.childMeasurements,
-        alignment: alignment
+        alignment: alignment,
+        passContext: passContext
       )
       return measured.childMeasurements.enumerated().map { index, childMeasurement in
         let childDimensions = viewDimensions(
           for: resolved.children[index],
-          measured: childMeasurement
+          measured: childMeasurement,
+          passContext: passContext
         )
         return PlacementRequest(
           resolved: resolved.children[index],

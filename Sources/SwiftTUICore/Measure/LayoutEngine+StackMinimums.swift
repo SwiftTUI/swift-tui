@@ -129,12 +129,6 @@ extension LayoutEngine {
         }
         stack.append(content)
         continue
-      case .safeAreaInset:
-        guard let base = current.children.first else {
-          continue
-        }
-        stack.append(base)
-        continue
       default:
         break
       }

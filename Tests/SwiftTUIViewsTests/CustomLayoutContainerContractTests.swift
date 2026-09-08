@@ -293,6 +293,31 @@ struct CustomLayoutContainerContractTests {
     #expect(silentPlaced.children.map(\.bounds.origin.x) == [0])
   }
 
+  @Test("T238: frame alignment preserves custom guides through wrapper chains")
+  func wrappedFrameAlignmentHonoursLayoutAnswer() {
+    let engine = LayoutEngine()
+    let box = container("wrapped-box", layout: AlignmentContractLayout(leading: 3, top: 2))
+    let wrappers: [LayoutBehavior] = [
+      .padding(.init(top: 1, leading: 1, bottom: 1, trailing: 1)),
+      .offset(x: 2, y: 1),
+    ]
+    for behavior in wrappers {
+      let wrapper = ResolvedNode(
+        identity: testIdentity("wrapper"), kind: .view("Wrapper"),
+        children: [box], layoutBehavior: behavior
+      )
+      let outer = frame("outer", width: 10, alignment: .topLeading, child: wrapper)
+      let context = LayoutPassContext()
+      let measured = engine.measure(outer, passContext: context)
+      let placed = engine.place(
+        outer, measured: measured,
+        in: .init(origin: .zero, size: measured.measuredSize), passContext: context)
+      let expectedX = if case .padding = behavior { -4 } else { -3 }
+      let expectedY = if case .padding = behavior { -3 } else { -2 }
+      #expect(placed.children.first?.bounds.origin == .init(x: expectedX, y: expectedY))
+    }
+  }
+
   @Test("LayoutSubview.dimensions exposes a nested custom child's guide answer")
   func layoutSubviewDimensionsExposeAnswer() {
     let engine = LayoutEngine()
@@ -355,7 +380,7 @@ struct CustomLayoutContainerContractTests {
     let distinctProposals = Set(measured.childMeasurements.map(\.proposal)).count
     let callsAfterPass = probe.horizontalAlignmentCalls
     #expect(callsAfterPass >= 1)
-    #expect(callsAfterPass <= max(2, distinctProposals))
+    #expect(callsAfterPass == distinctProposals)
 
     // Re-reading the same guide at an already-measured proposal within the
     // same pass is a memo hit, however many times it happens.
@@ -373,6 +398,24 @@ struct CustomLayoutContainerContractTests {
       of: box, proposal: boxMeasurement.proposal, passContext: LayoutPassContext())
     #expect(freshDimensions[.leading] == 3)
     #expect(probe.horizontalAlignmentCalls == callsAfterPass + 1)
+  }
+
+  @Test("T239: overlay placement reuses alignment answers from measurement")
+  func overlayAlignmentHookIsMemoizedPerPass() {
+    let probe = HookProbe()
+    let engine = LayoutEngine()
+    let overlay = ResolvedNode(
+      identity: testIdentity("overlay"), kind: .view("ZStack"),
+      children: [container("box", layout: ProbedContractLayout(probe: probe))],
+      layoutBehavior: .overlay(alignment: .topLeading)
+    )
+    let context = LayoutPassContext()
+    let measured = engine.measure(overlay, passContext: context)
+    #expect(probe.horizontalAlignmentCalls == 1)
+    _ = engine.place(
+      overlay, measured: measured,
+      in: .init(origin: .zero, size: measured.measuredSize), passContext: context)
+    #expect(probe.horizontalAlignmentCalls == 1)
   }
 
   @Test("a guide answered from a persisted cache matches a fresh pass")

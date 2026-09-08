@@ -3960,11 +3960,17 @@ SwiftTUIViews.Keyframes.body
 SwiftTUIViews.KeyframesBuilder
 SwiftTUIViews.KeyframesBuilder.WholeValueTrack
 SwiftTUIViews.KeyframesBuilder.buildArray(_:)
+SwiftTUIViews.KeyframesBuilder.buildArray(_:)
 SwiftTUIViews.KeyframesBuilder.buildBlock()
 SwiftTUIViews.KeyframesBuilder.buildEither(first:)
+SwiftTUIViews.KeyframesBuilder.buildEither(first:)
+SwiftTUIViews.KeyframesBuilder.buildEither(first:)
+SwiftTUIViews.KeyframesBuilder.buildEither(second:)
+SwiftTUIViews.KeyframesBuilder.buildEither(second:)
 SwiftTUIViews.KeyframesBuilder.buildEither(second:)
 SwiftTUIViews.KeyframesBuilder.buildExpression(_:)
 SwiftTUIViews.KeyframesBuilder.buildExpression(_:)
+SwiftTUIViews.KeyframesBuilder.buildOptional(_:)
 SwiftTUIViews.KeyframesBuilder.buildOptional(_:)
 SwiftTUIViews.KeyframesBuilder.buildPartialBlock(accumulated:next:)
 SwiftTUIViews.KeyframesBuilder.buildPartialBlock(accumulated:next:)
