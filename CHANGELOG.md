@@ -8,8 +8,30 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-08
+
+This minor release completes the control-style follow-ups and fixes layout,
+input, animation, collection binding, and lifecycle defects across the hosts.
+Public API additions include keyframe-builder control-flow overloads and the
+`FrameDropBlocker.taskTransfer` diagnostic case. No ordinary public symbols
+were removed since 0.11.3.
+
+### Added
+
+- Bare-keyframe builders support conditionals, loops, and multi-case switches
+  while preserving sequential timing, including empty loops.
+
 ### Fixed
 
+- Nested menus, popovers, and sheets share presentation ordering with input
+  routing, modal focus, Escape dismissal, and focus restoration.
+- Duplicate-ID `ForEach` bindings resolve the intended occurrence after
+  collection edits. Bindings to removed occurrences cannot overwrite a
+  surviving row; versioned lookup avoids repeated indexing for state-backed
+  collections.
+- Visible lazy-list rows preserve appearance and running tasks when their
+  backing nodes change. Task ownership transfers at commit, with safe
+  completion handling and cancellation when the row eventually departs.
 - Body-producing styles update stored dynamic properties before evaluating
   `makeBody`, including mutations captured by actions and per-control state.
 - Closed ControlGroups with value-only state survive enclosing lazy-tab
@@ -18,6 +40,35 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 - Scroll drawing and hit testing use the viewport chosen by layout. Overlay
   indicators no longer compete for the corner cell, and inline menus keep
   their Escape handler and keyboard dismissal focus when disabled.
+- Wrapped custom layouts retain alignment answers, and each placement pass
+  evaluates alignment hooks once. Custom layouts named `Group` or `EmptyView`
+  retain their own measurement and placement behavior.
+- Spacer-only overlays distribute stack surplus correctly, flexible safe-area
+  insets advertise their flexibility, and bounded stacks reserve later
+  children's minimum sizes before distributing a deficit.
+- Synthetic text-field carets mark the current glyph, including wide and
+  masked text. Hover handlers receive exit callbacks when their view or
+  modifier disappears, and Escape respects the focused navigation stack.
+- Indeterminate progress indicators animate while idle and cancel their tick
+  task on removal. Reduced-motion and determinate indicators remain static.
+- Stepper input checks the live binding and current bounds before adjusting,
+  so inactive controls do not rewrite out-of-range values.
+- Deadline-driven gestures deliver updates with their authored transaction.
+  Explicit transaction metadata takes precedence over stored binding animation,
+  and termination and wheel handlers update the correct focus owner.
+- Interrupted insertion and matched-geometry removal start from their visible
+  geometry. Geometry-changing animations render their arrival and final frame;
+  clipped offset descendants remain visible where their content intersects.
+- Removed animation slots discard stale velocity, and completed transitions
+  release curve registrations once their final consumer finishes.
+- Scroll-position registrations retire with their owner. Live input streams
+  adopt changed mouse-coordinate modes without discarding buffered input.
+- Capsule tile fills and curved `strokeBorder` backgrounds respect their
+  geometry. Narrow table cells truncate oversized graphemes without shifting
+  separators, and rich-text decoration clearing has additional regression
+  coverage.
+- Layout diagnostics accumulate work across late-preference reconciliation
+  passes and budget fallback paths.
 
 ### Changed
 
