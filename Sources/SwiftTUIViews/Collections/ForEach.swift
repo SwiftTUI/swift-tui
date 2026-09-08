@@ -253,7 +253,7 @@ extension ResolvedNode {
     _ entityIdentity: EntityIdentity,
     at entityStructuralPath: StructuralPath
   ) {
-    if kind == .view("Group") {
+    if declaredChildShape(self, under: identity) == .group {
       // A multi-statement row builder mints a `Group` that
       // `consumeDeclaredChild` splices into the parent's child list, so the row
       // entity has to ride on the values that survive the splice rather than on

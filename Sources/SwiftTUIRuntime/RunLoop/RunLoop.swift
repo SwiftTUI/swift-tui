@@ -92,6 +92,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// seed a fling from a coalescing-robust trailing-window velocity estimate.
   package var scrollPanVelocitySampler = PointerVelocitySampler()
   package var hoveredPointerRouteID: RouteID?
+  package var hoveredPointerHandlers: [LocalPointerHandlerRegistry.HoverHandler] = []
   /// The most recent pointer event's location. Hover is recomputed only on
   /// pointer events; the focus-sync hover reconcile re-hit-tests this stored
   /// location after a frame moves geometry under a stationary pointer.

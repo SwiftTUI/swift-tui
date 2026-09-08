@@ -331,6 +331,7 @@ package func normalizeResolvedElements(
     return ResolvedNode(
       identity: context.identity,
       kind: .view("EmptyView"),
+      typeDiscriminator: ObjectIdentifier(SynthesizedEmptyViewMarker.self),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
       intrinsicSize: .zero
@@ -345,6 +346,7 @@ package func normalizeResolvedElements(
     return ResolvedNode(
       identity: context.identity,
       kind: .view("Group"),
+      typeDiscriminator: ObjectIdentifier(SynthesizedGroupWrapperMarker.self),
       children: groupedChildren,
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction
@@ -964,9 +966,7 @@ private func deferResolveDescent<V: View>(
     )
     placeholder.viewNodeID = graphNode.viewNodeID
     placeholder.recomputeSubtreeRuntimeNodeIDsStamped()
-  } else if placeholder.identity == context.identity,
-    placeholder.kind == .view("EmptyView") || placeholder.kind == .view("Group")
-  {
+  } else if declaredChildShape(placeholder, under: context.identity) != .single {
     return nil
   }
 

@@ -4,8 +4,9 @@
 /// The check is conservative: it only elides frames that were produced
 /// *solely* by an animation deadline (no user input, no state invalidation)
 /// and carry no explicit animation transaction, provided every identity
-/// that would be redrawn is absent from the set of identities that have
-/// ever appeared on-screen.
+/// that would be redrawn is absent from the previous committed visible set.
+/// Callers must first exclude layout-changing property animations: prior
+/// visibility cannot predict where their next sample will place the content.
 ///
 /// The predicate is a pure function with no runtime dependencies and is
 /// therefore unit-testable in isolation.
@@ -16,7 +17,7 @@
 ///   invariant — clipped-out identities must NEVER be recorded in
 ///   `drawnIdentities` — is documented at the recording site in
 ///   `Raster/Rasterizer+Paint.swift`; it is what makes eliding an off-screen
-///   animation (paint-only or layout-affecting) sound.
+///   paint-only animation sound after those geometry barriers.
 ///
 /// - Note: "never drawn" only implies "cannot reach the surface" for a redraw
 ///   that repaints a node where it already sits. Work owned by the placed
@@ -30,8 +31,7 @@ package enum OffscreenFrameElision {
   ///   - hasExplicitAnimationTransactions: Whether the frame carries any new
   ///     identity-scoped animation transaction.
   ///   - redrawIdentities: Identities that would be redrawn this frame.
-  ///   - drawnIdentities: Identities that have been committed to the visible
-  ///     surface at least once.
+  ///   - drawnIdentities: Identities visible in the previous committed surface.
   ///   - hasPlacedPassOwnedAnimationWork: Whether the placed-overlay pass owns
   ///     live animation work — an insertion offset, a matched-geometry travel,
   ///     or an exit overlay. Such a frame can never be elided, for two

@@ -420,7 +420,8 @@ package func navigationDestinationPopAction(
     return entries.last?.dismiss
   }
 
-  return entries.max { lhs, rhs in
+  let scopedEntries = entries.filter { scopeDepth(of: $0.scopeIdentity, in: scopePath) >= 0 }
+  return scopedEntries.max { lhs, rhs in
     scopeDepth(of: lhs.scopeIdentity, in: scopePath)
       < scopeDepth(of: rhs.scopeIdentity, in: scopePath)
   }?.dismiss

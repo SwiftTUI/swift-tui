@@ -394,6 +394,8 @@ private func resolvePortalAttachmentGroupElements(
   return ResolvedNode(
     identity: context.identity,
     kind: .view(kindName),
+    typeDiscriminator: kindName == "Group"
+      ? ObjectIdentifier(SynthesizedGroupWrapperMarker.self) : nil,
     children: resolvedChildren,
     environmentSnapshot: context.environment,
     transactionSnapshot: context.transaction

@@ -153,7 +153,8 @@ package final class AnimationController: Sendable {
     set { previousFrame.matchedKeyIdentities = newValue }
   }
   /// Where each co-present non-source was drawn last frame, relative to its
-  /// baseline slot (``AnimationPlacedTreeCapture/adoptionOffsets``).
+  /// baseline slot. Capture seeds a time-free fallback; placed sampling then
+  /// replaces it with the offsets actually drawn, including in-flight sources.
   private var previousAdoptionOffsets: [Identity: PlacedAnimationOverlayOffset] {
     get { previousFrame.adoptionOffsets }
     set { previousFrame.adoptionOffsets = newValue }
@@ -537,8 +538,10 @@ package final class AnimationController: Sendable {
     for (key, state) in result.activeAnimationCustomStates {
       activeAnimations[key]?.customState = state
     }
+    var completedAnimationBoxes: Set<AnimationBox> = []
     for key in result.completedAnimationKeys {
       if let entry = activeAnimations.removeValue(forKey: key) {
+        completedAnimationBoxes.insert(entry.animationBox)
         releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
       }
     }
@@ -555,6 +558,7 @@ package final class AnimationController: Sendable {
       guard var entry = removingNodes[viewNodeID] else { continue }
       guard entry.completionBatchID != nil else {
         removingNodes.removeValue(forKey: viewNodeID)
+        if let box = entry.animationBox { completedAnimationBoxes.insert(box) }
         continue
       }
       if !entry.isLogicallyComplete {
@@ -564,6 +568,14 @@ package final class AnimationController: Sendable {
       }
     }
 
+    pruneCompletedAnimationRegistrations(completedAnimationBoxes)
+    var sampledAdoptionOffsets: [Identity: PlacedAnimationOverlayOffset] = [:]
+    for offset in result.snapshot.adoptionOffsets {
+      sampledAdoptionOffsets[offset.identity] = offset
+    }
+    // The frame-tail uses a draft controller: these sampled positions cross
+    // the frame boundary only when that draft commits.
+    previousAdoptionOffsets = sampledAdoptionOffsets
     return result.snapshot
   }
 
@@ -604,6 +616,21 @@ package final class AnimationController: Sendable {
     return removingNodes.values.contains { entry in
       entry.placedSnapshot != nil && entry.parentIdentity != nil
         && entry.animationBox.map { registeredAnimations[$0] != nil } == true
+    }
+  }
+
+  /// A previous visibility snapshot cannot prove a geometry-changing slot
+  /// stays offscreen. Layout must run even when the slot's wrapper was clipped.
+  package var hasLayoutAffectingPropertyAnimation: Bool {
+    activeAnimations.keys.contains { key in
+      guard case .property(let slot) = key.scope else { return false }
+      switch slot {
+      case .padding, .offset, .position, .frameWidth, .frameHeight:
+        return true
+      case .opacity, .foregroundShapeStyle, .backgroundShapeStyle, .borderShapeStyle,
+        .borderBlendPhase, .shapeFillStyle, .shapeStrokeStyle, .textRoll:
+        return false
+      }
     }
   }
 
@@ -801,7 +828,7 @@ package final class AnimationController: Sendable {
     var logicalAlreadyReleased: Bool
   }
 
-  /// Prune registration-ledger entries for property curves that just completed
+  /// Prune registration-ledger entries for curves whose consumers just completed
   /// and whose box no longer backs any live consumer (009). The box→animation
   /// ledger is otherwise append-only, so a run of unique finite curves grows it
   /// without bound. A box can back several active slots and any in-flight
@@ -2063,6 +2090,12 @@ package final class AnimationController: Sendable {
 
     let key = AnimationKey(identity: identity, slot: slot)
 
+    // A slot appearing or disappearing breaks value continuity even when
+    // its view identity survives. No older velocity can bridge that gap.
+    if previous == nil || current == nil {
+      slotVelocitySamplers.removeValue(forKey: key)
+    }
+
     switch request {
     case .inherit, .disabled:
       if let superseded = activeAnimations.removeValue(forKey: key) {
@@ -2425,6 +2458,7 @@ package final class AnimationController: Sendable {
           // here, at the head, fires the `.removed` barrier on this frame
           // whether or not a placed pass follows (elided frames run none).
           removingNodes.removeValue(forKey: viewNodeID)
+          completedAnimationBoxes.insert(box)
           releaseBatch(entry.completionBatchID, logicalAlreadyReleased: true)
           redrawIdentities.insert(entry.identity)
           continue
@@ -2525,6 +2559,7 @@ package final class AnimationController: Sendable {
 
     for viewNodeID in removalsToPurge {
       if let entry = removingNodes.removeValue(forKey: viewNodeID) {
+        if let box = entry.animationBox { completedAnimationBoxes.insert(box) }
         releaseBatch(
           entry.completionBatchID,
           logicalAlreadyReleased: entry.isLogicallyComplete

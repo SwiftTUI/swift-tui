@@ -42,15 +42,19 @@ extension RunLoop {
       currentRouteID.pairsIgnoringOwner(with: hoveredRouteID)
     {
       hoveredPointerRouteID = hoveredRouteID
+      hoveredPointerHandlers = localPointerHandlerRegistry.hoverCallbacks(
+        pairingWith: hoveredRouteID)
       dispatchHoverSupersedingTraversalOnMutation(
-        routeID: hoveredRouteID,
+        handlers: hoveredPointerHandlers,
         phase: .moved(localLocation)
       )
     } else {
       clearPointerHover()
       hoveredPointerRouteID = hoveredRouteID
+      hoveredPointerHandlers = localPointerHandlerRegistry.hoverCallbacks(
+        pairingWith: hoveredRouteID)
       dispatchHoverSupersedingTraversalOnMutation(
-        routeID: hoveredRouteID,
+        handlers: hoveredPointerHandlers,
         phase: .entered(localLocation)
       )
     }
@@ -68,8 +72,7 @@ extension RunLoop {
   /// events.
   package func reconcilePointerHover() {
     guard let currentRouteID = hoveredPointerRouteID,
-      let location = lastPointerLocation,
-      localPointerHandlerRegistry.hasHoverSubscribers
+      let location = lastPointerLocation
     else {
       return
     }
@@ -81,18 +84,22 @@ extension RunLoop {
         )
       }
     if let freshRouteID, freshRouteID.pairsIgnoringOwner(with: currentRouteID) {
+      hoveredPointerRouteID = freshRouteID
+      hoveredPointerHandlers = localPointerHandlerRegistry.hoverCallbacks(pairingWith: freshRouteID)
       return
     }
     updatePointerHover(at: location)
   }
 
   package func clearPointerHover() {
-    guard let hoveredPointerRouteID else {
+    guard hoveredPointerRouteID != nil else {
       return
     }
+    let handlers = hoveredPointerHandlers
     self.hoveredPointerRouteID = nil
+    hoveredPointerHandlers = []
     dispatchHoverSupersedingTraversalOnMutation(
-      routeID: hoveredPointerRouteID,
+      handlers: handlers,
       phase: .exited
     )
   }
@@ -105,14 +112,11 @@ extension RunLoop {
   /// by it vanished because of the hover, not the traversal, so the
   /// traversal must not continue onto the region's document-order neighbor.
   private func dispatchHoverSupersedingTraversalOnMutation(
-    routeID: RouteID,
+    handlers: [LocalPointerHandlerRegistry.HoverHandler],
     phase: HoverPhase
   ) {
     let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
-    localPointerHandlerRegistry.dispatchHover(
-      routeID: routeID,
-      phase: phase
-    )
+    for handler in handlers { handler(phase) }
     if schedulerInvalidationRequestGeneration() != invalidationGenerationBeforeDispatch {
       pendingFocusTraversal = nil
     }

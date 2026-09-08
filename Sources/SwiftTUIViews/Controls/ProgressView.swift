@@ -9,6 +9,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
   private var label: Label
   private var currentValueLabel: CurrentValueLabel
   private let authoringScope: AuthoringContext?
+  @State private var indeterminatePhase: UInt64 = 0
 
   /// Creates an indeterminate progress view with no label.
   public init(barWidth: Int = 12) where Label == EmptyView, CurrentValueLabel == EmptyView {
@@ -97,31 +98,53 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
+    withDynamicPropertyUpdateScope(self, for: context) {
+      [resolvedNode(in: context)]
+    }
+  }
+
+  private func resolvedNode(in context: ResolveContext) -> ResolvedNode {
     let fraction = progressFraction(value: value, total: total)
-    let phase = isIndeterminate
-      ? context.transaction.debugSignature.unicodeScalars.reduce(into: UInt64(0)) { seed, scalar in
-        seed = seed &* 31 &+ UInt64(scalar.value)
-      } : 0
+    let animates = isIndeterminate && !context.environmentValues.renderingReduceMotion
+    var tasks: [TaskDescriptor] = []
+    if animates {
+      // Cadence belongs to the primitive so every style receives a live
+      // phase, while standalone style fixtures remain inert.
+      let descriptor = TaskDescriptor(
+        id: "\(context.identity)#indeterminateProgress", priority: .userInitiated)
+      let phase = $indeterminatePhase
+      context.viewGraph?.recordLifecycleEvaluationOwner(
+        target: context.identity, owner: context.identity)
+      HandlerDescriptorIntake(context: context).registerTask(
+        identity: context.identity, descriptor: descriptor
+      ) {
+        while !Task.isCancelled {
+          try? await Task.sleep(for: .milliseconds(120))
+          guard !Task.isCancelled else { return }
+          phase.wrappedValue &+= 1
+        }
+      }
+      tasks.append(descriptor)
+    }
     let configuration = ProgressViewStyleConfiguration(
       fractionCompleted: isIndeterminate ? nil : (fraction.isFinite ? fraction : 0),
       label: isEmptyView(label) ? nil : .init(authoringContext: authoringScope) { label },
       currentValueLabel: isEmptyView(currentValueLabel)
         ? nil : .init(authoringContext: authoringScope) { currentValueLabel },
       barWidth: max(1, barWidth),
-      indeterminatePhase: phase,
+      indeterminatePhase: animates ? indeterminatePhase : 0,
       accessibilityReduceMotion: context.environmentValues.renderingReduceMotion,
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
     let child = context.environmentValues.progressViewStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("ProgressViewBody")))
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("ProgressView"),
-        children: [child],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
-      )
-    ]
+    return ResolvedNode(
+      identity: context.identity,
+      kind: .view("ProgressView"),
+      children: [child],
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction,
+      lifecycleMetadata: .init(tasks: tasks)
+    )
   }
 }

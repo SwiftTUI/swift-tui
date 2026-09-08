@@ -1799,3 +1799,96 @@ private struct StressNP025Destination: View {
     )
   }
 }
+private enum T248PanelRoute: Hashable, Sendable {
+  case detail(Int)
+}
+
+extension T248PanelRoute {
+  fileprivate var detailValue: Int {
+    switch self {
+    case .detail(let value): value
+    }
+  }
+}
+
+extension FrameworkStressNavigationPresentationTests {
+  @Test("T248: Escape from a sibling Panel preserves the other stack's path")
+  func escapeFromSiblingPanelPreservesOtherStackPath() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("T248Panel", "Root"),
+      size: .init(width: 60, height: 8)
+    ) {
+      T248PanelPanelFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.frame.contains("right int 2"))
+    #expect(harness.frame.contains("Panel Target"))
+
+    _ = try harness.focusText("Panel Target")
+    let frame = try harness.pressKey(KeyPress(.escape))
+
+    #expect(frame.contains("right int 2"), "got:\n\(frame)")
+  }
+
+  @Test("T248: Escape from a sibling stack root preserves the other stack's path")
+  func escapeFromSiblingStackRootPreservesOtherStackPath() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("T248Sibling", "Root"),
+      size: .init(width: 64, height: 8)
+    ) {
+      T248SiblingSiblingStackFixture()
+    }
+    defer { harness.shutdown() }
+
+    #expect(harness.frame.contains("right int 2"))
+    #expect(harness.frame.contains("Left Root Target"))
+
+    _ = try harness.focusText("Left Root Target")
+    let frame = try harness.pressKey(KeyPress(.escape))
+
+    #expect(frame.contains("right int 2"), "got:\n\(frame)")
+  }
+}
+
+@MainActor
+private struct T248PanelPanelFixture: View {
+  @State private var rightPath: [T248PanelRoute] = [.detail(1), .detail(2)]
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 2) {
+      Panel(id: "panel") {
+        Button("Panel Target") {}
+      }
+      NavigationStack(path: $rightPath) {
+        Text("right stack root")
+          .navigationDestination(for: T248PanelRoute.self) { route in
+            Text("right int \(route.detailValue)")
+          }
+      }
+    }
+  }
+}
+
+@MainActor
+private struct T248SiblingSiblingStackFixture: View {
+  @State private var leftPath: [T248PanelRoute] = []
+  @State private var rightPath: [T248PanelRoute] = [.detail(1), .detail(2)]
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 2) {
+      NavigationStack(path: $leftPath) {
+        Button("Left Root Target") { leftPath.append(.detail(1)) }
+          .navigationDestination(for: T248PanelRoute.self) { route in
+            Text("left int \(route.detailValue)")
+          }
+      }
+      NavigationStack(path: $rightPath) {
+        Text("right stack root")
+          .navigationDestination(for: T248PanelRoute.self) { route in
+            Text("right int \(route.detailValue)")
+          }
+      }
+    }
+  }
+}

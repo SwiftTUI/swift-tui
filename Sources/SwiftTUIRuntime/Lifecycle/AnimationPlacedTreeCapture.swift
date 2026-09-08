@@ -6,8 +6,8 @@ struct AnimationPlacedTreeCapture {
   var matchedIdentities: [MatchedGeometryKey: Identity]
   /// The co-present pairs in this tree (plan 2026-08-25-003 Stage A). The
   /// sampler derives the frame's adoption offsets from them; the controller
-  /// keeps the time-free offsets so a departing adoptee's exit overlay is
-  /// frozen where it was drawn, not at its layout slot.
+  /// seeds time-free offsets here and replaces them with the sampled offsets
+  /// before commit, so a departing adoptee freezes where it was drawn.
   var adoptionPairs: [MatchedGeometryAdoptionPair]
   var adoptionOffsets: [Identity: PlacedAnimationOverlayOffset]
 

@@ -77,6 +77,11 @@ package enum DeclaredChildShape: Sendable, Equatable {
   case group
 }
 
+// Only framework-synthesized normalization nodes carry these markers. Debug
+// names are not roles: a user Layout may also be named Group or EmptyView.
+package enum SynthesizedEmptyViewMarker {}
+package enum SynthesizedGroupWrapperMarker {}
+
 /// The live declaration owner that must re-consume a producer's structural output.
 /// A lifetime identifier keeps delayed replay from retaining or targeting a replaced owner.
 package struct DeclaredChildReplayBoundary: Sendable {
@@ -91,14 +96,13 @@ package func declaredChildShape(
   guard resolved.identity == identity else {
     return .single
   }
-  switch resolved.kind {
-  case .view("EmptyView"):
+  if resolved.typeDiscriminator == ObjectIdentifier(SynthesizedEmptyViewMarker.self) {
     return .empty
-  case .view("Group"):
-    return .group
-  default:
-    return .single
   }
+  if resolved.typeDiscriminator == ObjectIdentifier(SynthesizedGroupWrapperMarker.self) {
+    return .group
+  }
+  return .single
 }
 
 /// Consumes one resolved declared child, returning what the enclosing

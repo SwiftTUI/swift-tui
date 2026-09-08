@@ -101,4 +101,29 @@ struct RasterizerOffsetDamageTests {
     )
     #expect(contained.subtreeBounds == containedParentBounds)
   }
+
+  @Test(
+    "T252: a clipped wrapper can contain visible offset descendants", arguments: [false, true],
+    [false, true])
+  func visibleDescendantSurvivesWrapperCulling(explicitlyClipped: Bool, grouped: Bool) {
+    var wrapper = offsetTree(childText: "NEW")
+    if explicitlyClipped { wrapper.clipBounds = wrapperBounds }
+    if grouped { wrapper.drawEffects = .init([.compositingGroup]) }
+    let root = DrawNode(
+      identity: testIdentity("T252", "Viewport"),
+      bounds: .init(origin: .zero, size: .init(width: 3, height: 11)),
+      clipBounds: childBounds,
+      children: [wrapper]
+    )
+    let result = Rasterizer().rasterizeCollectingVisibleIdentities(
+      root, minimumSize: .zero, previousSurface: nil, damage: nil)
+    if explicitlyClipped {
+      #expect(!result.surface.lines.contains("NEW"))
+      #expect(!result.visibleIdentities.contains(testIdentity("offset-wrapper", "child")))
+    } else {
+      #expect(result.surface.lines.contains("NEW"))
+      #expect(result.visibleIdentities.contains(testIdentity("offset-wrapper", "child")))
+    }
+    #expect(!result.visibleIdentities.contains(testIdentity("offset-wrapper")))
+  }
 }

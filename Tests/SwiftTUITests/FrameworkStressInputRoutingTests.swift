@@ -2014,3 +2014,61 @@ private struct StressInput034Fixture: View {
     }
   }
 }
+extension FrameworkStressInputRoutingTests {
+  @Test("T247: departing hover handlers receive one exit", arguments: [false, true])
+  func departingHoverReceivesExit(removesModifierOnly: Bool) throws {
+    let phases = StressInputBox<[String]>([])
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("T247", "Root"),
+      size: .init(width: 48, height: 6)
+    ) {
+      DepartingHoverFixture(phases: phases, removesModifierOnly: removesModifierOnly)
+    }
+    defer { harness.shutdown() }
+
+    let point = try #require(harness.point(forText: "Hover target"))
+    _ = try harness.movePointer(to: point)
+    _ = try harness.render()
+    _ = try harness.movePointer(to: Point(x: 46, y: 5))
+    _ = try harness.render()
+    #expect(phases.value == ["inner-entered", "outer-entered", "inner-exited", "outer-exited"])
+    #expect(harness.frame.contains("outside"))
+  }
+}
+
+private struct DepartingHoverFixture: View {
+  let phases: StressInputBox<[String]>
+  let removesModifierOnly: Bool
+  @State private var present = true
+  @State private var hovering = false
+
+  var body: some View {
+    VStack(alignment: .leading) {
+      Text(hovering ? "inside" : "outside")
+      if present {
+        Text("Hover target")
+          .onPointerHover { phase in
+            switch phase {
+            case .entered:
+              phases.value.append("inner-entered")
+              hovering = true
+              present = false
+            case .exited:
+              phases.value.append("inner-exited")
+              hovering = false
+            case .moved: break
+            }
+          }
+          .onPointerHover { phase in
+            switch phase {
+            case .entered: phases.value.append("outer-entered")
+            case .exited: phases.value.append("outer-exited")
+            case .moved: break
+            }
+          }
+      } else if removesModifierOnly {
+        Text("Hover target")
+      }
+    }
+  }
+}

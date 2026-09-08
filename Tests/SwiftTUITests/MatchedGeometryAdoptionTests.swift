@@ -622,3 +622,62 @@ private struct AdoptionCounterPane: View {
     }
   }
 }
+extension MatchedGeometryAdoptionTests {
+  @Test("T251: departing adoption freezes at the last sampled source position")
+  func departingAdoptionFreezesAtSampledPosition() throws {
+    let pair = Self.makePair(
+      label: "T251",
+      sourceBounds: CellRect(origin: .init(x: 42, y: 2), size: Self.sourceBounds.size),
+      nonSourceTransition: .opacity
+    )
+    let movingSource = testIdentity("T251", "MovingSource")
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(pair.animation.animationBox)
+    pair.controller.beginTransitionCollection()
+    pair.controller.registerTransition(
+      for: pair.nonSource, viewNodeID: pair.nonSourceNodeID, transition: AnyTransition.opacity)
+    pair.controller.finishTransitionCollection()
+    pair.controller.processResolvedTree(
+      Self.resolvedPair(
+        root: pair.root, source: movingSource, nonSource: pair.nonSource,
+        nonSourceNodeID: pair.nonSourceNodeID, config: pair.config),
+      transaction: transaction, timestamp: pair.start)
+    let moving = Self.placedPair(
+      root: pair.root, source: movingSource, sourceBounds: Self.sourceBounds,
+      nonSource: pair.nonSource, nonSourceBounds: Self.nonSourceBounds,
+      config: pair.config, label: "T251")
+    let adoption = pair.controller.capturePlacedTree(moving)
+    let departure = pair.start.advanced(by: .milliseconds(500))
+    let lastSnapshot = pair.controller.placedAnimationOverlaySnapshot(
+      for: moving, at: departure, adoption: adoption)
+    var drawn = moving
+    applyPlacedAnimationOverlaySnapshot(lastSnapshot, to: &drawn)
+    let lastBounds = try #require(Self.node(pair.nonSource, in: drawn)).bounds
+    #expect(lastBounds.origin.x == 22)
+
+    let third = testIdentity("T251", "Third")
+    var thirdNode = ResolvedNode(identity: third, kind: .view("Leaf"))
+    thirdNode.matchedGeometry = MatchedGeometryConfig(key: Self.key)
+    pair.controller.beginTransitionCollection()
+    pair.controller.finishTransitionCollection()
+    pair.controller.processResolvedTree(
+      ResolvedNode(identity: pair.root, kind: .view("Root"), children: [thirdNode]),
+      transaction: transaction, timestamp: departure)
+    let thirdBounds = CellRect(origin: .init(x: 40, y: 2), size: Self.sourceBounds.size)
+    let placed = PlacedNode(
+      identity: pair.root, bounds: Self.surface,
+      children: [
+        PlacedNode(identity: third, bounds: thirdBounds, matchedGeometry: .init(key: Self.key))
+      ])
+    for milliseconds in [0, 500] {
+      let snapshot = pair.controller.placedAnimationOverlaySnapshot(
+        for: placed, at: departure.advanced(by: .milliseconds(milliseconds)))
+      var frame = placed
+      applyPlacedAnimationOverlaySnapshot(snapshot, to: &frame)
+      let overlay = try #require(Self.node(pair.nonSource, in: frame))
+      #expect(overlay.isTransient)
+      #expect(overlay.bounds.origin.x == (milliseconds == 0 ? 22 : 31))
+      #expect(overlay.bounds.size == lastBounds.size)
+    }
+  }
+}

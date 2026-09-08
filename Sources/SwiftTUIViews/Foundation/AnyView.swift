@@ -52,7 +52,7 @@ public struct AnyView: PrimitiveView, ResolvableView {
     let contentContext = payloadContext.child(component: .named("Content")).asEntityHost()
     let content = storage.resolve(contentContext)
 
-    if content.kind == .view("Group"), content.identity == contentContext.identity {
+    if declaredChildShape(content, under: contentContext.identity) == .group {
       // A multi-element erased payload normalized to a synthesized group at
       // the content identity. Hoist the elements: the enclosing `resolveView`
       // re-normalizes them into a group at this AnyView's own identity, which

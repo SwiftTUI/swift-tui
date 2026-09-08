@@ -1001,47 +1001,9 @@ struct OffscreenFrameElisionRuntimeTests {
 
   // MARK: - Oracle soundness (Task 8.2)
 
-  /// Guards the disjointness branch of the elision gate: a deadline-only tick
-  /// whose redraw set OVERLAPS the visible `drawnIdentities` must NOT be
-  /// elided — it renders and presents.
-  ///
-  /// Soundness rationale (corrected). The load-bearing safety guarantee for
-  /// elision is NOT `redrawIdentities`. `applyInterpolations` populates
-  /// `redrawIdentities` with ONLY the directly-animated identity (every scope)
-  /// plus removal identities — it NEVER records layout-affected siblings. The
-  /// layout-affecting animatable slots (`frameWidth`/`frameHeight`/`offset`/
-  /// `position`/`padding`; see `AnimationModels.AnimatableSlot`) animate through
-  /// this same `.property` path: they mutate `node.layoutBehavior` in place
-  /// WITHOUT dirtying siblings, WITHOUT adding `.invalidation`, and WITHOUT
-  /// adding any sibling to `redrawIdentities`. So `redrawIdentities` cannot, by
-  /// construction, observe a sibling that an off-screen size animation might
-  /// shift.
-  ///
-  /// The REAL safety guarantee is `drawnIdentities`: it is a geometric
-  /// PAINT-VISIBILITY predicate computed in `Rasterizer+Paint.swift` — a node
-  /// fully clipped out of the viewport is NEVER recorded; only nodes whose
-  /// painted bounds intersect the viewport (width > 0 && height > 0 after clip)
-  /// are inserted. An off-screen animated identity is therefore absent from
-  /// `drawnIdentities` → disjoint → safely elidable. If an off-screen size
-  /// animation ever grew the child enough to push it into the viewport, the
-  /// child's painted bounds would intersect the viewport → it WOULD land in
-  /// `drawnIdentities` → disjointness breaks → elision is correctly
-  /// disqualified. The load-bearing invariant is thus: "clipped-out identities
-  /// must NEVER be recorded in `drawnIdentities`" (documented at the recording
-  /// site in `Sources/SwiftTUICore/Raster/Rasterizer+Paint.swift`).
-  ///
-  /// This means a purely off-screen animation cannot be constructed to force a
-  /// VISIBLE sibling into the tick's `redrawIdentities` — not because clipping
-  /// "isolates redraw" (it does not touch the redraw set at all), but because
-  /// `redrawIdentities` simply never tracks siblings. So this test takes the
-  /// form that DOES exercise the gate's disjointness branch in the
-  /// failing-to-elide direction: an ON-SCREEN animation whose tick redraw set
-  /// overlaps `drawnIdentities` must NOT elide. If the gate ever wrongly
-  /// reported disjointness for a visible animation, this frame would silently
-  /// stop presenting. The complementary off-screen LAYOUT-animation case (a
-  /// clipped size animation still elides because the child stays out of
-  /// `drawnIdentities`) is covered by
-  /// ``offscreenLayoutAnimationStillElides()``.
+  /// Visible paint-only animations must render when their redraw overlaps
+  /// the previous visible set. Geometry-changing slots use a separate barrier:
+  /// their next sample may cross a clip even if the prior sample was invisible.
   @Test("on-screen deadline tick whose redraw overlaps drawnIdentities is NOT elided")
   func onScreenOverlappingDeadlineTickRenders() async throws {
     let terminalSize = CellSize(width: 20, height: 20)
@@ -1136,52 +1098,11 @@ struct OffscreenFrameElisionRuntimeTests {
 
   // MARK: - Off-screen LAYOUT animation soundness
 
-  /// The genuinely interesting elision boundary: a LAYOUT-affecting off-screen
-  /// animation. Every other probe in this suite animates the paint-only
-  /// `borderBlendPhase`; this one animates `frameHeight` (a member of
-  /// `AnimatableSlot`'s layout-affecting set) so the in-flight tick mutates
-  /// `node.layoutBehavior` rather than a paint attribute.
-  ///
-  /// This directly exercises the corrected soundness argument (see
-  /// ``onScreenOverlappingDeadlineTickRenders()``): `applyInterpolations`
-  /// routes a `frameHeight` animation through the same `.property` path that
-  /// only inserts the directly-animated identity into `redrawIdentities` — it
-  /// never dirties siblings and never adds `.invalidation`. The frame's safety
-  /// therefore rests entirely on `drawnIdentities`: the animated view is
-  /// clipped far below a 2-row ScrollView viewport, so its painted bounds never
-  /// intersect the viewport and it is never recorded in `drawnIdentities`.
-  ///
-  /// Asserts that a `[.deadline]`-only tick for this off-screen LAYOUT
-  /// animation (1) keeps the clipped child OUT of `drawnIdentities`, and (2) is
-  /// elided (`elidedFrameCount` advances, `presentCount` stays flat) — proving
-  /// a clipped LAYOUT animation is safely elided, not merely a clipped paint
-  /// animation.
-  ///
-  /// The argument below is scoped to `.property` animations. Work owned by the
-  /// placed-overlay pass — an insertion offset, a matched-geometry travel, or
-  /// an exit overlay — breaks its premise: it relocates the node itself across
-  /// the viewport boundary, from or to a position that `drawnIdentities` never
-  /// recorded. Those disqualify elision outright rather than relying on that
-  /// set. See ``offsetOnlyInsertionTransitionIsNeverElided()`` and
-  /// ``offsetOnlyRemovalTransitionDrainsOffScreen()``.
-  ///
-  /// Sibling-near-viewport-edge variant NOT added — and it is unconstructible
-  /// in this layout/clip model, not merely skipped. A `frameHeight` animation
-  /// only ever mutates its OWN node's `layoutBehavior` and only inserts its OWN
-  /// identity into `redrawIdentities`; it does not push or resize any sibling.
-  /// The only path by which an off-screen size animation could affect visible
-  /// output is by growing its OWN painted bounds back into the viewport — in
-  /// which case THAT identity (not a sibling) enters `drawnIdentities`,
-  /// disjointness breaks, and elision is correctly disqualified. There is no
-  /// construction in which an off-screen animation moves a DISTINCT visible
-  /// sibling, because the framework never propagates an animated size delta to
-  /// a sibling's `redrawIdentities` or to its painted geometry through this
-  /// animation path. The "self grows into viewport → not disjoint → not elided"
-  /// case is already the contrapositive guarded by
-  /// ``onScreenOverlappingDeadlineTickRenders()`` (a visible animated identity
-  /// is in `drawnIdentities`, so it does not elide).
-  @Test("off-screen frameHeight (layout) animation still elides on a deadline-only tick")
-  func offscreenLayoutAnimationStillElides() async throws {
+  /// Even a size animation that happens to remain clipped must take the
+  /// conservative geometry path. Prior visibility alone cannot prove that
+  /// another size/offset sample will remain clipped (T252).
+  @Test("T252: off-screen frameHeight animation keeps the geometry barrier")
+  func offscreenLayoutAnimationKeepsGeometryBarrier() async throws {
     let terminalSize = CellSize(width: 20, height: 2)
     let rootIdentity = testIdentity("ElisionOffscreenLayoutAnim", "Root")
     let terminal = ElisionProbeTerminalHost(surfaceSize: terminalSize)
@@ -1255,10 +1176,9 @@ struct OffscreenFrameElisionRuntimeTests {
       )
 
       let elidedBefore = runLoop.renderer.elidedFrameCount
-      let presentsBefore = terminal.presentCount
 
       // Drive a pure animation-deadline frame for the off-screen LAYOUT
-      // animation: this is the case the gate must elide. One virtual step, so
+      // animation: its geometry must be evaluated. One virtual step, so
       // the frameHeight curve has genuinely advanced when the tick lands.
       scheduler.requestDeadline(clock.advance(by: .milliseconds(16)))
       _ = try await runLoop.renderPendingFramesAsync(
@@ -1289,22 +1209,7 @@ struct OffscreenFrameElisionRuntimeTests {
         """
       )
 
-      // ASSERTION 2 — the off-screen LAYOUT deadline tick elided (gate fired) and
-      // presented nothing.
-      #expect(
-        runLoop.renderer.elidedFrameCount > elidedBefore,
-        """
-        an off-screen LAYOUT (frameHeight) deadline-only tick must elide; \
-        elidedBefore=\(elidedBefore) after=\(runLoop.renderer.elidedFrameCount)
-        """
-      )
-      #expect(
-        terminal.presentCount == presentsBefore,
-        """
-        an elided off-screen LAYOUT tick must not present; \
-        presentsBefore=\(presentsBefore) after=\(terminal.presentCount)
-        """
-      )
+      #expect(runLoop.renderer.elidedFrameCount == elidedBefore)
     }
   }
 
@@ -2213,6 +2118,66 @@ private struct SlideRemovalProbe: View {
       withAnimation(.linear(duration: .milliseconds(300))) {
         show = false
       }
+    }
+  }
+}
+extension OffscreenFrameElisionRuntimeTests {
+  @Test("T252: geometry property deadlines render an offscreen arrival, including completion")
+  func geometryPropertyArrivalRenders() async throws {
+    let size = CellSize(width: 20, height: 1)
+    let root = testIdentity("T252")
+    let terminal = ElisionProbeTerminalHost(surfaceSize: size)
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: root, presentationSurface: terminal,
+      terminalInputReader: ElisionEmptyInputReader(), signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      proposal: .init(width: size.width, height: size.height),
+      viewBuilder: { _, _ in GeometryArrivalProbe() }
+    )
+    defer { runLoop.lifecycleCoordinator.shutdown() }
+    let clock = VirtualFrameClock(MonotonicInstant.now())
+    runLoop.frameClock = { [clock] in clock.now }
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
+      scheduler.requestInvalidation(of: [root])
+      var frames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &frames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      let controller = runLoop.renderer.internalAnimationController
+      #expect(
+        controller.debugStateSnapshot().activeAnimationKeys.contains {
+          $0.scope == .property(.offset)
+        })
+      #expect(!Self.surfaceContains("arrival", terminal))
+      let elided = runLoop.renderer.elidedFrameCount
+      // A coarse final tick also checks the barrier after the head retires
+      // the geometry slot, before the tail can decide to elide the frame.
+      for interval in [500, 600] {
+        scheduler.requestDeadline(clock.advance(by: .milliseconds(interval)))
+        _ = try await runLoop.renderPendingFramesAsync(renderedFrames: &frames, eventPump: nil)
+      }
+      #expect(controller.activeAnimationCount == 0)
+      #expect(runLoop.renderer.elidedFrameCount == elided)
+      #expect(
+        Self.surfaceContains("arrival", terminal), "surface: \(terminal.lastSurface?.lines ?? [])")
+    }
+  }
+}
+
+private struct GeometryArrivalProbe: View {
+  @State private var offset: Int = 0
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<50, id: \.self) { _ in Text("filler") }
+        Text("arrival").offset(y: offset)
+      }
+    }
+    .frame(width: 20, height: 1)
+    .onAppear {
+      withAnimation(.linear(duration: .seconds(1))) { offset = -50 }
     }
   }
 }

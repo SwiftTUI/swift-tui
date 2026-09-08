@@ -18,7 +18,24 @@ struct DeclaredChildConsumptionTests {
   }
 
   private func node(kind: NodeKind, identity: Identity) -> ResolvedNode {
-    ResolvedNode(identity: identity, kind: kind, children: [])
+    var node = ResolvedNode(identity: identity, kind: kind, children: [])
+    switch kind {
+    case .view("EmptyView"):
+      node.typeDiscriminator = ObjectIdentifier(SynthesizedEmptyViewMarker.self)
+    case .view("Group"):
+      node.typeDiscriminator = ObjectIdentifier(SynthesizedGroupWrapperMarker.self)
+    default: break
+    }
+    return node
+  }
+
+  @Test(
+    "T254: debug names alone do not make structural wrappers", arguments: ["Group", "EmptyView"])
+  func debugNameDoesNotDefineShape(name: String) {
+    let node = ResolvedNode(identity: identity(), kind: .view(name))
+    #expect(
+      consumeDeclaredChild(node, resolvedUnder: identity(), in: nil, policy: .declaredBuilder).count
+        == 1)
   }
 
   @Test("an unmodified empty element is dropped")

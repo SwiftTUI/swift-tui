@@ -264,3 +264,46 @@ private struct VelocityDragFixture: View {
     }
   }
 }
+extension AnimationVelocityChannelTests {
+  @Test("T253: a disappearing slot discards velocity history", arguments: [0, 1, 2])
+  func disappearingSlotDiscardsVelocity(requestKind: Int) {
+    let previousLatch = AnimationVelocityConfiguration.isEnabled
+    AnimationVelocityConfiguration.isEnabled = true
+    defer { AnimationVelocityConfiguration.isEnabled = previousLatch }
+    let controller = AnimationController()
+    let spring = Animation.spring(duration: .seconds(1), bounce: 0)
+    controller.register(spring)
+    let identity = testIdentity("T253")
+    let start = MonotonicInstant(offset: .seconds(800))
+    var tracking = TransactionSnapshot()
+    tracking.tracksVelocity = true
+    controller.processResolvedTree(
+      Self.leaf(identity, opacity: 0.2), transaction: .init(), timestamp: start)
+    controller.processResolvedTree(
+      Self.leaf(identity, opacity: 0.4), transaction: tracking,
+      timestamp: start.advanced(by: .milliseconds(50)))
+    controller.processResolvedTree(
+      Self.leaf(identity, opacity: 0.6), transaction: tracking,
+      timestamp: start.advanced(by: .milliseconds(100)))
+    var absent = Self.leaf(identity, opacity: 0)
+    absent.drawMetadata.baseStyle.explicitOpacity = nil
+    var disappearance = TransactionSnapshot()
+    switch requestKind {
+    case 0: disappearance.animationRequest = .inherit
+    case 1: disappearance.animationRequest = .disabled
+    default: disappearance.animationRequest = .animate(spring.animationBox)
+    }
+    controller.processResolvedTree(
+      absent, transaction: disappearance, timestamp: start.advanced(by: .milliseconds(150)))
+    #expect(controller.velocitySamplerCount == 0)
+    controller.processResolvedTree(
+      Self.leaf(identity, opacity: 0.6), transaction: .init(),
+      timestamp: start.advanced(by: .seconds(2)))
+    var animate = TransactionSnapshot()
+    animate.animationRequest = .animate(spring.animationBox)
+    controller.processResolvedTree(
+      Self.leaf(identity, opacity: 0.3), transaction: animate,
+      timestamp: start.advanced(by: .milliseconds(2050)))
+    #expect(controller.initialVelocity(forIdentity: identity, slot: .opacity) == nil)
+  }
+}

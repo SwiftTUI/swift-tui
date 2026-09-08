@@ -342,13 +342,18 @@ package final class LocalPointerHandlerRegistry: Equatable {
     // The caller's route may carry a stale `ownerNodeID` (a hover exit paired
     // against a route captured before the hovered node re-minted), so resolve
     // through the same explicit pairing query the pointer release path uses.
-    guard let resolved = hoverRouteID(pairingWith: routeID) else {
-      return
-    }
     // Every stacked level receives the phase, in registration order.
-    for handler in hoverHandlers[resolved] ?? [] {
+    for handler in hoverCallbacks(pairingWith: routeID) {
       handler(phase)
     }
+  }
+
+  /// A bounded snapshot of one route's stacked callbacks. The run loop keeps
+  /// the current hover's callbacks until its matching exit, including when
+  /// publication removes the route from this registry first.
+  package func hoverCallbacks(pairingWith routeID: RouteID) -> [HoverHandler] {
+    guard let resolved = hoverRouteID(pairingWith: routeID) else { return [] }
+    return hoverHandlers[resolved] ?? []
   }
 
   package func reset() {

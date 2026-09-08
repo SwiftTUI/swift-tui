@@ -141,14 +141,10 @@ extension Rasterizer {
         // NEVER be recorded here.  The elision gate (see
         // Pipeline/OffscreenFrameElision.swift) skips a deadline-only frame
         // when its redraw set is DISJOINT from the committed
-        // `drawnIdentities`.  `redrawIdentities` only ever names the
-        // directly-animated identity, so for an off-screen animation
-        // (including a layout-affecting one) disjointness holds precisely
-        // because the clipped child is absent here.  If a future
-        // "optimization" recorded laid-out-but-clipped identities, an
-        // off-screen animation that DID push visible cells would still look
-        // disjoint and would be wrongly elided — silently voiding elision
-        // correctness.  Keep this gated on positive post-clip extent.
+        // `drawnIdentities`, after excluding geometry-changing animations.
+        // A geometry slot can move content into view from an invisible
+        // wrapper, so its prior visibility cannot justify elision (T252).
+        // Keep this set descriptive of positive post-clip paint extent.
         if visibility.bounds.size.width > 0, visibility.bounds.size.height > 0 {
           visibleIdentities.insert(node.identity)
         }
@@ -183,7 +179,8 @@ extension Rasterizer {
           paintCompositingGroup(
             node,
             split: groupSplit,
-            visibleBounds: visibility.bounds,
+            visibleBounds: nodeContext.clip.flatMap { intersect(node.subtreeBounds, $0) }
+              ?? node.subtreeBounds,
             context: nodeContext,
             cells: &cells,
             imageAttachments: &imageAttachments,
@@ -233,13 +230,22 @@ extension Rasterizer {
     for node: DrawNode,
     inheritedClip: CellRect?
   ) -> PaintVisibility? {
+    // A disjoint explicit clip is empty, rather than an absent clip.
+    if let inheritedClip, let ownClip = node.clipBounds,
+      intersect(inheritedClip, ownClip) == nil
+    {
+      return nil
+    }
     let clip = intersect(inheritedClip, node.clipBounds)
     let bounds: CellRect
     if let clip {
-      guard let clippedBounds = intersect(node.bounds, clip) else {
+      // An offset/position wrapper can be invisible while its translated
+      // descendant paints inside this clip. Cull only the whole subtree;
+      // keep the wrapper's own visible extent empty for the visibility set.
+      guard intersect(node.subtreeBounds, clip) != nil else {
         return nil
       }
-      bounds = clippedBounds
+      bounds = intersect(node.bounds, clip) ?? CellRect(origin: clip.origin, size: .zero)
     } else {
       bounds = node.bounds
     }

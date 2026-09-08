@@ -178,7 +178,7 @@ extension RunLoop {
           self.hoveredPointerRouteID = paired.routeID
         }
       } else {
-        self.hoveredPointerRouteID = nil
+        clearPointerHover()
       }
     }
     // The paired re-key above tracks the hovered region by identity + kind

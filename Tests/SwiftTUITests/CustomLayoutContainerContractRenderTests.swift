@@ -419,3 +419,63 @@ private struct LeadingGuideLayout: Layout {
     PlainLayout().placeSubviews(in: bounds, proposal: proposal, subviews: subviews, cache: &cache)
   }
 }
+extension CustomLayoutContainerContractRenderTests {
+  @Test(
+    "T254: custom layouts with structural wrapper names survive", arguments: [false, true],
+    [0, 1, 2])
+  func reservedLayoutNamesSurvive(useEmptyName: Bool, wrapping: Int) throws {
+    let layout =
+      useEmptyName
+      ? AnyLayout(ReservedNameLayouts.EmptyView()) : AnyLayout(ReservedNameLayouts.Group())
+    let content = layout { Text("child") }
+    let frame = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        switch wrapping {
+        case 1: AnyView(content)
+        case 2: ForEach(0..<1, id: \.self) { _ in content }
+        default: content
+        }
+        Text("tail")
+      },
+      context: .init(identity: testIdentity("T254"))
+    )
+    #expect(frame.measuredTree.measuredSize == .init(width: 13, height: 4))
+    let lines = frame.rasterSurface.lines
+    try #require(lines.count == 4)
+    #expect(lines[1].hasPrefix("  child"))
+    #expect(lines[3].hasPrefix("tail"))
+  }
+}
+
+private enum ReservedNameLayouts {
+  struct Group: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout Void)
+      -> LayoutSize
+    {
+      .init(width: 13, height: 3)
+    }
+
+    func placeSubviews(
+      in bounds: LayoutRect, proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout Void
+    ) {
+      for subview in subviews {
+        subview.place(
+          at: .init(x: bounds.origin.x + 2, y: bounds.origin.y + 1), proposal: .unspecified)
+      }
+    }
+  }
+
+  struct EmptyView: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout Void)
+      -> LayoutSize
+    {
+      Group().sizeThatFits(proposal: proposal, subviews: subviews, cache: &cache)
+    }
+
+    func placeSubviews(
+      in bounds: LayoutRect, proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout Void
+    ) {
+      Group().placeSubviews(in: bounds, proposal: proposal, subviews: subviews, cache: &cache)
+    }
+  }
+}
