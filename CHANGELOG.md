@@ -8,6 +8,17 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-09-09
+
+### Changed
+
+- Complete the coordinated 0.12 minor release after correcting the GIF-editor
+  example's height-floor regression test. The test now verifies clipped
+  thumbnails and the terminal-size guard after the bounded-layout fixes in
+  0.12.0. Framework behavior is unchanged from 0.12.0.
+- Refresh the bundled browser runtime provenance for the matching 0.12.1
+  web packages and correct changelog navigation.
+
 ## [0.12.0] - 2026-09-08
 
 This minor release completes the control-style follow-ups and fixes layout,
@@ -1742,7 +1753,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.12.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.12.1...HEAD
+[0.12.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.1
 [0.12.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.0
 [0.11.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.3
 [0.11.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.2
