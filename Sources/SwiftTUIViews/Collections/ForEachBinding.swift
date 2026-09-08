@@ -21,11 +21,15 @@ extension ForEach {
   /// Creates repeated content from a binding to a mutable collection,
   /// handing each row a binding to its own element.
   ///
-  /// Row bindings are ID-verified rather than index-captured: a write checks
-  /// that the captured position still holds the captured identity, relocates
-  /// by ID when the collection reordered, and (where SwiftUI writes through
-  /// a stale index) drops a write whose element is gone entirely, reporting
-  /// a `forEach.staleElementBindingWrite` runtime issue instead.
+  /// Row bindings address the current occurrence of an ID, counting duplicates
+  /// from zero in collection order. Reads and writes relocate after mutations;
+  /// a write whose occurrence is gone is dropped and reports a
+  /// `forEach.staleElementBindingWrite` runtime issue. A missing read traps.
+  ///
+  /// State-backed arrays with stored IDs share an index per stored value, so
+  /// reading all rows takes linear lookup work. Sources without value currency
+  /// (including arbitrary getter/setter bindings), custom collections and
+  /// computed IDs require a current-data scan for each access.
   @MainActor
   public init<C>(
     _ data: Binding<C>,
@@ -55,6 +59,7 @@ extension ForEach {
     let snapshot = data.wrappedValue
     let ids = snapshot.map { $0[keyPath: id] }
     let occurrences = makeForEachOccurrences(ids: ids)
+    let lookup = ForEachBindingLookup(collection: data, snapshot: snapshot, ids: ids, id: id)
     var rows: [ForEachBindingElement<C.Element, C.Index, ID>] = []
     rows.reserveCapacity(ids.count)
     var offset = 0
@@ -70,7 +75,7 @@ extension ForEach {
       offset += 1
     }
     self.init(rows, id: \.elementID) { row in
-      content(projectedElementBinding(collection: data, id: id, row: row))
+      content(projectedElementBinding(collection: data, lookup: lookup, row: row))
     }
   }
 }
@@ -78,21 +83,18 @@ extension ForEach {
 @MainActor
 private func projectedElementBinding<C, ID: Hashable & Sendable>(
   collection: Binding<C>,
-  id idKeyPath: KeyPath<C.Element, ID>,
+  lookup: ForEachBindingLookup<C, ID>,
   row: ForEachBindingElement<C.Element, C.Index, ID>
 ) -> Binding<C.Element>
 where C: MutableCollection & RandomAccessCollection {
-  let capturedIndex = row.index
   let elementID = row.elementID
   let occurrence = row.occurrence
   var projected = Binding<C.Element>(
     mainActorGet: {
       let snapshot = collection.wrappedValue
       guard
-        let index = locateElement(
+        let index = lookup.locateElement(
           in: snapshot,
-          id: idKeyPath,
-          capturedIndex: capturedIndex,
           elementID: elementID,
           occurrence: occurrence
         )
@@ -111,10 +113,8 @@ where C: MutableCollection & RandomAccessCollection {
     set: { newValue in
       var snapshot = collection.wrappedValue
       guard
-        let index = locateElement(
+        let index = lookup.locateElement(
           in: snapshot,
-          id: idKeyPath,
-          capturedIndex: capturedIndex,
           elementID: elementID,
           occurrence: occurrence
         )
@@ -140,33 +140,77 @@ where C: MutableCollection & RandomAccessCollection {
   // rides the element binding, and writes funnel through the collection
   // binding's setter either way.
   projected.transaction = collection.transaction
+  projected.valueIdentity = lookup.valueIdentity
   return projected
 }
 
-private func locateElement<C, ID: Hashable & Sendable>(
-  in collection: C,
-  id idKeyPath: KeyPath<C.Element, ID>,
-  capturedIndex: C.Index,
-  elementID: ID,
-  occurrence: Int
-) -> C.Index?
+// These standard collections guarantee that membership and indices cannot
+// change without replacing the value. A custom struct can wrap reference
+// storage, so merely checking that C is not a class would be unsound.
+private protocol ForEachBindingValueCollection {}
+extension Array: ForEachBindingValueCollection {}
+extension ArraySlice: ForEachBindingValueCollection {}
+extension ContiguousArray: ForEachBindingValueCollection {}
+
+@MainActor
+private final class ForEachBindingLookup<C, ID: Hashable & Sendable>
 where C: MutableCollection & RandomAccessCollection {
-  if capturedIndex >= collection.startIndex,
-    capturedIndex < collection.endIndex,
-    collection[capturedIndex][keyPath: idKeyPath] == elementID
-  {
-    return capturedIndex
-  }
-  var seen = 0
-  var index = collection.startIndex
-  while index < collection.endIndex {
-    if collection[index][keyPath: idKeyPath] == elementID {
-      if seen == occurrence {
-        return index
-      }
-      seen += 1
+  let valueIdentity: (@MainActor @Sendable () -> StateValueIdentity?)?
+  private let id: KeyPath<C.Element, ID>
+  private var indexedValueIdentity: StateValueIdentity?
+  private var indicesByID: [ID: [C.Index]] = [:]
+
+  init(collection: Binding<C>, snapshot: C, ids: [ID], id: KeyPath<C.Element, ID>) {
+    self.id = id
+    // A stored ID cannot depend on external state. Computed IDs and paths
+    // through a reference can change while the collection value stays put.
+    if C.self is any ForEachBindingValueCollection.Type,
+      !(C.Element.self is AnyObject.Type),
+      MemoryLayout<C.Element>.offset(of: id) != nil
+    {
+      valueIdentity = collection.valueIdentity
+    } else {
+      valueIdentity = nil
     }
-    collection.formIndex(after: &index)
+    if let identity = valueIdentity?() {
+      rebuild(in: snapshot, ids: ids, identity: identity)
+    }
   }
-  return nil
+
+  func locateElement(in collection: C, elementID: ID, occurrence: Int) -> C.Index? {
+    if let identity = valueIdentity?() {
+      if indexedValueIdentity !== identity {
+        rebuild(in: collection, ids: collection.map { $0[keyPath: id] }, identity: identity)
+      }
+      guard let indices = indicesByID[elementID], occurrence < indices.count else {
+        return nil
+      }
+      return indices[occurrence]
+    }
+
+    // No producer guarantee means no reusable index, even if count and the
+    // captured position's ID still match. Equal-count replacement can insert
+    // an earlier duplicate while leaving both of those checks unchanged.
+    indexedValueIdentity = nil
+    indicesByID.removeAll(keepingCapacity: false)
+    var seen = 0
+    for index in collection.indices {
+      if collection[index][keyPath: id] == elementID {
+        if seen == occurrence {
+          return index
+        }
+        seen += 1
+      }
+    }
+    return nil
+  }
+
+  private func rebuild(in collection: C, ids: [ID], identity: StateValueIdentity) {
+    indicesByID.removeAll(keepingCapacity: true)
+    indicesByID.reserveCapacity(ids.count)
+    for (index, elementID) in zip(collection.indices, ids) {
+      indicesByID[elementID, default: []].append(index)
+    }
+    indexedValueIdentity = identity
+  }
 }

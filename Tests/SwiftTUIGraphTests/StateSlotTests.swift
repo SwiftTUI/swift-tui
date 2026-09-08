@@ -4,6 +4,27 @@ import Testing
 
 @Suite(.serialized)
 struct StateSlotTests {
+  @Test("stored-value tokens distinguish writes even when equality omits an ID")
+  func valueIdentityTracksStoresAndBranches() {
+    struct PartialEquality: Equatable {
+      var id: Int
+      static func == (lhs: Self, rhs: Self) -> Bool { true }
+    }
+    var slot = AnyStateSlot(PartialEquality(id: 1))
+    let baseline = slot
+    #expect(slot.valueIdentity === baseline.valueIdentity)
+    let firstChange = slot.set(PartialEquality(id: 2))
+    #expect(!firstChange)
+    let discarded = slot.valueIdentity
+    #expect(discarded !== baseline.valueIdentity)
+    slot = baseline
+    #expect(slot.valueIdentity === baseline.valueIdentity)
+    let secondChange = slot.set(PartialEquality(id: 3))
+    #expect(!secondChange)
+    #expect(slot.valueIdentity !== discarded)
+    #expect(slot.value(as: PartialEquality.self).id == 3)
+  }
+
   @Test("equatable state slot preserves type and reports real changes")
   func equatableStateSlotTracksChanges() {
     var slot = AnyStateSlot(1)

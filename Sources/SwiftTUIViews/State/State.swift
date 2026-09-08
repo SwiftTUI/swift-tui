@@ -94,12 +94,15 @@ package enum StateSlotOrdinals {
 private struct DynamicStateLocation<Value> {
   var getValue: @MainActor () -> Value
   var setValue: @MainActor (Value) -> Void
+  var valueIdentity: @MainActor @Sendable () -> StateValueIdentity?
 
   var binding: Binding<Value> {
-    Binding(
+    var binding = Binding(
       mainActorGet: getValue,
       set: setValue
     )
+    binding.valueIdentity = valueIdentity
+    return binding
   }
 }
 
@@ -116,8 +119,10 @@ private final class StateBox<Value> {
   /// participates in matching a box to its graph slot.
   let declarationFileID: String
   private var seedValue: Value
+  private(set) var seedValueIdentity = StateValueIdentity()
   private var boundLocationsByOwner: [StateStorageOwner: DynamicStateLocation<Value>]
-  private var retainedValuesByOwner: [StateStorageOwner: Value]
+  private var retainedValuesByOwner:
+    [StateStorageOwner: (value: Value, identity: StateValueIdentity)]
   /// Latches once any owner binds a location. Distinguishes a pre-mount
   /// seed read (expected: the box has only its seed) from an imperative
   /// access that lost its live slot and silently degraded to the seed —
@@ -144,6 +149,7 @@ private final class StateBox<Value> {
 
   func updateSeedValue(_ newValue: Value) {
     seedValue = newValue
+    seedValueIdentity = StateValueIdentity()
   }
 
   func remember(
@@ -164,14 +170,18 @@ private final class StateBox<Value> {
   func retainedValue(
     for owner: StateStorageOwner
   ) -> Value? {
-    retainedValuesByOwner[owner]
+    retainedValuesByOwner[owner]?.value
+  }
+
+  func retainedValueIdentity(for owner: StateStorageOwner) -> StateValueIdentity? {
+    retainedValuesByOwner[owner]?.identity
   }
 
   func storeRetainedValue(
     _ value: Value,
     for owner: StateStorageOwner
   ) {
-    retainedValuesByOwner[owner] = value
+    retainedValuesByOwner[owner] = (value, StateValueIdentity())
   }
 
   /// Releases graph-location closures for owner lifetimes the live registry can
@@ -320,11 +330,20 @@ public struct State<Value> {
   }
 
   public var projectedValue: Binding<Value> {
-    return activeLocation()?.binding
-      ?? Binding(
-        mainActorGet: { wrappedValue },
-        set: { wrappedValue = $0 }
-      )
+    if let location = activeLocation() {
+      return location.binding
+    }
+    var binding = Binding(
+      mainActorGet: { wrappedValue },
+      set: { wrappedValue = $0 }
+    )
+    binding.valueIdentity = {
+      if let location = activeLocation() {
+        return location.valueIdentity()
+      }
+      return box.seedValueIdentity
+    }
+    return binding
   }
 
   #if DEBUG
@@ -493,6 +512,7 @@ public struct State<Value> {
     // a new slot from carried mutation would resurrect state across committed
     // removal and leak writes into replacement identities.
     let authoredSeed = box.currentSeedValue()
+    let authoredSeedIdentity = box.seedValueIdentity
     let slotOrdinal = box.currentOrdinal
     let declarationFileID = box.declarationFileID
     let dormantPolicy = box.dormantPolicy
@@ -548,6 +568,14 @@ public struct State<Value> {
         } else {
           box?.storeRetainedValue(newValue, for: storageOwner)
         }
+      },
+      valueIdentity: { [weak box] in
+        if let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) {
+          // The preceding value read primes the slot and records its reader.
+          // Inspecting currency must not introduce a new state dependency.
+          return liveViewNode.stateSlotStorage(slotIdentifier)?.valueIdentity
+        }
+        return box?.retainedValueIdentity(for: storageOwner) ?? authoredSeedIdentity
       }
     )
   }

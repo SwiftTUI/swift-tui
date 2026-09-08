@@ -39,6 +39,14 @@ package struct DormantStateSlotSnapshot {
   fileprivate var valueType: Any.Type
 }
 
+/// Identity of one stored value, independent of its `Equatable` semantics.
+/// Copies/checkpoints retain the token; every store creates a fresh token, so
+/// restoring a checkpoint and then writing cannot collide with a discarded
+/// branch. This certifies replacement of the value, not mutations of referents.
+package final class StateValueIdentity: Sendable {
+  package init() {}
+}
+
 package struct AnyStateSlot {
   private enum Storage {
     case uninitialized
@@ -46,6 +54,7 @@ package struct AnyStateSlot {
   }
 
   private var storage: Storage
+  package private(set) var valueIdentity = StateValueIdentity()
   package let dormantPolicy: DormantStateSlotPolicy
 
   package init() {
@@ -322,6 +331,7 @@ package struct AnyStateSlot {
     // fixed at initial-store time and must not be reset to the
     // non-Equatable always-false comparator when the value updates.
     storage = .value(value, valueType, equals)
+    valueIdentity = StateValueIdentity()
     return didChange
   }
 

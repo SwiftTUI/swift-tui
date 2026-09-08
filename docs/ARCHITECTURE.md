@@ -30,6 +30,17 @@ or terminal bytes.
 
 ## Modules and the dependency graph
 
+Collection-binding `ForEach` lookup lives in
+`SwiftTUIViews/Collections/ForEachBinding.swift`. Rows share an ID-to-indices
+map certified by a stored-value token from `Binding`. `State` exposes the
+token of its exact graph slot, retained owner value, or seed.
+`SwiftTUIGraph/Resolve/StateSlot.swift` owns `StateValueIdentity`: a fresh token
+on every store, copied with checkpoint values so restored and discarded
+branches cannot alias. Tokens certify value replacement only. Lookup reuse
+requires a standard value-semantic array and an inline stored ID; arbitrary
+sources and externally dependent projections scan current data. Reads still
+go through the source binding so state dependencies remain reader-attributed.
+
 `SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
 examples, and the public website can live in sibling organization repositories.
 The public Swift products below remain in this package unless a later

@@ -24,6 +24,12 @@ public struct Binding<Value> {
   /// those consumers with no distinction, preserving prior behavior.
   package var bindingSourceID: AnyID?
 
+  /// Certifies replacement of the returned value, when its producer owns all
+  /// stores. Nil means unknown: source identity and writes through this binding
+  /// alone cannot certify arbitrary closures' external mutations. Consumers
+  /// must also prove that their projection has value semantics before caching.
+  package var valueIdentity: (@MainActor @Sendable () -> StateValueIdentity?)?
+
   /// The transaction applied to writes made through this binding.
   ///
   /// Verified against real SwiftUI (2026-08-05): an explicit ambient scope
@@ -103,6 +109,7 @@ public struct Binding<Value> {
     )
     self.transaction = base.transaction
     self.bindingSourceID = base.bindingSourceID
+    self.valueIdentity = base.valueIdentity
   }
 
   /// Creates a binding that projects a non-optional base as an optional
@@ -123,6 +130,7 @@ public struct Binding<Value> {
     )
     self.transaction = base.transaction
     self.bindingSourceID = base.bindingSourceID
+    self.valueIdentity = base.valueIdentity
   }
 
   @MainActor
@@ -177,10 +185,13 @@ public struct Binding<Value> {
   /// Returns a read-only binding that ignores writes.
   @MainActor
   public static func constant(_ value: Value) -> Self {
-    Self(
+    let identity = StateValueIdentity()
+    var binding = Self(
       mainActorGet: { value },
       set: { _ in }
     )
+    binding.valueIdentity = { identity }
+    return binding
   }
 
   @MainActor
@@ -198,6 +209,11 @@ public struct Binding<Value> {
       set: { wrappedValue[keyPath: keyPath] = $0 }
     )
     projected.transaction = transaction
+    // Computed properties and paths through references may change without a
+    // base store. Only an inline stored-value projection inherits currency.
+    if !(Value.self is AnyObject.Type), MemoryLayout<Value>.offset(of: keyPath) != nil {
+      projected.valueIdentity = valueIdentity
+    }
     return projected
   }
 }
