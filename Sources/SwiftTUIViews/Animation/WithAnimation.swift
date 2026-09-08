@@ -78,15 +78,17 @@ public func withTransaction<Result>(
   // Completions added with `addAnimationCompletion` open one batch for the
   // scope (the `withAnimation(_:completionCriteria:_:completion:)` path),
   // so every animation the body starts reports to every registered closure.
-  try withCompletionBatch(transaction.pendingCompletions) {
-    // Continuity and custom key values are scoped for every request shape
-    // so state writes inside `body` can thread them onto their invalidation
-    // segments. A metadata-only transaction (request `.inherit`) still
-    // passes the enclosing scope's animation intent through untouched.
-    try AnimationContextStorage.$currentIsContinuous.withValue(transaction.isContinuous) {
-      try AnimationContextStorage.$currentCustomValues.withValue(transaction.customValues) {
-        try AnimationContextStorage.$currentTracksVelocity.withValue(transaction.tracksVelocity) {
-          try withTransactionRequestScope(transaction, body)
+  try AnimationContextStorage.$isExplicitTransactionScope.withValue(true) {
+    try withCompletionBatch(transaction.pendingCompletions) {
+      // Continuity and custom key values are scoped for every request shape
+      // so state writes inside `body` can thread them onto their invalidation
+      // segments. A metadata-only transaction (request `.inherit`) still
+      // passes the enclosing scope's animation intent through untouched.
+      try AnimationContextStorage.$currentIsContinuous.withValue(transaction.isContinuous) {
+        try AnimationContextStorage.$currentCustomValues.withValue(transaction.customValues) {
+          try AnimationContextStorage.$currentTracksVelocity.withValue(transaction.tracksVelocity) {
+            try withTransactionRequestScope(transaction, body)
+          }
         }
       }
     }

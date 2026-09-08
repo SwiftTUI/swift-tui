@@ -65,7 +65,7 @@ public struct ScrollWheelModifier: PrimitiveViewModifier, Sendable {
     let routeID = runtimePrimaryRouteID(for: routeIdentity)
     let intake = HandlerDescriptorIntake(
       context: context,
-      fallbackSnapshot: authoringContext
+      preferringSnapshot: authoringContext
     )
     intake.registerPointerHandler(routeID: routeID, structuralKey: node.identity) { event in
       guard case .scrolled(let deltaX, let deltaY) = event.kind else {

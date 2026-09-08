@@ -1,10 +1,28 @@
 extension Rasterizer {
+  /// Shared physical-pixel geometry for the Braille and tile capsule paths.
+  static func capsuleCapParameters(
+    subpixelWidth: Int, subpixelHeight: Int, metrics: CellPixelMetrics
+  ) -> (isHorizontal: Bool, radiusX: Int, radiusY: Int) {
+    let cellWidth = max(1, (subpixelWidth + 1) / 2)
+    let cellHeight = max(1, (subpixelHeight + 3) / 4)
+    let pixelWidth = cellWidth * metrics.width
+    let pixelHeight = cellHeight * metrics.height
+    let capRadius = min(pixelWidth, pixelHeight) / 2
+    // Preserve the inclusive-bound clamp used by the Braille renderer.
+    return (
+      pixelWidth >= pixelHeight,
+      max(0, capRadius / max(1, metrics.width / 2) - 1),
+      max(0, capRadius / max(1, metrics.height / 4) - 1)
+    )
+  }
+
   internal func shapeContains(
     pointX x: Int,
     pointY y: Int,
     in bounds: CellRect,
     geometry: ShapeGeometry,
-    fillMode: ShapeFillMode = .full
+    fillMode: ShapeFillMode = .full,
+    metrics: CellPixelMetrics = .estimated
   ) -> Bool {
     let targetBounds: CellRect
     switch fillMode {
@@ -29,7 +47,8 @@ extension Rasterizer {
         pointX: x,
         pointY: y,
         in: targetBounds,
-        geometry: geometry
+        geometry: geometry,
+        metrics: metrics
       )
     case .roundedRectangle(let cornerRadius):
       if case .interior = fillMode {
@@ -83,7 +102,8 @@ extension Rasterizer {
     pointX x: Int,
     pointY y: Int,
     in bounds: CellRect,
-    geometry: ShapeGeometry
+    geometry: ShapeGeometry,
+    metrics: CellPixelMetrics
   ) -> Bool {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return false
@@ -131,43 +151,32 @@ extension Rasterizer {
       let dy = (py - cySub) / Double(ry)
       return dx * dx + dy * dy <= 1
     case .capsule:
-      // Matches `drawCapsule`: wide capsules get left/right semicircles
-      // joined by a horizontal body rect, tall capsules are transposed.
-      if subW == 1 || subH == 1 {
-        return true
+      let cap = Self.capsuleCapParameters(
+        subpixelWidth: subW, subpixelHeight: subH, metrics: metrics)
+      let rx = Double(cap.radiusX)
+      let ry = Double(cap.radiusY)
+      func insideCap(centerX: Double, centerY: Double) -> Bool {
+        guard rx > 0, ry > 0 else { return false }
+        let dx = (px - centerX) / rx
+        let dy = (py - centerY) / ry
+        return dx * dx + dy * dy <= 1
       }
-      if subW >= subH {
-        let radius = Double(max(0, (subH - 1) / 2))
-        let cySub = Double((subH - 1) / 2)
-        let leftCx = radius
-        let rightCx = Double(subW - 1) - radius
-        if px < leftCx {
-          let dx = px - leftCx
-          let dy = py - cySub
-          return dx * dx + dy * dy <= radius * radius
-        } else if px > rightCx {
-          let dx = px - rightCx
-          let dy = py - cySub
-          return dx * dx + dy * dy <= radius * radius
-        } else {
-          return py >= cySub - radius && py <= cySub + radius
-        }
+      // Match the union of both ellipses and the connecting body used by
+      // drawCapsule, including pixel aspect correction and overlapping caps.
+      if cap.isHorizontal {
+        let cy = Double((subH - 1) / 2)
+        let left = rx
+        let right = Double(subW - 1) - rx
+        return insideCap(centerX: left, centerY: cy)
+          || insideCap(centerX: right, centerY: cy)
+          || (px >= left && px <= right && abs(py - cy) <= ry)
       } else {
-        let radius = Double(max(0, (subW - 1) / 2))
-        let cxSub = Double((subW - 1) / 2)
-        let topCy = radius
-        let bottomCy = Double(subH - 1) - radius
-        if py < topCy {
-          let dx = px - cxSub
-          let dy = py - topCy
-          return dx * dx + dy * dy <= radius * radius
-        } else if py > bottomCy {
-          let dx = px - cxSub
-          let dy = py - bottomCy
-          return dx * dx + dy * dy <= radius * radius
-        } else {
-          return px >= cxSub - radius && px <= cxSub + radius
-        }
+        let cx = Double((subW - 1) / 2)
+        let top = ry
+        let bottom = Double(subH - 1) - ry
+        return insideCap(centerX: cx, centerY: top)
+          || insideCap(centerX: cx, centerY: bottom)
+          || (py >= top && py <= bottom && abs(px - cx) <= rx)
       }
     case .rectangle, .roundedRectangle, .path:
       assertionFailure("curvedShapeContains called with non-curved geometry")

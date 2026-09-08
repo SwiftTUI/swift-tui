@@ -6,6 +6,10 @@
 @MainActor
 package enum AnimationContextStorage {
   @TaskLocal package static var currentRequest: AnimationRequest = .inherit
+  /// Explicit transaction scopes also exist when every field is default.
+  /// Binding-stored intent must yield to those scopes without inspecting
+  /// metadata values as a proxy for whether a scope was opened.
+  @TaskLocal package static var isExplicitTransactionScope = false
   /// The batch ID associated with the innermost enclosing
   /// `withAnimation` scope, or `nil` at the root.  State writes thread
   /// it alongside the animation request so every animation in the same

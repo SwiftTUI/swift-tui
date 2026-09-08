@@ -149,6 +149,7 @@ public struct Binding<Value> {
     }
     return AnimationContextStorage.currentRequest == .inherit
       && AnimationContextStorage.currentBatchID == nil
+      && !AnimationContextStorage.isExplicitTransactionScope
   }
 
   public var projectedValue: Self {

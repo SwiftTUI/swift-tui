@@ -40,9 +40,11 @@ extension Rasterizer {
     switch geometry {
     case .circle, .ellipse, .capsule:
       // Curved shapes rasterize onto the Braille subpixel canvas (Route A).
-      // Tile styles need per-cell glyph writes, so they fall through to the
-      // cell-walk loop below (Route B).
+      // Tile glyphs and inset background masks use the cell walk (Route B).
       if case .tile = colorMode {
+        break
+      }
+      if case .interior = mode {
         break
       }
       paintBrailleShape(
@@ -124,7 +126,8 @@ extension Rasterizer {
             pointY: y,
             in: shapeBounds,
             geometry: geometry,
-            fillMode: mode
+            fillMode: mode,
+            metrics: environment.cellPixelMetrics
           )
         else {
           x += 1
@@ -561,23 +564,12 @@ extension Rasterizer {
       return
     }
 
-    // Derive cell frame dimensions from the Braille canvas (2 subpixels
-    // wide, 4 tall per cell). These are always exact on a well-formed
-    // canvas; ceiling-style derivation guards against degenerate inputs.
-    let cellW = max(1, (subW + 1) / 2)
-    let cellH = max(1, (subH + 3) / 4)
-    let subpixelPxWidth = max(1, metrics.width / 2)
-    let subpixelPxHeight = max(1, metrics.height / 4)
-    let pxWidth = cellW * metrics.width
-    let pxHeight = cellH * metrics.height
-    // Cap pixel radius = shortest pixel axis / 2 (same as Circle).
-    let capRadiusPx = min(pxWidth, pxHeight) / 2
-    // Subpixel radii for the cap, preserving the old (-1) inclusive-bound
-    // clamp so bit-identity at 8x16 metrics holds.
-    let rx = max(0, capRadiusPx / subpixelPxWidth - 1)
-    let ry = max(0, capRadiusPx / subpixelPxHeight - 1)
+    let cap = Self.capsuleCapParameters(
+      subpixelWidth: subW, subpixelHeight: subH, metrics: metrics)
+    let rx = cap.radiusX
+    let ry = cap.radiusY
 
-    if pxWidth >= pxHeight {
+    if cap.isHorizontal {
       // Wide capsule: caps on left/right, body connects horizontally.
       let cy = (subH - 1) / 2
       let leftCx = rx

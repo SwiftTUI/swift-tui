@@ -38,7 +38,7 @@ public struct TerminationRequestModifier: PrimitiveViewModifier, Sendable {
     let node = content.resolve(in: context)
     let intake = HandlerDescriptorIntake(
       context: context,
-      fallbackSnapshot: authoringContext
+      preferringSnapshot: authoringContext
     )
     intake.registerTerminationHandler(
       identity: node.identity,

@@ -71,6 +71,36 @@ private func renderShape<V: View>(
 @MainActor
 @Suite("Circle/Ellipse/Capsule aspect-correction across terminal metrics")
 struct CircleAspectFixtureTests {
+  @Test(
+    "T263: tile-filled capsules stay within their metric-aware Braille silhouette",
+    arguments: [
+      CellPixelMetrics.estimated,
+      CellPixelMetrics(width: 10, height: 16, source: .reported),
+      CellPixelMetrics(width: 10, height: 14, source: .reported),
+      CellPixelMetrics(width: 12, height: 16, source: .reported),
+    ])
+  func tileCapsuleStaysInsideSilhouette(metrics: CellPixelMetrics) {
+    for (width, height) in [(24, 15), (24, 20), (6, 16), (20, 6), (8, 4), (1, 1)] {
+      let solid = renderShape(
+        Capsule().fill(Color.red).frame(width: width, height: height),
+        frameWidth: width, frameHeight: height, metrics: metrics)
+      let tiled = renderShape(
+        Capsule().fill(TileStyle(.init(rows: ["x"]), foreground: Color.red))
+          .frame(width: width, height: height),
+        frameWidth: width, frameHeight: height, metrics: metrics)
+      #expect(solid.rasterSurface.size == tiled.rasterSurface.size)
+      var outside: [CellPoint] = []
+      var tileCells = 0
+      for (y, rows) in zip(solid.rasterSurface.cells, tiled.rasterSurface.cells).enumerated() {
+        for (x, cells) in zip(rows.0, rows.1).enumerated() where cells.1.character == "x" {
+          tileCells += 1
+          if brailleDotCount(cells.0) == 0 { outside.append(.init(x: x, y: y)) }
+        }
+      }
+      if width * height >= 32 { #expect(tileCells > 0) }
+      #expect(outside.isEmpty, "size \(width)x\(height), metrics \(metrics), outside \(outside)")
+    }
+  }
 
   // MARK: Circle: basic sanity at all three metrics
 

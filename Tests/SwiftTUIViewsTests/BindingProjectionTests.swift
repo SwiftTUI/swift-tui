@@ -25,16 +25,66 @@ struct BindingProjectionTests {
   private final class WriteProbe {
     var value = 0.0
     var observedRequests: [AnimationRequest] = []
+    var observedContinuity: [Bool] = []
+    var observedVelocity: [Bool] = []
+    var observedCustomValues: [[ObjectIdentifier: AnyHashableSendable]] = []
 
     var binding: Binding<Double> {
       Binding(
         get: { self.value },
         set: { newValue in
           self.observedRequests.append(AnimationContextStorage.currentRequest)
+          self.observedContinuity.append(AnimationContextStorage.currentIsContinuous)
+          self.observedVelocity.append(AnimationContextStorage.currentTracksVelocity)
+          self.observedCustomValues.append(AnimationContextStorage.currentCustomValues)
           self.value = newValue
         }
       )
     }
+  }
+
+  private enum T259Key: TransactionKey {
+    static let defaultValue = 0
+  }
+
+  @Test("T259: explicit metadata scopes override stored binding animation", arguments: 0..<7)
+  func metadataScopeWinsOverStoredAnimation(kind: Int) {
+    let probe = WriteProbe()
+    let animation = Animation.linear(duration: .seconds(1))
+    let binding = probe.binding.animation(animation)
+    var transaction = Transaction()
+    switch kind {
+    case 0, 1: transaction.tracksVelocity = kind == 0
+    case 2, 3: transaction.isContinuous = kind == 2
+    case 4, 5: transaction[T259Key.self] = kind == 4 ? 37 : 0
+    default: break  // An explicitly opened default transaction is still a scope.
+    }
+    if kind < 2 {
+      withTransaction(\.tracksVelocity, transaction.tracksVelocity) { binding.wrappedValue = 1 }
+    } else {
+      withTransaction(transaction) { binding.wrappedValue = 1 }
+    }
+    #expect(probe.observedRequests == [.inherit])
+    #expect(probe.observedContinuity == [transaction.isContinuous])
+    #expect(probe.observedVelocity == [transaction.tracksVelocity])
+    #expect(probe.observedCustomValues == [transaction.customValues])
+    binding.wrappedValue = 2
+    #expect(probe.observedRequests.last == .animate(animation.animationBox))
+    #expect(probe.observedVelocity.last == false)
+  }
+
+  @Test("T259: nested default metadata restores the enclosing scope")
+  func nestedMetadataScopeRestoresOuter() {
+    let probe = WriteProbe()
+    let animation = Animation.linear(duration: .seconds(1))
+    let binding = probe.binding.animation(animation)
+    withTransaction(\.tracksVelocity, true) {
+      withTransaction(\.tracksVelocity, false) { binding.wrappedValue = 1 }
+      binding.wrappedValue = 2
+    }
+    binding.wrappedValue = 3
+    #expect(probe.observedRequests == [.inherit, .inherit, .animate(animation.animationBox)])
+    #expect(probe.observedVelocity == [false, true, false])
   }
 
   // MARK: - Projection shape

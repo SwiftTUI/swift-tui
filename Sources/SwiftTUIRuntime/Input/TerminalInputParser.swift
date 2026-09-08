@@ -27,6 +27,11 @@ public struct TerminalInputParser: Sendable {
     self.mouseCoordinateMode = mouseCoordinateMode
   }
 
+  /// Refreshes interpretation without discarding an incomplete input sequence.
+  mutating func updateMouseCoordinateMode(_ mode: MouseCoordinateMode) {
+    mouseCoordinateMode = mode
+  }
+
   /// Feeds raw bytes into the parser and returns any completed input events.
   public mutating func feed(_ bytes: [UInt8]) -> [InputEvent] {
     bufferedBytes.append(contentsOf: bytes)

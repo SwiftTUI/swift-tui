@@ -34,6 +34,8 @@ struct StackSequentialAllocationPlan {
   /// equal division must not undercut rigid children only to hand the
   /// slack to a more flexible sibling).
   var groupIdealSuffixes: [Int]
+  /// Minimum space owed to this and later members of the same priority group.
+  var groupMinimumSuffixes: [Int]
   /// For each order position, whether it and every later member of its
   /// group are unbounded (eligible for balanced batch allocation).
   var unboundedTailFromPosition: [Bool]
@@ -162,6 +164,9 @@ extension LayoutEngine {
     let reservedLowerMinimums = order.indices.map {
       suffixMinimums[groupEndPositions[$0]]
     }
+    let groupMinimumSuffixes = order.indices.map {
+      suffixMinimums[$0] - suffixMinimums[groupEndPositions[$0]]
+    }
 
     var suffixIdeals = [Int](repeating: 0, count: order.count + 1)
     for position in order.indices.reversed() {
@@ -206,6 +211,7 @@ extension LayoutEngine {
       groupEndPositions: groupEndPositions,
       reservedLowerMinimums: reservedLowerMinimums,
       groupIdealSuffixes: groupIdealSuffixes,
+      groupMinimumSuffixes: groupMinimumSuffixes,
       unboundedTailFromPosition: unboundedTailFromPosition,
       deficitClaimantCounts: deficitClaimantCounts,
       spacerSuffixMinimums: spacerSuffixMinimums
@@ -350,6 +356,13 @@ extension LayoutEngine {
       ? max(plan.minimums[childIndex], plan.ideals[childIndex])
       : plan.minimums[childIndex]
     var offer = max(share, floorSize)
+    if !inSurplus {
+      // Earlier flexible siblings cannot spend a later sibling's minimum.
+      // Keep the current floor when the deficit itself is impossible, so
+      // fitting the proposal never takes precedence over structural minima.
+      let laterMinimums = plan.groupMinimumSuffixes[position] - plan.minimums[childIndex]
+      offer = min(offer, max(floorSize, available - laterMinimums))
+    }
     if let cap = plan.maximums[childIndex] {
       offer = min(offer, cap)
     }

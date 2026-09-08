@@ -34,6 +34,45 @@ private final class ControlStressProbe<Value> {
   }
 }
 
+extension FrameworkStressControlBindingTests {
+  @Test(
+    "T256: bounds-inactive Stepper input cannot rewrite an out-of-range model", arguments: 0..<14)
+  func inactiveStepperPreservesRawValue(combination: Int) throws {
+    let useDouble = combination % 2 == 1
+    let below = (combination / 2) % 2 == 1
+    let input = combination / 4
+    // Activation is the increment action, so only the upper boundary applies.
+    let raw = below ? -5 : 10
+    let integer = ControlStressProbe(raw)
+    let floating = ControlStressProbe(Double(raw))
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("T256", "Root"), size: .init(width: 42, height: 4)
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        if useDouble {
+          Stepper("Bounded", value: floating.binding(), in: 0.0...5.0)
+        } else {
+          Stepper("Bounded", value: integer.binding(), in: 0...5)
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    #expect(harness.frame.contains(below ? "◁" : "▷"))
+    switch input {
+    case 0: _ = try harness.clickText(below ? "◁" : "▷")
+    case 1: _ = try harness.pressKey(KeyPress(below ? .arrowLeft : .arrowRight))
+    case 2:
+      let point = try #require(harness.point(forText: "Bounded"))
+      _ = try harness.scrollPointer(at: point, deltaY: below ? 1 : -1)
+    default: _ = try harness.pressKey(KeyPress(.return))
+    }
+    #expect(integer.value == raw)
+    #expect(floating.value == Double(raw))
+    #expect(integer.writes.isEmpty)
+    #expect(floating.writes.isEmpty)
+  }
+}
+
 // MARK: - Attempt 001: button action reinstall after enablement churn
 
 extension FrameworkStressControlBindingTests {

@@ -6,6 +6,25 @@ import Testing
 @MainActor
 @Suite
 struct CollectionSupportTests {
+  @Test("T265: narrow table cells contain wide graphemes", arguments: ["界", "🦊", "👩‍💻"])
+  func narrowTableCellsContainWideGraphemes(glyph: String) {
+    for alignment in [TableCellAlignment.leading, .center, .trailing] {
+      for mode in [TextTruncationMode.head, .middle, .tail] {
+        let cell = renderTableCell(glyph, width: 1, alignment: alignment, truncationMode: mode)
+        #expect(cell == "…")
+        #expect(layoutText(for: cell, width: nil).size.width == 1)
+      }
+    }
+    let columns = [TableColumn("界", width: 1), TableColumn("End", width: 3)]
+    for header in [false, true] {
+      let row = formattedTableLine(
+        cells: [glyph, "xyz"], widths: [1, 3],
+        columns: columns, usesTitleAlignment: header)
+      #expect(row == "… | xyz")
+      #expect(layoutText(for: row, width: nil).size.width == 7)
+    }
+  }
+
   @Test("picker selection helpers support exact and optional matches")
   func pickerSelectionHelpersSupportExactAndOptionalMatches() {
     let tag = SelectionTag(value: 3, includeOptional: true)

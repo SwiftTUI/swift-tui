@@ -18,6 +18,57 @@
   @MainActor
   @Suite
   struct InputReaderControlMessageTests {
+    @Test("T260: a live input decoder refreshes coordinate mode without losing buffered bytes")
+    func liveMouseModeRefresh() async throws {
+      var descriptors: [Int32] = [0, 0]
+      #expect(unsafe pipe(&descriptors) == 0)
+      let readDescriptor = descriptors[0]
+      let writeDescriptor = descriptors[1]
+      var writerClosed = false
+      defer {
+        _ = close(readDescriptor)
+        if !writerClosed { _ = close(writeDescriptor) }
+      }
+      let flags = fcntl(readDescriptor, F_GETFL)
+      #expect(flags >= 0)
+      #expect(fcntl(readDescriptor, F_SETFL, flags | O_NONBLOCK) >= 0)
+      let reader = InputReader(fileDescriptor: readDescriptor)
+      let stream = reader.inputEvents()
+      var iterator = stream.makeAsyncIterator()
+      // A preceding key acknowledges parsing the chunk that also contains
+      // the incomplete mouse report. Updating must preserve that buffer.
+      try writeAllBytes(Array("q\u{001B}[<0;17;".utf8), to: writeDescriptor)
+      let key = await iterator.next()
+      #expect(key == .key(.character("q")))
+      let firstMetrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+      let secondMetrics = CellPixelMetrics(width: 10, height: 20, source: .reported)
+      let modes: [MouseCoordinateMode] = [
+        .pixels(metrics: firstMetrics, source: .terminalPixels),
+        .pixels(metrics: secondMetrics, source: .terminalPixels),
+        .cells,
+      ]
+      let expected: [PointerLocation] = [
+        .subCell(
+          location: Point(x: 2, y: 2), source: .terminalPixels,
+          metrics: firstMetrics, rawPixel: PixelPoint(x: 16, y: 32)),
+        .subCell(
+          location: Point(x: 1.6, y: 1.6), source: .terminalPixels,
+          metrics: secondMetrics, rawPixel: PixelPoint(x: 16, y: 32)),
+        .cellFallback(CellPoint(x: 16, y: 32)),
+      ]
+      for index in modes.indices {
+        reader.updateInputCapabilities(.init(mouseCoordinateMode: modes[index]))
+        let bytes = index == 0 ? "33M" : "\u{001B}[<0;17;33M"
+        try writeAllBytes(Array(bytes.utf8), to: writeDescriptor)
+        let event = await iterator.next()
+        #expect(event == .mouse(MouseEvent(kind: .down(.primary), location: expected[index])))
+      }
+      _ = close(writeDescriptor)
+      writerClosed = true
+      let end = await iterator.next()
+      #expect(end == nil)
+    }
+
     @Test("input reader routes resize control messages without leaking them as key input")
     func inputReaderRoutesResizeControlMessages() async throws {
       var descriptors: [Int32] = [0, 0]

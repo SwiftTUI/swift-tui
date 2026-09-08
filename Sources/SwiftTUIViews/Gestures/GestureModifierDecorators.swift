@@ -248,46 +248,48 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     let disposition = inner.handle(event: event)
-    if disposition == .handled,
-      let value: V = inner.currentValue(as: V.self)
-    {
-      // The body's transaction is real: edits govern the during-gesture
-      // write below. It arrives inert — SwiftUI hands drag updating
-      // bodies no preset animation and does not auto-set `isContinuous`
-      // (probe 2026-08-05). The end-of-gesture reset is governed solely
-      // by `GestureState`'s reset transaction, so nothing here is stored
-      // across calls.
-      var transaction = Transaction()
-      let nextState = withImperativeAuthoringContext(authoringContext) { () -> S in
-        var state = box.currentValue()
-        updater(value, &state, &transaction)
-        return state
-      }
-      withImperativeAuthoringContext(authoringContext) {
-        withTransaction(transaction) {
-          box.setValue(nextState)
-        }
-      }
-      didFire = true
+    if disposition == .handled {
+      updateCurrentValue()
     }
-    if inner.phase.isTerminal, didFire {
-      withImperativeAuthoringContext(authoringContext) {
-        box.resetToSeedApplyingResetTransaction()
-      }
-      didFire = false
-    }
+    resetIfTerminal()
     return disposition
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
-    let didTerminate = inner.handleDeadline(at: instant)
-    if didTerminate, didFire {
-      withImperativeAuthoringContext(authoringContext) {
-        box.resetToSeedApplyingResetTransaction()
-      }
-      didFire = false
+    let didAdvance = inner.handleDeadline(at: instant)
+    if didAdvance {
+      updateCurrentValue()
     }
-    return didTerminate
+    // A sequence may finish its first stage on this deadline while the
+    // composite remains active. Its state resets only at the composite end.
+    resetIfTerminal()
+    return didAdvance
+  }
+
+  private func updateCurrentValue() {
+    guard let value: V = inner.currentValue(as: V.self) else { return }
+    // The updater's transaction governs this write; the GestureState's
+    // separately authored reset transaction governs the terminal reset.
+    var transaction = Transaction()
+    let nextState = withImperativeAuthoringContext(authoringContext) { () -> S in
+      var state = box.currentValue()
+      updater(value, &state, &transaction)
+      return state
+    }
+    withImperativeAuthoringContext(authoringContext) {
+      withTransaction(transaction) {
+        box.setValue(nextState)
+      }
+    }
+    didFire = true
+  }
+
+  private func resetIfTerminal() {
+    guard inner.phase.isTerminal, didFire else { return }
+    withImperativeAuthoringContext(authoringContext) {
+      box.resetToSeedApplyingResetTransaction()
+    }
+    didFire = false
   }
 
   func currentValue() -> V? { inner.currentValue(as: V.self) }

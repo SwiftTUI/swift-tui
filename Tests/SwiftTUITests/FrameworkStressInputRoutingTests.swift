@@ -14,6 +14,53 @@ import Testing
 )
 struct FrameworkStressInputRoutingTests {}
 
+extension FrameworkStressInputRoutingTests {
+  @Test(
+    "T262: termination and wheel handlers preserve their authored FocusState owner",
+    arguments: [false, true])
+  func handlerModifiersPreserveFocusOwner(termination: Bool) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("T262", "Root"), size: .init(width: 36, height: 6)
+    ) { T262FocusOwnerFixture() }
+    defer { harness.shutdown() }
+    _ = try harness.focus(T262FocusOwnerFixture.firstID)
+    #expect(harness.frame.contains("focus:first"))
+    if termination {
+      let result = try harness.requestTermination(.signal("SIGTERM"))
+      #expect(result.disposition == .cancel)
+    } else {
+      let point = try #require(harness.point(forText: "Wheel target"))
+      _ = try harness.scrollPointer(at: point, deltaY: 1)
+    }
+    #expect(harness.frame.contains("focus:second"))
+  }
+}
+
+private struct T262FocusOwnerFixture: View {
+  enum Field: String, Hashable { case first, second }
+  static let firstID = testIdentity("T262", "first")
+  @FocusState private var focus: Field?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack {
+        Button("First") {}.id(Self.firstID).focused($focus, equals: .first)
+        Button("Second") {}.focused($focus, equals: .second)
+      }
+      Text("Wheel target")
+        .onTerminationRequest { _ in
+          focus = .second
+          return .cancel
+        }
+        .onScrollWheel { _ in
+          focus = .second
+          return .handled
+        }
+      Text("focus:\(focus?.rawValue ?? "none")")
+    }
+  }
+}
+
 @MainActor
 private final class StressInputBox<Value> {
   var value: Value

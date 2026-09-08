@@ -147,6 +147,9 @@ extension InputReader {
       ) { continuation in
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode,
+          currentMouseCoordinateMode: { [weak self] in
+            self?.mouseCoordinateMode.withLock { $0 } ?? mouseCoordinateMode
+          },
           controlChannelEnabled: controlChannelEnabled,
           transform: { parser, input in parser.feed(input) },
           flushTransform: { parser in parser.flush() }
@@ -229,6 +232,9 @@ extension InputReader {
       ) { continuation in
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
+          currentMouseCoordinateMode: { [weak self] in
+            self?.mouseCoordinateMode.withLock { $0 } ?? mouseCoordinateMode
+          },
           controlChannelEnabled: controlChannelEnabled,
           transform: transform,
           flushTransform: flushTransform
@@ -283,6 +289,9 @@ extension InputReader {
       ) { continuation in
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode,
+          currentMouseCoordinateMode: { [weak self] in
+            self?.mouseCoordinateMode.withLock { $0 } ?? mouseCoordinateMode
+          },
           controlChannelEnabled: controlChannelEnabled,
           transform: { parser, input in parser.feed(input) },
           flushTransform: { parser in parser.flush() }
@@ -364,6 +373,9 @@ extension InputReader {
       ) { continuation in
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
+          currentMouseCoordinateMode: { [weak self] in
+            self?.mouseCoordinateMode.withLock { $0 } ?? mouseCoordinateMode
+          },
           controlChannelEnabled: controlChannelEnabled,
           transform: transform,
           flushTransform: flushTransform
@@ -412,6 +424,9 @@ extension InputReader {
         let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode,
+          currentMouseCoordinateMode: { [weak self] in
+            self?.mouseCoordinateMode.withLock { $0 } ?? mouseCoordinateMode
+          },
           controlChannelEnabled: controlChannelEnabled,
           transform: { parser, input in parser.feed(input) },
           flushTransform: { parser in parser.flush() }
@@ -563,6 +578,9 @@ extension InputReader {
         let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
+          currentMouseCoordinateMode: { [weak self] in
+            self?.mouseCoordinateMode.withLock { $0 } ?? mouseCoordinateMode
+          },
           controlChannelEnabled: controlChannelEnabled,
           transform: transform,
           flushTransform: flushTransform

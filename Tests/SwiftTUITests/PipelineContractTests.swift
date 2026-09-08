@@ -6,8 +6,79 @@ import Testing
 @testable import SwiftTUIViews
 
 @MainActor
+private final class T264RealizationProbe {
+  var heights: [Int] = []
+  var changesEveryPass = false
+}
+
+@MainActor
 @Suite(.serialized)
 struct PipelineContractTests {
+  @Test("T264: synchronous late-preference relayout accounts for every layout pass")
+  func latePreferenceWorkIncludesAllPasses() async {
+    func root(_ probe: T264RealizationProbe) -> some View {
+      Panel(id: "T264-panel") {
+        GeometryReader { proxy in
+          let _ = probe.heights.append(proxy.size.height)
+          Text("body \(proxy.size.width)x\(proxy.size.height)")
+            .toolbarItem(
+              .init(
+                title: "Size \(probe.changesEveryPass ? probe.heights.count : proxy.size.height)",
+                icon: nil,
+                position: .bottom, isEnabled: true, action: {}))
+        }
+      }
+      .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
+      .frame(width: 30, height: 6)
+    }
+    let syncProbe = T264RealizationProbe()
+    let asyncProbe = T264RealizationProbe()
+    let sync = DefaultRenderer().render(
+      root(syncProbe),
+      context: .init(identity: testIdentity("T264")), proposal: .init(width: 30, height: 6))
+    let async = await DefaultRenderer().renderAsync(
+      root(asyncProbe),
+      context: .init(identity: testIdentity("T264")), proposal: .init(width: 30, height: 6))
+    #expect(Set(syncProbe.heights) == [5, 6])
+    #expect(Set(asyncProbe.heights) == [5, 6])
+    #expect(sync.rasterSurface == async.rasterSurface)
+    // Worker realization can add asynchronous passes. Compare each stage's
+    // reported work against the work actually returned by its layout calls.
+    for scenario in 0..<4 {
+      let useAsync = scenario % 2 == 1
+      let exceedsBudget = scenario >= 2
+      let renderer = DefaultRenderer()
+      let probe = T264RealizationProbe()
+      probe.changesEveryPass = exceedsBudget
+      let draft = renderer.prepareFrameHeadForCancellationTesting(
+        root(probe),
+        context: .init(identity: testIdentity("T264")), proposal: .init(width: 30, height: 6))
+      defer { renderer.abortPreparedFrameHeadForCancellationTesting(draft) }
+      var passes = 0
+      var expected = LayoutWorkMetrics()
+      func render(_ input: FrameTailInput) -> FrameTailLayoutOutput {
+        let output = renderer.frameTailRenderer.renderLayout(input, clock: nil)
+        passes += 1
+        expected.merge(output.layoutWork)
+        return output
+      }
+      let stage = LatePreferenceReconciliationStage(policy: .toolbarHostRuntimeBound)
+      let result: ReconciledFrameTailLayout?
+      if useAsync {
+        result = await stage.runAsync(initialInput: draft.frameTailInput) { input in
+          .init(layout: render(input), suspensionDuration: .zero)
+        }.layout
+      } else {
+        result = stage.run(initialInput: draft.frameTailInput, renderLayout: render)
+      }
+      #expect(passes > 1)
+      #expect(result?.layout.layoutWork == expected)
+      #expect(
+        result?.runtimeIssues.contains { $0.code == "latePreference.reconciliationLimitExceeded" }
+          == exceedsBudget)
+    }
+  }
+
   @Test("runtime render pipeline runs the canonical composed stage order")
   func runtimeRenderPipelineRunsCanonicalStageOrder() {
     let pipeline = RuntimeRenderPipeline()

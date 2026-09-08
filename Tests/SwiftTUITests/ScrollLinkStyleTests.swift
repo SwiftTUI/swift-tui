@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
@@ -6,6 +7,37 @@ import Testing
 
 @MainActor
 struct ScrollLinkStyleTests {
+  @Test("T258: nested rich Text preserves explicit decoration clears", arguments: [false, true])
+  func nestedTextDecorationClears(ambient: Bool) throws {
+    let restored = Text("on").underline().strikethrough()
+    let cleared = Text("clear \(restored) clear").underline(false).strikethrough(false)
+    let nested = Text("nested \(cleared) end")
+    let content = Text("before \(nested) after")
+    let view =
+      ambient
+      ? AnyView(VStack { content }.underline().strikethrough())
+      : AnyView(content.underline().strikethrough())
+    let frame = DefaultRenderer().render(
+      view, context: .init(identity: testIdentity("T258")),
+      proposal: .init(width: 80, height: 1)
+    )
+    for runs in [allRichRuns(in: frame.resolvedTree), drawnRichRuns(in: frame.drawTree)] {
+      let plain = runs.filter { $0.text.contains("clear") }
+      #expect(plain.count == 2)
+      #expect(
+        plain.allSatisfy { $0.style.underlineStyle == nil && $0.style.strikethroughStyle == nil })
+      let before = try #require(runs.first { $0.text.contains("before") })
+      #expect(before.style.underlineStyle != nil && before.style.strikethroughStyle != nil)
+      let on = try #require(runs.first { $0.text == "on" })
+      #expect(on.style.underlineStyle != nil && on.style.strikethroughStyle != nil)
+    }
+    let line = try #require(frame.rasterSurface.lines.first)
+    let clearRange = try #require(line.range(of: "clear"))
+    let column = line.distance(from: line.startIndex, to: clearRange.lowerBound)
+    #expect(frame.rasterSurface.cells[0][column].style?.underlineStyle == nil)
+    #expect(frame.rasterSurface.cells[0][column].style?.strikethroughStyle == nil)
+  }
+
   @Test("link presentation merges before its label without splitting the rich payload")
   func richMergeOrder() throws {
     let link = Link(
@@ -386,7 +418,8 @@ struct ScrollLinkStyleTests {
     // the list's, while its scroll route still clamps to the content.
     #expect(listRegion.rect == CellRect(origin: .zero, size: .init(width: 20, height: 6)))
     let route = try #require(list.semanticSnapshot.scrollRoutes.first { $0.identity == listID })
-    #expect(route.viewportRect == CellRect(origin: .init(x: 1, y: 1), size: .init(width: 18, height: 4)))
+    #expect(
+      route.viewportRect == CellRect(origin: .init(x: 1, y: 1), size: .init(width: 18, height: 4)))
     let scrollID = testIdentity("Scroll")
     let scroll = DefaultRenderer().render(
       ScrollView { Text(String(repeating: "content\n", count: 20)) }.id(scrollID),

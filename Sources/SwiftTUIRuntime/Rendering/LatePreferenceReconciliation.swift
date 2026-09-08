@@ -60,28 +60,43 @@ struct LatePreferenceReconciliationStage {
     initialInput: FrameTailInput,
     renderLayout: (FrameTailInput) -> FrameTailLayoutOutput
   ) -> ReconciledFrameTailLayout {
+    var accumulatedLayoutWork = LayoutWorkMetrics()
+    func renderAndRecordLayout(_ input: FrameTailInput) -> FrameTailLayoutOutput {
+      let layout = renderLayout(input)
+      accumulatedLayoutWork.merge(layout.layoutWork)
+      return layout
+    }
+    func applyingAccumulatedLayoutWork(
+      to reconciled: ReconciledFrameTailLayout
+    ) -> ReconciledFrameTailLayout {
+      var reconciled = reconciled
+      reconciled.layout.layoutWork = accumulatedLayoutWork
+      return reconciled
+    }
+
     var input = initialInput
-    var layout = renderLayout(input)
+    var layout = renderAndRecordLayout(input)
 
     let budget = policy.relayoutPassBudget(for: initialInput)
     for _ in 0..<budget {
       switch reconciliationStep(input: input, layout: layout) {
       case .finished(let reconciled):
-        return reconciled
+        return applyingAccumulatedLayoutWork(to: reconciled)
       case .needsRelayout(let nextInput):
         input = nextInput
         let previousShadow = layout.layoutShadow
-        layout = renderLayout(input)
+        layout = renderAndRecordLayout(input)
         foldLayoutShadow(previousShadow, into: &layout)
       }
     }
 
-    return reconciliationLimitExceeded(
+    let exceeded = reconciliationLimitExceeded(
       input: input,
       layout: layout,
       budget: budget,
-      renderLayout: renderLayout
+      renderLayout: renderAndRecordLayout
     )
+    return applyingAccumulatedLayoutWork(to: exceeded)
   }
 
   @MainActor
@@ -148,10 +163,19 @@ struct LatePreferenceReconciliationStage {
       input: input,
       layout: layout,
       budget: budget,
-      renderLayout: renderLayout
+      renderLayout: { input in
+        let pass = await renderLayout(input)
+        if let layout = pass.layout {
+          recordLayoutWork(layout)
+        }
+        return pass
+      }
     )
     totalSuspensionDuration += exceeded.suspensionDuration
-    return .init(layout: exceeded.layout, suspensionDuration: totalSuspensionDuration)
+    return .init(
+      layout: exceeded.layout.map { applyingAccumulatedLayoutWork(to: $0) },
+      suspensionDuration: totalSuspensionDuration
+    )
   }
 
   @MainActor
@@ -161,7 +185,8 @@ struct LatePreferenceReconciliationStage {
     shouldRelayoutLayoutRealizationSnapshot: (FrameTailInput) -> Bool = { _ in false }
   ) -> LatePreferenceReconciliationStep {
     let realizations = input.layoutPassContext.layoutDependentRealizationsByIdentity
-    let canonicalRealized = input.canonicalResolved.applyingLayoutDependentRealizations(realizations)
+    let canonicalRealized = input.canonicalResolved.applyingLayoutDependentRealizations(
+      realizations)
     let reconciliation = reconcileLatePreferenceConsumers(in: canonicalRealized)
     let presented = projectResolvedPresentation(reconciliation.resolved)
     let runtimeIssues = layoutRuntimeIssues(input: input, resolved: presented)

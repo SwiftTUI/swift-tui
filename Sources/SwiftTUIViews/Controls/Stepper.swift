@@ -135,18 +135,23 @@ extension Stepper {
         context: context,
         fallbackAuthoringScope: authoringScope
       )
-      intake.registerAction(identity: context.identity) {
-        let next = steppedControlValue(
-          from: binding.wrappedValue,
-          delta: 1,
+      let adjust: @MainActor @Sendable (Int) -> Bool = { delta in
+        // Use the display's clamping rule against the live binding: several
+        // inputs may arrive through this registration before the next render.
+        // An inactive direction must not normalize an out-of-range model.
+        let value = clampedControlValue(binding.wrappedValue, to: bounds)
+        guard stepperCanAdjust(value, delta: delta, step: step, bounds: bounds) else {
+          return false
+        }
+        return updateBoundControlValue(
+          binding,
+          delta: delta,
           step: step,
           bounds: bounds
         )
-        guard next != binding.wrappedValue else {
-          return false
-        }
-        binding.wrappedValue = next
-        return true
+      }
+      intake.registerAction(identity: context.identity) {
+        adjust(1)
       }
       intake.registerKeyPressHandler(identity: context.identity) { keyPress in
         guard keyPress.modifiers.isEmpty else {
@@ -162,12 +167,7 @@ extension Stepper {
           return false
         }
 
-        return updateBoundControlValue(
-          binding,
-          delta: deltaCount,
-          step: step,
-          bounds: bounds
-        )
+        return adjust(deltaCount)
       }
 
       let rootRouteID = runtimePrimaryRouteID(for: context.identity)
@@ -185,12 +185,7 @@ extension Stepper {
           return .ignored
         }
 
-        let handled = updateBoundControlValue(
-          binding,
-          delta: wheelDelta,
-          step: step,
-          bounds: bounds
-        )
+        let handled = adjust(wheelDelta)
         return handled ? .claimed : .ignored
       }
       // Each half claims its press whether or not the value can move: a click
@@ -202,12 +197,7 @@ extension Stepper {
         intake.registerPointerHandler(routeID: routeID) { event in
           switch event.kind {
           case .down(.primary):
-            _ = updateBoundControlValue(
-              binding,
-              delta: delta,
-              step: step,
-              bounds: bounds
-            )
+            _ = adjust(delta)
             return .claimed
           case .up(.primary):
             return .claimed

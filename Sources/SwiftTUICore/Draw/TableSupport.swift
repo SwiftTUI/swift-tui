@@ -89,14 +89,22 @@ package func renderTableCell(
   truncationMode: TextTruncationMode = .tail
 ) -> String {
   let resolvedWidth = max(1, width)
-  let line = layoutText(
+  var laidOutLine = layoutText(
     for: content,
     width: resolvedWidth,
     lineLimit: 1,
     truncationMode: truncationMode,
     wrappingStrategy: .wordBoundary
-  ).lines[0].text
-  let usedWidth = layoutText(for: line, width: nil).size.width
+  ).lines[0]
+  // A single grapheme can exceed the column without creating a second line.
+  // Enforce the cell budget before padding or emitting the next separator.
+  if laidOutLine.cellWidth > resolvedWidth {
+    laidOutLine = truncating(
+      laidOutLine, to: resolvedWidth,
+      mode: truncationMode, forceIndicator: true)
+  }
+  let line = laidOutLine.text
+  let usedWidth = laidOutLine.cellWidth
   let remaining = max(0, resolvedWidth - usedWidth)
 
   switch alignment {
