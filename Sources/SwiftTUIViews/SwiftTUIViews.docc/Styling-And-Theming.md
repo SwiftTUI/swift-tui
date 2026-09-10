@@ -1,7 +1,8 @@
 # Styling and Theming
 
 Color views with `Color`, semantic roles, and gradients; apply built-in
-control styles; and write your own styles against the open style protocols.
+control styles; and write your first custom style against an open style
+protocol.
 
 ## Overview
 
@@ -12,11 +13,12 @@ directly through modifiers such as `.foregroundStyle(_:)`, `.background(_:)`,
 (`.primary`, `.tint`, `.success`, …) are shape styles too, but resolve at
 render time through the active `Theme`, so the same view adapts to light,
 dark, and high-contrast terminals. Above both sit the control style
-families: `ButtonStyle`, `TextFieldStyle`, `PickerStyle`, and their peers are
-public, extensible protocols — including families SwiftUI keeps closed — so
-an app can restyle whole control categories, not just individual views. For
-the view-composition basics these examples build on, see
-<doc:Authoring-Views>.
+families: all 28 of them, `ButtonStyle`, `TextFieldStyle`, `PickerStyle`, and
+their peers, are public, extensible protocols, including families SwiftUI
+keeps closed, so an app can restyle whole control categories, not just
+individual views. <doc:Style-System> is the map of every family; this article
+covers the color layers underneath and one custom style end to end. For the
+view-composition basics these examples build on, see <doc:Authoring-Views>.
 
 ## Colors, foregrounds, and backgrounds
 
@@ -120,32 +122,37 @@ VStack(alignment: .leading, spacing: 1) {
 }
 ```
 
-The same scope rule covers the remaining control families:
+The same scope rule covers every environment-scoped family:
 
 | Surface | Style protocol |
 | --- | --- |
+| Buttons, text fields, pickers, toggles, links | ``ButtonStyle``, ``TextFieldStyle``, ``PickerStyle``, ``ToggleStyle``, ``LinkStyle`` |
 | Labels and labeled containers | ``LabelStyle``, ``LabeledContentStyle``, ``GroupBoxStyle`` |
-| Bound controls and progress | ``ToggleStyle``, ``DisclosureGroupStyle``, ``TextEditorStyle``, ``ProgressViewStyle`` |
+| Bound controls and progress | ``DisclosureGroupStyle``, ``TextEditorStyle``, ``ProgressViewStyle``, ``SpinnerStyle`` |
 | Numeric controls | ``SliderStyle``, ``StepperStyle`` |
 | Menus and grouped controls | ``MenuStyle``, ``ControlGroupStyle`` |
-| Alerts and confirmation dialogs | ``PromptStyle`` |
+| Collections and scroll containers | ``ListStyle``, ``OutlineStyle``, ``TableStyle``, ``ScrollViewStyle`` |
+| Tab strips and toolbars | ``TabViewStyle``, ``ToolbarStyle`` |
+| Sheets, alerts, and confirmation dialogs | ``SheetStyle``, ``PromptStyle`` |
 | Covers and anchored popovers | ``FullScreenCoverStyle``, ``PopoverStyle`` |
 | Command palettes | ``PaletteStyle`` |
-| Scroll containers and links | ``ScrollViewStyle``, ``LinkStyle`` |
 
 ``ToastStyle`` is passed to an individual `toast(..., style:)` declaration.
 ``Panel`` supplies structural action scoping and has no style family.
-<doc:Authoring-Styles> explains each family's composition or presentation
-contract, including the interaction routes that remain owned by the control.
+<doc:Style-System> lists every family's built-ins and configuration in one
+table; <doc:Authoring-Styles> explains each family's composition or
+presentation contract, including the interaction routes that remain owned by
+the control.
 
 ## Writing a custom button style
 
 The style protocols are open: conform, implement
 `makeBody(configuration:)`, and pass the conformance to the same modifier.
 ``ButtonStyleConfiguration`` hands you the authored label as a view plus the
-render state a style legitimately needs — `role`, `isEnabled`, `isPressed`,
-`focusActive`, and the resolved style environment, whose `theme` supplies
-semantic colors:
+render state a style legitimately needs: `role`, `isEnabled`, `isFocused`,
+`showsFocusEffect` (read them together as `focusActive`), `isPressed`,
+`controlProminence`, `buttonBorderShape`, and the resolved style environment,
+whose `theme` supplies semantic colors:
 
 ```swift
 struct RoleBadgeButtonStyle: ButtonStyle {
@@ -176,13 +183,13 @@ Button("Delete", role: .destructive) { delete() }
 Styles must be `Sendable`; `makeBody(configuration:)` runs on the main
 actor. Conformances can also override `resolvedProminence(base:)` to raise
 control prominence the way `.borderedProminent` does. The other families
-mirror this shape — a protocol, a public configuration, an `Any*Style`
-eraser, and a scoping modifier. <doc:Authoring-Styles> covers the contract
-in full, including the presentation-value families and the route wrappers
-interactive configurations expose; <doc:Testing-Styles> shows how a style
-library unit-tests its styles without a live render; and
-<doc:Divergences-And-Gaps> records how far the styling contract currently
-extends.
+mirror this shape: a protocol, a public configuration, an `Any*Style`
+eraser, and a scoping modifier. <doc:Style-System> maps all 28 families;
+<doc:Authoring-Styles> covers the contract in full, including the
+presentation-value families and the route wrappers interactive configurations
+expose; <doc:Testing-Styles> shows how a style library unit-tests its styles
+without a live render; and <doc:Divergences-And-Gaps> records the contract's
+ratified departures from SwiftUI.
 
 ## Themes are host-selected
 

@@ -48,9 +48,17 @@ every app product re-exports.
   authoring.
 - [Scrolling](https://swifttui.sh/docs/documentation/swifttuiviews/scrolling)
   — scroll views, programmatic scrolling, positions, and indicators.
+- [The Style System](https://swifttui.sh/docs/documentation/swifttuiviews/style-system)
+  — all 28 open style families in one place: built-ins, scoping, custom
+  conformances, route wrappers, theming, diagnostics, and tests.
 - [Styling and Theming](https://swifttui.sh/docs/documentation/swifttuiviews/styling-and-theming)
-  — built-in and custom control styles, semantic roles, colors, gradients,
-  and the theme model.
+  — semantic roles, colors, gradients, the theme model, and your first
+  custom style.
+- [Authoring Styles](https://swifttui.sh/docs/documentation/swifttuiviews/authoring-styles)
+  — the contract every family shares: body-producing and presentation-value
+  styles, route wrappers, and what a style may change.
+- [Testing Styles](https://swifttui.sh/docs/documentation/swifttuiviews/testing-styles)
+  — unit-test a style without a live render through the fixture SPI.
 - [Animating Views](https://swifttui.sh/docs/documentation/swifttuiviews/animating-views)
   — implicit and explicit animation, transitions, phase animators, and
   timelines in terminal cells.

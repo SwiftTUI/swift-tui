@@ -74,6 +74,70 @@ extension PortalStyleValueTests {
   }
 }
 
+extension PortalStyleValueTests {
+  @Test("an unrepresentable sheet scroll height is rejected and the presented sheet falls back")
+  func unrepresentableSheetScrollHeight() {
+    #expect(!SheetSurfaceStylePresentation(scrollMaximumHeight: Int.max).validationProblems.isEmpty)
+    // Taller than any terminal is still a representable count, not misuse.
+    #expect(SheetSurfaceStylePresentation(scrollMaximumHeight: 500).validationProblems.isEmpty)
+    let baseline = presentedSheet(UnrepresentableScrollHeightSheetStyle(invalid: false))
+    let frame = presentedSheet(UnrepresentableScrollHeightSheetStyle(invalid: true))
+    #expect(
+      frame.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+    #expect(frame.rasterSurface == baseline.rasterSurface)
+    #expect(frame.rasterSurface.lines.joined().contains("Body"))
+  }
+
+  @Test("an unrepresentable prompt width is rejected and the presented alert falls back")
+  func unrepresentablePromptWidth() {
+    #expect(!PromptSurfaceStylePresentation(maximumWidth: Int.max).validationProblems.isEmpty)
+    #expect(PromptSurfaceStylePresentation(maximumWidth: 500).validationProblems.isEmpty)
+    let baseline = presentedAlert(UnrepresentableWidthPromptStyle(invalid: false))
+    let frame = presentedAlert(UnrepresentableWidthPromptStyle(invalid: true))
+    #expect(
+      frame.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.count == 1)
+    #expect(frame.rasterSurface == baseline.rasterSurface)
+    #expect(frame.rasterSurface.lines.joined().contains("Title"))
+  }
+
+  private func presentedSheet(_ style: some SheetStyle) -> RenderSnapshot {
+    DefaultRenderer().render(
+      Text("Base").sheet("Title", isPresented: .constant(true)) { Text("Body") }
+        .sheetStyle(style),
+      context: .init(identity: testIdentity("Root")), proposal: .init(width: 50, height: 20))
+  }
+
+  private func presentedAlert(_ style: some PromptStyle) -> RenderSnapshot {
+    DefaultRenderer().render(
+      Text("Base").alert("Title", isPresented: .constant(true)).promptStyle(style),
+      context: .init(identity: testIdentity("Root")), proposal: .init(width: 50, height: 20))
+  }
+}
+
+private struct UnrepresentableScrollHeightSheetStyle: SheetStyle {
+  let invalid: Bool
+  var snapshotLabel: String { "UnrepresentableScrollHeightSheetStyle" }
+  func resolvePresentation(for configuration: SheetStyleConfiguration)
+    -> SheetSurfaceStylePresentation
+  {
+    var presentation = configuration.defaultPresentation
+    if invalid { presentation.scrollMaximumHeight = Int.max }
+    return presentation
+  }
+}
+
+private struct UnrepresentableWidthPromptStyle: PromptStyle {
+  let invalid: Bool
+  var snapshotLabel: String { "UnrepresentableWidthPromptStyle" }
+  func resolvePresentation(for configuration: PromptStyleConfiguration)
+    -> PromptSurfaceStylePresentation
+  {
+    var presentation = configuration.defaultPresentation
+    if invalid { presentation.maximumWidth = Int.max }
+    return presentation
+  }
+}
+
 private struct OversizedInsetPopoverStyle: PopoverStyle {
   func resolvePresentation(for configuration: PopoverStyleConfiguration)
     -> AnchoredSurfaceStylePresentation

@@ -18,6 +18,51 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   APIs retain their names. `ChildProcessPty` now belongs to the framework's
   `SwiftTUIPTYPrimitives`, which the new umbrella re-exports; its public
   `requestSignal` retains termination requests made during startup.
+### Added
+
+- A DocC guide, "The Style System", maps all 28 open style families: the
+  four parts every family shares, applying and scoping built-in styles,
+  restyling a subtree with one modifier chain, the two kinds of family, a
+  table of every family's built-ins and `.automatic` alias, custom styles,
+  route wrappers, theme helpers, diagnostics, and testing. Every public
+  declaration in the style families now carries reference documentation.
+- `PickerStyleConfiguration.focusActive` combines `isFocused` and
+  `showsFocusEffect` like every other interactive configuration.
+- `StyleEnvironmentSnapshot.groupBoxChrome(prominence:)` and
+  `resolvedStyle(for:)` are public, so a custom style can match the built-in
+  group-box chrome and foreground resolution.
+- `TabViewStylePresentation` and `TabViewOverflowMenuPresentation` are
+  `Equatable`, and the four toast built-ins report a fixed `snapshotLabel`.
+- `TextFieldStyleConfiguration` exposes `isEnabled`, `isFocused`, and
+  `showsFocusEffect` like its sibling configurations, with `focusActive`
+  derived from them. The fixture initializer takes the three flags; the
+  earlier `focusActive:` spelling remains available, so existing style-library
+  tests keep compiling.
+- `DisclosureGroupStyleConfiguration.trigger(content:)` is the disclosure
+  group's pointer route. The built-in styles wrap their label row in it.
+
+### Fixed
+
+- The style environment snapshot every control hands its style now carries
+  the terminal's cell pixel metrics instead of the estimated fallback.
+- The `.menu` picker built-in honors `focusEffectDisabled()`: it drew its
+  focus rail from `isFocused` alone.
+- Toast and tab-view presentations are validated like the other families. An
+  out-of-order toast size bound, an oversized padding, an out-of-range or
+  repeated tab index, or a negative strip height reports
+  `style.invalidPresentation` and renders the automatic presentation instead
+  of degrading silently. Portal scroll heights and widths are also checked for
+  representability.
+- An invalid spinner presentation reports once per invalid style value rather
+  than once per animated frame.
+- The spinner, list, outline, and table erasers describe themselves by
+  snapshot label in `debugDescription`.
+- A press on a disclosure group's expanded content no longer collapses the
+  group: only the label row (the style's trigger route) toggles expansion,
+  and the group's semantic action keeps a zero-size pointer region like
+  `Menu`.
+- A disabled `.plain` link dims like a disabled `.automatic` link; the plain
+  built-in dropped the chrome opacity.
 
 ## [0.12.1] - 2026-09-09
 

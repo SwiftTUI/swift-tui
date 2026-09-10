@@ -5,6 +5,17 @@ private enum OutlineStyleKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
+  /// The outline style every ``OutlineGroup`` in this subtree resolves against.
+  ///
+  /// This is the environment slot `outlineStyle(_:)` writes, and the nearest
+  /// write wins. It defaults to ``AnyOutlineStyle/automatic``, a fixed alias of
+  /// ``AnyOutlineStyle/rounded``. Reading it is rarely necessary: an outline
+  /// resolves its own style, and a custom style receives what it needs through
+  /// ``OutlineStyleConfiguration``.
+  ///
+  /// This accessor is public while the other style families keep their slots
+  /// package-visible, a difference recorded for the next minor release rather
+  /// than a deliberate asymmetry.
   public var outlineStyle: AnyOutlineStyle {
     get { self[OutlineStyleKey.self] }
     set { self[OutlineStyleKey.self] = newValue }

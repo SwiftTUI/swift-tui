@@ -1876,8 +1876,10 @@ SwiftTUIPrimitives.StyleEnvironmentSnapshot.appearance
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.cellPixelMetrics
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.controlChrome(isEnabled:isFocused:isPressed:isSelected:prominence:role:)
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.foregroundStyle
+SwiftTUIPrimitives.StyleEnvironmentSnapshot.groupBoxChrome(prominence:)
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.init(appearance:theme:foregroundStyle:tintStyle:isEnabled:cellPixelMetrics:)
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.isEnabled
+SwiftTUIPrimitives.StyleEnvironmentSnapshot.resolvedStyle(for:)
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.rowChrome(isEnabled:isFocused:isPressed:isSelected:role:)
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.theme
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.tintStyle
@@ -3460,6 +3462,7 @@ SwiftTUIViews.CustomAnimation.velocity(value:time:context:)
 SwiftTUIViews.DangerToastStyle
 SwiftTUIViews.DangerToastStyle.init()
 SwiftTUIViews.DangerToastStyle.resolvePresentation(for:)
+SwiftTUIViews.DangerToastStyle.snapshotLabel
 SwiftTUIViews.DefaultBottomToolbarStyle
 SwiftTUIViews.DefaultBottomToolbarStyle.init()
 SwiftTUIViews.DefaultBottomToolbarStyle.itemLayout
@@ -3501,6 +3504,7 @@ SwiftTUIViews.DisclosureGroupStyleConfiguration.isPressed
 SwiftTUIViews.DisclosureGroupStyleConfiguration.label
 SwiftTUIViews.DisclosureGroupStyleConfiguration.showsFocusEffect
 SwiftTUIViews.DisclosureGroupStyleConfiguration.styleEnvironment
+SwiftTUIViews.DisclosureGroupStyleConfiguration.trigger(content:)
 SwiftTUIViews.Divider
 SwiftTUIViews.Divider.init(strokeStyle:)
 SwiftTUIViews.Divider.strokeStyle
@@ -3767,6 +3771,7 @@ SwiftTUIViews.Image.source
 SwiftTUIViews.InfoToastStyle
 SwiftTUIViews.InfoToastStyle.init()
 SwiftTUIViews.InfoToastStyle.resolvePresentation(for:)
+SwiftTUIViews.InfoToastStyle.snapshotLabel
 SwiftTUIViews.InlineMenuStyle
 SwiftTUIViews.InlineMenuStyle.init()
 SwiftTUIViews.InlineMenuStyle.makeBody(configuration:)
@@ -4185,6 +4190,7 @@ SwiftTUIViews.PickerStyleConfiguration.Option.isSelected
 SwiftTUIViews.PickerStyleConfiguration.Option.label
 SwiftTUIViews.PickerStyleConfiguration.Option.route(content:)
 SwiftTUIViews.PickerStyleConfiguration.controlIdentity
+SwiftTUIViews.PickerStyleConfiguration.focusActive
 SwiftTUIViews.PickerStyleConfiguration.isActiveNavigation
 SwiftTUIViews.PickerStyleConfiguration.isEnabled
 SwiftTUIViews.PickerStyleConfiguration.isFocused
@@ -4701,6 +4707,7 @@ SwiftTUIViews.SubmitScopeModifier
 SwiftTUIViews.SuccessToastStyle
 SwiftTUIViews.SuccessToastStyle.init()
 SwiftTUIViews.SuccessToastStyle.resolvePresentation(for:)
+SwiftTUIViews.SuccessToastStyle.snapshotLabel
 SwiftTUIViews.SurfaceSheetStyle
 SwiftTUIViews.SurfaceSheetStyle.init()
 SwiftTUIViews.SurfaceSheetStyle.resolvePresentation(for:)
@@ -4910,9 +4917,12 @@ SwiftTUIViews.TextFieldStyleConfiguration.chrome
 SwiftTUIViews.TextFieldStyleConfiguration.displayText
 SwiftTUIViews.TextFieldStyleConfiguration.fieldContent
 SwiftTUIViews.TextFieldStyleConfiguration.focusActive
+SwiftTUIViews.TextFieldStyleConfiguration.isEnabled
+SwiftTUIViews.TextFieldStyleConfiguration.isFocused
 SwiftTUIViews.TextFieldStyleConfiguration.isShowingPrompt
 SwiftTUIViews.TextFieldStyleConfiguration.label
 SwiftTUIViews.TextFieldStyleConfiguration.placeholderStyle
+SwiftTUIViews.TextFieldStyleConfiguration.showsFocusEffect
 SwiftTUIViews.TextFieldStyleConfiguration.showsLabel
 SwiftTUIViews.TextFieldStyleConfiguration.styleEnvironment
 SwiftTUIViews.TextFigure
@@ -5312,6 +5322,7 @@ SwiftTUIViews.ViewThatFits.init(in:content:)
 SwiftTUIViews.WarningToastStyle
 SwiftTUIViews.WarningToastStyle.init()
 SwiftTUIViews.WarningToastStyle.resolvePresentation(for:)
+SwiftTUIViews.WarningToastStyle.snapshotLabel
 SwiftTUIViews.ZStack
 SwiftTUIViews.ZStack.alignment
 SwiftTUIViews.ZStack.init(alignment:content:)

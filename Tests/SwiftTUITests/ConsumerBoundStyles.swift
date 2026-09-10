@@ -33,23 +33,27 @@ struct ConsumerDisclosureGroupStyle: DisclosureGroupStyle {
       isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
       isPressed: configuration.isPressed)
     VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .center, spacing: 1) {
-        Text(configuration.focusActive ? "▌" : " ")
-          .foregroundStyle(
-            configuration.focusActive ? chrome.borderStyle : AnyShapeStyle(.background))
-        Text(configuration.isExpanded ? "▾" : "▸")
-          .foregroundStyle(
-            configuration.isExpanded ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator))
-        if !prefix.isEmpty { Text(prefix) }
-        configuration.label
-      }
-      .foregroundStyle(chrome.foregroundStyle)
-      .background {
-        if configuration.focusActive || configuration.isPressed {
-          Rectangle().fill(chrome.backgroundStyle)
+      // The trigger wrapper makes the label row the pointer activation;
+      // keyboard activation stays with the primitive either way.
+      configuration.trigger {
+        HStack(alignment: .center, spacing: 1) {
+          Text(configuration.focusActive ? "▌" : " ")
+            .foregroundStyle(
+              configuration.focusActive ? chrome.borderStyle : AnyShapeStyle(.background))
+          Text(configuration.isExpanded ? "▾" : "▸")
+            .foregroundStyle(
+              configuration.isExpanded ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator))
+          if !prefix.isEmpty { Text(prefix) }
+          configuration.label
         }
+        .foregroundStyle(chrome.foregroundStyle)
+        .background {
+          if configuration.focusActive || configuration.isPressed {
+            Rectangle().fill(chrome.backgroundStyle)
+          }
+        }
+        .opacity(chrome.opacity)
       }
-      .opacity(chrome.opacity)
       if configuration.isExpanded {
         configuration.content.padding(.init(leading: 1))
       }

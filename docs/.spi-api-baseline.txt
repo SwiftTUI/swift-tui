@@ -323,6 +323,7 @@ SwiftTUIViews.TextEditorStyleConfiguration.init(editorContent:isEnabled:isFocuse
 SwiftTUIViews.TextFieldStyleConfiguration.FieldContent.init(displayText:)
 SwiftTUIViews.TextFieldStyleConfiguration.Label.init(content:)
 SwiftTUIViews.TextFieldStyleConfiguration.init(displayText:fieldContent:isShowingPrompt:label:showsLabel:chrome:placeholderStyle:focusActive:styleEnvironment:)
+SwiftTUIViews.TextFieldStyleConfiguration.init(displayText:fieldContent:isShowingPrompt:label:showsLabel:chrome:placeholderStyle:isEnabled:isFocused:showsFocusEffect:styleEnvironment:)
 SwiftTUIViews.ToastStyleConfiguration.init(stackIndex:stackCount:terminalSize:styleEnvironment:)
 SwiftTUIViews.ToggleStyleConfiguration.Label.init(content:)
 SwiftTUIViews.ToggleStyleConfiguration.init(label:isOn:isMixed:isEnabled:isFocused:showsFocusEffect:isPressed:styleEnvironment:)

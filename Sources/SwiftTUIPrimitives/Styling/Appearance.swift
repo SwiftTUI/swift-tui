@@ -25,26 +25,55 @@ public enum AppearanceSource: String, Equatable, Sendable, Codable {
 
 /// A semantic prominence hint for emphasized controls.
 public enum ControlProminence: Hashable, Sendable {
+  /// The ordinary emphasis level: neutral surfaces and borders.
   case standard
+  /// Raised emphasis: built-in chrome fills the control with the accent tone
+  /// and picks a contrasting foreground.
   case increased
 }
 
 /// A semantic role for buttons and other acceptance or cancellation actions.
 public enum ButtonRole: Hashable, Sendable {
+  /// Backs out of the current step without applying it. Built-in chrome tones
+  /// it neutral.
   case cancel
+  /// Performs an action that discards or destroys data. Built-in chrome tones
+  /// it with the theme's danger color.
   case destructive
+  /// Dismisses the surface the button is in. Built-in chrome tones it
+  /// neutral, like `cancel`.
   case close
+  /// Accepts and applies the current step. Built-in chrome tones it with the
+  /// theme accent, the same tone an unroled button gets.
   case confirm
 }
 
 /// The resolved chrome used to render a focused or interactive control.
 public struct ControlChrome: Equatable, Sendable {
+  /// The paint for the control's text and glyphs.
   public var foregroundStyle: AnyShapeStyle
+  /// The paint filling the cells behind the control's content.
   public var contentBackgroundStyle: AnyShapeStyle
+  /// The paint for the control's border glyphs.
   public var borderForegroundStyle: AnyShapeStyle
+  /// The paint filling the cells the border occupies, or `nil` to leave them
+  /// unfilled. `nil` in every chrome the built-in resolvers return.
   public var borderBackgroundStyle: BorderBackgroundStyle?
+  /// The opacity to render the control at, from 0 to 1.
+  ///
+  /// `1` in every state except disabled, where the built-in resolvers return
+  /// `0.6`.
   public var opacity: Double
 
+  /// Creates a control chrome value.
+  ///
+  /// - Parameters:
+  ///   - foregroundStyle: The paint for text and glyphs.
+  ///   - contentBackgroundStyle: The paint behind the content.
+  ///   - borderForegroundStyle: The paint for border glyphs.
+  ///   - borderBackgroundStyle: The paint behind the border cells, or `nil`.
+  ///     Defaults to `nil`.
+  ///   - opacity: The render opacity from 0 to 1. Defaults to `1`.
   public init(
     foregroundStyle: AnyShapeStyle,
     contentBackgroundStyle: AnyShapeStyle,
@@ -59,10 +88,14 @@ public struct ControlChrome: Equatable, Sendable {
     self.opacity = opacity
   }
 
+  /// An alias for `contentBackgroundStyle`, for call sites that name the
+  /// content fill simply the background.
   public var backgroundStyle: AnyShapeStyle {
     contentBackgroundStyle
   }
 
+  /// An alias for `borderForegroundStyle`, for call sites that pass one paint
+  /// to a border modifier.
   public var borderStyle: AnyShapeStyle {
     borderForegroundStyle
   }
@@ -70,9 +103,16 @@ public struct ControlChrome: Equatable, Sendable {
 
 /// The resolved chrome used to render a container such as a group box.
 public struct ContainerChrome: Equatable, Sendable {
+  /// The paint for the container's own text and glyphs, such as its label.
   public var foregroundStyle: AnyShapeStyle
+  /// The paint for the container's border glyphs.
   public var borderStyle: AnyShapeStyle
 
+  /// Creates a container chrome value.
+  ///
+  /// - Parameters:
+  ///   - foregroundStyle: The paint for the container's text and glyphs.
+  ///   - borderStyle: The paint for the container's border glyphs.
   public init(
     foregroundStyle: AnyShapeStyle,
     borderStyle: AnyShapeStyle
@@ -351,7 +391,8 @@ public struct TerminalAppearance: Equatable, Sendable, Codable {
   /// This function memoizes the theme by appearance value equality.
   /// The derivation is pure, so an unchanged appearance returns the last theme.
   /// This is the steady state.
-  /// Style-key environment changes create new snapshots more frequently than the appearance changes.
+  /// Style-key environment changes create new snapshots more often than the
+  /// appearance itself changes.
   public func synthesizedTheme() -> Theme {
     if let cached = synthesizedThemeMemo.withLock({ $0 }), cached.appearance == self {
       return cached.theme
@@ -528,7 +569,15 @@ extension TerminalAppearance {
 }
 
 extension StyleEnvironmentSnapshot {
-  package func resolvedStyle(
+  /// Resolves a semantic role to a paint, honoring the ambient foreground and
+  /// tint overrides carried by this snapshot.
+  ///
+  /// The built-in control chrome resolves its foreground through this method,
+  /// so a third-party style that calls it matches built-in foreground
+  /// resolution: an explicit `foregroundStyle(_:)` or `tint(_:)` in the
+  /// environment wins for `.foreground` and `.tint`; every other role comes
+  /// from the theme.
+  public func resolvedStyle(
     for role: SemanticStyleRole
   ) -> AnyShapeStyle {
     switch role {
@@ -548,6 +597,10 @@ extension StyleEnvironmentSnapshot {
   }
 
   /// Resolves semantic chrome for a styled control using this snapshot's palette.
+  ///
+  /// Under increased prominence the selected surface is not distinguished:
+  /// `isSelected` has no effect there, and the fill follows only the pressed,
+  /// focused, or idle state.
   public func controlChrome(
     isEnabled: Bool,
     isFocused: Bool,
@@ -558,10 +611,11 @@ extension StyleEnvironmentSnapshot {
   ) -> ControlChrome {
     let tone = chromeTone(for: role)
     let neutralSurface = themeStyle(for: .background)
-    let focusedSurface = AnyShapeStyle(
-      prominence == .increased ? .terminalAccent(tone) : .terminalRow(tone, isSelected: true)
-    )
-    let selectedSurface = AnyShapeStyle(.terminalRow(tone, isSelected: true))
+    // Focused and selected standard-prominence controls share the selected
+    // row surface. The increased-prominence branch below returns before
+    // either surface is read, so it needs no accent arm here.
+    let focusedSurface = AnyShapeStyle(.terminalRow(tone, isSelected: true))
+    let selectedSurface = focusedSurface
     let neutralBorder = AnyShapeStyle(.terminalBorder(.neutral))
     let focusedBorder = AnyShapeStyle(.terminalBorder(tone))
 
@@ -655,7 +709,16 @@ extension StyleEnvironmentSnapshot {
     )
   }
 
-  package func groupBoxChrome(
+  /// Resolves semantic chrome for a group box using this snapshot's palette.
+  ///
+  /// The built-in bordered group box style uses this for its foreground and
+  /// border paints: a neutral border at standard prominence, the accent tone
+  /// at increased prominence. A custom ``GroupBoxStyle`` can call it to match
+  /// the theme without re-deriving the tones.
+  ///
+  /// - Parameter prominence: The control prominence in effect for the box.
+  /// - Returns: The foreground and border paints for the box chrome.
+  public func groupBoxChrome(
     prominence: ControlProminence = .standard
   ) -> ContainerChrome {
     let tone: TerminalTone = prominence == .increased ? .accent : .neutral

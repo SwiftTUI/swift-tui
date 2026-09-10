@@ -190,18 +190,85 @@ package final class StyleHeavyFieldsStorage: Sendable {
 }
 
 /// Styling state captured from the environment during resolve.
+///
+/// This is the value every style configuration carries as its
+/// `styleEnvironment`: the detected terminal appearance, the active semantic
+/// `Theme`, the ambient foreground and tint paints, whether the styled view is
+/// enabled, and the terminal's cell metrics. A style reads it instead of
+/// reaching for global state, so the same style renders correctly under a
+/// different appearance, theme, or ambient paint.
+///
+/// Resolve mints one of these per styled control from the environment in
+/// effect there. Constructing one directly is for style tests, where the
+/// memberwise initializer's defaults stand in for a live host; see the
+/// Testing Styles guide.
 public struct StyleEnvironmentSnapshot: Equatable, Sendable {
   /// Boxed storage for the heavy value-type fields (~5 KB to 8 bytes).
   package var heavyFields: StyleHeavyFieldsStorage
 
+  /// The detected appearance of the host terminal at the styled view.
+  ///
+  /// Carries the terminal's foreground, background, and tint colors, its ANSI
+  /// palette, the derived contrast level, and how the value was determined.
+  /// Prefer `theme` for paints; read this when a style needs the raw terminal
+  /// colors or the contrast level.
   public var appearance: TerminalAppearance { heavyFields.appearance }
+  /// The active semantic palette.
+  ///
+  /// The host selects the theme; when it selects none, this is the theme
+  /// synthesized from `appearance`. Resolve paints through
+  /// `Theme.style(for:)` or `resolvedStyle(for:)` rather than naming literal
+  /// colors, so a style follows whatever palette is in effect.
   public var theme: Theme { heavyFields.theme }
+  /// The ambient foreground paint at the styled view, or `nil` when the app
+  /// set none.
+  ///
+  /// Written by `foregroundStyle(_:)`. `resolvedStyle(for:)` returns it for
+  /// the `.foreground` role, so a style that resolves paints through that
+  /// method honors an app-level override without extra work.
   public var foregroundStyle: AnyShapeStyle?
+  /// The ambient tint paint at the styled view, or `nil` when the app set
+  /// none.
+  ///
+  /// Written by `tint(_:)`. `resolvedStyle(for:)` returns it for the `.tint`
+  /// role, so accent chrome such as a focused border follows it.
   public var tintStyle: AnyShapeStyle?
+  /// Whether the styled view accepts interaction.
+  ///
+  /// The resolved value of `disabled(_:)` at the control, already combined
+  /// with every ancestor's value. A style should render a disabled treatment
+  /// when this is `false`; it must not try to re-enable the control, which
+  /// the primitive owns.
   public var isEnabled: Bool
   /// Display metrics for the current terminal surface.
+  ///
+  /// Resolved through the environment, this is the metric the host reported.
+  /// A snapshot constructed directly, as a style fixture does, gets
+  /// `CellPixelMetrics.estimated`, the conventional 8x16 fallback. The value
+  /// is advisory: layout, placement, and alignment stay in cells, and a style
+  /// uses these metrics only for aspect correction of shapes, motion, or
+  /// image sizes.
   public var cellPixelMetrics: CellPixelMetrics
 
+  /// Creates a snapshot, defaulting every field to the no-host baseline.
+  ///
+  /// Intended for style tests: the defaults describe a terminal no host has
+  /// reported on, so a fixture needs to pass only the fields its assertion
+  /// depends on. See the Testing Styles guide.
+  ///
+  /// - Parameters:
+  ///   - appearance: The terminal appearance. Defaults to
+  ///     `TerminalAppearance.fallback`.
+  ///   - theme: The semantic palette, or `nil` to synthesize one from
+  ///     `appearance`. Defaults to `nil`.
+  ///   - foregroundStyle: The ambient foreground paint, or `nil` for none.
+  ///     Defaults to `nil`.
+  ///   - tintStyle: The ambient tint paint, or `nil` for none. Defaults to
+  ///     `nil`.
+  ///   - isEnabled: Whether the styled view accepts interaction. Defaults to
+  ///     `true`.
+  ///   - cellPixelMetrics: The cell-to-pixel metrics. Defaults to
+  ///     `CellPixelMetrics.estimated`.
   public init(
     appearance: TerminalAppearance = .fallback,
     theme: Theme? = nil,

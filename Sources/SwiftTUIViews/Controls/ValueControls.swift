@@ -189,7 +189,9 @@ extension TextField {
       showsLabel: showsLabel,
       chrome: chrome,
       placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
-      focusActive: isFocused && showsFocusEffect,
+      isEnabled: isEnabled,
+      isFocused: isFocused,
+      showsFocusEffect: showsFocusEffect,
       styleEnvironment: styleEnvironment
     )
     let child = textFieldStyle.resolveBody(
@@ -273,9 +275,25 @@ extension DisclosureGroup {
         binding.wrappedValue.toggle()
         return true
       }
+      // The style's trigger route (the label row) is the only pointer
+      // activation; a press on the expanded content reaches neither it nor
+      // the action above.
+      intake.registerPointerHandler(
+        routeID: runtimePrimaryRouteID(for: disclosureGroupTriggerIdentity(for: context.identity))
+      ) { event in
+        switch event.kind {
+        case .down(.primary):
+          binding.wrappedValue.toggle()
+          return .claimed
+        case .up(.primary):
+          return .claimed
+        default:
+          return .ignored
+        }
+      }
     }
 
-    let configuration = DisclosureGroupStyleConfiguration(
+    var configuration = DisclosureGroupStyleConfiguration(
       label: .init(authoringContext: authoringScope) { label },
       content: .init(authoringContext: authoringScope) {
         if expanded { content }
@@ -287,20 +305,27 @@ extension DisclosureGroup {
       isPressed: isPressed,
       styleEnvironment: styleEnvironment
     )
+    configuration.bindRoutes(to: context.identity)
     let child = context.environmentValues.disclosureGroupStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("DisclosureBody"))
     )
 
+    var metadata = focusableControlMetadata(
+      focusInteractions: .activate,
+      accessibilityRole: .disclosureGroup
+    )
+    // Keep geometric evidence that the keyboard action has no pointer area of
+    // its own. Merely omitting the region permits the runtime's
+    // ancestor-action fallback, which collapsed the group from a press on its
+    // expanded content; the style's trigger route owns pointer activation.
+    metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
     return ResolvedNode(
       identity: context.identity,
       kind: .view("DisclosureGroup"),
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        focusInteractions: .activate,
-        accessibilityRole: .disclosureGroup
-      )
+      semanticMetadata: metadata
     )
   }
 

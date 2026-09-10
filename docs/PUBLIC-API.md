@@ -61,8 +61,12 @@ Document a feature on this surface first when the surface can express it.
 
 ### The value-type conformance guard
 
-`View`, `ViewModifier`, `DynamicProperty`, `ButtonStyle`, `PickerStyle`,
-`TextFieldStyle`, `TabViewStyle`, `Scene`, and `App` each declare one
+`View`, `ViewModifier`, `DynamicProperty`, `Scene`, `App`, and every
+body-producing style protocol (`ButtonStyle`, `TextFieldStyle`, `PickerStyle`,
+`ToggleStyle`, `LabelStyle`, `LabeledContentStyle`, `GroupBoxStyle`,
+`ControlGroupStyle`, `MenuStyle`, `DisclosureGroupStyle`, `SliderStyle`,
+`StepperStyle`, `ProgressViewStyle`, `TextEditorStyle`, `TabViewStyle`, and
+`PaletteStyle`) each declare one
 underscored static requirement — `_viewValueTypeWitness` and its per-protocol
 siblings — defaulted on the unconstrained protocol extension and
 `@available(*, unavailable)` on the `Self: AnyObject` extension. A class

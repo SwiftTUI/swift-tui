@@ -38,4 +38,18 @@ struct ScrollLinkStyleFixtureTests {
     #expect(plain.backgroundStyle == automatic.backgroundStyle)
     #expect(plain.backgroundStyle != nil)
   }
+
+  @Test("a disabled plain link fixture carries the automatic style's dimmed opacity")
+  func plainLinkFixtureKeepsDisabledOpacity() {
+    let configuration = LinkStyleConfiguration(
+      isInline: false, isEnabled: false, isFocused: false, showsFocusEffect: true,
+      isPressed: false, styleEnvironment: .init())
+    let automatic = AutomaticLinkStyle().resolvePresentation(for: configuration)
+    let plain = PlainLinkStyle().resolvePresentation(for: configuration)
+    #expect(automatic.opacity != nil)
+    #expect(automatic.opacity.map { $0 < 1 } == true)
+    #expect(plain.opacity == automatic.opacity)
+    #expect(plain.foregroundStyle == nil)
+    #expect(plain.underline == .hidden)
+  }
 }

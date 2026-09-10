@@ -242,11 +242,13 @@ package struct ButtonPlainStyleBody<Label: View>: View {
     //     wider label (e.g. "File" → "ile"). An HStack sibling cannot
     //     overlap the label by construction.
     //
-    // The bordered/automatic chrome wrapper opts out of the gutter
-    // (`reservesRailGutter: false`) because that wrapper signals focus
-    // via a heavy border drawn inside its own horizontal padding; a
-    // second leading gutter would just widen every bordered button
-    // for no visual gain.
+    // The chrome wrapper opts out of the gutter
+    // (`reservesRailGutter: false`) because a second leading gutter
+    // would just widen every chromed button for no visual gain. The
+    // bordered style then signals focus with a heavy border drawn
+    // inside its own horizontal padding; the dense styles
+    // (automatic, borderedProminent) draw no border overlay at all
+    // and signal focus through the chrome fill alone.
     controlFocusRow(
       showsRail: focusActive,
       railStyle: chrome.borderStyle,

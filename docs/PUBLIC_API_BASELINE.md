@@ -20,7 +20,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 416 | 2484 |
+| `SwiftTUIViews` | 416 | 2493 |
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -32,7 +32,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 169 | 1472 |
+| `SwiftTUIPrimitives` | 169 | 1474 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 0 | 0 |
@@ -234,7 +234,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `CoordinateSpace` — struct — 9 members
 - `CubicKeyframe` — struct — 2 members
 - `CustomAnimation` — protocol — 5 members
-- `DangerToastStyle` — struct — 2 members
+- `DangerToastStyle` — struct — 3 members
 - `DefaultBottomToolbarStyle` — struct — 4 members
 - `DefaultFocusScopeModifier` — struct
 - `DefaultPaletteStyle` — struct — 3 members
@@ -242,7 +242,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `DisappearLifecycleModifier` — struct
 - `DisclosureGroup` — struct — 3 members
 - `DisclosureGroupStyle` — protocol — 6 members
-- `DisclosureGroupStyleConfiguration` — struct — 13 members
+- `DisclosureGroupStyleConfiguration` — struct — 14 members
 - `Divider` — struct — 2 members
 - `DragGesture` — struct — 16 members
 - `DrawMetadataModifier` — struct
@@ -296,7 +296,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `IDModifier` — struct
 - `IgnoreSafeAreaModifier` — struct
 - `Image` — struct — 9 members
-- `InfoToastStyle` — struct — 2 members
+- `InfoToastStyle` — struct — 3 members
 - `InlineMenuStyle` — struct — 3 members
 - `InlinePickerStyle` — struct — 4 members
 - `InsetGroupedListStyle` — struct — 3 members
@@ -380,7 +380,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `PhaseAnimator` — struct — 3 members
 - `Picker` — struct — 3 members
 - `PickerStyle` — protocol — 8 members
-- `PickerStyleConfiguration` — struct — 21 members
+- `PickerStyleConfiguration` — struct — 22 members
 - `PlaceholderContentView` — struct
 - `PlainButtonStyle` — struct — 3 members
 - `PlainGroupBoxStyle` — struct — 3 members
@@ -464,7 +464,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `StepperStyleConfiguration` — struct — 16 members
 - `SubmitActionModifier` — struct
 - `SubmitScopeModifier` — struct
-- `SuccessToastStyle` — struct — 2 members
+- `SuccessToastStyle` — struct — 3 members
 - `SurfaceSheetStyle` — struct — 3 members
 - `Tab` — struct — 2 members
 - `Table` — struct — 11 members
@@ -493,7 +493,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TextEditorStyleConfiguration` — struct — 8 members
 - `TextField` — struct — 2 members
 - `TextFieldStyle` — protocol — 4 members
-- `TextFieldStyleConfiguration` — struct — 13 members
+- `TextFieldStyleConfiguration` — struct — 16 members
 - `TextFigure` — struct — 8 members
 - `TimelineSchedule` — protocol — 5 members
 - `TimelineScheduleMode` — enum — 2 members
@@ -535,7 +535,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `ViewThatFits` — struct — 2 members
 - `VStack` — struct — 3 members
 - `VStackLayout` — struct — 6 members
-- `WarningToastStyle` — struct — 2 members
+- `WarningToastStyle` — struct — 3 members
 - `withAnimation(_:_:)` — func
 - `withAnimation(_:completionCriteria:_:completion:)` — func
 - `withTransaction(_:_:_:)` — func
@@ -822,7 +822,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `Size` — struct — 4 members
 - `Spacing` — struct — 4 members
 - `StrokeStyle` — struct — 16 members
-- `StyleEnvironmentSnapshot` — struct — 10 members
+- `StyleEnvironmentSnapshot` — struct — 12 members
 - `TableBorderGlyphs` — struct — 18 members
 - `TableCellAlignment` — enum — 4 members
 - `TableCellPayload` — struct — 5 members

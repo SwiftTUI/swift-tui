@@ -19,9 +19,10 @@ programming interface. A test target opts in with one import attribute:
 @_spi(StyleFixtures) import SwiftTUIViews
 ```
 
-Behind that import every configuration, captured-slot type, and
-presentation value in the shipped families has a public initializer.
-Application code that authors or applies styles never sees it, so the
+Behind that import every configuration and captured-slot type in the shipped
+families has an initializer. Presentation values already have ordinary public
+initializers, because styles construct them. Application code that authors or
+applies styles never sees the fixture initializers, so the
 framework-constructs-configurations invariant holds everywhere outside
 explicitly opted-in test code. Use the attribute in test targets only.
 
@@ -151,11 +152,14 @@ let artifacts = DefaultRenderer().render(
 #expect(artifacts.rasterSurface.lines[1].hasPrefix("Home content"))
 ```
 
-The tab-view item and overflow-trigger configurations predate the SPI and
-keep ordinary public initializers as their fixture path; the body
-configuration is SPI-gated like the other families. So does
-`PickerStyleConfiguration.Option(label:)`, a single inert option; the parent
-configuration and its indexed option fixture are SPI-gated.
+The tab-view item, overflow-trigger, and style configurations predate the SPI
+and keep ordinary public initializers as their fixture path; the body
+configuration is SPI-gated like the other families, and its fixture
+initializer derives `items`, `visibleItems`, and `overflowItems` from the
+style configuration and presentation you pass rather than mirroring stored
+properties. `PickerStyleConfiguration.Option(label:)` is likewise an ordinary
+public initializer for a single inert option; the parent configuration and its
+indexed option fixture are SPI-gated.
 
 ## What the fixture surface covers
 
@@ -166,7 +170,7 @@ configuration and its indexed option fixture are SPI-gated.
 | ``LabeledContentStyle`` | ``LabeledContentStyleConfiguration`` and its `Label` and `Content` slots |
 | ``GroupBoxStyle`` | ``GroupBoxStyleConfiguration`` and its `Label` and `Content` slots; pass `nil` for an absent label |
 | ``ToggleStyle`` | ``ToggleStyleConfiguration`` and its `Label` slot; supply a constant or write-counted binding |
-| ``DisclosureGroupStyle`` | ``DisclosureGroupStyleConfiguration`` and its `Label` and `Content` slots |
+| ``DisclosureGroupStyle`` | ``DisclosureGroupStyleConfiguration`` and its `Label` and `Content` slots; the trigger route is inert |
 | ``TextEditorStyle`` | ``TextEditorStyleConfiguration`` and `EditorContent(displayText:)`; the editor fixture is inert |
 | ``ProgressViewStyle`` | ``ProgressViewStyleConfiguration`` and optional `Label` and `CurrentValueLabel` slots; `indeterminatePhase` defaults to zero |
 | ``SliderStyle`` | ``SliderStyleConfiguration`` and `Label`/`ValueLabel` slots; the track route is inert |
@@ -174,7 +178,7 @@ configuration and its indexed option fixture are SPI-gated.
 | ``MenuStyle`` | ``MenuStyleConfiguration`` and `Label`/`Content` slots; trigger and portal wrappers are inert |
 | ``ControlGroupStyle`` | ``ControlGroupStyleConfiguration`` and optional `Label` plus `Content` slots |
 | ``PaletteStyle`` | ``PaletteStyleConfiguration`` and `Command(id:name:description:isEnabled:)`; command routes, activation, and dismissal are inert |
-| ``TextFieldStyle`` | ``TextFieldStyleConfiguration``, its `Label` slot, and `FieldContent` |
+| ``TextFieldStyle`` | ``TextFieldStyleConfiguration`` (with `isEnabled`, `isFocused`, and `showsFocusEffect`; the earlier `focusActive:` spelling still compiles), its `Label` slot, and `FieldContent` |
 | ``PickerStyle`` | ``PickerStyleConfiguration``, its `Label` slot, and `Option` fixtures; option and trigger routes are inert |
 | ``ListStyle`` | ``ListStyleConfiguration`` |
 | ``OutlineStyle`` | ``OutlineStyleConfiguration`` |
@@ -188,6 +192,7 @@ configuration and its indexed option fixture are SPI-gated.
 | ``LinkStyle`` | ``LinkStyleConfiguration`` with inline, enabled, focused, and pressed state |
 | ``ToastStyle`` | ``ToastStyleConfiguration`` |
 | ``TabViewStyle`` | ``TabViewStyleBodyConfiguration`` and its `Content` slot; the item, trigger, and strip configurations through their public initializers |
+| ``ToolbarStyle`` | No configuration: call `itemLayout` and `placement` directly |
 
 Presentation values (``AnchoredSurfaceStylePresentation``, ``SpinnerStylePresentation``,
 ``SheetSurfaceStylePresentation``, ``PromptSurfaceStylePresentation``,
@@ -195,8 +200,11 @@ Presentation values (``AnchoredSurfaceStylePresentation``, ``SpinnerStylePresent
 ``TabViewStylePresentation``, ``ScrollViewStylePresentation``,
 ``LinkStylePresentation``, and the collection presentations) have public
 initializers because styles construct them. SPI symbols do not appear in the
-reference documentation; the initializers mirror the configuration's
-documented stored properties in declaration order.
+reference documentation. With three exceptions the fixture initializers mirror
+the configuration's documented stored properties in declaration order: the
+slider configuration also accepts the stepper's argument order, the scroll
+configuration defaults `showsFocusEffect`, and the tab-view body configuration
+derives its item lists as described above.
 
 Picker fixtures can omit `controlIdentity`. The older initializer spelling
 with an explicit identity remains available, but neither form enables
@@ -207,8 +215,8 @@ independently, the SPI also provides
 
 ## Keeping the seam honest
 
-For example, a label-style test supplies both authored slots without a live
-control:
+A fixture supplies exactly the state the framework would. A label-style test,
+for example, provides both authored slots without a live control:
 
 ```swift
 let configuration = LabelStyleConfiguration(

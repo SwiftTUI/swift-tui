@@ -382,6 +382,25 @@ struct ScrollLinkStyleTests {
     #expect(cleared.style.strikethroughStyle == .init(pattern: .solid))
   }
 
+  @Test("a disabled plain link dims exactly like a disabled automatic link")
+  func plainLinkStyleKeepsDisabledOpacity() throws {
+    let frame = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Link("Automatic", destination: "https://example.com")
+        Link("Plain", destination: "https://example.com").linkStyle(.plain)
+      }
+      .disabled(true),
+      context: .init(identity: testIdentity("DisabledLinks")),
+      proposal: .init(width: 20, height: 2))
+    let runs = allLinkRuns(in: frame.resolvedTree)
+    let automatic = try #require(runs.first { $0.text == "Automatic" })
+    let plain = try #require(runs.first { $0.text == "Plain" })
+    #expect(automatic.style.opacity < 1)
+    #expect(plain.style.opacity == automatic.style.opacity)
+    #expect(plain.style.underlineStyle == nil)
+    #expect(plain.style.foregroundStyle == nil)
+  }
+
   @Test("an out-of-range link opacity falls back to inheritance and reports once")
   func invalidLinkOpacity() throws {
     let context = ResolveContext(identity: testIdentity("Opacity"))

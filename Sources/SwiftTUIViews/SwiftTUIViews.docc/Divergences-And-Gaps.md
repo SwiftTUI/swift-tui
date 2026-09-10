@@ -815,7 +815,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   *Ratified.* The
   open-protocol model above — a public style protocol, a public
   configuration carrying the authored subviews and the render state a style
-  legitimately needs, an `Any*Style` eraser stored in the environment, a
+  legitimately needs (`ToolbarStyle` alone has no configuration: it supplies
+  a layout and a placement), an `Any*Style` eraser stored in the environment, a
   lower-camel-cased modifier scoping a style to one control, a subtree, or
   an application, and retained-reuse participation — is the framework's
   styling contract for every styleable surface. It applies to

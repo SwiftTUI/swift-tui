@@ -17,7 +17,9 @@ import SwiftTUICore
 /// Declares where a toolbar strip is placed relative to its scope's
 /// content.
 public enum ToolbarPlacement: Sendable {
+  /// The strip is composed above the scope's content.
   case top
+  /// The strip is composed below the scope's content.
   case bottom
 }
 
@@ -31,14 +33,63 @@ public enum ToolbarPlacement: Sendable {
 ///
 /// A toolbar host reads the nearest `toolbarStyle(_:)` value from the
 /// environment; the style is not passed at the declaration.
+///
+/// This family has no configuration type and no presentation type. A toolbar
+/// style is a `Layout` plus a placement, so there is nothing to resolve against
+/// render state: it does not see focus, enablement, or the theme, and it never
+/// builds a body. The item views, their identities, focus stops, key handling,
+/// pointer routes, and accessibility semantics stay with the toolbar primitive.
+/// A style is tested by reading ``ToolbarStyle/itemLayout`` and
+/// ``ToolbarStyle/placement`` directly, with no fixture type involved (see
+/// <doc:Testing-Styles>).
+///
+/// The built-ins are ``DefaultTopToolbarStyle`` and
+/// ``DefaultBottomToolbarStyle``, reachable as ``ToolbarStyle/defaultTop`` and
+/// ``ToolbarStyle/defaultBottom`` or through ``AnyToolbarStyle``. There is no
+/// `.automatic` member in this family; the environment default is
+/// ``AnyToolbarStyle/defaultTop``, so applying `.defaultTop` explicitly changes
+/// nothing.
+///
+/// A conforming type must be a value type and `Sendable`, because the
+/// environment carries it across resolves.
+///
+/// ```swift
+/// struct StackedToolbarStyle: ToolbarStyle {
+///   var itemLayout: VStackLayout { VStackLayout(alignment: .leading, spacing: 0) }
+///   var placement: ToolbarPlacement { .bottom }
+/// }
+/// ```
+///
+/// See <doc:Style-System>, <doc:Authoring-Styles>, and
+/// <doc:Navigation-And-Tabs>.
 public protocol ToolbarStyle: Sendable {
+  /// The concrete `Layout` type that arranges the strip's items.
+  ///
+  /// It stays concrete rather than erased so the strip's reuse cache can key on
+  /// the real layout's signature instead of collapsing every style onto one
+  /// entry.
   associatedtype ItemLayout: Layout
+
+  /// The layout the strip runs over the toolbar items.
+  ///
+  /// It is read once per strip build and receives the item views as its
+  /// subviews, so alignment, spacing, and wrapping are the style's to choose.
   var itemLayout: ItemLayout { get }
+
+  /// Whether the host composes the strip above or below the scope's content.
   var placement: ToolbarPlacement { get }
+
+  /// The label reported in snapshots and diagnostics.
+  ///
+  /// It is also part of the toolbar strip's reuse-cache signature, alongside the
+  /// placement and the concrete layout's signature. Two styles that report the
+  /// same label must therefore render the same strip; give a custom style a
+  /// label of its own rather than reusing a built-in's.
   var snapshotLabel: String { get }
 }
 
 extension ToolbarStyle {
+  /// The reflected type name, supplied when a conforming type declares no label.
   public var snapshotLabel: String {
     String(reflecting: Self.self)
   }
@@ -47,34 +98,49 @@ extension ToolbarStyle {
 /// A top-placed toolbar that lays items out horizontally with a
 /// single-cell gap.
 public struct DefaultTopToolbarStyle: ToolbarStyle {
+  /// A horizontal stack, center-aligned, with one cell between items.
   public var itemLayout: HStackLayout {
     HStackLayout(alignment: .center, spacing: 1)
   }
+  /// ``ToolbarPlacement/top``: the strip is composed above the content.
   public var placement: ToolbarPlacement { .top }
 
+  /// The label reported in snapshots and diagnostics,
+  /// `"ToolbarStyle.defaultTop"`.
   public var snapshotLabel: String { "ToolbarStyle.defaultTop" }
 
+  /// Creates the style.
   public init() {}
 }
 
 /// A bottom-placed toolbar that lays items out horizontally with a
 /// single-cell gap.
 public struct DefaultBottomToolbarStyle: ToolbarStyle {
+  /// A horizontal stack, center-aligned, with one cell between items.
   public var itemLayout: HStackLayout {
     HStackLayout(alignment: .center, spacing: 1)
   }
+  /// ``ToolbarPlacement/bottom``: the strip is composed below the content.
   public var placement: ToolbarPlacement { .bottom }
 
+  /// The label reported in snapshots and diagnostics,
+  /// `"ToolbarStyle.defaultBottom"`.
   public var snapshotLabel: String { "ToolbarStyle.defaultBottom" }
 
+  /// Creates the style.
   public init() {}
 }
 
 extension ToolbarStyle where Self == DefaultTopToolbarStyle {
+  /// The default toolbar style, as a leading-dot value of the protocol's own
+  /// type: `.toolbarStyle(.defaultTop)`. It is also the environment default, so
+  /// applying it explicitly changes nothing.
   public static var defaultTop: DefaultTopToolbarStyle { .init() }
 }
 
 extension ToolbarStyle where Self == DefaultBottomToolbarStyle {
+  /// The bottom-placed toolbar style, as a leading-dot value of the protocol's
+  /// own type: `.toolbarStyle(.defaultBottom)`.
   public static var defaultBottom: DefaultBottomToolbarStyle { .init() }
 }
 
@@ -126,27 +192,45 @@ extension ConcreteStyleBox: AnyToolbarStyleBox where S: ToolbarStyle {
 /// strip's reuse signature, and it keeps this initializer free of actor
 /// isolation (`AnyLayout`'s is `@MainActor`) so the environment key can
 /// hold a `static let` default.
+///
+/// This is the value the environment carries, and the type both
+/// `toolbarStyle(_:)` overloads write, the one on `ActionScope` and the one on
+/// ``View``.
 public struct AnyToolbarStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   private let box: any AnyToolbarStyleBox
 
+  /// Wraps a concrete toolbar style for storage in the environment.
+  ///
+  /// Deliberately not actor-isolated, so an environment key can hold an erased
+  /// style as a `static let` default.
+  ///
+  /// - Parameter style: The style to erase. It is kept boxed, so the strip's
+  ///   reuse signature still sees the concrete layout.
   public init<S: ToolbarStyle>(
     _ style: S
   ) {
     box = ConcreteStyleBox(style: style)
   }
 
+  /// The default toolbar style: a horizontal, center-aligned strip with one
+  /// cell between items, composed above the scope's content.
   public static var defaultTop: Self {
     Self(DefaultTopToolbarStyle())
   }
 
+  /// The same horizontal strip as ``defaultTop``, composed below the scope's
+  /// content.
   public static var defaultBottom: Self {
     Self(DefaultBottomToolbarStyle())
   }
 
+  /// The wrapped style's ``ToolbarStyle/snapshotLabel``.
   public var description: String {
     box.snapshotLabel
   }
 
+  /// The wrapped style's ``ToolbarStyle/snapshotLabel``, the same text as
+  /// ``description``.
   public var debugDescription: String {
     description
   }

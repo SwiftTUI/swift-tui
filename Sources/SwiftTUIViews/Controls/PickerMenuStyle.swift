@@ -29,9 +29,9 @@ package struct MenuPickerStyleBody: View {
         "Select"
       }
     let triggerRow = controlFocusRow(
-      showsRail: configuration.isFocused,
+      showsRail: configuration.focusActive,
       railStyle: triggerChrome.borderStyle,
-      isHighlighted: configuration.isFocused,
+      isHighlighted: configuration.focusActive,
       backgroundStyle: triggerChrome.backgroundStyle,
       reservesRailSpaceWhenHidden: true
     ) {

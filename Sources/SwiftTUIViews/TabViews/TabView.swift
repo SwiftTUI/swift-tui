@@ -172,7 +172,10 @@ extension TabView {
       availableWidth: tabViewAvailableWidth(in: context),
       isOverflowMenuExpanded: storedTabOverflowMenuExpanded(in: ownerNode)
     )
-    let stylePresentation = tabStyle.presentation(for: styleConfiguration)
+    let stylePresentation = tabStyle.validatedPresentation(
+      for: styleConfiguration,
+      identity: context.identity
+    )
     if stylePresentation.overflowMenu == nil,
       storedTabOverflowMenuExpanded(in: ownerNode)
     {

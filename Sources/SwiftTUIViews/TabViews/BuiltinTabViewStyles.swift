@@ -1,10 +1,17 @@
 @_spi(Testing) import SwiftTUICore
 
 extension AutomaticTabViewStyle: TabViewStyle {
+  /// The label reported in snapshots and diagnostics,
+  /// `"AnyTabViewStyle.automatic"`.
   public var snapshotLabel: String {
     "AnyTabViewStyle.automatic"
   }
 
+  /// Resolves a two-row strip with every option visible and no overflow menu.
+  ///
+  /// - Parameter configuration: The tab state; only its option count is read.
+  /// - Returns: A presentation with `stripHeight` 2 and every option index
+  ///   visible.
   @MainActor
   public func presentation(
     for configuration: TabViewStyleConfiguration
@@ -16,6 +23,12 @@ extension AutomaticTabViewStyle: TabViewStyle {
     )
   }
 
+  /// Renders the underline strip above the active tab's content.
+  ///
+  /// - Parameter configuration: The items, presentation, and content slot for
+  ///   this resolve.
+  /// - Returns: A vertical stack of the tab labels with their rules, then
+  ///   ``TabViewStyleBodyConfiguration/content``.
   @MainActor
   public func makeBody(
     configuration: TabViewStyleBodyConfiguration
@@ -25,10 +38,17 @@ extension AutomaticTabViewStyle: TabViewStyle {
 }
 
 extension UnderlineTabViewStyle: TabViewStyle {
+  /// The label reported in snapshots and diagnostics,
+  /// `"AnyTabViewStyle.underline"`.
   public var snapshotLabel: String {
     "AnyTabViewStyle.underline"
   }
 
+  /// Resolves a two-row strip with every option visible and no overflow menu.
+  ///
+  /// - Parameter configuration: The tab state; only its option count is read.
+  /// - Returns: A presentation with `stripHeight` 2 and every option index
+  ///   visible.
   @MainActor
   public func presentation(
     for configuration: TabViewStyleConfiguration
@@ -40,6 +60,16 @@ extension UnderlineTabViewStyle: TabViewStyle {
     )
   }
 
+  /// Renders the underline strip above the active tab's content.
+  ///
+  /// Each visible item is wrapped in its pointer route, drawn as its label on
+  /// one row and a block rule on the next, and the focused item is drawn on an
+  /// accent surface.
+  ///
+  /// - Parameter configuration: The items, presentation, and content slot for
+  ///   this resolve.
+  /// - Returns: A vertical stack of the tab labels with their rules, then
+  ///   ``TabViewStyleBodyConfiguration/content``.
   @MainActor
   public func makeBody(
     configuration: TabViewStyleBodyConfiguration
@@ -49,10 +79,25 @@ extension UnderlineTabViewStyle: TabViewStyle {
 }
 
 extension LiteralTabsTabViewStyle: TabViewStyle {
+  /// The label reported in snapshots and diagnostics,
+  /// `"AnyTabViewStyle.literalTabs"`.
   public var snapshotLabel: String {
     "AnyTabViewStyle.literalTabs"
   }
 
+  /// Resolves a three-row strip, moving the tabs that do not fit into an
+  /// overflow menu.
+  ///
+  /// Every option stays visible while there is one option, or while the tab
+  /// widths fit ``TabViewStyleConfiguration/availableWidth``. Otherwise it keeps
+  /// the leading tabs that fit alongside the trigger and puts the rest behind an
+  /// overflow menu, whose trigger label, padding, background, border tone, and
+  /// radius it fills in from the focus state.
+  ///
+  /// - Parameter configuration: The tab state, including the available width,
+  ///   the selection, the focused option, and whether the menu is expanded.
+  /// - Returns: A presentation with `stripHeight` 3 and, when the tabs do not
+  ///   fit, an overflow menu.
   @MainActor
   public func presentation(
     for configuration: TabViewStyleConfiguration
@@ -147,6 +192,13 @@ extension LiteralTabsTabViewStyle: TabViewStyle {
     )
   }
 
+  /// Renders the literal-tab strip, its overflow trigger, and, while the menu
+  /// is expanded, the overflow menu over the content.
+  ///
+  /// - Parameter configuration: The items, presentation, overflow trigger, and
+  ///   content slot for this resolve.
+  /// - Returns: The strip above ``TabViewStyleBodyConfiguration/content``, with
+  ///   an expanded overflow menu overlaid beneath the trigger when there is one.
   @MainActor
   public func makeBody(
     configuration: TabViewStyleBodyConfiguration
@@ -156,10 +208,17 @@ extension LiteralTabsTabViewStyle: TabViewStyle {
 }
 
 extension PowerlineTabViewStyle: TabViewStyle {
+  /// The label reported in snapshots and diagnostics,
+  /// `"AnyTabViewStyle.powerline"`.
   public var snapshotLabel: String {
     "AnyTabViewStyle.powerline"
   }
 
+  /// Resolves a one-row strip with every option visible and no overflow menu.
+  ///
+  /// - Parameter configuration: The tab state; only its option count is read.
+  /// - Returns: A presentation with `stripHeight` 1 and every option index
+  ///   visible.
   @MainActor
   public func presentation(
     for configuration: TabViewStyleConfiguration
@@ -171,6 +230,16 @@ extension PowerlineTabViewStyle: TabViewStyle {
     )
   }
 
+  /// Renders the powerline strip above the active tab's content.
+  ///
+  /// Each visible item is wrapped in its pointer route and drawn as its label
+  /// followed by a separator, which is `◤` on the selected tab, `◢` on the tab
+  /// before it, and a dimmed `╱` elsewhere.
+  ///
+  /// - Parameter configuration: The items, presentation, and content slot for
+  ///   this resolve.
+  /// - Returns: The one-row segment strip, then
+  ///   ``TabViewStyleBodyConfiguration/content``.
   @MainActor
   public func makeBody(
     configuration: TabViewStyleBodyConfiguration

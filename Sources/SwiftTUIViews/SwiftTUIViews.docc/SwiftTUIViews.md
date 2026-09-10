@@ -32,6 +32,9 @@ It provides:
   These include single-line and multiline text entry, split navigation, tab
   shells, and terminal-native presentations: `alert`, `confirmationDialog`,
   `sheet`, `fullScreenCover`, `popover`, `popoverTip`, and `toast`.
+- an open style system: every control, container, and presentation family
+  is a public style protocol with built-in styles, a configuration, and a
+  scoping modifier (see <doc:Style-System>).
 - ASCII-art banner text through ``TextFigure``. Embedded FIGlet fonts support
   normal layout proposals without external font files.
 
@@ -106,6 +109,41 @@ Lowering helpers remain package-only implementation details.
 - ``Ellipse``
 - ``Capsule``
 
+### Styling
+
+- <doc:Style-System>
+- <doc:Styling-And-Theming>
+- <doc:Authoring-Styles>
+- <doc:Testing-Styles>
+- ``ButtonStyle``
+- ``TextFieldStyle``
+- ``PickerStyle``
+- ``ToggleStyle``
+- ``LinkStyle``
+- ``LabelStyle``
+- ``LabeledContentStyle``
+- ``GroupBoxStyle``
+- ``ControlGroupStyle``
+- ``MenuStyle``
+- ``DisclosureGroupStyle``
+- ``SliderStyle``
+- ``StepperStyle``
+- ``ProgressViewStyle``
+- ``SpinnerStyle``
+- ``TextEditorStyle``
+- ``ListStyle``
+- ``OutlineStyle``
+- ``TableStyle``
+- ``ScrollViewStyle``
+- ``ToolbarStyle``
+- ``TabViewStyle``
+- ``SheetStyle``
+- ``PromptStyle``
+- ``FullScreenCoverStyle``
+- ``PopoverStyle``
+- ``ToastStyle``
+- ``PaletteStyle``
+
 ### Guides
 
 - <doc:Coming-From-SwiftUI>
@@ -121,6 +159,7 @@ Lowering helpers remain package-only implementation details.
 - <doc:Scrolling>
 - <doc:Navigation-And-Tabs>
 - <doc:Dismissal-Is-Data>
+- <doc:Style-System>
 - <doc:Styling-And-Theming>
 - <doc:Authoring-Styles>
 - <doc:Testing-Styles>

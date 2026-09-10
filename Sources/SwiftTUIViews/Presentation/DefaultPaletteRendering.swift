@@ -1,14 +1,45 @@
 import SwiftTUICore
 
 /// A fuzzy filter, keyboard selection, and up to twelve visible command rows.
+///
+/// The body is a filter field above the matching rows. Typing filters the
+/// commands by a case-insensitive subsequence match on
+/// ``PaletteStyleConfiguration/Command/name`` alone, ranking tighter and
+/// earlier matches first; an empty query keeps contribution order. Down and Tab
+/// move the selection forward, Up and Shift-Tab move it back, and Return runs
+/// the selected command through
+/// ``PaletteStyleConfiguration/Command/perform()``, which also dismisses the
+/// palette. The selection is tracked by command identity, so it survives
+/// filtering while the selected command still matches and otherwise falls back
+/// to the first row.
+///
+/// At most twelve rows are visible, and the window always contains the
+/// selection: once the selection is past the twelfth match it sits on the
+/// window's bottom row, so moving up scrolls the window rather than moving the
+/// cursor inside it. Each row is a pointer-routed button showing the command's
+/// name with its description trailing in the separator paint, marked and filled
+/// with the selection paint when selected, and rendered disabled when the
+/// contribution is. With no commands in scope, or no match for the query, the
+/// body says so in place of the rows.
+///
+/// See <doc:Commands-And-Key-Input>.
 public struct DefaultPaletteStyle: PaletteStyle {
+  /// Creates the style.
   public init() {}
+  /// The label reported in snapshots and diagnostics,
+  /// `"AnyPaletteStyle.automatic"`.
   public var snapshotLabel: String { "AnyPaletteStyle.automatic" }
+  /// Returns the filter field, a divider, and the visible command rows.
+  ///
+  /// - Parameter configuration: The palette's title, its commands, and the
+  ///   render state.
+  /// - Returns: The default palette body.
   @MainActor public func makeBody(configuration: PaletteStyleConfiguration) -> some View {
     DefaultPaletteStyleBody(configuration: configuration)
   }
 }
 extension PaletteStyle where Self == DefaultPaletteStyle {
+  /// The framework palette; see ``DefaultPaletteStyle``.
   public static var automatic: Self { .init() }
 }
 extension DefaultPaletteStyle: ReuseTransparentStyle {}

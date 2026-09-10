@@ -102,7 +102,9 @@ extension SecureField {
       showsLabel: showsLabel,
       chrome: chrome,
       placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
-      focusActive: isFocused && showsFocusEffect,
+      isEnabled: isEnabled,
+      isFocused: isFocused,
+      showsFocusEffect: showsFocusEffect,
       styleEnvironment: styleEnvironment
     )
     let child = textFieldStyle.resolveBody(

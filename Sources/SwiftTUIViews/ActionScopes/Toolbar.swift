@@ -21,6 +21,18 @@ extension ActionScope where Self: View {
   /// `environment(_:_:)` erases to `some View`, which would drop the
   /// conformance, so this applies the same modifier directly —
   /// `ModifiedContent` conditionally conforms to `ActionScope`.
+  ///
+  /// The style is stored in the environment for the subtree, so the nearest
+  /// modifier above a ``ToolbarModifier`` scope wins. It affects only the strip
+  /// a `toolbar()` scope composes: its item layout and whether the strip sits
+  /// above or below the content. The built-ins are
+  /// ``AnyToolbarStyle/defaultTop`` and ``AnyToolbarStyle/defaultBottom``; the
+  /// environment default is ``AnyToolbarStyle/defaultTop``, so writing it
+  /// explicitly changes nothing.
+  ///
+  /// - Parameter style: The erased style to store for the subtree.
+  /// - Returns: The scope, still an `ActionScope`, with the style in force
+  ///   below it.
   @MainActor
   public func toolbarStyle(
     _ style: AnyToolbarStyle
@@ -33,6 +45,15 @@ extension ActionScope where Self: View {
     )
   }
 
+  /// Sets the toolbar style for this scope's subtree from a concrete style,
+  /// preserving the `ActionScope` conformance.
+  ///
+  /// Equivalent to wrapping `style` in ``AnyToolbarStyle`` and calling the
+  /// other overload, so the same nearest-modifier-wins rule applies.
+  ///
+  /// - Parameter style: The concrete style to store for the subtree.
+  /// - Returns: The scope, still an `ActionScope`, with the style in force
+  ///   below it.
   @MainActor
   public func toolbarStyle<S: ToolbarStyle>(
     _ style: S

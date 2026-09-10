@@ -102,6 +102,12 @@ swift run --package-path counter counter
 - **State in, screen out.** Views are a pure function of your app's state:
   change a value and the runtime recomputes layout and rewrites exactly the
   cells that changed. No draw loop, no buffer diffing, no repaint bookkeeping.
+- **Real components, open styles.** Buttons, text fields, pickers, sliders,
+  lists, tables, tabs, sheets, and command palettes ship with built-in styles,
+  and every one of the 28 style families is an open protocol: conform, then
+  restyle a control, a subtree, or the whole app with one modifier. That
+  includes the families SwiftUI keeps closed. See
+  [The Style System](Sources/SwiftTUIViews/SwiftTUIViews.docc/Style-System.md).
 - **The terminal, negotiated for you.** Truecolor, Kitty and Sixel images,
   OSC 8 hyperlinks, and mouse reporting are probed per session and degrade
   gracefully: one binary is correct in kitty, a bare SSH session, or CI. Every

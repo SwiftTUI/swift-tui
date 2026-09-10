@@ -265,30 +265,83 @@ extension EnvironmentValues {
     return nil
   }
 
+  /// The detected appearance of the host terminal.
+  ///
+  /// Carries the terminal's foreground, background, and tint colors, its ANSI
+  /// palette, the derived contrast level, and how the value was determined.
+  /// The host writes the live value near the scene root; without a host it is
+  /// `TerminalAppearance.fallback`.
+  ///
+  /// A style rarely reads this key directly, because every style
+  /// configuration already carries the same value as
+  /// `StyleEnvironmentSnapshot.appearance`, and the semantic `Theme`
+  /// derived from it is usually the better source of paints.
+  ///
+  /// See <doc:Styling-And-Theming>.
   public var terminalAppearance: TerminalAppearance {
     get { self[TerminalAppearanceKey.self] }
     set { self[TerminalAppearanceKey.self] = newValue }
   }
 
+  /// The size of the terminal surface in cells.
+  ///
+  /// This is the whole surface, not the space proposed to the reading view;
+  /// use a layout proposal or `GeometryReader` for that. Presentation styles
+  /// read it to size sheets, prompts, and covers against the screen. Defaults
+  /// to 80 by 24 cells when no host has reported a size.
+  ///
+  /// See <doc:Geometry-And-Preferences>.
   public var terminalSize: CellSize {
     get { self[TerminalSizeKey.self] }
     set { self[TerminalSizeKey.self] = newValue }
   }
 
+  /// The insets, in cells, that host chrome reserves at the edges of the
+  /// terminal surface.
+  ///
+  /// Zero on a plain terminal host. A host that reserves edge cells, such as
+  /// one drawing its own status line, writes them here so full-surface
+  /// content can stay clear of them.
+  ///
+  /// See <doc:Geometry-And-Preferences>.
   public var safeAreaInsets: EdgeInsets {
     get { self[SafeAreaInsetsKey.self] }
     set { self[SafeAreaInsetsKey.self] = newValue }
   }
 
+  /// The contrast level of the detected terminal appearance.
+  ///
+  /// Derived from ``EnvironmentValues/terminalAppearance`` rather than stored,
+  /// so it cannot be written on its own. `ColorSchemeContrast.increased`
+  /// means the terminal's foreground and background are far enough apart that
+  /// styles should prefer stronger separation over subtle tinting.
+  ///
+  /// See <doc:Styling-And-Theming>.
   public var colorSchemeContrast: ColorSchemeContrast {
     terminalAppearance.colorSchemeContrast
   }
 
+  /// The emphasis level controls in this subtree render with.
+  ///
+  /// Written with `controlProminence(_:)` and defaulting to
+  /// `ControlProminence.standard`. Built-in chrome reads it to choose between
+  /// a neutral surface and a filled accent one; a style receives it through
+  /// its configuration and is free to ignore it.
+  ///
+  /// See <doc:Style-System>.
   public var controlProminence: ControlProminence {
     get { self[ControlProminenceKey.self] }
     set { self[ControlProminenceKey.self] = newValue }
   }
 
+  /// The border geometry bordered buttons in this subtree ask for.
+  ///
+  /// Written with `buttonBorderShape(_:)` and defaulting to
+  /// `ButtonBorderShape.automatic`, which leaves the choice to the style. It
+  /// reaches a ``ButtonStyle`` through
+  /// ``ButtonStyleConfiguration/buttonBorderShape``.
+  ///
+  /// See <doc:Style-System>.
   public var buttonBorderShape: ButtonBorderShape {
     get { self[ButtonBorderShapeKey.self] }
     set { self[ButtonBorderShapeKey.self] = newValue }
@@ -397,6 +450,14 @@ extension EnvironmentValues {
     set { self[HorizontalScrollIndicatorVisibilityKey.self] = newValue }
   }
 
+  /// Whether tables in this subtree show their header row.
+  ///
+  /// Written with `tableHeaders(_:)` and defaulting to
+  /// `TableHeaderVisibility.automatic`, which leaves the decision to the
+  /// table. The resolved value reaches a ``TableStyle`` through
+  /// ``TableStyleConfiguration/showsHeaders``.
+  ///
+  /// See <doc:Collections>.
   public var tableHeaderVisibility: TableHeaderVisibility {
     get { self[TableHeaderVisibilityKey.self] }
     set { self[TableHeaderVisibilityKey.self] = newValue }
@@ -407,21 +468,58 @@ extension EnvironmentValues {
     set { self[ThemeKey.self] = newValue }
   }
 
+  /// The ambient foreground paint, or `nil` when none is set.
+  ///
+  /// Written with `foregroundStyle(_:)`. It reaches a style as
+  /// `StyleEnvironmentSnapshot.foregroundStyle` and overrides the
+  /// `.foreground` semantic role in
+  /// `StyleEnvironmentSnapshot.resolvedStyle(for:)`, so a style that
+  /// resolves paints through that method inherits an app-level override
+  /// without extra work. `nil` means the theme decides.
+  ///
+  /// See <doc:Styling-And-Theming>.
   public var foregroundStyle: AnyShapeStyle? {
     get { self[ForegroundStyleKey.self] }
     set { self[ForegroundStyleKey.self] = newValue }
   }
 
+  /// The ambient tint paint, or `nil` when none is set.
+  ///
+  /// Written with `tint(_:)`. It reaches a style as
+  /// `StyleEnvironmentSnapshot.tintStyle` and overrides the `.tint` semantic
+  /// role in `StyleEnvironmentSnapshot.resolvedStyle(for:)`, so accent
+  /// chrome such as a focused border follows it. `nil` means the theme
+  /// decides.
+  ///
+  /// See <doc:Styling-And-Theming>.
   public var tintStyle: AnyShapeStyle? {
     get { self[TintStyleKey.self] }
     set { self[TintStyleKey.self] = newValue }
   }
 
+  /// Whether controls in this subtree accept interaction.
+  ///
+  /// Written with `disabled(_:)`, which combines with ancestor values rather
+  /// than replacing them, so a nested `disabled(false)` cannot re-enable a
+  /// disabled subtree. A disabled control registers no activation handler, and
+  /// the value reaches a style as `StyleEnvironmentSnapshot.isEnabled`.
+  /// Defaults to `true`.
+  ///
+  /// See <doc:Forms-And-Controls>.
   public var isEnabled: Bool {
     get { self[IsEnabledKey.self] }
     set { self[IsEnabledKey.self] = newValue }
   }
 
+  /// Whether focus is currently on the reading view or anywhere inside it.
+  ///
+  /// The value is baked per node from the runtime focus identity, so a
+  /// container reads `true` while any descendant holds focus. Reading it
+  /// registers a dependency on focus movement, which widens the subtree
+  /// recomputed when focus moves; prefer the focus state a control's style
+  /// configuration already carries when one is available.
+  ///
+  /// See <doc:Focus>.
   public var isFocused: Bool {
     get {
       // The containment bake: a reader's value can flip when focus moves
@@ -439,6 +537,15 @@ extension EnvironmentValues {
     set { _isFocused = newValue }
   }
 
+  /// Whether focused controls in this subtree draw a focus effect.
+  ///
+  /// Defaults to `true`. Setting it to `false` suppresses the visual
+  /// treatment only: the control still takes focus, still receives keyboard
+  /// input, and still reports its focus state. Built-in styles combine it
+  /// with the focus state, which a ``ButtonStyle`` sees as
+  /// ``ButtonStyleConfiguration/showsFocusEffect``.
+  ///
+  /// See <doc:Focus>.
   public var isFocusEffectEnabled: Bool {
     get { self[IsFocusEffectEnabledKey.self] }
     set { self[IsFocusEffectEnabledKey.self] = newValue }
@@ -533,7 +640,8 @@ extension EnvironmentValues {
       theme: theme,
       foregroundStyle: foregroundStyle,
       tintStyle: tintStyle,
-      isEnabled: isEnabled
+      isEnabled: isEnabled,
+      cellPixelMetrics: cellPixelMetrics
     )
   }
 

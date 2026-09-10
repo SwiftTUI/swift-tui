@@ -70,7 +70,9 @@ struct StyleFixtureConstructionTests {
         borderForegroundStyle: AnyShapeStyle(.separator)
       ),
       placeholderStyle: AnyShapeStyle(.placeholder),
-      focusActive: false,
+      isEnabled: true,
+      isFocused: false,
+      showsFocusEffect: true,
       styleEnvironment: styleEnvironment
     )
 
@@ -95,7 +97,9 @@ struct StyleFixtureConstructionTests {
         borderForegroundStyle: AnyShapeStyle(.separator)
       ),
       placeholderStyle: AnyShapeStyle(.placeholder),
-      focusActive: true,
+      isEnabled: true,
+      isFocused: true,
+      showsFocusEffect: true,
       styleEnvironment: styleEnvironment
     )
 

@@ -236,6 +236,9 @@ Closed compact content has no focus targets or active control actions.
 
 ## See Also
 
+- <doc:Style-System>
+- <doc:Styling-And-Theming>
+- <doc:Authoring-Styles>
 - <doc:Focus>
 - <doc:Commands-And-Key-Input>
 - <doc:Dismissal-Is-Data>
