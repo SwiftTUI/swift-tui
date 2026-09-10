@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-10
+
 ### Removed
 
 - Move the `SwiftTUITerminal` product and SwiftTerm-backed emulation to the
@@ -1809,7 +1811,7 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.12.1...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.0...HEAD
 [0.12.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.1
 [0.12.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.0
 [0.11.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.3
@@ -1821,3 +1823,5 @@ See the GitHub releases for the full per-tag history:
 [0.9.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.9.0
 [0.3.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.3.4
 [0.0.18]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.0.18
+
+[0.13.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.0
