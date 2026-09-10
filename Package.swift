@@ -68,10 +68,6 @@ let packageDependencies: [Package.Dependency] = [
     url: "https://github.com/apple/swift-argument-parser.git",
     from: "1.8.2"
   ),
-  .package(
-    url: "https://github.com/migueldeicaza/SwiftTerm.git",
-    from: "1.18.0"
-  ),
 ]
 
 let swiftTUIRuntimeDependencies: [Target.Dependency] = [
@@ -119,7 +115,6 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
     .library(name: "SwiftTUIArguments", targets: ["SwiftTUIArguments"]),
     .library(name: "SwiftTUIPTYPrimitives", targets: ["SwiftTUIPTYPrimitives"]),
-    .library(name: "SwiftTUITerminal", targets: ["SwiftTUITerminal"]),
     .library(name: "SwiftTUICLI", targets: ["SwiftTUICLI"]),
     .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
     .library(name: "SwiftTUIWebHost", targets: ["SwiftTUIWebHost"]),
@@ -255,47 +250,6 @@ let package = Package(
         ),
       ],
       path: "Platforms/Embedding/Sources/SwiftTUIPTYPrimitives",
-      swiftSettings: swiftSettings()
-    ),
-    // The PTY layer and SwiftTerm cannot build on Windows. The dependency
-    // *edges* are conditional — a source-level `#if` alone would still make
-    // SwiftPM build SwiftTerm there — and the condition is an allowlist with
-    // no negation, so it must name every platform the edge serves today:
-    // macOS/Catalyst/iOS (declared package platforms), Linux, and Android
-    // (the CLI stack cross-compiles for Android). WASI is deliberately
-    // absent — the PTY targets have never built there (the WASI lane builds
-    // `--target SwiftTUIWASI` precisely to avoid them).
-    // The emulation layer is the ONLY target depending on SwiftTerm, so the
-    // POSIX-bound dependency stays legible and a future package move is
-    // mechanical. `SwiftTUITerminal` re-exports it, keeping the split
-    // invisible to consumers.
-    .target(
-      name: "SwiftTUITerminalEmulation",
-      dependencies: [
-        "SwiftTUIRuntime",
-        .product(
-          name: "SwiftTerm",
-          package: "SwiftTerm",
-          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
-        ),
-      ],
-      path: "Platforms/Embedding/Sources/SwiftTUITerminalEmulation",
-      swiftSettings: swiftSettings()
-    ),
-    .target(
-      name: "SwiftTUITerminal",
-      dependencies: [
-        "SwiftTUIRuntime",
-        .target(
-          name: "SwiftTUITerminalEmulation",
-          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
-        ),
-        .target(
-          name: "SwiftTUIPTYPrimitives",
-          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
-        ),
-      ],
-      path: "Platforms/Embedding/Sources/SwiftTUITerminal",
       swiftSettings: swiftSettings()
     ),
     // Low-level syscall facade (Stage 2.1 of the Windows plan): free
@@ -652,24 +606,6 @@ let package = Package(
         ),
       ],
       path: "Platforms/Embedding/Tests/SwiftTUIPTYPrimitivesTests",
-      swiftSettings: swiftSettings()
-    ),
-    .testTarget(
-      name: "SwiftTUITerminalTests",
-      dependencies: [
-        "SwiftTUI",
-        "SwiftTUICore",
-        "SwiftTUITestSupport",
-        .target(
-          name: "SwiftTUIPTYPrimitives",
-          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
-        ),
-        .target(
-          name: "SwiftTUITerminal",
-          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
-        ),
-      ],
-      path: "Platforms/Embedding/Tests/SwiftTUITerminalTests",
       swiftSettings: swiftSettings()
     ),
     .testTarget(

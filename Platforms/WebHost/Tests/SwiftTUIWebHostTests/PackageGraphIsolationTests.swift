@@ -63,7 +63,6 @@
         "SwiftTUIWebHost",
         "SwiftTUIWASI",
         "SwiftTUIWASISurfaceBridge",
-        "SwiftTUITerminal",
       ] {
         let block = try #require(targetBlock(named: targetName, in: rootManifest))
         #expect(block.contains("\"SwiftTUIRuntime\""))

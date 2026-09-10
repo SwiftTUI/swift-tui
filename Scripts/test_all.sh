@@ -192,7 +192,7 @@ Runs the exhaustive checked-in repo verification surface:
     suites isolated from the broad SwiftTUI runtime step
   - focused SwiftTUIArguments tests
   - focused SwiftTUICLI tests
-  - focused SwiftTUITerminal / PTY primitive tests
+  - focused PTY primitive tests
   - focused SwiftTUIWASI / SwiftTUIWASISurfaceBridge tests
   - focused SwiftTUIWebHost tests
   - focused SwiftTUIAndroidHost tests
@@ -511,7 +511,7 @@ runtime_shard_command_text() {
 # The socket, PTY, and process-launching targets stay out of the merged
 # launch: on the first CI run of the merged shape (swift-tui run 32844751713)
 # WebHostLoopbackWireTests lost its 5 s WebSocket reads and a
-# SwiftTUITerminalTests session-lifecycle race lost its wakeup with 2,389
+# Terminal embedding formerly lost lifecycle wakeups under contention with 2,389
 # tests in flight on a 4-vCPU runner — contention, not defects (both pass in
 # their own launch, as they always did). They keep their own launches below;
 # the cost is four ~8 s discovery passes.
@@ -520,7 +520,6 @@ run_non_runtime_test_targets() {
     --skip '^SwiftTUITests\.' \
     --skip '^EntryPointLaunchTests\.' \
     --skip '^SwiftTUICLITests\.' \
-    --skip '^SwiftTUITerminalTests\.' \
     --skip '^SwiftTUIPTYPrimitivesTests\.' \
     --skip '^SwiftTUIWebHostTests\.'
 }
@@ -916,18 +915,13 @@ if [ "$lane" = all ]; then
 elif [ "$lane" = core ]; then
   run_function_step \
     "Run non-runtime test targets" \
-    "$(swift_command_text test --skip '^SwiftTUITests\.' --skip '^EntryPointLaunchTests\.' --skip '^SwiftTUICLITests\.' --skip '^SwiftTUITerminalTests\.' --skip '^SwiftTUIPTYPrimitivesTests\.' --skip '^SwiftTUIWebHostTests\.')" \
+    "$(swift_command_text test --skip '^SwiftTUITests\.' --skip '^EntryPointLaunchTests\.' --skip '^SwiftTUICLITests\.' --skip '^SwiftTUIPTYPrimitivesTests\.' --skip '^SwiftTUIWebHostTests\.')" \
     run_non_runtime_test_targets
 
   run_function_step \
     "Run SwiftTUICLI tests" \
     "$(swift_command_text test --filter SwiftTUICLITests)" \
     run_swift test --filter SwiftTUICLITests
-
-  run_function_step \
-    "Run SwiftTUITerminal tests" \
-    "$(swift_command_text test --filter SwiftTUITerminalTests)" \
-    run_swift test --filter SwiftTUITerminalTests
 
   run_function_step \
     "Run SwiftTUIPTYPrimitives tests" \
@@ -1083,11 +1077,6 @@ if [ "$lane" = all ]; then
     "Run SwiftTUICLI tests" \
     "$(swift_command_text test --filter SwiftTUICLITests)" \
     run_swift test --filter SwiftTUICLITests
-
-  run_function_step \
-    "Run SwiftTUITerminal tests" \
-    "$(swift_command_text test --filter SwiftTUITerminalTests)" \
-    run_swift test --filter SwiftTUITerminalTests
 
   run_function_step \
     "Run SwiftTUIPTYPrimitives tests" \

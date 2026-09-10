@@ -46,7 +46,7 @@ swift_tui_target_block=$(target_block SwiftTUI)
 swift_tui_runtime_target_block=$(target_block SwiftTUIRuntime)
 
 case "$swift_tui_runtime_target_block" in
-  *SwiftTUICLI*|*SwiftTUIWebHost*|*FlyingFox*|*UnixSignals*|*SwiftTerm*)
+  *SwiftTUICLI*|*SwiftTUIWebHost*|*FlyingFox*|*UnixSignals*)
     fail 'The SwiftTUIRuntime target must not depend on host, terminal-runner, or terminal-emulator products.'
     ;;
 esac
@@ -147,7 +147,7 @@ case "$cli_target_block" in
     ;;
 esac
 
-for host_target in SwiftTUIWebHost SwiftTUIWASI SwiftTUIWASISurfaceBridge SwiftTUITerminal
+for host_target in SwiftTUIWebHost SwiftTUIWASI SwiftTUIWASISurfaceBridge
 do
   host_target_block=$(target_block "$host_target")
 

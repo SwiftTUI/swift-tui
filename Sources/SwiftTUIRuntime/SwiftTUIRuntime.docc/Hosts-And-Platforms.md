@@ -232,7 +232,7 @@ resize) and a Win32 console controller on Windows.
 | WASI / browser | Supported through `SwiftTUIWASI` and the [`swift-tui-web`](https://github.com/SwiftTUI/swift-tui-web) browser packages. |
 | Android host / cross-compilation | `SwiftTUIAndroidHost` cross-compiles for `aarch64-unknown-linux-android28` and `x86_64-unknown-linux-android28`. The reusable Compose host + JNI shim ship as the published `sh.swifttui:android-host` AAR, with the `sh.swifttui.android` Gradle plugin, from [`swift-tui-android`](https://github.com/SwiftTUI/swift-tui-android). Consumer apps depend on the tagged `SwiftTUIAndroidHost` SwiftPM product over HTTPS and let the plugin cross-build their Swift host. |
 | Native SwiftUI host | Supported on macOS 15+ and iOS 18+ by the external [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) package. |
-| `SwiftTUITerminal` / `SwiftTUIPTYPrimitives` (PTY embedding) | macOS and Linux only. |
+| `SwiftTUITerminalView` from the external [`swift-tui-terminal-view`](https://github.com/SwiftTUI/swift-tui-terminal-view) package (PTY embedding) | macOS and Linux only. |
 
 ## The Web Packages
 

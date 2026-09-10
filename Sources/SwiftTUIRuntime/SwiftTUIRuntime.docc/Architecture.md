@@ -67,8 +67,9 @@ boundaries, the runtime pipeline, and the phase products that connect them.
   `swift-tui-swiftui` package: https://github.com/SwiftTUI/swift-tui-swiftui
 - `SwiftTUIWebHost` is compound: its runner starts a localhost browser host and
   `SwiftTUIWebHostCLI` composes terminal and WebHost launch routing
-- terminal-program embedding lives in `SwiftTUITerminal` and
-  `SwiftTUIPTYPrimitives`. The tabbed/split-pane workspace layer lives in the
+- terminal-program embedding lives in the external
+  [`swift-tui-terminal-view`](https://github.com/SwiftTUI/swift-tui-terminal-view)
+  package; shared PTY plumbing remains in `SwiftTUIPTYPrimitives`. The tabbed/split-pane workspace layer lives in the
   `terminal-workspace` example app in `SwiftTUI/swift-tui-examples`
 
 The conceptual model is:

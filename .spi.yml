@@ -11,8 +11,6 @@ builder:
         - SwiftTUIArguments
         - SwiftTUITerminalCLI
         - SwiftTUICLI
-        - SwiftTUITerminalEmulation
-        - SwiftTUITerminal
         - SwiftTUIWASI
         - SwiftTUIWebHost
         - SwiftTUIWebHostCLI

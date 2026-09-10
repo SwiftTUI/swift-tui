@@ -44,7 +44,7 @@ packaging boundaries live in
 | One binary that supports terminal launch and `--web` | `SwiftTUIWebHostCLI` | `import SwiftTUIWebHostCLI` |
 | Host-managed Android app | `SwiftTUIAndroidHost` | `import SwiftTUIAndroidHost` |
 | Native SwiftUI embedding on macOS or iOS | `SwiftUIHost` from the separate [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) package | `import SwiftUIHost` |
-| Embedded terminal program panes | `SwiftTUITerminal` | `import SwiftTUITerminal` |
+| Embedded terminal program panes | `SwiftTUITerminalView` from the separate [`swift-tui-terminal-view`](https://github.com/SwiftTUI/swift-tui-terminal-view) package | `import SwiftTUITerminalView` |
 | Charts and compact metrics | `SwiftTUICharts` (from the separate [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package) | `import SwiftTUICharts` |
 | Finite animated images or GIF import/export without the full convenience product | `SwiftTUIAnimatedImage` | `import SwiftTUIAnimatedImage` |
 
@@ -52,8 +52,8 @@ packaging boundaries live in
 `SwiftTUIWebHostCLI`, and `SwiftTUIAndroidHost` all re-export the authoring
 surface, so an executable or host usually imports one integration product.
 `SwiftTUI` additionally includes `SwiftTUIAnimatedImage` by default. Add peer
-products such as `SwiftTUITerminal` alongside your launch product only when
-you use those views. Charts and the SwiftUI host come from separate packages.
+products such as `SwiftTUITerminalView` alongside your launch product only when
+you use those views. Charts, terminal views, and the SwiftUI host come from separate packages.
 
 ## Common Compositions
 
@@ -151,12 +151,16 @@ distribution and engine-profile matrix.
 
 ### Terminal Program Embedding
 
-`SwiftTUITerminal` is an opt-in product for embedding external terminal
-programs inside SwiftTUI views.
+`SwiftTUITerminalView` is an opt-in product from the separate
+[`swift-tui-terminal-view`](https://github.com/SwiftTUI/swift-tui-terminal-view)
+package for embedding terminal programs. Add that package dependency and its
+`SwiftTUITerminalView` product to your target, then import it alongside your
+launch product. The [installation guide](https://swifttui.sh/docs/terminal-view/documentation/swifttuiterminalview/getting-started)
+provides the complete manifest.
 
 ```swift
 import SwiftTUI
-import SwiftTUITerminal
+import SwiftTUITerminalView
 
 struct ShellPane: View {
   @State private var session = TerminalProcessSession(

@@ -247,7 +247,8 @@ The policy at this package boundary: runners (`SwiftTUICLI`, `SwiftTUIWASI`,
 `SwiftTUIAndroidHost` host ship from this package; the `SwiftUIHost` host is
 wholly external in
 [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui); embedding
-products are `SwiftTUITerminal` and `SwiftTUIPTYPrimitives`. Showcase and
+plumbing remains in `SwiftTUIPTYPrimitives`; terminal views ship from
+[`swift-tui-terminal-view`](https://github.com/SwiftTUI/swift-tui-terminal-view). Showcase and
 example targets never become products.
 
 ## Removed From The Public Surface
@@ -255,8 +256,8 @@ example targets never become products.
 The `SwiftTUITerminalWorkspace` product (the tabbed/split-pane workspace layer
 above `TerminalView`) moved out of the framework and now lives in the
 [`terminal-workspace` example](https://github.com/SwiftTUI/swift-tui-examples/tree/main/terminal-workspace)
-in `swift-tui-examples`. `SwiftTUITerminal` remains the public
-terminal-embedding surface.
+in `swift-tui-examples`. `SwiftTUITerminalView` from the separate `swift-tui-terminal-view` package
+is the public terminal-embedding surface.
 
 These migration-era APIs are no longer public:
 

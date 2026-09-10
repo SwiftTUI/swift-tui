@@ -19,8 +19,6 @@ for module in \
   SwiftTUIAnimatedImage \
   SwiftTUIArguments \
   SwiftTUIPTYPrimitives \
-  SwiftTUITerminalEmulation \
-  SwiftTUITerminal \
   SwiftTUITerminalCLI \
   SwiftTUICLIAttach \
   SwiftTUIPlatformIO \

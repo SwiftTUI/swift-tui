@@ -80,9 +80,6 @@ flowchart TD
     SwiftTUIWebHostCLI --> SwiftTUIWebHost
     SwiftTUIWebHostCLI --> SwiftTUITerminalCLI
     SwiftTUIWebHostCLI --> SwiftTUIArguments
-    SwiftTUITerminal --> SwiftTUIRuntime
-    SwiftTUITerminal --> SwiftTUITerminalEmulation
-    SwiftTUITerminalEmulation["SwiftTUITerminalEmulation<br/>(sole SwiftTerm dependent)"] --> SwiftTUIRuntime
     SwiftTUIAnimatedImage --> SwiftTUIViews
     SwiftTUIProfiling["SwiftTUIProfiling<br/>(optional, opt-in)"] --> SwiftTUIRuntime
 ```
@@ -191,14 +188,13 @@ contains no nested Swift packages.
   SwiftUI on macOS/iOS lives in the separate
   [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui)
   package, not under this package's `Platforms/` tree.
-- **Terminal-program embedding** — `SwiftTUITerminal` (`TerminalView`,
-  `TerminalSession`, `TerminalProcessSession`), `SwiftTUITerminalEmulation`
-  (the SwiftTerm-backed emulator and its key/mouse/event vocabulary — the
-  only target depending on SwiftTerm, re-exported by `SwiftTUITerminal`),
-  and `SwiftTUIPTYPrimitives` (pty creation, fd lifecycle, resize). These are
-  POSIX-only: their dependency edges are platform-conditional and every
-  source file is compiled out on Windows. The tabbed/split-pane workspace
-  layer lives in the `terminal-workspace` example app in
+- **Terminal-program embedding** — `TerminalView`, session management, and
+  the SwiftTerm-backed emulator ship from the separate
+  [`swift-tui-terminal-view`](https://github.com/SwiftTUI/swift-tui-terminal-view)
+  package as `SwiftTUITerminalView`. This framework retains
+  `SwiftTUIPTYPrimitives` (PTY creation, child spawning, fd lifecycle, resize)
+  and its conditional C shim dependency for POSIX CLI attach. The tabbed and
+  split-pane workspace lives in the `terminal-workspace` example in
   `SwiftTUI/swift-tui-examples`.
 
 `SwiftTUIWebHost` owns the embedded in-tree HTTP/WebSocket server

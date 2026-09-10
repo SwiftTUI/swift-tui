@@ -24,8 +24,6 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIAnimatedImage` | 5 | 31 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
-| `SwiftTUITerminalEmulation` | 6 | 75 |
-| `SwiftTUITerminal` | 7 | 45 |
 | `SwiftTUITerminalCLI` | 6 | 24 |
 | `SwiftTUICLIAttach` | 1 | 6 |
 | `SwiftTUICLI` | 0 | 0 |
@@ -576,29 +574,6 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `PTYHandles` — struct — 4 members
 - `PTYPair` — class — 9 members
 - `ptyResize(masterFD:cols:rows:)` — func
-
-## SwiftTUITerminalEmulation
-
-### Canonical surface (6)
-
-- `TerminalBufferKind` — enum — 2 members
-- `TerminalEmulator` — class — 7 members
-- `TerminalEmulatorEvent` — enum — 9 members
-- `TerminalEmulatorKey` — struct — 29 members
-- `TerminalEmulatorMouse` — struct — 17 members
-- `TerminalMouseMode` — enum — 5 members
-
-## SwiftTUITerminal
-
-### Canonical surface (7)
-
-- `TerminalExitReason` — enum — 3 members
-- `TerminalLifecycle` — enum — 3 members
-- `TerminalProcessSession` — class — 13 members
-- `TerminalSession` — protocol — 11 members
-- `TerminalView` — struct — 4 members
-- `TerminalViewKeyDisposition` — enum — 2 members
-- `View` — extension — 2 members
 
 ## SwiftTUITerminalCLI
 

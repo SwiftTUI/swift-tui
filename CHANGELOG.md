@@ -8,6 +8,17 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Removed
+
+- Move the `SwiftTUITerminal` product and SwiftTerm-backed emulation to the
+  separate `swift-tui-terminal-view` package. SwiftTerm is no longer a framework
+  dependency. To migrate, add that package, change the product dependency to
+  `SwiftTUITerminalView` from `swift-tui-terminal-view`, and replace
+  `import SwiftTUITerminal` with `import SwiftTUITerminalView`. View and session
+  APIs retain their names. `ChildProcessPty` now belongs to the framework's
+  `SwiftTUIPTYPrimitives`, which the new umbrella re-exports; its public
+  `requestSignal` retains termination requests made during startup.
+
 ## [0.12.1] - 2026-09-09
 
 ### Changed

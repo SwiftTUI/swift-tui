@@ -1,6 +1,4 @@
-// This whole module is compiled out on Windows: the dependency edges to
-// SwiftTerm and the PTY layer are platform-conditional in Package.swift, so
-// the target must compile to an empty module there.
+// PTY plumbing is POSIX-only; dependency edges exclude Windows.
 #if !os(Windows)
   public enum PTYError: Error, Equatable, Sendable, CustomStringConvertible {
     case allocationFailed(errno: Int32)

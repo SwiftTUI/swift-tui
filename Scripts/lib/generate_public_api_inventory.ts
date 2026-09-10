@@ -125,8 +125,6 @@ const PRIMARY_MODULES = [
   "SwiftTUIAnimatedImage",
   "SwiftTUIArguments",
   "SwiftTUIPTYPrimitives",
-  "SwiftTUITerminalEmulation",
-  "SwiftTUITerminal",
   "SwiftTUITerminalCLI",
   "SwiftTUICLIAttach",
   "SwiftTUICLI",
