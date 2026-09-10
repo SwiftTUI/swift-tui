@@ -194,7 +194,7 @@ run_candidate \
   "process/presentation integration and wall-clock sensitivity" \
   "terminal embedding test support" \
   "Scripts/repeat_async_flake_registry.sh" \
-  "swiftly run swift test --filter SwiftTUITerminalTests.RenderDiffTests"
+  "swiftly run swift test --filter SwiftTUITests.ForeignSurfaceRenderDiffTests"
 
 unsorted_summary_file="$run_root/summary.unsorted.tsv"
 awk -F '\t' '

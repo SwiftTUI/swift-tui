@@ -1,11 +1,8 @@
-// This whole module is compiled out on Windows: the dependency edges to
-// SwiftTerm and the PTY layer are platform-conditional in Package.swift, so
-// the target must compile to an empty module there.
+// PTY process spawning is POSIX-only; the C shim dependency is conditional.
 #if !os(Windows)
   import Foundation
   public import SwiftTUICore
   import SwiftTUIPTYCPrimitives
-  public import SwiftTUIPTYPrimitives
 
   #if canImport(Darwin)
     import Darwin
@@ -130,7 +127,7 @@
     /// `start()`. A concurrent termination can therefore reach this actor before
     /// `start()` or while PTY setup is suspended. Remembering the signal closes
     /// that race without publishing a child that can outlive its session.
-    func requestSignal(_ signal: Int32) {
+    public func requestSignal(_ signal: Int32) {
       guard pid > 0 else {
         pendingSignal = signal
         return

@@ -2,7 +2,6 @@
 // POSIX-only subsystem whose modules build empty (or not at all) on Windows.
 #if !os(Windows)
 
-  import SwiftTUICore
   import SwiftTUIRuntime
   @_spi(Testing) import SwiftTUITestSupport
   import Synchronization
@@ -11,13 +10,13 @@
   @testable import SwiftTUITerminal
 
   @MainActor
-  @Suite("TerminalView input")
+  @Suite("TerminalView input", .timeLimit(.minutes(1)))
   struct TerminalViewInputTests {
     @Test("configured host interception consumes Escape before the child")
     func hostInterceptionConsumesEscape() async throws {
       let session = RecordingTerminalSession()
       let routedKeyPresses = Mutex<[KeyPress]>([])
-      let runLoop = try makeTerminalViewRunLoop(
+      let runLoop = await makeTerminalViewRunLoop(
         TerminalView(
           session: session,
           keyRouting: { keyPress in
@@ -27,7 +26,9 @@
         )
       )
 
-      #expect(runLoop.handleKeyPress(KeyPress(.escape)) == nil)
+      defer { runLoop.stop() }
+
+      await runLoop.press(KeyPress(.escape))
       await Task.yield()
       #expect(routedKeyPresses.withLock { $0 } == [KeyPress(.escape)])
       #expect(session.sentKeys.isEmpty)
@@ -36,9 +37,11 @@
     @Test("default key routing forwards Escape to the child")
     func defaultRoutingForwardsEscape() async throws {
       let session = RecordingTerminalSession()
-      let runLoop = try makeTerminalViewRunLoop(TerminalView(session: session))
+      let runLoop = await makeTerminalViewRunLoop(TerminalView(session: session))
 
-      #expect(runLoop.handleKeyPress(KeyPress(.escape)) == nil)
+      defer { runLoop.stop() }
+
+      await runLoop.press(KeyPress(.escape))
       await session.sentKeySignal.wait {
         session.sentKeys == [TerminalEmulatorKey(code: .escape)]
       }
@@ -50,7 +53,7 @@
     func hostRoutingSeesOriginalKeyPresses() async throws {
       let session = RecordingTerminalSession()
       let routedKeyPresses = Mutex<[KeyPress]>([])
-      let runLoop = try makeTerminalViewRunLoop(
+      let runLoop = await makeTerminalViewRunLoop(
         TerminalView(
           session: session,
           keyRouting: { keyPress in
@@ -59,6 +62,8 @@
           }
         )
       )
+      defer { runLoop.stop() }
+
       let keyPresses = [
         KeyPress(.character("x")),
         KeyPress(.pageDown),
@@ -66,7 +71,7 @@
       ]
 
       for keyPress in keyPresses {
-        #expect(runLoop.handleKeyPress(keyPress) == nil)
+        await runLoop.press(keyPress)
       }
       await session.sentKeySignal.wait {
         session.sentKeys.count == keyPresses.count
@@ -87,10 +92,10 @@
     }
 
     @Test("forwarded unmappable input remains ignored")
-    func forwardedUnmappableInputRemainsIgnored() throws {
+    func forwardedUnmappableInputRemainsIgnored() async throws {
       let session = RecordingTerminalSession()
       let routedKeyPresses = Mutex<[KeyPress]>([])
-      let runLoop = try makeTerminalViewRunLoop(
+      let runLoop = await makeTerminalViewRunLoop(
         TerminalView(
           session: session,
           keyRouting: { keyPress in
@@ -99,10 +104,12 @@
           }
         )
       )
+      defer { runLoop.stop() }
+
       let invalidFunctionKey = KeyPress(.functionKey(0))
 
       #expect(TerminalEmulatorKey(keyPress: invalidFunctionKey) == nil)
-      #expect(runLoop.handleKeyPress(invalidFunctionKey) == nil)
+      await runLoop.press(invalidFunctionKey)
       #expect(routedKeyPresses.withLock { $0 } == [invalidFunctionKey])
       #expect(session.sentKeys.isEmpty)
     }
@@ -111,7 +118,7 @@
     func hostFocusedTerminalRoutesThroughFrameworkMember() async throws {
       let session = RecordingTerminalSession()
       let routedKeyPresses = Mutex<[KeyPress]>([])
-      let runLoop = try makeTerminalViewRunLoop(
+      let runLoop = await makeTerminalViewRunLoop(
         HostFocusedTerminalFixture(
           session: session,
           keyRouting: { keyPress in
@@ -121,28 +128,30 @@
         )
       )
 
+      defer { runLoop.stop() }
+
       // The sibling owns initial focus, so terminal input must remain dormant.
-      #expect(runLoop.handleKeyPress(KeyPress(.arrowDown)) == nil)
+      await runLoop.press(KeyPress(.arrowDown))
       await Task.yield()
       #expect(routedKeyPresses.withLock { $0 }.isEmpty)
       #expect(session.sentKeys.isEmpty)
 
       runLoop.focusTracker.focusNext()
-      try settleTerminalViewRunLoop(runLoop)
+      await runLoop.settle()
 
-      #expect(runLoop.handleKeyPress(KeyPress(.arrowDown)) == nil)
+      await runLoop.press(KeyPress(.arrowDown))
       await session.sentKeySignal.wait {
         session.sentKeys == [TerminalEmulatorKey(code: .arrowDown)]
       }
-      #expect(runLoop.handleKeyPress(KeyPress(.escape)) == nil)
+      await runLoop.press(KeyPress(.escape))
       await Task.yield()
 
       #expect(routedKeyPresses.withLock { $0 } == [KeyPress(.arrowDown), KeyPress(.escape)])
       #expect(session.sentKeys == [TerminalEmulatorKey(code: .arrowDown)])
 
       runLoop.focusTracker.focusPrevious()
-      try settleTerminalViewRunLoop(runLoop)
-      #expect(runLoop.handleKeyPress(KeyPress(.arrowDown)) == nil)
+      await runLoop.settle()
+      await runLoop.press(KeyPress(.arrowDown))
       await Task.yield()
       #expect(routedKeyPresses.withLock { $0 } == [KeyPress(.arrowDown), KeyPress(.escape)])
       #expect(session.sentKeys == [TerminalEmulatorKey(code: .arrowDown)])
@@ -187,49 +196,61 @@
   @MainActor
   private func makeTerminalViewRunLoop<Content: View>(
     _ terminalView: Content
-  ) throws -> SwiftTUIRuntime.RunLoop<Int, Content> {
-    let terminalSize = CellSize(width: 20, height: 4)
+  ) async -> TerminalViewInputHarness {
+    let harness = TerminalViewInputHarness()
     let rootIdentity = Identity(components: [.named("TerminalViewInputRoot")])
     let runLoop = SwiftTUIRuntime.RunLoop(
       rootIdentity: rootIdentity,
-      presentationSurface: TerminalViewInputHost(surfaceSize: terminalSize),
-      terminalInputReader: TerminalViewInputReader(),
-      stateContainer: StateContainer(
-        initialState: 0,
-        invalidationIdentities: [rootIdentity]
-      ),
-      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
-      proposal: ProposedSize(width: terminalSize.width, height: terminalSize.height),
+      presentationSurface: harness.host,
+      terminalInputReader: harness.input,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: harness.focusTracker,
+      proposal: ProposedSize(width: 20, height: 4),
       exitKeyBindings: .none,
-      viewBuilder: { _, _ in terminalView }
-    )
-    runLoop.installFocusTrackerInvalidator()
-    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
-
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    for _ in 0..<5 {
-      let previousFrameCount = renderedFrames
-      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-      if previousFrameCount == renderedFrames {
-        break
+      viewBuilder: { _, _ in
+        Panel(id: "input-root") { terminalView }
+          .keyCommand("Test input barrier", key: .functionKey(99), modifiers: []) {
+            harness.barriers += 1
+            harness.barrierSignal.notify()
+          }
       }
-    }
-    return runLoop
+    )
+    harness.task = Task { _ = try await runLoop.run() }
+    let host = harness.host
+    await host.frameSignal.wait { host.frames > 0 }
+    return harness
   }
 
+  /// Drives the public input stream. A scoped command acknowledges each batch
+  /// before assertions, without exposing the runtime's private dispatch methods.
   @MainActor
-  private func settleTerminalViewRunLoop<State, Content: View>(
-    _ runLoop: SwiftTUIRuntime.RunLoop<State, Content>
-  ) throws {
-    var renderedFrames = 0
-    for _ in 0..<5 {
-      let previousFrameCount = renderedFrames
-      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-      if previousFrameCount == renderedFrames {
-        break
-      }
+  private final class TerminalViewInputHarness {
+    let input = TerminalViewInputReader()
+    let host = TerminalViewInputHost(surfaceSize: CellSize(width: 20, height: 4))
+    let focusTracker = FocusTracker(
+      invalidationIdentities: [Identity(components: [.named("TerminalViewInputRoot")])]
+    )
+    let barrierSignal = MainActorConditionSignal()
+    var barriers = 0
+    var task: Task<Void, any Error>?
+
+    func press(_ key: KeyPress) async {
+      input.send(key)
+      await settle()
+    }
+
+    func settle() async {
+      let target = barriers + 1
+      let host = self.host
+      let previousFrames = host.frames
+      input.send(KeyPress(.functionKey(99)))
+      await barrierSignal.wait { self.barriers >= target }
+      await host.frameSignal.wait { host.frames > previousFrames }
+    }
+
+    func stop() {
+      input.finish()
+      task?.cancel()
     }
   }
 
@@ -310,13 +331,18 @@
   }
 
   private final class TerminalViewInputReader: TerminalInputReading {
-    func inputEvents() -> AsyncStream<InputEvent> {
-      AsyncStream { $0.finish() }
-    }
+    private let pair = AsyncStream<InputEvent>.makeStream()
+
+    func inputEvents() -> AsyncStream<InputEvent> { pair.stream }
+    func send(_ key: KeyPress) { pair.continuation.yield(.key(key)) }
+    func finish() { pair.continuation.finish() }
   }
 
-  private final class TerminalViewInputHost: PresentationSurface {
-    var surfaceSize: CellSize
+  private final class TerminalViewInputHost: PresentationSurface, Sendable {
+    private let frameStorage = Mutex(0)
+    let frameSignal = ConditionSignal()
+    var frames: Int { frameStorage.withLock { $0 } }
+    let surfaceSize: CellSize
     let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
     let appearance: TerminalAppearance = .fallback
 
@@ -326,6 +352,11 @@
 
     func enableRawMode() throws {}
     func disableRawMode() throws {}
+    func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+      frameStorage.withLock { $0 += 1 }
+      frameSignal.notify()
+      return TerminalPresentationMetrics(linesTouched: surface.size.height)
+    }
     func write(_: String) throws {}
     func clearScreen() throws {}
     func moveCursor(to _: CellPoint) throws {}

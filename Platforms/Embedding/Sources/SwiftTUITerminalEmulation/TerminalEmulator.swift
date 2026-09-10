@@ -3,7 +3,7 @@
 // the target must compile to an empty module there.
 #if !os(Windows)
   import Foundation
-  public import SwiftTUICore
+  public import SwiftTUIRuntime
   @unsafe @preconcurrency import SwiftTerm
 
   public actor TerminalEmulator {

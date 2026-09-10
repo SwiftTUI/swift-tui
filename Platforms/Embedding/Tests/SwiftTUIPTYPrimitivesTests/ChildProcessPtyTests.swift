@@ -6,7 +6,7 @@
   import SwiftTUIRuntime
   import Testing
 
-  @testable import SwiftTUITerminal
+  @testable import SwiftTUIPTYPrimitives
 
   #if canImport(Darwin)
     import Darwin

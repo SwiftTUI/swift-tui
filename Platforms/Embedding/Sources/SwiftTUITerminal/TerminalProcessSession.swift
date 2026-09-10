@@ -2,7 +2,7 @@
 // SwiftTerm and the PTY layer are platform-conditional in Package.swift, so
 // the target must compile to an empty module there.
 #if !os(Windows)
-  public import SwiftTUICore
+  public import SwiftTUIRuntime
   import SwiftTUIPTYPrimitives
   public import SwiftTUITerminalEmulation
   import Synchronization

@@ -24,3 +24,7 @@ this product only if a custom integration needs direct pty lifecycle control.
 ### Resizing
 
 - ``ptyResize(masterFD:cols:rows:)``
+
+### Child processes
+
+- ``ChildProcessPty``

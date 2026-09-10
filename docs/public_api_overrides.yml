@@ -217,7 +217,7 @@ classifications:
     - SwiftTUIPTYPrimitives.PTYHandles
     - SwiftTUIPTYPrimitives.PTYPair
     - "SwiftTUIPTYPrimitives.ptyResize(masterFD:cols:rows:)"
-    - SwiftTUITerminal.ChildProcessPty
+    - SwiftTUIPTYPrimitives.ChildProcessPty
     - SwiftTUITerminal.TerminalExitReason
     - SwiftTUITerminal.TerminalLifecycle
     - SwiftTUITerminal.TerminalProcessSession

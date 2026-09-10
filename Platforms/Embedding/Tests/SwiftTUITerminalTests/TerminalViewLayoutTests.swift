@@ -2,7 +2,6 @@
 // POSIX-only subsystem whose modules build empty (or not at all) on Windows.
 #if !os(Windows)
 
-  import SwiftTUICore
   import SwiftTUIRuntime
   @_spi(Testing) import SwiftTUITestSupport
   import Synchronization
@@ -11,7 +10,7 @@
   @testable import SwiftTUITerminal
 
   @MainActor
-  @Suite("TerminalView layout")
+  @Suite("TerminalView layout", .timeLimit(.minutes(1)))
   struct TerminalViewLayoutTests {
     @Test("TerminalView accepts the parent's full proposal")
     func acceptsProposal() {
@@ -24,7 +23,7 @@
       #expect(artifacts.rasterSurface.size == CellSize(width: 40, height: 12))
     }
 
-    @Test("draw emits exactly one foreignSurface command at the assigned bounds")
+    @Test("the assigned surface renders the complete child grid")
     func emitsForeignSurface() {
       let row = Array(repeating: RasterCell(character: "x"), count: 4)
       let grid = ForeignGrid(
@@ -37,33 +36,38 @@
         proposal: ProposedSize(width: 4, height: 2)
       )
 
-      let surfaces = allCommands(in: artifacts.drawTree).compactMap { command -> CellRect? in
-        if case .foreignSurface(let bounds, _) = command {
-          return bounds
-        }
-        return nil
-      }
-
-      #expect(surfaces == [CellRect(origin: .zero, size: CellSize(width: 4, height: 2))])
+      #expect(artifacts.rasterSurface.size == grid.size)
+      #expect(
+        artifacts.rasterSurface.cells.map { $0.map(\.character) }
+          == grid.cells.map { $0.map(\.character) })
     }
 
-    @Test("render registers one lifecycle task for start, resize, and event consumption")
-    func registersLifecycleTask() {
+    @Test("the view lifecycle starts, resizes, and subscribes to the session once")
+    func registersLifecycleTask() async throws {
       let session = StubTerminalSession(grid: ForeignGrid.empty)
-      let artifacts = DefaultRenderer().render(
-        TerminalView(session: session),
-        proposal: ProposedSize(width: 7, height: 3)
+      let input = ClipboardTerminalInputReader()
+      let identity = Identity(components: [.named("TerminalViewLifecycleRoot")])
+      let runLoop = SwiftTUIRuntime.RunLoop(
+        rootIdentity: identity,
+        presentationSurface: ClipboardTerminalHost(),
+        terminalInputReader: input,
+        signalReader: ClipboardSignalReader(),
+        stateContainer: StateContainer(initialState: 0, invalidationIdentities: [identity]),
+        focusTracker: FocusTracker(invalidationIdentities: [identity]),
+        proposal: ProposedSize(width: 7, height: 3),
+        exitKeyBindings: .none,
+        viewBuilder: { _, _ in TerminalView(session: session) }
       )
-
-      let taskStarts = artifacts.commitPlan.lifecycle.compactMap { entry -> TaskDescriptor? in
-        if case .taskStart(let descriptor) = entry.operation {
-          return descriptor
-        }
-        return nil
+      let task = Task { try await runLoop.run() }
+      defer {
+        input.finish()
+        task.cancel()
       }
-
-      #expect(taskStarts.count == 1)
-      #expect(taskStarts.first?.priority == .userInitiated)
+      await session.lifecycleSignal.wait { session.lifecycleCalls.count >= 3 }
+      #expect(session.lifecycleCalls == ["events", "start", "resize"])
+      #expect(session.cachedSnapshot.size == CellSize(width: 7, height: 3))
+      input.finish()
+      #expect(try await task.value.exitReason == .inputEnded)
     }
 
     @Test("TerminalView forwards child clipboard requests to the host clipboard action")
@@ -105,6 +109,13 @@
   }
 
   private final class StubTerminalSession: TerminalSession {
+    private let callStorage = Mutex<[String]>([])
+    let lifecycleSignal = ConditionSignal()
+    var lifecycleCalls: [String] { callStorage.withLock { $0 } }
+    private func record(_ call: String) {
+      callStorage.withLock { $0.append(call) }
+      lifecycleSignal.notify()
+    }
     private let snapshotStorage: Mutex<ForeignGrid>
 
     init(grid: ForeignGrid) {
@@ -115,7 +126,7 @@
       snapshotStorage.withLock { $0 }
     }
 
-    func start() async throws {}
+    func start() async throws { record("start") }
 
     func snapshot() async -> ForeignGrid {
       cachedSnapshot
@@ -143,10 +154,12 @@
       snapshotStorage.withLock { grid in
         grid.size = size
       }
+      record("resize")
     }
 
     func events() -> AsyncStream<TerminalEmulatorEvent> {
-      AsyncStream { continuation in
+      record("events")
+      return AsyncStream { continuation in
         continuation.finish()
       }
     }
@@ -300,12 +313,6 @@
         continuation.finish()
       }
     }
-  }
-
-  private func allCommands(in node: DrawNode) -> [DrawCommand] {
-    node.commands
-      + node.children.flatMap(allCommands(in:))
-      + node.postCommands
   }
 
 #endif

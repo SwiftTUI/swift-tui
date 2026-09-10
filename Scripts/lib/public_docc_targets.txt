@@ -17,8 +17,9 @@
 #     pushed the hosted DocC archive past Cloudflare Pages' 20,000-file
 #     per-project limit (the 0.9.10 deploy failed at 20,196 files). Their
 #     symbols remain reachable through the modules that re-export them.
-#   - SwiftTUIPTYPrimitives — pty plumbing behind SwiftTUITerminal; only
-#     ChildProcessPty's advanced surface names its types.
+#   - SwiftTUIPTYPrimitives — PTY plumbing shared by CLI attach and terminal embedding.
+#     ChildProcessPty lives here; publication remains deferred under the
+#     Cloudflare per-project file budget.
 #   - SwiftTUICLIAttach — the POSIX-only attach subsystem behind SwiftTUICLI;
 #     apps never name its one public type (ScenePty).
 #   - Example packages in SwiftTUI/swift-tui-examples — runnable samples and

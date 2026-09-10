@@ -248,7 +248,11 @@ let package = Package(
     .target(
       name: "SwiftTUIPTYPrimitives",
       dependencies: [
-        "SwiftTUICore"
+        "SwiftTUICore",
+        .target(
+          name: "SwiftTUIPTYCPrimitives",
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+        ),
       ],
       path: "Platforms/Embedding/Sources/SwiftTUIPTYPrimitives",
       swiftSettings: swiftSettings()
@@ -288,10 +292,6 @@ let package = Package(
         ),
         .target(
           name: "SwiftTUIPTYPrimitives",
-          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
-        ),
-        .target(
-          name: "SwiftTUIPTYCPrimitives",
           condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
         ),
       ],
@@ -730,10 +730,6 @@ let package = Package(
         "SwiftTUICore",
         .target(
           name: "SwiftTUIPTYPrimitives",
-          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
-        ),
-        .target(
-          name: "SwiftTUITerminal",
           condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
         ),
         "CEntryPointImageLocator",

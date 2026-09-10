@@ -7,7 +7,6 @@
   import SwiftTUIArguments
   import SwiftTUICore
   import SwiftTUIPTYPrimitives
-  import SwiftTUITerminal
   import Testing
 
   // Signal constants (`SIGKILL`) come from the platform C library; `dladdr` is
