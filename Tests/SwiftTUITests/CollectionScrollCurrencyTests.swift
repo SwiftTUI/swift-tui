@@ -27,7 +27,7 @@ struct CollectionScrollCurrencyTests {
 
     // Arrow keys are selection keys, so they need focus inside the list. A
     // click on a visible row is how a user gets there.
-    _ = try harness.focusText("«0»")
+    _ = try harness.clickText("«0»")
     var previousRows = scrollCurrencyRows(harness.frame)
     #expect(previousRows.contains(0))
     #expect(previousRows.count > 3)
@@ -167,7 +167,7 @@ struct CollectionScrollCurrencyTests {
     }
     defer { harness.shutdown() }
 
-    _ = try harness.clickText("«0»")
+    _ = try harness.focusText("«0»")
     #expect(
       harness.runLoop.focusTracker.currentFocusIdentity?.description.contains("ListRow") == false,
       "the nested Button, not its synthetic row, must own focus"
