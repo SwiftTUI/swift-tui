@@ -213,7 +213,8 @@ extension LayoutEngine {
         edge: edge,
         alignment: alignment,
         spacing: spacing,
-        safeArea: safeArea
+        safeArea: safeArea,
+        passContext: passContext
       )
     case .border(let set, let placement, _, _, _, _, let sides):
       guard let childMeasurement = measured.childMeasurements.first,
@@ -230,6 +231,20 @@ extension LayoutEngine {
         return []
       }
 
+      if placement == .inset, bounds.size.width > 0, bounds.size.height > 0,
+        childMeasurement.measuredSize.width > 0, childMeasurement.measuredSize.height > 0
+      {
+        let occupied = borderLayoutInsets(set: set, placement: .outset, sides: sides)
+        if occupied.horizontal >= bounds.size.width || occupied.vertical >= bounds.size.height {
+          passContext?.recordRuntimeIssue(
+            .init(
+              severity: .warning,
+              code: "layout.insetBorderOccludesContent",
+              message: "The inset border leaves no interior cells for its content. "
+                + "Add padding or use placement: .outset to keep the content visible.",
+              identity: resolved.identity, source: "border"))
+        }
+      }
       let insets = borderLayoutInsets(
         set: set,
         placement: placement,

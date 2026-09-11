@@ -56,18 +56,8 @@ func placedOrigin(
   anchor: Alignment
 ) -> LayoutPoint {
   let dimensions = ViewDimensions(width: childSize.width, height: childSize.height)
-  let xOffset =
-    if anchor.horizontal == .center {
-      (childSize.width + 1) / 2
-    } else {
-      dimensions[anchor.horizontal]
-    }
-  let yOffset =
-    if anchor.vertical == .center {
-      (childSize.height + 1) / 2
-    } else {
-      dimensions[anchor.vertical]
-    }
+  let xOffset = dimensions[anchor.horizontal]
+  let yOffset = dimensions[anchor.vertical]
 
   return LayoutPoint(
     x: position.x - xOffset,

@@ -6,6 +6,106 @@ import Testing
 
 @Suite
 struct LayoutEngineTests {
+  @Test("STUI-55: lazy fallback placement uses the caller's custom alignment context")
+  func lazyFallbackUsesAlignmentContext() throws {
+    let engine = LayoutEngine()
+    let handle = CustomLayoutHandle(
+      NoOpCustomLayoutProxy(),
+      explicitHorizontalAlignmentHandler: { _, _, _, guide, context in
+        guide == .leading ? (context == nil ? 0 : 3) : nil
+      })
+    let child = ResolvedNode(
+      identity: testIdentity("custom-guide"), kind: .view("Custom"),
+      layoutBehavior: .custom(handle))
+    let root = stack(
+      "fallback", axis: .vertical,
+      children: [child, leaf("ordinary", size: .init(width: 4, height: 1))])
+    let context = LayoutPassContext()
+    let measured = engine.measure(root, passContext: context)
+    let bounds = CellRect(origin: .zero, size: measured.measuredSize)
+    let requests = engine.lazyStackPlacementRequests(
+      for: root, measured: measured, in: bounds, axis: .vertical, spacing: 0,
+      horizontalAlignment: .leading, verticalAlignment: .top,
+      viewportContext: nil, passContext: LayoutPassContext())
+    #expect(requests[1].bounds.origin.x == 3)
+    var lazy = root
+    lazy.layoutBehavior = .lazyStack(
+      axis: .vertical, spacing: 0, horizontalAlignment: .leading, verticalAlignment: .top)
+    let lazyMeasured = engine.measure(lazy, passContext: LayoutPassContext())
+    _ = try #require(lazyMeasured.containerAllocationSnapshot?.lazyStack)
+    let visible = engine.lazyStackPlacementRequests(
+      for: lazy, measured: lazyMeasured, in: bounds, axis: .vertical, spacing: 0,
+      horizontalAlignment: .leading, verticalAlignment: .top,
+      viewportContext: .init(axes: .vertical, viewportRect: bounds, contentOffset: .zero),
+      passContext: LayoutPassContext())
+    #expect(visible.last?.bounds.origin.x == 3)
+  }
+
+  @Test("STUI-61: safe-area adornments honor wrapped guides on their cross axis")
+  func safeAreaInsetHonorsCrossAxisGuides() {
+    for edge: Edge in [.top, .bottom, .leading, .trailing] {
+      let engine = LayoutEngine()
+      let guided = leaf(
+        "guide", size: .init(width: 2, height: 2),
+        layoutMetadata: LayoutMetadata()
+          .settingHorizontalAlignmentGuide(.center, debugName: "center", computeValue: { _ in 0 })
+          .settingVerticalAlignmentGuide(
+            .firstTextBaseline, debugName: "baseline", computeValue: { _ in 1 }))
+      let inset = ResolvedNode(
+        identity: testIdentity("inset-wrapper"), kind: .view("Padding"), children: [guided],
+        layoutBehavior: .padding(.init(top: 1, leading: 1)))
+      let node = ResolvedNode(
+        identity: testIdentity("safe"), kind: .view("SafeAreaInset"),
+        children: [leaf("base", size: .init(width: 10, height: 10)), inset],
+        layoutBehavior: .safeAreaInset(
+          edge: edge, alignment: .init(horizontal: .center, vertical: .firstTextBaseline),
+          spacing: 0, safeArea: .init()))
+      let measured = engine.measure(node, proposal: .init(width: 10, height: 10))
+      let placed = engine.place(node, measured: measured, origin: .init(x: 2, y: 3))
+      let bounds = placed.bounds
+      let reference = ViewDimensions(width: bounds.size.width, height: bounds.size.height)
+      let actual = placed.children[1].bounds.origin
+      if edge == .top || edge == .bottom {
+        #expect(actual.x == bounds.origin.x + reference[HorizontalAlignment.center] - 1)
+      } else {
+        #expect(actual.y == bounds.origin.y + reference[VerticalAlignment.firstTextBaseline] - 2)
+      }
+    }
+  }
+
+  @Test("STUI-76: a fixed frame shields its parent from the child's structural minimum")
+  func fixedFrameMinimumRespectsPinnedAxis() {
+    for axis: Axis in [.horizontal, .vertical] {
+      let engine = LayoutEngine()
+      let content = leaf(
+        "large", size: .init(width: 10, height: 10),
+        layoutMetadata: .init(minimumWidth: 10, minimumHeight: 10))
+      let frame = ResolvedNode(
+        identity: testIdentity("fixed"), kind: .view("Frame"), children: [content],
+        layoutBehavior: .frame(
+          width: axis == .horizontal ? 2 : nil, height: axis == .vertical ? 2 : nil,
+          alignment: .topLeading))
+      let ideal = engine.measure(frame)
+      #expect(engine.derivedMinimumMainSize(for: frame, idealMeasurement: ideal, axis: axis) == 2)
+      var flexible = frame
+      flexible.layoutBehavior = .flexibleFrame(
+        minWidth: axis == .horizontal ? 2 : nil, idealWidth: nil,
+        maxWidth: axis == .horizontal ? 2 : nil,
+        minHeight: axis == .vertical ? 2 : nil, idealHeight: nil,
+        maxHeight: axis == .vertical ? 2 : nil, alignment: .topLeading)
+      #expect(
+        engine.derivedMinimumMainSize(
+          for: flexible, idealMeasurement: engine.measure(flexible), axis: axis) == 2)
+      let sibling = leaf(
+        "priority", size: .init(width: 6, height: 6),
+        layoutMetadata: .init(layoutPriority: 1))
+      let node = stack("parent", axis: axis, children: [frame, sibling])
+      let measured = engine.measure(node, proposal: .init(width: 8, height: 8))
+      #expect(engine.mainDimension(of: measured.childMeasurements[1].measuredSize, for: axis) == 6)
+      #expect(engine.mainDimension(of: measured.measuredSize, for: axis) == 8)
+    }
+  }
+
   @Test("STUI-64: frames honor modifier guides throughout the wrapper chain")
   func framesHonorWrappedModifierGuides() {
     for flexible in [false, true] {

@@ -19,7 +19,8 @@ extension LayoutEngine {
     edge: Edge,
     alignment: Alignment,
     spacing: Int,
-    safeArea: EdgeInsets
+    safeArea: EdgeInsets,
+    passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
     guard resolved.children.count >= 2, measured.childMeasurements.count >= 2 else {
       return measured.childMeasurements.enumerated().compactMap { index, childMeasurement in
@@ -69,51 +70,34 @@ extension LayoutEngine {
         )
       }
 
+    let alignedInsetOrigin =
+      simpleAlignedOrigin(
+        for: inset, measured: insetMeasurement, in: bounds,
+        alignment: alignment, passContext: passContext)
+      ?? alignedOrigin(
+        for: viewDimensions(for: inset, measured: insetMeasurement, passContext: passContext),
+        in: bounds, alignment: alignment)
     let insetOrigin: CellPoint =
       switch edge {
       case .top:
         CellPoint(
-          x: simpleAlignedCoordinate(
-            childSize: insetMeasurement.measuredSize.width,
-            availableSize: bounds.size.width,
-            origin: bounds.origin.x,
-            alignment: alignment.horizontal,
-            hasExplicitGuide: false
-          ) ?? bounds.origin.x,
+          x: alignedInsetOrigin.x,
           y: bounds.origin.y - safeArea.top
         )
       case .bottom:
         CellPoint(
-          x: simpleAlignedCoordinate(
-            childSize: insetMeasurement.measuredSize.width,
-            availableSize: bounds.size.width,
-            origin: bounds.origin.x,
-            alignment: alignment.horizontal,
-            hasExplicitGuide: false
-          ) ?? bounds.origin.x,
+          x: alignedInsetOrigin.x,
           y: bounds.maxY - insetMeasurement.measuredSize.height + safeArea.bottom
         )
       case .leading:
         CellPoint(
           x: bounds.origin.x - safeArea.leading,
-          y: simpleAlignedCoordinate(
-            childSize: insetMeasurement.measuredSize.height,
-            availableSize: bounds.size.height,
-            origin: bounds.origin.y,
-            alignment: alignment.vertical,
-            hasExplicitGuide: false
-          ) ?? bounds.origin.y
+          y: alignedInsetOrigin.y
         )
       case .trailing:
         CellPoint(
           x: bounds.maxX - insetMeasurement.measuredSize.width + safeArea.trailing,
-          y: simpleAlignedCoordinate(
-            childSize: insetMeasurement.measuredSize.height,
-            availableSize: bounds.size.height,
-            origin: bounds.origin.y,
-            alignment: alignment.vertical,
-            hasExplicitGuide: false
-          ) ?? bounds.origin.y
+          y: alignedInsetOrigin.y
         )
       }
 

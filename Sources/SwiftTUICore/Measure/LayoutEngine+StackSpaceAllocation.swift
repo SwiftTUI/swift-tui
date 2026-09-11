@@ -122,6 +122,11 @@ extension LayoutEngine {
     let flexibilities: [Int?] = children.indices.map { index in
       maximums[index].map { max(0, $0 - minimums[index]) }
     }
+    // An unknown custom response is not a promise to absorb its entire offer.
+    // Measure it before proven absorbers so its unused share remains available.
+    let needsResponse = children.indices.map {
+      maximums[$0] == nil && stackAllocationNeedsMeasuredResponse(children[$0], axis: axis)
+    }
 
     let order = children.indices.sorted { lhs, rhs in
       let leftPriority = children[lhs].layoutMetadata.layoutPriority
@@ -136,6 +141,8 @@ extension LayoutEngine {
         return true
       case (.none, .some):
         return false
+      case (.none, .none) where needsResponse[lhs] != needsResponse[rhs]:
+        return needsResponse[lhs]
       default:
         return lhs < rhs
       }
@@ -178,7 +185,7 @@ extension LayoutEngine {
 
     var unboundedTailFromPosition = [Bool](repeating: false, count: order.count)
     for position in order.indices.reversed() {
-      guard maximums[order[position]] == nil else {
+      guard maximums[order[position]] == nil, !needsResponse[order[position]] else {
         continue
       }
       let next = position + 1
@@ -216,6 +223,24 @@ extension LayoutEngine {
       deficitClaimantCounts: deficitClaimantCounts,
       spacerSuffixMinimums: spacerSuffixMinimums
     )
+  }
+
+  private func stackAllocationNeedsMeasuredResponse(_ node: ResolvedNode, axis: Axis) -> Bool {
+    var work = [node]
+    while let current = work.popLast() {
+      if current.layoutRealizedContent != nil { return true }
+      if case .custom = current.layoutBehavior { return true }
+      if case .flexibleFrame(_, _, let maxW, _, _, let maxH, _) = current.layoutBehavior,
+        case .infinity = axis == .horizontal ? maxW : maxH
+      {
+        continue
+      }
+      // Indexed rows have their own allocation product; inspecting their
+      // content here must not realize an offscreen dataset.
+      if current.usesIndexedChildSource { continue }
+      work.append(contentsOf: current.children)
+    }
+    return false
   }
 
   /// Advances the sequential allocation: finishes the stack when every

@@ -333,8 +333,8 @@ extension LayoutEngine {
         case .vertical:
           height
         }
-      return max(explicit ?? 0, childMinimums.first ?? 0)
-    case .flexibleFrame(let minW, _, _, let minH, _, _, _):
+      return explicit ?? (childMinimums.first ?? 0)
+    case .flexibleFrame(let minW, _, let maxW, let minH, _, let maxH, _):
       let minDim: ProposedDimension? =
         switch axis {
         case .horizontal:
@@ -342,10 +342,17 @@ extension LayoutEngine {
         case .vertical:
           minH
         }
+      let maxDim = axis == .horizontal ? maxW : maxH
+      let minimum: Int
       if case .finite(let v) = minDim {
-        return max(v, childMinimums.first ?? 0)
+        minimum = max(v, childMinimums.first ?? 0)
+      } else {
+        minimum = childMinimums.first ?? 0
       }
-      return childMinimums.first ?? 0
+      if case .finite(let cap) = maxDim {
+        return min(minimum, cap)
+      }
+      return minimum
     case .viewThatFits:
       return childMinimums.max() ?? 0
     case .custom(let token):

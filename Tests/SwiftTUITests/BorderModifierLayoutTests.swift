@@ -16,6 +16,11 @@ struct BorderModifierLayoutTests {
 
     #expect(artifacts.rasterSurface.size.width == 2)
     #expect(artifacts.rasterSurface.size.height == 1)
+    #expect(!artifacts.rasterSurface.lines.joined().contains("hi"))
+    #expect(
+      artifacts.diagnostics.runtime.issues.contains {
+        $0.code == "layout.insetBorderOccludesContent"
+      })
   }
 
   @Test("explicit outset placement keeps the layout-growing behavior")
@@ -27,6 +32,21 @@ struct BorderModifierLayoutTests {
 
     #expect(artifacts.rasterSurface.size.width == 4)
     #expect(artifacts.rasterSurface.size.height == 3)
+    #expect(artifacts.rasterSurface.lines.joined().contains("hi"))
+    #expect(
+      !artifacts.diagnostics.runtime.issues.contains {
+        $0.code == "layout.insetBorderOccludesContent"
+      })
+  }
+
+  @Test("STUI-126: padded inset borders preserve text without an occlusion diagnostic")
+  func paddedBorderKeepsInterior() {
+    let artifacts = DefaultRenderer().render(Text("hi").padding(1).border(set: .single))
+    #expect(artifacts.rasterSurface.lines.joined().contains("hi"))
+    #expect(
+      !artifacts.diagnostics.runtime.issues.contains {
+        $0.code == "layout.insetBorderOccludesContent"
+      })
   }
 
   @Test("every public border overload defaults to inset placement")

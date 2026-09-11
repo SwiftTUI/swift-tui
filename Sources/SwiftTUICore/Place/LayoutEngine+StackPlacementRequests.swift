@@ -227,7 +227,8 @@ extension LayoutEngine {
         axis: axis,
         spacing: spacing,
         horizontalAlignment: horizontalAlignment,
-        verticalAlignment: verticalAlignment
+        verticalAlignment: verticalAlignment,
+        passContext: passContext
       )
     }
 
@@ -236,7 +237,8 @@ extension LayoutEngine {
       childMeasurements: measured.childMeasurements,
       axis: axis,
       horizontalAlignment: horizontalAlignment,
-      verticalAlignment: verticalAlignment
+      verticalAlignment: verticalAlignment,
+      passContext: passContext
     )
 
     switch axis {

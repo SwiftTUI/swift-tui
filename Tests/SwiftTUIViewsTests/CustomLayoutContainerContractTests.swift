@@ -15,6 +15,64 @@ import Testing
 @MainActor
 @Suite("Custom layout container contract (plan 2026-08-31-001)")
 struct CustomLayoutContainerContractTests {
+  @Test("STUI-87: custom layouts return unused offers to flexible siblings")
+  func customLayoutUnusedOfferReachesSpacer() {
+    for axis: SwiftTUICore.Axis in [.horizontal, .vertical] {
+      for reversed in [false, true] {
+        for wrapped in [false, true] {
+          let capped = ResolvedNode(
+            identity: testIdentity("cap"), kind: .view("Frame"),
+            children: [leaf("content", width: 1, height: 1)],
+            layoutBehavior: .flexibleFrame(
+              minWidth: nil, idealWidth: nil, maxWidth: axis == .horizontal ? 50 : nil,
+              minHeight: nil, idealHeight: nil, maxHeight: axis == .vertical ? 50 : nil,
+              alignment: .topLeading))
+          let custom = ResolvedNode(
+            identity: testIdentity("custom"), kind: .view("Custom"), children: [capped],
+            layoutBehavior: AnyLayout(ProposalForwardingContractLayout()).resolvedBehavior)
+          let child =
+            wrapped
+            ? ResolvedNode(
+              identity: testIdentity("wrapper"), kind: .view("Padding"), children: [custom],
+              layoutBehavior: .padding(.init()))
+            : custom
+          let spacer = ResolvedNode(
+            identity: testIdentity("spacer"), kind: .view("Spacer"),
+            intrinsicSize: .zero)
+          let root = stack(
+            "parent", axis: axis, spacing: 0,
+            children: reversed ? [spacer, child] : [child, spacer])
+          let measured = LayoutEngine().measure(root, proposal: .init(width: 200, height: 200))
+          let sizes = measured.childMeasurements.map {
+            axis == .horizontal ? $0.measuredSize.width : $0.measuredSize.height
+          }
+          #expect(sizes == (reversed ? [150, 50] : [50, 150]))
+        }
+      }
+    }
+  }
+
+  @Test("STUI-62: custom placement anchors land on the requested cell")
+  func placementAnchorMatchesDimensions() {
+    for width in 1...4 {
+      for height in 1...4 {
+        let size = LayoutSize(width: width, height: height)
+        let dimensions = ViewDimensions(width: width, height: height)
+        for anchor: Alignment in [.center, .topLeading, .bottomTrailing] {
+          let origin = placedOrigin(for: size, at: .init(x: 7, y: 8), anchor: anchor)
+          #expect(origin.x + dimensions[anchor.horizontal] == 7)
+          #expect(origin.y + dimensions[anchor.vertical] == 8)
+        }
+        let fallback = defaultPlacement(
+          in: .init(origin: .init(x: 2, y: 3), size: .init(width: 10, height: 10)),
+          proposal: .unspecified)
+        let origin = placedOrigin(for: size, at: fallback.position, anchor: fallback.anchor)
+        #expect(origin.x + dimensions[HorizontalAlignment.center] == 7)
+        #expect(origin.y + dimensions[VerticalAlignment.center] == 8)
+      }
+    }
+  }
+
   // MARK: layoutProperties
 
   @Test("built-in stack layouts declare their axis; the default declares none")
@@ -583,6 +641,21 @@ private struct SpacingContractLayout: Layout {
   ) {
     DefaultContractLayout().placeSubviews(
       in: bounds, proposal: proposal, subviews: subviews, cache: &cache)
+  }
+}
+
+private struct ProposalForwardingContractLayout: Layout {
+  func sizeThatFits(
+    proposal: ProposedViewSize, subviews: LayoutSubviews, cache _: inout Void
+  ) -> LayoutSize {
+    subviews.first?.sizeThatFits(proposal) ?? .zero
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect, proposal: ProposedViewSize, subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    subviews.first?.place(at: bounds.origin, anchor: .topLeading, proposal: proposal)
   }
 }
 
