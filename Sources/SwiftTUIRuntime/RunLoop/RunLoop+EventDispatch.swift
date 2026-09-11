@@ -85,7 +85,13 @@ extension RunLoop {
     let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
     for identity in renderer.viewGraph.keyEventBubblePath(from: focusedIdentity)
     where localKeyHandlerRegistry.hasHandler(identity: identity) {
-      if localKeyHandlerRegistry.dispatch(identity: identity, keyPress: keyPress) {
+      let handled =
+        if identity == focusedIdentity {
+          localKeyHandlerRegistry.dispatch(identity: identity, keyPress: keyPress)
+        } else {
+          localKeyHandlerRegistry.dispatchBubbled(identity: identity, keyPress: keyPress)
+        }
+      if handled {
         requestDispatchBackstopInvalidation(
           schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
         )

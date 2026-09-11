@@ -172,11 +172,13 @@ package struct HandlerDescriptorIntake {
 
   package func registerKeyPressHandler(
     identity: Identity,
+    receivesBubbledEvents: Bool = true,
     handler: @escaping @MainActor (KeyPress) -> Bool
   ) {
     let scope = dispatchScope
     context.localKeyHandlerRegistry?.register(
       identity: identity,
+      receivesBubbledEvents: receivesBubbledEvents,
       keyPressHandler: { press in
         withImperativeAuthoringContext(scope) {
           handler(press)

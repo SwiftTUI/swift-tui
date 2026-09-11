@@ -1108,7 +1108,14 @@ package final class ViewGraph {
   ) -> [Identity] {
     var path = [identity]
     var visited: Set<Identity> = [identity]
-    var node = nodeIfExists(for: identity)
+    // Semantic controls can publish focus identities without graph nodes. Start at their nearest
+    // graph-backed owner, then use the same hosting-chain walk as every other focus identity.
+    var node: ViewNode?
+    var structuralIdentity: Identity? = identity
+    while node == nil, let candidate = structuralIdentity {
+      node = nodeIfExists(for: candidate)
+      structuralIdentity = candidate.parent
+    }
     while let current = node, path.count < limit {
       if visited.insert(current.identity).inserted {
         path.append(current.identity)

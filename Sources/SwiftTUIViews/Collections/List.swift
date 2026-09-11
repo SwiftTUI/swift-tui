@@ -223,7 +223,10 @@ extension List {
         }
       }
 
-      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+      intake.registerKeyPressHandler(
+        identity: context.identity,
+        receivesBubbledEvents: false
+      ) { keyPress in
         guard keyPress.modifiers.isEmpty else {
           return false
         }

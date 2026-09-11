@@ -57,6 +57,18 @@ public enum KeyEvent: Equatable, Hashable, Sendable {
 }
 
 @MainActor
+private enum KeyPressDeliveryContext {
+  static var isBubbled = false
+
+  static func withValue<Result>(_ value: Bool, _ apply: () -> Result) -> Result {
+    let saved = isBubbled
+    isBubbled = value
+    defer { isBubbled = saved }
+    return apply()
+  }
+}
+
+@MainActor
 package final class LocalKeyHandlerRegistry: Equatable {
   package typealias KeyPressHandler = @MainActor (KeyPress) -> Bool
   package typealias PasteHandler = @MainActor (String) -> Bool
@@ -121,19 +133,26 @@ package final class LocalKeyHandlerRegistry: Equatable {
 
   package func register(
     identity: Identity,
-    keyPressHandler: @escaping KeyPressHandler
+    receivesBubbledEvents: Bool = true,
+    keyPressHandler: @escaping @MainActor (KeyPress) -> Bool
   ) {
+    let registeredHandler: KeyPressHandler = { keyPress in
+      if KeyPressDeliveryContext.isBubbled, !receivesBubbledEvents {
+        return false
+      }
+      return keyPressHandler(keyPress)
+    }
     let owner = RuntimeRegistrationOwnerKey.current(identity: identity)
     let ordinal =
       keyPressHandlers[identity]?.byOwner[owner]?.ordinal ?? claimContributionOrdinal()
     keyPressHandlers[identity, default: .init()]
       .byOwner[owner, default: ContributedBucket(ordinal: ordinal, handlers: [])]
-      .handlers.append(keyPressHandler)
+      .handlers.append(registeredHandler)
     ownersByIdentity[identity] = owner
     ViewNodeContext.current?.recordKeyPressHandlerRegistration(
       identity: identity,
       ordinal: ordinal,
-      handler: keyPressHandler
+      handler: registeredHandler
     )
   }
 
@@ -162,6 +181,25 @@ package final class LocalKeyHandlerRegistry: Equatable {
 
   @discardableResult
   package func dispatch(
+    identity: Identity,
+    keyPress: KeyPress
+  ) -> Bool {
+    KeyPressDeliveryContext.withValue(false) {
+      dispatchRegisteredHandlers(identity: identity, keyPress: keyPress)
+    }
+  }
+
+  @discardableResult
+  package func dispatchBubbled(
+    identity: Identity,
+    keyPress: KeyPress
+  ) -> Bool {
+    KeyPressDeliveryContext.withValue(true) {
+      dispatchRegisteredHandlers(identity: identity, keyPress: keyPress)
+    }
+  }
+
+  private func dispatchRegisteredHandlers(
     identity: Identity,
     keyPress: KeyPress
   ) -> Bool {
