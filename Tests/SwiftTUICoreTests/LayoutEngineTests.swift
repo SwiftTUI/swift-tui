@@ -6,6 +6,57 @@ import Testing
 
 @Suite
 struct LayoutEngineTests {
+  @Test("STUI-64: frames honor modifier guides throughout the wrapper chain")
+  func framesHonorWrappedModifierGuides() {
+    for flexible in [false, true] {
+      for intermediate in [false, true] {
+        for horizontal in [false, true] {
+          for alignment: Alignment in [.topLeading, .center, .bottomTrailing] {
+            let engine = LayoutEngine()
+            let metadata =
+              horizontal
+              ? LayoutMetadata().settingHorizontalAlignmentGuide(
+                alignment.horizontal, debugName: alignment.horizontal.debugName,
+                computeValue: { _ in 3 })
+              : LayoutMetadata().settingVerticalAlignmentGuide(
+                alignment.vertical, debugName: alignment.vertical.debugName,
+                computeValue: { _ in 4 })
+            let content = leaf(
+              "guided", size: .init(width: 1, height: 1),
+              layoutMetadata: intermediate ? LayoutMetadata() : metadata)
+            let inner = ResolvedNode(
+              identity: testIdentity("inner"), kind: .view("Frame"),
+              children: [content],
+              layoutBehavior: .frame(width: 1, height: 1, alignment: .topLeading),
+              layoutMetadata: intermediate ? metadata : LayoutMetadata())
+            // A leaf guide uses padding directly; an intermediate guide must be
+            // found before the walk reaches the unguided leaf below its frame.
+            let padding = ResolvedNode(
+              identity: testIdentity("padding"), kind: .view("Padding"),
+              children: [intermediate ? inner : content],
+              layoutBehavior: .padding(.init(top: 1, leading: 1, bottom: 1, trailing: 1)))
+            let outer = ResolvedNode(
+              identity: testIdentity("outer"), kind: .view("Frame"),
+              children: [padding],
+              layoutBehavior: flexible
+                ? .flexibleFrame(
+                  minWidth: 10, idealWidth: nil, maxWidth: 10,
+                  minHeight: 8, idealHeight: nil, maxHeight: 8, alignment: alignment)
+                : .frame(width: 10, height: 8, alignment: alignment))
+            let measured = engine.measure(outer)
+            let placed = engine.place(outer, measured: measured, origin: .zero)
+            let reference = ViewDimensions(width: 10, height: 8)
+            if horizontal {
+              #expect(placed.children.first?.bounds.origin.x == reference[alignment.horizontal] - 4)
+            } else {
+              #expect(placed.children.first?.bounds.origin.y == reference[alignment.vertical] - 5)
+            }
+          }
+        }
+      }
+    }
+  }
+
   @Test("T246: a flexible safe-area inset expands when its stack cross axis grows")
   func safeAreaInsetExpandsWithStackCrossAxis() {
     let engine = LayoutEngine()

@@ -83,6 +83,12 @@ around the container, and the two `explicitAlignment(of:in:proposal:subviews:cac
 overloads answer a horizontal or vertical alignment guide for the container as
 a whole.
 
+An `alignmentGuide` modifier also controls placement inside a fixed or flexible
+`frame(alignment:)`. Guides propagate through layout wrappers such as padding,
+offsets, borders, and nested frames. Padding translates a guide by its inset;
+a guide authored on an outer wrapper takes precedence over the same guide
+in its content.
+
 ## Style With Modifiers
 
 Modifiers wrap the view they are called on, so order matters. `padding(_:)`

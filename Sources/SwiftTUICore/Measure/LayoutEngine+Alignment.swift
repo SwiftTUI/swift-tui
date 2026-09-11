@@ -64,14 +64,23 @@ extension LayoutEngine {
     // the slow path — the two paths differ for oversize children.
     var guideNode = child
     var guideMeasurement = childMeasurement
-    while let next = alignmentPropagationChild(for: guideNode, measured: guideMeasurement) {
+    while true {
+      // Modifier guides can belong to any level of the propagation chain,
+      // including an intermediate wrapper above an unguided leaf.
+      if guideNode.layoutMetadata.hasExplicitHorizontalAlignmentGuide(alignment.horizontal)
+        || guideNode.layoutMetadata.hasExplicitVerticalAlignmentGuide(alignment.vertical)
+      {
+        return nil
+      }
+      guard let next = alignmentPropagationChild(for: guideNode, measured: guideMeasurement) else {
+        break
+      }
       guideNode = next.0
       guideMeasurement = next.1
     }
     let customHandle = customLayoutHandleAnsweringAlignment(for: guideNode)
     let hasExplicitHorizontalGuide =
-      child.layoutMetadata.hasExplicitHorizontalAlignmentGuide(alignment.horizontal)
-      || customHandle?.explicitAlignment(
+      customHandle?.explicitAlignment(
         engine: self,
         node: guideNode,
         measured: guideMeasurement,
@@ -79,8 +88,7 @@ extension LayoutEngine {
         passContext: passContext
       ) != nil
     let hasExplicitVerticalGuide =
-      child.layoutMetadata.hasExplicitVerticalAlignmentGuide(alignment.vertical)
-      || customHandle?.explicitAlignment(
+      customHandle?.explicitAlignment(
         engine: self,
         node: guideNode,
         measured: guideMeasurement,

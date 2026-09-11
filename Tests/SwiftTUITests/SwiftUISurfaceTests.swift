@@ -6720,6 +6720,28 @@ struct SwiftUISurfaceTests {
       ])
   }
 
+  @Test("STUI-64: public wrapped alignment guides shift frame content", arguments: [false, true])
+  func publicWrappedAlignmentGuidesShiftFrameContent(flexible: Bool) {
+    let content = Text("X")
+      .alignmentGuide(.leading) { _ in -2 }
+      .alignmentGuide(.top) { _ in -2 }
+      .padding(1)
+    let artifacts = DefaultRenderer().render(
+      Group {
+        if flexible {
+          content.frame(
+            minWidth: 10, maxWidth: 10, minHeight: 5, maxHeight: 5,
+            alignment: .topLeading)
+        } else {
+          content.frame(width: 10, height: 5, alignment: .topLeading)
+        }
+      },
+      context: .init(identity: testIdentity("Root"))
+    )
+    // Padding's guide is (-1, -1), so its origin is (1, 1) and X is at (2, 2).
+    #expect(artifacts.rasterSurface.lines == ["", "", "  X", "", ""])
+  }
+
   @Test("ZStack supports arbitrary combined alignment guides")
   func zStackSupportsCombinedAlignmentGuides() {
     let alignment = Alignment(horizontal: .trailing, vertical: .firstTextBaseline)
