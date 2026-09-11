@@ -179,6 +179,12 @@ timelineRow
   }
 ```
 
+The handler can be attached to a row inside a `ScrollView`, `List`, or `Table`.
+It runs before the container consumes the delta, including when the container
+is already at an edge. Returning `.ignored` lets scrolling continue; each
+handler is called at most once for that wheel event. Wheel interception does
+not move keyboard focus.
+
 On terminals a click-drag over content stays a click-drag; only hosts whose
 native paradigm is touch pan the content with a drag.
 

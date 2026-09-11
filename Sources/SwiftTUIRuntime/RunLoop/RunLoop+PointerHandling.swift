@@ -430,9 +430,49 @@ extension RunLoop {
     location: PointerLocation,
     timestamp: MonotonicInstant = .now()
   ) {
-    // Scroll events should not move keyboard focus — the scroll target
-    // is resolved independently via scrollTarget(at:).
-    if var scrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY) {
+    // Content handlers get first refusal, including when an enclosing scroll
+    // view is clamped. Keep scroll bodies out of this identity walk: explicit
+    // identities can make nested scroll routes siblings, so body dispatch must
+    // retain the spatial ordering below.
+    let initialScrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY)
+    var visitedHandlerRoutes: Set<RouteID> = []
+    if let hitTarget = hitTarget(at: location) {
+      let event = LocalPointerEvent(
+        kind: .scrolled(deltaX: deltaX, deltaY: deltaY),
+        location: location,
+        targetRect: hitTarget.region.rect,
+        scrollContext: scrollContext(for: hitTarget.region.identity),
+        namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
+        timestamp: timestamp
+      )
+      // Without a scrollable route, retain ordinary identity bubbling. A
+      // wheel modifier can itself occupy a non-overflowing scroll body's route.
+      if initialScrollRoute == nil {
+        let dispatch = dispatchPointerEventResolvingHandler(
+          preferredRouteID: hitTarget.region.routeID,
+          identity: hitTarget.region.identity,
+          event: event
+        )
+        if let acceptedRoute = dispatch.handlerRouteID {
+          scheduler.requestInvalidation(
+            of: scrollPointerInvalidationIdentities(for: acceptedRoute.identity)
+          )
+        }
+        return
+      }
+      if dispatchWheelEvent(
+        preferredRouteID: hitTarget.region.routeID,
+        identity: hitTarget.region.identity,
+        event: event,
+        includesPreferredScrollBody: false,
+        visitedHandlerRoutes: &visitedHandlerRoutes
+      ) {
+        return
+      }
+    }
+
+    // Scroll events should not move keyboard focus.
+    if var scrollRoute = initialScrollRoute {
       var refusedIdentities: Set<Identity> = []
       while true {
         // A wheel notch is an explicit reposition: cancel any fling on that route
@@ -442,7 +482,7 @@ extension RunLoop {
           for: scrollRoute.identity,
           ownerNodeID: scrollRoute.viewNodeID
         )
-        let dispatchOutcome = dispatchPointerEvent(
+        let handled = dispatchWheelEvent(
           preferredRouteID: routeID,
           identity: scrollRoute.identity,
           event: .init(
@@ -455,12 +495,11 @@ extension RunLoop {
             ),
             namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
             timestamp: timestamp
-          )
+          ),
+          includesPreferredScrollBody: true,
+          visitedHandlerRoutes: &visitedHandlerRoutes
         )
-        if dispatchOutcome.wantsPointerStream {
-          scheduler.requestInvalidation(
-            of: scrollPointerInvalidationIdentities(for: scrollRoute.identity)
-          )
+        if handled {
           break
         }
         // The route refused the delta (clamped at its edge, or the delta
@@ -479,25 +518,43 @@ extension RunLoop {
         }
         scrollRoute = enclosingRoute
       }
-    } else if let hitTarget = hitTarget(at: location) {
-      let dispatchOutcome = dispatchPointerEvent(
-        preferredRouteID: hitTarget.region.routeID,
-        identity: hitTarget.region.identity,
-        event: .init(
-          kind: .scrolled(deltaX: deltaX, deltaY: deltaY),
-          location: location,
-          targetRect: hitTarget.region.rect,
-          scrollContext: scrollContext(for: hitTarget.region.identity),
-          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces,
-          timestamp: timestamp
-        )
+    }
+  }
+
+  /// Visits wheel handlers once per event, deferring scroll bodies to the
+  /// spatial retry loop. Invalidate the accepting handler's identity rather
+  /// than the original hit, which may be a child with an untracked binding.
+  private func dispatchWheelEvent(
+    preferredRouteID: RouteID,
+    identity: Identity,
+    event: LocalPointerEvent,
+    includesPreferredScrollBody: Bool,
+    visitedHandlerRoutes: inout Set<RouteID>
+  ) -> Bool {
+    let candidates =
+      [preferredRouteID]
+      + fallbackPrimaryRouteIDs(
+        startingAt: identity, excluding: preferredRouteID
       )
-      if dispatchOutcome.wantsPointerStream {
+    for candidate in candidates {
+      let isScrollBody = latestSemanticSnapshot.scrollRoutes.contains { route in
+        primaryRouteID(for: route.identity, ownerNodeID: route.viewNodeID)
+          .pairsIgnoringOwner(with: candidate)
+      }
+      if isScrollBody && !(includesPreferredScrollBody && candidate == preferredRouteID) {
+        continue
+      }
+      guard let resolved = localPointerHandlerRegistry.handlerRouteID(pairingWith: candidate),
+        visitedHandlerRoutes.insert(resolved).inserted
+      else { continue }
+      if localPointerHandlerRegistry.dispatch(routeID: resolved, event: event).wantsPointerStream {
         scheduler.requestInvalidation(
-          of: scrollPointerInvalidationIdentities(for: hitTarget.region.identity)
+          of: scrollPointerInvalidationIdentities(for: resolved.identity)
         )
+        return true
       }
     }
+    return false
   }
 
   /// The invalidation a consumed pointer scroll requests: the route identity

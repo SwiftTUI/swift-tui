@@ -98,6 +98,157 @@ struct PointerHoverTests {
 @MainActor
 @Suite
 struct ScrollWheelTests {
+  @Test("a wheel handler on a non-overflowing ScrollView remains reachable")
+  func nonOverflowingScrollViewWheelHandler() throws {
+    let events = ScrollWheelEventBox()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NonOverflowingWheel"), size: .init(width: 20, height: 5)
+    ) {
+      ScrollView {
+        Text("Short content").onTapGesture {}
+      }.onScrollWheel { event in
+        events.append(event)
+        return .handled
+      }
+    }
+    defer { harness.shutdown() }
+    let point = try #require(harness.point(forText: "Short content"))
+    _ = try harness.scrollPointer(at: point, deltaY: 1)
+    #expect(events.values == [ScrollWheelEvent(deltaX: 0, deltaY: 1)])
+  }
+
+  @Test(
+    "collection row wheel handlers can consume or pass through to List and Table",
+    arguments: [false, true], [false, true])
+  func collectionRowInterception(table: Bool, handled: Bool) throws {
+    let events = ScrollWheelEventBox()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("CollectionWheelInterception"),
+      size: .init(width: 24, height: 8)
+    ) {
+      if table {
+        Table(0..<10, id: \.self, columns: [TableColumn("Name", width: 16)]) { row in
+          Text("Row \(row)").onScrollWheel { event in
+            events.append(event)
+            return handled ? .handled : .ignored
+          }
+        }.tableHeaders(.hidden)
+      } else {
+        List {
+          ForEach(0..<10) { row in
+            Text("Row \(row)").onScrollWheel { event in
+              events.append(event)
+              return handled ? .handled : .ignored
+            }
+          }
+        }.listStyle(.plain)
+      }
+    }
+    defer { harness.shutdown() }
+    let initialFrame = harness.frame
+    let point = try #require(
+      harness.point(forText: "Row 0"), "Rendered collection: \(initialFrame)")
+    let frame = try harness.scrollPointer(at: point, deltaY: 1)
+    #expect(events.values == [ScrollWheelEvent(deltaX: 0, deltaY: 1)])
+    if handled {
+      #expect(frame == initialFrame)
+    } else {
+      #expect(frame != initialFrame)
+      #expect(!frame.contains("Row 0"))
+    }
+  }
+
+  @Test(
+    "ignored content handlers run once before nested scroll boundary chaining",
+    arguments: [false, true])
+  func ignoredContentChainsAcrossSiblingScrollIdentities(atEdge: Bool) throws {
+    let events = ScrollWheelEventBox()
+    let inner = WheelPositionBox(y: atEdge ? 5 : 0)
+    let outer = WheelPositionBox(y: 0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NestedWheelInterception"), size: .init(width: 30, height: 8)
+    ) {
+      ScrollView(.vertical, position: outer.binding) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Header")
+          ScrollView(.vertical, position: inner.binding) {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<8) { row in
+                Text("Inner \(row)")
+                  .onScrollWheel { event in
+                    events.append(event)
+                    return .ignored
+                  }
+              }
+            }
+            .onScrollWheel { event in
+              events.append(ScrollWheelEvent(deltaX: event.deltaX, deltaY: 100))
+              return .ignored
+            }
+          }.scrollIndicators(.hidden)
+            .id(testIdentity("NestedWheelInterception", "Inner"))
+            .frame(width: 20, height: 3, alignment: .topLeading)
+          ForEach(0..<8) { row in Text("Tail \(row)") }
+        }
+      }.scrollIndicators(.hidden)
+        .id(testIdentity("NestedWheelInterception", "Outer"))
+        .frame(width: 24, height: 6, alignment: .topLeading)
+    }
+    defer { harness.shutdown() }
+    let point = try #require(harness.point(forText: atEdge ? "Inner 6" : "Inner 1"))
+    let frame = try harness.scrollPointer(at: point, deltaY: 1)
+
+    #expect(
+      events.values == [
+        ScrollWheelEvent(deltaX: 0, deltaY: 1),
+        ScrollWheelEvent(deltaX: 0, deltaY: 100),
+      ])
+    #expect(inner.value.y == (atEdge ? 5 : 1))
+    #expect(outer.value.y == (atEdge ? 1 : 0))
+    #expect(frame.contains("Header") == !atEdge)
+    #expect(frame.contains(atEdge ? "Inner 5" : "Inner 3"))
+  }
+
+  @Test(
+    "content wheel handlers precede ScrollView, including at its edge",
+    arguments: [false, true], [false, true])
+  func contentWheelPrecedesScrollView(handled: Bool, atEdge: Bool) throws {
+    let events = ScrollWheelEventBox()
+    let position = WheelPositionBox(y: atEdge ? 5 : 0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("WheelInterception"), size: .init(width: 20, height: 5)
+    ) {
+      ScrollView(.vertical, position: position.binding) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<8) { row in
+            Text("Row \(row)")
+              .onScrollWheel { event in
+                events.append(event)
+                return handled ? .handled : .ignored
+              }
+          }
+        }
+      }.scrollIndicators(.hidden)
+        .id(testIdentity("WheelInterception", "Scroll"))
+        .frame(width: 16, height: 3, alignment: .topLeading)
+    }
+    defer { harness.shutdown() }
+    let initialFrame = harness.frame
+    let focus = harness.runLoop.focusTracker.currentFocusIdentity
+    let point = try #require(harness.point(forText: atEdge ? "Row 6" : "Row 1"))
+    let frame = try harness.scrollPointer(at: point, deltaY: 1)
+
+    #expect(events.values == [ScrollWheelEvent(deltaX: 0, deltaY: 1)])
+    #expect(position.value.y == (atEdge ? 5 : handled ? 0 : 1))
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == focus)
+    if handled || atEdge {
+      #expect(frame == initialFrame)
+    } else {
+      #expect(!frame.contains("Row 0"))
+      #expect(frame.contains("Row 3"))
+    }
+  }
+
   @Test("onScrollWheel receives deltas and ignores other pointer events")
   func wheelReceivesOnlyScrollEvents() throws {
     let events = ScrollWheelEventBox()
@@ -179,6 +330,17 @@ private final class ScrollWheelEventBox {
 
   func append(_ event: ScrollWheelEvent) {
     values.append(event)
+  }
+}
+
+@MainActor
+private final class WheelPositionBox {
+  var value: ScrollCellOffset
+
+  init(y: Int) { value = .init(x: 0, y: y) }
+
+  var binding: Binding<ScrollCellOffset> {
+    Binding(get: { self.value }, set: { self.value = $0 })
   }
 }
 
