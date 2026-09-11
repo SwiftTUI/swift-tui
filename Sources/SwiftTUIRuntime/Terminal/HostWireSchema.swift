@@ -192,6 +192,9 @@ package enum HostWireSchema {
       .init("politeness", wire: .key("politeness")),
     ],
     "ScrollRoute": [
+      .init(
+        "scrollAnchorCorrection",
+        wire: .notSerialized("frame commit command applied to the owning scroll binding")),
       .init("identity", wire: .key("id")),
       .init(
         "viewNodeID",

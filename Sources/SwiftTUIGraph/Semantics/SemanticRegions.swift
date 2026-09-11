@@ -50,7 +50,18 @@ public struct FocusRegion: Equatable, Sendable {
 /// Thus, externally identical values can compare `!=` if internal routing or bookkeeping differs.
 /// Public consumers must not treat `==` as
 /// visible-field equality.
+package struct LazyScrollAnchorCorrection: Equatable, Sendable {
+  package var requestedOffset: CellPoint
+  package var correctedOffset: CellPoint
+
+  package init(requestedOffset: CellPoint, correctedOffset: CellPoint) {
+    self.requestedOffset = requestedOffset
+    self.correctedOffset = correctedOffset
+  }
+}
+
 public struct ScrollRoute: Equatable, Sendable {
+  package var scrollAnchorCorrection: LazyScrollAnchorCorrection? = nil
   public var identity: Identity
   package var viewNodeID: ViewNodeID?
   public var viewportRect: CellRect
@@ -106,6 +117,7 @@ package enum ScrollTargetRole: Equatable, Sendable {
 }
 
 package struct ScrollTarget: Equatable, Sendable {
+  package var isEstimated: Bool = false
   package var identity: Identity
   package var scrollIdentity: Identity
   package var rect: CellRect

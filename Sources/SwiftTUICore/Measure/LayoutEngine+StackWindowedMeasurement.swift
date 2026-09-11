@@ -1,68 +1,31 @@
-// Windowed measurement for indexed-source lazy stacks (proposal
-// 2026-07-13-002 Stage 2.2 / F144; eligibility, estimator, and iterative
-// scheduling reworked by the scroll-latency program Stage 2, plan
-// 2026-07-31-002).
-//
-// The exhaustive lazy measure arm realizes EVERY element (a full resolveView
-// per row) and ideal-measures all of them before placement windows anything.
-// Under a scroll-declared measure viewport, this path realizes and measures
-// only the estimated-visible band plus overscan, and synthesizes every other
-// allocation entry from the estimated row extent — the shape SwiftUI's lazy
-// layout estimates use. A windowed product is valid only for the hint it was
-// built under; the retained-measurement gate denies cross-frame reuse on any
-// hint change, and windowed products are never stored in the cross-frame
-// measurement cache (which has no such gate).
-//
-// The band is measured through the measurement WORK STACK, not by re-entrant
-// `measure()` calls: windowed measurement now also runs on the frame-tail
-// worker (snapshot sources are eligible), whose small stack the nested
-// custom-layout + scroll shapes already push near the guard — an in-place
-// per-row measure re-entry overflowed it (SIGBUS in the stack guard region,
-// caught by the async frame-tail suite). The probe, the band, and the
-// product assembly are three work-stack phases instead.
-
-/// Process-latched R4-C ideal-estimate gate (`SWIFTTUI_LAZY_IDEAL_ESTIMATE`,
-/// kill switch, default on). A bare enum with a `static let`: measurement
-/// runs on the frame-tail worker as well as the main actor, and the lazy
-/// static initialization is the thread-safe latch.
-enum LazyStackIdealEstimateGate {
-  static let isEnabled = FeatureGate.lazyStackIdealEstimate.initialIsEnabled()
+/// A logical element owns a run of zero or more independently measured fragments.
+struct LazyElementMeasurement {
+  var children: [ResolvedNode]
+  var measurements: [MeasuredNode]
 }
 
-/// Everything the deferred windowed-lazy-stack phases need to run at the
-/// work-stack top level. One context type serves both the probe finish (which
-/// derives the window) and the band finish (which assembles the product).
-/// A final class deliberately: the context rides inside work-stack items and
-/// carries a whole `ResolvedNode`; as a struct every enum-case construction
-/// copied it (retain traffic across the node's COW fields) on the windowed
-/// hot path.
 final class WindowedLazyStackMeasurementContext {
   let node: ResolvedNode
   let originalProposal: ProposedSize
   let effectiveProposal: ProposedSize
   let axis: Axis
-  let spacing: Int
+  let spacing: Int?
   let horizontalAlignment: HorizontalAlignment
   let verticalAlignment: VerticalAlignment
   let hint: MeasureViewportHint
   let idealProposal: ProposedSize
   let retainedSnapshot: LazyStackAllocationSnapshot?
-  /// The lazy stack's own measurement grade: band children issue at this
-  /// grade (commit site, sticky-downward); the element-0 stride probe is
-  /// probe-grade regardless.
   let grade: MeasurementGrade
+  var known: [Int: LazyElementMeasurement] = [:]
+  let identities: [Identity]
+  let segments: [Identity]
+  var anchor: (element: Int, fragment: Identity, viewportOffset: Int)?
 
   init(
-    node: ResolvedNode,
-    originalProposal: ProposedSize,
-    effectiveProposal: ProposedSize,
-    axis: Axis,
-    spacing: Int,
-    horizontalAlignment: HorizontalAlignment,
-    verticalAlignment: VerticalAlignment,
-    hint: MeasureViewportHint,
-    idealProposal: ProposedSize,
-    retainedSnapshot: LazyStackAllocationSnapshot?,
+    node: ResolvedNode, originalProposal: ProposedSize, effectiveProposal: ProposedSize,
+    axis: Axis, spacing: Int?, horizontalAlignment: HorizontalAlignment,
+    verticalAlignment: VerticalAlignment, hint: MeasureViewportHint,
+    idealProposal: ProposedSize, retainedSnapshot: LazyStackAllocationSnapshot?,
     grade: MeasurementGrade
   ) {
     self.node = node
@@ -76,363 +39,308 @@ final class WindowedLazyStackMeasurementContext {
     self.idealProposal = idealProposal
     self.retainedSnapshot = retainedSnapshot
     self.grade = grade
+    let source = node.indexedChildSource!
+    identities = (0..<source.count).map { source.elementIdentity(at: $0) }
+    segments = (0..<source.count).map { source.estimationSegment(at: $0) }
+    if let old = retainedSnapshot, let fragments = old.fragments,
+      let oldHint = old.windowHint
+    {
+      let requested = axis == .vertical ? hint.contentOffset.y : hint.contentOffset.x
+      let previous =
+        old.correctedContentOffset
+        ?? (axis == .vertical ? oldHint.contentOffset.y : oldHint.contentOffset.x)
+      // An explicit offset change selects a new window and takes precedence
+      // over automatic preservation, including short scrollTo commands.
+      if requested == previous {
+        let byIdentity = Dictionary(
+          identities.enumerated().map { ($0.element, $0.offset) },
+          uniquingKeysWith: { first, _ in first })
+        let visible =
+          fragments.firstIndex {
+            $0.mainOffset
+              + (axis == .vertical
+                ? $0.measurement.measuredSize.height : $0.measurement.measuredSize.width) > previous
+          } ?? 0
+        let candidates =
+          Array(fragments.dropFirst(visible)) + Array(fragments.prefix(visible).reversed())
+        for fragment in candidates {
+          guard old.childIdentities.indices.contains(fragment.elementIndex),
+            let index = byIdentity[old.childIdentities[fragment.elementIndex]]
+          else { continue }
+          anchor = (index, fragment.identity, fragment.mainOffset - requested)
+          break
+        }
+      }
+    }
   }
 }
 
+enum LazyStackIdealEstimateGate {
+  static let isEnabled = FeatureGate.lazyStackIdealEstimate.initialIsEnabled()
+}
+
 extension LayoutEngine {
-  /// Phase 1 — eligibility, hint claim, and scheduling. Returns `true` when
-  /// windowed measurement work was scheduled (the caller must not schedule
-  /// the exhaustive arm); `false` falls through to exhaustive. Eligibility:
-  /// - an indexed source. Both realization regimes benefit: a live
-  ///   main-actor source windows realization *and* measurement; a frame-head
-  ///   worker snapshot (`canRunOnWorker == true`) has realization sunk, but
-  ///   windowing still bounds measurement — which Stage-0 measured as the
-  ///   dominant per-notch phase (152 ms of a 292 ms document pipeline). The
-  ///   old `!source.canRunOnWorker` gate assumed snapshots had nothing left
-  ///   to save and put every under-budget document on the exhaustive path.
-  /// - an unclaimed measure-viewport hint from an enclosing scroll layout
-  ///   whose axes include the stack axis with a known viewport length. The
-  ///   claim makes the *outermost* indexed stack the hint's only consumer:
-  ///   the hint's offset is content-origin-relative, so a nested stack
-  ///   anchoring `offset / ownStride` at its own origin would park its
-  ///   window at its end (the claim is taken even when a later leg declines,
-  ///   deliberately — descendants of an ineligible indexed stack must not
-  ///   window against an offset that is not theirs either).
-  /// - an explicit spacing override (`nil` spacing negotiates per adjacent
-  ///   pair, which needs realized neighbors),
-  /// - single-cell elements (a spliced/EmptyView element would break the
-  ///   1:1 index alignment between allocation entries and source elements,
-  ///   so the first splice observed falls back to exhaustive).
   func scheduleWindowedLazyStackMeasurement(
-    for node: ResolvedNode,
-    originalProposal: ProposedSize,
-    effectiveProposal: ProposedSize,
-    grade: MeasurementGrade,
-    passContext: LayoutPassContext?,
-    localMetrics: inout LayoutWorkMetrics,
-    work: inout [MeasurementWorkItem]
+    for node: ResolvedNode, originalProposal: ProposedSize, effectiveProposal: ProposedSize,
+    grade: MeasurementGrade, passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics, work: inout [MeasurementWorkItem]
   ) -> Bool {
     guard
-      case .lazyStack(
-        let axis, let spacingOverride, let horizontalAlignment, let verticalAlignment
-      ) = node.layoutBehavior,
-      let source = node.indexedChildSource,
-      let passContext,
-      let candidateHint = passContext.currentMeasureViewportHint
-    else {
-      return false
-    }
-    let axisMatches =
-      switch axis {
-      case .horizontal:
-        candidateHint.axes.contains(.horizontal)
-      case .vertical:
-        candidateHint.axes.contains(.vertical)
-      }
-    guard axisMatches else {
-      return false
-    }
-    // Past this point the stack is an addressee of the hint on its axis, so
-    // claim before the remaining legs: even if spacing/splice shape makes
-    // THIS stack fall back to exhaustive, its descendants see the hint as
-    // consumed and measure exhaustively too instead of mis-anchoring.
-    guard let hint = passContext.claimCurrentMeasureViewportHint(for: node.identity) else {
-      return false
-    }
-    let viewportLength = mainDimension(of: hint.viewportSize, for: axis)
-    let count = source.count
-    guard let spacing = spacingOverride, viewportLength > 0, count > 0 else {
-      return false
-    }
-    let retainedSnapshot = retainedLazyStackSnapshot(
-      for: node,
-      axis: axis,
-      passContext: passContext
-    )
-
+      case .lazyStack(let axis, let spacing, let horizontal, let vertical) = node.layoutBehavior,
+      let source = node.indexedChildSource, let passContext,
+      let candidate = passContext.currentMeasureViewportHint,
+      axis == .vertical ? candidate.axes.contains(.vertical) : candidate.axes.contains(.horizontal),
+      let hint = passContext.claimCurrentMeasureViewportHint(for: node.identity),
+      mainDimension(of: hint.viewportSize, for: axis) > 0, source.count > 0,
+      (spacing ?? 0) >= 0
+    else { return false }
     let context = WindowedLazyStackMeasurementContext(
-      node: node,
-      originalProposal: originalProposal,
-      effectiveProposal: effectiveProposal,
-      axis: axis,
-      spacing: spacing,
-      horizontalAlignment: horizontalAlignment,
-      verticalAlignment: verticalAlignment,
+      node: node, originalProposal: originalProposal, effectiveProposal: effectiveProposal,
+      axis: axis, spacing: spacing, horizontalAlignment: horizontal, verticalAlignment: vertical,
       hint: hint,
       idealProposal: stackProposal(
-        axis: axis,
-        main: .unspecified,
-        cross: crossDimension(of: effectiveProposal, for: axis)
-      ),
-      retainedSnapshot: retainedSnapshot,
-      grade: grade
+        axis: axis, main: .unspecified,
+        cross: crossDimension(of: effectiveProposal, for: axis)),
+      retainedSnapshot: retainedLazyStackSnapshot(
+        for: node, axis: axis, passContext: passContext,
+        requireSameMembership: false), grade: grade
     )
-
-    // Anchor stride: the previous frame's product for this identity when one
-    // exists (a windowed product carries its refined stride; an exhaustive
-    // product yields its exact mean), else probe element 0 first. Markdown-
-    // shaped content is wildly heterogeneous (heading 1–2 rows, code 12), so
-    // a bare element-0 probe mis-anchors the window and under-estimates the
-    // content length — which the enclosing scroll clamps its offset against.
-    if let anchorStride = retainedEstimatedRowStride(
-      for: node, axis: axis, passContext: passContext),
-      let window = lazyStackEstimatedVisibleWindow(
-        hint: hint,
-        axis: axis,
-        count: count,
-        rowStride: anchorStride
-      )
-    {
-      return scheduleWindowedLazyStackBand(
-        context: context,
-        source: source,
-        window: window,
-        probeElement: nil,
-        probeMeasurement: nil,
-        localMetrics: &localMetrics,
-        work: &work
-      )
+    let old = context.retainedSnapshot
+    let previousMean = old.map {
+      ($0.contentMainLength + (spacing ?? 0)) / max(1, $0.childMainLengths.count)
     }
-
-    let probeElements = source.childElements(at: 0)
-    guard probeElements.count == 1 else {
-      return false
-    }
-    localMetrics.branching.builtinChildMeasureRequests += 1
-    localMetrics.branching.builtinChildMeasureRequestsProbe += 1
-    work.append(.finishWindowedLazyStackProbe(context, probeElement: probeElements[0]))
-    work.append(.measure(probeElements[0], context.idealProposal, .probe))
+    let seed = max(1, old?.estimatedRowStride ?? previousMean ?? (axis == .vertical ? 1 : 2))
+    let initial =
+      lazyStackEstimatedVisibleWindow(
+        hint: hint, axis: axis,
+        count: source.count, rowStride: seed) ?? 0..<1
+    let start = context.anchor?.element ?? initial.lowerBound + 1
+    let length = mainDimension(of: hint.viewportSize, for: axis)
+    let lower = context.anchor == nil ? initial.lowerBound : max(0, start - 1)
+    let upper =
+      context.anchor == nil
+      ? initial.upperBound : min(source.count, start + max(2, length / seed + 2))
+    scheduleLazyElements(
+      context, indices: Array(lower..<upper), localMetrics: &localMetrics, work: &work)
     return true
   }
 
-  /// Phase 2 (no-seed shape only) — the probe's finish: derive the window
-  /// from the probe extent and schedule the band, or fall back to the
-  /// exhaustive arm when no window exists.
-  func finishWindowedLazyStackProbe(
-    context: WindowedLazyStackMeasurementContext,
-    probeElement: ResolvedNode,
-    probeMeasurement: MeasuredNode,
-    localMetrics: inout LayoutWorkMetrics,
-    work: inout [MeasurementWorkItem]
+  private func scheduleLazyElements(
+    _ context: WindowedLazyStackMeasurementContext, indices: [Int],
+    localMetrics: inout LayoutWorkMetrics, work: inout [MeasurementWorkItem]
   ) {
-    let anchorStride =
-      max(1, mainDimension(of: probeMeasurement.measuredSize, for: context.axis))
-      + context.spacing
-    guard let source = context.node.indexedChildSource,
-      let window = lazyStackEstimatedVisibleWindow(
-        hint: context.hint,
-        axis: context.axis,
-        count: source.count,
-        rowStride: anchorStride
-      ),
-      scheduleWindowedLazyStackBand(
-        context: context,
-        source: source,
-        window: window,
-        probeElement: probeElement,
-        probeMeasurement: probeMeasurement,
-        localMetrics: &localMetrics,
-        work: &work
-      )
-    else {
+    let source = context.node.indexedChildSource!
+    let elements = indices.map { source.childElements(at: $0) }
+    let children = elements.flatMap { $0 }
+    localMetrics.branching.lazyFragmentMeasureRequests += children.count
+    scheduleChildren(
+      children, proposal: context.idealProposal, grade: context.grade,
+      finish: .finishCompositionalLazyStack(
+        context, indices: indices, elements: elements,
+        childCount: children.count), localMetrics: &localMetrics, work: &work)
+  }
+
+  func finishCompositionalLazyStack(
+    context: WindowedLazyStackMeasurementContext, indices: [Int], elements: [[ResolvedNode]],
+    measurements: [MeasuredNode], passContext: LayoutPassContext?,
+    localMetrics: inout LayoutWorkMetrics, work: inout [MeasurementWorkItem],
+    results: inout [MeasuredNode]
+  ) {
+    var consumed = 0
+    for (index, children) in zip(indices, elements) {
+      let end = consumed + children.count
+      context.known[index] = .init(
+        children: children, measurements: Array(measurements[consumed..<end]))
+      consumed = end
+    }
+    let snapshot = compositionalLazySnapshot(context, passContext: passContext)
+    // Any observed negative gap invalidates monotone offset search. Exhaustive
+    // measurement retains overlap semantics, including negative custom preferences.
+    if snapshot == nil {
       scheduleExhaustiveStackMeasurement(
-        for: context.node,
-        originalProposal: context.originalProposal,
-        effectiveProposal: context.effectiveProposal,
-        axis: context.axis,
-        spacing: context.spacing,
-        grade: context.grade,
-        localMetrics: &localMetrics,
-        work: &work
-      )
+        for: context.node, originalProposal: context.originalProposal,
+        effectiveProposal: context.effectiveProposal, axis: context.axis, spacing: context.spacing,
+        grade: context.grade, localMetrics: &localMetrics, work: &work)
       return
     }
-  }
-
-  /// Schedules the band's child measures plus the assembly finish. Returns
-  /// `false` (scheduling nothing) when an element splices — the caller falls
-  /// back to exhaustive.
-  private func scheduleWindowedLazyStackBand(
-    context: WindowedLazyStackMeasurementContext,
-    source: any IndexedChildSource,
-    window: Range<Int>,
-    probeElement: ResolvedNode?,
-    probeMeasurement: MeasuredNode?,
-    localMetrics: inout LayoutWorkMetrics,
-    work: inout [MeasurementWorkItem]
-  ) -> Bool {
-    var windowChildren: [ResolvedNode] = []
-    windowChildren.reserveCapacity(window.count)
-    for index in window {
-      if index == 0, let probeElement {
-        windowChildren.append(probeElement)
-        continue
-      }
-      let elements = source.childElements(at: index)
-      guard elements.count == 1 else {
-        return false
-      }
-      windowChildren.append(elements[0])
+    let allocation = snapshot!
+    let count = context.identities.count
+    let viewport = mainDimension(of: context.hint.viewportSize, for: context.axis)
+    let requested =
+      allocation.correctedContentOffset
+      ?? mainDimension(of: context.hint.contentOffset, for: context.axis)
+    let offset = min(max(0, requested), max(0, allocation.contentMainLength - viewport))
+    var needed: [Int] = []
+    for index in 0..<count where context.known[index] == nil {
+      let start = allocation.childMainOffsets[index]
+      let end = start + allocation.childMainLengths[index]
+      if end >= max(0, offset - 1) && start <= offset + viewport + 1 { needed.append(index) }
     }
-
-    // Index 0's probe measurement is reused when it landed inside the
-    // window; every other in-window child measures through the work stack —
-    // never by native re-entry, which overflows the frame-tail worker's
-    // stack under nested custom-layout shapes.
-    let probeReused = probeMeasurement != nil && window.lowerBound == 0
-    let scheduledChildren = probeReused ? Array(windowChildren.dropFirst()) : windowChildren
-    scheduleChildren(
-      scheduledChildren,
-      proposal: context.idealProposal,
-      grade: context.grade,
-      finish: .finishWindowedLazyStack(
-        context,
-        window: window,
-        windowChildren: windowChildren,
-        reusedProbeMeasurement: probeReused ? probeMeasurement : nil,
-        scheduledChildCount: scheduledChildren.count
-      ),
-      localMetrics: &localMetrics,
-      work: &work
-    )
-    return true
+    // Empty runs still advance logical indices; discovery continues until the
+    // viewport is filled or the source ends. No phantom cell is assigned to empties.
+    if !needed.isEmpty {
+      scheduleLazyElements(context, indices: needed, localMetrics: &localMetrics, work: &work)
+      return
+    }
+    let cross = max(0, allocation.crossLeading + allocation.crossTrailing)
+    let size =
+      context.axis == .vertical
+      ? CellSize(width: cross, height: allocation.contentMainLength)
+      : CellSize(width: allocation.contentMainLength, height: cross)
+    let sizes = context.identities.indices.map { index in
+      ChildAllocation(
+        identity: context.identities[index],
+        size: context.axis == .vertical
+          ? CellSize(width: cross, height: allocation.childMainLengths[index])
+          : CellSize(width: allocation.childMainLengths[index], height: cross))
+    }
+    results.append(
+      MeasuredNode(
+        viewNodeID: context.node.viewNodeID, identity: context.node.identity,
+        proposal: context.originalProposal,
+        measuredSize: clampedSize(
+          size,
+          proposal: clampingProposal(
+            for: context.node, effectiveProposal: context.effectiveProposal)),
+        childMeasurements: [],
+        containerAllocationSnapshot: .init(childSizes: sizes, lazyStack: allocation)))
   }
 
-  /// Phase 3 — assembly: refined stride from the measured band, allocation
-  /// arrays with estimates outside the window, and the final product.
-  /// Mirrors makeMeasuredNode's assembly (clamping, no stored child
-  /// measurements for lazy stacks) WITHOUT the cross-frame cache store: a
-  /// windowed product must never be served for a different offset.
-  func assembleWindowedLazyStackProduct(
-    context: WindowedLazyStackMeasurementContext,
-    window: Range<Int>,
-    windowChildren: [ResolvedNode],
-    windowMeasurements: [MeasuredNode]
-  ) -> MeasuredNode {
-    let node = context.node
+  private func compositionalLazySnapshot(
+    _ context: WindowedLazyStackMeasurementContext, passContext: LayoutPassContext?
+  ) -> LazyStackAllocationSnapshot? {
     let axis = context.axis
-    let spacing = context.spacing
-    // Bound once: the synthesis loop below asks for an identity per
-    // out-of-window index, and an optional-chained existential open per
-    // index is measurable at document scale.
-    let source = node.indexedChildSource
-    let count = source?.count ?? windowChildren.count
-
-    // Refined estimate: the mean measured extent of this frame's band. The
-    // product stores it (rounded) as the stride the NEXT window anchors
-    // from, and synthesizes this frame's out-of-window entries with it.
-    let measuredExtentSum = windowMeasurements.reduce(0) {
-      $0 + mainDimension(of: $1.measuredSize, for: axis)
+    let fallback = context.spacing ?? (axis == .vertical ? 0 : 1)
+    var summaries: [Int: (extent: Int, first: Spacing?, last: Spacing?)] = [:]
+    var samples: [Identity: (sum: Int, count: Int)] = [:]
+    var localOffsets: [Int: [Int]] = [:]
+    var crossLeading = 0
+    var crossTrailing = 0
+    for (index, run) in context.known {
+      let spacings = run.children.map { effectiveSpacing(for: $0, passContext: passContext) }
+      var cursor = 0
+      var offsets: [Int] = []
+      for ordinal in run.children.indices {
+        if ordinal > 0 {
+          let gap =
+            context.spacing
+            ?? preferredSpacingDistance(
+              from: spacings[ordinal - 1],
+              to: spacings[ordinal], axis: axis)
+          if gap < 0 { return nil }
+          cursor += gap
+        }
+        offsets.append(cursor)
+        cursor += mainDimension(of: run.measurements[ordinal].measuredSize, for: axis)
+      }
+      localOffsets[index] = offsets
+      summaries[index] = (cursor, spacings.first, spacings.last)
+      if !run.children.isEmpty {
+        let old = samples[context.segments[index]] ?? (0, 0)
+        samples[context.segments[index]] = (old.sum + cursor, old.count + 1)
+      }
+      let cross = stackCrossMetrics(
+        for: run.children, childMeasurements: run.measurements,
+        axis: axis, horizontalAlignment: context.horizontalAlignment,
+        verticalAlignment: context.verticalAlignment, passContext: passContext)
+      crossLeading = max(crossLeading, cross.leading)
+      crossTrailing = max(crossTrailing, cross.trailing)
     }
-    let rowExtent = max(
-      1, (measuredExtentSum + windowMeasurements.count / 2) / max(1, windowMeasurements.count)
-    )
-    let rowStride = rowExtent + spacing
-
-    let crossMetrics = stackCrossMetrics(
-      for: windowChildren,
-      childMeasurements: windowMeasurements,
-      axis: axis,
-      horizontalAlignment: context.horizontalAlignment,
-      verticalAlignment: context.verticalAlignment
-    )
-    let bandCross = windowMeasurements.reduce(0) {
-      max($0, crossDimension(of: $1.measuredSize, for: axis))
+    var oldLengths: [Identity: Int] = [:]
+    if let old = context.retainedSnapshot {
+      for index in old.childIdentities.indices where old.childMainLengths.indices.contains(index) {
+        oldLengths[old.childIdentities[index]] = old.childMainLengths[index]
+      }
     }
-    var childMainOffsets: [Int] = []
-    var childMainLengths: [Int] = []
-    var childIdentities: [Identity] = []
-    var childSizes: [ChildAllocation] = []
-    childMainOffsets.reserveCapacity(count)
-    childMainLengths.reserveCapacity(count)
-    childIdentities.reserveCapacity(count)
-    childSizes.reserveCapacity(count)
-
+    var offsets: [Int] = []
+    var lengths: [Int] = []
+    var fragments: [LazyStackFragmentAllocation] = []
     var cursor = 0
-    for index in 0..<count {
-      childMainOffsets.append(cursor)
-      let length: Int
-      let identity: Identity
-      let size: CellSize
-      if window.contains(index) {
-        let measurement = windowMeasurements[index - window.lowerBound]
-        length = mainDimension(of: measurement.measuredSize, for: axis)
-        identity = windowChildren[index - window.lowerBound].identity
-        size = measurement.measuredSize
-      } else {
-        identity = source?.elementIdentity(at: index) ?? node.identity
-        // A new band's mean may refine the unseen tail, but changing an
-        // already-scrolled prefix changes the current window's origin and
-        // visibly moves content independently of the scroll offset. Carry
-        // the index-parallel prefix only after the retained source signature
-        // proves element order is unchanged. Exact extents then remain exact
-        // and earlier estimates remain spatially stable across re-windowing.
-        length =
-          if index < window.lowerBound,
-            let retainedSnapshot = context.retainedSnapshot,
-            retainedSnapshot.childMainLengths.indices.contains(index)
-          {
-            retainedSnapshot.childMainLengths[index]
-          } else {
-            rowExtent
-          }
-        size =
-          switch axis {
-          case .vertical:
-            CellSize(width: bandCross, height: length)
-          case .horizontal:
-            CellSize(width: length, height: bandCross)
-          }
+    var previous: Spacing?
+    var hasPrevious = false
+    let knownStart = context.known.keys.min() ?? 0
+    for index in context.identities.indices {
+      let summary = summaries[index]
+      let isEmpty = context.known[index]?.children.isEmpty == true
+      if !isEmpty && hasPrevious {
+        let gap: Int
+        if let previous, let first = summary?.first {
+          gap = context.spacing ?? preferredSpacingDistance(from: previous, to: first, axis: axis)
+        } else {
+          gap = fallback
+        }
+        if gap < 0 { return nil }
+        cursor += gap
       }
-      childMainLengths.append(length)
-      childIdentities.append(identity)
-      childSizes.append(ChildAllocation(identity: identity, size: size))
+      offsets.append(cursor)
+      let sample = samples[context.segments[index]]
+      let estimate = sample.map { max(1, ($0.sum + $0.count / 2) / $0.count) } ?? 1
+      // Old extents seed geometry only. Exact observations are always measured
+      // from current producers and proposals; identity equality is not currency.
+      let length =
+        summary?.extent
+        ?? ((index < knownStart || sample == nil)
+          ? oldLengths[context.identities[index]].map { max(1, $0) } : nil)
+        ?? estimate
+      lengths.append(length)
+      if let run = context.known[index] {
+        for ordinal in run.children.indices {
+          fragments.append(
+            .init(
+              elementIndex: index, fragmentIndex: ordinal,
+              identity: run.children[ordinal].identity,
+              mainOffset: cursor + localOffsets[index]![ordinal],
+              measurement: run.measurements[ordinal]))
+        }
+      }
       cursor += length
-      if index < count - 1 {
-        cursor += spacing
+      if !isEmpty {
+        previous = summary?.last
+        hasPrevious = true
       }
     }
-    let contentMainLength = cursor
-
-    let snapshot = LazyStackAllocationSnapshot(
-      axis: axis,
-      childMainOffsets: childMainOffsets,
-      childMainLengths: childMainLengths,
-      childIdentities: childIdentities,
-      contentMainLength: contentMainLength,
-      crossLeading: crossMetrics.leading,
-      crossTrailing: crossMetrics.trailing,
-      measuredWindow: window,
-      estimatedRowStride: rowStride,
-      windowHint: context.hint
-    )
-
-    let crossLength = max(0, crossMetrics.leading + crossMetrics.trailing)
-    let rawSize: CellSize =
-      switch axis {
-      case .vertical:
-        CellSize(width: crossLength, height: contentMainLength)
-      case .horizontal:
-        CellSize(width: contentMainLength, height: crossLength)
+    var snapshot = LazyStackAllocationSnapshot(
+      axis: axis, childMainOffsets: offsets,
+      childMainLengths: lengths, childIdentities: context.identities, contentMainLength: cursor,
+      crossLeading: crossLeading, crossTrailing: crossTrailing,
+      measuredWindow: (context.known.keys.min() ?? 0)..<((context.known.keys.max() ?? -1) + 1),
+      estimatedRowStride: max(
+        1, (cursor + context.identities.count / 2) / max(1, context.identities.count)),
+      windowHint: context.hint)
+    snapshot.fragments = fragments
+    snapshot.exactElementIndices = Set(context.known.keys)
+    if let anchor = context.anchor {
+      var matching = fragments.first { $0.identity == anchor.fragment }
+      var viewportOffset = anchor.viewportOffset
+      if matching == nil, let oldFragments = context.retainedSnapshot?.fragments,
+        let oldIndex = oldFragments.firstIndex(where: { $0.identity == anchor.fragment })
+      {
+        let byIdentity = Dictionary(
+          fragments.map { ($0.identity, $0) },
+          uniquingKeysWith: { first, _ in first })
+        let candidates =
+          Array(oldFragments.dropFirst(oldIndex + 1))
+          + Array(oldFragments.prefix(oldIndex).reversed())
+        for old in candidates {
+          if let surviving = byIdentity[old.identity] {
+            matching = surviving
+            viewportOffset =
+              old.mainOffset - mainDimension(of: context.hint.contentOffset, for: axis)
+            break
+          }
+        }
       }
-
-    return MeasuredNode(
-      viewNodeID: node.viewNodeID,
-      identity: node.identity,
-      proposal: context.originalProposal,
-      measuredSize: clampedSize(
-        rawSize,
-        proposal: clampingProposal(for: node, effectiveProposal: context.effectiveProposal)
-      ),
-      childMeasurements: [],
-      containerAllocationSnapshot: ContainerAllocationSnapshot(
-        childSizes: childSizes,
-        selectedChildIndex: nil,
-        lazyStack: snapshot
-      )
-    )
+      if let matching {
+        let viewport = mainDimension(of: context.hint.viewportSize, for: axis)
+        snapshot.correctedContentOffset = min(
+          max(0, matching.mainOffset - viewportOffset),
+          max(0, cursor - viewport))
+      } else {
+        snapshot.correctedContentOffset = 0
+      }
+    }
+    return snapshot
   }
-
   /// Hintless ideal-round estimate for indexed lazy stacks (scroll-latency
   /// R4-C, app-tier finding 1 of report 2026-08-01-001).
   ///
@@ -464,7 +372,8 @@ extension LayoutEngine {
   /// snapshot, and are never stored in the cross-frame measurement cache.
   /// Ineligible: any in-scope measure-viewport hint (a claimed hint means
   /// this measure is part of a windowed band — exhaustive semantics stay),
-  /// spliced elements, negotiated (`nil`) spacing.
+  /// overlapping negative spacing. Empty and multi-fragment probes keep their
+  /// logical cardinality and use an explicitly estimated nonempty extent.
   ///
   /// Returns `true` when the estimate was served or scheduled; `false` falls
   /// through to the exhaustive arm.
@@ -478,12 +387,14 @@ extension LayoutEngine {
     results: inout [MeasuredNode]
   ) -> Bool {
     guard LazyStackIdealEstimateGate.isEnabled,
-      case .lazyStack(let axis, .some(let spacing), _, _) = node.layoutBehavior,
+      case .lazyStack(let axis, let spacingOverride, _, _) = node.layoutBehavior,
       let source = node.indexedChildSource,
       case .unspecified = mainDimension(of: effectiveProposal, for: axis)
     else {
       return false
     }
+    let spacing = spacingOverride ?? (axis == .vertical ? 0 : 1)
+    guard spacing >= 0 else { return false }
     // Hintless — or vacuous: a scroll layout measured at an unspecified
     // scrolling axis still pushes a hint whose viewport length on that axis
     // is 0 ("unknown — do not window"). Such a hint carries no window for
@@ -521,32 +432,15 @@ extension LayoutEngine {
       return false
     }
     let probeElements = source.childElements(at: 0)
-    guard probeElements.count == 1 else {
-      return false
-    }
-    localMetrics.branching.builtinChildMeasureRequests += 1
-    localMetrics.branching.builtinChildMeasureRequestsProbe += 1
-    work.append(
-      .finishLazyStackIdealEstimate(
-        node,
-        originalProposal: originalProposal,
-        effectiveProposal: effectiveProposal,
-        axis: axis,
-        spacing: spacing,
-        count: count
-      )
-    )
-    work.append(
-      .measure(
-        probeElements[0],
-        stackProposal(
-          axis: axis,
-          main: .unspecified,
-          cross: crossDimension(of: effectiveProposal, for: axis)
-        ),
-        .probe
-      )
-    )
+    scheduleChildren(
+      probeElements,
+      proposal: stackProposal(
+        axis: axis, main: .unspecified,
+        cross: crossDimension(of: effectiveProposal, for: axis)), grade: .probe,
+      finish: .finishLazyStackIdealEstimate(
+        node, originalProposal: originalProposal,
+        effectiveProposal: effectiveProposal, axis: axis, spacing: spacing, count: count,
+        childCount: probeElements.count), localMetrics: &localMetrics, work: &work)
     return true
   }
 
@@ -658,42 +552,11 @@ extension LayoutEngine {
     )
   }
 
-  /// The stride to anchor this frame's window from, carried from the
-  /// previous frame's product for the same identity: a windowed product's
-  /// refined `estimatedRowStride`, or an exhaustive product's exact mean
-  /// (`(contentMainLength + spacing) / count` — content is `Σ extents +
-  /// (count−1)·spacing`, so this recovers mean extent + spacing). `nil`
-  /// when no usable previous product exists; the caller probes element 0.
-  private func retainedEstimatedRowStride(
-    for node: ResolvedNode,
-    axis: Axis,
-    passContext: LayoutPassContext
-  ) -> Int? {
-    guard
-      let snapshot = retainedLazyStackSnapshot(
-        for: node,
-        axis: axis,
-        passContext: passContext
-      )
-    else {
-      return nil
-    }
-    if let stride = snapshot.estimatedRowStride, stride > 0 {
-      return stride
-    }
-    let count = snapshot.childMainLengths.count
-    guard snapshot.measuredWindow == nil, count > 0, snapshot.contentMainLength > 0,
-      case .lazyStack(_, .some(let spacing), _, _) = node.layoutBehavior
-    else {
-      return nil
-    }
-    return max(1, (snapshot.contentMainLength + spacing) / count)
-  }
-
   private func retainedLazyStackSnapshot(
     for node: ResolvedNode,
     axis: Axis,
-    passContext: LayoutPassContext
+    passContext: LayoutPassContext,
+    requireSameMembership: Bool = true
   ) -> LazyStackAllocationSnapshot? {
     let retainedLayout = passContext.retainedLayout
     let previousMeasured: MeasuredNode?
@@ -720,8 +583,8 @@ extension LayoutEngine {
       previousResolved = retainedLayout?.resolvedNode(for: node.identity)
     }
     let snapshot =
-      previousMeasured?.containerAllocationSnapshot?.lazyStack
-      ?? previousPlaced?.lazyStackAllocationSnapshot
+      previousPlaced?.lazyStackAllocationSnapshot
+      ?? previousMeasured?.containerAllocationSnapshot?.lazyStack
     guard
       let snapshot,
       snapshot.axis == axis,
@@ -738,8 +601,8 @@ extension LayoutEngine {
       // exactly when the retained source is a snapshot or the current one
       // is live; otherwise skip reuse and measure fresh.
       previousSource.canRunOnWorker || !source.canRunOnWorker,
-      previousSource.measurementSignature == source.measurementSignature,
-      snapshot.childMainLengths.count == source.count
+      !requireSameMembership || previousSource.measurementSignature == source.measurementSignature,
+      !requireSameMembership || snapshot.childMainLengths.count == source.count
     else {
       return nil
     }

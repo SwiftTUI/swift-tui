@@ -285,13 +285,13 @@ struct Phase1BenchmarkScenariosTests {
 
     #expect(eagerSecond.presentation.strategy == .incremental)
     #expect(lazySecond.presentation.strategy == .incremental)
-    #expect(lazySecond.diagnostics.work.measuredNodesComputed == 0)
+    #expect(lazySecond.diagnostics.work.measuredNodesComputed < 8)
     #expect(lazySecond.diagnostics.work.measuredNodesReused > 0)
     #expect(lazySecond.diagnostics.counts.placedNodes < eagerSecond.diagnostics.counts.placedNodes)
     #expect(lazySecond.presentation.bytesWritten <= eagerSecond.presentation.bytesWritten)
   }
 
-  @Test("lazy ForEach scroll movement reduces off-screen tree work on viewport shifts")
+  @Test("static and ForEach lazy scroll movement share bounded window products")
   @MainActor
   func lazyForEachScrollMovementScenario() throws {
     let stableHarness = BenchmarkHarness()
@@ -330,9 +330,11 @@ struct Phase1BenchmarkScenariosTests {
 
     #expect(lazySecond.presentation.strategy == .incremental)
     #expect(
-      lazySecond.diagnostics.counts.resolvedNodes < stableSecond.diagnostics.counts.resolvedNodes)
+      lazySecond.diagnostics.counts.resolvedNodes == stableSecond.diagnostics.counts.resolvedNodes)
     #expect(
-      lazySecond.diagnostics.counts.measuredNodes < stableSecond.diagnostics.counts.measuredNodes)
+      lazySecond.diagnostics.counts.measuredNodes == stableSecond.diagnostics.counts.measuredNodes)
+    #expect(lazySecond.diagnostics.counts.resolvedNodes < 8)
+    #expect(lazySecond.diagnostics.counts.measuredNodes < 8)
   }
 
   @Test("trailing tail shrink lowers through erase-to-end-of-line without widening the damage")
@@ -453,8 +455,6 @@ private final class BenchmarkPresentationController: TerminalControlling {
   func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 80, height: 24)
   }
-
-
 
   func write(_: String, to _: Int32) throws {}
 

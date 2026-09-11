@@ -197,7 +197,7 @@ struct BranchingFactorOracleTests {
     try assertLedger(fixture: "view-that-fits", family: .builtin, branching: branching)
   }
 
-  @Test("windowed lazy list: one stride probe plus the visible band")
+  @Test("windowed lazy list: fragment requests stay inside the visible band")
   func windowedLazyList() throws {
     let rows = (0..<40).map { index in
       leaf("row-\(index)", size: .init(width: 20, height: 1))
@@ -221,12 +221,11 @@ struct BranchingFactorOracleTests {
     )
     let branching = passContext.workMetrics.branching
 
-    // Element-0 stride probe (reused inside the window) plus the 11
-    // remaining band children: stride 1, 10 viewport rows, one overscan row
-    // each side plus the partial-row allowance, clamped at the top. Only
-    // the stride probe is probe-grade; the band children place.
+    // The logical band is measured at commit grade; there is no separate
+    // singleton-row stride probe. Fragment requests remain visible-band bounded.
     #expect(branching.builtinChildMeasureRequests == 12)
-    #expect(branching.builtinChildMeasureRequestsProbe == 1)
+    #expect(branching.lazyFragmentMeasureRequests == 12)
+    #expect(branching.builtinChildMeasureRequestsProbe == 0)
     #expect(branching.builtinContainerMeasureComputations == 1)
     try assertLedger(fixture: "windowed-lazy-list", family: .builtin, branching: branching)
   }

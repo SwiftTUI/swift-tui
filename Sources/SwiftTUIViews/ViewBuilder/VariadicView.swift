@@ -2,7 +2,9 @@ import SwiftTUICore
 
 /// The builder artifact produced by array-like view composition such as
 /// `ForEach` expansion or `buildArray` support.
-public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView {
+public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView,
+  DeclaredChildStructure
+{
   package let content: [Content]
 
   package init(
@@ -37,6 +39,19 @@ public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, Declar
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
+    var accumulator = DeclaredChildAccumulator(indexed: false)
+    appendDeclaredStructure(
+      in: context, kindName: kindName, nextIndex: &nextIndex, into: &accumulator
+    )
+    resolved.append(contentsOf: accumulator.nodes)
+  }
+
+  package func appendDeclaredStructure(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    into resolved: inout DeclaredChildAccumulator
+  ) {
     let slotContext = context.indexedChild(
       kind: .init(rawValue: kindName),
       index: nextIndex
@@ -45,7 +60,7 @@ public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, Declar
     var elementIndex = 0
 
     for element in content {
-      appendDeclaredChildNodes(
+      appendDeclaredContent(
         element,
         in: slotContext,
         kindName: kindName,

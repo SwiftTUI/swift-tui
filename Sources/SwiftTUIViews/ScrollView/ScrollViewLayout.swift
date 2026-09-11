@@ -23,6 +23,7 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     var bottom: Int = 0
   }
 
+  var scrollIdentity: Identity? = nil
   var axes: Axis.Set
   var position: ScrollCellOffset
   var indicatorAxes: Axis.Set
@@ -235,7 +236,8 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     return MeasureViewportHint(
       axes: axes,
       contentOffset: .init(x: max(0, position.x), y: max(0, position.y)),
-      viewportSize: .init(width: width, height: height)
+      viewportSize: .init(width: width, height: height),
+      scrollIdentity: scrollIdentity
     )
   }
 

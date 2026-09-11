@@ -141,6 +141,7 @@ package struct SemanticExtractor: Sendable {
         }
 
         if interactionsEnabled, let scrollRole = node.semanticMetadata.scrollRole {
+          let anchorOffset = node.children.first?.placementMetadata.scrollAnchorCorrection
           scrollRoutes.append(
             ScrollRoute(
               identity: node.identity,
@@ -150,6 +151,7 @@ package struct SemanticExtractor: Sendable {
               structuralHostChain: context.structuralHostChain
             )
           )
+          scrollRoutes[scrollRoutes.count - 1].scrollAnchorCorrection = anchorOffset
           selectionRoutes.append(
             SelectionRoute(identity: node.identity, role: scrollRole)
           )
@@ -491,6 +493,7 @@ extension SemanticExtractor {
               rect: estimate.rect
             )
           )
+          targets[targets.count - 1].isEstimated = estimate.isEstimated
         }
       }
       for child in frame.node.children.reversed() {

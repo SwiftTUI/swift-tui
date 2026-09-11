@@ -115,6 +115,8 @@ package struct PreMeasureCutoffMetrics: Equatable, Sendable {
 package struct LayoutBranchingMetrics: Equatable, Sendable {
   package var builtinContainerMeasureComputations = 0
   package var builtinChildMeasureRequests = 0
+  /// Fragment requests issued by compositional lazy measurement, including cache serves.
+  package var lazyFragmentMeasureRequests = 0
   package var customContainerMeasureComputations = 0
   package var customChildMeasureRequests = 0
   package var customPlacementChildMeasureRequests = 0
@@ -149,6 +151,7 @@ package struct LayoutBranchingMetrics: Equatable, Sendable {
   package mutating func merge(_ other: Self) {
     builtinContainerMeasureComputations += other.builtinContainerMeasureComputations
     builtinChildMeasureRequests += other.builtinChildMeasureRequests
+    lazyFragmentMeasureRequests += other.lazyFragmentMeasureRequests
     customContainerMeasureComputations += other.customContainerMeasureComputations
     customChildMeasureRequests += other.customChildMeasureRequests
     customPlacementChildMeasureRequests += other.customPlacementChildMeasureRequests

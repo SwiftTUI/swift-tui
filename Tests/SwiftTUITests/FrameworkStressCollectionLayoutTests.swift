@@ -161,7 +161,7 @@ extension FrameworkStressCollectionLayoutTests {
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
       #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
     }
   }
 }
@@ -226,7 +226,7 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
       #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
       #expect(collectionLayoutText(retained).contains("004 row 0 of \(count)"))
     }
@@ -393,7 +393,7 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
       let expected = alternate ? "007 alternate 30" : "007 primary 1"
       #expect(collectionLayoutText(retained).contains(expected))
     }
@@ -452,7 +452,7 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
       #expect(collectionLayoutText(retained).contains("008 grouped \(values[0])"))
     }
   }
@@ -539,9 +539,11 @@ extension FrameworkStressCollectionLayoutTests {
     // index after stable entities move to different collection positions.
     let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
     let rootIdentity = testIdentity("CollectionLayout010")
+    let position = CollectionLayout010ScrollBox()
 
     for generation in 0..<24 {
-      let root = CollectionLayout010Root(rotated: !generation.isMultiple(of: 2))
+      let root = CollectionLayout010Root(
+        rotated: !generation.isMultiple(of: 2), position: position)
       let retained = renderer.render(
         root,
         context: .init(
@@ -557,7 +559,7 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
       #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
     }
   }
@@ -569,8 +571,14 @@ private struct CollectionLayout010Row: Identifiable {
 }
 
 @MainActor
+private final class CollectionLayout010ScrollBox {
+  var value = ScrollCellOffset.zero
+}
+
+@MainActor
 private struct CollectionLayout010Root: View {
   let rotated: Bool
+  let position: CollectionLayout010ScrollBox
 
   private var rows: [CollectionLayout010Row] {
     let base = [
@@ -582,7 +590,10 @@ private struct CollectionLayout010Root: View {
   }
 
   var body: some View {
-    ScrollView(.horizontal) {
+    ScrollView(
+      .horizontal,
+      position: Binding(get: { position.value }, set: { position.value = $0 })
+    ) {
       LazyHStack(alignment: .top, spacing: 1) {
         ForEach(rows) { row in
           Text("\(row.id)")
@@ -670,7 +681,7 @@ extension FrameworkStressCollectionLayoutTests {
       )
       let matchesOccurrenceGeometry =
         retained.rasterSurface == fresh.rasterSurface
-        && retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes
+        && collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh)
 
       #expect(matchesOccurrenceGeometry)
     }
@@ -734,7 +745,7 @@ extension FrameworkStressCollectionLayoutTests {
       )
       let matchesCurrentTopology =
         retained.rasterSurface == fresh.rasterSurface
-        && retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes
+        && collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh)
 
       #expect(matchesCurrentTopology)
     }
@@ -792,7 +803,7 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
       let expectedFirst = mixed ? "014 static head" : "014 row 1"
       #expect(retained.rasterSurface.lines.first == expectedFirst)
     }
@@ -853,7 +864,7 @@ extension FrameworkStressCollectionLayoutTests {
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
       #expect(retained.measuredTree.measuredSize == fresh.measuredTree.measuredSize)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
     }
   }
 }
@@ -924,7 +935,7 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
       let expectedFirst = count == 4 ? "016 row 0" : "016 row 14"
       #expect(retained.rasterSurface.lines.first == expectedFirst)
     }
@@ -989,7 +1000,7 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
       #expect(retained.rasterSurface.lines.first == "017 row 5")
       #expect(retained.rasterSurface.lines[height - 1] == "017 row \(4 + height)")
     }
@@ -1055,9 +1066,10 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
-      let expectedFirst = removedPrefix ? "018 row 8" : "018 row 5"
-      #expect(retained.rasterSurface.lines.first == expectedFirst)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
+      // Membership changes preserve the visible entity through the owning binding.
+      #expect(retained.rasterSurface.lines.first == "018 row 5")
+      #expect(position.value.y == (removedPrefix ? 2 : 5))
     }
   }
 }
@@ -1123,8 +1135,9 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot.scrollRoutes == fresh.semanticSnapshot.scrollRoutes)
-      #expect(retained.rasterSurface.lines.first?.hasPrefix(values[2]) == true)
+      #expect(collectionLayoutScrollGeometry(retained) == collectionLayoutScrollGeometry(fresh))
+      #expect(retained.rasterSurface.lines.first?.hasPrefix("C") == true)
+      #expect(position.value.x == (generation.isMultiple(of: 2) ? 6 : 9))
     }
   }
 }
@@ -2163,5 +2176,16 @@ private struct CollectionLayout033Root: View {
           .layoutValue(key: CollectionLayout033ColumnKey.self, value: row.column)
       }
     }
+  }
+}
+
+// A correction is a frame commit command; compare every persistent route field
+// independently of whether this frame needed to move the binding.
+@MainActor
+private func collectionLayoutScrollGeometry(_ snapshot: RenderSnapshot) -> [ScrollRoute] {
+  snapshot.semanticSnapshot.scrollRoutes.map { route in
+    var geometry = route
+    geometry.scrollAnchorCorrection = nil
+    return geometry
   }
 }

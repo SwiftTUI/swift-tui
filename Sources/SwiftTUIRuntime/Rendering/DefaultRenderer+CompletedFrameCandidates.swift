@@ -238,6 +238,9 @@ extension DefaultRenderer {
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets
     )
+    draft.resolveContext.localScrollPositionRegistry?.commitLazyScrollAnchors(
+      artifacts.semanticSnapshot.scrollRoutes
+    )
     draft.graphDraft.updateCommittedScrollGeometry(
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
       scrollTargets: artifacts.semanticSnapshot.scrollTargets

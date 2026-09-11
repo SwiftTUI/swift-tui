@@ -111,7 +111,49 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
 }
 
 /// Allocation state captured for lazy stacks.
+package struct LazyStackFragmentAllocation: Equatable, Sendable {
+  package var elementIndex: Int
+  package var fragmentIndex: Int
+  package var identity: Identity
+  package var mainOffset: Int
+  package var measurement: MeasuredNode
+}
+
 package struct LazyStackAllocationSnapshot: Equatable, Sendable {
+  // Keep optional window products out of MeasuredNode's recursive inline
+  // footprint. Immutable storage preserves value semantics across retained frames.
+  private struct WindowData: Equatable, Sendable {
+    var fragments: [LazyStackFragmentAllocation]?
+    var correctedContentOffset: Int?
+    var exactElementIndices: Set<Int> = []
+    var hint: MeasureViewportHint?
+  }
+  private final class WindowStorage: Equatable, Sendable {
+    let value: WindowData
+    init(_ value: WindowData) { self.value = value }
+    static func == (lhs: WindowStorage, rhs: WindowStorage) -> Bool {
+      lhs === rhs || lhs.value == rhs.value
+    }
+  }
+  private var windowStorage: WindowStorage?
+  private mutating func updateWindow(_ update: (inout WindowData) -> Void) {
+    var value = windowStorage?.value ?? WindowData()
+    update(&value)
+    windowStorage = WindowStorage(value)
+  }
+  /// Exact fragments, separately addressed from logical-element estimates.
+  package var fragments: [LazyStackFragmentAllocation]? {
+    get { windowStorage?.value.fragments }
+    set { updateWindow { $0.fragments = newValue } }
+  }
+  package var correctedContentOffset: Int? {
+    get { windowStorage?.value.correctedContentOffset }
+    set { updateWindow { $0.correctedContentOffset = newValue } }
+  }
+  package var exactElementIndices: Set<Int> {
+    get { windowStorage?.value.exactElementIndices ?? [] }
+    set { updateWindow { $0.exactElementIndices = newValue } }
+  }
   package var axis: Axis
   package var childMainOffsets: [Int]
   package var childMainLengths: [Int]
@@ -125,10 +167,10 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
   package var contentMainLength: Int
   package var crossLeading: Int
   package var crossTrailing: Int
-  /// The realized-and-measured index band when this snapshot was built under
+  /// The envelope of measured logical elements when this snapshot was built under
   /// a measure-viewport hint (proposal 2026-07-13-002 Stage 2.2); `nil`
-  /// means exhaustive — every entry is a real measurement. Entries outside
-  /// the window are synthesized from the estimated row extent, so a windowed
+  /// means exhaustive. The exact-element set, rather than every index in the
+  /// envelope, identifies observed elements. Other entries are estimates. A windowed
   /// product is only valid for its window: the retained-measurement gate
   /// denies reuse whenever the current hint differs from ``windowHint``.
   package var measuredWindow: Range<Int>?
@@ -145,7 +187,10 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
   /// window and the stored stride are only mutually consistent for the hint
   /// they were derived from, and any offset change re-windows anyway.
   /// `nil` on exhaustive products.
-  package var windowHint: MeasureViewportHint?
+  package var windowHint: MeasureViewportHint? {
+    get { windowStorage?.value.hint }
+    set { updateWindow { $0.hint = newValue } }
+  }
 
   package init(
     axis: Axis,

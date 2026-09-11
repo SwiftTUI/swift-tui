@@ -3,7 +3,7 @@ import SwiftTUICore
 /// The builder artifact produced by conditional branches inside a
 /// ``ViewBuilder``.
 public struct ConditionalContent<TrueContent: View, FalseContent: View>: PrimitiveView,
-  ResolvableView, DeclaredChildrenView
+  ResolvableView, DeclaredChildrenView, DeclaredChildStructure
 {
   /// The currently active conditional branch.
   public enum Storage {
@@ -32,6 +32,19 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
+    var accumulator = DeclaredChildAccumulator(indexed: false)
+    appendDeclaredStructure(
+      in: context, kindName: kindName, nextIndex: &nextIndex, into: &accumulator
+    )
+    resolved.append(contentsOf: accumulator.nodes)
+  }
+
+  package func appendDeclaredStructure(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    into resolved: inout DeclaredChildAccumulator
+  ) {
     let slotContext = context.indexedChild(
       kind: .init(rawValue: kindName),
       index: nextIndex
@@ -42,7 +55,7 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
     case .trueContent(let content):
       let branchContext = slotContext.child(component: .init(rawValue: "true"))
       var branchIndex = 0
-      appendDeclaredChildNodes(
+      appendDeclaredContent(
         content,
         in: branchContext,
         kindName: kindName,
@@ -57,7 +70,7 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
       }
       let branchContext = slotContext.child(component: .init(rawValue: "false"))
       var branchIndex = 0
-      appendDeclaredChildNodes(
+      appendDeclaredContent(
         content,
         in: branchContext,
         kindName: kindName,

@@ -59,6 +59,13 @@ package final class LocalScrollPositionRegistry: Equatable {
   private var registrations: [Identity: ScrollPositionRegistrationSnapshot] = [:]
   private var latestScrollRoutes: [ScrollRoute] = []
   private var latestScrollTargets: [ScrollTarget] = []
+  private struct PendingLazyTarget {
+    var query: ScrollTargetQuery
+    var anchor: UnitPoint?
+    var originalOffset: ScrollOffset
+    var requestedOffset: ScrollOffset
+  }
+  private var pendingLazyTargets: [Identity: PendingLazyTarget] = [:]
   /// What each scroll route last auto-revealed (focused element + text cursor),
   /// keyed by the route identity. Lets `sync` fire focus-reveal only when focus
   /// (or a focused text cursor) *changes*, not as a standing per-frame constraint
@@ -124,6 +131,21 @@ package final class LocalScrollPositionRegistry: Equatable {
     latestScrollTargets = scrollTargets
   }
 
+  /// Apply geometry refinement only when its owning frame commits. Abandoned
+  /// worker candidates and measurement probes cannot mutate authored bindings.
+  package func commitLazyScrollAnchors(_ routes: [ScrollRoute]) {
+    for route in routes {
+      guard let correction = route.scrollAnchorCorrection,
+        let registration = registrations[route.identity]
+      else { continue }
+      let requested = ScrollOffset(x: correction.requestedOffset.x, y: correction.requestedOffset.y)
+      let corrected = ScrollOffset(x: correction.correctedOffset.x, y: correction.correctedOffset.y)
+      if registration.currentOffset() == requested && requested != corrected {
+        registration.applyOffset(corrected)
+      }
+    }
+  }
+
   /// Returns copies of `routes` with `contentOffset` populated from each
   /// region's live scroll offset. Routes without a live registration are
   /// returned unchanged (keeping their `.zero` offset).
@@ -155,12 +177,21 @@ package final class LocalScrollPositionRegistry: Equatable {
       let route = latestScrollRoutes.first(where: { $0.identity == target.scrollIdentity }),
       let registration = registrations[target.scrollIdentity]
     {
-      return scrollTo(
+      let original = registration.currentOffset()
+      let changed = scrollTo(
         rect: target.rect,
         anchor: anchor,
         route: route,
         registration: registration
       )
+      if target.isEstimated {
+        pendingLazyTargets[route.identity] = .init(
+          query: query, anchor: anchor,
+          originalOffset: original, requestedOffset: registration.currentOffset())
+      } else {
+        pendingLazyTargets.removeValue(forKey: route.identity)
+      }
+      return changed
     }
 
     // No placed target: ask the in-scope producers that answer for their own
@@ -304,6 +335,33 @@ package final class LocalScrollPositionRegistry: Equatable {
       scrollRoutes: scrollRoutes,
       scrollTargets: scrollTargets
     )
+
+    // Refine a command's estimated target against the materialized frame.
+    // Empty targets restore the pre-command viewport. A later input offset
+    // supersedes this pending command instead of being overwritten by it.
+    for (identity, pending) in pendingLazyTargets {
+      guard let route = scrollRoutes.first(where: { $0.identity == identity }),
+        let registration = registrations[identity],
+        registration.currentOffset() == pending.requestedOffset
+      else {
+        pendingLazyTargets.removeValue(forKey: identity)
+        continue
+      }
+      let target = firstTarget(matching: pending.query, scopeIdentity: identity)
+      guard target?.isEstimated != true else { continue }
+      pendingLazyTargets.removeValue(forKey: identity)
+      if let target {
+        if scrollTo(
+          rect: target.rect, anchor: pending.anchor, route: route,
+          registration: registration)
+        {
+          return true
+        }
+      } else if registration.currentOffset() != pending.originalOffset {
+        registration.applyOffset(pending.originalOffset)
+        return true
+      }
+    }
 
     // Drop reveal anchors whose scroll route is no longer live. `sync` receives
     // the frame's full route set, so a route absent here has had its owning

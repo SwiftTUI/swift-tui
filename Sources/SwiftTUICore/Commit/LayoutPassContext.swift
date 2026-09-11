@@ -37,6 +37,7 @@ package struct ScrollViewportContext: Equatable, Sendable {
 /// size, which is what measurement is computing) — the window math clamps
 /// to the content range itself.
 package struct MeasureViewportHint: Equatable, Sendable {
+  package var scrollIdentity: Identity?
   package var axes: AxisSet
   package var contentOffset: CellPoint
   package var viewportSize: CellSize
@@ -44,8 +45,10 @@ package struct MeasureViewportHint: Equatable, Sendable {
   package init(
     axes: AxisSet,
     contentOffset: CellPoint,
-    viewportSize: CellSize
+    viewportSize: CellSize,
+    scrollIdentity: Identity? = nil
   ) {
+    self.scrollIdentity = scrollIdentity
     self.axes = axes
     self.contentOffset = contentOffset
     self.viewportSize = viewportSize

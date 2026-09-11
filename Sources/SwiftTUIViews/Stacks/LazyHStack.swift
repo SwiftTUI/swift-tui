@@ -18,42 +18,14 @@ public struct LazyHStack<Content: View>: PrimitiveView, ResolvableView {
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let stackContext = context.settingEnvironment(\.stackAxis, to: .horizontal)
-    let childContext = stackContext.indexedChild(
-      kind: .init(rawValue: "LazyHStack"),
-      index: 0
+    let source = makeCompositionalIndexedChildSource(
+      from: content, in: stackContext, kindName: "LazyHStack"
     )
-    if let source = makeIndexedChildSource(
-      from: content,
-      in: childContext
-    ) {
-      context.recordResolvedComputation()
-      return [
-        ResolvedNode(
-          identity: context.identity,
-          kind: .view("LazyHStack"),
-          environmentSnapshot: context.environment,
-          transactionSnapshot: context.transaction,
-          layoutBehavior: .lazyStack(
-            axis: .horizontal,
-            spacing: spacing,
-            horizontalAlignment: .center,
-            verticalAlignment: alignment
-          ),
-          indexedChildSource: source
-        )
-      ]
-    }
-
-    let resolvedChildren = resolveDeclaredChildren(
-      content,
-      in: stackContext,
-      kindName: "LazyHStack"
-    )
+    context.recordResolvedComputation()
     return [
       ResolvedNode(
         identity: context.identity,
         kind: .view("LazyHStack"),
-        children: resolvedChildren,
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
         layoutBehavior: .lazyStack(
@@ -61,7 +33,8 @@ public struct LazyHStack<Content: View>: PrimitiveView, ResolvableView {
           spacing: spacing,
           horizontalAlignment: .center,
           verticalAlignment: alignment
-        )
+        ),
+        indexedChildSource: source
       )
     ]
   }

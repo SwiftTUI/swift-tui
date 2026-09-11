@@ -112,7 +112,7 @@ extension LayoutEngine {
       case .lazyStack = resolved.layoutBehavior,
       let snapshot = measured.containerAllocationSnapshot?.lazyStack,
       snapshot.childIdentities.count == snapshot.childMainOffsets.count,
-      snapshot.childIdentities.count > placedChildren.count
+      !snapshot.childIdentities.isEmpty
     else {
       return nil
     }
@@ -120,9 +120,14 @@ extension LayoutEngine {
     let placedIdentities = Set(placedChildren.map(\.identity))
     let crossLength = max(0, snapshot.crossLeading + snapshot.crossTrailing)
     var estimates: [LazyChildScrollEstimate] = []
-    estimates.reserveCapacity(snapshot.childIdentities.count - placedChildren.count)
+    estimates.reserveCapacity(max(0, snapshot.childIdentities.count - placedChildren.count))
     for (index, identity) in snapshot.childIdentities.enumerated()
     where !placedIdentities.contains(identity) {
+      if snapshot.exactElementIndices.contains(index),
+        snapshot.fragments?.contains(where: { $0.elementIndex == index }) != true
+      {
+        continue
+      }
       let rect: CellRect =
         switch snapshot.axis {
         case .vertical:
@@ -143,6 +148,7 @@ extension LayoutEngine {
           )
         }
       estimates.append(LazyChildScrollEstimate(identity: identity, rect: rect))
+      estimates[estimates.count - 1].isEstimated = !snapshot.exactElementIndices.contains(index)
     }
     return estimates.isEmpty ? nil : estimates
   }
@@ -338,10 +344,12 @@ extension LayoutEngine {
     )
     translatedNode.lazyChildScrollEstimates = node.lazyChildScrollEstimates.map { estimates in
       estimates.map { estimate in
-        LazyChildScrollEstimate(
+        var translatedEstimate = LazyChildScrollEstimate(
           identity: estimate.identity,
           rect: translated(estimate.rect, by: delta)
         )
+        translatedEstimate.isEstimated = estimate.isEstimated
+        return translatedEstimate
       }
     }
     translatedNode.hostedCollectionTableColumnWidths = node.hostedCollectionTableColumnWidths

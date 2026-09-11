@@ -2,7 +2,9 @@ import SwiftTUICore
 
 /// The builder artifact produced when a ``ViewBuilder`` contains multiple child
 /// expressions in sequence.
-public struct TupleView<each Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView {
+public struct TupleView<each Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView,
+  DeclaredChildStructure
+{
   package let value: (repeat each Content)
 
   package init(
@@ -29,8 +31,21 @@ public struct TupleView<each Content: View>: PrimitiveView, ResolvableView, Decl
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
+    var accumulator = DeclaredChildAccumulator(indexed: false)
+    appendDeclaredStructure(
+      in: context, kindName: kindName, nextIndex: &nextIndex, into: &accumulator
+    )
+    resolved.append(contentsOf: accumulator.nodes)
+  }
+
+  package func appendDeclaredStructure(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    into resolved: inout DeclaredChildAccumulator
+  ) {
     for child in repeat each value {
-      appendDeclaredChildNodes(
+      appendDeclaredContent(
         child,
         in: context,
         kindName: kindName,

@@ -1,7 +1,9 @@
 import SwiftTUICore
 
 /// A transparent structural container that groups child views.
-public struct Group<Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView {
+public struct Group<Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView,
+  DeclaredChildStructure
+{
   package var content: Content
 
   public init(
@@ -24,18 +26,32 @@ public struct Group<Content: View>: PrimitiveView, ResolvableView, DeclaredChild
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   ) {
+    var accumulator = DeclaredChildAccumulator(indexed: false)
+    appendDeclaredStructure(
+      in: context, kindName: kindName, nextIndex: &nextIndex, into: &accumulator
+    )
+    resolved.append(contentsOf: accumulator.nodes)
+  }
+
+  package func appendDeclaredStructure(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    into resolved: inout DeclaredChildAccumulator
+  ) {
     let groupContext = context.indexedChild(
       kind: .init(rawValue: kindName),
       index: nextIndex
     )
     nextIndex += 1
-    resolved.append(
-      contentsOf: resolveDeclaredChildren(
-        content,
-        in: groupContext,
-        kindName: "Group"
-      )
+    var children = DeclaredChildAccumulator(indexed: resolved.indexed)
+    var groupIndex = 0
+    appendDeclaredContent(
+      content, in: groupContext, kindName: "Group",
+      nextIndex: &groupIndex, into: &children
     )
+    children.normalizeOccurrences()
+    resolved.append(children)
   }
 
   package func appendScopedDeclaredChildren(

@@ -515,14 +515,16 @@ struct DiagnosticsAndCacheTests {
     )
 
     #expect(eagerSecond.diagnostics.work.measuredNodesComputed == 0)
-    #expect(lazySecond.diagnostics.work.measuredNodesComputed == 0)
+    // Compositional stacks remeasure the current viewport band on scroll.
+    #expect(lazySecond.diagnostics.work.measuredNodesComputed < 8)
     #expect(lazySecond.diagnostics.work.measuredNodesReused > 0)
     #expect(eagerSecond.diagnostics.work.placedNodesReused > 0)
     #expect(lazySecond.diagnostics.counts.placedNodes < eagerSecond.diagnostics.counts.placedNodes)
+    #expect(lazySecond.rasterSurface == eagerSecond.rasterSurface)
   }
 
-  @Test("single-ForEach lazy stacks lower off-screen resolution and measurement work on scroll")
-  func singleForEachLazyStacksLowerOffScreenWorkOnScroll() {
+  @Test("static and ForEach lazy stacks share bounded window products on scroll")
+  func staticAndForEachLazyStacksShareWindowProductsOnScroll() {
     let stableRenderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
@@ -593,9 +595,12 @@ struct DiagnosticsAndCacheTests {
     )
 
     #expect(
-      lazySecond.diagnostics.counts.resolvedNodes < stableSecond.diagnostics.counts.resolvedNodes)
+      lazySecond.diagnostics.counts.resolvedNodes == stableSecond.diagnostics.counts.resolvedNodes)
     #expect(
-      lazySecond.diagnostics.counts.measuredNodes < stableSecond.diagnostics.counts.measuredNodes)
+      lazySecond.diagnostics.counts.measuredNodes == stableSecond.diagnostics.counts.measuredNodes)
+    #expect(lazySecond.diagnostics.counts.resolvedNodes < 8)
+    #expect(lazySecond.diagnostics.counts.measuredNodes < 8)
+    #expect(lazySecond.rasterSurface == stableSecond.rasterSurface)
   }
 
   @Test("default renderer invalidates changed subtrees even when identities stay stable")
@@ -740,7 +745,8 @@ struct DiagnosticsAndCacheTests {
 
     #expect(dispatched)
     #expect(box.value == 1)
-    #expect(keyRegistry.dispatch(identity: testIdentity("CountStepper"), keyPress: KeyPress(.arrowRight)))
+    #expect(
+      keyRegistry.dispatch(identity: testIdentity("CountStepper"), keyPress: KeyPress(.arrowRight)))
     #expect(box.value == 2)
   }
 

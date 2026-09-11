@@ -334,43 +334,31 @@ extension LayoutEngine {
             passContext: passContext
           )
         )
-      case .finishWindowedLazyStackProbe(let context, let probeElement):
-        let probeMeasurement = popMeasurement(from: &results)
-        finishWindowedLazyStackProbe(
-          context: context,
-          probeElement: probeElement,
-          probeMeasurement: probeMeasurement,
-          localMetrics: &localMetrics,
-          work: &work
-        )
-      case .finishWindowedLazyStack(
-        let context,
-        let window,
-        let windowChildren,
-        let reusedProbeMeasurement,
-        let scheduledChildCount
-      ):
-        var windowMeasurements = popMeasurements(from: &results, count: scheduledChildCount)
-        if let reusedProbeMeasurement {
-          windowMeasurements.insert(reusedProbeMeasurement, at: 0)
-        }
-        results.append(
-          assembleWindowedLazyStackProduct(
-            context: context,
-            window: window,
-            windowChildren: windowChildren,
-            windowMeasurements: windowMeasurements
-          )
-        )
+      case .finishCompositionalLazyStack(let context, let indices, let elements, let childCount):
+        let measurements = popMeasurements(from: &results, count: childCount)
+        finishCompositionalLazyStack(
+          context: context, indices: indices, elements: elements,
+          measurements: measurements, passContext: passContext, localMetrics: &localMetrics,
+          work: &work, results: &results)
       case .finishLazyStackIdealEstimate(
         let node,
         let originalProposal,
         let effectiveProposal,
         let axis,
         let spacing,
-        let count
+        let count,
+        let childCount
       ):
-        let probeMeasurement = popMeasurement(from: &results)
+        let probes = popMeasurements(from: &results, count: childCount)
+        let main =
+          probes.reduce(0) { $0 + mainDimension(of: $1.measuredSize, for: axis) }
+          + max(0, childCount - 1) * spacing
+        let cross = probes.reduce(0) { max($0, crossDimension(of: $1.measuredSize, for: axis)) }
+        let probeMeasurement = MeasuredNode(
+          identity: node.identity, proposal: originalProposal,
+          measuredSize: axis == .vertical
+            ? CellSize(width: cross, height: main)
+            : CellSize(width: main, height: cross), childMeasurements: [])
         results.append(
           finishLazyStackIdealEstimate(
             node,

@@ -213,6 +213,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           transactionSnapshot: context.transaction,
           layoutBehavior: AnyLayout(
             ScrollViewLayout(
+              scrollIdentity: context.identity,
               axes: axes,
               position: position.wrappedValue,
               indicatorAxes: indicatorAxes,

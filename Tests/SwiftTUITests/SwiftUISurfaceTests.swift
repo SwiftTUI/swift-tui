@@ -4238,8 +4238,8 @@ struct SwiftUISurfaceTests {
     #expect(route.contentBounds.size == .init(width: 5, height: 3))
   }
 
-  @Test("scroll position changes do not emit lifecycle deltas for lazy stacks")
-  func lazyStackScrollPositionChangesDoNotEmitLifecycleDeltas() {
+  @Test("static lazy rows emit lifecycle transitions when entering the viewport")
+  func staticLazyRowsEmitViewportLifecycleTransitions() {
     final class ScrollBox {
       var position = ScrollCellOffset.zero
     }
@@ -4278,7 +4278,10 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(scrolledArtifacts.rasterSurface.lines.prefix(2) == ["Row 1", "Row 2"])
-    #expect(scrolledArtifacts.commitPlan.lifecycle.isEmpty)
+    let operations = scrolledArtifacts.commitPlan.lifecycle.map(\.operation)
+    #expect(operations.count == 2)
+    #expect(operations.contains(where: isAppear))
+    #expect(operations.contains(where: isTaskStart))
   }
 
   @Test("lazy stacks scope focus and interaction to the visible viewport")
@@ -4370,8 +4373,8 @@ struct SwiftUISurfaceTests {
     #expect(isTaskStart(operations[3]))
   }
 
-  @Test("mixed static siblings keep LazyVStack on the stable lifecycle path")
-  func lazyVStackWithMixedStaticSiblingsKeepsStableLifecycleDuringScroll() {
+  @Test("mixed lazy sources emit lifecycle only for rows entering the viewport")
+  func mixedLazySourcesEmitViewportLifecycleTransitions() {
     final class ScrollBox {
       var position = ScrollCellOffset.zero
     }
@@ -4412,7 +4415,10 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(scrolledArtifacts.rasterSurface.lines.prefix(2) == ["Row 0", "Row 1"])
-    #expect(scrolledArtifacts.commitPlan.lifecycle.isEmpty)
+    let operations = scrolledArtifacts.commitPlan.lifecycle.map(\.operation)
+    #expect(operations.count == 2)
+    #expect(operations.contains(where: isAppear))
+    #expect(operations.contains(where: isTaskStart))
   }
 
   @Test("ScrollCellOffset helper APIs support incremental and absolute updates")

@@ -108,6 +108,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
 /// out-of-window row can target the estimate and let materialization catch
 /// up once the viewport arrives.
 package struct LazyChildScrollEstimate: Equatable, Sendable {
+  package var isEstimated: Bool = true
   package var identity: Identity
   package var rect: CellRect
 
@@ -130,6 +131,7 @@ package struct PlacedNodePlacementMetadata: Equatable, Sendable {
   /// nodes intentionally do not embed their realized rows in the measured
   /// tree and therefore may be absent from its retained index.
   package var lazyStackAllocationSnapshot: LazyStackAllocationSnapshot?
+  package var scrollAnchorCorrection: LazyScrollAnchorCorrection? = nil
   package var hostedCollectionTableColumnWidths: [Int]?
   package var scrollViewportRect: CellRect?
   /// Viewport explicitly chosen by the parent layout for this content child.
@@ -139,6 +141,7 @@ package struct PlacedNodePlacementMetadata: Equatable, Sendable {
 
   package var isEmpty: Bool {
     lazyChildScrollEstimates == nil && lazyStackAllocationSnapshot == nil
+      && scrollAnchorCorrection == nil
       && hostedCollectionTableColumnWidths == nil
       && scrollViewportRect == nil && parentScrollViewportRect == nil
       && hostedListVisibleLayout == nil

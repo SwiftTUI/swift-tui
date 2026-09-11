@@ -1,9 +1,3 @@
-private struct IndexedLazyStackPlacementChild {
-  var index: Int
-  var resolved: ResolvedNode
-  var measured: MeasuredNode
-}
-
 extension LayoutEngine {
   func stackPlacementRequests(
     for resolved: ResolvedNode,
@@ -98,67 +92,82 @@ extension LayoutEngine {
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
-    // The viewport's main-axis span relative to the stack's origin: the
-    // refinement/extension loop measures real row extents against this,
-    // deliberately unclamped by the snapshot's (estimated) content length —
-    // when estimates over-length the content, the estimated-visible index
-    // range under-covers the viewport and only real measures can prove
-    // more rows fit.
-    let visibleMainWindow: Range<Int>? = viewportContext.flatMap { context in
-      let axisMatches =
-        switch axis {
-        case .horizontal: context.axes.contains(.horizontal)
-        case .vertical: context.axes.contains(.vertical)
-        }
-      guard axisMatches else {
-        return nil
-      }
-      let stackStart = mainDimension(of: bounds.origin, for: axis)
-      let viewportStart = mainDimension(of: context.viewportRect.origin, for: axis)
-      let viewportLength = mainDimension(of: context.viewportRect.size, for: axis)
-      guard viewportLength > 0 else {
-        return nil
-      }
-      let lower = viewportStart - stackStart
-      return lower..<(lower + viewportLength)
-    }
-
     if let source = resolved.indexedChildSource,
       let allocation = measured.containerAllocationSnapshot,
       let snapshot = allocation.lazyStack
     {
-      if snapshot.measuredWindow != nil, allocation.childSizes.count == source.count {
-        // Windowed product (Stage 2.2): 1 cell per element by construction
-        // (splices fall back to exhaustive at measure), so the source count
-        // IS the flattened count and rows realize on demand strictly within
-        // the visible range — realizing every element here was exactly the
-        // cost windowed measurement removes.
-        let visibleRange =
-          viewportContext.flatMap {
-            lazyStackVisibleChildRange(
-              for: snapshot,
-              in: bounds,
-              viewportContext: $0,
-              overscan: 0
+      if let fragments = snapshot.fragments {
+        if let viewportContext {
+          let viewport = viewportContext.viewportRect
+          let offset =
+            axis == .vertical
+            ? viewport.origin.y - bounds.origin.y
+            : viewport.origin.x - bounds.origin.x
+          let length = mainDimension(of: viewport.size, for: axis)
+          let storedOffset =
+            snapshot.correctedContentOffset
+            ?? snapshot.windowHint.map { mainDimension(of: $0.contentOffset, for: axis) }
+          let storedLength = snapshot.windowHint.map {
+            mainDimension(of: $0.viewportSize, for: axis)
+          }
+          if storedOffset != offset || storedLength != length {
+            let context = passContext ?? LayoutPassContext()
+            var hint =
+              snapshot.windowHint
+              ?? .init(
+                axes: viewportContext.axes,
+                contentOffset: viewportContext.contentOffset, viewportSize: viewport.size)
+            hint.viewportSize = viewport.size
+            if axis == .vertical {
+              hint.contentOffset.y = max(0, offset)
+            } else {
+              hint.contentOffset.x = max(0, offset)
+            }
+            let refined = context.withMeasureViewportHint(hint) {
+              measure(resolved, proposal: measured.proposal, passContext: context)
+            }
+            // The entire logical band remeasures through the work stack; no
+            // fragment loop re-enters measurement on the native stack.
+            return lazyStackPlacementRequests(
+              for: resolved, measured: refined, in: bounds,
+              axis: axis, spacing: spacing, horizontalAlignment: horizontalAlignment,
+              verticalAlignment: verticalAlignment, viewportContext: nil, passContext: context
             )
-          } ?? (0..<source.count)
-
-        return indexedLazyStackPlacementRequests(
-          childAt: { index in
-            let elements = source.childElements(at: index)
-            return elements.count == 1 ? elements[0] : nil
-          },
-          childSizes: allocation.childSizes,
-          measured: measured,
-          in: bounds,
-          axis: axis,
-          horizontalAlignment: horizontalAlignment,
-          verticalAlignment: verticalAlignment,
-          snapshot: snapshot,
-          visibleRange: visibleRange,
-          visibleMainWindow: visibleMainWindow,
-          passContext: passContext
-        )
+            .filter { request in
+              let start = mainDimension(of: request.bounds.origin, for: axis)
+              let end = start + mainDimension(of: request.bounds.size, for: axis)
+              let visibleStart = mainDimension(of: viewport.origin, for: axis)
+              return end > visibleStart && start < visibleStart + length
+            }
+          }
+        }
+        return fragments.compactMap { fragment in
+          if let viewportContext {
+            let start = mainDimension(of: bounds.origin, for: axis) + fragment.mainOffset
+            let end = start + mainDimension(of: fragment.measurement.measuredSize, for: axis)
+            let visibleStart = mainDimension(of: viewportContext.viewportRect.origin, for: axis)
+            let visibleEnd =
+              visibleStart + mainDimension(of: viewportContext.viewportRect.size, for: axis)
+            if end <= visibleStart || start >= visibleEnd { return nil }
+          }
+          let children = source.childElements(at: fragment.elementIndex)
+          guard children.indices.contains(fragment.fragmentIndex) else { return nil }
+          let child = children[fragment.fragmentIndex]
+          let dimensions = viewDimensions(
+            for: child, measured: fragment.measurement,
+            passContext: passContext)
+          let origin =
+            axis == .vertical
+            ? CellPoint(
+              x: bounds.origin.x + snapshot.crossLeading - dimensions[horizontalAlignment],
+              y: bounds.origin.y + fragment.mainOffset)
+            : CellPoint(
+              x: bounds.origin.x + fragment.mainOffset,
+              y: bounds.origin.y + snapshot.crossLeading - dimensions[verticalAlignment])
+          return PlacementRequest(
+            resolved: child, measured: fragment.measurement,
+            bounds: CellRect(origin: origin, size: fragment.measurement.measuredSize))
+        }
       }
 
       // Exhaustive product: a multi-view element contributes one cell per
@@ -186,7 +195,6 @@ extension LayoutEngine {
           verticalAlignment: verticalAlignment,
           snapshot: snapshot,
           visibleRange: visibleRange,
-          visibleMainWindow: visibleMainWindow,
           passContext: passContext
         )
       }
@@ -276,7 +284,7 @@ extension LayoutEngine {
   }
 
   private func indexedLazyStackPlacementRequests(
-    childAt: (Int) -> ResolvedNode?,
+    childAt: (Int) -> ResolvedNode,
     childSizes: [ChildAllocation],
     measured: MeasuredNode,
     in bounds: CellRect,
@@ -285,196 +293,34 @@ extension LayoutEngine {
     verticalAlignment: VerticalAlignment,
     snapshot: LazyStackAllocationSnapshot,
     visibleRange: Range<Int>,
-    visibleMainWindow: Range<Int>?,
     passContext: LayoutPassContext?
   ) -> [PlacementRequest] {
-    guard !visibleRange.isEmpty else { return [] }
-
-    // Window refinement can make placement's estimated-visible range extend
-    // beyond the band measured earlier in this frame. Re-measure that visible
-    // run at its ideal main-axis size. Rows remain adjacent, but the run must
-    // not anchor at its changing visible lower bound: when that boundary drops
-    // an estimated row whose real height differs, every surviving row jumps.
-    // Anchor inside the measured band when it overlaps the visible run, then
-    // reflow in both directions from that stable exact allocation.
-    // A nil child means an on-demand realization spliced (windowed
-    // products pin 1 cell per element at measure time, so this is a
-    // mid-frame source drift that cannot normally happen) — tolerate by
-    // not placing the row rather than misaligning every later index.
-    func measuredRow(at index: Int) -> IndexedLazyStackPlacementChild? {
-      guard let child = childAt(index) else {
-        return nil
-      }
-      let childSize = childSizes[index].size
-      let mainProposal: ProposedDimension =
-        if snapshot.measuredWindow?.contains(index) == false {
-          .unspecified
-        } else {
-          .finite(mainDimension(of: childSize, for: axis))
-        }
-      var childMeasurement = measure(
+    visibleRange.map { index in
+      let child = childAt(index)
+      let size = childSizes[index].size
+      var measurement = measure(
         child,
         proposal: stackProposal(
           axis: axis,
-          main: mainProposal,
-          cross: crossDimension(of: measured.proposal, for: axis)
-        ),
-        passContext: passContext
-      )
+          main: .finite(mainDimension(of: size, for: axis)),
+          cross: crossDimension(of: measured.proposal, for: axis)), passContext: passContext)
       if isSpacer(child) {
-        childMeasurement.measuredSize = settingMainDimension(
-          of: childMeasurement.measuredSize,
-          for: axis,
-          to: mainDimension(of: childSize, for: axis)
-        )
+        measurement.measuredSize = settingMainDimension(
+          of: measurement.measuredSize,
+          for: axis, to: mainDimension(of: size, for: axis))
       }
-      return IndexedLazyStackPlacementChild(
-        index: index,
-        resolved: child,
-        measured: childMeasurement
-      )
+      let dimensions = viewDimensions(for: child, measured: measurement, passContext: passContext)
+      let origin =
+        axis == .vertical
+        ? CellPoint(
+          x: bounds.origin.x + snapshot.crossLeading - dimensions[horizontalAlignment],
+          y: bounds.origin.y + snapshot.childMainOffsets[index])
+        : CellPoint(
+          x: bounds.origin.x + snapshot.childMainOffsets[index],
+          y: bounds.origin.y + snapshot.crossLeading - dimensions[verticalAlignment])
+      return PlacementRequest(
+        resolved: child, measured: measurement,
+        bounds: CellRect(origin: origin, size: measurement.measuredSize))
     }
-
-    var placementChildren: [IndexedLazyStackPlacementChild] = []
-    placementChildren.reserveCapacity(visibleRange.count)
-
-    for index in visibleRange {
-      guard let placementChild = measuredRow(at: index) else {
-        continue
-      }
-      placementChildren.append(placementChild)
-    }
-
-    guard !placementChildren.isEmpty else { return [] }
-
-    let anchorIndex: Int =
-      if let measuredWindow = snapshot.measuredWindow {
-        max(visibleRange.lowerBound, measuredWindow.lowerBound)
-          < min(visibleRange.upperBound, measuredWindow.upperBound)
-          ? max(visibleRange.lowerBound, measuredWindow.lowerBound)
-          : visibleRange.lowerBound
-      } else {
-        visibleRange.lowerBound
-      }
-    var refinedLengths: [Int: Int] = [:]
-    refinedLengths.reserveCapacity(placementChildren.count)
-    for child in placementChildren {
-      refinedLengths[child.index] = mainDimension(of: child.measured.measuredSize, for: axis)
-    }
-
-    func spacing(after index: Int) -> Int {
-      guard index + 1 < snapshot.childMainOffsets.count else { return 0 }
-      return snapshot.childMainOffsets[index + 1]
-        - snapshot.childMainOffsets[index]
-        - snapshot.childMainLengths[index]
-    }
-
-    var refinedOffsets: [Int: Int] = [
-      anchorIndex: snapshot.childMainOffsets[anchorIndex]
-    ]
-    var nextMainOffset = snapshot.childMainOffsets[anchorIndex]
-    if anchorIndex + 1 < visibleRange.upperBound {
-      for index in anchorIndex..<(visibleRange.upperBound - 1) {
-        nextMainOffset += refinedLengths[index] ?? snapshot.childMainLengths[index]
-        nextMainOffset += spacing(after: index)
-        refinedOffsets[index + 1] = nextMainOffset
-      }
-    }
-    nextMainOffset = snapshot.childMainOffsets[anchorIndex]
-    if anchorIndex > visibleRange.lowerBound {
-      for index in stride(
-        from: anchorIndex - 1,
-        through: visibleRange.lowerBound,
-        by: -1
-      ) {
-        nextMainOffset -= refinedLengths[index] ?? snapshot.childMainLengths[index]
-        nextMainOffset -= spacing(after: index)
-        refinedOffsets[index] = nextMainOffset
-      }
-    }
-
-    // The estimated-visible index range came from the snapshot's ESTIMATED
-    // geometry; the refined (real) extents just measured can pack the run
-    // shorter than those estimates, leaving viewport rows uncovered past
-    // either end of the run with nothing placed into them — the bottom-edge
-    // blank-region defect (org report 2026-08-03-003, findings 1–2). Extend
-    // the run with on-demand realization until the refined geometry covers
-    // the viewport or rows run out; extension rows measure exactly like
-    // visible-range rows, so a correctly-estimated run extends by nothing.
-    if let visibleMainWindow {
-      let childCount = min(childSizes.count, snapshot.childMainOffsets.count)
-
-      let lastIndex = placementChildren[placementChildren.count - 1].index
-      var cursor =
-        (refinedOffsets[lastIndex] ?? snapshot.childMainOffsets[lastIndex])
-        + (refinedLengths[lastIndex] ?? snapshot.childMainLengths[lastIndex])
-        + spacing(after: lastIndex)
-      var nextIndex = lastIndex + 1
-      while cursor < visibleMainWindow.upperBound, nextIndex < childCount {
-        guard let placementChild = measuredRow(at: nextIndex) else {
-          break
-        }
-        let length = mainDimension(of: placementChild.measured.measuredSize, for: axis)
-        refinedLengths[nextIndex] = length
-        refinedOffsets[nextIndex] = cursor
-        placementChildren.append(placementChild)
-        cursor += length + spacing(after: nextIndex)
-        nextIndex += 1
-      }
-
-      let firstIndex = placementChildren[0].index
-      var topCursor = refinedOffsets[firstIndex] ?? snapshot.childMainOffsets[firstIndex]
-      var previousIndex = firstIndex - 1
-      var prepended: [IndexedLazyStackPlacementChild] = []
-      while topCursor > visibleMainWindow.lowerBound, previousIndex >= 0 {
-        guard let placementChild = measuredRow(at: previousIndex) else {
-          break
-        }
-        let length = mainDimension(of: placementChild.measured.measuredSize, for: axis)
-        topCursor -= length + spacing(after: previousIndex)
-        refinedLengths[previousIndex] = length
-        refinedOffsets[previousIndex] = topCursor
-        prepended.append(placementChild)
-        previousIndex -= 1
-      }
-      if !prepended.isEmpty {
-        placementChildren = prepended.reversed() + placementChildren
-      }
-    }
-
-    var requests: [PlacementRequest] = []
-    requests.reserveCapacity(placementChildren.count)
-    for child in placementChildren {
-      let dimensions = viewDimensions(
-        for: child.resolved,
-        measured: child.measured,
-        passContext: passContext
-      )
-      let mainOffset = refinedOffsets[child.index] ?? snapshot.childMainOffsets[child.index]
-
-      let origin: CellPoint =
-        switch axis {
-        case .vertical:
-          .init(
-            x: bounds.origin.x + snapshot.crossLeading - dimensions[horizontalAlignment],
-            y: bounds.origin.y + mainOffset
-          )
-        case .horizontal:
-          .init(
-            x: bounds.origin.x + mainOffset,
-            y: bounds.origin.y + snapshot.crossLeading - dimensions[verticalAlignment]
-          )
-        }
-
-      requests.append(
-        PlacementRequest(
-          resolved: child.resolved,
-          measured: child.measured,
-          bounds: CellRect(origin: origin, size: child.measured.measuredSize)
-        )
-      )
-    }
-
-    return requests
   }
 }

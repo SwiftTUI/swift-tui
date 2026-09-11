@@ -599,7 +599,7 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
     passContext?.recordCustomPlacementChildMeasureRequests(node.children.count)
 
     return node.children.map { child in
-      let placement =
+      var placement =
         placementRecorder.placement(for: child.identity)
         ?? defaultPlacement(in: bounds, proposal: measured.proposal)
       // A placement that carries a viewport context (a scroll layout placing
@@ -611,7 +611,8 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
         MeasureViewportHint(
           axes: context.axes,
           contentOffset: context.contentOffset,
-          viewportSize: context.viewportRect.size
+          viewportSize: context.viewportRect.size,
+          scrollIdentity: node.identity
         )
       }
       let childMeasurement: MeasuredNode
@@ -630,6 +631,36 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
           passContext: passContext
         )
       }
+      var anchorCorrection: LazyScrollAnchorCorrection?
+      if var viewport = placement.viewportContext {
+        // Correction belongs to this scroll placement, not to the lazy stack's
+        // local allocation. Descend measurement wrappers but stop at the first
+        // claimed lazy allocation (nested scroll owners have their own placement).
+        var pending = [childMeasurement]
+        while let candidate = pending.popLast() {
+          if let snapshot = candidate.containerAllocationSnapshot?.lazyStack,
+            let corrected = snapshot.correctedContentOffset,
+            snapshot.windowHint?.scrollIdentity == node.identity
+          {
+            let requested = viewport.contentOffset
+            var offset = requested
+            if snapshot.axis == .vertical {
+              placement.position.y -= corrected - offset.y
+              offset.y = corrected
+            } else {
+              placement.position.x -= corrected - offset.x
+              offset.x = corrected
+            }
+            viewport.contentOffset = offset
+            placement.viewportContext = viewport
+            if requested != offset {
+              anchorCorrection = .init(requestedOffset: requested, correctedOffset: offset)
+            }
+            break
+          }
+          pending.append(contentsOf: candidate.childMeasurements.reversed())
+        }
+      }
       var placed = engine.place(
         child,
         measured: childMeasurement,
@@ -644,6 +675,7 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
         viewportContext: placement.viewportContext,
         passContext: passContext
       )
+      placed.placementMetadata.scrollAnchorCorrection = anchorCorrection
       if let viewport = placement.viewportContext?.viewportRect {
         var metadata = placed.placementMetadata
         metadata.parentScrollViewportRect = viewport

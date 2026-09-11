@@ -802,28 +802,34 @@ struct DefaultRendererFrameHeadCoordinator {
     )
   }
 
-  private func indexedChildSourceWorkerSnapshot(
-    of node: ResolvedNode
-  ) -> ResolvedNode {
-    var node = node
-    node.children = node.children.map(indexedChildSourceWorkerSnapshot(of:))
+}
 
-    guard let source = node.indexedChildSource,
-      !source.canRunOnWorker
-    else {
-      return node
-    }
+@MainActor
+package func indexedChildSourceWorkerSnapshot(
+  of node: ResolvedNode
+) -> ResolvedNode {
+  var node = node
+  node.children = node.children.map(indexedChildSourceWorkerSnapshot(of:))
 
-    let children = (0..<source.count).flatMap { index in
-      source.childElements(at: index).map(indexedChildSourceWorkerSnapshot(of:))
-    }
-    node.indexedChildSource = IndexedChildSourceSnapshot(
-      identityRoot: source.identityRoot,
-      measurementSignature: source.measurementSignature,
-      children: children
-    )
+  guard let source = node.indexedChildSource,
+    !source.canRunOnWorker
+  else {
     return node
   }
+
+  let elements = (0..<source.count).map { index in
+    source.childElements(at: index).map(indexedChildSourceWorkerSnapshot(of:))
+  }
+  node.indexedChildSource = IndexedChildSourceSnapshot(
+    identityRoot: source.identityRoot,
+    measurementSignature: source.measurementSignature,
+    children: (0..<source.count).map { indexedChildSourceWorkerSnapshot(of: source.child(at: $0)) },
+    elements: elements,
+    identities: (0..<source.count).map { source.elementIdentity(at: $0) },
+    tags: (0..<source.count).map { source.elementSelectionTag(at: $0) },
+    segments: (0..<source.count).map { source.estimationSegment(at: $0) }
+  )
+  return node
 }
 
 private struct FrameHeadBaselineCheckpoints {

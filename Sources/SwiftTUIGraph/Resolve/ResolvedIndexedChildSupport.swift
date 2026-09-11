@@ -102,6 +102,9 @@ package protocol IndexedChildSource: Sendable {
   /// as best-effort targets.
   func elementIdentity(at index: Int) -> Identity
 
+  /// Estimation cohorts follow source ownership, never a neighboring static header.
+  func estimationSegment(at index: Int) -> Identity
+
   /// A realization-free candidate tag derived from the indexed element ID.
   /// Collection containers use it to locate an initially selected direct-data
   /// row before that row enters the viewport. Authored row metadata remains
@@ -144,6 +147,8 @@ extension IndexedChildSource {
   package func elementIdentity(at index: Int) -> Identity {
     child(at: index).identity
   }
+
+  package func estimationSegment(at index: Int) -> Identity { identityRoot }
 
   package func elementSelectionTag(at index: Int) -> SelectionTag? {
     nil
@@ -275,6 +280,10 @@ package struct IndexedChildSourceSnapshot: IndexedChildSource {
   package let identityRoot: Identity
   package let measurementSignature: IndexedChildMeasurementSignature
   private let children: [ResolvedNode]
+  private let elements: [[ResolvedNode]]
+  private let identities: [Identity]
+  private let tags: [SelectionTag?]
+  private let segments: [Identity]
 
   package init(
     identityRoot: Identity,
@@ -284,6 +293,31 @@ package struct IndexedChildSourceSnapshot: IndexedChildSource {
     self.identityRoot = identityRoot
     self.measurementSignature = measurementSignature
     self.children = children
+    elements = children.map { [$0] }
+    identities = children.map(\.identity)
+    tags = children.map { _ in nil }
+    segments = children.map { _ in identityRoot }
+  }
+
+  package init(
+    identityRoot: Identity,
+    measurementSignature: IndexedChildMeasurementSignature,
+    children: [ResolvedNode],
+    elements: [[ResolvedNode]],
+    identities: [Identity],
+    tags: [SelectionTag?],
+    segments: [Identity]
+  ) {
+    precondition(
+      children.count == elements.count && elements.count == identities.count
+        && identities.count == tags.count && tags.count == segments.count)
+    self.identityRoot = identityRoot
+    self.measurementSignature = measurementSignature
+    self.children = children
+    self.elements = elements
+    self.identities = identities
+    self.tags = tags
+    self.segments = segments
   }
 
   package var count: Int {
@@ -295,12 +329,17 @@ package struct IndexedChildSourceSnapshot: IndexedChildSource {
   }
 
   package var workerResolvedChildren: [ResolvedNode]? {
-    children
+    elements.flatMap { $0 }
   }
 
   package func child(at index: Int) -> ResolvedNode {
     children[index]
   }
+
+  package func childElements(at index: Int) -> [ResolvedNode] { elements[index] }
+  package func elementIdentity(at index: Int) -> Identity { identities[index] }
+  package func elementSelectionTag(at index: Int) -> SelectionTag? { tags[index] }
+  package func estimationSegment(at index: Int) -> Identity { segments[index] }
 }
 
 extension ResolvedNode {

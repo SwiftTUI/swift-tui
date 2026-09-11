@@ -206,7 +206,7 @@ current status of each.
 | No `ScenePhase` | None; a session is one full-canvas scene |
 | Scale transitions and matched size changes use placed bounds and clipping rather than re-layout or bitmap scaling | Expect whole-cell steps; content keeps its destination layout while the interpolated frame clips it |
 | `Menu` anchors top-leading, not at its source control | None; noted so it is not mistaken for a layout bug |
-| The lazy path requires a single direct `ForEach` | Restructure heterogeneous content into one indexed source; the eager fallback reports a runtime issue past a few hundred rows |
+| Lazy stacks estimate unseen content | Compose static fragments and multiple `ForEach` sources directly; default spacing is exact between realized neighbors. Body-dependent empty rows and negative spacing can require exhaustive work |
 | No `addArc`, no general `clipShape(_:)`, no animatable path morphing | Analytic primitives plus parameter animation; see <doc:Shapes> and <doc:AspectCorrectShapes> |
 | No `onMoveCommand`/`onExitCommand`; `Text` is not `Hashable` | Note-only |
 

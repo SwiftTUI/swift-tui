@@ -119,6 +119,15 @@ extension LayoutEngine {
       return nil
     }
 
+    // Overlapping layouts need exact interval traversal. Binary search is
+    // invalid when either starts or ends are nonmonotone.
+    if (1..<childCount).contains(where: {
+      snapshot.childMainOffsets[$0] < snapshot.childMainOffsets[$0 - 1]
+        + snapshot.childMainLengths[$0 - 1]
+    }) {
+      return 0..<childCount
+    }
+
     let firstVisible = firstLazyStackChildIndex(
       in: snapshot,
       lowerBoundOfChildEndAfter: visibleStart,

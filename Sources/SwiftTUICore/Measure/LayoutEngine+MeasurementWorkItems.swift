@@ -107,16 +107,9 @@ indirect enum MeasurementWorkItem {
   /// the band, and the band's finish assembles the windowed product. Native
   /// per-row measure re-entry overflowed the frame-tail worker's stack under
   /// nested custom-layout + scroll shapes.
-  case finishWindowedLazyStackProbe(
+  case finishCompositionalLazyStack(
     WindowedLazyStackMeasurementContext,
-    probeElement: ResolvedNode
-  )
-  case finishWindowedLazyStack(
-    WindowedLazyStackMeasurementContext,
-    window: Range<Int>,
-    windowChildren: [ResolvedNode],
-    reusedProbeMeasurement: MeasuredNode?,
-    scheduledChildCount: Int
+    indices: [Int], elements: [[ResolvedNode]], childCount: Int
   )
   /// Hintless ideal-round estimate for indexed lazy stacks (scroll-latency
   /// R4-C): the element-0 probe's finish assembles the stride x count
@@ -127,6 +120,7 @@ indirect enum MeasurementWorkItem {
     effectiveProposal: ProposedSize,
     axis: Axis,
     spacing: Int,
-    count: Int
+    count: Int,
+    childCount: Int
   )
 }

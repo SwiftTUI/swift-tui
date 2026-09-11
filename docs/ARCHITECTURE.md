@@ -41,6 +41,16 @@ requires a standard value-semantic array and an inline stored ID; arbitrary
 sources and externally dependent projections scan current data. Reads still
 go through the source binding so state dependencies remain reader-attributed.
 
+Lazy-stack composition lives in
+`SwiftTUIViews/Collections/CompositionalIndexedChildSource.swift`. Eager and
+indexed consumers share the builder structural traversal; each ForEach retains
+its own identity/occurrence scope and current producer. The graph's grouped
+`IndexedChildSourceSnapshot` keeps logical elements separate from rendered
+fragments during worker conversion. Core windowed measurement schedules fragment
+runs on its work stack and records exact fragment allocations separately from
+dense logical-element estimates. The scroll placement applies anchor corrections;
+`LocalScrollPositionRegistry` synchronizes bindings only for committed geometry.
+
 `SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
 examples, and the public website can live in sibling organization repositories.
 The public Swift products below remain in this package unless a later

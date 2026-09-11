@@ -364,11 +364,24 @@ are omitted even when SwiftUI exposes a corresponding API.
   `frame(in: .named(...))` read whose space is not present resolves in global
   coordinates and records a frame diagnostic instead of trapping; duplicate
   names keep last-writer-wins.
-- **The lazy path requires a single direct `ForEach`.** *Gap.* `LazyVStack`
-  and `LazyHStack` window only an indexed row source under a scroll-declared
-  viewport; other shapes fall back to exhaustive realization. Heterogeneous
-  builder collections are eager and report a runtime issue past a few hundred
-  rows.
+- **Lazy stacks estimate unseen content.** *Provisional.* Under a scroll viewport,
+  `LazyVStack` and `LazyHStack` compose static content, groups, conditionals and
+  multiple `ForEach` sources. Default spacing negotiates exact gaps between
+  realized neighboring fragments; unseen extents remain estimates. Logical
+  elements can contribute zero or multiple fragments. A surviving visible
+  fragment keeps its viewport offset through membership and estimate changes,
+  subject to endpoint clamping; explicit scroll commands take precedence.
+  Deleted anchors choose the next surviving fragment, then the previous one.
+  Arbitrary body-dependent empty rows can require scanning the entire dataset,
+  and one row's unbounded expansion must be realized in full. Observed negative
+  spacing uses exhaustive layout. Source membership and allocation metadata
+  remain O(N), even when body and fragment-measurement work is windowed.
+  Offscreen body side effects may run less often: data loading and task startup
+  must not depend on eager evaluation of offscreen bodies. Static and data-source
+  fragments use viewport lifecycle transitions; remaining visible does not restart
+  a fragment's task. Opaque bodies or
+  modifiers hiding a `ForEach` do not acquire structural transparency.
+  `List` and `Table` retain their separate row-composition contracts.
 - **`padding()` is one cell.** *Ratified.* SwiftUI's unlabeled default is
   platform-adaptive; the cell is the terminal's natural quantum, and the
   literal default keeps padded layouts predictable.

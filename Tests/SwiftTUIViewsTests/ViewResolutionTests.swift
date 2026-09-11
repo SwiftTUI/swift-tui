@@ -66,7 +66,7 @@ struct ViewResolutionTests {
     #expect(resolved.identity == testIdentity("root"))
     #expect(resolved.kind == .view("AnyView"))
     #expect(content.kind == .view("LazyVStack"))
-    #expect(content.children.count == 2)
+    #expect(content.indexedChildSource?.count == 2)
     #expect(
       content.layoutBehavior
         == .lazyStack(
@@ -92,7 +92,7 @@ struct ViewResolutionTests {
     #expect(resolved.identity == testIdentity("root"))
     #expect(resolved.kind == .view("AnyView"))
     #expect(content.kind == .view("LazyHStack"))
-    #expect(content.children.count == 2)
+    #expect(content.indexedChildSource?.count == 2)
     #expect(
       content.layoutBehavior
         == .lazyStack(
@@ -148,8 +148,8 @@ struct ViewResolutionTests {
     #expect(content.indexedChildSource != nil)
   }
 
-  @Test("LazyVStack with mixed static siblings still resolves ForEach eagerly")
-  func lazyVStackWithMixedStaticSiblingsResolvesForEachEagerly() throws {
+  @Test("LazyVStack composes static siblings without realizing ForEach rows")
+  func lazyVStackWithMixedStaticSiblingsDefersForEachRows() throws {
     let counter = ResolveInvocationCounter()
     let resolver = Resolver()
     let view = LazyVStack(alignment: .leading, spacing: 1) {
@@ -168,8 +168,11 @@ struct ViewResolutionTests {
     let content = try #require(resolved.anyViewPayloadContent)
 
     #expect(content.kind == .view("LazyVStack"))
-    #expect(content.children.count == 5)
-    #expect(counter.count == 3)
+    let source = try #require(content.indexedChildSource)
+    #expect(source.count == 5)
+    #expect(counter.count == 0)
+    #expect(source.childElements(at: 1).count == 1)
+    #expect(counter.count == 1)
   }
 
   @Test("overlay and background builders tolerate implicit EmptyView branches")

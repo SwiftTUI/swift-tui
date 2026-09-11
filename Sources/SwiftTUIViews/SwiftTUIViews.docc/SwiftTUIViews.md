@@ -23,7 +23,8 @@ It provides:
 - focus coordination through ``FocusState``
 - layout composition through ``Layout``, ``AnyLayout``, and the built-in stack
   layouts. Viewport-lazy containers such as ``LazyVStack`` and ``LazyHStack``
-  support the single-``ForEach`` full-lazy path
+  compose static fragments, groups, conditionals, and multiple ``ForEach``
+  sources with viewport measurement and estimated unseen extents
 - continuous cell-space gestures and drawing through ``DragGesture``,
   ``SpatialTapGesture``, ``View/onPointerHover(_:)``,
   ``View/onScrollWheel(perform:)``, ``Canvas``, and
