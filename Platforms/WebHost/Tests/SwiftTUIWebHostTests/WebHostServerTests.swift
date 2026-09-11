@@ -110,8 +110,16 @@
         .map { index in
           Array("\u{001E}runtimeIssue:{\"index\":\(index)}\n".utf8)
         }
-      for record in overflowingNonSurface {
+      for record in overflowingNonSurface.prefix(WebHostSceneChannel.detachedNonSurfaceBacklogLimit)
+      {
         try await channel.send(record)
+      }
+      for record in overflowingNonSurface.dropFirst(
+        WebHostSceneChannel.detachedNonSurfaceBacklogLimit)
+      {
+        await #expect(throws: WebHostByteSinkError.outboundBacklogExceeded) {
+          try await channel.send(record)
+        }
       }
 
       let detachedObservations = await channel.consumeObservations()
@@ -127,7 +135,7 @@
       let output = await channel.attach(client: client)
       var outputIterator = output.makeAsyncIterator()
 
-      // Only the newest bounded non-surface records survive, in order, and not
+      // Admitted reliable records survive, in order, and not
       // one surface record among them.
       var flushed: [[UInt8]] = []
       for _ in 0..<WebHostSceneChannel.detachedNonSurfaceBacklogLimit {
@@ -137,7 +145,7 @@
         }
         flushed.append(bytes)
       }
-      #expect(flushed == overflowingNonSurface.suffix(flushed.count))
+      #expect(flushed == Array(overflowingNonSurface.prefix(flushed.count)))
 
       let attachedObservations = await channel.consumeObservations()
       #expect(attachedObservations.phase == .preCapabilities)

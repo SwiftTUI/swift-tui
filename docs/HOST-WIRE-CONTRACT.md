@@ -370,7 +370,7 @@ and goes beneath it. The channel is in one of four phases.
 
 | Phase | Surface records | Non-surface records | Scene input |
 | --- | --- | --- | --- |
-| `detached` | Dropped | Retained, bounded FIFO of 32 (oldest dropped at the cap) | Alive |
+| `detached` | Dropped | Retained FIFO, at most 32 records / 4 MiB; new records fail explicitly at capacity | Alive |
 | `pre-capabilities` | Dropped, observed as suppressed | Delivered, after the detached backlog is flushed in order | Alive |
 | `active` | Delivered | Delivered | Alive |
 | `terminal` | Dropped | Dropped | Finished |
@@ -414,6 +414,60 @@ connection:
 A retired connection's receive loop deliberately outlives detachment so bytes
 already in flight are refused *with a reason* rather than vanishing.
 `shutdown()` cancels whatever is left.
+
+### WebHost outbound delivery budget
+
+Each of the transport pump, acknowledged scene-output queue, and socket outbox
+admits at most **32 records and 4 MiB**, including its active write. The socket
+budget counts WebSocket framing as well as payload bytes. The detached control
+backlog has the same limits. These are fixed package-owned limits, shared by
+`WebHostOutboundBudget`; they are not per-frame delivery guarantees.
+
+The pump checks record capacity before encoding another surface and byte
+capacity before enqueueing its encoded record. Encoding and enqueueing are
+serialized with capability changes. Once the budget is exceeded, the pump
+refuses further publications until a new capability declaration. Presentation
+continues retaining the latest authoritative frame, and rejected presentations
+report zero admitted bytes rather than terminating the scene's run loop.
+`drain()` reports the overflow; clipboard admission returns `false` and runtime
+issue admission throws when refused.
+
+The connected channel's `send` completes only when the socket writer has
+finished that entire record. The bridge awaits the writer instead of draining
+an AsyncStream into another queue. The socket outbox also budgets HTTP replies,
+WebSocket control frames, and pongs, which do not pass through the frame pump.
+In-process test adapters can use bounded stream delivery without socket-write
+acknowledgements; that adapter caps each record at 4 MiB and the stream at 32
+records, rather than tracking consumption bytes.
+
+Overflow or a failed/10-second timed-out pump send ends the affected connection.
+If a socket write might be partial, the descriptor is shut down: a close record
+cannot safely be inserted into an unfinished frame. The client therefore may
+observe abnormal closure rather than a WebSocket close status. The browser's
+existing abnormal-close reconnect path redeclares capabilities, resets the wire
+epoch, and receives a full keyframe with image payloads from the retained latest
+frame. Tagged sends, acknowledgements, and failures from an older connection
+cannot enter or detach its successor. No already-encoded delta is skipped while
+continuing the same connection. A failed encoding generation also forces the
+next surface attempt to start a new baseline, even if a control send succeeds
+in between.
+
+Clipboard records, runtime issues, and frame-embedded accessibility
+announcements remain FIFO alongside visual frames. They are never evicted to
+admit newer records. A connection failure invalidates outstanding delivery;
+there is no exactly-once delivery or replay guarantee across disconnects.
+Controls still waiting in the pump at a capability declaration have never been
+sent, so they retain their order and are assigned to the new connection. The
+detached backlog refuses new controls at capacity and preserves previously
+admitted records. Reconnect refreshes the retained semantic frame, so its last
+announcement may be repeated, as with any full semantic refresh.
+
+This policy bounds queued encoded data, not total process memory. The retained
+authoritative raster, image source data, encoder image/style state, OS socket
+buffers, and temporary encoding of an oversized individual record are separate
+allocations. Diagnostic samples of suppressed surfaces are also capped at 32
+records / 4 MiB. A sustained slow consumer is disconnected once it exceeds the
+budget; visual coalescing is not part of this policy.
 
 ## Android delivery-coupled commit
 
@@ -462,7 +516,7 @@ forward-looking. The rows below describe only the state at this package's
 | S1 | Complete: every surface record carries an epoch and generation. Deltas name their baseline generation. All three Swift host ingresses accept keyframe/image resync. The sibling browser and Android decoders compare stamped baselines and emit deduplicated keyframe repairs. |
 | S2 | Resend-on-miss is complete. Browser decode/cache misses enter bounded unresolved/request tracking, with overflow deferred and admitted IDs deduplicated until payload repair, disappearance, or epoch reset. Android bitmap-cache eviction requests selected IDs deduplicated until payload repair or epoch reset. Android treats a lazy-JNI old-host return of zero as unavailable rather than retrying it or treating an incidental keyframe as image repair. The wire still has no retained-image acknowledgement. |
 | S3a | Complete: the Android copy ABI encodes against a candidate and commits only when bytes are copied out. An abandoned size query, an undersized copy, or a commit landing mid-handshake leaves committed encoder state and accumulated damage intact. See [Android delivery-coupled commit](#android-delivery-coupled-commit). |
-| S3b | Complete: the detached backlog drops surface records and bounds the rest at 32. A client close is connection-local and leaves scene input alive. Every connection carries a token that gates input, close, and capability callbacks. Session stop is the sole idempotent terminal transition. See [WebHost connection lifecycle](#webhost-connection-lifecycle). |
+| S3b | Complete: the detached backlog drops surface records and bounds reliable controls at 32 records / 4 MiB, refusing overflow. Connected output has bounded admission and socket-write acknowledgement. A client close is connection-local and leaves scene input alive. Connection tokens gate input, capabilities, sends, completions, and failures. Session stop is the sole idempotent terminal transition. See [WebHost connection lifecycle](#webhost-connection-lifecycle). |
 | S3d | Complete: with `styleAppend` negotiated, a delta carries `stylesBase` and only its appended styles. All three decoders splice onto their retained table and refuse a base that does not match it. Undeclared streams keep the full retransmit byte for byte. See [Style epoch](#persistent-style-epoch). |
 | S3e | Complete. The browser/WASI shared input queue writes a control record larger than its remaining 64 KiB capacity as ordered chunks. It does not reject the record, so a large paste arrives intact. A write that fits with nothing queued ahead of it still lands **synchronously**. Only a write that cannot fit suspends and waits for capacity. Writes are **serialized**. A small write issued while a chunked one is suspended queues behind it. It does not take the fast path or land inside the first record. Capacity waits are bounded by a caller-owned deadline, and a deadline failure surfaces as a runtime issue in the mount, not console-only. |
 

@@ -209,6 +209,11 @@ dependency) and the bundled browser resources. `SwiftTUIWebHostCLI` composes tha
 terminal runner, and the `SwiftTUI` convenience product includes it by default.
 Use `SwiftTUICLI` directly for a terminal-only graph.
 
+`WebHostOutboundBudget` bounds the transport pump, acknowledged scene output,
+and socket outbox. Socket completion propagates back to the pump, so a slow
+reader cannot move its backlog into a downstream unbounded stream. See the
+[outbound delivery policy](HOST-WIRE-CONTRACT.md#webhost-outbound-delivery-budget).
+
 ## Source layout
 
 The passive composition families live beside their primitives in

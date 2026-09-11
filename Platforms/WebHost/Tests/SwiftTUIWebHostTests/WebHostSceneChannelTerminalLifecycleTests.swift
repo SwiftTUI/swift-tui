@@ -68,7 +68,7 @@
     func sessionStopIsIdempotentAndTerminal() async throws {
       let channel = WebHostSceneChannel()
       let clientStream = AsyncStream<WebHostSocketMessage> { _ in }
-      _ = await channel.attach(client: clientStream)
+      let output = await channel.attach(client: clientStream)
       try await channel.send(Array("\u{001E}runtimeIssue:{\"code\":\"before-stop\"}\n".utf8))
 
       // The stop-handler spy: `WebHostServerSession.stop()` must terminate the
@@ -126,6 +126,7 @@
       #expect(terminal.suppressedSurfaceRecords.isEmpty)
       #expect(terminal.capsProcessedCount == 0)
       #expect(terminal.refreshRequestCount == 0)
+      withExtendedLifetime(output) {}
     }
 
     /// Bounded condition wait over consumed intervals: callbacks travel real

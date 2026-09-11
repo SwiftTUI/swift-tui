@@ -99,8 +99,7 @@
 
     /// Cap on records retained while detached. Surface records never enter this
     /// backlog, so it bounds clipboard and runtime-issue records only. At the
-    /// cap the oldest record is dropped: for both kinds the newest is the one
-    /// worth delivering.
+    /// cap a new record is refused explicitly; accepted controls stay FIFO.
     package static let detachedNonSurfaceBacklogLimit = 32
 
     private static let surfaceRecordPrefix = Array("\u{001E}surface:".utf8)
@@ -109,6 +108,11 @@
     private nonisolated let inboundContinuation: AsyncStream<WebHostInboundEvent>.Continuation
 
     private var outputContinuation: AsyncStream<WebHostSocketMessage>.Continuation?
+    private var waitsForSocketWrites = false
+    private var closeSocket: (@Sendable () -> Void)?
+    private var outputBudget = WebHostOutboundBudget()
+    private var outputWaiters: [CheckedContinuation<Void, any Error>?] = []
+    private var detachedBudget = WebHostOutboundBudget()
     private var detachedNonSurfaceBacklog: [[UInt8]] = []
     private var phase: Phase = .detached
     private var currentToken: UInt64?
@@ -122,6 +126,7 @@
       [(target: UInt64, continuation: CheckedContinuation<Void, Never>)] = []
 
     private var suppressedSurfaceRecords: [[UInt8]] = []
+    private var suppressionBudget = WebHostOutboundBudget()
     private var discardedInboundChunks: [WebHostDiscardedInboundChunk] = []
     private var refreshRequestCount = 0
     private var capsProcessedCount = 0
@@ -223,6 +228,13 @@
     package func send(
       _ bytes: [UInt8]
     ) async throws {
+      try await send(bytes, connectionToken: nil)
+    }
+
+    package func send(_ bytes: [UInt8], connectionToken: UInt64?) async throws {
+      if let connectionToken, connectionToken != currentToken {
+        throw WebHostByteSinkError.sendFailed("Connection was replaced.")
+      }
       switch phase {
       case .terminal:
         return
@@ -230,39 +242,105 @@
         guard !Self.isSurfaceRecord(bytes) else {
           return
         }
-        if detachedNonSurfaceBacklog.count >= Self.detachedNonSurfaceBacklogLimit {
-          detachedNonSurfaceBacklog.removeFirst(
-            detachedNonSurfaceBacklog.count - Self.detachedNonSurfaceBacklogLimit + 1
-          )
+        guard detachedBudget.admit(bytes.count) else {
+          throw WebHostByteSinkError.outboundBacklogExceeded
         }
         detachedNonSurfaceBacklog.append(bytes)
       case .preCapabilities:
         guard !Self.isSurfaceRecord(bytes) else {
           // Observed as suppression, never as delivery: the record belongs to
           // the epoch that ended with the previous client.
-          suppressedSurfaceRecords.append(bytes)
+          // Diagnostics must not become another unbounded outbound byte queue.
+          if suppressionBudget.admit(bytes.count) { suppressedSurfaceRecords.append(bytes) }
           return
         }
-        yieldOutput(bytes)
+        try await sendOutput(bytes)
       case .active:
-        yieldOutput(bytes)
+        // Untagged pre-declaration frames must not enter a newly active socket.
+        if waitsForSocketWrites, connectionToken == nil, Self.isSurfaceRecord(bytes) { return }
+        try await sendOutput(bytes)
       }
+    }
+
+    private func sendOutput(_ bytes: [UInt8]) async throws {
+      guard waitsForSocketWrites, let token = currentToken else {
+        guard yieldOutput(bytes) else { throw WebHostByteSinkError.outboundBacklogExceeded }
+        return
+      }
+      try await withTaskCancellationHandler {
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { continuation in
+          guard yieldOutput(bytes, waiter: continuation) else {
+            continuation.resume(throwing: WebHostByteSinkError.outboundBacklogExceeded)
+            return
+          }
+        }
+      } onCancel: {
+        Task { await self.disconnect(connectionToken: token) }
+      }
+    }
+
+    /// Acknowledged only after the socket writer completes the whole record.
+    /// A stale writer cannot release a successor connection's budget/waiter.
+    package func completeOutput(token: UInt64, byteCount: Int, succeeded: Bool) {
+      guard token == currentToken, waitsForSocketWrites, !outputWaiters.isEmpty else { return }
+      let waiter = outputWaiters.removeFirst()
+      outputBudget.release(byteCount)
+      if succeeded {
+        waiter?.resume()
+      } else {
+        waiter?.resume(throwing: WebHostByteSinkError.sendDidNotComplete)
+        disconnectCurrentConnection(token: token)
+      }
+    }
+
+    package func disconnect(connectionToken: UInt64?) async {
+      disconnectCurrentConnection(token: connectionToken)
+    }
+
+    private func disconnectCurrentConnection(token: UInt64?) {
+      guard let token, token == currentToken else { return }
+      outputContinuation?.yield(.close(code: 1013, reason: "Outbound backlog or write failure."))
+      // A write may already be partial. Abort the descriptor before any new
+      // record can be written; finishing only the AsyncStream cannot wake it.
+      closeSocket?()
+      detachCurrentConnection(token: token)
     }
 
     /// The one place a data record reaches a client, so the delivery gauge cannot
     /// drift from what was actually yielded.
+    @discardableResult
     private func yieldOutput(
-      _ bytes: [UInt8]
-    ) {
+      _ bytes: [UInt8],
+      waiter: CheckedContinuation<Void, any Error>? = nil
+    ) -> Bool {
       guard let outputContinuation else {
-        return
+        return false
       }
-      yieldedOutputRecords += 1
-      outputContinuation.yield(.data(bytes))
+      guard bytes.count <= WebHostOutboundBudget.byteLimit,
+        !waitsForSocketWrites || outputBudget.admit(bytes.count)
+      else {
+        disconnectCurrentConnection(token: currentToken)
+        return false
+      }
+      if waitsForSocketWrites { outputWaiters.append(waiter) }
+      if case .enqueued = outputContinuation.yield(.data(bytes)) {
+        yieldedOutputRecords += 1
+        return true
+      } else {
+        // Refused or terminated: never drop an admitted delta and keep going.
+        if waitsForSocketWrites {
+          _ = outputWaiters.popLast()
+          outputBudget.release(bytes.count)
+        }
+        disconnectCurrentConnection(token: currentToken)
+        return false
+      }
     }
 
     package func attach(
-      client: AsyncStream<WebHostSocketMessage>
+      client: AsyncStream<WebHostSocketMessage>,
+      waitsForSocketWrites: Bool = false
     ) -> AsyncStream<WebHostSocketMessage> {
       guard phase != .terminal else {
         return AsyncStream { $0.finish() }
@@ -273,19 +351,24 @@
         previous.finish()
         outputContinuation = nil
       }
+      failOutputWaiters()
+      closeSocket = nil
+      self.waitsForSocketWrites = waitsForSocketWrites
 
       lastIssuedToken += 1
       let token = lastIssuedToken
       currentToken = token
       phase = .preCapabilities
 
-      return AsyncStream { continuation in
+      return AsyncStream(bufferingPolicy: .bufferingOldest(WebHostOutboundBudget.recordLimit)) {
+        continuation in
         outputContinuation = continuation
         yieldInbound(.connectionOpened(token: token))
         for bytes in detachedNonSurfaceBacklog {
           yieldOutput(bytes)
         }
         detachedNonSurfaceBacklog.removeAll(keepingCapacity: true)
+        detachedBudget = WebHostOutboundBudget()
 
         // The receive loop deliberately outlives detachment. Bytes already in
         // flight when a client is replaced still have to reach the reader tagged
@@ -310,6 +393,15 @@
           }
         }
       }
+    }
+
+    package func attachSocket(
+      client: AsyncStream<WebHostSocketMessage>,
+      onDisconnect: @escaping @Sendable () -> Void
+    ) -> (output: AsyncStream<WebHostSocketMessage>, token: UInt64?) {
+      let output = attach(client: client, waitsForSocketWrites: true)
+      if currentToken != nil { closeSocket = onDisconnect }
+      return (output, currentToken)
     }
 
     /// Applies a client's capability declaration, or refuses it.
@@ -356,7 +448,10 @@
       outputContinuation?.yield(.normalClose)
       outputContinuation?.finish()
       outputContinuation = nil
+      failOutputWaiters()
+      closeSocket = nil
       detachedNonSurfaceBacklog.removeAll(keepingCapacity: true)
+      detachedBudget = WebHostOutboundBudget()
       for task in receiveTasks {
         task.cancel()
       }
@@ -386,6 +481,7 @@
         sceneInputFinished: sceneInputFinished
       )
       suppressedSurfaceRecords.removeAll(keepingCapacity: true)
+      suppressionBudget = WebHostOutboundBudget()
       discardedInboundChunks.removeAll(keepingCapacity: true)
       refreshRequestCount = 0
       capsProcessedCount = 0
@@ -446,7 +542,17 @@
       phase = .detached
       outputContinuation?.finish()
       outputContinuation = nil
+      failOutputWaiters()
+      closeSocket = nil
       yieldInbound(.connectionClosed(token: token))
+    }
+
+    private func failOutputWaiters() {
+      for waiter in outputWaiters {
+        waiter?.resume(throwing: WebHostByteSinkError.sendDidNotComplete)
+      }
+      outputWaiters.removeAll()
+      outputBudget = WebHostOutboundBudget()
     }
 
     private func yieldInbound(

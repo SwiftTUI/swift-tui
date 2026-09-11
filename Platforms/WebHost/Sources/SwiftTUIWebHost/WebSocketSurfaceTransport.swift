@@ -9,12 +9,23 @@
 
   package protocol WebHostByteSink: Sendable {
     func send(_ bytes: [UInt8]) async throws
+    func send(_ bytes: [UInt8], connectionToken: UInt64?) async throws
+    func disconnect(connectionToken: UInt64?) async
+  }
+
+  extension WebHostByteSink {
+    package func send(_ bytes: [UInt8], connectionToken: UInt64?) async throws {
+      try await send(bytes)
+    }
+
+    package func disconnect(connectionToken: UInt64?) async {}
   }
 
   package enum WebHostByteSinkError: Error, Equatable, Sendable, CustomStringConvertible {
     case sendFailed(String)
     case sendDidNotComplete
     case sendTimedOut
+    case outboundBacklogExceeded
 
     package var description: String {
       switch self {
@@ -24,6 +35,8 @@
         return "WebHost byte sink did not complete."
       case .sendTimedOut:
         return "WebHost byte sink timed out."
+      case .outboundBacklogExceeded:
+        return "WebHost outbound backlog exceeded 32 records or 4 MiB; reconnect required."
       }
     }
   }
@@ -40,6 +53,8 @@
       var pointerInputCapabilities: PointerInputCapabilities
       var encodingState: HostWireEncodingState
       var wireCapabilities: HostWireCapabilities
+      var connectionToken: UInt64?
+      var encodingGeneration: UInt64 = 0
       /// The most recent frame presented to this transport, retained so a
       /// reconnecting client can be given a keyframe without waiting for the app
       /// to produce one. An idle app produces none, and the pre-capabilities
@@ -111,11 +126,15 @@
     /// session surface-active, and requests a refresh. A second declaration on
     /// the same connection is not a new epoch.
     package func declareCapabilities(
-      _ capabilities: HostWireCapabilities
+      _ capabilities: HostWireCapabilities,
+      connectionToken: UInt64? = nil
     ) {
       state.withLock { state in
         state.wireCapabilities = capabilities
         state.encodingState = capabilities.negotiatedEncodingState()
+        state.connectionToken = connectionToken
+        pump.beginConnection(connectionToken: connectionToken)
+        state.encodingGeneration = pump.generation
       }
     }
 
@@ -134,14 +153,16 @@
     /// keyframe in the new epoch — the first surface record the reconnecting
     /// client is allowed to receive. A no-op before the first present.
     package func requestSurfaceRefresh() {
-      let bytes = state.withLock { state -> [UInt8] in
+      state.withLock { state in
         guard let retained = state.lastPresentedFrame else {
-          return []
+          return
         }
+        guard prepareEncoding(&state) else { return }
         let background = state.renderStyle.appearance.backgroundColor
+        let bytes: [UInt8]
         switch retained {
         case .raster(let surface):
-          return Array(
+          bytes = Array(
             WebSurfaceFrameEncoder.encode(
               surface,
               damage: nil,
@@ -149,18 +170,17 @@
               state: &state.encodingState
             ).utf8)
         case .semantic(let frame):
-          return Array(
+          bytes = Array(
             WebSurfaceFrameEncoder.encode(
               frame,
               fallbackBackground: background,
               state: &state.encodingState
             ).utf8)
         }
+        pump.enqueue(
+          bytes, connectionToken: state.connectionToken, generation: state.encodingGeneration,
+          isSurface: true)
       }
-      // A refresh is best-effort by construction: a transport already carrying a
-      // send failure has nothing useful to add by throwing from a capability
-      // declaration.
-      try? sendBytes(bytes)
     }
 
     package var surfaceSize: CellSize {
@@ -227,21 +247,23 @@
     @discardableResult
     @MainActor
     package func writeClipboard(_ text: String) throws -> Bool {
-      try sendBytes(Array(WebSurfaceFrameEncoder.encodeClipboard(text).utf8))
-      return true
+      sendBytes(Array(WebSurfaceFrameEncoder.encodeClipboard(text).utf8))
     }
 
     package func notifyRuntimeIssue(_ issue: RuntimeIssue) throws {
-      try sendBytes(Array(WebSurfaceFrameEncoder.encodeRuntimeIssue(issue).utf8))
+      if !sendBytes(Array(WebSurfaceFrameEncoder.encodeRuntimeIssue(issue).utf8)) {
+        throw WebHostByteSinkError.outboundBacklogExceeded
+      }
     }
 
     @discardableResult
     package func present(
       _ surface: RasterSurface
     ) throws -> TerminalPresentationMetrics {
-      let bytes = state.withLock { state in
+      let bytes = state.withLock { state -> [UInt8] in
         state.lastPresentedFrame = .raster(surface)
-        return Array(
+        guard prepareEncoding(&state) else { return [] }
+        let bytes = Array(
           WebSurfaceFrameEncoder.encode(
             surface,
             damage: nil,
@@ -249,8 +271,11 @@
             state: &state.encodingState
           ).utf8
         )
+        return pump.enqueue(
+          bytes, connectionToken: state.connectionToken, generation: state.encodingGeneration,
+          isSurface: true)
+          ? bytes : []
       }
-      try sendBytes(bytes)
       return .rasterHostMetrics(
         for: surface,
         damage: nil,
@@ -260,17 +285,21 @@
 
     @discardableResult
     package func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
-      let bytes = state.withLock { state in
+      let bytes = state.withLock { state -> [UInt8] in
         state.lastPresentedFrame = .semantic(frame)
-        return Array(
+        guard prepareEncoding(&state) else { return [] }
+        let bytes = Array(
           WebSurfaceFrameEncoder.encode(
             frame,
             fallbackBackground: state.renderStyle.appearance.backgroundColor,
             state: &state.encodingState
           ).utf8
         )
+        return pump.enqueue(
+          bytes, connectionToken: state.connectionToken, generation: state.encodingGeneration,
+          isSurface: true)
+          ? bytes : []
       }
-      try sendBytes(bytes)
       return .rasterHostMetrics(
         for: frame.raster,
         damage: frame.rasterDamage,
@@ -289,6 +318,8 @@
         throw error
       }
     }
+
+    package var outboundBacklog: WebHostOutboundBudget { pump.backlog }
 
     private static func pointerInputCapabilities(
       for cellPixelSize: PixelSize?,
@@ -311,51 +342,46 @@
       )
     }
 
+    private func prepareEncoding(_ state: inout State) -> Bool {
+      guard pump.canEnqueue(connectionToken: state.connectionToken) else { return false }
+      let generation = pump.generation
+      if state.encodingGeneration != generation {
+        state.encodingState = state.wireCapabilities.negotiatedEncodingState()
+        state.encodingGeneration = generation
+      }
+      return true
+    }
+
     private func sendBytes(
       _ bytes: [UInt8]
-    ) throws {
-      guard !bytes.isEmpty else {
-        return
+    ) -> Bool {
+      state.withLock { state in
+        pump.enqueue(bytes, connectionToken: state.connectionToken)
       }
-      // Hand the batch off without blocking; the pump's drain task does the
-      // sending and callers await `drain()` to learn when it finished. A prior
-      // send failure deliberately does NOT throw here: `present` errors
-      // propagate out of the hosting run loop and end the scene, so surfacing
-      // a stale pump error from the next present turned one transient stall
-      // (a 10 s send timeout) into a permanently dead session on a client
-      // that has no reconnect. The pump drops the broken epoch and recovers
-      // instead — see `ByteSinkPump`.
-      pump.enqueue(bytes)
     }
   }
 
-  /// Buffers byte batches and drains them to the sink on a dedicated task.
-  ///
-  /// `enqueue` is synchronous, ordered, and never blocks the caller. It replaces
-  /// a `DispatchSemaphore` bridge that blocked a cooperative-pool thread while a
-  /// child task did the async send — a pattern that deadlocked the pool under
-  /// parallel load and surfaced as spurious "byte sink timed out" failures.
-  ///
-  /// A send failure is connection-scoped, not fatal. The failed batch and
-  /// everything queued behind it are dropped — they extend an encoding epoch
-  /// the peer can no longer decode once one record is missing — the error is
-  /// retained for `waitUntilIdle()`/`currentError()` reporting, and the next
-  /// enqueue starts a fresh attempt; a later successful send clears the error.
-  /// Wire consistency self-heals through the existing machinery: the browser
-  /// decoder detects a broken delta baseline and requests a resync, and a
-  /// reconnecting client re-anchors to a keyframe via its capability
-  /// declaration. The previous design latched the first error forever and
-  /// skipped every later batch, so one stalled send permanently froze the
-  /// session. The per-send timeout still applies, but it races *inside* the
-  /// drain task and so never blocks a presenting caller.
+  /// A bounded FIFO. Capacity includes the active send. Overflow closes the
+  /// connection and refuses publication until a new capability declaration;
+  /// it never splices a newer delta into a stream with missing records.
   private final class ByteSinkPump: Sendable {
+    private struct Batch {
+      var bytes: [UInt8]
+      var connectionToken: UInt64?
+      var generation: UInt64
+      var isSurface: Bool
+    }
+
     private enum DrainStep {
-      case batch([UInt8])
+      case batch(Batch)
       case finished([CheckedContinuation<Void, Never>])
     }
 
     private struct State {
-      var pending: [[UInt8]] = []
+      var pending: [Batch] = []
+      var budget = WebHostOutboundBudget()
+      var generation: UInt64 = 0
+      var overflowed = false
       var isDraining = false
       var lastError: WebHostByteSinkError?
       var idleWaiters: [CheckedContinuation<Void, Never>] = []
@@ -375,10 +401,68 @@
       state.withLock(\.lastError)
     }
 
-    /// Appends `bytes` to the FIFO send queue, starting a drain task if idle.
-    func enqueue(_ bytes: [UInt8]) {
+    var generation: UInt64 { state.withLock(\.generation) }
+
+    var backlog: WebHostOutboundBudget { state.withLock(\.budget) }
+
+    func beginConnection(connectionToken: UInt64?) {
+      state.withLock { state in
+        state.generation += 1
+        // Unsent controls have no decoder baseline and have never reached a
+        // socket. Preserve them across a capability boundary, including the
+        // first declaration, instead of silently discarding clipboard/issues.
+        state.pending = state.pending.compactMap { batch in
+          if batch.isSurface {
+            state.budget.release(batch.bytes.count)
+            return nil
+          }
+          var retained = batch
+          retained.connectionToken = connectionToken
+          retained.generation = state.generation
+          return retained
+        }
+        state.overflowed = false
+        state.lastError = nil
+      }
+    }
+
+    /// Check the record budget before encoding; byte admission follows once
+    /// the encoded size is known. Presentations remain synchronous/nonblocking.
+    func canEnqueue(connectionToken: UInt64?) -> Bool {
+      let result = state.withLock { state -> (allowed: Bool, disconnect: Bool) in
+        guard !state.overflowed else { return (false, false) }
+        guard state.budget.records < WebHostOutboundBudget.recordLimit else {
+          overflow(&state)
+          return (false, true)
+        }
+        return (true, false)
+      }
+      if result.disconnect {
+        Task { await sink.disconnect(connectionToken: connectionToken) }
+      }
+      return result.allowed
+    }
+
+    @discardableResult
+    func enqueue(
+      _ bytes: [UInt8], connectionToken: UInt64?, generation: UInt64? = nil,
+      isSurface: Bool = false
+    ) -> Bool {
+      var accepted = false
+      var disconnect = false
       let shouldStartDrain = state.withLock { state -> Bool in
-        state.pending.append(bytes)
+        guard !state.overflowed else { return false }
+        if let generation, generation != state.generation { return false }
+        guard state.budget.admit(bytes.count) else {
+          overflow(&state)
+          disconnect = true
+          return false
+        }
+        accepted = true
+        state.pending.append(
+          Batch(
+            bytes: bytes, connectionToken: connectionToken, generation: state.generation,
+            isSurface: isSurface))
         guard !state.isDraining else { return false }
         state.isDraining = true
         return true
@@ -386,6 +470,21 @@
       if shouldStartDrain {
         Task { await self.drain() }
       }
+      if disconnect {
+        Task { await sink.disconnect(connectionToken: connectionToken) }
+      }
+      return accepted
+    }
+
+    private func discardPending(_ state: inout State) {
+      for batch in state.pending { state.budget.release(batch.bytes.count) }
+      state.pending.removeAll(keepingCapacity: false)
+    }
+
+    private func overflow(_ state: inout State) {
+      state.overflowed = true
+      state.lastError = .outboundBacklogExceeded
+      discardPending(&state)
     }
 
     /// Suspends until the send queue is fully drained.
@@ -418,15 +517,20 @@
         switch step {
         case .batch(let batch):
           do {
-            try await sendWithTimeout(batch)
+            try await sendWithTimeout(batch.bytes, connectionToken: batch.connectionToken)
             state.withLock { state in
-              state.lastError = nil
+              if batch.generation == state.generation, !state.overflowed {
+                state.lastError = nil
+              }
             }
           } catch let error as WebHostByteSinkError {
-            recordFailure(error)
+            recordFailure(error, generation: batch.generation)
+            await sink.disconnect(connectionToken: batch.connectionToken)
           } catch {
-            recordFailure(.sendFailed(String(describing: error)))
+            recordFailure(.sendFailed(String(describing: error)), generation: batch.generation)
+            await sink.disconnect(connectionToken: batch.connectionToken)
           }
+          state.withLock { $0.budget.release(batch.bytes.count) }
         case .finished(let waiters):
           for waiter in waiters {
             waiter.resume()
@@ -440,19 +544,21 @@
     /// the encoding epoch the failed record broke, so delivering them would
     /// hand the decoder deltas against a baseline it never received. The next
     /// enqueue starts a fresh attempt.
-    private func recordFailure(_ error: WebHostByteSinkError) {
+    private func recordFailure(_ error: WebHostByteSinkError, generation: UInt64) {
       state.withLock { state in
+        guard generation == state.generation, !state.overflowed else { return }
         state.lastError = error
-        state.pending.removeAll(keepingCapacity: false)
+        discardPending(&state)
+        state.generation += 1
       }
     }
 
-    private func sendWithTimeout(_ bytes: [UInt8]) async throws {
+    private func sendWithTimeout(_ bytes: [UInt8], connectionToken: UInt64?) async throws {
       let sink = self.sink
       let timeoutNanoseconds = sendTimeoutNanoseconds
       try await withThrowingTaskGroup(of: Void.self) { group in
         group.addTask {
-          try await sink.send(bytes)
+          try await sink.send(bytes, connectionToken: connectionToken)
         }
         group.addTask {
           try await Task.sleep(nanoseconds: timeoutNanoseconds)

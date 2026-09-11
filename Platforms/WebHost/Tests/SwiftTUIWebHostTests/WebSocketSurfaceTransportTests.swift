@@ -11,6 +11,186 @@
   @testable import SwiftTUIWebHost
 
   struct WebSocketSurfaceTransportTests {
+    @Test("slow progressing sockets stay bounded and reconnect with the latest full image frame")
+    func slowProgressOverflowAndReconnect() async throws {
+      let channel = WebHostSceneChannel()
+      let disconnected = AsyncEvent()
+      let client = AsyncStream<WebHostSocketMessage>.makeStream()
+      let (output, connectionToken) = await channel.attachSocket(client: client.stream) {
+        disconnected.fire()
+      }
+      let token = try #require(connectionToken)
+      let transport = WebSocketSurfaceTransport(
+        surfaceSize: .init(width: 2, height: 1), sink: channel)
+      let caps = HostWireCapabilities(acceptsDeltaFrames: true)
+      await channel.applyCapabilities(
+        token: token,
+        reanchor: { transport.declareCapabilities(caps, connectionToken: token) },
+        requestRefresh: {})
+      var iterator = output.makeAsyncIterator()
+      try transport.present(Self.steadyFrame(sequence: 1))
+      var current = try await nextBytes(&iterator)
+      var lastGeneration = try #require(
+        try decodedSurfaceFrame(String(decoding: current, as: UTF8.self))["gen"] as? Int)
+
+      // The consumer completes one write for every two new frames. Every send
+      // makes progress, so a per-send timeout cannot bound this imbalance.
+      for step in 0..<16 {
+        try transport.present(Self.steadyFrame(sequence: UInt64(2 + step * 2)))
+        try transport.present(Self.steadyFrame(sequence: UInt64(3 + step * 2)))
+        #expect(transport.outboundBacklog.records <= WebHostOutboundBudget.recordLimit)
+        #expect(transport.outboundBacklog.bytes <= WebHostOutboundBudget.byteLimit)
+        await channel.completeOutput(token: token, byteCount: current.count, succeeded: true)
+        current = try await nextBytes(&iterator)
+        let frame = try decodedSurfaceFrame(String(decoding: current, as: UTF8.self))
+        #expect(frame["baselineGen"] as? Int == lastGeneration)
+        lastGeneration = try #require(frame["gen"] as? Int)
+      }
+      for sequence in 34...200 {
+        try transport.present(Self.imageFrame(sequence: UInt64(sequence)))
+        #expect(transport.outboundBacklog.records <= WebHostOutboundBudget.recordLimit)
+        #expect(transport.outboundBacklog.bytes <= WebHostOutboundBudget.byteLimit)
+      }
+      await disconnected.wait()
+      await #expect(throws: WebHostByteSinkError.outboundBacklogExceeded) {
+        try await transport.drain()
+      }
+      #expect(transport.outboundBacklog.records == 0)
+      #expect(transport.outboundBacklog.bytes == 0)
+      #expect(await channel.currentConnectionToken() == nil)
+
+      let nextClient = AsyncStream<WebHostSocketMessage>.makeStream()
+      let (nextOutput, nextConnectionToken) = await channel.attachSocket(client: nextClient.stream)
+      {}
+      let nextToken = try #require(nextConnectionToken)
+      await channel.applyCapabilities(
+        token: nextToken,
+        reanchor: { transport.declareCapabilities(caps, connectionToken: nextToken) },
+        requestRefresh: { transport.requestSurfaceRefresh() })
+      var nextIterator = nextOutput.makeAsyncIterator()
+      let refreshed = try await nextBytes(&nextIterator)
+      let record = String(decoding: refreshed, as: UTF8.self)
+      let frame = try decodedSurfaceFrame(record)
+      #expect(frame["encoding"] == nil)
+      #expect(frame["sequence"] as? Int == 200)
+      #expect(record.contains("dataBase64"))
+      var actual = frame
+      var expected = try decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(Self.imageFrame(sequence: 200)))
+      for key in ["epoch", "gen"] {
+        actual.removeValue(forKey: key)
+        expected.removeValue(forKey: key)
+      }
+      #expect(NSDictionary(dictionary: actual).isEqual(to: expected))
+      // Old completions and failures must not detach or acknowledge the new socket.
+      await channel.completeOutput(token: token, byteCount: current.count, succeeded: false)
+      await channel.disconnect(connectionToken: token)
+      #expect(await channel.currentConnectionToken() == nextToken)
+      await channel.completeOutput(token: nextToken, byteCount: refreshed.count, succeeded: true)
+      try await transport.drain()
+      await channel.shutdown()
+      client.continuation.finish()
+      nextClient.continuation.finish()
+    }
+
+    @MainActor
+    @Test("slow sockets preserve clipboard, issue and announcement records in FIFO order")
+    func reliableRecordsSurviveBackpressure() async throws {
+      let channel = WebHostSceneChannel()
+      let client = AsyncStream<WebHostSocketMessage>.makeStream()
+      let (output, connectionToken) = await channel.attachSocket(client: client.stream) {}
+      let token = try #require(connectionToken)
+      let transport = WebSocketSurfaceTransport(
+        surfaceSize: .init(width: 2, height: 1), sink: channel)
+      await channel.applyCapabilities(
+        token: token,
+        reanchor: { transport.declareCapabilities(HostWireCapabilities(), connectionToken: token) },
+        requestRefresh: {})
+      try transport.present(Self.steadyFrame(sequence: 1))
+      #expect(try transport.writeClipboard("keep clipboard"))
+      try transport.notifyRuntimeIssue(
+        .init(severity: .warning, code: "keep", message: "keep issue"))
+      var announced = Self.steadyFrame(sequence: 2)
+      announced.semantics.accessibilityAnnouncements = [.init(message: "keep announcement")]
+      try transport.present(announced)
+      try transport.present(Self.steadyFrame(sequence: 3))
+      var iterator = output.makeAsyncIterator()
+      var records: [String] = []
+      for _ in 0..<5 {
+        let bytes = try await nextBytes(&iterator)
+        records.append(String(decoding: bytes, as: UTF8.self))
+        await channel.completeOutput(token: token, byteCount: bytes.count, succeeded: true)
+      }
+      try await transport.drain()
+      #expect(records[1].hasPrefix("\u{001E}clipboard:"))
+      #expect(records[2].hasPrefix("\u{001E}runtimeIssue:"))
+      #expect(records[3].contains("keep announcement"))
+      #expect(!records[4].contains("keep announcement"))
+      await channel.shutdown()
+      client.continuation.finish()
+    }
+
+    @MainActor
+    @Test("oversized reliable records fail explicitly without entering the byte queue")
+    func oversizedRecordFailsAdmission() async throws {
+      let sink = RecordingByteSink()
+      let transport = WebSocketSurfaceTransport(surfaceSize: .init(width: 2, height: 1), sink: sink)
+      #expect(
+        try !transport.writeClipboard(
+          String(repeating: "x", count: WebHostOutboundBudget.byteLimit)))
+      #expect(transport.outboundBacklog.bytes == 0)
+      await #expect(throws: WebHostByteSinkError.outboundBacklogExceeded) {
+        try await transport.drain()
+      }
+      #expect(await sink.strings().isEmpty)
+    }
+
+    @MainActor
+    @Test("a successful control send cannot hide the need to reset a failed delta baseline")
+    func controlSuccessAfterFailedFrameStillRekeys() async throws {
+      let sink = FailOnceByteSink()
+      let transport = WebSocketSurfaceTransport(surfaceSize: .init(width: 2, height: 1), sink: sink)
+      transport.declareCapabilities(HostWireCapabilities(acceptsDeltaFrames: true))
+      try transport.present(Self.imageFrame(sequence: 1))
+      await #expect(throws: WebHostByteSinkError.self) { try await transport.drain() }
+      #expect(try transport.writeClipboard("control after failed frame"))
+      try await transport.drain()
+      try transport.present(Self.imageFrame(sequence: 2))
+      try await transport.drain()
+      let records = await sink.strings()
+      let record = try #require(records.last)
+      let frame = try decodedSurfaceFrame(record)
+      #expect(frame["encoding"] == nil)
+      #expect(frame["gen"] as? Int == 1)
+      #expect(record.contains("dataBase64"))
+    }
+
+    private func nextBytes(
+      _ iterator: inout AsyncStream<WebHostSocketMessage>.Iterator,
+      isolation: isolated (any Actor)? = #isolation
+    ) async throws -> [UInt8] {
+      guard case .data(let bytes) = try #require(await iterator.next(isolation: isolation)) else {
+        throw WebHostByteSinkError.sendDidNotComplete
+      }
+      return bytes
+    }
+
+    @MainActor
+    @Test("a capability declaration preserves controls that have not reached the socket")
+    func capabilityDeclarationPreservesUnsentControls() async throws {
+      let sink = PausingByteSink()
+      let transport = WebSocketSurfaceTransport(surfaceSize: .init(width: 2, height: 1), sink: sink)
+      try transport.present(Self.steadyFrame(sequence: 1))
+      await sink.started.wait()
+      #expect(try transport.writeClipboard("queued before capabilities"))
+      transport.declareCapabilities(HostWireCapabilities(), connectionToken: 1)
+      sink.release.fire()
+      try await transport.drain()
+      let records = await sink.strings()
+      #expect(records.count == 2)
+      #expect(records.last?.contains("queued before capabilities") == true)
+    }
+
     @Test("semantic host-frame present emits a v2 web-surface frame with accessibilityTree")
     func semanticHostFramePresentEmitsV2FrameWithAccessibilityTree() async throws {
       let sink = RecordingByteSink()
@@ -144,6 +324,7 @@
 
       // A reconnecting client re-declares; its decoder has no baseline, so
       // the stream must restart with a full keyframe.
+      try await transport.drain()
       transport.declareCapabilities(capabilities)
       try transport.present(Self.steadyFrame(sequence: 3))
       try await transport.drain()
@@ -380,6 +561,21 @@
     func strings() -> [String] {
       sent.map { String(decoding: $0, as: UTF8.self) }
     }
+  }
+
+  private actor PausingByteSink: WebHostByteSink {
+    nonisolated let started = AsyncEvent()
+    nonisolated let release = AsyncEvent()
+    private var sent: [String] = []
+
+    func send(_ bytes: [UInt8]) async throws {
+      started.fire()
+      await release.wait()
+      try Task.checkCancellation()
+      sent.append(String(decoding: bytes, as: UTF8.self))
+    }
+
+    func strings() -> [String] { sent }
   }
 
   private struct StalledByteSink: WebHostByteSink {

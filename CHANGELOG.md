@@ -8,6 +8,14 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Bound slow WebSocket clients to 32 records / 4 MiB at each outbound queue,
+  including active writes. Overflow closes the affected connection; reconnect
+  starts from the latest full frame with image payloads restored. Clipboard,
+  runtime issue, and accessibility announcement records stay FIFO, and detached
+  control overflow is reported instead of silently evicting older records.
+
 ## [0.13.0] - 2026-09-10
 
 ### Removed

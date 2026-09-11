@@ -229,8 +229,14 @@
   /// thread that drains the outbox, and — for WebSocket sessions — a bridge
   /// task that speaks to the scene channel actor.
   final class WebHostLoopbackConnection: Sendable {
+    private struct OutboundRecord: Sendable {
+      var bytes: [UInt8]
+      var completion: (@Sendable (Bool) -> Void)?
+    }
+
     private struct State {
-      var outbox: [[UInt8]] = []
+      var outbox: [OutboundRecord] = []
+      var budget = WebHostOutboundBudget()
       var outboxFinished = false
       var readerDone = false
       var writerDone = false
@@ -275,33 +281,49 @@
     /// socket down in both directions. The descriptor itself closes only after
     /// both threads have finished with it.
     func terminate() {
+      var abandoned: [OutboundRecord] = []
       let shouldShutdown = state.withLock { state in
         guard !state.terminated else {
           return false
         }
         state.terminated = true
+        abandoned = state.outbox
+        state.outbox.removeAll()
+        for record in abandoned { state.budget.release(record.bytes.count) }
         return true
       }
       if shouldShutdown {
         WebHostPOSIXSocket.shutdownBoth(fd)
         outboxSignal.signal()
       }
+      for record in abandoned { record.completion?(false) }
     }
 
     // MARK: - Writer
 
     private func enqueue(
-      _ bytes: [UInt8]
+      _ bytes: [UInt8],
+      completion: (@Sendable (Bool) -> Void)? = nil
     ) {
       let accepted = state.withLock { state in
         guard !state.outboxFinished, !state.terminated else {
           return false
         }
-        state.outbox.append(bytes)
+        guard state.budget.admit(bytes.count) else { return false }
+        state.outbox.append(OutboundRecord(bytes: bytes, completion: completion))
         return true
       }
       if accepted {
         outboxSignal.signal()
+      } else {
+        completion?(false)
+        terminate()
+      }
+    }
+
+    private func writeRecord(_ bytes: [UInt8]) async -> Bool {
+      await withCheckedContinuation { continuation in
+        enqueue(bytes) { succeeded in continuation.resume(returning: succeeded) }
       }
     }
 
@@ -318,7 +340,7 @@
         while true {
           let (item, finished, terminated) = state.withLock { state in
             (
-              state.outbox.isEmpty ? nil : state.outbox.removeFirst(),
+              state.terminated || state.outbox.isEmpty ? nil : state.outbox.removeFirst(),
               state.outboxFinished,
               state.terminated
             )
@@ -335,10 +357,11 @@
             }
             break
           }
-          guard
-            WebHostPOSIXSocket.sendAll(
-              fd, item, pollTimeoutMilliseconds: Self.writePollTimeoutMilliseconds)
-          else {
+          let succeeded = WebHostPOSIXSocket.sendAll(
+            fd, item.bytes, pollTimeoutMilliseconds: Self.writePollTimeoutMilliseconds)
+          state.withLock { $0.budget.release(item.bytes.count) }
+          item.completion?(succeeded)
+          guard succeeded else {
             terminate()
             writerExit()
             return
@@ -468,15 +491,24 @@
       // Natural termination is guaranteed: the reader's `finish()` on the client
       // stream drives the channel to detach, and detach finishes this output.
       Task { [channel] in
-        let output = await channel.attach(client: clientStream)
+        let (output, token) = await channel.attachSocket(client: clientStream) { self.terminate() }
         for await message in output {
           switch message {
           case .text(let text):
-            enqueue(WebHostWebSocketWire.encodeFrame(opcode: .text, payload: Array(text.utf8)))
+            guard
+              await writeRecord(
+                WebHostWebSocketWire.encodeFrame(opcode: .text, payload: Array(text.utf8)))
+            else { return }
           case .data(let bytes):
-            enqueue(WebHostWebSocketWire.encodeFrame(opcode: .binary, payload: bytes))
+            let succeeded = await writeRecord(
+              WebHostWebSocketWire.encodeFrame(opcode: .binary, payload: bytes))
+            if let token {
+              await channel.completeOutput(
+                token: token, byteCount: bytes.count, succeeded: succeeded)
+            }
+            guard succeeded else { return }
           case .close(let code, let reason):
-            enqueue(WebHostWebSocketWire.encodeClose(code: code, reason: reason))
+            _ = await writeRecord(WebHostWebSocketWire.encodeClose(code: code, reason: reason))
           }
         }
         finishWrites()

@@ -112,7 +112,7 @@
         case .capabilities(let capabilities):
           await channel.applyCapabilities(
             token: token,
-            reanchor: { transport.declareCapabilities(capabilities) },
+            reanchor: { transport.declareCapabilities(capabilities, connectionToken: token) },
             requestRefresh: { transport.requestSurfaceRefresh() }
           )
         case .resync(let request):
