@@ -56,50 +56,35 @@ public enum KeyEvent: Equatable, Hashable, Sendable {
   case functionKey(Int)
 }
 
-@MainActor
-private enum KeyPressDeliveryContext {
-  static var isBubbledFromSyntheticTarget = false
-
-  static func withValue<Result>(_ value: Bool, _ apply: () -> Result) -> Result {
-    let saved = isBubbledFromSyntheticTarget
-    isBubbledFromSyntheticTarget = value
-    defer { isBubbledFromSyntheticTarget = saved }
-    return apply()
-  }
-}
-
-package struct KeyPressFocusRequest: Equatable, Sendable {
-  package let identity: Identity
-  package let traversalStep: Int
-
-  package init(identity: Identity, traversalStep: Int) {
-    self.identity = identity
-    self.traversalStep = traversalStep
-  }
-}
-
 package enum KeyPressDispatchOutcome: Equatable, Sendable {
   case ignored
-  case handled(focusRequest: KeyPressFocusRequest?)
+  case handled
+  case handledAndMoveFocus(to: Identity, traversalStep: Int)
 
   package var isHandled: Bool {
-    if case .handled = self {
-      return true
+    switch self {
+    case .ignored:
+      false
+    case .handled, .handledAndMoveFocus:
+      true
     }
-    return false
   }
 }
 
 @MainActor
 package final class LocalKeyHandlerRegistry: Equatable {
-  package typealias KeyPressHandler = @MainActor (KeyPress) -> Bool
-  package typealias KeyPressOutcomeHandler = @MainActor (KeyPress) -> KeyPressDispatchOutcome
+  package typealias KeyPressHandler = @MainActor (KeyPress) -> KeyPressDispatchOutcome
   package typealias PasteHandler = @MainActor (String) -> Bool
 
   package struct KeyPressRegistration {
-    package let handler: KeyPressOutcomeHandler
+    package let receivesSyntheticBubbles: Bool
+    package let handler: KeyPressHandler
 
-    package init(handler: @escaping KeyPressOutcomeHandler) {
+    package init(
+      receivesSyntheticBubbles: Bool = true,
+      handler: @escaping KeyPressHandler
+    ) {
+      self.receivesSyntheticBubbles = receivesSyntheticBubbles
       self.handler = handler
     }
   }
@@ -164,31 +149,13 @@ package final class LocalKeyHandlerRegistry: Equatable {
 
   package func register(
     identity: Identity,
-    receivesBubbledEventsFromSyntheticTargets: Bool = true,
-    keyPressHandler: @escaping @MainActor (KeyPress) -> Bool
+    receivesSyntheticBubbles: Bool = true,
+    keyPressHandler: @escaping KeyPressHandler
   ) {
-    registerWithOutcome(
-      identity: identity,
-      receivesBubbledEventsFromSyntheticTargets: receivesBubbledEventsFromSyntheticTargets,
-      keyPressHandler: { keyPress in
-        keyPressHandler(keyPress) ? .handled(focusRequest: nil) : .ignored
-      }
+    let registration = KeyPressRegistration(
+      receivesSyntheticBubbles: receivesSyntheticBubbles,
+      handler: keyPressHandler
     )
-  }
-
-  package func registerWithOutcome(
-    identity: Identity,
-    receivesBubbledEventsFromSyntheticTargets: Bool = true,
-    keyPressHandler: @escaping KeyPressOutcomeHandler
-  ) {
-    let registration = KeyPressRegistration { keyPress in
-      if KeyPressDeliveryContext.isBubbledFromSyntheticTarget,
-        !receivesBubbledEventsFromSyntheticTargets
-      {
-        return .ignored
-      }
-      return keyPressHandler(keyPress)
-    }
     let owner = RuntimeRegistrationOwnerKey.current(identity: identity)
     let ordinal =
       keyPressHandlers[identity]?.byOwner[owner]?.ordinal ?? claimContributionOrdinal()
@@ -231,36 +198,27 @@ package final class LocalKeyHandlerRegistry: Equatable {
     identity: Identity,
     keyPress: KeyPress
   ) -> Bool {
-    dispatchWithOutcome(identity: identity, keyPress: keyPress).isHandled
+    dispatchOutcome(
+      identity: identity,
+      keyPress: keyPress,
+      isSyntheticBubble: false
+    ).isHandled
   }
 
-  package func dispatchWithOutcome(
-    identity: Identity,
-    keyPress: KeyPress
-  ) -> KeyPressDispatchOutcome {
-    KeyPressDeliveryContext.withValue(false) {
-      dispatchRegisteredHandlers(identity: identity, keyPress: keyPress)
-    }
-  }
-
-  package func dispatchBubbledWithOutcome(
+  package func dispatchOutcome(
     identity: Identity,
     keyPress: KeyPress,
-    fromSyntheticTarget: Bool
-  ) -> KeyPressDispatchOutcome {
-    KeyPressDeliveryContext.withValue(fromSyntheticTarget) {
-      dispatchRegisteredHandlers(identity: identity, keyPress: keyPress)
-    }
-  }
-
-  private func dispatchRegisteredHandlers(
-    identity: Identity,
-    keyPress: KeyPress
+    isSyntheticBubble: Bool
   ) -> KeyPressDispatchOutcome {
     guard let contributions = keyPressHandlers[identity] else {
       return .ignored
     }
     for registration in contributions.flattened.reversed() {
+      if isSyntheticBubble,
+        !registration.receivesSyntheticBubbles
+      {
+        continue
+      }
       let outcome = registration.handler(keyPress)
       if outcome.isHandled {
         return outcome
@@ -365,24 +323,6 @@ package final class LocalKeyHandlerRegistry: Equatable {
         ContributedBucket(ordinal: ordinal, handlers: handlers)
       self.ownersByIdentity[identity] = owner
     }
-  }
-
-  package func restoreKeyPressHandlers(
-    _ snapshot: [Identity: [KeyPressHandler]],
-    ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:],
-    ordinalsByIdentity: [Identity: UInt64] = [:]
-  ) {
-    restoreKeyPressHandlers(
-      snapshot.mapValues { handlers in
-        handlers.map { handler in
-          KeyPressRegistration { keyPress in
-            handler(keyPress) ? .handled(focusRequest: nil) : .ignored
-          }
-        }
-      },
-      ownersByIdentity: ownersByIdentity,
-      ordinalsByIdentity: ordinalsByIdentity
-    )
   }
 
   package func restorePasteHandlers(

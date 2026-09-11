@@ -19,7 +19,7 @@ struct FrameDropEligibilityBlockerTests {
     let registry = LocalKeyHandlerRegistry()
     #expect(registry.activeFrameDropEligibilityBlocker == nil)
 
-    registry.register(identity: testIdentity("Root", "Field"), keyPressHandler: { _ in false })
+    registry.register(identity: testIdentity("Root", "Field"), keyPressHandler: { _ in .ignored })
     #expect(registry.activeFrameDropEligibilityBlocker == .handlerInstallations)
   }
 

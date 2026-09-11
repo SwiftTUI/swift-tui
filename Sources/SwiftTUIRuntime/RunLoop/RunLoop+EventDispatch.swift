@@ -83,31 +83,29 @@ extension RunLoop {
     from focusedIdentity: Identity
   ) -> Bool {
     let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
-    let fromSyntheticTarget = !renderer.viewGraph.containsNode(for: focusedIdentity)
+    let focusedTargetIsSynthetic = !renderer.viewGraph.containsNode(for: focusedIdentity)
     for identity in renderer.viewGraph.keyEventBubblePath(from: focusedIdentity)
     where localKeyHandlerRegistry.hasHandler(identity: identity) {
-      let outcome =
-        if identity == focusedIdentity {
-          localKeyHandlerRegistry.dispatchWithOutcome(identity: identity, keyPress: keyPress)
-        } else {
-          localKeyHandlerRegistry.dispatchBubbledWithOutcome(
-            identity: identity,
-            keyPress: keyPress,
-            fromSyntheticTarget: fromSyntheticTarget
-          )
+      let outcome = localKeyHandlerRegistry.dispatchOutcome(
+        identity: identity,
+        keyPress: keyPress,
+        isSyntheticBubble: focusedTargetIsSynthetic && identity != focusedIdentity
+      )
+      switch outcome {
+      case .ignored:
+        continue
+      case .handled:
+        break
+      case .handledAndMoveFocus(let targetIdentity, let traversalStep):
+        performFocusTraversal(step: traversalStep) {
+          _ = focusTracker.setFocus(to: targetIdentity)
+          return focusTracker.currentFocusIdentity
         }
-      if case .handled(let focusRequest) = outcome {
-        if let focusRequest {
-          performFocusTraversal(step: focusRequest.traversalStep) {
-            _ = focusTracker.setFocus(to: focusRequest.identity)
-            return focusTracker.currentFocusIdentity
-          }
-        }
-        requestDispatchBackstopInvalidation(
-          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
-        )
-        return true
       }
+      requestDispatchBackstopInvalidation(
+        schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
+      )
+      return true
     }
     return false
   }

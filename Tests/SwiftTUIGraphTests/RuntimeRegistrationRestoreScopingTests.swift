@@ -402,7 +402,11 @@ struct RuntimeRegistrationRestoreScopingTests {
         handler: { true },
         followUpInvalidationIdentity: nil
       )
-      customNode.recordKeyPressHandlerRegistration(identity: pinned, ordinal: 0) { _ in true }
+      customNode.recordKeyPressHandlerRegistration(
+        identity: pinned,
+        ordinal: 0,
+        registration: .init { _ in .handled }
+      )
     }
     customNode.endRegistrationCapture()
     graph.finishEvaluation(
@@ -512,7 +516,11 @@ struct RuntimeRegistrationRestoreScopingTests {
     let departingNode = graph.beginEvaluation(identity: departingIdentity, invalidator: nil)
     departingNode.beginRegistrationCapture()
     ViewNodeContext.withValue(departingNode) {
-      departingNode.recordKeyPressHandlerRegistration(identity: pinned, ordinal: 0) { _ in true }
+      departingNode.recordKeyPressHandlerRegistration(
+        identity: pinned,
+        ordinal: 0,
+        registration: .init { _ in .handled }
+      )
       departingNode.recordScrollPositionRegistration(
         .init(identity: departingIdentity, currentOffset: { .zero }, applyOffset: { _ in }))
     }
@@ -553,7 +561,11 @@ struct RuntimeRegistrationRestoreScopingTests {
     let arrivingNode = graph.beginEvaluation(identity: arrivingIdentity, invalidator: nil)
     arrivingNode.beginRegistrationCapture()
     ViewNodeContext.withValue(arrivingNode) {
-      arrivingNode.recordKeyPressHandlerRegistration(identity: pinned, ordinal: 0) { _ in true }
+      arrivingNode.recordKeyPressHandlerRegistration(
+        identity: pinned,
+        ordinal: 0,
+        registration: .init { _ in .handled }
+      )
       arrivingNode.recordScrollPositionRegistration(
         .init(identity: arrivingIdentity, currentOffset: { .zero }, applyOffset: { _ in }))
     }
@@ -2301,9 +2313,11 @@ struct RuntimeRegistrationRestoreScopingTests {
         handler: { marker.hasSuffix("1") },
         followUpInvalidationIdentity: identity.child("follow-up-\(marker)")
       )
-      node.recordKeyPressHandlerRegistration(identity: identity, ordinal: 0) { _ in
-        marker.hasSuffix("1")
-      }
+      node.recordKeyPressHandlerRegistration(
+        identity: identity,
+        ordinal: 0,
+        registration: .init { _ in marker.hasSuffix("1") ? .handled : .ignored }
+      )
       node.recordPasteHandlerRegistration(identity: identity, ordinal: 0) { _ in
         marker.hasSuffix("1")
       }

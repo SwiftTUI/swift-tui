@@ -109,8 +109,16 @@ struct DuplicateRegistrationProbeTests {
     withArmedProbe {
       let before = alarmCount
       ViewNodeContext.withValue(node) {
-        node.recordKeyPressHandlerRegistration(identity: identity, ordinal: 0) { _ in false }
-        node.recordKeyPressHandlerRegistration(identity: identity, ordinal: 0) { _ in false }
+        node.recordKeyPressHandlerRegistration(
+          identity: identity,
+          ordinal: 0,
+          registration: .init { _ in .ignored }
+        )
+        node.recordKeyPressHandlerRegistration(
+          identity: identity,
+          ordinal: 0,
+          registration: .init { _ in .ignored }
+        )
       }
       #expect(alarmCount == before, "contributed families append by design")
     }

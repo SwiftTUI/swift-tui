@@ -5315,7 +5315,7 @@ private struct ReusedHandlerProbe: PrimitiveView, ResolvableView {
       identity: context.identity,
       keyPressHandler: { keyPress in
         recorder.recordKey(keyPress.key)
-        return true
+        return .handled
       }
     )
     return [interactiveProbeTextNode("Interactive", in: context)]

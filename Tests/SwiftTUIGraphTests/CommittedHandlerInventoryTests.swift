@@ -51,7 +51,11 @@ struct CommittedHandlerInventoryTests {
         handler: { false },
         followUpInvalidationIdentity: nil
       )
-      node.recordKeyPressHandlerRegistration(identity: pressKey, ordinal: 0) { _ in false }
+      node.recordKeyPressHandlerRegistration(
+        identity: pressKey,
+        ordinal: 0,
+        registration: .init { _ in .ignored }
+      )
       node.recordPasteHandlerRegistration(identity: pasteKey, ordinal: 0) { _ in false }
       node.recordCommandRegistration(
         commandSnapshot(scope: commandScope)

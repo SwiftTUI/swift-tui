@@ -225,7 +225,7 @@ extension List {
 
       intake.registerKeyPressHandler(
         identity: context.identity,
-        receivesBubbledEventsFromSyntheticTargets: false
+        receivesSyntheticBubbles: false
       ) { keyPress in
         guard keyPress.modifiers.isEmpty else {
           return false
@@ -345,11 +345,9 @@ extension List {
             // Selection and focus are one control action. Returning ignored
             // after changing selection lets an ancestor consume the arrow
             // before the runtime moves focus, leaving the two out of sync.
-            return .handled(
-              focusRequest: .init(
-                identity: listRowIdentity(for: context.identity, rowIndex: targetIndex),
-                traversalStep: delta
-              )
+            return .handledAndMoveFocus(
+              to: listRowIdentity(for: context.identity, rowIndex: targetIndex),
+              traversalStep: delta
             )
           }
         }

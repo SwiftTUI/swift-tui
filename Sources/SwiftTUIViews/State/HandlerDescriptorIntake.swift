@@ -172,28 +172,27 @@ package struct HandlerDescriptorIntake {
 
   package func registerKeyPressHandler(
     identity: Identity,
-    receivesBubbledEventsFromSyntheticTargets: Bool = true,
+    receivesSyntheticBubbles: Bool = true,
     handler: @escaping @MainActor (KeyPress) -> Bool
   ) {
-    let scope = dispatchScope
-    context.localKeyHandlerRegistry?.register(
+    registerKeyPressOutcomeHandler(
       identity: identity,
-      receivesBubbledEventsFromSyntheticTargets: receivesBubbledEventsFromSyntheticTargets,
-      keyPressHandler: { press in
-        withImperativeAuthoringContext(scope) {
-          handler(press)
-        }
+      receivesSyntheticBubbles: receivesSyntheticBubbles,
+      handler: { press in
+        handler(press) ? .handled : .ignored
       }
     )
   }
 
   package func registerKeyPressOutcomeHandler(
     identity: Identity,
+    receivesSyntheticBubbles: Bool = true,
     handler: @escaping @MainActor (KeyPress) -> KeyPressDispatchOutcome
   ) {
     let scope = dispatchScope
-    context.localKeyHandlerRegistry?.registerWithOutcome(
+    context.localKeyHandlerRegistry?.register(
       identity: identity,
+      receivesSyntheticBubbles: receivesSyntheticBubbles,
       keyPressHandler: { press in
         withImperativeAuthoringContext(scope) {
           handler(press)

@@ -302,7 +302,7 @@ struct CommittedHandlerResolutionOracleTests {
       registrations.actionRegistry?.register(identity: action) { false }
       registrations.keyHandlerRegistry?.register(
         identity: key,
-        keyPressHandler: { _ in false }
+        keyPressHandler: { _ in .ignored }
       )
       registrations.commandRegistry?.registerKeyCommand(
         at: command,
