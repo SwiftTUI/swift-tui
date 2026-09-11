@@ -317,31 +317,18 @@ extension LayoutEngine {
     _ node: PlacedNode,
     by delta: CellPoint
   ) -> PlacedNode {
-    let translatedBounds = translated(node.bounds, by: delta)
-    let translatedChildren = node.children
-
-    var translatedNode = PlacedNode(
-      viewNodeID: node.viewNodeID,
-      identity: node.identity,
-      kind: node.kind,
-      environmentSnapshot: node.environmentSnapshot,
-      bounds: translatedBounds,
-      contentBounds: translated(node.contentBounds, by: delta),
-      clipBounds: node.clipBounds.map { translated($0, by: delta) },
-      zIndex: node.zIndex,
-      children: translatedChildren,
-      semanticRole: node.semanticRole,
-      layoutMetadata: node.layoutMetadata,
-      drawMetadata: node.drawMetadata,
-      drawEffects: node.drawEffects,
-      surfaceComposition: node.surfaceComposition,
-      semanticMetadata: node.semanticMetadata,
-      lifecycleMetadata: node.lifecycleMetadata,
-      drawPayload: node.drawPayload,
-      layoutBehavior: node.layoutBehavior,
-      isTransient: node.isTransient,
-      matchedGeometry: node.matchedGeometry
-    )
+    var translatedNode = node
+    translatedNode.bounds = translated(node.bounds, by: delta)
+    translatedNode.contentBounds = translated(node.contentBounds, by: delta)
+    translatedNode.clipBounds = node.clipBounds.map { translated($0, by: delta) }
+    var metadata = node.placementMetadata
+    metadata.scrollViewportRect = metadata.scrollViewportRect.map { translated($0, by: delta) }
+    metadata.parentScrollViewportRect = metadata.parentScrollViewportRect.map {
+      translated($0, by: delta)
+    }
+    metadata.hostedListVisibleLayout = metadata.hostedListVisibleLayout?.translated(by: delta)
+    metadata.hostedTableVisibleLayout = metadata.hostedTableVisibleLayout?.translated(by: delta)
+    translatedNode.placementMetadata = metadata
     translatedNode.lazyChildScrollEstimates = node.lazyChildScrollEstimates.map { estimates in
       estimates.map { estimate in
         var translatedEstimate = LazyChildScrollEstimate(
@@ -352,7 +339,6 @@ extension LayoutEngine {
         return translatedEstimate
       }
     }
-    translatedNode.hostedCollectionTableColumnWidths = node.hostedCollectionTableColumnWidths
     return translatedNode
   }
 

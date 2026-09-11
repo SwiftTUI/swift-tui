@@ -140,7 +140,8 @@ extension DrawExtractor {
         // Keep the row's outer border behind committed cell nodes. Column
         // separators are drawn between the hosted cell frames below.
         let borderStyle = TextStyle(
-          foregroundStyle: payload.borderStyle ?? payload.style.borderStyle ?? .semantic(.separator),
+          foregroundStyle: payload.borderStyle ?? payload.style.borderStyle
+            ?? .semantic(.separator),
           opacity: payload.opacity
         )
         let widths = layout.widths
@@ -352,6 +353,10 @@ extension DrawExtractor {
     let bodyEnd = max(bodyStart, displayLines.count - fixedBottomCount)
     let bodyLines = Array(displayLines[bodyStart..<bodyEnd])
     let bodyCapacity = viewportLineCount - fixedTopCount - fixedBottomCount
+    let anchorLine = payload.scrollAnchorRowIndex.map { row in
+      bodyLines.firstIndex { $0.role == .row && ($0.rowIndex ?? -1) >= row }
+        ?? max(0, bodyLines.count - 1)
+    }
 
     if bodyLines.count <= bodyCapacity {
       let all =
@@ -364,7 +369,8 @@ extension DrawExtractor {
     if !showsIndicators {
       let window = visibleTableBodyWindow(
         from: bodyLines,
-        lineCapacity: bodyCapacity
+        lineCapacity: bodyCapacity,
+        anchorLine: anchorLine
       )
       let visible =
         Array(displayLines.prefix(fixedTopCount))
@@ -373,13 +379,9 @@ extension DrawExtractor {
       return (visible, nil, visible.count)
     }
 
-    let anchoredOffset =
-      selectedTableLineIndex(in: bodyLines).map {
-        min(
-          max(0, $0 - (bodyCapacity / 2)),
-          max(0, bodyLines.count - bodyCapacity)
-        )
-      } ?? 0
+    let anchoredOffset = visibleTableBodyWindow(
+      from: bodyLines, lineCapacity: bodyCapacity, anchorLine: anchorLine
+    ).offset
     let anchoredEnd = min(bodyLines.count, anchoredOffset + bodyCapacity)
     let initialHiddenAbove = anchoredOffset > 0
     let initialHiddenBelow = anchoredEnd < bodyLines.count
@@ -389,7 +391,8 @@ extension DrawExtractor {
     let bodyWindowCapacity = max(1, bodyCapacity - reservedIndicators)
     let window = visibleTableBodyWindow(
       from: bodyLines,
-      lineCapacity: bodyWindowCapacity
+      lineCapacity: bodyWindowCapacity,
+      anchorLine: anchorLine
     )
     let hiddenAbove = window.offset > 0
     let hiddenBelow = window.offset + window.lines.count < bodyLines.count
@@ -786,7 +789,8 @@ extension DrawExtractor {
 
   private func visibleTableBodyWindow(
     from bodyLines: [TableDisplayLine],
-    lineCapacity: Int
+    lineCapacity: Int,
+    anchorLine: Int? = nil
   ) -> (offset: Int, lines: [TableDisplayLine]) {
     guard lineCapacity > 0 else {
       return (0, [])
@@ -794,7 +798,7 @@ extension DrawExtractor {
 
     let selectedIndex = selectedTableLineIndex(in: bodyLines) ?? 0
     let offset = min(
-      max(0, selectedIndex - (lineCapacity / 2)),
+      max(0, anchorLine ?? (selectedIndex - (lineCapacity / 2))),
       max(0, bodyLines.count - lineCapacity)
     )
     let end = min(bodyLines.count, offset + lineCapacity)

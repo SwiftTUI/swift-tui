@@ -6,6 +6,51 @@ import Testing
 
 @Suite("Retained reuse invariants")
 struct RetainedReuseInvariantTests {
+  @Test("STUI-75: translation preserves tall collection lines and all viewport products")
+  func translationPreservesCollectionProducts() {
+    let bounds = rect(x: 2, y: 3, width: 20, height: 10)
+    var child = PlacedNode(
+      identity: testIdentity("translated-child"),
+      resolvedMetadata: makeMetadata("translated-child", semanticRole: .scroll, isTransient: false),
+      bounds: bounds)
+    child.hostedListVisibleLayout = .init(
+      contentBounds: bounds,
+      lines: [.init(kind: .text("tall", .init()), isHeader: false, rowIndex: 0, height: 3)],
+      sectionChromeBounds: [bounds])
+    child.hostedTableVisibleLayout = .init(
+      contentBounds: bounds,
+      lines: [
+        .init(
+          segments: [], backgroundStyle: nil, role: .row,
+          isSelectedRow: false, rowIndex: 0, height: 3)
+      ], widths: [20])
+    child.hostedCollectionTableColumnWidths = [20]
+    child.scrollViewportRect = bounds
+    var metadata = child.placementMetadata
+    metadata.parentScrollViewportRect = bounds
+    metadata.scrollAnchorCorrection = .init(
+      requestedOffset: .init(x: 0, y: 8), correctedOffset: .init(x: 0, y: 10))
+    metadata.lazyStackAllocationSnapshot = .init(
+      axis: .vertical, childMainOffsets: [8], childMainLengths: [3], contentMainLength: 20)
+    child.placementMetadata = metadata
+    let parent = PlacedNode(
+      identity: testIdentity("translated-parent"), bounds: bounds, children: [child])
+    let delta = CellPoint(x: 4, y: -2)
+    let translated = LayoutEngine().translatedPlacement(parent, by: delta).children[0]
+    #expect(
+      translated.hostedListVisibleLayout == child.hostedListVisibleLayout?.translated(by: delta))
+    #expect(
+      translated.hostedTableVisibleLayout == child.hostedTableVisibleLayout?.translated(by: delta))
+    #expect(translated.hostedCollectionTableColumnWidths == [20])
+    let expectedBounds = rect(x: 6, y: 1, width: 20, height: 10)
+    #expect(translated.scrollViewportRect == expectedBounds)
+    #expect(translated.placementMetadata.parentScrollViewportRect == expectedBounds)
+    #expect(translated.placementMetadata.scrollAnchorCorrection == metadata.scrollAnchorCorrection)
+    #expect(translated.lazyStackAllocationSnapshot == metadata.lazyStackAllocationSnapshot)
+    #expect(child.scrollViewportRect == bounds)
+    #expect(child.hostedListVisibleLayout?.totalContentHeight == 3)
+  }
+
   @Test("PlacedNodeResolvedMetadata round-trips every resolved projection")
   func placedNodeResolvedMetadataRoundTripsEveryProjection() {
     let projectionIdentity = testIdentity("Projection")
