@@ -27,7 +27,7 @@ struct CollectionScrollCurrencyTests {
 
     // Arrow keys are selection keys, so they need focus inside the list. A
     // click on a visible row is how a user gets there.
-    _ = try harness.clickText("«0»")
+    _ = try harness.focusText("«0»")
     var previousRows = scrollCurrencyRows(harness.frame)
     #expect(previousRows.contains(0))
     #expect(previousRows.count > 3)
@@ -155,6 +155,30 @@ struct CollectionScrollCurrencyTests {
     let afterPage = try #require(scrollCurrencyRows(harness.frame).min())
     #expect(afterPage > 0, "PageDown advances a screenful")
     #expect(afterPage <= afterHome + 1, "PageDown advances at most one screenful")
+  }
+
+  @Test("List scroll keys bubble from nested controls")
+  func listScrollKeysBubbleFromNestedControls() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ScrollCurrencyNestedControl"),
+      size: .init(width: 30, height: 12)
+    ) {
+      NestedControlCurrencyList()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.clickText("«0»")
+    #expect(
+      harness.runLoop.focusTracker.currentFocusIdentity?.description.contains("ListRow") == false,
+      "the nested Button, not its synthetic row, must own focus"
+    )
+    #expect(scrollCurrencyRows(harness.frame).contains(0))
+
+    _ = try harness.pressKey(KeyPress(.pageDown))
+    #expect(
+      !scrollCurrencyRows(harness.frame).contains(0),
+      "the List fallback must scroll after the nested control ignores PageDown"
+    )
   }
 
   @Test("T-04: scrollTo(id) is a no-op in-window and reveals an out-of-window row")
@@ -345,6 +369,18 @@ private struct NonSelectableCurrencyList: View {
   var body: some View {
     List(0..<10_000, id: \.self) { row in
       Text("«\(row)»")
+    }
+    .frame(height: 10)
+  }
+}
+
+@MainActor
+private struct NestedControlCurrencyList: View {
+  @State private var selection: Int? = 0
+
+  var body: some View {
+    List(0..<100, id: \.self, selection: $selection) { row in
+      Button("«\(row)»") {}
     }
     .frame(height: 10)
   }

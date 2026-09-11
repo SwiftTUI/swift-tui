@@ -225,7 +225,7 @@ extension List {
 
       intake.registerKeyPressHandler(
         identity: context.identity,
-        receivesBubbledEvents: false
+        receivesBubbledEventsFromSyntheticTargets: false
       ) { keyPress in
         guard keyPress.modifiers.isEmpty else {
           return false
@@ -307,9 +307,9 @@ extension List {
           intake.registerAction(identity: rowIdentity) {
             policy.isMultiple ? policy.toggle(tag) : activate(tag)
           }
-          intake.registerKeyPressHandler(identity: rowIdentity) { keyPress in
+          intake.registerKeyPressOutcomeHandler(identity: rowIdentity) { keyPress in
             guard keyPress.modifiers.isEmpty else {
-              return false
+              return .ignored
             }
             let delta: Int?
             switch keyPress.key {
@@ -322,29 +322,38 @@ extension List {
             }
 
             guard let delta, !rows.isEmpty else {
-              return false
+              return .ignored
             }
 
             let targetIndex = min(
               max(rowIndex + delta, rows.startIndex),
               rows.index(before: rows.endIndex)
             )
+            guard targetIndex != rowIndex else {
+              return .ignored
+            }
             guard let targetTag = rows[targetIndex].tag else {
-              return false
+              return .ignored
             }
             if !policy.isMultiple {
               _ = policy.select(targetTag)
             }
             if let scrollCurrency {
-              // This handler owns the common case: with focus on a row, the
-              // row's own handler sees the arrow and the container's never
-              // does. Pin before revealing — while nothing is stored the
-              // window IS the selection, so a minimal reveal would just be
-              // re-centred by the fallback underneath it.
+              // Pin before revealing — while nothing is stored the window IS
+              // the selection, so a minimal reveal would just be re-centred
+              // by the fallback underneath it.
               scrollCurrency.pinCurrentAnchor()
               scrollCurrency.reveal(row: targetIndex)
             }
-            return false
+            // Selection and focus are one control action. Returning ignored
+            // after changing selection lets an ancestor consume the arrow
+            // before the runtime moves focus, leaving the two out of sync.
+            return .handled(
+              focusRequest: .init(
+                identity: listRowIdentity(for: context.identity, rowIndex: targetIndex),
+                traversalStep: delta
+              )
+            )
           }
         }
       }

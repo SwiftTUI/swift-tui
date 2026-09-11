@@ -1629,15 +1629,29 @@ package final class ViewNode {
   package func recordKeyPressHandlerRegistration(
     identity: Identity,
     ordinal: UInt64,
-    handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
+    registration: LocalKeyHandlerRegistry.KeyPressRegistration
   ) {
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordKeyPressHandler(
       identity: identity,
       ordinal: ordinal,
-      handler: handler
+      registration: registration
     )
     refreshCommittedHandlerInventoryOutsideCapture()
+  }
+
+  package func recordKeyPressHandlerRegistration(
+    identity: Identity,
+    ordinal: UInt64,
+    handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
+  ) {
+    recordKeyPressHandlerRegistration(
+      identity: identity,
+      ordinal: ordinal,
+      registration: .init { keyPress in
+        handler(keyPress) ? .handled(focusRequest: nil) : .ignored
+      }
+    )
   }
 
   package func recordPasteHandlerRegistration(

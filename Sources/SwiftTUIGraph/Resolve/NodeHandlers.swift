@@ -120,7 +120,8 @@ package struct ContributedHandlerNodeRecord<Handler>: RuntimeNodeRecord {
 
 package struct KeyHandlerNodeRecord: RuntimeNodeRecord {
   package var owners: [Identity: RuntimeRegistrationOwnerKey] = [:]
-  package var keyPress = ContributedHandlerNodeRecord<LocalKeyHandlerRegistry.KeyPressHandler>()
+  package var keyPress =
+    ContributedHandlerNodeRecord<LocalKeyHandlerRegistry.KeyPressRegistration>()
   package var paste = ContributedHandlerNodeRecord<LocalKeyHandlerRegistry.PasteHandler>()
 
   package init() {}
@@ -793,9 +794,9 @@ package struct NodeHandlers {
   package mutating func recordKeyPressHandler(
     identity: Identity,
     ordinal: UInt64,
-    handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
+    registration: LocalKeyHandlerRegistry.KeyPressRegistration
   ) {
-    keyHandler.keyPress.record(identity: identity, ordinal: ordinal, handler: handler)
+    keyHandler.keyPress.record(identity: identity, ordinal: ordinal, handler: registration)
   }
 
   package mutating func recordPasteHandler(
