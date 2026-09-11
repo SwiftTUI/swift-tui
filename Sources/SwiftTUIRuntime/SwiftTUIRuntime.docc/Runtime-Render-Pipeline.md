@@ -269,12 +269,13 @@ different ownership model.
 
 ## Lazy Container Windowing
 
-`LazyVStack`/`LazyHStack` content backed by an indexed source (a direct
-`ForEach`) uses viewport windowing under a `ScrollView`. The scroll layout
-declares a measure-time viewport. Measurement realizes and sizes only the
-visible band plus overscan. It derives other allocation entries from the first
-row extent. Placement materializes rows only in the visible range. Hosts and
-tests can observe these results:
+`LazyVStack`/`LazyHStack` content composed of static fragments, `Group`,
+conditionals, and one or more `ForEach` sources uses viewport windowing under a
+`ScrollView`. The scroll layout declares a measure-time viewport. Measurement
+realizes and sizes only the visible band plus overscan; a logical element can
+contribute zero or multiple fragments, and exact fragment allocations are kept
+separate from dense logical-element estimates. Placement materializes rows
+only in the visible range. Hosts and tests can observe these results:
 
 - Rows outside the viewport are not placed: they paint nothing, mint no
   interaction regions, and are not focus-traversal targets until scrolled
@@ -284,10 +285,11 @@ tests can observe these results:
 - The container's content size is an estimate that refines as real
   measurements replace estimates when the window moves. The scroll offset
   registry re-anchors on content-size change.
-- Some shapes are ineligible. They include sources spliced into multiple cells
-  per element, negotiated (`nil`) spacing, and sources without an enclosing
-  scroll-declared viewport. They use exhaustive realization, byte-identical to
-  the pre-windowing pipeline.
+- Default (`nil`) spacing is exact between realized neighboring fragments.
+  Exhaustive layout remains for sources without an enclosing scroll-declared
+  viewport and for observed negative spacing; a single element whose body
+  expands without bound is realized in full. Opaque bodies or modifiers hiding
+  a `ForEach` do not acquire structural transparency.
 - Some live lazy sources exceed the worker-snapshot element budget. Their frames
   keep those sources live and run the frame tail on the main actor. They do not
   pre-realize every element for worker offload.
