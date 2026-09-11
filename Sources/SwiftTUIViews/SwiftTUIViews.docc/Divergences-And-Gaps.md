@@ -251,10 +251,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   applied with `scrollPosition(_:)`) is no longer claimed by different
   semantics. The `ScrollView(position:)` initializer itself has no SwiftUI
   counterpart.
-- **No `scrollPosition(_:)` identity abstraction.** *Gap.* SwiftUI's
-  `ScrollPosition` model (scroll to identity, edge, or anchor through a
-  bindable abstraction) is unimplemented; the name is now unclaimed and
-  available to a faithful implementation.
+- **Scroll commands and observed offsets use separate APIs.** *Ratified omission.*
+  Bind `ScrollCellOffset` through `ScrollView(position:)` to observe and set
+  cell offsets. Use `ScrollViewReader` and `ScrollViewProxy` for identity,
+  edge, and anchor commands, including unrealized indexed rows. There is no
+  additional bindable `ScrollPosition` model: an offset does not uniquely name
+  a visible row, and commands can outlive or fail to resolve a target. The
+  proxy reports target resolution explicitly. A future identity-observation
+  API would need to define that separate contract; the name remains unclaimed.
 - **`ScrollViewProxy.scrollTo` returns `Bool` and adds offset forms;
   `ScrollViewReader` evaluates `content` once.** *Ratified.* The `Bool`
   reports whether a scroll target resolved: the fail-loud preference applied
@@ -360,7 +364,7 @@ are omitted even when SwiftUI exposes a corresponding API.
   a `GeometryReader` or an unselected `ViewThatFits` candidate does not
   realize its authored content and commits no lifecycle, task, gesture, focus,
   or semantic side effects.
-- **Missing named coordinate spaces fall back to global.** *Gap.* A
+- **Missing named coordinate spaces fall back to global.** *Ratified.* A
   `frame(in: .named(...))` read whose space is not present resolves in global
   coordinates and records a frame diagnostic instead of trapping; duplicate
   names keep last-writer-wins.
@@ -391,8 +395,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   where SwiftUI strokes at sub-cell resolution and never occludes, a cell
   grid makes "inside the bounds" necessarily mean *replacing* the outermost
   content cells: a border on content with no padding overwrites its first
-  and last rows and columns, and small content can disappear entirely with
-  no diagnostic. Pad the content, size the frame for the border, or use
+  and last rows and columns. A border that leaves no interior cells reports
+  `layout.insetBorderOccludesContent`; partial overlap remains the inset
+  contract and does not imply an authoring error. Pad the content, size the
+  frame for the border, or use
   explicit `placement: .outset`, which reserves terminal cells around the
   content and grows the frame.
 - **`ignoresSafeArea` takes the edge set positionally.** *Ratified.*
@@ -463,7 +469,11 @@ are omitted even when SwiftUI exposes a corresponding API.
   flattened text). Flattened section chrome (headers/footers) honors the
   truncation mode but renders one line; an authored limit above one there
   reports a `collection.unsupportedSectionChromeLineLimit` runtime issue and
-  clamps. Variable-height *flattened* lines remain a *Gap*.
+  clamps. Low-level flattened `ListPayload`/`TablePayload` text remains a
+  *Ratified* single-line representation. Use hosted `List` rows and `Table`
+  cells for multiline content: their measured heights drive placement, chrome,
+  and semantics together. Maintaining a second multiline text layout inside
+  flattened payload rendering is deliberately omitted.
 
 ## Controls and text
 

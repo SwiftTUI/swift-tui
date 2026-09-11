@@ -10,6 +10,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- Preserve custom alignment guides in lazy stacks and safe-area insets, and
+  align odd-sized custom-layout anchors with `ViewDimensions`.
+- Respect fixed-frame minimums and return unused custom-layout offers to
+  flexible stack siblings.
+- Preserve tall hosted List/Table rows and viewport metadata when retained
+  content moves, and honor eager Table scroll anchors after wheel or proxy input.
+- Diagnose inset borders that leave no interior cells for nonempty content.
 - Bound slow WebSocket clients to 32 records / 4 MiB at each outbound queue,
   including active writes. Overflow closes the affected connection; reconnect
   starts from the latest full frame with image payloads restored. Clipboard,
