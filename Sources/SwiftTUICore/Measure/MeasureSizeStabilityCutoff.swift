@@ -136,6 +136,7 @@ extension LayoutEngine {
         animationExcludedIdentities: animationExcludedIdentities,
         previousFrameNodeCount: previousFrameNodeCount,
         policy: policy,
+        validationRecorder: passContext.retainedValidationRecorder,
         into: &result
       )
     }
@@ -149,6 +150,7 @@ extension LayoutEngine {
     animationExcludedIdentities: Set<Identity>,
     previousFrameNodeCount: Int,
     policy: MeasureCutoffPolicy,
+    validationRecorder: RetainedValidationRecorder?,
     into result: inout MeasureCutoffPrePassResult
   ) {
     // D9: animated roots churn size per tick; certification would be pure
@@ -321,7 +323,8 @@ extension LayoutEngine {
     // only (the same terms as the layout shadow oracle's fresh pass).
     let scratchContext = LayoutPassContext(
       purpose: .sizeStabilityPrePass,
-      measurementSeedSession: session
+      measurementSeedSession: session,
+      retainedValidationRecorder: validationRecorder
     )
     var certifiedProduct: MeasuredNode?
     for baseline in baselines {

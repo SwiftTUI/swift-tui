@@ -744,7 +744,8 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
       let value = store.lookup(
         resolved: node,
         proposal: proposal,
-        layoutDebugName: debugName
+        layoutDebugName: debugName,
+        recorder: passContext.retainedValidationRecorder?.comparisons
       )
     else {
       return nil

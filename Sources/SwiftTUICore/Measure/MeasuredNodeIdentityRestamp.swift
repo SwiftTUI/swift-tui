@@ -1,3 +1,10 @@
+private struct IdentityRestampFrame {
+  var node: MeasuredNode
+  let resolved: ResolvedNode
+  var nextChildIndex: Int
+  let descendsIntoChildren: Bool
+}
+
 extension MeasuredNode {
   /// Re-stamps a served measured product's identities from the current
   /// resolved tree.
@@ -22,11 +29,30 @@ extension MeasuredNode {
   /// storing no child measurements) keep their subtree stamps: their reuse is
   /// gated elsewhere and their identities come from element sources, not this
   /// zip.
-  package func restampingIdentities(from resolved: ResolvedNode) -> MeasuredNode {
+  package func restampingIdentities(
+    from resolved: ResolvedNode,
+    recorder: RetainedValidationRecorder? = nil
+  ) -> MeasuredNode {
+    var work = RetainedValidationWork()
+    guard let recorder else {
+      // recursion-allowed: one-time dispatch to the generic iterative overload.
+      return restampingIdentities(from: resolved, mode: SkipComparisonWork.self, work: &work)
+    }
+    defer { recorder.merge(work) }
+    // recursion-allowed: one-time dispatch to the generic iterative overload.
+    return restampingIdentities(from: resolved, mode: CountComparisonWork.self, work: &work)
+  }
+
+  private func restampingIdentities<Mode: ComparisonWorkMode>(
+    from resolved: ResolvedNode,
+    mode: Mode.Type,
+    work: inout RetainedValidationWork
+  ) -> MeasuredNode {
     // Heap-backed walks; serves run on the frame-tail worker's small stack.
     var drifted = false
     var probe: [(MeasuredNode, ResolvedNode)] = [(self, resolved)]
     while let (cachedNode, currentNode) = probe.popLast() {
+      if Mode.isEnabled { work.identityNodesChecked += 1 }
       if cachedNode.identity != currentNode.identity {
         drifted = true
         break
@@ -45,19 +71,15 @@ extension MeasuredNode {
     // Iterative post-order rebuild, the `synchronizeRetainedPhaseMetadata`
     // shape: completed children are written back into the parent frame's
     // value-typed `childMeasurements[index]`.
-    struct Frame {
-      var node: MeasuredNode
-      let resolved: ResolvedNode
-      var nextChildIndex: Int
-      let descendsIntoChildren: Bool
-    }
 
-    func makeFrame(_ measured: MeasuredNode, _ resolved: ResolvedNode) -> Frame {
+    func makeFrame(_ measured: MeasuredNode, _ resolved: ResolvedNode) -> IdentityRestampFrame {
+      if Mode.isEnabled { work.measuredNodesRestamped += 1 }
       var node = measured
       node.identity = resolved.identity
       if var snapshot = node.containerAllocationSnapshot {
         if snapshot.childSizes.count == resolved.children.count {
           for index in snapshot.childSizes.indices {
+            if Mode.isEnabled { work.allocationIdentitiesRestamped += 1 }
             snapshot.childSizes[index].identity = resolved.children[index].identity
           }
         }
@@ -65,13 +87,14 @@ extension MeasuredNode {
           lazyStack.childIdentities.count == resolved.children.count
         {
           for index in lazyStack.childIdentities.indices {
+            if Mode.isEnabled { work.allocationIdentitiesRestamped += 1 }
             lazyStack.childIdentities[index] = resolved.children[index].identity
           }
           snapshot.lazyStack = lazyStack
         }
         node.containerAllocationSnapshot = snapshot
       }
-      return Frame(
+      return IdentityRestampFrame(
         node: node,
         resolved: resolved,
         nextChildIndex: 0,
@@ -79,7 +102,7 @@ extension MeasuredNode {
       )
     }
 
-    var stack: [Frame] = [makeFrame(self, resolved)]
+    var stack: [IdentityRestampFrame] = [makeFrame(self, resolved)]
     while true {
       let index = stack.count - 1
       if stack[index].descendsIntoChildren,

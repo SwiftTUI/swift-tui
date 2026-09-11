@@ -245,8 +245,33 @@ package struct MeasuredNode: Equatable, Sendable {
   /// form could not have: it is maintained on every `childMeasurements` write,
   /// so unequal counts prove unequal subtrees without walking either.
   package static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.isEqual(to: rhs)
+  }
+
+  package func isEqual(
+    to other: Self,
+    recorder: RetainedValidationRecorder? = nil
+  ) -> Bool {
+    var work = RetainedValidationWork()
+    guard let recorder else {
+      // recursion-allowed: one-time dispatch to the generic iterative overload.
+      return isEqual(to: other, mode: SkipComparisonWork.self, work: &work)
+    }
+    defer { recorder.merge(work) }
+    // recursion-allowed: one-time dispatch to the generic iterative overload.
+    return isEqual(to: other, mode: CountComparisonWork.self, work: &work)
+  }
+
+  private func isEqual<Mode: ComparisonWorkMode>(
+    to other: Self,
+    mode: Mode.Type,
+    work: inout RetainedValidationWork
+  ) -> Bool {
+    let lhs = self
+    let rhs = other
     var pending: [(Self, Self)] = [(lhs, rhs)]
     while let (lhs, rhs) = pending.popLast() {
+      if Mode.isEnabled { work.measuredEqualityNodes += 1 }
       guard
         lhs.subtreeNodeCount == rhs.subtreeNodeCount,
         lhs.viewNodeID == rhs.viewNodeID,

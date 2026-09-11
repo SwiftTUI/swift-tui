@@ -12,7 +12,7 @@ import Foundation
 /// carry file-private copies of similar helpers; bare module-scope functions
 /// with the same signatures would collide with them.
 enum SourceParsingTestSupport {
-  /// Returns the source text of the first `func <name>(` and its body
+  /// Returns the source text of the first function with this name and its body
   /// (balanced braces), or "" if not found. Tolerates the formatter's
   /// operator spacing (`static func == (lhs:` declares `==` with a space
   /// before the paren).
@@ -21,6 +21,7 @@ enum SourceParsingTestSupport {
     guard
       let start = lines.firstIndex(where: { line in
         line.contains("func \(name)(") || line.contains("func \(name) (")
+          || line.contains("func \(name)<")
       })
     else {
       return ""

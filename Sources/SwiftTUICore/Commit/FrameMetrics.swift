@@ -158,6 +158,7 @@ package struct LayoutBranchingMetrics: Equatable, Sendable {
 }
 
 package struct LayoutWorkMetrics: Equatable, Sendable {
+  package var retainedValidation: RetainedValidationWork?
   package var measuredNodesComputed: Int
   package var measuredNodesReused: Int
   package var placedNodesComputed: Int
@@ -215,6 +216,10 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     layoutDependentMainActorFallbacks += other.layoutDependentMainActorFallbacks
     preMeasureCutoff.merge(other.preMeasureCutoff)
     branching.merge(other.branching)
+    if let work = other.retainedValidation {
+      if retainedValidation == nil { retainedValidation = .init() }
+      retainedValidation?.merge(work)
+    }
     geometryResolutionDiagnostics.merge(other.geometryResolutionDiagnostics)
   }
 }

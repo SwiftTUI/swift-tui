@@ -112,6 +112,8 @@ and then `SwiftTUIRuntime`.
   erased evaluator thunks up to the Views driver. Depends on `SwiftTUIPrimitives`
   **only**. A successful `swift build --target SwiftTUIGraph` proves that graph
   code does not name a render type. It does not use Foundation.
+  `Resolve/ComparisonWork.swift` owns optional retained-comparison tallies;
+  the comparison walkers select a counting or non-counting specialization.
 - **`SwiftTUICore`** — the render engine. Consumes the graph's immutable
   `ResolvedNode` snapshots. It runs measure, place, the semantic and draw
   extractors, the rasterizer, and the commit planner. It also runs the text/image
@@ -120,6 +122,10 @@ and then `SwiftTUIRuntime`.
   layout-dependent-content realization callback (the GeometryReader analog).
   Depends on `SwiftTUIGraph` + `SwiftTUIPrimitives` and `@_exported`-imports both
   so downstream `import SwiftTUICore` is unchanged. Foundation-free.
+  `Measure/RetainedValidationWork.swift` combines Graph's comparison tallies
+  with Core's measured-product checks and identity/metadata restamping work.
+  `LayoutPassContext` owns the optional accumulator; runtime diagnostics and
+  profiling consume its snapshot without a dependency from Graph to Core.
 - **`SwiftTUIViews`** — the authoring surface. The `View` protocol, view
   builders, containers, controls, layout, state, focus, gestures, modifiers,
   and shapes. `View` is body-only and `@MainActor`-isolated, and its

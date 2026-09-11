@@ -336,7 +336,20 @@ public struct EnvironmentSnapshot: Sendable {
 
 extension EnvironmentSnapshot: Equatable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
+    var work = ComparisonWork()
+    return lhs.isEqual(to: rhs, mode: SkipComparisonWork.self, work: &work)
+  }
+
+  @inline(__always)
+  package func isEqual<Mode: ComparisonWorkMode>(
+    to rhs: Self,
+    mode: Mode.Type,
+    work: inout ComparisonWork
+  ) -> Bool {
+    let lhs = self
+    if Mode.isEnabled { work.environmentSnapshots += 1 }
     if lhs.storage === rhs.storage {
+      if Mode.isEnabled { work.environmentSharedStorage += 1 }
       return true
     }
 
@@ -349,9 +362,11 @@ extension EnvironmentSnapshot: Equatable {
     }
 
     for (identifier, left) in lhs.storage.typedValues {
-      guard let right = rhs.storage.typedValues[identifier],
-        left.isEqual(to: right)
-      else {
+      guard let right = rhs.storage.typedValues[identifier] else {
+        return false
+      }
+      if Mode.isEnabled { work.environmentValues += 1 }
+      guard left.isEqual(to: right) else {
         return false
       }
     }

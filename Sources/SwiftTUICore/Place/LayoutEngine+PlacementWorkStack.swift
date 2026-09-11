@@ -69,7 +69,8 @@ extension LayoutEngine {
       measured: measured,
       bounds: bounds,
       viewportContext: viewportContext,
-      retainedLayout: passContext?.retainedLayout
+      retainedLayout: passContext?.retainedLayout,
+      recorder: passContext?.retainedValidationRecorder
     ) {
       localMetrics.placedNodesReused += retained.placed.subtreeNodeCount
       if let fragment = retained.placedFrameFragment {

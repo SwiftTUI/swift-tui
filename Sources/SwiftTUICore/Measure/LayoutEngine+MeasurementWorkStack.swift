@@ -427,7 +427,8 @@ extension LayoutEngine {
     }
 
     if allowsReuse, !hasInvalidatedIndexedDescendant,
-      let cached = cache?.lookup(resolved: node, proposal: proposal)
+      let cached = cache?.lookup(
+        resolved: node, proposal: proposal, recorder: passContext?.retainedValidationRecorder)
     {
       localMetrics.measuredNodesReused += cached.subtreeNodeCount
       results.append(cached)

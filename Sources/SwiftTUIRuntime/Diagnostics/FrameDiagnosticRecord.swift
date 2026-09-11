@@ -47,6 +47,7 @@ public struct FrameDiagnosticRecord: Sendable {
   /// (set post-init, defaulting to zeroes) so the public record surface
   /// stays frozen.
   package var layoutBranching: LayoutBranchingMetrics = .init()
+  package var retainedValidation: RetainedValidationWork?
   public var geometryAnchorResolutionMissCount: Int
   public var firstGeometryAnchorResolutionMissIdentity: String?
   public var geometryMissingNamedCoordinateSpaceCount: Int

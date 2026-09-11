@@ -16,8 +16,10 @@ extension ResolvedNode {
   /// the cache's comparison witness. A legacy nil discriminator is compatible
   /// with any concrete type, but that relation is not transitive: replacing a
   /// typed witness with nil would let a different concrete type reuse it later.
-  package func measurementEquivalence(
-    to other: Self
+  private func measurementEquivalence<Mode: ComparisonWorkMode>(
+    to other: Self,
+    mode: Mode.Type,
+    work: inout ComparisonWork
   ) -> MeasurementEquivalence {
     // Node-hosted collections preserve authored row subtrees instead of
     // collapsing them into draw payloads. Those trees can exceed the frame-tail
@@ -27,11 +29,12 @@ extension ResolvedNode {
     var pending: [(Self, Self)] = [(self, other)]
     var canRefreshWitness = true
     while let (lhs, rhs) = pending.popLast() {
+      if Mode.isEnabled { work.measurementNodes += 1 }
       guard
         lhs.structuralPath == rhs.structuralPath,
         lhs.kind == rhs.kind,
         Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
-        lhs.environmentSnapshot == rhs.environmentSnapshot,
+        lhs.environmentSnapshot.isEqual(to: rhs.environmentSnapshot, mode: mode, work: &work),
         lhs.layoutBehavior.isEquivalentForMeasurement(to: rhs.layoutBehavior),
         lhs.layoutMetadata == rhs.layoutMetadata,
         // Alignment-guide closures are invisible to `layoutMetadata ==`; a
@@ -55,6 +58,20 @@ extension ResolvedNode {
       }
     }
     return .init(isCompatible: true, canRefreshWitness: canRefreshWitness)
+  }
+
+  package func measurementEquivalence(
+    to other: Self,
+    recorder: ComparisonWorkRecorder? = nil
+  ) -> MeasurementEquivalence {
+    var work = ComparisonWork()
+    guard let recorder else {
+      // recursion-allowed: one-time dispatch to the generic iterative overload.
+      return measurementEquivalence(to: other, mode: SkipComparisonWork.self, work: &work)
+    }
+    defer { recorder.merge(work) }
+    // recursion-allowed: one-time dispatch to the generic iterative overload.
+    return measurementEquivalence(to: other, mode: CountComparisonWork.self, work: &work)
   }
 
   /// Stricter equivalence check used by the retained layout placement cache.
@@ -121,8 +138,10 @@ extension ResolvedNode {
   /// byte-identically. Crucially it compares fields in place — it never projects
   /// a `PlacedNodeResolvedMetadata` per node — so the metadata check adds only a
   /// handful of comparisons to a walk that already runs.
-  package func placementEquivalence(
-    to other: Self
+  private func placementEquivalence<Mode: ComparisonWorkMode>(
+    to other: Self,
+    mode: Mode.Type,
+    work: inout ComparisonWork
   ) -> PlacementEquivalence {
     // The recursion folded a tri-state on the way back up; this walks the same
     // pairs on the heap and folds globally instead. That is the same function
@@ -134,11 +153,12 @@ extension ResolvedNode {
     var pending: [(Self, Self)] = [(self, other)]
 
     while let (lhs, rhs) = pending.popLast() {
+      if Mode.isEnabled { work.placementNodes += 1 }
       guard
         lhs.structuralPath == rhs.structuralPath,
         lhs.kind == rhs.kind,
         Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator),
-        lhs.environmentSnapshot == rhs.environmentSnapshot,
+        lhs.environmentSnapshot.isEqual(to: rhs.environmentSnapshot, mode: mode, work: &work),
         lhs.layoutBehavior.isEquivalentForPlacement(to: rhs.layoutBehavior),
         lhs.layoutMetadata == rhs.layoutMetadata,
         // Alignment-guide closures are invisible to `layoutMetadata ==`; a
@@ -182,6 +202,20 @@ extension ResolvedNode {
     }
 
     return sawMetadataDivergence ? .geometryReusable : .identical
+  }
+
+  package func placementEquivalence(
+    to other: Self,
+    recorder: ComparisonWorkRecorder? = nil
+  ) -> PlacementEquivalence {
+    var work = ComparisonWork()
+    guard let recorder else {
+      // recursion-allowed: one-time dispatch to the generic iterative overload.
+      return placementEquivalence(to: other, mode: SkipComparisonWork.self, work: &work)
+    }
+    defer { recorder.merge(work) }
+    // recursion-allowed: one-time dispatch to the generic iterative overload.
+    return placementEquivalence(to: other, mode: CountComparisonWork.self, work: &work)
   }
 
   /// Two discriminators are "compatible" for equivalence purposes when

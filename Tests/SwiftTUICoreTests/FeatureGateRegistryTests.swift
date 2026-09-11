@@ -8,6 +8,7 @@ import Testing
 struct FeatureGateRegistryTests {
   @Test("feature gate registry owns the gate environment names")
   func registryOwnsGateEnvironmentNames() {
+    #expect(!FeatureGate.retainedValidationCounters.defaultIsEnabled)
     #expect(
       FeatureGate.allCases.map(\.environmentVariableName) == [
         "SWIFTTUI_SOUNDNESS_PROBE",
@@ -25,6 +26,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_FOCUS_MOVE_NARROWING",
         "SWIFTTUI_STATE_CAPTURE_BINDING",
         "SWIFTTUI_ANIMATION_VELOCITY",
+        "SWIFTTUI_RETAINED_VALIDATION_COUNTERS",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)

@@ -66,6 +66,7 @@ public struct FrameDiagnosticWork: Equatable, Sendable {
   /// (set post-init, defaulting to zeroes) so the public work surface stays
   /// frozen.
   package var layoutBranching: LayoutBranchingMetrics = .init()
+  package var retainedValidation: RetainedValidationWork?
   /// Committed-value anchor-projection walk tallies (serve-path plan
   /// 2026-08-12-003). Same post-init pattern as `layoutBranching`.
   package var lifetimeAnchorTallies: LifetimeAnchorProjectionTallies = .init()

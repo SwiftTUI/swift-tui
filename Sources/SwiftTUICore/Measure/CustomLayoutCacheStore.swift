@@ -80,7 +80,8 @@ package final class CustomLayoutCacheStore: Sendable {
   package func lookup(
     resolved: ResolvedNode,
     proposal: ProposedSize,
-    layoutDebugName: String
+    layoutDebugName: String,
+    recorder: ComparisonWorkRecorder? = nil
   ) -> (any Sendable)? {
     storage.withLock { storage in
       storage.lookups += 1
@@ -94,7 +95,7 @@ package final class CustomLayoutCacheStore: Sendable {
       }
       guard
         cached.layoutDebugName == layoutDebugName,
-        cached.resolved.isEquivalentForMeasurement(to: resolved)
+        cached.resolved.measurementEquivalence(to: resolved, recorder: recorder).isCompatible
       else {
         identityStorage.entries.removeValue(forKey: proposal)
         storage.entryCount -= 1

@@ -1,3 +1,13 @@
+private struct PhaseMetadataFrame {
+  var node: PlacedNode
+  let resolved: ResolvedNode
+  var nextChildIndex: Int
+  /// Structural mismatch — should not happen because
+  /// `isEquivalentForPlacement` gated on `children.count`, but play it safe
+  /// and stop descending at this node rather than zipping mismatched trees.
+  let descendsIntoChildren: Bool
+}
+
 extension LayoutEngine {
   // MARK: - Retained layout
 
@@ -22,7 +32,9 @@ extension LayoutEngine {
       let previousResolved = retainedLayout.resolvedNode(for: resolved.identity),
       let previousMeasured = retainedLayout.measuredNode(for: resolved.identity),
       previousMeasured.proposal == proposal,
-      previousResolved.isEquivalentForMeasurement(to: resolved)
+      previousResolved.measurementEquivalence(
+        to: resolved, recorder: passContext?.retainedValidationRecorder?.comparisons
+      ).isCompatible
     else {
       return nil
     }
@@ -75,7 +87,8 @@ extension LayoutEngine {
     // re-resolve can produce exactly that) still serves. Re-stamp the served
     // subtree's identities from the current resolved tree; see
     // `MeasuredNode.restampingIdentities(from:)` for the contract.
-    return previousMeasured.restampingIdentities(from: resolved)
+    return previousMeasured.restampingIdentities(
+      from: resolved, recorder: passContext?.retainedValidationRecorder)
   }
 
   internal func retainedPlacement(
@@ -83,7 +96,8 @@ extension LayoutEngine {
     measured: MeasuredNode,
     bounds: CellRect,
     viewportContext: LazyStackViewportContext?,
-    retainedLayout: RetainedLayoutSession?
+    retainedLayout: RetainedLayoutSession?,
+    recorder: RetainedValidationRecorder? = nil
   ) -> RetainedPlacementResult? {
     if viewportContext != nil, case .lazyStack = resolved.layoutBehavior {
       return nil
@@ -112,14 +126,15 @@ extension LayoutEngine {
 
     // One walk decides both reuse validity (geometry) and whether the
     // geometry-stable metadata mirrors are also unchanged.
-    let equivalence = previousResolved.placementEquivalence(to: resolved)
+    let equivalence = previousResolved.placementEquivalence(
+      to: resolved, recorder: recorder?.comparisons)
     guard equivalence != .divergent else {
       return nil
     }
 
-    let measurementMatches = previousMeasured == measured
+    let measurementMatches = previousMeasured.isEqual(to: measured, recorder: recorder)
     let translationMeasurementMatches = isEquivalentForViewportTranslation(
-      previousMeasured, measured)
+      previousMeasured, measured, recorder: recorder)
 
     // `placementEquivalence` deliberately ignores resolved metadata that does
     // not affect geometry so visual, semantic, lifecycle, and animation-tick
@@ -137,7 +152,7 @@ extension LayoutEngine {
     func reuse(_ placed: PlacedNode) -> PlacedNode {
       skipMetadataSync
         ? placed
-        : synchronizeRetainedPhaseMetadata(placed: placed, from: resolved)
+        : synchronizeRetainedPhaseMetadata(placed: placed, from: resolved, recorder: recorder)
     }
 
     if previousPlaced.bounds == bounds {
@@ -186,29 +201,40 @@ extension LayoutEngine {
   /// from the current frame.
   internal func synchronizeRetainedPhaseMetadata(
     placed: PlacedNode,
-    from resolved: ResolvedNode
+    from resolved: ResolvedNode,
+    recorder: RetainedValidationRecorder? = nil
+  ) -> PlacedNode {
+    var work = RetainedValidationWork()
+    guard let recorder else {
+      // recursion-allowed: one-time dispatch to the generic iterative overload.
+      return synchronizeRetainedPhaseMetadata(
+        placed: placed, from: resolved, mode: SkipComparisonWork.self, work: &work)
+    }
+    defer { recorder.merge(work) }
+    // recursion-allowed: one-time dispatch to the generic iterative overload.
+    return synchronizeRetainedPhaseMetadata(
+      placed: placed, from: resolved, mode: CountComparisonWork.self, work: &work)
+  }
+
+  private func synchronizeRetainedPhaseMetadata<Mode: ComparisonWorkMode>(
+    placed: PlacedNode,
+    from resolved: ResolvedNode,
+    mode: Mode.Type,
+    work: inout RetainedValidationWork
   ) -> PlacedNode {
     // Iterative post-order rebuild for the same reason as `translatedPlacement`:
     // this runs on the frame-tail worker's small stack over node-hosted
     // collection rows and deep custom-layout chains. Completed children are
     // written back into the parent frame's value-typed `children[index]`.
-    struct Frame {
-      var node: PlacedNode
-      let resolved: ResolvedNode
-      var nextChildIndex: Int
-      /// Structural mismatch — should not happen because
-      /// `isEquivalentForPlacement` gated on `children.count`, but play it safe
-      /// and stop descending at this node rather than zipping mismatched trees.
-      let descendsIntoChildren: Bool
-    }
 
-    func makeFrame(_ placed: PlacedNode, _ resolved: ResolvedNode) -> Frame {
+    func makeFrame(_ placed: PlacedNode, _ resolved: ResolvedNode) -> PhaseMetadataFrame {
+      if Mode.isEnabled { work.placedNodesRestamped += 1 }
       var node = placed
       node.synchronizeResolvedPhaseMetadata(
         from: resolved,
         semanticRole: semanticRole(for: resolved)
       )
-      return Frame(
+      return PhaseMetadataFrame(
         node: node,
         resolved: resolved,
         nextChildIndex: 0,
@@ -216,7 +242,7 @@ extension LayoutEngine {
       )
     }
 
-    var stack: [Frame] = [makeFrame(placed, resolved)]
+    var stack: [PhaseMetadataFrame] = [makeFrame(placed, resolved)]
     while true {
       let index = stack.count - 1
       if stack[index].descendsIntoChildren,
@@ -243,11 +269,31 @@ extension LayoutEngine {
 
   internal func isEquivalentForViewportTranslation(
     _ lhs: MeasuredNode,
-    _ rhs: MeasuredNode
+    _ rhs: MeasuredNode,
+    recorder: RetainedValidationRecorder? = nil
+  ) -> Bool {
+    var work = RetainedValidationWork()
+    guard let recorder else {
+      // recursion-allowed: one-time dispatch to the generic iterative overload.
+      return isEquivalentForViewportTranslation(
+        lhs, rhs, mode: SkipComparisonWork.self, work: &work)
+    }
+    defer { recorder.merge(work) }
+    // recursion-allowed: one-time dispatch to the generic iterative overload.
+    return isEquivalentForViewportTranslation(
+      lhs, rhs, mode: CountComparisonWork.self, work: &work)
+  }
+
+  private func isEquivalentForViewportTranslation<Mode: ComparisonWorkMode>(
+    _ lhs: MeasuredNode,
+    _ rhs: MeasuredNode,
+    mode: Mode.Type,
+    work: inout RetainedValidationWork
   ) -> Bool {
     // Heap-backed pair walk; same field contract as the recursion.
     var pending: [(MeasuredNode, MeasuredNode)] = [(lhs, rhs)]
     while let (lhs, rhs) = pending.popLast() {
+      if Mode.isEnabled { work.viewportComparisonNodes += 1 }
       guard
         lhs.identity == rhs.identity,
         lhs.measuredSize == rhs.measuredSize,

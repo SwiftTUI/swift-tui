@@ -168,6 +168,7 @@ extension FrameDiagnostics {
       firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity
     )
     work.layoutBranching = layoutWork?.branching ?? .init()
+    work.retainedValidation = layoutWork?.retainedValidation
     if let resolveWork {
       work.lifetimeAnchorTallies.nodesWalked = resolveWork.lifetimeAnchorNodesWalked
       work.lifetimeAnchorTallies.replaceCalls = resolveWork.lifetimeAnchorReplaceCalls

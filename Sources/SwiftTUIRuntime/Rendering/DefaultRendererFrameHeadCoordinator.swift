@@ -726,7 +726,8 @@ struct DefaultRendererFrameHeadCoordinator {
       retainedLayout: frameTailRetainedInput.retainedLayout,
       invalidatedIdentities: resolveInputs.invalidatedIdentities,
       customLayoutCompatibilityDepthLimit:
-        LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit
+        LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit,
+      retainedValidationRecorder: RetainedValidationRecorder.isEnabled ? .init() : nil
     )
     let frameContext = FrameContext(
       environment: resolveInputs.environment,

@@ -26,6 +26,17 @@ public struct PerfFrameWorkCounters: Equatable, Sendable {
   public var lifetimeAnchorWalked: Int?
   public var lifetimeAnchorReplace: Int?
   public var lifetimeAnchorReplaceNoop: Int?
+  public var validationMeasurementNodes: Int?
+  public var validationPlacementNodes: Int?
+  public var validationEnvironmentSnapshots: Int?
+  public var validationEnvironmentSharedStorage: Int?
+  public var validationEnvironmentValues: Int?
+  public var validationIdentityNodes: Int?
+  public var validationMeasuredRestamps: Int?
+  public var validationAllocationRestamps: Int?
+  public var validationPlacedRestamps: Int?
+  public var validationMeasuredEqualityNodes: Int?
+  public var validationViewportNodes: Int?
 
   public init(
     resolvedComputed: Int? = nil,
@@ -41,7 +52,18 @@ public struct PerfFrameWorkCounters: Equatable, Sendable {
     customPlacementChildMeasureRequests: Int? = nil,
     lifetimeAnchorWalked: Int? = nil,
     lifetimeAnchorReplace: Int? = nil,
-    lifetimeAnchorReplaceNoop: Int? = nil
+    lifetimeAnchorReplaceNoop: Int? = nil,
+    validationMeasurementNodes: Int? = nil,
+    validationPlacementNodes: Int? = nil,
+    validationEnvironmentSnapshots: Int? = nil,
+    validationEnvironmentSharedStorage: Int? = nil,
+    validationEnvironmentValues: Int? = nil,
+    validationIdentityNodes: Int? = nil,
+    validationMeasuredRestamps: Int? = nil,
+    validationAllocationRestamps: Int? = nil,
+    validationPlacedRestamps: Int? = nil,
+    validationMeasuredEqualityNodes: Int? = nil,
+    validationViewportNodes: Int? = nil
   ) {
     self.resolvedComputed = resolvedComputed
     self.resolvedReused = resolvedReused
@@ -57,6 +79,17 @@ public struct PerfFrameWorkCounters: Equatable, Sendable {
     self.lifetimeAnchorWalked = lifetimeAnchorWalked
     self.lifetimeAnchorReplace = lifetimeAnchorReplace
     self.lifetimeAnchorReplaceNoop = lifetimeAnchorReplaceNoop
+    self.validationMeasurementNodes = validationMeasurementNodes
+    self.validationPlacementNodes = validationPlacementNodes
+    self.validationEnvironmentSnapshots = validationEnvironmentSnapshots
+    self.validationEnvironmentSharedStorage = validationEnvironmentSharedStorage
+    self.validationEnvironmentValues = validationEnvironmentValues
+    self.validationIdentityNodes = validationIdentityNodes
+    self.validationMeasuredRestamps = validationMeasuredRestamps
+    self.validationAllocationRestamps = validationAllocationRestamps
+    self.validationPlacedRestamps = validationPlacedRestamps
+    self.validationMeasuredEqualityNodes = validationMeasuredEqualityNodes
+    self.validationViewportNodes = validationViewportNodes
   }
 }
 
@@ -117,6 +150,17 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
   public var lifetimeAnchorWalked: Int?
   public var lifetimeAnchorReplace: Int?
   public var lifetimeAnchorReplaceNoop: Int?
+  public var validationMeasurementNodes: Int?
+  public var validationPlacementNodes: Int?
+  public var validationEnvironmentSnapshots: Int?
+  public var validationEnvironmentSharedStorage: Int?
+  public var validationEnvironmentValues: Int?
+  public var validationIdentityNodes: Int?
+  public var validationMeasuredRestamps: Int?
+  public var validationAllocationRestamps: Int?
+  public var validationPlacedRestamps: Int?
+  public var validationMeasuredEqualityNodes: Int?
+  public var validationViewportNodes: Int?
 
   public init(
     committedFrames: Int = 0,
@@ -142,7 +186,18 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     customPlacementChildMeasureRequests: Int? = nil,
     lifetimeAnchorWalked: Int? = nil,
     lifetimeAnchorReplace: Int? = nil,
-    lifetimeAnchorReplaceNoop: Int? = nil
+    lifetimeAnchorReplaceNoop: Int? = nil,
+    validationMeasurementNodes: Int? = nil,
+    validationPlacementNodes: Int? = nil,
+    validationEnvironmentSnapshots: Int? = nil,
+    validationEnvironmentSharedStorage: Int? = nil,
+    validationEnvironmentValues: Int? = nil,
+    validationIdentityNodes: Int? = nil,
+    validationMeasuredRestamps: Int? = nil,
+    validationAllocationRestamps: Int? = nil,
+    validationPlacedRestamps: Int? = nil,
+    validationMeasuredEqualityNodes: Int? = nil,
+    validationViewportNodes: Int? = nil
   ) {
     self.committedFrames = committedFrames
     self.answeredInputs = answeredInputs
@@ -168,6 +223,17 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     self.lifetimeAnchorWalked = lifetimeAnchorWalked
     self.lifetimeAnchorReplace = lifetimeAnchorReplace
     self.lifetimeAnchorReplaceNoop = lifetimeAnchorReplaceNoop
+    self.validationMeasurementNodes = validationMeasurementNodes
+    self.validationPlacementNodes = validationPlacementNodes
+    self.validationEnvironmentSnapshots = validationEnvironmentSnapshots
+    self.validationEnvironmentSharedStorage = validationEnvironmentSharedStorage
+    self.validationEnvironmentValues = validationEnvironmentValues
+    self.validationIdentityNodes = validationIdentityNodes
+    self.validationMeasuredRestamps = validationMeasuredRestamps
+    self.validationAllocationRestamps = validationAllocationRestamps
+    self.validationPlacedRestamps = validationPlacedRestamps
+    self.validationMeasuredEqualityNodes = validationMeasuredEqualityNodes
+    self.validationViewportNodes = validationViewportNodes
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -195,6 +261,17 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     case lifetimeAnchorWalked = "lifetime_anchor_walked"
     case lifetimeAnchorReplace = "lifetime_anchor_replace"
     case lifetimeAnchorReplaceNoop = "lifetime_anchor_replace_noop"
+    case validationMeasurementNodes = "validation_measurement_nodes"
+    case validationPlacementNodes = "validation_placement_nodes"
+    case validationEnvironmentSnapshots = "validation_environment_snapshots"
+    case validationEnvironmentSharedStorage = "validation_environment_shared_storage"
+    case validationEnvironmentValues = "validation_environment_values"
+    case validationIdentityNodes = "validation_identity_nodes"
+    case validationMeasuredRestamps = "validation_measured_restamps"
+    case validationAllocationRestamps = "validation_allocation_restamps"
+    case validationPlacedRestamps = "validation_placed_restamps"
+    case validationMeasuredEqualityNodes = "validation_measured_equality_nodes"
+    case validationViewportNodes = "validation_viewport_nodes"
   }
 }
 
@@ -242,7 +319,25 @@ extension PerfDeterministicCounters {
       lifetimeAnchorReplace: sumIfAnyPresent(
         frames, \.workCounters.lifetimeAnchorReplace),
       lifetimeAnchorReplaceNoop: sumIfAnyPresent(
-        frames, \.workCounters.lifetimeAnchorReplaceNoop)
+        frames, \.workCounters.lifetimeAnchorReplaceNoop),
+      validationMeasurementNodes: sumIfAnyPresent(
+        frames, \.workCounters.validationMeasurementNodes),
+      validationPlacementNodes: sumIfAnyPresent(frames, \.workCounters.validationPlacementNodes),
+      validationEnvironmentSnapshots: sumIfAnyPresent(
+        frames, \.workCounters.validationEnvironmentSnapshots),
+      validationEnvironmentSharedStorage: sumIfAnyPresent(
+        frames, \.workCounters.validationEnvironmentSharedStorage),
+      validationEnvironmentValues: sumIfAnyPresent(
+        frames, \.workCounters.validationEnvironmentValues),
+      validationIdentityNodes: sumIfAnyPresent(frames, \.workCounters.validationIdentityNodes),
+      validationMeasuredRestamps: sumIfAnyPresent(
+        frames, \.workCounters.validationMeasuredRestamps),
+      validationAllocationRestamps: sumIfAnyPresent(
+        frames, \.workCounters.validationAllocationRestamps),
+      validationPlacedRestamps: sumIfAnyPresent(frames, \.workCounters.validationPlacedRestamps),
+      validationMeasuredEqualityNodes: sumIfAnyPresent(
+        frames, \.workCounters.validationMeasuredEqualityNodes),
+      validationViewportNodes: sumIfAnyPresent(frames, \.workCounters.validationViewportNodes)
     )
   }
 
@@ -282,6 +377,17 @@ extension PerfDeterministicCounters {
     append("lifetime_anchor_walked", lifetimeAnchorWalked)
     append("lifetime_anchor_replace", lifetimeAnchorReplace)
     append("lifetime_anchor_replace_noop", lifetimeAnchorReplaceNoop)
+    append("validation_measurement_nodes", validationMeasurementNodes)
+    append("validation_placement_nodes", validationPlacementNodes)
+    append("validation_environment_snapshots", validationEnvironmentSnapshots)
+    append("validation_environment_shared_storage", validationEnvironmentSharedStorage)
+    append("validation_environment_values", validationEnvironmentValues)
+    append("validation_identity_nodes", validationIdentityNodes)
+    append("validation_measured_restamps", validationMeasuredRestamps)
+    append("validation_allocation_restamps", validationAllocationRestamps)
+    append("validation_placed_restamps", validationPlacedRestamps)
+    append("validation_measured_equality_nodes", validationMeasuredEqualityNodes)
+    append("validation_viewport_nodes", validationViewportNodes)
     return entries
   }
 

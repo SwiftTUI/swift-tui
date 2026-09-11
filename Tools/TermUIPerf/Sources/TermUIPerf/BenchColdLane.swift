@@ -188,7 +188,21 @@ enum BenchColdLane {
       customPlacementChildMeasureRequests: branching.customPlacementChildMeasureRequests,
       lifetimeAnchorWalked: work.lifetimeAnchorCounters.nodesWalked,
       lifetimeAnchorReplace: work.lifetimeAnchorCounters.replaceCalls,
-      lifetimeAnchorReplaceNoop: work.lifetimeAnchorCounters.replaceNoops
+      lifetimeAnchorReplaceNoop: work.lifetimeAnchorCounters.replaceNoops,
+      validationMeasurementNodes: work.retainedValidationCounters?.validationMeasurementNodes,
+      validationPlacementNodes: work.retainedValidationCounters?.validationPlacementNodes,
+      validationEnvironmentSnapshots: work.retainedValidationCounters?
+        .validationEnvironmentSnapshots,
+      validationEnvironmentSharedStorage: work.retainedValidationCounters?
+        .validationEnvironmentSharedStorage,
+      validationEnvironmentValues: work.retainedValidationCounters?.validationEnvironmentValues,
+      validationIdentityNodes: work.retainedValidationCounters?.validationIdentityNodes,
+      validationMeasuredRestamps: work.retainedValidationCounters?.validationMeasuredRestamps,
+      validationAllocationRestamps: work.retainedValidationCounters?.validationAllocationRestamps,
+      validationPlacedRestamps: work.retainedValidationCounters?.validationPlacedRestamps,
+      validationMeasuredEqualityNodes: work.retainedValidationCounters?
+        .validationMeasuredEqualityNodes,
+      validationViewportNodes: work.retainedValidationCounters?.validationViewportNodes
     )
   }
 

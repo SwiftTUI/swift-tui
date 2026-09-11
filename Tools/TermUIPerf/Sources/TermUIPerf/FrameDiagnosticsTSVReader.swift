@@ -187,7 +187,22 @@ enum PerfFrameDiagnosticsTSVReader {
           lifetimeAnchorReplace: optionalInt(
             "lifetime_anchor_replace", fields, column),
           lifetimeAnchorReplaceNoop: optionalInt(
-            "lifetime_anchor_replace_noop", fields, column)
+            "lifetime_anchor_replace_noop", fields, column),
+          validationMeasurementNodes: optionalInt("validation_measurement_nodes", fields, column),
+          validationPlacementNodes: optionalInt("validation_placement_nodes", fields, column),
+          validationEnvironmentSnapshots: optionalInt(
+            "validation_environment_snapshots", fields, column),
+          validationEnvironmentSharedStorage: optionalInt(
+            "validation_environment_shared_storage", fields, column),
+          validationEnvironmentValues: optionalInt("validation_environment_values", fields, column),
+          validationIdentityNodes: optionalInt("validation_identity_nodes", fields, column),
+          validationMeasuredRestamps: optionalInt("validation_measured_restamps", fields, column),
+          validationAllocationRestamps: optionalInt(
+            "validation_allocation_restamps", fields, column),
+          validationPlacedRestamps: optionalInt("validation_placed_restamps", fields, column),
+          validationMeasuredEqualityNodes: optionalInt(
+            "validation_measured_equality_nodes", fields, column),
+          validationViewportNodes: optionalInt("validation_viewport_nodes", fields, column)
         ),
         inputToCommitFirstMs: double("input_to_commit_first_ms", fields, column),
         inputToCommitLastMs: double("input_to_commit_last_ms", fields, column),

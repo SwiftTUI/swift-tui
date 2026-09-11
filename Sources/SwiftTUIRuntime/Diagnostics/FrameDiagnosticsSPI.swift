@@ -1,5 +1,40 @@
 import SwiftTUICore
 
+/// Optional retained-validation census. Nil means collection was disabled.
+@_spi(Runners) public struct RetainedValidationCounterSnapshot: Equatable, Sendable {
+  public let validationMeasurementNodes: Int
+  public let validationPlacementNodes: Int
+  public let validationEnvironmentSnapshots: Int
+  public let validationEnvironmentSharedStorage: Int
+  public let validationEnvironmentValues: Int
+  public let validationIdentityNodes: Int
+  public let validationMeasuredRestamps: Int
+  public let validationAllocationRestamps: Int
+  public let validationPlacedRestamps: Int
+  public let validationMeasuredEqualityNodes: Int
+  public let validationViewportNodes: Int
+}
+
+extension FrameDiagnosticWork {
+  @_spi(Runners) public var retainedValidationCounters: RetainedValidationCounterSnapshot? {
+    retainedValidation.map { work in
+      RetainedValidationCounterSnapshot(
+        validationMeasurementNodes: work.comparison.measurementNodes,
+        validationPlacementNodes: work.comparison.placementNodes,
+        validationEnvironmentSnapshots: work.comparison.environmentSnapshots,
+        validationEnvironmentSharedStorage: work.comparison.environmentSharedStorage,
+        validationEnvironmentValues: work.comparison.environmentValues,
+        validationIdentityNodes: work.identityNodesChecked,
+        validationMeasuredRestamps: work.measuredNodesRestamped,
+        validationAllocationRestamps: work.allocationIdentitiesRestamped,
+        validationPlacedRestamps: work.placedNodesRestamped,
+        validationMeasuredEqualityNodes: work.measuredEqualityNodes,
+        validationViewportNodes: work.viewportComparisonNodes
+      )
+    }
+  }
+}
+
 /// SPI snapshot of the plan-2026-08-11-004 branching-factor counters for
 /// external harnesses: TermUIPerf's cold benchmark lane (plan 2026-08-11-005)
 /// reads its work census off the public one-shot `RenderSnapshot`, and these

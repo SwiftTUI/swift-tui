@@ -356,7 +356,9 @@ struct LatePreferenceReconciliationStage {
         retainedLayout: input.retained.retainedLayout,
         invalidatedIdentities: input.layoutPassContext.invalidatedIdentities,
         customLayoutCompatibilityDepthLimit:
-          LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit
+          LayoutPassContext.mainActorCustomLayoutCompatibilityDepthLimit,
+        retainedValidationRecorder:
+          input.layoutPassContext.retainedValidationRecorder == nil ? nil : .init()
       ),
       graphAnimationInputToken: input.graphAnimationInputToken,
       evaluatedNodeIDs: input.evaluatedNodeIDs,

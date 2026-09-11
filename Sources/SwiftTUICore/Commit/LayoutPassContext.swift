@@ -165,6 +165,7 @@ package final class LayoutPassContext: Sendable {
   /// consume the production pass's realizations instead of realizing anew.
   private let allowsLiveLayoutRealization: Bool
   private let state: Mutex<MutableState>
+  package let retainedValidationRecorder: RetainedValidationRecorder?
 
   package init(
     purpose: LayoutPassPurpose = .main,
@@ -174,8 +175,10 @@ package final class LayoutPassContext: Sendable {
     scrollViewportContext: ScrollViewportContext? = nil,
     customLayoutCompatibilityDepthLimit: Int = defaultCustomLayoutCompatibilityDepthLimit,
     measurementSeedSession: RetainedLayoutSession? = nil,
-    seededLayoutRealizations: [LayoutDependentContentRealization]? = nil
+    seededLayoutRealizations: [LayoutDependentContentRealization]? = nil,
+    retainedValidationRecorder: RetainedValidationRecorder? = nil
   ) {
+    self.retainedValidationRecorder = retainedValidationRecorder
     self.purpose = purpose
     self.customLayoutCacheStore = customLayoutCacheStore
     self.retainedLayout = retainedLayout
@@ -282,6 +285,7 @@ package final class LayoutPassContext: Sendable {
   package var workMetrics: LayoutWorkMetrics {
     state.withLock {
       var metrics = $0.workMetrics
+      metrics.retainedValidation = retainedValidationRecorder?.snapshot
       metrics.geometryResolutionDiagnostics = $0.placedFrameTable.geometryResolutionDiagnostics
       return metrics
     }

@@ -62,7 +62,8 @@ package final class MeasurementCache: Sendable {
   /// structural inputs still match.
   package func lookup(
     resolved: ResolvedNode,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    recorder: RetainedValidationRecorder? = nil
   ) -> MeasuredNode? {
     storage.withLock { storage in
       storage.lookups += 1
@@ -84,7 +85,8 @@ package final class MeasurementCache: Sendable {
       // Verify equivalence before touching LRU bookkeeping.  If the cached
       // entry is stale we evict it here so subsequent lookups don't keep
       // re-fetching and re-rejecting the same mismatching cache line.
-      let equivalence = cached.resolved.measurementEquivalence(to: resolved)
+      let equivalence = cached.resolved.measurementEquivalence(
+        to: resolved, recorder: recorder?.comparisons)
       guard equivalence.isCompatible else {
         nodeStorage.entries.removeValue(forKey: proposal)
         storage.entryCount -= 1
@@ -110,7 +112,7 @@ package final class MeasurementCache: Sendable {
       compactOrderIfNeeded(in: &nodeStorage)
       storage.entriesByNodeID[viewNodeID] = nodeStorage
       storage.hits += 1
-      return cached.node.restampingIdentities(from: resolved)
+      return cached.node.restampingIdentities(from: resolved, recorder: recorder)
     }
   }
 

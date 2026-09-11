@@ -132,6 +132,7 @@ package enum FrameRecordDerivation {
       elidedCommitDuration: nil
     )
     record.layoutBranching = diag.work.layoutBranching
+    record.retainedValidation = diag.work.retainedValidation
     record.lifetimeAnchorNodesWalked = diag.work.lifetimeAnchorTallies.nodesWalked
     record.lifetimeAnchorReplaceCalls = diag.work.lifetimeAnchorTallies.replaceCalls
     record.lifetimeAnchorReplaceNoops = diag.work.lifetimeAnchorTallies.replaceNoops

@@ -213,6 +213,17 @@ package enum FrameDiagnosticsTSVFormatting {
     "lifetime_anchor_walked",
     "lifetime_anchor_replace",
     "lifetime_anchor_replace_noop",
+    "validation_measurement_nodes",
+    "validation_placement_nodes",
+    "validation_environment_snapshots",
+    "validation_environment_shared_storage",
+    "validation_environment_values",
+    "validation_identity_nodes",
+    "validation_measured_restamps",
+    "validation_allocation_restamps",
+    "validation_placed_restamps",
+    "validation_measured_equality_nodes",
+    "validation_viewport_nodes",
   ]
 
   package static func fields(
@@ -445,6 +456,17 @@ package enum FrameDiagnosticsTSVFormatting {
       String(record.lifetimeAnchorNodesWalked),
       String(record.lifetimeAnchorReplaceCalls),
       String(record.lifetimeAnchorReplaceNoops),
+      record.retainedValidation.map { String($0.comparison.measurementNodes) } ?? "-",
+      record.retainedValidation.map { String($0.comparison.placementNodes) } ?? "-",
+      record.retainedValidation.map { String($0.comparison.environmentSnapshots) } ?? "-",
+      record.retainedValidation.map { String($0.comparison.environmentSharedStorage) } ?? "-",
+      record.retainedValidation.map { String($0.comparison.environmentValues) } ?? "-",
+      record.retainedValidation.map { String($0.identityNodesChecked) } ?? "-",
+      record.retainedValidation.map { String($0.measuredNodesRestamped) } ?? "-",
+      record.retainedValidation.map { String($0.allocationIdentitiesRestamped) } ?? "-",
+      record.retainedValidation.map { String($0.placedNodesRestamped) } ?? "-",
+      record.retainedValidation.map { String($0.measuredEqualityNodes) } ?? "-",
+      record.retainedValidation.map { String($0.viewportComparisonNodes) } ?? "-",
     ]
   }
 
