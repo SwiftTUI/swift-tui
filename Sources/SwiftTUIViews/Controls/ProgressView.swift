@@ -128,7 +128,8 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     }
     let configuration = ProgressViewStyleConfiguration(
       fractionCompleted: isIndeterminate ? nil : (fraction.isFinite ? fraction : 0),
-      label: isEmptyView(label) ? nil : .init(authoringContext: authoringScope) { label },
+      label: isEmptyView(label)
+        ? nil : .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       currentValueLabel: isEmptyView(currentValueLabel)
         ? nil : .init(authoringContext: authoringScope) { currentValueLabel },
       barWidth: max(1, barWidth),
@@ -144,6 +145,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
+      semanticMetadata: SemanticMetadata(accessibilityRole: .status).namingControl(with: label),
       lifecycleMetadata: .init(tasks: tasks)
     )
   }

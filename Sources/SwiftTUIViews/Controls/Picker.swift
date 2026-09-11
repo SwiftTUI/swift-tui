@@ -190,7 +190,7 @@ extension Picker {
 
     var configuration = PickerStyleConfiguration(
       controlIdentity: context.identity,
-      label: .init(authoringContext: authoringScope) { label },
+      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       options: options.map { .init(label: $0.label) },
       selectedIndex: selectedIndex,
       isFocused: isFocused,
@@ -216,7 +216,7 @@ extension Picker {
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         accessibilityRole: .picker
-      )
+      ).namingControl(with: label)
     )
     if !resolvedOptions.runtimeIssues.isEmpty {
       node.preferenceValues.merge(

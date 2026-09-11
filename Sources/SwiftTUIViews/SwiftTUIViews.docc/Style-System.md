@@ -267,6 +267,20 @@ animation cadence. It may not change the primitive's accessibility role, focus
 stop, command scope, binding ownership, dismissal policy, or event precedence.
 Those stay with the primitive for every built-in and custom style.
 
+Controls derive their accessible names from the authored label slot, before
+style chrome, shortcut hints, and displayed control values are added. A composed
+label contributes its text in authored order; `Label` contributes its title,
+not its icon. Hidden label content is excluded, and explicit
+`accessibilityLabel(_:)` values replace inferred text, including empty overrides.
+Repeating the label slot in a style does not repeat the control's name.
+
+A literal `Text` title remains available when the style omits the slot, including
+an icon-only `Label`. If a custom style omits a generic label whose name requires
+evaluating its body, supply `accessibilityLabel(_:)` on the control. Accessibility
+extraction does not instantiate omitted bodies or run a second copy of their
+state, tasks, or handlers. These names are part of the shared semantic snapshot
+used by terminal, browser, and native hosts.
+
 ## Diagnostics
 
 Nothing in the style system traps on a bad style. Each problem reports a

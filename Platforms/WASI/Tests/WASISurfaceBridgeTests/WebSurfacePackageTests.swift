@@ -6,6 +6,38 @@ import Testing
 
 @Suite
 struct WebSurfacePackageTests {
+  @MainActor
+  @Test("rendered counter button carries its authored name into the browser wire frame")
+  func renderedCounterAccessibleName() throws {
+    let snapshot = DefaultRenderer().render(
+      VStack {
+        Button("Increment") {}.systemHint("Ctrl+I")
+        Button {
+        } label: {
+          HStack {
+            Text("Reset")
+            Text("decoration").accessibilityHidden()
+            Text("counter")
+          }
+        }
+        Button("Decrement") {}.accessibilityLabel("Subtract one")
+      },
+      context: ResolveContext(identity: Identity(components: ["counter"])),
+      proposal: .init(width: 40, height: 10)
+    )
+    let frame = try decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        SemanticHostFrame(
+          sequence: 1, raster: snapshot.rasterSurface, semantics: snapshot.semanticSnapshot,
+          focusedIdentity: nil)
+      ))
+    let tree = try #require(frame["accessibilityTree"] as? [[String: Any]])
+    let buttons = tree.filter { $0["role"] as? String == "button" }
+    #expect(tree.allSatisfy { $0["hidden"] as? Bool != true })
+    #expect(
+      buttons.map { $0["label"] as? String } == ["Increment", "Reset counter", "Subtract one"])
+  }
+
   @Test("package encoder keeps raster-only frames on web-surface version 1")
   func packageEncoderKeepsRasterOnlyFramesOnVersionOne() throws {
     let frame = try decodedSurfaceFrame(WebSurfaceFrameEncoder.encode(Self.basicSurface()))

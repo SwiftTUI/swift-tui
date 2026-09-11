@@ -113,12 +113,12 @@ extension Button {
       label: .init(authoringContext: authoringScope) {
         if let hint = resolvedHint {
           HStack(spacing: 0) {
-            originalLabel
+            originalLabel.authoredAccessibilityLabel()
             Spacer(minLength: 1)
             Text(hint).foregroundStyle(.muted)
           }
         } else {
-          originalLabel
+          originalLabel.authoredAccessibilityLabel()
         }
       },
       role: role,
@@ -144,7 +144,7 @@ extension Button {
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
         accessibilityRole: .button
-      )
+      ).namingControl(with: label)
     )
   }
 }

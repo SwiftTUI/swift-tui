@@ -19,8 +19,13 @@ controls and for visual-only content.
 Built-in controls publish their own roles: `Button`, `Toggle`, `TextField`,
 `SecureField`, `TextEditor`, `Slider`, `Stepper`, `Picker`, `Link`, `Menu`,
 and `DisclosureGroup` each attach the matching `AccessibilityRole` and
-participate in focus. `TextField` and `SecureField` also publish their title
-as the accessible label. A plain form needs no annotation at all:
+participate in focus. Styled controls publish their authored title or composed
+label as their accessible name, excluding style chrome and displayed values.
+`TextField` and `SecureField` retain their titles when showing entered text.
+`ProgressView` publishes its label with the status role. Explicit
+`accessibilityLabel(_:)` overrides take precedence. See <doc:Style-System> for
+the naming contract when a custom style omits its label. A plain form needs no
+annotation at all:
 
 ```swift
 VStack(alignment: .leading, spacing: 1) {

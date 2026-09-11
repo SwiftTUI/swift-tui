@@ -45,7 +45,7 @@ extension Label {
     in context: ResolveContext
   ) -> ResolvedNode {
     let configuration = LabelStyleConfiguration(
-      title: .init(authoringContext: authoringScope) { title },
+      title: .init(authoringContext: authoringScope) { title.authoredAccessibilityLabel() },
       icon: .init(authoringContext: authoringScope) { icon },
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
@@ -56,7 +56,8 @@ extension Label {
       kind: .view("Label"),
       children: [child],
       environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction
+      transactionSnapshot: context.transaction,
+      semanticMetadata: SemanticMetadata().namingControl(with: title)
     )
   }
 }

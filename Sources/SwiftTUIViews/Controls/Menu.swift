@@ -54,6 +54,7 @@ public struct Menu<Label: View, Content: View>: PrimitiveView, ResolvableView {
       MenuStateHost(menu: self, controlIdentity: context.identity),
       in: context.child(component: .named("MenuState")))
     var metadata = focusableControlMetadata(focusInteractions: .activate, accessibilityRole: .menu)
+      .namingControl(with: label)
     // The open menu remains a keyboard dismissal target after disablement.
     // Its commands and pointer routes still obey the disabled environment.
     metadata.allowsFocusWhenDisabled = menuIsExpanded(
@@ -157,7 +158,7 @@ extension Menu {
     }
 
     var configuration = MenuStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label },
+      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       content: .init(authoringContext: authoringScope) { content },
       isPresented: enabledStyleBinding(expansionBinding, isEnabled: isEnabled),
       isEnabled: isEnabled, isFocused: isFocused, showsFocusEffect: showsFocusEffect,

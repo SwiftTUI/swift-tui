@@ -185,7 +185,7 @@ extension Stepper {
 
     let formatted = formattedControlValue(currentValue, bounds: bounds, step: step)
     var configuration = StepperStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label },
+      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       valueLabel: .init(authoringContext: authoringScope) { Text(formatted) },
       canDecrement: canDecrement,
       canIncrement: canIncrement,
@@ -207,7 +207,7 @@ extension Stepper {
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         accessibilityRole: .stepper
-      )
+      ).namingControl(with: label)
     )
   }
 }

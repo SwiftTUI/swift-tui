@@ -171,7 +171,7 @@ extension Slider {
 
     let formatted = formattedControlValue(currentValue, bounds: bounds, step: trackStep)
     var configuration = SliderStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label },
+      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       valueLabel: .init(authoringContext: authoringScope) { Text(formatted) },
       fractionCompleted: sliderFraction(value: currentValue, bounds: bounds),
       trackCellCount: 8,
@@ -195,7 +195,7 @@ extension Slider {
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         accessibilityRole: .slider
-      )
+      ).namingControl(with: label)
     )
   }
 }

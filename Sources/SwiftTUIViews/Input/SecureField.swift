@@ -98,7 +98,7 @@ extension SecureField {
         caretAnchor: presentation.caretAnchor
       ),
       isShowingPrompt: presentation.isShowingPrompt,
-      label: .init(authoringContext: authoringScope) { label },
+      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       showsLabel: showsLabel,
       chrome: chrome,
       placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
@@ -121,7 +121,8 @@ extension SecureField {
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         accessibilityRole: .secureField
-      ).merging(SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
+      ).namingControl(with: label).merging(
+        SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
     )
   }
 }

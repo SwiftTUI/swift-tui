@@ -28,6 +28,33 @@ private enum AccessibilityVisualCandidateSummary: Sendable {
   }
 }
 
+private struct AuthoredAccessibilityLabelSummary {
+  struct Source {
+    var continuesPrevious: Bool
+    var text: [String]
+    var acceptsContinuation = true
+  }
+
+  var text: [String] = []
+  var source: Source?
+
+  mutating func merge(_ other: Self) {
+    text.append(contentsOf: other.text)
+    if source?.acceptsContinuation == true, let otherSource = other.source,
+      otherSource.continuesPrevious
+    {
+      source?.text.append(contentsOf: otherSource.text)
+      source?.acceptsContinuation = otherSource.acceptsContinuation
+    } else if source != nil, let otherSource = other.source, !otherSource.continuesPrevious {
+      // A repeated placement starts another slot. Ignore that entire slot,
+      // including its later roots, rather than appending its continuation.
+      source?.acceptsContinuation = false
+    } else {
+      source = source ?? other.source
+    }
+  }
+}
+
 extension SemanticExtractor {
   func accessibilityNodesAndVisualLabelRoutes(
     from root: PlacedNode,
@@ -37,19 +64,50 @@ extension SemanticExtractor {
     let textInputCursorAnchors = textInputAccessibilityCursorAnchors(from: root)
     var visualLabelRoutes = AccessibilityVisualLabelRoutes()
     var visualCandidateSummaries: [Int: AccessibilityVisualCandidateSummary] = [:]
+    var labelSummaries: [Int: AuthoredAccessibilityLabelSummary] = [:]
+    var authoredLabels: [Int: String] = [:]
     var emittedSubtrees: Set<Identity> = []
-    var hiddenDescendantSubtrees: Set<Identity> = []
     var nextTraversalOrdinal = 0
     var stack:
       [(
         node: PlacedNode,
         traversalOrdinal: Int?,
-        parentTraversalOrdinal: Int?
-      )] = [(root, nil, nil)]
+        parentTraversalOrdinal: Int?,
+        collectingLabel: Bool
+      )] = [(root, nil, nil, false)]
 
     while let frame = stack.popLast() {
       let node = frame.node
       if let traversalOrdinal = frame.traversalOrdinal {
+        var labelSummary =
+          labelSummaries.removeValue(forKey: traversalOrdinal)
+          ?? AuthoredAccessibilityLabelSummary()
+        let metadata = node.semanticMetadata
+        if let explicit = metadata.accessibilityLabel {
+          labelSummary.text = explicit.isEmpty ? [] : [explicit]
+        } else if metadata.usesAuthoredAccessibilityLabel {
+          let label =
+            labelSummary.source?.text.joined(separator: " ") ?? metadata.accessibilityTitle
+          if let label { authoredLabels[traversalOrdinal] = label }
+          labelSummary.text = label.map { $0.isEmpty ? [] : [$0] } ?? []
+        } else if frame.collectingLabel,
+          let text = accessibilityTextLabel(from: node.drawPayload)
+        {
+          labelSummary.text.insert(text, at: 0)
+        }
+        // Nested controls and Label own their slots. Their chrome and sources
+        // must not escape to an enclosing control's name.
+        if metadata.usesAuthoredAccessibilityLabel || metadata.accessibilityLabel != nil {
+          labelSummary.source = nil
+        }
+        if let source = metadata.accessibilityLabelSource {
+          labelSummary.source = .init(
+            continuesPrevious: source == .continuation, text: labelSummary.text)
+        }
+        if !frame.collectingLabel { labelSummary.text = [] }
+        if let parent = frame.parentTraversalOrdinal {
+          labelSummaries[parent, default: .init()].merge(labelSummary)
+        }
         var visualCandidateSummary: AccessibilityVisualCandidateSummary = .none
         if node.semanticMetadata.accessibilityRole == .image,
           accessibilityVisualContentIsUnlabeled(node)
@@ -81,18 +139,14 @@ extension SemanticExtractor {
           )
         }
 
-        let childSummary = accessibilityChildSummary(
+        let hasEmittedChild = accessibilityHasEmittedChild(
           for: node,
-          emittedSubtrees: emittedSubtrees,
-          hiddenDescendantSubtrees: hiddenDescendantSubtrees
+          emittedSubtrees: emittedSubtrees
         )
         if accessibilitySelfIsRelevant(node, focusIdentities: focusIdentities)
-          || childSummary.hasEmittedChild
+          || hasEmittedChild
         {
           emittedSubtrees.insert(node.identity)
-        }
-        if childSummary.hasHiddenDescendant {
-          hiddenDescendantSubtrees.insert(node.identity)
         }
       } else {
         let traversalOrdinal = nextTraversalOrdinal
@@ -101,9 +155,11 @@ extension SemanticExtractor {
           continue
         }
 
-        stack.append((node, traversalOrdinal, frame.parentTraversalOrdinal))
+        let collectingLabel =
+          frame.collectingLabel || node.semanticMetadata.accessibilityLabelSource != nil
+        stack.append((node, traversalOrdinal, frame.parentTraversalOrdinal, collectingLabel))
         for child in node.children.reversed() {
-          stack.append((child, nil, traversalOrdinal))
+          stack.append((child, nil, traversalOrdinal, collectingLabel))
         }
       }
     }
@@ -122,20 +178,19 @@ extension SemanticExtractor {
       let emits = emittedSubtrees.contains(node.identity)
       var childParentIdentity = frame.emittedParentIdentity
       if emits {
-        let childSummary = accessibilityChildSummary(
+        let hasEmittedChild = accessibilityHasEmittedChild(
           for: node,
-          emittedSubtrees: emittedSubtrees,
-          hiddenDescendantSubtrees: hiddenDescendantSubtrees
+          emittedSubtrees: emittedSubtrees
         )
         if let accessibilityNode = accessibilityNode(
           for: node,
           parentIdentity: frame.emittedParentIdentity,
-          hasEmittedChild: childSummary.hasEmittedChild,
-          hasHiddenDescendant: childSummary.hasHiddenDescendant,
+          hasEmittedChild: hasEmittedChild,
           focusIdentities: focusIdentities,
           textInputCursorAnchors: textInputCursorAnchors,
           inferredVisualRole:
-            visualLabelRoutes.inferredRolesByTraversalOrdinal[traversalOrdinal]
+            visualLabelRoutes.inferredRolesByTraversalOrdinal[traversalOrdinal],
+          authoredLabel: authoredLabels[traversalOrdinal]
         ) {
           nodes.append(accessibilityNode)
           childParentIdentity = node.identity
@@ -200,26 +255,11 @@ extension SemanticExtractor {
     return identities
   }
 
-  private func accessibilityChildSummary(
+  private func accessibilityHasEmittedChild(
     for node: PlacedNode,
-    emittedSubtrees: Set<Identity>,
-    hiddenDescendantSubtrees: Set<Identity>
-  ) -> (hasEmittedChild: Bool, hasHiddenDescendant: Bool) {
-    var hasEmittedChild = false
-    var hasHiddenDescendant = false
-
-    for child in node.children where !child.isTransient {
-      if emittedSubtrees.contains(child.identity) {
-        hasEmittedChild = true
-      }
-      if child.semanticMetadata.accessibilityHidden
-        || hiddenDescendantSubtrees.contains(child.identity)
-      {
-        hasHiddenDescendant = true
-      }
-    }
-
-    return (hasEmittedChild, hasHiddenDescendant)
+    emittedSubtrees: Set<Identity>
+  ) -> Bool {
+    node.children.contains { !$0.isTransient && emittedSubtrees.contains($0.identity) }
   }
 
   private func accessibilitySelfIsRelevant(
@@ -244,10 +284,10 @@ extension SemanticExtractor {
     for node: PlacedNode,
     parentIdentity: Identity?,
     hasEmittedChild: Bool,
-    hasHiddenDescendant: Bool,
     focusIdentities: Set<Identity>,
     textInputCursorAnchors: [Identity: CellPoint],
-    inferredVisualRole: AccessibilityRole?
+    inferredVisualRole: AccessibilityRole?,
+    authoredLabel: String?
   ) -> AccessibilityNode? {
     let selfIsRelevant = accessibilitySelfIsRelevant(
       node,
@@ -275,9 +315,12 @@ extension SemanticExtractor {
       parentIdentity: parentIdentity?.strippingEntityOccurrences,
       rect: semanticBounds(for: node),
       role: role,
-      label: accessibilityLabel(for: node, role: role),
+      label: node.semanticMetadata.accessibilityLabel ?? authoredLabel
+        ?? accessibilityLabel(for: node, role: role),
       hint: node.semanticMetadata.accessibilityHint,
-      hidden: hasHiddenDescendant,
+      // Hidden subtrees were already pruned. A hidden label decoration must
+      // not hide its visible control (or ancestors) in browser/native hosts.
+      hidden: false,
       liveRegion: node.semanticMetadata.accessibilityLiveRegion,
       cursorAnchor: textInputCursorAnchors[node.identity] ?? accessibilityCursorAnchor(for: node)
     )

@@ -88,7 +88,7 @@ extension FrameworkStressAccessibilityFocusTests {
       accessibilityFocusNodes(in: harness).last { $0.role == .button }
     )
     #expect(target.role == .button)
-    #expect(target.label == nil)
+    #expect(target.label == "Visible target 5")
     #expect(!accessibilityFocusNodes(in: harness).contains { $0.label == "Explicit target 5" })
   }
 }

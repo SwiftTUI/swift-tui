@@ -59,7 +59,7 @@ extension Toggle {
     }
 
     let configuration = ToggleStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label },
+      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       isOn: enabledStyleBinding(binding, isEnabled: isEnabled),
       isMixed: false,
       isEnabled: isEnabled,
@@ -81,7 +81,7 @@ extension Toggle {
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
         accessibilityRole: .toggle
-      )
+      ).namingControl(with: label)
     )
   }
 
@@ -185,7 +185,7 @@ extension TextField {
         caretAnchor: presentation.caretAnchor
       ),
       isShowingPrompt: presentation.isShowingPrompt,
-      label: .init(authoringContext: authoringScope) { label },
+      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       showsLabel: showsLabel,
       chrome: chrome,
       placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
@@ -208,7 +208,8 @@ extension TextField {
       semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         accessibilityRole: .textField
-      ).merging(SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
+      ).namingControl(with: label).merging(
+        SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
     )
   }
 }
@@ -294,7 +295,7 @@ extension DisclosureGroup {
     }
 
     var configuration = DisclosureGroupStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label },
+      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       content: .init(authoringContext: authoringScope) {
         if expanded { content }
       },
@@ -313,7 +314,7 @@ extension DisclosureGroup {
     var metadata = focusableControlMetadata(
       focusInteractions: .activate,
       accessibilityRole: .disclosureGroup
-    )
+    ).namingControl(with: label)
     // Keep geometric evidence that the keyboard action has no pointer area of
     // its own. Merely omitting the region permits the runtime's
     // ancestor-action fallback, which collapsed the group from a press on its
