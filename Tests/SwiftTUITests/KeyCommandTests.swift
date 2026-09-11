@@ -475,9 +475,10 @@ struct KeyCommandDispatchTests {
     let model = ListSelectionModel()
     let runLoop = makeRunLoop {
       List(selection: Binding(get: { model.selection }, set: { model.selection = $0 })) {
-        ForEach(0..<3) { index in
-          Text("row \(index)").tag(index)
-        }
+        Text("row 0").tag(0)
+        Text("separator")
+        Text("row 1").tag(1)
+        Text("row 2").tag(2)
       }
       .onKeyPress(.arrowDown) { _ in
         model.receivedArrowCount += 1
@@ -491,11 +492,11 @@ struct KeyCommandDispatchTests {
 
     #expect(model.receivedArrowCount == 0)
     #expect(model.selection == 1)
-    #expect(runLoop.focusTracker.currentFocusIdentity?.description.contains("ListRow[1]") == true)
+    #expect(runLoop.focusTracker.currentFocusIdentity?.description.contains("ListRow[2]") == true)
 
     let lastRow = try #require(
       runLoop.focusTracker.focusRegions.first {
-        $0.identity.description.contains("ListRow[2]")
+        $0.identity.description.contains("ListRow[3]")
       }?.identity
     )
     _ = runLoop.focusTracker.setFocus(to: lastRow)

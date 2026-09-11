@@ -325,14 +325,11 @@ extension List {
               return .ignored
             }
 
-            let targetIndex = min(
-              max(rowIndex + delta, rows.startIndex),
-              rows.index(before: rows.endIndex)
-            )
-            guard targetIndex != rowIndex else {
-              return .ignored
+            var targetIndex = rowIndex + delta
+            while rows.indices.contains(targetIndex), rows[targetIndex].tag == nil {
+              targetIndex += delta
             }
-            guard let targetTag = rows[targetIndex].tag else {
+            guard rows.indices.contains(targetIndex), let targetTag = rows[targetIndex].tag else {
               return .ignored
             }
             if !policy.isMultiple {
