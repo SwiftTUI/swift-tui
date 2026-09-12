@@ -283,18 +283,18 @@ struct EquatableBoundaryReuseTests {
 
   /// P2 (eval task #16): the memo diagnostic flags an *inert* opt-in — a view
   /// the author conformed to `Equatable` (expecting memoization) that reads
-  /// `@State`/`@Observable`/focus, so the gate denies it and `.equatable()` is a
-  /// silent no-op. The #1 adoption trap.
-  @Test("memo diagnostic flags an inert Equatable opt-in (reads @State -> never memo-reused)")
+  /// opaque state or focus data, so the gate denies it. Immutable scalar state
+  /// and live observation certificates can now qualify instead.
+  @Test("memo diagnostic flags an inert Equatable opt-in with opaque state reads")
   func inertEquatableOptInIsDiagnosed() {
     struct InertChrome: View, Equatable {
       let tag: Int
-      @State private var counter = 0
+      @State private var counter = [0]
 
       var body: some View {
-        // Reads @State -> records a dependency -> gate denies despite the
-        // Equatable conformance. The `==` is `@State`-blind (compares `tag`).
-        Text("inert:\(tag):\(counter)")
+        // Containers remain uncovered; the replacement witness certifies
+        // known scalar semantics only. The author compares only `tag`.
+        Text("inert:\(tag):\(counter[0])")
       }
 
       nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
@@ -331,7 +331,7 @@ struct EquatableBoundaryReuseTests {
     _ = renderer.render(Root(dynamic: "v1"), context: .init(identity: rootIdentity))
     // Frame 2 invalidates the root, reaching InertChrome (a descendant). Its
     // value is `==` (tag unchanged) and it passes the reuse guards, but it reads
-    // @State -> the production gate denies it. The oracle records it as inert.
+    // opaque State -> the gate denies it. The oracle records it as inert.
     _ = renderer.render(
       Root(dynamic: "v2"),
       context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity])
