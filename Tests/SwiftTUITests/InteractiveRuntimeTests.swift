@@ -5223,7 +5223,7 @@ private func interactiveProbeTextNode(
   )
 }
 
-private struct RunLoopInvalidationProbeLeaf: PrimitiveView, ResolvableView {
+private struct RunLoopInvalidationProbeLeaf: PrimitiveView, IterativeResolvableView {
   let state: Int
   let recorder: RunLoopInvalidationRecorder
 
@@ -5241,11 +5241,11 @@ private struct RunLoopInvalidationProbeLeaf: PrimitiveView, ResolvableView {
   }
 }
 
-private struct RunLoopInvalidationProbeRoot: PrimitiveView, ResolvableView {
+private struct RunLoopInvalidationProbeRoot: PrimitiveView, IterativeResolvableView {
   let state: Int
   let recorder: RunLoopInvalidationRecorder
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     context.recordResolvedComputation()
     recorder.record(
       RunLoopInvalidationRecord(
@@ -5257,22 +5257,24 @@ private struct RunLoopInvalidationProbeRoot: PrimitiveView, ResolvableView {
       )
     )
 
-    let child = resolveView(
+    return resolveViewWork(
       RunLoopInvalidationProbeLeaf(
         state: state,
         recorder: recorder
       ),
       in: context.indexedChild(kind: .named("ProbeRoot"), index: 0)
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("ProbeRoot"),
-        children: [child],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
-      )
-    ]
+    ).map { child in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("ProbeRoot"),
+          children: [child],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
+        )
+      ]
+
+    }
   }
 }
 
@@ -5303,7 +5305,7 @@ private final class ReusedHandlerRecorder: Sendable {
   }
 }
 
-private struct ReusedHandlerProbe: PrimitiveView, ResolvableView {
+private struct ReusedHandlerProbe: PrimitiveView, IterativeResolvableView {
   let recorder: ReusedHandlerRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -5322,29 +5324,31 @@ private struct ReusedHandlerProbe: PrimitiveView, ResolvableView {
   }
 }
 
-private struct ReusedHandlerRoot: PrimitiveView, ResolvableView {
+private struct ReusedHandlerRoot: PrimitiveView, IterativeResolvableView {
   let recorder: ReusedHandlerRecorder
   let dirtyLabel: String
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     context.recordResolvedComputation()
-    let interactiveChild = resolveView(
+    return resolveViewWork(
       ReusedHandlerProbe(recorder: recorder),
       in: context.indexedChild(kind: .named("Harness"), index: 0)
-    )
-    let dirtyChild = interactiveProbeTextNode(
-      dirtyLabel,
-      in: context.indexedChild(kind: .named("Harness"), index: 1)
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Harness"),
-        children: [interactiveChild, dirtyChild],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
+    ).map { interactiveChild in
+      let dirtyChild = interactiveProbeTextNode(
+        dirtyLabel,
+        in: context.indexedChild(kind: .named("Harness"), index: 1)
       )
-    ]
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Harness"),
+          children: [interactiveChild, dirtyChild],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
+        )
+      ]
+
+    }
   }
 }
 
@@ -5745,7 +5749,7 @@ private final class RuntimeLifecycleRecorder: Sendable {
   }
 }
 
-private struct LifecycleRuntimeProbe: PrimitiveView, ResolvableView {
+private struct LifecycleRuntimeProbe: PrimitiveView, IterativeResolvableView {
   let recorder: RuntimeLifecycleRecorder
   let focusable: Bool
 
@@ -5794,7 +5798,7 @@ private struct LifecycleRuntimeProbe: PrimitiveView, ResolvableView {
   }
 }
 
-private struct ScrollLifecycleRuntimeProbe: PrimitiveView, ResolvableView {
+private struct ScrollLifecycleRuntimeProbe: PrimitiveView, IterativeResolvableView {
   let label: String
   let text: String
   let recorder: RuntimeLifecycleRecorder
@@ -5839,34 +5843,32 @@ private struct ScrollLifecycleRuntimeProbe: PrimitiveView, ResolvableView {
   }
 }
 
-private struct LifecycleRuntimeRoot: PrimitiveView, ResolvableView {
+private struct LifecycleRuntimeRoot: PrimitiveView, IterativeResolvableView {
   let state: LifecycleRuntimeState
   let recorder: RuntimeLifecycleRecorder
   let focusable: Bool
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     context.recordResolvedComputation()
-    let children =
+    let childrenWork: ResolveWork<[ResolvedNode]> =
       state.showChild
-      ? [
-        resolveView(
-          LifecycleRuntimeProbe(
-            recorder: recorder,
-            focusable: focusable
-          ),
-          in: context.indexedChild(kind: .named("RuntimeRoot"), index: 0)
+      ? resolveViewWork(
+        LifecycleRuntimeProbe(recorder: recorder, focusable: focusable),
+        in: context.indexedChild(kind: .named("RuntimeRoot"), index: 0)
+      ).map { [$0] }
+      : .value([])
+    return childrenWork.map { children in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("RuntimeRoot"),
+          children: children,
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
         )
       ]
-      : []
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("RuntimeRoot"),
-        children: children,
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
-      )
-    ]
+
+    }
   }
 }
 

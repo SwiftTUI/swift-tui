@@ -159,32 +159,35 @@ extension View {
   }
 }
 
-public struct ToolbarItemContributionModifier: PrimitiveViewModifier, Sendable {
+public struct ToolbarItemContributionModifier: IterativePrimitiveViewModifier, Sendable {
   package let config: ToolbarItemConfig
   package let authoringContext: ImperativeAuthoringContextSnapshot?
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    var wrappedConfig = config
-    wrappedConfig.sourceIdentity = node.identity
-    // Nested wrap: the config's own construction-time capture (if any) stays
-    // innermost and wins at dispatch; this attachment-scope wrap is the
-    // fallback for configs constructed outside any authoring context. The
-    // attachment itself is authored in the enclosing body, so that captured
-    // owner wins over the lower node where this contribution resolves.
-    wrappedConfig.action = intake.wrappingSendable(config.action)
-    node.appendDirectToolbarItemContribution(wrappedConfig)
-    node.preferenceValues.merge(
-      ToolbarItemsPreferenceKey.self,
-      value: [wrappedConfig]
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      var wrappedConfig = config
+      wrappedConfig.sourceIdentity = node.identity
+      // Nested wrap: the config's own construction-time capture (if any) stays
+      // innermost and wins at dispatch; this attachment-scope wrap is the
+      // fallback for configs constructed outside any authoring context. The
+      // attachment itself is authored in the enclosing body, so that captured
+      // owner wins over the lower node where this contribution resolves.
+      wrappedConfig.action = intake.wrappingSendable(config.action)
+      node.appendDirectToolbarItemContribution(wrappedConfig)
+      node.preferenceValues.merge(
+        ToolbarItemsPreferenceKey.self,
+        value: [wrappedConfig]
+      )
+      return [node]
+
+    }
   }
 }

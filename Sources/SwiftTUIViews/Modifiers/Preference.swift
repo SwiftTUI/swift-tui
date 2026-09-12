@@ -96,110 +96,125 @@ extension View {
 }
 
 public struct AnchorPreferenceWritingModifier<Key: PreferenceKey, Value: Sendable>:
-  PrimitiveViewModifier
+  IterativePrimitiveViewModifier
 {
   var source: AnchorSource<Value>
   var transform: (Anchor<Value>) -> Key.Value
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    let anchor = Anchor<Value>(
-      viewNodeID: node.viewNodeID,
-      identity: node.identity,
-      kind: source.kind
-    )
-    node.preferenceValues.merge(
-      Key.self,
-      value: content.withAuthoredClosureScope {
-        transform(anchor)
-      }
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      let anchor = Anchor<Value>(
+        viewNodeID: node.viewNodeID,
+        identity: node.identity,
+        kind: source.kind
+      )
+      node.preferenceValues.merge(
+        Key.self,
+        value: content.withAuthoredClosureScope {
+          transform(anchor)
+        }
+      )
+      return [node]
+
+    }
   }
 }
 
 public struct AnchorPreferenceTransformModifier<Key: PreferenceKey, Value: Sendable>:
-  PrimitiveViewModifier
+  IterativePrimitiveViewModifier
 {
   var source: AnchorSource<Value>
   var transform: (inout Key.Value, Anchor<Value>) -> Void
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    let anchor = Anchor<Value>(
-      viewNodeID: node.viewNodeID,
-      identity: node.identity,
-      kind: source.kind
-    )
-    node.preferenceValues.transform(Key.self) { value in
-      content.withAuthoredClosureScope {
-        transform(&value, anchor)
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      let anchor = Anchor<Value>(
+        viewNodeID: node.viewNodeID,
+        identity: node.identity,
+        kind: source.kind
+      )
+      node.preferenceValues.transform(Key.self) { value in
+        content.withAuthoredClosureScope {
+          transform(&value, anchor)
+        }
       }
+      return [node]
+
     }
-    return [node]
   }
 }
 
-public struct PreferenceWritingModifier<Key: PreferenceKey>: PrimitiveViewModifier {
+public struct PreferenceWritingModifier<Key: PreferenceKey>: IterativePrimitiveViewModifier {
   var value: Key.Value
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.preferenceValues.merge(Key.self, value: value)
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.preferenceValues.merge(Key.self, value: value)
+      return [node]
+
+    }
   }
 }
 
-public struct PreferenceTransformModifier<Key: PreferenceKey>: PrimitiveViewModifier {
+public struct PreferenceTransformModifier<Key: PreferenceKey>: IterativePrimitiveViewModifier {
   var transform: (inout Key.Value) -> Void
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.preferenceValues.transform(Key.self) { value in
-      content.withAuthoredClosureScope {
-        transform(&value)
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.preferenceValues.transform(Key.self) { value in
+        content.withAuthoredClosureScope {
+          transform(&value)
+        }
       }
+      return [node]
+
     }
-    return [node]
   }
 }
 
-public struct PreferenceChangeModifier<Key: PreferenceKey>: PrimitiveViewModifier
+public struct PreferenceChangeModifier<Key: PreferenceKey>: IterativePrimitiveViewModifier
 where
   Key.Value: Equatable
 {
   let action: @MainActor (Key.Value) -> Void
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
-    let intake = HandlerDescriptorIntake(context: context)
-    intake.registerPreferenceObservation(
-      identity: node.identity,
-      key: Key.self,
-      value: node.preferenceValues[Key.self],
-      action: action
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
+      let intake = HandlerDescriptorIntake(context: context)
+      intake.registerPreferenceObservation(
+        identity: node.identity,
+        key: Key.self,
+        value: node.preferenceValues[Key.self],
+        action: action
+      )
+      return [node]
+
+    }
   }
 }
 
 public struct PreferenceOverlayValueModifier<Key: PreferenceKey, Overlay: View>:
-  PrimitiveViewModifier
+  IterativePrimitiveViewModifier
 {
   var alignment: Alignment
   private let transform: (Key.Value) -> Overlay
@@ -214,47 +229,51 @@ public struct PreferenceOverlayValueModifier<Key: PreferenceKey, Overlay: View>:
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let baseNode = content.resolve(in: context.child(component: .named("base")))
-    let overlayView = withAuthoringContext(authoringScope) {
-      context.trackingObservableAccess {
-        transform(baseNode.preferenceValues[Key.self])
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context.child(component: .named("base"))).flatMap { completed in
+      let baseNode = completed
+      let overlayView = withAuthoringContext(authoringScope) {
+        context.trackingObservableAccess {
+          transform(baseNode.preferenceValues[Key.self])
+        }
+      }
+      // The overlay derives from the base subtree's preference fold — data the
+      // invalidation tracker does not see, so the overlay subtree is never in
+      // any invalidation cone of its own. Reaching this resolve means the
+      // wrapper recomputed and the fold may have changed; retained reuse below
+      // here would keep serving content computed from the previous fold.
+      var overlayContext = context.child(component: .named("overlay"))
+      overlayContext.withinChurnedSubtree = true
+      // Resolve under the declaration-site scope like `OverlayModifier`'s
+      // stored view: primitive leaves that defer authored closures past this
+      // resolve (a `GeometryReader`'s realization) capture the ambient here —
+      // an unwrapped resolve would hand their dynamic-property reads to the
+      // evaluating node's owner instead of the authoring body's (the
+      // stale-`@State`-binding family).
+      return withAuthoringContext(authoringScope) {
+        overlayView.resolveWork(in: overlayContext)
+      }.map { overlayNode in
+        return [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view("Overlay"),
+            children: [baseNode, overlayNode],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction,
+            layoutBehavior: .decoration(primaryIndex: 0, alignment: alignment)
+          )
+        ]
+
       }
     }
-    // The overlay derives from the base subtree's preference fold — data the
-    // invalidation tracker does not see, so the overlay subtree is never in
-    // any invalidation cone of its own. Reaching this resolve means the
-    // wrapper recomputed and the fold may have changed; retained reuse below
-    // here would keep serving content computed from the previous fold.
-    var overlayContext = context.child(component: .named("overlay"))
-    overlayContext.withinChurnedSubtree = true
-    // Resolve under the declaration-site scope like `OverlayModifier`'s
-    // stored view: primitive leaves that defer authored closures past this
-    // resolve (a `GeometryReader`'s realization) capture the ambient here —
-    // an unwrapped resolve would hand their dynamic-property reads to the
-    // evaluating node's owner instead of the authoring body's (the
-    // stale-`@State`-binding family).
-    let overlayNode = withAuthoringContext(authoringScope) {
-      overlayView.resolve(in: overlayContext)
-    }
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Overlay"),
-        children: [baseNode, overlayNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .decoration(primaryIndex: 0, alignment: alignment)
-      )
-    ]
   }
 }
 
 public struct PreferenceBackgroundValueModifier<Key: PreferenceKey, Background: View>:
-  PrimitiveViewModifier
+  IterativePrimitiveViewModifier
 {
   var alignment: Alignment
   private let transform: (Key.Value) -> Background
@@ -269,34 +288,38 @@ public struct PreferenceBackgroundValueModifier<Key: PreferenceKey, Background: 
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let baseNode = content.resolve(in: context.child(component: .named("base")))
-    let backgroundView = withAuthoringContext(authoringScope) {
-      context.trackingObservableAccess {
-        transform(baseNode.preferenceValues[Key.self])
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context.child(component: .named("base"))).flatMap { completed in
+      let baseNode = completed
+      let backgroundView = withAuthoringContext(authoringScope) {
+        context.trackingObservableAccess {
+          transform(baseNode.preferenceValues[Key.self])
+        }
+      }
+      // Mirrors the overlay variant: the background derives from the fold, so
+      // reuse below here must not outlive the wrapper's recompute, and the
+      // resolve runs under the declaration-site scope so deferred authored
+      // closures bind their dynamic properties to the authoring body's owner.
+      var backgroundContext = context.child(component: .named("background"))
+      backgroundContext.withinChurnedSubtree = true
+      return withAuthoringContext(authoringScope) {
+        backgroundView.resolveWork(in: backgroundContext)
+      }.map { backgroundNode in
+        return [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view("Background"),
+            children: [backgroundNode, baseNode],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction,
+            layoutBehavior: .decoration(primaryIndex: 1, alignment: alignment)
+          )
+        ]
+
       }
     }
-    // Mirrors the overlay variant: the background derives from the fold, so
-    // reuse below here must not outlive the wrapper's recompute, and the
-    // resolve runs under the declaration-site scope so deferred authored
-    // closures bind their dynamic properties to the authoring body's owner.
-    var backgroundContext = context.child(component: .named("background"))
-    backgroundContext.withinChurnedSubtree = true
-    let backgroundNode = withAuthoringContext(authoringScope) {
-      backgroundView.resolve(in: backgroundContext)
-    }
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Background"),
-        children: [backgroundNode, baseNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .decoration(primaryIndex: 1, alignment: alignment)
-      )
-    ]
   }
 }

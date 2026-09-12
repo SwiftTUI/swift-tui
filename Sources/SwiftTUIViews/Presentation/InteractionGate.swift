@@ -8,17 +8,20 @@ extension View {
   }
 }
 
-package struct InteractionGateModifier: PrimitiveViewModifier, Sendable {
+package struct InteractionGateModifier: IterativePrimitiveViewModifier, Sendable {
   package var availability: InteractionAvailability
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.semanticMetadata = node.semanticMetadata.merging(
-      SemanticMetadata(interactionAvailability: availability)
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.semanticMetadata = node.semanticMetadata.merging(
+        SemanticMetadata(interactionAvailability: availability)
+      )
+      return [node]
+
+    }
   }
 }

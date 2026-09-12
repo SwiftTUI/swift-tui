@@ -666,7 +666,7 @@ extension View {
 /// The modifier the `toast(...)` methods install, carrying one toast
 /// declaration; apps call those methods rather than naming this type, which has
 /// no public initializer.
-public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
+public struct ToastModifier<ToastContent: View>: IterativePrimitiveViewModifier {
   var isPresented: Binding<Bool>
   var style: AnyToastStyle
   var duration: Double?
@@ -675,79 +675,82 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
   var onDismiss: (@MainActor @Sendable () -> Void)? = nil
   var onDismissAuthoringContext: AuthoringContext? = makePortalAttachmentAuthoringContext()
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    // Toasts emit their declaration directly (no trigger leaf), so they
-    // report the activation observation here — the frame head's portal
-    // reconcile escalation depends on seeing every emitter's resolve.
-    let active = isPresented.wrappedValue
-    context.presentationTriggerObserver?.record(
-      sourceIdentity: node.identity,
-      isActive: active,
-      emitterIdentity: node.identity
-    )
-    guard active else {
-      return [node]
-    }
-
-    let sourceIdentity = node.identity
-    // Chained `.toast` modifiers collapse onto one chain node and share its
-    // source identity; the inner modifier's declaration is already merged on
-    // the flowing node when the outer resolves, so counting same-source
-    // declarations claims the next attachment ordinal — distinct portal
-    // tokens ("toast", "toast[1]", …) keep chained items from overwriting
-    // each other in the family store. The ordinal counts *active* inner
-    // declarations only, so an inner toggle can shift an outer token; the
-    // re-minted entry then re-arms its dismissal deadline, which is
-    // acceptable for transient toasts.
-    let attachmentOrdinal = node.preferenceValues[
-      PresentationCoordinatorDeclarationPreferenceKey.self
-    ].declarations.count { $0.sourceIdentity == sourceIdentity }
-    let token = attachmentOrdinal == 0 ? "toast" : "toast[\(attachmentOrdinal)]"
-    let portalEntryID = presentationAttachment(for: node, token: token)
-    let dismissInvalidator = context.invalidationProxy?.invalidator
-    let onDismiss = presentationDismissObserver(
-      onDismiss,
-      authoringContext: onDismissAuthoringContext
-    )
-    let item = ToastPresentationItem(
-      id: portalEntryID.description,
-      portalEntryID: portalEntryID,
-      contentPayloads: portalAttachmentDeclaredBuilderChildren(
-        from: toastContent,
-        portalEntryID: portalEntryID,
-        modalPolicy: .nonModal
-      ),
-      style: style,
-      duration: duration,
-      dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
-        withAuthoringContext(dismissAuthoringContext) {
-          isPresented.wrappedValue = false
-        }
-        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
-      },
-      onDismiss: onDismiss
-    )
-
-    var declaration = PresentationCoordinatorDeclaration(
-      sourceIdentity: sourceIdentity
-    ) { registry in
-      registry.toast.sync(
-        sourceIdentity: sourceIdentity,
-        items: [item]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      // Toasts emit their declaration directly (no trigger leaf), so they
+      // report the activation observation here — the frame head's portal
+      // reconcile escalation depends on seeing every emitter's resolve.
+      let active = isPresented.wrappedValue
+      context.presentationTriggerObserver?.record(
+        sourceIdentity: node.identity,
+        isActive: active,
+        emitterIdentity: node.identity
       )
+      guard active else {
+        return [node]
+      }
+
+      let sourceIdentity = node.identity
+      // Chained `.toast` modifiers collapse onto one chain node and share its
+      // source identity; the inner modifier's declaration is already merged on
+      // the flowing node when the outer resolves, so counting same-source
+      // declarations claims the next attachment ordinal — distinct portal
+      // tokens ("toast", "toast[1]", …) keep chained items from overwriting
+      // each other in the family store. The ordinal counts *active* inner
+      // declarations only, so an inner toggle can shift an outer token; the
+      // re-minted entry then re-arms its dismissal deadline, which is
+      // acceptable for transient toasts.
+      let attachmentOrdinal = node.preferenceValues[
+        PresentationCoordinatorDeclarationPreferenceKey.self
+      ].declarations.count { $0.sourceIdentity == sourceIdentity }
+      let token = attachmentOrdinal == 0 ? "toast" : "toast[\(attachmentOrdinal)]"
+      let portalEntryID = presentationAttachment(for: node, token: token)
+      let dismissInvalidator = context.invalidationProxy?.invalidator
+      let onDismiss = presentationDismissObserver(
+        onDismiss,
+        authoringContext: onDismissAuthoringContext
+      )
+      let item = ToastPresentationItem(
+        id: portalEntryID.description,
+        portalEntryID: portalEntryID,
+        contentPayloads: portalAttachmentDeclaredBuilderChildren(
+          from: toastContent,
+          portalEntryID: portalEntryID,
+          modalPolicy: .nonModal
+        ),
+        style: style,
+        duration: duration,
+        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+          withAuthoringContext(dismissAuthoringContext) {
+            isPresented.wrappedValue = false
+          }
+          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+        },
+        onDismiss: onDismiss
+      )
+
+      var declaration = PresentationCoordinatorDeclaration(
+        sourceIdentity: sourceIdentity
+      ) { registry in
+        registry.toast.sync(
+          sourceIdentity: sourceIdentity,
+          items: [item]
+        )
+      }
+      // Toasts declare directly (no trigger leaf), so they stamp the captured
+      // presenter environment themselves — mirrors `resolvePresentationModifier`.
+      declaration.sourceEnvironmentValues = context.environmentValues
+      node.preferenceValues.merge(
+        PresentationCoordinatorDeclarationPreferenceKey.self,
+        value: .init(declarations: [declaration])
+      )
+      return [node]
+
     }
-    // Toasts declare directly (no trigger leaf), so they stamp the captured
-    // presenter environment themselves — mirrors `resolvePresentationModifier`.
-    declaration.sourceEnvironmentValues = context.environmentValues
-    node.preferenceValues.merge(
-      PresentationCoordinatorDeclarationPreferenceKey.self,
-      value: .init(declarations: [declaration])
-    )
-    return [node]
   }
 }
 

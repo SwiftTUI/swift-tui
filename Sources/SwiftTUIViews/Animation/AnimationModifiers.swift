@@ -191,7 +191,8 @@ package struct TransactionCompletion: Sendable {
 
 // MARK: - ValueAnimationModifier
 
-public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveViewModifier, Sendable,
+public struct ValueAnimationModifier<Value: Equatable & Sendable>: IterativePrimitiveViewModifier,
+  Sendable,
   Equatable
 {
   package var animation: Animation?
@@ -205,10 +206,10 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
     self.value = value
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     // The value-gate mechanics (silent per-node slot, outer-first cursor
     // reservation, per-node ordinal claim, first-appearance baseline) are
     // shared with `ValueTransactionModifier` through
@@ -219,9 +220,10 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
       // Value unchanged — pass through the parent transaction as-is (the only
       // difference between `childContext` and `context` here is the cursor,
       // which is excluded from reuse-gating equality).
-      let resolved = content.resolveElements(in: gate.childContext)
-      gate.storeFirstAppearanceBaseline(value, in: context)
-      return resolved
+      return content.resolveElementsWork(in: gate.childContext).map { resolved in
+        gate.storeFirstAppearanceBaseline(value, in: context)
+        return resolved
+      }
     }
 
     var childContext = gate.childContext
@@ -239,15 +241,16 @@ public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveView
     // refresh re-stamped the frame-root transaction over every descendant,
     // and the request reached only the subtree roots.
     childContext.propagated.authoredTransactionOverride = true
-    let resolved = content.resolveElements(in: childContext)
-    gate.storeFirstAppearanceBaseline(value, in: context)
-    return resolved
+    return content.resolveElementsWork(in: childContext).map { resolved in
+      gate.storeFirstAppearanceBaseline(value, in: context)
+      return resolved
+    }
   }
 }
 
 // MARK: - TransactionModifier
 
-public struct TransactionModifier: PrimitiveViewModifier, Sendable {
+public struct TransactionModifier: IterativePrimitiveViewModifier, Sendable {
   package var transform: @Sendable (inout Transaction) -> Void
 
   package init(
@@ -256,10 +259,10 @@ public struct TransactionModifier: PrimitiveViewModifier, Sendable {
     self.transform = transform
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     // Every Transaction field the transform can observe must be carried
     // IN from the context snapshot here and written BACK below, or edits
     // to it silently do nothing (plan 2026-08-04-002 mechanics §5).
@@ -283,6 +286,6 @@ public struct TransactionModifier: PrimitiveViewModifier, Sendable {
     // See ValueAnimationModifier: the authored edit must survive nested
     // `resolveView` frame-input refreshes below this modifier (F137).
     childContext.propagated.authoredTransactionOverride = true
-    return content.resolveElements(in: childContext)
+    return content.resolveElementsWork(in: childContext)
   }
 }

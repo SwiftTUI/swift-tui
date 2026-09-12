@@ -20,7 +20,7 @@ struct ConcreteStyleBox<S: Sendable>: AnyStyleBox {
     styleLabel: String,
     in context: ResolveContext,
     makeBody: @escaping @MainActor @Sendable (S, Configuration) -> Body
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     if hasDynamicPropertyUpdateSurface(style) {
       return resolveStyleBody(
         DynamicStyleBody(style: style, configuration: configuration, makeBody: makeBody),
@@ -124,9 +124,9 @@ func resolveStyleBody<Body: View>(
   _ body: Body,
   styleLabel: String,
   in context: ResolveContext
-) -> ResolvedNode {
+) -> ResolveWork<ResolvedNode> {
   withStyleRouteInstallationLedger(styleLabel: styleLabel) {
-    resolveView(
+    resolveViewWork(
       body,
       in: context,
       authoringContextOverride: currentAuthoringContext()

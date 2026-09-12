@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 /// A transparent structural container that groups child views.
-public struct Group<Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView,
+public struct Group<Content: View>: PrimitiveView, IterativeResolvableView, DeclaredChildrenView,
   DeclaredChildStructure
 {
   package var content: Content
@@ -12,8 +12,8 @@ public struct Group<Content: View>: PrimitiveView, ResolvableView, DeclaredChild
     self.content = content()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    resolveDeclaredChildren(
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    resolveDeclaredChildrenWork(
       content,
       in: context,
       kindName: "Group"

@@ -5,7 +5,7 @@
 
 /// Presents selectable rows in a vertically scrollable list.
 public struct List<SelectionValue: Hashable & Sendable, Content: View>: PrimitiveView,
-  ResolvableView
+  IterativeResolvableView
 {
   private var selectionPolicy: CollectionSelectionPolicy<SelectionValue>
   private var onActivate: (@MainActor (SelectionValue) -> Void)?
@@ -51,10 +51,10 @@ public struct List<SelectionValue: Hashable & Sendable, Content: View>: Primitiv
     self.content = content()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
@@ -71,7 +71,7 @@ extension List {
 
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
@@ -88,348 +88,358 @@ extension List {
     let showsIndicators =
       context.environmentValues.scrollIndicatorVisibility.allowsVisibleIndicators
     let itemContext = context.child(component: .named("ListItems"))
-    var resolvedContent: ResolvedItems
+    let resolvedContentWork: ResolveWork<ResolvedItems>
     if usesIndexedDataSource,
       let source = makeIndexedChildSource(
         from: content,
         in: itemContext.settingEnvironment(\.isResolvingHostedCollectionContent, to: true)
       )
     {
-      resolvedContent = resolvedIndexedItems(from: source, in: context)
+      resolvedContentWork = .value(resolvedIndexedItems(from: source, in: context))
     } else {
-      resolvedContent = resolvedItems(in: itemContext)
-      // D22: `usesIndexedDataSource` is set only by the direct-data
-      // initializers, so `List { ForEach(data) }` silently takes the eager
-      // path even though the recognition machinery would have succeeded on it.
-      // Flipping that spelling to windowed is its own characterization
-      // program; making the fork visible is not.
-      if let issue = eagerCollectionRuntimeIssue(
-        rowCount: resolvedContent.rows.count,
-        identity: context.identity,
-        source: "List"
-      ) {
-        resolvedContent.runtimeIssues.append(issue)
-      }
-    }
-    let rows = resolvedContent.rows
-    // Locate the selected row through the source's id index when there is
-    // one: scanning every row and asking the policy about each tag is
-    // O(dataset) on the resolve path of every frame (register item D18).
-    // The eager path keeps the scan — it has already materialized every row.
-    let selectedIndex: Int? =
-      if let source = resolvedContent.indexedSource {
-        selectionPolicy.selectionTag().flatMap(source.elementIndex(forSelectionTag:))
-      } else {
-        rows.indices.first { index in
-          rows[index].tag.map(selectionPolicy.contains) == true
-        }
-      }
-    // Likewise for focus: the focused identity already encodes its row index,
-    // so parsing it beats minting an identity per row until one matches.
-    let focusedRowIndex = context.environmentValues.focusedIdentity.flatMap { focused in
-      listRowIndex(parsedFrom: focused, container: context.identity)
-    }.flatMap { rowIndex in
-      rows.indices.contains(rowIndex) ? rowIndex : nil
-    }
-    let isListOrRowFocused = isFocused || focusedRowIndex != nil
-    let activeRowIndex = focusedRowIndex ?? selectedIndex
-    // Focus is signalled at the row layer (caret + selected-row chrome);
-    // the list container itself stays neutral so the row signal stays visible.
-    let chrome = styleEnvironment.controlChrome(
-      isEnabled: isEnabled,
-      isFocused: false
-    )
-    let rowChrome = styleEnvironment.rowChrome(
-      isEnabled: isEnabled,
-      isFocused: isListOrRowFocused && showsFocusEffect,
-      isSelected: true
-    )
-
-    let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
-    var scrollCurrency: CollectionScrollCurrency?
-    if isEnabled, !rows.isEmpty {
-      let showsIndicatorLines = showsIndicators
-      let rowCount = rows.count
-      scrollCurrency = CollectionScrollCurrency(
-        identity: context.identity,
-        geometry: CollectionScrollGeometry(
-          rowCount: rowCount,
-          rowSpan: listStyle.listRowDisplaySpan,
-          // Chrome border rows are layout-bearing content insets, not display
-          // lines: line 0 of every list style's scrollable stream is row 0.
-          chromeInset: 0
-        ),
-        ownerNode: ownerNode,
-        registry: context.scrollCommandRegistry,
-        windowMetrics: { viewportLineCount in
-          let window = listStyle.viewportBackedListWindow(
-            itemCount: rowCount,
-            selectedRowIndex: activeRowIndex,
-            anchorRowIndex: nil,
-            showsIndicators: showsIndicatorLines,
-            viewportLineCount: viewportLineCount
-          )
-          return (window.offset, window.visibleLineCount)
-        }
-      )
-    }
-
-    if isEnabled {
-      let policy = selectionPolicy
-      let intake = HandlerDescriptorIntake(
-        context: context,
-        fallbackAuthoringScope: nil
-      )
-      let activate: @MainActor (SelectionTag) -> Bool = { tag in
-        guard let value = policy.value(from: tag) else {
-          return false
-        }
-        if !policy.isMultiple {
-          _ = policy.select(tag)
-        }
-        onActivate?(value)
-        return true
-      }
-
-      if let scrollCurrency {
-        // Registration is unconditional for an enabled non-empty collection:
-        // scrolling is not a selection feature, and this registration is what
-        // lets `ScrollViewProxy` reach the collection at all.
-        let indexedSource = resolvedContent.indexedSource
-        intake.registerScrollPosition(
+      resolvedContentWork = resolvedItems(in: itemContext).map { completed in
+        var resolvedContent = completed
+        // D22: `usesIndexedDataSource` is set only by the direct-data
+        // initializers, so `List { ForEach(data) }` silently takes the eager
+        // path even though the recognition machinery would have succeeded on it.
+        // Flipping that spelling to windowed is its own characterization
+        // program; making the fork visible is not.
+        if let issue = eagerCollectionRuntimeIssue(
+          rowCount: resolvedContent.rows.count,
           identity: context.identity,
-          currentOffset: { scrollCurrency.currentOffset() },
-          applyOffset: { scrollCurrency.applyOffset($0) },
-          revealTarget: { query, anchor in
-            scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
-              indexedSource?.elementIndex(matching: query)
-            }
+          source: "List"
+        ) {
+          resolvedContent.runtimeIssues.append(issue)
+        }
+        return resolvedContent
+      }
+    }
+    return resolvedContentWork.map { completed in
+      let resolvedContent = completed
+      let rows = resolvedContent.rows
+      // Locate the selected row through the source's id index when there is
+      // one: scanning every row and asking the policy about each tag is
+      // O(dataset) on the resolve path of every frame (register item D18).
+      // The eager path keeps the scan — it has already materialized every row.
+      let selectedIndex: Int? =
+        if let source = resolvedContent.indexedSource {
+          selectionPolicy.selectionTag().flatMap(source.elementIndex(forSelectionTag:))
+        } else {
+          rows.indices.first { index in
+            rows[index].tag.map(selectionPolicy.contains) == true
+          }
+        }
+      // Likewise for focus: the focused identity already encodes its row index,
+      // so parsing it beats minting an identity per row until one matches.
+      let focusedRowIndex = context.environmentValues.focusedIdentity.flatMap { focused in
+        listRowIndex(parsedFrom: focused, container: context.identity)
+      }.flatMap { rowIndex in
+        rows.indices.contains(rowIndex) ? rowIndex : nil
+      }
+      let isListOrRowFocused = isFocused || focusedRowIndex != nil
+      let activeRowIndex = focusedRowIndex ?? selectedIndex
+      // Focus is signalled at the row layer (caret + selected-row chrome);
+      // the list container itself stays neutral so the row signal stays visible.
+      let chrome = styleEnvironment.controlChrome(
+        isEnabled: isEnabled,
+        isFocused: false
+      )
+      let rowChrome = styleEnvironment.rowChrome(
+        isEnabled: isEnabled,
+        isFocused: isListOrRowFocused && showsFocusEffect,
+        isSelected: true
+      )
+
+      let ownerNode =
+        ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
+      var scrollCurrency: CollectionScrollCurrency?
+      if isEnabled, !rows.isEmpty {
+        let showsIndicatorLines = showsIndicators
+        let rowCount = rows.count
+        scrollCurrency = CollectionScrollCurrency(
+          identity: context.identity,
+          geometry: CollectionScrollGeometry(
+            rowCount: rowCount,
+            rowSpan: listStyle.listRowDisplaySpan,
+            // Chrome border rows are layout-bearing content insets, not display
+            // lines: line 0 of every list style's scrollable stream is row 0.
+            chromeInset: 0
+          ),
+          ownerNode: ownerNode,
+          registry: context.scrollCommandRegistry,
+          windowMetrics: { viewportLineCount in
+            let window = listStyle.viewportBackedListWindow(
+              itemCount: rowCount,
+              selectedRowIndex: activeRowIndex,
+              anchorRowIndex: nil,
+              showsIndicators: showsIndicatorLines,
+              viewportLineCount: viewportLineCount
+            )
+            return (window.offset, window.visibleLineCount)
           }
         )
-
-        let rootRouteID = runtimePrimaryRouteID(for: context.identity)
-        intake.registerPointerHandler(routeID: rootRouteID) { event in
-          guard case .scrolled(let deltaX, let deltaY) = event.kind,
-            let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
-          else {
-            return .ignored
-          }
-          // Behavioural flip (scroll-currency S1): the wheel moves the window
-          // and leaves the selection alone. Arrow keys keep selection
-          // semantics. Previously the wheel drove `policy.step`, so a
-          // non-selectable collection could not scroll at all and a selectable
-          // one could not be looked through without changing what was selected.
-          return scrollCurrency.scroll(byRows: delta) ? .claimed : .ignored
-        }
       }
 
-      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
-        guard keyPress.modifiers.isEmpty else {
-          return false
-        }
-        let event = keyPress.key
-        if let scrollCurrency, applyCollectionScrollKey(event, to: scrollCurrency) {
+      if isEnabled {
+        let policy = selectionPolicy
+        let intake = HandlerDescriptorIntake(
+          context: context,
+          fallbackAuthoringScope: nil
+        )
+        let activate: @MainActor (SelectionTag) -> Bool = { tag in
+          guard let value = policy.value(from: tag) else {
+            return false
+          }
+          if !policy.isMultiple {
+            _ = policy.select(tag)
+          }
+          onActivate?(value)
           return true
         }
-        guard policy.isSelectable else {
-          return false
-        }
 
-        let delta: Int?
-        switch event {
-        case .arrowUp:
-          delta = -1
-        case .arrowDown:
-          delta = 1
-        case .return:
-          guard let activeRowIndex, rows.indices.contains(activeRowIndex) else {
-            return false
-          }
-          guard let tag = rows[activeRowIndex].tag else {
-            return false
-          }
-          return activate(tag)
-        case .space:
-          guard let activeRowIndex, rows.indices.contains(activeRowIndex),
-            let tag = rows[activeRowIndex].tag
-          else {
-            return false
-          }
-          return policy.isMultiple ? policy.toggle(tag) : activate(tag)
-        default:
-          delta = nil
-        }
-
-        guard let delta, !rows.isEmpty else {
-          return false
-        }
-
-        guard policy.step(orderedTags: rows.compactMap(\.tag), delta: delta) else {
-          return false
-        }
         if let scrollCurrency {
-          scrollCurrency.pinCurrentAnchor()
-          if let selectedRow = rows.firstIndex(where: { row in
-            row.tag.map(policy.contains) == true
-          }) {
-            scrollCurrency.reveal(row: selectedRow)
+          // Registration is unconditional for an enabled non-empty collection:
+          // scrolling is not a selection feature, and this registration is what
+          // lets `ScrollViewProxy` reach the collection at all.
+          let indexedSource = resolvedContent.indexedSource
+          intake.registerScrollPosition(
+            identity: context.identity,
+            currentOffset: { scrollCurrency.currentOffset() },
+            applyOffset: { scrollCurrency.applyOffset($0) },
+            revealTarget: { query, anchor in
+              scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
+                indexedSource?.elementIndex(matching: query)
+              }
+            }
+          )
+
+          let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+          intake.registerPointerHandler(routeID: rootRouteID) { event in
+            guard case .scrolled(let deltaX, let deltaY) = event.kind,
+              let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
+            else {
+              return .ignored
+            }
+            // Behavioural flip (scroll-currency S1): the wheel moves the window
+            // and leaves the selection alone. Arrow keys keep selection
+            // semantics. Previously the wheel drove `policy.step`, so a
+            // non-selectable collection could not scroll at all and a selectable
+            // one could not be looked through without changing what was selected.
+            return scrollCurrency.scroll(byRows: delta) ? .claimed : .ignored
           }
         }
-        return true
-      }
 
-      if policy.isSelectable {
-        let interactionIndices: any Sequence<Int> =
-          if resolvedContent.indexedSource == nil {
-            rows.indices
-          } else {
-            collectionInteractionBand(
-              count: rows.count,
-              scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
-              selectionAnchor: activeRowIndex,
-              visibleRowCount: scrollCurrency.map { currency in
-                currency.visibleLineCount / currency.geometry.rowSpan
-              }
-            )
-          }
-        for rowIndex in interactionIndices {
-          let row = rows[rowIndex]
-          guard let tag = row.tag else {
-            continue
-          }
-          let rowIdentity = listRowIdentity(
-            for: context.identity,
-            rowIndex: rowIndex
-          )
-          intake.registerAction(identity: rowIdentity) {
-            policy.isMultiple ? policy.toggle(tag) : activate(tag)
-          }
-          intake.registerKeyPressHandler(identity: rowIdentity) { keyPress in
-            guard keyPress.modifiers.isEmpty else {
-              return false
-            }
-            let delta: Int?
-            switch keyPress.key {
-            case .arrowUp:
-              delta = -1
-            case .arrowDown:
-              delta = 1
-            default:
-              delta = nil
-            }
-
-            guard let delta, !rows.isEmpty else {
-              return false
-            }
-
-            let targetIndex = min(
-              max(rowIndex + delta, rows.startIndex),
-              rows.index(before: rows.endIndex)
-            )
-            guard let targetTag = rows[targetIndex].tag else {
-              return false
-            }
-            if !policy.isMultiple {
-              _ = policy.select(targetTag)
-            }
-            if let scrollCurrency {
-              // This handler owns the common case: with focus on a row, the
-              // row's own handler sees the arrow and the container's never
-              // does. Pin before revealing — while nothing is stored the
-              // window IS the selection, so a minimal reveal would just be
-              // re-centred by the fallback underneath it.
-              scrollCurrency.pinCurrentAnchor()
-              scrollCurrency.reveal(row: targetIndex)
-            }
+        intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+          guard keyPress.modifiers.isEmpty else {
             return false
           }
+          let event = keyPress.key
+          if let scrollCurrency, applyCollectionScrollKey(event, to: scrollCurrency) {
+            return true
+          }
+          guard policy.isSelectable else {
+            return false
+          }
+
+          let delta: Int?
+          switch event {
+          case .arrowUp:
+            delta = -1
+          case .arrowDown:
+            delta = 1
+          case .return:
+            guard let activeRowIndex, rows.indices.contains(activeRowIndex) else {
+              return false
+            }
+            guard let tag = rows[activeRowIndex].tag else {
+              return false
+            }
+            return activate(tag)
+          case .space:
+            guard let activeRowIndex, rows.indices.contains(activeRowIndex),
+              let tag = rows[activeRowIndex].tag
+            else {
+              return false
+            }
+            return policy.isMultiple ? policy.toggle(tag) : activate(tag)
+          default:
+            delta = nil
+          }
+
+          guard let delta, !rows.isEmpty else {
+            return false
+          }
+
+          guard policy.step(orderedTags: rows.compactMap(\.tag), delta: delta) else {
+            return false
+          }
+          if let scrollCurrency {
+            scrollCurrency.pinCurrentAnchor()
+            if let selectedRow = rows.firstIndex(where: { row in
+              row.tag.map(policy.contains) == true
+            }) {
+              scrollCurrency.reveal(row: selectedRow)
+            }
+          }
+          return true
+        }
+
+        if policy.isSelectable {
+          let interactionIndices: any Sequence<Int> =
+            if resolvedContent.indexedSource == nil {
+              rows.indices
+            } else {
+              collectionInteractionBand(
+                count: rows.count,
+                scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
+                selectionAnchor: activeRowIndex,
+                visibleRowCount: scrollCurrency.map { currency in
+                  currency.visibleLineCount / currency.geometry.rowSpan
+                }
+              )
+            }
+          for rowIndex in interactionIndices {
+            let row = rows[rowIndex]
+            guard let tag = row.tag else {
+              continue
+            }
+            let rowIdentity = listRowIdentity(
+              for: context.identity,
+              rowIndex: rowIndex
+            )
+            intake.registerAction(identity: rowIdentity) {
+              policy.isMultiple ? policy.toggle(tag) : activate(tag)
+            }
+            intake.registerKeyPressHandler(identity: rowIdentity) { keyPress in
+              guard keyPress.modifiers.isEmpty else {
+                return false
+              }
+              let delta: Int?
+              switch keyPress.key {
+              case .arrowUp:
+                delta = -1
+              case .arrowDown:
+                delta = 1
+              default:
+                delta = nil
+              }
+
+              guard let delta, !rows.isEmpty else {
+                return false
+              }
+
+              let targetIndex = min(
+                max(rowIndex + delta, rows.startIndex),
+                rows.index(before: rows.endIndex)
+              )
+              guard let targetTag = rows[targetIndex].tag else {
+                return false
+              }
+              if !policy.isMultiple {
+                _ = policy.select(targetTag)
+              }
+              if let scrollCurrency {
+                // This handler owns the common case: with focus on a row, the
+                // row's own handler sees the arrow and the container's never
+                // does. Pin before revealing — while nothing is stored the
+                // window IS the selection, so a minimal reveal would just be
+                // re-centred by the fallback underneath it.
+                scrollCurrency.pinCurrentAnchor()
+                scrollCurrency.reveal(row: targetIndex)
+              }
+              return false
+            }
+          }
         }
       }
-    }
 
-    var payload = ListPayload(
-      items: resolvedContent.items,
-      selectedRowIndex: activeRowIndex,
-      style: listStyle,
-      foregroundStyle: chrome.foregroundStyle,
-      backgroundStyle: chrome.backgroundStyle,
-      borderStyle: chrome.borderStyle,
-      selectedRowForegroundStyle: isListOrRowFocused && showsFocusEffect
-        ? rowChrome.foregroundStyle : nil,
-      selectedRowBackgroundStyle: isListOrRowFocused && showsFocusEffect
-        ? rowChrome.backgroundStyle : nil,
-      selectedRowMarkerStyle: isListOrRowFocused && showsFocusEffect ? rowChrome.borderStyle : nil,
-      // The gutter is structural: reserve it for any non-empty list whose
-      // focus effects are enabled, regardless of whether focus is currently
-      // inside the list. Toggling the gutter on focus arrival would shift
-      // every row's content sideways at the moment of highlighting.
-      showsSelectionMarker: showsFocusEffect && !rows.isEmpty,
-      showsIndicators: showsIndicators,
-      opacity: chrome.opacity
-    )
-    payload.isViewportBacked = resolvedContent.indexedSource != nil
-    if resolvedContent.indexedSource != nil {
-      // The rows are committed child nodes; the payload's copies were N
-      // identical empty stubs carrying only their count (register item D18).
-      // Carry the count instead of the array.
-      payload.virtualRowCount = rows.count
-    }
-    payload.scrollAnchorRowIndex = scrollCurrency?.storedAnchorRow
+      var payload = ListPayload(
+        items: resolvedContent.items,
+        selectedRowIndex: activeRowIndex,
+        style: listStyle,
+        foregroundStyle: chrome.foregroundStyle,
+        backgroundStyle: chrome.backgroundStyle,
+        borderStyle: chrome.borderStyle,
+        selectedRowForegroundStyle: isListOrRowFocused && showsFocusEffect
+          ? rowChrome.foregroundStyle : nil,
+        selectedRowBackgroundStyle: isListOrRowFocused && showsFocusEffect
+          ? rowChrome.backgroundStyle : nil,
+        selectedRowMarkerStyle: isListOrRowFocused && showsFocusEffect
+          ? rowChrome.borderStyle : nil,
+        // The gutter is structural: reserve it for any non-empty list whose
+        // focus effects are enabled, regardless of whether focus is currently
+        // inside the list. Toggling the gutter on focus arrival would shift
+        // every row's content sideways at the moment of highlighting.
+        showsSelectionMarker: showsFocusEffect && !rows.isEmpty,
+        showsIndicators: showsIndicators,
+        opacity: chrome.opacity
+      )
+      payload.isViewportBacked = resolvedContent.indexedSource != nil
+      if resolvedContent.indexedSource != nil {
+        // The rows are committed child nodes; the payload's copies were N
+        // identical empty stubs carrying only their count (register item D18).
+        // Carry the count instead of the array.
+        payload.virtualRowCount = rows.count
+      }
+      payload.scrollAnchorRowIndex = scrollCurrency?.storedAnchorRow
 
-    var metadata = focusableControlMetadata(
-      // A selectable list signals focus at the row layer, so the container
-      // stays neutral. A non-selectable *viewport-backed* list has no row
-      // focus at all, so the container itself must be focusable or its
-      // PageUp/PageDown/Home/End handlers are unreachable — the same bargain
-      // `ScrollView` makes. Builder-spelled (eager) lists keep today's
-      // behaviour; they take the unwindowed path anyway.
-      isFocusable: rows.isEmpty
-        ? nil
-        : (selectionPolicy.isSelectable || resolvedContent.indexedSource == nil ? false : true),
-      focusInteractions: .edit,
-      scrollRole: .list,
-      accessibilityRole: .list
-    )
-    metadata.hostedCollectionContainer = .init(kind: .list)
-    var node = ResolvedNode(
-      identity: context.identity,
-      kind: .view("List"),
-      children: resolvedContent.children,
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: metadata,
-      drawPayload: .list(payload),
-      indexedChildSource: resolvedContent.indexedSource
-    )
-    node.drawMetadata.clipsToBounds = true
-    var preferences = node.preferenceValues
-    var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
-    for issue in resolvedContent.runtimeIssues where !runtimeIssues.contains(issue) {
-      runtimeIssues.append(issue)
+      var metadata = focusableControlMetadata(
+        // A selectable list signals focus at the row layer, so the container
+        // stays neutral. A non-selectable *viewport-backed* list has no row
+        // focus at all, so the container itself must be focusable or its
+        // PageUp/PageDown/Home/End handlers are unreachable — the same bargain
+        // `ScrollView` makes. Builder-spelled (eager) lists keep today's
+        // behaviour; they take the unwindowed path anyway.
+        isFocusable: rows.isEmpty
+          ? nil
+          : (selectionPolicy.isSelectable || resolvedContent.indexedSource == nil ? false : true),
+        focusInteractions: .edit,
+        scrollRole: .list,
+        accessibilityRole: .list
+      )
+      metadata.hostedCollectionContainer = .init(kind: .list)
+      var node = ResolvedNode(
+        identity: context.identity,
+        kind: .view("List"),
+        children: resolvedContent.children,
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: metadata,
+        drawPayload: .list(payload),
+        indexedChildSource: resolvedContent.indexedSource
+      )
+      node.drawMetadata.clipsToBounds = true
+      var preferences = node.preferenceValues
+      var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
+      for issue in resolvedContent.runtimeIssues where !runtimeIssues.contains(issue) {
+        runtimeIssues.append(issue)
+      }
+      preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+      node.preferenceValues = preferences
+      return node
     }
-    preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
-    node.preferenceValues = preferences
-    return node
   }
 
   private func resolvedItems(
     in context: ResolveContext
-  ) -> ResolvedItems {
-    let nodes = resolveDeclaredChildren(
+  ) -> ResolveWork<ResolvedItems> {
+    return resolveDeclaredChildrenWork(
       content,
       in: context.settingEnvironment(\.isResolvingHostedCollectionContent, to: true),
       kindName: "ListContent"
     )
-    var result = ResolvedItems()
-    var hasEmittedSection = false
-    var previousSectionBottomVisibility: Visibility?
-    collectTopLevelItems(
-      from: nodes,
-      into: &result,
-      hasEmittedSection: &hasEmittedSection,
-      previousSectionBottomVisibility: &previousSectionBottomVisibility
-    )
-    return result
+    .map { nodes in
+      var result = ResolvedItems()
+      var hasEmittedSection = false
+      var previousSectionBottomVisibility: Visibility?
+      collectTopLevelItems(
+        from: nodes,
+        into: &result,
+        hasEmittedSection: &hasEmittedSection,
+        previousSectionBottomVisibility: &previousSectionBottomVisibility
+      )
+      return result
+    }
   }
 
   private func resolvedIndexedItems(
@@ -612,27 +622,32 @@ extension List {
     from nodes: [ResolvedNode],
     into result: inout ResolvedItems
   ) {
-    for var node in nodes {
+    var work = Array(nodes.reversed())
+    while var node = work.popLast() {
       if node.semanticMetadata.isHostedCollectionRowBoundary {
         appendRow(node: &node, to: &result)
         continue
       }
       if containsHostedCollectionRowBoundary(node) {
-        collectItems(from: node.children, into: &result)
+        work.append(contentsOf: node.children.reversed())
         continue
       }
       let row = resolvedHostedListRow(from: node)
       if row.tagCount > 0 || node.children.isEmpty {
         appendRow(node: &node, row: row, to: &result)
       } else {
-        collectItems(from: node.children, into: &result)
+        work.append(contentsOf: node.children.reversed())
       }
     }
   }
 
   private func containsHostedCollectionRowBoundary(_ node: ResolvedNode) -> Bool {
-    node.semanticMetadata.isHostedCollectionRowBoundary
-      || node.children.contains(where: containsHostedCollectionRowBoundary)
+    var work = [node]
+    while let current = work.popLast() {
+      if current.semanticMetadata.isHostedCollectionRowBoundary { return true }
+      work.append(contentsOf: current.children)
+    }
+    return false
   }
 
   private func appendRow(

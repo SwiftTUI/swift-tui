@@ -3,7 +3,7 @@ import SwiftTUICore
 /// The builder artifact produced by conditional branches inside a
 /// ``ViewBuilder``.
 public struct ConditionalContent<TrueContent: View, FalseContent: View>: PrimitiveView,
-  ResolvableView, DeclaredChildrenView, DeclaredChildStructure
+  IterativeResolvableView, DeclaredChildrenView, DeclaredChildStructure
 {
   /// The currently active conditional branch.
   public enum Storage {
@@ -77,18 +77,6 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: Primiti
         nextIndex: &branchIndex,
         into: &resolved
       )
-    }
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    switch storage {
-    case .trueContent(let content):
-      return resolveBranchElements(content, in: context, component: "true")
-    case .falseContent(let content):
-      if collapsesImplicitEmptyFalseBranch, content is EmptyView {
-        return []
-      }
-      return resolveBranchElements(content, in: context, component: "false")
     }
   }
 

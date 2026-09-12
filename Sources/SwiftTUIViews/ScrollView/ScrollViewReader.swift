@@ -69,7 +69,7 @@ public struct ScrollViewProxy {
 }
 
 /// Provides imperative scroll control for descendant scroll views.
-public struct ScrollViewReader<Content: View>: PrimitiveView, ResolvableView {
+public struct ScrollViewReader<Content: View>: PrimitiveView, IterativeResolvableView {
   private let bridge: ScrollViewProxyBridge
   private let content: Content
 
@@ -81,7 +81,7 @@ public struct ScrollViewReader<Content: View>: PrimitiveView, ResolvableView {
     self.content = content(ScrollViewProxy(bridge: bridge))
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let contentContext = context.child(component: .named("ScrollViewReaderContent"))
     bridge.configure(
       registry: context.scrollCommandRegistry,
@@ -89,7 +89,7 @@ public struct ScrollViewReader<Content: View>: PrimitiveView, ResolvableView {
       invalidationIdentity: contentContext.identity,
       invalidator: context.invalidationProxy?.invalidator
     )
-    return content.resolveElements(in: contentContext)
+    return content.resolveElementsWork(in: contentContext)
   }
 }
 

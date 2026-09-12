@@ -224,7 +224,7 @@ public struct AnyToggleStyle: Sendable, CustomStringConvertible, CustomDebugStri
 
   @MainActor
   package func resolveBody(configuration: ToggleStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     box.resolveBody(configuration: configuration, in: context)
   }
@@ -333,14 +333,14 @@ private protocol AnyToggleStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(configuration: ToggleStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyToggleStyleBox where S: ToggleStyle {
 
   @MainActor
   func resolveBody(configuration: ToggleStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,

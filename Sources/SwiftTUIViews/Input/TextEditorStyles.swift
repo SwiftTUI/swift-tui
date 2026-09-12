@@ -222,7 +222,7 @@ public struct AnyTextEditorStyle: Sendable, CustomStringConvertible, CustomDebug
 
   @MainActor
   package func resolveBody(configuration: TextEditorStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     box.resolveBody(configuration: configuration, in: context)
   }
@@ -337,14 +337,14 @@ private protocol AnyTextEditorStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(configuration: TextEditorStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyTextEditorStyleBox where S: TextEditorStyle {
 
   @MainActor
   func resolveBody(configuration: TextEditorStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,

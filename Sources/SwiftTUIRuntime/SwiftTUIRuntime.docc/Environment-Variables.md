@@ -109,9 +109,8 @@ mains get 8 MiB).
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `SWIFTTUI_STACK_LEAN_PROFILE` | exactly `0` or `1` | The stack-lean resolve profile: lean ambient slots instead of task-locals, reuse/memo/selective evaluation off, chunked descent. Defaults on for WASI builds. On Windows it arms automatically when the measured main-thread stack reserve is below the 8 MiB full-engine floor (link with `-Xlinker /STACK:16777216` to run the full engine); an explicit value overrides that automatic choice, and a debug build that degrades emits a `windows.stack-floor-lean-profile` runtime issue. Otherwise off natively. Other values are ignored. |
+| `SWIFTTUI_STACK_LEAN_PROFILE` | exactly `0` or `1` | The stack-lean resolve profile: lean ambient slots instead of task-locals, reuse/memo/selective evaluation off; shares iterative descent with the full profile. Defaults on for WASI builds. On Windows it arms automatically when the measured main-thread stack reserve is below the 8 MiB full-engine floor (link with `-Xlinker /STACK:16777216` to run the full engine); an explicit value overrides that automatic choice, and a debug build that degrades emits a `windows.stack-floor-lean-profile` runtime issue. Otherwise off natively. Other values are ignored. |
 | `SWIFTTUI_LEAN_RETAINED_REUSE` | exactly `1` | Re-enables retained reuse under the lean profile (a reuse hit shortens the descent, so it can only shallow the stack). Ignored when the lean profile is off. |
-| `SWIFTTUI_RESOLVE_DEPTH_LIMIT` | positive integer | Overrides the chunked-descent depth cap (default 6 under the lean profile) and force-enables the chunked resolve driver on native builds for debugging. `0` or negative disables the driver. |
 
 ### Soundness and verification gates
 
@@ -198,3 +197,8 @@ and `swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md`), not here.
 - <doc:Runtime-Render-Pipeline>
 - ``RuntimeRenderMode``
 - ``RunLoop/renderMode``
+
+`SWIFTTUI_ASSERT_ITERATIVE_RESOLVE=1` enables a development assertion that rejects
+a synchronous resolver drain nested inside another drain. It detects internal
+child paths that bypass the continuation protocol. It also rejects explicit
+authored renderer re-entry, so it is intended for framework validation.

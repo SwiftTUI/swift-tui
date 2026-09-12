@@ -442,16 +442,16 @@ struct StateCaptureBindingTests {
     }
   }
 
-  private struct ResolvableCaptureHost: PrimitiveView, ResolvableView {
+  private struct ResolvableCaptureHost: PrimitiveView, IterativeResolvableView {
     @State private var value = "seed"
     let log: ClosureLog
 
-    func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
       withDynamicPropertyUpdateScope(self, for: context) {
         log.bodyObserved.append(value)
         log.read = { value }
         log.write = { value = $0 }
-        return resolveViewElements(Text(value), in: context)
+        return resolveViewElementsWork(Text(value), in: context)
       }
     }
   }

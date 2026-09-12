@@ -11,7 +11,7 @@ protocol AnyTabViewStyleBox: AnyStyleBox {
   func resolveBody(
     configuration: TabViewStyleBodyConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode
+  ) -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyTabViewStyleBox where S: TabViewStyle {
@@ -27,7 +27,7 @@ extension ConcreteStyleBox: AnyTabViewStyleBox where S: TabViewStyle {
   func resolveBody(
     configuration: TabViewStyleBodyConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     // TabBody is the seam the `8ace32a5` regression wedged on, and so the
     // reason `resolveStyleBody` rebases rather than mints a fresh scope.
     resolveBody(

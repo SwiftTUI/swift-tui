@@ -305,7 +305,7 @@ public struct AnyDisclosureGroupStyle: Sendable, CustomStringConvertible,
   @MainActor
   package func resolveBody(
     configuration: DisclosureGroupStyleConfiguration, in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     box.resolveBody(configuration: configuration, in: context)
   }
 }
@@ -386,14 +386,14 @@ private protocol AnyDisclosureGroupStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(configuration: DisclosureGroupStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyDisclosureGroupStyleBox where S: DisclosureGroupStyle {
 
   @MainActor
   func resolveBody(configuration: DisclosureGroupStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,

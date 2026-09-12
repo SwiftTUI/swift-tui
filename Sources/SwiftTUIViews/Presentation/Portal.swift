@@ -1,28 +1,19 @@
 import SwiftTUICore
 
-/// Destination-owned content payload for portal-hosted UI.
+/// Destination-owned content, scheduled at its placement context.
 @MainActor
 package struct PortalAttachmentContentPayload: Sendable {
-  /// Declaration presence, without evaluating an opaque view body at the host.
   package let hasDeclaredContent: Bool
-  private let resolveElementsClosure:
-    @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
+  private let elements:
+    @MainActor @Sendable (ResolveContext, ResolveContext) -> ResolveWork<[ResolvedNode]>
 
   package init<V: View>(
     authoringContext: AuthoringContext? = currentAuthoringContext(),
     @ViewBuilder content: @escaping @MainActor () -> V
   ) {
-    // Build the view value at the declaration site so captured bindings
-    // keep pointing at their original owner. Resolve it later at the
-    // portal destination so dynamic properties inside the hosted content
-    // bind to destination graph nodes.
-    let output = withAuthoringContext(authoringContext) {
-      content()
-    }
+    let output = withAuthoringContext(authoringContext) { content() }
     hasDeclaredContent = !(output is EmptyView)
-    resolveElementsClosure = { context, _ in
-      [resolveView(output, in: context)]
-    }
+    elements = { context, _ in resolveViewWork(output, in: context).map { [$0] } }
   }
 
   package init(
@@ -30,25 +21,46 @@ package struct PortalAttachmentContentPayload: Sendable {
     resolveElements:
       @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
   ) {
+    self.init(
+      hasDeclaredContent: hasDeclaredContent,
+      resolveElementsWork: { context, root in
+        .deferred { .value(resolveElements(context, root)) }
+      })
+  }
+
+  package init(
+    hasDeclaredContent: Bool = true,
+    resolveElementsWork:
+      @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> ResolveWork<[ResolvedNode]>
+  ) {
     self.hasDeclaredContent = hasDeclaredContent
-    resolveElementsClosure = resolveElements
+    elements = resolveElementsWork
   }
 
-  package func resolveElements(
-    in context: ResolveContext,
-    placementRoot: ResolveContext? = nil
-  ) -> [ResolvedNode] {
-    resolveElementsClosure(context, placementRoot ?? context)
+  package func resolveElements(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> [ResolvedNode]
+  {
+    resolveElementsWork(in: context, placementRoot: placementRoot).run()
   }
 
-  package func resolve(
-    in context: ResolveContext,
-    placementRoot: ResolveContext? = nil
-  ) -> ResolvedNode {
-    normalizeResolvedElements(
-      resolveElements(in: context, placementRoot: placementRoot),
-      in: context
-    )
+  package func resolveElementsWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolveWork<[ResolvedNode]>
+  {
+    elements(context, placementRoot ?? context)
+  }
+
+  package func resolve(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolvedNode
+  {
+    resolveWork(in: context, placementRoot: placementRoot).run()
+  }
+
+  package func resolveWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolveWork<ResolvedNode>
+  {
+    resolveElementsWork(in: context, placementRoot: placementRoot).map {
+      normalizeResolvedElements($0, in: context)
+    }
   }
 }
 
@@ -109,6 +121,18 @@ package struct PortalAttachmentPayload: Sendable {
     payload.resolveElements(in: context, placementRoot: placementRoot)
   }
 
+  package func resolveElementsWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolveWork<[ResolvedNode]>
+  {
+    payload.resolveElementsWork(in: context, placementRoot: placementRoot)
+  }
+
+  package func resolveWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolveWork<ResolvedNode>
+  {
+    payload.resolveWork(in: context, placementRoot: placementRoot)
+  }
+
   package func attachingEdgeIfMissing(
     _ edge: PortalAttachmentEdge
   ) -> PortalAttachmentPayload {
@@ -122,12 +146,12 @@ package struct PortalAttachmentPayload: Sendable {
 }
 
 @MainActor
-package struct PortalAttachmentView: PrimitiveView, ResolvableView {
+package struct PortalAttachmentView: PrimitiveView, IterativeResolvableView {
   package var payload: PortalAttachmentPayload
   package var placementRoot: ResolveContext? = nil
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    payload.resolveElements(in: context, placementRoot: placementRoot)
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    payload.resolveElementsWork(in: context, placementRoot: placementRoot)
   }
 }
 
@@ -136,30 +160,38 @@ package struct PortalAttachmentView: PrimitiveView, ResolvableView {
 /// sequence adds no competing entity route; every deferred payload resolves
 /// relative to the stable sequence slot and keeps its declaration-side ID.
 @MainActor
-package struct PortalAttachmentSequenceView: PrimitiveView, ResolvableView,
+package struct PortalAttachmentSequenceView: PrimitiveView, IterativeResolvableView,
   DeclaredChildrenView
 {
   package var payloads: [PortalAttachmentPayload]
   package var fixedSizeChildren = false
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    if fixedSizeChildren {
-      return payloads.enumerated().map { index, payload in
-        resolveView(
-          PortalAttachmentView(
-            payload: payload,
-            placementRoot: context
-          )
-          .fixedSize(),
-          in: payloadContext(index: index, root: context)
-        )
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    let result = DeclaredChildrenWorkState()
+    return resolveSequentially(Array(payloads.enumerated())) { index, payload in
+      let childContext = payloadContext(index: index, root: context)
+      if fixedSizeChildren {
+        return resolveViewWork(
+          PortalAttachmentView(payload: payload, placementRoot: context).fixedSize(),
+          in: childContext
+        ).map {
+          result.nodes.append($0)
+        }
       }
-    }
-    return payloads.enumerated().flatMap { index, payload in
-      payload.resolveElements(
-        in: payloadContext(index: index, root: context),
-        placementRoot: context
-      )
+      return payload.resolveElementsWork(in: childContext, placementRoot: context).map {
+        result.nodes.append(contentsOf: $0)
+      }
+    }.map { result.nodes }
+  }
+
+  package func appendDeclaredChildrenWork(
+    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+  ) -> ResolveWork<Void> {
+    .deferred {
+      let childContext = context.indexedChild(
+        kind: .init(rawValue: kindName), index: state.nextIndex)
+      state.nextIndex += 1
+      return makeResolveWork(in: childContext).map { state.nodes.append(contentsOf: $0) }
     }
   }
 
@@ -189,8 +221,8 @@ package struct PortalAttachmentSequenceView: PrimitiveView, ResolvableView,
     )
     nextIndex += 1
     children.append(
-      ScopedContentPayload(resolveElements: { _, placementRoot in
-        resolveElements(in: sequenceContext.applying(to: placementRoot))
+      ScopedContentPayload(resolveElementsWork: { _, placementRoot in
+        makeResolveWork(in: sequenceContext.applying(to: placementRoot))
       })
     )
   }
@@ -209,8 +241,8 @@ package struct PortalAttachmentSequenceView: PrimitiveView, ResolvableView,
     children.append(
       PortalAttachmentContentPayload(
         hasDeclaredContent: payloads.contains { $0.hasDeclaredContent },
-        resolveElements: { _, placementRoot in
-          resolveElements(in: sequenceContext.applying(to: placementRoot))
+        resolveElementsWork: { _, placementRoot in
+          makeResolveWork(in: sequenceContext.applying(to: placementRoot))
         })
     )
   }
@@ -349,55 +381,34 @@ package func portalAttachmentDeclaredBuilderChildren<V: View>(
 }
 
 @MainActor
-package struct PortalAttachmentGroupView: PrimitiveView, ResolvableView {
+package struct PortalAttachmentGroupView: PrimitiveView, IterativeResolvableView {
   package var kindName: String
   package var payloads: [PortalAttachmentPayload]
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     switch payloads.count {
-    case 0:
-      return []
-    case 1:
-      return payloads[0].resolveElements(
-        in: context,
-        placementRoot: context
-      )
+    case 0: return .value([])
+    case 1: return payloads[0].resolveElementsWork(in: context, placementRoot: context)
     default:
-      return [
-        resolvePortalAttachmentGroupElements(
-          kindName: kindName,
-          payloads: payloads,
-          in: context
-        )
-      ]
+      context.recordResolvedComputation()
+      let result = DeclaredChildrenWorkState()
+      return resolveSequentially(Array(payloads.enumerated())) { index, payload in
+        payload.resolveElementsWork(
+          in: context.indexedChild(kind: .init(rawValue: kindName), index: index),
+          placementRoot: context
+        ).map {
+          result.nodes.append(contentsOf: $0)
+        }
+      }.map {
+        [
+          ResolvedNode(
+            identity: context.identity, kind: .view(kindName),
+            typeDiscriminator: kindName == "Group"
+              ? ObjectIdentifier(SynthesizedGroupWrapperMarker.self) : nil,
+            children: result.nodes, environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction)
+        ]
+      }
     }
   }
-}
-
-@MainActor
-private func resolvePortalAttachmentGroupElements(
-  kindName: String = "Group",
-  payloads: [PortalAttachmentPayload],
-  in context: ResolveContext
-) -> ResolvedNode {
-  context.recordResolvedComputation()
-  let resolvedChildren = payloads.enumerated().flatMap { index, payload in
-    payload.resolveElements(
-      in: context.indexedChild(
-        kind: .init(rawValue: kindName),
-        index: index
-      ),
-      placementRoot: context
-    )
-  }
-
-  return ResolvedNode(
-    identity: context.identity,
-    kind: .view(kindName),
-    typeDiscriminator: kindName == "Group"
-      ? ObjectIdentifier(SynthesizedGroupWrapperMarker.self) : nil,
-    children: resolvedChildren,
-    environmentSnapshot: context.environment,
-    transactionSnapshot: context.transaction
-  )
 }

@@ -320,14 +320,14 @@ private final class TabResolutionProbe {
   var counts: [String: Int] = [:]
 }
 
-private struct ResolutionCountingTabLeaf: PrimitiveView, ResolvableView {
+private struct ResolutionCountingTabLeaf: PrimitiveView, IterativeResolvableView {
   let name: String
   let probe: TabResolutionProbe
 
   @MainActor
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     probe.counts[name, default: 0] += 1
-    return resolveViewElements(Text("Opaque \(name)"), in: context)
+    return resolveViewElementsWork(Text("Opaque \(name)"), in: context)
   }
 }
 

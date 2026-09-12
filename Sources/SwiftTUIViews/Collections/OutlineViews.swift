@@ -393,7 +393,7 @@ private struct OutlineEntry<Element, ID: Hashable & Sendable>: Identifiable {
   let isLast: Bool
 }
 
-private struct OutlineRow<Content: View>: PrimitiveView, ResolvableView {
+private struct OutlineRow<Content: View>: PrimitiveView, IterativeResolvableView {
   let prefix: String
   let content: Content
   let authoringScope: AuthoringContext?
@@ -422,36 +422,38 @@ private struct OutlineRow<Content: View>: PrimitiveView, ResolvableView {
     }
   }
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let isHosted = context.environmentValues.isResolvingHostedCollectionContent
     let renderedPrefix =
       isHosted
       ? String(prefix.drop(while: \.isWhitespace))
       : prefix
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("OutlineRow"),
-        children: resolveDeclaredChildren(
-          rowBody(prefix: renderedPrefix, spacing: isHosted ? 1 : 0),
-          in: context.child(component: .named("Content")),
-          kindName: "OutlineRow"
-        ),
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        semanticMetadata: .init(isHostedCollectionRowBoundary: true)
-      )
-    ]
+    return resolveDeclaredChildrenWork(
+      rowBody(prefix: renderedPrefix, spacing: isHosted ? 1 : 0),
+      in: context.child(component: .named("Content")),
+      kindName: "OutlineRow"
+    ).map { children in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("OutlineRow"),
+          children: children,
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          semanticMetadata: .init(isHostedCollectionRowBoundary: true)
+        )
+      ]
+    }
   }
 }
 
-private struct ScopedOutlineRowContent<Content: View>: PrimitiveView, ResolvableView {
+private struct ScopedOutlineRowContent<Content: View>: PrimitiveView, IterativeResolvableView {
   let authoringScope: AuthoringContext?
   let content: Content
 
-  func resolveElements(
+  func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     // Mint a per-row owner for the row content by routing through
     // `resolveView`, so each outline row's row-local `@State` binds to its own
     // node keyed on `context.identity` — already the per-row explicit-ID
@@ -467,19 +469,20 @@ private struct ScopedOutlineRowContent<Content: View>: PrimitiveView, Resolvable
     // and the row content is still built under `authoringScope` in
     // `OutlineTree.rowView(for:)`, so a row button that mutates enclosing state
     // still routes to the enclosing owner.
-    let resolved = withAuthoringContext(authoringScope) {
-      resolveView(content, in: context)
+    return withAuthoringContext(authoringScope) {
+      resolveViewWork(content, in: context)
+    }.map { resolved in
+      // Splicing lifts the row content's children into the enclosing outline
+      // container, so the group's own minted node — this row's `@State` owner —
+      // lives in no children slot, and a dropped value's mint lives in none
+      // either. Both are anchored at the nearest declaring host.
+      return consumeDeclaredChild(
+        resolved,
+        resolvedUnder: context.identity,
+        in: context.viewGraph,
+        policy: .declaredBuilder
+      )
     }
-    // Splicing lifts the row content's children into the enclosing outline
-    // container, so the group's own minted node — this row's `@State` owner —
-    // lives in no children slot, and a dropped value's mint lives in none
-    // either. Both are anchored at the nearest declaring host.
-    return consumeDeclaredChild(
-      resolved,
-      resolvedUnder: context.identity,
-      in: context.viewGraph,
-      policy: .declaredBuilder
-    )
   }
 }
 

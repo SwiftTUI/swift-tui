@@ -185,9 +185,25 @@ Automatic flattening requires a mutable class on the child storage. The package
 `Sendable` policy requires a `Mutex` for reads of that class. This cost is not
 acceptable on the engine's hottest accessor.
 
-Nesting far below these bounds is first limited by resolve. This descent
-recurses for each view level on the main actor. `DeferredResolveDriver`
-chunks it on hosts whose stack budget is small enough to need it.
+Authored-view resolution uses typed `ResolveWork` continuations on every host.
+A main-actor driver drains descent and completion jobs from a heap worklist.
+Parents consume completed child values once, including Group/Empty splicing,
+entity occurrence claims, style route checks and preference folds. There is no
+placeholder or ancestor replay pass.
+
+Each job reinstalls the effective view-node, authoring, environment, entity,
+resolve-lifetime, style-route, observation-certificate and dormant-state scopes.
+Registration capture and forwarded dynamic-property preparation stay open across
+the logical child evaluation and close when its completion runs. Sibling order
+remains depth-first. The driver drains synchronously, so no continuation crosses
+a frame checkpoint. Dirty evaluators and delayed layout realization start a new
+drain at their synchronous entry boundary.
+
+This bounds framework-owned authored descent. Authored callbacks that explicitly
+re-enter an engine and recursive value-storage destruction retain their existing
+separate depth contracts. In particular, a tiny host stack can still overflow
+while destroying an otherwise successfully resolved deep value tree; the
+`flattenForRelease()` guidance above continues to apply.
 
 ### Commit
 

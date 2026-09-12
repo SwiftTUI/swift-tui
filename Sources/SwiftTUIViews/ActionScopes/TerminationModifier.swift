@@ -19,7 +19,7 @@ extension View {
   }
 }
 
-public struct TerminationRequestModifier: PrimitiveViewModifier, Sendable {
+public struct TerminationRequestModifier: IterativePrimitiveViewModifier, Sendable {
   package let authoringContext: ImperativeAuthoringContextSnapshot?
   package let action: @MainActor @Sendable (TerminationRequest) -> TerminationDisposition
 
@@ -31,19 +31,22 @@ public struct TerminationRequestModifier: PrimitiveViewModifier, Sendable {
     self.action = action
   }
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    intake.registerTerminationHandler(
-      identity: node.identity,
-      handler: action
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      intake.registerTerminationHandler(
+        identity: node.identity,
+        handler: action
+      )
+      return [node]
+
+    }
   }
 }

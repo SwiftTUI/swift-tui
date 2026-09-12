@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 /// Increments or decrements a numeric binding.
-public struct Stepper<Label: View>: PrimitiveView, ResolvableView {
+public struct Stepper<Label: View>: PrimitiveView, IterativeResolvableView {
   private enum ValueStorage {
     case integer(Binding<Int>, bounds: ClosedRange<Int>?, step: Int)
     case double(Binding<Double>, bounds: ClosedRange<Double>?, step: Double)
@@ -71,17 +71,17 @@ public struct Stepper<Label: View>: PrimitiveView, ResolvableView {
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
 extension Stepper {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     switch valueStorage {
     case .integer(let binding, let bounds, let step):
       resolvedNode(
@@ -105,7 +105,7 @@ extension Stepper {
     bounds: ClosedRange<Value>?,
     step: Value,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -195,19 +195,22 @@ extension Stepper {
       isPressed: isPressed,
       styleEnvironment: styleEnvironment)
     configuration.bindRoutes(to: context.identity)
-    let child = context.environmentValues.stepperStyle.resolveBody(
-      configuration: configuration, in: context.child(component: .named("StepperBody")))
+    return context.environmentValues.stepperStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("StepperBody"))
+    ).map { child in
 
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("Stepper"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        focusInteractions: .edit,
-        accessibilityRole: .stepper
-      ).namingControl(with: label)
-    )
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("Stepper"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: focusableControlMetadata(
+          focusInteractions: .edit,
+          accessibilityRole: .stepper
+        ).namingControl(with: label)
+      )
+
+    }
   }
 }

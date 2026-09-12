@@ -875,12 +875,12 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
   }
 }
 
-struct LayoutContainer<Content: View>: PrimitiveView, ResolvableView {
+struct LayoutContainer<Content: View>: PrimitiveView, IterativeResolvableView {
   var layout: AnyLayout
   var authoringScope: AuthoringContext?
   var content: Content
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     // The container's declared orientation reaches its children the way a
     // built-in stack's does (plan 2026-08-31-001): `Spacer` and `Divider`
     // read `\.stackAxis` at resolve time. Installed unconditionally — a
@@ -897,24 +897,26 @@ struct LayoutContainer<Content: View>: PrimitiveView, ResolvableView {
     // produces multiple elements (for example `ForEach`) would be collapsed
     // into an implicit `Group`, and the layout would see one overlapping
     // subview instead of distinct siblings.
-    let resolvedChildren = withAuthoringContext(authoringScope) {
-      resolveDeclaredChildren(
+    return withAuthoringContext(authoringScope) {
+      resolveDeclaredChildrenWork(
         content,
         in: childContext,
         kindName: "Layout"
       )
     }
 
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view(layout.debugName),
-        children: resolvedChildren,
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: layout.resolvedBehavior
-      )
-    ]
+    .map { resolvedChildren in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view(layout.debugName),
+          children: resolvedChildren,
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: layout.resolvedBehavior
+        )
+      ]
+    }
   }
 }
 

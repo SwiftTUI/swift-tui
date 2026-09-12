@@ -254,7 +254,7 @@ public struct AnyPaletteStyle: Sendable, CustomStringConvertible, CustomDebugStr
 
   @MainActor
   package func resolveBody(configuration: PaletteStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     box.resolveBody(configuration: configuration, in: context)
   }
@@ -269,13 +269,13 @@ extension AnyPaletteStyle: TypedReuseEqualityProviding {
 
 private protocol AnyPaletteStyleBox: AnyStyleBox {
   @MainActor func resolveBody(configuration: PaletteStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyPaletteStyleBox where S: PaletteStyle {
   @MainActor
   func resolveBody(configuration: PaletteStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,

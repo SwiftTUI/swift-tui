@@ -178,7 +178,7 @@ func styleRoute<Content: View>(target: StyleRouteTarget?, content: Content) -> s
 /// A first installation resolves exactly as `PointerRouteView` does. A
 /// repeated installation within the same style-body resolve reports through
 /// the shared misuse channel and resolves its content without a route.
-package struct StyleRouteView<Content: View>: PrimitiveView, ResolvableView {
+package struct StyleRouteView<Content: View>: PrimitiveView, IterativeResolvableView {
   package var target: StyleRouteTarget
   package var content: Content
 
@@ -190,9 +190,9 @@ package struct StyleRouteView<Content: View>: PrimitiveView, ResolvableView {
     self.content = content
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     if let ledger = StyleRouteInstallationLedgerStorage.current,
       !ledger.claim(target.identity)
     {
@@ -207,15 +207,27 @@ package struct StyleRouteView<Content: View>: PrimitiveView, ResolvableView {
           identity: target.identity
         )
       )
-      return [
-        content.resolve(in: context.child(component: .named("content")))
-      ]
+      return content.resolveWork(in: context.child(component: .named("content"))).map { [$0] }
     }
     return PointerRouteView(
       identity: target.identity,
       content: content,
       captureOnPress: target.captureOnPress
     )
-    .resolveElements(in: context)
+    .makeResolveWork(in: context)
+  }
+}
+
+@MainActor
+package func withStyleRouteAlternativesWork<Result>(_ body: () -> ResolveWork<Result>)
+  -> ResolveWork<Result>
+{
+  guard let ledger = StyleRouteInstallationLedgerStorage.current else { return body() }
+  let prior = StyleRouteInstallationLedgerStorage.forksPerDeclaredChild
+  StyleRouteInstallationLedgerStorage.forksPerDeclaredChild = true
+  defer { StyleRouteInstallationLedgerStorage.forksPerDeclaredChild = prior }
+  return body().map { result in
+    ledger.absorbAlternatives()
+    return result
   }
 }

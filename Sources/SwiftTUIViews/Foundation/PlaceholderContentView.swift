@@ -11,7 +11,7 @@ import SwiftTUICore
 /// For the scoped `body:` forms the placeholder also restores the transaction
 /// that was in effect *outside* the modifier for the wrapped view, so only
 /// the modifiers applied inside the closure see the scoped animation.
-public struct PlaceholderContentView<Base: View>: PrimitiveView, ResolvableView {
+public struct PlaceholderContentView<Base: View>: PrimitiveView, IterativeResolvableView {
   package let base: Base
   /// The transaction to re-install for `base`, or `nil` to resolve `base`
   /// under the ambient transaction.
@@ -22,9 +22,9 @@ public struct PlaceholderContentView<Base: View>: PrimitiveView, ResolvableView 
     self.restoredTransaction = restoredTransaction
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     guard let restoredTransaction else {
-      return base.resolveElements(in: context)
+      return base.resolveElementsWork(in: context)
     }
     // Two nodes. The outer one is the placeholder the scoped closure
     // decorates: a modifier that stamps its content node (opacity, draw
@@ -39,25 +39,26 @@ public struct PlaceholderContentView<Base: View>: PrimitiveView, ResolvableView 
     // The restored transaction must survive nested `resolveView` frame-input
     // refreshes below this node, exactly like an authored edit (F137).
     contentContext.propagated.authoredTransactionOverride = true
-    let contentNode = resolveView(base, in: contentContext)
+    return resolveViewWork(base, in: contentContext).map { contentNode in
 
-    var restoreSnapshot = restoredTransaction
-    restoreSnapshot.scopeRole = .restoresOuter
-    let restoreNode = ResolvedNode(
-      identity: restoreContext.identity,
-      kind: .view("PlaceholderRestore"),
-      children: [contentNode],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: restoreSnapshot
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("PlaceholderContent"),
-        children: [restoreNode],
+      var restoreSnapshot = restoredTransaction
+      restoreSnapshot.scopeRole = .restoresOuter
+      let restoreNode = ResolvedNode(
+        identity: restoreContext.identity,
+        kind: .view("PlaceholderRestore"),
+        children: [contentNode],
         environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
+        transactionSnapshot: restoreSnapshot
       )
-    ]
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("PlaceholderContent"),
+          children: [restoreNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
+        )
+      ]
+    }
   }
 }

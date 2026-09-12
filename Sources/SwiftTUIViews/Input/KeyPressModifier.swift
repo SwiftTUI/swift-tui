@@ -71,7 +71,7 @@ extension View {
   }
 }
 
-public struct KeyPressModifier: PrimitiveViewModifier, Sendable {
+public struct KeyPressModifier: IterativePrimitiveViewModifier, Sendable {
   package let match: KeyPressMatch
   package let authoringContext: ImperativeAuthoringContextSnapshot?
   package let action: @MainActor @Sendable (KeyPress) -> KeyPressResult
@@ -86,29 +86,32 @@ public struct KeyPressModifier: PrimitiveViewModifier, Sendable {
     self.action = action
   }
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
-    // A disabled ancestor must suppress key-press handling, matching how
-    // `Button`/`Toggle` skip action registration when `isEnabled` is false.
-    // Without this guard a `.disabled(true)` subtree still registers focused
-    // key-press handlers, so the key would dispatch to a view the user cannot
-    // interact with.
-    guard context.environmentValues.isEnabled else {
-      return [node]
-    }
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    intake.registerKeyPressHandler(identity: node.identity) { keyPress in
-      guard match.matches(keyPress) else {
-        return false
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
+      // A disabled ancestor must suppress key-press handling, matching how
+      // `Button`/`Toggle` skip action registration when `isEnabled` is false.
+      // Without this guard a `.disabled(true)` subtree still registers focused
+      // key-press handlers, so the key would dispatch to a view the user cannot
+      // interact with.
+      guard context.environmentValues.isEnabled else {
+        return [node]
       }
-      return action(keyPress) == .handled
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      intake.registerKeyPressHandler(identity: node.identity) { keyPress in
+        guard match.matches(keyPress) else {
+          return false
+        }
+        return action(keyPress) == .handled
+      }
+      return [node]
+
     }
-    return [node]
   }
 }

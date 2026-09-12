@@ -1,7 +1,9 @@
 import SwiftTUICore
 
 /// A compact progress bar with optional label and current-value content.
-public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView, ResolvableView {
+public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
+  IterativeResolvableView
+{
   public var value: Double
   public var total: Double
   public var barWidth: Int
@@ -95,15 +97,15 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     self.currentValueLabel = currentValueLabel()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     withDynamicPropertyUpdateScope(self, for: context) {
-      [resolvedNode(in: context)]
+      resolvedNode(in: context).map { [$0] }
     }
   }
 
-  private func resolvedNode(in context: ResolveContext) -> ResolvedNode {
+  private func resolvedNode(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
     let fraction = progressFraction(value: value, total: total)
     let animates = isIndeterminate && !context.environmentValues.renderingReduceMotion
     var tasks: [TaskDescriptor] = []
@@ -137,16 +139,19 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
       accessibilityReduceMotion: context.environmentValues.renderingReduceMotion,
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
-    let child = context.environmentValues.progressViewStyle.resolveBody(
-      configuration: configuration, in: context.child(component: .named("ProgressViewBody")))
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("ProgressView"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: SemanticMetadata(accessibilityRole: .status).namingControl(with: label),
-      lifecycleMetadata: .init(tasks: tasks)
-    )
+    return context.environmentValues.progressViewStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("ProgressViewBody"))
+    ).map { child in
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("ProgressView"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: SemanticMetadata(accessibilityRole: .status).namingControl(with: label),
+        lifecycleMetadata: .init(tasks: tasks)
+      )
+
+    }
   }
 }

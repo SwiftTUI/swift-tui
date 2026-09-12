@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 /// A typed scoped view wrapper that preserves the original authoring scope.
-package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
+package struct ScopedBuilder<Output: View>: PrimitiveView, IterativeResolvableView {
   // `var`, and read directly by `resolveElements`: the forwarded update pass
   // mutates this payload in place (plan 2026-08-30-001 §3.4). The initializer
   // used to capture `output` in a stored `resolveElementsClosure`, which would
@@ -34,7 +34,7 @@ package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
     output
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     // A scoped builder with no captured scope resolves as a fresh authored
     // subtree at its destination, not inheriting whatever task-local authoring
     // context happened to be active in the parent wrapper.
@@ -45,7 +45,7 @@ package struct ScopedBuilder<Output: View>: PrimitiveView, ResolvableView {
     // own `resolveView` still binds its `@State` ownership before its
     // `resolveElements` evaluates.
     withAuthoringContext(authoringContext) {
-      resolveViewElements(output, in: context)
+      resolveViewElementsWork(output, in: context)
     }
   }
 

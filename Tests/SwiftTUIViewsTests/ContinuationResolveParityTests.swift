@@ -3,15 +3,9 @@ import Testing
 @testable import SwiftTUICore
 @testable import SwiftTUIViews
 
-/// The depth-capped worklist resolve (`DeferredResolveDriver`): a resolve
-/// pass whose inline descent is capped at K levels must produce the same
-/// committed graph as the unbounded recursion — the cut serves the node's
-/// stale committed snapshot as a structural placeholder, the drain
-/// re-resolves the subtree from a shallow stack, and the ancestor snapshot
-/// rebuild splices the result. These tests force tiny caps on native so the
-/// WASI-only production profile's mechanism is exercised by the repo gate.
+/// State, identity, preferences and lifecycle parity across explicit continuations.
 @MainActor
-struct DeferredResolveChunkingTests {
+struct ContinuationResolveParityTests {
   // MARK: - Harness
 
   private func makeContext(
@@ -47,7 +41,7 @@ struct DeferredResolveChunkingTests {
   }
 
   /// Type-erased nesting: wraps `leaf` in `levels` single-child VStacks so
-  /// the resolve descent is guaranteed deeper than any test cap.
+  /// the runtime nesting crosses many continuation boundaries.
   private func nested(_ levels: Int, leaf: some View) -> AnyView {
     var current = AnyView(leaf)
     for _ in 0..<levels {
@@ -58,7 +52,7 @@ struct DeferredResolveChunkingTests {
   }
 
   /// Structural projection that ignores per-graph bookkeeping (node IDs mint
-  /// in a different order under chunking) but pins identity, kind, entity
+  /// independently in different graphs) but pins identity, kind, entity
   /// identity + occurrence, and tree shape.
   private func structuralDescription(
     _ node: ResolvedNode,
@@ -89,8 +83,8 @@ struct DeferredResolveChunkingTests {
 
   // MARK: - First-sight parity
 
-  @Test("a first-sight chunked resolve commits the unchunked structure")
-  func firstSightChunkedMatchesUnchunkedStructure() {
+  @Test("a first-sight independent resolve commits the baseline structure")
+  func firstSightIndependentMatchesUnindependentStructure() {
     let rootIdentity = testIdentity("Root")
     let view = nested(
       8,
@@ -103,39 +97,22 @@ struct DeferredResolveChunkingTests {
     let baselineGraph = ViewGraph()
     let baseline = resolveFrame(view, graph: baselineGraph, rootIdentity: rootIdentity)
 
-    let chunkedGraph = ViewGraph()
-    chunkedGraph.setDeferredResolveDepthLimitForTesting(2)
-    let chunked = resolveFrame(view, graph: chunkedGraph, rootIdentity: rootIdentity)
+    let independentGraph = ViewGraph()
+    let independent = resolveFrame(view, graph: independentGraph, rootIdentity: rootIdentity)
 
     #expect(
-      chunkedGraph.deferredResolveDriver.deferralCount > 0,
-      "the cap never engaged — the fixture is shallower than the cut depth"
-    )
-    // Cuts only fire at structural child edges, so inline descent may
-    // overshoot the cap by the deepest non-structural chain (here the
-    // AnyView payload level) — but must stay far below the unbounded depth.
-    #expect(
-      chunkedGraph.deferredResolveDriver.maxDescentDepth
-        < baselineGraph.deferredResolveDriver.maxDescentDepth / 2,
-      """
-      chunked inline depth \(chunkedGraph.deferredResolveDriver.maxDescentDepth) \
-      is not meaningfully below the unbounded \
-      \(baselineGraph.deferredResolveDriver.maxDescentDepth)
-      """
+      structuralDescription(independent) == structuralDescription(baseline)
     )
     #expect(
-      structuralDescription(chunked) == structuralDescription(baseline)
-    )
-    #expect(
-      !containsKind(chunked, named: "DeferredResolvePlaceholder"),
+      !containsKind(independent, named: "DeferredResolvePlaceholder"),
       "a placeholder leaked past the drain into the committed tree"
     )
   }
 
   // MARK: - Steady-state parity
 
-  @Test("a chunked second frame recommits the unchunked first frame byte-for-byte")
-  func steadyStateChunkedFrameMatchesUnchunkedCommit() {
+  @Test("a independent second frame recommits the baseline first frame byte-for-byte")
+  func steadyStateIndependentFrameMatchesUnindependentCommit() {
     let rootIdentity = testIdentity("Root")
     let view = nested(
       8,
@@ -148,18 +125,16 @@ struct DeferredResolveChunkingTests {
     let graph = ViewGraph()
     let first = resolveFrame(view, graph: graph, rootIdentity: rootIdentity)
 
-    graph.setDeferredResolveDepthLimitForTesting(2)
     let second = resolveFrame(view, graph: graph, rootIdentity: rootIdentity)
 
-    #expect(graph.deferredResolveDriver.deferralCount > 0)
     #expect(
       structuralDescription(second) == structuralDescription(first)
     )
   }
 
-  // MARK: - Preference bubbling across the cut
+  // MARK: - Preference bubbling across continuations
 
-  @Test("toolbar-item preferences authored below the cut bubble to the root")
+  @Test("toolbar-item preferences authored across continuations bubble to the root")
   func toolbarPreferencesBubbleAcrossTheCut() {
     let rootIdentity = testIdentity("Root")
     let view = nested(
@@ -173,22 +148,20 @@ struct DeferredResolveChunkingTests {
     let baseline = resolveFrame(view, graph: baselineGraph, rootIdentity: rootIdentity)
     let baselineItems = baseline.preferenceValues[ToolbarItemsPreferenceKey.self]
 
-    let chunkedGraph = ViewGraph()
-    chunkedGraph.setDeferredResolveDepthLimitForTesting(2)
-    let chunked = resolveFrame(view, graph: chunkedGraph, rootIdentity: rootIdentity)
-    let chunkedItems = chunked.preferenceValues[ToolbarItemsPreferenceKey.self]
+    let independentGraph = ViewGraph()
+    let independent = resolveFrame(view, graph: independentGraph, rootIdentity: rootIdentity)
+    let independentItems = independent.preferenceValues[ToolbarItemsPreferenceKey.self]
 
-    #expect(chunkedGraph.deferredResolveDriver.deferralCount > 0)
     #expect(baselineItems.map(\.title) == ["Deep"])
     #expect(
-      chunkedItems.map(\.title) == baselineItems.map(\.title),
-      "the spliced subtree's preferences did not rebuild through the ancestor spine"
+      independentItems.map(\.title) == baselineItems.map(\.title),
+      "child preferences did not propagate through their parent continuations"
     )
   }
 
-  // MARK: - Lifecycle events across the cut
+  // MARK: - Lifecycle events across continuations
 
-  @Test("appear and task events for subtrees below the cut match the unchunked frame")
+  @Test("appear and task events for subtrees across continuations match the baseline frame")
   func lifecycleEventsMatchAcrossTheCut() {
     let rootIdentity = testIdentity("Root")
     func probe() -> AnyView {
@@ -204,52 +177,48 @@ struct DeferredResolveChunkingTests {
     _ = resolveFrame(probe(), graph: baselineGraph, rootIdentity: rootIdentity)
     let baselineState = baselineGraph.debugTotalStateSnapshot()
 
-    let chunkedGraph = ViewGraph()
-    chunkedGraph.setDeferredResolveDepthLimitForTesting(2)
-    _ = resolveFrame(probe(), graph: chunkedGraph, rootIdentity: rootIdentity)
-    let chunkedState = chunkedGraph.debugTotalStateSnapshot()
+    let independentGraph = ViewGraph()
+    _ = resolveFrame(probe(), graph: independentGraph, rootIdentity: rootIdentity)
+    let independentState = independentGraph.debugTotalStateSnapshot()
 
-    #expect(chunkedGraph.deferredResolveDriver.deferralCount > 0)
     #expect(
-      chunkedState.structuralAppearEvents.map(\.identity)
+      independentState.structuralAppearEvents.map(\.identity)
         == baselineState.structuralAppearEvents.map(\.identity),
-      "appear events dropped or reordered across the chunk boundary"
+      "appear events dropped or reordered across the continuation boundary"
     )
     #expect(
-      chunkedState.stableTaskStartEvents.map(\.identity)
+      independentState.stableTaskStartEvents.map(\.identity)
         == baselineState.stableTaskStartEvents.map(\.identity)
     )
     #expect(
-      chunkedState.stableTaskCancelEvents.isEmpty
+      independentState.stableTaskCancelEvents.isEmpty
         == baselineState.stableTaskCancelEvents.isEmpty
     )
   }
 
-  @Test("a steady chunked re-resolve emits no spurious task cancels or restarts")
-  func steadyChunkedFrameKeepsTasksStable() {
+  @Test("a steady independent re-resolve emits no spurious task cancels or restarts")
+  func steadyIndependentFrameKeepsTasksStable() {
     let rootIdentity = testIdentity("Root")
     let view = nested(6, leaf: Text("alive").task {})
 
     let graph = ViewGraph()
     _ = resolveFrame(view, graph: graph, rootIdentity: rootIdentity)
 
-    graph.setDeferredResolveDepthLimitForTesting(2)
     _ = resolveFrame(view, graph: graph, rootIdentity: rootIdentity)
     let state = graph.debugTotalStateSnapshot()
 
-    #expect(graph.deferredResolveDriver.deferralCount > 0)
     #expect(
       state.stableTaskCancelEvents.isEmpty,
-      "the cut's stale placeholder commit was diffed as a task change"
+      "a completed steady pass was diffed as a task change"
     )
     #expect(
       state.stableTaskStartEvents.isEmpty,
-      "a steady frame restarted an already-running task across the cut"
+      "a steady frame restarted an already-running task across continuations"
     )
     #expect(state.structuralAppearEvents.isEmpty)
   }
 
-  // MARK: - State across the cut and across boundary movement
+  // MARK: - State across continuations and across boundary movement
 
   @MainActor
   private final class StateProbeBox {
@@ -270,16 +239,14 @@ struct DeferredResolveChunkingTests {
     }
   }
 
-  @Test("state below the cut persists when the chunk boundary moves between frames")
+  @Test("state across continuations persists when the continuation boundary moves between frames")
   func statePersistsAcrossBoundaryMovement() throws {
     let rootIdentity = testIdentity("Root")
     let captured = StateProbeBox()
     let view = nested(6, leaf: CountingLeaf(captured: captured))
 
     let graph = ViewGraph()
-    graph.setDeferredResolveDepthLimitForTesting(3)
     _ = resolveFrame(view, graph: graph, rootIdentity: rootIdentity)
-    #expect(graph.deferredResolveDriver.deferralCount > 0)
     #expect(captured.lastSeenCount == 0)
 
     let binding = try #require(captured.binding)
@@ -288,19 +255,17 @@ struct DeferredResolveChunkingTests {
       binding.wrappedValue = 42
     }
 
-    // The boundary moves: the node that was a chunk root last frame resolves
-    // inline this frame (and vice versa); its state slot must follow.
-    graph.setDeferredResolveDepthLimitForTesting(2)
+    // A second completed pass must keep the same state owner.
     _ = resolveFrame(view, graph: graph, rootIdentity: rootIdentity)
     #expect(
       captured.lastSeenCount == 42,
-      "the deferred re-resolve lost the state slot written between frames"
+      "the next resolve lost the state slot written between frames"
     )
   }
 
-  // MARK: - Entity identity occurrences across the cut
+  // MARK: - Entity identity occurrences across continuations
 
-  @Test("duplicate explicit-.id siblings keep distinct occurrences across the cut")
+  @Test("duplicate explicit-.id siblings keep distinct occurrences across continuations")
   func duplicateEntityOccurrencesSurviveTheCut() {
     let rootIdentity = testIdentity("Root")
     let view = nested(
@@ -314,14 +279,12 @@ struct DeferredResolveChunkingTests {
     let baselineGraph = ViewGraph()
     let baseline = resolveFrame(view, graph: baselineGraph, rootIdentity: rootIdentity)
 
-    let chunkedGraph = ViewGraph()
-    chunkedGraph.setDeferredResolveDepthLimitForTesting(2)
-    let chunked = resolveFrame(view, graph: chunkedGraph, rootIdentity: rootIdentity)
+    let independentGraph = ViewGraph()
+    let independent = resolveFrame(view, graph: independentGraph, rootIdentity: rootIdentity)
 
-    #expect(chunkedGraph.deferredResolveDriver.deferralCount > 0)
     #expect(
-      structuralDescription(chunked) == structuralDescription(baseline),
-      "entity occurrence assignment diverged across the chunk boundary"
+      structuralDescription(independent) == structuralDescription(baseline),
+      "entity occurrence assignment diverged across the continuation boundary"
     )
   }
 
@@ -333,25 +296,11 @@ struct DeferredResolveChunkingTests {
     let view = nested(8, leaf: Text("leaf"))
 
     let graph = ViewGraph()
-    graph.setDeferredResolveDepthLimitForTesting(2)
     _ = resolveFrame(view, graph: graph, rootIdentity: rootIdentity)
-    #expect(graph.deferredResolveDriver.isIdle)
+    #expect(ResolveWorkDiagnostics.activeDrains == 0)
 
     _ = resolveFrame(view, graph: graph, rootIdentity: rootIdentity)
-    #expect(graph.deferredResolveDriver.isIdle)
+    #expect(ResolveWorkDiagnostics.activeDrains == 0)
   }
 
-  @Test("the native default leaves the driver disabled")
-  func nativeDefaultDisablesTheDriver() {
-    let graph = ViewGraph()
-    #expect(graph.deferredResolveDriver.depthLimit == nil)
-
-    let rootIdentity = testIdentity("Root")
-    _ = resolveFrame(
-      nested(8, leaf: Text("leaf")),
-      graph: graph,
-      rootIdentity: rootIdentity
-    )
-    #expect(graph.deferredResolveDriver.deferralCount == 0)
-  }
 }

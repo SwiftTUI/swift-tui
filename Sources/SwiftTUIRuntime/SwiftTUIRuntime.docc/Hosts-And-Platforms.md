@@ -72,8 +72,8 @@ and each reuse door's normal guards still decide that.
 
 The full/native profile uses the normal `TaskLocal` context bindings. It keeps
 retained and memoized resolve reuse available. It enables selective evaluation
-after the first full render and leaves the chunked-descent depth limit unset by
-default.
+after the first full render. Both profiles resolve authored children through
+the same iterative continuation driver.
 
 On Windows, the runtime measures the main thread's stack reserve at session
 start and arms the stack-lean profile automatically when the reserve is below
@@ -94,12 +94,11 @@ stacks:
   context, and view-node context) use MainActor-scoped save/restore slots
   instead of `TaskLocal.withValue`. Async bindings remain task-local because
   they can suspend.
-- The chunked resolve driver limits inline descent depth (default 6). Cuts
-  occur only at structural child edges. The driver queues cut subtrees after
-  the stack unwinds and reruns resolve to a bottom-up fixpoint.
+- The continuation driver restores only the effective scopes for each job.
+  Authored nesting adds heap work rather than native call frames.
 
-`SWIFTTUI_STACK_LEAN_PROFILE`, `SWIFTTUI_LEAN_RETAINED_REUSE`, and
-`SWIFTTUI_RESOLVE_DEPTH_LIMIT` select and tune the profiles in both
+`SWIFTTUI_STACK_LEAN_PROFILE` and `SWIFTTUI_LEAN_RETAINED_REUSE`
+select and tune the profiles in both
 directions. Their grammar is documented in <doc:Environment-Variables>.
 
 ## The Host-Frame Contract

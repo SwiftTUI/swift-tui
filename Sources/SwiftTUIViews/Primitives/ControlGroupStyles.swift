@@ -230,6 +230,15 @@ public struct ControlGroupStyleConfiguration: Sendable {
 }
 
 extension ControlGroupStyleConfiguration.Content: ResolvableView, DeclaredChildrenView {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    sequence.makeResolveWork(in: context)
+  }
+  package func appendDeclaredChildrenWork(
+    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+  ) -> ResolveWork<Void> {
+    sequence.appendDeclaredChildrenWork(in: context, kindName: kindName, into: state)
+  }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     sequence.resolveElements(in: context)
   }
@@ -320,7 +329,7 @@ public struct AnyControlGroupStyle: Sendable, CustomStringConvertible,
   package func resolveBody(
     configuration: ControlGroupStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     box.resolveBody(configuration: configuration, in: context)
   }
 }
@@ -396,7 +405,7 @@ private protocol AnyControlGroupStyleBox: AnyStyleBox {
   func resolveBody(
     configuration: ControlGroupStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode
+  ) -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyControlGroupStyleBox where S: ControlGroupStyle {
@@ -405,7 +414,7 @@ extension ConcreteStyleBox: AnyControlGroupStyleBox where S: ControlGroupStyle {
   func resolveBody(
     configuration: ControlGroupStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,
       makeBody: { style, configuration in style.makeBody(configuration: configuration) })

@@ -264,7 +264,7 @@ public struct AnyProgressViewStyle: Sendable, CustomStringConvertible, CustomDeb
   @MainActor
   package func resolveBody(
     configuration: ProgressViewStyleConfiguration, in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     box.resolveBody(configuration: configuration, in: context)
   }
 }
@@ -379,14 +379,14 @@ private protocol AnyProgressViewStyleBox: AnyStyleBox {
 
   @MainActor
   func resolveBody(configuration: ProgressViewStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyProgressViewStyleBox where S: ProgressViewStyle {
 
   @MainActor
   func resolveBody(configuration: ProgressViewStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,

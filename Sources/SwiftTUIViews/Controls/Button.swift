@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// A focusable control that triggers an action when activated.
-public struct Button<Label: View>: PrimitiveView, ResolvableView {
+public struct Button<Label: View>: PrimitiveView, IterativeResolvableView {
   public var role: ButtonRole?
   package var systemHintText: String?
   private var action: (@MainActor @Sendable () -> Void)?
@@ -32,16 +32,16 @@ public struct Button<Label: View>: PrimitiveView, ResolvableView {
     authoringScope = authoringContext
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 
   package func resolve(
     in context: ResolveContext
   ) -> ResolvedNode {
-    resolvedNode(in: context)
+    resolvedNode(in: context).run()
   }
 
   /// Attaches a muted, right-aligned shortcut hint inside the button label area.
@@ -82,7 +82,7 @@ public struct Button<Label: View>: PrimitiveView, ResolvableView {
 extension Button {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -130,21 +130,23 @@ extension Button {
       buttonBorderShape: context.environmentValues.buttonBorderShape,
       styleEnvironment: styleEnvironment
     )
-    let child = buttonStyle.resolveBody(
+    return buttonStyle.resolveBody(
       configuration: configuration,
       in: context.child(component: .named("ButtonBody"))
-    )
+    ).map { child in
 
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("Button"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        focusInteractions: .activate,
-        accessibilityRole: .button
-      ).namingControl(with: label)
-    )
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("Button"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: focusableControlMetadata(
+          focusInteractions: .activate,
+          accessibilityRole: .button
+        ).namingControl(with: label)
+      )
+
+    }
   }
 }

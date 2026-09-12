@@ -6,12 +6,10 @@ import Testing
 @_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
-/// Composed-runtime coverage for the chunked resolve driver with a
-/// Life-shaped autonomous tick task authored DEEPER than the depth cap: the
-/// task registers from a drained chunk, and its state writes must keep
-/// producing frames (the WASI Game-of-Life freeze class).
+/// A deeply authored task must retain its owner and schedule frames after its
+/// resolving continuation has completed.
 @MainActor
-@Suite("Deferred-resolve deep task runtime frames")
+@Suite("Iterative-resolve deep task runtime frames")
 struct DeferredResolveDeepTaskTests {
   private struct DeepTickProbe: View {
     @State private var generation = 0
@@ -49,7 +47,7 @@ struct DeferredResolveDeepTaskTests {
     return current
   }
 
-  @Test("a tick task authored below the chunk boundary keeps presenting frames")
+  @Test("a tick task authored below the continuation boundary keeps presenting frames")
   func deepTickTaskKeepsPresentingFrames() async throws {
     let terminal = RecordingPresentationSurface(
       surfaceSize: .init(width: 40, height: 24)
@@ -77,7 +75,6 @@ struct DeferredResolveDeepTaskTests {
         Self.nested(8, leaf: DeepTickProbe())
       }
     )
-    runLoop.renderer.viewGraph.setDeferredResolveDepthLimitForTesting(3)
 
     let result = try await runLoop.run()
 

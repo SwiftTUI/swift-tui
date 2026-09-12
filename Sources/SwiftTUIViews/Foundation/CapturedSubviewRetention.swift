@@ -7,9 +7,9 @@ package struct CapturedSubviewRetention: Sendable {
   package var identity: Identity
 
   @MainActor
-  package func resolve(
+  package func resolveWork(
     payloads: [ScopedContentPayload], in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let ownerNode = context.viewGraph.flatMap { graph in
       owner.graphScope == graph.stateGraphScopeID
         ? graph.nodeForOwnerLifetimeID(owner.ownerLifetime) : nil
@@ -22,21 +22,23 @@ package struct CapturedSubviewRetention: Sendable {
     // Logical ownership stays at the declaration. Structural placement,
     // inherited style values, focus, and runtime registries come from the host.
     let contentContext = context.replacingIdentity(with: identity)
-    var children = CapturedSubviewSequenceView(payloads: payloads).resolveElements(
-      in: contentContext)
-    if !children.isEmpty {
-      children[0].preferenceValues[ActiveCapturedSubviewOwnersPreferenceKey.self].insert(owner)
-    }
-    if let ownerNode, let graph = context.viewGraph {
-      let locator = graph.dormantStateArchiveLocator(
-        rootedAt: ResolvedNode(
-          identity: identity, kind: .view("CapturedSubviewSequence"), children: children))
-      withTransientDormantStateSlot {
-        ownerNode.setStateSlotSilently(
-          ordinal: StateSlotOrdinals.capturedSubviewLocator, value: locator)
+    return CapturedSubviewSequenceView(payloads: payloads).makeResolveWork(in: contentContext).map {
+      completed in
+      var children = completed
+      if !children.isEmpty {
+        children[0].preferenceValues[ActiveCapturedSubviewOwnersPreferenceKey.self].insert(owner)
       }
+      if let ownerNode, let graph = context.viewGraph {
+        let locator = graph.dormantStateArchiveLocator(
+          rootedAt: ResolvedNode(
+            identity: identity, kind: .view("CapturedSubviewSequence"), children: children))
+        withTransientDormantStateSlot {
+          ownerNode.setStateSlotSilently(
+            ordinal: StateSlotOrdinals.capturedSubviewLocator, value: locator)
+        }
+      }
+      return children
     }
-    return children
   }
 }
 

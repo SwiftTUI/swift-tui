@@ -380,7 +380,7 @@ public struct AnyMenuStyle: Sendable, CustomStringConvertible, CustomDebugString
 
   @MainActor
   package func resolveBody(configuration: MenuStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     box.resolveBody(configuration: configuration, in: context)
   }
@@ -396,13 +396,13 @@ extension AnyMenuStyle: TypedReuseEqualityProviding {
 private protocol AnyMenuStyleBox: AnyStyleBox {
   @MainActor
   func resolveBody(configuration: MenuStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyMenuStyleBox where S: MenuStyle {
   @MainActor
   func resolveBody(configuration: MenuStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,
@@ -632,6 +632,10 @@ private struct MenuStylePortalView<Anchor: View>: PrimitiveView, ResolvableView 
   let anchor: Anchor
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    makeResolveWork(in: context).run()
+  }
+
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let portalIdentity = controlIdentity.child(.named("MenuPortal"))
     let ledger = StyleRouteInstallationLedgerStorage.current
     if let ledger, !ledger.claim(portalIdentity) {
@@ -639,7 +643,7 @@ private struct MenuStylePortalView<Anchor: View>: PrimitiveView, ResolvableView 
         StyleMisuse.duplicateRouteIssue(
           family: "MenuStyle", role: "portal", styleLabel: ledger.styleLabel,
           identity: portalIdentity))
-      return [anchor.resolve(in: context)]
+      return anchor.resolveWork(in: context).map { [$0] }
     }
     let presentation = StyleMisuse.validatedPresentation(
       presentation, problems: presentation.validationProblems, family: "MenuStyle",
@@ -653,6 +657,6 @@ private struct MenuStylePortalView<Anchor: View>: PrimitiveView, ResolvableView 
         presentation: presentation)
     )
     .background { MenuStyleUsageMarker(identity: controlIdentity) }
-    .resolveElements(in: context)
+    .resolveElementsWork(in: context)
   }
 }

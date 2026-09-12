@@ -92,7 +92,7 @@ public struct AnyTabViewStyle: Sendable, CustomStringConvertible, CustomDebugStr
   package func resolveBody(
     configuration: TabViewStyleBodyConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     box.resolveBody(
       configuration: configuration,
       in: context
@@ -797,7 +797,7 @@ public struct TabViewStyleBodyConfiguration: Sendable {
   /// own state and authoring scope intact, including the dormant-state archive
   /// that lets an unselected tab keep its state. A style that omits it renders a
   /// strip with nothing under it.
-  public struct Content: PrimitiveView, ResolvableView, Sendable {
+  public struct Content: PrimitiveView, IterativeResolvableView, Sendable {
     package var payload: LazySubviewPayload?
     /// The declaring `TabView`'s control identity — the identity focus rests
     /// on while the tab strip is focused. Recorded so the content slot can
@@ -858,11 +858,11 @@ public struct TabViewStyleBodyConfiguration: Sendable {
       )
     }
 
-    package func resolveElements(
+    package func makeResolveWork(
       in context: ResolveContext
-    ) -> [ResolvedNode] {
+    ) -> ResolveWork<[ResolvedNode]> {
       guard let payload else {
-        return []
+        return .value([])
       }
 
       if let controlIdentity {
@@ -887,55 +887,57 @@ public struct TabViewStyleBodyConfiguration: Sendable {
           structuralPath: payloadContext.structuralPath
         )
       }
-      var child = withResolveEntityRoute(payloadRoute) {
+      return withResolveEntityRoute(payloadRoute) {
         if let payloadEntityIdentity {
-          payload.resolveInEntityRoutedHost(
+          payload.resolveInEntityRoutedHostWork(
             in: payloadContext,
             entityIdentity: payloadEntityIdentity,
             structuralIdentity: payloadStructuralIdentity
           )
         } else {
-          payload.resolve(
+          payload.resolveWork(
             in: payloadContext,
             placementRoot: context
           )
         }
-      }
-      if child.entityIdentity == nil, let payloadEntityIdentity {
-        child.attachingEntityIdentity(
-          payloadEntityIdentity,
-          at: payloadContext.structuralPath
-        )
-      }
+      }.map { @MainActor completed in
+        var child = completed
+        if child.entityIdentity == nil, let payloadEntityIdentity {
+          child.attachingEntityIdentity(
+            payloadEntityIdentity,
+            at: payloadContext.structuralPath
+          )
+        }
 
-      if let controlIdentity {
-        // Also declare the identity the payload actually returned. Style-body
-        // builder normalization may consume or rebase the authored slot, and
-        // dirty-frontier entry can begin inside the entity-hosted content cone.
-        context.viewGraph?.declareFocusPresentationInertSlot(
-          child.identity,
-          forControl: controlIdentity
-        )
-      }
+        if let controlIdentity {
+          // Also declare the identity the payload actually returned. Style-body
+          // builder normalization may consume or rebase the authored slot, and
+          // dirty-frontier entry can begin inside the entity-hosted content cone.
+          context.viewGraph?.declareFocusPresentationInertSlot(
+            child.identity,
+            forControl: controlIdentity
+          )
+        }
 
-      if payload.lifecyclePolicy == .dormantStatePreserving,
-        let graph = context.viewGraph
-      {
-        dormantArchiveLocatorSink?(
-          graph.dormantStateArchiveLocator(rootedAt: child)
-        )
-      }
+        if payload.lifecyclePolicy == .dormantStatePreserving,
+          let graph = context.viewGraph
+        {
+          dormantArchiveLocatorSink?(
+            graph.dormantStateArchiveLocator(rootedAt: child)
+          )
+        }
 
-      return [
-        ResolvedNode(
-          identity: context.identity,
-          kind: .view("Group"),
-          typeDiscriminator: ObjectIdentifier(SynthesizedGroupWrapperMarker.self),
-          children: [child],
-          environmentSnapshot: context.environment,
-          transactionSnapshot: context.transaction
-        )
-      ]
+        return [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view("Group"),
+            typeDiscriminator: ObjectIdentifier(SynthesizedGroupWrapperMarker.self),
+            children: [child],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction
+          )
+        ]
+      }
     }
   }
 

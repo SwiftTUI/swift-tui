@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 /// Edits a string binding using keyboard input while masking the rendered value.
-public struct SecureField<Label: View>: PrimitiveView, ResolvableView {
+public struct SecureField<Label: View>: PrimitiveView, IterativeResolvableView {
   package var text: Binding<String>
   package var prompt: Text?
   @State private var textInputValue = TextInputValue()
@@ -38,11 +38,11 @@ public struct SecureField<Label: View>: PrimitiveView, ResolvableView {
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     return withDynamicPropertyUpdateScope(self, for: context) {
-      [resolvedNode(in: context)]
+      resolvedNode(in: context).map { [$0] }
     }
   }
 }
@@ -50,7 +50,7 @@ public struct SecureField<Label: View>: PrimitiveView, ResolvableView {
 extension SecureField {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -107,22 +107,24 @@ extension SecureField {
       showsFocusEffect: showsFocusEffect,
       styleEnvironment: styleEnvironment
     )
-    let child = textFieldStyle.resolveBody(
+    return textFieldStyle.resolveBody(
       configuration: configuration,
       in: context.child(component: .named("SecureFieldBody"))
-    )
+    ).map { child in
 
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("SecureField"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        focusInteractions: .edit,
-        accessibilityRole: .secureField
-      ).namingControl(with: label).merging(
-        SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
-    )
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("SecureField"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: focusableControlMetadata(
+          focusInteractions: .edit,
+          accessibilityRole: .secureField
+        ).namingControl(with: label).merging(
+          SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
+      )
+
+    }
   }
 }

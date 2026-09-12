@@ -12,40 +12,42 @@ import SwiftTUICore
 // resolution helpers travel with the structs that call them, keeping their
 // file-scoped `private` access intact.
 
-public struct PaddingModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct PaddingModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var insets: EdgeInsets
 
   @inline(never)
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let contentNode = resolveModifierContent(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Padding"),
-        children: [contentNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .padding(insets)
-      )
-    ]
+    ).map { contentNode in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Padding"),
+          children: [contentNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .padding(insets)
+        )
+      ]
+
+    }
   }
 }
 
-public struct SafeAreaPaddingModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct SafeAreaPaddingModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var edges: Edge.Set
   package var additional: Int
 
   @inline(never)
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let safeAreaInsets = context.environmentValues.safeAreaInsets.masked(to: edges)
     let appliedInsets = safeAreaInsets.adding(
       max(0, additional),
@@ -56,49 +58,53 @@ public struct SafeAreaPaddingModifier: PrimitiveViewModifier, Sendable, Equatabl
       .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
         safeAreaInsets = safeAreaInsets.adding(appliedInsets)
       }
-    let contentNode = resolveModifierContent(content, in: contentContext)
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("SafeAreaPadding"),
-        children: [contentNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .padding(appliedInsets)
-      )
-    ]
+    return resolveModifierContent(content, in: contentContext).map { contentNode in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("SafeAreaPadding"),
+          children: [contentNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .padding(appliedInsets)
+        )
+      ]
+
+    }
   }
 }
 
-public struct IgnoreSafeAreaModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct IgnoreSafeAreaModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var edges: Edge.Set
 
   @inline(never)
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let reclaimedInsets = context.environmentValues.safeAreaInsets.masked(to: edges)
     let contentContext =
       context.child(component: .named("content"))
       .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
         safeAreaInsets = safeAreaInsets.zeroing(edges)
       }
-    let contentNode = resolveModifierContent(content, in: contentContext)
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("IgnoreSafeArea"),
-        children: [contentNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .safeAreaIgnoring(reclaimedInsets, fillsProposal: false)
-      )
-    ]
+    return resolveModifierContent(content, in: contentContext).map { contentNode in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("IgnoreSafeArea"),
+          children: [contentNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .safeAreaIgnoring(reclaimedInsets, fillsProposal: false)
+        )
+      ]
+
+    }
   }
 }
 
-public struct SafeAreaInsetModifier<Inset: View>: PrimitiveViewModifier {
+public struct SafeAreaInsetModifier<Inset: View>: IterativePrimitiveViewModifier {
   package var inset: Inset
   package var edge: Edge
   package var alignment: Alignment
@@ -120,41 +126,45 @@ public struct SafeAreaInsetModifier<Inset: View>: PrimitiveViewModifier {
   }
 
   @inline(never)
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let baseNode = resolveModifierContent(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveModifierContent(
       content,
       in: context.child(component: .named("base"))
-    )
-    let insetNode = resolveStoredModifierView(
-      inset,
-      authoringScope: insetAuthoringScope,
-      in: context.child(component: .named("inset"))
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("SafeAreaInset"),
-        children: [baseNode, insetNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .safeAreaInset(
-          edge: edge,
-          alignment: alignment,
-          spacing: max(0, spacing),
-          safeArea: context.environmentValues.safeAreaInsets
-        )
-      )
-    ]
+    ).flatMap { baseNode in
+      return resolveStoredModifierView(
+        inset,
+        authoringScope: insetAuthoringScope,
+        in: context.child(component: .named("inset"))
+      ).map { insetNode in
+        return [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view("SafeAreaInset"),
+            children: [baseNode, insetNode],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction,
+            layoutBehavior: .safeAreaInset(
+              edge: edge,
+              alignment: alignment,
+              spacing: max(0, spacing),
+              safeArea: context.environmentValues.safeAreaInsets
+            )
+          )
+        ]
+
+      }
+
+    }
   }
 }
 
 /// A wrapper that installs a `LayoutBehavior.border` on its child.
 /// The layout engine reserves frame space for the border glyphs.
 /// The rasterizer paints the glyphs into the reserved cells.
-public struct BorderModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct BorderModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var set: BorderSet
   package var placement: StrokeStyle.Placement
   package var foreground: BorderEdgeStyle?
@@ -164,131 +174,141 @@ public struct BorderModifier: PrimitiveViewModifier, Sendable, Equatable {
   package var sides: Edge.Set
 
   @inline(never)
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let contentNode = resolveModifierContent(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Border"),
-        children: [contentNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .border(
-          set,
-          placement: placement,
-          foreground: foreground,
-          background: background,
-          blend: blend,
-          blendPhase: blendPhase,
-          sides: sides
+    ).map { contentNode in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Border"),
+          children: [contentNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .border(
+            set,
+            placement: placement,
+            foreground: foreground,
+            background: background,
+            blend: blend,
+            blendPhase: blendPhase,
+            sides: sides
+          )
         )
-      )
-    ]
+      ]
+
+    }
   }
 }
 
-public struct FrameModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct FrameModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var width: Int?
   package var height: Int?
   package var alignment: Alignment
 
   @inline(never)
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let contentNode = resolveModifierContent(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Frame"),
-        children: [contentNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .frame(width: width, height: height, alignment: alignment)
-      )
-    ]
-  }
-}
+    ).map { contentNode in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Frame"),
+          children: [contentNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .frame(width: width, height: height, alignment: alignment)
+        )
+      ]
 
-public struct OffsetModifier: PrimitiveViewModifier, Sendable, Equatable {
-  package var x: Int
-  package var y: Int
-
-  @inline(never)
-  package func resolve<Base: View>(
-    content: ModifierContentInputs<Base>,
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let contentNode = resolveModifierContent(
-      content,
-      in: context.child(component: .named("content"))
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Offset"),
-        children: [contentNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .offset(x: x, y: y)
-      )
-    ]
-  }
-}
-
-public struct PositionModifier: PrimitiveViewModifier, Sendable, Equatable {
-  package var x: Int
-  package var y: Int
-
-  @inline(never)
-  package func resolve<Base: View>(
-    content: ModifierContentInputs<Base>,
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let contentNode = resolveModifierContent(
-      content,
-      in: context.child(component: .named("content"))
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Position"),
-        children: [contentNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .position(x: x, y: y)
-      )
-    ]
-  }
-}
-
-public struct MatchedGeometryModifier: PrimitiveViewModifier, Sendable, Equatable {
-  package var config: MatchedGeometryConfig
-
-  package func resolve<Base: View>(
-    content: ModifierContentInputs<Base>,
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let nodes = content.resolveElements(in: context)
-    return nodes.map { node in
-      var tagged = node
-      tagged.matchedGeometry = config
-      return tagged
     }
   }
 }
 
-public struct FlexibleFrameModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct OffsetModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
+  package var x: Int
+  package var y: Int
+
+  @inline(never)
+  package func makeResolveWork<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveModifierContent(
+      content,
+      in: context.child(component: .named("content"))
+    ).map { contentNode in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Offset"),
+          children: [contentNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .offset(x: x, y: y)
+        )
+      ]
+
+    }
+  }
+}
+
+public struct PositionModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
+  package var x: Int
+  package var y: Int
+
+  @inline(never)
+  package func makeResolveWork<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveModifierContent(
+      content,
+      in: context.child(component: .named("content"))
+    ).map { contentNode in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Position"),
+          children: [contentNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .position(x: x, y: y)
+        )
+      ]
+
+    }
+  }
+}
+
+public struct MatchedGeometryModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
+  package var config: MatchedGeometryConfig
+
+  package func makeResolveWork<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveElementsWork(in: context).map { nodes in
+      return nodes.map { node in
+        var tagged = node
+        tagged.matchedGeometry = config
+        return tagged
+      }
+
+    }
+  }
+}
+
+public struct FlexibleFrameModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var minWidth: ProposedDimension?
   package var idealWidth: ProposedDimension?
   package var maxWidth: ProposedDimension?
@@ -298,32 +318,34 @@ public struct FlexibleFrameModifier: PrimitiveViewModifier, Sendable, Equatable 
   package var alignment: Alignment
 
   @inline(never)
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let contentNode = resolveModifierContent(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("FlexibleFrame"),
-        children: [contentNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .flexibleFrame(
-          minWidth: minWidth, idealWidth: idealWidth, maxWidth: maxWidth,
-          minHeight: minHeight, idealHeight: idealHeight, maxHeight: maxHeight,
-          alignment: alignment
+    ).map { contentNode in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("FlexibleFrame"),
+          children: [contentNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .flexibleFrame(
+            minWidth: minWidth, idealWidth: idealWidth, maxWidth: maxWidth,
+            minHeight: minHeight, idealHeight: idealHeight, maxHeight: maxHeight,
+            alignment: alignment
+          )
         )
-      )
-    ]
+      ]
+
+    }
   }
 }
 
-public struct OverlayModifier<OverlayContent: View>: PrimitiveViewModifier {
+public struct OverlayModifier<OverlayContent: View>: IterativePrimitiveViewModifier {
   package var overlay: OverlayContent
   package var alignment: Alignment
   package var overlayAuthoringScope: CapturedSubviewScope
@@ -338,29 +360,33 @@ public struct OverlayModifier<OverlayContent: View>: PrimitiveViewModifier {
     self.overlayAuthoringScope = overlayAuthoringScope
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let baseNode = resolveModifierContent(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveModifierContent(
       content,
       in: context.child(component: .named("base"))
-    )
-    let overlayNode = resolveStoredModifierView(
-      overlay,
-      authoringScope: overlayAuthoringScope,
-      in: context.child(component: .named("overlay"))
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Overlay"),
-        children: [baseNode, overlayNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .decoration(primaryIndex: 0, alignment: alignment)
-      )
-    ]
+    ).flatMap { baseNode in
+      return resolveStoredModifierView(
+        overlay,
+        authoringScope: overlayAuthoringScope,
+        in: context.child(component: .named("overlay"))
+      ).map { overlayNode in
+        return [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view("Overlay"),
+            children: [baseNode, overlayNode],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction,
+            layoutBehavior: .decoration(primaryIndex: 0, alignment: alignment)
+          )
+        ]
+
+      }
+
+    }
   }
 }
 
@@ -369,8 +395,8 @@ public struct OverlayModifier<OverlayContent: View>: PrimitiveViewModifier {
 private func resolveModifierContent<Base: View>(
   _ content: ModifierContentInputs<Base>,
   in context: ResolveContext
-) -> ResolvedNode {
-  content.resolve(in: context)
+) -> ResolveWork<ResolvedNode> {
+  content.resolveWork(in: context)
 }
 
 @inline(never)
@@ -379,13 +405,13 @@ private func resolveStoredModifierView<Content: View>(
   _ content: Content,
   authoringScope: CapturedSubviewScope,
   in context: ResolveContext
-) -> ResolvedNode {
+) -> ResolveWork<ResolvedNode> {
   withAuthoringContext(authoringScope.authoringContext) {
-    resolveView(content, in: context)
+    resolveViewWork(content, in: context)
   }
 }
 
-public struct BackgroundModifier<BackgroundContent: View>: PrimitiveViewModifier {
+public struct BackgroundModifier<BackgroundContent: View>: IterativePrimitiveViewModifier {
   package var background: BackgroundContent
   package var alignment: Alignment
   package var backgroundAuthoringScope: CapturedSubviewScope
@@ -400,28 +426,32 @@ public struct BackgroundModifier<BackgroundContent: View>: PrimitiveViewModifier
     self.backgroundAuthoringScope = backgroundAuthoringScope
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let backgroundNode = resolveStoredModifierView(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveStoredModifierView(
       background,
       authoringScope: backgroundAuthoringScope,
       in: context.child(component: .named("background"))
-    )
-    let baseNode = resolveModifierContent(
-      content,
-      in: context.child(component: .named("base"))
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Background"),
-        children: [backgroundNode, baseNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .decoration(primaryIndex: 1, alignment: alignment)
-      )
-    ]
+    ).flatMap { backgroundNode in
+      return resolveModifierContent(
+        content,
+        in: context.child(component: .named("base"))
+      ).map { baseNode in
+        return [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view("Background"),
+            children: [backgroundNode, baseNode],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction,
+            layoutBehavior: .decoration(primaryIndex: 1, alignment: alignment)
+          )
+        ]
+
+      }
+
+    }
   }
 }

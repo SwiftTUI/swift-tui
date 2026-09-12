@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// Arranges children vertically using stack layout rules.
-public struct VStack<Content: View>: PrimitiveView, ResolvableView {
+public struct VStack<Content: View>: PrimitiveView, IterativeResolvableView {
   public var alignment: HorizontalAlignment
   public var spacing: Int?
   package var content: Content
@@ -16,27 +16,29 @@ public struct VStack<Content: View>: PrimitiveView, ResolvableView {
     self.content = content()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let stackContext = context.settingEnvironment(\.stackAxis, to: .vertical)
-    let resolvedChildren = resolveDeclaredChildren(
+    return resolveDeclaredChildrenWork(
       content,
       in: stackContext,
       kindName: "VStack"
     )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("VStack"),
-        children: resolvedChildren,
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .stack(
-          axis: .vertical,
-          spacing: spacing,
-          horizontalAlignment: alignment,
-          verticalAlignment: .center
+    .map { resolvedChildren in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("VStack"),
+          children: resolvedChildren,
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .stack(
+            axis: .vertical,
+            spacing: spacing,
+            horizontalAlignment: alignment,
+            verticalAlignment: .center
+          )
         )
-      )
-    ]
+      ]
+    }
   }
 }

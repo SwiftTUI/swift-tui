@@ -4,17 +4,32 @@ import SwiftTUICore
 /// inline or a deferred host. A body-only wrapper would normalize the slots
 /// into one overlaying group before the destination stack can lay them out.
 @MainActor
-package struct CapturedSubviewSequenceView: PrimitiveView, ResolvableView, DeclaredChildrenView {
+package struct CapturedSubviewSequenceView: PrimitiveView, IterativeResolvableView,
+  DeclaredChildrenView
+{
   package var payloads: [ScopedContentPayload]
   package var retention: CapturedSubviewRetention? = nil
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    if let retention { return retention.resolve(payloads: payloads, in: context) }
-    return payloads.enumerated().flatMap { index, payload in
-      let childContext = payloadContext(index: index, root: context)
-      // Deferred ForEach payloads derive their collection scope from the
-      // shared declaration root, not their current flattened array offset.
-      return payload.resolveDeclaredElements(in: childContext, placementRoot: context)
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    if let retention { return retention.resolveWork(payloads: payloads, in: context) }
+    let result = DeclaredChildrenWorkState()
+    return resolveSequentially(Array(payloads.enumerated())) { index, payload in
+      payload.resolveDeclaredElementsWork(
+        in: payloadContext(index: index, root: context), placementRoot: context
+      ).map {
+        result.nodes.append(contentsOf: $0)
+      }
+    }.map { result.nodes }
+  }
+
+  package func appendDeclaredChildrenWork(
+    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+  ) -> ResolveWork<Void> {
+    .deferred {
+      let childContext = context.indexedChild(
+        kind: .init(rawValue: kindName), index: state.nextIndex)
+      state.nextIndex += 1
+      return makeResolveWork(in: childContext).map { state.nodes.append(contentsOf: $0) }
     }
   }
 
@@ -34,8 +49,8 @@ package struct CapturedSubviewSequenceView: PrimitiveView, ResolvableView, Decla
     let sequenceContext = context.indexedChild(kind: .init(rawValue: kindName), index: nextIndex)
     nextIndex += 1
     children.append(
-      ScopedContentPayload(resolveElements: { _, placementRoot in
-        resolveElements(in: sequenceContext.applying(to: placementRoot))
+      ScopedContentPayload(resolveElementsWork: { _, placementRoot in
+        makeResolveWork(in: sequenceContext.applying(to: placementRoot))
       }))
   }
 
@@ -46,8 +61,8 @@ package struct CapturedSubviewSequenceView: PrimitiveView, ResolvableView, Decla
     let sequenceContext = context.indexedChild(kind: .init(rawValue: kindName), index: nextIndex)
     nextIndex += 1
     children.append(
-      PortalAttachmentContentPayload(resolveElements: { _, placementRoot in
-        resolveElements(in: sequenceContext.applying(to: placementRoot))
+      PortalAttachmentContentPayload(resolveElementsWork: { _, placementRoot in
+        makeResolveWork(in: sequenceContext.applying(to: placementRoot))
       }))
   }
 

@@ -1,7 +1,7 @@
 @_spi(Testing) import SwiftTUICore
 
 /// Declares the cell content for a row in a ``Table``.
-public struct TableRow<Content: View>: PrimitiveView, ResolvableView {
+public struct TableRow<Content: View>: PrimitiveView, IterativeResolvableView {
   private var content: Content
 
   public init(
@@ -10,35 +10,27 @@ public struct TableRow<Content: View>: PrimitiveView, ResolvableView {
     self.content = content()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
 extension TableRow {
-  private func resolvedNode(
-    in context: ResolveContext
-  ) -> ResolvedNode {
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("TableRow"),
-      children: resolveDeclaredChildren(
-        content,
-        in: context,
-        kindName: "Cell"
-      ),
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: .init(accessibilityRole: .tableRow)
-    )
+  private func resolvedNode(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
+    resolveDeclaredChildrenWork(content, in: context, kindName: "Cell").map {
+      ResolvedNode(
+        identity: context.identity, kind: .view("TableRow"), children: $0,
+        environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
+        semanticMetadata: .init(accessibilityRole: .tableRow))
+    }
   }
 }
 
 /// Presents row and column data in a terminal table.
 public struct Table<SelectionValue: Hashable & Sendable, Rows: View>: PrimitiveView,
-  ResolvableView
+  IterativeResolvableView
 {
   public var columns: [TableColumn]
   private var selectionPolicy: CollectionSelectionPolicy<SelectionValue>
@@ -85,10 +77,10 @@ public struct Table<SelectionValue: Hashable & Sendable, Rows: View>: PrimitiveV
     self.rows = rows()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
@@ -102,7 +94,7 @@ extension Table {
 
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(
@@ -128,258 +120,266 @@ extension Table {
       )
     )
     let rowContext = context.child(component: .named("TableRows"))
-    var resolvedContent: ResolvedRows
+    let resolvedContentWork: ResolveWork<ResolvedRows>
     if usesIndexedDataSource, let source = makeIndexedChildSource(from: rows, in: rowContext) {
-      resolvedContent = resolvedIndexedRows(
-        from: source,
-        in: context,
-        columns: resolvedColumns,
-        tableStyle: tableStyle
-      )
+      resolvedContentWork = .value(
+        resolvedIndexedRows(
+          from: source,
+          in: context,
+          columns: resolvedColumns,
+          tableStyle: tableStyle
+        ))
     } else {
-      resolvedContent = resolvedRows(in: rowContext)
-      // See the matching note in `List.resolvedNode` (register item D22).
-      if let issue = eagerCollectionRuntimeIssue(
-        rowCount: resolvedContent.payloads.count,
-        identity: context.identity,
-        source: "Table"
-      ) {
-        resolvedContent.runtimeIssues.append(issue)
-      }
-    }
-    let resolvedRows = resolvedContent.payloads
-    if resolvedContent.indexedSource == nil {
-      resolvedContent.children = hostedTableRowNodes(
-        resolvedContent.children,
-        columns: resolvedColumns,
-        rows: resolvedRows,
-        joinGlyph: tableStyle.borderGlyphs.columnJoin
-      )
-    }
-    let selectableRowIndices = resolvedRows.indices.filter { index in
-      guard let tag = resolvedRows[index].tag else {
-        return false
-      }
-      return pickerSelectionValue(from: tag, as: SelectionValue.self) != nil
-    }
-    // See the matching note in `List.resolvedNode` (register item D18).
-    let selectedIndex: Int? =
-      if let source = resolvedContent.indexedSource {
-        selectionPolicy.selectionTag().flatMap(source.elementIndex(forSelectionTag:))
-      } else {
-        resolvedRows.firstIndex { row in
-          row.tag.map(selectionPolicy.contains) == true
-        }
-      }
-    let chrome = styleEnvironment.controlChrome(
-      isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect
-    )
-    let rowChrome = styleEnvironment.rowChrome(
-      isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect,
-      isSelected: true
-    )
-
-    let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
-    var scrollCurrency: CollectionScrollCurrency?
-    if isEnabled, !resolvedRows.isEmpty {
-      // A table body always alternates row/separator lines, so the row span is
-      // 2 and no chrome precedes row 0 *within the body* — the header and
-      // footer rules are fixed lines outside the scrolling window.
-      let rowCount = resolvedRows.count
-      let bodyLineCount = rowCount * 2 - 1
-      let anchorRow = selectedIndex
-      scrollCurrency = CollectionScrollCurrency(
-        identity: context.identity,
-        geometry: CollectionScrollGeometry(rowCount: rowCount, rowSpan: 2, chromeInset: 0),
-        ownerNode: ownerNode,
-        registry: context.scrollCommandRegistry,
-        windowMetrics: { viewportLineCount in
-          // Fixed chrome (header block + closing rule) sits outside the
-          // scrolling body, and overflow indicators claim up to two more
-          // lines. Under-counting here only makes `reveal` slightly eager,
-          // which is the safe direction.
-          let fixedLines = (showsHeaders ? 3 : 1) + 1 + 2
-          let bodyCapacity = max(1, viewportLineCount - fixedLines)
-          let selectedLine = min(max(0, (anchorRow ?? 0) * 2), max(0, bodyLineCount - 1))
-          let offset = min(
-            max(0, selectedLine - bodyCapacity / 2),
-            max(0, bodyLineCount - bodyCapacity)
-          )
-          return (offset, bodyCapacity)
-        }
-      )
-    }
-
-    if isEnabled {
-      let policy = selectionPolicy
-      let intake = HandlerDescriptorIntake(
-        context: context,
-        fallbackAuthoringScope: nil
-      )
-      let selectableTags = selectableRowIndices.compactMap { rowIndex in
-        resolvedRows[rowIndex].tag
-      }
-
-      if let scrollCurrency {
-        let indexedSource = resolvedContent.indexedSource
-        intake.registerScrollPosition(
+      resolvedContentWork = resolvedRows(in: rowContext).map { completed in
+        var resolvedContent = completed
+        // See the matching note in `List.resolvedNode` (register item D22).
+        if let issue = eagerCollectionRuntimeIssue(
+          rowCount: resolvedContent.payloads.count,
           identity: context.identity,
-          currentOffset: { scrollCurrency.currentOffset() },
-          applyOffset: { scrollCurrency.applyOffset($0) },
-          revealTarget: { query, anchor in
-            scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
-              indexedSource?.elementIndex(matching: query)
-            }
+          source: "Table"
+        ) {
+          resolvedContent.runtimeIssues.append(issue)
+        }
+        return resolvedContent
+      }
+    }
+    return resolvedContentWork.map { completed in
+      var resolvedContent = completed
+      let resolvedRows = resolvedContent.payloads
+      if resolvedContent.indexedSource == nil {
+        resolvedContent.children = hostedTableRowNodes(
+          resolvedContent.children,
+          columns: resolvedColumns,
+          rows: resolvedRows,
+          joinGlyph: tableStyle.borderGlyphs.columnJoin
+        )
+      }
+      let selectableRowIndices = resolvedRows.indices.filter { index in
+        guard let tag = resolvedRows[index].tag else {
+          return false
+        }
+        return pickerSelectionValue(from: tag, as: SelectionValue.self) != nil
+      }
+      // See the matching note in `List.resolvedNode` (register item D18).
+      let selectedIndex: Int? =
+        if let source = resolvedContent.indexedSource {
+          selectionPolicy.selectionTag().flatMap(source.elementIndex(forSelectionTag:))
+        } else {
+          resolvedRows.firstIndex { row in
+            row.tag.map(selectionPolicy.contains) == true
+          }
+        }
+      let chrome = styleEnvironment.controlChrome(
+        isEnabled: isEnabled,
+        isFocused: isFocused && showsFocusEffect
+      )
+      let rowChrome = styleEnvironment.rowChrome(
+        isEnabled: isEnabled,
+        isFocused: isFocused && showsFocusEffect,
+        isSelected: true
+      )
+
+      let ownerNode =
+        ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
+      var scrollCurrency: CollectionScrollCurrency?
+      if isEnabled, !resolvedRows.isEmpty {
+        // A table body always alternates row/separator lines, so the row span is
+        // 2 and no chrome precedes row 0 *within the body* — the header and
+        // footer rules are fixed lines outside the scrolling window.
+        let rowCount = resolvedRows.count
+        let bodyLineCount = rowCount * 2 - 1
+        let anchorRow = selectedIndex
+        scrollCurrency = CollectionScrollCurrency(
+          identity: context.identity,
+          geometry: CollectionScrollGeometry(rowCount: rowCount, rowSpan: 2, chromeInset: 0),
+          ownerNode: ownerNode,
+          registry: context.scrollCommandRegistry,
+          windowMetrics: { viewportLineCount in
+            // Fixed chrome (header block + closing rule) sits outside the
+            // scrolling body, and overflow indicators claim up to two more
+            // lines. Under-counting here only makes `reveal` slightly eager,
+            // which is the safe direction.
+            let fixedLines = (showsHeaders ? 3 : 1) + 1 + 2
+            let bodyCapacity = max(1, viewportLineCount - fixedLines)
+            let selectedLine = min(max(0, (anchorRow ?? 0) * 2), max(0, bodyLineCount - 1))
+            let offset = min(
+              max(0, selectedLine - bodyCapacity / 2),
+              max(0, bodyLineCount - bodyCapacity)
+            )
+            return (offset, bodyCapacity)
           }
         )
-
-        let rootRouteID = runtimePrimaryRouteID(for: context.identity)
-        intake.registerPointerHandler(routeID: rootRouteID) { event in
-          guard case .scrolled(let deltaX, let deltaY) = event.kind,
-            let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
-          else {
-            return .ignored
-          }
-          // Behavioural flip (scroll-currency S1) — see the matching note in
-          // `List.resolvedNode`.
-          return scrollCurrency.scroll(byRows: delta) ? .claimed : .ignored
-        }
       }
 
-      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
-        guard keyPress.modifiers.isEmpty else {
-          return false
+      if isEnabled {
+        let policy = selectionPolicy
+        let intake = HandlerDescriptorIntake(
+          context: context,
+          fallbackAuthoringScope: nil
+        )
+        let selectableTags = selectableRowIndices.compactMap { rowIndex in
+          resolvedRows[rowIndex].tag
         }
-        let event = keyPress.key
-        if let scrollCurrency, applyCollectionScrollKey(event, to: scrollCurrency) {
+
+        if let scrollCurrency {
+          let indexedSource = resolvedContent.indexedSource
+          intake.registerScrollPosition(
+            identity: context.identity,
+            currentOffset: { scrollCurrency.currentOffset() },
+            applyOffset: { scrollCurrency.applyOffset($0) },
+            revealTarget: { query, anchor in
+              scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
+                indexedSource?.elementIndex(matching: query)
+              }
+            }
+          )
+
+          let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+          intake.registerPointerHandler(routeID: rootRouteID) { event in
+            guard case .scrolled(let deltaX, let deltaY) = event.kind,
+              let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
+            else {
+              return .ignored
+            }
+            // Behavioural flip (scroll-currency S1) — see the matching note in
+            // `List.resolvedNode`.
+            return scrollCurrency.scroll(byRows: delta) ? .claimed : .ignored
+          }
+        }
+
+        intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+          guard keyPress.modifiers.isEmpty else {
+            return false
+          }
+          let event = keyPress.key
+          if let scrollCurrency, applyCollectionScrollKey(event, to: scrollCurrency) {
+            return true
+          }
+          guard policy.isSelectable else {
+            return false
+          }
+
+          let delta: Int?
+          switch event {
+          case .arrowUp:
+            delta = -1
+          case .arrowDown:
+            delta = 1
+          default:
+            delta = nil
+          }
+
+          guard let delta, !resolvedRows.isEmpty else {
+            return false
+          }
+
+          guard policy.step(orderedTags: selectableTags, delta: delta) else {
+            return false
+          }
+          if let scrollCurrency {
+            // Pin the currently-shown top row first: while nothing is stored the
+            // window IS the selection, so a minimal reveal would still be
+            // re-centred by the fallback underneath it.
+            scrollCurrency.pinCurrentAnchor()
+            if let selectedRow = resolvedRows.firstIndex(where: { row in
+              row.tag.map(policy.contains) == true
+            }) {
+              scrollCurrency.reveal(row: selectedRow)
+            }
+          }
           return true
         }
-        guard policy.isSelectable else {
-          return false
-        }
 
-        let delta: Int?
-        switch event {
-        case .arrowUp:
-          delta = -1
-        case .arrowDown:
-          delta = 1
-        default:
-          delta = nil
-        }
+        if policy.isSelectable {
+          let interactionIndices: any Sequence<Int> =
+            if resolvedContent.indexedSource == nil {
+              selectableRowIndices
+            } else {
+              collectionInteractionBand(
+                count: resolvedRows.count,
+                scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
+                selectionAnchor: selectedIndex,
+                visibleRowCount: scrollCurrency.map { currency in
+                  currency.visibleLineCount / currency.geometry.rowSpan
+                }
+              )
+            }
+          for rowIndex in interactionIndices {
+            guard let tag = resolvedRows[rowIndex].tag else {
+              continue
+            }
 
-        guard let delta, !resolvedRows.isEmpty else {
-          return false
-        }
-
-        guard policy.step(orderedTags: selectableTags, delta: delta) else {
-          return false
-        }
-        if let scrollCurrency {
-          // Pin the currently-shown top row first: while nothing is stored the
-          // window IS the selection, so a minimal reveal would still be
-          // re-centred by the fallback underneath it.
-          scrollCurrency.pinCurrentAnchor()
-          if let selectedRow = resolvedRows.firstIndex(where: { row in
-            row.tag.map(policy.contains) == true
-          }) {
-            scrollCurrency.reveal(row: selectedRow)
-          }
-        }
-        return true
-      }
-
-      if policy.isSelectable {
-        let interactionIndices: any Sequence<Int> =
-          if resolvedContent.indexedSource == nil {
-            selectableRowIndices
-          } else {
-            collectionInteractionBand(
-              count: resolvedRows.count,
-              scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
-              selectionAnchor: selectedIndex,
-              visibleRowCount: scrollCurrency.map { currency in
-                currency.visibleLineCount / currency.geometry.rowSpan
+            let routeID = runtimePrimaryRouteID(
+              for: tableRowIdentity(
+                for: context.identity,
+                rowIndex: rowIndex
+              )
+            )
+            intake.registerPointerHandler(routeID: routeID) { event in
+              switch event.kind {
+              case .down(.primary):
+                _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
+                return .claimed
+              case .up(.primary):
+                return .claimed
+              default:
+                return .ignored
               }
-            )
-          }
-        for rowIndex in interactionIndices {
-          guard let tag = resolvedRows[rowIndex].tag else {
-            continue
-          }
-
-          let routeID = runtimePrimaryRouteID(
-            for: tableRowIdentity(
-              for: context.identity,
-              rowIndex: rowIndex
-            )
-          )
-          intake.registerPointerHandler(routeID: routeID) { event in
-            switch event.kind {
-            case .down(.primary):
-              _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
-              return .claimed
-            case .up(.primary):
-              return .claimed
-            default:
-              return .ignored
             }
           }
         }
       }
-    }
 
-    var payload = TablePayload(
-      columns: resolvedColumns,
-      rows: resolvedRows,
-      selectedRowIndex: selectedIndex,
-      style: tableStyle,
-      foregroundStyle: chrome.foregroundStyle,
-      backgroundStyle: chrome.backgroundStyle,
-      borderStyle: chrome.borderStyle,
-      selectedRowForegroundStyle: isFocused && showsFocusEffect ? rowChrome.foregroundStyle : nil,
-      selectedRowBackgroundStyle: isFocused && showsFocusEffect ? rowChrome.backgroundStyle : nil,
-      selectedRowMarkerStyle: isFocused && showsFocusEffect ? rowChrome.borderStyle : nil,
-      showsHeaders: showsHeaders,
-      showsSelectionMarker: isSelectable && isFocused && showsFocusEffect,
-      showsIndicators: showsIndicators,
-      opacity: chrome.opacity
-    )
-    payload.isViewportBacked = resolvedContent.indexedSource != nil
-    payload.scrollAnchorRowIndex = scrollCurrency?.storedAnchorRow
+      var payload = TablePayload(
+        columns: resolvedColumns,
+        rows: resolvedRows,
+        selectedRowIndex: selectedIndex,
+        style: tableStyle,
+        foregroundStyle: chrome.foregroundStyle,
+        backgroundStyle: chrome.backgroundStyle,
+        borderStyle: chrome.borderStyle,
+        selectedRowForegroundStyle: isFocused && showsFocusEffect ? rowChrome.foregroundStyle : nil,
+        selectedRowBackgroundStyle: isFocused && showsFocusEffect ? rowChrome.backgroundStyle : nil,
+        selectedRowMarkerStyle: isFocused && showsFocusEffect ? rowChrome.borderStyle : nil,
+        showsHeaders: showsHeaders,
+        showsSelectionMarker: isSelectable && isFocused && showsFocusEffect,
+        showsIndicators: showsIndicators,
+        opacity: chrome.opacity
+      )
+      payload.isViewportBacked = resolvedContent.indexedSource != nil
+      payload.scrollAnchorRowIndex = scrollCurrency?.storedAnchorRow
 
-    var metadata = focusableControlMetadata(
-      // See the matching note in `List.resolvedNode`: a non-selectable
-      // viewport-backed table needs container focus for its scroll keys.
-      isFocusable: isSelectable
-        ? nil
-        : (resolvedContent.indexedSource == nil ? false : true),
-      focusInteractions: isSelectable ? .edit : .automatic,
-      scrollRole: .table,
-      accessibilityRole: .table
-    )
-    metadata.hostedCollectionContainer = .init(kind: .table)
-    var node = ResolvedNode(
-      identity: context.identity,
-      kind: .view("Table"),
-      children: resolvedContent.children,
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: metadata,
-      drawPayload: .table(payload),
-      indexedChildSource: resolvedContent.indexedSource
-    )
-    node.drawMetadata.clipsToBounds = true
-    var preferences = node.preferenceValues
-    var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
-    for issue in resolvedContent.runtimeIssues where !runtimeIssues.contains(issue) {
-      runtimeIssues.append(issue)
+      var metadata = focusableControlMetadata(
+        // See the matching note in `List.resolvedNode`: a non-selectable
+        // viewport-backed table needs container focus for its scroll keys.
+        isFocusable: isSelectable
+          ? nil
+          : (resolvedContent.indexedSource == nil ? false : true),
+        focusInteractions: isSelectable ? .edit : .automatic,
+        scrollRole: .table,
+        accessibilityRole: .table
+      )
+      metadata.hostedCollectionContainer = .init(kind: .table)
+      var node = ResolvedNode(
+        identity: context.identity,
+        kind: .view("Table"),
+        children: resolvedContent.children,
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: metadata,
+        drawPayload: .table(payload),
+        indexedChildSource: resolvedContent.indexedSource
+      )
+      node.drawMetadata.clipsToBounds = true
+      var preferences = node.preferenceValues
+      var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
+      for issue in resolvedContent.runtimeIssues where !runtimeIssues.contains(issue) {
+        runtimeIssues.append(issue)
+      }
+      preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+      node.preferenceValues = preferences
+      return node
     }
-    preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
-    node.preferenceValues = preferences
-    return node
   }
 
   private func hostedTableRowNodes(
@@ -441,24 +441,25 @@ extension Table {
   /// `lineLimit`/`truncationMode` keeps them, and taller cells span their row
   /// across multiple cells at draw time.
   private func singleLineHostedTableCell(_ source: ResolvedNode) -> ResolvedNode {
-    var node = source
-    node.layoutMetadata.lineLimit = node.layoutMetadata.lineLimit ?? 1
-    node.layoutMetadata.textTruncationMode = node.layoutMetadata.textTruncationMode ?? .tail
-    node.children = node.children.map(singleLineHostedTableCell)
-    return node
+    mapResolvedCollectionTree(source) { node in
+      node.layoutMetadata.lineLimit = node.layoutMetadata.lineLimit ?? 1
+      node.layoutMetadata.textTruncationMode = node.layoutMetadata.textTruncationMode ?? .tail
+    }
   }
 
   private func resolvedRows(
     in context: ResolveContext
-  ) -> ResolvedRows {
-    let nodes = resolveDeclaredChildren(
+  ) -> ResolveWork<ResolvedRows> {
+    return resolveDeclaredChildrenWork(
       rows,
       in: context,
       kindName: "TableContent"
     )
-    var result = ResolvedRows()
-    collectTableRows(from: nodes, into: &result)
-    return result
+    .map { nodes in
+      var result = ResolvedRows()
+      collectTableRows(from: nodes, into: &result)
+      return result
+    }
   }
 
   private func resolvedIndexedRows(
@@ -525,7 +526,8 @@ extension Table {
     from nodes: [ResolvedNode],
     into result: inout ResolvedRows
   ) {
-    for var node in nodes {
+    var work = Array(nodes.reversed())
+    while var node = work.popLast() {
       if node.semanticMetadata.accessibilityRole == .tableRow {
         // TableRow is a structural host. Nested cell content contributes its
         // own accessibility normally; the table container owns the table role
@@ -588,7 +590,7 @@ extension Table {
           result.runtimeIssues.append(issue)
         }
       } else {
-        collectTableRows(from: node.children, into: &result)
+        work.append(contentsOf: node.children.reversed())
       }
     }
   }

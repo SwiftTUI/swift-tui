@@ -3,7 +3,7 @@ import SwiftTUICore
 package struct BuiltinItemPopoverPresentationModifier<
   Item: Identifiable & Sendable,
   PopoverContent: View
->: PrimitiveViewModifier where Item.ID: Sendable {
+>: IterativePrimitiveViewModifier where Item.ID: Sendable {
   package var item: Binding<Item?>
   package var attachmentAnchor: PopoverAttachmentAnchor
   package var arrowEdge: Edge?
@@ -13,10 +13,10 @@ package struct BuiltinItemPopoverPresentationModifier<
   package var onDismiss: (@MainActor @Sendable () -> Void)? = nil
   package var onDismissAuthoringContext: AuthoringContext? = nil
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let itemBinding = item
     let attachmentAnchor = attachmentAnchor
     let arrowEdge = arrowEdge
@@ -73,7 +73,7 @@ package struct BuiltinItemPopoverPresentationModifier<
   }
 }
 
-package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
+package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifier {
   @State private var dismissedTipID: String?
 
   package var tip: Tip?
@@ -86,10 +86,10 @@ package struct PopoverTipModifier<Tip: PopoverTip>: PrimitiveViewModifier {
   package var onDismiss: (@MainActor @Sendable () -> Void)? = nil
   package var onDismissAuthoringContext: AuthoringContext? = nil
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     // Lever B for tips: only the hot `isPresented` binding read moves into
     // the trigger leaf. Tip eligibility and the one-shot dismissal `@State`
     // stay read here (moving a `@State` read to the leaf would rebind its

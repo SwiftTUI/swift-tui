@@ -82,7 +82,7 @@ private func resolvedProbeTextNode(
   )
 }
 
-private struct ResolveProbeLeaf: PrimitiveView, ResolvableView {
+private struct ResolveProbeLeaf: PrimitiveView, IterativeResolvableView {
   let recorder: ResolveProbeRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -101,7 +101,7 @@ private struct ResolveProbeLeaf: PrimitiveView, ResolvableView {
   }
 }
 
-private struct RecordingBranchLeaf: PrimitiveView, ResolvableView {
+private struct RecordingBranchLeaf: PrimitiveView, IterativeResolvableView {
   let label: String
   let recorder: BranchResolveRecorder
 
@@ -120,34 +120,37 @@ private struct RecordingBranchLeaf: PrimitiveView, ResolvableView {
   }
 }
 
-private struct RecordingBranchRoot: PrimitiveView, ResolvableView {
+private struct RecordingBranchRoot: PrimitiveView, IterativeResolvableView {
   let labels: [String]
   let recorder: BranchResolveRecorder
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     context.recordResolvedComputation()
-    let children = labels.enumerated().map { index, label in
-      resolveView(
+    var children: [ResolvedNode] = []
+    return resolveSequentially(Array(labels.enumerated())) { index, label in
+      resolveViewWork(
         RecordingBranchLeaf(label: label, recorder: recorder),
         in: context.indexedChild(kind: .named("Branches"), index: index)
-      )
+      ).map { children.append($0) }
+    }.map { _ in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Branches"),
+          children: children,
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
+        )
+      ]
+
     }
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Branches"),
-        children: children,
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
-      )
-    ]
   }
 }
 
-private struct ResolveProbeRoot: PrimitiveView, ResolvableView {
+private struct ResolveProbeRoot: PrimitiveView, IterativeResolvableView {
   let recorder: ResolveProbeRecorder
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     context.recordResolvedComputation()
     recorder.record(
       ResolveProbeRecord(
@@ -161,19 +164,21 @@ private struct ResolveProbeRoot: PrimitiveView, ResolvableView {
       )
     )
 
-    let child = resolveView(
+    return resolveViewWork(
       ResolveProbeLeaf(recorder: recorder),
       in: context.indexedChild(kind: .named("ProbeRoot"), index: 0)
-    )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("ProbeRoot"),
-        children: [child],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
-      )
-    ]
+    ).map { child in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("ProbeRoot"),
+          children: [child],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
+        )
+      ]
+
+    }
   }
 }
 

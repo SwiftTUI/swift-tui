@@ -1070,11 +1070,12 @@ divergent from the project's intent.
   profile masks this fault because it disables retained reuse. This fault
   must close before the full profile or JSPI main-thread mode becomes the
   WASI default.
-- **Bounded-stack resolve is a profile mechanism, not architecture.** *Gap.*
-  The chunked driver is a stack-lean profile mechanism, not a fully iterative
-  engine. Resolve still recurses on the Swift call stack (built-in layout no
-  longer does; see "Runtime and pipeline internals"), so stack budgets
-  remain a per-engine constraint for resolve rather than a non-issue.
+- **Framework-owned resolve descent is iterative.** *Ratified.* All hosts use
+  typed child-result continuations. Parents resume after real child results,
+  with authoring and entity claims in depth-first order; no placeholder or
+  repeated-body fixpoint is used. Native and WASI share the driver. Explicit
+  authored engine re-entry and recursive value-storage destruction keep their
+  separate stack contracts described in the runtime pipeline documentation.
 
 ## Images and compositing
 

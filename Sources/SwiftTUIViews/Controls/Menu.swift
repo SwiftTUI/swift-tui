@@ -24,7 +24,7 @@ private func menuIsExpanded(in ownerNode: SwiftTUICore.ViewNode?) -> Bool {
 /// - The menu stays non-modal: opening it does not freeze surrounding
 ///   controls, although Escape still dismisses the topmost open menu.
 /// Use ``MenuStyle`` to compose a different trigger or inline content.
-public struct Menu<Label: View, Content: View>: PrimitiveView, ResolvableView {
+public struct Menu<Label: View, Content: View>: PrimitiveView, IterativeResolvableView {
   package var label: Label
   package var content: Content
   private let authoringScope: AuthoringContext?
@@ -47,30 +47,34 @@ public struct Menu<Label: View, Content: View>: PrimitiveView, ResolvableView {
     self.content = content()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let child = resolveView(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return resolveViewWork(
       MenuStateHost(menu: self, controlIdentity: context.identity),
-      in: context.child(component: .named("MenuState")))
-    var metadata = focusableControlMetadata(focusInteractions: .activate, accessibilityRole: .menu)
+      in: context.child(component: .named("MenuState"))
+    ).map { child in
+      var metadata = focusableControlMetadata(
+        focusInteractions: .activate, accessibilityRole: .menu
+      )
       .namingControl(with: label)
-    // The open menu remains a keyboard dismissal target after disablement.
-    // Its commands and pointer routes still obey the disabled environment.
-    metadata.allowsFocusWhenDisabled = menuIsExpanded(
-      in: context.viewGraph?.nodeForIdentity(context.identity.child(.named("MenuState"))))
-    // Keep geometric evidence that the keyboard action has no pointer area.
-    // Merely omitting its region permits the runtime's ancestor-action fallback.
-    metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Menu"),
-        children: [child],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        semanticMetadata: metadata)
-    ]
+      // The open menu remains a keyboard dismissal target after disablement.
+      // Its commands and pointer routes still obey the disabled environment.
+      metadata.allowsFocusWhenDisabled = menuIsExpanded(
+        in: context.viewGraph?.nodeForIdentity(context.identity.child(.named("MenuState"))))
+      // Keep geometric evidence that the keyboard action has no pointer area.
+      // Merely omitting its region permits the runtime's ancestor-action fallback.
+      metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Menu"),
+          children: [child],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          semanticMetadata: metadata)
+      ]
+    }
   }
 }
 
@@ -78,25 +82,29 @@ public struct Menu<Label: View, Content: View>: PrimitiveView, ResolvableView {
 /// Its expansion lifetime belongs to this dedicated child, which departs when
 /// the menu leaves, rather than the surviving style-body node.
 extension Menu {
-  private struct MenuStateHost: PrimitiveView, ResolvableView {
+  private struct MenuStateHost: PrimitiveView, IterativeResolvableView {
     let menu: Menu<Label, Content>
     let controlIdentity: Identity
 
-    func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
       let owner = ViewNodeContext.current?.stateOwnerHandle
-      let body = menu.resolvedBody(
-        in: context.replacingIdentity(with: controlIdentity), ownerNode: ViewNodeContext.current)
-      var node = ResolvedNode(
-        identity: context.identity, kind: .view("MenuState"), children: [body],
-        environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
-      if let owner { node.preferenceValues[CapturedSubviewOwnersPreferenceKey.self].insert(owner) }
-      return [node]
+      return menu.resolvedBody(
+        in: context.replacingIdentity(with: controlIdentity), ownerNode: ViewNodeContext.current
+      ).map { body in
+        var node = ResolvedNode(
+          identity: context.identity, kind: .view("MenuState"), children: [body],
+          environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
+        if let owner {
+          node.preferenceValues[CapturedSubviewOwnersPreferenceKey.self].insert(owner)
+        }
+        return [node]
+      }
     }
   }
 
   private func resolvedBody(
     in context: ResolveContext, ownerNode: SwiftTUICore.ViewNode?
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -170,14 +178,16 @@ extension Menu {
     }
     let style = context.environmentValues.menuStyle
     let bodyContext = context.child(component: .named("MenuBody"))
-    let child = style.resolveBody(configuration: configuration, in: bodyContext)
-    guard isExpanded,
-      !child.preferenceValues[MenuStyleUsagePreferenceKey.self].contains(context.identity)
-    else { return child }
-    ImperativeRuntimeIssueQueue.record(
-      StyleMisuse.missingRequiredRouteIssue(
-        family: "MenuStyle", role: "portal wrapper and inline content",
-        styleLabel: style.snapshotLabel, identity: context.identity))
-    return AnyMenuStyle.automatic.resolveBody(configuration: configuration, in: bodyContext)
+    return style.resolveBody(configuration: configuration, in: bodyContext).flatMap { child in
+      guard isExpanded,
+        !child.preferenceValues[MenuStyleUsagePreferenceKey.self].contains(context.identity)
+      else { return .value(child) }
+      ImperativeRuntimeIssueQueue.record(
+        StyleMisuse.missingRequiredRouteIssue(
+          family: "MenuStyle", role: "portal wrapper and inline content",
+          styleLabel: style.snapshotLabel, identity: context.identity))
+      return AnyMenuStyle.automatic.resolveBody(configuration: configuration, in: bodyContext)
+
+    }
   }
 }

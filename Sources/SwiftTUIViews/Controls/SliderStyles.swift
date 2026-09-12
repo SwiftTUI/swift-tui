@@ -322,7 +322,7 @@ public struct AnySliderStyle: Sendable, CustomStringConvertible, CustomDebugStri
   }
   @MainActor
   package func resolveBody(configuration: SliderStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     box.resolveBody(configuration: configuration, in: context)
   }
@@ -441,12 +441,12 @@ private struct LinearSliderStyleBody: View {
 private protocol AnySliderStyleBox: AnyStyleBox {
   @MainActor
   func resolveBody(configuration: SliderStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
 }
 extension ConcreteStyleBox: AnySliderStyleBox where S: SliderStyle {
   @MainActor
   func resolveBody(configuration: SliderStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,

@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 /// Toggles a boolean binding on or off.
-public struct Toggle<Label: View>: PrimitiveView, ResolvableView {
+public struct Toggle<Label: View>: PrimitiveView, IterativeResolvableView {
   package var isOn: Binding<Bool>
   private var label: Label
   private let authoringScope: AuthoringContext?
@@ -24,17 +24,17 @@ public struct Toggle<Label: View>: PrimitiveView, ResolvableView {
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
 extension Toggle {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -68,27 +68,29 @@ extension Toggle {
       isPressed: isPressed,
       styleEnvironment: styleEnvironment
     )
-    let child = context.environmentValues.toggleStyle.resolveBody(
+    return context.environmentValues.toggleStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("ToggleBody"))
-    )
+    ).map { child in
 
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("Toggle"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        focusInteractions: .activate,
-        accessibilityRole: .toggle
-      ).namingControl(with: label)
-    )
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("Toggle"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: focusableControlMetadata(
+          focusInteractions: .activate,
+          accessibilityRole: .toggle
+        ).namingControl(with: label)
+      )
+
+    }
   }
 
 }
 
 /// Edits a single-line string binding using terminal keyboard input.
-public struct TextField<Label: View>: PrimitiveView, ResolvableView {
+public struct TextField<Label: View>: PrimitiveView, IterativeResolvableView {
   package var text: Binding<String>
   package var prompt: Text?
   @State private var textInputValue = TextInputValue()
@@ -125,11 +127,11 @@ public struct TextField<Label: View>: PrimitiveView, ResolvableView {
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     return withDynamicPropertyUpdateScope(self, for: context) {
-      [resolvedNode(in: context)]
+      resolvedNode(in: context).map { [$0] }
     }
   }
 }
@@ -137,7 +139,7 @@ public struct TextField<Label: View>: PrimitiveView, ResolvableView {
 extension TextField {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -194,28 +196,30 @@ extension TextField {
       showsFocusEffect: showsFocusEffect,
       styleEnvironment: styleEnvironment
     )
-    let child = textFieldStyle.resolveBody(
+    return textFieldStyle.resolveBody(
       configuration: configuration,
       in: context.child(component: .named("TextFieldBody"))
-    )
+    ).map { child in
 
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("TextField"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        focusInteractions: .edit,
-        accessibilityRole: .textField
-      ).namingControl(with: label).merging(
-        SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
-    )
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("TextField"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: focusableControlMetadata(
+          focusInteractions: .edit,
+          accessibilityRole: .textField
+        ).namingControl(with: label).merging(
+          SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
+      )
+
+    }
   }
 }
 
 /// Reveals or hides nested content behind an expansion control.
-public struct DisclosureGroup<Label: View, Content: View>: PrimitiveView, ResolvableView {
+public struct DisclosureGroup<Label: View, Content: View>: PrimitiveView, IterativeResolvableView {
   public var isExpanded: Binding<Bool>
   private var label: Label
   private var content: Content
@@ -243,17 +247,17 @@ public struct DisclosureGroup<Label: View, Content: View>: PrimitiveView, Resolv
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
 extension DisclosureGroup {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -307,27 +311,29 @@ extension DisclosureGroup {
       styleEnvironment: styleEnvironment
     )
     configuration.bindRoutes(to: context.identity)
-    let child = context.environmentValues.disclosureGroupStyle.resolveBody(
+    return context.environmentValues.disclosureGroupStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("DisclosureBody"))
-    )
+    ).map { child in
 
-    var metadata = focusableControlMetadata(
-      focusInteractions: .activate,
-      accessibilityRole: .disclosureGroup
-    ).namingControl(with: label)
-    // Keep geometric evidence that the keyboard action has no pointer area of
-    // its own. Merely omitting the region permits the runtime's
-    // ancestor-action fallback, which collapsed the group from a press on its
-    // expanded content; the style's trigger route owns pointer activation.
-    metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("DisclosureGroup"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: metadata
-    )
+      var metadata = focusableControlMetadata(
+        focusInteractions: .activate,
+        accessibilityRole: .disclosureGroup
+      ).namingControl(with: label)
+      // Keep geometric evidence that the keyboard action has no pointer area of
+      // its own. Merely omitting the region permits the runtime's
+      // ancestor-action fallback, which collapsed the group from a press on its
+      // expanded content; the style's trigger route owns pointer activation.
+      metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("DisclosureGroup"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: metadata
+      )
+
+    }
   }
 
 }

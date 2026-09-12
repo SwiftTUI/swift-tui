@@ -52,14 +52,14 @@ package struct OverlayStackEntry: Sendable {
 }
 
 @MainActor
-package func composeOverlayStackTree(
+package func composeOverlayStackTreeWork(
   baseNode: ResolvedNode,
   entries: [OverlayStackEntry],
   in context: ResolveContext,
   forceEntryRefresh: Bool = false
-) -> ResolvedNode {
+) -> ResolveWork<ResolvedNode> {
   guard !entries.isEmpty else {
-    return baseNode
+    return .value(baseNode)
   }
 
   let sortedEntries = entries.sorted {
@@ -101,92 +101,95 @@ package func composeOverlayStackTree(
   {
     overlayContext.withinChurnedSubtree = true
   }
-  let overlayNode = resolveView(
+  return resolveViewWork(
     OverlayStackOverlayHost(entries: sortedEntries),
     in: overlayContext
-  )
+  ).map { overlayNode in
 
-  var hostedBaseNode = baseNode
-  hostedBaseNode.semanticMetadata.focusScopeBoundary = false
-  if disablesBaseInteraction {
-    hostedBaseNode.semanticMetadata = hostedBaseNode.semanticMetadata.merging(
-      SemanticMetadata(
-        interactionAvailability: .disabled(reason: .modalOverlay)
+    var hostedBaseNode = baseNode
+    hostedBaseNode.semanticMetadata.focusScopeBoundary = false
+    if disablesBaseInteraction {
+      hostedBaseNode.semanticMetadata = hostedBaseNode.semanticMetadata.merging(
+        SemanticMetadata(
+          interactionAvailability: .disabled(reason: .modalOverlay)
+        )
       )
+    }
+
+    var stackSemantics = SemanticMetadata()
+    stackSemantics.focusScopeBoundary = true
+    if baseNode.semanticMetadata.focusScopeBoundary {
+      stackSemantics.focusScopeIdentity = baseNode.identity
+    }
+
+    return ResolvedNode(
+      identity: context.identity,
+      structuralPath: context.structuralPath,
+      kind: .view("OverlayStack"),
+      children: [hostedBaseNode, overlayNode],
+      environmentSnapshot: hostContext.environment,
+      transactionSnapshot: hostContext.transaction,
+      layoutBehavior: .overlay(alignment: .topLeading),
+      surfaceComposition: .init(
+        role: .stackingContext,
+        stableKey: "overlay-stack:\(context.structuralPath.description)",
+        invalidationScope: .fullSurfaceDiff
+      ),
+      semanticMetadata: stackSemantics
     )
   }
-
-  var stackSemantics = SemanticMetadata()
-  stackSemantics.focusScopeBoundary = true
-  if baseNode.semanticMetadata.focusScopeBoundary {
-    stackSemantics.focusScopeIdentity = baseNode.identity
-  }
-
-  return ResolvedNode(
-    identity: context.identity,
-    structuralPath: context.structuralPath,
-    kind: .view("OverlayStack"),
-    children: [hostedBaseNode, overlayNode],
-    environmentSnapshot: hostContext.environment,
-    transactionSnapshot: hostContext.transaction,
-    layoutBehavior: .overlay(alignment: .topLeading),
-    surfaceComposition: .init(
-      role: .stackingContext,
-      stableKey: "overlay-stack:\(context.structuralPath.description)",
-      invalidationScope: .fullSurfaceDiff
-    ),
-    semanticMetadata: stackSemantics
-  )
 }
 
 @MainActor
-private struct OverlayStackOverlayHost: PrimitiveView, ResolvableView {
+private struct OverlayStackOverlayHost: PrimitiveView, IterativeResolvableView {
   var entries: [OverlayStackEntry]
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     // A modal blocks every earlier surface, including other portal entries.
     // Later nonmodal descendants (menus and tips) remain interactive above it.
     // Keep blocked entries mounted so state, tasks, and restoration survive.
     let topmostModalIndex = entries.lastIndex { $0.modalPolicy == .disablesBaseInteraction }
-    let children = entries.enumerated().map { index, entry in
+    var children: [ResolvedNode] = []
+    return resolveSequentially(Array(entries.enumerated())) { index, entry in
       let entryContext = context.child(
         component: .init(
           rawValue: PresentationOverlayEntryIdentityScheme.entryComponent(id: "\(entry.id)")
         )
       )
-      return resolveView(
+      return resolveViewWork(
         OverlayStackEntryHost(
           entry: entry,
           interactionBlocked: topmostModalIndex.map { index < $0 } ?? false
         ),
         in: entryContext
-      )
-    }
+      ).map { children.append($0) }
+    }.map { _ in
 
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("OverlayStackOverlays"),
-        children: children,
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .overlay(alignment: .topLeading),
-        surfaceComposition: .init(
-          role: .detachedOverlayHost,
-          stableKey: "overlay-host:\(context.structuralPath.description)",
-          invalidationScope: .fullSurfaceDiff
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("OverlayStackOverlays"),
+          children: children,
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .overlay(alignment: .topLeading),
+          surfaceComposition: .init(
+            role: .detachedOverlayHost,
+            stableKey: "overlay-host:\(context.structuralPath.description)",
+            invalidationScope: .fullSurfaceDiff
+          )
         )
-      )
-    ]
+      ]
+    }
   }
 }
 
 @MainActor
-private struct OverlayStackEntryHost: PrimitiveView, ResolvableView {
+private struct OverlayStackEntryHost: PrimitiveView, IterativeResolvableView {
   var entry: OverlayStackEntry
   var interactionBlocked: Bool
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     var bodyContext = context.child(component: .named("body"))
     // Portal-hosted content otherwise resolves under the portal root's
     // context, so the presenter's authored environment (`.disabled`,
@@ -196,48 +199,59 @@ private struct OverlayStackEntryHost: PrimitiveView, ResolvableView {
     if let sourceEnvironmentValues = entry.sourceEnvironmentValues {
       bodyContext = bodyContext.replacingEnvironmentValues(sourceEnvironmentValues)
     }
-    let bodyNode = entry.payload.resolve(in: bodyContext)
-    var entryNode = ResolvedNode(
-      identity: context.identity,
-      structuralEdgeRole: .detachedOverlayEntry,
-      kind: .view(entry.kindName),
-      children: [bodyNode],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      surfaceComposition: .init(
-        role: .detachedOverlayEntry,
-        stableKey: entry.surfaceStableKey,
-        invalidationScope: .fullSurfaceDiff
-      ),
-      semanticMetadata: .init(
-        interactionAvailability: interactionBlocked ? .disabled(reason: .modalOverlay) : .enabled
+    return entry.payload.resolveWork(in: bodyContext).map { bodyNode in
+      var entryNode = ResolvedNode(
+        identity: context.identity,
+        structuralEdgeRole: .detachedOverlayEntry,
+        kind: .view(entry.kindName),
+        children: [bodyNode],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        surfaceComposition: .init(
+          role: .detachedOverlayEntry,
+          stableKey: entry.surfaceStableKey,
+          invalidationScope: .fullSurfaceDiff
+        ),
+        semanticMetadata: .init(
+          interactionAvailability: interactionBlocked ? .disabled(reason: .modalOverlay) : .enabled
+        )
       )
-    )
-    if let onDismiss = entry.onDismiss {
-      let ordinal = entryNode.lifecycleMetadata.disappearHandlerIDs.count
-      let handlerID =
-        HandlerDescriptorIntake(
-          context: bodyContext,
-          fallbackAuthoringScope: nil
-        ).registerDisappearHandler(
-          identity: entryNode.identity,
-          ordinal: ordinal,
-          handler: onDismiss
-        ) ?? "\(entryNode.identity)#disappear[\(ordinal)]"
-      entryNode.lifecycleMetadata = entryNode.lifecycleMetadata.merging(
-        .init(disappearHandlerIDs: [handlerID])
+      if let onDismiss = entry.onDismiss {
+        let ordinal = entryNode.lifecycleMetadata.disappearHandlerIDs.count
+        let handlerID =
+          HandlerDescriptorIntake(
+            context: bodyContext,
+            fallbackAuthoringScope: nil
+          ).registerDisappearHandler(
+            identity: entryNode.identity,
+            ordinal: ordinal,
+            handler: onDismiss
+          ) ?? "\(entryNode.identity)#disappear[\(ordinal)]"
+        entryNode.lifecycleMetadata = entryNode.lifecycleMetadata.merging(
+          .init(disappearHandlerIDs: [handlerID])
+        )
+        context.viewGraph?.recordLifecycleEvaluationOwner(
+          target: entryNode.identity,
+          owner: context.identity
+        )
+      }
+      entryNode.declarationOwnerEdge = entry.declarationOwnerEdge(
+        placementRoot: context.structuralPath
       )
-      context.viewGraph?.recordLifecycleEvaluationOwner(
-        target: entryNode.identity,
-        owner: context.identity
-      )
-    }
-    entryNode.declarationOwnerEdge = entry.declarationOwnerEdge(
-      placementRoot: context.structuralPath
-    )
 
-    return [
-      entryNode
-    ]
+      return [
+        entryNode
+      ]
+    }
   }
+}
+
+@MainActor
+package func composeOverlayStackTree(
+  baseNode: ResolvedNode, entries: [OverlayStackEntry], in context: ResolveContext,
+  forceEntryRefresh: Bool = false
+) -> ResolvedNode {
+  composeOverlayStackTreeWork(
+    baseNode: baseNode, entries: entries, in: context, forceEntryRefresh: forceEntryRefresh
+  ).run()
 }

@@ -121,7 +121,7 @@ struct ViewGraphCheckpointTotalityTests {
     // transient per-frame class: a diagnostic buffer reset in `beginFrame`
     // and read only by the same frame's head assembly, so a discarded
     // draft's leftover entries are unobservable before the next frame
-    // clears them — and the `deferredResolveDriver` — the
+    // clears them the
     // chunked-resolve worklist, transient within one synchronous resolve
     // pass: its queue is empty and its depth zero at every frame boundary
     // (asserted in `beginFrame`), so no checkpoint can ever observe
@@ -161,7 +161,7 @@ struct ViewGraphCheckpointTotalityTests {
       Set(viewGraphGroupFields)
         == groupPropertyNames.union([
           "root", "nodeCheckpointImageStore", "detachedHostedRootsRecordedThisFrame",
-          "frameRuntimeIssues", "deferredResolveDriver",
+          "frameRuntimeIssues",
           "stateGraphScopeID", "nextNodeOwnerLifetimeRawValue",
           "nextAnimationInputMutationToken",
           "debugReachabilityContextBuildCount",

@@ -1676,16 +1676,17 @@ extension ActionScope where Self: View {
 /// Public so the tagged view's type can be written out; its stored
 /// properties and behavior are internal to the framework. Apply it through
 /// `tag(_:includeOptional:)` rather than constructing it.
-public struct TagValueModifier<Value: Hashable & Sendable>: PrimitiveViewModifier, Sendable,
+public struct TagValueModifier<Value: Hashable & Sendable>: IterativePrimitiveViewModifier,
+  Sendable,
   Equatable
 {
   package var tag: Value
   package var includeOptional: Bool
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let tagged = SemanticMetadataModifier(
       metadata: .init(
         selectionTag: .init(
@@ -1694,7 +1695,7 @@ public struct TagValueModifier<Value: Hashable & Sendable>: PrimitiveViewModifie
         )
       )
     )
-    return tagged.resolve(content: content, in: context)
+    return tagged.makeResolveWork(content: content, in: context)
   }
 }
 

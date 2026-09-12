@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// Presents scrollable content along one or both axes.
-public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
+public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView {
   public var axes: Axis.Set
   @State private var internalPosition = ScrollCellOffset.zero
   @State private var panAnchor: ScrollPanAnchor?
@@ -33,7 +33,7 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
     contentAuthoringScope = makeCapturedSubviewScope()
     self.content = content()
   }
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     return withDynamicPropertyUpdateScope(self, for: context) {
       let indicatorAxes = resolvedIndicatorAxes(
         environment: context.environmentValues
@@ -188,47 +188,48 @@ public struct ScrollView<Content: View>: PrimitiveView, ResolvableView {
           horizontalScrollIndicatorIdentity(for: context.identity)
         )
       }
-      let child = withAuthoringContext(contentAuthoringScope.authoringContext) {
-        content.resolve(in: context.child(component: .named("ScrollContent")))
-      }
-      var drawMetadata = DrawMetadata(
-        backgroundStyle: presentation.backgroundStyle,
-        scrollIndicatorAxes: indicatorAxes.isEmpty ? nil : indicatorAxes,
-        focusedScrollIndicatorAxes: focusedIndicatorAxes.isEmpty ? nil : focusedIndicatorAxes,
-        opacity: presentation.opacity, clipsToBounds: true)
-      drawMetadata.scrollIndicatorAppearance = .init(
-        contentInsets: presentation.contentInsets,
-        verticalGlyph: presentation.verticalIndicatorGlyph,
-        horizontalGlyph: presentation.horizontalIndicatorGlyph,
-        foregroundStyle: presentation.indicatorStyle,
-        focusedForegroundStyle: presentation.focusedIndicatorStyle,
-        reservesSpace: presentation.reservesIndicatorSpace)
+      return withAuthoringContext(contentAuthoringScope.authoringContext) {
+        content.resolveWork(in: context.child(component: .named("ScrollContent")))
+      }.map { child in
+        var drawMetadata = DrawMetadata(
+          backgroundStyle: presentation.backgroundStyle,
+          scrollIndicatorAxes: indicatorAxes.isEmpty ? nil : indicatorAxes,
+          focusedScrollIndicatorAxes: focusedIndicatorAxes.isEmpty ? nil : focusedIndicatorAxes,
+          opacity: presentation.opacity, clipsToBounds: true)
+        drawMetadata.scrollIndicatorAppearance = .init(
+          contentInsets: presentation.contentInsets,
+          verticalGlyph: presentation.verticalIndicatorGlyph,
+          horizontalGlyph: presentation.horizontalIndicatorGlyph,
+          foregroundStyle: presentation.indicatorStyle,
+          focusedForegroundStyle: presentation.focusedIndicatorStyle,
+          reservesSpace: presentation.reservesIndicatorSpace)
 
-      return [
-        ResolvedNode(
-          identity: context.identity,
-          kind: .view("ScrollView"),
-          children: [child],
-          environmentSnapshot: context.environment,
-          transactionSnapshot: context.transaction,
-          layoutBehavior: AnyLayout(
-            ScrollViewLayout(
-              scrollIdentity: context.identity,
-              axes: axes,
-              position: position.wrappedValue,
-              indicatorAxes: indicatorAxes,
-              contentInsets: presentation.contentInsets,
-              reservesIndicatorSpace: presentation.reservesIndicatorSpace
+        return [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view("ScrollView"),
+            children: [child],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction,
+            layoutBehavior: AnyLayout(
+              ScrollViewLayout(
+                scrollIdentity: context.identity,
+                axes: axes,
+                position: position.wrappedValue,
+                indicatorAxes: indicatorAxes,
+                contentInsets: presentation.contentInsets,
+                reservesIndicatorSpace: presentation.reservesIndicatorSpace
+              )
+            ).resolvedBehavior,
+            drawMetadata: drawMetadata,
+            semanticMetadata: scrollViewMetadata(
+              accessibilityRole: indicatorAxes.isEmpty
+                ? .scrollView : .scrollViewWithIndicators,
+              capturesPointerOnPress: allowsPanning
             )
-          ).resolvedBehavior,
-          drawMetadata: drawMetadata,
-          semanticMetadata: scrollViewMetadata(
-            accessibilityRole: indicatorAxes.isEmpty
-              ? .scrollView : .scrollViewWithIndicators,
-            capturesPointerOnPress: allowsPanning
           )
-        )
-      ]
+        ]
+      }
     }
   }
 

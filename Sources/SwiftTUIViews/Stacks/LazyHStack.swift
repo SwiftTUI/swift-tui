@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// Arranges children horizontally using lazy stack layout rules.
-public struct LazyHStack<Content: View>: PrimitiveView, ResolvableView {
+public struct LazyHStack<Content: View>: PrimitiveView, IterativeResolvableView {
   public var alignment: VerticalAlignment
   public var spacing: Int?
   package var content: Content
@@ -16,26 +16,27 @@ public struct LazyHStack<Content: View>: PrimitiveView, ResolvableView {
     self.content = content()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let stackContext = context.settingEnvironment(\.stackAxis, to: .horizontal)
-    let source = makeCompositionalIndexedChildSource(
+    return makeCompositionalIndexedChildSourceWork(
       from: content, in: stackContext, kindName: "LazyHStack"
-    )
-    context.recordResolvedComputation()
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("LazyHStack"),
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .lazyStack(
-          axis: .horizontal,
-          spacing: spacing,
-          horizontalAlignment: .center,
-          verticalAlignment: alignment
-        ),
-        indexedChildSource: source
-      )
-    ]
+    ).map { source in
+      context.recordResolvedComputation()
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("LazyHStack"),
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .lazyStack(
+            axis: .horizontal,
+            spacing: spacing,
+            horizontalAlignment: .center,
+            verticalAlignment: alignment
+          ),
+          indexedChildSource: source
+        )
+      ]
+    }
   }
 }

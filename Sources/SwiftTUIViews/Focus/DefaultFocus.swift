@@ -46,54 +46,60 @@ extension View {
   }
 }
 
-public struct PreferredDefaultFocusModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct PreferredDefaultFocusModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   var prefersDefaultFocus: Bool
   var namespace: Namespace.ID
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
-    if prefersDefaultFocus {
-      context.localDefaultFocusRegistry?.registerCandidate(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
+      if prefersDefaultFocus {
+        context.localDefaultFocusRegistry?.registerCandidate(
+          namespace: namespace,
+          identity: node.identity
+        )
+      }
+      return [node]
+
+    }
+  }
+}
+
+public struct DefaultFocusScopeModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
+  var namespace: Namespace.ID
+
+  package func makeResolveWork<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      context.localDefaultFocusRegistry?.registerScope(
         namespace: namespace,
         identity: node.identity
       )
+      node.semanticMetadata = node.semanticMetadata.merging(
+        focusStructureMetadata(scopeBoundary: true)
+      )
+      return [node]
+
     }
-    return [node]
   }
 }
 
-public struct DefaultFocusScopeModifier: PrimitiveViewModifier, Sendable, Equatable {
-  var namespace: Namespace.ID
-
-  package func resolve<Base: View>(
-    content: ModifierContentInputs<Base>,
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    context.localDefaultFocusRegistry?.registerScope(
-      namespace: namespace,
-      identity: node.identity
-    )
-    node.semanticMetadata = node.semanticMetadata.merging(
-      focusStructureMetadata(scopeBoundary: true)
-    )
-    return [node]
-  }
-}
-
-public struct BoolDefaultFocusModifier: PrimitiveViewModifier {
+public struct BoolDefaultFocusModifier: IterativePrimitiveViewModifier {
   var binding: FocusState<Bool>.Binding
   var value: Bool
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     applyDefaultFocus(in: context)
-    return content.resolveElements(in: context)
+    return content.resolveElementsWork(in: context)
   }
 
   private func applyDefaultFocus(
@@ -148,16 +154,16 @@ public struct BoolDefaultFocusModifier: PrimitiveViewModifier {
   }
 }
 
-public struct OptionalDefaultFocusModifier<Value: Hashable>: PrimitiveViewModifier {
+public struct OptionalDefaultFocusModifier<Value: Hashable>: IterativePrimitiveViewModifier {
   var binding: FocusState<Value?>.Binding
   var value: Value
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     applyDefaultFocus(in: context)
-    return content.resolveElements(in: context)
+    return content.resolveElementsWork(in: context)
   }
 
   private func applyDefaultFocus(

@@ -585,8 +585,8 @@ private struct ConditionalAlertPresentationView: View {
   }
 }
 
-private struct RenderTimePresentationMutationProbe: PrimitiveView, ResolvableView {
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+private struct RenderTimePresentationMutationProbe: PrimitiveView, IterativeResolvableView {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let spec = alertPromptPresentationSpec()
     let sourceIdentity = context.identity
 
@@ -611,7 +611,7 @@ private struct RenderTimePresentationMutationProbe: PrimitiveView, ResolvableVie
       )
     )
 
-    return Text("Workspace").resolveElements(in: context)
+    return Text("Workspace").resolveElementsWork(in: context)
   }
 }
 

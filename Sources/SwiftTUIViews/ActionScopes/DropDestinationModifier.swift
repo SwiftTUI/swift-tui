@@ -36,7 +36,7 @@ extension ActionScope where Self: View & Sendable {
   }
 }
 
-public struct DropDestinationRegistrationModifier: PrimitiveViewModifier, Sendable {
+public struct DropDestinationRegistrationModifier: IterativePrimitiveViewModifier, Sendable {
   package let authoringContext: ImperativeAuthoringContextSnapshot?
   package let action: @MainActor @Sendable ([DroppedPath], DropContext) -> Bool
 
@@ -48,20 +48,23 @@ public struct DropDestinationRegistrationModifier: PrimitiveViewModifier, Sendab
     self.action = action
   }
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
-    // Construction-scope preference: the drop action captures the enclosing
-    // body's `@State` (a consume-policy flag read at dispatch), so it must
-    // dispatch under the scope that authored it, not whichever node this
-    // modifier happens to resolve below.
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    intake.registerDropDestination(at: node.identity, handler: action)
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
+      // Construction-scope preference: the drop action captures the enclosing
+      // body's `@State` (a consume-policy flag read at dispatch), so it must
+      // dispatch under the scope that authored it, not whichever node this
+      // modifier happens to resolve below.
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      intake.registerDropDestination(at: node.identity, handler: action)
+      return [node]
+
+    }
   }
 }

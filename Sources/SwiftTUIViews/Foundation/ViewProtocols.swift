@@ -81,10 +81,28 @@ extension PrimitiveView {
 @MainActor
 package protocol ResolvableView {
   func resolveElements(in context: ResolveContext) -> [ResolvedNode]
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]>
+}
+
+extension ResolvableView {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    .deferred { .value(resolveElements(in: context)) }
+  }
+}
+
+package protocol IterativeResolvableView: View, ResolvableView {}
+
+extension IterativeResolvableView {
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    makeResolveWork(in: context).run()
+  }
 }
 
 @MainActor
 package protocol DeclaredChildrenView {
+  func appendDeclaredChildrenWork(
+    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+  ) -> ResolveWork<Void>
   func appendDeclaredChildren(
     in context: ResolveContext,
     kindName: String,
@@ -130,4 +148,17 @@ package protocol DeclaredChildrenView {
       _ resolveOne: @escaping @MainActor () -> ResolvedNode
     ) -> Void
   )
+}
+
+extension DeclaredChildrenView {
+  package func appendDeclaredChildrenWork(
+    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+  ) -> ResolveWork<Void> {
+    .deferred {
+      appendDeclaredChildren(
+        in: context, kindName: kindName,
+        nextIndex: &state.nextIndex, into: &state.nodes)
+      return .value(())
+    }
+  }
 }

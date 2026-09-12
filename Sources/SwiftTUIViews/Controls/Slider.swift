@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 /// Adjusts a numeric binding along a bounded linear range.
-public struct Slider<Label: View>: PrimitiveView, ResolvableView {
+public struct Slider<Label: View>: PrimitiveView, IterativeResolvableView {
   private enum ValueStorage {
     case integer(Binding<Int>, bounds: ClosedRange<Int>, step: Int)
     case double(Binding<Double>, bounds: ClosedRange<Double>, step: Double?)
@@ -71,17 +71,17 @@ public struct Slider<Label: View>: PrimitiveView, ResolvableView {
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
 extension Slider {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     switch valueStorage {
     case .integer(let binding, let bounds, let step):
       return resolvedNode(
@@ -111,7 +111,7 @@ extension Slider {
     trackStep: Value,
     adjustmentStep: Value,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -183,19 +183,22 @@ extension Slider {
       canIncrement: stepperCanAdjust(currentValue, delta: 1, step: adjustmentStep, bounds: bounds),
       styleEnvironment: styleEnvironment)
     configuration.bindRoutes(to: context.identity)
-    let child = context.environmentValues.sliderStyle.resolveBody(
-      configuration: configuration, in: context.child(component: .named("SliderBody")))
+    return context.environmentValues.sliderStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("SliderBody"))
+    ).map { child in
 
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("Slider"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        focusInteractions: .edit,
-        accessibilityRole: .slider
-      ).namingControl(with: label)
-    )
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("Slider"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: focusableControlMetadata(
+          focusInteractions: .edit,
+          accessibilityRole: .slider
+        ).namingControl(with: label)
+      )
+
+    }
   }
 }

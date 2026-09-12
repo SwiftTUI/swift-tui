@@ -13,7 +13,7 @@ private func setPickerMenuExpanded(
 
 /// Selects one value from a set of tagged options.
 public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: PrimitiveView,
-  ResolvableView
+  IterativeResolvableView
 {
   public var selection: Binding<SelectionValue>
   package var label: Label
@@ -42,10 +42,10 @@ public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: Prim
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
@@ -67,7 +67,7 @@ extension Picker {
 
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let pickerStyle = context.environmentValues.pickerStyle
     let isFocused =
@@ -90,170 +90,174 @@ extension Picker {
     }
     // Until explicitly toggled, preserve the menu's expanded-on-focus default.
     let isActiveNavigation = isFocused && isEnabled && (!wantsTrigger || (expansion ?? true))
-    let resolvedOptions = resolvedOptions(
+    return resolvedOptions(
       in: context.child(component: .named("PickerOptions"))
-    )
-    let options = resolvedOptions.options
-    let selectedIndex = options.firstIndex { option in
-      pickerSelectionMatches(
-        option.tag,
-        selection: selection.wrappedValue
-      )
-    }
+    ).flatMap { resolvedOptions in
+      let options = resolvedOptions.options
+      let selectedIndex = options.firstIndex { option in
+        pickerSelectionMatches(
+          option.tag,
+          selection: selection.wrappedValue
+        )
+      }
 
-    if isEnabled {
-      let binding = selection
-      let intake = HandlerDescriptorIntake(
-        context: context,
-        fallbackAuthoringScope: authoringScope
-      )
-      intake.registerKeyPressHandler(identity: context.identity) { keyPress in
-        guard keyPress.modifiers.isEmpty else {
-          return false
+      if isEnabled {
+        let binding = selection
+        let intake = HandlerDescriptorIntake(
+          context: context,
+          fallbackAuthoringScope: authoringScope
+        )
+        intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+          guard keyPress.modifiers.isEmpty else {
+            return false
+          }
+          if wantsTrigger, keyPress.key == .escape, isActiveNavigation {
+            setPickerMenuExpanded(false, in: ownerNode, identity: context.identity)
+            return true
+          }
+          let delta = pickerStyle.selectionDelta(for: keyPress.key)
+          guard let delta, !options.isEmpty else {
+            return false
+          }
+
+          if wantsTrigger {
+            setPickerMenuExpanded(true, in: ownerNode, identity: context.identity)
+          }
+          return stepBoundSelection(
+            binding,
+            orderedTags: options.map(\.tag),
+            delta: delta
+          )
         }
-        if wantsTrigger, keyPress.key == .escape, isActiveNavigation {
-          setPickerMenuExpanded(false, in: ownerNode, identity: context.identity)
-          return true
+
+        let rootRouteID = runtimePrimaryRouteID(for: context.identity)
+        intake.registerPointerHandler(routeID: rootRouteID) { event in
+          guard case .scrolled(let deltaX, let deltaY) = event.kind,
+            let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
+          else {
+            return .ignored
+          }
+
+          let handled = stepBoundSelection(
+            binding,
+            orderedTags: options.map(\.tag),
+            delta: delta
+          )
+          return handled ? .claimed : .ignored
         }
-        let delta = pickerStyle.selectionDelta(for: keyPress.key)
-        guard let delta, !options.isEmpty else {
-          return false
+
+        for (index, option) in options.enumerated() {
+          let routeID = runtimePrimaryRouteID(
+            for: pickerOptionIdentity(
+              for: context.identity,
+              index: index
+            )
+          )
+          intake.registerPointerHandler(routeID: routeID) { event in
+            switch event.kind {
+            case .down(.primary):
+              _ = setBoundSelection(binding, to: option.tag)
+              return .claimed
+            case .up(.primary):
+              return .claimed
+            default:
+              return .ignored
+            }
+          }
         }
 
         if wantsTrigger {
-          setPickerMenuExpanded(true, in: ownerNode, identity: context.identity)
-        }
-        return stepBoundSelection(
-          binding,
-          orderedTags: options.map(\.tag),
-          delta: delta
-        )
-      }
-
-      let rootRouteID = runtimePrimaryRouteID(for: context.identity)
-      intake.registerPointerHandler(routeID: rootRouteID) { event in
-        guard case .scrolled(let deltaX, let deltaY) = event.kind,
-          let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
-        else {
-          return .ignored
-        }
-
-        let handled = stepBoundSelection(
-          binding,
-          orderedTags: options.map(\.tag),
-          delta: delta
-        )
-        return handled ? .claimed : .ignored
-      }
-
-      for (index, option) in options.enumerated() {
-        let routeID = runtimePrimaryRouteID(
-          for: pickerOptionIdentity(
-            for: context.identity,
-            index: index
-          )
-        )
-        intake.registerPointerHandler(routeID: routeID) { event in
-          switch event.kind {
-          case .down(.primary):
-            _ = setBoundSelection(binding, to: option.tag)
-            return .claimed
-          case .up(.primary):
-            return .claimed
-          default:
-            return .ignored
-          }
-        }
-      }
-
-      if wantsTrigger {
-        intake.registerAction(identity: context.identity) {
-          setPickerMenuExpanded(!isActiveNavigation, in: ownerNode, identity: context.identity)
-          return true
-        }
-        let triggerRouteID = runtimePrimaryRouteID(
-          for: pickerTriggerIdentity(for: context.identity)
-        )
-        intake.registerPointerHandler(routeID: triggerRouteID) { event in
-          switch event.kind {
-          case .down(.primary):
+          intake.registerAction(identity: context.identity) {
             setPickerMenuExpanded(!isActiveNavigation, in: ownerNode, identity: context.identity)
-            return .claimed
-          case .up(.primary):
-            return .claimed
-          default:
-            return .ignored
+            return true
+          }
+          let triggerRouteID = runtimePrimaryRouteID(
+            for: pickerTriggerIdentity(for: context.identity)
+          )
+          intake.registerPointerHandler(routeID: triggerRouteID) { event in
+            switch event.kind {
+            case .down(.primary):
+              setPickerMenuExpanded(!isActiveNavigation, in: ownerNode, identity: context.identity)
+              return .claimed
+            case .up(.primary):
+              return .claimed
+            default:
+              return .ignored
+            }
           }
         }
       }
-    }
 
-    var configuration = PickerStyleConfiguration(
-      controlIdentity: context.identity,
-      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
-      options: options.map { .init(label: $0.label) },
-      selectedIndex: selectedIndex,
-      isFocused: isFocused,
-      isActiveNavigation: isActiveNavigation,
-      showsFocusEffect: showsFocusEffect,
-      isEnabled: isEnabled,
-      styleEnvironment: styleEnvironment,
-      viewportLineCount: context.environmentValues.pickerViewportLineCount,
-      lineWidth: context.environmentValues.pickerLineWidth
-    )
-    configuration.bindRoutes(to: context.identity)
-    let child = pickerStyle.resolveBody(
-      configuration: configuration,
-      in: context.child(component: .named("PickerBody"))
-    )
-
-    var node = ResolvedNode(
-      identity: context.identity,
-      kind: .view("Picker"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: focusableControlMetadata(
-        focusInteractions: .edit,
-        accessibilityRole: .picker
-      ).namingControl(with: label)
-    )
-    if !resolvedOptions.runtimeIssues.isEmpty {
-      node.preferenceValues.merge(
-        RuntimeIssuePreferenceKey.self,
-        value: resolvedOptions.runtimeIssues
+      var configuration = PickerStyleConfiguration(
+        controlIdentity: context.identity,
+        label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+        options: options.map { .init(label: $0.label) },
+        selectedIndex: selectedIndex,
+        isFocused: isFocused,
+        isActiveNavigation: isActiveNavigation,
+        showsFocusEffect: showsFocusEffect,
+        isEnabled: isEnabled,
+        styleEnvironment: styleEnvironment,
+        viewportLineCount: context.environmentValues.pickerViewportLineCount,
+        lineWidth: context.environmentValues.pickerLineWidth
       )
+      configuration.bindRoutes(to: context.identity)
+      return pickerStyle.resolveBody(
+        configuration: configuration,
+        in: context.child(component: .named("PickerBody"))
+      ).map { child in
+
+        var node = ResolvedNode(
+          identity: context.identity,
+          kind: .view("Picker"),
+          children: [child],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          semanticMetadata: focusableControlMetadata(
+            focusInteractions: .edit,
+            accessibilityRole: .picker
+          ).namingControl(with: label)
+        )
+        if !resolvedOptions.runtimeIssues.isEmpty {
+          node.preferenceValues.merge(
+            RuntimeIssuePreferenceKey.self,
+            value: resolvedOptions.runtimeIssues
+          )
+        }
+        return node
+
+      }
     }
-    return node
   }
 
   private func resolvedOptions(
     in context: ResolveContext
-  ) -> ResolvedOptions {
-    let nodes = content.resolveElements(in: context)
+  ) -> ResolveWork<ResolvedOptions> {
+    return content.resolveElementsWork(in: context).map { nodes in
 
-    // The authored options resolve ONLY to extract tags/labels — the style
-    // body renders separate `PickerOption` chrome, so these resolved nodes
-    // are committed nowhere. Any ViewNodes the resolution minted (a
-    // `ForEach`'s tagged rows carrying option state) are reachable through
-    // neither committed values nor parent links; resolve-lifetime scope owns
-    // each at the nearest declaring host so picker teardown reaches them.
-    for node in nodes {
-      context.viewGraph?.reportDetachedResolvedLifetimeResult(node)
+      // The authored options resolve ONLY to extract tags/labels — the style
+      // body renders separate `PickerOption` chrome, so these resolved nodes
+      // are committed nowhere. Any ViewNodes the resolution minted (a
+      // `ForEach`'s tagged rows carrying option state) are reachable through
+      // neither committed values nor parent links; resolve-lifetime scope owns
+      // each at the nearest declaring host so picker teardown reaches them.
+      for node in nodes {
+        context.viewGraph?.reportDetachedResolvedLifetimeResult(node)
+      }
+
+      var result = ResolvedOptions()
+      collectOptions(
+        from: nodes,
+        expectedEnvironment: context.environment,
+        expectedTransaction: context.transaction,
+        // An unmodified `Text` still carries the ambient text-layout attributes
+        // every text node inherits, so the representable baseline is the ambient
+        // metadata for this context — not a default-initialized `LayoutMetadata`.
+        expectedLayoutMetadata: ambientTextLayoutMetadata(in: context),
+        into: &result
+      )
+      return result
     }
-
-    var result = ResolvedOptions()
-    collectOptions(
-      from: nodes,
-      expectedEnvironment: context.environment,
-      expectedTransaction: context.transaction,
-      // An unmodified `Text` still carries the ambient text-layout attributes
-      // every text node inherits, so the representable baseline is the ambient
-      // metadata for this context — not a default-initialized `LayoutMetadata`.
-      expectedLayoutMetadata: ambientTextLayoutMetadata(in: context),
-      into: &result
-    )
-    return result
   }
 
   private func collectOptions(

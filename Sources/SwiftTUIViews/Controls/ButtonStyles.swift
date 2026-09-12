@@ -322,7 +322,7 @@ public struct AnyButtonStyle: Sendable, CustomStringConvertible, CustomDebugStri
   package func resolveBody(
     configuration: ButtonStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     box.resolveBody(
       configuration: configuration,
       in: context
@@ -558,7 +558,7 @@ private protocol AnyButtonStyleBox: AnyStyleBox {
   func resolveBody(
     configuration: ButtonStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode
+  ) -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyButtonStyleBox where S: ButtonStyle {
@@ -574,7 +574,7 @@ extension ConcreteStyleBox: AnyButtonStyleBox where S: ButtonStyle {
   func resolveBody(
     configuration: ButtonStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,
       makeBody: { style, configuration in style.makeBody(configuration: configuration) })

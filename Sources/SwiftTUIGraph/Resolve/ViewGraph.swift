@@ -149,13 +149,6 @@ package final class ViewGraph {
   /// Issued globally and deliberately excluded from checkpoint restore.
   package let stateGraphScopeID: StateGraphScopeID
 
-  /// Chunked-resolve driver (WASI stack-lean profile; test-forced on native).
-  /// Deliberately outside the checkpointed field groups: its state is
-  /// transient within one synchronous resolve pass — the queue is empty and
-  /// the depth is zero at every frame boundary (asserted in `beginFrame`),
-  /// so no checkpoint can ever observe non-default state.
-  package let deferredResolveDriver = DeferredResolveDriver()
-
   /// Per-frame diagnostics tallies (anchor-projection walk counters).
   /// Deliberately outside the checkpointed field groups: diagnostics, not
   /// graph state — a checkpoint restore must not rewind them.
@@ -1920,11 +1913,6 @@ package final class ViewGraph {
   }
 
   package func beginFrame() {
-    assert(
-      deferredResolveDriver.isIdle,
-      "deferred-resolve work leaked across a frame boundary"
-    )
-    deferredResolveDriver.beginFrame()
     // Diagnostic: flush the just-finished frame's reuse-denial histogram before
     // starting the next one (inert unless SWIFTTUI_REUSE_TRACE is set).
     ReuseDenialTrace.dumpAndReset(frameID: currentFrameID)
@@ -1997,7 +1985,7 @@ package final class ViewGraph {
   /// `overlayPreferenceValue`, a toolbar or title host, the presentation
   /// portal root reading the pop chain) is stale. Ancestors re-compose
   /// preferences in their bodies (the framework never patches committed
-  /// values after the fact — see `DeferredResolveDriver`), and a changed
+  /// values after the fact), and a changed
   /// value propagates to the root unless some level clears its key, so the
   /// frame escalates to the root evaluator: exactly a root frame's cost, paid
   /// only on frames where a resolve-time preference actually changed (org
@@ -2276,10 +2264,8 @@ package final class ViewGraph {
   }
 
   /// Publishes a node's appear handlers at most once per frame, keyed by the
-  /// handler IDs themselves rather than by the emitting node's identity. Two
-  /// producers legitimately reach here with the same IDs: the chunked resolve
-  /// driver's drain-and-rerun fixpoint finishes an appearing node more than
-  /// once in one frame, and a single-child flattening absorber commits a lone
+  /// handler IDs themselves rather than by the emitting node's identity. A
+  /// single-child flattening absorber commits a lone
   /// `ForEach` element's resolved node — `lifecycleMetadata` included — as its
   /// own value, so the container and the element's own node both arrive
   /// carrying the element's IDs under different identities (org task T171:

@@ -31,7 +31,8 @@ extension View {
 /// The value-gated sibling of ``TransactionModifier``: shares the gate
 /// mechanics of ``ValueAnimationModifier`` and applies a whole-transaction
 /// transform when its value changes.
-package struct ValueTransactionModifier<Value: Equatable & Sendable>: PrimitiveViewModifier,
+package struct ValueTransactionModifier<Value: Equatable & Sendable>:
+  IterativePrimitiveViewModifier,
   Sendable
 {
   package var value: Value
@@ -42,16 +43,17 @@ package struct ValueTransactionModifier<Value: Equatable & Sendable>: PrimitiveV
     self.transform = transform
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let gate = ValueGatedTransactionSupport.openGate(value: value, in: context)
 
     guard gate.valueChanged else {
-      let resolved = content.resolveElements(in: gate.childContext)
-      gate.storeFirstAppearanceBaseline(value, in: context)
-      return resolved
+      return content.resolveElementsWork(in: gate.childContext).map { resolved in
+        gate.storeFirstAppearanceBaseline(value, in: context)
+        return resolved
+      }
     }
 
     // Carry every observable Transaction field IN and write it BACK, exactly
@@ -74,9 +76,10 @@ package struct ValueTransactionModifier<Value: Equatable & Sendable>: PrimitiveV
     childContext.transaction.customValues = transaction.customValues
     childContext.transaction.tracksVelocity = transaction.tracksVelocity
     childContext.propagated.authoredTransactionOverride = true
-    let resolved = content.resolveElements(in: childContext)
-    gate.storeFirstAppearanceBaseline(value, in: context)
-    return resolved
+    return content.resolveElementsWork(in: childContext).map { resolved in
+      gate.storeFirstAppearanceBaseline(value, in: context)
+      return resolved
+    }
   }
 }
 

@@ -40,13 +40,24 @@ package struct ForEachIteration<Element> {
     rebuilding content: @escaping @MainActor (Element) -> Content,
     declaredChildReplayBoundary: DeclaredChildReplayBoundary? = nil
   ) -> ResolvedNode {
+    resolveWork(
+      view, rebuilding: content,
+      declaredChildReplayBoundary: declaredChildReplayBoundary
+    ).run()
+  }
+
+  package func resolveWork<Content: View>(
+    _ view: Content,
+    rebuilding content: @escaping @MainActor (Element) -> Content,
+    declaredChildReplayBoundary: DeclaredChildReplayBoundary? = nil
+  ) -> ResolveWork<ResolvedNode> {
     let route = ResolveEntityRoute(
       identity: entityIdentity,
       structuralPath: context.structuralPath
     )
-    var resolved = withAuthoringContext(authoringContext) {
+    let work = withAuthoringContext(authoringContext) {
       withResolveEntityRoute(route) {
-        resolveView(
+        resolveViewWork(
           view,
           in: context,
           authoringContextOverride: nil,
@@ -61,12 +72,15 @@ package struct ForEachIteration<Element> {
         )
       }
     }
-    resolved.attachResolvedForEachEntity(
-      entityIdentity,
-      at: context.structuralPath
-    )
-    context.viewGraph?.refreshResolvedMetadata(for: resolved)
-    return resolved
+    return work.map { completed in
+      var resolved = completed
+      resolved.attachResolvedForEachEntity(
+        entityIdentity,
+        at: context.structuralPath
+      )
+      context.viewGraph?.refreshResolvedMetadata(for: resolved)
+      return resolved
+    }
   }
 
   package func resolve<Content: View>(
@@ -81,9 +95,15 @@ package struct ForEachIteration<Element> {
   }
 
   package func resolveElements<Content: View>(
+    content: @escaping @MainActor (Element) -> Content, consumingAs mode: ConsumptionMode
+  ) -> [ResolvedNode] {
+    resolveElementsWork(content: content, consumingAs: mode).run()
+  }
+
+  package func resolveElementsWork<Content: View>(
     content: @escaping @MainActor (Element) -> Content,
     consumingAs mode: ConsumptionMode
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let boundary: DeclaredChildReplayBoundary?
     switch mode {
     case .normalizedNode:
@@ -99,10 +119,10 @@ package struct ForEachIteration<Element> {
         )
       }
     }
-    return consume(
-      resolve(content: content, declaredChildReplayBoundary: boundary),
-      as: mode
-    )
+    return resolveWork(
+      makeView(content), rebuilding: content,
+      declaredChildReplayBoundary: boundary
+    ).map { consume($0, as: mode) }
   }
 
   package func consume(

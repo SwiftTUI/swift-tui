@@ -443,6 +443,13 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
 
+    .executableTarget(
+      name: "ResolveDepthFixture",
+      dependencies: ["SwiftTUICore", "SwiftTUIViews"],
+      path: "Tests/ResolveDepthFixture",
+      swiftSettings: swiftSettings()
+    ),
+
     // Launch-entry-point regression fixtures. Tiny executables that
     // `EntryPointLaunchTests` runs under a PTY to prove `@main` starts the
     // runtime and a bare `MyApp.main()` is rejected with a diagnostic. They are

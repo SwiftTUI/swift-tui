@@ -43,7 +43,7 @@ extension View {
   }
 }
 
-public struct SubmitActionModifier: PrimitiveViewModifier, Sendable {
+public struct SubmitActionModifier: IterativePrimitiveViewModifier, Sendable {
   package let authoringContext: ImperativeAuthoringContextSnapshot?
   package let action: @MainActor @Sendable () -> Void
 
@@ -55,36 +55,36 @@ public struct SubmitActionModifier: PrimitiveViewModifier, Sendable {
     self.action = action
   }
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let composed = SubmitAction(
       authoringContext: authoringContext,
       action: action,
       inherited: context.environmentValues.submitAction
     )
-    return content.resolveElements(
+    return content.resolveElementsWork(
       in: context.settingEnvironment(\.submitAction, to: composed)
     )
   }
 }
 
-public struct SubmitScopeModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct SubmitScopeModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package let isBlocking: Bool
 
   package init(isBlocking: Bool) {
     self.isBlocking = isBlocking
   }
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     guard isBlocking else {
-      return content.resolveElements(in: context)
+      return content.resolveElementsWork(in: context)
     }
-    return content.resolveElements(
+    return content.resolveElementsWork(
       in: context.settingEnvironment(\.submitAction, to: nil)
     )
   }

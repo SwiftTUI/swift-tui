@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
-  PrimitiveViewModifier
+  IterativePrimitiveViewModifier
 {
   var title: String
   var isPresented: Binding<Bool>
@@ -14,10 +14,10 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
   var onDismiss: (@MainActor @Sendable () -> Void)? = nil
   var onDismissAuthoringContext: AuthoringContext? = nil
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let onDismiss = presentationDismissObserver(
       onDismiss,
@@ -76,7 +76,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
   }
 }
 
-public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveViewModifier {
+public struct BuiltinSheetPresentationModifier<SheetContent: View>: IterativePrimitiveViewModifier {
   var title: String
   var isPresented: Binding<Bool>
   var spec: PromptPresentationSpec
@@ -86,10 +86,10 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
   var onDismiss: (@MainActor @Sendable () -> Void)? = nil
   var onDismissAuthoringContext: AuthoringContext? = nil
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let onDismiss = presentationDismissObserver(
       onDismiss,
@@ -147,7 +147,7 @@ package struct BuiltinItemPromptPresentationModifier<
   Item: Identifiable & Sendable,
   Actions: View,
   Message: View
->: PrimitiveViewModifier where Item.ID: Sendable {
+>: IterativePrimitiveViewModifier where Item.ID: Sendable {
   var title: String
   var item: Binding<Item?>
   var spec: PromptPresentationSpec
@@ -159,10 +159,10 @@ package struct BuiltinItemPromptPresentationModifier<
   var onDismiss: (@MainActor @Sendable () -> Void)?
   var onDismissAuthoringContext: AuthoringContext?
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let itemBinding = item
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let onDismiss = presentationDismissObserver(
@@ -224,7 +224,7 @@ package struct BuiltinItemPromptPresentationModifier<
 package struct BuiltinItemSheetPresentationModifier<
   Item: Identifiable & Sendable,
   SheetContent: View
->: PrimitiveViewModifier where Item.ID: Sendable {
+>: IterativePrimitiveViewModifier where Item.ID: Sendable {
   var title: String
   var item: Binding<Item?>
   var spec: PromptPresentationSpec
@@ -234,10 +234,10 @@ package struct BuiltinItemSheetPresentationModifier<
   var onDismiss: (@MainActor @Sendable () -> Void)?
   var onDismissAuthoringContext: AuthoringContext?
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let itemBinding = item
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let onDismiss = presentationDismissObserver(
@@ -291,17 +291,17 @@ package struct BuiltinItemSheetPresentationModifier<
   }
 }
 
-package struct MenuStylePresentationModifier<MenuContent: View>: PrimitiveViewModifier {
+package struct MenuStylePresentationModifier<MenuContent: View>: IterativePrimitiveViewModifier {
   var isPresented: Binding<Bool>
   var menuContent: MenuContent
   var menuContentAuthoringContext: AuthoringContext?
   var dismissAuthoringContext: AuthoringContext?
   var presentation: AnchoredSurfaceStylePresentation
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let spec = menuPromptPresentationSpec(presentation: presentation)
     let surface = spec.prepareSurface(context)
@@ -355,7 +355,7 @@ package struct MenuStylePresentationModifier<MenuContent: View>: PrimitiveViewMo
 /// Sheet variant that absorbs `paletteCommand` contributions from the
 /// enclosing scope's subtree via `PaletteCommandsPreferenceKey` and
 /// projects the snapshot into its palette style. Mirrors `.toolbar()` absorption.
-public struct BuiltinPaletteSheetPresentationModifier: PrimitiveViewModifier {
+public struct BuiltinPaletteSheetPresentationModifier: IterativePrimitiveViewModifier {
   package let title: String
   package let isPresented: Binding<Bool>
   package let sheetContentAuthoringContext: AuthoringContext?
@@ -379,10 +379,10 @@ public struct BuiltinPaletteSheetPresentationModifier: PrimitiveViewModifier {
     self.onDismissAuthoringContext = onDismissAuthoringContext
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let onDismiss = presentationDismissObserver(
       onDismiss,

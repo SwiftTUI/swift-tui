@@ -479,7 +479,7 @@ public struct AnyPickerStyle: Sendable, CustomStringConvertible, CustomDebugStri
   package func resolveBody(
     configuration: PickerStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     box.resolveBody(
       configuration: configuration,
       in: context
@@ -767,7 +767,7 @@ private protocol AnyPickerStyleBox: AnyStyleBox {
   func resolveBody(
     configuration: PickerStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode
+  ) -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyPickerStyleBox where S: PickerStyle {
@@ -788,7 +788,7 @@ extension ConcreteStyleBox: AnyPickerStyleBox where S: PickerStyle {
   func resolveBody(
     configuration: PickerStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,
       makeBody: { style, configuration in style.makeBody(configuration: configuration) })

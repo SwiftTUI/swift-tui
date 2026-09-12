@@ -33,7 +33,7 @@ extension ActionScope where Self: View & Sendable {
   }
 }
 
-public struct KeyCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
+public struct KeyCommandRegistrationModifier: IterativePrimitiveViewModifier, Sendable {
   package let binding: KeyBinding
   package let description: String
   package let isEnabled: Bool
@@ -54,47 +54,50 @@ public struct KeyCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
     self.action = action
   }
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
-    guard
-      !binding.modifiers.isEmpty
-        || KeyBinding.allowsModifierlessCommands(for: binding.key)
-    else {
-      // Modifier-less registrations are framework-reserved for typing,
-      // arrow navigation, Tab, Enter, and Escape (function keys are the
-      // exception — they never produce text). Drop the registration — the
-      // command can never fire — but say so: a silently inert binding
-      // reads as a broken app, not a reserved key.
-      context.viewGraph?.recordFrameRuntimeIssue(
-        RuntimeIssue(
-          severity: .warning,
-          code: "keyCommand.modifierlessIgnored",
-          message:
-            "The key command \"\(description)\" binds \(binding.key) with no "
-            + "modifiers; modifier-less keys are reserved for typing and "
-            + "built-in navigation, so this registration is ignored and the "
-            + "command will never fire. Add a modifier (for example .ctrl) "
-            + "to the binding.",
-          identity: node.identity,
-          source: ".keyCommand"
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
+      guard
+        !binding.modifiers.isEmpty
+          || KeyBinding.allowsModifierlessCommands(for: binding.key)
+      else {
+        // Modifier-less registrations are framework-reserved for typing,
+        // arrow navigation, Tab, Enter, and Escape (function keys are the
+        // exception — they never produce text). Drop the registration — the
+        // command can never fire — but say so: a silently inert binding
+        // reads as a broken app, not a reserved key.
+        context.viewGraph?.recordFrameRuntimeIssue(
+          RuntimeIssue(
+            severity: .warning,
+            code: "keyCommand.modifierlessIgnored",
+            message:
+              "The key command \"\(description)\" binds \(binding.key) with no "
+              + "modifiers; modifier-less keys are reserved for typing and "
+              + "built-in navigation, so this registration is ignored and the "
+              + "command will never fire. Add a modifier (for example .ctrl) "
+              + "to the binding.",
+            identity: node.identity,
+            source: ".keyCommand"
+          )
         )
+        return [node]
+      }
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      intake.registerKeyCommand(
+        at: node.identity,
+        binding: binding,
+        description: description,
+        isEnabled: isEnabled,
+        action: action
       )
       return [node]
+
     }
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    intake.registerKeyCommand(
-      at: node.identity,
-      binding: binding,
-      description: description,
-      isEnabled: isEnabled,
-      action: action
-    )
-    return [node]
   }
 }

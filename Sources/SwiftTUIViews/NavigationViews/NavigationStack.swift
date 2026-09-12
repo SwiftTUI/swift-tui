@@ -5,7 +5,7 @@ public import SwiftTUICore
 /// `NavigationStack` has no built-in chrome. It renders the root content when
 /// its path and destination bindings are inactive, and renders the topmost
 /// destination declared by that data otherwise.
-public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, ResolvableView {
+public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, IterativeResolvableView {
   /// The framework-derived identity used by the stack's `ActionScope`
   /// conformance.
   ///
@@ -37,13 +37,13 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Resolvabl
     self.root = root()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     return withDynamicPropertyUpdateScope(self, for: context) {
-      [resolvedNode(in: context)]
+      resolvedNode(in: context).map { [$0] }
     }
   }
 
-  private func resolvedNode(in context: ResolveContext) -> ResolvedNode {
+  private func resolvedNode(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
     // Publish this stack's identity as the declaration scope for the
     // `navigationDestination(...)` modifiers resolving in its subtree. The
     // stack's identity is structural (position-based) and sits outside any
@@ -55,89 +55,92 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Resolvabl
       context
       .child(component: .named("Root"))
       .settingEnvironment(\.navigationDestinationDeclarationScope, to: context.identity)
-    let rootNode = root.resolve(in: rootContext)
-    let pathResolution = resolveValuePath(
-      from: rootNode,
-      pathBinding: pathBinding,
-      in: context
-    )
-    let resolution = resolveActiveDestinationChain(
-      from: pathResolution.visibleNode,
-      in: context,
-      initial: pathResolution
-    )
+    return root.resolveWork(in: rootContext).flatMap { rootNode in
+      resolveValuePath(
+        from: rootNode,
+        pathBinding: pathBinding,
+        in: context
+      ).flatMap { pathResolution in
+        resolveActiveDestinationChain(
+          from: pathResolution.visibleNode,
+          in: context,
+          initial: pathResolution
+        ).map { resolution in
 
-    // While a destination is presented, the root subtree stays resolved every
-    // frame (its state must survive the push) but is absent from this stack's
-    // committed children — reachable through neither committed values nor
-    // parent links. Resolve-lifetime scope owns the detached value at the
-    // nearest declaring host so owner churn/removal tears it down.
-    if resolution.visibleNode.identity != rootNode.identity {
-      context.viewGraph?.reportDetachedResolvedLifetimeResult(rootNode)
+          // While a destination is presented, the root subtree stays resolved every
+          // frame (its state must survive the push) but is absent from this stack's
+          // committed children — reachable through neither committed values nor
+          // parent links. Resolve-lifetime scope owns the detached value at the
+          // nearest declaring host so owner churn/removal tears it down.
+          if resolution.visibleNode.identity != rootNode.identity {
+            context.viewGraph?.reportDetachedResolvedLifetimeResult(rootNode)
+          }
+
+          // Record the pushed-destination surface content nodes this stack resolved
+          // so the finalize barrier can retire a surface the stack minted last frame
+          // but reminted this frame (a `.id("…-\(gen)")` folded onto this stack node
+          // bumps its declaration root each generation). Such a surface's content is
+          // orphaned by the fold's chain collapse — parented by neither a committed
+          // child nor a detached-hosted edge — so only this diff finds it. Keyed by
+          // the host node's stable ViewNodeID across the churn.
+          if let hostNodeID = ViewNodeContext.current?.viewNodeID {
+            context.viewGraph?.recordActiveNavigationSurfaces(
+              hostNodeID: hostNodeID,
+              contentNodeIDs: Set(resolution.activeSurfaceContentNodeIDs)
+            )
+          }
+
+          // A NavigationStack is a command host (Role A): a focus scope, not a focus
+          // target. Tab passes through to the focusable item leaves of the visible
+          // destination; the stack itself is never a Tab stop.
+          var metadata = focusStructureMetadata(scopeBoundary: true)
+          metadata.isCommandHost = true
+
+          var stackNode = ResolvedNode(
+            identity: context.identity,
+            kind: .view("NavigationStack"),
+            children: [resolution.visibleNode],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction,
+            semanticMetadata: metadata
+          )
+
+          var preferences = resolution.accumulatedPreferences
+          preferences.merge(resolution.visibleNode.preferenceValues)
+          preferences[NavigationDestinationDeclarationPreferenceKey.self] = .init()
+          preferences[NavigationValueDestinationPreferenceKey.self] = .init()
+
+          let navigationTitle = preferences[NavigationTitlePreferenceKey.self]
+          preferences[NavigationTitlePreferenceKey.self] = nil
+          if let navigationTitle {
+            var toolbarItems = preferences[ToolbarItemsPreferenceKey.self]
+            toolbarItems.insert(
+              ToolbarItemConfig(
+                title: navigationTitle,
+                position: .top,
+                isEnabled: false,
+                action: {}
+              ),
+              at: 0
+            )
+            preferences[ToolbarItemsPreferenceKey.self] = toolbarItems
+          }
+
+          var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
+          for issue in resolution.runtimeIssues where !runtimeIssues.contains(issue) {
+            runtimeIssues.append(issue)
+          }
+          preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+
+          var popPreferences = preferences[NavigationDestinationPopPreferenceKey.self]
+          popPreferences.entries.append(contentsOf: resolution.popEntries)
+          preferences[NavigationDestinationPopPreferenceKey.self] = popPreferences
+          stackNode.preferenceValues = preferences
+
+          return stackNode
+        }
+      }
     }
-
-    // Record the pushed-destination surface content nodes this stack resolved
-    // so the finalize barrier can retire a surface the stack minted last frame
-    // but reminted this frame (a `.id("…-\(gen)")` folded onto this stack node
-    // bumps its declaration root each generation). Such a surface's content is
-    // orphaned by the fold's chain collapse — parented by neither a committed
-    // child nor a detached-hosted edge — so only this diff finds it. Keyed by
-    // the host node's stable ViewNodeID across the churn.
-    if let hostNodeID = ViewNodeContext.current?.viewNodeID {
-      context.viewGraph?.recordActiveNavigationSurfaces(
-        hostNodeID: hostNodeID,
-        contentNodeIDs: Set(resolution.activeSurfaceContentNodeIDs)
-      )
-    }
-
-    // A NavigationStack is a command host (Role A): a focus scope, not a focus
-    // target. Tab passes through to the focusable item leaves of the visible
-    // destination; the stack itself is never a Tab stop.
-    var metadata = focusStructureMetadata(scopeBoundary: true)
-    metadata.isCommandHost = true
-
-    var stackNode = ResolvedNode(
-      identity: context.identity,
-      kind: .view("NavigationStack"),
-      children: [resolution.visibleNode],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: metadata
-    )
-
-    var preferences = resolution.accumulatedPreferences
-    preferences.merge(resolution.visibleNode.preferenceValues)
-    preferences[NavigationDestinationDeclarationPreferenceKey.self] = .init()
-    preferences[NavigationValueDestinationPreferenceKey.self] = .init()
-
-    let navigationTitle = preferences[NavigationTitlePreferenceKey.self]
-    preferences[NavigationTitlePreferenceKey.self] = nil
-    if let navigationTitle {
-      var toolbarItems = preferences[ToolbarItemsPreferenceKey.self]
-      toolbarItems.insert(
-        ToolbarItemConfig(
-          title: navigationTitle,
-          position: .top,
-          isEnabled: false,
-          action: {}
-        ),
-        at: 0
-      )
-      preferences[ToolbarItemsPreferenceKey.self] = toolbarItems
-    }
-
-    var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
-    for issue in resolution.runtimeIssues where !runtimeIssues.contains(issue) {
-      runtimeIssues.append(issue)
-    }
-    preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
-
-    var popPreferences = preferences[NavigationDestinationPopPreferenceKey.self]
-    popPreferences.entries.append(contentsOf: resolution.popEntries)
-    preferences[NavigationDestinationPopPreferenceKey.self] = popPreferences
-    stackNode.preferenceValues = preferences
-
-    return stackNode
   }
 }
 
@@ -223,187 +226,198 @@ extension View {
   }
 }
 
-public struct BooleanNavigationDestinationModifier<Destination: View>: PrimitiveViewModifier {
+public struct BooleanNavigationDestinationModifier<Destination: View>:
+  IterativePrimitiveViewModifier
+{
   var isPresented: Binding<Bool>
   var destination: Destination
   var destinationAuthoringContext: AuthoringContext?
   var dismissAuthoringContext: AuthoringContext?
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    let sourceIdentity = node.identity
-    let modifierOrdinal = navigationDestinationModifierOrdinal(for: sourceIdentity, in: context)
-    let declarationIdentity = navigationDestinationDeclarationIdentity(
-      sourceIdentity: sourceIdentity,
-      sourceEntity: node.entityIdentity,
-      modifierOrdinal: modifierOrdinal,
-      scope: context.environmentValues.navigationDestinationDeclarationScope
-    )
-    let activationOrdinal = updateNavigationDestinationActivation(
-      sourceIdentity: sourceIdentity,
-      modifierOrdinal: modifierOrdinal,
-      activeKey: isPresented.wrappedValue ? .boolean : nil,
-      in: context
-    )
-    let dismissInvalidator = context.invalidationProxy?.invalidator
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      let sourceIdentity = node.identity
+      let modifierOrdinal = navigationDestinationModifierOrdinal(for: sourceIdentity, in: context)
+      let declarationIdentity = navigationDestinationDeclarationIdentity(
+        sourceIdentity: sourceIdentity,
+        sourceEntity: node.entityIdentity,
+        modifierOrdinal: modifierOrdinal,
+        scope: context.environmentValues.navigationDestinationDeclarationScope
+      )
+      let activationOrdinal = updateNavigationDestinationActivation(
+        sourceIdentity: sourceIdentity,
+        modifierOrdinal: modifierOrdinal,
+        activeKey: isPresented.wrappedValue ? .boolean : nil,
+        in: context
+      )
+      let dismissInvalidator = context.invalidationProxy?.invalidator
 
-    let instance = activationOrdinal.map { ordinal in
-      NavigationDestinationInstance(
-        identity: declarationIdentity.child("Activation[\(ordinal)]"),
-        payload: NavigationDestinationPayload(
-          navigationDestinationAuthoringContext: destinationAuthoringContext,
-          declarationIdentity: declarationIdentity
-        ) {
-          destination
-        },
-        dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
-          withAuthoringContext(dismissAuthoringContext) {
-            isPresented.wrappedValue = false
+      let instance = activationOrdinal.map { ordinal in
+        NavigationDestinationInstance(
+          identity: declarationIdentity.child("Activation[\(ordinal)]"),
+          payload: NavigationDestinationPayload(
+            navigationDestinationAuthoringContext: destinationAuthoringContext,
+            declarationIdentity: declarationIdentity
+          ) {
+            destination
+          },
+          dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+            withAuthoringContext(dismissAuthoringContext) {
+              isPresented.wrappedValue = false
+            }
+            dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
           }
-          dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
-        }
-      )
-    }
+        )
+      }
 
-    node.preferenceValues.merge(
-      NavigationDestinationDeclarationPreferenceKey.self,
-      value: .init(
-        declarations: [
-          .init(
-            sourceIdentity: sourceIdentity,
-            declarationIdentity: declarationIdentity,
-            instance: instance
-          )
-        ]
+      node.preferenceValues.merge(
+        NavigationDestinationDeclarationPreferenceKey.self,
+        value: .init(
+          declarations: [
+            .init(
+              sourceIdentity: sourceIdentity,
+              declarationIdentity: declarationIdentity,
+              instance: instance
+            )
+          ]
+        )
       )
-    )
-    return [node]
+      return [node]
+
+    }
   }
 }
 
 public struct ItemNavigationDestinationModifier<Item: Identifiable & Sendable, Destination: View>:
-  PrimitiveViewModifier
+  IterativePrimitiveViewModifier
 where Item.ID: Sendable {
   var item: Binding<Item?>
   var destination: @MainActor (Item) -> Destination
   var destinationAuthoringContext: AuthoringContext?
   var dismissAuthoringContext: AuthoringContext?
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    let sourceIdentity = node.identity
-    let modifierOrdinal = navigationDestinationModifierOrdinal(for: sourceIdentity, in: context)
-    let declarationIdentity = navigationDestinationDeclarationIdentity(
-      sourceIdentity: sourceIdentity,
-      sourceEntity: node.entityIdentity,
-      modifierOrdinal: modifierOrdinal,
-      scope: context.environmentValues.navigationDestinationDeclarationScope
-    )
-    let currentItem = item.wrappedValue
-    let activeKey = currentItem.map { NavigationDestinationActivationKey($0.id) }
-    let activationOrdinal = updateNavigationDestinationActivation(
-      sourceIdentity: sourceIdentity,
-      modifierOrdinal: modifierOrdinal,
-      activeKey: activeKey,
-      in: context
-    )
-    let dismissInvalidator = context.invalidationProxy?.invalidator
-
-    let instance: NavigationDestinationInstance? =
-      if let currentItem, let activationOrdinal {
-        NavigationDestinationInstance(
-          identity:
-            declarationIdentity
-            .child("Item")
-            .explicitID(currentItem.id)
-            .child("Activation[\(activationOrdinal)]"),
-          payload: NavigationDestinationPayload(
-            navigationDestinationAuthoringContext: destinationAuthoringContext,
-            declarationIdentity: declarationIdentity
-          ) {
-            destination(currentItem)
-          },
-          dismiss: { [item, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
-            withAuthoringContext(dismissAuthoringContext) {
-              item.wrappedValue = nil
-            }
-            dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
-          }
-        )
-      } else {
-        nil
-      }
-
-    node.preferenceValues.merge(
-      NavigationDestinationDeclarationPreferenceKey.self,
-      value: .init(
-        declarations: [
-          .init(
-            sourceIdentity: sourceIdentity,
-            declarationIdentity: declarationIdentity,
-            instance: instance
-          )
-        ]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      let sourceIdentity = node.identity
+      let modifierOrdinal = navigationDestinationModifierOrdinal(for: sourceIdentity, in: context)
+      let declarationIdentity = navigationDestinationDeclarationIdentity(
+        sourceIdentity: sourceIdentity,
+        sourceEntity: node.entityIdentity,
+        modifierOrdinal: modifierOrdinal,
+        scope: context.environmentValues.navigationDestinationDeclarationScope
       )
-    )
-    return [node]
+      let currentItem = item.wrappedValue
+      let activeKey = currentItem.map { NavigationDestinationActivationKey($0.id) }
+      let activationOrdinal = updateNavigationDestinationActivation(
+        sourceIdentity: sourceIdentity,
+        modifierOrdinal: modifierOrdinal,
+        activeKey: activeKey,
+        in: context
+      )
+      let dismissInvalidator = context.invalidationProxy?.invalidator
+
+      let instance: NavigationDestinationInstance? =
+        if let currentItem, let activationOrdinal {
+          NavigationDestinationInstance(
+            identity:
+              declarationIdentity
+              .child("Item")
+              .explicitID(currentItem.id)
+              .child("Activation[\(activationOrdinal)]"),
+            payload: NavigationDestinationPayload(
+              navigationDestinationAuthoringContext: destinationAuthoringContext,
+              declarationIdentity: declarationIdentity
+            ) {
+              destination(currentItem)
+            },
+            dismiss: { [item, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+              withAuthoringContext(dismissAuthoringContext) {
+                item.wrappedValue = nil
+              }
+              dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
+            }
+          )
+        } else {
+          nil
+        }
+
+      node.preferenceValues.merge(
+        NavigationDestinationDeclarationPreferenceKey.self,
+        value: .init(
+          declarations: [
+            .init(
+              sourceIdentity: sourceIdentity,
+              declarationIdentity: declarationIdentity,
+              instance: instance
+            )
+          ]
+        )
+      )
+      return [node]
+
+    }
   }
 }
 
 /// The modifier value produced by
 /// ``View/navigationDestination(for:destination:)``.
 public struct ValueNavigationDestinationModifier<Data: Hashable & Sendable, Destination: View>:
-  PrimitiveViewModifier
+  IterativePrimitiveViewModifier
 {
   var data: Data.Type
   var destination: @MainActor @Sendable (Data) -> Destination
   var destinationAuthoringContext: AuthoringContext?
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    let sourceIdentity = node.identity
-    let modifierOrdinal = navigationDestinationModifierOrdinal(for: sourceIdentity, in: context)
-    let declarationIdentity = navigationDestinationDeclarationIdentity(
-      sourceIdentity: sourceIdentity,
-      sourceEntity: node.entityIdentity,
-      modifierOrdinal: modifierOrdinal,
-      scope: context.environmentValues.navigationDestinationDeclarationScope
-    )
-
-    node.preferenceValues.merge(
-      NavigationValueDestinationPreferenceKey.self,
-      value: .init(
-        declarations: [
-          .init(
-            sourceIdentity: sourceIdentity,
-            declarationIdentity: declarationIdentity,
-            valueTypeID: ObjectIdentifier(data),
-            valueTypeName: String(reflecting: data),
-            makePayload: { [destination, destinationAuthoringContext] value in
-              guard let value = value.unwrap(as: Data.self) else {
-                return nil
-              }
-              return NavigationDestinationPayload(
-                navigationDestinationAuthoringContext: destinationAuthoringContext,
-                declarationIdentity: declarationIdentity
-              ) {
-                destination(value)
-              }
-            }
-          )
-        ]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      let sourceIdentity = node.identity
+      let modifierOrdinal = navigationDestinationModifierOrdinal(for: sourceIdentity, in: context)
+      let declarationIdentity = navigationDestinationDeclarationIdentity(
+        sourceIdentity: sourceIdentity,
+        sourceEntity: node.entityIdentity,
+        modifierOrdinal: modifierOrdinal,
+        scope: context.environmentValues.navigationDestinationDeclarationScope
       )
-    )
-    return [node]
+
+      node.preferenceValues.merge(
+        NavigationValueDestinationPreferenceKey.self,
+        value: .init(
+          declarations: [
+            .init(
+              sourceIdentity: sourceIdentity,
+              declarationIdentity: declarationIdentity,
+              valueTypeID: ObjectIdentifier(data),
+              valueTypeName: String(reflecting: data),
+              makePayload: { [destination, destinationAuthoringContext] value in
+                guard let value = value.unwrap(as: Data.self) else {
+                  return nil
+                }
+                return NavigationDestinationPayload(
+                  navigationDestinationAuthoringContext: destinationAuthoringContext,
+                  declarationIdentity: declarationIdentity
+                ) {
+                  destination(value)
+                }
+              }
+            )
+          ]
+        )
+      )
+      return [node]
+
+    }
   }
 }
 
@@ -449,7 +463,7 @@ private func resolveValuePath(
   from rootNode: ResolvedNode,
   pathBinding: NavigationPathBinding?,
   in context: ResolveContext
-) -> NavigationChainResolution {
+) -> ResolveWork<NavigationChainResolution> {
   var visibleNode = rootNode
   var accumulatedPreferences = PreferenceValues()
   var popEntries: [NavigationDestinationPopEntry] = []
@@ -457,26 +471,28 @@ private func resolveValuePath(
   var activeSurfaceContentNodeIDs: [ViewNodeID] = []
 
   guard let pathBinding else {
-    return NavigationChainResolution(
-      visibleNode: visibleNode,
-      accumulatedPreferences: accumulatedPreferences,
-      popEntries: popEntries,
-      runtimeIssues: runtimeIssues,
-      depth: 0,
-      activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
-    )
+    return .value(
+      NavigationChainResolution(
+        visibleNode: visibleNode,
+        accumulatedPreferences: accumulatedPreferences,
+        popEntries: popEntries,
+        runtimeIssues: runtimeIssues,
+        depth: 0,
+        activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+      ))
   }
 
   let values = pathBinding.values()
   guard !values.isEmpty else {
-    return NavigationChainResolution(
-      visibleNode: visibleNode,
-      accumulatedPreferences: accumulatedPreferences,
-      popEntries: popEntries,
-      runtimeIssues: runtimeIssues,
-      depth: 0,
-      activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
-    )
+    return .value(
+      NavigationChainResolution(
+        visibleNode: visibleNode,
+        accumulatedPreferences: accumulatedPreferences,
+        popEntries: popEntries,
+        runtimeIssues: runtimeIssues,
+        depth: 0,
+        activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+      ))
   }
 
   var declarations = visibleNode.preferenceValues[
@@ -484,77 +500,88 @@ private func resolveValuePath(
   ].declarations
   visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
 
-  for (index, value) in values.prefix(navigationDestinationDepthLimit).enumerated() {
-    guard
-      let declaration = declarations.last(where: {
-        $0.valueTypeID == pathBinding.valueTypeID
-      }),
-      let payload = declaration.makePayload(value)
-    else {
-      runtimeIssues.append(
-        RuntimeIssue(
-          severity: .warning,
-          code: "navigation.missingValueDestination",
-          message:
-            "No navigation destination is registered for path value type \(pathBinding.valueTypeName); the path stopped at index \(index).",
-          identity: context.identity,
-          source: ".navigationDestination(for:destination:)"
+  func next(_ index: Int) -> ResolveWork<NavigationChainResolution> {
+    .deferred {
+      if index < min(values.count, navigationDestinationDepthLimit) {
+        let value = values[index]
+        guard
+          let declaration = declarations.last(where: {
+            $0.valueTypeID == pathBinding.valueTypeID
+          }),
+          let payload = declaration.makePayload(value)
+        else {
+          runtimeIssues.append(
+            RuntimeIssue(
+              severity: .warning,
+              code: "navigation.missingValueDestination",
+              message:
+                "No navigation destination is registered for path value type \(pathBinding.valueTypeName); the path stopped at index \(index).",
+              identity: context.identity,
+              source: ".navigationDestination(for:destination:)"
+            )
+          )
+          return .value(
+            NavigationChainResolution(
+              visibleNode: visibleNode,
+              accumulatedPreferences: accumulatedPreferences,
+              popEntries: popEntries,
+              runtimeIssues: runtimeIssues,
+              depth: index,
+              activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+            ))
+        }
+
+        accumulatedPreferences.merge(visibleNode.preferenceValues)
+        let instanceIdentity =
+          declaration.declarationIdentity
+          .child("Path[\(index)]")
+          .explicitID(value)
+        let instance = NavigationDestinationInstance(
+          identity: instanceIdentity,
+          payload: payload,
+          dismiss: { [pathBinding] in
+            pathBinding.removeSuffix(index)
+          }
         )
-      )
-      return NavigationChainResolution(
-        visibleNode: visibleNode,
-        accumulatedPreferences: accumulatedPreferences,
-        popEntries: popEntries,
-        runtimeIssues: runtimeIssues,
-        depth: index,
-        activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
-      )
-    }
+        popEntries.append(
+          NavigationDestinationPopEntry(
+            scopeIdentity: instanceIdentity,
+            dismiss: instance.dismiss
+          )
+        )
 
-    accumulatedPreferences.merge(visibleNode.preferenceValues)
-    let instanceIdentity =
-      declaration.declarationIdentity
-      .child("Path[\(index)]")
-      .explicitID(value)
-    let instance = NavigationDestinationInstance(
-      identity: instanceIdentity,
-      payload: payload,
-      dismiss: { [pathBinding] in
-        pathBinding.removeSuffix(index)
+        return NavigationDestinationSurface(instance: instance)
+          .resolveWork(in: context.replacingIdentity(with: instanceIdentity)).flatMap { completed in
+            visibleNode = completed
+            if let contentNodeID = visibleNode.children.first?.viewNodeID {
+              activeSurfaceContentNodeIDs.append(contentNodeID)
+            }
+
+            let nestedDeclarations = visibleNode.preferenceValues[
+              NavigationValueDestinationPreferenceKey.self
+            ].declarations
+            declarations.append(contentsOf: nestedDeclarations)
+            visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
+            return next(index + 1)
+          }
       }
-    )
-    popEntries.append(
-      NavigationDestinationPopEntry(
-        scopeIdentity: instanceIdentity,
-        dismiss: instance.dismiss
-      )
-    )
 
-    visibleNode = NavigationDestinationSurface(instance: instance)
-      .resolve(in: context.replacingIdentity(with: instanceIdentity))
-    if let contentNodeID = visibleNode.children.first?.viewNodeID {
-      activeSurfaceContentNodeIDs.append(contentNodeID)
+      if values.count > navigationDestinationDepthLimit {
+        runtimeIssues.append(navigationDepthLimitIssue(identity: context.identity))
+      }
+
+      return .value(
+        NavigationChainResolution(
+          visibleNode: visibleNode,
+          accumulatedPreferences: accumulatedPreferences,
+          popEntries: popEntries,
+          runtimeIssues: runtimeIssues,
+          depth: min(values.count, navigationDestinationDepthLimit),
+          activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+        ))
     }
-
-    let nestedDeclarations = visibleNode.preferenceValues[
-      NavigationValueDestinationPreferenceKey.self
-    ].declarations
-    declarations.append(contentsOf: nestedDeclarations)
-    visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
   }
-
-  if values.count > navigationDestinationDepthLimit {
-    runtimeIssues.append(navigationDepthLimitIssue(identity: context.identity))
-  }
-
-  return NavigationChainResolution(
-    visibleNode: visibleNode,
-    accumulatedPreferences: accumulatedPreferences,
-    popEntries: popEntries,
-    runtimeIssues: runtimeIssues,
-    depth: min(values.count, navigationDestinationDepthLimit),
-    activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
-  )
+  return next(0)
 }
 
 @MainActor
@@ -562,7 +589,7 @@ private func resolveActiveDestinationChain(
   from rootNode: ResolvedNode,
   in context: ResolveContext,
   initial: NavigationChainResolution
-) -> NavigationChainResolution {
+) -> ResolveWork<NavigationChainResolution> {
   var visibleNode = rootNode
   var accumulatedPreferences = initial.accumulatedPreferences
   var popEntries = initial.popEntries
@@ -570,80 +597,91 @@ private func resolveActiveDestinationChain(
   var depth = initial.depth
   var activeSurfaceContentNodeIDs = initial.activeSurfaceContentNodeIDs
 
-  while depth < navigationDestinationDepthLimit {
-    let declarations = visibleNode.preferenceValues[
-      NavigationDestinationDeclarationPreferenceKey.self
-    ].declarations
-    let activeInstances = declarations.compactMap(\.instance)
+  func next() -> ResolveWork<NavigationChainResolution> {
+    .deferred {
+      if depth < navigationDestinationDepthLimit {
+        let declarations = visibleNode.preferenceValues[
+          NavigationDestinationDeclarationPreferenceKey.self
+        ].declarations
+        let activeInstances = declarations.compactMap(\.instance)
 
-    visibleNode.preferenceValues[NavigationDestinationDeclarationPreferenceKey.self] = .init()
-    visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
+        visibleNode.preferenceValues[NavigationDestinationDeclarationPreferenceKey.self] = .init()
+        visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
 
-    guard let instance = activeInstances.last else {
-      return NavigationChainResolution(
-        visibleNode: visibleNode,
-        accumulatedPreferences: accumulatedPreferences,
-        popEntries: popEntries,
-        runtimeIssues: runtimeIssues,
-        depth: depth,
-        activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
-      )
-    }
+        guard let instance = activeInstances.last else {
+          return .value(
+            NavigationChainResolution(
+              visibleNode: visibleNode,
+              accumulatedPreferences: accumulatedPreferences,
+              popEntries: popEntries,
+              runtimeIssues: runtimeIssues,
+              depth: depth,
+              activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+            ))
+        }
 
-    if activeInstances.count > 1 {
-      for losingInstance in activeInstances.dropLast() {
-        losingInstance.dismiss()
-      }
-      runtimeIssues.append(
-        RuntimeIssue(
-          severity: .warning,
-          code: "navigation.multipleActiveDestinations",
-          message:
-            "\(activeInstances.count) binding-driven navigation destinations were active in the same surface; the last declaration won and every earlier binding was reset.",
-          identity: context.identity,
-          source: ".navigationDestination(...)"
+        if activeInstances.count > 1 {
+          for losingInstance in activeInstances.dropLast() {
+            losingInstance.dismiss()
+          }
+          runtimeIssues.append(
+            RuntimeIssue(
+              severity: .warning,
+              code: "navigation.multipleActiveDestinations",
+              message:
+                "\(activeInstances.count) binding-driven navigation destinations were active in the same surface; the last declaration won and every earlier binding was reset.",
+              identity: context.identity,
+              source: ".navigationDestination(...)"
+            )
+          )
+        }
+
+        accumulatedPreferences.merge(visibleNode.preferenceValues)
+        popEntries.append(
+          NavigationDestinationPopEntry(
+            scopeIdentity: instance.identity,
+            dismiss: instance.dismiss
+          )
         )
-      )
+
+        return NavigationDestinationSurface(instance: instance)
+          .resolveWork(in: context.replacingIdentity(with: instance.identity)).flatMap {
+            completed in
+            visibleNode = completed
+            // The surface's own node collapses onto the reused stack node under a
+            // folded `.id`; its payload content node stays distinct per generation and
+            // is the leak-bearing subtree, so track that. `NavigationDestinationSurface`
+            // resolves its payload as the single child of the surface node.
+            if let contentNodeID = visibleNode.children.first?.viewNodeID {
+              activeSurfaceContentNodeIDs.append(contentNodeID)
+            }
+            depth += 1
+            return next()
+          }
+      }
+
+      let hasOverflow = visibleNode.preferenceValues[
+        NavigationDestinationDeclarationPreferenceKey.self
+      ].declarations.contains { $0.instance != nil }
+      visibleNode.preferenceValues[NavigationDestinationDeclarationPreferenceKey.self] = .init()
+      visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
+      if hasOverflow,
+        !runtimeIssues.contains(where: { $0.code == "navigation.depthLimitExceeded" })
+      {
+        runtimeIssues.append(navigationDepthLimitIssue(identity: context.identity))
+      }
+      return .value(
+        NavigationChainResolution(
+          visibleNode: visibleNode,
+          accumulatedPreferences: accumulatedPreferences,
+          popEntries: popEntries,
+          runtimeIssues: runtimeIssues,
+          depth: depth,
+          activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
+        ))
     }
-
-    accumulatedPreferences.merge(visibleNode.preferenceValues)
-    popEntries.append(
-      NavigationDestinationPopEntry(
-        scopeIdentity: instance.identity,
-        dismiss: instance.dismiss
-      )
-    )
-
-    visibleNode = NavigationDestinationSurface(instance: instance)
-      .resolve(in: context.replacingIdentity(with: instance.identity))
-    // The surface's own node collapses onto the reused stack node under a
-    // folded `.id`; its payload content node stays distinct per generation and
-    // is the leak-bearing subtree, so track that. `NavigationDestinationSurface`
-    // resolves its payload as the single child of the surface node.
-    if let contentNodeID = visibleNode.children.first?.viewNodeID {
-      activeSurfaceContentNodeIDs.append(contentNodeID)
-    }
-    depth += 1
   }
-
-  let hasOverflow = visibleNode.preferenceValues[
-    NavigationDestinationDeclarationPreferenceKey.self
-  ].declarations.contains { $0.instance != nil }
-  visibleNode.preferenceValues[NavigationDestinationDeclarationPreferenceKey.self] = .init()
-  visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
-  if hasOverflow,
-    !runtimeIssues.contains(where: { $0.code == "navigation.depthLimitExceeded" })
-  {
-    runtimeIssues.append(navigationDepthLimitIssue(identity: context.identity))
-  }
-  return NavigationChainResolution(
-    visibleNode: visibleNode,
-    accumulatedPreferences: accumulatedPreferences,
-    popEntries: popEntries,
-    runtimeIssues: runtimeIssues,
-    depth: depth,
-    activeSurfaceContentNodeIDs: activeSurfaceContentNodeIDs
-  )
+  return next()
 }
 
 private func navigationDepthLimitIssue(identity: Identity) -> RuntimeIssue {
@@ -657,7 +695,7 @@ private func navigationDepthLimitIssue(identity: Identity) -> RuntimeIssue {
   )
 }
 
-private struct NavigationDestinationSurface: PrimitiveView, ActionScope, ResolvableView {
+private struct NavigationDestinationSurface: PrimitiveView, ActionScope, IterativeResolvableView {
   typealias ID = Identity
 
   var instance: NavigationDestinationInstance
@@ -666,23 +704,25 @@ private struct NavigationDestinationSurface: PrimitiveView, ActionScope, Resolva
     instance.identity
   }
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let payloadNode = instance.payload.resolve(in: context.child(component: .named("Content")))
-    // A pushed navigation destination is a command host (Role A): a focus scope,
-    // not a focus target. Tab passes through to the destination's item leaves.
-    var metadata = focusStructureMetadata(scopeBoundary: true)
-    metadata.isCommandHost = true
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    return instance.payload.resolveWork(in: context.child(component: .named("Content"))).map {
+      payloadNode in
+      // A pushed navigation destination is a command host (Role A): a focus scope,
+      // not a focus target. Tab passes through to the destination's item leaves.
+      var metadata = focusStructureMetadata(scopeBoundary: true)
+      metadata.isCommandHost = true
 
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("NavigationDestination"),
-        children: [payloadNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        semanticMetadata: metadata
-      )
-    ]
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("NavigationDestination"),
+          children: [payloadNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          semanticMetadata: metadata
+        )
+      ]
+    }
   }
 }
 

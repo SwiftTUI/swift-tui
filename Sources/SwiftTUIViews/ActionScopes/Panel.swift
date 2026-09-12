@@ -52,26 +52,33 @@ public struct Panel<ID: Hashable & Sendable, Content: View>: PrimitiveView, Acti
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let childNode = content.resolve(in: context.child(component: .named("content")))
-    // A Panel is a command host (Role A): a focus scope, not a focus target.
-    // It hoists commands/chrome and bounds a scope, but does not participate in
-    // top-level focus, so Tab passes through to item leaves. `.sealed` adds a
-    // hard stop that suppresses descendant focus too.
-    var metadata = focusStructureMetadata(scopeBoundary: true)
-    metadata.isCommandHost = true
-    if containment == .sealed {
-      metadata.sealsFocusDescendants = true
+    makeResolveWork(in: context).run()
+  }
+
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context.child(component: .named("content"))).map { completed in
+      let childNode = completed
+      // A Panel is a command host (Role A): a focus scope, not a focus target.
+      // It hoists commands/chrome and bounds a scope, but does not participate in
+      // top-level focus, so Tab passes through to item leaves. `.sealed` adds a
+      // hard stop that suppresses descendant focus too.
+      var metadata = focusStructureMetadata(scopeBoundary: true)
+      metadata.isCommandHost = true
+      if containment == .sealed {
+        metadata.sealsFocusDescendants = true
+      }
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Panel"),
+          children: [childNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          semanticMetadata: metadata
+        )
+      ]
+
     }
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("Panel"),
-        children: [childNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        semanticMetadata: metadata
-      )
-    ]
   }
 }
 

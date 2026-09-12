@@ -64,7 +64,7 @@ extension ActionScope where Self: View & Sendable {
   }
 }
 
-public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
+public struct PaletteCommandRegistrationModifier: IterativePrimitiveViewModifier, Sendable {
   package let name: String
   package let description: String?
   package let isEnabled: Bool
@@ -85,29 +85,33 @@ public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendabl
     self.action = action
   }
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     // Each modifier is a contribution site. Give its base a structural child
     // edge so repeated modifiers on the same chain have distinct identities
     // without deriving identity from labels or mutable preference cardinality.
-    var node = content.resolve(in: context.child(component: .named("PaletteCommandContent")))
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    let contribution = ActivePaletteCommand(
-      identity: context.identity,
-      name: name,
-      description: description,
-      isEnabled: isEnabled,
-      action: intake.wrappingSendable(action)
-    )
-    node.preferenceValues.merge(
-      PaletteCommandsPreferenceKey.self,
-      value: [contribution]
-    )
-    return [node]
+    return content.resolveWork(in: context.child(component: .named("PaletteCommandContent"))).map {
+      completed in
+      var node = completed
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      let contribution = ActivePaletteCommand(
+        identity: context.identity,
+        name: name,
+        description: description,
+        isEnabled: isEnabled,
+        action: intake.wrappingSendable(action)
+      )
+      node.preferenceValues.merge(
+        PaletteCommandsPreferenceKey.self,
+        value: [contribution]
+      )
+      return [node]
+
+    }
   }
 }

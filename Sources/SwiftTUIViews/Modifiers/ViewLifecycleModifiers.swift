@@ -94,175 +94,184 @@ private func recordLifecycleEvaluationOwner(
   )
 }
 
-public struct AppearLifecycleModifier: PrimitiveViewModifier {
+public struct AppearLifecycleModifier: IterativePrimitiveViewModifier {
   let authoringContext: ImperativeAuthoringContextSnapshot?
   let action: () -> Void
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    recordLifecycleEvaluationOwner(
-      for: node.identity,
-      in: context
-    )
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    let lifecycleAction = action
-    let handlerID =
-      intake.registerAppearHandler(
-        identity: node.identity,
-        ordinal: node.lifecycleMetadata.appearHandlerIDs.count,
-        handler: {
-          lifecycleAction()
-        }
-      ) ?? "\(node.identity)#appear[\(node.lifecycleMetadata.appearHandlerIDs.count)]"
-    node.lifecycleMetadata = node.lifecycleMetadata.merging(
-      .init(appearHandlerIDs: [handlerID])
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      recordLifecycleEvaluationOwner(
+        for: node.identity,
+        in: context
+      )
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      let lifecycleAction = action
+      let handlerID =
+        intake.registerAppearHandler(
+          identity: node.identity,
+          ordinal: node.lifecycleMetadata.appearHandlerIDs.count,
+          handler: {
+            lifecycleAction()
+          }
+        ) ?? "\(node.identity)#appear[\(node.lifecycleMetadata.appearHandlerIDs.count)]"
+      node.lifecycleMetadata = node.lifecycleMetadata.merging(
+        .init(appearHandlerIDs: [handlerID])
+      )
+      return [node]
+
+    }
   }
 }
 
-public struct DisappearLifecycleModifier: PrimitiveViewModifier {
+public struct DisappearLifecycleModifier: IterativePrimitiveViewModifier {
   let authoringContext: ImperativeAuthoringContextSnapshot?
   let action: () -> Void
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    recordLifecycleEvaluationOwner(
-      for: node.identity,
-      in: context
-    )
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    let lifecycleAction = action
-    let handlerID =
-      intake.registerDisappearHandler(
-        identity: node.identity,
-        ordinal: node.lifecycleMetadata.disappearHandlerIDs.count,
-        handler: {
-          lifecycleAction()
-        }
-      ) ?? "\(node.identity)#disappear[\(node.lifecycleMetadata.disappearHandlerIDs.count)]"
-    node.lifecycleMetadata = node.lifecycleMetadata.merging(
-      .init(disappearHandlerIDs: [handlerID])
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      recordLifecycleEvaluationOwner(
+        for: node.identity,
+        in: context
+      )
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      let lifecycleAction = action
+      let handlerID =
+        intake.registerDisappearHandler(
+          identity: node.identity,
+          ordinal: node.lifecycleMetadata.disappearHandlerIDs.count,
+          handler: {
+            lifecycleAction()
+          }
+        ) ?? "\(node.identity)#disappear[\(node.lifecycleMetadata.disappearHandlerIDs.count)]"
+      node.lifecycleMetadata = node.lifecycleMetadata.merging(
+        .init(disappearHandlerIDs: [handlerID])
+      )
+      return [node]
+
+    }
   }
 }
 
-public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
+public struct ChangeLifecycleModifier<Value: Equatable>: IterativePrimitiveViewModifier {
   var value: Value
   var initial: Bool
   let action: (Value, Value) -> Void
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let intake = HandlerDescriptorIntake(context: context)
-    let node = content.resolve(in: context)
-    let viewGraph = context.viewGraph
-    // The package-only exact `.id(Identity)` replaces the resolved path
-    // wholesale. Its scoped entity is therefore the lifecycle owner: it stays
-    // stable inside one enclosing identity lifetime and is reminted when that
-    // ancestor changes. Public generic IDs and structural paths retain the
-    // established resolved-identity ownership used by modifier-chain churn.
-    let routedEntityIdentity =
-      node.entityIdentity ?? ResolveEntityRouteStorage.current?.identity
-    let exactEntityIdentity = routedEntityIdentity.flatMap { entityIdentity in
-      entityIdentity.isScopedExactIdentity ? entityIdentity : nil
-    }
-    let ownerNode =
-      exactEntityIdentity.flatMap { viewGraph?.nodeForEntityIdentity($0) }
-      ?? viewGraph?.nodeForIdentity(node.identity)
-    // A content-first `.id(...).onChange(...)` can expose a freshly routed
-    // node before its resolved identity has entered the graph index. Keep the
-    // established identity owner for baseline/ordinal semantics, but queue the
-    // event on the concrete resolved node (or its route) so `initial: true` is
-    // not swallowed on that first lifetime pass.
-    let eventOwnerNode =
-      ownerNode
-      ?? node.viewNodeID.flatMap { viewGraph?.nodeForViewNodeID($0) }
-      ?? routedEntityIdentity.flatMap { viewGraph?.nodeForEntityIdentity($0) }
-    let modifierOrdinal = ownerNode?.claimChangeModifierOrdinal() ?? 0
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
+      let viewGraph = context.viewGraph
+      // The package-only exact `.id(Identity)` replaces the resolved path
+      // wholesale. Its scoped entity is therefore the lifecycle owner: it stays
+      // stable inside one enclosing identity lifetime and is reminted when that
+      // ancestor changes. Public generic IDs and structural paths retain the
+      // established resolved-identity ownership used by modifier-chain churn.
+      let routedEntityIdentity =
+        node.entityIdentity ?? ResolveEntityRouteStorage.current?.identity
+      let exactEntityIdentity = routedEntityIdentity.flatMap { entityIdentity in
+        entityIdentity.isScopedExactIdentity ? entityIdentity : nil
+      }
+      let ownerNode =
+        exactEntityIdentity.flatMap { viewGraph?.nodeForEntityIdentity($0) }
+        ?? viewGraph?.nodeForIdentity(node.identity)
+      // A content-first `.id(...).onChange(...)` can expose a freshly routed
+      // node before its resolved identity has entered the graph index. Keep the
+      // established identity owner for baseline/ordinal semantics, but queue the
+      // event on the concrete resolved node (or its route) so `initial: true` is
+      // not swallowed on that first lifetime pass.
+      let eventOwnerNode =
+        ownerNode
+        ?? node.viewNodeID.flatMap { viewGraph?.nodeForViewNodeID($0) }
+        ?? routedEntityIdentity.flatMap { viewGraph?.nodeForEntityIdentity($0) }
+      let modifierOrdinal = ownerNode?.claimChangeModifierOrdinal() ?? 0
 
-    // The graph store can read the owner's prior value before commit. Exact-ID
-    // entries follow the scoped entity above; ordinary entries keep their
-    // resolved-identity key. Fall back to a per-node slot only when no graph is
-    // threaded (a resolve-only path where the handler cannot dispatch).
-    let hadPreviousValue: Bool
-    let previousValue: Value?
-    if let viewGraph {
-      hadPreviousValue = viewGraph.hasChangeObservationValue(
-        entityIdentity: exactEntityIdentity,
-        identity: node.identity,
-        ordinal: modifierOrdinal
-      )
-      previousValue = viewGraph.changeObservationValue(
-        entityIdentity: exactEntityIdentity,
-        identity: node.identity,
-        ordinal: modifierOrdinal,
-        as: Value.self
-      )
-    } else {
-      let stateSlotOrdinal = StateSlotOrdinals.changeModifier(modifierOrdinal)
-      hadPreviousValue = ownerNode?.hasStateSlot(ordinal: stateSlotOrdinal) == true
-      previousValue = ownerNode.map { ownerNode in
-        ownerNode.stateSlot(
-          ordinal: stateSlotOrdinal,
-          seed: value
+      // The graph store can read the owner's prior value before commit. Exact-ID
+      // entries follow the scoped entity above; ordinary entries keep their
+      // resolved-identity key. Fall back to a per-node slot only when no graph is
+      // threaded (a resolve-only path where the handler cannot dispatch).
+      let hadPreviousValue: Bool
+      let previousValue: Value?
+      if let viewGraph {
+        hadPreviousValue = viewGraph.hasChangeObservationValue(
+          entityIdentity: exactEntityIdentity,
+          identity: node.identity,
+          ordinal: modifierOrdinal
+        )
+        previousValue = viewGraph.changeObservationValue(
+          entityIdentity: exactEntityIdentity,
+          identity: node.identity,
+          ordinal: modifierOrdinal,
+          as: Value.self
+        )
+      } else {
+        let stateSlotOrdinal = StateSlotOrdinals.changeModifier(modifierOrdinal)
+        hadPreviousValue = ownerNode?.hasStateSlot(ordinal: stateSlotOrdinal) == true
+        previousValue = ownerNode.map { ownerNode in
+          ownerNode.stateSlot(
+            ordinal: stateSlotOrdinal,
+            seed: value
+          )
+        }
+      }
+
+      let shouldTrigger =
+        if hadPreviousValue {
+          previousValue.map { $0 != value } ?? false
+        } else {
+          initial
+        }
+
+      if let viewGraph {
+        viewGraph.recordChangeObservationValue(
+          value,
+          entityIdentity: exactEntityIdentity,
+          identity: node.identity,
+          ordinal: modifierOrdinal
+        )
+      } else if let ownerNode {
+        ownerNode.setStateSlotSilently(
+          ordinal: StateSlotOrdinals.changeModifier(modifierOrdinal),
+          value: value
         )
       }
-    }
 
-    let shouldTrigger =
-      if hadPreviousValue {
-        previousValue.map { $0 != value } ?? false
-      } else {
-        initial
+      guard shouldTrigger else {
+        return [node]
       }
 
-    if let viewGraph {
-      viewGraph.recordChangeObservationValue(
-        value,
-        entityIdentity: exactEntityIdentity,
-        identity: node.identity,
-        ordinal: modifierOrdinal
-      )
-    } else if let ownerNode {
-      ownerNode.setStateSlotSilently(
-        ordinal: StateSlotOrdinals.changeModifier(modifierOrdinal),
-        value: value
-      )
-    }
+      let oldValue = previousValue ?? value
+      let lifecycleAction = action
 
-    guard shouldTrigger else {
+      let handlerID =
+        intake.registerChangeHandler(
+          identity: node.identity,
+          ordinal: modifierOrdinal,
+          handler: {
+            lifecycleAction(oldValue, value)
+          }
+        ) ?? "\(node.identity)#change[\(modifierOrdinal)]"
+      eventOwnerNode?.queueChangeHandler(handlerID)
       return [node]
+
     }
-
-    let oldValue = previousValue ?? value
-    let lifecycleAction = action
-
-    let handlerID =
-      intake.registerChangeHandler(
-        identity: node.identity,
-        ordinal: modifierOrdinal,
-        handler: {
-          lifecycleAction(oldValue, value)
-        }
-      ) ?? "\(node.identity)#change[\(modifierOrdinal)]"
-    eventOwnerNode?.queueChangeHandler(handlerID)
-    return [node]
   }
 }
 
@@ -300,7 +309,7 @@ private struct TaskLifecycleDescriptorIdentity {
   }
 }
 
-public struct TaskLifecycleModifier: PrimitiveViewModifier {
+public struct TaskLifecycleModifier: IterativePrimitiveViewModifier {
   var priority: TaskPriority
   fileprivate var descriptorIdentity: TaskLifecycleDescriptorIdentity?
   fileprivate var authoringContext: ImperativeAuthoringContextSnapshot?
@@ -318,49 +327,52 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
     self.action = action
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    let taskAction = action
-    let lifecycleIdentity = node.identity
-    recordLifecycleEvaluationOwner(
-      for: lifecycleIdentity,
-      in: context
-    )
-    let ownerNode = context.viewGraph?.nodeForIdentity(lifecycleIdentity)
-    let taskOrdinal = ownerNode?.claimTaskModifierOrdinal() ?? 0
-    let descriptorIdentityLabel = descriptorIdentity?.descriptorLabel(
-      in: context,
-      identity: lifecycleIdentity,
-      ordinal: taskOrdinal
-    )
-    let descriptorID =
-      if let label = descriptorIdentityLabel {
-        taskOrdinal == 0
-          ? "\(lifecycleIdentity)#task[\(label)]"
-          : "\(lifecycleIdentity)#task[\(taskOrdinal):\(label)]"
-      } else {
-        taskOrdinal == 0
-          ? "\(lifecycleIdentity)#task"
-          : "\(lifecycleIdentity)#task[\(taskOrdinal)]"
-      }
-    let descriptor = TaskDescriptor(id: descriptorID, priority: priority)
-    intake.registerTask(
-      identity: lifecycleIdentity,
-      descriptor: descriptor,
-      operation: {
-        await taskAction()
-      }
-    )
-    node.lifecycleMetadata = node.lifecycleMetadata.merging(
-      .init(tasks: [descriptor])
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      let taskAction = action
+      let lifecycleIdentity = node.identity
+      recordLifecycleEvaluationOwner(
+        for: lifecycleIdentity,
+        in: context
+      )
+      let ownerNode = context.viewGraph?.nodeForIdentity(lifecycleIdentity)
+      let taskOrdinal = ownerNode?.claimTaskModifierOrdinal() ?? 0
+      let descriptorIdentityLabel = descriptorIdentity?.descriptorLabel(
+        in: context,
+        identity: lifecycleIdentity,
+        ordinal: taskOrdinal
+      )
+      let descriptorID =
+        if let label = descriptorIdentityLabel {
+          taskOrdinal == 0
+            ? "\(lifecycleIdentity)#task[\(label)]"
+            : "\(lifecycleIdentity)#task[\(taskOrdinal):\(label)]"
+        } else {
+          taskOrdinal == 0
+            ? "\(lifecycleIdentity)#task"
+            : "\(lifecycleIdentity)#task[\(taskOrdinal)]"
+        }
+      let descriptor = TaskDescriptor(id: descriptorID, priority: priority)
+      intake.registerTask(
+        identity: lifecycleIdentity,
+        descriptor: descriptor,
+        operation: {
+          await taskAction()
+        }
+      )
+      node.lifecycleMetadata = node.lifecycleMetadata.merging(
+        .init(tasks: [descriptor])
+      )
+      return [node]
+
+    }
   }
 }

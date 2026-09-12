@@ -4552,7 +4552,9 @@ private struct AsyncFrameTailSendableGuideLayout: Layout {
   }
 }
 
-private struct AsyncFrameTailWorkerCustomLayout<Content: View>: PrimitiveView, ResolvableView {
+private struct AsyncFrameTailWorkerCustomLayout<Content: View>: PrimitiveView,
+  IterativeResolvableView
+{
   var recorder: AsyncFrameTailWorkerCustomLayoutRecorder
   var content: Content
 
@@ -4564,27 +4566,27 @@ private struct AsyncFrameTailWorkerCustomLayout<Content: View>: PrimitiveView, R
     self.content = content()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let handle = CustomLayoutHandle(
       AsyncFrameTailMainActorOnlyCustomLayoutProxy(),
       measurementReuseSignature: "AsyncFrameTailWorkerCustomLayout.measure",
       placementReuseSignature: "AsyncFrameTailWorkerCustomLayout.place",
       workerProxy: asyncFrameTailWorkerCustomLayoutSnapshot(recorder: recorder)
     )
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("AsyncFrameTailWorkerCustomLayout"),
-        children: resolveDeclaredChildren(
-          content,
-          in: context,
-          kindName: "AsyncFrameTailWorkerCustomLayout"
-        ),
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .custom(handle)
-      )
-    ]
+    return resolveDeclaredChildrenWork(
+      content, in: context, kindName: "AsyncFrameTailWorkerCustomLayout"
+    ).map { children in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("AsyncFrameTailWorkerCustomLayout"),
+          children: children,
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .custom(handle)
+        )
+      ]
+    }
   }
 }
 

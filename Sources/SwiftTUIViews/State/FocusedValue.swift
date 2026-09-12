@@ -157,27 +157,30 @@ extension Binding: MainActorFocusedValueEquatable where Value: Equatable {
   }
 }
 
-public struct FocusedValueWritingModifier<Value: Sendable>: PrimitiveViewModifier {
+public struct FocusedValueWritingModifier<Value: Sendable>: IterativePrimitiveViewModifier {
   var keyPath: WritableKeyPath<FocusedValues, Value?>
   var value: Value?
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
 
-    if let value {
-      var focusedValues = FocusedValues()
-      focusedValues[keyPath: keyPath] = value
-      context.localFocusedValuesRegistry?.register(
-        identity: node.identity,
-        descendantIdentities: Set(node.collectIdentities()),
-        values: focusedValues
-      )
+      if let value {
+        var focusedValues = FocusedValues()
+        focusedValues[keyPath: keyPath] = value
+        context.localFocusedValuesRegistry?.register(
+          identity: node.identity,
+          descendantIdentities: Set(node.collectIdentities()),
+          values: focusedValues
+        )
+      }
+
+      return [node]
+
     }
-
-    return [node]
   }
 }
 

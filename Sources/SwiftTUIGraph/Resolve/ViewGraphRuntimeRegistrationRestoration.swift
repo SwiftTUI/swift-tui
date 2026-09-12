@@ -82,9 +82,8 @@ package enum ViewGraphRuntimeRegistrationRestorer {
     restoredNodeIDs: inout Set<ViewNodeID>
   ) {
     // Explicit work list, never per-level recursion: the reuse-hit restore
-    // runs while the resolve descent still occupies the native stack, and the
-    // walk is as deep as the reused subtree — a depth the chunked resolve
-    // driver does not bound. Under the stack-lean profile no frame may stack
+    // runs within a resolve continuation, and the walk is as deep as the
+    // reused subtree. It therefore needs its own bounded-stack traversal. Under the stack-lean profile no frame may stack
     // deeper than the boot envelope, so this walk must stay O(1) on the
     // native stack for any tree height (the bounded-depth-reuse program's
     // precondition). Children push reversed so the visit order remains the

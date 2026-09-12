@@ -269,7 +269,7 @@ public struct AnyGroupBoxStyle: Sendable, CustomStringConvertible, CustomDebugSt
   package func resolveBody(
     configuration: GroupBoxStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     box.resolveBody(configuration: configuration, in: context)
   }
 }
@@ -382,7 +382,7 @@ private protocol AnyGroupBoxStyleBox: AnyStyleBox {
   func resolveBody(
     configuration: GroupBoxStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode
+  ) -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyGroupBoxStyleBox where S: GroupBoxStyle {
@@ -391,7 +391,7 @@ extension ConcreteStyleBox: AnyGroupBoxStyleBox where S: GroupBoxStyle {
   func resolveBody(
     configuration: GroupBoxStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,
       makeBody: { style, configuration in style.makeBody(configuration: configuration) })

@@ -30,10 +30,10 @@ package struct PortalSurfaceRoot: View, ActionScope {
   package var body: some View { PortalSurfaceContents(item: item) }
 }
 
-private struct PortalSurfaceContents: PrimitiveView, ResolvableView {
+private struct PortalSurfaceContents: PrimitiveView, IterativeResolvableView {
   let item: PromptPresentationItem
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    [item.surface.resolve(item, in: context)]
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    item.surface.resolveWork(item, in: context).map { [$0] }
   }
 }
 

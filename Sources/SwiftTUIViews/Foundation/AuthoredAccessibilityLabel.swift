@@ -9,20 +9,22 @@ extension View {
 
 /// Transparent forwarding keeps the authored layout elements and graph census.
 /// Unlike a metadata modifier, this does not introduce a modifier-content node.
-private struct AuthoredAccessibilityLabel<Content: View>: PrimitiveView, ResolvableView {
+private struct AuthoredAccessibilityLabel<Content: View>: PrimitiveView, IterativeResolvableView {
   var content: Content
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    var nodes = resolveViewElements(content, in: context)
-    var startsSlot = true
-    for index in nodes.indices {
-      guard !nodes[index].semanticMetadata.accessibilityHidden, !nodes[index].isTransient else {
-        continue
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    return resolveViewElementsWork(content, in: context).map { completed in
+      var nodes = completed
+      var startsSlot = true
+      for index in nodes.indices {
+        guard !nodes[index].semanticMetadata.accessibilityHidden, !nodes[index].isTransient else {
+          continue
+        }
+        nodes[index].semanticMetadata.accessibilityLabelSource = startsSlot ? .start : .continuation
+        startsSlot = false
       }
-      nodes[index].semanticMetadata.accessibilityLabelSource = startsSlot ? .start : .continuation
-      startsSlot = false
+      return nodes
     }
-    return nodes
   }
 }
 

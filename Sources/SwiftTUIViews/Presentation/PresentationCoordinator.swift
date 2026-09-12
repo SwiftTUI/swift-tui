@@ -315,7 +315,7 @@ package func presentationPortalIdentity(
     ])
 }
 
-package struct PresentationPortalRoot<Content: View>: PrimitiveView, ResolvableView {
+package struct PresentationPortalRoot<Content: View>: PrimitiveView, IterativeResolvableView {
   package var content: Content
   package var portalState: PresentationPortalDraft
   package var contentRootIdentity: Identity
@@ -330,7 +330,7 @@ package struct PresentationPortalRoot<Content: View>: PrimitiveView, ResolvableV
     self.contentRootIdentity = contentRootIdentity
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let hostIdentity = context.identity
     var contentContext = context.replacingIdentity(with: contentRootIdentity)
     portalState.injectHandles(
@@ -339,23 +339,22 @@ package struct PresentationPortalRoot<Content: View>: PrimitiveView, ResolvableV
       invalidator: context.invalidationProxy?.invalidator
     )
 
-    let baseNode = resolveView(content, in: contentContext)
-    return [
-      composePresentationPortalTree(
+    return resolveViewWork(content, in: contentContext).flatMap { baseNode in
+      composePresentationPortalTreeWork(
         baseNode: baseNode,
         portalState: portalState,
         in: context
-      )
-    ]
+      ).map { [$0] }
+    }
   }
 }
 
 @MainActor
-package func composePresentationPortalTree(
+package func composePresentationPortalTreeWork(
   baseNode: ResolvedNode,
   portalState: PresentationPortalDraft,
   in context: ResolveContext
-) -> ResolvedNode {
+) -> ResolveWork<ResolvedNode> {
   // The portal root is a graph-owned wrapper. Reconcile from the
   // current base snapshot before choosing the wrapper children so stale
   // declarations are removed through ordinary structural child diffing.
@@ -386,33 +385,34 @@ package func composePresentationPortalTree(
 
   var reconciledMints = declarationMints(baseDeclarations + seedOverlayDeclarations)
   var declarationsRefreshed = portalState.reconcile(baseDeclarations + seedOverlayDeclarations)
-  var composed = composePortalRootTree(
-    baseNode: baseNode,
-    entries: portalState.overlayEntries(),
-    in: context,
-    forceEntryRefresh: declarationsRefreshed
-  )
-
-  for _ in 0..<3 {
-    let composedDeclarations = composed.preferenceValues[
-      PresentationCoordinatorDeclarationPreferenceKey.self
-    ].declarations
-    let composedMints = declarationMints(composedDeclarations)
-    guard composedMints != reconciledMints else {
-      break
-    }
-    reconciledMints = composedMints
-    let refreshed = portalState.reconcile(composedDeclarations)
-    declarationsRefreshed = declarationsRefreshed || refreshed
-    composed = composePortalRootTree(
+  func compose(_ remaining: Int) -> ResolveWork<ResolvedNode> {
+    composePortalRootTreeWork(
       baseNode: baseNode,
       entries: portalState.overlayEntries(),
       in: context,
       forceEntryRefresh: declarationsRefreshed
-    )
+    ).flatMap { composed in
+      let composedDeclarations = composed.preferenceValues[
+        PresentationCoordinatorDeclarationPreferenceKey.self
+      ].declarations
+      let composedMints = declarationMints(composedDeclarations)
+      guard remaining > 0, composedMints != reconciledMints else {
+        return .value(composed)
+      }
+      reconciledMints = composedMints
+      let refreshed = portalState.reconcile(composedDeclarations)
+      declarationsRefreshed = declarationsRefreshed || refreshed
+      return compose(remaining - 1)
+    }
   }
+  return compose(3)
+}
 
-  return composed
+@MainActor
+package func composePresentationPortalTree(
+  baseNode: ResolvedNode, portalState: PresentationPortalDraft, in context: ResolveContext
+) -> ResolvedNode {
+  composePresentationPortalTreeWork(baseNode: baseNode, portalState: portalState, in: context).run()
 }
 
 /// The (source, mint-generation) fingerprint of a declaration list — the
@@ -434,30 +434,31 @@ private struct DeclarationMint: Hashable {
 }
 
 @MainActor
-private func composePortalRootTree(
+private func composePortalRootTreeWork(
   baseNode: ResolvedNode,
   entries: [OverlayStackEntry],
   in context: ResolveContext,
   forceEntryRefresh: Bool
-) -> ResolvedNode {
+) -> ResolveWork<ResolvedNode> {
   guard !entries.isEmpty else {
-    return ResolvedNode(
-      identity: context.identity,
-      structuralPath: context.structuralPath,
-      structuralEdgeRole: .detachedOverlayRoot,
-      kind: .view("PresentationPortalRoot"),
-      children: [baseNode],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      surfaceComposition: .init(
-        role: .detachedOverlayRoot,
-        stableKey: context.structuralPath.description,
-        invalidationScope: .fullSurfaceDiff
-      )
-    )
+    return .value(
+      ResolvedNode(
+        identity: context.identity,
+        structuralPath: context.structuralPath,
+        structuralEdgeRole: .detachedOverlayRoot,
+        kind: .view("PresentationPortalRoot"),
+        children: [baseNode],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        surfaceComposition: .init(
+          role: .detachedOverlayRoot,
+          stableKey: context.structuralPath.description,
+          invalidationScope: .fullSurfaceDiff
+        )
+      ))
   }
 
-  return composeOverlayStackTree(
+  return composeOverlayStackTreeWork(
     baseNode: baseNode,
     entries: entries,
     in: context,

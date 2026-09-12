@@ -42,7 +42,7 @@ extension View {
 }
 
 @MainActor
-public struct ScrollWheelModifier: PrimitiveViewModifier, Sendable {
+public struct ScrollWheelModifier: IterativePrimitiveViewModifier, Sendable {
   let authoringContext: ImperativeAuthoringContextSnapshot?
   let action: @MainActor @Sendable (ScrollWheelEvent) -> ScrollWheelResult
 
@@ -54,36 +54,39 @@ public struct ScrollWheelModifier: PrimitiveViewModifier, Sendable {
     self.action = action
   }
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    guard context.environmentValues.isEnabled else { return [node] }
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      guard context.environmentValues.isEnabled else { return [node] }
 
-    let routeIdentity = gestureRouteIdentity(for: node)
-    let routeID = runtimePrimaryRouteID(for: routeIdentity)
-    let intake = HandlerDescriptorIntake(
-      context: context,
-      preferringSnapshot: authoringContext
-    )
-    intake.registerPointerHandler(routeID: routeID, structuralKey: node.identity) { event in
-      guard case .scrolled(let deltaX, let deltaY) = event.kind else {
-        return .ignored
+      let routeIdentity = gestureRouteIdentity(for: node)
+      let routeID = runtimePrimaryRouteID(for: routeIdentity)
+      let intake = HandlerDescriptorIntake(
+        context: context,
+        preferringSnapshot: authoringContext
+      )
+      intake.registerPointerHandler(routeID: routeID, structuralKey: node.identity) { event in
+        guard case .scrolled(let deltaX, let deltaY) = event.kind else {
+          return .ignored
+        }
+        return action(ScrollWheelEvent(deltaX: deltaX, deltaY: deltaY)) == .handled
+          ? .claimed
+          : .ignored
       }
-      return action(ScrollWheelEvent(deltaX: deltaX, deltaY: deltaY)) == .handled
-        ? .claimed
-        : .ignored
-    }
 
-    var metadata = SemanticMetadata(
-      participatesInPointerHitTesting: true,
-      allowsHitTesting: true
-    )
-    if routeIdentity != node.identity {
-      metadata.explicitRouteIdentity = routeIdentity
+      var metadata = SemanticMetadata(
+        participatesInPointerHitTesting: true,
+        allowsHitTesting: true
+      )
+      if routeIdentity != node.identity {
+        metadata.explicitRouteIdentity = routeIdentity
+      }
+      node.semanticMetadata = node.semanticMetadata.merging(metadata)
+      return [node]
+
     }
-    node.semanticMetadata = node.semanticMetadata.merging(metadata)
-    return [node]
   }
 }

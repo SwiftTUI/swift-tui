@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 /// Generates repeated content from a random-access collection.
-public struct ForEach<Data, ID, Content>: PrimitiveView, ResolvableView
+public struct ForEach<Data, ID, Content>: PrimitiveView, IterativeResolvableView
 where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
   public var data: Data
   public var id: KeyPath<Data.Element, ID>
@@ -19,8 +19,8 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    var resolved: [ResolvedNode] = []
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    let result = DeclaredChildrenWorkState()
     let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
     // Adopt the retained identity artifacts the lazy containers already
     // cache, so an eager re-resolve over unchanged data reuses the
@@ -39,22 +39,27 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
       entityIdentities: artifacts.entityIdentities,
       elementIdentities: artifacts.elementIdentities
     )
-    for iteration in iterations {
-      // Eager realization: counted on the same probe as the indexed-source
-      // path so one counter compares the windowed and eager forks directly.
+    return resolveSequentially(iterations) { iteration in
       IndexedChildRealizationProbe.recordRealization()
-      resolved.append(
-        contentsOf: iteration.resolveElements(
-          content: content,
-          consumingAs: .declaredChildren
-        )
-      )
-    }
-    return resolved
+      return iteration.resolveElementsWork(content: content, consumingAs: .declaredChildren).map {
+        result.nodes.append(contentsOf: $0)
+      }
+    }.map { result.nodes }
   }
 }
 
 extension ForEach: DeclaredChildrenView {
+  package func appendDeclaredChildrenWork(
+    in context: ResolveContext, kindName: String, into state: DeclaredChildrenWorkState
+  ) -> ResolveWork<Void> {
+    .deferred {
+      let childContext = context.indexedChild(
+        kind: .init(rawValue: kindName), index: state.nextIndex)
+      state.nextIndex += 1
+      return makeResolveWork(in: childContext).map { state.nodes.append(contentsOf: $0) }
+    }
+  }
+
   package func appendDeclaredChildren(
     in context: ResolveContext,
     kindName: String,
@@ -90,7 +95,7 @@ extension ForEach: DeclaredChildrenView {
       let id = ids[offset]
       let occurrence = occurrences[offset]
       children.append(
-        ScopedContentPayload(resolveElements: { _, placementRoot in
+        ScopedContentPayload(resolveElementsWork: { _, placementRoot in
           let baseContext = slotContext.applying(to: placementRoot)
           let iteration = makeForEachIteration(
             element: element,
@@ -100,7 +105,7 @@ extension ForEach: DeclaredChildrenView {
             in: baseContext,
             authoringScope: iterationAuthoringScope
           )
-          return iteration.resolveElements(
+          return iteration.resolveElementsWork(
             content: content,
             consumingAs: .declaredChildren
           )
@@ -133,7 +138,7 @@ extension ForEach: DeclaredChildrenView {
       children.append(
         PortalAttachmentContentPayload(
           hasDeclaredContent: Content.self != EmptyView.self,
-          resolveElements: { _, placementRoot in
+          resolveElementsWork: { _, placementRoot in
             let baseContext = slotContext.applying(to: placementRoot)
             let iteration = makeForEachIteration(
               element: element,
@@ -143,7 +148,7 @@ extension ForEach: DeclaredChildrenView {
               in: baseContext,
               authoringScope: iterationAuthoringScope
             )
-            return iteration.resolveElements(
+            return iteration.resolveElementsWork(
               content: content,
               consumingAs: .declaredChildren
             )

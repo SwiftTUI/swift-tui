@@ -197,17 +197,19 @@ package func focusStructureMetadata(
   )
 }
 
-public struct IDModifier<ID: Hashable & Sendable>: PrimitiveViewModifier, Sendable, Equatable {
+public struct IDModifier<ID: Hashable & Sendable>: IterativePrimitiveViewModifier, Sendable,
+  Equatable
+{
   package var id: ID
 
   package init(id: ID) {
     self.id = id
   }
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let explicitIdentity = context.identity.explicitID(id)
     let entityIdentity = EntityIdentity(id)
     let routedContext = context.replacingIdentity(with: explicitIdentity)
@@ -219,14 +221,16 @@ public struct IDModifier<ID: Hashable & Sendable>: PrimitiveViewModifier, Sendab
       entityIdentity,
       for: ViewNodeContext.current
     )
-    var resolved = withResolveEntityRoute(route) {
-      content.resolveOwned(in: routedContext)
+    return withResolveEntityRoute(route) {
+      content.resolveOwnedWork(in: routedContext)
+    }.map { completed in
+      var resolved = completed
+      resolved.attachingEntityIdentity(
+        entityIdentity,
+        at: context.structuralPath
+      )
+      return [resolved]
     }
-    resolved.attachingEntityIdentity(
-      entityIdentity,
-      at: context.structuralPath
-    )
-    return [resolved]
   }
 }
 
@@ -252,13 +256,13 @@ private func exactEntityIdentity(
   )
 }
 
-package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable {
+package struct ExactIdentityModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var identity: Identity
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let slotNode = ViewNodeContext.current
     // Duplicate `.id(exact)` siblings under one body are distinct runtime
     // lifetimes. Claim this chain's occurrence before the entity claim so the
@@ -288,8 +292,8 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
       let occupant = context.viewGraph?.entityOccupant(of: slotNode),
       occupant != entityIdentity
     {
-      let hosted = withResolveEntityRoute(route) {
-        resolveView(
+      return withResolveEntityRoute(route) {
+        resolveViewWork(
           EntityRootedChainContent(
             content: content,
             entityIdentity: entityIdentity,
@@ -297,16 +301,17 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
           ),
           in: routedContext
         )
+      }.map { hosted in
+        return [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view("ExplicitIdentityHost"),
+            children: [hosted],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction
+          )
+        ]
       }
-      return [
-        ResolvedNode(
-          identity: context.identity,
-          kind: .view("ExplicitIdentityHost"),
-          children: [hosted],
-          environmentSnapshot: context.environment,
-          transactionSnapshot: context.transaction
-        )
-      ]
     }
     if !context.entityHosting {
       context.viewGraph?.prepareEntityRoutedOwner(
@@ -314,18 +319,20 @@ package struct ExactIdentityModifier: PrimitiveViewModifier, Sendable, Equatable
         for: slotNode
       )
     }
-    var resolved = withResolveEntityRoute(route) {
-      content.resolveOwned(in: routedContext)
+    return withResolveEntityRoute(route) {
+      content.resolveOwnedWork(in: routedContext)
+    }.map { completed in
+      var resolved = completed
+      resolved.attachingEntityIdentity(
+        entityIdentity,
+        at: context.structuralPath
+      )
+      return [resolved]
     }
-    resolved.attachingEntityIdentity(
-      entityIdentity,
-      at: context.structuralPath
-    )
-    return [resolved]
   }
 }
 
-private struct EntityRootedChainContent<Base: View>: PrimitiveView, ResolvableView {
+private struct EntityRootedChainContent<Base: View>: PrimitiveView, IterativeResolvableView {
   let content: ModifierContentInputs<Base>
   let entityIdentity: EntityIdentity
   let entityStructuralPath: StructuralPath
@@ -334,13 +341,15 @@ private struct EntityRootedChainContent<Base: View>: PrimitiveView, ResolvableVi
     fatalError("EntityRootedChainContent is resolved directly.")
   }
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    var resolved = content.resolveOwned(in: context)
-    resolved.attachingEntityIdentity(
-      entityIdentity,
-      at: entityStructuralPath
-    )
-    return [resolved]
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    content.resolveOwnedWork(in: context).map { completed in
+      var resolved = completed
+      resolved.attachingEntityIdentity(
+        entityIdentity,
+        at: entityStructuralPath
+      )
+      return [resolved]
+    }
   }
 }
 
@@ -352,116 +361,137 @@ extension ExactIdentityModifier: EntityRouteProvidingModifier {
   package var providesHostEscapingEntityRoute: Bool { true }
 }
 
-package struct LayoutMetadataModifier: PrimitiveViewModifier, Sendable {
+package struct LayoutMetadataModifier: IterativePrimitiveViewModifier, Sendable {
   package var metadata: LayoutMetadata
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.layoutMetadata = node.layoutMetadata.merging(metadata)
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.layoutMetadata = node.layoutMetadata.merging(metadata)
+      return [node]
+
+    }
   }
 }
 
-public struct LayoutValueModifier<Key: LayoutValueKey>: PrimitiveViewModifier {
+public struct LayoutValueModifier<Key: LayoutValueKey>: IterativePrimitiveViewModifier {
   var value: Key.Value
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.layoutMetadata = node.layoutMetadata.settingLayoutValue(
-      value,
-      for: ObjectIdentifier(Key.self),
-      debugName: String(reflecting: Key.self),
-      debugValue: String(describing: value)
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.layoutMetadata = node.layoutMetadata.settingLayoutValue(
+        value,
+        for: ObjectIdentifier(Key.self),
+        debugName: String(reflecting: Key.self),
+        debugValue: String(describing: value)
+      )
+      return [node]
+
+    }
   }
 }
 
-public struct HorizontalAlignmentGuideModifier: PrimitiveViewModifier, Sendable {
+public struct HorizontalAlignmentGuideModifier: IterativePrimitiveViewModifier, Sendable {
   var alignment: HorizontalAlignment
   var computeValue: @Sendable (ViewDimensions) -> Int
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.layoutMetadata = node.layoutMetadata.settingHorizontalAlignmentGuide(
-      alignment,
-      debugName: alignment.debugName,
-      computeValue: computeValue
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.layoutMetadata = node.layoutMetadata.settingHorizontalAlignmentGuide(
+        alignment,
+        debugName: alignment.debugName,
+        computeValue: computeValue
+      )
+      return [node]
+
+    }
   }
 }
 
-public struct VerticalAlignmentGuideModifier: PrimitiveViewModifier, Sendable {
+public struct VerticalAlignmentGuideModifier: IterativePrimitiveViewModifier, Sendable {
   var alignment: VerticalAlignment
   var computeValue: @Sendable (ViewDimensions) -> Int
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.layoutMetadata = node.layoutMetadata.settingVerticalAlignmentGuide(
-      alignment,
-      debugName: alignment.debugName,
-      computeValue: computeValue
-    )
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.layoutMetadata = node.layoutMetadata.settingVerticalAlignmentGuide(
+        alignment,
+        debugName: alignment.debugName,
+        computeValue: computeValue
+      )
+      return [node]
+
+    }
   }
 }
 
-public struct DrawMetadataModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct DrawMetadataModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var metadata: DrawMetadata
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.drawMetadata = node.drawMetadata.merging(metadata)
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.drawMetadata = node.drawMetadata.merging(metadata)
+      return [node]
+
+    }
   }
 }
 
-package struct DrawEffectModifier: PrimitiveViewModifier, Sendable, Equatable {
+package struct DrawEffectModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var effect: DrawEffect
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.drawEffects.append(effect)
-    if effect == .compositingGroup {
-      node.surfaceComposition = .init(
-        role: .isolatedCompositingGroup,
-        stableKey: node.identity.path,
-        invalidationScope: .compositedBounds
-      )
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.drawEffects.append(effect)
+      if effect == .compositingGroup {
+        node.surfaceComposition = .init(
+          role: .isolatedCompositingGroup,
+          stableKey: node.identity.path,
+          invalidationScope: .compositedBounds
+        )
+      }
+      return [node]
+
     }
-    return [node]
   }
 }
 
-public struct SemanticMetadataModifier: PrimitiveViewModifier, Sendable, Equatable {
+public struct SemanticMetadataModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var metadata: SemanticMetadata
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.semanticMetadata = node.semanticMetadata.merging(metadata)
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.semanticMetadata = node.semanticMetadata.merging(metadata)
+      return [node]
+
+    }
   }
 }
 
@@ -474,15 +504,15 @@ extension SemanticMetadataModifier: TabItemMetadataProvidingModifier {
   }
 }
 
-public struct EnvironmentWritingModifier<Value>: PrimitiveViewModifier {
+public struct EnvironmentWritingModifier<Value>: IterativePrimitiveViewModifier {
   package var keyPath: WritableKeyPath<EnvironmentValues, Value>
   package var value: Value
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    return content.resolveElements(
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveElementsWork(
       in: content.preparedDynamicPropertyContext(in: context)
         ?? dynamicPropertyContentPreparation(content: content, in: context)!
     )
@@ -496,18 +526,18 @@ public struct EnvironmentWritingModifier<Value>: PrimitiveViewModifier {
   }
 }
 
-public struct EnvironmentTransformModifier<Value>: PrimitiveViewModifier {
+public struct EnvironmentTransformModifier<Value>: IterativePrimitiveViewModifier {
   package var keyPath: WritableKeyPath<EnvironmentValues, Value>
   package var transform: (inout Value) -> Void
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let transformed =
       content.preparedDynamicPropertyContext(in: context)
       ?? dynamicPropertyContentPreparation(content: content, in: context)!
-    return content.resolveElements(in: transformed)
+    return content.resolveElementsWork(in: transformed)
   }
 
   package func dynamicPropertyContentPreparation<Base: View>(

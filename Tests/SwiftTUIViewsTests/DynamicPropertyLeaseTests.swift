@@ -80,7 +80,7 @@ private struct LeaseBoundaryRoot<Content: View>: View {
 }
 
 @MainActor
-private struct LeaseTransparentMemoModifier: PrimitiveViewModifier, Equatable {
+private struct LeaseTransparentMemoModifier: IterativePrimitiveViewModifier, Equatable {
   func dynamicPropertyContentPreparation<Base: View>(
     content _: ModifierContentInputs<Base>,
     in context: ResolveContext
@@ -88,21 +88,21 @@ private struct LeaseTransparentMemoModifier: PrimitiveViewModifier, Equatable {
     context
   }
 
-  func resolve<Base: View>(
+  func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    content.resolveElements(in: context)
+  ) -> ResolveWork<[ResolvedNode]> {
+    content.resolveElementsWork(in: context)
   }
 }
 
 @MainActor
-private struct LeaseStructuralDefaultModifier: PrimitiveViewModifier {
-  func resolve<Base: View>(
+private struct LeaseStructuralDefaultModifier: IterativePrimitiveViewModifier {
+  func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    content.resolveElements(
+  ) -> ResolveWork<[ResolvedNode]> {
+    content.resolveElementsWork(
       in: context.child(component: .named("custom-base"))
     )
   }

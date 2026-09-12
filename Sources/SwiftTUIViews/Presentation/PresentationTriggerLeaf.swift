@@ -90,11 +90,11 @@ func resolvePresentationModifier<Base: View>(
   content: ModifierContentInputs<Base>,
   isPresented: Binding<Bool>,
   in context: ResolveContext,
-  prepareBackground: (inout ResolvedNode) -> Void = { _ in },
+  prepareBackground: @escaping (inout ResolvedNode) -> Void = { _ in },
   declaration:
     @escaping @MainActor (_ background: ResolvedNode, _ triggerIdentity: Identity) ->
     PresentationCoordinatorDeclarationPreferenceValue
-) -> [ResolvedNode] {
+) -> ResolveWork<[ResolvedNode]> {
   resolvePresentationModifier(
     content: content,
     isActive: { isPresented.wrappedValue },
@@ -121,7 +121,7 @@ func resolveItemPresentationModifier<
       _ triggerIdentity: Identity,
       _ currentItem: Item
     ) -> PresentationCoordinatorDeclarationPreferenceValue
-) -> [ResolvedNode] where Item.ID: Sendable {
+) -> ResolveWork<[ResolvedNode]> where Item.ID: Sendable {
   let itemBinding = item
   return resolvePresentationModifier(
     content: content,
@@ -145,56 +145,56 @@ func resolvePresentationModifier<Base: View>(
   content: ModifierContentInputs<Base>,
   isActive: @escaping @MainActor () -> Bool,
   in context: ResolveContext,
-  prepareBackground: (inout ResolvedNode) -> Void = { _ in },
+  prepareBackground: @escaping (inout ResolvedNode) -> Void = { _ in },
   declaration:
     @escaping @MainActor (_ background: ResolvedNode, _ triggerIdentity: Identity) ->
     PresentationCoordinatorDeclarationPreferenceValue
-) -> [ResolvedNode] {
-  var background = content.resolve(in: context.child(component: .named("base")))
-  prepareBackground(&background)
-  let resolvedBackground = background
-  var triggerContext = context.child(component: .named("__presentationTrigger"))
-  // Reaching this resolve means the presentation wrapper recomputed — the
-  // background (and therefore the declaration this leaf carries) may have
-  // changed while the presentation is open. The leaf is the portal's only
-  // declaration emitter and has no descendants, so re-resolving it here is
-  // O(1); a spared leaf would keep its committed preference (the payload
-  // captured at activation) and record no observation, so the frame head
-  // would never re-reconcile an open presentation whose source content,
-  // cardinality, or environment changed. Activation-only frames still spare
-  // the background — its Layer-A reuse is what makes sheet-open O(overlay).
-  triggerContext.withinChurnedSubtree = true
-  let triggerIdentity = triggerContext.identity
-  // Captured at the modifier's context so the declaration carries the
-  // presenter's inherited environment (everything authored above the
-  // presentation modifier). Re-captured on every wrapper re-resolve, which is
-  // exactly when an environment change can reach an open presentation — the
-  // re-minted declaration then refreshes the overlay entry subtree.
-  let sourceEnvironmentValues = context.environmentValues
-  let trigger = PresentationTriggerLeaf(
-    sourceIdentity: resolvedBackground.identity,
-    isActive: isActive
-  ) {
-    var value = declaration(resolvedBackground, triggerIdentity)
-    for index in value.declarations.indices {
-      value.declarations[index].sourceEnvironmentValues = sourceEnvironmentValues
+) -> ResolveWork<[ResolvedNode]> {
+  return content.resolveWork(in: context.child(component: .named("base"))).flatMap { completed in
+    var background = completed
+    prepareBackground(&background)
+    let resolvedBackground = background
+    var triggerContext = context.child(component: .named("__presentationTrigger"))
+    // Reaching this resolve means the presentation wrapper recomputed — the
+    // background (and therefore the declaration this leaf carries) may have
+    // changed while the presentation is open. The leaf is the portal's only
+    // declaration emitter and has no descendants, so re-resolving it here is
+    // O(1); a spared leaf would keep its committed preference (the payload
+    // captured at activation) and record no observation, so the frame head
+    // would never re-reconcile an open presentation whose source content,
+    // cardinality, or environment changed. Activation-only frames still spare
+    // the background — its Layer-A reuse is what makes sheet-open O(overlay).
+    triggerContext.withinChurnedSubtree = true
+    let triggerIdentity = triggerContext.identity
+    // Captured at the modifier's context so the declaration carries the
+    // presenter's inherited environment (everything authored above the
+    // presentation modifier). Re-captured on every wrapper re-resolve, which is
+    // exactly when an environment change can reach an open presentation — the
+    // re-minted declaration then refreshes the overlay entry subtree.
+    let sourceEnvironmentValues = context.environmentValues
+    let trigger = PresentationTriggerLeaf(
+      sourceIdentity: resolvedBackground.identity,
+      isActive: isActive
+    ) {
+      var value = declaration(resolvedBackground, triggerIdentity)
+      for index in value.declarations.indices {
+        value.declarations[index].sourceEnvironmentValues = sourceEnvironmentValues
+      }
+      return value
     }
-    return value
+    return resolveViewWork(trigger, in: triggerContext).map { triggerNode in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("Presentation"),
+          children: [background, triggerNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .decoration(primaryIndex: 0, alignment: .topLeading)
+        )
+      ]
+    }
   }
-  let triggerNode = resolveView(
-    trigger,
-    in: triggerContext
-  )
-  return [
-    ResolvedNode(
-      identity: context.identity,
-      kind: .view("Presentation"),
-      children: [background, triggerNode],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      layoutBehavior: .decoration(primaryIndex: 0, alignment: .topLeading)
-    )
-  ]
 }
 
 /// A dismiss action's reconcile backstop: invalidates the presentation's

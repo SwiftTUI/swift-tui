@@ -25,7 +25,7 @@
 /// Defaults on for WASI builds; opt back out with
 /// `SWIFTTUI_STACK_LEAN_PROFILE=0`. Native processes default off but may opt
 /// IN with `SWIFTTUI_STACK_LEAN_PROFILE=1`, which runs the exact WASI resolve
-/// shape (lean ambient slots, reuse/memo/selective off, chunked descent) for
+/// shape (lean ambient slots, reuse/memo/selective off, iterative descent) for
 /// composed-runtime debugging and profile-shaped gate lanes.
 @MainActor
 package let stackLeanResolveProfile: Bool = {

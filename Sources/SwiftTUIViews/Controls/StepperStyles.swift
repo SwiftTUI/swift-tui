@@ -318,7 +318,7 @@ public struct AnyStepperStyle: Sendable, CustomStringConvertible, CustomDebugStr
   }
   @MainActor
   package func resolveBody(configuration: StepperStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     box.resolveBody(configuration: configuration, in: context)
   }
@@ -445,12 +445,12 @@ private struct StepperStyleRow: View {
 private protocol AnyStepperStyleBox: AnyStyleBox {
   @MainActor
   func resolveBody(configuration: StepperStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
 }
 extension ConcreteStyleBox: AnyStepperStyleBox where S: StepperStyle {
   @MainActor
   func resolveBody(configuration: StepperStyleConfiguration, in context: ResolveContext)
-    -> ResolvedNode
+    -> ResolveWork<ResolvedNode>
   {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,

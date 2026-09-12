@@ -29,21 +29,21 @@ import SwiftTUICore
 ///
 /// Usually applied through ``View/equatable()`` rather than
 /// constructed directly.
-public struct EquatableView<Content: View & Equatable>: PrimitiveView, ResolvableView {
+public struct EquatableView<Content: View & Equatable>: PrimitiveView, IterativeResolvableView {
   package var content: Content
 
   public init(content: Content) {
     self.content = content
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     // Resolve `content` transparently as this node's subtree (the `Group`
     // idiom), so the EquatableView node is the reuse boundary whose committed
     // subtree is the wrapped content. EquatableView is deliberately NOT a
     // `DeclaredChildrenView`: that path splices a child into its parent without
     // a `resolveView` call, which would deny the wrapper its own graph node and
     // the `memoViewValue` capture the memo gate compares against.
-    resolveDeclaredChildren(
+    resolveDeclaredChildrenWork(
       content,
       in: context,
       kindName: "EquatableView"

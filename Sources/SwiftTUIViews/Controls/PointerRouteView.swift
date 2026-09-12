@@ -14,21 +14,28 @@ struct PointerRouteView<Content: View>: PrimitiveView, ResolvableView {
 
   package func resolveElements(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> [ResolvedNode] { makeResolveWork(in: context).run() }
+
+  package func makeResolveWork(
+    in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]> {
     let wrapperContext = context.replacingIdentity(with: identity)
-    let child = content.resolve(
+    return content.resolveWork(
       in: wrapperContext.child(component: .named("content"))
-    )
-    return [
-      ResolvedNode(
-        identity: identity,
-        kind: .view("PointerRoute"),
-        children: [child],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        semanticMetadata: .init(
-          participatesInPointerHitTesting: true, captureOnPress: captureOnPress)
-      )
-    ]
+    ).map { completed in
+      let child = completed
+      return [
+        ResolvedNode(
+          identity: identity,
+          kind: .view("PointerRoute"),
+          children: [child],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          semanticMetadata: .init(
+            participatesInPointerHitTesting: true, captureOnPress: captureOnPress)
+        )
+      ]
+
+    }
   }
 }

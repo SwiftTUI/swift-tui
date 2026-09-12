@@ -2,7 +2,8 @@ import SwiftTUICore
 
 /// The builder artifact produced by array-like view composition such as
 /// `ForEach` expansion or `buildArray` support.
-public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView,
+public struct VariadicView<Content: View>: PrimitiveView, IterativeResolvableView,
+  DeclaredChildrenView,
   DeclaredChildStructure
 {
   package let content: [Content]
@@ -15,22 +16,6 @@ public struct VariadicView<Content: View>: PrimitiveView, ResolvableView, Declar
 
   public var body: Never {
     fatalError("VariadicView is a builder composition artifact.")
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    var resolved: [ResolvedNode] = []
-    var elementIndex = 0
-    for element in content {
-      appendDeclaredChildNodes(
-        element,
-        in: context,
-        kindName: "Group",
-        nextIndex: &elementIndex,
-        into: &resolved
-      )
-    }
-    assignEntityIdentityOccurrences(to: &resolved)
-    return resolved
   }
 
   package func appendDeclaredChildren(

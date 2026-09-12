@@ -2,7 +2,9 @@ import SwiftTUICore
 
 /// Selects one declared tab and renders a terminal-native tab strip above the
 /// active content.
-public struct TabView<SelectionValue: Hashable, Content: View>: PrimitiveView, ResolvableView {
+public struct TabView<SelectionValue: Hashable, Content: View>: PrimitiveView,
+  IterativeResolvableView
+{
   public var selection: Binding<SelectionValue>
   private var content: Content
   private let authoringScope: AuthoringContext?
@@ -16,11 +18,11 @@ public struct TabView<SelectionValue: Hashable, Content: View>: PrimitiveView, R
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     return withDynamicPropertyUpdateScope(self, for: context) {
-      [resolvedNode(in: context)]
+      resolvedNode(in: context).map { [$0] }
     }
   }
 }
@@ -43,7 +45,7 @@ extension TabView {
 
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -381,65 +383,67 @@ extension TabView {
       // instead of being served stale by value-blind Layer-A reuse.
       tabBodyContext.withinChurnedSubtree = true
     }
-    let child = tabStyle.resolveBody(
+    return tabStyle.resolveBody(
       configuration: bodyConfiguration,
       in: tabBodyContext
-    )
+    ).map { child in
 
-    var node = ResolvedNode(
-      identity: context.identity,
-      kind: .view("TabView"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: tabViewSemanticMetadata()
-    )
-    if let dormantArchiveRefreshRequest {
-      node.preferenceValues[DormantTabArchiveRefreshPreferenceKey.self] = [
-        dormantArchiveRefreshRequest
-      ]
-    }
-    if let optionTraversalDivergence {
-      // Observability-first, like the F166 placement mismatch: a tab showing a
-      // sibling's body is better reported than crashed, and the report names
-      // the shape that produced it.
-      var preferences = node.preferenceValues
-      var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
-      let issue = optionTraversalDivergence.runtimeIssue(
-        container: "TabView",
-        identity: context.identity
-      )
-      if !runtimeIssues.contains(issue) {
-        runtimeIssues.append(issue)
-      }
-      preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
-      node.preferenceValues = preferences
-    }
-    let duplicateTagIssues = options.compactMap { option -> RuntimeIssue? in
-      guard option.tagOccurrence > 0 else {
-        return nil
-      }
-      return RuntimeIssue(
-        severity: .warning,
-        code: "tab.duplicateTag",
-        message:
-          "TabView declared duplicate selection tag \(option.tag.identityComponent) "
-          + "at occurrence \(option.tagOccurrence); dormant state is isolated by occurrence, "
-          + "but unique stable tags are required for supported selection semantics.",
+      var node = ResolvedNode(
         identity: context.identity,
-        source: "TabView"
+        kind: .view("TabView"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: tabViewSemanticMetadata()
       )
-    }
-    if !duplicateTagIssues.isEmpty {
-      var preferences = node.preferenceValues
-      var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
-      for issue in duplicateTagIssues where !runtimeIssues.contains(issue) {
-        runtimeIssues.append(issue)
+      if let dormantArchiveRefreshRequest {
+        node.preferenceValues[DormantTabArchiveRefreshPreferenceKey.self] = [
+          dormantArchiveRefreshRequest
+        ]
       }
-      preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
-      node.preferenceValues = preferences
+      if let optionTraversalDivergence {
+        // Observability-first, like the F166 placement mismatch: a tab showing a
+        // sibling's body is better reported than crashed, and the report names
+        // the shape that produced it.
+        var preferences = node.preferenceValues
+        var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
+        let issue = optionTraversalDivergence.runtimeIssue(
+          container: "TabView",
+          identity: context.identity
+        )
+        if !runtimeIssues.contains(issue) {
+          runtimeIssues.append(issue)
+        }
+        preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+        node.preferenceValues = preferences
+      }
+      let duplicateTagIssues = options.compactMap { option -> RuntimeIssue? in
+        guard option.tagOccurrence > 0 else {
+          return nil
+        }
+        return RuntimeIssue(
+          severity: .warning,
+          code: "tab.duplicateTag",
+          message:
+            "TabView declared duplicate selection tag \(option.tag.identityComponent) "
+            + "at occurrence \(option.tagOccurrence); dormant state is isolated by occurrence, "
+            + "but unique stable tags are required for supported selection semantics.",
+          identity: context.identity,
+          source: "TabView"
+        )
+      }
+      if !duplicateTagIssues.isEmpty {
+        var preferences = node.preferenceValues
+        var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
+        for issue in duplicateTagIssues where !runtimeIssues.contains(issue) {
+          runtimeIssues.append(issue)
+        }
+        preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+        node.preferenceValues = preferences
+      }
+      return node
+
     }
-    return node
   }
 
   @MainActor

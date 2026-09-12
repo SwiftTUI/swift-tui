@@ -1,22 +1,23 @@
 // Automatic lifetime classification for resolved runtime nodes. The task-local
-// stack follows nested `resolveView` calls without adding checkpointed mutable
-// state to `ViewGraph`: every frame closes before its resolve call returns.
+// context follows logical `resolveView` nesting through explicit continuations
+// without adding checkpointed mutable state to `ViewGraph`: every frame closes
+// before the synchronous driver returns.
 
 @MainActor
-private final class ResolveLifetimeScopeFrame {
+package final class ResolveLifetimeScopeFrame {
   weak var graph: ViewGraph?
   let hostNodeID: ViewNodeID
   var observedNodeIDs: Set<ViewNodeID> = []
 
-  init(graph: ViewGraph, hostNodeID: ViewNodeID) {
+  package init(graph: ViewGraph, hostNodeID: ViewNodeID) {
     self.graph = graph
     self.hostNodeID = hostNodeID
   }
 }
 
 @MainActor
-private enum ResolveLifetimeScopeContext {
-  @TaskLocal static var current: ResolveLifetimeScopeFrame?
+package enum ResolveLifetimeScopeContext {
+  @TaskLocal package static var current: ResolveLifetimeScopeFrame?
 }
 
 extension ViewGraph {
@@ -99,7 +100,7 @@ extension ViewGraph {
     SoundnessProbeConfiguration.recordAutomaticLifetimeAnchor()
   }
 
-  private func closeResolveLifetimeScope(_ frame: ResolveLifetimeScopeFrame) {
+  package func closeResolveLifetimeScope(_ frame: ResolveLifetimeScopeFrame) {
     guard frame.graph === self,
       nodeIfExists(for: frame.hostNodeID) != nil
     else {

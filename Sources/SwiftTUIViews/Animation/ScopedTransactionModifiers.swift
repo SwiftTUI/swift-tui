@@ -51,7 +51,9 @@ extension View {
 /// under the transformed transaction while the placeholder restores the
 /// outer transaction for `base`, so only the modifiers applied in `content`
 /// observe the transform.
-package struct ScopedTransactionContent<Base: View, Content: View>: PrimitiveView, ResolvableView {
+package struct ScopedTransactionContent<Base: View, Content: View>: PrimitiveView,
+  IterativeResolvableView
+{
   package let base: Base
   package let transform: @Sendable (inout Transaction) -> Void
   package let content: @MainActor (PlaceholderContentView<Base>) -> Content
@@ -68,7 +70,7 @@ package struct ScopedTransactionContent<Base: View, Content: View>: PrimitiveVie
     authoringContext = currentAuthoringContext()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let outer = context.transaction
     let placeholder = PlaceholderContentView(base, restoring: outer)
     let bodyContext = context.child(component: .named("body"))
@@ -102,21 +104,22 @@ package struct ScopedTransactionContent<Base: View, Content: View>: PrimitiveVie
         content(placeholder)
       }
     }
-    let bodyNode = resolveView(view, in: childContext)
+    return resolveViewWork(view, in: childContext).map { bodyNode in
 
-    // The scope root carries the outer transaction: the controller computes
-    // this node's effective transaction the ordinary way and hands it down
-    // for the placeholder's `restoresOuter` hop to inherit from.
-    var snapshot = outer
-    snapshot.scopeRole = .scopeRoot
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("ScopedTransaction"),
-        children: [bodyNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: snapshot
-      )
-    ]
+      // The scope root carries the outer transaction: the controller computes
+      // this node's effective transaction the ordinary way and hands it down
+      // for the placeholder's `restoresOuter` hop to inherit from.
+      var snapshot = outer
+      snapshot.scopeRole = .scopeRoot
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("ScopedTransaction"),
+          children: [bodyNode],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: snapshot
+        )
+      ]
+    }
   }
 }

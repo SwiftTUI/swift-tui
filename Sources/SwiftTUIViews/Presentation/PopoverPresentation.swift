@@ -73,7 +73,9 @@ extension View {
   }
 }
 
-package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: PrimitiveViewModifier {
+package struct BuiltinPopoverPresentationModifier<PopoverContent: View>:
+  IterativePrimitiveViewModifier
+{
   package var isPresented: Binding<Bool>
   package var attachmentAnchor: PopoverAttachmentAnchor
   package var arrowEdge: Edge?
@@ -83,10 +85,10 @@ package struct BuiltinPopoverPresentationModifier<PopoverContent: View>: Primiti
   package var onDismiss: (@MainActor @Sendable () -> Void)? = nil
   package var onDismissAuthoringContext: AuthoringContext? = nil
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     // Lever B for popovers: the `isPresented` read moves into the trigger
     // leaf so toggling spares the disjoint-sibling background. See
     // ``resolvePresentationModifier``.

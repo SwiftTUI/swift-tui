@@ -521,19 +521,17 @@ private struct ScopedAnyViewActionOwner: View {
   }
 }
 
-private struct ScopedAnyViewHost: PrimitiveView, ResolvableView {
+private struct ScopedAnyViewHost: PrimitiveView, IterativeResolvableView {
   let content: AnyView
 
   var body: Never {
     fatalError("ScopedAnyViewHost resolves stored content directly.")
   }
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    [
-      content.resolve(
-        in: context.child(component: .named("ScopedAnyViewContent"))
-      )
-    ]
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    content.resolveWork(
+      in: context.child(component: .named("ScopedAnyViewContent"))
+    ).map { [$0] }
   }
 }
 

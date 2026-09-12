@@ -18,7 +18,7 @@ package struct PortalSurfacePresentation: Sendable {
   package var accessibilityRole: AccessibilityRole
   package var createsFocusScope: Bool
   private var resolveBody:
-    @MainActor @Sendable (PromptPresentationItem, ResolveContext) -> ResolvedNode
+    @MainActor @Sendable (PromptPresentationItem, ResolveContext) -> ResolveWork<ResolvedNode>
 
   package init<Content: View>(
     alignment: Alignment,
@@ -35,11 +35,18 @@ package struct PortalSurfacePresentation: Sendable {
     self.isIntrinsic = isIntrinsic
     self.accessibilityRole = accessibilityRole
     self.createsFocusScope = createsFocusScope
-    self.resolveBody = { item, context in resolveView(content(item), in: context) }
+    self.resolveBody = { item, context in resolveViewWork(content(item), in: context) }
   }
 
   @MainActor
   package func resolve(_ item: PromptPresentationItem, in context: ResolveContext) -> ResolvedNode {
+    resolveBody(item, context).run()
+  }
+
+  @MainActor
+  package func resolveWork(_ item: PromptPresentationItem, in context: ResolveContext)
+    -> ResolveWork<ResolvedNode>
+  {
     resolveBody(item, context)
   }
 

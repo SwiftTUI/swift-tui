@@ -1,37 +1,26 @@
 import SwiftTUICore
 
-/// A scoped authored child payload that preserves authoring scope without
-/// exposing `AnyView` as the transport type.
+/// Authored content with a typed continuation and captured state-owner scope.
 @MainActor
 package struct ScopedContentPayload: Sendable {
-  private let resolveElementsClosure:
-    @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
-  private let resolveEntityRoutedElementsClosure:
-    @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
-  private let resolveDeclaredElementsClosure:
-    @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
+  private let elements:
+    @MainActor @Sendable (ResolveContext, ResolveContext) -> ResolveWork<[ResolvedNode]>
+  private let entityElements:
+    @MainActor @Sendable (ResolveContext, ResolveContext) -> ResolveWork<[ResolvedNode]>
+  private let declaredElements:
+    @MainActor @Sendable (ResolveContext, ResolveContext) -> ResolveWork<[ResolvedNode]>
 
   package init<V: View>(
     authoringContext: AuthoringContext? = currentAuthoringContext(),
     @ViewBuilder content: @escaping @MainActor () -> V
   ) {
-    // Scoped payloads may resolve in a different part of the tree. Preserve
-    // the original owner identity and ViewNode, but isolate future first-time
-    // ordinal claims from the capture-site tracker.
     let authoringContext = makeCapturedAuthoringContext(from: authoringContext)
-    let builder = ScopedBuilder(
-      authoringContext: authoringContext,
-      content: content
-    )
-    resolveElementsClosure = { context, _ in
-      builder.resolveElements(in: context)
-    }
-    resolveEntityRoutedElementsClosure = { context, _ in
-      [resolveView(builder, in: context)]
-    }
-    resolveDeclaredElementsClosure = { context, _ in
+    let builder = ScopedBuilder(authoringContext: authoringContext, content: content)
+    elements = { context, _ in builder.makeResolveWork(in: context) }
+    entityElements = { context, _ in resolveViewWork(builder, in: context).map { [$0] } }
+    declaredElements = { context, _ in
       withAuthoringContext(authoringContext) {
-        [resolveView(builder.build(), in: context)]
+        resolveViewWork(builder.build(), in: context).map { [$0] }
       }
     }
   }
@@ -40,77 +29,89 @@ package struct ScopedContentPayload: Sendable {
     resolveElements:
       @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> [ResolvedNode]
   ) {
-    resolveElementsClosure = resolveElements
-    resolveEntityRoutedElementsClosure = resolveElements
-    resolveDeclaredElementsClosure = resolveElements
+    self.init(resolveElementsWork: { context, root in
+      .deferred { .value(resolveElements(context, root)) }
+    })
   }
 
-  /// Resolves a declared child through its own central seam, including its
-  /// authored entity route before dynamic properties are prepared. Unlike a
-  /// capture-slot wrapper, the declaration itself owns this graph position.
-  package func resolveDeclaredElements(
+  package init(
+    resolveElementsWork:
+      @escaping @MainActor @Sendable (ResolveContext, ResolveContext) -> ResolveWork<[ResolvedNode]>
+  ) {
+    elements = resolveElementsWork
+    entityElements = resolveElementsWork
+    declaredElements = resolveElementsWork
+  }
+
+  package func resolveDeclaredElements(in context: ResolveContext, placementRoot: ResolveContext)
+    -> [ResolvedNode]
+  {
+    resolveDeclaredElementsWork(in: context, placementRoot: placementRoot).run()
+  }
+
+  package func resolveDeclaredElementsWork(
     in context: ResolveContext, placementRoot: ResolveContext
-  ) -> [ResolvedNode] {
-    resolveDeclaredElementsClosure(context, placementRoot)
+  ) -> ResolveWork<[ResolvedNode]> {
+    declaredElements(context, placementRoot)
   }
 
-  package func resolveElements(
-    in context: ResolveContext,
-    placementRoot: ResolveContext? = nil
-  ) -> [ResolvedNode] {
-    // Captured content resolves through whatever node hosts this payload — a
-    // non-transparent hosting boundary. Host-escaping entity routes must not
-    // be claimed at that node (see `ResolveContext.entityHosting`).
-    resolveElementsClosure(
-      context.asEntityHost(),
-      (placementRoot ?? context).asEntityHost()
-    )
+  package func resolveElements(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> [ResolvedNode]
+  {
+    resolveElementsWork(in: context, placementRoot: placementRoot).run()
   }
 
-  /// Resolves the captured builder through the central graph seam below a
-  /// caller-owned entity host.
-  ///
-  /// Ordinary scoped payloads lower transparently. Dormant entity hosts need a
-  /// real central resolve at their qualified structural child so dynamic
-  /// properties prepare against the same node whose authored metadata commits.
+  package func resolveElementsWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolveWork<[ResolvedNode]>
+  {
+    elements(context.asEntityHost(), (placementRoot ?? context).asEntityHost())
+  }
+
   package func resolveElementsInEntityRoutedHost(
-    in context: ResolveContext,
-    placementRoot: ResolveContext? = nil
+    in context: ResolveContext, placementRoot: ResolveContext? = nil
   ) -> [ResolvedNode] {
-    resolveEntityRoutedElementsClosure(
-      context,
-      (placementRoot ?? context).asEntityHost()
-    )
+    resolveElementsInEntityRoutedHostWork(in: context, placementRoot: placementRoot).run()
   }
 
-  package func resolve(
-    in context: ResolveContext,
-    placementRoot: ResolveContext? = nil
-  ) -> ResolvedNode {
-    normalizeResolvedElements(
-      resolveElements(in: context, placementRoot: placementRoot),
-      in: context
-    )
+  package func resolveElementsInEntityRoutedHostWork(
+    in context: ResolveContext, placementRoot: ResolveContext? = nil
+  ) -> ResolveWork<[ResolvedNode]> {
+    entityElements(context, (placementRoot ?? context).asEntityHost())
+  }
+
+  package func resolve(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolvedNode
+  {
+    resolveWork(in: context, placementRoot: placementRoot).run()
+  }
+
+  package func resolveWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolveWork<ResolvedNode>
+  {
+    resolveElementsWork(in: context, placementRoot: placementRoot).map {
+      normalizeResolvedElements($0, in: context)
+    }
   }
 
   package func resolveInEntityRoutedHost(
-    in context: ResolveContext,
-    entityIdentity: EntityIdentity,
+    in context: ResolveContext, entityIdentity: EntityIdentity,
     structuralIdentity: TabDormantPayloadStructuralIdentity?
   ) -> ResolvedNode {
-    let route = ResolveEntityRoute(
-      identity: entityIdentity,
-      structuralPath: context.structuralPath
-    )
+    resolveInEntityRoutedHostWork(
+      in: context, entityIdentity: entityIdentity, structuralIdentity: structuralIdentity
+    ).run()
+  }
+
+  package func resolveInEntityRoutedHostWork(
+    in context: ResolveContext, entityIdentity: EntityIdentity,
+    structuralIdentity: TabDormantPayloadStructuralIdentity?
+  ) -> ResolveWork<ResolvedNode> {
+    let route = ResolveEntityRoute(identity: entityIdentity, structuralPath: context.structuralPath)
     return withResolveEntityRoute(route) {
-      resolveView(
+      resolveViewWork(
         EntityRoutedScopedContentHost(
-          payload: self,
-          entityIdentity: entityIdentity,
-          structuralIdentity: structuralIdentity
-        ),
-        in: context
-      )
+          payload: self, entityIdentity: entityIdentity,
+          structuralIdentity: structuralIdentity), in: context)
     }
   }
 }
@@ -120,12 +121,12 @@ package struct ScopedContentPayload: Sendable {
 /// unowned structural child, so its own IDs and metadata cannot displace or
 /// overwrite the dormant entity host.
 @MainActor
-private struct EntityRoutedScopedContentHost: PrimitiveView, ResolvableView {
+private struct EntityRoutedScopedContentHost: PrimitiveView, IterativeResolvableView {
   var payload: ScopedContentPayload
   var entityIdentity: EntityIdentity
   var structuralIdentity: TabDormantPayloadStructuralIdentity?
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let contentContext = context.child(
       component: tabContentValueComponent(structuralIdentity)
     )
@@ -137,24 +138,22 @@ private struct EntityRoutedScopedContentHost: PrimitiveView, ResolvableView {
       identity: entityIdentity,
       structuralPath: context.structuralPath
     )
-    let content = withResolveEntityRoute(ancestryRoute) {
-      normalizeResolvedElements(
-        payload.resolveElementsInEntityRoutedHost(
-          in: contentContext,
-          placementRoot: context
-        ),
-        in: contentContext
-      )
+    return withResolveEntityRoute(ancestryRoute) {
+      payload.resolveElementsInEntityRoutedHostWork(in: contentContext, placementRoot: context).map
+      {
+        normalizeResolvedElements($0, in: contentContext)
+      }
+    }.map { content in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("TabContentEntityHost"),
+          children: [content],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
+        )
+      ]
     }
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("TabContentEntityHost"),
-        children: [content],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
-      )
-    ]
   }
 }
 
@@ -208,20 +207,20 @@ package struct CapturedSubviewPayload: Sendable {
 }
 
 @MainActor
-package struct CapturedSubviewView: PrimitiveView, ResolvableView {
+package struct CapturedSubviewView: PrimitiveView, IterativeResolvableView {
   package var payload: CapturedSubviewPayload
 
   package init(payload: CapturedSubviewPayload) {
     self.payload = payload
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    payload.resolveElements(in: context)
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    payload.resolveElementsWork(in: context)
   }
 }
 
 @MainActor
-package struct CapturedSubviewGroupView: PrimitiveView, ResolvableView {
+package struct CapturedSubviewGroupView: PrimitiveView, IterativeResolvableView {
   package var kindName: String
   package var payloads: [CapturedSubviewPayload]
 
@@ -233,26 +232,15 @@ package struct CapturedSubviewGroupView: PrimitiveView, ResolvableView {
     self.payloads = payloads
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     switch payloads.count {
-    case 0:
-      return []
+    case 0: return .value([])
     case 1:
-      return [
-        resolveView(
-          CapturedSubviewView(payload: payloads[0]),
-          in: context
-        )
-      ]
+      return resolveViewWork(CapturedSubviewView(payload: payloads[0]), in: context).map { [$0] }
     default:
-      let scopedPayloads = payloads.map(\.payload)
-      return [
-        resolveScopedContentGroupElements(
-          kindName: kindName,
-          payloads: scopedPayloads,
-          in: context
-        )
-      ]
+      return resolveScopedContentGroupElementsWork(
+        kindName: kindName, payloads: payloads.map(\.payload), in: context
+      ).map { [$0] }
     }
   }
 }
@@ -393,43 +381,34 @@ package struct LazySubviewPayload: Sendable {
 package typealias NavigationDestinationPayload = LazySubviewPayload
 
 @MainActor
-package struct ScopedContentPayloadView: PrimitiveView, ResolvableView {
+package struct ScopedContentPayloadView: PrimitiveView, IterativeResolvableView {
   package var payload: ScopedContentPayload
   package var placementRoot: ResolveContext? = nil
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    payload.resolveElements(in: context, placementRoot: placementRoot)
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    payload.resolveElementsWork(in: context, placementRoot: placementRoot)
   }
 }
 
 @MainActor
-package struct ScopedContentPayloadGroupView: PrimitiveView, ResolvableView {
+package struct ScopedContentPayloadGroupView: PrimitiveView, IterativeResolvableView {
   package var kindName: String
   package var payloads: [ScopedContentPayload]
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     switch payloads.count {
-    case 0:
-      return []
-    case 1:
-      return payloads[0].resolveElements(
-        in: context,
-        placementRoot: context
-      )
+    case 0: return .value([])
+    case 1: return payloads[0].resolveElementsWork(in: context, placementRoot: context)
     default:
-      return [
-        resolveScopedContentGroupElements(
-          kindName: kindName,
-          payloads: payloads,
-          in: context
-        )
-      ]
+      return resolveScopedContentGroupElementsWork(
+        kindName: kindName, payloads: payloads, in: context
+      ).map { [$0] }
     }
   }
 }
 
 @MainActor
-private func resolveScopedContentGroupElements(
+private func resolveScopedContentGroupElementsWork(
   kindName: String = "Group",
   payloads: [ScopedContentPayload],
   layoutBehavior: LayoutBehavior = .intrinsic,
@@ -437,29 +416,71 @@ private func resolveScopedContentGroupElements(
   drawMetadata: DrawMetadata = DrawMetadata(),
   semanticMetadata: SemanticMetadata = SemanticMetadata(),
   in context: ResolveContext
-) -> ResolvedNode {
+) -> ResolveWork<ResolvedNode> {
   context.recordResolvedComputation()
-  let resolvedChildren = payloads.enumerated().flatMap { index, payload in
-    payload.resolveElements(
-      in: context.indexedChild(
-        kind: .init(rawValue: kindName),
-        index: index
-      ),
+  let result = DeclaredChildrenWorkState()
+  return resolveSequentially(Array(payloads.enumerated())) { index, payload in
+    payload.resolveElementsWork(
+      in: context.indexedChild(kind: .init(rawValue: kindName), index: index),
       placementRoot: context
+    ).map { result.nodes.append(contentsOf: $0) }
+  }.map {
+    let resolvedChildren = result.nodes
+
+    return ResolvedNode(
+      identity: context.identity,
+      kind: .view(kindName),
+      typeDiscriminator: kindName == "Group"
+        ? ObjectIdentifier(SynthesizedGroupWrapperMarker.self) : nil,
+      children: resolvedChildren,
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction,
+      layoutBehavior: layoutBehavior,
+      layoutMetadata: layoutMetadata,
+      drawMetadata: drawMetadata,
+      semanticMetadata: semanticMetadata
     )
   }
+}
 
-  return ResolvedNode(
-    identity: context.identity,
-    kind: .view(kindName),
-    typeDiscriminator: kindName == "Group"
-      ? ObjectIdentifier(SynthesizedGroupWrapperMarker.self) : nil,
-    children: resolvedChildren,
-    environmentSnapshot: context.environment,
-    transactionSnapshot: context.transaction,
-    layoutBehavior: layoutBehavior,
-    layoutMetadata: layoutMetadata,
-    drawMetadata: drawMetadata,
-    semanticMetadata: semanticMetadata
-  )
+extension CapturedSubviewPayload {
+  package func resolveElementsWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    payload.resolveElementsWork(in: context)
+  }
+  package func resolveWork(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
+    payload.resolveWork(in: context)
+  }
+}
+
+extension LazySubviewPayload {
+  package func resolveWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolveWork<ResolvedNode>
+  {
+    switch storage {
+    case .scopedContent(let payload):
+      return payload.resolveWork(in: context, placementRoot: placementRoot)
+    case .portal(let payload): return payload.resolveWork(in: context, placementRoot: placementRoot)
+    }
+  }
+  package func resolveElementsWork(in context: ResolveContext, placementRoot: ResolveContext? = nil)
+    -> ResolveWork<[ResolvedNode]>
+  {
+    switch storage {
+    case .scopedContent(let payload):
+      return payload.resolveElementsWork(in: context, placementRoot: placementRoot)
+    case .portal(let payload):
+      return payload.resolveElementsWork(in: context, placementRoot: placementRoot)
+    }
+  }
+  package func resolveInEntityRoutedHostWork(
+    in context: ResolveContext, entityIdentity: EntityIdentity,
+    structuralIdentity: TabDormantPayloadStructuralIdentity?
+  ) -> ResolveWork<ResolvedNode> {
+    switch storage {
+    case .scopedContent(let payload):
+      return payload.resolveInEntityRoutedHostWork(
+        in: context, entityIdentity: entityIdentity, structuralIdentity: structuralIdentity)
+    case .portal(let payload): return payload.resolveWork(in: context, placementRoot: context)
+    }
+  }
 }

@@ -1,7 +1,7 @@
 import SwiftTUICore
 
 /// Displays a title paired with an icon or glyph view.
-public struct Label<Title: View, Icon: View>: PrimitiveView, ResolvableView {
+public struct Label<Title: View, Icon: View>: PrimitiveView, IterativeResolvableView {
   private var title: Title
   private var icon: Icon
   private let authoringScope: AuthoringContext?
@@ -33,37 +33,40 @@ public struct Label<Title: View, Icon: View>: PrimitiveView, ResolvableView {
     icon = image
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
 extension Label {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let configuration = LabelStyleConfiguration(
       title: .init(authoringContext: authoringScope) { title.authoredAccessibilityLabel() },
       icon: .init(authoringContext: authoringScope) { icon },
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
-    let child = context.environmentValues.labelStyle.resolveBody(
-      configuration: configuration, in: context.child(component: .named("LabelBody")))
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("Label"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: SemanticMetadata().namingControl(with: title)
-    )
+    return context.environmentValues.labelStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("LabelBody"))
+    ).map { child in
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("Label"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: SemanticMetadata().namingControl(with: title)
+      )
+
+    }
   }
 }
 
 /// Displays a leading label paired with trailing content or a value.
-public struct LabeledContent<Label: View, Content: View>: PrimitiveView, ResolvableView {
+public struct LabeledContent<Label: View, Content: View>: PrimitiveView, IterativeResolvableView {
   private var label: Label
   private var content: Content
   private let authoringScope: AuthoringContext?
@@ -95,36 +98,39 @@ public struct LabeledContent<Label: View, Content: View>: PrimitiveView, Resolva
     content = Text(String(value))
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+  ) -> ResolveWork<[ResolvedNode]> {
+    resolvedNode(in: context).map { [$0] }
   }
 }
 
 extension LabeledContent {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let configuration = LabeledContentStyleConfiguration(
       label: .init(authoringContext: authoringScope) { label },
       content: .init(authoringContext: authoringScope) { content },
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
-    let child = context.environmentValues.labeledContentStyle.resolveBody(
-      configuration: configuration, in: context.child(component: .named("LabeledContentBody")))
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("LabeledContent"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction
-    )
+    return context.environmentValues.labeledContentStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("LabeledContentBody"))
+    ).map { child in
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("LabeledContent"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction
+      )
+
+    }
   }
 }
 
 /// Groups related controls into a compact row or stack.
-public struct ControlGroup<Label: View, Content: View>: PrimitiveView, ResolvableView {
+public struct ControlGroup<Label: View, Content: View>: PrimitiveView, IterativeResolvableView {
   private var showsLabel: Bool
   private var label: Label
   private var content: Content
@@ -159,9 +165,9 @@ public struct ControlGroup<Label: View, Content: View>: PrimitiveView, Resolvabl
     self.content = content()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     var configuration = ControlGroupStyleConfiguration(
       label: showsLabel ? .init(authoringContext: authoringScope) { label } : nil,
       content: .init(authoringContext: authoringScope) { content },
@@ -171,18 +177,21 @@ public struct ControlGroup<Label: View, Content: View>: PrimitiveView, Resolvabl
       configuration.content.retention = CapturedSubviewRetention(
         owner: owner, identity: context.identity.child(.named("ControlGroupContent")))
     }
-    let child = context.environmentValues.controlGroupStyle.resolveBody(
-      configuration: configuration, in: context.child(component: .named("ControlGroupBody")))
-    var node = ResolvedNode(
-      identity: context.identity, kind: .view("ControlGroup"), children: [child],
-      environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
-    if let owner { node.preferenceValues[CapturedSubviewOwnersPreferenceKey.self].insert(owner) }
-    return [node]
+    return context.environmentValues.controlGroupStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("ControlGroupBody"))
+    ).map { child in
+      var node = ResolvedNode(
+        identity: context.identity, kind: .view("ControlGroup"), children: [child],
+        environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
+      if let owner { node.preferenceValues[CapturedSubviewOwnersPreferenceKey.self].insert(owner) }
+      return [node]
+
+    }
   }
 }
 
 /// Frames related content with optional label chrome.
-public struct GroupBox<Label: View, Content: View>: PrimitiveView, ResolvableView {
+public struct GroupBox<Label: View, Content: View>: PrimitiveView, IterativeResolvableView {
   private var showsLabel: Bool
   private var label: Label
   private var content: Content
@@ -217,25 +226,28 @@ public struct GroupBox<Label: View, Content: View>: PrimitiveView, ResolvableVie
     self.content = content()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     let configuration = GroupBoxStyleConfiguration(
       label: showsLabel ? .init(authoringContext: authoringScope) { label } : nil,
       content: .init(authoringContext: authoringScope) { content },
       controlProminence: context.environmentValues.controlProminence,
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
-    let child = context.environmentValues.groupBoxStyle.resolveBody(
-      configuration: configuration, in: context.child(component: .named("GroupBoxBody")))
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("GroupBox"),
-        children: [child],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
-      )
-    ]
+    return context.environmentValues.groupBoxStyle.resolveBody(
+      configuration: configuration, in: context.child(component: .named("GroupBoxBody"))
+    ).map { child in
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("GroupBox"),
+          children: [child],
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction
+        )
+      ]
+
+    }
   }
 }

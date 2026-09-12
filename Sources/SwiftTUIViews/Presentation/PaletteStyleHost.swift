@@ -2,7 +2,7 @@ import SwiftTUICore
 
 /// The declaration supplies command data and source styling; this primitive
 /// owns pointer handlers beneath its own lifetime and resolves one typed body.
-struct PaletteStyleHost: PrimitiveView, ResolvableView {
+struct PaletteStyleHost: PrimitiveView, IterativeResolvableView {
   let style: AnyPaletteStyle
   let title: String
   let commands: [ActivePaletteCommand]
@@ -12,7 +12,7 @@ struct PaletteStyleHost: PrimitiveView, ResolvableView {
   let isPresented: @MainActor @Sendable () -> Bool
   let dismiss: @MainActor @Sendable () -> Void
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let owner = ViewNodeContext.current?.stateOwnerHandle
     let isPresented = self.isPresented
     let dismiss = self.dismiss
@@ -52,12 +52,15 @@ struct PaletteStyleHost: PrimitiveView, ResolvableView {
       title: title, commands: values, terminalSize: terminalSize,
       controlProminence: prominence, styleEnvironment: styleEnvironment)
     configuration.bindDismissal(dismissLive)
-    let body = style.resolveBody(
-      configuration: configuration, in: context.child(component: .named("PaletteBody")))
-    return [
-      ResolvedNode(
-        identity: context.identity, kind: .view("PaletteStyleHost"), children: [body],
-        environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
-    ]
+    return style.resolveBody(
+      configuration: configuration, in: context.child(component: .named("PaletteBody"))
+    ).map { body in
+      return [
+        ResolvedNode(
+          identity: context.identity, kind: .view("PaletteStyleHost"), children: [body],
+          environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
+      ]
+
+    }
   }
 }

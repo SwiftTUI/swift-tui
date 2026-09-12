@@ -235,7 +235,7 @@ public struct AnyLabelStyle: Sendable, CustomStringConvertible, CustomDebugStrin
   package func resolveBody(
     configuration: LabelStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     box.resolveBody(configuration: configuration, in: context)
   }
 }
@@ -362,7 +362,7 @@ private protocol AnyLabelStyleBox: AnyStyleBox {
   func resolveBody(
     configuration: LabelStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode
+  ) -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyLabelStyleBox where S: LabelStyle {
@@ -371,7 +371,7 @@ extension ConcreteStyleBox: AnyLabelStyleBox where S: LabelStyle {
   func resolveBody(
     configuration: LabelStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,
       makeBody: { style, configuration in style.makeBody(configuration: configuration) })

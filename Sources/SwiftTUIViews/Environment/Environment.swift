@@ -359,7 +359,7 @@ extension EnvironmentValues {
 // `ResolveContext.swift`.
 
 /// Reads an environment value and maps it into authored content.
-public struct EnvironmentReader<Value, Content: View>: PrimitiveView, ResolvableView {
+public struct EnvironmentReader<Value, Content: View>: PrimitiveView, IterativeResolvableView {
   private let keyPath: KeyPath<EnvironmentValues, Value>
   private let content: (Value) -> Content
   private let authoringContext: AuthoringContext?
@@ -373,14 +373,14 @@ public struct EnvironmentReader<Value, Content: View>: PrimitiveView, Resolvable
     authoringContext = currentAuthoringContext()
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let view = withAuthoringContext(authoringContext) {
       context.trackingObservableAccess {
         EnvironmentValues.recordRuntimeFocusStateDependencyRead(for: keyPath)
         return content(context.environmentValues[keyPath: keyPath])
       }
     }
-    return view.resolveElements(in: context)
+    return view.resolveElementsWork(in: context)
   }
 }
 

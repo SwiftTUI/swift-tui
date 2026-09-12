@@ -568,70 +568,76 @@ extension View {
 }
 
 @MainActor
-public struct BoolFocusBindingModifier: PrimitiveViewModifier {
+public struct BoolFocusBindingModifier: IterativePrimitiveViewModifier {
   var binding: FocusState<Bool>.Binding
 
-  package func resolve<Base: View>(
+  package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
-    let observedRequestGeneration = binding.requestGeneration
-    let registrationIdentity = node.identity
-    context.localFocusBindingRegistry?.register(
-      identity: registrationIdentity,
-      bindingKey: binding.bindingKey,
-      bindingID: binding.bindingID,
-      hasPendingRequest: binding.hasPendingRequest,
-      isSelected: binding.registrationValue,
-      applyRuntimeFocus: { isFocused in
-        binding.applyRuntimeValue(
-          isFocused,
-          observedRequestGeneration: observedRequestGeneration,
-          registrationIdentity: registrationIdentity
-        )
-      }
-    )
-    return [node]
-  }
-}
-
-@MainActor
-public struct OptionalFocusBindingModifier<Value: Hashable>: PrimitiveViewModifier {
-  var binding: FocusState<Value?>.Binding
-  var value: Value
-
-  package func resolve<Base: View>(
-    content: ModifierContentInputs<Base>,
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    let node = content.resolve(in: context)
-    let observedRequestGeneration = binding.requestGeneration
-    let registrationIdentity = node.identity
-    context.localFocusBindingRegistry?.register(
-      identity: registrationIdentity,
-      bindingKey: binding.bindingKey,
-      bindingID: binding.bindingID,
-      hasPendingRequest: binding.hasPendingRequest,
-      isSelected: binding.registrationValue == value,
-      applyRuntimeFocus: { isFocused in
-        if isFocused {
-          return binding.applyRuntimeValue(
-            value,
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
+      let observedRequestGeneration = binding.requestGeneration
+      let registrationIdentity = node.identity
+      context.localFocusBindingRegistry?.register(
+        identity: registrationIdentity,
+        bindingKey: binding.bindingKey,
+        bindingID: binding.bindingID,
+        hasPendingRequest: binding.hasPendingRequest,
+        isSelected: binding.registrationValue,
+        applyRuntimeFocus: { isFocused in
+          binding.applyRuntimeValue(
+            isFocused,
             observedRequestGeneration: observedRequestGeneration,
             registrationIdentity: registrationIdentity
           )
         }
-        guard binding.registrationValue == value else {
-          return false
+      )
+      return [node]
+
+    }
+  }
+}
+
+@MainActor
+public struct OptionalFocusBindingModifier<Value: Hashable>: IterativePrimitiveViewModifier {
+  var binding: FocusState<Value?>.Binding
+  var value: Value
+
+  package func makeResolveWork<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      let node = completed
+      let observedRequestGeneration = binding.requestGeneration
+      let registrationIdentity = node.identity
+      context.localFocusBindingRegistry?.register(
+        identity: registrationIdentity,
+        bindingKey: binding.bindingKey,
+        bindingID: binding.bindingID,
+        hasPendingRequest: binding.hasPendingRequest,
+        isSelected: binding.registrationValue == value,
+        applyRuntimeFocus: { isFocused in
+          if isFocused {
+            return binding.applyRuntimeValue(
+              value,
+              observedRequestGeneration: observedRequestGeneration,
+              registrationIdentity: registrationIdentity
+            )
+          }
+          guard binding.registrationValue == value else {
+            return false
+          }
+          return binding.applyRuntimeValue(
+            nil,
+            observedRequestGeneration: observedRequestGeneration,
+            registrationIdentity: registrationIdentity
+          )
         }
-        return binding.applyRuntimeValue(
-          nil,
-          observedRequestGeneration: observedRequestGeneration,
-          registrationIdentity: registrationIdentity
-        )
-      }
-    )
-    return [node]
+      )
+      return [node]
+
+    }
   }
 }

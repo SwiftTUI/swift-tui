@@ -25,15 +25,18 @@ extension View {
 }
 
 /// The modifier value produced by ``View/navigationTitle(_:)``.
-public struct NavigationTitleModifier: PrimitiveViewModifier, Sendable {
+public struct NavigationTitleModifier: IterativePrimitiveViewModifier, Sendable {
   package var title: String
 
-  package func resolve<Content: View>(
+  package func makeResolveWork<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
-  ) -> [ResolvedNode] {
-    var node = content.resolve(in: context)
-    node.preferenceValues[NavigationTitlePreferenceKey.self] = title
-    return [node]
+  ) -> ResolveWork<[ResolvedNode]> {
+    return content.resolveWork(in: context).map { completed in
+      var node = completed
+      node.preferenceValues[NavigationTitlePreferenceKey.self] = title
+      return [node]
+
+    }
   }
 }

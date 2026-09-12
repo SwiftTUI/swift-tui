@@ -2,7 +2,7 @@ import SwiftTUICore
 import Synchronization
 
 /// A focusable multiline text editor that accepts terminal keyboard input.
-public struct TextEditor: PrimitiveView, ResolvableView {
+public struct TextEditor: PrimitiveView, IterativeResolvableView {
   public var text: Binding<String>
   @State private var scrollPosition = ScrollCellOffset.zero
   @State private var textInputValue = TextInputValue()
@@ -18,11 +18,11 @@ public struct TextEditor: PrimitiveView, ResolvableView {
     authoringScope = currentAuthoringContext()
   }
 
-  package func resolveElements(
+  package func makeResolveWork(
     in context: ResolveContext
-  ) -> [ResolvedNode] {
+  ) -> ResolveWork<[ResolvedNode]> {
     return withDynamicPropertyUpdateScope(self, for: context) {
-      [resolvedNode(in: context)]
+      resolvedNode(in: context).map { [$0] }
     }
   }
 }
@@ -30,7 +30,7 @@ public struct TextEditor: PrimitiveView, ResolvableView {
 extension TextEditor {
   private func resolvedNode(
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused =
       context.environmentValues.focusedIdentity(comparedAgainst: [context.identity])
@@ -119,29 +119,31 @@ extension TextEditor {
       showsFocusEffect: showsFocusEffect,
       styleEnvironment: styleEnvironment
     )
-    let child = context.environmentValues.textEditorStyle.resolveBody(
+    return context.environmentValues.textEditorStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("TextEditorBody"))
-    )
+    ).map { child in
 
-    var metadata = focusableControlMetadata(
-      focusInteractions: .edit,
-      accessibilityRole: .textEditor
-    )
-    // The editor is ONE focus stop. Its body embeds a ScrollView, whose content
-    // (and transient scroll indicator) would otherwise emit their own top-level
-    // focus regions — putting the editor's internals on the Tab ring. Seal the
-    // descendants: the editor's own region stays, wheel scrolling still routes
-    // through the scroll role, and caret-driven scrolling uses the editor's own
-    // scroll-position binding, none of which need descendant focus regions.
-    metadata.sealsFocusDescendants = true
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("TextEditor"),
-      children: [child],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      semanticMetadata: metadata
-    )
+      var metadata = focusableControlMetadata(
+        focusInteractions: .edit,
+        accessibilityRole: .textEditor
+      )
+      // The editor is ONE focus stop. Its body embeds a ScrollView, whose content
+      // (and transient scroll indicator) would otherwise emit their own top-level
+      // focus regions — putting the editor's internals on the Tab ring. Seal the
+      // descendants: the editor's own region stays, wheel scrolling still routes
+      // through the scroll role, and caret-driven scrolling uses the editor's own
+      // scroll-position binding, none of which need descendant focus regions.
+      metadata.sealsFocusDescendants = true
+      return ResolvedNode(
+        identity: context.identity,
+        kind: .view("TextEditor"),
+        children: [child],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        semanticMetadata: metadata
+      )
+
+    }
   }
 }
 
@@ -167,7 +169,7 @@ final class TextEditorMeasuredContentWidth: Sendable {
 /// protected viewport without influencing its layout, and it draws
 /// nothing. This is the channel that carries the realized wrap width back to
 /// the movement layout map.
-private struct TextEditorContentWidthProbe: PrimitiveView, ResolvableView {
+private struct TextEditorContentWidthProbe: PrimitiveView, IterativeResolvableView {
   let measuredContentWidth: TextEditorMeasuredContentWidth
 
   func resolveElements(

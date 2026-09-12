@@ -2,7 +2,8 @@ import SwiftTUICore
 
 /// The builder artifact produced when a ``ViewBuilder`` contains multiple child
 /// expressions in sequence.
-public struct TupleView<each Content: View>: PrimitiveView, ResolvableView, DeclaredChildrenView,
+public struct TupleView<each Content: View>: PrimitiveView, IterativeResolvableView,
+  DeclaredChildrenView,
   DeclaredChildStructure
 {
   package let value: (repeat each Content)
@@ -17,8 +18,8 @@ public struct TupleView<each Content: View>: PrimitiveView, ResolvableView, Decl
     fatalError("TupleView is a builder composition artifact.")
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    resolveDeclaredChildren(
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    resolveDeclaredChildrenWork(
       self,
       in: context,
       kindName: "Group"

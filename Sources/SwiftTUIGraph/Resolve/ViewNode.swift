@@ -516,16 +516,6 @@ package final class ViewNode {
     reconcileDynamicPropertyLeases()
   }
 
-  /// Closes a `beginEvaluation` without committing: the chunked resolve
-  /// driver's cut serves the node's committed value as-is and defers the
-  /// real resolve to the drain, so nothing may fold the (freshly reset)
-  /// dependency tracker over the recorded dependencies or run the
-  /// subtree-deep commit walks at cut depth — the cut must stay O(1) on
-  /// the wasm stack.
-  package func abandonEvaluation() {
-    evaluationDepth = max(0, evaluationDepth - 1)
-  }
-
   package func finishEvaluation(
     accessedStateSlots: Int
   ) -> Bool {
@@ -1935,8 +1925,7 @@ package final class ViewNode {
     into registrations: RuntimeRegistrationSet
   ) {
     // Explicit work list, never per-level recursion — this walk is subtree-
-    // height deep and reachable from reuse paths whose native-stack budget
-    // the chunked resolve driver does not bound (see the mirrored note on
+    // height deep and reachable from reuse paths that need their own bounded-stack traversal (see the mirrored note on
     // `ViewGraphRuntimeRegistrationRestorer.restoreResolvedSubtree`).
     // Children push reversed to preserve the recursive walk's pre-order.
     var traversedNodes: Set<ObjectIdentifier> = []

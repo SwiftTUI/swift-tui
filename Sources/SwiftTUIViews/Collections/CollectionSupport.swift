@@ -276,29 +276,27 @@ func applyingHostedRowForegroundStyle(
   guard let style else {
     return source
   }
-  var node = source
-  node.drawMetadata.foregroundStyle = style
-  node.children = node.children.map {
-    applyingHostedRowForegroundStyle(style, to: $0)
+  return mapResolvedCollectionTree(source) { node in
+    node.drawMetadata.foregroundStyle = style
   }
-  return node
 }
 
 func collectedNodeTextParts(
   from node: ResolvedNode
 ) -> [String] {
   var parts: [String] = []
-  if case .text(let content) = node.drawPayload, !content.isEmpty {
-    parts.append(content)
-  }
-  if case .textFigure(let payload) = node.drawPayload, !payload.content.isEmpty {
-    parts.append(payload.content)
-  }
-  if case .richText(let payload) = node.drawPayload, !payload.visibleText.isEmpty {
-    parts.append(payload.visibleText)
-  }
-  for child in node.children {
-    parts.append(contentsOf: collectedNodeTextParts(from: child))
+  var work = [node]
+  while let node = work.popLast() {
+    if case .text(let content) = node.drawPayload, !content.isEmpty {
+      parts.append(content)
+    }
+    if case .textFigure(let payload) = node.drawPayload, !payload.content.isEmpty {
+      parts.append(payload.content)
+    }
+    if case .richText(let payload) = node.drawPayload, !payload.visibleText.isEmpty {
+      parts.append(payload.visibleText)
+    }
+    work.append(contentsOf: node.children.reversed())
   }
   return parts
 }
@@ -474,4 +472,28 @@ private func resolvedTableCellAlignment(
     return .trailing
   }
   return .leading
+}
+
+/// Postorder transformation of resolved collection content without native recursion.
+func mapResolvedCollectionTree(_ source: ResolvedNode, _ transform: (inout ResolvedNode) -> Void)
+  -> ResolvedNode
+{
+  var work: [(ResolvedNode, Bool)] = [(source, false)]
+  var results: [ResolvedNode] = []
+  while let (source, completing) = work.popLast() {
+    if completing {
+      var node = source
+      let count = node.children.count
+      if count > 0 {
+        node.children = Array(results.suffix(count))
+        results.removeLast(count)
+      }
+      transform(&node)
+      results.append(node)
+    } else {
+      work.append((source, true))
+      for child in source.children.reversed() { work.append((child, false)) }
+    }
+  }
+  return results[0]
 }

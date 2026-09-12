@@ -139,20 +139,16 @@ package struct ModifierContentInputs<Base: View> {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    resolveElementsWork(in: context).run()
+  }
+
+  package func resolveElementsWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     applyAuthoringContext {
-      // The actual content edge owns the central update/evaluation seam. A
-      // certified same-node producer may already have prepared this exact
-      // context before its own reuse door; every other edge evaluates here.
-      let resolved = resolveView(
-        base,
-        in: contentResolveContext(in: context)
-      )
-      return consumeDeclaredChild(
-        resolved,
-        resolvedUnder: context.identity,
-        in: context.viewGraph,
-        policy: .declaredBuilder
-      )
+      resolveViewWork(base, in: contentResolveContext(in: context)).map {
+        consumeDeclaredChild(
+          $0, resolvedUnder: context.identity,
+          in: context.viewGraph, policy: .declaredBuilder)
+      }
     }
   }
 
@@ -179,25 +175,26 @@ package struct ModifierContentInputs<Base: View> {
   }
 
   package func resolve(in context: ResolveContext) -> ResolvedNode {
+    resolveWork(in: context).run()
+  }
+
+  package func resolveWork(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
     applyAuthoringContext {
-      resolveView(
-        base,
-        in: contentResolveContext(in: context)
-      )
+      resolveViewWork(base, in: contentResolveContext(in: context))
     }
   }
 
   package func resolveOwned(in context: ResolveContext) -> ResolvedNode {
+    resolveOwnedWork(in: context).run()
+  }
+
+  package func resolveOwnedWork(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
     applyOwnedAuthoringContext(in: context) {
-      // Identity modifiers are structural content edges too. Going through
-      // the central resolver is what lets an entity-routed base update once
-      // at its routed owner instead of being guessed at the outer wrapper.
-      var resolved = resolveView(
-        base,
-        in: contentResolveContext(in: context)
-      )
-      resolved.structuralPath = context.structuralPath
-      return resolved
+      resolveViewWork(base, in: contentResolveContext(in: context)).map { completed in
+        var resolved = completed
+        resolved.structuralPath = context.structuralPath
+        return resolved
+      }
     }
   }
 
@@ -247,6 +244,10 @@ package struct ModifierContentInputs<Base: View> {
 
 @MainActor
 package protocol PrimitiveViewModifier: ViewModifier where Body == Never {
+  func makeResolveWork<Base: View>(
+    content: ModifierContentInputs<Base>, in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]>
+
   func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
@@ -273,8 +274,26 @@ extension PrimitiveViewModifier {
   }
 }
 
-public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, ResolvableView {
-  private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
+extension PrimitiveViewModifier {
+  package func makeResolveWork<Base: View>(
+    content: ModifierContentInputs<Base>, in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]> {
+    .deferred { .value(resolve(content: content, in: context)) }
+  }
+}
+
+package protocol IterativePrimitiveViewModifier: PrimitiveViewModifier {}
+
+extension IterativePrimitiveViewModifier {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>, in context: ResolveContext
+  ) -> [ResolvedNode] {
+    makeResolveWork(content: content, in: context).run()
+  }
+}
+
+public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, IterativeResolvableView {
+  private let resolveElementsClosure: @MainActor (ResolveContext) -> ResolveWork<[ResolvedNode]>
   private let updateDynamicPropertiesClosure:
     @MainActor (ResolveContext) -> DynamicPropertyUpdateResult
 
@@ -287,7 +306,7 @@ public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, Resolv
       authoringScope: authoringScope
     )
     resolveElementsClosure = { context in
-      inputs.resolveElements(in: context)
+      inputs.resolveElementsWork(in: context)
     }
     updateDynamicPropertiesClosure = { context in
       inputs.prepareDynamicProperties(in: context)
@@ -298,7 +317,7 @@ public struct ViewModifierContent<Modifier: ViewModifier>: PrimitiveView, Resolv
     fatalError("ViewModifier.Content is an opaque modifier-content carrier.")
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     // A composed modifier may place this carrier at any point in its body (or
     // omit it). `View.resolveBody` calls ResolvableView bodies directly, so
     // this carrier itself is the only exact pre-content seam: prepare here,
@@ -407,14 +426,15 @@ extension ModifiedContent: ViewModifier where Content: ViewModifier, Modifier: V
   }
 }
 
-extension ModifiedContent: ResolvableView where Content: View, Modifier: PrimitiveViewModifier {
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+extension ModifiedContent: IterativeResolvableView, ResolvableView
+where Content: View, Modifier: PrimitiveViewModifier {
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let inputs = ModifierContentInputs(
       base: content,
       authoringScope: authoringScope
     )
     return withDynamicPropertyUpdateScope(modifier, for: context) {
-      modifier.resolve(content: inputs, in: context)
+      modifier.makeResolveWork(content: inputs, in: context)
     }
   }
 }

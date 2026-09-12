@@ -331,34 +331,38 @@ private final class ProducerPublicationLedger {
   var activations: [String] = []
 }
 
-private struct ProducerPublicationFixture: PrimitiveView, ResolvableView {
+private struct ProducerPublicationFixture: PrimitiveView, IterativeResolvableView {
   let model: ProducerModel
   let ledger: ProducerPublicationLedger
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     ledger.hostResolveCalls += 1
     let generation = ledger.generation
     // Register the sibling action on the consumer itself. Its stable label
     // keeps clean style-subtree reuse independent from action publication.
-    let host = Button("host action") { ledger.activations.append("host=\(generation)") }
-      .resolve(in: context.child(component: .named("host")))
-    var stack = VStack(alignment: .leading, spacing: 0) {
-      ForEach(0..<1, id: \.self) { _ in
-        let value = model.value
-        if model.shape == 0 {
-          EmptyView()
-        } else if model.shape == 1 {
-          Button("head=\(value)") { ledger.activations.append("head=\(value)") }
-        } else {
-          Group {
-            Button("head=\(value)") { ledger.activations.append("head=\(value)") }
-            Button("tail=\(value)") { ledger.activations.append("tail=\(value)") }
+    return Button("host action") { ledger.activations.append("host=\(generation)") }
+      .resolveWork(in: context.child(component: .named("host"))).flatMap { host in
+        return VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<1, id: \.self) { _ in
+            let value = model.value
+            if model.shape == 0 {
+              EmptyView()
+            } else if model.shape == 1 {
+              Button("head=\(value)") { ledger.activations.append("head=\(value)") }
+            } else {
+              Group {
+                Button("head=\(value)") { ledger.activations.append("head=\(value)") }
+                Button("tail=\(value)") { ledger.activations.append("tail=\(value)") }
+              }
+            }
           }
         }
+        .resolveElementsWork(in: context).map { elements in
+          var stack = elements[0]
+          stack.children.insert(host, at: 0)
+          return [stack]
+
+        }
       }
-    }
-    .resolveElements(in: context)[0]
-    stack.children.insert(host, at: 0)
-    return [stack]
   }
 }
 

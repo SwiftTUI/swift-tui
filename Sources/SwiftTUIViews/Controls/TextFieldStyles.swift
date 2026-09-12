@@ -401,7 +401,7 @@ public struct AnyTextFieldStyle: Sendable, CustomStringConvertible, CustomDebugS
   package func resolveBody(
     configuration: TextFieldStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     box.resolveBody(
       configuration: configuration,
       in: context
@@ -515,7 +515,7 @@ private protocol AnyTextFieldStyleBox: AnyStyleBox {
   func resolveBody(
     configuration: TextFieldStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode
+  ) -> ResolveWork<ResolvedNode>
 }
 
 extension ConcreteStyleBox: AnyTextFieldStyleBox where S: TextFieldStyle {
@@ -524,7 +524,7 @@ extension ConcreteStyleBox: AnyTextFieldStyleBox where S: TextFieldStyle {
   func resolveBody(
     configuration: TextFieldStyleConfiguration,
     in context: ResolveContext
-  ) -> ResolvedNode {
+  ) -> ResolveWork<ResolvedNode> {
     resolveBody(
       configuration: configuration, styleLabel: style.snapshotLabel, in: context,
       makeBody: { style, configuration in style.makeBody(configuration: configuration) })
