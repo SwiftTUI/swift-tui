@@ -104,8 +104,9 @@ ForEach(messages, id: \.messageID) { message in
 
 ## Help lazy containers window
 
-`LazyVStack` and `LazyHStack` realize only the visible band when their shape
-lets the framework see what "visible" means. The eligible shape is:
+`LazyVStack` and `LazyHStack` realize only the visible band under a `ScrollView`.
+Static fragments, `Group`, conditionals, and one or more `ForEach` sources all
+compose into windowed fragments; for example:
 
 ```swift
 ScrollView {
@@ -121,14 +122,17 @@ The author-actionable rules:
 
 - Put the lazy stack inside a `ScrollView`. Without a scrolling viewport there
   is no visible band to window to.
-- Feed it one direct `ForEach` over your data.
-- Produce one row view per element. If a single element expands into several
-  sibling rows, the container builds everything.
-- Pass an explicit `spacing:` value. Leaving it unspecified makes spacing
-  depend on neighboring content, which also disables windowing.
+- Keep direct children structural. `ForEach` sources, `Group`, `if`, and other
+  declared structure compose into fragments across multiple sources; a logical
+  element may contribute zero or multiple fragments. Opaque bodies or modifiers
+  hiding a `ForEach` do not acquire structural transparency.
+- Default (`nil`) spacing is exact between realized neighboring fragments, so
+  an explicit `spacing:` is optional. Observed negative spacing uses exhaustive
+  layout, and a single element whose body expands without bound must be realized
+  in full.
 
-A shape that misses these rules still renders correctly — it just builds every
-row up front, like a plain `VStack`.
+A shape that needs exhaustive layout still renders correctly — it just builds
+every row up front, like a plain `VStack`.
 
 One visible consequence to plan for: offscreen rows do not exist yet. They
 cannot receive focus until scrolled into view, though programmatic scrolling
