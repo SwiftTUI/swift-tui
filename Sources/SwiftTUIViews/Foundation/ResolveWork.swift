@@ -1,4 +1,3 @@
-import Foundation
 import SwiftTUICore
 
 /// A typed child result and its explicit continuation. Scheduling never invokes
@@ -63,13 +62,7 @@ package struct ResolveWork<Value> {
       ResolveWorkDiagnostics.maximumDrains, ResolveWorkDiagnostics.activeDrains)
     defer { ResolveWorkDiagnostics.activeDrains -= 1 }
     if FeatureFlags.environmentValue(named: "SWIFTTUI_ASSERT_ITERATIVE_RESOLVE") == "1" {
-      #if os(WASI)
-        precondition(ResolveWorkDiagnostics.activeDrains == 1, "Nested synchronous resolve drain")
-      #else
-        precondition(
-          ResolveWorkDiagnostics.activeDrains == 1,
-          "Nested synchronous resolve drain: \(Thread.callStackSymbols.joined(separator: "\n"))")
-      #endif
+      precondition(ResolveWorkDiagnostics.activeDrains == 1, "Nested synchronous resolve drain")
     }
     let driver = ResolveWorkDriver()
     var result: Value?
