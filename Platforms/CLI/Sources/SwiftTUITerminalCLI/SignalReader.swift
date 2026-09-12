@@ -1,17 +1,18 @@
 #if os(macOS) || os(iOS) || os(Linux) || os(Android)
-  public import SwiftTUIVendorUnixSignals
+  @_exported public import SwiftTUIPlatformIO
+  import SwiftTUIVendorUnixSignals
   import Synchronization
 
   /// Reads Unix signals and exposes them as strings for the runtime.
   public final class SignalReader: SignalReading {
-    private let signals: [UnixSignal]
+    private let signals: [TerminalSignal]
     // Sources installed ahead of run-loop startup by armSignalSources();
     // consumed by the next events() call. Signals delivered in between are
     // buffered by the sequence's own stream.
     private let armedSequence = Mutex<UnixSignalsSequence?>(nil)
 
     /// Creates a signal reader for the supplied signals.
-    public init(signals: [UnixSignal]? = nil) {
+    public init(signals: [TerminalSignal]? = nil) {
       self.signals = signals ?? [.sigint, .sigterm, .sigwinch]
     }
 

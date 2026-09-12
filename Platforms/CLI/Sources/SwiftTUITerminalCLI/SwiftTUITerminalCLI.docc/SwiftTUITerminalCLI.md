@@ -17,6 +17,11 @@ diagnostic while the ordinary launch path is unaffected. Most apps import
 
 ## Topics
 
+On POSIX hosts, `SignalReader(signals: [.sigint, .sigterm, .sigwinch])` uses
+the framework-owned `TerminalSignal` vocabulary. The names and platform
+signal numbers are preserved. The older `UnixSignal` spelling remains a
+source-compatible alias for callers that already declare typed arrays.
+
 ### Launching
 
 - ``SwiftTUILauncher``

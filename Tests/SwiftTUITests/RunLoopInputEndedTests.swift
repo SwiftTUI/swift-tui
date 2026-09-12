@@ -12,6 +12,41 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(5)))
 struct RunLoopInputEndedTests {
+  @Test(
+    "STUI-63: secondary completion drains a cancelled live primary run loop",
+    arguments: [false, true])
+  func secondaryCompletionDrainsPrimary(secondaryThrows: Bool) async throws {
+    let input = InjectedTerminalInputReader()
+    let harness = InputEndedHarness(events: [], inputReader: input)
+    var primaryFinished = false
+    let primary = Task {
+      defer { primaryFinished = true }
+      return try await harness.run()
+    }
+    defer {
+      primary.cancel()
+      input.finish()
+    }
+    await harness.host.firstFrame.wait()
+    do {
+      try await withThrowingTaskGroup(of: Void.self) { group in
+        group.addTask { _ = try await primary.value }
+        group.addTask {
+          if secondaryThrows { throw SecondaryCompletionFailure.expected }
+        }
+        defer {
+          primary.cancel()
+          group.cancelAll()
+        }
+        _ = try await group.next()
+      }
+      #expect(!secondaryThrows)
+    } catch SecondaryCompletionFailure.expected {
+      #expect(secondaryThrows)
+    }
+    #expect(primaryFinished)
+  }
+
   @Test("input EOF exits while the production-shaped signal stream stays live")
   func inputEOFExitsWithLiveSignalReader() async throws {
     let harness = InputEndedHarness(events: [
@@ -60,6 +95,7 @@ private final class InputEndedHarness {
 
   init(
     events: [InputEvent],
+    inputReader: (any TerminalInputReading)? = nil,
     terminationDisposition: TerminationDisposition = .allow
   ) {
     let rootIdentity = testIdentity("InputEndedRoot")
@@ -68,7 +104,7 @@ private final class InputEndedHarness {
     runLoop = RunLoop(
       rootIdentity: rootIdentity,
       presentationSurface: host,
-      terminalInputReader: FinishingInputReader(events: events),
+      terminalInputReader: inputReader ?? FinishingInputReader(events: events),
       signalReader: NeverEndingSignalReader(),
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -150,6 +186,7 @@ private final class NeverEndingSignalReader: SignalReading {
 }
 
 private final class InputEndedRecordingHost: PresentationSurface {
+  let firstFrame = AsyncEvent()
   let surfaceSize = CellSize(width: 20, height: 4)
   let capabilityProfile = TerminalCapabilityProfile.previewUnicode
   let appearance = TerminalAppearance.fallback
@@ -164,6 +201,11 @@ private final class InputEndedRecordingHost: PresentationSurface {
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     frames.append(surface.lines.joined(separator: "\n"))
+    firstFrame.fire()
     return .fullRepaint(for: surface, capabilityProfile: capabilityProfile)
   }
+}
+
+private enum SecondaryCompletionFailure: Error {
+  case expected
 }

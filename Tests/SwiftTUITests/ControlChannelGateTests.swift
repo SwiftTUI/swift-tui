@@ -13,6 +13,42 @@ import Testing
 @MainActor
 @Suite
 struct ControlChannelGateTests {
+  @Test("control records interleaved with a paste delimiter preserve framing")
+  func controlRecordInsideSplitPasteDelimiter() {
+    var decoder = makeDecoder(controlChannelEnabled: true)
+    let batch = decoder.decode(
+      Array(
+        "\u{001B}[20\u{001E}resize:80:24\n0~a\u{001E}X\nb\u{001B}[201~".utf8))
+    #expect(batch.events == [.paste(PasteEvent(content: "a\u{001E}X\nb"))])
+    #expect(batch.controlMessages == [.resize(.init(width: 80, height: 24))])
+  }
+
+  @Test("STUI-84: armed control framing preserves paste payload at every byte boundary")
+  func armedChannelPreservesPaste() {
+    let payload = "before\u{001E}X\nY\u{001E}resize:1:2\n\u{001B}[200~tail"
+    let bytes = Array(
+      "\u{001B}[200~\(payload)\u{001B}[201~\u{001E}resize:80:24\nq".utf8)
+    for split in 0...bytes.count {
+      var decoder = makeDecoder(controlChannelEnabled: true)
+      let first = decoder.decode(Array(bytes[..<split]))
+      let last = decoder.decode(Array(bytes[split...]))
+      #expect(
+        first.events + last.events == [.paste(PasteEvent(content: payload)), .key(.character("q"))])
+      #expect(
+        first.controlMessages + last.controlMessages == [.resize(.init(width: 80, height: 24))])
+    }
+    var decoder = makeDecoder(controlChannelEnabled: true)
+    var events: [InputEvent] = []
+    var messages: [TerminalControlMessage] = []
+    for byte in bytes {
+      let batch = decoder.decode([byte])
+      events += batch.events
+      messages += batch.controlMessages
+    }
+    #expect(events == [.paste(PasteEvent(content: payload)), .key(.character("q"))])
+    #expect(messages == [.resize(.init(width: 80, height: 24))])
+  }
+
   private func makeDecoder(
     controlChannelEnabled: Bool
   ) -> TerminalInputEventDecoder<InputEvent> {

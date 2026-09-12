@@ -29,11 +29,10 @@
 
   /// Routes a SwiftTUI app between terminal-native and localhost WebHost launch.
   ///
-  /// Legacy spelling: the router itself is `SwiftTUITerminalCLI.SwiftTUILauncher`
-  /// (Stage 5.2 of the Windows plan), which this facade installs the web arm
-  /// into and delegates to. Prefer `SwiftTUILauncher` in new code; a formal
-  /// deprecation of this name waits for a release boundary so in-repo
-  /// coverage keeps building under warnings-as-errors.
+  /// Installs the web backend before delegating to `SwiftTUILauncher`.
+  /// Use this entry point from a custom main that needs web launch support.
+  /// Calling the portable launcher directly requires a backend to have
+  /// already been installed by a combined launch entry point.
   public enum WebHostCLIRunner {
     /// Constructs an app on the main actor and launches it using parsed CLI options.
     @MainActor

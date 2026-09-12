@@ -30,11 +30,6 @@ import SwiftTUICore
 
     private let pumpState = Mutex(PumpState())
 
-    /// Probe-suspension depth (the F42 gate in polling-pump form): while
-    /// nonzero the reader's pump parks without reading, so a capability
-    /// probe's write-then-read cycle cannot lose its reply to the reader.
-    let suspensionDepth = Mutex<Int>(0)
-
     /// Invoked by the pump when it consumes a `WINDOW_BUFFER_SIZE_EVENT`.
     /// Resize shares the console input queue with keystrokes — a second
     /// reader on the handle is unsupported and loses input — so the single

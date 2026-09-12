@@ -227,6 +227,7 @@ classifications:
     - SwiftTUITerminalCLI.RenderOnce
     - SwiftTUICLIAttach.ScenePty
     - SwiftTUITerminalCLI.SignalReader
+    - SwiftTUIPlatformIO.TerminalSignal
     # Stage 5.2 of the Windows plan: the platform-neutral launch router.
     - SwiftTUITerminalCLI.SwiftTUILauncher
     - SwiftTUITerminalCLI.TerminalRunner

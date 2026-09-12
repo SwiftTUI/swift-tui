@@ -23,20 +23,6 @@ private enum FocusedTitleKey: FocusedValueKey {
   private let runningOnLinux = false
 #endif
 
-#if os(Windows)
-  private let runningOnWindows = true
-#else
-  private let runningOnWindows = false
-#endif
-
-/// Windows plan, Stage 6 item 3: the Windows terminal controller reads
-/// console input records only, so a pipe-backed `InputReader` yields no bytes
-/// and its event stream never finishes — a drain-to-EOF wait wedges the
-/// serial lane. Windows input-path coverage lives in
-/// `WindowsInputRecordPumpTests`, which drives the real record pump.
-private let pipeBackedInputReaderUnsupportedOnWindows: Comment =
-  "the Windows controller reads console records only: a pipe-backed InputReader never delivers"
-
 @MainActor
 @Suite
 struct InteractiveRuntimeTests {
@@ -436,8 +422,7 @@ struct InteractiveRuntimeTests {
   }
 
   @Test(
-    "input reader drains nonblocking pointer bursts across multiple reads",
-    .disabled(if: runningOnWindows, pipeBackedInputReaderUnsupportedOnWindows)
+    "input reader drains nonblocking pointer bursts across multiple reads"
   )
   func inputReaderDrainsPointerBurstsAcrossMultipleReads() async throws {
     var descriptors: [Int32] = [0, 0]
@@ -492,8 +477,7 @@ struct InteractiveRuntimeTests {
   }
 
   @Test(
-    "input reader coalesces staggered pointer bursts before yielding",
-    .disabled(if: runningOnWindows, pipeBackedInputReaderUnsupportedOnWindows)
+    "input reader coalesces staggered pointer bursts before yielding"
   )
   func inputReaderCoalescesStaggeredPointerBursts() async throws {
     var descriptors: [Int32] = [0, 0]
@@ -3222,8 +3206,7 @@ struct InteractiveRuntimeTests {
   /// invalidation gates without the mask.
   @MainActor
   @Test(
-    "a second pointer scroll after settling still updates a WindowGroup-hosted scroll pane",
-    .disabled(if: runningOnWindows, pipeBackedInputReaderUnsupportedOnWindows)
+    "a second pointer scroll after settling still updates a WindowGroup-hosted scroll pane"
   )
   func secondPointerScrollAfterSettleUpdatesWindowGroupHostedScrollPane() async throws {
     var descriptors: [Int32] = [0, 0]
@@ -3500,8 +3483,7 @@ struct InteractiveRuntimeTests {
   /// scroll routes flicker away, silently dropping scroll input.
   @MainActor
   @Test(
-    "animation frames keep a TabView-hosted pane's surface stable",
-    .disabled(if: runningOnWindows, pipeBackedInputReaderUnsupportedOnWindows)
+    "animation frames keep a TabView-hosted pane's surface stable"
   )
   func animationFramesKeepTabHostedPaneSurfaceStable() async throws {
     var descriptors: [Int32] = [0, 0]
@@ -3568,8 +3550,7 @@ struct InteractiveRuntimeTests {
   }
 
   @Test(
-    "real InputReader scroll bursts update the visible gallery pane before any follow-up click",
-    .disabled(if: runningOnWindows, pipeBackedInputReaderUnsupportedOnWindows)
+    "real InputReader scroll bursts update the visible gallery pane before any follow-up click"
   )
   func realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick() async throws {
     var descriptors: [Int32] = [0, 0]
@@ -3996,8 +3977,7 @@ struct InteractiveRuntimeTests {
   /// re-resolve below the root, on the stored-context selective path.
   @MainActor
   @Test(
-    "ScrollViewReader proxy commands survive strip-click tab entry",
-    .disabled(if: runningOnWindows, pipeBackedInputReaderUnsupportedOnWindows)
+    "ScrollViewReader proxy commands survive strip-click tab entry"
   )
   func scrollViewReaderProxyCommandsSurviveStripClickTabEntry() async throws {
     var descriptors: [Int32] = [0, 0]
@@ -4221,8 +4201,7 @@ struct InteractiveRuntimeTests {
   /// would false-red on unrelated suites' deliberate oracle violations.
   @MainActor
   @Test(
-    "navigation push after strip-click tab entry leaves no teardown-coherence strand",
-    .disabled(if: runningOnWindows, pipeBackedInputReaderUnsupportedOnWindows)
+    "navigation push after strip-click tab entry leaves no teardown-coherence strand"
   )
   func navigationPushAfterStripClickTabEntryLeavesNoStrand() async throws {
     var descriptors: [Int32] = [0, 0]

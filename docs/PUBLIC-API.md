@@ -1,5 +1,13 @@
 # Public API
 
+`SignalReader` accepts the framework-owned `TerminalSignal` value from
+`SwiftTUIPlatformIO`. Signal names and native POSIX numbers are unchanged.
+`SwiftTUIVendorUnixSignals.UnixSignal` remains a re-exported compatibility
+alias to that same value, including for explicitly typed arrays. Consumers
+need no conversion; the public reader signature no longer depends on a
+vendored type identity. This source compatibility does not promise binary
+ABI compatibility for precompiled Swift modules.
+
 This document defines the shape of SwiftTUI's public surface. It identifies the
 canonical app-facing API, package-only API, removed API, and policies for
 consistent new API.

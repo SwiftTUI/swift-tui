@@ -405,7 +405,8 @@ let package = Package(
     .target(
       name: "SwiftTUIVendorUnixSignals",
       dependencies: [
-        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
+        "SwiftTUIPlatformIO",
+        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
       ],
       path: "Vendor/UnixSignals/Sources/UnixSignals",
       swiftSettings: swiftSettings()

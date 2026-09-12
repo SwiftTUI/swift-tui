@@ -197,7 +197,10 @@ contains no nested Swift packages.
   portable launch half) with `SwiftTUICLIAttach` (the POSIX-only attach
   subsystem: PTYs, Unix sockets, instance discovery) behind a
   platform-conditional edge, re-exported together by the `SwiftTUICLI`
-  compatibility facade over the `SwiftTUIPlatformIO` syscall facade;
+  compatibility facade over the `SwiftTUIPlatformIO` syscall facade and
+  framework-owned `TerminalSignal` value. The vendored signal implementation
+  depends on this leaf value; its `UnixSignal` spelling is a compatibility
+  alias, so existing typed signal arrays still work with `SignalReader`;
   `SwiftTUIWASI` (`WASIRunner`), `SwiftTUIWebHost` (`WebHostRunner`),
   `SwiftTUIWebHostCLI` (`WebHostCLIRunner`), `SwiftTUIAndroidHost`, and
   `SwiftTUIArguments` (argument parsing and `RuntimeConfiguration` flags).

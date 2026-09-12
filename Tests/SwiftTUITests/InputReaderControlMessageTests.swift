@@ -18,6 +18,39 @@
   @MainActor
   @Suite
   struct InputReaderControlMessageTests {
+    #if os(Linux)
+      @Test("STUI-73: PTY bytes preceding EIO reach both input streams", arguments: [false, true])
+      func ptyFinalBytesBeforeReadFailure(terminalEvents: Bool) async throws {
+        func makeClosedSlave() throws -> Int32 {
+          var master: Int32 = -1
+          var slave: Int32 = -1
+          try #require(unsafe openpty(&master, &slave, nil, nil, nil) == 0)
+          let flags = fcntl(master, F_GETFL)
+          try #require(fcntl(master, F_SETFL, flags | O_NONBLOCK) == 0)
+          try writeAllBytes(Array("qr".utf8), to: slave)
+          _ = close(slave)
+          return master
+        }
+        let probe = try makeClosedSlave()
+        let drained = drainAvailableTerminalInput(from: probe, maxBytesPerRead: 256)
+        _ = close(probe)
+        #expect(drained.bytes == Array("qr".utf8))
+        #expect(drained.failureErrno == EIO)
+
+        let descriptor = try makeClosedSlave()
+        defer { _ = close(descriptor) }
+        let reader = InputReader(fileDescriptor: descriptor)
+        var received: [InputEvent] = []
+        if terminalEvents {
+          for await event in reader.inputEvents() { received.append(event) }
+        } else {
+          for await key in reader.events() { received.append(.key(key)) }
+        }
+        #expect(received == [.key(.character("q")), .key(.character("r"))])
+        #expect(reader.liveReadSourceCount == 0)
+      }
+    #endif
+
     @Test("T260: a live input decoder refreshes coordinate mode without losing buffered bytes")
     func liveMouseModeRefresh() async throws {
       var descriptors: [Int32] = [0, 0]

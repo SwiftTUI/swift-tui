@@ -4,6 +4,7 @@
 
   @_spi(Runners) import SwiftTUI
   @_spi(Runners) import SwiftTUIRuntime
+  import SwiftTUIPlatformIO
   import Synchronization
   import Testing
 
@@ -22,6 +23,17 @@
   @Suite
   @MainActor
   struct SignalReaderArmingTests {
+    @Test("STUI-453: framework signals preserve legacy typed-array compatibility")
+    func frameworkOwnedSignalCompatibility() {
+      let legacySignals: [UnixSignal] = [.sigint, .sigterm, .sigwinch]
+      let ownedSignals: [TerminalSignal] = legacySignals
+      #expect(ownedSignals.map(\.rawValue) == [SIGINT, SIGTERM, SIGWINCH])
+      #expect(ownedSignals.map(\.description) == ["SIGINT", "SIGTERM", "SIGWINCH"])
+      #expect(String(reflecting: UnixSignal.self) == "SwiftTUIPlatformIO.TerminalSignal")
+      _ = SignalReader(signals: legacySignals)
+      _ = SignalReader(signals: ownedSignals)
+    }
+
     #if canImport(SwiftTUIVendorUnixSignals) && canImport(Darwin)
       /// A signal delivered after arming but before the run loop starts
       /// consuming events must be buffered, not dropped: arming registers the

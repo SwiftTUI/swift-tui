@@ -6,6 +6,10 @@ public enum TerminalControlMessage: Equatable, Sendable {
 package struct ControlMessageParser {
   private static let introducer: UInt8 = 0x1E
   private var bufferedCommand: [UInt8]? = nil
+  private var isPasting = false
+  private var pasteBoundaryOffset = 0
+  private static let pasteStart: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
+  private static let pasteEnd: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
 
   package init() {}
 
@@ -31,12 +35,25 @@ package struct ControlMessageParser {
         continue
       }
 
-      if byte == Self.introducer {
+      if !isPasting, byte == Self.introducer {
         bufferedCommand = []
         continue
       }
 
       payload.append(byte)
+      // Bracketed paste is an opaque payload even on an armed transport.
+      // Match on the bytes we forward, retaining partial delimiters across
+      // reads; a nested paste start inside the payload has no special role.
+      let boundary = isPasting ? Self.pasteEnd : Self.pasteStart
+      if byte == boundary[pasteBoundaryOffset] {
+        pasteBoundaryOffset += 1
+        if pasteBoundaryOffset == boundary.count {
+          isPasting.toggle()
+          pasteBoundaryOffset = 0
+        }
+      } else {
+        pasteBoundaryOffset = byte == boundary[0] ? 1 : 0
+      }
     }
 
     return (payload, messages)

@@ -35,7 +35,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIPrimitives` | 169 | 1474 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
-| `SwiftTUIPlatformIO` | 0 | 0 |
+| `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
 
 ## SwiftTUI
@@ -954,6 +954,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 > `SwiftTUIPlatformIO` is not shipped as a library product. Symbols here
 > are package-internal but carry `public` access for re-export through
 > other targets.
+
+### Canonical surface (1)
+
+- `TerminalSignal` — struct — 18 members
 
 ## SwiftTUITestSupport
 

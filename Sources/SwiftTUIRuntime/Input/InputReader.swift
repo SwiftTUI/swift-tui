@@ -13,6 +13,9 @@ public final class InputReader: InputReading, TerminalInputReading,
   private let mouseCoordinateMode: Mutex<MouseCoordinateMode>
   private let controlHandler: @Sendable (TerminalControlMessage) -> Void
   private let controlChannelEnabled: Bool
+  #if canImport(WASILibc) || canImport(ucrt)
+    private let pollGate = TerminalInputPollGate()
+  #endif
 
   #if !canImport(WASILibc) && !canImport(ucrt)
     /// Live dispatch read-sources, registered so ``withInputSuspended(_:)``
@@ -133,6 +136,7 @@ public final class InputReader: InputReading, TerminalInputReading,
 extension InputReader {
   #if canImport(WASILibc)
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
+      let pollGate = self.pollGate
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
       let controlChannelEnabled = self.controlChannelEnabled
@@ -171,7 +175,15 @@ extension InputReader {
         var backoff = InputPollBackoff()
 
         while !Task.isCancelled {
-          switch readTerminalInputChunk(from: fileDescriptor, maxBytes: 512) {
+          guard
+            let result = pollGate.read({
+              readTerminalInputChunk(from: fileDescriptor, maxBytes: 512)
+            })
+          else {
+            try? await Task.sleep(nanoseconds: 2_000_000)
+            continue
+          }
+          switch result {
           case .bytes(let chunk):
             backoff.recordInput()
             let decoded = decoder.decode(chunk)
@@ -218,6 +230,7 @@ extension InputReader {
       transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event],
       flushTransform: @escaping @Sendable (inout TerminalInputParser) -> [Event]
     ) -> AsyncStream<Event> {
+      let pollGate = self.pollGate
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
       let controlChannelEnabled = self.controlChannelEnabled
@@ -242,7 +255,15 @@ extension InputReader {
         var backoff = InputPollBackoff()
 
         while !Task.isCancelled {
-          switch readTerminalInputChunk(from: fileDescriptor, maxBytes: 512) {
+          guard
+            let result = pollGate.read({
+              readTerminalInputChunk(from: fileDescriptor, maxBytes: 512)
+            })
+          else {
+            try? await Task.sleep(nanoseconds: 2_000_000)
+            continue
+          }
+          switch result {
           case .bytes(let chunk):
             backoff.recordInput()
             let decoded = decoder.decode(chunk)
@@ -274,6 +295,7 @@ extension InputReader {
     }
   #elseif canImport(ucrt)
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
+      let pollGate = self.pollGate
       let controller = self.windowsController
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
@@ -313,14 +335,16 @@ extension InputReader {
         var backoff = InputPollBackoff()
 
         while !Task.isCancelled {
-          if controller.suspensionDepth.withLock({ $0 > 0 }) {
+          guard
+            let result = pollGate.read({
+              Self.readWindowsInput(controller: controller, fileDescriptor: fileDescriptor)
+            })
+          else {
             try? await Task.sleep(nanoseconds: 2_000_000)
             continue
           }
-          let chunk =
-            (try? controller.read(
-              from: fileDescriptor, maxBytes: 512, timeoutMilliseconds: 0)) ?? []
-          if !chunk.isEmpty {
+          switch result {
+          case .bytes(let chunk):
             backoff.recordInput()
             let decoded = decoder.decode(chunk)
 
@@ -339,6 +363,13 @@ extension InputReader {
               }
             }
             continue
+          case .endOfFile, .failure:
+            flushPendingMouseEvents()
+            for event in decoder.flushEscape() { continuation.yield(event) }
+            continuation.finish()
+            return
+          case .wouldBlock:
+            break
           }
           // Console input has no EOF: an empty poll is idle (or a spurious
           // wakeup after a filtered record run), never end-of-stream.
@@ -358,6 +389,7 @@ extension InputReader {
       transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event],
       flushTransform: @escaping @Sendable (inout TerminalInputParser) -> [Event]
     ) -> AsyncStream<Event> {
+      let pollGate = self.pollGate
       let controller = self.windowsController
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
@@ -383,14 +415,16 @@ extension InputReader {
         var backoff = InputPollBackoff()
 
         while !Task.isCancelled {
-          if controller.suspensionDepth.withLock({ $0 > 0 }) {
+          guard
+            let result = pollGate.read({
+              Self.readWindowsInput(controller: controller, fileDescriptor: fileDescriptor)
+            })
+          else {
             try? await Task.sleep(nanoseconds: 2_000_000)
             continue
           }
-          let chunk =
-            (try? controller.read(
-              from: fileDescriptor, maxBytes: 512, timeoutMilliseconds: 0)) ?? []
-          if !chunk.isEmpty {
+          switch result {
+          case .bytes(let chunk):
             backoff.recordInput()
             let decoded = decoder.decode(chunk)
 
@@ -403,6 +437,12 @@ extension InputReader {
             }
             await Task.yield()
             continue
+          case .endOfFile, .failure:
+            for event in decoder.flushEscape() { continuation.yield(event) }
+            continuation.finish()
+            return
+          case .wouldBlock:
+            break
           }
           for event in decoder.flushEscape() {
             continuation.yield(event)
@@ -411,6 +451,18 @@ extension InputReader {
           backoff.recordIdlePoll()
         }
       }
+    }
+    private static func readWindowsInput(
+      controller: WindowsTerminalController,
+      fileDescriptor: Int32
+    ) -> TerminalInputReadResult {
+      guard controller.isATTY(fileDescriptor) else {
+        return readWindowsRedirectedInputChunk(from: fileDescriptor, maxBytes: 512)
+      }
+      let bytes =
+        (try? controller.read(
+          from: fileDescriptor, maxBytes: 512, timeoutMilliseconds: 0)) ?? []
+      return bytes.isEmpty ? .wouldBlock : .bytes(bytes)
     }
   #else
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
@@ -510,13 +562,6 @@ extension InputReader {
             from: fileDescriptor,
             maxBytesPerRead: 256
           )
-          if drainResult.failureErrno != nil {
-            scheduledEscapeFlush?.cancel()
-            scheduledEscapeFlush = nil
-            source.cancel()
-            return
-          }
-
           if !drainResult.bytes.isEmpty {
             let decoded = decoder.decode(drainResult.bytes)
             for message in decoded.controlMessages {
@@ -619,13 +664,6 @@ extension InputReader {
             from: fileDescriptor,
             maxBytesPerRead: 256
           )
-          if drainResult.failureErrno != nil {
-            scheduledEscapeFlush?.cancel()
-            scheduledEscapeFlush = nil
-            source.cancel()
-            return
-          }
-
           if !drainResult.bytes.isEmpty {
             let decoded = decoder.decode(drainResult.bytes)
             for message in decoded.controlMessages {
@@ -667,11 +705,9 @@ extension InputReader: TerminalInputHandoffSuspending {
   /// drain can still consume the probe's reply, runs `body`, then resumes.
   /// Called from the main-actor capability probe; not reentrant.
   package func withInputSuspended<T>(_ body: () throws -> T) rethrows -> T {
-    #if canImport(WASILibc)
-      return try body()
-    #elseif canImport(ucrt)
-      windowsController.suspensionDepth.withLock { $0 += 1 }
-      defer { windowsController.suspensionDepth.withLock { $0 -= 1 } }
+    #if canImport(WASILibc) || canImport(ucrt)
+      pollGate.suspend()
+      defer { pollGate.resume() }
       return try body()
     #else
       let entries = suspendableSources.withLockUnchecked { registry in
@@ -698,11 +734,9 @@ extension InputReader: TerminalInputHandoffSuspending {
   package func withInputSuspended<T: Sendable>(
     _ body: @MainActor @Sendable () async throws -> T
   ) async rethrows -> T {
-    #if canImport(WASILibc)
-      return try await body()
-    #elseif canImport(ucrt)
-      windowsController.suspensionDepth.withLock { $0 += 1 }
-      defer { windowsController.suspensionDepth.withLock { $0 -= 1 } }
+    #if canImport(WASILibc) || canImport(ucrt)
+      pollGate.suspend()
+      defer { pollGate.resume() }
       return try await body()
     #else
       let entries = suspendableSources.withLockUnchecked { registry in

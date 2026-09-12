@@ -47,9 +47,11 @@ finish after its terminal session shuts down. In that case, the action throws
 `TerminalHandoffError.unavailable`. It does not re-enter raw mode or the
 alternate screen.
 
-The WASI ANSI runner currently reports `TerminalHandoffError.unavailable`.
-Its detached stdin poller cannot yet acknowledge a pause, so the runtime fails
-closed instead of letting SwiftTUI and the external operation race for input.
+The WASI ANSI runner suspends its stdin poller through the same acknowledged
+read barrier used for Windows polling input. Suspension waits for an in-flight
+read to finish before the operation begins. The host must provide the external
+operation; this API does not add subprocess support to WASI. Surface-only hosts
+without terminal mode control continue to report `TerminalHandoffError.unavailable`.
 
 ## Model-Owned Dependencies
 

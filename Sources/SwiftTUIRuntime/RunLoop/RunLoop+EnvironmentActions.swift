@@ -108,8 +108,7 @@ extension RunLoop {
   package func performTerminalHandoff(
     _ operation: @escaping @MainActor @Sendable () async throws -> Void
   ) async throws {
-    guard terminalHandoffPlatformSupportsExclusiveInputOwnership,
-      runtimeConfiguration.output == .tui,
+    guard runtimeConfiguration.output == .tui,
       let terminalSurface = presentationSurface as? any TerminalCommandPresentationSurface,
       let inputSuspender = terminalInputReader as? any TerminalInputHandoffSuspending,
       let sessionGeneration = activeTerminalHandoffSessionGeneration
@@ -240,18 +239,4 @@ extension RunLoop {
       terminalRenderPassWaiters.append(continuation)
     }
   }
-}
-
-/// Whether this platform can stop SwiftTUI's input consumer before a handoff.
-///
-/// WASI's ANSI runner currently reads stdin from a detached polling task. Its
-/// cooperative I/O has no pause-and-ack primitive, so allowing a handoff would
-/// let SwiftTUI race the external operation for the same bytes. Fail closed
-/// until that runner can prove exclusive input ownership.
-package var terminalHandoffPlatformSupportsExclusiveInputOwnership: Bool {
-  #if canImport(WASILibc)
-    false
-  #else
-    true
-  #endif
 }

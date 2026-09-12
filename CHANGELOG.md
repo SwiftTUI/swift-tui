@@ -8,6 +8,23 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve terminal bytes drained before a POSIX read failure, including Linux
+  PTY shutdown, and preserve record separators inside bracketed paste.
+- Deliver redirected UTF-8 input and EOF on Windows while keeping idle pipes
+  cancellable and console input record-based.
+- Acknowledge polling input suspension before terminal handoffs on WASI and
+  Windows, and resume input after the external operation completes.
+
+### Changed
+
+- `SignalReader` now names the framework-owned `TerminalSignal` value in its
+  public API. Existing `UnixSignal` arrays remain source-compatible through
+  the vendored module's alias. Signal names and native numbers are unchanged.
+- Clarify that `WebHostCLIRunner` installs web support for custom launch code;
+  a bare rename to the portable launcher does not perform that installation.
+
 ## [0.13.1] - 2026-09-12
 
 ### Added
