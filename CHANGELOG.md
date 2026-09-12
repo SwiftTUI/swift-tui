@@ -8,12 +8,19 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-09-12
+
 ### Added
 
 - Focus-scoped `onMoveCommand` and `onExitCommand` handlers with explicit
   consumption and bubbling through `KeyPressResult`.
 
 ### Fixed
+
+- Preserve authored accessible names when controls apply built-in styles.
+- Route nested scroll-wheel input to the appropriate scroll container.
+- Preserve authored reference state while tabs are dormant, and certify state
+  and observation reads before reusing memoized Equatable subtrees.
 
 - Preserve stacked key handlers on the first Equatable-boundary frame, and
   retain explicit focus changes made by pointer release actions.
@@ -49,6 +56,12 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   control overflow is reported instead of silently evicting older records.
 
 ### Changed
+
+- Window compositional lazy-stack content with source-qualified identity and
+  fragment-aware default spacing, including multiple authored sources.
+- Resolve authored view trees through explicit continuations while preserving
+  direct control ownership and bounded iterative cadence.
+- Add opt-in retained-cache validation work counters for performance diagnosis.
 
 - Classify framework environment keys through explicit ownership and reader
   certification markers instead of reflected names.
@@ -1860,7 +1873,7 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.1...HEAD
 [0.12.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.1
 [0.12.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.0
 [0.11.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.3
@@ -1874,3 +1887,5 @@ See the GitHub releases for the full per-tag history:
 [0.0.18]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.0.18
 
 [0.13.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.0
+
+[0.13.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.1
