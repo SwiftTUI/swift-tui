@@ -524,18 +524,16 @@ run_non_runtime_test_targets() {
     --skip '^SwiftTUIWebHostTests\.'
 }
 
-# The per-tick cadence suite re-runs under the WASI-shaped mode profiles so
-# the browser regime (stack-lean resolve, chunked depth-capped resolve) keeps
-# native coverage: the 0.1.9 frame-coalescing incident only reproduced with
-# those profiles active. `SWIFTTUI_RESOLVE_DEPTH_LIMIT=6` is the WASI
-# stack-lean default depth cap (DeferredResolveDriver.stackLeanDefaultDepthLimit).
+# The per-tick cadence suite re-runs under the WASI-shaped mode profiles and
+# with the iterative-descent assertion. Profile-dependent cadence and internal
+# child paths that accidentally start a nested synchronous drain keep native coverage.
 run_per_tick_cadence_lean_lane() {
   SWIFTTUI_STACK_LEAN_PROFILE=1 run_swift test \
     --filter SwiftTUITests.PerTickPresentCadenceTests
 }
 
-run_per_tick_cadence_depth_limit_lane() {
-  SWIFTTUI_RESOLVE_DEPTH_LIMIT=6 run_swift test \
+run_per_tick_cadence_iterative_lane() {
+  SWIFTTUI_ASSERT_ITERATIVE_RESOLVE=1 run_swift test \
     --filter SwiftTUITests.PerTickPresentCadenceTests
 }
 
@@ -961,9 +959,9 @@ if lane_runs_core; then
     run_per_tick_cadence_lean_lane
 
   run_function_step \
-    "Run SwiftTUI per-tick present cadence tests (chunked resolve driver)" \
-    "SWIFTTUI_RESOLVE_DEPTH_LIMIT=6 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
-    run_per_tick_cadence_depth_limit_lane
+    "Run SwiftTUI per-tick present cadence tests (iterative resolve assertion)" \
+    "SWIFTTUI_ASSERT_ITERATIVE_RESOLVE=1 $(swift_command_text test --filter SwiftTUITests.PerTickPresentCadenceTests)" \
+    run_per_tick_cadence_iterative_lane
 
   run_function_step \
     "Run SwiftTUI per-tick present cadence tests (stack-lean + retained reuse)" \

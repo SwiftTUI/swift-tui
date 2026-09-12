@@ -340,7 +340,8 @@ private struct ProducerPublicationFixture: PrimitiveView, IterativeResolvableVie
     // Register the sibling action on the consumer itself. Its stable label
     // keeps clean style-subtree reuse independent from action publication.
     return Button("host action") { ledger.activations.append("host=\(generation)") }
-      .resolveWork(in: context.child(component: .named("host"))).flatMap { host in
+      .makeResolveWork(in: context.child(component: .named("host"))).flatMap { hostElements in
+        let host = hostElements[0]
         return VStack(alignment: .leading, spacing: 0) {
           ForEach(0..<1, id: \.self) { _ in
             let value = model.value
