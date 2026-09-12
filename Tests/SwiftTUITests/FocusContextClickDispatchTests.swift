@@ -14,6 +14,16 @@ import Testing
 @Suite("FocusContextClickDispatch", .serialized)
 @MainActor
 struct FocusContextClickDispatchTests {
+  @Test("Click restoration preserves the release action's authored focus")
+  func clickRestorePreservesAuthoredFocus() async throws {
+    let harness = try ClickDispatchHarness(movesFocus: true)
+    try await harness.click(ClickDispatchIDs.secondTitle)
+    #expect(harness.focusedIdentity == ClickDispatchIDs.secondTitle)
+    try await harness.click(ClickDispatchIDs.review)
+    #expect(harness.focusedIdentity == ClickDispatchIDs.third)
+    #expect(harness.surfaceText.contains("Authored focus: third"))
+  }
+
   @Test("Clicking the review button mutates the field that was focused, not the first field")
   func clickReviewButtonMutatesTheFocusedField() async throws {
     let harness = try ClickDispatchHarness()
@@ -71,7 +81,7 @@ private final class ClickDispatchHarness {
   private let scheduler: FrameScheduler
   private var renderedFrames = 0
 
-  init() throws {
+  init(movesFocus: Bool = false) throws {
     let terminalSize = CellSize(width: 72, height: 22)
     let terminal = RecordingPresentationSurface(surfaceSize: terminalSize)
     let rootIdentity = testIdentity("FocusContextClickRoot")
@@ -90,7 +100,7 @@ private final class ClickDispatchHarness {
       focusTracker: focusTracker,
       environmentValues: environmentValues,
       proposal: .init(width: terminalSize.width, height: terminalSize.height),
-      viewBuilder: { _, _ in GalleryLikeClickRoot() }
+      viewBuilder: { _, _ in GalleryLikeClickRoot(movesFocus: movesFocus) }
     )
     focusTracker.invalidator = runLoop.scheduler
     self.terminal = terminal
@@ -148,6 +158,7 @@ private final class ClickDispatchHarness {
 private enum ClickDispatchIDs {
   static let firstTitle = testIdentity("ClickDispatchFirstTitle")
   static let secondTitle = testIdentity("ClickDispatchSecondTitle")
+  static let third = testIdentity("ClickDispatchThird")
   static let review = testIdentity("ClickDispatchReview")
 }
 
@@ -166,6 +177,8 @@ extension FocusedValues {
 // panel + bottom toolbar inside the gallery's own toolbar scope: the nesting
 // must not perturb focused-value dispatch either.
 private struct GalleryLikeClickTab: View {
+  var movesFocus = false
+  @FocusState private var focus: Identity?
   @State private var firstTitle = "Coverage matrix"
   @State private var secondTitle = "Focused test lane"
   @FocusedBinding(\.clickDispatchTitle) private var focusedTitle
@@ -178,8 +191,17 @@ private struct GalleryLikeClickTab: View {
         .focusedValue(\.clickDispatchTitle, $firstTitle)
       TextField("Second title", text: $secondTitle)
         .id(ClickDispatchIDs.secondTitle)
+        .focused($focus, equals: ClickDispatchIDs.secondTitle)
         .focusedValue(\.clickDispatchTitle, $secondTitle)
+      Button("Third control") {}
+        .id(ClickDispatchIDs.third)
+        .focused($focus, equals: ClickDispatchIDs.third)
+      Text("Authored focus: \(focus == ClickDispatchIDs.third ? "third" : "other")")
       Button("Mark focused reviewed") {
+        if movesFocus {
+          focus = ClickDispatchIDs.third
+          return
+        }
         guard let binding = $focusedTitle else { return }
         binding.wrappedValue = "\(binding.wrappedValue) reviewed"
       }
@@ -196,12 +218,13 @@ private struct GalleryLikeClickTab: View {
 }
 
 private struct GalleryLikeClickRoot: View {
+  var movesFocus = false
   @State private var selection = "focus"
 
   var body: some View {
     TabView(selection: $selection) {
       Tab("Focus Context", value: "focus") {
-        GalleryLikeClickTab()
+        GalleryLikeClickTab(movesFocus: movesFocus)
       }
       Tab("Other", value: "other") {
         Text("Other content")

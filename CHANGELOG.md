@@ -10,6 +10,10 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- Preserve stacked key handlers on the first Equatable-boundary frame, and
+  retain explicit focus changes made by pointer release actions.
+- Remember every dismissed bindingless tip for its anchor lifetime, and retain
+  parent modal suppression when an inner control is already disabled.
 - Preserve both task operations when chained modifiers collapse onto one
   owner, including independent ID replacement and cancellation on removal.
 - Keep retained ForEach row bindings current for mutable reference-backed IDs.

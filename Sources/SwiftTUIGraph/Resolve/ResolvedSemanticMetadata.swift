@@ -509,10 +509,10 @@ private func mergedInteractionAvailability(
   _ next: InteractionAvailability
 ) -> InteractionAvailability {
   switch (current, next) {
-  case (.disabled, _):
-    current
   case (_, .disabled):
     next
+  case (.disabled, _):
+    current
   case (.enabled, .enabled):
     .enabled
   }

@@ -209,7 +209,8 @@ extension RunLoop {
     let shouldApplyDefaultFocus =
       focusTracker.currentFocusIdentity == nil && !focusTracker.isPreservingNoFocus
       || (nextModalFocusScopePath != nil && nextModalFocusScopePath != previousModalFocusScopePath)
-    let hadFocusBeforeRegionUpdate = focusTracker.currentFocusIdentity != nil
+    let focusIdentityBeforeRegionUpdate = focusTracker.currentFocusIdentity
+    let hadFocusBeforeRegionUpdate = focusIdentityBeforeRegionUpdate != nil
     var focusChanged = focusTracker.updateRegions(
       renderedArtifacts.semanticSnapshot.focusRegions)
     // A traversal's landing region vanished before any further input: the
@@ -250,7 +251,10 @@ extension RunLoop {
       })
     {
       pendingClickFocusRestore = nil
-      if renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
+      // A release action may already have moved focus to another control on
+      // the preceding eager pass. Only restore a still-landed click target.
+      if focusIdentityBeforeRegionUpdate == pending.landedIdentity,
+        renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
         $0.identity == pending.originIdentity
       }) {
         focusChanged = focusTracker.setFocus(to: pending.originIdentity) || focusChanged

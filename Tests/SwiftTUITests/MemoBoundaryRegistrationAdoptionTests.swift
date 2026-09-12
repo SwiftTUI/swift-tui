@@ -22,6 +22,29 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct MemoBoundaryRegistrationAdoptionTests {
+  @Test("cold Equatable boundary publishes inner and outer key handlers")
+  func stackedKeysAtBoundaryRootSurvivePublication() throws {
+    let events = MemoBoundaryEventLog()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("MemoBoundaryKeys"), size: .init(width: 48, height: 8)
+    ) {
+      VStack {
+        MemoBoundaryKeyChild(events: events).equatable()
+          .onKeyPress(.character("x")) { _ in
+            events.value.append("outer")
+            return .ignored
+          }
+      }
+    }
+    defer { harness.shutdown() }
+    _ = try harness.pressKey(KeyPress(.character("x")))
+    #expect(events.value == ["outer", "inner"])
+    events.value = []
+    _ = try harness.renderAfterExternalMutation()
+    _ = try harness.pressKey(KeyPress(.character("x")))
+    #expect(events.value == ["outer", "inner"])
+  }
+
   @Test("a gesture at an Equatable boundary's body root survives publication")
   func gestureAtBoundaryRootSurvivesPublication() throws {
     let events = MemoBoundaryEventLog()
@@ -58,6 +81,18 @@ struct MemoBoundaryRegistrationAdoptionTests {
     #expect(harness.gestureRecognizerCount == 1)
     _ = try harness.clickText("boundary gesture target")
     #expect(events.value == ["boundary-high"])
+  }
+}
+
+private struct MemoBoundaryKeyChild: View, Equatable {
+  let events: MemoBoundaryEventLog
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.events === rhs.events }
+  var body: some View {
+    Text("key target").focusable()
+      .onKeyPress(.character("x")) { _ in
+        events.value.append("inner")
+        return .handled
+      }
   }
 }
 

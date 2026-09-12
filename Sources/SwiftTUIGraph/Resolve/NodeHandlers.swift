@@ -94,7 +94,10 @@ package struct ContributedHandlerNodeRecord<Handler>: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: Self) {
-    handlers.merge(departing.handlers, uniquingKeysWith: mergeKeepingCurrent)
+    // The departing boundary's inner handlers precede the adopter's outer
+    // handlers. Dispatch reverses this stack, allowing outer handlers to
+    // decline a key without losing the inner handler on the cold frame.
+    handlers.merge(departing.handlers) { current, adopted in adopted + current }
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
     ordinals.merge(departing.ordinals, uniquingKeysWith: mergeKeepingCurrent)
   }

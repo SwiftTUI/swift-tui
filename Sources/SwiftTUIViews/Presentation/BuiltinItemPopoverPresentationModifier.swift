@@ -74,7 +74,7 @@ package struct BuiltinItemPopoverPresentationModifier<
 }
 
 package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifier {
-  @State private var dismissedTipID: String?
+  @State private var dismissedTipIDs: Set<Tip.ID> = []
 
   package var tip: Tip?
   package var isPresented: Binding<Bool>?
@@ -101,7 +101,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
     // `content.resolve(in: context)` return would flip the resolved kind at
     // this identity ("Presentation" ↔ the content's own kind) whenever
     // `tip`/eligibility churns, tearing down the subtree — including the
-    // `@State` slot holding `dismissedTipID`, which must survive
+    // `@State` slot holding `dismissedTipIDs`, which must survive
     // `tip == nil` round trips so a dismissed tip stays suppressed when the
     // same tip ID returns.
     let tip = tip
@@ -109,7 +109,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
     let tipID: String
     if let tip, tip.isEligible {
       tipID = String(reflecting: tip.id)
-      suppressed = isPresented == nil && dismissedTipID == tipID
+      suppressed = isPresented == nil && dismissedTipIDs.contains(tip.id)
     } else {
       tipID = ""
       suppressed = true
@@ -125,7 +125,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
       onDismiss,
       authoringContext: onDismissAuthoringContext
     )
-    let dismissedTipID = $dismissedTipID
+    let dismissedTipIDs = $dismissedTipIDs
     let dismissInvalidator = context.invalidationProxy?.invalidator
     let popoverStyle = context.environmentValues.popoverStyle
     let styleInputs = PortalStyleResolveInputs(context)
@@ -157,13 +157,13 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
       let dismiss: @MainActor @Sendable () -> Void = {
         [
           isPresented, dismissAuthoringContext, dismissInvalidator, triggerIdentity,
-          dismissedTipID, tipID
+          dismissedTipIDs, tip
         ] in
         withAuthoringContext(dismissAuthoringContext) {
           if let isPresented {
             isPresented.wrappedValue = false
           } else {
-            dismissedTipID.wrappedValue = tipID
+            dismissedTipIDs.wrappedValue.insert(tip.id)
           }
         }
         requestPresentationDismissReconcile(

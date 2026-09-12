@@ -1289,3 +1289,37 @@ private func popoverTipStressEntryIDs<Content: View>(
   harness.runLoop.renderer.debugRuntimeSubsystemSnapshot().presentationPortalState.overlayEntries
     .map(\.id)
 }
+
+// STUI-66: dismissal history belongs to the anchor lifetime, across distinct tips.
+extension FrameworkStressPopoverTipLifecycleTests {
+  @Test("bindingless tips remember multiple dismissals across nil round trips")
+  func distinctTipDismissalsStaySuppressed() throws {
+    let rootIdentity = testIdentity("DistinctTipDismissals")
+    let model = PopoverTipStressModel()
+    model.tipID = "A"
+    model.title = "Tip A"
+    model.message = nil
+    model.icon = nil
+    model.actions = [.init(id: "ack", title: "Dismiss tip")]
+    let harness = try makePopoverTipStressHarness(
+      rootIdentity: rootIdentity, model: model, bindingless: true)
+    defer { harness.shutdown() }
+    for id in ["A", "B", "C"] {
+      model.tipID = id
+      model.title = "Tip \(id)"
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(popoverTipStressEntryCount(in: harness) == 1)
+      _ = try harness.clickText("Dismiss tip", chooseLast: true)
+      #expect(popoverTipStressEntryCount(in: harness) == 0)
+    }
+    for id in ["A", "B", "C", "A"] {
+      model.hasTip = false
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      model.hasTip = true
+      model.tipID = id
+      model.title = "Tip \(id)"
+      _ = try refreshPopoverTipStressHarness(harness, rootIdentity: rootIdentity)
+      #expect(popoverTipStressEntryCount(in: harness) == 0)
+    }
+  }
+}
