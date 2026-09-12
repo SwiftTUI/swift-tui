@@ -271,7 +271,7 @@ extension DrawExtractor {
     var commands: [DrawCommand] = []
     if let metrics = resolvedScrollIndicatorMetrics(
       viewportRect: viewportBounds,
-      contentBounds: content.contentBounds,
+      contentBounds: content.contentBoundsForParent,
       axes: axes,
       axis: .vertical,
       reservesSpace: appearance?.reservesSpace ?? true,
@@ -289,7 +289,7 @@ extension DrawExtractor {
     }
     if let metrics = resolvedScrollIndicatorMetrics(
       viewportRect: viewportBounds,
-      contentBounds: content.contentBounds,
+      contentBounds: content.contentBoundsForParent,
       axes: axes,
       axis: .horizontal,
       reservesSpace: appearance?.reservesSpace ?? true,

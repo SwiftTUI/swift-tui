@@ -166,6 +166,11 @@ package struct PlacedNode: Equatable, Sendable {
     }
   }
   package var contentBounds: CellRect
+  /// A nested scroll owns its overflow; ancestors see its allocated viewport.
+  /// Its full content bounds remain available to its own routes and indicators.
+  package var contentBoundsForParent: CellRect {
+    semanticMetadata.scrollRole == nil ? contentBounds : bounds
+  }
   package var clipBounds: CellRect?
   package var zIndex: Double
   package var children: [PlacedNode] {

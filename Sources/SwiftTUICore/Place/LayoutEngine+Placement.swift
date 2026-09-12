@@ -42,13 +42,13 @@ extension LayoutEngine {
       // Publish the same content extent and viewport used by scroll layout.
       // Including the outer inset or indicator track in the viewport would
       // make wheel, key, and pointer clamping stop before the final cells.
-      node.contentBounds = content.contentBounds
+      node.contentBounds = content.contentBoundsForParent
       if let viewport = content.placementMetadata.parentScrollViewportRect {
         node.scrollViewportRect = viewport
       } else {
         let innerBounds = appearance.insetBounds(bounds)
         let insets = resolvedScrollIndicatorInsets(
-          viewportRect: innerBounds, contentBounds: content.contentBounds,
+          viewportRect: innerBounds, contentBounds: content.contentBoundsForParent,
           axes: resolved.drawMetadata.scrollIndicatorAxes ?? [],
           reservesSpace: appearance.reservesSpace)
         node.scrollViewportRect = .init(
@@ -158,7 +158,7 @@ extension LayoutEngine {
     children: [PlacedNode]
   ) -> CellRect {
     children.reduce(parentBounds) { partial, child in
-      union(partial, child.contentBounds)
+      union(partial, child.contentBoundsForParent)
     }
   }
 
@@ -217,7 +217,7 @@ extension LayoutEngine {
     case .offset(let x, let y):
       if let child = children.first {
         return translated(
-          child.contentBounds,
+          child.contentBoundsForParent,
           by: .init(x: -x, y: -y)
         )
       }

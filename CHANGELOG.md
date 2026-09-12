@@ -10,6 +10,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- Keep ancestor scroll extents stable when a nested scroll view moves its
+  content, so outer indicators and endpoint clamping use the viewport's size.
 - Preserve custom alignment guides in lazy stacks and safe-area insets, and
   align odd-sized custom-layout anchors with `ViewDimensions`.
 - Respect fixed-frame minimums and return unused custom-layout offers to
