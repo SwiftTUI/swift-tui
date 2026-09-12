@@ -180,14 +180,14 @@ private struct TabDormantRegistry {
 }
 
 /// Locator recipes are live-graph currency and must never enter a dormant
-/// archive. Keeping them in a distinct transient slot lets the value-only tab
+/// archive. Keeping them in a distinct transient slot lets the detached tab
 /// registry itself nest safely inside an enclosing tab's archive.
 private struct TabDormantLocatorState {
   var activeKey: TabDormantKey?
   var activeLocator: DormantStateArchiveLocator?
 }
 
-/// Reads value-only archive snapshots for the tab owners that emitted a
+/// Reads detached archive snapshots for the tab owners that emitted a
 /// departure request in this candidate. The completed-frame path calls this
 /// while the suspended committed graph is still materialized, before the
 /// prepared checkpoint replaces outgoing owners. Nothing is written here, so

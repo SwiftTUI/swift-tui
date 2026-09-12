@@ -298,15 +298,16 @@ identity under the declaring group. Graph's `Resolve/RetainedSubviewState.swift`
 retains persistent slots, including authored reference values, for omitted
 content. Runtime captures those slots before departure and publishes them only
 with an accepted commit. Runtime registrations and presentation hosts depart
-normally. Lazy tabs retain their separate value-only dormancy contract.
-Retained archives project into nested `DormantStateSlotSnapshot` records at
-that boundary; reference-valued archives still fail the recursive value audit.
+normally. Lazy tabs also retain authored model references, under the distinct
+owned-state provenance. Retained archives project into detached
+`DormantStateSlotSnapshot` records at that boundary; framework persistent
+slots retain the recursive value audit.
 
 `TabViews/TabSelectionState.swift` owns tab selection, tag-qualified strip focus,
 option churn and overflow slot operations. `TabDormancy.swift` owns archive
 transitions, payload generations, locator intake and commit refreshes. Both
 operate on the declaring graph node's slots, so checkpoints restore their state.
-The value-only registry and transient live-graph locator remain separate slots;
+The archive registry and transient live-graph locator remain separate slots;
 `TabView.swift` composes the active content and registers input handlers through
 these collaborators.
 

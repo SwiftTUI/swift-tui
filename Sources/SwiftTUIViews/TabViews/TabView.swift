@@ -58,6 +58,8 @@ extension TabView {
     )
     let optionsChurned = TabSelectionState.updateOptions(
       in: ownerNode, tags: options.map(\.tag), labels: options.map(\.label))
+    // Input handlers capture tags only. Capturing the option array also owns
+    // every deferred payload's authored State seeds through retained chrome.
     let orderedTags = options.map(\.tag)
     let selectedIndex =
       options.firstIndex { option in
@@ -175,7 +177,7 @@ extension TabView {
         identity: context.identity,
         handler: {
           keyPress in
-          guard !options.isEmpty else {
+          guard !orderedTags.isEmpty else {
             return false
           }
 
@@ -238,7 +240,7 @@ extension TabView {
               invalidationIdentity: context.identity
             )
             TabSelectionState.setStoredFocusedTabIndex(
-              max(0, options.count - 1),
+              max(0, orderedTags.count - 1),
               tags: orderedTags,
               in: ownerNode,
               invalidationIdentity: context.identity,
@@ -248,7 +250,7 @@ extension TabView {
                 selectedIndex: selectedIndex,
                 orderedTags: orderedTags,
                 presentation: stylePresentation,
-                nextStoredIndex: max(0, options.count - 1)
+                nextStoredIndex: max(0, orderedTags.count - 1)
               )
             )
             return true
@@ -479,7 +481,7 @@ extension TabView {
             in: ownerNode,
             invalidationIdentity: context.identity
           )
-          _ = setBoundSelection(binding, to: options[index].tag)
+          _ = setBoundSelection(binding, to: orderedTags[index])
           return .claimed
         case .up(.primary):
           return .claimed
@@ -542,7 +544,7 @@ extension TabView {
             in: ownerNode,
             invalidationIdentity: context.identity
           )
-          _ = setBoundSelection(binding, to: options[index].tag)
+          _ = setBoundSelection(binding, to: orderedTags[index])
           return .claimed
         case .up(.primary):
           return .claimed

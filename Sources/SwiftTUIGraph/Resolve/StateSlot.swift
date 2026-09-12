@@ -9,6 +9,10 @@
 package enum DormantStateSlotPolicy: Equatable, Sendable {
   case transient
   case persistent
+  /// Authored state owns its model references independently of live effects.
+  case owned
+
+  package var survivesDormancy: Bool { self != .transient }
 }
 
 /// Resolve-time provenance for a slot's first materialization. A slot keeps
@@ -32,15 +36,23 @@ package func withTransientDormantStateSlot<Result>(
   try DormantStateSlotPolicyScope.$current.withValue(.transient, operation: body)
 }
 
-/// Closure-free reconstruction payload for one persistent state slot. The
-/// stored value has already passed the recursive value-only audit below.
+@MainActor
+package func withOwnedDormantStateSlot<Result>(
+  _ body: () throws -> Result
+) rethrows -> Result {
+  try DormantStateSlotPolicyScope.$current.withValue(.owned, operation: body)
+}
+
+/// Detached state ownership, without the slot's comparator or live graph owner.
+/// Authored model references remain shared across archive/checkpoint copies;
+/// rollback restores ownership and slot replacement, not a model's internals.
 package struct DormantStateSlotSnapshot {
   fileprivate var value: Any
   fileprivate var valueType: Any.Type
+  fileprivate var policy: DormantStateSlotPolicy = .persistent
 }
 
-/// Framework containers may project live persistent storage into an equivalent
-/// value-only envelope. The result still passes the normal recursive audit.
+/// Framework containers project live storage into detached state envelopes.
 package protocol DormantStateProjecting {
   @MainActor func dormantStateProjection() -> Self?
 }
@@ -104,7 +116,7 @@ package struct AnyStateSlot {
 
   package init(restoringDormant snapshot: DormantStateSlotSnapshot) {
     storage = Self.makeStorage(value: snapshot.value, valueType: snapshot.valueType)
-    dormantPolicy = .persistent
+    dormantPolicy = snapshot.policy
   }
 
   private static func makeStorage<T>(
@@ -167,13 +179,11 @@ package struct AnyStateSlot {
     }
   }
 
-  /// Returns a closure-free, value-only reconstruction payload. Persistent
-  /// provenance is necessary but not sufficient: `State` is generic and may
-  /// contain a class, task handle, binding closure, or another live runtime
-  /// edge. Such values remain transient instead of leaking that edge through
-  /// a dormant archive.
+  /// Returns a detached reconstruction payload. Authored ownership permits
+  /// model references; framework persistence requires value-only storage.
+  /// Direct task handles, bindings and other runtime handles remain excluded.
   @MainActor package func dormantSnapshot() -> DormantStateSlotSnapshot? {
-    guard dormantPolicy == .persistent,
+    guard dormantPolicy.survivesDormancy,
       case .value(let storedValue, let valueType, _) = storage
     else {
       return nil
@@ -185,8 +195,10 @@ package struct AnyStateSlot {
     } else {
       value = storedValue
     }
-    guard Self.isDormantValueOnly(value) else { return nil }
-    return DormantStateSlotSnapshot(value: value, valueType: valueType)
+    guard Self.isDormantValueOnly(value, allowsOwnedReferences: dormantPolicy == .owned) else {
+      return nil
+    }
+    return DormantStateSlotSnapshot(value: value, valueType: valueType, policy: dormantPolicy)
   }
 
   /// Test-only invariant probe for the framework-owned nested-archive envelope.
@@ -211,10 +223,13 @@ package struct AnyStateSlot {
     trustedMirrorModulePrefixes.contains { typeName.hasPrefix($0) }
   }
 
-  private static func isDormantValueOnly(_ value: Any) -> Bool {
+  private static func isDormantValueOnly(
+    _ value: Any, allowsOwnedReferences: Bool = false
+  ) -> Bool {
     var remainingNodes = 4_096
     return isDormantValueOnly(
       value,
+      allowsOwnedReferences: allowsOwnedReferences,
       depth: 0,
       remainingNodes: &remainingNodes
     )
@@ -222,6 +237,7 @@ package struct AnyStateSlot {
 
   private static func isDormantValueOnly(
     _ value: Any,
+    allowsOwnedReferences: Bool,
     depth: Int,
     remainingNodes: inout Int
   ) -> Bool {
@@ -238,11 +254,9 @@ package struct AnyStateSlot {
       guard snapshot.valueType == type(of: snapshot.value) else {
         return false
       }
-      return isDormantValueOnly(
-        snapshot.value,
-        depth: depth + 1,
-        remainingNodes: &remainingNodes
-      )
+      // This framework-created envelope was checked when captured. In
+      // particular, nested tab registries may own already-detached models.
+      return true
     }
 
     let valueType = type(of: value)
@@ -257,7 +271,9 @@ package struct AnyStateSlot {
       // report a struct-shaped mirror, but cannot change its metadata kind.
       // Native, foreign, and foreign-reference classes plus Objective-C class
       // wrappers (`NSObject` and friends on Darwin) are all reference payloads.
-      return false
+      // Only authored ownership admits them. Their internals belong to the
+      // model, just as while active; framework effect ownership is separate.
+      return allowsOwnedReferences
     default:
       break
     }
@@ -317,6 +333,7 @@ package struct AnyStateSlot {
       guard
         isDormantValueOnly(
           child.value,
+          allowsOwnedReferences: allowsOwnedReferences,
           depth: depth + 1,
           remainingNodes: &remainingNodes
         )

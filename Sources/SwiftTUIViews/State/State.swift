@@ -110,7 +110,7 @@ private struct DynamicStateLocation<Value> {
 private final class StateBox<Value> {
   private let slotOrdinal: Int
   /// Whether the graph slots this box binds may ride a lazy container's
-  /// dormant archive (`.persistent`, the authored-state default) or are
+  /// dormant archive (`.owned`, the authored-state default) or are
   /// re-derived scratch that must stay out of it (`.transient`). Fixed at
   /// construction: the slot keeps the policy it was born with.
   let dormantPolicy: DormantStateSlotPolicy
@@ -133,7 +133,7 @@ private final class StateBox<Value> {
     seedValue: Value,
     slotOrdinal: Int,
     declarationFileID: String,
-    dormantPolicy: DormantStateSlotPolicy = .persistent
+    dormantPolicy: DormantStateSlotPolicy = .owned
   ) {
     self.slotOrdinal = slotOrdinal
     self.declarationFileID = declarationFileID
@@ -589,6 +589,8 @@ private func withDormantStateSlotPolicy<Result>(
   _ body: () throws -> Result
 ) rethrows -> Result {
   switch policy {
+  case .owned:
+    return try withOwnedDormantStateSlot(body)
   case .persistent:
     return try withPersistentDormantStateSlot(body)
   case .transient:

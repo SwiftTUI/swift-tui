@@ -1,4 +1,4 @@
-/// Persistent value state captured for a temporarily dormant lazy payload.
+/// Persistent authored state captured for a temporarily dormant lazy payload.
 ///
 /// This is deliberately not a `ViewNode.Checkpoint`: it stores no nodes,
 /// children, resolved output, registrations, handlers, dependencies,
@@ -136,7 +136,7 @@ extension ViewGraph {
       }
 
       var persistentSlots: [StateSlotIdentifier: DormantStateSlotSnapshot] = [:]
-      for (identifier, slot) in node.stateSlots where slot.dormantPolicy == .persistent {
+      for (identifier, slot) in node.stateSlots where slot.dormantPolicy.survivesDormancy {
         if let snapshot = slot.dormantSnapshot() {
           persistentSlots[identifier] = snapshot
         } else if slot.isInitialized {

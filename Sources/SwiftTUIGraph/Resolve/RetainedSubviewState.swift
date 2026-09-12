@@ -1,6 +1,6 @@
 /// Persistent state owned by a declaring container while its captured content
-/// has no presentation host. Unlike a lazy tab's value-only dormant archive,
-/// this keeps authored reference values alive for the container's lifetime.
+/// has no presentation host. Like a lazy tab's authored-state archive,
+/// this keeps model references alive for the container's lifetime.
 /// It retains no graph node, evaluator, dependency, or runtime registration.
 @MainActor
 package struct RetainedSubviewState {
@@ -32,8 +32,7 @@ extension RetainedSubviewState: DormantStateProjecting {
     for record in records {
       var slots: [StateSlotIdentifier: DormantStateSlotSnapshot] = [:]
       for (identifier, slot) in record.slots {
-        // Preserve the lazy-tab value-only boundary, including for nested
-        // retained groups. Reference-valued archives still report and restart.
+        // Project slot storage without carrying its comparator or live owner.
         guard let snapshot = slot.dormantSnapshot() else { return nil }
         slots[identifier] = snapshot
       }
@@ -54,7 +53,7 @@ extension ViewGraph {
   ) -> RetainedSubviewState {
     let records = locator.nodeIDs.compactMap { nodeID -> RetainedSubviewState.Record? in
       guard let node = nodeForViewNodeID(nodeID) else { return nil }
-      let slots = node.stateSlots.filter { $0.value.dormantPolicy == .persistent }
+      let slots = node.stateSlots.filter { $0.value.dormantPolicy.survivesDormancy }
       let entity = node.committed.entityIdentity ?? node.lastHomedEntityIdentity
       guard !slots.isEmpty || entity != nil else { return nil }
       return .init(identity: node.identity, entityIdentity: entity, slots: slots)

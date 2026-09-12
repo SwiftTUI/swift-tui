@@ -7,7 +7,7 @@ how to keep reference-typed models alive across tab switches.
 
 `TabView` renders only the selected tab. A deselected tab is not hidden: its
 view tree is torn down, and its body is not evaluated again until the tab is
-reselected. Before teardown, SwiftTUI archives the tab's value-typed
+reselected. Before teardown, SwiftTUI archives the tab's authored
 persistent state and restores it when that tag becomes selected again, so
 the common case just works:
 
@@ -35,7 +35,7 @@ you left them, restored before the tab's first new body evaluation.
 
 What crosses the dormant seam:
 
-- `@State` values that are recursively value-only, including `@State` nested
+- `@State` values and owned model references, including `@State` nested
   inside a custom `DynamicProperty`. Standard-library and Foundation value
   types qualify — `UUID`, `Date`, SIMD vectors, and arrays and structs built
   from them. (`Data` is the exception: its mirror exposes a raw pointer, so
@@ -45,28 +45,27 @@ What crosses the dormant seam:
 - Navigation activation: a destination presented inside the tab is presented
   again when the tab returns.
 
-## Reference Types Do Not Survive
+## Reference Ownership
 
-Anything with a live runtime edge is torn down, not archived: class
-instances, running tasks and continuations, closures and captured bindings,
-`GestureState`, pointers, and metatypes. A class-backed model owned inside a
-tab is the common trap:
+An authored `@State` slot retains its model references in the tab's archive.
+The model has the same object identity on return, including references inside
+ordinary structs, optionals and collections:
 
 ```swift
 struct FeedTab: View {
-  // Not archivable: FeedModel is a class.
   @State private var model = FeedModel()
   // ...
 }
 ```
 
-When this tab departs, SwiftTUI reports the
-`tab.dormantStateUnsupportedValue` runtime issue naming the slot and its
-stored type, and the tab returns with a fresh `FeedModel` built from the
-authored initial value. The reset is never silent.
+The archive owns the stored value independently of the departing view node.
+View lifecycle tasks are cancelled and observation registrations are retired;
+activation creates new registrations against the retained model. Removing the
+tab or replacing its owner releases the archived references. Other owners and
+application-created reference cycles can, as usual, keep a model alive.
 
-The fix is the one the diagnostic suggests: hoist ownership above the
-`TabView` and pass the model down, so it never crosses the dormant seam:
+Ownership above `TabView` remains useful when a model must also survive tab
+removal or be shared between tabs:
 
 ```swift
 @MainActor @Observable
@@ -87,9 +86,12 @@ struct RootView: View {
 }
 ```
 
-The hoisted model survives every switch, and the tab's remaining value-typed
-`@State` still archives normally. Hoist only what must survive; tab-local
-state that should reset on deselection can stay tab-local. See
+Direct task handles, continuations, closures, captured bindings, pointers and
+metatypes remain unsupported archive payloads. Rejected slots emit
+`tab.dormantStateUnsupportedValue` and restart from their authored values.
+Opaque custom value mirrors are also rejected. Model internals are owned by
+the application: storing a task in a model does not make it a view lifecycle
+task, and SwiftTUI does not cancel it. See
 <doc:State-Keying> for the general owner-placement model.
 
 ## Lifecycle Restarts on Return
@@ -135,17 +137,19 @@ the exact rules.
 **Keying and lifetime.** An archive belongs to one live `TabView` owner and
 one selection identity: the typed tag value, its optional-matching policy,
 and its duplicate-tag occurrence. The registry lives on the `TabView` owner
-and retains at most one value-only archive per declared inactive tab, so
+and retains at most one state archive per declared inactive tab, so
 repeated switching never accumulates historical view nodes. A nested
 `TabView` rejoins both its active payload and its own inactive-tab archives
 when its outer tab returns.
 
 **What a record stores.** Only state-slot values whose producer declares
-them persistent for dormancy and whose payload passes a recursive
-value-only safety audit, plus closure-free entity-routing anchors that let
+them persistent for dormancy, plus closure-free entity-routing anchors that let
 descendant state rejoin the same lifetime. No view nodes, resolved output,
 registrations, handlers, observation dependencies, or evaluator closures
-are retained. Framework scratch that a control re-derives after
+are copied from the live node. Authored `@State` has an owned-reference policy;
+framework persistent slots retain their recursive value-only audit. Nested
+archives carry checked reconstruction envelopes without slot comparators.
+Framework scratch that a control re-derives after
 reactivation — a `TextEditor`'s measured content width — is declared
 transient and is neither archived nor warned about.
 
@@ -161,9 +165,13 @@ issue with the slot and stored type, and ambiguous selection reports
 `tab.duplicateTag`. The registry participates in the frame checkpoint, so an
 aborted frame neither consumes nor publishes dormant state. A state write
 that lands while the departing tab's asynchronous frame tail is suspended is
-captured as a value-only refresh guarded by the owner lifetime and a numeric
+captured as a state refresh guarded by the owner lifetime and a numeric
 refresh token; discarded frame candidates and stale tokens cannot mutate the
 committed archive.
+
+Checkpoints restore slot replacement and archive ownership. They do not clone
+or roll back mutations inside an application-owned reference object; all copies
+retain the same model, as ordinary active-state checkpoints do.
 
 ## See Also
 

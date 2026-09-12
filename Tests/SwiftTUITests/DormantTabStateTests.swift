@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 @_spi(Testing) import SwiftTUITestSupport
 import Testing
 
@@ -25,6 +26,62 @@ private struct DormantValueNamedType: Equatable, Sendable {
 @MainActor
 @Suite(.serialized)
 struct DormantTabStateTests {
+  @Test(
+    "authored reference state survives dormancy and releases at tab lifetime boundaries",
+    arguments: [false, true], [false, true])
+  func referenceOwnership(replaceOwner: Bool, asynchronous: Bool) async {
+    let (renderer, probe) = await referenceOwnershipJourney(
+      replaceOwner: replaceOwner, asynchronous: asynchronous)
+    let released = probe.isReleased
+    #expect(released)
+    #expect(renderer.viewGraph.debugTotalStateSnapshot().liveNodeIDs.count > 0)
+  }
+
+  private func referenceOwnershipJourney(replaceOwner: Bool, asynchronous: Bool) async
+    -> (DefaultRenderer, DormantReferenceProbe)
+  {
+    let model = DormantTabModel()
+    let probe = DormantReferenceProbe()
+    let renderer = DefaultRenderer()
+    let root = testIdentity("ReferenceDormantTabs")
+    let invalidator = DormantReferenceInvalidator()
+    func render() async -> RenderSnapshot {
+      var context = dormantContext(root: root, actions: LocalActionRegistry())
+      context.invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
+      if asynchronous {
+        return await renderer.renderAsync(
+          DormantReferenceTabs(model: model, probe: probe), context: context)
+      }
+      return renderer.render(
+        DormantReferenceTabs(model: model, probe: probe),
+        context: context)
+    }
+    _ = await render()
+    let original = probe.lastIdentity
+    #expect(original != nil)
+    probe.setCount(41)
+    model.selection = "B"
+    _ = await render()
+    let evaluations = probe.evaluations
+    let survivedDeparture = !probe.isReleased
+    #expect(survivedDeparture)
+    probe.setCount(42)
+    _ = await render()
+    let inactiveBodyStayedIdle = probe.evaluations == evaluations
+    #expect(inactiveBodyStayedIdle)
+    model.reversed = true
+    model.selection = "A"
+    let restoredText = surfaceText(await render())
+    #expect(restoredText.contains("reference 42"))
+    let restoredOriginal = probe.lastIdentity == original
+    #expect(restoredOriginal)
+    model.selection = "B"
+    _ = await render()
+    if replaceOwner { model.ownerGeneration += 1 } else { model.includesA = false }
+    _ = await render()
+    return (renderer, probe)
+  }
+
   @Test("inactive tab bodies stay unevaluated and composed state restores before activation")
   func composedStateRestoresSynchronously() {
     let model = DormantTabModel()
@@ -910,8 +967,10 @@ struct DormantTabStateTests {
       try #require(restoredNode.stateSlotStorage(ordinal: 3_001)).value(as: [SIMD2<Float>].self)
         == points
     )
-    #expect(try #require(restoredNode.stateSlotStorage(ordinal: 3_002)).value(as: UUID.self) == rowID)
-    #expect(try #require(restoredNode.stateSlotStorage(ordinal: 3_003)).value(as: Date.self) == stamp)
+    #expect(
+      try #require(restoredNode.stateSlotStorage(ordinal: 3_002)).value(as: UUID.self) == rowID)
+    #expect(
+      try #require(restoredNode.stateSlotStorage(ordinal: 3_003)).value(as: Date.self) == stamp)
     #expect(
       try #require(restoredNode.stateSlotStorage(ordinal: 3_004)).value(
         as: [DormantIdentifiedRow].self
@@ -1316,6 +1375,59 @@ private final class DormantTabModel {
   }
 }
 
+@MainActor @Observable
+private final class DormantOwnedModel {
+  var count = 0
+}
+
+@MainActor
+private final class DormantReferenceProbe {
+  weak var value: DormantOwnedModel?
+  var lastIdentity: ObjectIdentifier?
+  var evaluations = 0
+  var isReleased: Bool { value == nil }
+  func setCount(_ count: Int) { value?.count = count }
+}
+
+private final class DormantReferenceInvalidator: Invalidating {
+  func requestInvalidation(of identities: Set<Identity>) {}
+}
+
+@MainActor
+private struct DormantReferenceTabs: View {
+  let model: DormantTabModel
+  let probe: DormantReferenceProbe
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      if model.reversed {
+        Tab("B", value: "B") { Text("other") }
+        if model.includesA {
+          Tab("A", value: "A") { DormantReferenceContent(probe: probe) }
+        }
+      } else {
+        if model.includesA {
+          Tab("A", value: "A") { DormantReferenceContent(probe: probe) }
+        }
+        Tab("B", value: "B") { Text("other") }
+      }
+    }.id(model.ownerGeneration)
+  }
+}
+
+@MainActor
+private struct DormantReferenceContent: View {
+  let probe: DormantReferenceProbe
+  @State private var model = DormantOwnedModel()
+
+  var body: some View {
+    probe.value = model
+    probe.lastIdentity = ObjectIdentifier(model)
+    probe.evaluations += 1
+    return Text("reference \(model.count)")
+  }
+}
+
 @MainActor
 private final class DormantPayloadOwnerModel {
   var selection = "A"
@@ -1482,12 +1594,17 @@ private final class DormantRecursiveCustomMirror: CustomReflectable {
 @MainActor
 private struct DormantComposedCounter: DynamicProperty {
   @State private var value = 0
+  @State private var reference = DormantOwnedModel()
 
-  var wrappedValue: Int { value }
+  var wrappedValue: Int {
+    #expect(reference.count == value)
+    return value
+  }
   var projectedValue: Self { self }
 
   func increment() {
     value += 1
+    reference.count += 1
   }
 
   func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {

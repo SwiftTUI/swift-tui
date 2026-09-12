@@ -141,15 +141,15 @@ moving anything: a "reset" during a presentation dismiss is usually an
 owner-placement problem, and transient flicker can be a rendering issue even
 when state ownership is correct.
 
-## Tab switches archive value state
+## Tab switches archive authored state
 
 Switching tabs is not on the loses-state list. `TabView` resolves only the
-selected tab body, but when a tab is deselected its value-typed `@State` (and
+selected tab body, but when a tab is deselected its authored `@State` (and
 `@FocusState`) is archived and restored the next time that tag becomes
-active. State containing class instances, tasks, or closures does not survive
-dormancy; SwiftTUI reports a `tab.dormantStateUnsupportedValue` runtime issue
-and asks you to use value-only state or hoist that ownership above the
-`TabView`. Lifecycle is not archived: `onAppear` runs again and tasks restart
+active. Owned model references retain their object identity until the tab or
+its owner is removed. Direct task handles, closures and other unsupported
+runtime handles report `tab.dormantStateUnsupportedValue` and restart from
+their authored values. Lifecycle is not archived: `onAppear` runs again and tasks restart
 on reactivation. The full contract is in <doc:Dormant-Tab-State>.
 
 ## Live runtimes versus snapshots
