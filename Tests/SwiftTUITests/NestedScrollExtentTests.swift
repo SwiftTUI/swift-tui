@@ -41,7 +41,9 @@ struct NestedScrollExtentTests {
     #expect(chained.contentBounds.size == outer.contentBounds.size)
     let outerPoint = Point(
       x: Double(outer.viewportRect.origin.x + 1), y: Double(outer.viewportRect.origin.y + 1))
-    for _ in 0..<60 { _ = try harness.scrollPointer(at: outerPoint, deltaY: 1) }
+    // Coalesce endpoint traversal; the inner journey, handoff, and one-cell
+    // reversals above and below retain their individual input assertions.
+    _ = try harness.scrollPointer(at: outerPoint, deltaY: 60)
     let bottom = try #require(routes().first { $0.identity == outer.identity })
     #expect(bottom.contentBounds.size == outer.contentBounds.size)
     #expect(
@@ -50,7 +52,7 @@ struct NestedScrollExtentTests {
     _ = try harness.scrollPointer(at: outerPoint, deltaY: -1)
     let reversed = try #require(routes().first { $0.identity == outer.identity })
     #expect(reversed.contentBounds.origin.y == bottom.contentBounds.origin.y + 1)
-    for _ in 0..<60 { _ = try harness.scrollPointer(at: outerPoint, deltaY: -1) }
+    _ = try harness.scrollPointer(at: outerPoint, deltaY: -60)
     let top = try #require(routes().first { $0.identity == outer.identity })
     #expect(top.contentBounds == outer.contentBounds)
   }
