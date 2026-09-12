@@ -176,6 +176,28 @@ struct ForEachBindingCurrencyTests {
     }
   }
 
+  @Test("stored reference-backed IDs do not inherit collection value currency")
+  func storedReferenceBackedIDs() {
+    let id = MutableHashID(1)
+    let direct = State(wrappedValue: [MutableIDRecord(id: id, name: "before")])
+    let directRows = captureRows(direct.projectedValue, id: \.id)
+    let wrapped = State(wrappedValue: [
+      MutableIDRecord(id: WrappedHashID(value: id), name: "before")
+    ])
+    let wrappedRows = captureRows(wrapped.projectedValue, id: \.id)
+    #expect(directRows[0].valueIdentity == nil)
+    #expect(wrappedRows[0].valueIdentity == nil)
+    // Exercise the retained binding while the collection's value token stays fixed.
+    id.value.withLock { $0 = 1234 }
+    // Writes first make the old dictionary failure an assertion, not a fatal read.
+    directRows[0].wrappedValue = MutableIDRecord(id: id, name: "after")
+    wrappedRows[0].wrappedValue = MutableIDRecord(id: WrappedHashID(value: id), name: "after")
+    #expect(direct.wrappedValue[0].name == "after")
+    #expect(wrapped.wrappedValue[0].name == "after")
+    #expect(directRows[0].wrappedValue.name == "after")
+    #expect(wrappedRows[0].wrappedValue.name == "after")
+  }
+
   @Test("reference-backed custom collections cannot reuse a state value's index")
   func customCollection() {
     let storage = RecordStorage(seed)
@@ -331,6 +353,24 @@ private struct StateRowsHost: View {
 private final class IDBox {
   var value: Int
   init(_ value: Int) { self.value = value }
+}
+
+private final class MutableHashID: Hashable, Sendable {
+  let value: Mutex<Int>
+  init(_ value: Int) { self.value = Mutex(value) }
+  static func == (lhs: MutableHashID, rhs: MutableHashID) -> Bool {
+    lhs.value.withLock { $0 } == rhs.value.withLock { $0 }
+  }
+  func hash(into hasher: inout Hasher) { hasher.combine(value.withLock { $0 }) }
+}
+
+private struct WrappedHashID: Hashable, Sendable {
+  let value: MutableHashID
+}
+
+private struct MutableIDRecord<ID: Hashable & Sendable> {
+  var id: ID
+  var name: String
 }
 
 private struct ComputedRecord {

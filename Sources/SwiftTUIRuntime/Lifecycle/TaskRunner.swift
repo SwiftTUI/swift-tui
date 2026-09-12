@@ -7,6 +7,11 @@ final class TaskRunner {
     var descriptorID: String
   }
 
+  private struct LogicalTaskKey: Hashable {
+    var identity: Identity
+    var descriptorID: String
+  }
+
   private struct ActiveTask {
     var identity: Identity
     var descriptor: TaskDescriptor
@@ -26,6 +31,8 @@ final class TaskRunner {
   }
 
   private var activeTasks: [ActiveTaskKey: ActiveTask] = [:]
+  private var keysByNode: [ViewNodeID: Set<ActiveTaskKey>] = [:]
+  private var keyByLogicalTask: [LogicalTaskKey: ActiveTaskKey] = [:]
   private var nextGeneration = 0
 
   deinit {
@@ -48,17 +55,11 @@ final class TaskRunner {
 
     // A node's viewNodeID can churn — a fresh id for the *same* identity on
     // re-evaluation (e.g. a `TimelineView` re-attaching its `.task` each tick).
-    // Without this sweep, the old id's task is left running, and the lifecycle
-    // diff can miss the transient disappearance. Keep the sweep per descriptor
+    // Without this lookup, the old id's task is left running, and the lifecycle
+    // diff can miss the transient disappearance. Keep the lookup per descriptor
     // so sibling task modifiers on the same identity do not cancel each other.
-    let staleKeys = activeTasks.compactMap { entry in
-      entry.key.viewNodeID != viewNodeID
-        && entry.value.identity == identity
-        && entry.value.descriptor.id == descriptor.id
-        ? entry.key
-        : nil
-    }
-    for staleKey in staleKeys {
+    let logicalKey = LogicalTaskKey(identity: identity, descriptorID: descriptor.id)
+    if let staleKey = keyByLogicalTask[logicalKey] {
       cancel(key: staleKey)
     }
 
@@ -80,6 +81,8 @@ final class TaskRunner {
       task: task,
       ownership: ownership
     )
+    keysByNode[viewNodeID, default: []].insert(key)
+    keyByLogicalTask[logicalKey] = key
     return task
   }
 
@@ -101,40 +104,51 @@ final class TaskRunner {
       cancel(key: sourceKey)
       return
     }
-    activeTasks.removeValue(forKey: sourceKey)
+    _ = remove(key: sourceKey)
     activeTask.ownership.key = destinationKey
     activeTasks[destinationKey] = activeTask
+    keysByNode[destination, default: []].insert(destinationKey)
+    keyByLogicalTask[LogicalTaskKey(identity: identity, descriptorID: descriptor.id)] =
+      destinationKey
   }
 
   func cancel(
     viewNodeID: ViewNodeID,
     matching descriptor: TaskDescriptor? = nil
   ) {
-    let keys = activeTasks.compactMap { entry -> ActiveTaskKey? in
-      guard entry.key.viewNodeID == viewNodeID else {
-        return nil
-      }
-      guard descriptor == nil || descriptor == entry.value.descriptor else {
-        return nil
-      }
-      return entry.key
+    if let descriptor {
+      let key = ActiveTaskKey(viewNodeID: viewNodeID, descriptorID: descriptor.id)
+      if activeTasks[key]?.descriptor == descriptor { cancel(key: key) }
+      return
     }
-
-    for key in keys {
+    for key in keysByNode[viewNodeID] ?? [] {
       cancel(key: key)
     }
   }
 
   private func cancel(key: ActiveTaskKey) {
-    guard let activeTask = activeTasks.removeValue(forKey: key) else {
+    guard let activeTask = remove(key: key) else {
       return
     }
     activeTask.task.cancel()
   }
 
+  private func remove(key: ActiveTaskKey) -> ActiveTask? {
+    guard let activeTask = activeTasks.removeValue(forKey: key) else { return nil }
+    keysByNode[key.viewNodeID]?.remove(key)
+    if keysByNode[key.viewNodeID]?.isEmpty == true {
+      keysByNode.removeValue(forKey: key.viewNodeID)
+    }
+    keyByLogicalTask.removeValue(
+      forKey: LogicalTaskKey(identity: activeTask.identity, descriptorID: key.descriptorID))
+    return activeTask
+  }
+
   func cancelAll() {
     let tasks = activeTasks.values.map(\.task)
     activeTasks.removeAll(keepingCapacity: true)
+    keysByNode.removeAll(keepingCapacity: true)
+    keyByLogicalTask.removeAll(keepingCapacity: true)
     for task in tasks {
       task.cancel()
     }
@@ -159,7 +173,7 @@ final class TaskRunner {
     guard activeTasks[key]?.generation == generation else {
       return
     }
-    activeTasks.removeValue(forKey: key)
+    _ = remove(key: key)
   }
 
   private func taskPriority(

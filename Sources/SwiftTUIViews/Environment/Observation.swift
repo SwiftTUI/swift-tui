@@ -264,6 +264,10 @@ extension ObservationBridge {
   }
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    // Restore retires draft mailbox state. Reject an active recorder here,
+    // before mutation, instead of failing later when its owner tries to commit.
+    precondition(
+      activeDraft == nil, "Cannot restore observation checkpoint while recording a draft")
     currentPass = checkpoint.currentPass
     nextPass = max(nextPass, currentPass)
     mailbox.withLock { mailbox in

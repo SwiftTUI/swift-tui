@@ -213,10 +213,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   through the captured index and can corrupt a neighbor or trap. A read of a
   departed occurrence traps with a diagnostic, matching the optional-base
   unwrap precedent. State-backed `Array`, `ArraySlice`, and `ContiguousArray`
-  values with inline stored IDs share an occurrence index for each stored
+  values with inline stored POD or String IDs share an occurrence index for each stored
   value: construction and rebuilding are O(n), and subsequent row lookups
   are expected O(1). Arbitrary getter/setter bindings, custom collections,
-  reference elements and computed ID paths use a current-data O(n) scan per
+  reference elements, other ID storage and computed ID paths use a current-data O(n) scan per
   access because they can change without a tracked value store. Repeated
   full-list reads of those sources can therefore be O(n²).
   Swift drops the contextual isolation from

@@ -37,8 +37,9 @@ token of its exact graph slot, retained owner value, or seed.
 `SwiftTUIGraph/Resolve/StateSlot.swift` owns `StateValueIdentity`: a fresh token
 on every store, copied with checkpoint values so restored and discarded
 branches cannot alias. Tokens certify value replacement only. Lookup reuse
-requires a standard value-semantic array and an inline stored ID; arbitrary
-sources and externally dependent projections scan current data. Reads still
+requires a standard value-semantic array and an inline stored POD or String ID;
+other ID storage, arbitrary sources and externally dependent projections scan
+current data. Reads still
 go through the source binding so state dependencies remain reader-attributed.
 
 Lazy-stack composition lives in
@@ -299,6 +300,13 @@ backing node changes. `ViewGraphLifecyclePlanning.swift` emits task transfers
 for unchanged descriptors and keeps replacements keyed to their old cancel and
 new start owners. `LifecycleCoordinator` applies these transfers at commit;
 `TaskRunner` moves the existing handle and its completion owner together.
+Its owner-to-keys and logical-identity/descriptor indexes share one removal
+operation with cancellation and generation-checked completion. Startup never
+scans unrelated tasks; owner cancellation visits only that owner's keys.
+Collapsed nodes merge adopted task registrations by descriptor, preserving
+independent modifiers while keeping the current registration for a matching slot.
+Observation checkpoint restore requires no actively recording draft; restoration
+retires suspended draft mailboxes, whose owners must discard them before reuse.
 `Lifecycle/LifecycleCarryForward.swift` preserves transfer order through deferred
 commits, and the `taskTransfer` frame-drop blocker prevents dropping that work.
 

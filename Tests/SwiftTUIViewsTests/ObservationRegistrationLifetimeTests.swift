@@ -12,6 +12,19 @@ private final class RegistrationLifetimeModel {
 @MainActor
 @Suite("Observation registration lifetime")
 struct ObservationRegistrationLifetimeTests {
+  @Test("checkpoint restore rejects an actively recording draft at the restore boundary")
+  func restoreDuringActiveDraftTraps() async {
+    await #expect(processExitsWith: .failure) {
+      await MainActor.run {
+        let bridge = ObservationBridge()
+        let checkpoint = bridge.makeCheckpoint()
+        let draft = bridge.makeDraft(attaching: nil)
+        bridge.restoreCheckpoint(checkpoint)
+        withExtendedLifetime(draft) {}
+      }
+    }
+  }
+
   @Test("collapsed view bodies retain every same-identity observation dependency")
   func collapsedBodiesRetainEveryDependency() {
     let bridge = ObservationBridge()

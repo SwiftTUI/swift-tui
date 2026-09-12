@@ -71,6 +71,23 @@ private final class DependencyObservableModel: Observable, Sendable {
 @MainActor
 @Suite
 struct DependencyModelTests {
+  @Test("Table declares only its own identity as a focus comparison target")
+  func tableFocusReadIsTargetScoped() throws {
+    let dependencies = try resolveDependencies(
+      Table(columns: [TableColumn("Name")]) {
+        TableRow { Text("first").focusable() }
+        TableRow { Text("second").focusable() }
+      }
+    )
+    #expect(
+      !dependencies.environmentReads.contains(
+        EnvironmentValues.runtimeFocusSideFieldReadDependencyKey))
+    #expect(
+      dependencies.environmentReads.contains(
+        EnvironmentValues.runtimeFocusTargetScopedReadDependencyKey))
+    #expect(dependencies.focusComparisonTargets == [testIdentity("Root")])
+  }
+
   // MARK: - State
 
   @Test("state reads populate graph dependencies")

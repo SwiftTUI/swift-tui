@@ -26,7 +26,7 @@ extension ForEach {
   /// a write whose occurrence is gone is dropped and reports a
   /// `forEach.staleElementBindingWrite` runtime issue. A missing read traps.
   ///
-  /// State-backed arrays with stored IDs share an index per stored value, so
+  /// State-backed arrays with stored POD or String IDs share an index per stored value, so
   /// reading all rows takes linear lookup work. Sources without value currency
   /// (including arbitrary getter/setter bindings), custom collections and
   /// computed IDs require a current-data scan for each access.
@@ -162,10 +162,13 @@ where C: MutableCollection & RandomAccessCollection {
 
   init(collection: Binding<C>, snapshot: C, ids: [ID], id: KeyPath<C.Element, ID>) {
     self.id = id
-    // A stored ID cannot depend on external state. Computed IDs and paths
-    // through a reference can change while the collection value stays put.
+    // Stored IDs may themselves contain mutable references, including through
+    // a value wrapper. Admit reference-free storage and String's known value
+    // semantics; arbitrary non-POD Hashable values need a current-data scan.
+    // Hashable implementations must still derive equality from the ID value.
     if C.self is any ForEachBindingValueCollection.Type,
       !(C.Element.self is AnyObject.Type),
+      _isPOD(ID.self) || ID.self == String.self,
       MemoryLayout<C.Element>.offset(of: id) != nil
     {
       valueIdentity = collection.valueIdentity

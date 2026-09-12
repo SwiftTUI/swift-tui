@@ -457,7 +457,15 @@ package struct TaskNodeRecord: RuntimeNodeRecord {
   }
 
   package mutating func absorbAdopted(_ departing: TaskNodeRecord) {
-    registrations.merge(departing.registrations, uniquingKeysWith: mergeKeepingCurrent)
+    // Collapsed modifier nodes may contribute different task descriptors to
+    // one identity. Preserve every descriptor; the adopter wins only when
+    // both records name the same task slot, matching LocalTaskRegistry.restore.
+    for (identity, adopted) in departing.registrations {
+      var current = registrations[identity] ?? []
+      let currentIDs = Set(current.map { $0.descriptor.id })
+      current.append(contentsOf: adopted.filter { !currentIDs.contains($0.descriptor.id) })
+      registrations[identity] = current
+    }
     owners.merge(departing.owners, uniquingKeysWith: mergeKeepingCurrent)
   }
 

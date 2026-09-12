@@ -10,6 +10,14 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- Preserve both task operations when chained modifiers collapse onto one
+  owner, including independent ID replacement and cancellation on removal.
+- Keep retained ForEach row bindings current for mutable reference-backed IDs.
+- Scope Table's focus dependency to its own identity so descendant focus moves
+  do not force unrelated row-wrapper reconstruction.
+- Reject observation checkpoint restoration during active draft recording at
+  the restore boundary.
+
 - Keep ancestor scroll extents stable when a nested scroll view moves its
   content, so outer indicators and endpoint clamping use the viewport's size.
 - Preserve custom alignment guides in lazy stacks and safe-area insets, and
@@ -24,6 +32,11 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   starts from the latest full frame with image payloads restored. Clipboard,
   runtime issue, and accessibility announcement records stay FIFO, and detached
   control overflow is reported instead of silently evicting older records.
+
+### Changed
+
+- Index task handles by owner and logical descriptor to avoid global scans
+  during task startup and owner cancellation.
 
 ## [0.13.0] - 2026-09-10
 
