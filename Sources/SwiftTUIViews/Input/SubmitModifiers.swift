@@ -1,6 +1,6 @@
 import SwiftTUICore
 
-private enum SubmitActionKey: EnvironmentKey {
+private enum SubmitActionKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: SubmitAction? = nil
 }
 

@@ -1,6 +1,6 @@
 public import SwiftTUICore
 
-private enum FocusedValuesKey: EnvironmentKey {
+private enum FocusedValuesKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = FocusedValues()
 }
 
@@ -12,7 +12,7 @@ private enum FocusedValuesKey: EnvironmentKey {
 /// reverse dependency index for it contains *only* genuine focused-value readers.
 /// (Recording against `FocusedValuesKey` instead would attribute every node,
 /// because `ResolveContext.init` reads `environmentValues.focusedValues` per node.)
-private enum FocusedValuesDependencyKey: EnvironmentKey {
+private enum FocusedValuesDependencyKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = false
 }
 

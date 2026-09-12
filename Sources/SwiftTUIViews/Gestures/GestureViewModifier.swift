@@ -7,7 +7,7 @@ public import SwiftTUICore
 /// chain into the environment snapshot makes a live mask flip deny reuse only
 /// below the attachment whose descendant policy changed. The next resolve then
 /// republishes recognizers and pointer routes exactly as a fresh build would.
-private struct GestureSuppressionScopesEnvironmentKey: EnvironmentKey {
+private struct GestureSuppressionScopesEnvironmentKey: EnvironmentKey, FrameworkEnvironmentKey {
   static var defaultValue: [Identity] { [] }
 }
 

@@ -238,6 +238,13 @@ All 28 erasers use `ConcreteStyleBox` for storage and reuse comparison.
 Body-producing families share its body resolver; styles with dynamic properties
 use a prepared concrete working copy under the body's rebased authoring scope.
 
+Framework environment keys explicitly conform to `FrameworkEnvironmentKey`.
+Only keys qualified for tracked resolve-time consumption adopt
+`ReaderAttributedFrameworkEnvironmentKey`; the classification cache tests these
+markers instead of reflected module/type names. External keys retain public
+reader attribution. The production-key ownership test guards marker coverage;
+memo shadow and dedicated boundary tests remain the certification evidence.
+
 `Controls/ToggleStyles.swift`, `DisclosureGroupStyles.swift`, and
 `ProgressViewStyles.swift` own their style families. The shared
 `ControlStyleRow.swift` provides pure row composition across the bound-control,
@@ -294,6 +301,14 @@ with an accepted commit. Runtime registrations and presentation hosts depart
 normally. Lazy tabs retain their separate value-only dormancy contract.
 Retained archives project into nested `DormantStateSlotSnapshot` records at
 that boundary; reference-valued archives still fail the recursive value audit.
+
+`TabViews/TabSelectionState.swift` owns tab selection, tag-qualified strip focus,
+option churn and overflow slot operations. `TabDormancy.swift` owns archive
+transitions, payload generations, locator intake and commit refreshes. Both
+operate on the declaring graph node's slots, so checkpoints restore their state.
+The value-only registry and transient live-graph locator remain separate slots;
+`TabView.swift` composes the active content and registers input handlers through
+these collaborators.
 
 Viewport lifecycle carry follows a uniquely matched visible identity when its
 backing node changes. `ViewGraphLifecyclePlanning.swift` emits task transfers

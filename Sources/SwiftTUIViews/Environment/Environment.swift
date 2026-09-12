@@ -53,7 +53,7 @@ private final class EnvironmentValueBox: Sendable {
 // `ClipboardWriteAction`, `ClipboardReadAction`) and their keys live in
 // `EnvironmentActions.swift`.
 
-private enum StackAxisKey: EnvironmentKey {
+private enum StackAxisKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: SwiftTUICore.Axis? = nil
 }
 

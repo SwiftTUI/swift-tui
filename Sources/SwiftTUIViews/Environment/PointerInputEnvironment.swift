@@ -1,6 +1,6 @@
 public import SwiftTUICore
 
-private enum PointerInputCapabilitiesKey: EnvironmentKey {
+private enum PointerInputCapabilitiesKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: PointerInputCapabilities = .cellOnly
 }
 

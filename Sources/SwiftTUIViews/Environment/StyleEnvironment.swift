@@ -1,174 +1,176 @@
 public import SwiftTUICore
 
-private enum LinkStyleKey: EnvironmentKey {
+private enum LinkStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyLinkStyle.automatic
 }
 
-private enum ScrollViewStyleKey: EnvironmentKey {
+private enum ScrollViewStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyScrollViewStyle.automatic
 }
 
-private enum SliderStyleKey: EnvironmentKey {
+private enum SliderStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnySliderStyle.automatic
 }
 
-private enum StepperStyleKey: EnvironmentKey {
+private enum StepperStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyStepperStyle.automatic
 }
 
-enum ThemeKey: EnvironmentKey {
+enum ThemeKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: Theme? = nil
 }
 
-private enum ForegroundStyleKey: EnvironmentKey {
+private enum ForegroundStyleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: AnyShapeStyle? = nil
 }
 
-private enum TintStyleKey: EnvironmentKey {
+private enum TintStyleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: AnyShapeStyle? = nil
 }
 
-private enum TerminalAppearanceKey: EnvironmentKey {
+private enum TerminalAppearanceKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = TerminalAppearance.fallback
 }
 
-private enum TerminalSizeKey: EnvironmentKey {
+private enum TerminalSizeKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = CellSize(width: 80, height: 24)
 }
 
-private enum SafeAreaInsetsKey: EnvironmentKey {
+private enum SafeAreaInsetsKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = EdgeInsets.zero
 }
 
-private enum ControlProminenceKey: EnvironmentKey {
+private enum ControlProminenceKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = ControlProminence.standard
 }
 
-private enum ButtonBorderShapeKey: EnvironmentKey {
+private enum ButtonBorderShapeKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = ButtonBorderShape.automatic
 }
 
-private enum ButtonStyleKey: EnvironmentKey {
+private enum ButtonStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyButtonStyle.automatic
 }
 
-private enum ToggleStyleKey: EnvironmentKey {
+private enum ToggleStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyToggleStyle.automatic
 }
 
-private enum DisclosureGroupStyleKey: EnvironmentKey {
+private enum DisclosureGroupStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyDisclosureGroupStyle.automatic
 }
 
-private enum TextEditorStyleKey: EnvironmentKey {
+private enum TextEditorStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyTextEditorStyle.automatic
 }
 
-private enum ProgressViewStyleKey: EnvironmentKey {
+private enum ProgressViewStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyProgressViewStyle.automatic
 }
 
-private enum LabelStyleKey: EnvironmentKey {
+private enum LabelStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyLabelStyle.automatic
 }
 
-private enum LabeledContentStyleKey: EnvironmentKey {
+private enum LabeledContentStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyLabeledContentStyle.automatic
 }
 
-private enum ControlGroupStyleKey: EnvironmentKey {
+private enum ControlGroupStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyControlGroupStyle.automatic
 }
 
-private enum MenuStyleKey: EnvironmentKey {
+private enum MenuStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyMenuStyle.automatic
 }
 
-private enum PaletteStyleKey: EnvironmentKey {
+private enum PaletteStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyPaletteStyle.automatic
 }
 
-private enum GroupBoxStyleKey: EnvironmentKey {
+private enum GroupBoxStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyGroupBoxStyle.automatic
 }
 
-private enum TextFieldStyleKey: EnvironmentKey {
+private enum TextFieldStyleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = AnyTextFieldStyle.automatic
 }
 
-private enum PickerStyleKey: EnvironmentKey {
+private enum PickerStyleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = AnyPickerStyle.automatic
 }
 
-private enum ListStyleKey: EnvironmentKey {
+private enum ListStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyListStyle.automatic
 }
 
-private enum TableStyleKey: EnvironmentKey {
+private enum TableStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyTableStyle.automatic
 }
 
-private enum SpinnerStyleKey: EnvironmentKey {
+private enum SpinnerStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnySpinnerStyle.automatic
 }
 
-private enum ToolbarStyleKey: EnvironmentKey {
+private enum ToolbarStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyToolbarStyle.defaultTop
 }
 
-private enum SheetStyleKey: EnvironmentKey {
+private enum SheetStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnySheetStyle.automatic
 }
 
-private enum PromptStyleKey: EnvironmentKey {
+private enum PromptStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyPromptStyle.automatic
 }
 
-private enum FullScreenCoverStyleKey: EnvironmentKey {
+private enum FullScreenCoverStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyFullScreenCoverStyle.automatic
 }
 
-private enum PopoverStyleKey: EnvironmentKey {
+private enum PopoverStyleKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = AnyPopoverStyle.automatic
 }
 
-private enum TabViewStyleKey: EnvironmentKey {
+private enum TabViewStyleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = AnyTabViewStyle.automatic
 }
 
-private enum ScrollIndicatorVisibilityKey: EnvironmentKey {
+private enum ScrollIndicatorVisibilityKey: EnvironmentKey, ReaderAttributedFrameworkEnvironmentKey {
   static let defaultValue = ScrollIndicatorVisibility.automatic
 }
 
-private enum HorizontalScrollIndicatorVisibilityKey: EnvironmentKey {
+private enum HorizontalScrollIndicatorVisibilityKey: EnvironmentKey,
+  ReaderAttributedFrameworkEnvironmentKey
+{
   static let defaultValue = ScrollIndicatorVisibility.automatic
 }
 
-private enum TableHeaderVisibilityKey: EnvironmentKey {
+private enum TableHeaderVisibilityKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = TableHeaderVisibility.automatic
 }
 
-private enum IsEnabledKey: EnvironmentKey {
+private enum IsEnabledKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = true
 }
 
-private enum FocusedIdentityKey: EnvironmentKey {
+private enum FocusedIdentityKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: Identity? = nil
 }
 
-private enum PressedIdentityKey: EnvironmentKey {
+private enum PressedIdentityKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: Identity? = nil
 }
 
-private enum IsFocusEffectEnabledKey: EnvironmentKey {
+private enum IsFocusEffectEnabledKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = true
 }
 
-private enum PickerViewportLineCountKey: EnvironmentKey {
+private enum PickerViewportLineCountKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: Int? = nil
 }
 
-private enum PickerLineWidthKey: EnvironmentKey {
+private enum PickerLineWidthKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: Int? = nil
 }
 

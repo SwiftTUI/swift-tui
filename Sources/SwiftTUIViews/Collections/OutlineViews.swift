@@ -1,6 +1,6 @@
 import SwiftTUICore
 
-private enum OutlineStyleKey: EnvironmentKey {
+private enum OutlineStyleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = AnyOutlineStyle.automatic
 }
 

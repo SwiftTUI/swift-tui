@@ -10,23 +10,23 @@ public import SwiftTUICore
 // measurement, draw extraction, and semantics all consume the stamped
 // metadata.
 
-private enum LineLimitKey: EnvironmentKey {
+private enum LineLimitKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: Int? = nil
 }
 
-private enum TruncationModeKey: EnvironmentKey {
+private enum TruncationModeKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = Text.TruncationMode.tail
 }
 
-private enum TextWrappingStrategyKey: EnvironmentKey {
+private enum TextWrappingStrategyKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = Text.WrappingStrategy.wordBoundary
 }
 
-private enum UnderlineStyleKey: EnvironmentKey {
+private enum UnderlineStyleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: TextLineStyle? = nil
 }
 
-private enum StrikethroughStyleKey: EnvironmentKey {
+private enum StrikethroughStyleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: TextLineStyle? = nil
 }
 

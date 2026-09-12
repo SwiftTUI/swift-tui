@@ -185,25 +185,27 @@ extension ManagedPresentationCoordinator {
 
 // MARK: - Environment Handles
 
-private enum AlertPresentationCoordinatorHandleKey: EnvironmentKey {
+private enum AlertPresentationCoordinatorHandleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = PresentationCoordinatorHandle<PromptPresentationItem>.unavailable(
     "AlertPresentationCoordinatorHandle"
   )
 }
 
-private enum ConfirmationDialogPresentationCoordinatorHandleKey: EnvironmentKey {
+private enum ConfirmationDialogPresentationCoordinatorHandleKey: EnvironmentKey,
+  FrameworkEnvironmentKey
+{
   static let defaultValue = PresentationCoordinatorHandle<PromptPresentationItem>.unavailable(
     "ConfirmationDialogPresentationCoordinatorHandle"
   )
 }
 
-private enum SheetPresentationCoordinatorHandleKey: EnvironmentKey {
+private enum SheetPresentationCoordinatorHandleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = PresentationCoordinatorHandle<PromptPresentationItem>.unavailable(
     "SheetPresentationCoordinatorHandle"
   )
 }
 
-private enum ToastPresentationCoordinatorHandleKey: EnvironmentKey {
+private enum ToastPresentationCoordinatorHandleKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = PresentationCoordinatorHandle<ToastPresentationItem>.unavailable(
     "ToastPresentationCoordinatorHandle"
   )

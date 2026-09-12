@@ -1,6 +1,6 @@
 @_spi(Testing) import SwiftTUICore
 
-private enum HostedCollectionContentKey: EnvironmentKey {
+private enum HostedCollectionContentKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = false
 }
 

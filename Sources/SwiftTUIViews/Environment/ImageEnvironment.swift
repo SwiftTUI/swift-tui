@@ -1,6 +1,6 @@
 import SwiftTUICore
 
-private enum ImageResourceRootsKey: EnvironmentKey {
+private enum ImageResourceRootsKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: [String] = []
 }
 

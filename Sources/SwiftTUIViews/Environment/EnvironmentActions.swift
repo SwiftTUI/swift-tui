@@ -55,7 +55,7 @@ public struct RequestTerminationAction: Sendable, CustomStringConvertible,
   )
 }
 
-private enum RequestTerminationActionKey: EnvironmentKey {
+private enum RequestTerminationActionKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = RequestTerminationAction.placeholder
 }
 
@@ -115,7 +115,7 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
   )
 }
 
-private enum OpenLinkActionKey: EnvironmentKey {
+private enum OpenLinkActionKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = OpenLinkAction.placeholder
 }
 
@@ -215,7 +215,7 @@ public struct ResetFocusAction: Sendable, CustomStringConvertible, CustomDebugSt
   )
 }
 
-private enum ResetFocusActionKey: EnvironmentKey {
+private enum ResetFocusActionKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = ResetFocusAction.placeholder
 }
 
@@ -268,7 +268,7 @@ public struct ClipboardWriteAction: Sendable, CustomStringConvertible, CustomDeb
   )
 }
 
-private enum ClipboardWriteActionKey: EnvironmentKey {
+private enum ClipboardWriteActionKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = ClipboardWriteAction.placeholder
 }
 
@@ -308,7 +308,7 @@ package struct ClipboardReadAction: Sendable, CustomStringConvertible, CustomDeb
   )
 }
 
-private enum ClipboardReadActionKey: EnvironmentKey {
+private enum ClipboardReadActionKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = ClipboardReadAction.placeholder
 }
 
@@ -424,7 +424,7 @@ public struct TerminalHandoffAction: Sendable, CustomStringConvertible,
   )
 }
 
-private enum TerminalHandoffActionKey: EnvironmentKey {
+private enum TerminalHandoffActionKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = TerminalHandoffAction.placeholder
 }
 

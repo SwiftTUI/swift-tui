@@ -35,6 +35,10 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Changed
 
+- Classify framework environment keys through explicit ownership and reader
+  certification markers instead of reflected names.
+- Move tab selection, focus, overflow and dormancy operations into collaborators
+  that retain graph-owned checkpoint and teardown behavior.
 - Index task handles by owner and logical descriptor to avoid global scans
   during task startup and owner cancellation.
 

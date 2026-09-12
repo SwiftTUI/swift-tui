@@ -1,12 +1,12 @@
-private enum AccessibilityReduceMotionKey: EnvironmentKey {
+private enum AccessibilityReduceMotionKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = false
 }
 
-private enum StableOutputKey: EnvironmentKey {
+private enum StableOutputKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = false
 }
 
-private enum CursorFollowsFocusKey: EnvironmentKey {
+private enum CursorFollowsFocusKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = false
 }
 

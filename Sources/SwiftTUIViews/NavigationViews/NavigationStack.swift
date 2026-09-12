@@ -765,7 +765,7 @@ private func navigationDestinationDeclarationRoot(
     .explicitID(sourceEntity.description)
 }
 
-private enum NavigationDestinationDeclarationScopeKey: EnvironmentKey {
+private enum NavigationDestinationDeclarationScopeKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: Identity? = nil
 }
 

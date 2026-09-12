@@ -1,6 +1,6 @@
 public import SwiftTUICore
 
-private enum CellPixelMetricsKey: EnvironmentKey {
+private enum CellPixelMetricsKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: CellPixelMetrics = .estimated
 }
 

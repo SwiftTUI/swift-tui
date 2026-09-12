@@ -67,7 +67,7 @@ public struct ContentTransition: Hashable, Sendable {
   }
 }
 
-private enum ContentTransitionKey: EnvironmentKey {
+private enum ContentTransitionKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue = ContentTransition.identity
 }
 
