@@ -280,7 +280,7 @@ public struct EnvironmentValues: Equatable, Sendable {
     return true
   }
 
-  private func recordObservableEnvironmentRead<Value>(
+  func recordObservableEnvironmentRead<Value>(
     _ value: Value
   ) {
     guard let observable = value as? any Observable & AnyObject else {

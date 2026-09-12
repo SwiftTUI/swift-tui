@@ -4,8 +4,8 @@ package final class DependencyTracker {
 
   package init() {}
 
-  package func recordStateRead(_ key: StateSlotKey) {
-    currentDependencies.stateSlotReads.insert(key)
+  package func recordStateRead(_ key: StateSlotKey, version: StateValueIdentity? = nil) {
+    currentDependencies.mergeStateRead(key, certificate: .init(version: version))
   }
 
   package func recordEnvironmentRead(_ key: ObjectIdentifier) {
@@ -14,6 +14,17 @@ package final class DependencyTracker {
 
   package func recordObservableRead(_ id: ObjectIdentifier) {
     currentDependencies.observableReads.insert(id)
+    if let certificate = MemoObservationCertificateScope.current {
+      recordObservationCertificate(certificate)
+    } else {
+      currentDependencies.hasUncertifiedObservableReads = true
+    }
+  }
+
+  package func recordObservationCertificate(_ certificate: MemoObservationCertificate) {
+    if !currentDependencies.observationCertificates.contains(certificate) {
+      currentDependencies.observationCertificates.append(certificate)
+    }
   }
 
   package func recordEnvironmentWrite(_ key: ObjectIdentifier) {

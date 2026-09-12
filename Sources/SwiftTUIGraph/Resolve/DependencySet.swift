@@ -83,6 +83,9 @@ package struct StateOwnerHandle: Hashable, Sendable {
 
 package struct DependencySet: Equatable {
   package var stateSlotReads: Set<StateSlotKey>
+  package var stateReadCertificates: [StateSlotKey: StateReadCertificate] = [:]
+  package var observationCertificates: [MemoObservationCertificate] = []
+  package var hasUncertifiedObservableReads = false
   package var environmentReads: Set<ObjectIdentifier>
   package var observableReads: Set<ObjectIdentifier>
   /// The exact identities a target-scoped runtime-focus side-field read
@@ -113,15 +116,33 @@ package struct DependencySet: Equatable {
     self.stateSlotReads = stateSlotReads
     self.environmentReads = environmentReads
     self.observableReads = observableReads
+    hasUncertifiedObservableReads = !observableReads.isEmpty
     self.focusComparisonTargets = focusComparisonTargets
     self.environmentWrites = environmentWrites
   }
 
   package mutating func formUnion(_ other: Self) {
+    for key in other.stateSlotReads {
+      mergeStateRead(key, certificate: other.stateReadCertificates[key] ?? .init(version: nil))
+    }
+    observationCertificates.append(contentsOf: other.observationCertificates)
+    hasUncertifiedObservableReads =
+      hasUncertifiedObservableReads || other.hasUncertifiedObservableReads
     stateSlotReads.formUnion(other.stateSlotReads)
     environmentReads.formUnion(other.environmentReads)
     observableReads.formUnion(other.observableReads)
     focusComparisonTargets.formUnion(other.focusComparisonTargets)
     environmentWrites.formUnion(other.environmentWrites)
+  }
+
+  package mutating func mergeStateRead(_ key: StateSlotKey, certificate: StateReadCertificate) {
+    if stateSlotReads.contains(key),
+      stateReadCertificates[key] != certificate
+    {
+      stateReadCertificates[key] = .init(version: nil)
+    } else {
+      stateReadCertificates[key] = certificate
+    }
+    stateSlotReads.insert(key)
   }
 }

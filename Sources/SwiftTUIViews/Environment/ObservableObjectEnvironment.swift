@@ -50,7 +50,11 @@ extension EnvironmentValues {
   /// Reads or writes an observable model keyed by its type, matching
   /// SwiftUI's type-keyed subscript.
   public subscript<T: AnyObject & Observable & Sendable>(objectType: T.Type) -> T? {
-    get { self[ObservableObjectEnvironmentKey<T>.self].object }
+    get {
+      let object = self[ObservableObjectEnvironmentKey<T>.self].object
+      if let object { recordObservableEnvironmentRead(object) }
+      return object
+    }
     set { self[ObservableObjectEnvironmentKey<T>.self] = .init(object: newValue) }
   }
 }

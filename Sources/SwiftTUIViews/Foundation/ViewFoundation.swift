@@ -858,8 +858,8 @@ func beginMemoObservation<V: View>(
       || !deps.environmentReads.isEmpty
     // Adoption-trap diagnostic: the author conformed this view to `Equatable`
     // (opted into memoization) and it is value-equal + reuse-guarded, but the
-    // production gate will DENY it because it reads `@State`/`@Observable` or
-    // focus/press — so the `.equatable()` is silently a no-op. Flag it.
+    // production gate will DENY it because a state/observation certificate
+    // is uncovered or stale, or it reads focus/press. Flag the inert boundary.
     if view is any Equatable,
       !graphNode.hasNoMemoUncoveredDependencies(
         uncoveredEnvironmentKeys: EnvironmentValues.runtimeFocusStateDependencyKeys

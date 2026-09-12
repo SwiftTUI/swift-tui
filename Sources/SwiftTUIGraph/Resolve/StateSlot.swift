@@ -85,6 +85,21 @@ package struct AnyStateSlot {
   private var storage: Storage
   package private(set) var valueIdentity = StateValueIdentity()
   package let dormantPolicy: DormantStateSlotPolicy
+  private var supportsMemoRead = false
+
+  /// Scalar value semantics are known independently of author-supplied ==.
+  /// References, pointers, containers and opaque values remain uncovered.
+  package var memoReadVersion: StateValueIdentity? {
+    supportsMemoRead ? valueIdentity : nil
+  }
+
+  private static func supportsMemoRead(_ type: Any.Type) -> Bool {
+    // Exact metatypes avoid Foundation reference-to-scalar bridging casts.
+    type == Bool.self || type == Int.self || type == Int8.self || type == Int16.self
+      || type == Int32.self || type == Int64.self || type == UInt.self || type == UInt8.self
+      || type == UInt16.self || type == UInt32.self || type == UInt64.self
+      || type == Float.self || type == Double.self || type == String.self
+  }
 
   package init() {
     storage = .uninitialized
@@ -112,11 +127,13 @@ package struct AnyStateSlot {
   package init<T>(_ value: T) {
     storage = Self.makeStorage(value: value, valueType: T.self)
     dormantPolicy = DormantStateSlotPolicyScope.current
+    supportsMemoRead = Self.supportsMemoRead(T.self)
   }
 
   package init(restoringDormant snapshot: DormantStateSlotSnapshot) {
     storage = Self.makeStorage(value: snapshot.value, valueType: snapshot.valueType)
     dormantPolicy = snapshot.policy
+    supportsMemoRead = Self.supportsMemoRead(snapshot.valueType)
   }
 
   private static func makeStorage<T>(

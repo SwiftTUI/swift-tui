@@ -11,6 +11,12 @@ private struct WeakSendableInvalidator: Sendable {
   weak var value: (any ThreadSafeInvalidating)?
 }
 
+private final class ObservationReadCurrency: Sendable {
+  private let current = Mutex(true)
+  var isCurrent: Bool { current.withLock { $0 } }
+  func invalidate() { current.withLock { $0 = false } }
+}
+
 /// All callback-visible registration state shares one lock. A fire racing
 /// publication either joins the draft's held changes or the published queue;
 /// it cannot append to a draft after its promotion has already drained.
@@ -92,6 +98,19 @@ package final class ObservationBridge: Equatable {
       viewNodeID: ViewNodeContext.current?.viewNodeID,
       pass: pass
     )
+    let currency = ObservationReadCurrency()
+    let owner = ViewNodeContext.current?.ownerLifetimeID
+    let certificate = MemoObservationCertificate { [weak self] in
+      guard currency.isCurrent, let self else { return false }
+      if let owner,
+        self.viewGraph?.nodeForOwnerLifetimeID(owner)?.viewNodeID != record.viewNodeID
+      {
+        return false
+      }
+      return self.mailbox.withLock { mailbox in
+        mailbox.published[identity] == record || mailbox.drafts[pass]?.records[identity] == record
+      }
+    }
     if draft != nil {
       mailbox.withLock { mailbox in
         precondition(mailbox.drafts[pass] != nil)
@@ -104,10 +123,14 @@ package final class ObservationBridge: Equatable {
     // Collapsed custom bodies can record several dependency sets at the same
     // identity. Every read in this pass remains live until a newer pass replaces
     // it; per-call replacement would silently drop enclosing bodies' reads.
-    return withObservationTracking {
-      apply()
-    } onChange: { [weak self] in
-      self?.enqueueChange(identity: identity, pass: pass)
+    ViewNodeContext.current?.recordObservationCertificate(certificate)
+    return MemoObservationCertificateScope.$current.withValue(certificate) {
+      withObservationTracking {
+        apply()
+      } onChange: { [weak self] in
+        currency.invalidate()
+        self?.enqueueChange(identity: identity, pass: pass)
+      }
     }
   }
 

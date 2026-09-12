@@ -440,6 +440,13 @@ these conditions are true:
   and clean, and no invalidation lies inside the served subtree.
 - Its environment matches the committed snapshot for the keys it depends on.
 
+`MemoReadCertificates.swift` defines immutable-scalar state replacement
+witnesses and observation registration currency. The gate validates them
+throughout the served subtree; fired observation callbacks stay invalid across
+checkpoint restoration. Reference-backed and other opaque state values remain
+uncovered. The normative reuse article below specifies the supported types and
+registration lifecycle.
+
 `EquatableView` and `View.equatable()` remain the explicit opt-in. They make
 the author's `==` the whole comparison contract, including captured closures
 that the comparison plan would otherwise refuse.

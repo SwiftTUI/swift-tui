@@ -1026,9 +1026,13 @@ work-stack measurement and placement are complete.
   extraction net-negative. Dependency-aware body re-evaluation is the
   profile-gated memo layer (`memoizedReusableSnapshot` dispatching
   `MemoComparisonPlan` tiers, disabled under the stack-lean profile) plus
-  reader-scoped environment toleration; its recorded residual is that
-  state-slot and observable reads disqualify a node rather than comparing
-  read values. Resolve threads an explicit `ResolveContext`, crossing into
+  reader-scoped environment toleration. Immutable scalar state reads carry
+  owner-lifetime-qualified replacement witnesses, and observation reads carry
+  live registration certificates that expire immediately when their one-shot
+  callback fires. Memo reuse checks certificates throughout the served subtree.
+  Reference-backed and other opaque state reads remain conservative; a slot
+  replacement token cannot certify mutations inside a model. Resolve threads an
+  explicit `ResolveContext`, crossing into
   the graph layer through the typed `ReuseDecisionInputs` seam; the
   surviving ambient holders (view-node context, authoring context,
   environment storage, animation intent) are a measured design point priced

@@ -564,18 +564,20 @@ package final class ViewNode {
     seed: @autoclosure () -> Value
   ) -> Value {
     let readKey = StateSlotKey(owner: ownerLifetimeID, slot: identifier)
+    let value = primedStateSlot(identifier, seed: seed())
+    let version = stateSlots[identifier]?.memoReadVersion
     if let reader = ViewNodeContext.current {
       // Reader-attributed: the dependency belongs to the node actually
       // evaluating this read (which may be a descendant consuming a projected
       // binding), not the slot owner. A genuine self-read records on self
       // (reader == self == owner), exactly as before.
-      reader.recordStateReadDependency(readKey)
+      reader.recordStateReadDependency(readKey, version: version)
     } else {
       // No evaluating reader in scope (a read outside resolve): record on self.
-      dependencyTracker.recordStateRead(readKey)
+      dependencyTracker.recordStateRead(readKey, version: version)
     }
 
-    return primedStateSlot(identifier, seed: seed())
+    return value
   }
 
   /// Per-evaluation record of which storage box claimed each slot identity,
@@ -695,10 +697,15 @@ package final class ViewNode {
   /// reader-attributed reads so the dependency lands on the evaluating reader
   /// rather than the slot owner (see ``ReaderAttributionConfiguration``).
   package func recordStateReadDependency(
-    _ key: StateSlotKey
+    _ key: StateSlotKey, version: StateValueIdentity? = nil
   ) {
     recordDependencyTrackerMutation()
-    dependencyTracker.recordStateRead(key)
+    dependencyTracker.recordStateRead(key, version: version)
+  }
+
+  package func recordObservationCertificate(_ certificate: MemoObservationCertificate) {
+    recordDependencyTrackerMutation()
+    dependencyTracker.recordObservationCertificate(certificate)
   }
 
   package func setStateSlot<Value>(
@@ -1428,8 +1435,9 @@ package final class ViewNode {
   }
 
   /// Whether the node's recorded dependencies are all *covered by the memo
-  /// gate's other conjuncts* — i.e. it recorded no `@State` slot reads, no
-  /// `@Observable` reads, and no `@Environment` read of an *uncovered* key.
+  /// gate's other conjuncts* or current read certificates. State versions and
+  /// observation registration currency must still match; environment reads
+  /// must not name an uncovered key.
   ///
   /// `@Environment` reads of keys carried by `environmentSnapshot` ARE allowed:
   /// the gate's `committed.environmentSnapshot == environment` conjunct (in
@@ -1449,15 +1457,28 @@ package final class ViewNode {
   /// compute — so a focus reader must never be memo-reused on view-value +
   /// snapshot equality alone.
   ///
-  /// `@State` slot reads and `@Observable` reads stay excluded outright: neither
-  /// is covered by the environment snapshot. (`!isDirty` catches an observable
-  /// mutation, but state-value equality is not yet checked — a further widening.)
+  /// State certificates name owner lifetimes and immutable scalar replacement
+  /// tokens. Observation certificates require live, unfired registrations,
+  /// including fires that have not yet reached the graph's dirty queue.
   package func hasNoMemoUncoveredDependencies(
     uncoveredEnvironmentKeys: Set<ObjectIdentifier>
   ) -> Bool {
-    dependencies.stateSlotReads.isEmpty
-      && dependencies.observableReads.isEmpty
+    hasCurrentMemoReadCertificates
       && dependencies.environmentReads.isDisjoint(with: uncoveredEnvironmentKeys)
+  }
+
+  package var hasCurrentMemoReadCertificates: Bool {
+    guard !dependencies.hasUncertifiedObservableReads,
+      dependencies.observableReads.isEmpty || !dependencies.observationCertificates.isEmpty,
+      dependencies.observationCertificates.allSatisfy(\.isCurrent)
+    else { return false }
+    for key in dependencies.stateSlotReads {
+      guard let version = dependencies.stateReadCertificates[key]?.version,
+        let owner = ownerGraph?.nodeForOwnerLifetimeID(key.owner),
+        owner.stateSlotStorage(key.slot)?.memoReadVersion === version
+      else { return false }
+    }
+    return true
   }
 
   package func canReuse(

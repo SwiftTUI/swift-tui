@@ -2975,14 +2975,13 @@ package final class ViewGraph {
       // `environmentReuseVerdict` below: whole-snapshot equality is only one
       // of its outcomes.
       node.canMemoReuseIgnoringEnvironment(transaction: transaction),
-      // The reuse-safe dependency subset: no `@State`/`@Observable` reads, and no
-      // `@Environment` read of a key excluded from the snapshot (focus/press).
+      // Reads require current state/observation certificates, and no
+      // environment read of a key excluded from the snapshot (focus/press).
       // Snapshot-covered environment reads are verified by the environment
       // verdict — either the whole snapshot compares equal, or every key that
       // differs is one no node in this subtree (this node included) reads —
       // so layout containers qualify: the boundaries where whole-subtree reuse
-      // pays. State-value, observable, and focus/press equality are deferred /
-      // enforced elsewhere.
+      // pays. Descendant read certificates are checked after view equality.
       node.hasNoMemoUncoveredDependencies(uncoveredEnvironmentKeys: uncoveredEnvironmentKeys)
     else {
       return nil
@@ -3014,6 +3013,7 @@ package final class ViewGraph {
     guard MemoValueComparator.compareForReuse(priorViewValue, viewValue) == .equal else {
       return nil
     }
+    guard memoSubtreeHasCurrentReadCertificates(node) else { return nil }
     // Environment settles last. Every conjunct above is a field test or a
     // bounded identity scan; the toleration's reader/writer scans walk index
     // entries, so deferring them to here means they run only for a node that
@@ -4316,6 +4316,23 @@ package final class ViewGraph {
       }
     }
     return false
+  }
+
+  private func memoSubtreeHasCurrentReadCertificates(_ root: ViewNode) -> Bool {
+    var pending = [root]
+    var values = [root.committed]
+    var visited: Set<ViewNodeID> = []
+    // Committed-value islands need not be ordinary graph children.
+    while let value = values.popLast() {
+      if let id = value.viewNodeID, let node = nodesByNodeID[id] { pending.append(node) }
+      values.append(contentsOf: value.children)
+    }
+    while let node = pending.popLast() {
+      guard visited.insert(node.viewNodeID).inserted else { continue }
+      guard node.hasCurrentMemoReadCertificates else { return false }
+      pending.append(contentsOf: node.children)
+    }
+    return true
   }
 
   private func structuralInvalidationIntersects(

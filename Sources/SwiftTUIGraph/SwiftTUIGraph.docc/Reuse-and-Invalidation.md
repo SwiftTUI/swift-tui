@@ -202,6 +202,31 @@ the plan tiers extend the same gate to value-only types that never opted in.
 The comparator does not reflect at compare time. The reflective comparator
 belongs only to the sampled shadow oracle.
 
+State read certificates name the immutable owner lifetime, slot identifier and
+exact replacement token observed by the reader. The current implementation
+certifies `Bool`, signed and unsigned integer scalars, `Float`, `Double` and
+`String`. Every store advances the token, including an equal-value store;
+restoring a checkpoint restores its token without recycling discarded tokens.
+Different versions read during one evaluation fail closed. Reference models,
+containers, pointers and opaque values remain uncovered because replacement
+alone cannot prove their contents unchanged.
+
+Observation certificates require both an unfired callback and a current
+registration for that owner lifetime. Callback currency is synchronized and
+monotonic outside checkpoint state: restoring a graph and registration snapshot
+cannot revive a fired one-shot callback. A fresh evaluation renews registration
+and replaces conditional read dependencies. Pruning or discarding a registration
+also invalidates its certificate. Memo serves preserve the existing live
+registration. Explicit observable reads without a tracking bridge fail closed.
+These checks cover all recorded observation scopes, including direct property
+reads that do not pass through a framework property wrapper.
+
+Before serving a whole memoized subtree, the graph validates read certificates
+on its graph children and stamped committed-value islands. This is a subtree
+walk, not a constant-time gate. It prevents an unchanged ancestor from hiding a
+silently replaced descendant state value or an observation fire awaiting the
+main-actor invalidation drain.
+
 Both layers share the same acceptance path. `recordReusedSubtree` refreshes the
 retained root and its invalidator. The door restores recorded runtime
 registrations into the pass and rewrites the caller's structural path. It then
