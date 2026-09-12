@@ -339,9 +339,13 @@ extension SemanticExtractor {
 
       if let route = node.semanticMetadata.textInputAccessibilityCursorAnchor {
         let bounds = semanticBounds(for: node)
+        let anchor =
+          route.wrappedText.map {
+            wrappedTextCursorAnchor($0, offset: route.characterOffset, width: bounds.size.width)
+          } ?? route.anchor
         anchors[route.ownerIdentity] = CellPoint(
-          x: bounds.origin.x + route.anchor.x,
-          y: bounds.origin.y + route.anchor.y
+          x: bounds.origin.x + anchor.x,
+          y: bounds.origin.y + anchor.y
         )
       }
 

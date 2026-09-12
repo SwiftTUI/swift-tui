@@ -555,7 +555,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   Return key could be relabeled; the modifier would be inert theater, the
   same reasoning recorded for `onKeyPress` phases. Without an enclosing
   `onSubmit`, Return keeps its default routing.
-- **No `onMoveCommand` or `onExitCommand`.** *Gap.*
+- **Move and exit commands report consumption.** *Ratified.*
+  `onMoveCommand` handles unmodified arrow keys and `onExitCommand` handles
+  unmodified Escape on the focused hosting chain. Both return `KeyPressResult`:
+  `.handled` consumes the command and `.ignored` permits enclosing handlers
+  and default navigation or dismissal. Sibling scopes do not receive it.
+  This follows the terminal-native `onKeyPress` contract rather than SwiftUI's
+  Void-returning command callbacks.
 - **`onKeyPress` is reshaped end to end and is the canonical key API.**
   *Ratified.* The closure is labeled `perform:`, matching is a
   `KeyPressMatch` value with terminal-native statics such as `.arrowUp`, and
@@ -604,8 +610,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   `confirmationDialog` forms are recorded as intentional data-model
   extensions, not claims that SwiftUI has the same labels; titled sheet forms
   mirror SwiftTUI's existing titled Boolean sheet.
-- **`Menu` anchors at the presentation host.** *Gap.* The menu surface is
-  non-modal and anchors top-leading rather than at its source control.
+- **Floating menus follow their source control.** *Ratified.* The non-modal
+  surface opens below its source, flips above near the viewport's lower edge,
+  and clamps horizontally to the viewport. Inline styles keep inline layout.
 
 ## Gestures and input
 
@@ -619,10 +626,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   component: one on-target down-and-up fires it for any press duration,
   because terminals have no OS-level tap coalescing. Multi-tap sequences fail
   if the next tap misses the public 350 ms `TapGesture.interTapWindow`.
-- **A claiming high-priority gesture suppresses controls.** *Gap.* Once a
+- **A claiming high-priority gesture suppresses controls.** *Ratified.* Once a
   high-priority recognizer claims the pointer stream, sibling recognizers do
   not receive it and a descendant control does not activate;
-  `simultaneousGesture` is the explicit exception.
+  `simultaneousGesture` is the explicit exception. A control action firing after
+  another recognizer has claimed its stream would defeat exclusive arbitration;
+  authors who want both effects should choose simultaneous composition.
 - **`GestureMask` applies at registration time.** *Ratified.* The exact
   ancestor-suppression scope chain participates in retained-reuse currency, so
   a live mask flip narrowly re-resolves and republishes gesture-bearing

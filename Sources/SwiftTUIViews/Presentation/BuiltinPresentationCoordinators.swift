@@ -191,7 +191,7 @@ package final class MenuPresentationCoordinator:
   package func makeBody(
     for item: PromptPresentationItem
   ) -> some View {
-    HostedPromptPresentation(item: item)
+    HostedMenuPresentation(item: item)
   }
 
   package func present(

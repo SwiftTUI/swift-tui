@@ -4089,6 +4089,11 @@ SwiftTUIViews.ModifiedContent.content
 SwiftTUIViews.ModifiedContent.id
 SwiftTUIViews.ModifiedContent.init(content:modifier:)
 SwiftTUIViews.ModifiedContent.modifier
+SwiftTUIViews.MoveCommandDirection
+SwiftTUIViews.MoveCommandDirection.down
+SwiftTUIViews.MoveCommandDirection.left
+SwiftTUIViews.MoveCommandDirection.right
+SwiftTUIViews.MoveCommandDirection.up
 SwiftTUIViews.MoveKeyframe
 SwiftTUIViews.MoveKeyframe.Body
 SwiftTUIViews.MoveKeyframe.init(_:)
@@ -5193,9 +5198,11 @@ SwiftTUIViews.View.onAppear(perform:)
 SwiftTUIViews.View.onChange(of:initial:_:)
 SwiftTUIViews.View.onChange(of:initial:_:)
 SwiftTUIViews.View.onDisappear(perform:)
+SwiftTUIViews.View.onExitCommand(perform:)
 SwiftTUIViews.View.onKeyPress(_:modifiers:perform:)
 SwiftTUIViews.View.onKeyPress(_:perform:)
 SwiftTUIViews.View.onLongPressGesture(minimumDuration:maximumDistance:perform:)
+SwiftTUIViews.View.onMoveCommand(perform:)
 SwiftTUIViews.View.onPointerHover(_:)
 SwiftTUIViews.View.onPreferenceChange(_:perform:)
 SwiftTUIViews.View.onScrollWheel(perform:)

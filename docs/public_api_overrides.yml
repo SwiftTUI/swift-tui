@@ -541,6 +541,7 @@ classifications:
     - SwiftTUIViews.IgnoreSafeAreaModifier
     - SwiftTUIViews.KeyCommandRegistrationModifier
     - SwiftTUIViews.KeyPressMatch
+    - SwiftTUIViews.MoveCommandDirection
     - SwiftTUIViews.KeyPressModifier
     - SwiftTUIViews.LayoutValueModifier
     - SwiftTUIViews.MatchedGeometryModifier

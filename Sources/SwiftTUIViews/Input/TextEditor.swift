@@ -71,9 +71,9 @@ extension TextEditor {
       in: context
     )
 
-    // DISPLAY presentation and the accessibility caret anchor stay on `width:
-    // nil`: the visible wrapping is performed by the inner `Text`, so keeping
-    // these unwrapped leaves rendered output (and its fixtures) unchanged.
+    // Text performs visible wrapping. Carry the source caret offset to semantic
+    // extraction, where the current placed width is available even on the first
+    // frame and immediately after a resize.
     let presentation = TextInputPresentation(
       value: synchronizedValue,
       traits: .multiline,
@@ -93,7 +93,8 @@ extension TextEditor {
               displayText: presentation.displayText,
               displayRuns: presentation.displayRuns,
               ownerIdentity: ownerIdentity,
-              caretAnchor: presentation.caretAnchor
+              caretAnchor: presentation.caretAnchor,
+              wrappedCaretOffset: synchronizedValue.selection.head.rawValue
             )
             .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(chrome.foregroundStyle)

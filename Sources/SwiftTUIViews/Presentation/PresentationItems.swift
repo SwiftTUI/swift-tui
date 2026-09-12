@@ -146,6 +146,7 @@ package struct ToastPresentationItem: PortalPresentationItem {
   /// composed the active stack.
   package var style: AnyToastStyle
   package var duration: Double?
+  package var sourceEnvironmentValues: EnvironmentValues?
   package var dismiss: @MainActor @Sendable () -> Void
   package var onDismiss: (@MainActor @Sendable () -> Void)?
 
@@ -163,6 +164,7 @@ package struct ToastPresentationItem: PortalPresentationItem {
     contentPayloads: [PortalAttachmentPayload],
     style: AnyToastStyle,
     duration: Double?,
+    sourceEnvironmentValues: EnvironmentValues? = nil,
     dismiss: @escaping @MainActor @Sendable () -> Void,
     onDismiss: (@MainActor @Sendable () -> Void)? = nil
   ) {
@@ -176,6 +178,7 @@ package struct ToastPresentationItem: PortalPresentationItem {
     self.contentPayloads = contentPayloads.map { $0.attachingEdgeIfMissing(edge) }
     self.style = style
     self.duration = duration
+    self.sourceEnvironmentValues = sourceEnvironmentValues
     self.dismiss = dismiss
     self.onDismiss = onDismiss
   }

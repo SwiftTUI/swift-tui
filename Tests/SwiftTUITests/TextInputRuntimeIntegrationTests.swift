@@ -267,6 +267,35 @@ struct TextInputRuntimeIntegrationTests {
     #expect(!surfaceText(runLoop.host).contains("abc_"))
   }
 
+  @Test(
+    "TextEditor cursor follows visible wrapped text on its first frame and resize",
+    arguments: ["alpha beta 界é Z", "alpha\n\nbeta Z", "abcdefghijklmnopZ"])
+  func wrappedEditorCaretUsesCurrentPlacement(text: String) throws {
+    let box = PasteTextBox()
+    box.value = text
+    let identity = testIdentity("WrappedCursorTextEditor")
+    var width = 10
+    let runtime = makeTextInputRunLoop {
+      TextEditor(text: box.binding()).id(identity).frame(width: width, height: 7)
+    }
+    for currentWidth in [10, 16, 9] {
+      width = currentWidth
+      runtime.runLoop.scheduler.requestInvalidation(of: [runtime.runLoop.rootIdentity])
+      try renderPending(runtime.runLoop)
+      let surface = try #require(runtime.host.latestSurface)
+      let row = try #require(surface.lines.firstIndex { $0.contains("Z") })
+      let column = try #require(surface.lines[row].firstIndex(of: "Z"))
+      let prefix = String(surface.lines[row][..<column])
+      let expected = CellPoint(x: prefix.reduce(0) { $0 + cellWidth(of: $1) } + 1, y: row)
+      let node = try #require(
+        runtime.runLoop.latestSemanticSnapshot.accessibilityNodes.first {
+          $0.identity == identity
+        })
+      #expect(node.cursorAnchor == expected)
+      #expect(runtime.host.movedCursorPoints.last == expected)
+    }
+  }
+
   @Test("TextEditor runtime Ctrl+A selects all before replacement")
   func textEditorRuntimeCtrlASelectsAllBeforeReplacement() throws {
     let box = PasteTextBox()

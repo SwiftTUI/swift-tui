@@ -388,7 +388,6 @@ package struct PortalAttachmentGroupView: PrimitiveView, IterativeResolvableView
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     switch payloads.count {
     case 0: return .value([])
-    case 1: return payloads[0].resolveElementsWork(in: context, placementRoot: context)
     default:
       context.recordResolvedComputation()
       let result = DeclaredChildrenWorkState()
@@ -403,8 +402,7 @@ package struct PortalAttachmentGroupView: PrimitiveView, IterativeResolvableView
         [
           ResolvedNode(
             identity: context.identity, kind: .view(kindName),
-            typeDiscriminator: kindName == "Group"
-              ? ObjectIdentifier(SynthesizedGroupWrapperMarker.self) : nil,
+            typeDiscriminator: ObjectIdentifier(SynthesizedGroupWrapperMarker.self),
             children: result.nodes, environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction)
         ]

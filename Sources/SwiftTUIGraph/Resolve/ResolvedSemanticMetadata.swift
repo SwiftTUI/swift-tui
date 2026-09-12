@@ -491,16 +491,32 @@ package struct HostedCollectionItemMetadata: Equatable, Sendable {
   }
 }
 
-package struct TextInputAccessibilityCursorAnchor: Equatable, Sendable {
-  package var ownerIdentity: Identity
-  package var anchor: CellPoint
+/// Sparse immutable routing data. Keeping the payload out of line avoids
+/// enlarging every resolved node when only text inputs need wrapped caret data.
+package final class TextInputAccessibilityCursorAnchor: Equatable, Sendable {
+  package let ownerIdentity: Identity
+  package let anchor: CellPoint
+  package let wrappedText: String?
+  package let characterOffset: Int
+
+  package static func == (
+    lhs: TextInputAccessibilityCursorAnchor, rhs: TextInputAccessibilityCursorAnchor
+  ) -> Bool {
+    lhs === rhs
+      || (lhs.ownerIdentity == rhs.ownerIdentity && lhs.anchor == rhs.anchor
+        && lhs.wrappedText == rhs.wrappedText && lhs.characterOffset == rhs.characterOffset)
+  }
 
   package init(
     ownerIdentity: Identity,
-    anchor: CellPoint
+    anchor: CellPoint,
+    wrappedText: String? = nil,
+    characterOffset: Int = 0
   ) {
     self.ownerIdentity = ownerIdentity
     self.anchor = anchor
+    self.wrappedText = wrappedText
+    self.characterOffset = characterOffset
   }
 }
 

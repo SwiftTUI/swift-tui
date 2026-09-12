@@ -18,12 +18,15 @@ package struct PortalEntryID: Hashable, Sendable, CustomStringConvertible {
   }
 
   package var description: String {
-    "\(sourceIdentity.path)#\(token)"
+    if let sourceEntityIdentity {
+      return "entity:\(sourceEntityIdentity.scopedDescription)#\(token)"
+    }
+    return "\(sourceIdentity.path)#\(token)"
   }
 
   package var ownerStableKey: String {
     if let sourceEntityIdentity {
-      return "entity:\(sourceEntityIdentity.description)#\(token)"
+      return "entity:\(sourceEntityIdentity.scopedDescription)#\(token)"
     }
     return "source:\(sourceStructuralPath.description)#\(token)"
   }

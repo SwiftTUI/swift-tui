@@ -904,6 +904,7 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
   package var value: AnyID
   package var occurrence: Int
   package var debugDescription: String
+  private var scopeDescription: String?
   package var isScopedExactIdentity: Bool
   /// Whether this entity names a `ForEach` element (`init(forEachValue:…)`).
   /// Element entities live on the element's own explicit-identity node and
@@ -920,6 +921,7 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     self.value = AnyID(value)
     self.occurrence = occurrence
     debugDescription = String(reflecting: value)
+    scopeDescription = nil
     isScopedExactIdentity = false
     isForEachScoped = false
   }
@@ -932,6 +934,7 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     self.value = AnyID(ScopedForEachEntityID(scope: scope, value: value))
     self.occurrence = occurrence
     debugDescription = String(reflecting: value)
+    scopeDescription = scope.description
     isScopedExactIdentity = false
     isForEachScoped = true
   }
@@ -949,6 +952,7 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     value = AnyID(ScopedExactEntityID(scope: scope, identity: identity))
     self.occurrence = occurrence
     debugDescription = String(reflecting: identity)
+    scopeDescription = scope.scopedDescription
     isScopedExactIdentity = true
     isForEachScoped = false
   }
@@ -957,12 +961,14 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
     value: AnyID,
     occurrence: Int,
     debugDescription: String,
+    scopeDescription: String?,
     isScopedExactIdentity: Bool,
     isForEachScoped: Bool
   ) {
     self.value = value
     self.occurrence = occurrence
     self.debugDescription = debugDescription
+    self.scopeDescription = scopeDescription
     self.isScopedExactIdentity = isScopedExactIdentity
     self.isForEachScoped = isForEachScoped
   }
@@ -972,9 +978,17 @@ package struct EntityIdentity: Hashable, Sendable, CustomStringConvertible {
       value: value,
       occurrence: occurrence,
       debugDescription: debugDescription,
+      scopeDescription: scopeDescription,
       isScopedExactIdentity: isScopedExactIdentity,
       isForEachScoped: isForEachScoped
     )
+  }
+
+  /// Scope-bearing spelling for string-keyed presentation lifetimes. Keep
+  /// diagnostic descriptions compact; they intentionally omit enclosing scopes.
+  package var scopedDescription: String {
+    guard let scopeDescription else { return description }
+    return "scope[\(scopeDescription.utf8.count)]:\(scopeDescription)/\(description)"
   }
 
   package var description: String {

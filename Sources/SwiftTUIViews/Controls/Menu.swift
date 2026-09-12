@@ -14,13 +14,13 @@ private func menuIsExpanded(in ownerNode: SwiftTUICore.ViewNode?) -> Bool {
 /// the menu's site in the layout, taking exactly one cell of height.
 /// When active, a nonmodal portal entry hosts the user-supplied `content`.
 /// The automatic entry is a compact bordered box with intrinsic width at the
-/// top-leading of the portal root; a ``MenuStyle`` supplies its own
+/// source control; a ``MenuStyle`` supplies its own
 /// ``AnchoredSurfaceStylePresentation`` (insets, bounds, border, paint) or
 /// composes the content inline instead.
 ///
 /// **Current presentation behavior:**
-/// - Anchoring is at the presentation host's top-leading rather than
-///   at the menu's source frame.
+/// - The surface opens below the source, flips above when needed, and clamps
+///   to the viewport. Moving the trigger moves its open surface.
 /// - The menu stays non-modal: opening it does not freeze surrounding
 ///   controls, although Escape still dismisses the topmost open menu.
 /// Use ``MenuStyle`` to compose a different trigger or inline content.

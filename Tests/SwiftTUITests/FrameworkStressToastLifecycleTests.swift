@@ -1350,3 +1350,33 @@ private struct ToastLifecycle025Root: View {
     }
   }
 }
+
+extension FrameworkStressToastLifecycleTests {
+  @Test("chained toasts retain distinct source environments through updates")
+  func chainedToastSourceEnvironments() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ChainedToastEnvironments"), size: .init(width: 68, height: 18)
+    ) { ChainedToastEnvironmentRoot() }
+    defer { harness.shutdown() }
+    for generation in 0..<4 {
+      #expect(harness.frame.contains("inner environment value-\(generation)"))
+      #expect(harness.frame.contains("outer environment default"))
+      #expect(toastLifecycleEntryCount(in: harness) == 1)
+      _ = try harness.clickText("Change environment")
+    }
+  }
+}
+
+private struct ChainedToastEnvironmentRoot: View {
+  @State private var generation = 0
+  var body: some View {
+    Button("Change environment") { generation += 1 }
+      .toast(isPresented: .constant(true), duration: nil) {
+        ToastLifecycle005Reader(prefix: "inner")
+      }
+      .environment(\.toastLifecycleValue, "value-\(generation)")
+      .toast(isPresented: .constant(true), duration: nil) {
+        ToastLifecycle005Reader(prefix: "outer")
+      }
+  }
+}

@@ -8,12 +8,23 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- Focus-scoped `onMoveCommand` and `onExitCommand` handlers with explicit
+  consumption and bubbling through `KeyPressResult`.
+
 ### Fixed
 
 - Preserve stacked key handlers on the first Equatable-boundary frame, and
   retain explicit focus changes made by pointer release actions.
 - Remember every dismissed bindingless tip for its anchor lifetime, and retain
   parent modal suppression when an inner control is already disabled.
+- Keep sheets with scoped exact IDs independent, preserve state when conditional
+  portal siblings appear, and retain each chained toast's source environment.
+- Place TextEditor hardware and accessibility carets at the current wrapped text
+  position on the first frame and after resizing.
+- Anchor floating menus to their source controls, including movement and
+  viewport-edge clamping.
 - Preserve both task operations when chained modifiers collapse onto one
   owner, including independent ID replacement and cancellation on removal.
 - Keep retained ForEach row bindings current for mutable reference-backed IDs.

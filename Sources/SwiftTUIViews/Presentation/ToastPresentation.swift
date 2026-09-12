@@ -724,6 +724,7 @@ public struct ToastModifier<ToastContent: View>: IterativePrimitiveViewModifier 
         ),
         style: style,
         duration: duration,
+        sourceEnvironmentValues: context.environmentValues,
         dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
           withAuthoringContext(dismissAuthoringContext) {
             isPresented.wrappedValue = false
@@ -770,11 +771,7 @@ package struct ToastCoordinatorBodyView: View {
         // The stack's shape is known here and nowhere earlier, so each
         // row resolves its own style against its position in it.
         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-          ToastPresentationView(
-            item: item,
-            stackIndex: index,
-            stackCount: items.count
-          )
+          ToastSourceEnvironmentView(item: item, stackIndex: index, stackCount: items.count)
         }
       }
       .padding(.bottom, 1)
@@ -857,5 +854,21 @@ private struct ToastPresentationView: View {
     } else {
       toastBody
     }
+  }
+}
+
+/// Aggregate stack placement stays coordinator-owned; each row restores its
+/// own declaration's environment before resolving chrome and authored content.
+private struct ToastSourceEnvironmentView: PrimitiveView, IterativeResolvableView {
+  var item: ToastPresentationItem
+  var stackIndex: Int
+  var stackCount: Int
+
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    let rowContext = item.sourceEnvironmentValues.map(context.replacingEnvironmentValues) ?? context
+    return resolveViewWork(
+      ToastPresentationView(item: item, stackIndex: stackIndex, stackCount: stackCount),
+      in: rowContext
+    ).map { [$0] }
   }
 }
