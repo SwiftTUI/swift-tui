@@ -626,6 +626,7 @@ package func runDynamicPropertyUpdates<V>(
 ) -> DynamicPropertyUpdateResult {
   // Read-only: names the fields the container forwards itself, so the outer
   // walk skips them. The forwarded update below is the mutating half.
+  validateDormantHotReloadDeclarations(in: value)
   let traversalOwner = value as? any AdditionalDynamicPropertyUpdating
   var result = runDynamicPropertyUpdatePass(
     on: &value,

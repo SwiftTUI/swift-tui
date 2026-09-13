@@ -345,8 +345,9 @@ without Foundation. Limits bound nesting (128), values (65,536), and cumulative
 key/string UTF-8 bytes (4 MiB) per encoded slot. Integer encodings preserve
 64-bit and 128-bit boundaries; floating snapshots compare bit patterns.
 Codable model references decode as new instances. Non-Codable values and
-transient runtime slots carry explicit capture diagnostics. Nested dormant
-container registries currently fail capture rather than retaining old code.
+transient runtime slots carry explicit capture diagnostics. Framework dormant
+containers project detached archives for immediate encoding; replay retains no
+registry objects. Nested archive traversal is limited to 64 levels.
 
 `HotReloadReplay` matches complete destination owner schemas before slot
 initialization. Exact owners reserve their source records; one-component
@@ -361,9 +362,22 @@ Replay installs only under a fresh disjoint root on one graph. New slot
 initialization decodes through the destination type, consumes the record,
 and otherwise uses the new authored seed. The replay table and diagnostics
 live in `FrameCommitState`, so graph rollback restores consumption.
-`finishHotReloadReplay` reports unused records and releases the table.
-This is internal replay infrastructure; it does not arm application reload,
-discover destination schemas, swap runtime generations, or load libraries.
+`finishHotReloadReplay` reports unused records. Inactive records can remain until
+their owner materializes, when a read-only declaration walk requires the entire
+exact slot/type set before any claim. Inactive content never uses ordinal-rank
+or wrapper guesses. Subsequent snapshots carry still-inactive encoded records.
+
+`SwiftTUIRuntime/HotReload/` owns package-internal static generation swaps. A
+private scoped root factory resolves below a disjoint generation prefix and a
+stable erased payload component. It rehearses the replacement in fresh graphs
+without lifecycle publication, up to four schema passes, before installation.
+State-dependent topology must converge; refusal preserves the live generation.
+The commit retires old handlers/tasks and invokes old disappear handlers before
+new appear/task work. Focus follows the accepted owner map; Codable scroll and
+focus storage reconstructs runtime registrations. Pointer scratch resets.
+Identical-content, wrapper, inactive-tab, focus/scroll, real async input/task and
+100-generation tests cover the host. This internal stage does not arm an
+application reload command or load dynamic libraries.
 
 Viewport lifecycle carry follows a uniquely matched visible identity when its
 backing node changes. `ViewGraphLifecyclePlanning.swift` emits task transfers

@@ -1,5 +1,14 @@
 public import SwiftTUICore
 
+extension FocusState: HotReloadSlotDeclaring {
+  package func hotReloadDeclaration(path: StateSlotPath) -> (StateSlotIdentifier, String)? {
+    (
+      .init(ordinal: box.currentOrdinal, path: path),
+      String(reflecting: FocusStateStorage<Value>.self)
+    )
+  }
+}
+
 private struct FocusStateSnapshot<Value: Equatable>: Equatable {
   var value: Value
   var hasPendingRequest: Bool
@@ -58,6 +67,19 @@ private struct FocusStateStorage<Value: Equatable>: Equatable {
     snapshot.value = newValue
     snapshot.hasPendingRequest = false
     return didChange
+  }
+}
+
+extension FocusStateStorage: Encodable where Value: Encodable {
+  func encode(to encoder: any Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(snapshot.value)
+  }
+}
+
+extension FocusStateStorage: Decodable where Value: Decodable {
+  init(from decoder: any Decoder) throws {
+    self.init(value: try decoder.singleValueContainer().decode(Value.self), hasPendingRequest: true)
   }
 }
 

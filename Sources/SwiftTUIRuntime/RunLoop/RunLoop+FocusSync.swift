@@ -213,6 +213,10 @@ extension RunLoop {
     let hadFocusBeforeRegionUpdate = focusIdentityBeforeRegionUpdate != nil
     var focusChanged = focusTracker.updateRegions(
       renderedArtifacts.semanticSnapshot.focusRegions)
+    if let pending = hotReloadSession?.pendingFocus {
+      hotReloadSession?.pendingFocus = nil
+      focusChanged = focusTracker.setFocus(to: pending) || focusChanged
+    }
     // A traversal's landing region vanished before any further input: the
     // control revoked its own focusability as a consequence of receiving
     // focus (e.g. `.disabled` reading a `@FocusedValue` that the traversal
@@ -255,8 +259,9 @@ extension RunLoop {
       // the preceding eager pass. Only restore a still-landed click target.
       if focusIdentityBeforeRegionUpdate == pending.landedIdentity,
         renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
-        $0.identity == pending.originIdentity
-      }) {
+          $0.identity == pending.originIdentity
+        })
+      {
         focusChanged = focusTracker.setFocus(to: pending.originIdentity) || focusChanged
       }
     }

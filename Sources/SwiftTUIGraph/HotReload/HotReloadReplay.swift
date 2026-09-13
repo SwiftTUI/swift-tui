@@ -21,6 +21,9 @@ package struct HotReloadSnapshot: Equatable, Sendable {
     package var typeName: String
     package var value: SnapshotValue?
     package var failure: String?
+    package var isDormant = false
+    package var participatesInSchema = true
+    package var requiresDormantSchema = false
   }
   package var sourceRoot: Identity
   package var entries: [Entry]
@@ -39,7 +42,8 @@ package struct HotReloadReplay: Equatable, Sendable {
     snapshot: HotReloadSnapshot, destinationRoot: Identity, owners: [HotReloadOwnerSchema]
   ) {
     self.destinationRoot = destinationRoot
-    let sourceGroups = Dictionary(grouping: snapshot.entries, by: { $0.address.owner })
+    let sourceGroups = Dictionary(
+      grouping: snapshot.entries.filter(\.participatesInSchema), by: { $0.address.owner })
     let targetGroups = Dictionary(grouping: owners, by: \.identity)
     var availableSources = Set(sourceGroups.keys)
     var availableTargets = Set(targetGroups.keys)
@@ -97,6 +101,18 @@ package struct HotReloadReplay: Equatable, Sendable {
       }
     }
     for entry in snapshot.entries where !accepted.contains(entry.address) {
+      if entry.isDormant, targetGroups[entry.address.owner] == nil,
+        !snapshot.ambiguousOwners.contains(entry.address.owner),
+        sourceGroups[entry.address.owner]?.filter({ $0.address == entry.address }).count == 1,
+        entry.value != nil
+      {
+        // Inactive payloads have no destination tree to rehearse. Keep only
+        // exact keys; type-check when that payload first materializes.
+        var deferred = entry
+        deferred.requiresDormantSchema = true
+        pending[entry.address] = deferred
+        continue
+      }
       diagnostics.append(
         .init(
           address: entry.address,
@@ -136,6 +152,7 @@ package struct HotReloadReplay: Equatable, Sendable {
   ) -> HotReloadSnapshot.Entry? {
     guard let owner = Self.relative(identity, to: destinationRoot) else { return nil }
     let key = HotReloadSlotAddress(owner: owner, slot: slot)
+    guard pending[key]?.requiresDormantSchema == false else { return nil }
     return pending.removeValue(forKey: key)
   }
 
@@ -147,12 +164,12 @@ package struct HotReloadReplay: Equatable, Sendable {
     return decoded
   }
 
-  package mutating func finish() -> [HotReloadDiagnostic] {
-    for entry in pending.values {
+  package mutating func finish(keepingDormant: Bool = false) -> [HotReloadDiagnostic] {
+    for entry in pending.values where !keepingDormant || !entry.isDormant {
       diagnostics.append(
         .init(address: entry.address, reason: "Destination slot was never initialized"))
     }
-    pending.removeAll()
+    pending = keepingDormant ? pending.filter { $0.value.isDormant } : [:]
     sortDiagnostics()
     return diagnostics
   }
@@ -170,6 +187,19 @@ package struct HotReloadReplay: Equatable, Sendable {
   package static func relative(_ identity: Identity, to root: Identity) -> Identity? {
     guard identity.components.starts(with: root.components) else { return nil }
     return Identity(components: Array(identity.components.dropFirst(root.components.count)))
+  }
+
+  package func rebasedIdentity(_ identity: Identity, from sourceRoot: Identity) -> Identity? {
+    guard let relative = Self.relative(identity, to: sourceRoot) else { return nil }
+    let source = ownerMatches.keys.filter { relative.components.starts(with: $0.components) }
+      .max { $0.components.count < $1.components.count }
+    let rebased: [String]
+    if let source, let target = ownerMatches[source] {
+      rebased = target.components + relative.components.dropFirst(source.components.count)
+    } else {
+      rebased = relative.components
+    }
+    return Identity(components: destinationRoot.components + rebased)
   }
 }
 
@@ -194,25 +224,62 @@ extension ViewGraph {
   package func captureHotReloadSnapshot(rootedAt root: Identity) -> HotReloadSnapshot {
     var entries: [HotReloadSnapshot.Entry] = []
     var ownerCounts: [Identity: Int] = [:]
+    func capture(
+      _ slot: AnyStateSlot, identifier: StateSlotIdentifier, identity: Identity,
+      dormant: Bool, depth: Int
+    ) {
+      guard let owner = HotReloadReplay.relative(identity, to: root) else { return }
+      let address = HotReloadSlotAddress(owner: owner, slot: identifier)
+      do {
+        let value = try slot.hotReloadValue()
+        entries.append(
+          .init(
+            address: address, typeName: slot.storedTypeDescription, value: value,
+            isDormant: dormant,
+            participatesInSchema: slot.dormantPolicy.survivesDormancy))
+      } catch {
+        entries.append(
+          .init(
+            address: address, typeName: slot.storedTypeDescription,
+            failure: String(describing: error),
+            isDormant: dormant, participatesInSchema: slot.dormantPolicy.survivesDormancy))
+      }
+      let archives = slot.hotReloadNestedArchives()
+      guard depth < 64 else {
+        if !archives.isEmpty {
+          entries.append(
+            .init(
+              address: address, typeName: slot.storedTypeDescription,
+              failure: "Nested dormant archive depth exceeds 64", participatesInSchema: false))
+        }
+        return
+      }
+      for archive in archives {
+        for record in archive.records {
+          if let archivedOwner = HotReloadReplay.relative(record.identity, to: root),
+            !record.stateSlots.isEmpty
+          {
+            ownerCounts[archivedOwner, default: 0] += 1
+          }
+          for (key, value) in record.stateSlots {
+            capture(
+              AnyStateSlot(restoringDormant: value), identifier: key, identity: record.identity,
+              dormant: true, depth: depth + 1)
+          }
+        }
+      }
+    }
     for node in nodesByNodeID.values.sorted(by: { $0.viewNodeID < $1.viewNodeID }) {
       guard let owner = HotReloadReplay.relative(node.identity, to: root) else { continue }
       if node.stateSlots.values.contains(where: \.isInitialized) {
         ownerCounts[owner, default: 0] += 1
       }
       for (identifier, slot) in node.stateSlots where slot.isInitialized {
-        let address = HotReloadSlotAddress(owner: owner, slot: identifier)
-        do {
-          let value = try slot.hotReloadValue()
-          entries.append(
-            .init(address: address, typeName: slot.storedTypeDescription, value: value))
-        } catch {
-          entries.append(
-            .init(
-              address: address, typeName: slot.storedTypeDescription,
-              failure: String(describing: error)
-            ))
-        }
+        capture(slot, identifier: identifier, identity: node.identity, dormant: false, depth: 0)
       }
+    }
+    if hotReloadReplay?.destinationRoot == root {
+      entries.append(contentsOf: hotReloadReplay?.pending.values.filter(\.isDormant) ?? [])
     }
     entries.sort {
       ($0.address.owner.path, $0.address.slot.path.description, $0.address.slot.ordinal)
@@ -238,10 +305,11 @@ extension ViewGraph {
       snapshot: snapshot, destinationRoot: destinationRoot, owners: owners)
   }
 
-  package func finishHotReloadReplay() -> [HotReloadDiagnostic] {
+  package func finishHotReloadReplay(keepingDormant: Bool = false) -> [HotReloadDiagnostic] {
     guard var replay = hotReloadReplay else { return [] }
-    hotReloadReplay = nil
-    return replay.finish()
+    let diagnostics = replay.finish(keepingDormant: keepingDormant)
+    hotReloadReplay = replay.pending.isEmpty ? nil : replay
+    return diagnostics
   }
 }
 

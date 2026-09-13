@@ -207,6 +207,13 @@ package struct AnyStateSlot {
     return try SnapshotCoding.encode(encodable)
   }
 
+  @MainActor package func hotReloadNestedArchives() -> [DormantStateArchive] {
+    guard case .value(let value, _, _) = storage,
+      let projecting = value as? any HotReloadArchiveProjecting
+    else { return [] }
+    return projecting.hotReloadArchives()
+  }
+
   /// Returns a detached reconstruction payload. Authored ownership permits
   /// model references; framework persistence requires value-only storage.
   /// Direct task handles, bindings and other runtime handles remain excluded.

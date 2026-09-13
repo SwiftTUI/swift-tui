@@ -4430,6 +4430,7 @@ SwiftTUIViews.RoundedRectangle.init(cornerRadius:)
 SwiftTUIViews.SafeAreaInsetModifier
 SwiftTUIViews.SafeAreaPaddingModifier
 SwiftTUIViews.ScrollCellOffset
+SwiftTUIViews.ScrollCellOffset.init(from:)
 SwiftTUIViews.ScrollCellOffset.init(x:y:)
 SwiftTUIViews.ScrollCellOffset.scrollBy(x:y:)
 SwiftTUIViews.ScrollCellOffset.scrollTo(x:y:)

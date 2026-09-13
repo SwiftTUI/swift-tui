@@ -4,7 +4,7 @@ public import SwiftTUICore
 public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView {
   public var axes: Axis.Set
   @State private var internalPosition = ScrollCellOffset.zero
-  @State private var panAnchor: ScrollPanAnchor?
+  @State(dormantPolicy: .transient) private var panAnchor: ScrollPanAnchor? = nil
   private var explicitPosition: Binding<ScrollCellOffset>?
   private var fitsContent = false
   private let contentAuthoringScope: CapturedSubviewScope

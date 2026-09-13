@@ -416,4 +416,27 @@ struct HotReloadReplayTests {
       try graph.installHotReloadReplay(snapshot, at: destination, owners: [schema([10])])
     }
   }
+
+  @Test func inactiveValuesRequireTheWholeExactDeclarationSetBeforeClaiming() throws {
+    for changed in [false, true] {
+      let graph = ViewGraph()
+      var first = entry(10, value: 7)
+      var second = entry(20, value: 9)
+      first.isDormant = true
+      second.isDormant = true
+      try graph.installHotReloadReplay(
+        .init(sourceRoot: source, entries: [first, second]),
+        at: destination, owners: [])
+      let identity = absolute(owner)
+      let premature: Int? = graph.restoredHotReloadValue(for: identity, slot: slot(20))
+      #expect(premature == nil)
+      #expect(graph.needsDormantHotReloadSchema(for: identity))
+      graph.validateDormantHotReloadSchema(
+        for: identity,
+        slots: schema(changed ? [20, 30] : [10, 20]).slots, ambiguous: false)
+      let value: Int? = graph.restoredHotReloadValue(for: identity, slot: slot(20))
+      #expect(value == (changed ? nil : 9))
+      if changed { #expect(graph.finishHotReloadReplay().count == 2) }
+    }
+  }
 }

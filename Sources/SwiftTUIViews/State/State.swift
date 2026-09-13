@@ -481,6 +481,16 @@ public struct State<Value> {
     path: StateSlotPath = .root
   ) -> DynamicStateLocation<Value> {
     if let viewNode = liveAuthoringOwnerNode(stateOwnerHandle: storageOwner) {
+      if box.dormantPolicy.survivesDormancy {
+        let slot = StateSlotIdentifier(ordinal: box.currentOrdinal, path: path)
+        HotReloadSchemaCapture.current?.record(viewNode, slot: slot, type: Value.self)
+        if viewNode.ownerGraph?.hasHotReloadValue(for: viewNode.identity, slot: slot) == true {
+          // Restore even unread declarations before body/lifecycle evaluation.
+          _ = withDormantStateSlotPolicy(box.dormantPolicy) {
+            viewNode.primedStateSlot(slot, seed: box.currentSeedValue())
+          }
+        }
+      }
       if ViewNodeContext.current != nil {
         // Resolve-time claim bookkeeping: a second distinct box claiming
         // this slot identity in one evaluation is the silent-sharing
@@ -649,6 +659,13 @@ private func stateDeclarationSite(
     return declarationFileID
   }
   return "\(declarationFileID):\(slotOrdinal >> 16):\(slotOrdinal & 0xFFFF)"
+}
+
+extension State: HotReloadSlotDeclaring {
+  package func hotReloadDeclaration(path: StateSlotPath) -> (StateSlotIdentifier, String)? {
+    guard box.dormantPolicy.survivesDormancy else { return nil }
+    return (.init(ordinal: box.currentOrdinal, path: path), String(reflecting: Value.self))
+  }
 }
 
 extension State: CaptureBindableDynamicProperty {

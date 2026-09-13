@@ -658,6 +658,9 @@ package final class ViewNode {
     _ identifier: StateSlotIdentifier,
     seed: @autoclosure () -> Value
   ) -> Value {
+    if DormantStateSlotPolicyScope.current.survivesDormancy {
+      HotReloadSchemaCapture.current?.record(self, slot: identifier, type: Value.self)
+    }
     var slot = stateSlots[identifier] ?? .init()
     if !slot.isInitialized,
       let replayed: Value = ownerGraph?.restoredHotReloadValue(for: identity, slot: identifier)

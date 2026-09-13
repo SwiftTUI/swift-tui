@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 414 | 2504 |
+| `SwiftTUIViews` | 414 | 2505 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -423,7 +423,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `RoundedRectangle` — struct — 3 members
 - `SafeAreaInsetModifier` — struct
 - `SafeAreaPaddingModifier` — struct
-- `ScrollCellOffset` — struct — 7 members
+- `ScrollCellOffset` — struct — 8 members
 - `ScrollView` — struct — 4 members
 - `ScrollViewProxy` — struct — 5 members
 - `ScrollViewReader` — struct — 1 member

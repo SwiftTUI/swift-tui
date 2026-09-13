@@ -45,7 +45,15 @@ public struct AnyView: PrimitiveView, IterativeResolvableView {
   }
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
-    let payloadContext = context.child(component: storage.typeID.identityComponent)
+    makeResolveWork(in: context, payloadIdentity: storage.typeID.identityComponent)
+  }
+
+  /// A generation-scoped runtime host supplies its own disjoint lifetime root.
+  /// Ordinary AnyView resolution always retains the concrete-type component.
+  package func makeResolveWork(
+    in context: ResolveContext, payloadIdentity: IdentityComponent
+  ) -> ResolveWork<[ResolvedNode]> {
+    let payloadContext = context.child(component: payloadIdentity)
     // The payload's stored view resolves through this Content node — a
     // non-transparent hosting boundary. Host-escaping entity routes must not
     // be claimed here (see `ResolveContext.entityHosting`).

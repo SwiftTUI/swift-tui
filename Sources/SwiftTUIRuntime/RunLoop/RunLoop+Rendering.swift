@@ -304,6 +304,7 @@ extension RunLoop {
     // the writes' invalidations flow into this frame's flush as they did
     // when completions fired at commit.
     fireDeferredAnimationCompletions()
+    hotReloadSession?.finishCommittedReplay()
     updateFocusPresentation(focusPresentation)
     // Record the committed focus so the next frame's reuse-safety gate can
     // detect a focus move (see ``retainedReuseSuppressionScopeForFrameSafety()``).

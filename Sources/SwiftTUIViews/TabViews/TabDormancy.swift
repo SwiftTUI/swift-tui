@@ -111,7 +111,8 @@ package enum DormantTabArchiveRefreshPreferenceKey: PreferenceKey {
 }
 
 @MainActor
-private struct TabDormantRegistry {
+private struct TabDormantRegistry: HotReloadArchiveProjecting {
+  func hotReloadArchives() -> [DormantStateArchive] { entries.map(\.archive) }
   struct Entry {
     var key: TabDormantKey
     var archive: DormantStateArchive
