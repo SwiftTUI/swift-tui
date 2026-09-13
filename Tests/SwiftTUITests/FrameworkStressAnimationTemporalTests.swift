@@ -992,7 +992,7 @@ private func animationTemporalPlacedMatchedNode(
 // MARK: - Attempt 019: departed transition registration
 
 extension FrameworkStressAnimationTemporalTests {
-  @Test("stress animation temporal 019 removed transition modifier cannot animate later removal")
+  @Test("stress animation temporal 019 a removed explicit transition falls back to opacity")
   func animationTemporal019RemovedTransitionCannotAnimateLaterRemoval() throws {
     // Hypothesis: transition collection merges pending registrations without
     // deleting a live node's departed modifier, so a later removal reuses it.
@@ -1007,7 +1007,7 @@ extension FrameworkStressAnimationTemporalTests {
 
     controller.beginTransitionCollection()
     controller.registerTransition(
-      for: leafID, viewNodeID: nodeID, transition: AnyTransition.opacity)
+      for: leafID, viewNodeID: nodeID, transition: AnyTransition.offset(x: 4))
     controller.finishTransitionCollection()
     controller.processResolvedTree(
       animationTemporalRoot(identity: rootID, children: [leaf]),
@@ -1024,6 +1024,15 @@ extension FrameworkStressAnimationTemporalTests {
     )
     #expect(controller.debugStateSnapshot().transitionNodeIDs.isEmpty)
 
+    let bounds = CellRect(origin: .zero, size: .init(width: 20, height: 2))
+    controller.capturePlacedTree(
+      PlacedNode(
+        identity: rootID, bounds: bounds,
+        children: [
+          PlacedNode(
+            identity: leafID, bounds: .init(origin: .zero, size: .init(width: 4, height: 1)))
+        ]))
+
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
     controller.beginTransitionCollection()
@@ -1033,7 +1042,13 @@ extension FrameworkStressAnimationTemporalTests {
       transaction: transaction,
       timestamp: start.advanced(by: .milliseconds(40))
     )
-    #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+    #expect(controller.debugStateSnapshot().removingIdentities == [leafID])
+    let sampled = controller.placedAnimationOverlaySnapshot(
+      for: PlacedNode(identity: rootID, bounds: bounds),
+      at: start.advanced(by: .milliseconds(540)))
+    let overlay = try #require(sampled.removalOverlays.first)
+    #expect(overlay.modifiers.opacity == 0.5)
+    #expect(overlay.modifiers.offsetX == nil)
   }
 }
 
