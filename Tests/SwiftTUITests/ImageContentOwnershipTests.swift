@@ -11,9 +11,9 @@ struct ImageContentOwnershipTests {
     let bytes = [UInt8](repeating: 7, count: 4096)
     var changed = bytes
     changed[2048] = 9
-    var first: ImageContent? = try #require(repository.content(for: .embeddedImage(bytes)))
+    var first = repository.content(for: .embeddedImage(bytes))
     let firstID = try #require(first?.id)
-    weak var lifetime = first
+    weak let lifetime = first
     #expect(repository.content(for: .embeddedImage(bytes)) === first)
     let second = try #require(repository.content(for: .embeddedImage(changed)))
     #expect(second.id != firstID)

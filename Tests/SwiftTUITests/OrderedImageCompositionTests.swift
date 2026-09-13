@@ -159,7 +159,8 @@ struct OrderedImageCompositionTests {
   @Test("terminal preparation preserves authored graphics order and shares the ordered variant")
   func terminalReplay() throws {
     let lower = try attachment("z-lower", color: Color(red: 1, green: 0, blue: 0))
-    let upper = try attachment("a-upper", color: Color(red: 0, green: 0, blue: 1), mode: .multiply)
+    var upper = try attachment("a-upper", color: Color(red: 0, green: 0, blue: 1), mode: .multiply)
+    upper.opacity = 0.5
     let surface = RasterSurface(
       size: .init(width: 1, height: 1), cells: [[.empty]], imageAttachments: [lower, upper])
     let capabilities = TerminalGraphicsCapabilities(
@@ -170,7 +171,13 @@ struct OrderedImageCompositionTests {
       for: surface, capabilityProfile: .trueColor,
       graphicsCapabilities: capabilities, fallbackBackground: .white)
     #expect(prepared.imageAttachments[0].identity == lower.identity)
-    #expect(try pixels(prepared.imageAttachments[1]) == [rgbaPixel(red: 0, green: 0, blue: 0)])
+    #expect(
+      try pixels(prepared.imageAttachments[1]) == [
+        pixel(
+          Color(red: 0, green: 0, blue: 0, alpha: 0.5).composited(
+            over: Color(red: 1, green: 0, blue: 0)))
+      ])
+    #expect(prepared.imageAttachments[1].opacity == 1)
     var transmitted: Set<UInt32> = []
     let steps = renderer.graphicsWriteSteps(
       for: prepared, capabilityProfile: .trueColor,

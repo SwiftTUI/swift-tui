@@ -341,7 +341,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   /// cells/images host boundary and uses the exact portable blend arithmetic.
   /// Non-overlapping images take the existing path without decoding here.
   package func orderedAttachments(
-    in surface: RasterSurface, fallbackBackground: Color
+    in surface: RasterSurface, fallbackBackground: Color,
+    precompositePlacementOpacity: Bool = false
   ) -> [RasterImageAttachment] {
     let original = surface.imageAttachments
     guard original.count > 1, original.contains(where: { $0.compositing != nil }) else {
@@ -413,14 +414,17 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       guard !backdrop.isEmpty,
         let payload = encodedPNGPayload(
           for: attachment, fallbackBackground: fallbackBackground,
-          orderedBackdrop: backdrop)
+          orderedBackdrop: backdrop,
+          placementOpacity: precompositePlacementOpacity ? attachment.opacity : 1)
       else { continue }
       result[index].source = .data(payload.bytes)
       result[index].resolvedReference = .embeddedImage(payload.bytes)
       result[index].bounds = attachment.visibleBounds
       result[index].pixelSize = payload.pixelSize
       result[index].compositing = nil
-      // Keep placement alpha outside the variant identity, as on the ordinary image path.
+      // Capable hosts apply placement alpha after lookup. Terminal graphics
+      // need it baked over the ordered destination, like ordinary blends.
+      if precompositePlacementOpacity { result[index].opacity = 1 }
     }
     return result
   }
@@ -528,7 +532,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   private func encodedPNGPayload(
     for attachment: RasterImageAttachment,
     fallbackBackground: Color,
-    orderedBackdrop: [OrderedImageBackdrop]
+    orderedBackdrop: [OrderedImageBackdrop],
+    placementOpacity: Double = 1
   ) -> BlendedImageEncodedPayload? {
     guard
       let compositing = attachment.compositing,
@@ -550,7 +555,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       cellPixelSize: compositing.cellPixelSize,
       backdropSignature: compositing.backdropSignature,
       fallbackBackground: fallbackBackground,
-      placementOpacity: 1,
+      placementOpacity: placementOpacity,
       orderedBackdrop: orderedBackdrop.map(\.key)
     )
     if let cached = storage.withLockUnchecked({ $0.encodedLookup(for: key) }) {
@@ -567,7 +572,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       compositing: compositing,
       outputSize: outputSize,
       fallbackBackground: fallbackBackground,
-      placementOpacity: 1,
+      placementOpacity: placementOpacity,
       orderedBackdrop: orderedBackdrop
     )
     guard pixels.count == outputSize.width * outputSize.height else {

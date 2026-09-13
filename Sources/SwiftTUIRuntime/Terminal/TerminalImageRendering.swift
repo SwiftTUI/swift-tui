@@ -222,7 +222,7 @@ final class TerminalImageRenderer: Sendable {
     // pass-through is at worst a no-op for sixel.
     var prepared = surface
     prepared.imageAttachments = blendCompositor.orderedAttachments(
-      in: surface, fallbackBackground: fallbackBackground)
+      in: surface, fallbackBackground: fallbackBackground, precompositePlacementOpacity: true)
     if graphicsCapabilities.preferredProtocol != nil {
       return prepared
     }
@@ -486,13 +486,15 @@ final class TerminalImageRenderer: Sendable {
     if let variant {
       image = variant.image
     } else {
-      guard
-        let sourceImage = content.flatMap({ repository.decodedImage(for: $0) })
-          ?? repository.decodedImage(for: reference)
-      else {
-        return nil
+      if let content {
+        guard let sourceImage = repository.decodedImage(for: content) else { return nil }
+        image = sourceImage
+      } else {
+        guard case .namedResource = reference,
+          let sourceImage = repository.decodedImage(for: reference)
+        else { return nil }
+        image = sourceImage
       }
-      image = sourceImage
     }
     let mode = fallbackRenderMode(for: capabilityProfile)
     let cellSize = attachment.bounds.size

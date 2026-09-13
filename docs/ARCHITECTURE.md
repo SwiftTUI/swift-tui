@@ -649,7 +649,9 @@ portable linear-sRGB arithmetic. Its variant key includes prior content owners,
 geometry, opacity and occlusion, without retaining the prior decoded buffers in
 the key. Existing blend-cache budgets include this metadata. Non-overlapping
 images retain their original path. The upper image's own placement opacity stays
-outside its encoded variant, so opacity-only updates can reuse it.
+outside its encoded variant on capable native/wire hosts, so opacity-only updates
+can reuse it. Terminal preparation bakes that opacity over the ordered destination
+and emits an opaque placement, matching the existing terminal blend path.
 
 Terminal preparation, hosted raster delivery, and both full/delta web wire
 encoding use this preparation. Android consumes that same wire encoder. The

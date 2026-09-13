@@ -1135,9 +1135,10 @@ path, while unblended images keep the fast native path.
   image includes preceding image pixels in its captured backdrop, with authoring
   order and intervening cell occlusion supplied by the raster sidecar. The same
   portable variants reach terminal graphics/fallbacks, Apple hosted surfaces,
-  and browser/Android image records. Placement opacity stays outside the encoded
-  variant, while lower-layer content, placement and opacity invalidate dependent
-  variants. Hosts retain their existing cells-then-image attachment boundary;
+  and browser/Android image records. Capable native/wire hosts apply placement
+  opacity outside the encoded variant; terminal preparation bakes it into the
+  ordered destination. Lower-layer content, placement and opacity invalidate
+  dependent variants. Hosts retain their existing cells-then-image attachment boundary;
   this does not introduce general native replay of interleaved cell layers.
 ## Distribution
 
