@@ -8,14 +8,27 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-09-13
+
 ### Added
 
+- Drawing value APIs for angles and arcs, compatible-topology path animation,
+  and shape clipping.
+- Animated-image loop metadata and finite playback, including GIF round trips.
 - Opt-in merge-pressure frame pacing (`SWIFTTUI_MERGE_PRESSURE_PACING=1`)
   and frame-cost/coalescing telemetry. Input, signal, external and due-deadline
   wakes bypass the invalidation-only gap; the feature defaults off.
 
 ### Fixed
 
+- Preserve drawing opacity, curved-stroke colors, and raster extents; compose
+  overlapping images in authored order across native, web, and terminal hosts.
+- Reuse source-owned image content during resolution and encoding.
+- Correct control-style rendering and retained content placement, and validate
+  public collection-style presentations with deterministic diagnostics.
+- Keep wheel-driven invalidations responsive when frame pacing is enabled.
+- Reduce nested-scroll regression test cost while retaining endpoint, handoff,
+  and reversal assertions under the existing amd64 duration cap.
 - Animate numeric text in viewport-realized List rows and refresh eager rows'
   text presentation across retained layout.
 - Apply scoped animation and transaction timing to environment-carried
@@ -1912,7 +1925,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.1...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.2...HEAD
+[0.13.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.2
 [0.12.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.1
 [0.12.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.0
 [0.11.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.11.3
