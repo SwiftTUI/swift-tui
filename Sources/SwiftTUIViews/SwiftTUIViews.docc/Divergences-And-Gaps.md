@@ -517,9 +517,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   `backgroundStyle(_:)` is an environment write with different semantics,
   and that name is no longer claimed. The paint travels with the fragment
   when interpolated into rich content.
-- **`Text` is `Equatable` and `Sendable` but not `Hashable`.** *Gap.*
-  SwiftUI's `Text` is all three; hashing awaits `Hashable` metadata
-  payloads.
+- **`Text` is `Equatable`, `Hashable`, and `Sendable`.** *Ratified.*
+  Equality includes authored styles and rich fragments. Hashing uses the
+  textual structure; style-only differences may collide and are distinguished
+  by equality, as permitted by `Hashable`.
 - **`Image(fileURLString:)` names its input honestly.** *Ratified.* The
   initializer takes a `file://` URL *string* (parsed, host form and
   percent-encoding included); the earlier `fileURL:` label promised a URL
@@ -671,10 +672,26 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **Strokes are one cell wide.** *Ratified.* There are no `lineWidth:` stroke
   overloads; authors select apparent weight through the glyph palette via
   `borderSet`.
-- **No `addArc`, no general `clipShape(_:)`, no animatable path morphing.**
-  *Gap.* `addArc` needs an angle type; clipping to an arbitrary path is
-  unimplemented; parameterized shapes animate their parameters instead of
-  morphing paths.
+- **Arcs use explicit angle and sweep contracts.** *Ratified.* `Angle`
+  stores unnormalized radians and offers degree conversion. `Path.addArc`
+  connects the current pen to its start and emits cubic segments of at most
+  90 degrees. `clockwise` decreases the angle, which appears counterclockwise
+  on the terminal's downward-y axis. Equal endpoints add nothing; an authored
+  difference of at least one turn adds one complete circle. Invalid inputs
+  leave the path unchanged.
+- **`clipShape(_:)` clips rendered cells and image placements.** *Ratified.*
+  Masks use the same cell-center coverage as shape fills, including custom
+  paths, fill rules and geometric insets. Nested masks intersect. Wide glyphs
+  require their full cell span to be covered. Layout and hit-test regions
+  stay unchanged; `contentShape` controls interaction separately. Frames
+  containing shape masks and images rasterize afresh to preserve ordering of
+  split image placements; cell-only masks support incremental rasterization.
+- **Compatible paths morph their anchor and control points.** *Ratified.*
+  `Path` conforms to `Animatable`. Paths with identical ordered element kinds
+  and finite coordinates interpolate inside an animation transaction;
+  incompatible topology snaps to the target. Empty and collapsed paths retain
+  their authored topology. `interpolated(to:progress:)` exposes the same rule
+  with clamped progress and exact endpoints.
 - **Custom shapes stretch; built-ins inscribe.** *Ratified.* A custom
   `path(in:)` shape fills its frame, while `Circle` stays round by inscribing
   the short axis; both are recorded as consequences of the cell grid, together with
@@ -1109,9 +1126,11 @@ an active blend mode is precomposed against the sampled backdrop in linear
 sRGB with glyph-aware backdrops and presented through the existing attachment
 path, while unblended images keep the fast native path.
 
-- **No animated-image/GIF blending.** *Gap.*
-  `AnimatedImage(...).blendMode(...)` still emits unblended frames; the
-  precomposition path covers still images only.
+- **Decoded animated frames share still-image blending.** *Ratified.*
+  `AnimatedImage(...).blendMode(...)` presents cached PNG frames through the
+  existing image precomposition path. Raw GIF passthrough leaves playback to
+  the host; decode with `AnimatedGIF` and use `AnimatedImage` for framework
+  timing and per-frame blending.
 - **No ordered-layer compositing or native-host replay.** *Gap.* Multiple
   overlapping blended images do not composite as ordered layers, and the
   precomposed variant is not replayed on native hosts outside the terminal

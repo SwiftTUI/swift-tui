@@ -21,10 +21,10 @@ extension GIF {
     /// declares, or `nil` when it carries no such extension.
     ///
     /// Zero means "repeat forever"; a positive count is the number of
-    /// plays. **Absent is not zero** — the format defines a GIF with no
+    /// repeats after the initial play. **Absent is not zero** — a GIF with no
     /// looping extension as playing through exactly once — so a caller
-    /// that needs a number wants `loopCount ?? 1` rather than the type's
-    /// zero. The optional is what lets each caller pick its own default
+    /// that needs total finite plays uses `(loopCount ?? 0) + 1`, while
+    /// treating explicit zero separately. The optional lets a caller pick its own default
     /// instead of inheriting one baked in here.
     public let loopCount: Int?
 

@@ -46,7 +46,9 @@ The encoder writes GIF89a indexed images with:
 - One global color table, padded to the required power-of-two size
 - GIF LZW compression with sub-block framing
 - Graphics Control Extensions for delay, disposal, and transparency
-- Netscape looping extension for animated images
+- Netscape looping extension when `IndexedImage.loopCount` is nonnil, including
+  single-frame images. `nil` omits the extension, `0` repeats forever, and a
+  positive count specifies repeats after the initial play.
 
 `GIF.Image.unpack(as:)` returns the **first frame composited onto the
 logical screen** as `RGBA<T>` — the typical "static GIF preview" view.

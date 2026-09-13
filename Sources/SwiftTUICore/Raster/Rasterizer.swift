@@ -209,6 +209,8 @@ package struct Rasterizer: Sendable {
     }
 
     if let previousSurface,
+      !draw.subtreeHasShapeClip
+        || (previousSurface.imageAttachments.isEmpty && !hasImageCommands(draw)),
       let damage,
       let soundDamage = SoundRasterDamage(
         presentationDamage: damage,

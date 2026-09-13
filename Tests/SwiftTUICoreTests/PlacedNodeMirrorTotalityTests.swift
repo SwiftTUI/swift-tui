@@ -170,8 +170,8 @@ struct DrawNodePaintProjectionTotalityTests {
     "children":
       "the projection is defined as \"this node ignoring its children\" — the damage diff pairs "
       + "and walks children itself",
-    "subtreeNodeCount":
-      "derived aggregate recomputed by the children didSet; nothing about it paints",
+    "subtreeNodeSummary":
+      "derived count and mask flag recomputed from metadata and children; selects retained-image reuse",
     "subtreeBounds":
       "derived aggregate recomputed by the children didSet — the diff reads it directly for "
       + "re-keyed, departed, and arrived subtrees, and per-node comparison covers bounds",

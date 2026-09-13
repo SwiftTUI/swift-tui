@@ -123,6 +123,26 @@ extension Rasterizer {
         }
         nodeContext.clip = visibility.clip
 
+        if !node.metadata.shapeClips.isEmpty {
+          let surfaceBounds = CellRect(
+            origin: .zero,
+            size: .init(width: cells.first?.count ?? 0, height: cells.count))
+          guard let maskClip = intersect(visibility.clip ?? surfaceBounds, surfaceBounds) else {
+            continue
+          }
+          var unclippedNode = node
+          unclippedNode.metadata.shapeClips = []
+          // Disjoint rectangles commute in paint order. Keeping the original
+          // command bounds preserves gradient sampling, image scaling and text
+          // shaping while the existing rectangular clip enforces coverage.
+          for region in shapeClipRegions(node: node, clip: maskClip).reversed() {
+            var regionContext = nodeContext
+            regionContext.clip = region
+            stack.append(.visit(node: unclippedNode, context: regionContext))
+          }
+          continue
+        }
+
         // Record visibility BEFORE the dirty-rows cull.  The animation
         // tick-gating check treats this set as a geometric predicate
         // ("would the identity paint cells given the current clip"),

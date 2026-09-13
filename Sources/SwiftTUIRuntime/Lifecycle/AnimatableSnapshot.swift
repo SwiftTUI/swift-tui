@@ -73,6 +73,9 @@ package struct AnimatableSnapshot: Sendable {
     // paint time — in that case the .foregroundShapeStyle extraction
     // above already covers it.
     if case .shape(let shapePayload) = node.drawPayload {
+      if case .path(let path, _) = shapePayload.geometry {
+        snapshot[.shapePath] = AnyAnimatable(path.path)
+      }
       switch shapePayload.operation {
       case .fill(let style, _):
         if let fill = extractAnimatableShapeStyle(from: style) {

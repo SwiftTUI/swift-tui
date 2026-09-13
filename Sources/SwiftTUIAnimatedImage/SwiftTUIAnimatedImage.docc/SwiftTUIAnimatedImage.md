@@ -39,13 +39,22 @@ delay becomes 100 ms, and all delays are floored at 20 ms.
 
 ## Playback
 
-A sequence with more than one frame starts playing when the view appears
-and loops indefinitely, waiting each frame's own delay before advancing;
+A sequence with more than one frame starts playing when the view appears,
+waiting each frame's own delay before advancing;
 the playback task is cancelled with the view. Changing the view's sequence
 value restarts playback from the first frame. A single-frame sequence
 renders as a static image with no playback task. The test suite drives a
 real run loop and asserts that every GIF-decoded frame is presented and
 that a two-frame round trip preserves distinct 50 ms and 120 ms delays.
+
+`AnimatedImageSequence.loopCount` preserves GIF's optional repeat metadata:
+`nil` means no loop extension and one play; `0` repeats indefinitely; a
+positive value repeats that many times **after the first play**. A value of
+`1` therefore plays twice. Finite playback waits the last frame's delay and
+then leaves that frame visible without scheduling another tick. Existing
+frame-based initializers default to `0`; their new `loopCount:` overloads
+accept `nil` or any integer in `0...65535`. The count participates in sequence
+equality, hashing and playback task identity.
 
 Each frame reaches the renderer as PNG bytes through the same
 `Image(data:)` surface as static images — encoded once per frame and
@@ -80,8 +89,8 @@ AnimatedImage(
 
 ## Exporting a GIF
 
-``AnimatedGIF`` also encodes a sequence back into GIF file bytes. The
-default `loopCount` of `0` marks the file to loop forever:
+``AnimatedGIF`` also encodes a sequence back into GIF file bytes, preserving
+its `loopCount` metadata. Newly authored sequences default to infinite repeats:
 
 ```swift
 let sequence = AnimatedImageSequence(
@@ -90,6 +99,10 @@ let sequence = AnimatedImageSequence(
 )
 let gifBytes = try AnimatedGIF.encode(sequence)
 ```
+
+Use `AnimatedGIF.encode(sequence, loopCount: 2)` to override the exported
+repeat count, or `loopCount: nil` to omit the loop extension. Decode/encode
+round trips preserve absent, infinite and finite counts, even for one frame.
 
 The encoder builds a palette of up to 256 distinct colors and snaps any
 extra colors to the nearest palette entry. Fully transparent pixels stay

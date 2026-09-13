@@ -61,6 +61,17 @@ extension View {
     drawMetadata(.init(clipsToBounds: true))
   }
 
+  /// Clips this view and its descendants to a shape in its placed frame.
+  /// Coverage is sampled at cell centers, using the same geometry as shape
+  /// fills. Wide glyphs paint only when their entire cell span is covered.
+  /// Clipping leaves layout and hit testing unchanged; use `contentShape`
+  /// separately to constrain interaction. Multiple clips intersect.
+  public func clipShape<S: Shape>(_ shape: S) -> some View {
+    var metadata = DrawMetadata(clipsToBounds: true)
+    metadata.shapeClips = [.init(geometry: shape.geometry, insetAmount: shape.insetAmount)]
+    return drawMetadata(metadata)
+  }
+
   public func offset(_ offset: CellSize) -> some View {
     modifier(
       OffsetModifier(

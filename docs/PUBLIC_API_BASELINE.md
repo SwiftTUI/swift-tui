@@ -20,8 +20,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 59 | 509 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 414 | 2502 |
-| `SwiftTUIAnimatedImage` | 5 | 31 |
+| `SwiftTUIViews` | 414 | 2504 |
+| `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
 | `SwiftTUITerminalCLI` | 6 | 24 |
@@ -32,7 +32,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 169 | 1474 |
+| `SwiftTUIPrimitives` | 170 | 1487 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -486,7 +486,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TerminalHandoffAction` — struct — 5 members
 - `TerminalHandoffError` — enum — 4 members
 - `TerminationRequestModifier` — struct
-- `Text` — struct — 35 members
+- `Text` — struct — 36 members
 - `TextEditor` — struct — 2 members
 - `TextEditorStyle` — protocol — 7 members
 - `TextEditorStyleConfiguration` — struct — 8 members
@@ -525,7 +525,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 208 members
+- `View` — protocol — 209 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member
@@ -545,11 +545,11 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ### Canonical surface (5)
 
-- `AnimatedGIF` — enum — 3 members
+- `AnimatedGIF` — enum — 5 members
 - `AnimatedImage` — struct — 7 members
 - `AnimatedImageFrame` — struct — 5 members
 - `AnimatedImagePixel` — struct — 5 members
-- `AnimatedImageSequence` — struct — 6 members
+- `AnimatedImageSequence` — struct — 9 members
 
 ## SwiftTUIArguments
 
@@ -693,11 +693,12 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (168)
+### Canonical surface (169)
 
 - `adapt(_:to:method:)` — func
 - `Alignment` — struct — 16 members
 - `AlignmentID` — protocol — 1 member
+- `Angle` — struct — 8 members
 - `Animatable` — protocol — 2 members
 - `AnimatableArray` — struct — 10 members
 - `AnimatablePair` — struct — 12 members
@@ -780,7 +781,7 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `OklabColor` — struct — 5 members
 - `OklchColor` — struct — 5 members
 - `OutlineStylePresentation` — struct — 10 members
-- `Path` — struct — 27 members
+- `Path` — struct — 31 members
 - `Phase` — enum — 8 members
 - `PixelPoint` — struct — 4 members
 - `PixelSize` — struct — 4 members

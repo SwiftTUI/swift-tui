@@ -291,6 +291,14 @@ package enum AnimationPropertyValueApplication {
       guard let height = value.unwrap(as: Int.self) else { return }
       applyFrameHeight(height, to: &node)
 
+    case .shapePath:
+      guard let path = value.unwrap(as: Path.self),
+        case .shape(var payload) = node.drawPayload,
+        case .path(_, let fillRule) = payload.geometry
+      else { return }
+      payload.geometry = .path(BoxedPath(path), fillRule)
+      node.drawPayload = .shape(payload)
+
     case .shapeFillStyle:
       guard let style = unwrapShapeStyle(value) else { return }
       guard case .shape(let shapePayload) = node.drawPayload,

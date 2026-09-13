@@ -150,9 +150,37 @@ public struct Text: PrimitiveView, ResolvableView {
   }
 }
 
-// `Hashable` is deliberately omitted: it would require hashing the full
-// draw/semantic metadata payloads, which are `Equatable`-only today.
-extension Text: Equatable, Sendable {}
+extension Text: Hashable, Sendable {
+  // Equality continues to compare the complete authored value. Hashing its
+  // structural text content is sufficient for equal values to hash equally;
+  // style-only differences may collide and are resolved by full equality.
+  // This avoids imposing Hashable on opaque draw/semantic metadata.
+  nonisolated public func hash(into hasher: inout Hasher) {
+    hasher.combine(underlineExplicitlyCleared)
+    hasher.combine(strikethroughExplicitlyCleared)
+    switch storage {
+    case .plain(let text):
+      hasher.combine(0)
+      hasher.combine(text)
+    case .rich(let content):
+      hasher.combine(1)
+      hasher.combine(content.fragments.count)
+      for fragment in content.fragments {
+        switch fragment {
+        case .literal(let text):
+          hasher.combine(0)
+          hasher.combine(text)
+        case .text(let text):
+          hasher.combine(1)
+          hasher.combine(text)
+        case .link(let link):
+          hasher.combine(2)
+          hasher.combine(link.label)
+        }
+      }
+    }
+  }
+}
 
 extension Text {
   /// Alias for the supported text truncation modes.

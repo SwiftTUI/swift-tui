@@ -243,7 +243,11 @@ struct FrameworkStressAnimatedImageCodecTests {
     let finite = try AnimatedGIF.decode(data: AnimatedGIF.encode(sequence, loopCount: 3))
     let infinite = try AnimatedGIF.decode(data: AnimatedGIF.encode(sequence, loopCount: 0))
 
-    #expect(finite == infinite)
+    #expect(finite.frames == infinite.frames)
+    #expect(finite.frameDelays == infinite.frameDelays)
+    #expect(finite.loopCount == 3)
+    #expect(infinite.loopCount == 0)
+    #expect(finite != infinite)
   }
 
   @Test("stress animated image codec 024 trailing transport bytes do not corrupt GIF decoding")

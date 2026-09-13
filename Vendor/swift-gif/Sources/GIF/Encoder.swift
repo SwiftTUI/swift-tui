@@ -44,8 +44,8 @@ extension GIF {
     public let globalColorTable: [(r: UInt8, g: UInt8, b: UInt8)]
     /// Logical-screen background color index.
     public let backgroundIndex: Int
-    /// Netscape loop count. Zero means infinite.
-    public let loopCount: Int
+    /// Netscape repeats after the initial play. Zero means infinite; nil omits the extension.
+    public let loopCount: Int?
     /// Frames in source order.
     public let frames: [IndexedFrame]
 
@@ -54,6 +54,17 @@ extension GIF {
       globalColorTable: [(r: UInt8, g: UInt8, b: UInt8)],
       backgroundIndex: Int = 0,
       loopCount: Int = 0,
+      frames: [IndexedFrame]
+    ) {
+      self.init(size: size, globalColorTable: globalColorTable, backgroundIndex: backgroundIndex,
+        loopCount: Optional(loopCount), frames: frames)
+    }
+
+    public init(
+      size: (x: Int, y: Int),
+      globalColorTable: [(r: UInt8, g: UInt8, b: UInt8)],
+      backgroundIndex: Int = 0,
+      loopCount: Int?,
       frames: [IndexedFrame]
     ) {
       self.size = size
@@ -83,8 +94,8 @@ extension GIF {
       )
       writePalette(palette, into: &output)
 
-      if image.frames.count > 1 || image.loopCount != 1 {
-        writeNetscapeLoopExtension(loopCount: image.loopCount, into: &output)
+      if let loopCount = image.loopCount {
+        writeNetscapeLoopExtension(loopCount: loopCount, into: &output)
       }
 
       let minCodeSize = max(2, colorTableSizeBits(palette.count))

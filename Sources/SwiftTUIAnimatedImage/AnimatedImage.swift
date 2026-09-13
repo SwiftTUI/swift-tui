@@ -2,6 +2,7 @@
 public struct AnimatedImage: View {
   public var sequence: AnimatedImageSequence
   @State private var frameIndex = 0
+  @State private var activeSequence: AnimatedImageSequence?
 
   public init(
     _ sequence: AnimatedImageSequence
@@ -61,19 +62,16 @@ public struct AnimatedImage: View {
   }
 
   private var boundedFrameIndex: Int {
-    min(frameIndex, sequence.frames.count - 1)
+    activeSequence == sequence ? min(frameIndex, sequence.frames.count - 1) : 0
   }
 
   @MainActor
   private func play() async {
-    frameIndex = 0
-    while !Task.isCancelled && sequence.frames.count > 1 {
-      let currentFrame = min(frameIndex, sequence.frames.count - 1)
-      try? await Task.sleep(nanoseconds: sequence.delayNanoseconds[currentFrame])
-      if Task.isCancelled {
-        break
-      }
-      frameIndex = (currentFrame + 1) % sequence.frames.count
-    }
+    await AnimatedImagePlayback.run(
+      sequence,
+      onFrame: { index in
+        activeSequence = sequence
+        frameIndex = index
+      })
   }
 }

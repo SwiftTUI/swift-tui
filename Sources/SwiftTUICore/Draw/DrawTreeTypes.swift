@@ -284,7 +284,9 @@ package struct DrawNode: Equatable, Sendable {
   package var environmentSnapshot: EnvironmentSnapshot
   package var bounds: CellRect
   package var clipBounds: CellRect?
-  package var metadata: DrawMetadata
+  package var metadata: DrawMetadata {
+    didSet { recomputeSubtreeAggregates() }
+  }
   package var drawEffects: DrawEffects
   package var commands: [DrawCommand]
   /// Commands that must paint **after** this node's children have been
@@ -298,7 +300,11 @@ package struct DrawNode: Equatable, Sendable {
       recomputeSubtreeAggregates()
     }
   }
-  package private(set) var subtreeNodeCount: Int
+  // A subtree always has at least one node. Its count's sign carries the mask
+  // flag without widening this hot value beyond its 256-byte stack budget.
+  private var subtreeNodeSummary: Int
+  package var subtreeNodeCount: Int { abs(subtreeNodeSummary) }
+  package var subtreeHasShapeClip: Bool { subtreeNodeSummary < 0 }
   /// The absolute union of this node's `bounds` and every descendant's
   /// `subtreeBounds`. `.offset`/`.position` bake their translation into the
   /// *child's* absolute bounds (the wrapper keeps its own slot), so a node's own
@@ -331,19 +337,21 @@ package struct DrawNode: Equatable, Sendable {
     self.commands = commands
     self.postCommands = postCommands
     self.children = children
-    subtreeNodeCount = 1
+    subtreeNodeSummary = 1
     subtreeBounds = bounds
     recomputeSubtreeAggregates()
   }
 
   private mutating func recomputeSubtreeAggregates() {
     var count = 1
+    var hasShapeClip = !metadata.shapeClips.isEmpty
     var extent = bounds
     for child in children {
       count += child.subtreeNodeCount
+      hasShapeClip = hasShapeClip || child.subtreeHasShapeClip
       extent = extent.union(child.subtreeBounds)
     }
-    subtreeNodeCount = count
+    subtreeNodeSummary = hasShapeClip ? -count : count
     subtreeBounds = extent
   }
 }

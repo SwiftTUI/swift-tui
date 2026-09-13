@@ -48,6 +48,8 @@ SwiftTUIAndroidHost.swift_tui_android_tick(_:)
 SwiftTUIAnimatedImage.AnimatedGIF
 SwiftTUIAnimatedImage.AnimatedGIF.decode(contentsOf:)
 SwiftTUIAnimatedImage.AnimatedGIF.decode(data:)
+SwiftTUIAnimatedImage.AnimatedGIF.encode(_:)
+SwiftTUIAnimatedImage.AnimatedGIF.encode(_:loopCount:)
 SwiftTUIAnimatedImage.AnimatedGIF.encode(_:loopCount:)
 SwiftTUIAnimatedImage.AnimatedImage
 SwiftTUIAnimatedImage.AnimatedImage.body
@@ -75,7 +77,10 @@ SwiftTUIAnimatedImage.AnimatedImageSequence.frameDelays
 SwiftTUIAnimatedImage.AnimatedImageSequence.frames
 SwiftTUIAnimatedImage.AnimatedImageSequence.hash(into:)
 SwiftTUIAnimatedImage.AnimatedImageSequence.init(frames:frameDelays:)
+SwiftTUIAnimatedImage.AnimatedImageSequence.init(frames:frameDelays:loopCount:)
 SwiftTUIAnimatedImage.AnimatedImageSequence.init(frames:framesPerSecond:)
+SwiftTUIAnimatedImage.AnimatedImageSequence.init(frames:framesPerSecond:loopCount:)
+SwiftTUIAnimatedImage.AnimatedImageSequence.loopCount
 SwiftTUIArguments.CompletionsCommand
 SwiftTUIArguments.CompletionsCommand.Install
 SwiftTUIArguments.CompletionsCommand.Install.configuration
@@ -835,6 +840,15 @@ SwiftTUIPrimitives.Alignment.trailingFirstTextBaseline
 SwiftTUIPrimitives.Alignment.vertical
 SwiftTUIPrimitives.AlignmentID
 SwiftTUIPrimitives.AlignmentID.defaultValue(in:)
+SwiftTUIPrimitives.Angle
+SwiftTUIPrimitives.Angle.<(_:_:)
+SwiftTUIPrimitives.Angle.degrees
+SwiftTUIPrimitives.Angle.degrees(_:)
+SwiftTUIPrimitives.Angle.init(degrees:)
+SwiftTUIPrimitives.Angle.init(radians:)
+SwiftTUIPrimitives.Angle.radians
+SwiftTUIPrimitives.Angle.radians(_:)
+SwiftTUIPrimitives.Angle.zero
 SwiftTUIPrimitives.Animatable
 SwiftTUIPrimitives.Animatable.AnimatableData
 SwiftTUIPrimitives.Animatable.animatableData
@@ -1565,12 +1579,14 @@ SwiftTUIPrimitives.Path.Element.curve(to:control1:control2:)
 SwiftTUIPrimitives.Path.Element.line(to:)
 SwiftTUIPrimitives.Path.Element.move(to:)
 SwiftTUIPrimitives.Path.Element.quadCurve(to:control:)
+SwiftTUIPrimitives.Path.addArc(center:radius:startAngle:endAngle:clockwise:)
 SwiftTUIPrimitives.Path.addCurve(to:control1:control2:)
 SwiftTUIPrimitives.Path.addEllipse(in:)
 SwiftTUIPrimitives.Path.addLine(to:)
 SwiftTUIPrimitives.Path.addQuadCurve(to:control:)
 SwiftTUIPrimitives.Path.addRect(_:)
 SwiftTUIPrimitives.Path.addRoundedRect(in:cornerRadius:)
+SwiftTUIPrimitives.Path.animatableData
 SwiftTUIPrimitives.Path.boundingRect
 SwiftTUIPrimitives.Path.close()
 SwiftTUIPrimitives.Path.closeSubpath()
@@ -1583,6 +1599,8 @@ SwiftTUIPrimitives.Path.init(_:)
 SwiftTUIPrimitives.Path.init(_:)
 SwiftTUIPrimitives.Path.init(ellipseIn:)
 SwiftTUIPrimitives.Path.init(roundedRect:cornerRadius:)
+SwiftTUIPrimitives.Path.interpolated(to:progress:)
+SwiftTUIPrimitives.Path.isInterpolable(to:)
 SwiftTUIPrimitives.Path.move(to:)
 SwiftTUIPrimitives.Path.scaledBy(sx:sy:)
 SwiftTUIPrimitives.Path.translatedBy(dx:dy:)
@@ -4892,6 +4910,7 @@ SwiftTUIViews.Text.content
 SwiftTUIViews.Text.faint()
 SwiftTUIViews.Text.faint(_:)
 SwiftTUIViews.Text.foregroundStyle(_:)
+SwiftTUIViews.Text.hash(into:)
 SwiftTUIViews.Text.init(_:semanticMetadata:)
 SwiftTUIViews.Text.init(_:semanticMetadata:)
 SwiftTUIViews.Text.init(verbatim:)
@@ -5137,6 +5156,7 @@ SwiftTUIViews.View.border(blend:set:placement:sides:phase:)
 SwiftTUIViews.View.buttonBorderShape(_:)
 SwiftTUIViews.View.buttonStyle(_:)
 SwiftTUIViews.View.buttonStyle(_:)
+SwiftTUIViews.View.clipShape(_:)
 SwiftTUIViews.View.clipped()
 SwiftTUIViews.View.compositingGroup()
 SwiftTUIViews.View.confirmationDialog(_:isPresented:onDismiss:)

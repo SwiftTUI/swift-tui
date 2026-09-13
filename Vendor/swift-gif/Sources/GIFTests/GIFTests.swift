@@ -242,7 +242,7 @@ func singleFramePlayOnceWritesNoBlock() throws {
     GIF.IndexedImage(
       size: (x: 1, y: 1),
       globalColorTable: [(r: 255, g: 0, b: 0)],
-      loopCount: 1,
+      loopCount: nil,
       frames: [GIF.IndexedFrame(width: 1, height: 1, indices: [0])]
     )
   )
@@ -330,7 +330,7 @@ func globalColorTableIsSizedToThePalette(entries: Int) throws {
       globalColorTable: palette,
       // Play-once so no looping extension sits between the fields the
       // offsets below step through.
-      loopCount: 1,
+      loopCount: nil,
       frames: [
         GIF.IndexedFrame(
           width: entries,
@@ -370,7 +370,7 @@ func nonPowerOfTwoPaletteIsPadded(entries: Int, padded: Int) throws {
     GIF.IndexedImage(
       size: (x: entries, y: 1),
       globalColorTable: palette,
-      loopCount: 1,
+      loopCount: nil,
       frames: [
         GIF.IndexedFrame(
           width: entries,

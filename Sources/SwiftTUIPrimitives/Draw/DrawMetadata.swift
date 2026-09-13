@@ -1,5 +1,14 @@
 /// Visual metadata attached to a resolved node before draw extraction.
 package struct DrawMetadata: Equatable, Sendable {
+  package struct ShapeClip: Equatable, Sendable {
+    package var geometry: ShapeGeometry
+    package var insetAmount: Int
+
+    package init(geometry: ShapeGeometry, insetAmount: Int) {
+      self.geometry = geometry
+      self.insetAmount = max(0, insetAmount)
+    }
+  }
   /// List-specific styling preferences carried by draw metadata.
   package struct ListStyleMetadata: Equatable, Sendable {
     package var rowForegroundStyle: AnyShapeStyle?
@@ -50,6 +59,7 @@ package struct DrawMetadata: Equatable, Sendable {
   }
 
   package struct HeavyFields: Equatable, Sendable {
+    var shapeClips: [ShapeClip] = []
     var baseStyle: BaseStyle
     var borderShapeStyle: AnyShapeStyle?
     var borderStrokeStyle: StrokeStyle?
@@ -97,6 +107,7 @@ package struct DrawMetadata: Equatable, Sendable {
 
     func merging(_ other: Self) -> Self {
       var merged = self
+      merged.shapeClips += other.shapeClips
       merged.baseStyle = baseStyle.merging(other.baseStyle)
       merged.borderShapeStyle = other.borderShapeStyle ?? borderShapeStyle
       merged.borderStrokeStyle = other.borderStrokeStyle ?? borderStrokeStyle
@@ -200,6 +211,11 @@ package struct DrawMetadata: Equatable, Sendable {
   package var baseStyle: BaseStyle {
     get { heavyFields.value.baseStyle }
     set { heavyFields.value.baseStyle = newValue }
+  }
+
+  package var shapeClips: [ShapeClip] {
+    get { heavyFields.value.shapeClips }
+    set { heavyFields.value.shapeClips = newValue }
   }
 
   package var foregroundStyle: AnyShapeStyle? {

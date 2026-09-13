@@ -87,6 +87,9 @@ private func animatableStructureDiffers<T>(_ lhs: T, _ rhs: T) -> Bool {
   if let lhs = lhs as? MeshGradient, let rhs = rhs as? MeshGradient {
     return !lhs.isInterpolable(to: rhs)
   }
+  if let lhs = lhs as? Path, let rhs = rhs as? Path {
+    return !lhs.isInterpolable(to: rhs)
+  }
   return false
 }
 
@@ -132,6 +135,9 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
     // constructors.  Snap to the target instead.
     guard t.isFinite else {
       return AnyAnimatable(other.value)
+    }
+    if let source = value as? Path, let target = other.value as? Path {
+      return AnyAnimatable(source.interpolated(to: target, progress: t))
     }
 
     // Special case: ``TileStyle`` is variant-based (color vs

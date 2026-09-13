@@ -39,6 +39,13 @@ public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
     }
   }
   internal var delayNanoseconds: [UInt64]
+  /// GIF repeat count: `nil` means play once, `0` repeats forever, and a
+  /// positive value repeats that many times after the initial play.
+  /// Valid finite repeat counts are 1...65535. Programmatic initializers
+  /// without this argument retain their historical infinite-loop default.
+  public var loopCount: Int? {
+    didSet { Self.validateLoopCount(loopCount) }
+  }
   private var encodedFrameStore = EncodedFrameStore()
 
   /// PNG bytes for the frame at `index`, encoded once per frame (F153):
@@ -56,11 +63,13 @@ public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
   // conformances did before the cache existed.
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.frames == rhs.frames && lhs.delayNanoseconds == rhs.delayNanoseconds
+      && lhs.loopCount == rhs.loopCount
   }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(frames)
     hasher.combine(delayNanoseconds)
+    hasher.combine(loopCount)
   }
 
   public var frameDelays: [Duration] {
@@ -74,6 +83,12 @@ public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
     frames: [AnimatedImageFrame],
     framesPerSecond: Double
   ) {
+    self.init(frames: frames, framesPerSecond: framesPerSecond, loopCount: 0)
+  }
+
+  public init(
+    frames: [AnimatedImageFrame], framesPerSecond: Double, loopCount: Int?
+  ) {
     precondition(
       framesPerSecond.isFinite && framesPerSecond > 0,
       "AnimatedImageSequence requires a positive finite frame rate"
@@ -81,7 +96,7 @@ public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
     let delay = UInt64(max(1, (1_000_000_000.0 / framesPerSecond).rounded()))
     self.init(
       frames: frames,
-      delayNanoseconds: Array(repeating: delay, count: frames.count)
+      delayNanoseconds: Array(repeating: delay, count: frames.count), loopCount: loopCount
     )
   }
 
@@ -89,19 +104,25 @@ public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
     frames: [AnimatedImageFrame],
     frameDelays: [Duration]
   ) {
+    self.init(frames: frames, frameDelays: frameDelays, loopCount: 0)
+  }
+
+  public init(
+    frames: [AnimatedImageFrame], frameDelays: [Duration], loopCount: Int?
+  ) {
     precondition(
       frames.count == frameDelays.count,
       "AnimatedImageSequence requires one delay per frame"
     )
     self.init(
       frames: frames,
-      delayNanoseconds: frameDelays.map(Self.nanoseconds)
+      delayNanoseconds: frameDelays.map(Self.nanoseconds), loopCount: loopCount
     )
   }
 
   internal init(
     frames: [AnimatedImageFrame],
-    delayNanoseconds: [UInt64]
+    delayNanoseconds: [UInt64], loopCount: Int? = 0
   ) {
     precondition(!frames.isEmpty, "AnimatedImageSequence requires at least one frame")
     precondition(
@@ -117,6 +138,13 @@ public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
     )
     self.frames = frames
     self.delayNanoseconds = delayNanoseconds.map { max(1, $0) }
+    Self.validateLoopCount(loopCount)
+    self.loopCount = loopCount
+  }
+
+  private static func validateLoopCount(_ value: Int?) {
+    precondition(
+      value == nil || (0...65535).contains(value!), "GIF loop count must be absent or in 0...65535")
   }
 
   private static func nanoseconds(

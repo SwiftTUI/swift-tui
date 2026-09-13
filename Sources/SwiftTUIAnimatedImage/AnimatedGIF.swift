@@ -28,12 +28,26 @@ public enum AnimatedGIF {
       UInt64(normalizedGIFDelayMilliseconds(centiseconds: frame.delayCentiseconds))
         * 1_000_000
     }
-    return AnimatedImageSequence(frames: frames, delayNanoseconds: delays)
+    return AnimatedImageSequence(
+      frames: frames, delayNanoseconds: delays, loopCount: image.loopCount)
   }
 
   public static func encode(
     _ sequence: AnimatedImageSequence,
-    loopCount: Int = 0
+    loopCount: Int
+  ) throws -> [UInt8] {
+    try encode(sequence, loopCount: Optional(loopCount))
+  }
+
+  /// Encodes the sequence's loop metadata without changing absent counts.
+  public static func encode(_ sequence: AnimatedImageSequence) throws -> [UInt8] {
+    try encode(sequence, loopCount: sequence.loopCount)
+  }
+
+  /// Overrides loop metadata; `nil` removes the GIF looping extension.
+  public static func encode(
+    _ sequence: AnimatedImageSequence,
+    loopCount: Int?
   ) throws -> [UInt8] {
     let reservesTransparency = sequence.frames.contains { frame in
       frame.pixels.contains { $0.alpha == 0 }

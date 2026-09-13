@@ -48,6 +48,7 @@ package enum AnimatableSlot: Hashable, Sendable {
   case frameHeight
   case shapeFillStyle
   case shapeStrokeStyle
+  case shapePath
   /// A `Text` node's content-transition roll (`TextRollValue`).
   case textRoll
 }

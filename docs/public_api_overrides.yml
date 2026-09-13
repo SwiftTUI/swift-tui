@@ -623,6 +623,7 @@ classifications:
     - SwiftTUIPrimitives.Alignment
     - SwiftTUIPrimitives.AlignmentID
     - SwiftTUIPrimitives.Animatable
+    - SwiftTUIPrimitives.Angle
     - SwiftTUIPrimitives.AnimatableArray
     - SwiftTUIPrimitives.AnimatablePair
     - SwiftTUIGraph.AnyGestureRecognizer
