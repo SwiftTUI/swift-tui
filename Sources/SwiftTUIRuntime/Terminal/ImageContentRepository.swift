@@ -19,6 +19,7 @@ import Synchronization
   @_spi(Runners) public let format: String
   /// The existing deterministic wire identifier, computed once at admission.
   @_spi(Runners) public let wireID: String
+  package let kittyDigest: UInt32
   package let blendPrimaryDigest: UInt64
   package let blendSecondaryDigest: UInt64
 
@@ -48,15 +49,19 @@ import Synchronization
       return hash
     }
     var wire: UInt64 = 0xcbf2_9ce4_8422_2325
+    var kitty: UInt32 = 2_166_136_261
+    for byte in "embedded:".utf8 { kitty = (kitty ^ UInt32(byte)) &* 16_777_619 }
     var primary = addingCount(to: wire)
     var secondary = addingCount(to: 0x8422_2325_cbf2_9ce4)
     for byte in bytes {
+      kitty = (kitty ^ UInt32(byte)) &* 16_777_619
       wire = (wire ^ UInt64(byte)) &* 0x100_0000_01b3
       primary = (primary ^ UInt64(byte)) &* 0x100_0000_01b3
       secondary = (secondary ^ UInt64(byte)) &* 0x100_0000_01b3
     }
     let hex = String(wire, radix: 16)
     wireID = "\(format):\(String(repeating: "0", count: 16 - hex.count))\(hex):\(bytes.count)"
+    kittyDigest = kitty
     blendPrimaryDigest = primary
     blendSecondaryDigest = secondary
   }
@@ -110,9 +115,23 @@ import Synchronization
   }
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
   private let policy: Cost
+  private let memoryMetricToken: MemoryMetricRegistry.Token
 
   @_spi(Runners) public init(maxEntries: Int = 256, maxBytes: Int = 128 * 1024 * 1024) {
     policy = Cost(entries: max(0, maxEntries), bytes: max(0, maxBytes))
+    let storage = storage
+    memoryMetricToken = MemoryMetricRegistry.shared.register(
+      ClosureMemoryMetricProvider {
+        storage.withLockUnchecked { state in
+          MemoryMetricSnapshot(
+            name: "ImageContentRepository.sources", count: state.cache.count,
+            approxBytes: state.cache.totalCost.bytes,
+            detail: [
+              "hits": state.hits, "misses": state.misses, "fileReads": state.fileReads,
+              "fileBytesRead": state.fileBytesRead, "contentBytesHashed": state.contentBytesHashed,
+            ])
+        }
+      })
   }
 
   @_spi(Runners) public func content(for attachment: RasterImageAttachment) -> ImageContent? {

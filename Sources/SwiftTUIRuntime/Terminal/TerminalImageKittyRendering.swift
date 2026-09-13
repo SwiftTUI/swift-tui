@@ -383,6 +383,16 @@ func kittyImageID(
   )
 }
 
+/// Reuse the source owner's admitted digest rather than hashing the image at
+/// each placement. File bytes, including replacements, own the transmitted ID.
+func kittyImageID(content: ImageContent, rgbaTransmitSize: PixelSize? = nil) -> UInt32 {
+  var hash = content.kittyDigest
+  for byte in rgbaTransmitSuffixBytes(rgbaTransmitSize) {
+    hash = (hash ^ UInt32(byte)) &* 16_777_619
+  }
+  return hash == 0 ? 1 : hash
+}
+
 /// Blended-variant counterpart of ``kittyImageID(reference:rgbaTransmitSize:)``.
 func kittyVariantImageID(
   variantID: String,

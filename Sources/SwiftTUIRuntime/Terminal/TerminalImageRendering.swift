@@ -10,7 +10,7 @@ enum TerminalImageRenderMode: String, Hashable, Sendable {
 }
 
 private struct TerminalImageVariantKey: Sendable {
-  var reference: ImageAssetReference
+  var sourceID: String
   var variantID: String?
   var mode: TerminalImageRenderMode
   var outputSize: PixelSize
@@ -19,7 +19,7 @@ private struct TerminalImageVariantKey: Sendable {
 
 extension TerminalImageVariantKey: Hashable {
   static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.reference == rhs.reference
+    lhs.sourceID == rhs.sourceID
       && lhs.variantID == rhs.variantID
       && lhs.mode == rhs.mode
       && lhs.outputSize.width == rhs.outputSize.width
@@ -28,7 +28,7 @@ extension TerminalImageVariantKey: Hashable {
   }
 
   func hash(into hasher: inout Hasher) {
-    hasher.combine(reference)
+    hasher.combine(sourceID)
     hasher.combine(variantID)
     hasher.combine(mode)
     hasher.combine(outputSize.width)
@@ -220,11 +220,13 @@ final class TerminalImageRenderer: Sendable {
     // is the bug behind "kitty image transparency shows the wrong
     // color". Sixel images replace pixels in their footprint, so this
     // pass-through is at worst a no-op for sixel.
+    var prepared = surface
+    prepared.imageAttachments = blendCompositor.orderedAttachments(
+      in: surface, fallbackBackground: fallbackBackground)
     if graphicsCapabilities.preferredProtocol != nil {
-      return surface
+      return prepared
     }
 
-    var prepared = surface
     prepared.cells = normalizedCells(
       prepared.cells,
       size: prepared.size
@@ -322,7 +324,7 @@ final class TerminalImageRenderer: Sendable {
 
     var writeSteps: [String] = []
 
-    for attachment in attachments.sorted(by: compareImageAttachments) {
+    for attachment in attachments {
       // Fully occluded by later-painted cells (a presentation covers the
       // whole image): emit nothing. The occlusion change makes the
       // attachments differ from the previous frame, so the plan runs a
@@ -330,11 +332,20 @@ final class TerminalImageRenderer: Sendable {
       guard !attachment.effectiveVisibleBounds.isEmpty else {
         continue
       }
-      guard
-        let reference = attachment.resolvedReference,
-        let sourceImage = repository.decodedImage(for: reference)
-      else {
-        continue
+      guard let reference = attachment.resolvedReference else { continue }
+      let content = repository.contents.content(for: reference)
+      let sourceImage: DecodedImage
+      let sourceID: String
+      if let content {
+        guard let image = repository.decodedImage(for: content) else { continue }
+        sourceImage = image
+        sourceID = content.id
+      } else {
+        guard case .namedResource(let name) = reference,
+          let image = repository.decodedImage(for: reference)
+        else { continue }
+        sourceImage = image
+        sourceID = "named:\(name)"
       }
 
       switch graphicsProtocol {
@@ -377,6 +388,10 @@ final class TerminalImageRenderer: Sendable {
               variantID: presentation.id,
               rgbaTransmitSize: isDownsampled ? transmitPixelSize : nil
             )
+          } else if let content {
+            kittyImageID(
+              content: content,
+              rgbaTransmitSize: isDownsampled ? transmitPixelSize : nil)
           } else {
             kittyImageID(
               reference: reference,
@@ -397,7 +412,7 @@ final class TerminalImageRenderer: Sendable {
           )
           referencedImageIDs.insert(imageID)
         } else if let payload = kittyPayload(
-          for: reference,
+          sourceID: sourceID,
           variantID: presentation?.id,
           image: image,
           rgbaOutputSize: transmitPixelSize,
@@ -434,7 +449,7 @@ final class TerminalImageRenderer: Sendable {
         guard
           let payload = sixelPayload(
             for: displayAttachment,
-            sourceReference: reference,
+            sourceID: sourceID,
             variantID: presentation?.id,
             image: image,
             capabilityProfile: capabilityProfile,
@@ -465,11 +480,16 @@ final class TerminalImageRenderer: Sendable {
       return nil
     }
 
+    let content = repository.contents.content(for: reference)
+    let sourceID = content?.id ?? "named:\(reference)"
     let image: DecodedImage
     if let variant {
       image = variant.image
     } else {
-      guard let sourceImage = repository.decodedImage(for: reference) else {
+      guard
+        let sourceImage = content.flatMap({ repository.decodedImage(for: $0) })
+          ?? repository.decodedImage(for: reference)
+      else {
         return nil
       }
       image = sourceImage
@@ -483,7 +503,7 @@ final class TerminalImageRenderer: Sendable {
     let paletteSize = fallbackPaletteSize(for: mode)
 
     let key = TerminalImageVariantKey(
-      reference: reference,
+      sourceID: sourceID,
       variantID: variant?.id,
       mode: mode,
       outputSize: outputSize,
@@ -516,7 +536,7 @@ final class TerminalImageRenderer: Sendable {
   }
 
   private func kittyPayload(
-    for reference: ImageAssetReference,
+    sourceID: String,
     variantID: String?,
     image: DecodedImage,
     rgbaOutputSize: PixelSize,
@@ -527,7 +547,7 @@ final class TerminalImageRenderer: Sendable {
     }
 
     let key = TerminalImageVariantKey(
-      reference: reference,
+      sourceID: sourceID,
       variantID: variantID,
       mode: .kitty,
       outputSize: rgbaOutputSize,
@@ -561,7 +581,7 @@ final class TerminalImageRenderer: Sendable {
 
   private func sixelPayload(
     for attachment: RasterImageAttachment,
-    sourceReference: ImageAssetReference,
+    sourceID: String,
     variantID: String?,
     image: DecodedImage,
     capabilityProfile: TerminalCapabilityProfile,
@@ -576,7 +596,7 @@ final class TerminalImageRenderer: Sendable {
       graphicsCapabilities: graphicsCapabilities
     )
     let key = TerminalImageVariantKey(
-      reference: sourceReference,
+      sourceID: sourceID,
       variantID: variantID,
       mode: .sixel,
       outputSize: pixelSize,
@@ -717,17 +737,4 @@ private func imageFallbackCellIsVisible(
   _ cell: RasterCell
 ) -> Bool {
   cell.character != " " || cell.style != nil
-}
-
-private func compareImageAttachments(
-  lhs: RasterImageAttachment,
-  rhs: RasterImageAttachment
-) -> Bool {
-  if lhs.visibleBounds.origin.y != rhs.visibleBounds.origin.y {
-    return lhs.visibleBounds.origin.y < rhs.visibleBounds.origin.y
-  }
-  if lhs.visibleBounds.origin.x != rhs.visibleBounds.origin.x {
-    return lhs.visibleBounds.origin.x < rhs.visibleBounds.origin.x
-  }
-  return lhs.identity < rhs.identity
 }

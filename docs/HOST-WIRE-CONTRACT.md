@@ -140,6 +140,16 @@ always emitted by the current Swift encoder. Their addition does not change
 the full-frame version literals, the delta version literal, or the capability
 set.
 
+### Ordered blended image preparation
+
+Full and delta records use the same portable ordered-image preparation before
+encoding `images`. Upper blended images include preceding image pixels and
+intervening cell occlusion in their captured backdrop. They travel as ordinary
+PNG attachments, preserving the existing protocol version and decoder paths.
+Changes to a lower image's content, geometry or opacity invalidate a dependent
+variant. The upper image's own opacity remains placement metadata. This does not
+add a general ordered cell/image scene to the wire format.
+
 ### Transmit-once images
 
 `knownImageIDs` records which payloads were transmitted within one encoding

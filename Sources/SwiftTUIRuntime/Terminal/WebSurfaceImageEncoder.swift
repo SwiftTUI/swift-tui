@@ -45,9 +45,14 @@ extension WebSurfaceFrameEncoder {
     _ attachments: [RasterImageAttachment],
     fallbackBackground: Color,
     knownImageIDs: inout Set<String>,
-    contentRepository: ImageContentRepository = .shared
+    contentRepository: ImageContentRepository = .shared,
+    presentationLayers: [RasterPresentationLayer] = []
   ) -> [String] {
-    attachments.compactMap { attachment in
+    var surface = RasterSurface(size: .zero, cells: [], imageAttachments: attachments)
+    surface.presentationLayers = presentationLayers
+    let prepared = webSurfaceImageBlendCompositor.orderedAttachments(
+      in: surface, fallbackBackground: fallbackBackground)
+    return prepared.compactMap { attachment in
       encodeImage(
         attachment,
         fallbackBackground: fallbackBackground,

@@ -337,6 +337,94 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     )
   }
 
+  /// Prepare only overlapping blended images. The result keeps the ordinary
+  /// cells/images host boundary and uses the exact portable blend arithmetic.
+  /// Non-overlapping images take the existing path without decoding here.
+  package func orderedAttachments(
+    in surface: RasterSurface, fallbackBackground: Color
+  ) -> [RasterImageAttachment] {
+    let original = surface.imageAttachments
+    guard original.count > 1, original.contains(where: { $0.compositing != nil }) else {
+      return original
+    }
+    func intersects(_ a: CellRect, _ b: CellRect) -> Bool {
+      !a.isEmpty && !b.isEmpty && a.origin.x < b.maxX && b.origin.x < a.maxX
+        && a.origin.y < b.maxY && b.origin.y < a.maxY
+    }
+    func order(of attachment: RasterImageAttachment) -> Int? {
+      surface.presentationLayers.first { layer in
+        if case .image(let image) = layer.content {
+          return image.identity == attachment.identity && image.bounds == attachment.bounds
+            && image.visibleBounds == attachment.visibleBounds
+        }
+        return false
+      }?.order
+    }
+    // Sidecar order is authoritative when present; hand-built surfaces retain
+    // their attachment order. Incremental rasterization retains closed suffixes.
+    var result = original.enumerated().sorted {
+      (order(of: $0.element) ?? $0.offset) < (order(of: $1.element) ?? $1.offset)
+    }.map(\.element)
+    let orders = result.map { order(of: $0) }
+    for index in result.indices {
+      let attachment = result[index]
+      guard attachment.compositing != nil else { continue }
+      var backdrop: [OrderedImageBackdrop] = []
+      for priorIndex in 0..<index {
+        let prior = result[priorIndex]
+        guard prior.opacity > 0, intersects(prior.visibleBounds, attachment.visibleBounds) else {
+          continue
+        }
+        let bytes: [UInt8]
+        let wireID: String
+        let bounds: CellRect
+        if prior.compositing != nil,
+          let payload = encodedPNGPayload(for: prior, fallbackBackground: fallbackBackground)
+        {
+          bytes = payload.bytes
+          wireID = payload.id
+          bounds = prior.visibleBounds
+        } else if let content = repository.contents.content(for: prior) {
+          bytes = content.bytes
+          wireID = content.wireID
+          bounds = prior.bounds
+        } else {
+          continue
+        }
+        guard let content = repository.contents.content(for: .embeddedImage(bytes)),
+          let image = repository.decodedImage(for: content)
+        else { continue }
+        var occluders: [CellRect] = []
+        if let priorOrder = orders[priorIndex], let currentOrder = orders[index] {
+          occluders = surface.presentationLayers.compactMap { layer in
+            guard layer.order > priorOrder, layer.order < currentOrder, layer.effects.isEmpty,
+              case .cells = layer.content, intersects(layer.bounds, prior.visibleBounds)
+            else { return nil }
+            return layer.bounds
+          }
+        }
+        backdrop.append(
+          OrderedImageBackdrop(
+            image: image,
+            key: .init(
+              ownerID: content.id, wireID: wireID, bounds: bounds,
+              visibleBounds: prior.visibleBounds, opacity: prior.opacity, occluders: occluders)))
+      }
+      guard !backdrop.isEmpty,
+        let payload = encodedPNGPayload(
+          for: attachment, fallbackBackground: fallbackBackground,
+          orderedBackdrop: backdrop)
+      else { continue }
+      result[index].source = .data(payload.bytes)
+      result[index].resolvedReference = .embeddedImage(payload.bytes)
+      result[index].bounds = attachment.visibleBounds
+      result[index].pixelSize = payload.pixelSize
+      result[index].compositing = nil
+      // Keep placement alpha outside the variant identity, as on the ordinary image path.
+    }
+    return result
+  }
+
   package func cacheSnapshot() -> ImageBlendCompositorCacheSnapshot {
     storage.withLockUnchecked { $0.snapshot() }
   }
@@ -434,6 +522,14 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     for attachment: RasterImageAttachment,
     fallbackBackground: Color
   ) -> BlendedImageEncodedPayload? {
+    encodedPNGPayload(for: attachment, fallbackBackground: fallbackBackground, orderedBackdrop: [])
+  }
+
+  private func encodedPNGPayload(
+    for attachment: RasterImageAttachment,
+    fallbackBackground: Color,
+    orderedBackdrop: [OrderedImageBackdrop]
+  ) -> BlendedImageEncodedPayload? {
     guard
       let compositing = attachment.compositing,
       !attachment.visibleBounds.isEmpty,
@@ -454,7 +550,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       cellPixelSize: compositing.cellPixelSize,
       backdropSignature: compositing.backdropSignature,
       fallbackBackground: fallbackBackground,
-      placementOpacity: 1
+      placementOpacity: 1,
+      orderedBackdrop: orderedBackdrop.map(\.key)
     )
     if let cached = storage.withLockUnchecked({ $0.encodedLookup(for: key) }) {
       return cached
@@ -470,7 +567,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       compositing: compositing,
       outputSize: outputSize,
       fallbackBackground: fallbackBackground,
-      placementOpacity: 1
+      placementOpacity: 1,
+      orderedBackdrop: orderedBackdrop
     )
     guard pixels.count == outputSize.width * outputSize.height else {
       return nil
@@ -517,7 +615,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     compositing: RasterImageCompositing,
     outputSize: PixelSize,
     fallbackBackground: Color,
-    placementOpacity: Double
+    placementOpacity: Double,
+    orderedBackdrop: [OrderedImageBackdrop] = []
   ) -> [RGBAImagePixel] {
     let bounds = attachment.bounds
     let visibleBounds = attachment.visibleBounds
@@ -550,19 +649,21 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     // Fast path: all-sRGB backdrops let us composite in linear space with a
     // decode LUT instead of a `Color` (and ~three colour-space conversions) per
     // pixel. Any non-sRGB colour returns nil and we drop to the exact route.
-    if let fastPixels = fastBlendedPixels(
-      sourceImage: sourceImage,
-      compositing: compositing,
-      outputSize: outputSize,
-      visibleBounds: visibleBounds,
-      logicalOutputSize: logicalOutputSize,
-      visibleLogicalPixelSize: visibleLogicalPixelSize,
-      hiddenLeftPixels: hiddenLeftPixels,
-      hiddenTopPixels: hiddenTopPixels,
-      cellPixelSize: clampedCellPixelSize,
-      fallbackBackground: fallbackBackground,
-      placementOpacity: placementOpacity
-    ) {
+    if orderedBackdrop.isEmpty,
+      let fastPixels = fastBlendedPixels(
+        sourceImage: sourceImage,
+        compositing: compositing,
+        outputSize: outputSize,
+        visibleBounds: visibleBounds,
+        logicalOutputSize: logicalOutputSize,
+        visibleLogicalPixelSize: visibleLogicalPixelSize,
+        hiddenLeftPixels: hiddenLeftPixels,
+        hiddenTopPixels: hiddenTopPixels,
+        cellPixelSize: clampedCellPixelSize,
+        fallbackBackground: fallbackBackground,
+        placementOpacity: placementOpacity
+      )
+    {
       return fastPixels
     }
 
@@ -602,7 +703,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
         let source = color(
           from: sourceImage.pixels[(sourceY * sourceImage.pixelSize.width) + sourceX]
         )
-        let destination = backdropPixelColor(
+        var destination = backdropPixelColor(
           compositing.destinationBackdrop,
           relativeX: backdropCellX,
           relativeY: backdropCellY,
@@ -611,6 +712,18 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
           cellPixelSize: clampedCellPixelSize,
           fallbackBackground: fallbackBackground
         )
+        // Prior images are replayed in authoring order over the captured cell
+        // backdrop. A later cell write occludes an earlier image at that cell.
+        let globalX =
+          Double(visibleBounds.origin.x) + (Double(visiblePixelX) + 0.5) / Double(cellPixelWidth)
+        let globalY =
+          Double(visibleBounds.origin.y) + (Double(visiblePixelY) + 0.5) / Double(cellPixelHeight)
+        for layer in orderedBackdrop {
+          guard let sample = layer.pixel(x: globalX, y: globalY) else { continue }
+          let prior = color(from: sample)
+          destination = prior.withAlpha(prior.alpha * layer.key.opacity).composited(
+            over: destination)
+        }
         let composited: Color
         if let sourceBackdrop = compositing.sourceBackdrop {
           let groupBackdrop = backdropPixelColor(
@@ -879,6 +992,48 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   }
 }
 
+private struct OrderedImageBackdrop: Sendable {
+  struct Key: Hashable, Sendable {
+    var ownerID: String
+    var wireID: String
+    var bounds: CellRect
+    var visibleBounds: CellRect
+    var opacity: Double
+    var occluders: [CellRect]
+    var retainedBytes: Int {
+      ownerID.utf8.count + wireID.utf8.count + 128 + occluders.count * MemoryLayout<CellRect>.stride
+    }
+  }
+  var image: DecodedImage
+  var key: Key
+
+  func pixel(x: Double, y: Double) -> RGBAImagePixel? {
+    func contains(_ rect: CellRect) -> Bool {
+      x >= Double(rect.origin.x) && x < Double(rect.maxX)
+        && y >= Double(rect.origin.y) && y < Double(rect.maxY)
+    }
+    guard !key.bounds.isEmpty, contains(key.visibleBounds),
+      !key.occluders.contains(where: contains),
+      image.pixelSize.width > 0, image.pixelSize.height > 0
+    else { return nil }
+    let column = min(
+      image.pixelSize.width - 1,
+      max(
+        0,
+        Int(
+          (x - Double(key.bounds.origin.x)) * Double(image.pixelSize.width)
+            / Double(key.bounds.size.width))))
+    let row = min(
+      image.pixelSize.height - 1,
+      max(
+        0,
+        Int(
+          (y - Double(key.bounds.origin.y)) * Double(image.pixelSize.height)
+            / Double(key.bounds.size.height))))
+    return image.pixels[row * image.pixelSize.width + column]
+  }
+}
+
 private struct ImageBlendCacheKey: Hashable, Sendable {
   var source: String
   var fingerprint: ImageBlendSourceFingerprint
@@ -891,9 +1046,11 @@ private struct ImageBlendCacheKey: Hashable, Sendable {
   var backdropSignature: UInt64
   var fallbackBackground: Color
   var placementOpacity: Double
+  var orderedBackdrop: [OrderedImageBackdrop.Key] = []
 
   var retainedByteEstimate: Int {
     source.utf8.count
+      + orderedBackdrop.reduce(0) { $0 + $1.retainedBytes }
       + fallbackBackground.profile.name.utf8.count
       + (MemoryLayout<Int>.stride * 14)
       + (MemoryLayout<UInt64>.stride * 8)
@@ -945,6 +1102,17 @@ private func blendedImageID(
   hasher.combine(key.backdropSignature)
   hasher.combine(key.fallbackBackground)
   hasher.combine(key.placementOpacity.bitPattern)
+  if !key.orderedBackdrop.isEmpty {
+    hasher.combine("ordered-images-v1")
+    for layer in key.orderedBackdrop {
+      hasher.combine(layer.wireID)
+      hasher.combine(layer.bounds)
+      hasher.combine(layer.visibleBounds)
+      hasher.combine(layer.opacity.bitPattern)
+      hasher.combine(layer.occluders.count)
+      for rect in layer.occluders { hasher.combine(rect) }
+    }
+  }
   return "blend:png:\(hexString(hasher.value))"
 }
 

@@ -237,7 +237,8 @@ package enum WebSurfaceFrameEncoder {
     json += encodeImages(
       model.imageAttachments,
       fallbackBackground: fallbackBackground,
-      knownImageIDs: &knownImageIDs
+      knownImageIDs: &knownImageIDs,
+      presentationLayers: model.surface.presentationLayers
     ).joined(separator: ",")
     json += "]"
     if let damage = model.damage {
@@ -328,7 +329,8 @@ package enum WebSurfaceFrameEncoder {
     json += encodeImages(
       model.imageAttachments,
       fallbackBackground: fallbackBackground,
-      knownImageIDs: &candidate.knownImageIDs
+      knownImageIDs: &candidate.knownImageIDs,
+      presentationLayers: model.surface.presentationLayers
     ).joined(separator: ",")
     json += "]"
     json += ",\"damage\":"

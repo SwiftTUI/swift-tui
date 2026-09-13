@@ -21,6 +21,7 @@ public final class HostedRasterSurface:
   /// a small window and suites that assert on the deep rolling window opt in
   /// through the `frameHistoryLimit` initializer parameter.
   private static let defaultFrameHistoryLimit = 32
+  private let imageBlendCompositor = ImageBlendCompositor()
   private let frameHistoryLimit: Int
   private let state: Mutex<HostedRasterSurfaceState>
   private let frameHandler: @Sendable (SemanticHostFrame) -> Void
@@ -314,7 +315,10 @@ public final class HostedRasterSurface:
 extension HostedRasterSurface: SemanticHostFramePresentationSurface {
   @discardableResult
   public func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
-    submit(frame)
+    var prepared = frame
+    prepared.raster.imageAttachments = imageBlendCompositor.orderedAttachments(
+      in: frame.raster, fallbackBackground: appearance.backgroundColor)
+    submit(prepared)
     return TerminalPresentationMetrics.rasterHostMetrics(
       for: frame.raster,
       damage: frame.rasterDamage

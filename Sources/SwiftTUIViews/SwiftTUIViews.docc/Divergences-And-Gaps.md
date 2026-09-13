@@ -1131,10 +1131,14 @@ path, while unblended images keep the fast native path.
   existing image precomposition path. Raw GIF passthrough leaves playback to
   the host; decode with `AnimatedGIF` and use `AnimatedImage` for framework
   timing and per-frame blending.
-- **No ordered-layer compositing or native-host replay.** *Gap.* Multiple
-  overlapping blended images do not composite as ordered layers, and the
-  precomposed variant is not replayed on native hosts outside the terminal
-  image path.
+- **Overlapping images use ordered precomposition.** *Ratified.* A blended
+  image includes preceding image pixels in its captured backdrop, with authoring
+  order and intervening cell occlusion supplied by the raster sidecar. The same
+  portable variants reach terminal graphics/fallbacks, Apple hosted surfaces,
+  and browser/Android image records. Placement opacity stays outside the encoded
+  variant, while lower-layer content, placement and opacity invalidate dependent
+  variants. Hosts retain their existing cells-then-image attachment boundary;
+  this does not introduce general native replay of interleaved cell layers.
 ## Distribution
 
 SwiftTUI ships as a SwiftPM source package: every consumer build resolves the

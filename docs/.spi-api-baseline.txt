@@ -59,6 +59,16 @@ SwiftTUIRuntime.HostedSceneSession.init(for:sceneID:surface:renderMode:runtimeIs
 SwiftTUIRuntime.ImageBlendCompositor
 SwiftTUIRuntime.ImageBlendCompositor.encodedPNGPayload(for:fallbackBackground:)
 SwiftTUIRuntime.ImageBlendCompositor.init()
+SwiftTUIRuntime.ImageContent
+SwiftTUIRuntime.ImageContent.bytes
+SwiftTUIRuntime.ImageContent.format
+SwiftTUIRuntime.ImageContent.id
+SwiftTUIRuntime.ImageContent.wireID
+SwiftTUIRuntime.ImageContentRepository
+SwiftTUIRuntime.ImageContentRepository.content(for:)
+SwiftTUIRuntime.ImageContentRepository.init(maxEntries:maxBytes:)
+SwiftTUIRuntime.ImageContentRepository.removeAll()
+SwiftTUIRuntime.ImageContentRepository.shared
 SwiftTUIRuntime.LayoutBranchingCounterSnapshot
 SwiftTUIRuntime.LayoutBranchingCounterSnapshot.builtinChildMeasureRequests
 SwiftTUIRuntime.LayoutBranchingCounterSnapshot.builtinChildMeasureRequestsProbe

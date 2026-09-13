@@ -622,3 +622,39 @@ not links. This history moved here from the published
 - `docs/reports/2026-07-23-002-reuse-freshness-quirk-register.md`, “Residual 2
   — closure (2026-07-25),” records the live-object stranded-listing invariant,
   its deliberate teeth, and the resolved-vs-authored identity naming pitfall.
+
+## Reusable image ownership and ordered presentation
+
+`ImageContentRepository` admits immutable encoded bytes under a lifetime-unique
+owner ID. Its shared default retains at most 256 entries and 128 MiB, including
+encoded bytes, byte-key storage and estimated metadata. File revisions include
+POSIX device/inode, size and nanosecond modification/change times, verified on
+both sides of a read. Windows/WASI use read-then-byte-exact lookup where a reliable
+revision fast path is unavailable. This is validation when a source is requested,
+not a filesystem watcher. Embedded keys sample at most 128 bytes for hashing and
+compare full contents on collision. Eviction retires the owner; reacquisition has
+a new owner ID and the same deterministic wire fingerprints for identical bytes.
+
+The owner computes wire, blend and Kitty digests in one admission pass. Asset
+resolution, decoded images, blend variants and terminal payloads key reuse by
+that owner instead of a mutable file path or a fresh full-buffer hash. The memory
+metric `ImageContentRepository.sources` reports retained bytes, reads and hashed
+bytes. File replacement changes content and geometry on the next resolution;
+placements and repeated animation frames can reuse admitted content.
+
+`ImageBlendCompositor.orderedAttachments` consumes the raster sidecar's image
+order and intervening plain-cell occluders. An overlapping blended image samples
+prior decoded/precomposed images into its captured cell backdrop using the
+portable linear-sRGB arithmetic. Its variant key includes prior content owners,
+geometry, opacity and occlusion, without retaining the prior decoded buffers in
+the key. Existing blend-cache budgets include this metadata. Non-overlapping
+images retain their original path. The upper image's own placement opacity stays
+outside its encoded variant, so opacity-only updates can reuse it.
+
+Terminal preparation, hosted raster delivery, and both full/delta web wire
+encoding use this preparation. Android consumes that same wire encoder. The
+ordinary PNG attachment protocol remains sufficient; native CoreGraphics/canvas
+blend-mode replay and a new wire version are unnecessary. Hosts still paint
+final cells followed by image attachments; this is ordered image precomposition,
+not a general replay of every interleaved cell paint event. Terminal graphics
+preserve attachment order instead of sorting overlapping placements by identity.
