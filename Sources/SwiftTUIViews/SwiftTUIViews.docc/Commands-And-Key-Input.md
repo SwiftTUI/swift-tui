@@ -13,6 +13,8 @@ SwiftTUI splits it into layers you opt into per view:
   that scope, no matter which control holds it.
 - `onKeyPress(_:perform:)` handles keys on one specific view, only while
   that view is focused.
+- `onMoveCommand(perform:)` and `onExitCommand(perform:)` handle unmodified
+  arrow keys and Escape along the focused view's hosting chain.
 - `onSubmit(_:)` responds to Return in text inputs, and `submitScope(_:)`
   bounds how far a submission travels.
 - `paletteCommand(name:description:isEnabled:action:)` plus
@@ -113,6 +115,47 @@ The first argument is a ``KeyPressMatch``: `.key(_:modifiers:)` or
 `.keyPress(_:)` for one combination, or `.any` (the default) to observe
 every key the focused view receives and decide in the closure. A view
 inside a `.disabled(true)` subtree does not handle key presses.
+
+## Handle Directional Commands And Escape
+
+`onMoveCommand` maps unmodified arrows to
+`MoveCommandDirection.up`, `.down`, `.left`, and `.right`. `onExitCommand`
+handles unmodified Escape. Both return `KeyPressResult` so a view can consume
+the command or let it continue:
+
+```swift
+struct StepPreview: View {
+  @State private var step = 0
+  @State private var isInspecting = true
+
+  var body: some View {
+    Text(isInspecting ? "Step \(step)" : "Preview closed")
+      .focusable(true)
+      .onMoveCommand { direction in
+        guard isInspecting else { return .ignored }
+        switch direction {
+        case .left: step -= 1
+        case .right: step += 1
+        default: return .ignored
+        }
+        return .handled
+      }
+      .onExitCommand {
+        guard isInspecting else { return .ignored }
+        isInspecting = false
+        return .handled
+      }
+  }
+}
+```
+
+The nearest handler on the focused hosting chain runs first. Returning
+`.ignored` allows enclosing handlers and default navigation or presentation
+dismissal to try the event. Handlers stacked on the same identity run outermost
+modifier first, like `onKeyPress`. Sibling focus scopes do not receive it, and
+disabled views do not install handlers. Modified arrows remain available to
+other key routes. `onExitCommand` does not handle scene exit chords such as
+Control-C; configure those with the scene APIs below.
 
 ## Respond to Return in Text Inputs
 

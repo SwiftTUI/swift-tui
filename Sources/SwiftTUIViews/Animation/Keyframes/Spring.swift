@@ -1,7 +1,7 @@
 public import SwiftTUICore
 
 /// The physical parameters of a spring, evaluable at any time and for any
-/// ``VectorArithmetic`` value.
+/// `VectorArithmetic` value.
 ///
 /// Matches SwiftUI's `Spring`. `SpringKeyframe` takes one, and
 /// ``Animation/spring(_:)`` builds an animation from one. The

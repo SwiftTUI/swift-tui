@@ -439,6 +439,7 @@ A committed sample includes:
 - main-actor blocked and suspended timing.
 - render and desired generation.
 - wake causes and coalescing counts.
+- measured frame-cost averages, merge age, and the selected pacing gap.
 - focus-sync renders.
 - animation-controller active and pending state.
 - queued input seen during render suspension.
@@ -448,6 +449,18 @@ A committed sample includes:
 `SwiftTUIProfiling` turns the runtime's neutral diagnostic samples into
 consumer-facing records, files, and summaries. The runtime does not depend on the
 profiling product.
+
+The scheduler's optional merge-pressure policy spaces invalidation-only frames
+when recent requests have coalesced. Its gap is half the measured frame-cost
+average, capped at 50 milliseconds, and recent pressure expires after one
+second. Input, signals, external wakes, and due deadlines bypass the gap;
+wheel input that changes state is marked as input so it remains responsive.
+Enable it with `SWIFTTUI_MERGE_PRESSURE_PACING=1`; it defaults off.
+
+Retained layout can separately record comparison and restamping work through
+`SWIFTTUI_RETAINED_VALIDATION_COUNTERS=1`. These counters distinguish reuse
+validation from new layout work and appear in the diagnostics TSV. They default
+off. See <doc:Environment-Variables> and <doc:Performance-For-App-Authors>.
 
 ## Invariants
 

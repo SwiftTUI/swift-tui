@@ -15,8 +15,8 @@ never moves focus or selection.
 ## Present Scrollable Content
 
 Pass the scrollable axes to the initializer; the default is `.vertical`. The
-viewport is whatever the surrounding layout proposes, so give the scroll view
-a finite frame along each scrollable axis:
+viewport needs a finite proposal along each scrollable axis. An explicit frame
+is one way to provide it:
 
 ```swift
 ScrollView(.vertical) {
@@ -43,6 +43,62 @@ ScrollView(.horizontal) {
 }
 .frame(width: 20)
 ```
+
+### Let the viewport fill available space
+
+A scroll view accepts its finite proposal on a scrolling
+axis even when its content is short or empty. In a finite `VStack`, a vertical
+scroll view can take the space left below a header without an extra expanding
+frame; a horizontal scroll view behaves correspondingly in an `HStack`.
+Content remains top-leading and content-sized inside that viewport.
+
+```swift
+VStack(alignment: .leading, spacing: 0) {
+  Text("Activity")
+  ScrollView {
+    Text("No new events")
+  }
+}
+.frame(width: 40, height: 12)
+```
+
+Explicit frames and `.fixedSize` constrain sizing; an unbounded proposal asks
+for the content's ideal size.
+
+## Compose Lazy Content
+
+`LazyVStack` and `LazyHStack` can window a mixture of static
+fragments, `Group`, conditionals, and multiple directly authored `ForEach`
+sources within a scroll viewport:
+
+```swift
+ScrollView {
+  LazyVStack(alignment: .leading) {
+    Text("Pinned")
+    ForEach(0..<4, id: \.self) { index in
+      Text("Pinned item \(index)")
+    }
+    Divider()
+    Text("History")
+    ForEach(0..<1000, id: \.self) { index in
+      Text("Event \(index)")
+    }
+  }
+}
+.frame(height: 12)
+```
+
+The sources have distinct identity scopes, so equal IDs in these two
+`ForEach` declarations do not identify the same row. An element may contribute
+zero or multiple fragments; default spacing is resolved between neighboring
+realized fragments. Keep source IDs stable within each declaration.
+
+Windowing depends on a finite scrolling viewport and visible structural
+composition. An opaque view body hiding a source does not become structurally
+transparent. Negative spacing and some body-dependent content require
+exhaustive work; `.fixedSize()` and other unbounded probes request the full
+ideal size. Prefer direct `List` or `Table` data initializers when you also need
+row selection and collection chrome.
 
 ## Read And Set The Position
 
@@ -184,6 +240,10 @@ It runs before the container consumes the delta, including when the container
 is already at an edge. Returning `.ignored` lets scrolling continue; each
 handler is called at most once for that wheel event. Wheel interception does
 not move keyboard focus.
+
+Each nested scroll view exposes its allocated viewport to ancestor layout,
+while retaining its full content extent for its own offsets and indicators.
+Moving the inner content therefore does not change the outer scroll range.
 
 On terminals a click-drag over content stays a click-drag; only hosts whose
 native paradigm is touch pan the content with a drag.

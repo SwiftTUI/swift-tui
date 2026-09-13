@@ -51,10 +51,20 @@ that a two-frame round trip preserves distinct 50 ms and 120 ms delays.
 `nil` means no loop extension and one play; `0` repeats indefinitely; a
 positive value repeats that many times **after the first play**. A value of
 `1` therefore plays twice. Finite playback waits the last frame's delay and
-then leaves that frame visible without scheduling another tick. Existing
-frame-based initializers default to `0`; their new `loopCount:` overloads
+then leaves that frame visible without scheduling another tick.
+Frame-based initializers default to `0`; their `loopCount:` overloads
 accept `nil` or any integer in `0...65535`. The count participates in sequence
 equality, hashing and playback task identity.
+
+| `loopCount` | Total plays | When playback ends |
+| --- | --- | --- |
+| `nil` | One | Hold the last frame |
+| `0` | Unbounded | Continue until removal or a playback-policy change |
+| `1` | Two | Hold the last frame |
+| `n > 0` | `n + 1` | Hold the last frame |
+
+An editor that asks for a total play count should translate that value to GIF
+repeat metadata at its boundary, rather than treating repeats as total plays.
 
 Each frame reaches the renderer as PNG bytes through the same
 `Image(data:)` surface as static images — encoded once per frame and

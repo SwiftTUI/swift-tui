@@ -2,7 +2,7 @@ public import SwiftTUICore
 
 // MARK: - KeyframeTrack
 
-/// A sequence of keyframes that animate one ``Animatable`` property of a
+/// A sequence of keyframes that animate one `Animatable` property of a
 /// value, addressed by key path.
 ///
 /// Matches SwiftUI's `KeyframeTrack`. `Root` is the value type the timeline

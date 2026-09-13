@@ -79,6 +79,7 @@ to a browser instead of (or alongside) the terminal.
 | Variable | Values | Effect |
 | --- | --- | --- |
 | `SWIFTTUI_RENDER_MODE` | `sync`, `async` (default), `async-no-cancel`, `async-no-drop` | Initial value of ``RunLoop/renderMode``, which selects the interactive pipeline documented in <doc:Runtime-Render-Pipeline>. Unrecognized values fall back to `async`. |
+| `SWIFTTUI_MERGE_PRESSURE_PACING` | boolean, default off | Enables adaptive spacing between invalidation-only frames under recent merge pressure. The gap follows measured frame cost and is capped at 50 ms. Input (including wheel-driven changes), signals, external wakes, and due deadlines bypass it. |
 
 - `sync`: the one-shot synchronous pipeline. The entire fused frame tail
   (layout, semantics, draw, raster) runs on the main actor with no worker
@@ -166,6 +167,7 @@ preferred spelling.
 | `SWIFTTUI_INVAL_TRACE` | boolean, default off | Per-frame `[INVAL-TRACE]` line decomposing how the invalidation set was assembled (raw scheduler set, portal translation, force-root reasons). Also armable via `SWIFTTUI_TRACE=inval`. |
 | `SWIFTTUI_INVAL_TRACE_FILE` | file path | Appends invalidation-trace lines to a file instead of the bundle's `inval.log` or stderr. |
 | `SWIFTTUI_PUBLICATION_DIAGNOSTICS` | boolean | Enables runtime registration-publication diagnostics (checkpoint and portal bookkeeping counters). Also armable via `SWIFTTUI_TRACE=publication`. |
+| `SWIFTTUI_RETAINED_VALIDATION_COUNTERS` | boolean, default off | Records comparison, identity-validation, and metadata-restamping work during retained layout. Enable when profiling cache-validation cost; it adds diagnostic work and does not change reuse policy. |
 | `SWIFTTUI_DIAGNOSTICS` | boolean or file path | Terminal CLI runner: `1`/`true` writes the diagnostics TSV to the bundle's `diagnostics.tsv` (or `/tmp/termui-diagnostics.tsv` with no bundle); any other truthy value is used as the file path. `SWIFTTUI_DEBUG=1` (or `--debug`) implies the same resolution. |
 
 ### Browser (WASI) host

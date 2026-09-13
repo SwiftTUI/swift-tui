@@ -21,8 +21,9 @@ this guide.
 When state changes, SwiftTUI re-evaluates the views that depend on it,
 including their children. `EquatableView` — usually applied as `.equatable()`
 — is the designated opt-in that stops this at a boundary: the wrapped view is
-compared with its previous value using `==`, and when it is equal, its whole
-rendered subtree is kept as-is instead of being rebuilt.
+compared with its previous value using `==`. When the value is equal and the
+runtime's dependency and lifetime checks pass, the resolved subtree can be
+reused instead of rebuilding its body. Equality alone is not sufficient.
 
 It helps when a large, stable subtree sits beside frequently-changing state.
 Here, a 48-cell panel is skipped on every counter tick:
@@ -69,12 +70,16 @@ Prefer conforming the boundary view to `Equatable` directly — a plain
 DashboardPanel(title: "Static Panel")
 ```
 
-The direct form is also safer: if the view's `body` reads `@State` or
-`@Observable` values, or focus or press state, SwiftTUI notices and simply
-does not reuse it. The `.equatable()` wrapper instead trusts your `==`
-completely — if `==` ignores a value the subtree's rendering depends on (a
-captured closure is the classic case), the reused subtree will be stale.
-Treat `==` as a correctness contract, not a hint.
+Both forms validate tracked dependencies before memo reuse. State and
+observation read certificates check the values read by the committed
+subtree. Changed or uncertifiable reads decline reuse; unchanged certified reads
+can permit it when the other gates also pass. Focus, environment, transaction,
+and lifetime checks still apply.
+
+Your `==` must nevertheless include every ordinary input that affects rendering
+or behavior. The runtime cannot certify arbitrary data hidden in an untracked
+reference or captured closure. Treat equality as a correctness contract, and
+use tracked state or observation for mutable model data.
 
 `.equatable()` does nothing useful when the wrapped value changes every frame
 anyway, when the subtree is trivially cheap, or when the content does not
@@ -165,6 +170,24 @@ Then run with `SWIFTTUI_PROFILE=frames` to get a per-frame record stream (a
 stderr summary by default), and compare before and after a change. The
 `memory` and `cpu` signals cover the other two questions you are likely to
 ask.
+
+### Inspect retained work and frame pressure
+
+For a workload that appears to reuse content but still spends time validating
+it, enable `SWIFTTUI_RETAINED_VALIDATION_COUNTERS=1`. It records comparisons,
+identity checks, and metadata restamping in layout metrics, so a reuse hit is
+not mistaken for zero work. This diagnostic is off by default.
+
+`SWIFTTUI_MERGE_PRESSURE_PACING=1` enables an optional scheduler policy for
+sustained invalidation pressure. It spaces invalidation-only frames according
+to measured frame cost, with a gap capped at 50 milliseconds. Input, including
+wheel-driven changes, signals, external wakes, and due deadlines bypass the
+gap. It is off by default; compare both frame throughput and interaction
+latency on your workload before enabling it. Frame traces report pacing and
+presentation cost alongside wake causes and coalescing.
+
+See <doc:Environment-Variables> and <doc:Logging-And-Diagnostics> for enabling
+trace output. Keep diagnostic counters off when measuring the normal baseline.
 
 ## What not to do
 

@@ -110,7 +110,7 @@ extension KeyframeSequence: KeyframesLowering {
 /// ``KeyframeTimeline/init(initialValue:content:)``.
 ///
 /// Lists ``KeyframeTrack``s for a composite value. When `Value` is itself
-/// ``Animatable``, bare keyframes (`LinearKeyframe`, `CubicKeyframe`,
+/// `Animatable`, bare keyframes (`LinearKeyframe`, `CubicKeyframe`,
 /// `SpringKeyframe`, `MoveKeyframe`) are accepted directly and animate the
 /// whole value.
 @resultBuilder
@@ -163,7 +163,7 @@ public enum KeyframesBuilder<Value> {
 
 extension KeyframesBuilder where Value: Animatable {
   /// The single `\.self` track that bare keyframes in a block accumulate
-  /// into when `Value` is itself ``Animatable``.
+  /// into when `Value` is itself `Animatable`.
   public typealias WholeValueTrack = KeyframeTrack<
     Value, Value, KeyframeTrackContentSequence<Value>
   >
@@ -206,7 +206,7 @@ extension KeyframesBuilder where Value: Animatable {
     KeyframeTrackContentSequence(entries: components.flatMap { $0.content.entries })
   }
 
-  /// Accepts a bare keyframe for an ``Animatable`` value.
+  /// Accepts a bare keyframe for an `Animatable` value.
   public static func buildExpression<Content: KeyframeTrackContent>(
     _ expression: Content
   ) -> Content where Content.Value == Value {

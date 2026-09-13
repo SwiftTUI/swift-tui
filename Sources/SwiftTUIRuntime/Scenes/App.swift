@@ -17,7 +17,7 @@ public enum AppLaunchError: Error, Equatable, Sendable, CustomStringConvertible 
 /// A scene declaration for terminal applications.
 ///
 /// A scene is a value type — a struct or an enum — matching the authoring
-/// invariant ``View`` states.
+/// invariant [View](https://swifttui.sh/docs/documentation/swifttuiviews/view) states.
 @MainActor
 public protocol Scene {
   associatedtype Body: Scene
@@ -205,7 +205,7 @@ extension WindowGroup: ActionScope {
 /// A terminal application declaration composed of scenes.
 ///
 /// An app is a value type — a struct or an enum — matching the authoring
-/// invariant ``View`` states.
+/// invariant [View](https://swifttui.sh/docs/documentation/swifttuiviews/view) states.
 @MainActor
 public protocol App {
   associatedtype Body: Scene

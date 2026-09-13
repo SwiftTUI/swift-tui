@@ -50,7 +50,7 @@ import SwiftTUICore
 /// curve on top of the keyframe-driven values, and transitions inside the
 /// content are suppressed. Keep `content` cheap; it runs on every tick.
 ///
-/// `Int` properties step (``VectorArithmetic`` scaling truncates); prefer
+/// `Int` properties step (`VectorArithmetic` scaling truncates); prefer
 /// `Double` tracks and round in `content`.
 ///
 /// ### Reduce motion

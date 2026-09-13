@@ -38,8 +38,8 @@ every app product re-exports.
   — buttons, toggles, pickers, sliders, steppers, and text entry, built into
   a working form.
 - [Commands and Key Input](https://swifttui.sh/docs/documentation/swifttuiviews/commands-and-key-input)
-  — `keyCommand` chords, the command palette, `onKeyPress`, and submit
-  handling.
+  — `keyCommand` chords, the command palette, `onKeyPress`, directional and
+  Escape commands, and submit handling.
 - [Understanding Focus](https://swifttui.sh/docs/documentation/swifttuiviews/focus)
   — the runtime focus model for input routing, state control, and context
   export.
@@ -47,7 +47,8 @@ every app product re-exports.
   — `NavigationStack` push/pop with typed paths, destinations, and `TabView`
   authoring.
 - [Scrolling](https://swifttui.sh/docs/documentation/swifttuiviews/scrolling)
-  — scroll views, programmatic scrolling, positions, and indicators.
+  — viewport sizing, compositional lazy stacks, nested wheel routing,
+  programmatic scrolling, positions, and indicators.
 - [The Style System](https://swifttui.sh/docs/documentation/swifttuiviews/style-system)
   — all 28 open style families in one place: built-ins, scoping, custom
   conformances, route wrappers, theming, diagnostics, and tests.
@@ -69,8 +70,10 @@ every app product re-exports.
   — anchor preferences that publish subtree geometry for post-layout
   resolution.
 - [Shapes](https://swifttui.sh/docs/documentation/swifttuiviews/shapes) —
-  fill, stroke, and inset built-in and custom `Path` shapes, rasterized to
-  Braille subpixels.
+  arcs, fills, strokes, shape clipping, and compatible-path animation on the
+  terminal grid.
+- [Animated images](https://swifttui.sh/docs/documentation/swifttuianimatedimage)
+  — GIF decoding and encoding, frame timing, finite loop counts, and reduced motion.
 - [Aspect-correct shapes in terminals](https://swifttui.sh/docs/documentation/swifttuiviews/aspectcorrectshapes)
   — cell pixel metrics keep circles circular across terminal fonts.
 - [Pointer and Canvas Coordinates](https://swifttui.sh/docs/documentation/swifttuiviews/pointer-and-canvas)
@@ -128,6 +131,9 @@ catalogs.
 
 The same authored `App`, on other hosts.
 
+- [Adapting an Interface to Its Host](https://swifttui.sh/docs/documentation/swifttuiviews/adapting-to-hosts)
+  — share state and views while adapting touch targets, keyboard access,
+  navigation, scrolling, and accessibility to the host.
 - [Deploying to the Browser](https://swifttui.sh/docs/documentation/swifttuiwasi/deploying-to-the-browser)
   — `--web` for localhost, or a static WASI bundle packaged with
   [`@swifttui/build`](https://github.com/SwiftTUI/swift-tui-web) and mounted

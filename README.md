@@ -3,18 +3,17 @@
 **SwiftUI semantics, drawn in terminal cells.**
 
 ![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
-![Status](https://img.shields.io/badge/beta-0.13.2-DAA520)
+![Status](https://img.shields.io/badge/status-beta-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
 SwiftTUI is a Swift framework for building terminal user interfaces on macOS,
 Linux, and Windows. You write `View` types with `@State`, stacks, controls,
 focus, gestures, and animation — the declarative model SwiftUI has proven at
 platform scale — and the framework owns layout, input, redraw, and the
-terminal itself. The result is one fast native binary.
+terminal itself. The result is a native executable for the platform you build for.
 
 > [!important]
-> **Beta, pre-1.0.** The API has stabilized, but breaking changes may still land
-> before `1.0.0`.   
+> **Public beta.** The API is still being proven, and breaking changes can occur.
 > All changes are documented in the [CHANGELOG](https://github.com/SwiftTUI/swift-tui/blob/main/CHANGELOG.md).  
 > Pin with `.upToNextMinor`.
 
@@ -24,7 +23,7 @@ terminal itself. The result is one fast native binary.
     Try it first
   </dt>
   <dd>
-This is is a real SwiftTUI app, compiled to WebAssembly and <a href="https://swifttui.sh/webexample/">running live</a>.<br />
+This is a real SwiftTUI app, compiled to WebAssembly and <a href="https://swifttui.sh/webexample/">running live</a>.<br />
 The <a href="https://swifttui.sh">guided introduction</a> and <a href="https://swifttui.sh/docs/documentation/">API reference</a> are at <a href="https://swifttui.sh">SwiftTUI.sh</a>
 </dd>
 </dl>
@@ -60,8 +59,8 @@ struct CounterApp: App {
 }
 ```
 
-A frame is a pure function of the view tree and a size proposal, so this is
-exactly what that view renders at 40 columns
+Render a deterministic snapshot of a view at a chosen size. This is the
+counter at 40 columns
 (`RenderOnce.print(CounterView(), width: 40)`, color off):
 
 ```text
@@ -94,6 +93,7 @@ Add the package, depend on its `SwiftTUI` product, and `swift run`:
 Or clone [the demo's repo](https://github.com/SwiftTUI/swift-tui-counter-demo) and run its terminal target:  
 ```sh
 git clone https://github.com/SwiftTUI/swift-tui-counter-demo
+cd swift-tui-counter-demo
 swift run --package-path counter counter
 ```
 
@@ -127,6 +127,22 @@ Choosing between TUI frameworks? See the
 
 ## Built with SwiftTUI
 
+Shapes and images share the same layout and modifier model as controls. Draw
+arcs with `Angle` and `Path`, clip a subtree with `clipShape`, morph compatible
+paths, and layer images in authored order. Animated GIFs preserve frame timing
+and finite or continuous playback. See
+[Shapes](Sources/SwiftTUIViews/SwiftTUIViews.docc/Shapes.md) and
+[Animated Images](Sources/SwiftTUIAnimatedImage/SwiftTUIAnimatedImage.docc/SwiftTUIAnimatedImage.md).
+
+Build larger interfaces from compositional lazy stacks, data-backed lists and
+tables, nested scroll panes, and tabs that retain authored model state. Animated
+presence changes fade by default; numeric text, keyframes, and matched geometry
+make changes visible while respecting reduced motion. Explore the
+[building blocks](https://swifttui.sh/capabilities/) or go directly to
+[Scrolling](Sources/SwiftTUIViews/SwiftTUIViews.docc/Scrolling.md),
+[Animating Views](Sources/SwiftTUIViews/SwiftTUIViews.docc/Animating-Views.md), and
+[Commands and Key Input](Sources/SwiftTUIViews/SwiftTUIViews.docc/Commands-And-Key-Input.md).
+
 | [![GIF Editor](https://swifttui.sh/showcase/gifeditor.png)](https://github.com/SwiftTUI/swift-tui-examples/tree/main/gifeditor) | [![csvui](https://swifttui.sh/showcase/csvui.png)](https://github.com/SwiftTUI/swift-tui-examples/tree/main/csvui) |
 | :--: | :--: |
 | **GIF Editor** — canvas, layers, a scrubbable timeline, pointer tools, undo, export | **csvui** — a 34,000-row table browsed and edited in place |
@@ -155,13 +171,18 @@ launch it with `--web` to serve it over localhost, or compile it with the
 live demo is — and inside native apps through
 [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui) (macOS, iOS)
 and [`swift-tui-android`](https://github.com/SwiftTUI/swift-tui-android)
-(arm64 preview). The browser paths paint to the DOM with a real accessibility
+(arm64 preview). The browser paths paint to Canvas or DOM with a semantic accessibility
 tree; none of them is a terminal emulator. For narrower product graphs — the
 explicit `SwiftTUICLI` terminal runner, custom hosts, or one committed frame
 rendered without a TTY — start from
 [Choosing Modules And Platforms](Sources/SwiftTUI/SwiftTUI.docc/Choosing-Modules-And-Platforms.md);
 the full platform-by-product matrix (including the Windows notes) is
 [Hosts And Platforms](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Hosts-And-Platforms.md).
+
+Shared source can adapt to its input host: visible actions and larger targets
+for touch, focused commands for keyboards, and native scroll panning. Keep the
+model and view tree shared while choosing suitable navigation and control
+styles; see [Adapting an Interface to Its Host](Sources/SwiftTUIViews/SwiftTUIViews.docc/Adapting-To-Hosts.md).
 
 ## Documentation
 

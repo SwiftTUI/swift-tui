@@ -99,6 +99,7 @@ Lowering helpers remain package-only implementation details.
 - ``SpatialTapGesture``
 - ``ScrollWheelEvent``
 - ``ScrollWheelResult``
+- ``MoveCommandDirection``
 
 ### Shape Primitives
 
@@ -149,6 +150,7 @@ Lowering helpers remain package-only implementation details.
 
 - <doc:Coming-From-SwiftUI>
 - <doc:Authoring-Views>
+- <doc:Adapting-To-Hosts>
 - <doc:Forms-And-Controls>
 - <doc:Commands-And-Key-Input>
 - <doc:Focus>

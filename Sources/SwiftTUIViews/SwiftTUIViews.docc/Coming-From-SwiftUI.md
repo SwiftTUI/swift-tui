@@ -171,6 +171,15 @@ surprise. Each links back to its register section by name.
 
 ### Subtle behaviors worth knowing
 
+- **Directional and exit commands bubble.** `onMoveCommand`
+  and `onExitCommand` return `.handled` or `.ignored` on the focused hosting
+  chain. Escape is separate from the scene's exit chords; see
+  <doc:Commands-And-Key-Input>.
+- **Menus follow their source control.** Floating menus use the source's
+  placed geometry, follow movement, and clamp at viewport edges.
+- **Animated presence changes fade by default.** An animated
+  insertion or removal uses opacity unless it has an explicit transition.
+  Use `.transition(.identity)` to suppress the fade.
 - **Equal-value `@State` writes are inert.** Writing an unchanged value does
   not invalidate the owner, so a `Binding.animation(_:)` write of an equal
   value animates nothing.
@@ -205,10 +214,9 @@ current status of each.
 | `Color` vocabulary: `alpha:` not `opacity:`, `mixed(with:amount:method:)` not `mix(with:by:)`, no `Color.accentColor` | Prefer semantic roles (`.primary`, `.secondary`, `.tint`) resolved through the host theme; they are the intended currency |
 | No `ScenePhase` | None; a session is one full-canvas scene |
 | Scale transitions and matched size changes use placed bounds and clipping rather than re-layout or bitmap scaling | Expect whole-cell steps; content keeps its destination layout while the interpolated frame clips it |
-| `Menu` anchors top-leading, not at its source control | None; noted so it is not mistaken for a layout bug |
 | Lazy stacks estimate unseen content | Compose static fragments and multiple `ForEach` sources directly; default spacing is exact between realized neighbors. Body-dependent empty rows and negative spacing can require exhaustive work |
-| No `addArc`, no general `clipShape(_:)`, no animatable path morphing | Analytic primitives plus parameter animation; see <doc:Shapes> and <doc:AspectCorrectShapes> |
-| No `onMoveCommand`/`onExitCommand`; `Text` is not `Hashable` | Note-only |
+| Path morphing requires matching ordered element kinds; clipping samples cell centers | Use `Angle`, `Path.addArc`, `Path.interpolated(to:progress:)`, and `clipShape(_:)`; see <doc:Shapes> |
+| `Text` is not `Hashable` | Keep identity in your model instead of deriving it from a view |
 
 Beyond the recorded gaps sits a larger class of bare absences. The
 high-traffic ones include `searchable`, `refreshable`, `contextMenu`,

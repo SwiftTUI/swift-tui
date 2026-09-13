@@ -165,6 +165,12 @@ enter and exit behavior, ``AnyTransition/asymmetric(insertion:removal:)``.
 While a removal transition plays, the departing view is display-only: it no
 longer participates in layout, focus, or input.
 
+Insertion and removal inside an animation scope use an opacity
+transition when no explicit transition is attached. Use `.transition(.identity)`
+to suppress that fade on the corresponding insertion or removal. Reinserting a
+view while its removal fade is still running continues from its displayed
+opacity, avoiding a flash back to full opacity.
+
 ## Roll A Number When It Changes
 
 ``View/contentTransition(_:)`` describes how a ``Text`` changes when its
@@ -209,6 +215,10 @@ unanimated write cuts to the new string, and so does
 environment, so setting it on a container reaches every `Text` inside,
 including `Label` and `Button` titles.
 
+Numeric text also animates in viewport-realized `List` rows. Keep the row ID
+stable so the runtime can compare the previous and current text presentation;
+changing the ID creates a different row rather than a text update.
+
 ## Run Code When An Animation Finishes
 
 ``withAnimation(_:completionCriteria:_:completion:)`` fires a closure after
@@ -231,6 +241,10 @@ is fully removed. The completion closure is main-actor isolated and can
 write `@State` directly. Under reduce motion the state change applies
 instantly and the completion still fires, so completion-driven logic keeps
 working when no motion is drawn.
+
+A scope that performs no state write still completes without waiting for an
+unrelated frame. Completion-driven application logic therefore does not need
+to force an invalidation just to finish an empty scope.
 
 A ``Transaction`` carries any number of completions, each with its own
 criteria, through ``Transaction/addAnimationCompletion(criteria:_:)``; every
@@ -326,7 +340,7 @@ struct BounceBadge: View {
 
 ``KeyframeAnimator`` interpolates a value along keyframe tracks and re-renders
 its content with each sample, about twenty times a second. Each
-``KeyframeTrack`` addresses one ``Animatable`` property of the value by key
+``KeyframeTrack`` addresses one `Animatable` property of the value by key
 path and lists its keyframes: ``LinearKeyframe`` eases to a value along a
 ``UnitCurve``, ``CubicKeyframe`` passes through values smoothly,
 ``SpringKeyframe`` moves with a ``Spring``, and ``MoveKeyframe`` jumps. Tracks
@@ -369,7 +383,7 @@ struct BounceStar: View {
 ```
 
 `init(initialValue:repeating:content:keyframes:)` starts on appearance and,
-by default, loops. When the value is itself ``Animatable``, list bare
+by default, loops. When the value is itself `Animatable`, list bare
 keyframes and skip the track:
 
 ```swift
@@ -393,7 +407,7 @@ for charts and tests. Two things to know:
   `withAnimation` scope or ``View/animation(_:value:)`` cannot layer a curve
   on top of the keyframe values, and transitions inside the content are
   suppressed. Keep the content cheap; it runs on every tick.
-- `Int` properties step, because integer ``VectorArithmetic`` scaling
+- `Int` properties step, because integer `VectorArithmetic` scaling
   truncates. Use `Double` tracks and round in the content closure.
 
 Under reduce motion a trigger change writes the end value at once and
@@ -488,11 +502,10 @@ Text("TWO").background(Color.blue)
   .matchedGeometryEffect(id: "hero", in: heroSpace)
 ```
 
-Only registered transitions play — a swap without `.transition` cuts the
-departing instance on the swap frame, as it does outside a match. An offset
-transition (`.move`, `.offset`, `.slide`) composes additively with the
-matched translation, as in SwiftUI when the transition is applied inside
-the effect.
+The default opacity transition also applies to an animated matched-geometry
+swap without an explicit `.transition`. Use `.transition(.identity)` when a
+swap should have no fade. An offset transition (`.move`, `.offset`, `.slide`)
+composes additively with the matched translation when applied inside the effect.
 
 ### Position a view onto another
 
@@ -526,6 +539,10 @@ still takes space; hide it with `.hidden()` or a zero frame if it should
 not), reduce motion leaves adoption on, and when the source leaves inside
 an animated transaction the badge slides home from where it was drawn.
 
+Nested matches compose in displayed coordinates, including when the source
+itself is moving. Descendants inherit the displayed parent movement even when
+their own animation is disabled; they do not receive that movement twice.
+
 ## Reduce Motion
 
 Users opt out of animation by launching your app with `--reduce-motion` or
@@ -538,6 +555,11 @@ reference. Every built-in animation then renders in static form:
   `withAnimation` completions still fire.
 - ``View/contentTransition(_:)`` cuts to the new string instead of rolling.
 - ``PhaseAnimator`` rests at its first phase instead of cycling.
+- A triggered ``KeyframeAnimator`` settles at its final value; a repeating
+  animator rests at its initial value. Changing Reduce Motion during a run
+  settles its value immediately, so restoring motion does not reveal a stale
+  intermediate sample. A triggered phase animator similarly settles at its
+  first phase.
 - ``TimelineView`` schedules run at a low cadence — the `.animation`
   schedule drops to about four updates per second, and periodic schedules
   fire at most once per second.

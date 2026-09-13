@@ -90,6 +90,19 @@ and its content mounts after the runtime dismisses each earlier prompt. Escape
 dismisses the most recently activated *visible* presentation across families,
 so a queued prompt cannot intercept dismissal from a visible surface.
 
+## Preserve each source's lifetime
+
+Presentation identity is scoped to its source. The same explicit ID in two
+independent source scopes does not merge their sheets. Conditional portal
+siblings can appear without replacing an existing source's state, and chained
+toasts retain the environment at their own declaration.
+
+Floating menus anchor to their source control's placed geometry and follow it
+when it moves, with viewport-edge clamping. A bindingless `popoverTip` remembers
+each dismissed tip for the lifetime of its anchor; replacing the anchor begins
+a new lifetime. Hoist application-owned dismissal state when it must outlive
+that anchor.
+
 ## Observe teardown at the presenter
 
 `onDismiss` runs once after a previously committed activation disappears. It

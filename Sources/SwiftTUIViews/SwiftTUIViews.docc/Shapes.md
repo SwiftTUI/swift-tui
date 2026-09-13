@@ -1,7 +1,7 @@
 # Shapes
 
-Fill, stroke, and inset terminal shapes, both the built-in primitives and
-custom `Path`-based shapes, rasterized to Braille subpixels.
+Fill, stroke, clip, and animate terminal shapes, from built-in primitives to
+custom paths and arcs, rasterized to Braille subpixels.
 
 ## Overview
 
@@ -64,25 +64,94 @@ Two properties to keep in mind, both consequences of the cell grid:
   primitives carry exact, fixture-pinned output. Arbitrary paths do not. Their
   edges are quantized to subpixels and cannot blend color across a cell.
 
+## Draw arcs with angles
+
+`Angle` supplies `.degrees(_:)` and `.radians(_:)`, and
+`Path.addArc(center:radius:startAngle:endAngle:clockwise:)` adds a circular arc:
+
+```swift
+struct Sector: Shape {
+  func path(in rect: Rect) -> Path {
+    let center = Point(
+      x: rect.origin.x + rect.size.width / 2,
+      y: rect.origin.y + rect.size.height / 2
+    )
+    return Path { path in
+      path.move(to: center)
+      path.addArc(
+        center: center,
+        radius: min(rect.size.width, rect.size.height) / 2,
+        startAngle: .degrees(0),
+        endAngle: .degrees(120),
+        clockwise: false
+      )
+      path.closeSubpath()
+    }
+  }
+}
+
+Sector().fill(Color.cyan).frame(width: 20, height: 10)
+```
+
+Zero points along positive x, and positive angles point toward positive y.
+`clockwise: true` decreases the angle; because terminal y increases downward,
+this looks counterclockwise on screen. Arcs use cubic segments of at most 90
+degrees. An empty path moves to the arc's start; an existing subpath connects
+to it with a line. Equal endpoints add nothing, while an authored difference
+of at least one turn draws a full circle without closing it. Nonpositive radii
+and nonfinite inputs leave the path unchanged.
+
+## Clip a subtree
+
+`clipShape(_:)` clips the view and its descendants to a
+built-in or custom shape in the view's placed frame:
+
+```swift
+Text("A clipped card")
+  .frame(width: 24, height: 7)
+  .background(Color.blue)
+  .clipShape(RoundedRectangle(cornerRadius: 2))
+```
+
+The mask samples coverage at cell centers. A wide glyph appears only when its
+entire cell span is covered, and nested clips intersect. This is a drawing
+operation: it does not change layout or hit testing. Apply `contentShape(_:)`
+separately when interaction should follow a shape. Image content uses the same
+clip coverage across terminal, browser, and native hosts.
+
+## Animate compatible paths
+
+`Path` conforms to `Animatable`. Paths can interpolate when their
+ordered element kinds match: move with move, line with line, quadratic with
+quadratic, cubic with cubic, and close with close. Anchor and control points
+must be finite. Keep this topology stable while changing coordinates in an
+animated state update, and the runtime can morph the custom shape.
+
+For explicit sampling, check `start.isInterpolable(to: end)` and use
+`start.interpolated(to: end, progress: fraction)`. Progress is clamped to
+`0...1`; incompatible topology or nonfinite progress snaps to the destination.
+Adding a segment or changing a line into a curve is not a morph. In particular,
+changing an arc's sweep can change its cubic segment count. Use stable segments
+or a cross-fade when the outlines have different structures.
+
 ## Differences from SwiftUI
 
 SwiftTUI shapes target a cell grid rasterized to Braille subpixels, not a
 resolution-independent vector canvas. Some of SwiftUI's `Shape` API is therefore
 **deliberately absent, not missing**:
 
-- **No `trim(from:to:)`, `offset`, `rotation`, `scale`, or `transform`.** These
-  are path/vector transforms with no faithful meaning over discrete cells.
+- **No SwiftUI-style shape transform modifiers.** `trim(from:to:)`, shape
+  `rotation`, `scale`, and `transform` modifiers are absent. To author a path
+  in a different coordinate space, use `Path.scaledBy(sx:sy:)` and
+  `Path.translatedBy(dx:dy:)`. View-level `.offset` moves the placed result.
 - **No `lineWidth:` stroke overloads.** Terminal strokes are one cell wide.
   `StrokeStyle` carries `lineWidth` only as a reserved field.
   Stroke weight is expressed through the glyph palette (`borderSet`: `.single`,
   `.heavy`, `.double`, …) instead.
-- **No `addArc` (yet).** Arc construction needs an angle type. It is a planned
-  follow-on. Use `addQuadCurve`/`addCurve`, or `Path(ellipseIn:)`.
-- **No general `clipShape(_:)` to an arbitrary path.** Masking is available at
-  the border level (a custom-path `strokeBorder` clips its background to the
-  interior). A general path clip is a planned follow-on.
-- **No animatable path morphing.** Parameterized shapes animate via their own
-  animatable parameters, not by interpolating dissimilar paths.
+- **Clipping uses cell coverage.** It is not a pixel-antialiased mask and does
+  not alter interaction regions.
+- **Path morphing needs compatible topology.** Dissimilar paths snap rather
+  than inventing a correspondence between unrelated segments.
 
 ## Topics
 
@@ -99,3 +168,4 @@ resolution-independent vector canvas. Some of SwiftUI's `Shape` API is therefore
 ## See Also
 
 - <doc:AspectCorrectShapes>
+- <doc:Animating-Views>
