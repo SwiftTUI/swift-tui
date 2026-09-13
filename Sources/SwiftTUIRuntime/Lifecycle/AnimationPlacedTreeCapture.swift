@@ -25,10 +25,9 @@ struct AnimationPlacedTreeCapture {
       matchedIdentities[entry.config.key] = entry.identity
     }
     let pairs = MatchedGeometryAdoption.pairs(from: entries)
-    var adoptionOffsets: [Identity: PlacedAnimationOverlayOffset] = [:]
-    for offset in MatchedGeometryAdoption.offsets(for: pairs) {
-      adoptionOffsets[offset.identity] = offset
-    }
+    let adoptionOffsets = NestedMatchedGeometryPlacement.absoluteOffsets(
+      in: placed,
+      applying: PlacedAnimationOverlaySampling.sampleAdoption(tree: placed, pairs: pairs))
     return .init(
       root: placed,
       matchedBounds: matchedBounds,

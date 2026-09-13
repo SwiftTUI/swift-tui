@@ -54,7 +54,9 @@ package enum PlacedAnimationOverlaySampling {
     let adoptionOffsets = sampleAdoption(
       tree: tree,
       pairs: adoption,
-      liveOffsets: insertionResult.offsets + matchedResult.offsets,
+      liveOffsets: insertionResult.offsets
+        + NestedMatchedGeometryPlacement.localOffsets(
+          in: tree, absolute: matchedResult.offsets),
       liveScales: insertionScaleResult.scales
     )
 
@@ -85,28 +87,8 @@ package enum PlacedAnimationOverlaySampling {
   ) -> [PlacedAnimationOverlayOffset] {
     let pairs = pairs ?? MatchedGeometryAdoption.pairs(in: tree)
     guard !pairs.isEmpty else { return [] }
-    var overrides: [Identity: CellRect] = [:]
-    if !liveOffsets.isEmpty || !liveScales.isEmpty {
-      for pair in pairs {
-        var rect = pair.sourceBounds
-        var changed = false
-        for offset in liveOffsets where offset.identity == pair.source {
-          rect = CellRect(
-            origin: CellPoint(x: rect.origin.x + offset.dx, y: rect.origin.y + offset.dy),
-            size: offset.size ?? rect.size
-          )
-          changed = true
-        }
-        for scale in liveScales where scale.identity == pair.source {
-          rect = scaledTransitionRect(rect, scale: scale.scale, anchor: scale.anchor)
-          changed = true
-        }
-        if changed {
-          overrides[pair.source] = rect
-        }
-      }
-    }
-    return MatchedGeometryAdoption.offsets(for: pairs, sourceRectOverrides: overrides)
+    return NestedMatchedGeometryPlacement.offsets(
+      in: tree, pairs: pairs, liveOffsets: liveOffsets, liveScales: liveScales)
   }
 
   private struct RemovalSamplingResult {

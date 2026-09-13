@@ -10,6 +10,9 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- Compose nested matched-geometry adoption and interpolation in displayed
+  coordinates, including animated sources and frozen descendants.
+- Preserve displayed opacity when reinserting a view during its removal fade.
 - Complete no-write animation scopes without waiting for an unrelated frame,
   and preserve logical completions when a sibling animation is pruned.
 - Settle triggered keyframe and phase animators when Reduce Motion changes
@@ -26,6 +29,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Changed
 
+- Animate unmarked presence changes with a default opacity transition. An
+  explicit `.transition(.identity)` suppresses the corresponding fade.
 - `SignalReader` now names the framework-owned `TerminalSignal` value in its
   public API. Existing `UnixSignal` arrays remain source-compatible through
   the vendored module's alias. Signal names and native numbers are unchanged.

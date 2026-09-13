@@ -777,16 +777,16 @@ are omitted even when SwiftUI exposes a corresponding API.
   node's bounds (a `.background`, an overlay, full-frame chrome) resize with
   it. Because the modifier tags its content, chrome that should follow the
   box goes inside the modifier.
-- **A matched-geometry swap plays the pair's transitions along the matched
-  path; there is no default transition.** *Ratified* / *Gap*. The departing
+- **Animated presence changes default to opacity, including matched swaps.**
+  *Ratified.* The departing
   instance's exit overlay travels to the destination rect while its removal
   phase plays and the arriving instance's insertion phase plays from the
   source rect, so `.transition(.opacity)` on both cross-fades like SwiftUI's
   removal-positioned-onto-source behaviour. An offset transition composes
-  additively with the matched translation. The remaining *Gap*: SwiftUI
-  applies a default `.opacity` transition to any view whose presence changes
-  inside an animated transaction; SwiftTUI plays only registered
-  transitions, so an untransitioned swap (or conditional) cuts.
+  additively with the matched translation. An unmarked presence boundary uses
+  `.opacity` once for its subtree inside an animated transaction. Explicit
+  transitions take precedence; `.transition(.identity)` suppresses that edge.
+  Initial mounts and ordinary unanimated changes do not acquire a default fade.
 - **Co-present non-source instances are positioned onto their source.**
   *Ratified.* While a source and an `isSource: false` instance share a key
   on one screen, the non-source is laid out at its own slot and rendered at
@@ -803,12 +803,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   overlay starts where it was drawn. A non-source that is the *sole* holder
   of its key keeps SwiftUI's rule: it receives the match when the key swaps
   to it and supplies no geometry when it leaves.
-- **Nested matched nodes keep the first-hit rule.** *Gap (narrowed).* A
-  placed-level offset stops at the first identity it translates, so a matched
-  node inside an adopted (or matched-animating) ancestor rides the ancestor's
-  move and its own adoption or match is dropped; a source nested inside an
-  adopted subtree also records its baseline rect as the next swap's `from`.
-  Lifting this means walking into translated subtrees with a composed delta.
+- **Nested matched nodes compose in displayed coordinates.** *Ratified.*
+  Each nested adoptee reaches its own source after ancestor displacement;
+  nested sources supply their displayed rect, including for the next swap.
+  Insertion offsets add, while matched interpolation reaches each absolute
+  target without double-counting its ancestor. Frozen descendants retain their
+  full adoption displacement even when the ancestor survives. A cyclic adoption
+  dependency (a source inside its own adoptee) is suppressed because it has no
+  independent target. Layout baselines remain unchanged.
 - **Matched-geometry namespaces work without `@Namespace`.** *Provisional.*
   The wrapper exists with SwiftUI semantics, but
   `matchedGeometryEffect(id:in:)` also accepts `.default`, one global

@@ -220,33 +220,33 @@ struct MatchedGeometryTransitionTests {
 
   // MARK: - One-sided registrations and the untransitioned swap
 
-  @Test("a transition on the departing instance alone travels it without fading the arrival")
-  func departingOnlyTravelsWithoutArrivalFade() throws {
+  @Test("an explicit departing transition composes with the arrival's default fade")
+  func departingTransitionWithDefaultArrival() throws {
     let swap = Self.makeSwap(label: "DepartingOnly", registration: .departingOnly)
     let state = swap.controller.debugStateSnapshot()
     #expect(state.removingIdentities == [swap.sourceIdentity])
-    #expect(!state.activeAnimationKeys.contains(Self.arrivalOpacityKey(swap)))
+    #expect(state.activeAnimationKeys.contains(Self.arrivalOpacityKey(swap)))
     let snapshot = swap.controller.placedAnimationOverlaySnapshot(
       for: swap.placed, at: swap.start.advanced(by: .milliseconds(500)))
     #expect(snapshot.removalOverlays.first?.matchedGeometryOffset != nil)
   }
 
-  @Test("a transition on the arriving instance alone fades it in with no exit overlay")
-  func arrivingOnlyFadesInWithoutOverlay() throws {
+  @Test("an explicit arriving transition composes with the departure's default fade")
+  func arrivingTransitionWithDefaultDeparture() throws {
     let swap = Self.makeSwap(label: "ArrivingOnly", registration: .arrivingOnly)
     let state = swap.controller.debugStateSnapshot()
     #expect(swap.controller.activeMatchedGeometryCount == 1)
-    #expect(state.removingIdentities.isEmpty)
+    #expect(state.removingIdentities == [swap.sourceIdentity])
     #expect(state.activeAnimationKeys.contains(Self.arrivalOpacityKey(swap)))
   }
 
-  @Test("an untransitioned swap retains no exit overlay and no fade")
-  func untransitionedSwapRetainsNothingExtra() throws {
+  @Test("an unmarked matched swap fades both presence edges by default")
+  func unmarkedSwapUsesDefaultTransitions() throws {
     let swap = Self.makeSwap(label: "None", registration: .none)
     let state = swap.controller.debugStateSnapshot()
     #expect(swap.controller.activeMatchedGeometryCount == 1)
-    #expect(state.removingIdentities.isEmpty)
-    #expect(!state.activeAnimationKeys.contains(Self.arrivalOpacityKey(swap)))
+    #expect(state.removingIdentities == [swap.sourceIdentity])
+    #expect(state.activeAnimationKeys.contains(Self.arrivalOpacityKey(swap)))
   }
 
   // MARK: - Raster through the real pipeline
@@ -286,7 +286,9 @@ struct MatchedGeometryTransitionTests {
         frameInstant: t0
       )
       #expect(controller.activeMatchedGeometryCount == 1)
-      #expect(controller.debugStateSnapshot().removingIdentities.count == 1)
+      // Both the hero and its empty spacing sibling change presence. The
+      // sibling's implicit overlay paints nothing and cannot alter this raster.
+      #expect(controller.debugStateSnapshot().removingIdentities.count == 2)
       let atSwap = try backgrounds(swapFrame)
       #expect(Array(atSwap[0..<4]) == Array(repeating: Color.red, count: 4), "\(atSwap)")
       #expect(!atSwap.contains(Color.blue), "\(atSwap)")
@@ -302,7 +304,8 @@ struct MatchedGeometryTransitionTests {
       let mid = try backgrounds(halfway)
       for column in 5..<9 {
         let color = mid[column]
-        #expect(color != nil && color != Color.red && color != Color.blue, "column \(column): \(mid)")
+        #expect(
+          color != nil && color != Color.red && color != Color.blue, "column \(column): \(mid)")
       }
       #expect(!mid.contains(Color.red) && !mid.contains(Color.blue), "\(mid)")
       let untouched = mid.indices.filter { !(5..<9).contains($0) }

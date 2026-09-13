@@ -151,6 +151,9 @@ struct AnimationLedgerLifetimeTests {
     firstPlaced.children[0].identity = second
     firstPlaced.children[0].bounds.origin.x = 10
     #expect(controller.activeMatchedGeometryCount == 1)
+    // Presence now includes a default opacity property channel. Complete the
+    // resolved sample as well as the placed matched-geometry channel.
+    _ = controller.applyInterpolations(to: &first, at: start.advanced(by: .seconds(2)))
     _ = controller.placedAnimationOverlaySnapshot(
       for: firstPlaced, at: start.advanced(by: .seconds(2)))
     #expect(controller.activeMatchedGeometryCount == 0)

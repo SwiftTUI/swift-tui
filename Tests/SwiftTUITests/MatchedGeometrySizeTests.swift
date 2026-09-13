@@ -336,6 +336,8 @@ private struct MatchedRasterFixture: View {
       .buttonStyle(.plain)
       .frame(width: width, alignment: .leading)
       .background(Color.red)
+      // This fixture isolates bounds/clip interpolation from presence fades.
+      .transition(.identity)
       .matchedGeometryEffect(id: "hero")
       .id("MatchedButton")
   }

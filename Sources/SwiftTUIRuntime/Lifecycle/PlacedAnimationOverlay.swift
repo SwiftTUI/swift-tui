@@ -168,7 +168,8 @@ package func applyPlacedAnimationOverlaySnapshot(
   if !matchedGeometryOffsets.isEmpty {
     tree = translatePlacedNodesByIdentity(
       tree: tree,
-      offsets: matchedGeometryOffsets
+      offsets: matchedGeometryOffsets,
+      offsetsAreAbsolute: true
     )
   }
 
@@ -191,28 +192,35 @@ private func overlayOffsetMap(
 }
 
 /// Translates (and, when the offset carries a `size`, resizes by bounds and
-/// clip) the first node matching each offset's identity. The walk stops at a
-/// hit: an offset on a node *inside* a translated subtree is dropped, so a
-/// nested matched node rides its ancestor's move (the register's nested-node
-/// *Gap (narrowed)*).
+/// clip) matching nodes, composing descendants' own offsets. Repeated absorbed
+/// identities on one ancestor route receive the effect only once.
+/// Absolute offsets are used for a frozen subtree whose ancestors are absent.
 package func translatePlacedNodesByIdentity(
   tree: PlacedNode,
-  offsets: [Identity: PlacedAnimationOverlayOffset]
+  offsets: [Identity: PlacedAnimationOverlayOffset],
+  offsetsAreAbsolute: Bool = false
 ) -> PlacedNode {
-  var node = tree
-  if let delta = offsets[node.identity] {
-    var translated = node
-    translateBounds(&translated, dx: delta.dx, dy: delta.dy)
-    if let size = delta.size {
-      resizeBounds(&translated, to: size)
+  func walk(_ original: PlacedNode, dx: Int, dy: Int, applied: Set<Identity>) -> PlacedNode {
+    var node = original
+    var applied = applied
+    var inheritedDX = dx
+    var inheritedDY = dy
+    if let delta = offsets[node.identity], applied.insert(node.identity).inserted {
+      let localDX = delta.dx - (offsetsAreAbsolute ? dx : 0)
+      let localDY = delta.dy - (offsetsAreAbsolute ? dy : 0)
+      translateBounds(&node, dx: localDX, dy: localDY)
+      inheritedDX += localDX
+      inheritedDY += localDY
+      if let size = delta.size {
+        resizeBounds(&node, to: size)
+      }
     }
-    return translated
+    node.children = node.children.map {
+      walk($0, dx: inheritedDX, dy: inheritedDY, applied: applied)
+    }
+    return node
   }
-  let walked = node.children.map { child in
-    translatePlacedNodesByIdentity(tree: child, offsets: offsets)
-  }
-  node.children = walked
-  return node
+  return walk(tree, dx: 0, dy: 0, applied: [])
 }
 
 /// Resizes a matched-geometry node to its interpolated size at the placed

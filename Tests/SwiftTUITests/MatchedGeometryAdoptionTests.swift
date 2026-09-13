@@ -447,10 +447,10 @@ struct MatchedGeometryAdoptionTests {
         && travelling.bounds.origin.x < thirdBounds.origin.x)
   }
 
-  // MARK: - 8. Nested matched nodes keep the first-hit rule
+  // MARK: - 8. Nested matched nodes adopt independently
 
-  @Test("an inner matched node under an adopted outer node rides the outer translation")
-  func nestedMatchedNodeRidesOuterAdoption() throws {
+  @Test("an inner matched node under an adopted outer node reaches its own source")
+  func nestedMatchedNodeAdoptsIndependently() throws {
     let controller = AnimationController()
     let outerKey = MatchedGeometryKey(id: "outer")
     let innerKey = MatchedGeometryKey(id: "inner")
@@ -488,11 +488,12 @@ struct MatchedGeometryAdoptionTests {
     applyPlacedAnimationOverlaySnapshot(snapshot, to: &tree)
     let adoptedOuter = try #require(Self.node(outer, in: tree))
     #expect(adoptedOuter.bounds == CellRect(origin: .zero, size: CellSize(width: 20, height: 3)))
-    // Today's first-hit rule: the inner node's own adoption is dropped; it
-    // moves with its adopted ancestor (a *Gap (narrowed)* in the register).
+    // The inner target is expressed in displayed coordinates, after the
+    // ancestor's adoption. Its own match must still reach its own source.
     let nested = try #require(Self.node(inner, in: tree))
     #expect(
-      nested.bounds == CellRect(origin: CellPoint(x: 2, y: 1), size: CellSize(width: 4, height: 1)),
+      nested.bounds
+        == CellRect(origin: CellPoint(x: 40, y: 0), size: CellSize(width: 4, height: 1)),
       "\(nested.bounds)")
   }
 

@@ -570,13 +570,19 @@ package final class AnimationController: Sendable {
     }
 
     pruneCompletedAnimationRegistrations(completedAnimationBoxes)
-    var sampledAdoptionOffsets: [Identity: PlacedAnimationOverlayOffset] = [:]
-    for offset in result.snapshot.adoptionOffsets {
-      sampledAdoptionOffsets[offset.identity] = offset
-    }
     // The frame-tail uses a draft controller: these sampled positions cross
     // the frame boundary only when that draft commits.
-    previousAdoptionOffsets = sampledAdoptionOffsets
+    previousAdoptionOffsets = NestedMatchedGeometryPlacement.absoluteOffsets(
+      in: tree, applying: result.snapshot.adoptionOffsets)
+    if !result.snapshot.adoptionOffsets.isEmpty {
+      var presented = tree
+      applyPlacedAnimationOverlaySnapshot(result.snapshot, to: &presented)
+      var entries: [MatchedGeometryPlacedEntry] = []
+      AnimationTreeQueries.collectMatchedGeometryEntries(presented, into: &entries)
+      for entry in entries where entry.config.isSource {
+        previousMatchedGeometryBounds[entry.config.key] = entry.bounds
+      }
+    }
     return result.snapshot
   }
 
@@ -1324,12 +1330,23 @@ package final class AnimationController: Sendable {
     // diff above already treats mid-removal identities as departed, so the
     // reinsertion still fires its own insertion transition when one is
     // registered.)
+    var reinsertionOpacities: [Identity: Double] = [:]
     if !removingNodes.isEmpty {
       let supersededRemovals = removingNodes.filter { _, entry in
         newIdentities.contains(entry.identity)
       }
       for viewNodeID in supersededRemovals.keys {
         if let entry = removingNodes.removeValue(forKey: viewNodeID) {
+          if let target = entry.transition.removalModifiers().opacity,
+            let box = entry.animationBox, let animation = registeredAnimations[box]
+          {
+            var state = entry.customState
+            let progress =
+              animation.evaluate(
+                elapsed: entry.startTime.duration(to: timestamp), state: &state) ?? 1
+            reinsertionOpacities[entry.identity] =
+              entry.startOpacity + (target - entry.startOpacity) * progress
+          }
           releaseBatch(
             entry.completionBatchID,
             logicalAlreadyReleased: entry.isLogicallyComplete
@@ -1402,9 +1419,26 @@ package final class AnimationController: Sendable {
       {
         continue
       }
-      guard let viewNodeID = newNodeIDByIdentity[identity],
-        let transition = transitionsByNodeID[viewNodeID]
-      else { continue }
+      guard let viewNodeID = newNodeIDByIdentity[identity] else { continue }
+      var authoredTransition = transitionsByNodeID[viewNodeID]
+      if authoredTransition == nil,
+        var wrapped = AnimationTreeQueries.findResolvedSubtree(in: node, identity: identity)
+      {
+        // Layout wrappers can own the presence boundary while the authored
+        // transition is registered on their single content child. Carry that
+        // child's choice (including identity) to the whole wrapped unit,
+        // matching the removal path's wrapper capture.
+        while wrapped.children.count == 1, authoredTransition == nil {
+          wrapped = wrapped.children[0]
+          if let wrappedNodeID = wrapped.viewNodeID {
+            authoredTransition = transitionsByNodeID[wrappedNodeID]
+          }
+        }
+      }
+      if authoredTransition == nil {
+        guard previousTreeRoot != nil, newParentByIdentity[identity] != nil else { continue }
+      }
+      let transition = authoredTransition ?? .opacity
       // Reparent suppression: a newly-inserted Identity whose ViewNodeID was
       // live last frame AND carried a transition registration last frame is a
       // transition-marked node that changed parents (same ViewNodeID, new
@@ -1429,6 +1463,7 @@ package final class AnimationController: Sendable {
         viewNodeID: viewNodeID,
         transition: transition,
         snapshot: newSnapshots[identity] ?? .init(),
+        reinsertionOpacity: reinsertionOpacities[identity],
         transaction: newTransactionsByIdentity[identity]
           ?? transactionPlan.transaction(for: identity),
         timestamp: timestamp
@@ -1512,6 +1547,42 @@ package final class AnimationController: Sendable {
         transactionPlan: transactionPlan,
         timestamp: timestamp
       )
+    }
+
+    // Unmarked presence boundaries use opacity. Select the topmost departed
+    // subtree once: synthesizing a registration on every node would multiply
+    // the fade and make a bulk departure search the old tree for every leaf.
+    // Explicit transitions anywhere within that boundary own its behavior,
+    // including `.identity`, which intentionally suppresses the default.
+    if let previousRoot = previousTreeRoot,
+      transactionPlan.transactions.contains(where: { $0.animationRequest.animationBoxIfAny != nil })
+    {
+      var pending = [previousRoot]
+      while let previousNode = pending.popLast() {
+        if !newIdentities.contains(previousNode.identity),
+          let parent = previousParentByIdentity[previousNode.identity],
+          newIdentities.contains(parent)
+        {
+          let subtreeIdentities = AnimationTreeQueries.collectIdentities(in: previousNode)
+          let hasExplicitTransition = previousTransitionIdentitiesByNodeID.values.contains {
+            subtreeIdentities.contains($0)
+          }
+          if !hasExplicitTransition,
+            let nodeID = previousNode.viewNodeID,
+            removingNodes[nodeID] == nil,
+            previousNode.entityIdentity == nil || !newLiveNodeIDs.contains(nodeID)
+          {
+            planRemovalOverlay(
+              removedNodeID: nodeID, identity: previousNode.identity,
+              transition: .opacity, previousRoot: previousRoot,
+              newIdentities: newIdentities,
+              matchedDestinationsByKey: matchedDestinationsByKey,
+              transactionPlan: transactionPlan, timestamp: timestamp)
+          }
+          continue
+        }
+        pending.append(contentsOf: previousNode.children)
+      }
     }
 
     // Prune transition registrations for nodes that are no longer
@@ -1655,6 +1726,7 @@ package final class AnimationController: Sendable {
     viewNodeID: ViewNodeID,
     transition: AnyTransition,
     snapshot: AnimatableSnapshot,
+    reinsertionOpacity: Double? = nil,
     transaction: TransactionSnapshot,
     timestamp: MonotonicInstant
   ) {
@@ -1677,6 +1749,7 @@ package final class AnimationController: Sendable {
       let key = AnimationKey(identity: identity, slot: .opacity)
       let effectiveFrom: AnyAnimatable =
         sampleCurrentValue(for: key, at: timestamp)
+        ?? reinsertionOpacity.map(AnyAnimatable.init)
         ?? AnyAnimatable(startOpacity)
       if let existing = activeAnimations[key] {
         releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)
@@ -1752,6 +1825,7 @@ package final class AnimationController: Sendable {
     transactionPlan: FrameAnimationTransactionPlan,
     timestamp: MonotonicInstant
   ) {
+    guard transition.removalModifiers() != .identity else { return }
     // Resolve the injection point: the deepest disappearing ancestor (the
     // subtree to inject) and the first surviving ancestor it attaches to.
     // See `AnimationTransitionRemovalPlanning` for the walk-up rules.
@@ -1885,7 +1959,8 @@ package final class AnimationController: Sendable {
       placedSnapshot =
         previousAdoptionOffsets.isEmpty
         ? frozen
-        : translatePlacedNodesByIdentity(tree: frozen, offsets: previousAdoptionOffsets)
+        : translatePlacedNodesByIdentity(
+          tree: frozen, offsets: previousAdoptionOffsets, offsetsAreAbsolute: true)
     } else {
       placedSnapshot = nil
     }

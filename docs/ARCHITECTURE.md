@@ -432,6 +432,11 @@ commit`) that decides what runs on the main actor versus a frame-tail worker.
 The full developer-facing mechanics are in
 [`Runtime-Render-Pipeline.md`](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Runtime-Render-Pipeline.md).
 
+`Lifecycle/NestedMatchedGeometryPlacement.swift` resolves co-present adoption
+dependencies in displayed coordinates. The placed overlay walk composes nested
+offsets, and frozen removal snapshots retain each descendant's absolute adoption
+displacement while the retained layout baseline stays unchanged.
+
 `resolve` reuses unchanged work in two ways. **Retained reuse** skips a subtree
 that is separate from the frame's invalidation. **Memoized-body reuse** is on by
 default. It can also skip a subtree under an invalidated ancestor when all of
