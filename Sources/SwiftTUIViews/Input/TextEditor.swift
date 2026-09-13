@@ -110,6 +110,7 @@ extension TextEditor {
             TextEditorContentWidthProbe(measuredContentWidth: measuredContentWidth)
           }
         }
+        .fittingContent()
         .focusable(false)
         // Wrapping, scrolling, and the caret map remain one protected slot.
         // Measuring inside the viewport also handles arbitrary style padding.

@@ -8,6 +8,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep finite ScrollView viewports full-sized with short or empty content,
+  and allocate spare stack space to unframed scroll views on their scrolling
+  axes. Content remains top-leading and content-sized; explicit frames and
+  `.fixedSize` retain their sizing constraints (STUI-489).
+
 ## [0.13.2] - 2026-09-13
 
 ### Added

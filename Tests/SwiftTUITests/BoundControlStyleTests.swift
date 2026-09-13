@@ -167,6 +167,11 @@ struct BoundControlStyleTests {
         Text("B")
       })
     #expect(row.rasterSurface.lines[1].contains("B"))
+    let plain = render(TextEditor(text: .constant("A")).textEditorStyle(.plain))
+    #expect(plain.measuredTree.measuredSize.height == 1)
+    let overflow = render(TextEditor(text: .constant(String(repeating: "A\n", count: 20))))
+    #expect(overflow.measuredTree.measuredSize.height == 8)
+    #expect(overflow.semanticSnapshot.scrollRoutes.first?.viewportRect.size.height == 6)
   }
 
   @Test(

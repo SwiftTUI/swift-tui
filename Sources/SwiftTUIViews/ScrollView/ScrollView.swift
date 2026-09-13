@@ -6,6 +6,7 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
   @State private var internalPosition = ScrollCellOffset.zero
   @State private var panAnchor: ScrollPanAnchor?
   private var explicitPosition: Binding<ScrollCellOffset>?
+  private var fitsContent = false
   private let contentAuthoringScope: CapturedSubviewScope
   private let interactionAuthoringScope: AuthoringContext?
   private var content: Content
@@ -32,6 +33,13 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
     interactionAuthoringScope = currentAuthoringContext()
     contentAuthoringScope = makeCapturedSubviewScope()
     self.content = content()
+  }
+  /// Protected editing surfaces keep their content-sized viewport contract.
+  /// Ordinary scroll views always accept the finite scrolling-axis proposal.
+  func fittingContent() -> Self {
+    var copy = self
+    copy.fitsContent = true
+    return copy
   }
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     return withDynamicPropertyUpdateScope(self, for: context) {
@@ -218,7 +226,8 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
                 position: position.wrappedValue,
                 indicatorAxes: indicatorAxes,
                 contentInsets: presentation.contentInsets,
-                reservesIndicatorSpace: presentation.reservesIndicatorSpace
+                reservesIndicatorSpace: presentation.reservesIndicatorSpace,
+                fitsContent: fitsContent
               )
             ).resolvedBehavior,
             drawMetadata: drawMetadata,

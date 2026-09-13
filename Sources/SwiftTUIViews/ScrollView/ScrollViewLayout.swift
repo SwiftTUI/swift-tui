@@ -17,7 +17,7 @@ import SwiftTUICore
 // initializer below what `ScrollView.swift` needs. Nothing outside this
 // layout reads it.
 
-struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
+struct ScrollViewLayout: Layout, StackMinimumLayoutProviding, StackExpansionLayoutProviding {
   struct IndicatorInsets: Equatable {
     var trailing: Int = 0
     var bottom: Int = 0
@@ -29,6 +29,7 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
   var indicatorAxes: Axis.Set
   var contentInsets: EdgeInsets = .zero
   var reservesIndicatorSpace: Bool = true
+  var fitsContent = false
   /// The previous frame's converged indicator insets, derived from the
   /// retained container measurement (scroll-latency R1.3). Optimization seed
   /// only: `measuredContent` verifies it with a real measurement and falls
@@ -37,6 +38,8 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
   /// cold start.
   var indicatorInsetSeed: IndicatorInsets? = nil
   func makeCache(subviews _: LayoutSubviews) {}
+
+  var stackExpansionAxes: AxisSet { fitsContent ? [] : axes }
 
   func stackMinimumMainSize(
     axis: SwiftTUICore.Axis,
@@ -146,9 +149,11 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding {
     case .unspecified:
       return child + reserved
     case .finite(let value):
-      if axis {
+      if fitsContent && axis {
         return min(child + reserved, value)
       }
+      // The finite proposal sizes the viewport, even when content is short.
+      // Content still receives an unspecified proposal on scrolling axes.
       return value
     case .infinity:
       return child + reserved
@@ -378,7 +383,7 @@ extension ScrollViewLayout: RetainedMeasurementSeedableLayout {
 
 extension ScrollViewLayout {
   private var reuseSignature: String {
-    "ScrollViewLayout:\(axes.rawValue):\(indicatorAxes.rawValue):\(contentInsets.top):\(contentInsets.leading):\(contentInsets.bottom):\(contentInsets.trailing):\(reservesIndicatorSpace)"
+    "ScrollViewLayout:\(axes.rawValue):\(indicatorAxes.rawValue):\(contentInsets.top):\(contentInsets.leading):\(contentInsets.bottom):\(contentInsets.trailing):\(reservesIndicatorSpace):\(fitsContent)"
   }
 
   var measurementReuseSignature: String? { reuseSignature }

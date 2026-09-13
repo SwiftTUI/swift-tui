@@ -193,6 +193,7 @@ package final class CustomLayoutHandle: CustomLayoutToken {
   package let workerProxy: (any WorkerCustomLayoutProxy)?
   package let measurementReuseSignature: String?
   package let placementReuseSignature: String?
+  package let stackExpansionAxes: AxisSet
   package let placementHandler:
     (
       @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, CellRect, LayoutPassContext?) ->
@@ -216,6 +217,7 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     self.measurementReuseSignature = measurementReuseSignature
     self.placementReuseSignature = placementReuseSignature
     placementHandler = nil
+    stackExpansionAxes = []
     stackMinimumMainSizeHandler = nil
     preferredSpacingHandler = nil
     explicitHorizontalAlignmentHandler = nil
@@ -227,6 +229,7 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     measurementReuseSignature: String? = nil,
     placementReuseSignature: String? = nil,
     workerProxy: (any WorkerCustomLayoutProxy)? = nil,
+    stackExpansionAxes: AxisSet = [],
     placementHandler:
       (
         @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, CellRect, LayoutPassContext?) ->
@@ -244,6 +247,7 @@ package final class CustomLayoutHandle: CustomLayoutToken {
     self.measurementReuseSignature = measurementReuseSignature
     self.placementReuseSignature = placementReuseSignature
     self.workerProxy = workerProxy
+    self.stackExpansionAxes = stackExpansionAxes
     self.placementHandler = placementHandler
     self.stackMinimumMainSizeHandler = stackMinimumMainSizeHandler
     self.preferredSpacingHandler = preferredSpacingHandler

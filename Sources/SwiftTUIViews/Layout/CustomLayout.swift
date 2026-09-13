@@ -464,6 +464,14 @@ package protocol StackMinimumLayoutProviding {
   ) -> Int?
 }
 
+package protocol StackExpansionLayoutProviding {
+  /// Axes on which this container can absorb an unbounded stack offer,
+  /// independently of its content. An absent axis leaves the ordinary
+  /// content-derived maximum in force. Explicit frames and fixedSize still
+  /// constrain the container at the parent allocation boundary.
+  var stackExpansionAxes: AxisSet { get }
+}
+
 // `AnyLayoutBox`, `ConcreteAnyLayoutBox`, and `LayoutWorkerProxy` live in
 // `CustomLayoutErasure.swift`.
 
@@ -495,6 +503,8 @@ public struct AnyLayout: Layout {
         measurementReuseSignature: layout.measurementReuseSignature,
         placementReuseSignature: layout.placementReuseSignature,
         workerProxy: workerProxy,
+        stackExpansionAxes: (layout as? any StackExpansionLayoutProviding)?.stackExpansionAxes
+          ?? [],
         stackMinimumMainSizeHandler: {
           engine, node, idealMeasurement, axis, contentMinimum, passContext in
           workerProxy.stackMinimumMainSize(

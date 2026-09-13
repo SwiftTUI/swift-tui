@@ -50,6 +50,25 @@ struct ScrollViewLayoutInsetSeedTests {
     return (size, passContext.workMetrics.measuredNodesComputed)
   }
 
+  @Test("STUI-489: finite zero and unbounded proposals preserve viewport sizing boundaries")
+  func proposalBoundaries() {
+    for axes: SwiftTUIViews.Axis.Set in [.vertical, .horizontal, [.vertical, .horizontal]] {
+      let layout = ScrollViewLayout(
+        axes: axes, position: .zero, indicatorAxes: [], contentInsets: .init(all: 1))
+      let content = contentNode("Boundary", size: .init(width: 4, height: 2))
+      for dimension: ProposedDimension in [.unspecified, .infinity] {
+        let size = measuredViewport(
+          of: layout, content: content, proposal: .init(width: dimension, height: dimension)
+        ).size
+        #expect(size == .init(width: 6, height: 4))
+      }
+      let zero = measuredViewport(
+        of: layout, content: content, proposal: .init(width: 0, height: 0)
+      ).size
+      #expect(zero == .zero)
+    }
+  }
+
   @Test("A confirmed seed collapses the indicator-shown steady state to one measure")
   func confirmedSeedMeasuresOnce() {
     // 40x100 content in a 20x10 viewport: overflows, vertical indicator shown,
@@ -77,6 +96,7 @@ struct ScrollViewLayoutInsetSeedTests {
     // refutes it and the unchanged cold loop recomputes the same result.
     let content = contentNode("Fitting", size: .init(width: 10, height: 5))
     let cold = measuredViewport(of: verticalScrollLayout(), content: content)
+    #expect(cold.size == .init(width: 20, height: 10))
     #expect(cold.contentMeasures == 1)
 
     var poisoned = verticalScrollLayout()

@@ -53,8 +53,18 @@ extension LayoutEngine {
       if current.layoutRealizedContent != nil {
         return true
       }
+      if isFixedSize(current.layoutMetadata, on: axis) {
+        continue
+      }
 
       switch current.layoutBehavior {
+      case .custom(let token):
+        guard let handle = token as? CustomLayoutHandle else {
+          preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
+        }
+        if handle.stackExpansionAxes.contains(axis == .horizontal ? .horizontal : .vertical) {
+          return true
+        }
       case .intrinsic:
         switch current.drawPayload {
         case .rule:

@@ -120,6 +120,7 @@ public struct TextEditorStyleConfiguration: Sendable {
         ScrollView(.vertical) {
           Text(displayText).fixedSize(horizontal: false, vertical: true)
         }
+        .fittingContent()
         .focusable(false)
         .ambientTextAttributesReset()
       }
