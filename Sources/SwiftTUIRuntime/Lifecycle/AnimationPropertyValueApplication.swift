@@ -219,6 +219,10 @@ package enum AnimationPropertyValueApplication {
       drawMetadata.baseStyle.foregroundStyle = style
       node.drawMetadata = drawMetadata
 
+    case .tintShapeStyle:
+      guard let style = unwrapShapeStyle(value) else { return }
+      node.environmentSnapshot.style.tintStyle = style
+
     case .backgroundShapeStyle:
       guard let style = unwrapShapeStyle(value) else { return }
       var drawMetadata = node.drawMetadata

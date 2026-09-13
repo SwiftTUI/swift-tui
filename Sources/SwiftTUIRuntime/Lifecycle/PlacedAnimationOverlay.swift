@@ -12,24 +12,28 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
   /// a deterministic function of the layout, not an animation sample — so
   /// it is applied first and does not count as transient decoration.
   package var adoptionOffsets: [PlacedAnimationOverlayOffset]
+  /// Current text samples, including at-rest values that clear a cached roll.
+  package var textRolls: [Identity: TextRollValue]
 
   package init(
     removalOverlays: [PlacedRemovalOverlaySnapshot] = [],
     insertionOffsets: [PlacedAnimationOverlayOffset] = [],
     insertionScales: [PlacedAnimationOverlayScale] = [],
     matchedGeometryOffsets: [PlacedAnimationOverlayOffset] = [],
-    adoptionOffsets: [PlacedAnimationOverlayOffset] = []
+    adoptionOffsets: [PlacedAnimationOverlayOffset] = [],
+    textRolls: [Identity: TextRollValue] = [:]
   ) {
     self.removalOverlays = removalOverlays
     self.insertionOffsets = insertionOffsets
     self.insertionScales = insertionScales
     self.matchedGeometryOffsets = matchedGeometryOffsets
     self.adoptionOffsets = adoptionOffsets
+    self.textRolls = textRolls
   }
 
   /// No channel at all: the effective tree is the baseline.
   package var isEmpty: Bool {
-    !hasTransientDecoration && adoptionOffsets.isEmpty
+    !hasTransientDecoration && adoptionOffsets.isEmpty && textRolls.isEmpty
   }
 
   /// Whether an animation *sample* decorates the tree this frame: an exit
@@ -43,6 +47,7 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
       || !insertionOffsets.isEmpty
       || !insertionScales.isEmpty
       || !matchedGeometryOffsets.isEmpty
+      || textRolls.values.contains(where: \.isRolling)
   }
 }
 
@@ -112,6 +117,15 @@ package func applyPlacedAnimationOverlaySnapshot(
   _ snapshot: PlacedAnimationOverlaySnapshot,
   to tree: inout PlacedNode
 ) {
+  if !snapshot.textRolls.isEmpty {
+    func applyText(to node: inout PlacedNode) {
+      if let roll = snapshot.textRolls[node.identity] {
+        node.drawMetadata.textRoll = roll
+      }
+      for index in node.children.indices { applyText(to: &node.children[index]) }
+    }
+    applyText(to: &tree)
+  }
   // Adoption first: every later channel's offset is a delta relative to a
   // node's own rect, so a traveling exit overlay or a live insertion offset
   // on an adopted node composes on top of the adopted rect additively.

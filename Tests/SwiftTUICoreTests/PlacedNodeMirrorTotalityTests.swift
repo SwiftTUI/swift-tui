@@ -56,8 +56,8 @@ struct PlacedNodeMirrorTotalityTests {
       "subtreeNodeCount": "derived cache recomputed from placement geometry",
       "subtreeBounds": "derived cache recomputed from placement geometry",
       "placementMetadata":
-        "placement-owned: populated from allocation snapshots by the layout engine, not "
-        + "projected from the resolved node",
+        "allocation products are placement-owned; the sparse text animation transaction "
+        + "is separately mirrored by textAnimationTransaction",
     ],
   ]
 

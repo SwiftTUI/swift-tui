@@ -43,6 +43,8 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
   package var layoutBehavior: LayoutBehavior
   package var isTransient: Bool
   package var matchedGeometry: MatchedGeometryConfig?
+  /// Only text with a content transition needs authored animation intent after layout.
+  package var textAnimationTransaction: TransactionSnapshot?
 
   package init(
     viewNodeID: ViewNodeID? = nil,
@@ -59,7 +61,8 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
     drawPayload: DrawPayload = .none,
     layoutBehavior: LayoutBehavior = .intrinsic,
     isTransient: Bool = false,
-    matchedGeometry: MatchedGeometryConfig? = nil
+    matchedGeometry: MatchedGeometryConfig? = nil,
+    textAnimationTransaction: TransactionSnapshot? = nil
   ) {
     self.viewNodeID = viewNodeID
     self.identity = identity
@@ -76,6 +79,7 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
     self.layoutBehavior = layoutBehavior
     self.isTransient = isTransient
     self.matchedGeometry = matchedGeometry
+    self.textAnimationTransaction = textAnimationTransaction
   }
 
   package init(
@@ -97,7 +101,9 @@ package struct PlacedNodeResolvedMetadata: Equatable, Sendable {
       drawPayload: resolved.drawPayload,
       layoutBehavior: resolved.layoutBehavior,
       isTransient: resolved.isTransient,
-      matchedGeometry: resolved.matchedGeometry
+      matchedGeometry: resolved.matchedGeometry,
+      textAnimationTransaction: resolved.drawMetadata.contentTransition == nil
+        ? nil : resolved.transactionSnapshot
     )
   }
 }
@@ -118,7 +124,7 @@ package struct LazyChildScrollEstimate: Equatable, Sendable {
   }
 }
 
-/// Rare placement-only metadata kept out of `PlacedNode`'s inline footprint.
+/// Sparse placement products and text animation intent kept out of `PlacedNode`'s inline footprint.
 ///
 /// Deep placed trees are destroyed recursively by Swift value semantics, so
 /// adding another inline field to `PlacedNode` can exhaust the thread stack at
@@ -138,6 +144,7 @@ package struct PlacedNodePlacementMetadata: Equatable, Sendable {
   package var parentScrollViewportRect: CellRect?
   package var hostedListVisibleLayout: ListVisibleLayout?
   package var hostedTableVisibleLayout: TableVisibleLayout?
+  package var textAnimationTransaction: TransactionSnapshot?
 
   package var isEmpty: Bool {
     lazyChildScrollEstimates == nil && lazyStackAllocationSnapshot == nil
@@ -146,6 +153,7 @@ package struct PlacedNodePlacementMetadata: Equatable, Sendable {
       && scrollViewportRect == nil && parentScrollViewportRect == nil
       && hostedListVisibleLayout == nil
       && hostedTableVisibleLayout == nil
+      && textAnimationTransaction == nil
   }
 }
 
@@ -262,6 +270,14 @@ package struct PlacedNode: Equatable, Sendable {
       _placementMetadata = newValue.isEmpty ? nil : Boxed(newValue)
     }
   }
+  package var textAnimationTransaction: TransactionSnapshot? {
+    get { placementMetadata.textAnimationTransaction }
+    set {
+      var metadata = placementMetadata
+      metadata.textAnimationTransaction = newValue
+      placementMetadata = metadata
+    }
+  }
   package var lazyChildScrollEstimates: [LazyChildScrollEstimate]? {
     get { placementMetadata.lazyChildScrollEstimates }
     set {
@@ -344,7 +360,8 @@ package struct PlacedNode: Equatable, Sendable {
         drawPayload: drawPayload,
         layoutBehavior: layoutBehavior,
         isTransient: isTransient,
-        matchedGeometry: matchedGeometry
+        matchedGeometry: matchedGeometry,
+        textAnimationTransaction: textAnimationTransaction
       )
     }
     set {
@@ -384,6 +401,7 @@ package struct PlacedNode: Equatable, Sendable {
       isTransient: resolvedMetadata.isTransient,
       matchedGeometry: resolvedMetadata.matchedGeometry
     )
+    textAnimationTransaction = resolvedMetadata.textAnimationTransaction
   }
 
   package init(
@@ -458,6 +476,7 @@ package struct PlacedNode: Equatable, Sendable {
     layoutBehavior = metadata.layoutBehavior
     isTransient = metadata.isTransient
     matchedGeometry = metadata.matchedGeometry
+    textAnimationTransaction = metadata.textAnimationTransaction
   }
 
   private mutating func recomputeSubtreeAggregates() {

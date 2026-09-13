@@ -47,13 +47,20 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
   ) -> (placed: PlacedNode, overlay: PlacedAnimationOverlaySnapshot) {
     let placed = layout.baselinePlaced
     let animationController = draft.animationDraft.controller
+    let textRolls = animationController.processRealizedText(
+      in: placed,
+      transactionPlan: .init(
+        base: draft.frameContext.transaction,
+        segments: draft.frameContext.animationSegments),
+      at: draft.animationTimestamp)
     let adoption = animationController.capturePlacedTree(layout.baselinePlaced)
-    let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
+    var animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
       for: placed,
       at: draft.animationTimestamp,
       surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal),
       adoption: adoption
     )
+    animationOverlaySnapshot.textRolls = textRolls
     return (placed, animationOverlaySnapshot)
   }
 

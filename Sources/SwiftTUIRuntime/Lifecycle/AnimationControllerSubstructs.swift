@@ -20,6 +20,9 @@ extension AnimationController {
   /// insertions, removals, and matched-geometry swaps on the next frame.
   package struct PreviousFrameState: Sendable {
     package var snapshots: [Identity: AnimatableSnapshot] = [:]
+    /// Text realized during layout is absent from the resolved-tree snapshot.
+    /// Keep only the placed window; offscreen/replaced rows are pruned at the tail.
+    package var realizedTextTargets: [Identity: AnyAnimatable] = [:]
     /// Per-slot rings of values written under `Transaction.tracksVelocity`,
     /// seeding the next `.animate(spring)` on the same slot (plan
     /// 2026-08-25-002 T4). Lives here so the frame-head draft's samples ride
@@ -59,6 +62,7 @@ extension AnimationController {
     /// and set members so a reset on the hot path doesn't re-allocate.
     package mutating func reset() {
       snapshots.removeAll(keepingCapacity: true)
+      realizedTextTargets.removeAll(keepingCapacity: true)
       velocitySamplers.removeAll(keepingCapacity: true)
       treeRoot = nil
       placedRoot = nil

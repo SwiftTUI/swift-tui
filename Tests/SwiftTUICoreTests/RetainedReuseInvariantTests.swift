@@ -315,7 +315,28 @@ struct RetainedReuseInvariantTests {
         "layoutBehavior",
         "isTransient",
         "matchedGeometry",
+        "textAnimationTransaction",
       ])
+  }
+
+  @Test("retained text placement refreshes authored animation intent without growing the node")
+  func textAnimationProjectionRefreshes() {
+    var text = ResolvedNode(
+      identity: testIdentity("text-intent"), kind: .view("Text"),
+      drawPayload: .text("7"))
+    text.drawMetadata.contentTransition = .init(kind: .numericText)
+    text.transactionSnapshot.animationRequest = .disabled
+    let metadata = PlacedNodeResolvedMetadata(resolved: text, semanticRole: .generic)
+    var placed = PlacedNode(
+      identity: text.identity, resolvedMetadata: metadata,
+      bounds: .init(origin: .zero, size: .init(width: 1, height: 1)))
+    #expect(placed.textAnimationTransaction?.animationRequest == .disabled)
+    text.transactionSnapshot.animationRequest = .inherit
+    placed.synchronizeResolvedPhaseMetadata(from: text, semanticRole: .generic)
+    #expect(placed.textAnimationTransaction?.animationRequest == .inherit)
+    text.drawMetadata.contentTransition = nil
+    placed.synchronizeResolvedPhaseMetadata(from: text, semanticRole: .generic)
+    #expect(placed.textAnimationTransaction == nil)
   }
 }
 

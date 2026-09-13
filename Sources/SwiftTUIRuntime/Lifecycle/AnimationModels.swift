@@ -37,6 +37,7 @@ import SwiftTUIViews
 package enum AnimatableSlot: Hashable, Sendable {
   case opacity
   case foregroundShapeStyle
+  case tintShapeStyle
   case backgroundShapeStyle
   case borderShapeStyle
   case borderBlendPhase

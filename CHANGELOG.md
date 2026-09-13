@@ -10,6 +10,10 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- Animate numeric text in viewport-realized List rows and refresh eager rows'
+  text presentation across retained layout.
+- Apply scoped animation and transaction timing to environment-carried
+  foreground and tint styles while preserving base-view and sibling isolation.
 - Compose nested matched-geometry adoption and interpolation in displayed
   coordinates, including animated sources and frozen descendants.
 - Preserve displayed opacity when reinserting a view during its removal fade.

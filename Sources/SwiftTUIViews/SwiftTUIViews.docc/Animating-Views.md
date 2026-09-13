@@ -119,6 +119,11 @@ Text(label)
 transform, for example `{ $0.disablesAnimations = true }` to hold one
 modifier still inside an animated scope.
 
+The scoped forms also include `foregroundStyle` and `tint` applied inside
+the closure. These styles keep their scoped timing when they flow into the
+wrapped view. A closer style modifier on the wrapped view still overrides
+the inherited style and uses the outer transaction.
+
 ## Transitions On Insertion And Removal
 
 ``View/transition(_:)`` describes how a view enters and leaves when a

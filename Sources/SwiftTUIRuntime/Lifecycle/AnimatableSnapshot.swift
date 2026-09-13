@@ -47,6 +47,10 @@ package struct AnimatableSnapshot: Sendable {
       snapshot[.foregroundShapeStyle] = fg
     }
 
+    if let tint = extractAnimatableShapeStyle(from: node.environmentSnapshot.style.tintStyle) {
+      snapshot[.tintShapeStyle] = tint
+    }
+
     if let bg = extractAnimatableShapeStyle(
       from: node.drawMetadata.baseStyle.backgroundStyle
     ) {

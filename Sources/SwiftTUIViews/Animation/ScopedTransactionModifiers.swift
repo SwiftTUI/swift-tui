@@ -94,6 +94,8 @@ package struct ScopedTransactionContent<Base: View, Content: View>: PrimitiveVie
     childContext.transaction.isContinuous = transaction.isContinuous
     childContext.transaction.customValues = transaction.customValues
     childContext.transaction.tracksVelocity = transaction.tracksVelocity
+    childContext.transaction.customValues[ObjectIdentifier(ScopedStyleAnimationContextKey.self)] =
+      AnyHashableSendable(true)
     // The scoped edit must survive nested `resolveView` frame-input
     // refreshes below this node (F137); the placeholder sets the same flag
     // on its own hop when it restores `outer`.

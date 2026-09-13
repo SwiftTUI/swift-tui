@@ -437,6 +437,18 @@ dependencies in displayed coordinates. The placed overlay walk composes nested
 offsets, and frozen removal snapshots retain each descendant's absolute adoption
 displacement while the retained layout baseline stays unchanged.
 
+The same main-actor seam after layout enrolls numeric text from realized
+collection rows in the animation ledger and reprojects the head's current text
+sample onto eager rows. `PlacedNodeResolvedMetadata.textAnimationTransaction`
+carries only the relevant text's authored intent through the sparse placed
+metadata storage. Retained layout keeps destination text and geometry; the
+placed overlay snapshot owns each frame's draw-time roll.
+
+`Animation/ScopedStyleAnimation.swift` records the authoring transaction for
+foreground and tint writes in scoped modifier bodies. Placeholder restoration
+preserves that per-style provenance while restoring the base transaction;
+closer base-view style writers clear or replace the provenance.
+
 `resolve` reuses unchanged work in two ways. **Retained reuse** skips a subtree
 that is separate from the frame's invalidation. **Memoized-body reuse** is on by
 default. It can also skip a subtree under an invalidated ancestor when all of

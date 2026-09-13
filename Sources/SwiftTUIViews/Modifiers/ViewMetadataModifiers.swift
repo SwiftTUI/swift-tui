@@ -522,7 +522,7 @@ public struct EnvironmentWritingModifier<Value>: IterativePrimitiveViewModifier 
     content _: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveContext? {
-    context.settingEnvironment(keyPath, to: value)
+    recordingScopedStyleWrite(keyPath, in: context.settingEnvironment(keyPath, to: value))
   }
 }
 
@@ -544,10 +544,11 @@ public struct EnvironmentTransformModifier<Value>: IterativePrimitiveViewModifie
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveContext? {
-    context.transformingEnvironment(keyPath) { value in
+    let transformed = context.transformingEnvironment(keyPath) { value in
       content.withAuthoredClosureScope {
         transform(&value)
       }
     }
+    return recordingScopedStyleWrite(keyPath, in: transformed)
   }
 }

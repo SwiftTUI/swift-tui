@@ -36,12 +36,20 @@ public struct PlaceholderContentView<Base: View>: PrimitiveView, IterativeResolv
     let restoreContext = context.child(component: .named("restore"))
     var contentContext = restoreContext.child(component: .named("content"))
     contentContext.transaction = restoredTransaction
+    for key in [
+      ObjectIdentifier(ScopedForegroundStyleAnimationKey.self),
+      ObjectIdentifier(ScopedTintStyleAnimationKey.self),
+    ] {
+      if let intent = context.transaction.customValues[key] {
+        contentContext.transaction.customValues[key] = intent
+      }
+    }
     // The restored transaction must survive nested `resolveView` frame-input
     // refreshes below this node, exactly like an authored edit (F137).
     contentContext.propagated.authoredTransactionOverride = true
     return resolveViewWork(base, in: contentContext).map { contentNode in
 
-      var restoreSnapshot = restoredTransaction
+      var restoreSnapshot = contentContext.transaction
       restoreSnapshot.scopeRole = .restoresOuter
       let restoreNode = ResolvedNode(
         identity: restoreContext.identity,

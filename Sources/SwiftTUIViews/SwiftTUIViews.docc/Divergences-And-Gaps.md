@@ -735,14 +735,15 @@ are omitted even when SwiftUI exposes a corresponding API.
   `Transaction.tracksVelocity` seed the next spring on the same value.
   `SWIFTTUI_ANIMATION_VELOCITY=0` restores the at-rest restart for one
   release.
-- **Scoped `body:` forms govern node-owning and node-decorating modifiers.**
-  *Gap (narrowed).* `View.animation(_:body:)` and `View.transaction(_:body:)`
+- **Scoped `body:` forms include environment-carried foreground and tint.**
+  *Ratified.* `View.animation(_:body:)` and `View.transaction(_:body:)`
   scope the transaction to modifiers that create a node (`offset`,
   `position`, `frame`, `padding`, `border`) or decorate the placeholder node
-  (`opacity`, draw effects). A style that flows through the environment
-  (`foregroundStyle`, `tint`) applied inside `body` lands on the wrapped
-  content's own nodes and follows their transaction, where SwiftUI scopes it
-  too.
+  (`opacity`, draw effects), and animatable `foregroundStyle` and `tint`
+  writes that flow through the environment. Each style keeps its authoring
+  transaction across the placeholder restore; a closer style writer in the
+  base view takes precedence. Nested scopes keep their own timings, and a nil
+  scoped animation leaves the base view's outer animation intact.
 - **Custom `Transition` bodies are not exposed.** *Ratified.* SwiftTUI ships
   the built-in `AnyTransition` opacity, move, offset, scale, combined, and
   asymmetric effects. Scale preserves layout and changes placed bounds around
@@ -768,6 +769,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   digit on screen. An unanimated write, reduce motion, `.identity`, and rich
   `Text` content cut. SwiftUI's `.interpolate` (font and colour interpolation)
   has no cell-grid reading and is not offered.
+  Indexed List rows join the animation ledger after viewport realization;
+  eager rows reapply the current text sample across retained layout. Departing
+  rows release their roll, and the layout baseline stays at the target text.
 - **Matched size interpolates by bounds and clip, not re-layout; tag outside
   the chrome.** *Ratified.* `matchedGeometryEffect(id:in:properties:anchor:isSource:)`
   interpolates the rect in anchor space; a size change is applied at the
