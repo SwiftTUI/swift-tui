@@ -57,10 +57,23 @@ extension RunLoop {
         scheduler.requestInput()
         return handleKeyPress(keyPress)
       case .mouse(let mouseEvent):
-        if shouldScheduleFrame(for: mouseEvent) {
+        let schedulesInput = shouldScheduleFrame(for: mouseEvent)
+        let bypassPacing =
+          !schedulesInput
+          && (scheduler as? any CommittedFrameCostRecording)?.mergePressurePacingEnabled == true
+        let invalidationBefore = bypassPacing ? schedulerInvalidationRequestGeneration() : nil
+        if schedulesInput {
           scheduler.requestInput()
         }
         handleMouseEvent(mouseEvent)
+        // Wheel dispatch normally schedules only its precise invalidations.
+        // Preserve that no-op/edge behavior, but mark a changed wheel frame
+        // as input when pacing is enabled so it cannot enter an invalidation gap.
+        if let invalidationBefore,
+          schedulerInvalidationRequestGeneration() != invalidationBefore
+        {
+          scheduler.requestInput()
+        }
         return nil
       case .paste(let pasteEvent):
         scheduler.requestInput()

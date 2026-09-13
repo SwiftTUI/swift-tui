@@ -8,6 +8,31 @@ import Testing
 @MainActor
 @Suite
 struct MergePressurePacingRuntimeTests {
+  @Test("a wheel mutation bypasses pacing while an unhandled wheel creates no frame")
+  func wheelBypass() async throws {
+    let h = try PacingHarness(scroll: true)
+    defer { h.loop.frameSink = nil }
+    try h.engage()
+    let before = h.frames
+    _ = h.loop.handle(
+      .input(
+        .mouse(
+          MouseEvent(
+            kind: .scrolled(deltaX: 0, deltaY: 1),
+            location: .cellFallback(CellPoint(x: 80, y: 30))))))
+    try await h.render()
+    #expect(h.frames == before)
+    _ = h.loop.handle(
+      .input(
+        .mouse(
+          MouseEvent(
+            kind: .scrolled(deltaX: 0, deltaY: 1),
+            location: .cellFallback(CellPoint(x: 2, y: 2))))))
+    try await h.render()
+    #expect(h.frames == before + 1)
+    #expect(h.samples.last?.scheduledFrame.causes.contains(.input) == true)
+    #expect(h.samples.last?.scheduledFrame.causes.contains(.invalidation) == true)
+  }
   @Test("an unprofiled disabled run does not feed frame cost", arguments: [false, true])
   func telemetryArming(profiled: Bool) async throws {
     let h = try PacingHarness(enabled: false, profiled: profiled)
@@ -98,7 +123,7 @@ private final class PacingHarness: FrameDiagnosticSink {
   var frames = 0
   var samples: [CommittedFrameSample] = []
 
-  init(enabled: Bool = true, profiled: Bool = true) throws {
+  init(enabled: Bool = true, profiled: Bool = true, scroll: Bool = false) throws {
     scheduler = FrameScheduler(mergePressurePacingEnabled: enabled)
     state = StateContainer(initialState: 0, invalidationIdentities: [root])
     state.invalidator = scheduler
@@ -111,6 +136,12 @@ private final class PacingHarness: FrameDiagnosticSink {
       focusTracker: FocusTracker(invalidationIdentities: [root]),
       viewBuilder: { [weak self] state, _ in
         if let self { self.now = self.now.advanced(by: self.renderCost) }
+        if scroll {
+          return AnyView(
+            ScrollView(.vertical) {
+              VStack(spacing: 0) { ForEach(0..<100) { Text("row \($0)") } }
+            }.frame(width: 20, height: 4, alignment: .topLeading))
+        }
         return AnyView(Text("motion").offset(x: state, y: 0))
       })
     loop.frameClock = { [unowned self] in now }
