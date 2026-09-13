@@ -7,6 +7,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let rootIdentity: Identity
   package let renderer: DefaultRenderer
   package var hotReloadSession: HotReloadSession?
+  #if DEBUG && (os(macOS) || os(Linux))
+    package var hotReloadLoader: HotReloadLoader?
+    package var hotReloadLoadRequested = false
+  #endif
   package let presentationSurface: any PresentationSurfaceMetricsProvider
   package let terminalInputReader: any TerminalInputReading
   package let signalReader: (any SignalReading)?

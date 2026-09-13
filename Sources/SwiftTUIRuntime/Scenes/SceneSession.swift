@@ -248,6 +248,38 @@ import SwiftTUIViews
     focusTracker: FocusTracker,
     resources: SceneSessionResources
   ) async throws -> RunLoopResult<SceneSessionState> {
+    #if DEBUG && (os(macOS) || os(Linux))
+      if resources.surfaceName == "terminal",
+        let spool = FeatureFlags.environmentValue(named: "SWIFTTUI_HOT_RELOAD_SPOOL"),
+        !spool.isEmpty
+      {
+        let loader = try HotReloadLoader(spoolPath: spool)
+        let session = HotReloadSession(content: HotReloadGeneration {
+          configuration.makeScopedRootView()
+        })
+        let loop = makeRunLoop(configuration: configuration, sessionName: sessionName,
+          stateContainer: stateContainer, focusTracker: focusTracker, resources: resources
+        ) { HotReloadHost(session: session) }
+        loop.installHotReloadSession(session)
+        loop.hotReloadLoader = loader
+        return try await loop.run()
+      }
+    #endif
+    let loop = makeRunLoop(configuration: configuration, sessionName: sessionName,
+      stateContainer: stateContainer, focusTracker: focusTracker, resources: resources
+    ) { configuration.makeScopedRootView() }
+    return try await loop.run()
+  }
+
+  @MainActor
+  private static func makeRunLoop<Content: View, Root: View>(
+    configuration: WindowSceneConfiguration<Content>,
+    sessionName: String,
+    stateContainer: StateContainer<SceneSessionState>,
+    focusTracker: FocusTracker,
+    resources: SceneSessionResources,
+    @ViewBuilder content: @escaping @MainActor () -> Root
+  ) -> RunLoop<SceneSessionState, WindowHostView<Root>> {
     var environmentValues = EnvironmentValues()
     environmentValues.terminalAppearance = resources.presentationSurface.appearance
     environmentValues.theme = resources.presentationSurface.theme
@@ -263,7 +295,7 @@ import SwiftTUIViews
       environmentSnapshot.values["windowTitle"] = title
     }
 
-    let runLoop = RunLoop<SceneSessionState, WindowHostView<ScopedBuilder<Content>>>(
+    let runLoop = RunLoop<SceneSessionState, WindowHostView<Root>>(
       rootIdentity: configuration.rootIdentity,
       presentationSurface: resources.presentationSurface,
       terminalInputReader: resources.terminalInputReader,
@@ -277,7 +309,7 @@ import SwiftTUIViews
       runtimeConfiguration: resources.runtimeConfiguration,
       exitKeyBindings: configuration.exitKeyBindings,
       viewBuilder: ScopedMapper { _ in
-        WindowHostView(content: configuration.makeScopedRootView())
+        WindowHostView(content: content())
       }
     )
     DebugBundle.prepareIfNeeded(configuration: resources.runtimeConfiguration)
@@ -301,6 +333,6 @@ import SwiftTUIViews
       runLoop.renderMode = renderMode
     }
 
-    return try await runLoop.run()
+    return runLoop
   }
 }

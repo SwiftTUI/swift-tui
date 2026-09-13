@@ -2531,6 +2531,8 @@ SwiftTUIRuntime.HostedSurfaceSizeNegotiator.negotiate(proposedWidth:proposedHeig
 SwiftTUIRuntime.HostedSurfaceSizeNegotiator.preferredGridSize
 SwiftTUIRuntime.HostedSurfaceSizeNegotiator.renderedGridSize
 SwiftTUIRuntime.HostedSurfaceSizeNegotiator.sizeThatFits(proposedWidth:proposedHeight:)
+SwiftTUIRuntime.HotReloadExport
+SwiftTUIRuntime.HotReloadExport.retainedRoot(_:)
 SwiftTUIRuntime.InProcessSignalReader
 SwiftTUIRuntime.InProcessSignalReader.events()
 SwiftTUIRuntime.InProcessSignalReader.finish()

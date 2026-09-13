@@ -376,8 +376,25 @@ The commit retires old handlers/tasks and invokes old disappear handlers before
 new appear/task work. Focus follows the accepted owner map; Codable scroll and
 focus storage reconstructs runtime registrations. Pointer scratch resets.
 Identical-content, wrapper, inactive-tab, focus/scroll, real async input/task and
-100-generation tests cover the host. This internal stage does not arm an
-application reload command or load dynamic libraries.
+100-generation tests cover the host.
+
+On DEBUG macOS/Linux terminal sessions, `swifttui-dev` sets a private spool
+environment variable to arm the native loader. SIGUSR1 queues a load at the next
+frame boundary. A 0700 same-user directory, bounded regular files, monotonic
+manifest names and scalar ABI/toolchain exports are checked before the retained
+root payload is cast. Application images resolve framework symbols from the
+executable; macOS uses first-image lookup and Linux binds image-local symbols.
+Images are never unloaded, including compatibility refusals after `dlopen`.
+The loader stops at 100 images and unlinks consumed spool files.
+
+`Tools/SwiftTUIDev` owns the public `swifttui-dev` executable. It builds a debug
+host with exported framework symbols, watches Swift executable-target sources,
+then links only that target's objects into each replacement image. Compilation
+is serialized; edits remain observable during builds and invalidate stale
+candidates. Dependency content, manifests, lockfiles, resources and toolchain
+changes require a restart. The app acknowledges a committed frame, which gives
+the driver's optional JSON event log its timing endpoint. Native release and
+WASI builds contain no loader, signal hook or public `HotReloadExport` API.
 
 Viewport lifecycle carry follows a uniquely matched visible identity when its
 backing node changes. `ViewGraphLifecyclePlanning.swift` emits task transfers

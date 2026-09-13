@@ -80,3 +80,4 @@ are re-exported from the core pipeline layer.
 - <doc:Environment-Variables>
 - <doc:TerminalEmbedding>
 - <doc:Terminal-Handoffs>
+- <doc:Compiled-Hot-Reload>

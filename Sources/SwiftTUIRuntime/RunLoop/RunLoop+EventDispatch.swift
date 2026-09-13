@@ -392,6 +392,13 @@ extension RunLoop {
   }
 
   package func signalDisposition(for name: String) -> RuntimeSignalDisposition {
+    #if DEBUG && (os(macOS) || os(Linux))
+      if name == "SIGUSR1", hotReloadLoader != nil {
+        hotReloadLoadRequested = true
+        scheduler.requestInput()
+        return .continueFrame
+      }
+    #endif
     switch name {
     case "SIGWINCH":
       return .continueFrame

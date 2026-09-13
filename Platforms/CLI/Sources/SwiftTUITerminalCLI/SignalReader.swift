@@ -2,6 +2,7 @@
   @_exported public import SwiftTUIPlatformIO
   import SwiftTUIVendorUnixSignals
   import Synchronization
+  import SwiftTUIRuntime
 
   /// Reads Unix signals and exposes them as strings for the runtime.
   public final class SignalReader: SignalReading {
@@ -13,7 +14,14 @@
 
     /// Creates a signal reader for the supplied signals.
     public init(signals: [TerminalSignal]? = nil) {
-      self.signals = signals ?? [.sigint, .sigterm, .sigwinch]
+      var defaults: [TerminalSignal] = [.sigint, .sigterm, .sigwinch]
+      #if DEBUG && (os(macOS) || os(Linux))
+        if let spool = FeatureFlags.environmentValue(named: "SWIFTTUI_HOT_RELOAD_SPOOL"),
+          !spool.isEmpty {
+          defaults.append(.sigusr1)
+        }
+      #endif
+      self.signals = signals ?? defaults
     }
 
     public func events() -> AsyncStream<String> {

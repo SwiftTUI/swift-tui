@@ -30,6 +30,8 @@
 classifications:
 
   canonical:
+    # Debug native application reload export; absent from release/WASI builds.
+    - SwiftTUIRuntime.HotReloadExport
     # ─── SwiftTUI umbrella ─────────────────────────────────────────────────
     - SwiftTUI.App
 

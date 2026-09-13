@@ -108,6 +108,7 @@ func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDe
 
 let packageProducts: [Product] =
   [
+    .executable(name: "swifttui-dev", targets: ["SwiftTUIDev"]),
     .library(name: "SwiftTUIViews", targets: ["SwiftTUIViews"]),
     .library(name: "SwiftTUIRuntime", targets: ["SwiftTUIRuntime"]),
     .library(name: "SwiftTUIProfiling", targets: ["SwiftTUIProfiling"]),
@@ -131,6 +132,12 @@ let package = Package(
   products: packageProducts,
   dependencies: packageDependencies,
   targets: [
+    .executableTarget(
+      name: "SwiftTUIDev",
+      dependencies: ["SwiftTUIRuntime"],
+      path: "Tools/SwiftTUIDev",
+      swiftSettings: swiftSettings()
+    ),
     .target(
       name: "SwiftTUIPrimitives",
       dependencies: [
@@ -558,7 +565,12 @@ let package = Package(
         "Accessibility/README.md",
         "Fixtures",
       ],
-      swiftSettings: swiftSettings()
+      swiftSettings: swiftSettings(),
+      linkerSettings: [
+        // Debug reload images resolve against the test executable's sole
+        // framework copy, just like swifttui-dev's initial application link.
+        .unsafeFlags(["-Xlinker", "--export-dynamic"], .when(platforms: [.linux], configuration: .debug))
+      ]
     ),
     .testTarget(
       name: "SwiftTUIArgumentsTests",

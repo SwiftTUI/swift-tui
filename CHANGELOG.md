@@ -8,6 +8,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- Debug terminal hot reload on macOS and Linux through `swifttui-dev`, with
+  serialized builds, stale-edit coalescing, ABI/toolchain checks and a 100-image
+  restart boundary. Compatible Codable state, focus, scroll and inactive-tab
+  values replay into fresh owners while old lifecycle work retires.
+
 ### Fixed
 
 - Keep finite ScrollView viewports full-sized with short or empty content,

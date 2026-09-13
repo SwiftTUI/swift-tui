@@ -19,7 +19,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 59 | 509 |
+| `SwiftTUIRuntime` | 60 | 511 |
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 414 | 2505 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
@@ -47,7 +47,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 ## SwiftTUIRuntime
 
-### Canonical surface (59)
+### Canonical surface (60)
 
 - `AnyScene` — struct — 3 members
 - `App` — protocol — 3 members
@@ -65,6 +65,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `HostedSurfaceSizeNegotiation` — struct — 3 members
 - `HostedSurfaceSizeNegotiator` — struct — 9 members
 - `HostLengthSize` — struct — 3 members
+- `HotReloadExport` — enum — 1 member
 - `InProcessSignalReader` — class — 4 members
 - `InputEvent` — enum — 5 members
 - `InputReader` — class — 3 members

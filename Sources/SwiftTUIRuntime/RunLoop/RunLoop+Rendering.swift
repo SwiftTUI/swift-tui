@@ -40,6 +40,7 @@ extension RunLoop {
     )
     let drainPass = beginDeadlineDrainPass()
     while true {
+      processPendingHotReload()
       let consumedAt = frameClock()
       guard var scheduledFrame = consumeReadyFrame(for: drainPass, at: consumedAt) else {
         break
@@ -305,6 +306,7 @@ extension RunLoop {
     // when completions fired at commit.
     fireDeferredAnimationCompletions()
     hotReloadSession?.finishCommittedReplay()
+    acknowledgeHotReloadCommit()
     updateFocusPresentation(focusPresentation)
     // Record the committed focus so the next frame's reuse-safety gate can
     // detect a focus move (see ``retainedReuseSuppressionScopeForFrameSafety()``).
@@ -452,6 +454,7 @@ extension RunLoop {
       if let frameBudget, consumedScheduledFrames >= frameBudget {
         break frameLoop
       }
+      processPendingHotReload()
       let consumedAt = frameClock()
       guard var scheduledFrame = consumeReadyFrame(for: drainPass, at: consumedAt) else {
         break frameLoop

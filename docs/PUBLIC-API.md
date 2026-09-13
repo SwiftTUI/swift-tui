@@ -40,6 +40,12 @@ Symbol classifications still govern API use, and SPI remains a separate contract
 
 ## The one authoring story
 
+`SwiftTUIRuntime.HotReloadExport` is a debug-only macOS/Linux development API.
+Its generic `retainedRoot` factory creates the owned payload for the terminal
+`swifttui-dev` loader without exposing `AnyView`. It is absent from release and
+WASI builds. See the [compiled reload guide](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Compiled-Hot-Reload.md)
+for the C export, ownership, dependency boundaries and diagnostic resets.
+
 The package presents a single primary authoring story: write views with the
 SwiftUI-shaped surface on `View`; use `SwiftTUI` for one-import apps and
 `SwiftTUIRuntime` for platform-neutral runtime composition; treat
