@@ -6,6 +6,33 @@ import Testing
 
 @MainActor
 struct PerfScenarioDriverCompletionTests {
+  @Test("first-frame wait observes completed work after delayed executor resumption")
+  func firstFrameWinsAfterResumption() async throws {
+    let driver = makeDriver()
+    var now = ContinuousClock.now
+    var sleeps = 0
+    let frame = try await PerfScenarioRunner.waitForPresentedFrame(
+      in: driver.terminalHost, timeout: .seconds(2), now: { now },
+      sleep: {
+        sleeps += 1
+        try presentFrame(in: driver.terminalHost)
+        now = now.advanced(by: .seconds(3))
+      })
+    #expect(frame.frameNumber == 1)
+    #expect(sleeps == 1)
+  }
+
+  @Test("first-frame wait still times out when no frame was presented")
+  func missingFirstFrameTimesOut() async throws {
+    let driver = makeDriver()
+    var now = ContinuousClock.now
+    await #expect(throws: PerfScenarioError.markerTimedOut("<first frame>")) {
+      _ = try await PerfScenarioRunner.waitForPresentedFrame(
+        in: driver.terminalHost, timeout: .seconds(2), now: { now },
+        sleep: { now = now.advanced(by: .seconds(3)) })
+    }
+  }
+
   @Test("quiescence waits a full idle interval after the latest frame", arguments: [0, 1, 2])
   func quiescenceResetsOnNewFrames(frameAtSleep: Int) async throws {
     let driver = makeDriver()

@@ -750,17 +750,23 @@ public enum PerfScenarioRunner {
   }
 
   @MainActor
-  private static func waitForPresentedFrame(
+  static func waitForPresentedFrame(
     in terminalHost: PerfTerminalHost,
-    timeout: Duration = .seconds(2)
+    timeout: Duration = .seconds(2),
+    now: () -> ContinuousClock.Instant = { .now },
+    sleep: () async throws -> Void = { try await Task.sleep(for: .milliseconds(1)) }
   ) async throws -> PerfPresentedFrame {
-    let clock = ContinuousClock()
-    let deadline = clock.now.advanced(by: timeout)
-    while clock.now < deadline {
+    let deadline = now().advanced(by: timeout)
+    while true {
+      try Task.checkCancellation()
+      // The producer and waiter share the main actor. A frame can finish
+      // while the waiter is suspended past its deadline under executor load.
+      // Inspect that completed work before diagnosing absent progress.
       if let frame = terminalHost.presentedFrames.last {
         return frame
       }
-      try await Task.sleep(nanoseconds: 1_000_000)
+      guard now() < deadline else { break }
+      try await sleep()
     }
     throw PerfScenarioError.markerTimedOut("<first frame>")
   }
