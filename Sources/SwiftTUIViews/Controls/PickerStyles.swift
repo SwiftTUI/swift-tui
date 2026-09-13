@@ -300,20 +300,17 @@ public struct PickerStyleConfiguration: Sendable {
   /// colors, the enablement flag, and the `controlChrome`/`rowChrome` helpers a
   /// custom style uses to match the built-in treatments.
   public var styleEnvironment: StyleEnvironmentSnapshot
-  /// The number of lines the framework has reserved for the picker, or `nil`
-  /// when it is unconstrained.
+  /// The preferred line count supplied by `View.pickerViewportLineCount(_:)`,
+  /// or `nil` when no hint is supplied.
   ///
-  /// It is supplied by the framework through a package-level modifier, so a
-  /// style reads it but application code cannot set it. ``InlinePickerStyle``
-  /// windows its rows to the reserved height and draws `↑` and `↓` markers on
+  /// ``InlinePickerStyle`` windows its rows to this height and draws `↑` and `↓` markers on
   /// the lines above and below the window.
   public var viewportLineCount: Int?
   /// The cell width the framework asks option rows to occupy, or `nil` to let
   /// the style choose.
   ///
-  /// It is supplied the same package-level way as ``viewportLineCount``. The
-  /// inline and menu built-ins fall back to the widest option label plus the two
-  /// cells the selection marker and its spacing take.
+  /// Supplied by `View.pickerLineWidth(_:)`. The inline built-in falls back to
+  /// the widest option label plus the two cells for the selection marker.
   public var lineWidth: Int?
   private var triggerIdentity: Identity?
 

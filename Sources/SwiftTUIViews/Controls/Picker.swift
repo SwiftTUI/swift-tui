@@ -288,7 +288,7 @@ extension Picker {
               "Picker option content cannot be represented by the text-only option metadata "
               + "model (discarded: \(reasons.joined(separator: ", "))). "
               + "The extracted text and tag remain active; use a single unmodified Text value "
-              + "for deterministic picker chrome.",
+              + "or PickerOption declaration for deterministic picker chrome.",
             identity: node.identity,
             source: "Picker"
           )

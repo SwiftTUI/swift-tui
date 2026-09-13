@@ -199,7 +199,13 @@ public struct AnyTableStyle: Sendable, CustomStringConvertible, CustomDebugStrin
 
   @MainActor
   package func presentation(for configuration: TableStyleConfiguration) -> TableStylePresentation {
-    box.presentation(for: configuration)
+    let resolved = box.presentation(for: configuration)
+    return StyleMisuse.validatedPresentation(
+      resolved, problems: resolved.validationProblems, family: "TableStyle",
+      styleLabel: description, identity: ViewNodeContext.current?.identity,
+      report: { ImperativeRuntimeIssueQueue.record($0) },
+      fallback: { Self.automatic.box.presentation(for: configuration) }
+    )
   }
 }
 

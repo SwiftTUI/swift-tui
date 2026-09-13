@@ -5,10 +5,14 @@
 /// `TableStylePresentation`.
 ///
 /// This is the value a `ListStyle` resolves and the list payload carries into
-/// layout and draw. It is not validated: every field is used as returned, so
-/// there is no per-field fallback. It carries geometry and visibility only; the
+/// layout and draw. Insets, container inset, fill stroke width, and corner radius
+/// must be nonnegative, representable cell counts; stroke line width must be
+/// positive and representable. Invalid geometry reports `style.invalidPresentation`
+/// and uses the automatic presentation for that resolve. It carries geometry and visibility only; the
 /// container's border and background paints come from the authored per-view
 /// chrome or the theme, not from here.
+/// Closed enum and Boolean combinations remain valid. Custom paths follow the
+/// ordinary shape-rendering contract rather than a List-specific path validator.
 public struct ListStylePresentation:
   Equatable,
   Sendable,

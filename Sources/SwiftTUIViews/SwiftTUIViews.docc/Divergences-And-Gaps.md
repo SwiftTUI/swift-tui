@@ -445,8 +445,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   `picker.unrepresentableOptionContent` runtime issue naming the option
   identity instead of degrading silently. Terminal option rows are
   single-line text by construction, and structured option metadata keeps every
-  picker style deterministic, the same trade recorded for tab labels. A
-  metadata-only authoring shape for non-Text content remains an additive gap.
+  picker style deterministic, the same trade recorded for tab labels.
+  `PickerOption("Label", value: value)` provides an explicit metadata-only
+  declaration for model-driven options without authoring arbitrary row content.
 - **`TabView` resolves only the selected body.** *Ratified.* Resolving only
   the visible tab keeps resolve and commit cost proportional to the visible
   surface, which matters more on a terminal than in SwiftUI's retained scene

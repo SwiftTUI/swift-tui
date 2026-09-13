@@ -203,8 +203,13 @@ public struct TableBorderGlyphs: Equatable, Sendable {
 ///
 /// An outline row's prefix is one indenter per ancestor level, then one
 /// connector for the row itself. This is the value an `OutlineStyle` resolves.
-/// It is not validated: the four strings are used as returned, so keep them the
-/// same display width if the levels are to line up.
+/// The strings may be empty or span multiple terminal cells, but must contain
+/// only printable single-line text. Invalid text reports `style.invalidPresentation`
+/// and uses the automatic presentation for that resolve. Matching the widths
+/// within each pair of indenters and connectors keeps levels aligned; the
+/// indenter pair need not match the connector pair. Widths are author choices.
+/// The presentation resolves per outline level; an invalid style reports once
+/// for each level that resolves it.
 public struct OutlineStylePresentation:
   Equatable,
   Sendable,

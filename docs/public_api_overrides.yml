@@ -94,6 +94,7 @@ classifications:
     - SwiftTUIViews.OutlineGroup
     - SwiftTUIViews.Panel
     - SwiftTUIViews.Picker
+    - SwiftTUIViews.PickerOption
     - SwiftTUIViews.PopoverAttachmentAnchor
     - SwiftTUIViews.PopoverTip
     - SwiftTUIViews.PopoverTipAction
@@ -446,9 +447,6 @@ classifications:
     - SwiftTUIViews.BoolFocusBindingModifier
     - SwiftTUIViews.BorderModifier
     - SwiftTUIViews.BooleanNavigationDestinationModifier
-    - SwiftTUIViews.BuiltinPaletteSheetPresentationModifier
-    - SwiftTUIViews.BuiltinPromptPresentationModifier
-    - SwiftTUIViews.BuiltinSheetPresentationModifier
     - SwiftTUIViews.ItemNavigationDestinationModifier
     - SwiftTUIViews.NavigationTitleModifier
     - SwiftTUIViews.SafeAreaInsetModifier
@@ -457,7 +455,6 @@ classifications:
     - SwiftTUIViews.TagValueModifier
     - SwiftTUIViews.TaskLifecycleModifier
     - SwiftTUIViews.TerminationRequestModifier
-    - SwiftTUIViews.ToastModifier
     - SwiftTUIViews.ToolbarItemContributionModifier
     - SwiftTUIViews.ToolbarModifier
     - SwiftTUIViews.TransactionModifier

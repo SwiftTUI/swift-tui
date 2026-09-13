@@ -296,10 +296,10 @@ runtime issue and falls back:
   such as empty spinner frames, a non-positive cadence, an inset too large for
   the terminal, or a tab index outside the options. The surface renders the
   family's automatic presentation for that resolve. Spinner, scroll, link,
-  menu portal, sheet, prompt, cover, popover, toast, and tab-view presentations
+  menu portal, sheet, prompt, cover, popover, toast, tab-view, list, outline, and table presentations
   are validated; scroll and link validate per field and keep the valid fields.
-  List, outline, table, and toolbar values are not validated, so an
-  out-of-range value there degrades silently.
+  Toolbar has no presentation value; its closed placement enum and public
+  `Layout` use the ordinary layout contract and diagnostics.
 
 Every style reports a `snapshotLabel` (by default the reflected type name)
 that names it in snapshot descriptions, debug bundles, and the issues above.

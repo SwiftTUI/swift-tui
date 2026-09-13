@@ -1,5 +1,6 @@
 public import SwiftTUICore
 
+@_documentation(visibility: internal)
 public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
   IterativePrimitiveViewModifier
 {
@@ -76,6 +77,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
   }
 }
 
+@_documentation(visibility: internal)
 public struct BuiltinSheetPresentationModifier<SheetContent: View>: IterativePrimitiveViewModifier {
   var title: String
   var isPresented: Binding<Bool>
@@ -355,6 +357,7 @@ package struct MenuStylePresentationModifier<MenuContent: View>: IterativePrimit
 /// Sheet variant that absorbs `paletteCommand` contributions from the
 /// enclosing scope's subtree via `PaletteCommandsPreferenceKey` and
 /// projects the snapshot into its palette style. Mirrors `.toolbar()` absorption.
+@_documentation(visibility: internal)
 public struct BuiltinPaletteSheetPresentationModifier: IterativePrimitiveViewModifier {
   package let title: String
   package let isPresented: Binding<Bool>

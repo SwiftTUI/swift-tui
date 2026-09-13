@@ -193,10 +193,11 @@ does not yet produce; it is always `false` today.
 retains text editing, selection, scrolling, and input behavior. Its measured
 viewport drives wrapped caret navigation, including when a custom style adds
 padding. The built-in `.automatic` style aliases `.roundedBorder`; `.plain`
-removes the surrounding chrome. The rounded built-in sizes its chrome with a
-package-only layout hint; a public style that approximates it with
-`.frame(minHeight:)` grows to fill a finite proposal, which is a documented
-difference rather than a bug.
+removes the surrounding chrome. The rounded built-in and public custom styles
+can use `.minimumIntrinsicSize(height: 3)` to reserve chrome space while
+remaining content-sized. `.frame(minHeight:)` instead grows to fill a finite
+proposal. The intrinsic-size hint exposes only the minimum dimensions, not the
+framework's internal layout metadata.
 
 ``TextFieldStyle`` likewise surrounds the protected `fieldContent` slot, which
 keeps editing, the caret, and paste; the configuration reports `showsLabel`,
@@ -220,7 +221,11 @@ configuration's `accessibilityReduceMotion` is `true` under either policy.
 pointer mapping and keeps a drag captured when it leaves those bounds. The
 configuration supplies a normalized fraction and `trackCellCount`, the cell
 count the primitive prefers for its track (currently a constant eight; a style
-may draw any width inside the route). The primitive keeps clamping, step
+may draw any width inside the route). Style bodies resolve before layout, so
+this is an intrinsic preference, not the eventual placed width. For a responsive
+track, place flexible content inside the route, for example
+`configuration.track { Rectangle().frame(maxWidth: .infinity).frame(height: 1) }`;
+the pointer endpoints follow its placed bounds. The primitive keeps clamping, step
 rounding, arrow keys, wheel input, and Space activation. `.automatic` is a
 fixed alias of `.linear`.
 
@@ -238,9 +243,15 @@ plus without the rail.
 and `isEnabled`. Wrap an option's composed row in `option.route { … }` to
 select it by occurrence, including when two labels have the same text.
 The picker owns selection tags, bounds, disabled handling, and the binding;
-`viewportLineCount` and `lineWidth` are supplied by the framework for the
-menu treatment and cannot be set from app code. `.automatic` is a fixed alias
-of `.inline`.
+`viewportLineCount` and `lineWidth` are public environment hints set through
+`pickerViewportLineCount(_:)` and `pickerLineWidth(_:)`. The inline treatment
+uses them for its option window and row width; custom styles may interpret
+them differently. `.automatic` is a fixed alias of `.inline`.
+
+Declare plain option metadata with `PickerOption("Label", value: value)` or
+an unmodified `Text("Label").tag(value)`. A picker extracts labels and tags;
+its style owns row content. Structured or modified tagged options still report
+`picker.unrepresentableOptionContent` when their authored behavior would be lost.
 
 ```swift
 struct CompactPickerStyle: PickerStyle {
@@ -409,9 +420,14 @@ valid fields are kept; an invalid link opacity uses the automatic opacity for
 the same control state, including disabled dimming. A closed portal declaration reads its style, so a
 later opening uses the current value, but does not call it: nothing that
 never renders falls back or reports. A spinner reports once per invalid style
-value, not once per animated frame. List, outline, table, and toolbar
-presentations are not validated: an out-of-range value there degrades
-silently.
+value, not once per animated frame. List validates nonnegative, representable
+insets and container geometry, including positive stroke line width. Table
+validates its insets and all fifteen border glyphs (one printable cell each).
+Outline requires printable single-line connectors and indenters, allowing empty
+or multiple-cell strings and author-chosen widths. These three families replace
+the whole invalid presentation with their automatic presentation. Toolbar has
+no presentation value: its closed placement enum and public `Layout` follow
+the ordinary layout contract and diagnostics.
 
 ### Collections
 

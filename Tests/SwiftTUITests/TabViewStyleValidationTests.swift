@@ -10,6 +10,40 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct TabViewStyleValidationTests {
+  private struct InsetOverflowStyle: TabViewStyle {
+    var inset: Int
+    func presentation(for configuration: TabViewStyleConfiguration) -> TabViewStylePresentation {
+      .init(
+        stripHeight: 3, visibleOptionIndices: [0],
+        overflowMenu: .init(
+          triggerLeadingWidth: 9, overflowIndices: [1], isExpanded: true,
+          selectedOverflowIndex: nil, focusedOverflowIndex: nil, triggerLabel: "▴",
+          borderInset: inset))
+    }
+    func makeBody(configuration: TabViewStyleBodyConfiguration) -> some View {
+      LiteralTabsTabViewStyle().makeBody(configuration: configuration)
+    }
+  }
+
+  @Test("custom overflow border clearance moves the rendered row inside the menu")
+  func overflowInsetIsRendered() throws {
+    func frame(_ inset: Int) -> RenderSnapshot {
+      DefaultRenderer().render(
+        TabView(selection: .constant(0)) {
+          Tab("Alpha", value: 0) { Text("Content") }
+          Tab("Beta", value: 1) { Text("Other") }
+        }.tabViewStyle(InsetOverflowStyle(inset: inset)),
+        context: .init(identity: testIdentity("OverflowClearance")),
+        proposal: .init(width: 40, height: 14))
+    }
+    let baseline = frame(1)
+    let inset = frame(2)
+    let baselineRow = try #require(baseline.rasterSurface.lines.firstIndex { $0.contains("Beta") })
+    let insetRow = try #require(inset.rasterSurface.lines.firstIndex { $0.contains("Beta") })
+    #expect(insetRow == baselineRow + 1)
+    #expect(styleIssues(in: inset).isEmpty)
+  }
+
   /// Resolves a fixed presentation and renders it through the automatic
   /// body, so a fallback is visible as the automatic strip.
   private struct FixedPresentationTabViewStyle: TabViewStyle {

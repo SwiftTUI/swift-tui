@@ -79,4 +79,31 @@ struct PickerOptionDiagnosticsTests {
       }
     )
   }
+
+  @Test("metadata declarations support generated options and optional selection")
+  func explicitMetadataOptions() {
+    final class SelectionBox { var value: Int? = 1 }
+    let selection = SelectionBox()
+    let identity = testIdentity("PickerMetadata", "Picker")
+    let keys = LocalKeyHandlerRegistry()
+    var environment = EnvironmentValues()
+    environment.focusedIdentity = identity
+    let artifacts = DefaultRenderer().render(
+      Picker("Mode", selection: Binding(get: { selection.value }, set: { selection.value = $0 })) {
+        ForEach(1..<4) { value in
+          PickerOption("Option \(value)", value: value)
+        }
+      }.id(identity).pickerStyle(.inline),
+      context: .init(
+        identity: testIdentity("PickerMetadata"), environmentValues: environment,
+        localKeyHandlerRegistry: keys, applyEnvironmentValues: true),
+      proposal: .init(width: 30, height: 8))
+    #expect(
+      !artifacts.diagnostics.runtime.issues.contains {
+        $0.code == "picker.unrepresentableOptionContent"
+      })
+    #expect(artifacts.rasterSurface.lines.joined().contains("Option 3"))
+    #expect(keys.dispatch(identity: identity, keyPress: KeyPress(.arrowDown)))
+    #expect(selection.value == 2)
+  }
 }

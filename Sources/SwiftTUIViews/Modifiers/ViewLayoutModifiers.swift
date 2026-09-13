@@ -8,6 +8,19 @@ public import SwiftTUICore
 // implementation types live in `ViewLayoutModifierTypes.swift`.
 
 extension View {
+  /// Sets the minimum intrinsic size advertised to layout, in terminal cells.
+  ///
+  /// Unlike a flexible `frame(minWidth:minHeight:)`, this hint does not make
+  /// content fill a larger finite proposal. Stacks account for this minimum
+  /// when distributing space; a parent may still clip overflowing content.
+  /// A `nil` axis leaves its existing hint unchanged. Negative values become
+  /// zero. Use this when custom control chrome needs a minimum without growing
+  /// into all available space, such as a three-line bordered text editor.
+  public func minimumIntrinsicSize(width: Int? = nil, height: Int? = nil) -> some View {
+    layoutMetadata(
+      .init(minimumWidth: width.map { max(0, $0) }, minimumHeight: height.map { max(0, $0) }))
+  }
+
   public func layoutPriority(_ priority: Double) -> some View {
     layoutMetadata(.init(layoutPriority: priority))
   }

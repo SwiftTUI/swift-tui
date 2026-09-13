@@ -1712,15 +1712,24 @@ extension TagValueModifier: TabItemMetadataProvidingModifier {
 }
 
 extension View {
-  package func pickerViewportLineCount(
+  /// Sets the preferred inline-picker height, including two indicator lines.
+  ///
+  /// Values below three become three. `nil` removes the hint and the indicator
+  /// lines. This is an environment hint for styles, not a frame constraint;
+  /// custom styles may interpret it differently.
+  public func pickerViewportLineCount(
     _ count: Int?
   ) -> some View {
-    environment(\.pickerViewportLineCount, count)
+    environment(\.pickerViewportLineCount, count.map { max(3, $0) })
   }
 
-  package func pickerLineWidth(
+  /// Sets the preferred inline-picker row width in terminal cells.
+  ///
+  /// Values below one become one. `nil` lets the style use its intrinsic row
+  /// width. The hint is passed to custom styles; other built-ins may ignore it.
+  public func pickerLineWidth(
     _ width: Int?
   ) -> some View {
-    environment(\.pickerLineWidth, width)
+    environment(\.pickerLineWidth, width.map { max(1, $0) })
   }
 }

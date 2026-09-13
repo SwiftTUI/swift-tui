@@ -9,8 +9,10 @@
 /// per-row authored metadata, and separator paint is `borderStyle`.
 ///
 /// This is the value a `TableStyle` resolves and the table payload carries into
-/// layout and draw. It is not validated: every field is used as returned, so
-/// there is no per-field fallback.
+/// layout and draw. Insets must be nonnegative, representable cell counts and
+/// every border glyph must occupy one printable terminal cell. An invalid value
+/// reports `style.invalidPresentation` and uses the automatic presentation for
+/// that resolve, including its paints.
 public struct TableStylePresentation:
   Equatable,
   Sendable,

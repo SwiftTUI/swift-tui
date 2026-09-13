@@ -188,7 +188,13 @@ public struct AnyListStyle: Sendable, CustomStringConvertible, CustomDebugString
 
   @MainActor
   package func presentation(for configuration: ListStyleConfiguration) -> ListStylePresentation {
-    box.presentation(for: configuration)
+    let resolved = box.presentation(for: configuration)
+    return StyleMisuse.validatedPresentation(
+      resolved, problems: resolved.validationProblems, family: "ListStyle",
+      styleLabel: description, identity: ViewNodeContext.current?.identity,
+      report: { ImperativeRuntimeIssueQueue.record($0) },
+      fallback: { Self.automatic.box.presentation(for: configuration) }
+    )
   }
 }
 

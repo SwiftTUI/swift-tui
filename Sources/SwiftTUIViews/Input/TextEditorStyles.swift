@@ -304,11 +304,10 @@ extension PlainTextEditorStyle: ReuseTransparentStyle {}
 /// active. The paints come from the style environment's `controlChrome(...)`
 /// helper, so the frame dims when the editor is disabled.
 ///
-/// The built-in sizes that frame with a package-only layout hint that keeps
-/// the editor content-sized under a finite proposal. A public style cannot
-/// call it; approximating the built-in with `.frame(minHeight:)` fills a
-/// finite proposal instead of staying content-sized, which is a documented
-/// difference rather than a defect.
+/// The built-in uses `View.minimumIntrinsicSize(width:height:)` with height
+/// three, keeping the editor content-sized under a finite proposal. Custom
+/// styles can use the same public hint; a flexible `.frame(minHeight:)` would
+/// fill the finite proposal instead.
 public struct RoundedBorderTextEditorStyle: TextEditorStyle {
   /// Creates the style.
   public init() {}
@@ -378,6 +377,6 @@ private struct RoundedBorderTextEditorStyleBody: View {
       }
       // A stack-minimum hint keeps the editor content-sized under a finite
       // proposal; a flexible frame would fill it.
-      .layoutMetadata(.init(minimumHeight: 3))
+      .minimumIntrinsicSize(height: 3)
   }
 }

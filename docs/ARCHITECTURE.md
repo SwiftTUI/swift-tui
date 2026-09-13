@@ -238,6 +238,9 @@ through the shared `Foundation/StyleBoxing.swift` seam. Environment keys and
 modifiers remain in `Environment/StyleEnvironment.swift` and
 `Modifiers/StyleModifiers.swift`.
 All 28 erasers use `ConcreteStyleBox` for storage and reuse comparison.
+`Controls/PickerOption.swift` supplies the explicit text-and-tag metadata
+declaration. `Collections/CollectionStyleValidation.swift` validates List,
+Table, and Outline presentations before they reach layout and draw.
 Body-producing families share its body resolver; styles with dynamic properties
 use a prepared concrete working copy under the body's rebased authoring scope.
 

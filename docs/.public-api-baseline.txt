@@ -3342,9 +3342,6 @@ SwiftTUIViews.BorderlessButtonMenuStyle
 SwiftTUIViews.BorderlessButtonMenuStyle.init()
 SwiftTUIViews.BorderlessButtonMenuStyle.makeBody(configuration:)
 SwiftTUIViews.BorderlessButtonMenuStyle.snapshotLabel
-SwiftTUIViews.BuiltinPaletteSheetPresentationModifier
-SwiftTUIViews.BuiltinPromptPresentationModifier
-SwiftTUIViews.BuiltinSheetPresentationModifier
 SwiftTUIViews.Button
 SwiftTUIViews.Button.init(_:role:action:)
 SwiftTUIViews.Button.init(role:action:label:)
@@ -4194,6 +4191,9 @@ SwiftTUIViews.Picker
 SwiftTUIViews.Picker.init(_:selection:content:)
 SwiftTUIViews.Picker.init(selection:content:label:)
 SwiftTUIViews.Picker.selection
+SwiftTUIViews.PickerOption
+SwiftTUIViews.PickerOption.body
+SwiftTUIViews.PickerOption.init(_:value:)
 SwiftTUIViews.PickerStyle
 SwiftTUIViews.PickerStyle.Body
 SwiftTUIViews.PickerStyle.makeBody(configuration:)
@@ -4984,7 +4984,6 @@ SwiftTUIViews.TitleOnlyLabelStyle
 SwiftTUIViews.TitleOnlyLabelStyle.init()
 SwiftTUIViews.TitleOnlyLabelStyle.makeBody(configuration:)
 SwiftTUIViews.TitleOnlyLabelStyle.snapshotLabel
-SwiftTUIViews.ToastModifier
 SwiftTUIViews.ToastStyle
 SwiftTUIViews.ToastStyle.resolvePresentation(for:)
 SwiftTUIViews.ToastStyle.snapshotLabel
@@ -5206,6 +5205,7 @@ SwiftTUIViews.View.listStyle(_:)
 SwiftTUIViews.View.matchedGeometryEffect(id:in:properties:anchor:isSource:)
 SwiftTUIViews.View.menuStyle(_:)
 SwiftTUIViews.View.menuStyle(_:)
+SwiftTUIViews.View.minimumIntrinsicSize(width:height:)
 SwiftTUIViews.View.modifier(_:)
 SwiftTUIViews.View.navigationDestination(for:destination:)
 SwiftTUIViews.View.navigationDestination(isPresented:destination:)
@@ -5243,8 +5243,10 @@ SwiftTUIViews.View.panel()
 SwiftTUIViews.View.panel(id:)
 SwiftTUIViews.View.phaseAnimator(_:content:animation:)
 SwiftTUIViews.View.phaseAnimator(_:trigger:content:animation:)
+SwiftTUIViews.View.pickerLineWidth(_:)
 SwiftTUIViews.View.pickerStyle(_:)
 SwiftTUIViews.View.pickerStyle(_:)
+SwiftTUIViews.View.pickerViewportLineCount(_:)
 SwiftTUIViews.View.popover(isPresented:onDismiss:attachmentAnchor:arrowEdge:content:)
 SwiftTUIViews.View.popover(item:onDismiss:attachmentAnchor:arrowEdge:content:)
 SwiftTUIViews.View.popoverStyle(_:)

@@ -13,9 +13,9 @@ extension EnvironmentValues {
   /// resolves its own style, and a custom style receives what it needs through
   /// ``OutlineStyleConfiguration``.
   ///
-  /// This accessor is public while the other style families keep their slots
-  /// package-visible, a difference recorded for the next minor release rather
-  /// than a deliberate asymmetry.
+  /// This existing accessor remains public for source compatibility. Other
+  /// families keep their storage slots package-visible; applications select
+  /// all styles through their public view modifiers.
   public var outlineStyle: AnyOutlineStyle {
     get { self[OutlineStyleKey.self] }
     set { self[OutlineStyleKey.self] = newValue }

@@ -666,6 +666,7 @@ extension View {
 /// The modifier the `toast(...)` methods install, carrying one toast
 /// declaration; apps call those methods rather than naming this type, which has
 /// no public initializer.
+@_documentation(visibility: internal)
 public struct ToastModifier<ToastContent: View>: IterativePrimitiveViewModifier {
   var isPresented: Binding<Bool>
   var style: AnyToastStyle

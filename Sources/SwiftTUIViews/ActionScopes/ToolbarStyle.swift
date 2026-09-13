@@ -53,6 +53,12 @@ public enum ToolbarPlacement: Sendable {
 /// A conforming type must be a value type and `Sendable`, because the
 /// environment carries it across resolves.
 ///
+/// There is no additional style-presentation validator: placement is a closed
+/// enum and item geometry follows the same measurement and placement contract
+/// as any public `Layout`. Custom layouts must return valid sizes and place
+/// their children consistently. Layout diagnostics apply without synthesizing
+/// a different toolbar style or discarding its items.
+///
 /// ```swift
 /// struct StackedToolbarStyle: ToolbarStyle {
 ///   var itemLayout: VStackLayout { VStackLayout(alignment: .leading, spacing: 0) }

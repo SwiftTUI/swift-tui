@@ -173,7 +173,13 @@ public struct AnyOutlineStyle: Sendable, CustomStringConvertible, CustomDebugStr
   package func presentation(
     for configuration: OutlineStyleConfiguration
   ) -> OutlineStylePresentation {
-    box.presentation(for: configuration)
+    let resolved = box.presentation(for: configuration)
+    return StyleMisuse.validatedPresentation(
+      resolved, problems: resolved.validationProblems, family: "OutlineStyle",
+      styleLabel: description, identity: ViewNodeContext.current?.identity,
+      report: { ImperativeRuntimeIssueQueue.record($0) },
+      fallback: { Self.automatic.box.presentation(for: configuration) }
+    )
   }
 }
 
