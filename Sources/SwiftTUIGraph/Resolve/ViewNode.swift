@@ -659,7 +659,13 @@ package final class ViewNode {
     seed: @autoclosure () -> Value
   ) -> Value {
     var slot = stateSlots[identifier] ?? .init()
-    slot.initializeIfNeeded(with: seed())
+    if !slot.isInitialized,
+      let replayed: Value = ownerGraph?.restoredHotReloadValue(for: identity, slot: identifier)
+    {
+      slot.initializeIfNeeded(with: replayed)
+    } else {
+      slot.initializeIfNeeded(with: seed())
+    }
     stateSlots[identifier] = slot
 
     guard slot.stores(Value.self) else {

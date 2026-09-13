@@ -194,6 +194,12 @@ package final class ViewGraph {
   private var dependencyIndex: DependencyIndex
   private var frameCommit: FrameCommitState
 
+  package var hotReloadReplay: HotReloadReplay? {
+    get { frameCommit.hotReloadReplay }
+    set { frameCommit.hotReloadReplay = newValue }
+    _modify { yield &frameCommit.hotReloadReplay }
+  }
+
   /// Graph-local monotonic owner-lifetime allocator. Deliberately outside
   /// `GraphIndex`: checkpoint restore may rewind raw `ViewNodeID` allocation,
   /// but can never make a distinct owner reuse a lifetime token.
@@ -819,6 +825,7 @@ package final class ViewGraph {
 
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
     DebugTotalStateSnapshot(
+      hotReloadReplay: hotReloadReplay,
       root: root?.identity,
       nodesByNodeID: nodesByNodeID.mapValues { node in
         node.debugTotalStateSnapshot()

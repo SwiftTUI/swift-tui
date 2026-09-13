@@ -196,6 +196,17 @@ package struct AnyStateSlot {
     }
   }
 
+  /// Detach through Codable; never retain old generation values or metadata.
+  package func hotReloadValue() throws -> SnapshotValue {
+    guard dormantPolicy.survivesDormancy else {
+      throw HotReloadSlotCaptureError.transientRuntimeState
+    }
+    guard case .value(let value, let type, _) = storage,
+      type is any Decodable.Type, let encodable = value as? any Encodable
+    else { throw HotReloadSlotCaptureError.notCodable }
+    return try SnapshotCoding.encode(encodable)
+  }
+
   /// Returns a detached reconstruction payload. Authored ownership permits
   /// model references; framework persistence requires value-only storage.
   /// Direct task handles, bindings and other runtime handles remain excluded.
@@ -401,4 +412,9 @@ package struct AnyStateSlot {
     }
     self = AnyStateSlot(value())
   }
+}
+
+private enum HotReloadSlotCaptureError: Error {
+  case transientRuntimeState
+  case notCodable
 }

@@ -5,6 +5,7 @@ extension ViewGraph {
   }
 
   package struct DebugTotalStateSnapshot: Equatable {
+    package var hotReloadReplay: HotReloadReplay?
     package var root: Identity?
     package var nodesByNodeID: [ViewNodeID: ViewNode.DebugTotalStateSnapshot]
     package var nodesByOwnerLifetimeID: [NodeOwnerLifetimeID: ViewNodeID]
@@ -32,8 +33,7 @@ extension ViewGraph {
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID>
     package var latestLifecycleEvents: [LifecycleEvent]
     package var stateMutationKeys: Set<StateSlotKey>
-    package var stateMutationOwnerLifetimeIDsByKey:
-      [StateSlotKey: Set<NodeOwnerLifetimeID>]
+    package var stateMutationOwnerLifetimeIDsByKey: [StateSlotKey: Set<NodeOwnerLifetimeID>]
     package var lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID]
     package var lifecycleEvaluationTargetsByOwner: [ViewNodeID: Set<ViewNodeID>]
     package var lifecycleEvaluationTargetsRecordedByOwner: [ViewNodeID: Set<ViewNodeID>]

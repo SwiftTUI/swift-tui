@@ -97,8 +97,7 @@ extension ViewGraph {
     package var invalidatedNodeIDs: Set<ViewNodeID> = []
     package var graphLocalDirtyNodeIDs: Set<ViewNodeID> = []
     package var stateMutationKeys: Set<StateSlotKey> = []
-    package var stateMutationOwnerLifetimeIDsByKey:
-      [StateSlotKey: Set<NodeOwnerLifetimeID>] = [:]
+    package var stateMutationOwnerLifetimeIDsByKey: [StateSlotKey: Set<NodeOwnerLifetimeID>] = [:]
   }
 
   /// Lifecycle-evaluation ownership edges: which owner re-evaluates which
@@ -136,6 +135,7 @@ extension ViewGraph {
   /// mutations, not state — restores bump it rather than write it back, keeping
   /// it monotonic. See the matching per-node generation on ``ViewNode``.
   package struct FrameCommitState {
+    package var hotReloadReplay: HotReloadReplay?
     package var currentFrameID: UInt64 = 0
     /// O(1) content token for canonical inputs consumed by the animation
     /// controller. Checkpoint restore carries the token with the graph state;

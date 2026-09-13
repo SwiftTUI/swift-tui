@@ -339,6 +339,32 @@ The archive registry and transient live-graph locator remain separate slots;
 `TabView.swift` composes the active content and registers input handlers through
 these collaborators.
 
+`SwiftTUIGraph/HotReload/` owns package-internal cross-generation state currency.
+`SnapshotCoding` encodes Codable slots into detached scalar/container values
+without Foundation. Limits bound nesting (128), values (65,536), and cumulative
+key/string UTF-8 bytes (4 MiB) per encoded slot. Integer encodings preserve
+64-bit and 128-bit boundaries; floating snapshots compare bit patterns.
+Codable model references decode as new instances. Non-Codable values and
+transient runtime slots carry explicit capture diagnostics. Nested dormant
+container registries currently fail capture rather than retaining old code.
+
+`HotReloadReplay` matches complete destination owner schemas before slot
+initialization. Exact owners reserve their source records; one-component
+wrapper fallbacks require uniqueness in both directions and never remove
+entity or indexed-sibling components. Declaration-rank fallback requires
+equal counts and type agreement within each discovered-property path.
+Count/type changes conservatively reset that entire path group. Structural
+matching cannot infer semantic changes to same-typed declarations.
+Co-resident source owners and duplicate destination schemas are refused.
+
+Replay installs only under a fresh disjoint root on one graph. New slot
+initialization decodes through the destination type, consumes the record,
+and otherwise uses the new authored seed. The replay table and diagnostics
+live in `FrameCommitState`, so graph rollback restores consumption.
+`finishHotReloadReplay` reports unused records and releases the table.
+This is internal replay infrastructure; it does not arm application reload,
+discover destination schemas, swap runtime generations, or load libraries.
+
 Viewport lifecycle carry follows a uniquely matched visible identity when its
 backing node changes. `ViewGraphLifecyclePlanning.swift` emits task transfers
 for unchanged descriptors and keeps replacements keyed to their old cancel and
