@@ -26,6 +26,7 @@ struct ImageLookupKey: Sendable {
   var source: ImageSource
   var resourceRoots: [String]
   var cellPixelSize: PixelSize
+  var contentID: String? = nil
 }
 
 /// Entry-count + byte cost for the repository's decode/resolution caches.
@@ -66,6 +67,7 @@ struct ImageAssetCachePolicy: Sendable {
 extension ImageLookupKey: Hashable {
   static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.source == rhs.source
+      && lhs.contentID == rhs.contentID
       && lhs.resourceRoots == rhs.resourceRoots
       && lhs.cellPixelSize.width == rhs.cellPixelSize.width
       && lhs.cellPixelSize.height == rhs.cellPixelSize.height
@@ -95,6 +97,7 @@ extension ImageLookupKey: Hashable {
       hasher.combine(source)
     }
     hasher.combine(resourceRoots)
+    hasher.combine(contentID)
     hasher.combine(cellPixelSize.width)
     hasher.combine(cellPixelSize.height)
   }
@@ -162,6 +165,10 @@ private func isPNGBytes(_ bytes: [UInt8]) -> Bool {
 }
 
 final class ImageAssetRepository: Sendable {
+  private enum DecodedKey: Hashable, Sendable {
+    case content(String)
+    case named(String)
+  }
   // Both caches live for the process (`sharedImageAssetRepository`), so without a
   // bound a long session that views many distinct images grows them without
   // limit (and leaks across tests sharing the singleton). F52 moved them onto
@@ -172,19 +179,22 @@ final class ImageAssetRepository: Sendable {
 
   private struct Storage {
     var resolutions = BoundedLRUCache<ImageLookupKey, ResolvedImageAsset, ImageAssetCacheCost>()
-    var decodedImages = BoundedLRUCache<ImageAssetReference, DecodedImage, ImageAssetCacheCost>()
+    var decodedImages = BoundedLRUCache<DecodedKey, DecodedImage, ImageAssetCacheCost>()
   }
 
   private let resolutionPolicy: ImageAssetCachePolicy
   private let decodedPolicy: ImageAssetCachePolicy
+  let contents: ImageContentRepository
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
 
   init(
     resolutionCachePolicy: ImageAssetCachePolicy = .resolutionDefault,
-    decodedCachePolicy: ImageAssetCachePolicy = .decodedDefault
+    decodedCachePolicy: ImageAssetCachePolicy = .decodedDefault,
+    contentRepository: ImageContentRepository = .shared
   ) {
     resolutionPolicy = resolutionCachePolicy
     decodedPolicy = decodedCachePolicy
+    contents = contentRepository
   }
 
   func resolver() -> ImageAssetResolver {
@@ -202,18 +212,21 @@ final class ImageAssetRepository: Sendable {
     resourceRoots: [String],
     cellPixelSize: PixelSize
   ) -> ResolvedImageAsset? {
+    guard let reference = resolvedReference(for: source, resourceRoots: resourceRoots),
+      let content = contents.content(for: reference)
+    else { return nil }
     let lookupKey = ImageLookupKey(
       source: source,
       resourceRoots: resourceRoots,
-      cellPixelSize: cellPixelSize
+      cellPixelSize: cellPixelSize,
+      contentID: content.id
     )
 
     if let cached = storage.withLockUnchecked({ $0.resolutions.recordAccess(lookupKey) }) {
       return cached
     }
 
-    guard let reference = resolvedReference(for: source, resourceRoots: resourceRoots),
-      let image = decodedImage(for: reference)
+    guard let image = decodedImage(for: content)
     else {
       return nil
     }
@@ -247,15 +260,24 @@ final class ImageAssetRepository: Sendable {
   func decodedImage(
     for reference: ImageAssetReference
   ) -> DecodedImage? {
-    if let cached = storage.withLockUnchecked({ $0.decodedImages.recordAccess(reference) }) {
+    if case .namedResource(let name) = reference {
+      return storage.withLockUnchecked { $0.decodedImages.recordAccess(.named(name)) }
+    }
+    guard let content = contents.content(for: reference) else { return nil }
+    return decodedImage(for: content)
+  }
+
+  func decodedImage(for content: ImageContent) -> DecodedImage? {
+    let key = DecodedKey.content(content.id)
+    if let cached = storage.withLockUnchecked({ $0.decodedImages.recordAccess(key) }) {
       return cached
     }
 
-    guard let decoded = loadDecodedImage(for: reference) else {
+    guard let decoded = decodeImageBytes(content.bytes) else {
       return nil
     }
 
-    storeDecodedImage(decoded, for: reference)
+    storeDecodedImage(decoded, key: key)
     return decoded
   }
 
@@ -268,6 +290,12 @@ final class ImageAssetRepository: Sendable {
     _ decoded: DecodedImage,
     for reference: ImageAssetReference
   ) -> Bool {
+    guard let key = decodedKey(for: reference) else { return false }
+    return storeDecodedImage(decoded, key: key)
+  }
+
+  @discardableResult
+  private func storeDecodedImage(_ decoded: DecodedImage, key: DecodedKey) -> Bool {
     guard let byteCount = decodedImageCacheByteCount(decoded) else {
       return false
     }
@@ -279,13 +307,18 @@ final class ImageAssetRepository: Sendable {
 
     storage.withLockUnchecked { storage in
       storage.decodedImages.upsert(
-        reference,
+        key,
         value: decoded,
         cost: cost,
         policy: decodedPolicy
       )
     }
     return true
+  }
+
+  private func decodedKey(for reference: ImageAssetReference) -> DecodedKey? {
+    if case .namedResource(let name) = reference { return .named(name) }
+    return contents.content(for: reference).map { .content($0.id) }
   }
 
   private func resolvedReference(
@@ -309,26 +342,6 @@ final class ImageAssetRepository: Sendable {
     case .data(let bytes):
       return .embeddedImage(bytes)
     }
-  }
-
-  private func loadDecodedImage(
-    for reference: ImageAssetReference
-  ) -> DecodedImage? {
-    let bytes: [UInt8]
-    switch reference {
-    case .namedResource:
-      return nil
-    case .filePath(let path):
-      guard let read = readFileBytes(at: path) else {
-        return nil
-      }
-      bytes = read
-    case .embeddedImage(let read):
-      // Despite the case name, this carries any supported image format.
-      bytes = read
-    }
-
-    return decodeImageBytes(bytes)
   }
 
   /// Decodes a raster image from its bytes, dispatching by magic bytes
@@ -537,35 +550,7 @@ private func fileExists(
   return true
 }
 
-private func readFileBytes(
-  at path: String
-) -> [UInt8]? {
-  let fileDescriptor = openReadOnlyFile(path)
-  guard fileDescriptor >= 0 else {
-    return nil
-  }
-  defer {
-    closeFile(fileDescriptor)
-  }
-
-  var bytes: [UInt8] = []
-  var buffer = Array(repeating: UInt8(0), count: 4096)
-
-  while true {
-    let bytesRead = unsafe readFileChunk(fileDescriptor, &buffer, buffer.count)
-    if bytesRead > 0 {
-      bytes.append(contentsOf: buffer.prefix(bytesRead))
-      continue
-    }
-
-    guard bytesRead == 0 else {
-      return nil
-    }
-    return bytes
-  }
-}
-
-private func parseFileURL(
+func parseFileURL(
   _ rawValue: String
 ) -> String? {
   let prefix = "file://"
@@ -688,23 +673,5 @@ private func closeFile(
     _ = WASILibc.close(fileDescriptor)
   #elseif canImport(ucrt)
     _ = _close(fileDescriptor)
-  #endif
-}
-
-private func readFileChunk(
-  _ fileDescriptor: Int32,
-  _ buffer: UnsafeMutableRawPointer?,
-  _ count: Int
-) -> Int {
-  #if canImport(Darwin)
-    unsafe Darwin.read(fileDescriptor, buffer, count)
-  #elseif canImport(Glibc)
-    unsafe Glibc.read(fileDescriptor, buffer, count)
-  #elseif canImport(Android)
-    unsafe Android.read(fileDescriptor, buffer, count)
-  #elseif canImport(WASILibc)
-    Int(unsafe WASILibc.read(fileDescriptor, buffer, count))
-  #elseif canImport(ucrt)
-    Int(unsafe _read(fileDescriptor, buffer, UInt32(count)))
   #endif
 }

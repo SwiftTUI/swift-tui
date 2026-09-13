@@ -348,9 +348,9 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     precompositePlacementOpacity: Bool = false
   ) -> BlendedImageVariant? {
     guard
-      let reference = imageReference(for: attachment),
       let compositing = attachment.compositing,
-      !attachment.visibleBounds.isEmpty
+      !attachment.visibleBounds.isEmpty,
+      let content = repository.contents.content(for: attachment)
     else {
       return nil
     }
@@ -363,7 +363,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
 
     let placementOpacity = precompositePlacementOpacity ? attachment.opacity : 1
     let key = ImageBlendCacheKey(
-      source: sourceCacheKey(for: reference),
+      source: content.id,
+      fingerprint: ImageBlendSourceFingerprint(content),
       bounds: attachment.bounds,
       visibleBounds: attachment.visibleBounds,
       outputSize: outputSize,
@@ -379,7 +380,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       return cached
     }
 
-    guard let sourceImage = repository.decodedImage(for: reference) else {
+    guard let sourceImage = repository.decodedImage(for: content) else {
       return nil
     }
 
@@ -434,16 +435,17 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     fallbackBackground: Color
   ) -> BlendedImageEncodedPayload? {
     guard
-      let reference = imageReference(for: attachment),
       let compositing = attachment.compositing,
-      !attachment.visibleBounds.isEmpty
+      !attachment.visibleBounds.isEmpty,
+      let content = repository.contents.content(for: attachment)
     else {
       return nil
     }
 
     let outputSize = blendedOutputSize(for: attachment, compositing: compositing)
     let key = ImageBlendCacheKey(
-      source: sourceCacheKey(for: reference),
+      source: content.id,
+      fingerprint: ImageBlendSourceFingerprint(content),
       bounds: attachment.bounds,
       visibleBounds: attachment.visibleBounds,
       outputSize: outputSize,
@@ -458,7 +460,7 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       return cached
     }
 
-    guard let sourceImage = repository.decodedImage(for: reference) else {
+    guard let sourceImage = repository.decodedImage(for: content) else {
       return nil
     }
 
@@ -781,18 +783,6 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     return pixels
   }
 
-  private func imageReference(
-    for attachment: RasterImageAttachment
-  ) -> ImageAssetReference? {
-    if let reference = attachment.resolvedReference {
-      return reference
-    }
-    if case .data(let bytes) = attachment.source {
-      return .embeddedImage(bytes)
-    }
-    return nil
-  }
-
   private func blendedOutputSize(
     for attachment: RasterImageAttachment,
     compositing: RasterImageCompositing
@@ -890,7 +880,8 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
 }
 
 private struct ImageBlendCacheKey: Hashable, Sendable {
-  var source: ImageBlendSourceCacheKey
+  var source: String
+  var fingerprint: ImageBlendSourceFingerprint
   var bounds: CellRect
   var visibleBounds: CellRect
   var outputSize: PixelSize
@@ -902,57 +893,22 @@ private struct ImageBlendCacheKey: Hashable, Sendable {
   var placementOpacity: Double
 
   var retainedByteEstimate: Int {
-    source.retainedByteEstimate
+    source.utf8.count
       + fallbackBackground.profile.name.utf8.count
       + (MemoryLayout<Int>.stride * 14)
-      + (MemoryLayout<UInt64>.stride * 5)
+      + (MemoryLayout<UInt64>.stride * 8)
   }
 }
 
-private enum ImageBlendSourceCacheKey: Hashable, Sendable {
-  case namedResource(String)
-  case filePath(String)
-  case embeddedImage(byteCount: Int, digest: UInt64, secondaryDigest: UInt64)
-
-  var retainedByteEstimate: Int {
-    switch self {
-    case .namedResource(let name):
-      name.utf8.count
-    case .filePath(let path):
-      path.utf8.count
-    case .embeddedImage:
-      MemoryLayout<Int>.stride + (MemoryLayout<UInt64>.stride * 2)
-    }
+private struct ImageBlendSourceFingerprint: Hashable, Sendable {
+  var byteCount: Int
+  var primary: UInt64
+  var secondary: UInt64
+  init(_ content: ImageContent) {
+    byteCount = content.bytes.count
+    primary = content.blendPrimaryDigest
+    secondary = content.blendSecondaryDigest
   }
-}
-
-private func sourceCacheKey(
-  for reference: ImageAssetReference
-) -> ImageBlendSourceCacheKey {
-  switch reference {
-  case .namedResource(let name):
-    .namedResource(name)
-  case .filePath(let path):
-    .filePath(path)
-  case .embeddedImage(let bytes):
-    .embeddedImage(
-      byteCount: bytes.count,
-      digest: stableDigest(for: bytes, seed: 0xcbf2_9ce4_8422_2325),
-      secondaryDigest: stableDigest(for: bytes, seed: 0x8422_2325_cbf2_9ce4)
-    )
-  }
-}
-
-private func stableDigest(
-  for bytes: [UInt8],
-  seed: UInt64
-) -> UInt64 {
-  var hasher = ImageBlendStableHasher(seed: seed)
-  hasher.combine(bytes.count)
-  for byte in bytes {
-    hasher.combine(byte)
-  }
-  return hasher.value
 }
 
 private func proportionalPixelSample(
@@ -977,7 +933,7 @@ private func blendedImageID(
 ) -> String {
   var hasher = ImageBlendStableHasher()
   hasher.combine("swift-tui-blended-image-v1")
-  hasher.combine(key.source)
+  hasher.combine(key.fingerprint)
   hasher.combine(key.bounds)
   hasher.combine(key.visibleBounds)
   hasher.combine(key.outputSize.width)
@@ -1002,21 +958,12 @@ private struct ImageBlendStableHasher {
   }
 
   mutating func combine(
-    _ source: ImageBlendSourceCacheKey
+    _ source: ImageBlendSourceFingerprint
   ) {
-    switch source {
-    case .namedResource(let name):
-      combine("named")
-      combine(name)
-    case .filePath(let path):
-      combine("file")
-      combine(path)
-    case .embeddedImage(let byteCount, let digest, let secondaryDigest):
-      combine("embedded")
-      combine(byteCount)
-      combine(digest)
-      combine(secondaryDigest)
-    }
+    combine("embedded")
+    combine(source.byteCount)
+    combine(source.primary)
+    combine(source.secondary)
   }
 
   mutating func combine(

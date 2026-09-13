@@ -5,7 +5,7 @@ import SwiftTUICore
 // This is the image-attachment half of the web-surface JSON encoder: it
 // resolves an attachment's bytes (embedded, file path, or inline data),
 // sniffs the container format from the magic bytes, derives a stable
-// content-hash image ID so unchanged images are transmitted only once, and
+// source-owned image ID so unchanged images are transmitted only once, and
 // base64-encodes the payload.
 //
 // Split out of `WebSurfaceFrameEncoder.swift`. `encodeImages` is widened to
@@ -44,13 +44,15 @@ extension WebSurfaceFrameEncoder {
   package static func encodeImages(
     _ attachments: [RasterImageAttachment],
     fallbackBackground: Color,
-    knownImageIDs: inout Set<String>
+    knownImageIDs: inout Set<String>,
+    contentRepository: ImageContentRepository = .shared
   ) -> [String] {
     attachments.compactMap { attachment in
       encodeImage(
         attachment,
         fallbackBackground: fallbackBackground,
-        knownImageIDs: &knownImageIDs
+        knownImageIDs: &knownImageIDs,
+        contentRepository: contentRepository
       )
     }
   }
@@ -58,7 +60,8 @@ extension WebSurfaceFrameEncoder {
   private static func encodeImage(
     _ attachment: RasterImageAttachment,
     fallbackBackground: Color,
-    knownImageIDs: inout Set<String>
+    knownImageIDs: inout Set<String>,
+    contentRepository: ImageContentRepository
   ) -> String? {
     guard !attachment.visibleBounds.isEmpty else {
       return nil
@@ -66,7 +69,8 @@ extension WebSurfaceFrameEncoder {
 
     let payload = imagePayload(
       for: attachment,
-      fallbackBackground: fallbackBackground
+      fallbackBackground: fallbackBackground,
+      contentRepository: contentRepository
     )
     guard let payload else {
       return nil
@@ -102,7 +106,8 @@ extension WebSurfaceFrameEncoder {
 
   private static func imagePayload(
     for attachment: RasterImageAttachment,
-    fallbackBackground: Color
+    fallbackBackground: Color,
+    contentRepository: ImageContentRepository
   ) -> ImagePayload? {
     if let blended = HostWireFrameModel.blendedImagePayload(
       for: attachment,
@@ -119,36 +124,19 @@ extension WebSurfaceFrameEncoder {
       )
     }
 
-    guard let bytes = imageBytes(for: attachment) else {
+    guard let content = contentRepository.content(for: attachment) else {
       return nil
     }
+    let bytes = content.bytes
     let format = imageFormat(for: bytes)
     return ImagePayload(
       bytes: bytes,
       format: format,
-      id: webImageID(for: bytes, format: format),
+      id: content.wireID,
       pixelSize: attachment.pixelSize,
       bounds: attachment.bounds,
       visibleBounds: attachment.visibleBounds
     )
-  }
-
-  private static func imageBytes(
-    for attachment: RasterImageAttachment
-  ) -> [UInt8]? {
-    switch attachment.resolvedReference {
-    case .embeddedImage(let bytes):
-      return bytes
-    case .filePath(let path):
-      return webSurfaceReadFileBytes(at: path)
-    case .namedResource, nil:
-      break
-    }
-
-    if case .data(let bytes) = attachment.source {
-      return bytes
-    }
-    return nil
   }
 
   /// Detects the container format from the leading magic bytes. Used
@@ -182,34 +170,6 @@ extension WebSurfaceFrameEncoder {
     "[\(size.width),\(size.height)]"
   }
 
-  private static func webImageID(
-    for bytes: [UInt8],
-    format: WebSurfaceImageFormat
-  ) -> String {
-    "\(format.jsonValue):\(hexString(fnv1a64(bytes))):\(bytes.count)"
-  }
-
-  private static func fnv1a64(
-    _ bytes: [UInt8]
-  ) -> UInt64 {
-    var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-    for byte in bytes {
-      hash ^= UInt64(byte)
-      hash &*= 0x100_0000_01b3
-    }
-    return hash
-  }
-
-  private static func hexString(
-    _ value: UInt64
-  ) -> String {
-    var text = String(value, radix: 16, uppercase: false)
-    while text.count < 16 {
-      text = "0" + text
-    }
-    return text
-  }
-
   private static func base64Encoded(
     _ bytes: [UInt8]
   ) -> String {
@@ -237,7 +197,7 @@ extension WebSurfaceFrameEncoder {
   }
 }
 
-private func webSurfaceReadFileBytes(
+func imageContentReadFileBytes(
   at path: String
 ) -> [UInt8]? {
   let fileDescriptor = webSurfaceOpenRead(path)
