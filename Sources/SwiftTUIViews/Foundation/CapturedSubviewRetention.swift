@@ -5,11 +5,20 @@ import SwiftTUICore
 package struct CapturedSubviewRetention: Sendable {
   package var owner: StateOwnerHandle
   package var identity: Identity
+  package var family: String
 
   @MainActor
   package func resolveWork(
     payloads: [ScopedContentPayload], in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
+    if let ledger = StyleRouteInstallationLedgerStorage.current,
+      !ledger.claimRetainedContent(identity)
+    {
+      ImperativeRuntimeIssueQueue.record(
+        StyleMisuse.duplicateContentIssue(
+          family: family, styleLabel: ledger.styleLabel, identity: identity))
+      return .value([])
+    }
     let ownerNode = context.viewGraph.flatMap { graph in
       owner.graphScope == graph.stateGraphScopeID
         ? graph.nodeForOwnerLifetimeID(owner.ownerLifetime) : nil

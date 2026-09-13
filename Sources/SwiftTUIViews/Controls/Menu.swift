@@ -174,7 +174,7 @@ extension Menu {
     configuration.bindRoutes(to: context.identity, presentation: expansionBinding)
     if let owner {
       configuration.content.retention = CapturedSubviewRetention(
-        owner: owner, identity: context.identity.child(.named("MenuContent")))
+        owner: owner, identity: context.identity.child(.named("MenuContent")), family: "MenuStyle")
     }
     let style = context.environmentValues.menuStyle
     let bodyContext = context.child(component: .named("MenuBody"))

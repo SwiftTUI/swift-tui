@@ -578,16 +578,22 @@ public struct TabViewOverflowMenuPresentation: Sendable {
   /// The paint of the menu's border. `nil`, the default, draws no border.
   public var borderStyle: AnyShapeStyle?
 
-  /// Reserved; the built-in hosting does not read it.
-  ///
-  /// ``LiteralTabsTabViewStyle`` sets it to `1`, but the built-in overflow menu
-  /// draws its outline from ``borderStyle`` and ``cornerRadius`` alone. Defaults
-  /// to `0`.
+  /// Minimum cells reserved inside each border edge. Each content inset is the
+  /// larger of this value and `contentPadding` on that edge. Defaults to `0`;
+  /// literal tabs reserve one cell. Must be nonnegative and representable.
   public var borderInset: Int
 
   /// The corner radius of the menu's border, in cells. Defaults to `0`, a square
   /// corner.
   public var cornerRadius: Int
+
+  package var resolvedContentPadding: EdgeInsets {
+    .init(
+      top: max(contentPadding.top, borderInset),
+      leading: max(contentPadding.leading, borderInset),
+      bottom: max(contentPadding.bottom, borderInset),
+      trailing: max(contentPadding.trailing, borderInset))
+  }
 
   /// Whether the selection is one of the overflowed options, which holds exactly
   /// when ``selectedOverflowIndex`` is not `nil`.
@@ -698,6 +704,11 @@ extension TabViewStylePresentation {
     }
     guard let overflowMenu else {
       return problems
+    }
+    if overflowMenu.borderInset < 0
+      || overflowMenu.borderInset > AnchoredSurfaceStylePresentation.representableCellCount
+    {
+      problems.append("overflowMenu.borderInset must be a nonnegative representable cell count")
     }
     let overflow = Set(overflowMenu.overflowIndices)
     if overflowMenu.overflowIndices.contains(where: { !options.contains($0) }) {

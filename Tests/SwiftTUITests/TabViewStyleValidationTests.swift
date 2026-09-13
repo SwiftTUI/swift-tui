@@ -116,6 +116,13 @@ struct TabViewStyleValidationTests {
     let valid = TabViewStylePresentation(
       stripHeight: 3, visibleOptionIndices: [0, 1], overflowMenu: overflow([2, 3]))
     #expect(valid.validationProblems(optionCount: 4).isEmpty)
+    for inset in [-1, Int.max] {
+      var invalidInset = valid
+      invalidInset.overflowMenu?.borderInset = inset
+      #expect(
+        invalidInset.validationProblems(optionCount: 4)
+          .contains { $0.contains("borderInset") })
+    }
     #expect(valid.validationProblems(optionCount: 3).count == 1)
     let repeated = TabViewStylePresentation(
       stripHeight: 0, visibleOptionIndices: [1, 1], overflowMenu: nil)

@@ -88,8 +88,8 @@ public struct LinkStylePresentation: Sendable, Equatable {
   /// `nil` inherits; an explicit value multiplies the containing text's opacity.
   ///
   /// The value must be finite and between zero and one. An out-of-range opacity
-  /// is discarded: the field falls back to `nil`, so the link inherits instead
-  /// of dimming, and the render is reported as a partially invalid presentation
+  /// falls back to the automatic opacity for the same control state, preserving
+  /// disabled dimming, and the render is reported as a partially invalid presentation
   /// (`style.invalidPresentation`).
   public var opacity: Double?
 

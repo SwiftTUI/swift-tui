@@ -110,7 +110,11 @@ declaring group owns retained child state across inline and compact hosts, and
 omitted content has no live focus targets or control actions. Value-only
 retained archives also survive dormancy of an enclosing lazy tab; reference-
 valued archives obey the tab's existing rejection-and-restart rule. Placing
-retained content twice in one body is unsupported.
+retained content twice in one body emits `style.duplicateContent`: the first
+placement owns the content and later placements are omitted. `ViewThatFits`
+candidates may each place it once. The diagnostic has the same per-resolve
+scope as route diagnostics; selective evaluator reruns and depth-cut resolves
+outside that scope cannot diagnose every repeated placement.
 
 ``PaletteStyle`` creates views from command data instead of captured content.
 Its configuration supplies the declaration title, commands, terminal size,
@@ -401,8 +405,8 @@ families whose values carry independent fields fall back per field instead:
 scroll styling validates each indicator glyph (one grapheme in one terminal
 cell), the insets, and the opacity on their own, and link styling validates
 its optional opacity, so an invalid field uses its automatic value while the
-valid fields are kept; an invalid link opacity falls back to inheriting the
-containing text's opacity. A closed portal declaration reads its style, so a
+valid fields are kept; an invalid link opacity uses the automatic opacity for
+the same control state, including disabled dimming. A closed portal declaration reads its style, so a
 later opening uses the current value, but does not call it: nothing that
 never renders falls back or reports. A spinner reports once per invalid style
 value, not once per animated frame. List, outline, table, and toolbar

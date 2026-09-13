@@ -70,6 +70,7 @@ package final class StyleRouteInstallationLedger {
   /// The resolving style's `snapshotLabel`, for the misuse message.
   package let styleLabel: String
   private var installed: Set<Identity>
+  private var retainedContent: Set<Identity> = []
   private var alternatives: [StyleRouteInstallationLedger] = []
 
   package convenience init(styleLabel: String) {
@@ -87,12 +88,17 @@ package final class StyleRouteInstallationLedger {
     installed.insert(identity).inserted
   }
 
+  package func claimRetainedContent(_ identity: Identity) -> Bool {
+    retainedContent.insert(identity).inserted
+  }
+
   /// A ledger for one candidate of an alternatives container. It starts from
   /// the routes installed so far, so a candidate that re-installs an outer
   /// route still reports, while sibling candidates that each install the
   /// same route do not report against each other.
   package func makeAlternative() -> StyleRouteInstallationLedger {
     let alternative = StyleRouteInstallationLedger(styleLabel: styleLabel, installed: installed)
+    alternative.retainedContent = retainedContent
     alternatives.append(alternative)
     return alternative
   }
@@ -102,6 +108,7 @@ package final class StyleRouteInstallationLedger {
   package func absorbAlternatives() {
     for alternative in alternatives {
       installed.formUnion(alternative.installed)
+      retainedContent.formUnion(alternative.retainedContent)
     }
     alternatives.removeAll()
   }

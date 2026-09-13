@@ -14,9 +14,9 @@ import SwiftTUICore
 /// to the first row.
 ///
 /// At most twelve rows are visible, and the window always contains the
-/// selection: once the selection is past the twelfth match it sits on the
-/// window's bottom row, so moving up scrolls the window rather than moving the
-/// cursor inside it. Each row is a pointer-routed button showing the command's
+/// selection. The window scrolls only when selection leaves it, so reversing
+/// direction moves the cursor within the existing rows. Each row is a
+/// pointer-routed button showing the command's
 /// name with its description trailing in the separator paint, marked and filled
 /// with the selection paint when selected, and rendered disabled when the
 /// contribution is. With no commands in scope, or no match for the query, the
@@ -52,6 +52,7 @@ private struct DefaultPaletteStyleBody: View {
 
   @State private var query = ""
   @State private var selectedCommandKey: AnyID?
+  @State private var visibleStart = 0
   @FocusState private var isQueryFocused: Bool
   @Namespace private var filterFocusNamespace
 
@@ -84,6 +85,7 @@ private struct DefaultPaletteStyleBody: View {
     .focusScope(filterFocusNamespace)
     .onAppear {
       query = ""
+      visibleStart = 0
     }
     .onChange(of: matchKeys, initial: true) { _, newKeys in
       reconcileSelection(for: newKeys)
@@ -135,11 +137,17 @@ private struct DefaultPaletteStyleBody: View {
       return 0..<rows.count
     }
 
-    let start = min(
-      max(0, selectedIndex - Self.maximumVisibleRows + 1),
-      rows.count - Self.maximumVisibleRows
-    )
+    let start = windowStart(count: rows.count, selectedIndex: selectedIndex)
     return start..<(start + Self.maximumVisibleRows)
+  }
+
+  private func windowStart(count: Int, selectedIndex: Int) -> Int {
+    let start = min(max(0, visibleStart), max(0, count - Self.maximumVisibleRows))
+    if selectedIndex < start { return selectedIndex }
+    if selectedIndex >= start + Self.maximumVisibleRows {
+      return selectedIndex - Self.maximumVisibleRows + 1
+    }
+    return start
   }
 
   private func row(
@@ -201,12 +209,14 @@ private struct DefaultPaletteStyleBody: View {
     let rows = matches
     guard !rows.isEmpty else {
       selectedCommandKey = nil
+      visibleStart = 0
       return
     }
 
     let currentIndex = effectiveSelectedIndex(in: rows) ?? 0
     let nextIndex = min(max(currentIndex + delta, 0), rows.count - 1)
     selectedCommandKey = rows[nextIndex].key
+    visibleStart = windowStart(count: rows.count, selectedIndex: nextIndex)
   }
 
   private func openSelectedCommand() {
@@ -226,13 +236,16 @@ private struct DefaultPaletteStyleBody: View {
   private func reconcileSelection(for keys: [AnyID]) {
     guard !keys.isEmpty else {
       selectedCommandKey = nil
+      visibleStart = 0
       return
     }
 
-    if let selectedCommandKey, keys.contains(selectedCommandKey) {
+    if let selectedCommandKey, let index = keys.firstIndex(of: selectedCommandKey) {
+      visibleStart = windowStart(count: keys.count, selectedIndex: index)
       return
     }
     selectedCommandKey = keys.first
+    visibleStart = 0
   }
 }
 

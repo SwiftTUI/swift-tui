@@ -566,14 +566,15 @@ extension SpinnerStyle where Self == GlyphSpinnerStyle {
     .builtin("asteriskCycle", ["*", "·", "+", "÷"], interval: .milliseconds(240))
   }
 
-  /// Twenty frames climbing and descending two ogham ladders, a blank then
-  /// ᚁ up to ᚅ and back, a blank then ᚆ up to ᚊ and back, finishing on ᚔ.
+  /// Twenty frames climbing and descending two ogham ladders, starting at ᚁ,
+  /// with a blank between ladders and at the end, finishing on ᚔ. The first
+  /// frame stays visibly active when accessibility reduces motion.
   public static var oghamPulse: GlyphSpinnerStyle {
     .builtin(
       "oghamPulse",
       [
-        " ", "ᚁ", "ᚂ", "ᚃ", "ᚄ", "ᚅ", "ᚄ", "ᚃ", "ᚂ", "ᚁ", " ", "ᚆ", "ᚇ", "ᚈ", "ᚉ", "ᚊ", "ᚉ",
-        "ᚈ", "ᚇ", "ᚆ",
+        "ᚁ", "ᚂ", "ᚃ", "ᚄ", "ᚅ", "ᚄ", "ᚃ", "ᚂ", "ᚁ", " ", "ᚆ", "ᚇ", "ᚈ", "ᚉ", "ᚊ", "ᚉ",
+        "ᚈ", "ᚇ", "ᚆ", " ",
       ],
       finished: "ᚔ")
   }

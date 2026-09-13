@@ -277,12 +277,11 @@ private func linkTextStyle(
   let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
   let isPressed = context.environmentValues.pressedIdentity(comparedAgainst: [identity]) == identity
   let linkStyle = context.environmentValues.linkStyle
-  var presentation = linkStyle.presentation(
-    for: .init(
-      isInline: isInline, isEnabled: context.environmentValues.isEnabled,
-      isFocused: isFocused, showsFocusEffect: showsFocusEffect, isPressed: isPressed,
-      styleEnvironment: styleEnvironment)
-  )
+  let configuration = LinkStyleConfiguration(
+    isInline: isInline, isEnabled: context.environmentValues.isEnabled,
+    isFocused: isFocused, showsFocusEffect: showsFocusEffect, isPressed: isPressed,
+    styleEnvironment: styleEnvironment)
+  var presentation = linkStyle.presentation(for: configuration)
   // The only field the run merge would pass through unchecked: an opacity
   // outside the unit range bakes an unbounded factor into the cell color.
   if let opacity = presentation.opacity, !opacity.isFinite || !(0...1).contains(opacity) {
@@ -290,7 +289,7 @@ private func linkTextStyle(
       StyleMisuse.partiallyInvalidPresentationIssue(
         family: "LinkStyle", styleLabel: linkStyle.description,
         problems: ["opacity must be finite and between zero and one"], identity: identity))
-    presentation.opacity = nil
+    presentation.opacity = AutomaticLinkStyle().resolvePresentation(for: configuration).opacity
   }
   var style = inheritedStyle.merging(
     TextStyle(

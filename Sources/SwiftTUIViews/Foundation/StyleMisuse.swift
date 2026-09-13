@@ -28,6 +28,18 @@ enum StyleMisuse {
   /// style-body resolve (see `StyleRouteView`).
   static let duplicateRouteCode = "style.duplicateRoute"
 
+  static func duplicateContentIssue(
+    family: String, styleLabel: String, identity: Identity
+  ) -> RuntimeIssue {
+    RuntimeIssue(
+      severity: .warning, code: "style.duplicateContent",
+      message:
+        "\(family) \(styleLabel) placed retained content more than once in one body resolve. "
+        + "The first placement owns the content; later placements are omitted. "
+        + "Place each retained content slot once per configuration.",
+      identity: identity, source: family)
+  }
+
   /// The issue code for a style body that omitted a wrapper the primitive
   /// needs while the control is in a state that requires it (a presented
   /// menu without its portal or inline content).

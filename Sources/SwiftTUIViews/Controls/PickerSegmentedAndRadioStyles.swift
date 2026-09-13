@@ -38,7 +38,7 @@ package struct SegmentedPickerStyleBody: View {
       }
       .padding(.init(horizontal: 1, vertical: 1))
       .background {
-        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerChrome.backgroundStyle)
+        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.background)
       }
       .overlay {
         RoundedRectangle(cornerRadius: 1).strokeBorder(
@@ -85,7 +85,7 @@ package struct RadioGroupPickerStyleBody: View {
       }
       .padding(.init(horizontal: 1, vertical: 1))
       .background {
-        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerChrome.backgroundStyle)
+        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.background)
       }
       .overlay {
         RoundedRectangle(cornerRadius: 1).strokeBorder(

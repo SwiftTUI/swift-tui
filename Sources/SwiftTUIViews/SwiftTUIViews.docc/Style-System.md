@@ -287,6 +287,9 @@ Nothing in the style system traps on a bad style. Each problem reports a
 runtime issue and falls back:
 
 - `style.duplicateRoute`: a route installed twice in one body; the first wins.
+- `style.duplicateContent`: retained Menu or ControlGroup content placed twice
+  in one body; the first placement owns the content and later placements are
+  omitted. Alternative candidates in `ViewThatFits` may each place it once.
 - `style.missingRequiredRoute`: a presented menu style omitted both its
   content and its portal wrapper; the automatic body renders for that resolve.
 - `style.invalidPresentation`: a presentation value the surface cannot honor,

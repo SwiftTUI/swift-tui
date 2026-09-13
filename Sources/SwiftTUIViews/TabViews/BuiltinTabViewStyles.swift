@@ -550,7 +550,7 @@ private struct LiteralTabsOverflowMenuView: View {
         }
       }
     }
-    .padding(configuration.presentation.overflowMenu?.contentPadding ?? .zero)
+    .padding(configuration.presentation.overflowMenu?.resolvedContentPadding ?? .zero)
     .background {
       if let overflow = configuration.presentation.overflowMenu,
         let backgroundStyle = overflow.backgroundStyle
@@ -855,7 +855,7 @@ private func literalTabsOverflowMenuLeadingWidth(
     literalTabOverflowMenuWidth(
       options: configuration.options,
       overflowIndices: overflow.overflowIndices
-    ) + overflow.contentPadding.horizontal
+    ) + overflow.resolvedContentPadding.horizontal
   let triggerTrailingEdge = trigger.leadingWidth + literalTabWidth(label: trigger.label)
   let rightAlignedLeading = triggerTrailingEdge - menuWidth
   let maxLeading = configuration.availableWidth - menuWidth

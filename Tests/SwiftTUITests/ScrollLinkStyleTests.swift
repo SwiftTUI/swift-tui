@@ -401,7 +401,7 @@ struct ScrollLinkStyleTests {
     #expect(plain.style.foregroundStyle == nil)
   }
 
-  @Test("an out-of-range link opacity falls back to inheritance and reports once")
+  @Test("an out-of-range link opacity falls back to automatic and reports once")
   func invalidLinkOpacity() throws {
     let context = ResolveContext(identity: testIdentity("Opacity"))
     let invalid = DefaultRenderer().render(
@@ -423,6 +423,31 @@ struct ScrollLinkStyleTests {
     #expect(try #require(allLinkRuns(in: valid.resolvedTree).first).style.opacity == 0.5)
     #expect(
       valid.diagnostics.runtime.issues.filter { $0.code == "style.invalidPresentation" }.isEmpty)
+  }
+
+  @Test("invalid custom opacity keeps disabled dimming and independent custom paint")
+  func invalidDisabledLinkOpacity() throws {
+    for opacity in [4.0, -1, .infinity, .nan] {
+      let artifacts = DefaultRenderer().render(
+        VStack {
+          Link("Automatic", destination: "https://example.com")
+          Text("See \(Link("Custom", destination: "https://example.com"))")
+            .linkStyle(ConsumerLinkStyle(foreground: .color(.green), opacity: opacity))
+        }
+        .disabled(true).opacity(0.5),
+        context: .init(identity: testIdentity("InvalidDisabledLink")))
+      let runs = allLinkRuns(in: artifacts.resolvedTree)
+      let automatic = try #require(runs.first { $0.text == "Automatic" })
+      let custom = try #require(runs.first { $0.text == "Custom" })
+      #expect(custom.style.opacity == automatic.style.opacity)
+      #expect(custom.style.opacity < 1)
+      #expect(custom.style.foregroundStyle == .color(.green))
+      let issues = artifacts.diagnostics.runtime.issues.filter {
+        $0.code == "style.invalidPresentation"
+      }
+      #expect(issues.count == 1)
+      #expect(issues.first?.message.contains("automatic values") == true)
+    }
   }
 
   @Test("collection bodies keep their full hit region; a scroll body excludes its reserved track")

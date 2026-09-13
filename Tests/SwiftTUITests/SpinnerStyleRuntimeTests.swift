@@ -12,6 +12,24 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct SpinnerStyleRuntimeTests {
+  @Test("ogham remains visibly active with reduced motion and registers no animation task")
+  func oghamReducedMotionRemainsVisible() {
+    let registry = LocalTaskRegistry()
+    let active = DefaultRenderer().render(
+      Spinner(stage: .active).spinnerStyle(.oghamPulse)
+        .environment(\.accessibilityReduceMotion, true),
+      context: .init(
+        identity: testIdentity("OghamActive"), localTaskRegistry: registry,
+        applyEnvironmentValues: true),
+      proposal: .init(width: 4, height: 1))
+    let inactive = render(
+      style: GlyphSpinnerStyle.oghamPulse, stage: .inactive,
+      identity: testIdentity("OghamInactive"))
+    #expect(surface(of: active).contains("ᚁ"))
+    #expect(!surface(of: inactive).contains("ᚁ"))
+    #expect(registry.snapshot().isEmpty)
+  }
+
   private func render(
     _ renderer: DefaultRenderer = DefaultRenderer(),
     style: some SpinnerStyle,

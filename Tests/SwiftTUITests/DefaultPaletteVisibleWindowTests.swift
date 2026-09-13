@@ -37,6 +37,8 @@ struct DefaultPaletteVisibleWindowTests {
       _ = try harness.pressKey(KeyPress(.arrowUp))
       #expect(harness.frame.contains("> \(names[index])"), "index \(index):\n\(harness.frame)")
       #expect(visibleNames().count == 12, "index \(index):\n\(harness.frame)")
+      let start = min(index, 8)
+      #expect(visibleNames() == Array(names[start..<(start + 12)]))
     }
     #expect(visibleNames() == Array(names[0..<12]))
   }

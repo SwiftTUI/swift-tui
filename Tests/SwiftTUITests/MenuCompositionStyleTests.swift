@@ -6,6 +6,66 @@ import Testing
 
 @MainActor
 struct MenuCompositionStyleTests {
+  private struct RepeatedContentStyle: ControlGroupStyle {
+    var alternatives = false
+    func makeBody(configuration: ControlGroupStyleConfiguration) -> some View {
+      if alternatives {
+        ViewThatFits {
+          HStack { configuration.content }
+          VStack { configuration.content }
+        }
+      } else {
+        VStack {
+          configuration.content
+          configuration.content
+        }
+      }
+    }
+  }
+
+  private struct RepeatedMenuContentStyle: MenuStyle {
+    func makeBody(configuration: MenuStyleConfiguration) -> some View {
+      VStack {
+        configuration.trigger { configuration.label }
+        if configuration.isPresented {
+          configuration.content
+          configuration.content
+        }
+      }
+    }
+  }
+
+  @Test("a repeated retained Menu slot keeps one live command")
+  func repeatedMenuContent() throws {
+    let artifacts = renderMenu(
+      .init(RepeatedMenuContentStyle()),
+      enabled: true, focused: false, expanded: true)
+    let issues = artifacts.diagnostics.runtime.issues.filter { $0.code == "style.duplicateContent" }
+    #expect(issues.count == 1)
+    #expect(issues.first?.source == "MenuStyle")
+    #expect(artifacts.rasterSurface.lines.filter { $0.contains("First command") }.count == 1)
+  }
+
+  @Test("retained content reports a duplicate placement and preserves alternative candidates")
+  func retainedContentPlacement() {
+    for alternatives in [false, true] {
+      let artifacts = DefaultRenderer().render(
+        ControlGroup { Button("Retained command") {} }
+          .controlGroupStyle(RepeatedContentStyle(alternatives: alternatives)),
+        context: .init(identity: testIdentity("RepeatedContent")),
+        proposal: .init(width: 40, height: 8))
+      let issues = artifacts.diagnostics.runtime.issues.filter {
+        $0.code == "style.duplicateContent"
+      }
+      #expect(issues.count == (alternatives ? 0 : 1))
+      if !alternatives {
+        #expect(issues.first?.source == "ControlGroupStyle")
+        #expect(issues.first?.message.contains("RepeatedContentStyle") == true)
+      }
+      #expect(artifacts.rasterSurface.lines.filter { $0.contains("Retained command") }.count == 1)
+    }
+  }
+
   @Test(
     "public consumer menu preserves every raster cell", arguments: [false, true], [false, true])
   func menuParity(enabled: Bool, focused: Bool) {

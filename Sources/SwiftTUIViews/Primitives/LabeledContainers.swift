@@ -175,7 +175,8 @@ public struct ControlGroup<Label: View, Content: View>: PrimitiveView, Iterative
     let owner = ViewNodeContext.current?.stateOwnerHandle
     if let owner {
       configuration.content.retention = CapturedSubviewRetention(
-        owner: owner, identity: context.identity.child(.named("ControlGroupContent")))
+        owner: owner, identity: context.identity.child(.named("ControlGroupContent")),
+        family: "ControlGroupStyle")
     }
     return context.environmentValues.controlGroupStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("ControlGroupBody"))
