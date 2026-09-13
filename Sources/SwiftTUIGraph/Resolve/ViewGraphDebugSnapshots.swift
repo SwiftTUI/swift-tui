@@ -6,6 +6,7 @@ extension ViewGraph {
 
   package struct DebugTotalStateSnapshot: Equatable {
     package var hotReloadReplay: HotReloadReplay?
+    package var hotReloadTypeAliases: [String: String]
     package var root: Identity?
     package var nodesByNodeID: [ViewNodeID: ViewNode.DebugTotalStateSnapshot]
     package var nodesByOwnerLifetimeID: [NodeOwnerLifetimeID: ViewNodeID]

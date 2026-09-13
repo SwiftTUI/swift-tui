@@ -33,6 +33,14 @@
     private var changedAt = ProcessInfo.processInfo.systemUptime
     private var observationError: (any Error)?
     private var foregroundGroup: pid_t?
+    private struct ApplicationCommand: Decodable {
+      let moduleName: String
+      let importPath: String
+      let sources: [String]
+      let otherArguments: [String]
+      let isLibrary: Bool
+    }
+    private var applicationCommand: ApplicationCommand?
 
     init(options: DevOptions) throws {
       self.options = options
@@ -108,6 +116,7 @@
         "-Xswiftc", "-DSWIFTTUI_HOT_RELOAD",
         "-Xlinker", scalarObject.path, "-Xlinker", exportFlag])
       try validateBuildInputs()
+      try loadApplicationCommand()
       let executable = binaryDirectory.appendingPathComponent(options.product)
       let process = Process()
       process.executableURL = executable
@@ -115,6 +124,7 @@
       process.arguments = options.applicationArguments
       var environment = ProcessInfo.processInfo.environment
       environment["SWIFTTUI_HOT_RELOAD_SPOOL"] = spool.path
+      environment["SWIFTTUI_HOT_RELOAD_MODULE"] = applicationCommand?.moduleName
       process.environment = environment
       process.standardInput = FileHandle.standardInput
       process.standardOutput = FileHandle.standardOutput
@@ -177,35 +187,16 @@
           }
           let began = ProcessInfo.processInfo.systemUptime
           record("build_start")
+          let image = spool.appendingPathComponent(imageName(sequence + 1))
           do {
-            _ = try await swift(["build", "-c", "debug", "--target", targetName,
-              "-Xswiftc", "-DSWIFTTUI_HOT_RELOAD"])
+            try await compileApplicationImage(image, scalarObject: scalarObject)
           } catch {
+            try? FileManager.default.removeItem(at: image)
             record("build_failed")
             message("Build failed; the current app is still running. \(error)")
             continue
           }
           try validateBuildInputs()
-          try observeSources()
-          if observed != candidate {
-            record("discarded")
-            continue
-          }
-          let image = spool.appendingPathComponent(imageName(sequence + 1))
-          let objects = try applicationObjects()
-          var link = ["run", "swiftc", "-emit-library"] + objects + [scalarObject.path, "-o", image.path]
-          #if os(macOS)
-            link += ["-Xlinker", "-undefined", "-Xlinker", "dynamic_lookup"]
-          #else
-            link += ["-Xlinker", "-Bsymbolic"]
-          #endif
-          do { _ = try await command(link) }
-          catch {
-            try? FileManager.default.removeItem(at: image)
-            record("link_failed")
-            message("Relink failed; the current app is still running. \(error)")
-            continue
-          }
           try observeSources()
           if observed != candidate {
             try? FileManager.default.removeItem(at: image)
@@ -266,8 +257,10 @@
       process.arguments = arguments
       let stdout = spool.appendingPathComponent("stdout.log")
       let stderr = spool.appendingPathComponent("stderr.log")
-      FileManager.default.createFile(atPath: stdout.path, contents: nil)
-      FileManager.default.createFile(atPath: stderr.path, contents: nil)
+      guard FileManager.default.createFile(atPath: stdout.path, contents: nil),
+        FileManager.default.createFile(atPath: stderr.path, contents: nil) else {
+        throw DevError("Cannot create compiler output files")
+      }
       let out = try FileHandle(forWritingTo: stdout)
       let err = try FileHandle(forWritingTo: stderr)
       defer { try? out.close(); try? err.close(); commandProcess = nil }
@@ -321,19 +314,70 @@
       binaryDirectory = URL(fileURLWithPath: path)
     }
 
-    private func applicationObjects() throws -> [String] {
-      let directory = binaryDirectory.appendingPathComponent("\(targetName).build")
-      let map = directory.appendingPathComponent("output-file-map.json")
-      guard let contents = try JSONSerialization.jsonObject(with: Data(contentsOf: map)) as? [String: [String: String]] else {
-        throw DevError("Unsupported SwiftPM output-file-map layout")
+    private func loadApplicationCommand() throws {
+      struct Plan: Decodable { let swiftCommands: [String: ApplicationCommand] }
+      let plan = try JSONDecoder().decode(Plan.self,
+        from: Data(contentsOf: binaryDirectory.appendingPathComponent("description.json")))
+      let candidates = plan.swiftCommands.values.filter { command in
+        !command.isLibrary && !command.sources.isEmpty
+          && command.sources.allSatisfy {
+            URL(fileURLWithPath: $0).resolvingSymlinksInPath().path.hasPrefix(targetDirectory.path + "/")
+          }
       }
-      var objects = contents.values.compactMap { $0["object"] }.sorted()
-      let wrapper = directory.appendingPathComponent("\(targetName).swiftmodule.o").path
-      if FileManager.default.fileExists(atPath: wrapper) { objects.append(wrapper) }
-      guard !objects.isEmpty, objects.allSatisfy({
-        $0.hasPrefix(directory.path + "/") && FileManager.default.fileExists(atPath: $0)
-      }) else { throw DevError("Unsupported SwiftPM application object layout") }
-      return objects
+      guard candidates.count == 1, let command = candidates.first,
+        !command.otherArguments.contains("-module-abi-name"),
+        command.moduleName.unicodeScalars.allSatisfy({
+          CharacterSet.alphanumerics.contains($0) && $0.isASCII || $0 == "_"
+        })
+      else { throw DevError("Unsupported SwiftPM executable command; generated sources require a restart") }
+      applicationCommand = ApplicationCommand(moduleName: command.moduleName, importPath: command.importPath,
+        sources: command.sources.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path },
+        otherArguments: command.otherArguments, isLibrary: command.isLibrary)
+    }
+
+    private func compileApplicationImage(_ image: URL, scalarObject: URL) async throws {
+      guard let applicationCommand else { throw DevError("No SwiftPM application compile command") }
+      let current = try sourceSnapshot()
+      let swiftFiles = Set(current.keys.filter { $0.hasPrefix(targetDirectory.path + "/") && $0.hasSuffix(".swift") })
+      guard swiftFiles == Set(applicationCommand.sources) else {
+        throw DevError("The target's source-file set changed; restart swifttui-dev to refresh its build plan")
+      }
+      for source in applicationCommand.sources {
+        if let text = String(data: current[source] ?? Data(), encoding: .utf8),
+          text.range(of: #"@objc\s*\("#, options: .regularExpression) != nil {
+          throw DevError("Explicit Objective-C names are process-global; this target requires a restart")
+        }
+      }
+      var flags: [String] = []
+      let original = applicationCommand.otherArguments
+      var index = 0
+      while index < original.count {
+        let flag = original[index]
+        index += 1
+        if ["-incremental", "-enable-batch-mode", "-serialize-diagnostics", "-parseable-output"].contains(flag)
+          || flag.hasPrefix("-j") { continue }
+        if flag == "-index-store-path" { index += 1; continue }
+        if flag == "-Xfrontend", index + 2 < original.count,
+          original[index] == "-entry-point-function-name", original[index + 1] == "-Xfrontend" {
+          index += 3
+          continue
+        }
+        flags.append(flag)
+      }
+      // Each image gets its own Swift/Objective-C type namespace. Keep the
+      // source module name for qualified references, and change only its ABI
+      // name. The graph compares declared logical type aliases, never objects.
+      let abiName = "\(applicationCommand.moduleName)_SwiftTUIReload_\(sequence + 1)"
+      var arguments = ["run", "swiftc", "-emit-library", "-module-name", applicationCommand.moduleName,
+        "-Xfrontend", "-module-abi-name", "-Xfrontend", abiName,
+        "-I", applicationCommand.importPath] + flags + applicationCommand.sources
+        + [scalarObject.path, "-o", image.path]
+      #if os(macOS)
+        arguments += ["-Xlinker", "-undefined", "-Xlinker", "dynamic_lookup"]
+      #else
+        arguments += ["-Xlinker", "-Bsymbolic"]
+      #endif
+      _ = try await command(arguments)
     }
 
     private func sourceSnapshot() throws -> [String: Data] {
@@ -402,8 +446,13 @@
     }
 
     private func validateChangedSources(from before: [String: Data], to after: [String: Data]) throws {
+      guard Set(before.keys) == Set(after.keys) else {
+        record("restart_required")
+        throw DevError("The source-file set changed; restart swifttui-dev to refresh its build plan")
+      }
       let changed = Set(before.keys).union(after.keys).filter { before[$0] != after[$0] }
       guard changed.allSatisfy({ $0.hasPrefix(targetDirectory.path + "/") && $0.hasSuffix(".swift") }) else {
+        record("restart_required")
         throw DevError("A source dependency changed during the build; restart swifttui-dev")
       }
     }

@@ -34,6 +34,14 @@ and effects in view lifecycle modifiers because schema discovery evaluates the
 candidate before publishing it. Reload replaces the root content of the terminal
 session; scene declarations and additional windows are outside this contract.
 
+After SwiftPM builds the initial host, the driver reads its structured compiler
+command from `description.json`. It recompiles the executable target's Swift
+sources with those settings and a unique ABI module name, then links each image
+against the host's framework symbols. Distinct runtime type names prevent
+duplicate Swift/Objective-C class registration. Replay compares explicitly
+declared logical module aliases in Codable schema names and framework-generated
+`AnyView` type components; it does not change application data or authored identity keys.
+
 `--debounce-ms` sets the quiet period (200 ms by default). `--target` selects the
 executable target explicitly. Arguments after `--` go to the app. Build or link
 failures leave the current generation interactive, with compiler diagnostics on
@@ -58,12 +66,19 @@ construction run application code and must be safe to evaluate during discovery.
 
 ## Restart boundaries and measurement
 
-Changing package manifests, dependency contents, lockfiles, resources or the
-Swift toolchain requires a restart. Only Swift files in the selected executable
+Changing package manifests, dependency contents, lockfiles, resources, the set
+of source files or the Swift toolchain requires a restart. Only existing Swift
+files in the selected executable
 target reload; dependency targets keep the executable's single framework and
-library copies. The driver detects SwiftPM object maps and rejects unsupported
-layouts. Plugins and external generated inputs are outside the supported
+library copies. The driver detects SwiftPM compiler descriptions and rejects
+unsupported layouts. Explicit `@objc(...)` names are process-global and are
+rejected for image compilation. Plugins and external generated inputs are outside the supported
 single-target workflow; restart after changing them.
+
+Runtime names embedded in custom identity keys can differ between images;
+those owners reset under the ordinary
+identity rules. Keep stable explicit identities independent of reflected type
+names when state continuity is required.
 
 Loaded images remain mapped because Swift runtime metadata can outlive a root.
 After 100 image attempts the next edit exits the app and requests a restart;

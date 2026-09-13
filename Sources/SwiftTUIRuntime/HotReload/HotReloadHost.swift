@@ -30,6 +30,7 @@ package final class HotReloadSession {
   package private(set) var lastReport: [HotReloadDiagnostic] = []
   package private(set) var awaitingCommit = false
   package var pendingFocus: Identity?
+  package var replayTypeAliases: [String: String] = [:]
   private var isPreparing = false
   private weak var graph: ViewGraph?
   private var environment: EnvironmentSnapshot = .init()
@@ -67,8 +68,10 @@ package final class HotReloadSession {
     // from a previous rehearsal can silently survive into another candidate.
     for _ in 0..<maximumAttempts {
       let renderer = DefaultRenderer()
+      renderer.viewGraph.hotReloadTypeAliases = replayTypeAliases
       if !schemas.isEmpty {
-        try renderer.viewGraph.installHotReloadReplay(snapshot, at: newRoot, owners: schemas)
+        try renderer.viewGraph.installHotReloadReplay(
+          snapshot, at: newRoot, owners: schemas, typeAliases: replayTypeAliases)
       }
       let capture = HotReloadSchemaCapture()
       var context = ResolveContext(
@@ -88,7 +91,7 @@ package final class HotReloadSession {
     }
     guard converged else { throw HotReloadSwapError.schemaDidNotConverge }
     lastReport = graph.finishHotReloadReplay()
-    try graph.installHotReloadReplay(snapshot, at: newRoot, owners: schemas)
+    try graph.installHotReloadReplay(snapshot, at: newRoot, owners: schemas, typeAliases: replayTypeAliases)
     content = replacement
     generation = nextGeneration
     generationRoot = newRoot
@@ -134,6 +137,7 @@ package struct HotReloadHost: PrimitiveView, IterativeResolvableView {
   package var body: Never { fatalError("HotReloadHost is a primitive view.") }
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    context.viewGraph?.hotReloadTypeAliases = session.replayTypeAliases
     let root = context.identity.child("Generation[\(generation)]")
     session.attach(context: context, generationRoot: root)
     return withAuthoringContext(nil) {

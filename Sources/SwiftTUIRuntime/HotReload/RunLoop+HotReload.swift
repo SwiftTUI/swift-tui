@@ -10,6 +10,7 @@ extension RunLoop {
       hotReloadLoadRequested = false
       do {
         if let replacement = try loader.loadPending() {
+          hotReloadSession?.replayTypeAliases = loader.replayTypeAliases
           try replaceHotReloadGeneration(replacement)
           if let session = hotReloadSession { loader.installed(generation: session.generation) }
         }

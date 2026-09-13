@@ -26,8 +26,16 @@
     private var expectedGeneration: UInt64?
     private var announcedReady = false
     package var loadedImageCount: Int { imageCount }
+    package let replayTypeAliases: [String: String]
 
-    package init(spoolPath: String, expectedToolchain: UInt64? = nil) throws {
+    package init(spoolPath: String, expectedToolchain: UInt64? = nil, logicalModule: String? = nil) throws {
+      if let logicalModule {
+        replayTypeAliases = Dictionary(uniqueKeysWithValues: (1...HotReloadABI.maximumImages).map {
+          ("\(logicalModule)_SwiftTUIReload_\($0)", logicalModule)
+        })
+      } else {
+        replayTypeAliases = [:]
+      }
       guard spoolPath.hasPrefix("/"), !spoolPath.utf8.contains(0) else {
         throw HotReloadLoadError("Reload spool must be an absolute path")
       }
@@ -68,7 +76,9 @@
       guard unsafe fstat(directory, &info) == 0, info.st_uid == getuid(), info.st_mode & 0o777 == 0o700 else {
         throw HotReloadLoadError("Reload spool permissions changed; restart swifttui-dev")
       }
-      let manifest = unsafe "pending".withCString { unsafe openat(directory, $0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC) }
+      let manifest = unsafe "pending".withCString {
+        unsafe openat(directory, $0, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
+      }
       if manifest < 0, errno == ENOENT { return nil }
       guard manifest >= 0 else { throw HotReloadLoadError("Cannot open pending reload manifest") }
       defer {
@@ -88,7 +98,9 @@
       guard imageCount < HotReloadABI.maximumImages else {
         throw HotReloadLoadError("100 image limit reached; restart swifttui-dev")
       }
-      let imageFD = unsafe name.withCString { unsafe openat(directory, $0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC) }
+      let imageFD = unsafe name.withCString {
+        unsafe openat(directory, $0, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
+      }
       guard imageFD >= 0 else { throw HotReloadLoadError("Cannot open reload image") }
       defer { _ = close(imageFD) }
       try validateFile(imageFD, maximumBytes: 256 * 1024 * 1024)

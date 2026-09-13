@@ -389,10 +389,15 @@ The loader stops at 100 images and unlinks consumed spool files.
 
 `Tools/SwiftTUIDev` owns the public `swifttui-dev` executable. It builds a debug
 host with exported framework symbols, watches Swift executable-target sources,
-then links only that target's objects into each replacement image. Compilation
+then uses SwiftPM's compiler description to rebuild that target into each
+replacement image. Every image has a unique Swift ABI module namespace, avoiding
+duplicate Objective-C class registration. Graph-scoped declared aliases compare
+Codable type schemas and the concrete-type component of nested `AnyView` owners.
+The graph retains aliases after replay so subsequent frames keep the same logical
+payload identity. User values and authored identity components remain exact. Compilation
 is serialized; edits remain observable during builds and invalidate stale
 candidates. Dependency content, manifests, lockfiles, resources and toolchain
-changes require a restart. The app acknowledges a committed frame, which gives
+and source-file-set changes require a restart. The app acknowledges a committed frame, which gives
 the driver's optional JSON event log its timing endpoint. Native release and
 WASI builds contain no loader, signal hook or public `HotReloadExport` API.
 

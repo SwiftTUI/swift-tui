@@ -200,6 +200,13 @@ package final class ViewGraph {
     _modify { yield &frameCommit.hotReloadReplay }
   }
 
+  /// Persistent configuration for the mounted reload session, including frames
+  /// after its one-shot replay has finished. Ordinary graphs keep this empty.
+  package var hotReloadTypeAliases: [String: String] {
+    get { frameCommit.hotReloadTypeAliases }
+    set { frameCommit.hotReloadTypeAliases = newValue }
+  }
+
   /// Graph-local monotonic owner-lifetime allocator. Deliberately outside
   /// `GraphIndex`: checkpoint restore may rewind raw `ViewNodeID` allocation,
   /// but can never make a distinct owner reuse a lifetime token.
@@ -826,6 +833,7 @@ package final class ViewGraph {
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
     DebugTotalStateSnapshot(
       hotReloadReplay: hotReloadReplay,
+      hotReloadTypeAliases: hotReloadTypeAliases,
       root: root?.identity,
       nodesByNodeID: nodesByNodeID.mapValues { node in
         node.debugTotalStateSnapshot()

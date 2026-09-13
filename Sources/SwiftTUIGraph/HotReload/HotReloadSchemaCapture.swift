@@ -55,7 +55,9 @@ extension ViewGraph {
     guard !deferred.isEmpty else { return }
     let compatible =
       !ambiguous && deferred.count == slots.count
-      && deferred.allSatisfy { slots[$0.key.slot] == $0.value.typeName }
+      && deferred.allSatisfy {
+        slots[$0.key.slot].map { HotReloadTypeNames.canonical($0, aliases: replay.typeAliases) } == $0.value.typeName
+      }
     for (address, entry) in deferred {
       if compatible {
         replay.pending[address]?.requiresDormantSchema = false

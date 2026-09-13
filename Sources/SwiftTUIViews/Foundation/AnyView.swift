@@ -45,7 +45,12 @@ public struct AnyView: PrimitiveView, IterativeResolvableView {
   }
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
-    makeResolveWork(in: context, payloadIdentity: storage.typeID.identityComponent)
+    // The concrete logical type remains part of identity. A reload session
+    // supplies only compiler-generated module aliases, so an ABI namespace
+    // change cannot masquerade as a different authored payload type.
+    let component = HotReloadTypeNames.canonical(storage.typeID.identityComponent.rawValue,
+      aliases: context.viewGraph?.hotReloadTypeAliases ?? [:])
+    return makeResolveWork(in: context, payloadIdentity: .init(rawValue: component))
   }
 
   /// A generation-scoped runtime host supplies its own disjoint lifetime root.

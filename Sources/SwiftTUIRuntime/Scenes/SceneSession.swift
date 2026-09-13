@@ -253,7 +253,8 @@ import SwiftTUIViews
         let spool = FeatureFlags.environmentValue(named: "SWIFTTUI_HOT_RELOAD_SPOOL"),
         !spool.isEmpty
       {
-        let loader = try HotReloadLoader(spoolPath: spool)
+        let loader = try HotReloadLoader(spoolPath: spool,
+          logicalModule: FeatureFlags.environmentValue(named: "SWIFTTUI_HOT_RELOAD_MODULE"))
         let session = HotReloadSession(content: HotReloadGeneration {
           configuration.makeScopedRootView()
         })

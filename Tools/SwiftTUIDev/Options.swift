@@ -44,6 +44,7 @@ struct DevOptions {
       }
     }
     if !help, product.isEmpty { throw DevError("Specify --product <executable product>") }
+    packagePath = packagePath.resolvingSymlinksInPath()
   }
 
   static let usage = """

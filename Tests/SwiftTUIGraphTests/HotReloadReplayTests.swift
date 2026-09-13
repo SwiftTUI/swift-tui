@@ -143,6 +143,29 @@ struct SnapshotCodingTests {
 @MainActor
 @Suite("Hot-reload state replay")
 struct HotReloadReplayTests {
+  @Test func declaredImageModuleAliasesReconstructReferencesWithoutRewritingUserKeys() throws {
+    let type = String(reflecting: ReloadModel.self)
+    let parts = type.split(separator: ".", maxSplits: 1)
+    let encoded = try SnapshotCoding.encode(ReloadModel(count: 42))
+    let address = HotReloadSlotAddress(owner: Identity(components: ["ID[Image.Type]"]), slot: slot(10))
+    for permitsAlias in [false, true] {
+      let graph = ViewGraph()
+      try graph.installHotReloadReplay(
+        .init(sourceRoot: source, entries: [
+          .init(address: address, typeName: "Image." + parts[1], value: encoded)
+        ]), at: destination,
+        owners: [.init(identity: address.owner, slots: [slot(10): type])],
+        typeAliases: permitsAlias ? ["Image": String(parts[0])] : [:])
+      let restored: ReloadModel? = graph.restoredHotReloadValue(for: absolute(address.owner), slot: slot(10))
+      #expect(restored?.count == (permitsAlias ? 42 : nil))
+    }
+    let aliases = ["Image": "Logical"]
+    #expect(HotReloadTypeNames.canonical("Swift.Array<Image.Record>", aliases: aliases)
+      == "Swift.Array<Logical.Record>")
+    #expect(HotReloadTypeNames.canonical("OtherImage.Record", aliases: aliases) == "OtherImage.Record")
+    #expect(HotReloadTypeNames.canonical("Container.Image.Record", aliases: aliases) == "Container.Image.Record")
+    #expect(HotReloadTypeNames.canonical("Image", aliases: aliases) == "Image")
+  }
   private let source = Identity(components: ["App", "Generation[0]"])
   private let destination = Identity(components: ["App", "Generation[1]"])
   private let owner = Identity(components: ["Root"])

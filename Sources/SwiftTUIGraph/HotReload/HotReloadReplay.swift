@@ -31,6 +31,7 @@ package struct HotReloadSnapshot: Equatable, Sendable {
 }
 
 package struct HotReloadReplay: Equatable, Sendable {
+  package var typeAliases: [String: String]
   package var destinationRoot: Identity
   package var pending: [HotReloadSlotAddress: HotReloadSnapshot.Entry] = [:]
   package var diagnostics: [HotReloadDiagnostic] = []
@@ -39,8 +40,19 @@ package struct HotReloadReplay: Equatable, Sendable {
 
   /// Build every match before exposing values to first body evaluation.
   package init(
-    snapshot: HotReloadSnapshot, destinationRoot: Identity, owners: [HotReloadOwnerSchema]
+    snapshot: HotReloadSnapshot, destinationRoot: Identity, owners: [HotReloadOwnerSchema],
+    typeAliases: [String: String] = [:]
   ) {
+    self.typeAliases = typeAliases
+    var snapshot = snapshot
+    for index in snapshot.entries.indices {
+      snapshot.entries[index].typeName = HotReloadTypeNames.canonical(
+        snapshot.entries[index].typeName, aliases: typeAliases)
+    }
+    let owners = owners.map { owner in
+      HotReloadOwnerSchema(identity: owner.identity,
+        slots: owner.slots.mapValues { HotReloadTypeNames.canonical($0, aliases: typeAliases) })
+    }
     self.destinationRoot = destinationRoot
     let sourceGroups = Dictionary(
       grouping: snapshot.entries.filter(\.participatesInSchema), by: { $0.address.owner })
@@ -156,8 +168,10 @@ package struct HotReloadReplay: Equatable, Sendable {
     return pending.removeValue(forKey: key)
   }
 
-  package static func decode<Value>(_ entry: HotReloadSnapshot.Entry) throws -> Value {
-    guard entry.typeName == String(reflecting: Value.self),
+  package static func decode<Value>(
+    _ entry: HotReloadSnapshot.Entry, typeAliases: [String: String] = [:]
+  ) throws -> Value {
+    guard entry.typeName == HotReloadTypeNames.canonical(String(reflecting: Value.self), aliases: typeAliases),
       let type = Value.self as? any Decodable.Type, let value = entry.value,
       let decoded = try SnapshotCoding.decode(type, from: value) as? Value
     else { throw SnapshotCodingError.incompatibleContainer }
@@ -211,7 +225,7 @@ extension ViewGraph {
     // application Decodable code runs. It may read or write other live state.
     guard let entry = hotReloadReplay?.takeEntry(for: identity, slot: slot) else { return nil }
     do {
-      let decoded: Value = try HotReloadReplay.decode(entry)
+      let decoded: Value = try HotReloadReplay.decode(entry, typeAliases: hotReloadReplay?.typeAliases ?? [:])
       hotReloadReplay?.restoredCount += 1
       return decoded
     } catch {
@@ -292,7 +306,8 @@ extension ViewGraph {
   }
 
   package func installHotReloadReplay(
-    _ snapshot: HotReloadSnapshot, at destinationRoot: Identity, owners: [HotReloadOwnerSchema]
+    _ snapshot: HotReloadSnapshot, at destinationRoot: Identity, owners: [HotReloadOwnerSchema],
+    typeAliases: [String: String] = [:]
   ) throws {
     guard hotReloadReplay == nil,
       !snapshot.sourceRoot.components.starts(with: destinationRoot.components),
@@ -302,7 +317,7 @@ extension ViewGraph {
       })
     else { throw HotReloadInstallationError.destinationIsNotFresh }
     hotReloadReplay = HotReloadReplay(
-      snapshot: snapshot, destinationRoot: destinationRoot, owners: owners)
+      snapshot: snapshot, destinationRoot: destinationRoot, owners: owners, typeAliases: typeAliases)
   }
 
   package func finishHotReloadReplay(keepingDormant: Bool = false) -> [HotReloadDiagnostic] {

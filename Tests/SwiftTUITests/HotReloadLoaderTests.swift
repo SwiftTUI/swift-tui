@@ -2,6 +2,13 @@
   import Foundation
   import SwiftTUITestSupport
   import Testing
+  #if canImport(Darwin)
+    import Darwin
+  #elseif canImport(Glibc)
+    import Glibc
+  #elseif canImport(Musl)
+    import Musl
+  #endif
 
   @testable import SwiftTUICore
   @testable import SwiftTUIRuntime
@@ -11,11 +18,14 @@
   private final class ReloadImageFixture {
     let root: URL
     let loader: HotReloadLoader
+    let moduleName: String
     init() throws {
       root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+      moduleName = "ReloadFixture_" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
       try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
         attributes: [.posixPermissions: 0o700])
-      loader = try HotReloadLoader(spoolPath: root.path, expectedToolchain: 12345)
+      loader = try HotReloadLoader(spoolPath: root.path, expectedToolchain: 12345,
+        logicalModule: moduleName)
     }
     func clean() { try? FileManager.default.removeItem(at: root) }
     func image(_ sequence: UInt64, version: String = "one", abi: UInt64 = HotReloadABI.version,
@@ -25,12 +35,16 @@
       try """
         import SwiftTUIRuntime
         import SwiftTUIViews
+        \(abi == HotReloadABI.version ? "final class" : "struct") ReloadFixtureReference: Codable {
+          var value = 7
+        }
         struct ReloadFixtureRoot: View {
           @State private var count = 0
+          @State private var reference = ReloadFixtureReference()
           var body: some View {
             VStack {
-              Text("image \(version) count=\\(count)")
-              Button("Increment") { count += 1 }
+              Text("image \(version) count=\\(count) reference=\\(reference.value)")
+              Button("Increment") { count += 1; reference.value += 1 }
             }
           }
         }
@@ -50,7 +64,8 @@
         ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".swiftly/bin").path
       process.executableURL = URL(fileURLWithPath: swiftlyDirectory).appendingPathComponent("swiftly")
       var arguments = ["run", "swiftc", "-swift-version", "6", "-D", "DEBUG",
-        "-emit-library", "-module-name", "ReloadFixture",
+        "-emit-library", "-module-name", moduleName,
+        "-Xfrontend", "-module-abi-name", "-Xfrontend", "\(moduleName)_SwiftTUIReload_\(sequence)",
         "-I", repo.appendingPathComponent(".build/debug/Modules").path, source.path,
         "-o", root.appendingPathComponent(HotReloadLoader.imageName(sequence)).path]
       #if os(macOS)
@@ -60,7 +75,7 @@
       #endif
       process.arguments = arguments
       let log = root.appendingPathComponent("compiler.log")
-      FileManager.default.createFile(atPath: log.path, contents: nil)
+      _ = FileManager.default.createFile(atPath: log.path, contents: nil)
       let output = try FileHandle(forWritingTo: log)
       defer { try? output.close() }
       process.standardOutput = output
@@ -107,7 +122,7 @@
       _ = loop.handle(.signal("SIGUSR1"))
       #expect(session.generation == 0)
       try loop.renderPendingFrames(renderedFrames: &frames)
-      #expect(surface.frames.last?.contains("image two count=1") == true,
+      #expect(surface.frames.last?.contains("image two count=1 reference=8") == true,
         "\(surface.frames.last ?? "") \(session.lastReport)")
       #expect(fixture.loader.loadedImageCount == 2)
       #expect(!FileManager.default.fileExists(atPath:
@@ -177,6 +192,18 @@
         to: fixture.root.appendingPathComponent("pending"), atomically: true, encoding: .utf8)
       #expect(throws: HotReloadLoadError.self) { try fixture.loader.loadPending() }
       #expect(fixture.loader.loadedImageCount == 0)
+    }
+
+    @Test func fifoManifestsAndImagesAreRefusedWithoutBlocking() throws {
+      let fixture = try ReloadImageFixture()
+      defer { fixture.clean() }
+      let pending = fixture.root.appendingPathComponent("pending").path
+      #expect(unsafe pending.withCString { unsafe mkfifo($0, 0o600) } == 0)
+      #expect(throws: HotReloadLoadError.self) { try fixture.loader.loadPending() }
+      let image = fixture.root.appendingPathComponent(HotReloadLoader.imageName(1)).path
+      #expect(unsafe image.withCString { unsafe mkfifo($0, 0o600) } == 0)
+      try fixture.publish(1)
+      #expect(throws: HotReloadLoadError.self) { try fixture.loader.loadPending() }
     }
   }
 #endif

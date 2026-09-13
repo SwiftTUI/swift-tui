@@ -26,6 +26,6 @@ package enum HotReloadABI {
   // Available to a release-built driver, whose child is always a debug build.
   // Update whenever the private payload/runtime contract changes. The driver
   // emits a literal scalar export, never a call into the host framework.
-  package static let version: UInt64 = 0x5354_5549_524C_0001
+  package static let version: UInt64 = 0x5354_5549_524C_0002
   package static let maximumImages = 100
 }
