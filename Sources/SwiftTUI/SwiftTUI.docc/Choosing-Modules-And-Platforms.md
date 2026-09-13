@@ -36,7 +36,8 @@ packaging boundaries live in
 | App shape | Depend on | Import |
 | --- | --- | --- |
 | Batteries-included executable: terminal by default, `--web` when requested, animated GIF/images available, and `App` conforms to `SwiftTUICommand` | `SwiftTUI` | `import SwiftTUI` |
-| Shared view package or custom host/launcher | `SwiftTUIRuntime` | `import SwiftTUIRuntime` |
+| Shared view package | `SwiftTUIViews` | `import SwiftTUIViews` |
+| Custom host/launcher or shared scene declarations | `SwiftTUIRuntime` | `import SwiftTUIRuntime` |
 | Explicit terminal runner control | `SwiftTUIRuntime` + `SwiftTUICLI` | `import SwiftTUIRuntime` and `import SwiftTUICLI` |
 | WASI executable or manifest-mode app | `SwiftTUIWASI` | `import SwiftTUIWASI` |
 | Browser deployment from a WASI build | `SwiftTUIWASI` app plus `@swifttui/web` tooling | `import SwiftTUIWASI` in the app |
@@ -48,12 +49,24 @@ packaging boundaries live in
 | Charts and compact metrics | `SwiftTUICharts` (from the separate [`swift-tui-charts`](https://github.com/SwiftTUI/swift-tui-charts) package) | `import SwiftTUICharts` |
 | Finite animated images or GIF import/export without the full convenience product | `SwiftTUIAnimatedImage` | `import SwiftTUIAnimatedImage` |
 
-`SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftTUIWebHost`,
-`SwiftTUIWebHostCLI`, and `SwiftTUIAndroidHost` all re-export the authoring
+`SwiftTUIRuntime`, `SwiftTUICLI`, `SwiftTUIWASI`, `SwiftTUIWebHost`, and
+`SwiftTUIWebHostCLI` re-export the authoring
 surface, so an executable or host usually imports one integration product.
 `SwiftTUI` additionally includes `SwiftTUIAnimatedImage` by default. Add peer
 products such as `SwiftTUITerminalView` alongside your launch product only when
 you use those views. Charts, terminal views, and the SwiftUI host come from separate packages.
+
+`SwiftTUIAndroidHost` exposes the Android bridge; shared view or scene source
+also imports `SwiftTUIViews` or `SwiftTUIRuntime` as appropriate. The bridge does
+not re-export those modules.
+
+Both `SwiftTUIViews` and `SwiftTUIRuntime` are published library products.
+Their re-exports make lower-layer public vocabulary such as `Color`, `CellSize`,
+and `AnyShapeStyle` available without importing non-product targets.
+`SwiftTUICore`, `SwiftTUIGraph`, `SwiftTUIPrimitives`, `SwiftTUITerminalCLI`,
+and `SwiftTUICLIAttach` are not supported direct imports for external packages.
+The generated [product and module map](https://github.com/SwiftTUI/swift-tui/blob/main/docs/PUBLIC_MODULE_MAP.md)
+records product roots, declaration ownership, and conditional re-export paths.
 
 ## Common Compositions
 

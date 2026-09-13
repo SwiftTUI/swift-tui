@@ -45,7 +45,8 @@ SwiftTUIPrimitives -> SwiftTUIGraph -> SwiftTUICore -> SwiftTUIViews -> SwiftTUI
   and their typed products, extractors, style resolution, content engine. Consumes
   the graph's `ResolvedNode` snapshots. It `@_exported`-imports Graph and
   Primitives, so
-  `import SwiftTUICore` is unchanged. Terminal-IO-free.
+  its public vocabulary reaches supported product imports. `SwiftTUICore` is
+  not itself a library product or supported external direct import. Terminal-IO-free.
 - **SwiftTUIViews** — the SwiftUI-shaped authoring surface (`View`, controls,
   layout, state, focus, gestures). `@_exported`-imports Core so the published
   `SwiftTUIViews` product is a self-sufficient authoring surface for external

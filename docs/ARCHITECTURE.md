@@ -54,11 +54,13 @@ dense logical-element estimates. The scroll placement applies anchor corrections
 
 `SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
 examples, and the public website can live in sibling organization repositories.
-The public Swift products below remain in this package unless a later
-extraction promotes their package-private seams to stable public API. The engine
-is a layered stack of internal targets
+The public Swift products below live in this package. The engine
+is a layered stack of targets
 (`SwiftTUIPrimitives` → `SwiftTUIGraph` → `SwiftTUICore` → `SwiftTUIViews` →
-`SwiftTUIRuntime`), with a set of product targets layered on top.
+`SwiftTUIRuntime`). `SwiftTUIViews` and `SwiftTUIRuntime` are also published
+library products; convenience and host products build on those layers. The
+generated [product and module map](PUBLIC_MODULE_MAP.md) records product roots,
+supported direct imports, declaration ownership, and conditional re-export paths.
 
 ```mermaid
 flowchart TD
@@ -97,11 +99,13 @@ flowchart TD
 
 ### Core targets
 
-The engine uses five internal targets with compiler-enforced boundaries. These
+The engine uses five targets with compiler-enforced boundaries. These
 boundaries separate the reconciliation engine from the render machinery in an
-AttributeGraph-shaped design. None of these targets is a published product.
-Consumers get their APIs through re-exports (`@_exported`) from `SwiftTUICore`
-and then `SwiftTUIRuntime`.
+AttributeGraph-shaped design. `SwiftTUIViews` and `SwiftTUIRuntime` are published
+products and supported direct imports. `SwiftTUIPrimitives`, `SwiftTUIGraph`,
+and `SwiftTUICore` are non-product targets. Consumers reach their public
+vocabulary through re-exports (`@_exported`) from the supported product imports;
+the owning module remains unchanged.
 
 - **`SwiftTUIPrimitives`** — the leaf vocabulary. It contains inert
   `Equatable`/`Sendable` value types with no engine or render-pipeline
@@ -145,7 +149,8 @@ and then `SwiftTUIRuntime`.
   policy. The one sanctioned back-edge from render to graph is the
   layout-dependent-content realization callback (the GeometryReader analog).
   Depends on `SwiftTUIGraph` + `SwiftTUIPrimitives` and `@_exported`-imports both
-  so downstream `import SwiftTUICore` is unchanged. Foundation-free.
+  so its public vocabulary reaches supported product imports. Direct external
+  `import SwiftTUICore` is not a supported product contract. Foundation-free.
   `Measure/RetainedValidationWork.swift` combines Graph's comparison tallies
   with Core's measured-product checks and identity/metadata restamping work.
   `LayoutPassContext` owns the optional accumulator; runtime diagnostics and
@@ -217,6 +222,10 @@ contains no nested Swift packages.
   `SwiftTUIWASI` (`WASIRunner`), `SwiftTUIWebHost` (`WebHostRunner`),
   `SwiftTUIWebHostCLI` (`WebHostCLIRunner`), `SwiftTUIAndroidHost`, and
   `SwiftTUIArguments` (argument parsing and `RuntimeConfiguration` flags).
+  `SwiftTUITerminalCLI`, `SwiftTUICLIAttach`, and `SwiftTUIPlatformIO` are
+  non-product support targets. External packages select `SwiftTUICLI` or another
+  published host product and use the surface it exposes; those support target
+  names are not supported direct imports.
 - **External host** — the `SwiftUIHost` product for embedding SwiftTUI inside
   SwiftUI on macOS/iOS lives in the separate
   [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui)

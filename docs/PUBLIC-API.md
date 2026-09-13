@@ -21,11 +21,22 @@ fixture initializers on every style configuration and captured slot;
 presentation values keep ordinary public initializers because styles
 construct them — see the `Testing-Styles` DocC article). Thus, an SPI
 break creates a reviewable diff instead of a silent downstream failure. The inventory script generates and compares all
-three files:
+three symbol files and the [product and module map](PUBLIC_MODULE_MAP.md):
 `Scripts/generate_public_api_inventory.sh`; see
 [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md#public-api-baseline). Those files answer "is
 symbol X public?". This document explains when to use a symbol and why it has
 its current shape.
+
+The generated map distinguishes library products (SwiftPM dependency choices)
+from modules (declaration owners and Swift import names). External packages may
+directly import the root modules of their selected library products. In
+particular, `SwiftTUIViews` supports reusable view libraries and `SwiftTUIRuntime`
+supports runtime/host composition; both expose the required lower-layer public
+vocabulary through re-exports. `SwiftTUICore`, `SwiftTUIGraph`,
+`SwiftTUIPrimitives`, `SwiftTUITerminalCLI`, `SwiftTUICLIAttach`, and
+`SwiftTUIPlatformIO` have no standalone library product. Their presence in a
+consumer's transitive build graph does not establish a supported direct import.
+Symbol classifications still govern API use, and SPI remains a separate contract.
 
 ## The one authoring story
 

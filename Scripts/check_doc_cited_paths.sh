@@ -54,7 +54,7 @@ record_cited_path_violations() {
   while IFS= read -r rcp_source_file; do
     [ -n "$rcp_source_file" ] || continue
     if rg -o --no-line-number \
-      '\b(Sources|Platforms|Tests|Scripts|Tools)/[A-Za-z0-9_@+./-]+(:[0-9]+(-[0-9]+)?)?' \
+      '\b(Vendor|Sources|Platforms|Tests|Scripts|Tools)/[A-Za-z0-9_@+./-]+(:[0-9]+(-[0-9]+)?)?' \
       "$rcp_scan_root/$rcp_source_file" >"$rcp_matches_file"
     then
       :
@@ -207,7 +207,7 @@ record_forbidden_violations() {
   record_forbidden_pattern \
     "$rfv_scan_root" "$rfv_files_file" "$rfv_output_file" \
     moved-swifttui-runtime-path "" \
-    'Sources/SwiftTUI/(Accessibility|Configuration|Diagnostics|Input|Lifecycle|RunLoop|Scenes|Support|Terminal|[^`[:space:]]+\.swift)' \
+    'Sources/SwiftTUI/(Accessibility|Configuration|Diagnostics|Input|Lifecycle|RunLoop|Scenes|Support|Terminal)/' \
     0 0
   record_forbidden_pattern \
     "$rfv_scan_root" "$rfv_files_file" "$rfv_output_file" \
@@ -270,12 +270,17 @@ run_self_test() {
   scratch_root=$(mktemp -d "${TMPDIR:-/tmp}/swift-tui-doc-path-self-test.XXXXXX")
   trap 'rm -rf "$scratch_root"' EXIT HUP INT TERM
 
-  mkdir -p "$scratch_root/Sources" "$scratch_root/docs"
+  mkdir -p "$scratch_root/Sources/SwiftTUI" "$scratch_root/docs" \
+    "$scratch_root/Vendor/UnixSignals/Sources/UnixSignals"
   : >"$scratch_root/Sources/Present.swift"
+  : >"$scratch_root/Sources/SwiftTUI/SwiftTUI.swift"
+  : >"$scratch_root/Vendor/UnixSignals/Sources/UnixSignals/UnixSignal.swift"
   cat >"$scratch_root/docs/clean.md" <<'EOF'
 # Clean fixture
 
 The implementation is at `Sources/Present.swift:12`.
+The current umbrella is [source](../Sources/SwiftTUI/SwiftTUI.swift).
+The vendor source is [source](../Vendor/UnixSignals/Sources/UnixSignals/UnixSignal.swift).
 The execution-mode matrix lives in
 [Hosts and Platforms](HOSTS-AND-PLATFORMS.md).
 Not all five hosts are products of one package; SwiftUIHost is external.
@@ -290,6 +295,7 @@ EOF
 
 This cites `Sources/Missing.swift` and the retired
 `Sources/SwiftTUICore/Resolve/` ownership.
+Also retired: `Sources/SwiftTUI/Terminal/Moved.swift`.
 
 The execution-mode matrix uses SwiftTUICLI and SwiftTUIWASI.
 All five hosts are sibling products of one
@@ -364,7 +370,9 @@ forbidden|host-matrix-owner-link|docs/bad-wrapped.md
 forbidden|host-matrix-owner-link|docs/bad.md
 forbidden|host-overview-incomplete|docs/bad-wrapped.md
 forbidden|host-overview-incomplete|docs/bad.md
+forbidden|moved-swifttui-runtime-path|docs/bad.md
 missing-path|docs/bad.md|Sources/Missing.swift
+missing-path|docs/bad.md|Sources/SwiftTUI/Terminal/Moved.swift
 missing-path|docs/bad.md|Sources/SwiftTUICore/Resolve/
 EOF
   if ! diff -u "$expected_bad" "$bad_actual"; then

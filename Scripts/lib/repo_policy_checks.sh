@@ -223,6 +223,20 @@ run_repo_policy_phase() {
     "./Scripts/check_public_api_generator_fixtures.sh" \
     ./Scripts/check_public_api_generator_fixtures.sh
 
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Test public module map generation" \
+    "bun test Scripts/lib/generate_public_api_inventory.test.ts" \
+    bun test Scripts/lib/generate_public_api_inventory.test.ts
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Build supported public import consumers" \
+    "bash Scripts/check_public_import_consumers.sh" \
+    bash Scripts/check_public_import_consumers.sh
+
   if [ "${SWIFTTUI_SKIP_PUBLIC_API_BASELINE:-0}" = "1" ]; then
     skip_repo_policy_check \
       "$mode" \

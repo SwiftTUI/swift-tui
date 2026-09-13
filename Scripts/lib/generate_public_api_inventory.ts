@@ -3,7 +3,7 @@
 // generate_public_api_inventory.ts
 //
 // Reads the symbol-graph JSON files emitted by `swift package
-// dump-symbol-graph` and produces two committed artefacts:
+// dump-symbol-graph` and the evaluated manifest. Produces committed artefacts:
 //
 //   docs/PUBLIC_API_BASELINE.md    — curated, classification-grouped list of
 //                                    every public top-level symbol per module.
@@ -11,6 +11,8 @@
 //   docs/.public-api-baseline.txt  — flat sorted list of every public symbol
 //                                    path (top-level + members). Reviewers
 //                                    git-diff this.
+//   docs/PUBLIC_MODULE_MAP.md      — product roots, supported imports, ownership
+//                                    counts, and conditional re-export paths.
 //
 // Classifications come from docs/public_api_overrides.yml. Symbols not in
 // that file fall into the `pending-review` bucket.
@@ -39,8 +41,10 @@ interface Args {
   spiSymbolgraphDir?: string;
   /** Output path for the flat SPI-only baseline; paired with the above. */
   baselineSpi?: string;
-  /** Package manifest used to reconcile configured modules with products. */
+  /** Evaluated manifest and source membership from swift package describe --type json. */
   packageManifest: string;
+  packageRoot: string;
+  moduleMap: string;
   check: boolean;
   allowMissingModules: string[];
 }
@@ -71,7 +75,9 @@ function parseArgs(argv: readonly string[]): Args {
     baselineFlat: required("--baseline-flat"),
     spiSymbolgraphDir,
     baselineSpi,
-    packageManifest: get("--package-manifest") ?? "Package.swift",
+    packageManifest: required("--package-manifest"),
+    packageRoot: get("--package-root") ?? ".",
+    moduleMap: get("--module-map") ?? "docs/PUBLIC_MODULE_MAP.md",
     check: argv.includes("--check"),
     allowMissingModules: values(argv, "--allow-missing-module"),
   };
@@ -112,12 +118,10 @@ interface SymbolGraph {
 // ---------------------------------------------------------------------------
 // Module configuration
 //
-// Library products live in PRIMARY_MODULES. PACKAGE_ONLY_MODULES and
-// TEST_SUPPORT_MODULES are emitted as separate sections because they have
-// intentionally different audiences even though their symbols carry `public`
-// access.
+// This is the symbol-graph census, not a product list. Product membership is
+// derived from the evaluated manifest; names of products and modules may differ.
 
-const PRIMARY_MODULES = [
+export const ALL_MODULES = [
   "SwiftTUI",
   "SwiftTUIRuntime",
   "SwiftTUIProfiling",
@@ -132,20 +136,14 @@ const PRIMARY_MODULES = [
   "SwiftTUIWebHost",
   "SwiftTUIWebHostCLI",
   "SwiftTUIAndroidHost",
-] as const;
-const PACKAGE_ONLY_MODULES = [
   "SwiftTUICore",
   "SwiftTUIPrimitives",
   "SwiftTUIGraph",
   "SwiftTUIPTYCPrimitives",
   "SwiftTUIPlatformIO",
+  "SwiftTUITestSupport",
 ] as const;
 const TEST_SUPPORT_MODULES = ["SwiftTUITestSupport"] as const;
-const ALL_MODULES = [
-  ...PRIMARY_MODULES,
-  ...PACKAGE_ONLY_MODULES,
-  ...TEST_SUPPORT_MODULES,
-] as const;
 
 // Library products which intentionally do not participate in the inventory.
 // Keep this empty unless a product has a reviewed reason to be absent.
@@ -457,24 +455,14 @@ function validateOverrides(
   }
 }
 
-async function configuredLibraryProducts(packageManifest: string): Promise<string[]> {
-  const manifest = Bun.file(packageManifest);
-  if (!(await manifest.exists())) {
-    throw new Error(`Package manifest does not exist: ${packageManifest}`);
-  }
-  const products = new Set<string>();
-  for (const line of (await manifest.text()).split("\n")) {
-    // Keep this grammar in lockstep with Scripts/check_docc_coverage.sh:
-    // sed -n 's/.*\.library(name: "\([^"]*\)".*/\1/p'
-    const match = line.match(/.*\.library\(name: "([^"]*)".*/);
-    if (match?.[1]) products.add(match[1]);
-  }
-  if (products.size === 0) {
-    throw new Error(
-      `Could not find any one-line .library products in ${packageManifest}`,
-    );
-  }
-  return [...products].sort();
+export interface PackageDescription {
+  products: { name: string; targets: string[]; type: { library?: string[] } }[];
+  targets: { name: string; type: string; path: string; sources: string[] }[];
+}
+
+export function libraryProducts(manifest: PackageDescription) {
+  return manifest.products.filter((product) => product.type.library !== undefined)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function emittedGraphModules(symbolgraphDir: string): Promise<string[]> {
@@ -487,17 +475,22 @@ async function emittedGraphModules(symbolgraphDir: string): Promise<string[]> {
   return [...modules].sort();
 }
 
-async function validateModuleReconciliation(args: Args): Promise<void> {
+async function validateModuleReconciliation(
+  args: Args,
+  manifest: PackageDescription,
+): Promise<void> {
   const configuredModules = new Set<string>(ALL_MODULES);
   const excludedProducts = new Set(EXCLUDED_PRODUCTS);
   const knownUnscanned = new Set<string>(KNOWN_UNSCANNED_MODULES);
   const failures: string[] = [];
 
-  for (const product of await configuredLibraryProducts(args.packageManifest)) {
-    if (!configuredModules.has(product) && !excludedProducts.has(product)) {
-      failures.push(
-        `library product '${product}' is missing from ALL_MODULES`,
-      );
+  const targets = new Set(manifest.targets.map((target) => target.name));
+  for (const product of libraryProducts(manifest)) {
+    for (const target of product.targets) {
+      if (!targets.has(target)) failures.push(`product '${product.name}' has unknown target '${target}'`);
+      if (!configuredModules.has(target) && !excludedProducts.has(product.name)) {
+        failures.push(`library product '${product.name}' target '${target}' is missing from ALL_MODULES`);
+      }
     }
   }
 
@@ -653,10 +646,181 @@ function hasDocComment(sym: SymbolGraphSymbol): boolean {
 // ---------------------------------------------------------------------------
 // Render outputs
 
+export interface ReexportEdge {
+  from: string;
+  to: string;
+  condition: string;
+  spi: string;
+  source: string;
+}
+
+// Mask comments and literals while preserving newlines. Imports inside examples,
+// nested block comments, and raw/multiline strings are not declarations.
+function maskSwiftTokens(source: string): string {
+  let result = "";
+  for (let i = 0; i < source.length;) {
+    const start = i;
+    if (source.startsWith("//", i)) {
+      const end = source.indexOf("\n", i);
+      i = end < 0 ? source.length : end;
+    } else if (source.startsWith("/*", i)) {
+      let depth = 1;
+      i += 2;
+      while (i < source.length && depth > 0) {
+        if (source.startsWith("/*", i)) { depth++; i += 2; }
+        else if (source.startsWith("*/", i)) { depth--; i += 2; }
+        else i++;
+      }
+    } else {
+      if (source[i] !== '"' && source[i] !== "#") { result += source[i++]; continue; }
+      const literal = source.slice(i).match(/^(#*)("""|")/);
+      if (!literal) { result += source[i++]; continue; }
+      const hashes = literal[1]!;
+      const delimiter = literal[2]! + hashes;
+      i += literal[0].length;
+      while (i < source.length) {
+        if (source.startsWith("\\" + hashes, i)) i += hashes.length + 2;
+        else if (source.startsWith(delimiter, i)) { i += delimiter.length; break; }
+        else i++;
+      }
+    }
+    result += source.slice(start, i).replace(/[^\n]/g, " ");
+  }
+  return result;
+}
+
+export function parseReexports(source: string, module: string, path: string): ReexportEdge[] {
+  const edges: ReexportEdge[] = [];
+  const conditions: { alternatives: string[]; active: string }[] = [];
+  for (const line of maskSwiftTokens(source).split("\n")) {
+    const directive = line.trim().match(/^#(if|elseif|else|endif)\b\s*(.*)$/);
+    if (directive) {
+      const [, kind, expression] = directive;
+      if (kind === "if") conditions.push({ alternatives: [expression!], active: expression! });
+      else {
+        const current = conditions.at(-1);
+        if (!current) throw new Error(`Unbalanced conditional in ${path}`);
+        if (kind === "endif") conditions.pop();
+        else {
+          const previous = current.alternatives.map((item) => `(${item})`).join(" || ");
+          current.active = `!(${previous})` + (kind === "elseif" ? ` && (${expression})` : "");
+          if (kind === "elseif") current.alternatives.push(expression!);
+        }
+      }
+      continue;
+    }
+    if (!line.includes("@_exported")) continue;
+    const match = line.trim().match(/^(?:(?:@\w+(?:\([^)]*\))?|public)\s+)*import\s+([A-Za-z_][A-Za-z0-9_]*)\s*;?$/);
+    if (!match) throw new Error(`Unsupported re-export declaration in ${path}: ${line.trim()}`);
+    edges.push({
+      from: module,
+      to: match[1]!,
+      condition: conditions.map((item) => `(${item.active})`).join(" && ") || "always",
+      spi: [...line.matchAll(/@_spi\(([^)]+)\)/g)].map((match) => match[1]).join(", ") || "none",
+      source: path,
+    });
+  }
+  if (conditions.length) throw new Error(`Unbalanced conditional in ${path}`);
+  return edges;
+}
+
+export async function loadReexports(manifest: PackageDescription, root: string): Promise<ReexportEdge[]> {
+  const edges: ReexportEdge[] = [];
+  for (const target of manifest.targets.filter((target) => target.type === "library")) {
+    for (const source of target.sources.filter((source) => source.endsWith(".swift"))) {
+      const path = join(target.path, source);
+      edges.push(...parseReexports(await Bun.file(join(root, path)).text(), target.name, path));
+    }
+  }
+  return edges.sort((a, b) =>
+    `${a.from}/${a.to}/${a.condition}/${a.source}`.localeCompare(`${b.from}/${b.to}/${b.condition}/${b.source}`)
+  );
+}
+
+export function reachableModules(module: string, edges: readonly ReexportEdge[]): string[] {
+  const visited = new Set<string>([module]);
+  const pending = [module];
+  while (pending.length) {
+    const from = pending.pop()!;
+    for (const edge of edges.filter((edge) => edge.from === from)) {
+      if (visited.has(edge.to)) continue;
+      visited.add(edge.to);
+      pending.push(edge.to);
+    }
+  }
+  visited.delete(module);
+  return [...visited].sort();
+}
+
+export function renderModuleMap(
+  manifest: PackageDescription,
+  reports: readonly ModuleReport[],
+  edges: readonly ReexportEdge[],
+): string {
+  const codeList = (names: readonly string[]) => names.map((name) => `\`${name}\``).join(", ") || "—";
+  const products = libraryProducts(manifest);
+  const lines = [
+    "# Public product and module map", "",
+    "<!-- DO NOT EDIT — regenerated by Scripts/generate_public_api_inventory.sh -->", "",
+    "Product-to-target edges and source membership come from the evaluated manifest",
+    "(`swift package describe --type json`). Public owner counts reuse the symbol-graph",
+    "inventory in [PUBLIC_API_BASELINE.md](PUBLIC_API_BASELINE.md); re-exports come from",
+    "`@_exported import` declarations in those targets' Swift sources.", "",
+    "## Supported direct imports", "",
+    "External packages may depend on a library product below and directly import its listed",
+    "root module(s). A transitive build dependency is not a supported direct-import contract.",
+    "Non-product modules expose their classified public declarations through re-exports where",
+    "listed; `public` access alone does not promise a stable application API. See",
+    "[PUBLIC-API.md](PUBLIC-API.md) for classifications and platform-specific host contracts.",
+    "`SwiftTUITestSupport` is supported for downstream tests only. Product presence does not",
+    "promise every host API on every platform; source conditions below still apply.", "",
+    "| Library product | Root target / supported direct import |",
+    "|---|---|",
+    ...products.map((product) => `| \`${product.name}\` | ${codeList([...product.targets].sort())} |`), "",
+    "## Public declaration ownership", "",
+    "Counts and owner attribution match the existing inventory, including extension members.",
+    "Re-exporting a declaration does not change its owning module. Explicitly unscanned",
+    "implementation/vendor targets are named below; they have no symbol count here.", "",
+    "| Owning module | Direct product roots | Top-level | All public |",
+    "|---|---|---:|---:|",
+    ...reports.map((report) => {
+      const roots = products.filter((product) => product.targets.includes(report.module)).map((product) => product.name);
+      const count = report.topLevel.length + report.topLevel.reduce((sum, entry) => sum + entry.members.length, 0);
+      return `| [\`${report.module}\`](PUBLIC_API_BASELINE.md#${report.module.toLowerCase()}) | ${roots.length ? codeList(roots) : "None (non-product support target)"} | ${report.topLevel.length} | ${count} |`;
+    }), "",
+    `Explicitly unscanned: ${codeList([...KNOWN_UNSCANNED_MODULES].sort())}.`, "",
+    "## Re-export edges", "",
+    "These are source-declared edges across all conditional branches, not ordinary imports",
+    "or manifest dependency edges. `public import` alone is not a re-export. SPI annotations",
+    "also expose the named SPI to the importing module; they do not make SPI declarations",
+    "ordinary public API (tracked separately in [.spi-api-baseline.txt](.spi-api-baseline.txt)).", "",
+    "| Importing module | Re-exported module | Source condition | SPI annotation | Declaration source |",
+    "|---|---|---|---|---|",
+    ...edges.map((edge) => `| \`${edge.from}\` | \`${edge.to}\` | \`${edge.condition.replaceAll("|", "\\|")}\` | ${edge.spi} | [source](../${edge.source}) |`), "",
+    "## Reachability through re-exports", "",
+    "This is the union of potentially reachable modules across source conditions. It is not",
+    "a promise that all paths coexist on any one platform: apply every edge condition above.",
+    "It includes unscanned and external modules so those paths are visible without inventing",
+    "a second symbol census. Use the owner table and baseline for inventoried declarations.", "",
+    "| Supported direct import | Other modules reachable through re-exports |",
+    "|---|---|",
+    ...[...new Set(products.flatMap((product) => product.targets))].sort().map((module) =>
+      `| \`${module}\` | ${codeList(reachableModules(module, edges))} |`
+    ), "",
+    "## Consumer evidence", "",
+    "`Scripts/check_public_import_consumers.sh` builds separate external SwiftPM consumers",
+    "with only the `SwiftTUIViews` or `SwiftTUIRuntime` product dependency. They use owning",
+    "module APIs plus re-exported view, style, geometry, and graph vocabulary without",
+    "importing non-product targets. The repository policy gate runs these builds.", "",
+  ];
+  return lines.join("\n");
+}
+
 function renderBaselineMarkdown(
   reports: ReadonlyArray<ModuleReport>,
   notes: ReadonlyMap<string, string>,
   generatedAt: string,
+  manifest: PackageDescription,
 ): string {
   const lines: string[] = [];
   lines.push("# Public API Baseline");
@@ -687,6 +851,7 @@ function renderBaselineMarkdown(
   );
   lines.push("");
   lines.push("For prose context, see [PUBLIC-API.md](PUBLIC-API.md).");
+  lines.push("For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_MAP.md](PUBLIC_MODULE_MAP.md).");
   lines.push("");
 
   // Summary table
@@ -705,8 +870,8 @@ function renderBaselineMarkdown(
 
   // Per-module sections
   for (const report of reports) {
-    const isPackageOnly = (PACKAGE_ONLY_MODULES as readonly string[]).includes(
-      report.module,
+    const isPackageOnly = !libraryProducts(manifest).some((product) =>
+      product.targets.includes(report.module)
     );
     const isTestSupport = (TEST_SUPPORT_MODULES as readonly string[]).includes(
       report.module,
@@ -718,9 +883,9 @@ function renderBaselineMarkdown(
         `> \`${report.module}\` is not shipped as a library product. Symbols here`,
       );
       lines.push(
-        `> are package-internal but carry \`public\` access for re-export through`,
+        `> carry \`public\` access but do not establish a supported direct import.`,
       );
-      lines.push(`> other targets.`);
+      lines.push(`> See the module map for re-export paths and symbol classifications below.`);
       lines.push("");
     }
     if (isTestSupport) {
@@ -924,7 +1089,8 @@ async function writeFileEnsuringDir(path: string, contents: string): Promise<voi
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const overrides = await loadOverrides(args.overrides);
-  await validateModuleReconciliation(args);
+  const manifest = await Bun.file(args.packageManifest).json() as PackageDescription;
+  await validateModuleReconciliation(args, manifest);
   const existingBaselineMd = await readFileIfExists(args.baselineMd);
   const generatedAt = args.check
     ? extractGeneratedAt(existingBaselineMd) ??
@@ -989,7 +1155,10 @@ async function main(): Promise<void> {
     );
   }
 
-  const renderedMd = renderBaselineMarkdown(reports, overrides.notes, generatedAt);
+  const edges = await loadReexports(manifest, args.packageRoot);
+  const renderedMap = renderModuleMap(manifest, reports, edges);
+  const moduleMapStale = await readFileIfExists(args.moduleMap) !== renderedMap;
+  const renderedMd = renderBaselineMarkdown(reports, overrides.notes, generatedAt, manifest);
   const renderedFlat = renderFlatBaseline(reports);
   const drift = await checkDrift(
     reports,
@@ -1025,6 +1194,9 @@ async function main(): Promise<void> {
 
   if (args.check) {
     const failures: string[] = [];
+    if (moduleMapStale && missingModules.length === 0) {
+      failures.push("Public module map is stale. Run Scripts/generate_public_api_inventory.sh to regenerate.");
+    }
     {
       // Every `swiftui_divergent` symbol must be named in the divergence
       // register, so the register stays true without manual sweeps (D64).
@@ -1127,9 +1299,10 @@ async function main(): Promise<void> {
   }
 
   await writeFileEnsuringDir(args.baselineMd, renderedMd);
+  await writeFileEnsuringDir(args.moduleMap, renderedMap);
   await writeFileEnsuringDir(args.baselineFlat, renderedFlat);
   console.log(
-    `[generate_public_api_inventory] Wrote ${args.baselineMd} and ${args.baselineFlat}.`,
+    `[generate_public_api_inventory] Wrote ${args.baselineMd}, ${args.baselineFlat}, and ${args.moduleMap}.`,
   );
   if (renderedSpiFlat !== undefined && args.baselineSpi) {
     if (spiPartial) {
@@ -1158,4 +1331,4 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+if (import.meta.main) await main();

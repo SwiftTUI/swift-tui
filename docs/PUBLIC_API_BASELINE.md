@@ -12,6 +12,7 @@ companion flat list at [`.public-api-baseline.txt`](.public-api-baseline.txt)
 is the machine-grep target; this file is grouped for human review.
 
 For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
+For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_MAP.md](PUBLIC_MODULE_MAP.md).
 
 ## Summary
 
@@ -575,6 +576,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 
 ## SwiftTUITerminalCLI
 
+> `SwiftTUITerminalCLI` is not shipped as a library product. Symbols here
+> carry `public` access but do not establish a supported direct import.
+> See the module map for re-export paths and symbol classifications below.
+
 ### Canonical surface (6)
 
 - `App` — extension — 2 members
@@ -585,6 +590,10 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 - `TerminalRunnerError` — enum — 2 members
 
 ## SwiftTUICLIAttach
+
+> `SwiftTUICLIAttach` is not shipped as a library product. Symbols here
+> carry `public` access but do not establish a supported direct import.
+> See the module map for re-export paths and symbol classifications below.
 
 ### Canonical surface (1)
 
@@ -638,8 +647,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 ## SwiftTUICore
 
 > `SwiftTUICore` is not shipped as a library product. Symbols here
-> are package-internal but carry `public` access for re-export through
-> other targets.
+> carry `public` access but do not establish a supported direct import.
+> See the module map for re-export paths and symbol classifications below.
 
 ### Canonical surface (39)
 
@@ -690,8 +699,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 ## SwiftTUIPrimitives
 
 > `SwiftTUIPrimitives` is not shipped as a library product. Symbols here
-> are package-internal but carry `public` access for re-export through
-> other targets.
+> carry `public` access but do not establish a supported direct import.
+> See the module map for re-export paths and symbol classifications below.
 
 ### Canonical surface (169)
 
@@ -872,8 +881,8 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 ## SwiftTUIGraph
 
 > `SwiftTUIGraph` is not shipped as a library product. Symbols here
-> are package-internal but carry `public` access for re-export through
-> other targets.
+> carry `public` access but do not establish a supported direct import.
+> See the module map for re-export paths and symbol classifications below.
 
 ### Canonical surface (57)
 
@@ -944,14 +953,14 @@ For prose context, see [PUBLIC-API.md](PUBLIC-API.md).
 ## SwiftTUIPTYCPrimitives
 
 > `SwiftTUIPTYCPrimitives` is not shipped as a library product. Symbols here
-> are package-internal but carry `public` access for re-export through
-> other targets.
+> carry `public` access but do not establish a supported direct import.
+> See the module map for re-export paths and symbol classifications below.
 
 ## SwiftTUIPlatformIO
 
 > `SwiftTUIPlatformIO` is not shipped as a library product. Symbols here
-> are package-internal but carry `public` access for re-export through
-> other targets.
+> carry `public` access but do not establish a supported direct import.
+> See the module map for re-export paths and symbol classifications below.
 
 ### Canonical surface (1)
 

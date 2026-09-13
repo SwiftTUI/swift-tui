@@ -1,0 +1,10 @@
+{
+  "products": [
+    { "name": "SwiftTUI", "targets": ["SwiftTUI"], "type": { "library": ["automatic"] } },
+    { "name": "MissingProduct", "targets": ["MissingProduct"], "type": { "library": ["automatic"] } }
+  ],
+  "targets": [
+    { "name": "SwiftTUI", "type": "library", "path": ".", "sources": [] },
+    { "name": "MissingProduct", "type": "library", "path": ".", "sources": [] }
+  ]
+}

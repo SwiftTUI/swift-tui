@@ -1,0 +1,4 @@
+{
+  "products": [{ "name": "SwiftTUI", "targets": ["SwiftTUI"], "type": { "library": ["automatic"] } }],
+  "targets": [{ "name": "SwiftTUI", "type": "library", "path": ".", "sources": [] }]
+}

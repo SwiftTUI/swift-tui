@@ -50,6 +50,7 @@ flowchart TD
 | [HOST-WIRE-CONTRACT.md](HOST-WIRE-CONTRACT.md) | The normative converged host-wire record, state, capability, delivery, and consumer contract at `HEAD`, including known gaps. |
 | [ACCESSIBILITY.md](ACCESSIBILITY.md) | Maintainer notes on the semantic substrate: how one snapshot feeds all five host-side consumer paths. The authoring surface is documented in the `SwiftTUIViews` DocC catalog. |
 | [PUBLIC-API.md](PUBLIC-API.md) | The public surface policy and inventory: what is canonical, what is package-only, and what was removed. |
+| [PUBLIC_MODULE_MAP.md](PUBLIC_MODULE_MAP.md) | Generated library products, supported direct imports, public declaration owners, and conditional re-export reachability. |
 | [GLOSSARY.md](GLOSSARY.md) | Framework vocabulary for architecture reviews: reconciliation/reuse, lifetimes, the cross-host wire, and the authoring seam. |
 | [SOUNDNESS-ORACLES.md](SOUNDNESS-ORACLES.md) | The canonical map of reconciliation soundness probes: enforcement tier, sampling, release behavior, residual quarantine, and owning tests. |
 

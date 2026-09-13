@@ -55,6 +55,8 @@ run_case() {
     --symbolgraph-dir "${graph_dir}" \
     --overrides "${fixture_root}/${overrides}" \
     --package-manifest "${fixture_root}/${manifest}" \
+    --package-root "${fixture_root}" \
+    --module-map "${case_dir}/PUBLIC_MODULE_MAP.md" \
     --baseline-md "${case_dir}/PUBLIC_API_BASELINE.md" \
     --baseline-flat "${case_dir}/public-api-baseline.txt" \
     --check \
@@ -87,26 +89,26 @@ expect_failure \
   unknown-classification \
   "classifications.canonical key 'SwiftTUI.Unknown' does not match a top-level dump symbol" \
   unknown-classification.yml \
-  Package.swift
+  package-description.json
 
 expect_failure \
   unlisted-module \
   "symbol-graph module 'UnknownSupport' is neither configured nor explicitly unscanned" \
   overrides.yml \
-  Package.swift \
+  package-description.json \
   unknown-module/UnknownSupport.symbols.json
 
 expect_failure \
   missing-product \
-  "library product 'MissingProduct' is missing from ALL_MODULES" \
+  "library product 'MissingProduct' target 'MissingProduct' is missing from ALL_MODULES" \
   overrides.yml \
-  missing-product.Package.swift
+  missing-product.package-description.json
 
 expect_failure \
   removed-present \
   "symbol(s) are classified \"removed\" but still present" \
   removed-present.yml \
-  Package.swift
+  package-description.json
 
 materializer_dir="${scratch}/materializer"
 mkdir -p "${materializer_dir}"

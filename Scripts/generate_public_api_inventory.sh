@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Generates `docs/PUBLIC_API_BASELINE.md` (curated grouping) and
+# Generates `docs/PUBLIC_MODULE_MAP.md` (products, ownership, re-exports),
+# `docs/PUBLIC_API_BASELINE.md` (curated grouping) and
 # `docs/.public-api-baseline.txt` (flat sorted list) from
 # `swift package dump-symbol-graph`.
 #
@@ -57,6 +58,11 @@ SYMBOLGRAPH_SCRATCH_DIR=".build/public-api-symbolgraph"
 DUMP_LOG="$(mktemp -t swift-tui-symbolgraph.XXXXXX)"
 trap 'rm -f "${DUMP_LOG}"' EXIT
 rm -rf "${SYMBOLGRAPH_SCRATCH_DIR}"
+mkdir -p "${SYMBOLGRAPH_SCRATCH_DIR}"
+# SwiftPM evaluates computed/multiline product declarations and resolves each
+# target's actual source list (including custom paths and exclusions).
+MANIFEST_JSON="${SYMBOLGRAPH_SCRATCH_DIR}/package-description.json"
+swiftly run swift package describe --type json >"${MANIFEST_JSON}"
 
 SWIFT_PACKAGE_ARGS=(
   --scratch-path "${SYMBOLGRAPH_SCRATCH_DIR}"
@@ -121,6 +127,9 @@ fi
 
 # Drive the markdown + flat-list generator.
 GENERATE_ARGS=(
+  --package-manifest "${MANIFEST_JSON}"
+  --package-root "${REPO_ROOT}"
+  --module-map "docs/PUBLIC_MODULE_MAP.md"
   --symbolgraph-dir "${PUBLIC_SYMBOLGRAPH_KEEP}"
   --overrides "docs/public_api_overrides.yml"
   --baseline-md "docs/PUBLIC_API_BASELINE.md"
