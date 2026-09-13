@@ -76,6 +76,7 @@ jobs:
             curl \
             git \
             libcurl4-openssl-dev \
+            ripgrep \
             unzip
 
       - name: Cache Swiftly toolchain

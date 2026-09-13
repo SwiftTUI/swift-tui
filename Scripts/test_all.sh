@@ -888,6 +888,12 @@ if lane_runs_core; then
     "$repo_root" \
     "Scripts/check_value_type_invariant.sh" \
     Scripts/check_value_type_invariant.sh
+
+  run_step \
+    "Build supported public import consumers" \
+    "$repo_root" \
+    "bash Scripts/check_public_import_consumers.sh" \
+    bash Scripts/check_public_import_consumers.sh
 fi
 
 if [ "$lane" = all ]; then
