@@ -134,6 +134,8 @@ private func withCompletionBatch<Result>(
     return try body()
   }
   let batchID = AnimationBatchIDAllocator.next()
+  let scope = AnimationCompletionScope()
+  let sink = AnimationCompletionStorage.effectiveSink
   let snapshot = currentImperativeAuthoringContextSnapshot()
   for completion in completions {
     let closure = completion.closure
@@ -143,14 +145,23 @@ private func withCompletionBatch<Result>(
     } else {
       scopedCompletion = closure
     }
-    AnimationCompletionStorage.effectiveSink?.registerCompletion(
+    sink?.registerCompletion(
       batchID: batchID,
       barrier: completion.barrier,
       closure: scopedCompletion
     )
   }
-  return try AnimationContextStorage.$currentBatchID.withValue(batchID) {
-    try body()
+  defer {
+    // No submitted write means no frame can ever claim this batch. Finish
+    // after unwinding the body's transaction locals, including when it throws.
+    if !scope.didSubmitInvalidation {
+      sink?.finishEmptyCompletionScope(batchID: batchID)
+    }
+  }
+  return try AnimationContextStorage.$currentCompletionScope.withValue(scope) {
+    try AnimationContextStorage.$currentBatchID.withValue(batchID) {
+      try body()
+    }
   }
 }
 
@@ -185,6 +196,9 @@ private func withTransactionRequestScope<Result>(
 /// The function creates a new `AnimationBatchID` for the scope.
 /// Each state write inside `body` goes through the scheduler with that batch ID.
 /// The animation controller fires `completion` after all animations and removal overlays in the batch drain.
+/// If the body submits no state invalidation, the completion runs after the
+/// body returns. Completions authored during a frame respect its commit and
+/// lifecycle ordering, including frame cancellation.
 ///
 /// `completionCriteria` is carried on the registration so the
 /// controller can distinguish `.logicallyComplete` (curve returned nil)

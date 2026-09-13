@@ -48,6 +48,7 @@ public final class StateContainer<State: Equatable & Sendable> {
     if animationRequest != .inherit || batchID != nil || tracksVelocity,
       let animationAware = invalidator as? any AnimationAwareInvalidating
     {
+      AnimationContextStorage.currentCompletionScope?.didSubmitInvalidation = true
       animationAware.requestInvalidation(
         of: invalidationIdentities,
         animation: animationRequest,

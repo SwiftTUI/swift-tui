@@ -456,6 +456,7 @@ package final class AnimationController: Sendable {
       activeAnimationBoxesByKey: activeAnimations.mapValues(\.animationBox),
       registeredAnimationCount: registeredAnimations.count,
       completionClosureBatchIDs: Set(completions.keys),
+      unclaimedCompletionBatchIDs: unclaimedCompletionBatchIDs,
       batchRefCounts: batchRefCounts,
       pendingEmptyBatchCompletions: pendingEmptyBatchCompletions,
       removalAnimationBoxesByNodeID: removingNodes.mapValues(\.animationBox),
@@ -867,10 +868,21 @@ package final class AnimationController: Sendable {
       detail: [
         "registered": registeredAnimations.count,
         "completions": completions.count,
+        "unclaimedCompletionBatches": unclaimedCompletionBatchIDs.count,
         "batchRefCounts": batchRefCounts.count,
         "pendingEmptyBatches": pendingEmptyBatchCompletions.count,
       ]
     )
+  }
+
+  /// Registrations without a live retainer or a scheduled empty-batch drain.
+  /// These can be legitimate between authoring and resolve; a batch that stays
+  /// here after its home frame is the orphan-completion diagnostic.
+  private var unclaimedCompletionBatchIDs: Set<AnimationBatchID> {
+    Set(
+      completions.keys.filter {
+        batchRefCounts[$0] == nil && pendingEmptyBatchCompletions[$0] == nil
+      })
   }
 
   /// Whether the *live* controller still holds animation work that needs another
@@ -1532,12 +1544,24 @@ package final class AnimationController: Sendable {
       !newIdentities.contains(key.identity)
         && !exitOverlayIdentities.contains(key.identity)
     }
+    var departedBatchCounts: [AnimationBatchID: Int] = [:]
+    for key in departedKeys {
+      if let batchID = activeAnimations[key]?.batchID {
+        departedBatchCounts[batchID, default: 0] += 1
+      }
+    }
+    // Decide against the whole prune, not dictionary iteration order: only
+    // retainers that actually survive this frame can own these completions.
+    let survivingBatches = Set(
+      departedBatchCounts.compactMap { batchID, count in
+        (batchRefCounts[batchID] ?? 0) > count ? batchID : nil
+      })
     for key in departedKeys {
       guard let entry = activeAnimations.removeValue(forKey: key) else { continue }
       releaseBatch(
         entry.batchID,
         logicalAlreadyReleased: entry.isLogicallyReleased,
-        firingCompletion: false
+        firingCompletion: entry.batchID.map { survivingBatches.contains($0) } ?? false
       )
     }
     if !slotVelocitySamplers.isEmpty {
@@ -2807,6 +2831,15 @@ extension AnimationController: AnimationRegistrationSink {
 }
 
 extension AnimationController: AnimationCompletionSink {
+  package func finishEmptyCompletionScope(batchID: AnimationBatchID) {
+    let closures = takeCompletions(for: batchID)
+    if isFrameHeadTransactionActive {
+      deferredFrameHeadCompletions.append(contentsOf: closures)
+    } else {
+      dispatchOrDeferCommittedCompletions(closures)
+    }
+  }
+
   /// Parks the completions of batches the scheduler's latest-wins
   /// coalescing displaced before the frame drained (F117). A superseded
   /// batch's animations never retain it — its state writes rode the frame

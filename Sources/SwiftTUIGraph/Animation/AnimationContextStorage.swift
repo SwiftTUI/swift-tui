@@ -15,6 +15,7 @@ package enum AnimationContextStorage {
   /// it alongside the animation request so every animation in the same
   /// batch can be resolved to a single completion closure.
   @TaskLocal package static var currentBatchID: AnimationBatchID? = nil
+  @TaskLocal package static var currentCompletionScope: AnimationCompletionScope?
   /// Continuity metadata scoped by `withTransaction` (View module).
   /// State writes thread it onto their invalidation segment so
   /// resolve-time transforms below the written subtree can observe it.
@@ -27,6 +28,15 @@ package enum AnimationContextStorage {
   /// the animation controller so the value can be sampled into the velocity
   /// channel, so the write branches take the animation-aware path for it.
   @TaskLocal package static var currentTracksVelocity: Bool = false
+}
+
+/// Tracks only synchronous writes submitted by one completion-bearing scope.
+/// Nested scopes replace this task local, so their writes do not claim an
+/// otherwise empty outer batch.
+@MainActor
+package final class AnimationCompletionScope {
+  package var didSubmitInvalidation = false
+  package init() {}
 }
 
 /// Internal completion barrier carried across the graph/runtime boundary.
@@ -46,6 +56,11 @@ package protocol AnimationCompletionSink: AnyObject, Sendable {
     barrier: AnimationCompletionBarrier,
     closure: @escaping @MainActor @Sendable () -> Void
   )
+  func finishEmptyCompletionScope(batchID: AnimationBatchID)
+}
+
+extension AnimationCompletionSink {
+  package func finishEmptyCompletionScope(batchID: AnimationBatchID) {}
 }
 
 @MainActor

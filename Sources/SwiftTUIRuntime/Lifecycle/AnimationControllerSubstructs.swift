@@ -64,6 +64,7 @@ extension AnimationController {
       placedRoot = nil
       matchedGeometryBounds.removeAll(keepingCapacity: true)
       matchedKeyIdentities.removeAll(keepingCapacity: true)
+      adoptionOffsets.removeAll(keepingCapacity: true)
       parentByIdentity.removeAll(keepingCapacity: true)
       childIndexByIdentity.removeAll(keepingCapacity: true)
       identities.removeAll(keepingCapacity: true)

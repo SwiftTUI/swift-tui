@@ -33,6 +33,7 @@ extension AnimationController {
     package var activeAnimationBoxesByKey: [AnimationKey: AnimationBox]
     package var registeredAnimationCount: Int
     package var completionClosureBatchIDs: Set<AnimationBatchID>
+    package var unclaimedCompletionBatchIDs: Set<AnimationBatchID>
     package var batchRefCounts: [AnimationBatchID: Int]
     package var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
     package var removalAnimationBoxesByNodeID: [ViewNodeID: AnimationBox?]

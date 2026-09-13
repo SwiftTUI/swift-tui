@@ -736,6 +736,7 @@ package final class ViewNode {
       if animationRequest != .inherit || batchID != nil || tracksVelocity,
         let animationAware = invalidator as? any AnimationAwareInvalidating
       {
+        AnimationContextStorage.currentCompletionScope?.didSubmitInvalidation = true
         animationAware.requestInvalidation(
           of: invalidationIdentities,
           animation: animationRequest,

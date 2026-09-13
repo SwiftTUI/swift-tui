@@ -55,6 +55,9 @@ import SwiftTUICore
 ///
 /// ### Reduce motion
 ///
+/// Enabling reduce motion during a triggered run settles its original
+/// timeline at its end value. Restoring motion does not replay that trigger.
+///
 /// Under reduce motion a trigger change writes the keyframes' end value at
 /// once, and repeating mode rests at `initialValue` without starting a task.
 public struct KeyframeAnimator<Value: Sendable, KeyframePath: Keyframes, Content: View>: View
@@ -173,7 +176,13 @@ where KeyframePath.Value == Value {
       return
     }
     guard previous != trigger else {
-      // An unchanged trigger is a `.task` replay (dormant-tab re-mount).
+      // A policy restart must settle the original timeline. Rebuilding from
+      // the current value would change relative keyframe endpoints.
+      if reduceMotion, let inFlight = flight {
+        value = inFlight.timeline.value(time: inFlight.timeline.duration)
+        flight = nil
+      }
+      // Other unchanged-trigger replays (including dormant tabs) stay quiet.
       return
     }
     lastRunTrigger = trigger

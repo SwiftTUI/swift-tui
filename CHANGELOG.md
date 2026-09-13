@@ -10,6 +10,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- Complete no-write animation scopes without waiting for an unrelated frame,
+  and preserve logical completions when a sibling animation is pruned.
+- Settle triggered keyframe and phase animators when Reduce Motion changes
+  during a run; restoring motion no longer reveals a stale intermediate value.
+- Clear retained matched-geometry adoption offsets when the animation
+  controller resets.
+
 - Preserve terminal bytes drained before a POSIX read failure, including Linux
   PTY shutdown, and preserve record separators inside bracketed paste.
 - Deliver redirected UTF-8 input and EOF on Windows while keeping idle pipes

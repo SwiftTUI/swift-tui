@@ -35,6 +35,8 @@
 ///
 /// The initial mount is not a trigger change.
 /// The view renders at phase 0 without an animation. It reacts only to subsequent changes.
+/// Reduce motion reconciles the retained phase to phase 0 and consumes trigger
+/// changes without playing a cycle. Restoring motion keeps the animator at rest.
 ///
 /// ### Animation curve
 ///
@@ -120,8 +122,21 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
 
   @ViewBuilder
   private func phaseAnimatorBody(accessibilityReduceMotion: Bool) -> some View {
+    // Bind both task-written slots even when the reduced branch renders the
+    // constant rest phase, so its reconciliation writes reach mounted state.
+    _ = currentPhase
+    _ = lastRunTrigger
     if accessibilityReduceMotion {
-      phaseContent(phases[0])
+      if currentPhase != phases[0] || lastRunTrigger != trigger {
+        phaseContent(phases[0])
+          .task(id: trigger) { @MainActor in
+            guard !Task.isCancelled else { return }
+            currentPhase = phases[0]
+            lastRunTrigger = trigger
+          }
+      } else {
+        phaseContent(phases[0])
+      }
     } else if let trigger {
       // Touch `lastRunTrigger` in body so `State.remember(...)`
       // registers a per-instance location for it during the normal
