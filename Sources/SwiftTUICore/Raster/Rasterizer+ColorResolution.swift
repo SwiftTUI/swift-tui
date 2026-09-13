@@ -131,15 +131,17 @@ extension Rasterizer {
 
     switch geometry {
     case .circle:
-      // Matches `paintBrailleShape`'s circle case:
-      //   radius = (min(subW, subH) - 1) / 2  (Int floor)
-      //   cx = (subW - 1) / 2, cy = (subH - 1) / 2
-      let radius = Double(max(0, (min(subW, subH) - 1) / 2))
+      // Share the Braille renderer's pixel-aspect correction. A circle in
+      // pixel space is an ellipse when its subpixel samples are not square.
+      let radii = Self.subpixelCircleRadii(frameCells: bounds.size, metrics: metrics)
+      let rx = Double(max(0, radii.rx - 1))
+      let ry = Double(max(0, radii.ry - 1))
+      guard rx > 0, ry > 0 else { return false }
       let cxSub = Double((subW - 1) / 2)
       let cySub = Double((subH - 1) / 2)
-      let dx = px - cxSub
-      let dy = py - cySub
-      return dx * dx + dy * dy <= radius * radius
+      let dx = (px - cxSub) / rx
+      let dy = (py - cySub) / ry
+      return dx * dx + dy * dy <= 1
     case .ellipse:
       // Matches `paintBrailleShape`'s ellipse case.
       let rx = max(0, (subW - 1) / 2)

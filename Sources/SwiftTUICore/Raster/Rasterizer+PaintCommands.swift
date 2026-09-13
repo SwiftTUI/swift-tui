@@ -334,8 +334,8 @@ extension Rasterizer {
           continue
         }
         let cellStyle = ResolvedTextStyle(
-          foregroundColor: cell.foreground,
-          backgroundColor: cell.background
+          foregroundColor: cell.foreground?.opacity(payload.opacity),
+          backgroundColor: cell.background?.opacity(payload.opacity)
         )
         write(
           cell.character,
@@ -372,7 +372,9 @@ extension Rasterizer {
         guard let character = context.canvas.character(x: cellX, y: cellY) else {
           continue
         }
-        let resolvedStyle = context.gridCellStyles[cellY][cellX] ?? fallbackStyle
+        var resolvedStyle = context.gridCellStyles[cellY][cellX] ?? fallbackStyle
+        resolvedStyle.foregroundColor = resolvedStyle.foregroundColor?.opacity(payload.opacity)
+        resolvedStyle.backgroundColor = resolvedStyle.backgroundColor?.opacity(payload.opacity)
         let styleToWrite: ResolvedTextStyle? =
           resolvedStyle.isDefault ? nil : resolvedStyle
         write(
@@ -487,20 +489,11 @@ extension Rasterizer {
     // so we don't overwrite anything already on the surface.
     let originX = shapeBounds.origin.x
     let originY = shapeBounds.origin.y
-    let backgroundColor: Color? =
+    let backgroundMode: ResolvedShapeColorMode? =
       backgroundStyle
       .flatMap { $0.backgroundStyle(for: .top) }
-      .flatMap { style in
-        resolveColor(
-          from: resolvedColorMode(
-            from: style,
-            environment: environment,
-            bounds: shapeBounds
-          ),
-          bounds: shapeBounds,
-          sampleX: originX,
-          sampleY: originY
-        )
+      .map { style in
+        resolvedColorMode(from: style, environment: environment, bounds: shapeBounds)
       }
 
     for cellY in 0..<cellH {
@@ -526,7 +519,9 @@ extension Rasterizer {
         )
         let resolved = ResolvedTextStyle(
           foregroundColor: foregroundColor,
-          backgroundColor: backgroundColor
+          backgroundColor: backgroundMode.flatMap {
+            resolveColor(from: $0, bounds: shapeBounds, sampleX: targetX, sampleY: targetY)
+          }
         )
         write(
           cell.glyph,

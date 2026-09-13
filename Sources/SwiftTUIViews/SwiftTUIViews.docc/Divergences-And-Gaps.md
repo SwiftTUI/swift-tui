@@ -687,10 +687,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   drawings compare structurally across rerenders; the SwiftUI-shaped closure
   form compares by identity. An extra `init(grid:_:)` hands SwiftUI-habit
   code the size alongside the context.
-- **`Canvas` draws on the legacy integer-cell interface internally.** *Gap.*
-  The internal drawing coordinate model is still the integer-cell interface,
-  not the fractional cell-coordinate model the rest of the geometry system
-  uses.
+- **`Canvas` authors fractional cell coordinates and rasterizes grid samples.**
+  *Ratified.* `Point` and `Rect` drawing operations quantize only at the selected
+  `CanvasGrid` boundary. `GridSample` and direct `CellPoint` writes remain
+  explicit escape hatches for sample and terminal-cell operations.
 
 ## Animation and transitions
 
@@ -893,9 +893,14 @@ are omitted even when SwiftUI exposes a corresponding API.
   container appearance while preserving clipping and host input policy. Link
   styles merge into standalone and inline rich-text runs without replacing
   their action or semantic identities. Structural Panel remains unstyled.
-- **`Color` vocabulary differs.** *Gap.* Initializers use `alpha:` where
-  SwiftUI uses `opacity:`, and mixing is `mixed(with:amount:method:)` rather
-  than `mix(with:by:)`.
+- **`Color` uses channel alpha and explicit color-mixing methods.** *Ratified.*
+  Component initializers retain `alpha:` consistently with the stored channel,
+  color-space constructors, coding and compositing APIs. `.opacity(_:)` multiplies
+  that alpha; it does not replace it. Mixing retains
+  `mixed(with:amount:method:)` and `interpolated(to:progress:method:)`, with
+  perceptual mixing by default and a clamped fraction. These describe concrete
+  color math rather than adopting SwiftUI's `opacity:` and `mix(with:by:)`
+  spellings. Existing labels remain supported without deprecations or aliases.
 - **`.primary` and `.secondary` are semantic-role aliases; `Color.accentColor`
   is omitted.** *Ratified.* `.foregroundStyle(.primary)` and `.secondary`
   resolve through the host theme as aliases for the `foreground` and `muted`
@@ -921,9 +926,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   matching SwiftUI. Same-node modifier chains compound through the metadata
   merge. Retained draw reuse verifies the inherited factor before serving a
   cached subtree, and animated fades write the overlay root only (the
-  cascade reaches descendants at extraction). A `Canvas` fades its default
-  foreground but not colors the drawing resolves internally, a residual
-  *Gap* shared with the image path below.
+  cascade reaches descendants at extraction). A `Canvas` applies the factor
+  after its drawing resolves colors, including explicit foregrounds,
+  backgrounds, styled samples and direct cell writes. The default foreground
+  receives the same factor exactly once.
 
 ## Surface extensions with no SwiftUI analog
 

@@ -122,8 +122,11 @@ public struct RasterSurface: Equatable, Sendable {
     imageAttachments: [RasterImageAttachment] = [],
     metadata: [String: String] = [:]
   ) {
-    self.size = size
     self.cells = Self.makeCells(size: size, lines: lines, styleRuns: styleRuns)
+    self.size = CellSize(
+      width: max(size.width, cells.first?.count ?? 0),
+      height: max(size.height, lines.count, cells.count)
+    )
     self.attachments = attachments
     self.imageAttachments = imageAttachments
     self.metadata = metadata

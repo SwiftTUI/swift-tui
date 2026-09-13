@@ -372,14 +372,13 @@ extension DrawExtractor {
         )
       )
     case .canvas(let payload):
-      // The canvas default foreground fades; colors the drawing sets
-      // explicitly cannot (they resolve inside the canvas context) — see the
-      // divergence register.
+      var fadedPayload = payload
+      fadedPayload.opacity *= effectiveOpacity
       commands.append(
         .canvas(
           bounds: bounds,
-          payload: payload,
-          foregroundStyle: faded(drawMetadata.foregroundStyle ?? .semantic(.foreground))
+          payload: fadedPayload,
+          foregroundStyle: drawMetadata.foregroundStyle ?? .semantic(.foreground)
         )
       )
     case .foreignSurface(let payload):

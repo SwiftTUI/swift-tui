@@ -10,6 +10,10 @@ public struct CanvasPayload: Equatable, Sendable {
   /// Grid used when rasterizing the drawing.
   public var grid: CanvasGrid
 
+  // Draw extraction supplies the ancestor opacity once, after author code
+  // resolves all explicit and default colors inside the drawing.
+  package var opacity: Double = 1
+
   public init(
     drawing: any CanvasDrawing,
     grid: CanvasGrid = .braille2x4
@@ -19,7 +23,8 @@ public struct CanvasPayload: Equatable, Sendable {
   }
 
   public static func == (lhs: CanvasPayload, rhs: CanvasPayload) -> Bool {
-    lhs.grid == rhs.grid && canvasDrawingsEqual(lhs.drawing, rhs.drawing)
+    lhs.grid == rhs.grid && lhs.opacity == rhs.opacity
+      && canvasDrawingsEqual(lhs.drawing, rhs.drawing)
   }
 }
 
