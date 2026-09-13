@@ -33,6 +33,7 @@
     private var changedAt = ProcessInfo.processInfo.systemUptime
     private var observationError: (any Error)?
     private var foregroundGroup: pid_t?
+    private var pendingDiagnostic: String?
     private struct ApplicationCommand: Decodable {
       let moduleName: String
       let importPath: String
@@ -56,6 +57,9 @@
         attributes: [.posixPermissions: 0o700])
       var initialized = false
       defer { if !initialized { try? manager.removeItem(at: spool) } }
+      guard manager.createFile(atPath: spool.appendingPathComponent("diagnostics.log").path, contents: nil) else {
+        throw DevError("Cannot create compiler diagnostics log")
+      }
       if let log = options.eventLog {
         guard manager.createFile(atPath: log.path, contents: nil) else {
           throw DevError("Cannot create event log: \(log.path)")
@@ -68,6 +72,9 @@
     func run() async throws -> Int32 {
       defer {
         if let foregroundGroup { _ = tcsetpgrp(STDIN_FILENO, foregroundGroup) }
+        if let pendingDiagnostic {
+          FileHandle.standardError.write(Data("swifttui-dev: \(pendingDiagnostic)\n".utf8))
+        }
         try? eventHandle?.close()
         try? FileManager.default.removeItem(at: spool)
       }
@@ -111,7 +118,7 @@
       observed = try sourceSnapshot()
       contract = try contractSnapshot()
       dependencies = try dependencySnapshot()
-      message("Building \(options.product). Compiler output: \(spool.path)")
+      message("Building \(options.product). During the session, follow compiler diagnostics at \(spool.path)/diagnostics.log")
       _ = try await swift(["build", "-c", "debug", "--product", options.product,
         "-Xswiftc", "-DSWIFTTUI_HOT_RELOAD",
         "-Xlinker", scalarObject.path, "-Xlinker", exportFlag])
@@ -192,7 +199,7 @@
             try await compileApplicationImage(image, scalarObject: scalarObject)
           } catch {
             try? FileManager.default.removeItem(at: image)
-            record("build_failed")
+            record("build_failed", fields: ["detail": String(describing: error)])
             message("Build failed; the current app is still running. \(error)")
             continue
           }
@@ -231,6 +238,7 @@
             record("load_failed", fields: ["detail": status.dropFirst(2).joined(separator: " ")])
             message("Reload refused: \(status.dropFirst(2).joined(separator: " "))")
           } else {
+            pendingDiagnostic = nil
             record("committed", fields: [
               "buildToFrameMilliseconds": (ProcessInfo.processInfo.systemUptime - began) * 1000,
               "observedEditToFrameMilliseconds": (ProcessInfo.processInfo.systemUptime - candidateEditedAt) * 1000,
@@ -326,10 +334,13 @@
       }
       guard candidates.count == 1, let command = candidates.first,
         !command.otherArguments.contains("-module-abi-name"),
+        !command.otherArguments.contains(where: {
+          ["-load-plugin-executable", "-load-plugin-library", "-load-resolved-plugin"].contains($0)
+        }),
         command.moduleName.unicodeScalars.allSatisfy({
           CharacterSet.alphanumerics.contains($0) && $0.isASCII || $0 == "_"
         })
-      else { throw DevError("Unsupported SwiftPM executable command; generated sources require a restart") }
+      else { throw DevError("Unsupported SwiftPM executable command; generated sources and compiler plugins are not supported") }
       applicationCommand = ApplicationCommand(moduleName: command.moduleName, importPath: command.importPath,
         sources: command.sources.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path },
         otherArguments: command.otherArguments, isLibrary: command.isLibrary)
@@ -496,7 +507,22 @@
     }
 
     private func message(_ text: String) {
-      FileHandle.standardError.write(Data("\r\nswifttui-dev: \(text)\r\n".utf8))
+      if child?.isRunning == true {
+        // The application owns the terminal screen. Interleaving diagnostics
+        // with its raster bytes leaves text the renderer cannot know to erase.
+        pendingDiagnostic = text
+        let log = spool.appendingPathComponent("diagnostics.log")
+        if !FileManager.default.fileExists(atPath: log.path) {
+          _ = FileManager.default.createFile(atPath: log.path, contents: nil)
+        }
+        if let handle = try? FileHandle(forWritingTo: log) {
+          defer { try? handle.close() }
+          _ = try? handle.seekToEnd()
+          try? handle.write(contentsOf: Data("\(text)\n".utf8))
+        }
+      } else {
+        FileHandle.standardError.write(Data("\r\nswifttui-dev: \(text)\r\n".utf8))
+      }
     }
 
     private func imageName(_ sequence: UInt64) -> String {

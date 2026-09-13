@@ -44,8 +44,12 @@ declared logical module aliases in Codable schema names and framework-generated
 
 `--debounce-ms` sets the quiet period (200 ms by default). `--target` selects the
 executable target explicitly. Arguments after `--` go to the app. Build or link
-failures leave the current generation interactive, with compiler diagnostics on
-stderr. A newer edit discards an in-flight candidate. The driver restarts neither
+failures leave the current generation interactive. While the app owns the
+terminal, compiler diagnostics go to the private spool's `diagnostics.log` and
+the optional JSON event log. The initial build prints the log location; follow
+it from another terminal. An unresolved diagnostic prints on stderr after the
+app stops. This keeps compiler text out of the application's raster. A newer
+edit discards an in-flight candidate. The driver restarts neither
 the app nor its input stream for an accepted reload.
 
 ## State and effects
@@ -63,6 +67,9 @@ file-private or nested types whose reflected name changes may reset.
 Old lifecycle work retires before new lifecycle work starts. New bodies, actions
 and tasks execute the replacement code. Custom Codable methods and root
 construction run application code and must be safe to evaluate during discovery.
+Task cancellation is requested before replacement tasks start; cancelled tasks
+can finish their cleanup asynchronously. Capture values needed after an `await`
+before suspending instead of reading a retired owner's state during cleanup.
 
 ## Restart boundaries and measurement
 
