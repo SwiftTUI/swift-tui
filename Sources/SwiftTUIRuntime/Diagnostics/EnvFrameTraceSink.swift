@@ -103,7 +103,9 @@ import Synchronization
           focusRerenders: "\(s.focusSyncRerenders)",
           drop: s.completedFrameDropDecision?.action.rawValue ?? "-",
           blockers: s.dropEligibilityBlockers.map(\.rawValue),
-          extra: "present=\(s.presentationDuration)"))
+          extra:
+            "present=\(s.presentationDuration) pace=\(s.scheduledFrame.pacing.engaged ? String(describing: s.scheduledFrame.pacing.gap) : "-")"
+        ))
     case .zeroArtifact(let s):
       writeLine(
         row(
@@ -124,7 +126,10 @@ import Synchronization
           tail: "-",
           animActive: s.animationControllerActiveAnimationCount,
           animPending: s.animationControllerHasPendingWork,
-          focusRerenders: "-", drop: "-", blockers: [], extra: "-"))
+          focusRerenders: "-", drop: "-", blockers: [],
+          extra:
+            "pace=\(s.scheduledFrame.pacing.engaged ? String(describing: s.scheduledFrame.pacing.gap) : "-")"
+        ))
     }
   }
 

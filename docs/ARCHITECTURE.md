@@ -125,6 +125,19 @@ and then `SwiftTUIRuntime`.
   code does not name a render type. It does not use Foundation.
   `Resolve/ComparisonWork.swift` owns optional retained-comparison tallies;
   the comparison walkers select a counting or non-counting specialization.
+  `Pipeline/FramePacing.swift` defines the optional merge-pressure readiness
+  policy. The scheduler counts fresh coalesced invalidations, excluding cancelled
+  intent replay, and folds committed consume-to-acknowledgment cost under its
+  existing lock. `SWIFTTUI_MERGE_PRESSURE_PACING=1` delays only pure invalidation
+  wakes by half the EWMA, capped at 50 ms, during the second after observed
+  pressure. Other causes and eligible due deadlines bypass it. Readiness and
+  wake-time queries share the gate; it creates no deadline intent. The gate
+  defaults off. Profiling still collects the cost when disabled; unprofiled,
+  disabled runs pay no extra frame-clock read. Samples retain the consume-time
+  snapshot in `scheduledFrame`, and TSV exports `merged_invalidations`,
+  `pace_ewma`/`pace_gap` (milliseconds), and `pace_engaged` (whether the frame
+  was held by the gate). Async cost includes suspension, so it is a latency
+  signal rather than a direct measure of main-actor CPU occupancy.
 - **`SwiftTUICore`** — the render engine. Consumes the graph's immutable
   `ResolvedNode` snapshots. It runs measure, place, the semantic and draw
   extractors, the rasterizer, and the commit planner. It also runs the text/image

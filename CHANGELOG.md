@@ -8,6 +8,12 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in merge-pressure frame pacing (`SWIFTTUI_MERGE_PRESSURE_PACING=1`)
+  and frame-cost/coalescing telemetry. Input, signal, external and due-deadline
+  wakes bypass the invalidation-only gap; the feature defaults off.
+
 ### Fixed
 
 - Animate numeric text in viewport-realized List rows and refresh eager rows'

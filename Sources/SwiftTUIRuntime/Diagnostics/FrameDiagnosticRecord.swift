@@ -32,6 +32,8 @@ public struct FrameDiagnosticRecord: Sendable {
   /// Total `request*` calls the scheduler coalesced into this frame.
   /// `> 1` indicates cancellation pressure for Stage 3D rollout.
   public var coalescedIntentRequests: Int
+  package var mergedInvalidationRequestCount = 0
+  package var pacing: FramePacingSnapshot = .init()
   public var scheduledAnimationRequest: String
   public var scheduledAnimationBatchID: UInt64?
   public var animationControllerActiveAnimationCount: Int

@@ -127,6 +127,7 @@ extension RunLoop {
       try applyAcquiredFrame(
         artifacts,
         scheduledFrame: scheduledFrame,
+        consumedAt: consumedAt,
         frameInstant: frameInstant,
         renderIntentDiagnostics: renderIntentDiagnostics,
         convergence: convergence,
@@ -251,6 +252,7 @@ extension RunLoop {
   private func applyAcquiredFrame(
     _ acquiredArtifacts: FrameArtifacts,
     scheduledFrame: ScheduledFrame,
+    consumedAt: MonotonicInstant,
     frameInstant: MonotonicInstant,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
     convergence: FocusSyncConvergenceState,
@@ -347,6 +349,15 @@ extension RunLoop {
       tailJobState: acquisition.tailJobState
     )
 
+    // Cost includes acquisition and synchronous commit/present submission,
+    // but never waits for the terminal writer queue's delivery acknowledgment.
+    if let recorder = scheduler as? any CommittedFrameCostRecording,
+      recorder.mergePressurePacingEnabled || hasFrameSink
+    {
+      let acknowledgedAt = frameClock()
+      recorder.recordCommittedFrame(
+        cost: consumedAt.duration(to: acknowledgedAt), at: acknowledgedAt)
+    }
     emitCommittedFrameSample(
       artifacts: artifacts,
       scheduledFrame: scheduledFrame,
@@ -582,6 +593,7 @@ extension RunLoop {
       try applyAcquiredFrame(
         artifacts,
         scheduledFrame: scheduledFrame,
+        consumedAt: consumedAt,
         frameInstant: frameInstant,
         renderIntentDiagnostics: renderIntentDiagnostics,
         convergence: convergence,

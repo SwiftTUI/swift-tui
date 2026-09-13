@@ -27,6 +27,7 @@ struct FeatureGateRegistryTests {
         "SWIFTTUI_STATE_CAPTURE_BINDING",
         "SWIFTTUI_ANIMATION_VELOCITY",
         "SWIFTTUI_RETAINED_VALIDATION_COUNTERS",
+        "SWIFTTUI_MERGE_PRESSURE_PACING",
       ])
     #expect(
       Set(FeatureGate.allCases.map(\.environmentVariableName)).count == FeatureGate.allCases.count)

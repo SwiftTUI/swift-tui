@@ -27,6 +27,8 @@ public struct ScheduledFrame: Equatable, Sendable {
   /// An `intentRequestCount > 1` value means that multiple intents merged into one render.
   /// In this state, a hypothetical pre-start cancellation can supersede an active tail job.
   public var intentRequestCount: Int
+  package var mergedInvalidationRequestCount: Int = 0
+  package var pacing: FramePacingSnapshot = .init()
 
   public init(
     causes: Set<WakeCause>,
@@ -258,6 +260,11 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
   }
 
   private struct CoalescingState {
+    var pendingMergedInvalidationCount = 0
+    var lastMergeObservedAt: MonotonicInstant?
+    var ewmaFrameCost: Duration = .zero
+    var lastCommitAcknowledgedAt: MonotonicInstant?
+    var pacingEngaged = false
     var pendingCauses: Set<WakeCause> = []
     var invalidatedIdentities: Set<Identity> = []
     var signalNames: Set<String> = []
@@ -308,7 +315,53 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
     uncheckedState: PendingFrameRequestWaiters()
   )
 
-  public init() {}
+  private let pacingPolicy: MergePressurePacingPolicy
+  package let mergePressurePacingEnabled: Bool
+
+  public init() {
+    mergePressurePacingEnabled = FeatureGate.mergePressurePacing.initialIsEnabled()
+    pacingPolicy = .init()
+  }
+
+  package init(mergePressurePacingEnabled: Bool, pacingPolicy: MergePressurePacingPolicy = .init())
+  {
+    self.mergePressurePacingEnabled = mergePressurePacingEnabled
+    self.pacingPolicy = pacingPolicy
+  }
+
+  private func pressureGap(_ state: CoalescingState, at now: MonotonicInstant) -> Duration {
+    guard let merge = state.lastMergeObservedAt,
+      merge.duration(to: now) >= .zero,
+      merge.duration(to: now) <= pacingPolicy.pressureWindow
+    else { return .zero }
+    return min(
+      max(state.ewmaFrameCost / pacingPolicy.gapDenominator * pacingPolicy.gapNumerator, .zero),
+      pacingPolicy.gapCeiling)
+  }
+
+  private func paceUntil(
+    _ state: inout CoalescingState, at now: MonotonicInstant, deadlineDue: Bool
+  ) -> MonotonicInstant? {
+    guard mergePressurePacingEnabled, state.pendingCauses == [.invalidation], !deadlineDue,
+      let commit = state.lastCommitAcknowledgedAt
+    else { return nil }
+    let until = commit.advanced(by: pressureGap(state, at: now))
+    guard until > now else { return nil }
+    state.pacingEngaged = true
+    return until
+  }
+
+  package func pacingSnapshot(at now: MonotonicInstant) -> FramePacingSnapshot {
+    coalescingLock.withLock { state in snapshot(state, at: now) }
+  }
+
+  private func snapshot(_ state: CoalescingState, at now: MonotonicInstant) -> FramePacingSnapshot {
+    FramePacingSnapshot(
+      ewmaFrameCost: state.ewmaFrameCost,
+      gap: mergePressurePacingEnabled ? pressureGap(state, at: now) : .zero,
+      engaged: state.pacingEngaged,
+      mergeAge: state.lastMergeObservedAt.map { $0.duration(to: now) })
+  }
 
   /// The invalidation identities coalesced since the last `consumeReadyFrame`.
   /// Read by the run loop to tell whether an action it just dispatched already
@@ -341,6 +394,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
 
   public func requestInvalidation(of identities: Set<Identity>) {
     coalescingLock.withLock { state in
+      if state.pendingCauses.contains(.invalidation) { state.pendingMergedInvalidationCount += 1 }
       state.pendingCauses.insert(.invalidation)
       state.invalidatedIdentities.formUnion(identities)
       state.pendingIntentRequestCount += 1
@@ -397,8 +451,9 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
 
   public func hasPendingFrame(at now: MonotonicInstant = .now()) -> Bool {
     coalescingLock.withLock { state in
-      !state.pendingCauses.isEmpty
-        || (state.pendingDeadlines.first.map { $0.instant <= now } ?? false)
+      let due = state.pendingDeadlines.first.map { $0.instant <= now } ?? false
+      return paceUntil(&state, at: now, deadlineDue: due) == nil
+        && (!state.pendingCauses.isEmpty || due)
     }
   }
 
@@ -406,6 +461,10 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
     after now: MonotonicInstant = .now()
   ) -> MonotonicInstant? {
     coalescingLock.withLock { state in
+      let deadline = state.pendingDeadlines.first?.instant
+      if let until = paceUntil(&state, at: now, deadlineDue: deadline.map { $0 <= now } ?? false) {
+        return deadline.map { min(until, $0) } ?? until
+      }
       if !state.pendingCauses.isEmpty {
         return now
       }
@@ -453,6 +512,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
         }
       }
       let deadlineDue = triggeredDeadline != nil
+      guard paceUntil(&state, at: now, deadlineDue: deadlineDue) == nil else { return nil }
       guard !state.pendingCauses.isEmpty || deadlineDue else {
         return nil
       }
@@ -465,7 +525,8 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
       let liveAnimationBatchIDs = AnimationInvalidationSegments.liveBatchIDs(
         in: state.pendingAnimationSegments
       )
-      let scheduled = ScheduledFrame(
+      if state.pendingMergedInvalidationCount > 0 { state.lastMergeObservedAt = now }
+      var scheduled = ScheduledFrame(
         causes: causes,
         invalidatedIdentities: state.invalidatedIdentities,
         signalNames: state.signalNames.sorted(),
@@ -478,6 +539,10 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
         },
         intentRequestCount: state.pendingIntentRequestCount
       )
+      scheduled.mergedInvalidationRequestCount = state.pendingMergedInvalidationCount
+      scheduled.pacing = snapshot(state, at: now)
+      state.pendingMergedInvalidationCount = 0
+      state.pacingEngaged = false
 
       state.pendingCauses.removeAll(keepingCapacity: true)
       state.invalidatedIdentities.removeAll(keepingCapacity: true)
@@ -493,6 +558,11 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
 
   public func reset() {
     coalescingLock.withLock { state in
+      state.pendingMergedInvalidationCount = 0
+      state.lastMergeObservedAt = nil
+      state.ewmaFrameCost = .zero
+      state.lastCommitAcknowledgedAt = nil
+      state.pacingEngaged = false
       state.pendingCauses.removeAll(keepingCapacity: true)
       state.invalidatedIdentities.removeAll(keepingCapacity: true)
       state.signalNames.removeAll(keepingCapacity: true)
@@ -647,6 +717,7 @@ extension FrameScheduler: AnimationAwareInvalidating {
     tracksVelocity: Bool
   ) {
     coalescingLock.withLock { state in
+      if state.pendingCauses.contains(.invalidation) { state.pendingMergedInvalidationCount += 1 }
       state.pendingCauses.insert(.invalidation)
       state.invalidatedIdentities.formUnion(identities)
       state.pendingIntentRequestCount += 1
@@ -668,6 +739,15 @@ extension FrameScheduler: AnimationAwareInvalidating {
     }
     notifyPendingFrameRequestWaiters()
     wakeHandlerLock.withLockUnchecked { $0 }?()
+  }
+}
+
+extension FrameScheduler: CommittedFrameCostRecording {
+  package func recordCommittedFrame(cost: Duration, at instant: MonotonicInstant) {
+    coalescingLock.withLock { state in
+      state.ewmaFrameCost = max(cost, .zero) / 2 + state.ewmaFrameCost / 2
+      state.lastCommitAcknowledgedAt = instant
+    }
   }
 }
 

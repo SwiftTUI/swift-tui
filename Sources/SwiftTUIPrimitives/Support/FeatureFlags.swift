@@ -30,6 +30,7 @@ package enum FeatureGate: CaseIterable, Sendable {
   case stateCaptureBinding
   case animationVelocity
   case retainedValidationCounters
+  case mergePressurePacing
 
   package var environmentVariableName: String {
     switch self {
@@ -65,6 +66,8 @@ package enum FeatureGate: CaseIterable, Sendable {
       "SWIFTTUI_ANIMATION_VELOCITY"
     case .retainedValidationCounters:
       "SWIFTTUI_RETAINED_VALIDATION_COUNTERS"
+    case .mergePressurePacing:
+      "SWIFTTUI_MERGE_PRESSURE_PACING"
     }
   }
 
@@ -79,7 +82,7 @@ package enum FeatureGate: CaseIterable, Sendable {
       // opts out.
       true
     case .overlayIncrementalDamage, .rasterVerifyIncremental, .rasterTrustSoundDamage,
-      .presentedProgressGuard, .retainedValidationCounters:
+      .presentedProgressGuard, .retainedValidationCounters, .mergePressurePacing:
       // Opt-in behavior/verification toggles: absent ⇒ off, leaving the default
       // build (and, for the raster pair, the `#if DEBUG` policy fallback at their
       // resolution sites) in effect. The presented-progress guard's default

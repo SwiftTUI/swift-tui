@@ -7,14 +7,22 @@ import SwiftTUICore
 /// the legacy logger keeps working; it moves to `SwiftTUIProfiling` in phase 2.
 package enum FrameRecordDerivation {
   package static func record(from sample: RuntimeFrameSample) -> FrameDiagnosticRecord {
+    var record: FrameDiagnosticRecord
+    let scheduled: ScheduledFrame
     switch sample {
     case .committed(let committed):
-      committedRecord(committed)
+      record = committedRecord(committed)
+      scheduled = committed.scheduledFrame
     case .zeroArtifact(let zero):
-      zeroArtifactRecord(zero)
+      record = zeroArtifactRecord(zero)
+      scheduled = zero.scheduledFrame
     case .elided(let elided):
-      elidedRecord(elided)
+      record = elidedRecord(elided)
+      scheduled = elided.scheduledFrame
     }
+    record.mergedInvalidationRequestCount = scheduled.mergedInvalidationRequestCount
+    record.pacing = scheduled.pacing
+    return record
   }
 
   private static func committedRecord(_ sample: CommittedFrameSample) -> FrameDiagnosticRecord {
