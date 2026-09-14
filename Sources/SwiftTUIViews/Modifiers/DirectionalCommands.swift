@@ -15,8 +15,8 @@ public enum MoveCommandDirection: CaseIterable, Hashable, Sendable {
 extension View {
   /// Handles an unmodified arrow key on the focused view's hosting chain.
   ///
-  /// The nearest view receives the command first. Return `.handled` to consume
-  /// it or `.ignored` to let enclosing handlers and default navigation try it.
+  /// Enclosing handlers receive the command first. Return `.handled` to consume
+  /// it or `.ignored` to let handlers nearer the focus and default navigation try it.
   /// Handlers at the same view identity follow `onKeyPress` stacking order
   /// (outermost modifier first). Disabled views do not install a handler.
   @MainActor
@@ -39,8 +39,8 @@ extension View {
 
   /// Handles unmodified Escape on the focused view's hosting chain.
   ///
-  /// Return `.ignored` to bubble to an enclosing handler or the runtime's
-  /// presentation-dismissal route. Return `.handled` when the command has been
+  /// Enclosing handlers run first. Return `.ignored` to continue toward the
+  /// focus and then the runtime's presentation-dismissal route. Return `.handled` when the command has been
   /// consumed. Sibling focus scopes do not receive the command, and disabled
   /// views do not install a handler. This modifier does not handle configured
   /// scene exit chords such as Control-C.

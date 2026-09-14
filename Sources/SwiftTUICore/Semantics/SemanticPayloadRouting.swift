@@ -117,7 +117,9 @@ extension SemanticExtractor {
           focusInteractions: .edit,
           scopePath: scopePath,
           sectionIdentity: sectionIdentity,
-          modalFocusScopePath: modalFocusScopePath
+          modalFocusScopePath: modalFocusScopePath,
+          ownerNodeID: node.viewNodeID,
+          ownerIdentity: node.identity
         )
       )
     }
@@ -215,7 +217,9 @@ extension SemanticExtractor {
             focusInteractions: .activate,
             scopePath: scopePath,
             sectionIdentity: sectionIdentity ?? node.identity,
-            modalFocusScopePath: modalFocusScopePath
+            modalFocusScopePath: modalFocusScopePath,
+            ownerNodeID: node.viewNodeID,
+            ownerIdentity: node.identity
           )
         )
       }
@@ -397,7 +401,9 @@ extension SemanticExtractor {
               focusInteractions: .activate,
               scopePath: scopePath,
               sectionIdentity: sectionIdentity,
-              modalFocusScopePath: modalFocusScopePath
+              modalFocusScopePath: modalFocusScopePath,
+              ownerNodeID: node.viewNodeID,
+              ownerIdentity: node.identity
             )
           )
         }

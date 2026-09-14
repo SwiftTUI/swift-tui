@@ -172,15 +172,32 @@ package struct HandlerDescriptorIntake {
 
   package func registerKeyPressHandler(
     identity: Identity,
+    phase: LocalKeyHandlerRegistry.KeyPressPhase = .control,
+    requiresFocusedTarget: Bool = false,
     handler: @escaping @MainActor (KeyPress) -> Bool
   ) {
     let scope = dispatchScope
     context.localKeyHandlerRegistry?.register(
       identity: identity,
+      phase: phase,
+      requiresFocusedTarget: requiresFocusedTarget,
       keyPressHandler: { press in
         withImperativeAuthoringContext(scope) {
           handler(press)
         }
+      }
+    )
+  }
+
+  package func registerFocusedKeyPressHandler(
+    identity: Identity,
+    handler: @escaping LocalKeyHandlerRegistry.FocusedKeyPressHandler
+  ) {
+    let scope = dispatchScope
+    context.localKeyHandlerRegistry?.register(
+      identity: identity,
+      focusedKeyPressHandler: { press, focus in
+        withImperativeAuthoringContext(scope) { handler(press, focus) }
       }
     )
   }

@@ -162,7 +162,7 @@ struct RoutePairingRegistryTests {
     registry.restoreKeyPressHandlers(
       [
         identity: [
-          { _ in
+          .init { _ in
             received.append("inner")
             return true
           }
@@ -174,7 +174,7 @@ struct RoutePairingRegistryTests {
     registry.restoreKeyPressHandlers(
       [
         identity: [
-          { _ in
+          .init { _ in
             received.append("outer")
             return true
           }
@@ -201,7 +201,7 @@ struct RoutePairingRegistryTests {
     registry.restoreKeyPressHandlers(
       [
         identity: [
-          { _ in
+          .init { _ in
             received.append("inner")
             return true
           }
@@ -213,7 +213,7 @@ struct RoutePairingRegistryTests {
     registry.restoreKeyPressHandlers(
       [
         identity: [
-          { _ in
+          .init { _ in
             received.append("outer")
             return true
           }
@@ -291,7 +291,7 @@ struct RoutePairingRegistryTests {
     registry.restoreKeyPressHandlers(
       [
         identity: [
-          { _ in
+          .init { _ in
             received.append("restored")
             return true
           }

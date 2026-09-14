@@ -1650,13 +1650,27 @@ package final class ViewNode {
   package func recordKeyPressHandlerRegistration(
     identity: Identity,
     ordinal: UInt64,
+    phase: LocalKeyHandlerRegistry.KeyPressPhase = .control,
+    requiresFocusedTarget: Bool = false,
     handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
+  ) {
+    recordKeyPressHandlerRegistration(
+      identity: identity, ordinal: ordinal,
+      registration: .init(
+        phase: phase, requiresFocusedTarget: requiresFocusedTarget, handler: handler)
+    )
+  }
+
+  package func recordKeyPressHandlerRegistration(
+    identity: Identity,
+    ordinal: UInt64,
+    registration: LocalKeyHandlerRegistry.KeyPressRegistration
   ) {
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordKeyPressHandler(
       identity: identity,
       ordinal: ordinal,
-      handler: handler
+      registration: registration
     )
     refreshCommittedHandlerInventoryOutsideCapture()
   }

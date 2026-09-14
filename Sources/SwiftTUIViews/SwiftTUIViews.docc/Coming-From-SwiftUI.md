@@ -171,9 +171,10 @@ surprise. Each links back to its register section by name.
 
 ### Subtle behaviors worth knowing
 
-- **Directional and exit commands bubble.** `onMoveCommand`
+- **Enclosing key handlers intercept first.** `onKeyPress`, `onMoveCommand`
   and `onExitCommand` return `.handled` or `.ignored` on the focused hosting
-  chain. Escape is separate from the scene's exit chords; see
+  chain, from enclosing views toward the focus, before default control behavior.
+  Escape is separate from the scene's exit chords; see
   <doc:Commands-And-Key-Input>.
 - **Menus follow their source control.** Floating menus use the source's
   placed geometry, follow movement, and clamp at viewport edges.

@@ -59,7 +59,66 @@ public enum KeyEvent: Equatable, Hashable, Sendable {
 @MainActor
 package final class LocalKeyHandlerRegistry: Equatable {
   package typealias KeyPressHandler = @MainActor (KeyPress) -> Bool
+  package typealias FocusedKeyPressHandler =
+    @MainActor (KeyPress, Identity) -> FocusedKeyPressResult
   package typealias PasteHandler = @MainActor (String) -> Bool
+
+  package enum FocusedKeyPressResult {
+    case ignored
+    case handled
+    case focus(Identity)
+  }
+
+  package enum KeyPressPhase: Sendable {
+    case interception
+    case control
+  }
+
+  package struct KeyPressRegistration {
+    package let phase: KeyPressPhase
+    package let requiresFocusedTarget: Bool
+    private enum Action {
+      case key(KeyPressHandler)
+      case focused(FocusedKeyPressHandler)
+    }
+    private let action: Action
+
+    package init(
+      phase: KeyPressPhase = .control,
+      requiresFocusedTarget: Bool = false,
+      handler: @escaping KeyPressHandler
+    ) {
+      self.phase = phase
+      self.requiresFocusedTarget = requiresFocusedTarget
+      self.action = .key(handler)
+    }
+
+    package init(focusedHandler: @escaping FocusedKeyPressHandler) {
+      phase = .control
+      requiresFocusedTarget = false
+      action = .focused(focusedHandler)
+    }
+
+    @MainActor
+    package func dispatch(
+      _ keyPress: KeyPress,
+      focusedIdentity: Identity,
+      requestFocus: (Identity) -> Void
+    ) -> Bool {
+      switch action {
+      case .key(let handler):
+        return handler(keyPress)
+      case .focused(let handler):
+        switch handler(keyPress, focusedIdentity) {
+        case .ignored: return false
+        case .handled: return true
+        case .focus(let target):
+          requestFocus(target)
+          return true
+        }
+      }
+    }
+  }
 
   /// One contributing owner's stacked handlers plus the persisted ordinal of
   /// the bucket's first registration. The ordinal — not the owner's
@@ -103,7 +162,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
     }
   }
 
-  private var keyPressHandlers: [Identity: ContributedHandlers<KeyPressHandler>] = [:]
+  private var keyPressHandlers: [Identity: ContributedHandlers<KeyPressRegistration>] = [:]
   private var pasteHandlers: [Identity: ContributedHandlers<PasteHandler>] = [:]
   private var ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:]
   /// Monotonic mint for ``ContributedBucket/ordinal``. Never reset: ordinals
@@ -121,19 +180,36 @@ package final class LocalKeyHandlerRegistry: Equatable {
 
   package func register(
     identity: Identity,
+    phase: KeyPressPhase = .control,
+    requiresFocusedTarget: Bool = false,
     keyPressHandler: @escaping KeyPressHandler
   ) {
+    register(
+      identity: identity,
+      registration: .init(
+        phase: phase, requiresFocusedTarget: requiresFocusedTarget, handler: keyPressHandler
+      ))
+  }
+
+  package func register(
+    identity: Identity,
+    focusedKeyPressHandler: @escaping FocusedKeyPressHandler
+  ) {
+    register(identity: identity, registration: .init(focusedHandler: focusedKeyPressHandler))
+  }
+
+  private func register(identity: Identity, registration: KeyPressRegistration) {
     let owner = RuntimeRegistrationOwnerKey.current(identity: identity)
     let ordinal =
       keyPressHandlers[identity]?.byOwner[owner]?.ordinal ?? claimContributionOrdinal()
     keyPressHandlers[identity, default: .init()]
       .byOwner[owner, default: ContributedBucket(ordinal: ordinal, handlers: [])]
-      .handlers.append(keyPressHandler)
+      .handlers.append(registration)
     ownersByIdentity[identity] = owner
     ViewNodeContext.current?.recordKeyPressHandlerRegistration(
       identity: identity,
       ordinal: ordinal,
-      handler: keyPressHandler
+      registration: registration
     )
   }
 
@@ -163,13 +239,22 @@ package final class LocalKeyHandlerRegistry: Equatable {
   @discardableResult
   package func dispatch(
     identity: Identity,
-    keyPress: KeyPress
+    keyPress: KeyPress,
+    phase: KeyPressPhase? = nil,
+    focusedIdentity: Identity? = nil,
+    requestFocus: (Identity) -> Void = { _ in }
   ) -> Bool {
     guard let contributions = keyPressHandlers[identity] else {
       return false
     }
-    for handler in contributions.flattened.reversed() {
-      if handler(keyPress) {
+    for registration in contributions.flattened.reversed()
+    where phase == nil || registration.phase == phase {
+      if registration.requiresFocusedTarget, let focusedIdentity, focusedIdentity != identity {
+        continue
+      }
+      if registration.dispatch(
+        keyPress, focusedIdentity: focusedIdentity ?? identity, requestFocus: requestFocus
+      ) {
         return true
       }
     }
@@ -194,9 +279,14 @@ package final class LocalKeyHandlerRegistry: Equatable {
   }
 
   package func hasHandler(
-    identity: Identity
+    identity: Identity,
+    phase: KeyPressPhase? = nil
   ) -> Bool {
-    keyPressHandlers[identity]?.isEmpty == false
+    guard let contributions = keyPressHandlers[identity] else { return false }
+    guard let phase else { return !contributions.isEmpty }
+    return contributions.byOwner.values.contains { bucket in
+      bucket.handlers.contains { $0.phase == phase }
+    }
   }
 
   package func hasPasteHandler(
@@ -239,7 +329,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
     }
   }
 
-  package func snapshotKeyPressHandlers() -> [Identity: [KeyPressHandler]] {
+  package func snapshotKeyPressHandlers() -> [Identity: [KeyPressRegistration]] {
     keyPressHandlers.mapValues(\.flattened)
   }
 
@@ -248,7 +338,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
   }
 
   package func restoreKeyPressHandlers(
-    _ snapshot: [Identity: [KeyPressHandler]],
+    _ snapshot: [Identity: [KeyPressRegistration]],
     ownersByIdentity: [Identity: RuntimeRegistrationOwnerKey] = [:],
     ordinalsByIdentity: [Identity: UInt64] = [:]
   ) {

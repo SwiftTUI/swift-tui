@@ -2,6 +2,24 @@ import SwiftTUICore
 import SwiftTUIViews
 
 extension RunLoop {
+  package struct PendingKeyFocus {
+    var identity: Identity
+    var ownerNodeID: ViewNodeID
+    var ownerIdentity: Identity?
+  }
+
+  package func requestKeyFocus(_ identity: Identity) {
+    let ownerNodeID = pendingKeyFocus?.ownerNodeID ?? focusTracker.currentFocusOwnerNodeID
+    let ownerIdentity = pendingKeyFocus?.ownerIdentity ?? focusTracker.currentFocusOwnerIdentity
+    pendingKeyFocus = nil
+    if focusTracker.focusRegions.contains(where: { $0.identity == identity }) {
+      _ = focusTracker.setFocus(to: identity)
+    } else if let ownerNodeID {
+      pendingKeyFocus = .init(
+        identity: identity, ownerNodeID: ownerNodeID, ownerIdentity: ownerIdentity)
+    }
+  }
+
   /// A keyboard focus traversal (Tab / Shift+Tab / arrow move) recorded when
   /// it lands, together with the region list it traversed. Held until the
   /// next input event so the runtime can recognize a landing region that
@@ -31,6 +49,9 @@ extension RunLoop {
     step: Int,
     _ move: () -> Identity?
   ) {
+    // Only an actual traversal supersedes a collection's pending move.
+    // An enclosing handler may consume Tab or an arrow before this point.
+    pendingKeyFocus = nil
     let regionsAtTraversal = focusTracker.focusRegions
     let previousFocus = focusTracker.currentFocusIdentity
     guard let landedIdentity = move(), landedIdentity != previousFocus else {
@@ -213,6 +234,14 @@ extension RunLoop {
     let hadFocusBeforeRegionUpdate = focusIdentityBeforeRegionUpdate != nil
     var focusChanged = focusTracker.updateRegions(
       renderedArtifacts.semanticSnapshot.focusRegions)
+    if let pending = pendingKeyFocus {
+      pendingKeyFocus = nil
+      if renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
+        $0.identity == pending.identity && $0.ownerNodeID == pending.ownerNodeID
+      }) {
+        focusChanged = focusTracker.setFocus(to: pending.identity) || focusChanged
+      }
+    }
     if let pending = hotReloadSession?.pendingFocus {
       hotReloadSession?.pendingFocus = nil
       focusChanged = focusTracker.setFocus(to: pending) || focusChanged

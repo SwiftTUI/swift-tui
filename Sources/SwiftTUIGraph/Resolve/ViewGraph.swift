@@ -1103,21 +1103,36 @@ package final class ViewGraph {
   }
 
   /// Identities along the hosting chain from `identity` outward,
-  /// nearest-first — the key-event bubble path. `parent` links stop at
+  /// nearest-first. `parent` links stop at
   /// island seams (`.id`-rerooted subtrees, capture-hosted content), so the
   /// walk bridges them with `evaluationHost`, mirroring the upward
   /// invalidation walks. Handlers registered above such a seam are
   /// otherwise unreachable from the focused identity: a rerooted focus
   /// identity is never a path-descendant of the handler's structural
   /// identity, so no identity-string walk can connect them.
-  package func keyEventBubblePath(
+  /// Synthetic targets start at their producing node. An explicit owner that
+  /// has retired must not fall back to a different occurrence of the identity.
+  package func keyEventHostingPath(
     from identity: Identity,
+    ownerNodeID: ViewNodeID? = nil,
+    ownerIdentity: Identity? = nil,
     limit: Int = 64
   ) -> [Identity] {
     var path = [identity]
     var visited: Set<Identity> = [identity]
-    var node = nodeIfExists(for: identity)
-    while let current = node, path.count < limit {
+    var visitedNodes: Set<ViewNodeID> = []
+    var node: ViewNode? =
+      if let ownerNodeID { nodeIfExists(for: ownerNodeID) } else { nodeIfExists(for: identity) }
+    if ownerNodeID != nil, node == nil { return [] }
+    if let ownerIdentity, visited.insert(ownerIdentity).inserted {
+      path.append(ownerIdentity)
+    }
+    while let current = node, path.count < limit,
+      visitedNodes.insert(current.viewNodeID).inserted
+    {
+      if visited.insert(current.resolvedIdentity).inserted {
+        path.append(current.resolvedIdentity)
+      }
       if visited.insert(current.identity).inserted {
         path.append(current.identity)
       }

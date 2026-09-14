@@ -560,8 +560,9 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **Move and exit commands report consumption.** *Ratified.*
   `onMoveCommand` handles unmodified arrow keys and `onExitCommand` handles
   unmodified Escape on the focused hosting chain. Both return `KeyPressResult`:
-  `.handled` consumes the command and `.ignored` permits enclosing handlers
-  and default navigation or dismissal. Sibling scopes do not receive it.
+  `.handled` consumes the command and `.ignored` permits handlers nearer the
+  focus and then default navigation or dismissal. Enclosing handlers run first.
+  Sibling scopes do not receive it.
   This follows the terminal-native `onKeyPress` contract rather than SwiftUI's
   Void-returning command callbacks.
 - **`onKeyPress` is reshaped end to end and is the canonical key API.**
@@ -572,6 +573,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   keyboard state to match against, so SwiftUI's phase surface would be
   unimplementable theater. The name stays because the role matches: this is
   where key handling is authored.
+  Enclosing handlers intercept before focused content, matching native SwiftUI
+  observations; built-in control behavior runs after authored handlers decline.
 - **`\.openLinkAction` stands where SwiftUI has `\.openURL`, and environment
   verbs return `Bool`.** *Ratified.* The rename marks the changed contract
   (`LinkDestination` values, terminal link delivery), and `Bool` returns,

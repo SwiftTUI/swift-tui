@@ -87,22 +87,34 @@ extension RunLoop {
     }
   }
 
-  /// Dispatches `keyPress` to the focused identity's handlers and then up its
-  /// hosting chain, stopping at the first handler that consumes it. Returns
+  /// Authored handlers intercept from the enclosing host toward the focus.
+  /// Built-in controls then handle declined keys from the focus outward. Returns
   /// `true` when the event was consumed. The dispatch backstop is requested
   /// only in that case: an unhandled key gets none (see the caller).
-  private func dispatchKeyPressAlongBubblePath(
+  private func dispatchFocusedKeyPress(
     _ keyPress: KeyPress,
-    from focusedIdentity: Identity
+    from focusedIdentity: Identity,
+    allowsControlHandling: Bool = true
   ) -> Bool {
     let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
-    for identity in renderer.viewGraph.keyEventBubblePath(from: focusedIdentity)
-    where localKeyHandlerRegistry.hasHandler(identity: identity) {
-      if localKeyHandlerRegistry.dispatch(identity: identity, keyPress: keyPress) {
-        requestDispatchBackstopInvalidation(
-          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
-        )
-        return true
+    let path = renderer.viewGraph.keyEventHostingPath(
+      from: focusedIdentity,
+      ownerNodeID: pendingKeyFocus?.ownerNodeID ?? focusTracker.currentFocusOwnerNodeID,
+      ownerIdentity: pendingKeyFocus?.ownerIdentity ?? focusTracker.currentFocusOwnerIdentity
+    )
+    for phase in [LocalKeyHandlerRegistry.KeyPressPhase.interception, .control]
+    where phase == .interception || allowsControlHandling {
+      let identities = phase == .interception ? Array(path.reversed()) : path
+      for identity in identities {
+        if localKeyHandlerRegistry.dispatch(
+          identity: identity, keyPress: keyPress, phase: phase, focusedIdentity: focusedIdentity,
+          requestFocus: { requestKeyFocus($0) }
+        ) {
+          requestDispatchBackstopInvalidation(
+            schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
+          )
+          return true
+        }
       }
     }
     return false
@@ -142,7 +154,7 @@ extension RunLoop {
       }
     }
 
-    let focusedIdentity = focusTracker.currentFocusIdentity
+    let focusedIdentity = pendingKeyFocus?.identity ?? focusTracker.currentFocusIdentity
     let focusedActivationIdentity = focusedIdentity.flatMap {
       activationIdentity(for: $0)
     }
@@ -162,19 +174,16 @@ extension RunLoop {
     // binding.
     if focusedInteractions == .edit, exitKeyBindings.contains(keyPress) {
       if !keyPress.modifiers.isEmpty, let focusedIdentity,
-        dispatchKeyPressAlongBubblePath(keyPress, from: focusedIdentity)
+        dispatchFocusedKeyPress(keyPress, from: focusedIdentity)
       {
         return nil
       }
       return .userExit(keyPress)
     }
 
-    // Bubble from the focused identity up its hosting chain (SwiftUI parity:
-    // `.onKeyPress` above a `.frame`/`.id` boundary registers at the
-    // structural ancestor identity, which an identity-string walk cannot
-    // reach from a rerooted focus identity). The focused identity itself
-    // dispatches first, preserving stacked-handler priority and editor
-    // interception at the exact identity.
+    // Intercept from the enclosing hosting scope toward the focused target,
+    // crossing `.id` and captured-content seams through graph ownership.
+    // Only after authored handlers decline do built-in control handlers run.
     //
     // The handler's own `@State` writes already invalidate the precise
     // readers (reader attribution), so the coarse root sweep is redundant
@@ -187,7 +196,7 @@ extension RunLoop {
     // backstop — a declined ESC previously root-swept here before the
     // framework dismiss branch even ran, riding the close transition's
     // replayed sets as `root_invalidated`.
-    if let focusedIdentity, dispatchKeyPressAlongBubblePath(keyPress, from: focusedIdentity) {
+    if let focusedIdentity, dispatchFocusedKeyPress(keyPress, from: focusedIdentity) {
       return nil
     }
 
@@ -370,7 +379,18 @@ extension RunLoop {
         case " ": .space
         default: .character(character)
         }
-      _ = handleKeyPress(KeyPress(key, modifiers: []))
+      // Synthesized text can reach authored handlers and focused editors,
+      // but must never fall through to control activation or scene commands.
+      // In particular, an ignored Space on a List ancestor is still paste.
+      if let focusedIdentity = focusTracker.currentFocusIdentity {
+        let isEditing =
+          focusTracker.focusRegions.first {
+            $0.identity == focusedIdentity
+          }?.focusInteractions == .edit
+        _ = dispatchFocusedKeyPress(
+          KeyPress(key, modifiers: []), from: focusedIdentity, allowsControlHandling: isEditing
+        )
+      }
     }
   }
 
@@ -381,8 +401,11 @@ extension RunLoop {
     guard let focusedIdentity = focusTracker.currentFocusIdentity else {
       return false
     }
-    for identity in renderer.viewGraph.keyEventBubblePath(from: focusedIdentity)
-    where localKeyHandlerRegistry.hasHandler(identity: identity) {
+    for identity in renderer.viewGraph.keyEventHostingPath(
+      from: focusedIdentity, ownerNodeID: focusTracker.currentFocusOwnerNodeID,
+      ownerIdentity: focusTracker.currentFocusOwnerIdentity
+    )
+    where localKeyHandlerRegistry.hasHandler(identity: identity, phase: .interception) {
       return true
     }
     let region = focusTracker.focusRegions.first { region in

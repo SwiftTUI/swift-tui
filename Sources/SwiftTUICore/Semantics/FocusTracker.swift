@@ -37,6 +37,14 @@ public final class FocusTracker {
     prefersNoFocus
   }
 
+  package var currentFocusOwnerNodeID: ViewNodeID? {
+    currentFocusRegion()?.ownerNodeID
+  }
+
+  package var currentFocusOwnerIdentity: Identity? {
+    currentFocusRegion()?.ownerIdentity
+  }
+
   /// How many modal focus restorations are currently pending.
   ///
   /// Exposed for stress harnesses that assert the restoration stack drains when

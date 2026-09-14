@@ -70,6 +70,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// backward into the scope, which would trap the Tab cycle. See
   /// ``processFocusSyncIteration(_:convergence:)``.
   package var pendingFocusTraversal: PendingFocusTraversal?
+  /// A collection key selected a target that scrolling has not realized yet.
+  /// Consumed at the next focus sync and guarded by the producing graph owner.
+  package var pendingKeyFocus: PendingKeyFocus?
   /// The most recent click-focus move, kept until the next input event. If
   /// the region the click landed on vanishes from the semantic snapshot
   /// before any further input — the same self-revoking class as

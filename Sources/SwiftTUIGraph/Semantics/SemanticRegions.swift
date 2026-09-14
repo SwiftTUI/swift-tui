@@ -8,6 +8,11 @@ public struct FocusRegion: Equatable, Sendable {
   public var identity: Identity
   public var rect: CellRect
   public var focusInteractions: FocusInteractions
+  /// The graph node that produced this focus target, including synthetic rows.
+  package var ownerNodeID: ViewNodeID?
+  /// The producing value's identity. A fused modifier node can have a
+  /// different structural identity from its List or other control payload.
+  package var ownerIdentity: Identity?
   package var scopePath: [Identity]
   package var sectionIdentity: Identity?
   package var modalFocusScopePath: [Identity]?
@@ -22,6 +27,8 @@ public struct FocusRegion: Equatable, Sendable {
     self.identity = identity
     self.rect = rect
     self.focusInteractions = focusInteractions
+    self.ownerNodeID = nil
+    self.ownerIdentity = nil
     self.scopePath = scopePath
     self.sectionIdentity = sectionIdentity
     self.modalFocusScopePath = nil
@@ -33,11 +40,15 @@ public struct FocusRegion: Equatable, Sendable {
     focusInteractions: FocusInteractions = .automatic,
     scopePath: [Identity] = [],
     sectionIdentity: Identity? = nil,
-    modalFocusScopePath: [Identity]?
+    modalFocusScopePath: [Identity]?,
+    ownerNodeID: ViewNodeID? = nil,
+    ownerIdentity: Identity? = nil
   ) {
     self.identity = identity
     self.rect = rect
     self.focusInteractions = focusInteractions
+    self.ownerNodeID = ownerNodeID
+    self.ownerIdentity = ownerIdentity
     self.scopePath = scopePath
     self.sectionIdentity = sectionIdentity
     self.modalFocusScopePath = modalFocusScopePath

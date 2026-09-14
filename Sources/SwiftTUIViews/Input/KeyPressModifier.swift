@@ -40,11 +40,12 @@ public struct KeyPressMatch: Equatable, Sendable {
 }
 
 extension View {
-  /// Registers a key handler for this view while it is focused.
+  /// Registers a key handler while this view or its hosted content has focus.
   ///
   /// Return `.handled` to consume the key press. Return `.ignored` to leave it
-  /// available to other focused-key handlers and the runtime's default input
-  /// routing.
+  /// available to handlers closer to the focused target and then to default
+  /// control behavior. Enclosing handlers run first; handlers stacked on the
+  /// same identity run outermost modifier first.
   @MainActor
   public func onKeyPress(
     _ match: KeyPressMatch = .any,
@@ -60,7 +61,7 @@ extension View {
   }
 
   /// Registers a key handler for an exact key plus modifier combination while
-  /// this view is focused.
+  /// this view or its hosted content has focus.
   @MainActor
   public func onKeyPress(
     _ key: KeyEvent,
@@ -104,7 +105,7 @@ public struct KeyPressModifier: IterativePrimitiveViewModifier, Sendable {
         context: context,
         preferringSnapshot: authoringContext
       )
-      intake.registerKeyPressHandler(identity: node.identity) { keyPress in
+      intake.registerKeyPressHandler(identity: node.identity, phase: .interception) { keyPress in
         guard match.matches(keyPress) else {
           return false
         }

@@ -93,7 +93,9 @@ package struct SemanticExtractor: Sendable {
               focusInteractions: node.semanticMetadata.focusInteractions,
               scopePath: scopePath,
               sectionIdentity: sectionIdentity,
-              modalFocusScopePath: modalFocusScopePath
+              modalFocusScopePath: modalFocusScopePath,
+              ownerNodeID: node.viewNodeID,
+              ownerIdentity: node.identity
             )
           )
         }

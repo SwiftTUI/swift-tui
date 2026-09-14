@@ -12,6 +12,7 @@ extension RunLoop {
     switch mouseEvent.kind {
     case .down, .up, .dragged, .scrolled:
       pendingFocusTraversal = nil
+      pendingKeyFocus = nil
     case .moved:
       break
     }

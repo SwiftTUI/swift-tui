@@ -229,14 +229,22 @@ extension List {
           }
         }
 
-        intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+        // Scrolling may fall back through hosted content; selection and
+        // activation belong only to the exact focused container or row.
+        // The registry checks the live dispatch target, not resolve-time focus.
+        if let scrollCurrency {
+          intake.registerKeyPressHandler(identity: context.identity) { keyPress in
+            guard keyPress.modifiers.isEmpty else { return false }
+            return applyCollectionScrollKey(keyPress.key, to: scrollCurrency)
+          }
+        }
+        intake.registerKeyPressHandler(
+          identity: context.identity, requiresFocusedTarget: true
+        ) { keyPress in
           guard keyPress.modifiers.isEmpty else {
             return false
           }
           let event = keyPress.key
-          if let scrollCurrency, applyCollectionScrollKey(event, to: scrollCurrency) {
-            return true
-          }
           guard policy.isSelectable else {
             return false
           }
@@ -285,6 +293,42 @@ extension List {
         }
 
         if policy.isSelectable {
+          // One handler serves the live focused row, including a
+          // target that scrolling will realize on the next frame. Selection
+          // and focus advance to the same index; geometric focus movement
+          // cannot reach rows outside the current viewport.
+          intake.registerFocusedKeyPressHandler(identity: context.identity) { keyPress, focused in
+            guard keyPress.modifiers.isEmpty,
+              let rowIndex = listRowIndex(parsedFrom: focused, container: context.identity),
+              rows.indices.contains(rowIndex)
+            else { return .ignored }
+            let delta: Int
+            switch keyPress.key {
+            case .arrowUp: delta = -1
+            case .arrowDown: delta = 1
+            case .return, .space:
+              guard let tag = rows[rowIndex].tag else { return .ignored }
+              let handled = policy.isMultiple ? policy.toggle(tag) : activate(tag)
+              return handled ? .handled : .ignored
+            default: return .ignored
+            }
+            var targetIndex = rowIndex
+            var candidate = rowIndex + delta
+            while rows.indices.contains(candidate) {
+              if rows[candidate].tag != nil {
+                targetIndex = candidate
+                break
+              }
+              candidate += delta
+            }
+            guard let targetTag = rows[targetIndex].tag else { return .ignored }
+            if !policy.isMultiple { _ = policy.select(targetTag) }
+            if let scrollCurrency {
+              scrollCurrency.pinCurrentAnchor()
+              scrollCurrency.reveal(row: targetIndex)
+            }
+            return .focus(listRowIdentity(for: context.identity, rowIndex: targetIndex))
+          }
           let interactionIndices: any Sequence<Int> =
             if resolvedContent.indexedSource == nil {
               rows.indices
@@ -309,45 +353,6 @@ extension List {
             )
             intake.registerAction(identity: rowIdentity) {
               policy.isMultiple ? policy.toggle(tag) : activate(tag)
-            }
-            intake.registerKeyPressHandler(identity: rowIdentity) { keyPress in
-              guard keyPress.modifiers.isEmpty else {
-                return false
-              }
-              let delta: Int?
-              switch keyPress.key {
-              case .arrowUp:
-                delta = -1
-              case .arrowDown:
-                delta = 1
-              default:
-                delta = nil
-              }
-
-              guard let delta, !rows.isEmpty else {
-                return false
-              }
-
-              let targetIndex = min(
-                max(rowIndex + delta, rows.startIndex),
-                rows.index(before: rows.endIndex)
-              )
-              guard let targetTag = rows[targetIndex].tag else {
-                return false
-              }
-              if !policy.isMultiple {
-                _ = policy.select(targetTag)
-              }
-              if let scrollCurrency {
-                // This handler owns the common case: with focus on a row, the
-                // row's own handler sees the arrow and the container's never
-                // does. Pin before revealing — while nothing is stored the
-                // window IS the selection, so a minimal reveal would just be
-                // re-centred by the fallback underneath it.
-                scrollCurrency.pinCurrentAnchor()
-                scrollCurrency.reveal(row: targetIndex)
-              }
-              return false
             }
           }
         }

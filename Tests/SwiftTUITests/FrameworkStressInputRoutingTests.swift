@@ -1992,14 +1992,14 @@ private struct StressInput033Fixture: View {
 // MARK: - Attempt 034: onSubmit precedence and detachment across churn
 
 extension FrameworkStressInputRoutingTests {
-  @Test("Return submits ahead of ancestor key handlers and detaches with churn")
-  func stressInputRouting034SubmitPrecedesAncestorsAndDetaches() throws {
-    // Hypothesis: the focused field's submit intercept may lose the bubble
-    // race to an ancestor `.onKeyPress(.return)`, or a restored handler may
-    // keep submitting after structural churn removed the `onSubmit`.
+  @Test("Enclosing Return interception precedes submit and preserves detachment")
+  func stressInputRouting034AncestorInterceptionPrecedesSubmitAndDetaches() throws {
+    // STUI-492: the ancestor intercepts first. A declined key still submits,
+    // and a restored handler must not submit after onSubmit is detached.
     let text = StressInputBox("")
     let submits = StressInputBox(0)
     let ancestorReturns = StressInputBox(0)
+    let consumesReturn = StressInputBox(true)
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("StressInput034Root"),
       size: .init(width: 44, height: 8)
@@ -2007,7 +2007,8 @@ extension FrameworkStressInputRoutingTests {
       StressInput034Fixture(
         text: text,
         submits: submits,
-        ancestorReturns: ancestorReturns
+        ancestorReturns: ancestorReturns,
+        consumesReturn: consumesReturn
       )
     }
     defer { harness.shutdown() }
@@ -2018,8 +2019,12 @@ extension FrameworkStressInputRoutingTests {
     #expect(text.value == "hi")
 
     _ = try harness.pressKey(KeyPress(.return))
+    #expect(submits.value == 0)
+    #expect(ancestorReturns.value == 1)
+    consumesReturn.value = false
+    _ = try harness.pressKey(KeyPress(.return))
     #expect(submits.value == 1)
-    #expect(ancestorReturns.value == 0)
+    #expect(ancestorReturns.value == 2)
     #expect(text.value == "hi")
 
     _ = try harness.clickText("Detach submit")
@@ -2028,7 +2033,7 @@ extension FrameworkStressInputRoutingTests {
     _ = try harness.pressKey(KeyPress(.return))
 
     #expect(submits.value == 1)
-    #expect(ancestorReturns.value == 1)
+    #expect(ancestorReturns.value == 3)
     #expect(text.value == "hi")
   }
 }
@@ -2039,6 +2044,7 @@ private struct StressInput034Fixture: View {
   let text: StressInputBox<String>
   let submits: StressInputBox<Int>
   let ancestorReturns: StressInputBox<Int>
+  let consumesReturn: StressInputBox<Bool>
   @State private var hasSubmit = true
 
   var body: some View {
@@ -2057,7 +2063,7 @@ private struct StressInput034Fixture: View {
     }
     .onKeyPress(.return) { _ in
       ancestorReturns.value += 1
-      return .handled
+      return consumesReturn.value ? .handled : .ignored
     }
   }
 }

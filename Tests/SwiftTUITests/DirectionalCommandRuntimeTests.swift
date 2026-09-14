@@ -21,7 +21,7 @@ struct DirectionalCommandRuntimeTests {
     #expect(!harness.frame.contains("Sheet target"))
   }
 
-  @Test("move commands bubble only after the focused handler declines")
+  @Test("enclosing move commands intercept before the focused handler")
   func directionalRouting() throws {
     let log = CommandRouteLog()
     let harness = try StressRuntimeHarness(
@@ -32,11 +32,11 @@ struct DirectionalCommandRuntimeTests {
     for key in [KeyEvent.arrowUp, .arrowDown, .arrowLeft, .arrowRight] {
       _ = try harness.pressKey(KeyPress(key))
     }
-    #expect(log.moves == [.up, .down, .left, .right])
-    #expect(log.parentMoves == [.up])
+    #expect(log.moves == [.down, .left, .right])
+    #expect(log.parentMoves == [.up, .down, .left, .right])
     #expect(log.siblingMoves.isEmpty)
     _ = try harness.pressKey(KeyPress(.arrowUp, modifiers: .shift))
-    #expect(log.moves.count == 4)
+    #expect(log.moves.count == 3)
   }
 
   @Test("exit handling stays on the focused chain and propagates ignored Escape")
@@ -48,10 +48,10 @@ struct DirectionalCommandRuntimeTests {
     defer { harness.shutdown() }
     _ = try harness.clickText("First target")
     _ = try harness.pressKey(KeyPress(.escape))
-    #expect(log.exits == ["first", "parent"])
+    #expect(log.exits == ["parent", "first"])
     _ = try harness.clickText("Second target")
     _ = try harness.pressKey(KeyPress(.escape))
-    #expect(log.exits == ["first", "parent", "second"])
+    #expect(log.exits == ["parent", "first", "second"])
     _ = try harness.pressKey(KeyPress(.escape, modifiers: .shift))
     #expect(log.exits.count == 3)
   }
@@ -97,11 +97,11 @@ private struct CommandRouteFixture: View {
       }
       .onMoveCommand { direction in
         log.parentMoves.append(direction)
-        return .handled
+        return direction == .up ? .handled : .ignored
       }
       .onExitCommand {
         log.exits.append("parent")
-        return .handled
+        return .ignored
       }
       VStack {
         Text("Second target").focusable()

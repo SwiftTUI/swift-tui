@@ -86,9 +86,10 @@ chain is built.
 
 ## Handle Keys on the Focused View
 
-`onKeyPress` registers a handler that runs only while its view is
-focused. Return `.handled` to consume the key, or `.ignored` to leave it
-for other handlers and the runtime's default routing:
+`onKeyPress` registers a handler that runs while its view or hosted content
+has focus. Enclosing handlers run first, followed by handlers nearer the focused
+target. Return `.handled` to consume the key, or `.ignored` to continue dispatch.
+Built-in control behavior runs only after authored handlers decline:
 
 ```swift
 struct PreviewPane: View {
@@ -149,13 +150,23 @@ struct StepPreview: View {
 }
 ```
 
-The nearest handler on the focused hosting chain runs first. Returning
-`.ignored` allows enclosing handlers and default navigation or presentation
-dismissal to try the event. Handlers stacked on the same identity run outermost
+The outermost handler on the focused hosting chain runs first. Returning
+`.ignored` allows handlers nearer the focus and then default navigation or
+presentation dismissal to try the event. Handlers stacked on the same identity run outermost
 modifier first, like `onKeyPress`. Sibling focus scopes do not receive it, and
 disabled views do not install handlers. Modified arrows remain available to
 other key routes. `onExitCommand` does not handle scene exit chords such as
 Control-C; configure those with the scene APIs below.
+
+A handler attached to a `List` receives keys while one of its selectable rows
+has focus. Selecting a row does not focus its plain `Text` label; label handlers
+require focus within that content. An enclosing handler can consume arrows or
+Space before List selection, focus movement, or activation occurs.
+
+This enclosing-first order replaces the nearest-first order used through
+0.13.2. If a parent observes keys that its descendants should also receive,
+return `.ignored`. Return `.handled` only when the parent intends to intercept
+the key, including when a descendant is a text editor.
 
 ## Respond to Return in Text Inputs
 

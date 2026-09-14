@@ -17,10 +17,23 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Fixed
 
+- Route keys from synthetic List-row focus targets through their graph owner,
+  preserving single-step selection/focus movement and one activation per key
+  (STUI-491).
+- Keep pasted spaces from activating controls after enclosing key handlers
+  decline the synthesized text.
 - Keep finite ScrollView viewports full-sized with short or empty content,
   and allocate spare stack space to unframed scroll views on their scrolling
   axes. Content remains top-leading and content-sized; explicit frames and
   `.fixedSize` retain their sizing constraints (STUI-489).
+
+### Changed
+
+- Focused `onKeyPress`, `onMoveCommand`, and `onExitCommand` handlers now run
+  from enclosing views toward the focused target before built-in control
+  behavior, matching observed SwiftUI precedence (STUI-492). Parent handlers
+  must return `.ignored` to allow descendant handlers and editing/navigation
+  defaults to run. Same-identity modifier order remains outermost first.
 
 ## [0.13.2] - 2026-09-13
 
