@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-09-14
+
 ### Added
 
 - Debug terminal hot reload on macOS and Linux through `swifttui-dev`, with
@@ -1952,7 +1954,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.2...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.3...HEAD
+[0.13.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.3
 [0.13.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.2
 [0.12.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.1
 [0.12.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.0
