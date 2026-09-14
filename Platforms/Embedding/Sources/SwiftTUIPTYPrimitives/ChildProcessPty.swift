@@ -67,6 +67,9 @@
       let childPair = PTYPair(handles: handles, retainSlaveFD: true)
       pair = childPair
       try? await childPair.resize(initialSize)
+      // Start draining before the child can fill or close its terminal. The
+      // pair buffers output until the caller begins consuming read().
+      await childPair.startReading()
 
       let forkedPID = unsafe argv.withUnsafeMutablePointer { argvPointer in
         unsafe envp.withUnsafeMutablePointer { envpPointer in
@@ -95,7 +98,7 @@
         self.pendingSignal = nil
         try? sendSignalToStartedProcess(pendingSignal)
       }
-      await childPair.releaseAndCloseSlaveFD()
+      // Retain the slave until the exit watcher drains the child's final bytes.
     }
 
     public func waitForExit() async -> ExitStatus {
@@ -170,6 +173,7 @@
         return
       }
 
+      await pair?.finishChildOutput()
       exitStatus = status
       exitTask?.cancel()
       exitTask = nil

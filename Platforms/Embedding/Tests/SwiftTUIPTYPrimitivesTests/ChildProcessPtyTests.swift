@@ -16,6 +16,23 @@
 
   @Suite("ChildProcessPty", .serialized)
   struct ChildProcessPtyTests {
+    @Test("output survives a child exiting before its reader starts", .timeLimit(.minutes(1)))
+    func readAfterExit() async throws {
+      let pty = ChildProcessPty(
+        executable: "/bin/sh",
+        arguments: ["-c", "printf 'ASYNCPROBEOK\\n'"],
+        initialSize: CellSize(width: 80, height: 24)
+      )
+      try await pty.start()
+      #expect(await pty.waitForExit() == .exited(code: 0))
+
+      var collected: [UInt8] = []
+      for await chunk in await pty.pair.read() {
+        collected.append(contentsOf: chunk)
+      }
+      #expect(String(decoding: collected, as: UTF8.self) == "ASYNCPROBEOK\r\n")
+    }
+
     @Test("spawn a child process and read its output through the shared pair")
     func spawnEcho() async throws {
       let pty = ChildProcessPty(

@@ -16,10 +16,14 @@
     private var masterFD: Int32
     private var retainedSlaveFD: Int32
     private var readSource: (any DispatchSourceRead)?
+    private let readStream: AsyncStream<[UInt8]>
     private var readContinuation: AsyncStream<[UInt8]>.Continuation?
     private var didStartReading = false
 
     public init(handles: PTYHandles, retainSlaveFD: Bool) {
+      let (stream, continuation) = AsyncStream<[UInt8]>.makeStream()
+      readStream = stream
+      readContinuation = continuation
       masterFD = handles.masterFD
       slavePath = handles.slavePath
       retainedSlaveFD = retainSlaveFD ? handles.slaveFD : -1
@@ -91,11 +95,23 @@
     }
 
     public func read() -> AsyncStream<[UInt8]> {
-      AsyncStream { continuation in
-        Task {
-          await self.startReading(continuation: continuation)
-        }
+      guard !didStartReading else {
+        return AsyncStream { $0.finish() }
       }
+      didStartReading = true
+      startReading()
+      return readStream
+    }
+
+    /// The child has exited, so all of its writes are available. Drain before
+    /// closing our retained slave: Darwin discards unread terminal output when
+    /// the last slave closes. The stream buffers it even if read() starts later.
+    func finishChildOutput() {
+      drainAvailable()
+      releaseAndCloseSlaveFD()
+      // Descendants may still own the slave. In that case the normal reader
+      // keeps running until their output reaches EOF as well.
+      drainAvailable()
     }
 
     public func close() {
@@ -112,14 +128,10 @@
       }
     }
 
-    private func startReading(continuation: AsyncStream<[UInt8]>.Continuation) async {
-      guard !didStartReading, masterFD >= 0 else {
-        continuation.finish()
+    func startReading() {
+      guard masterFD >= 0, readSource == nil, readContinuation != nil else {
         return
       }
-
-      didStartReading = true
-      readContinuation = continuation
 
       let source = DispatchSource.makeReadSource(
         fileDescriptor: masterFD,
@@ -135,7 +147,7 @@
         }
       }
       source.setCancelHandler {}
-      continuation.onTermination = { @Sendable [weak self] _ in
+      readContinuation?.onTermination = { @Sendable [weak self] _ in
         guard let self else {
           return
         }
@@ -147,6 +159,7 @@
 
       readSource = source
       source.resume()
+      drainAvailable()
     }
 
     private func stopReading() {

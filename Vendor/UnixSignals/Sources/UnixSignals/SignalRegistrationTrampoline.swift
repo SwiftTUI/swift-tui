@@ -15,16 +15,38 @@
   import Darwin
   import Synchronization
 
-  /// One bit per signal number, set from the signal handler. The handler may
-  /// only perform a lock-free atomic RMW — no allocation, no locks.
+  /// One bit per signal number. The handler uses lock-free atomics and
+  /// async-signal-safe POSIX calls only — no allocation, no locks.
   private let recordedSignalBits = Atomic<UInt64>(0)
+  private let armedSignalBits = Atomic<UInt64>(0)
 
   private func signalRegistrationRecordingHandler(_ signalNumber: Int32) {
     guard signalNumber > 0, signalNumber < 64 else { return }
+    let savedErrno = errno
+    defer { errno = savedErrno }
     _ = recordedSignalBits.bitwiseOr(
       UInt64(1) << UInt64(signalNumber),
       ordering: .sequentiallyConsistent
     )
+    if armedSignalBits.load(ordering: .sequentiallyConsistent)
+      & (UInt64(1) << UInt64(signalNumber)) != 0
+    {
+      replayRecordedSignal(signalNumber)
+    }
+  }
+
+  private func replayRecordedSignal(_ signalNumber: Int32) {
+    let bit = UInt64(1) << UInt64(signalNumber)
+    guard
+      recordedSignalBits.bitwiseAnd(~bit, ordering: .sequentiallyConsistent).oldValue
+        & bit != 0
+    else { return }
+
+    var action = sigaction()
+    unsafe action.__sigaction_u.__sa_handler = SIG_IGN
+    unsafe sigemptyset(&action.sa_mask)
+    unsafe sigaction(signalNumber, &action, nil)
+    kill(getpid(), signalNumber)  // ignore-unacceptable-language
   }
 
   package enum SignalRegistrationTrampoline {
@@ -35,6 +57,10 @@
     /// Installs the recording handler in place of the default disposition.
     /// Called where upstream called `signal(sig, SIG_IGN)`.
     static func install(for signalNumber: Int32) {
+      let bit = UInt64(1) << UInt64(signalNumber)
+      // Initialize/reset both atomics before a signal can enter the handler.
+      _ = armedSignalBits.bitwiseAnd(~bit, ordering: .sequentiallyConsistent)
+      _ = recordedSignalBits.bitwiseAnd(~bit, ordering: .sequentiallyConsistent)
       var action = sigaction()
       // __sigaction_u is a C union; assigning into one of its members has
       // no static type-safety guarantee, so this write is genuinely unsafe.
@@ -44,29 +70,20 @@
       unsafe sigaction(signalNumber, &action, nil)
     }
 
-    /// Swaps each recording handler for `SIG_IGN` — the registered kqueue
-    /// sources own delivery from here — and replays any signal recorded
-    /// while registration was in flight. Replaying with kill(2) after the
-    /// swap routes the signal through EVFILT_SIGNAL, the same path live
-    /// signals take. A signal that races the swap can be delivered twice;
-    /// sequence consumers must treat delivery as idempotent (SIGINT/SIGTERM/
-    /// SIGWINCH all are).
+    /// Arms replay before checking recorded receipts. A queued signal may not
+    /// have entered its handler yet: switching it to SIG_IGN now would discard
+    /// it. Leave the recording handler installed until either this handoff or
+    /// the delayed handler claims a receipt and replays it through kqueue.
+    /// A signal observed by both mechanisms may be delivered twice; consumers
+    /// must treat delivery as idempotent (SIGINT/SIGTERM/SIGWINCH all are).
     static func handOffToKqueue(signalNumbers: [Int32]) {
       var mask: UInt64 = 0
       for signalNumber in signalNumbers where signalNumber > 0 && signalNumber < 64 {
-        signal(signalNumber, SIG_IGN)
         mask |= UInt64(1) << UInt64(signalNumber)
       }
-      // Clear only this sequence's bits; concurrent sequences trapping other
-      // signals keep theirs.
-      let recorded =
-        recordedSignalBits.bitwiseAnd(
-          ~mask,
-          ordering: .sequentiallyConsistent
-        ).oldValue & mask
-      for signalNumber in signalNumbers
-      where recorded & (UInt64(1) << UInt64(signalNumber)) != 0 {
-        kill(getpid(), signalNumber)  // ignore-unacceptable-language
+      _ = armedSignalBits.bitwiseOr(mask, ordering: .sequentiallyConsistent)
+      for signalNumber in signalNumbers where signalNumber > 0 && signalNumber < 64 {
+        replayRecordedSignal(signalNumber)
       }
     }
 
@@ -76,6 +93,9 @@
     static func abandon(signalNumbers: [Int32]) {
       for signalNumber in signalNumbers {
         signal(signalNumber, SIG_IGN)
+        let bit = UInt64(1) << UInt64(signalNumber)
+        _ = armedSignalBits.bitwiseAnd(~bit, ordering: .sequentiallyConsistent)
+        _ = recordedSignalBits.bitwiseAnd(~bit, ordering: .sequentiallyConsistent)
       }
     }
   }
