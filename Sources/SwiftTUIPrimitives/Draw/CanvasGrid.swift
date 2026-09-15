@@ -176,46 +176,6 @@ package struct CanvasGridBuffer: Equatable, Sendable {
     }
   }
 
-  package mutating func strokeCircle(centerX: Int, centerY: Int, radius: Int) {
-    guard radius >= 0 else { return }
-    if radius == 0 {
-      setPixel(x: centerX, y: centerY)
-      return
-    }
-    var x = radius
-    var y = 0
-    var err = 1 - radius
-    while x >= y {
-      setPixel(x: centerX + x, y: centerY + y)
-      setPixel(x: centerX + y, y: centerY + x)
-      setPixel(x: centerX - y, y: centerY + x)
-      setPixel(x: centerX - x, y: centerY + y)
-      setPixel(x: centerX - x, y: centerY - y)
-      setPixel(x: centerX - y, y: centerY - x)
-      setPixel(x: centerX + y, y: centerY - x)
-      setPixel(x: centerX + x, y: centerY - y)
-      y += 1
-      if err < 0 {
-        err += 2 * y + 1
-      } else {
-        x -= 1
-        err += 2 * (y - x) + 1
-      }
-    }
-  }
-
-  package mutating func fillCircle(centerX: Int, centerY: Int, radius: Int) {
-    guard radius >= 0 else { return }
-    let r2 = radius * radius
-    for dy in -radius...radius {
-      let dx = Int(Double(r2 - dy * dy).squareRoot().rounded(.down))
-      let y = centerY + dy
-      for x in (centerX - dx)...(centerX + dx) {
-        setPixel(x: x, y: y)
-      }
-    }
-  }
-
   package mutating func strokeEllipse(
     centerX: Int,
     centerY: Int,
