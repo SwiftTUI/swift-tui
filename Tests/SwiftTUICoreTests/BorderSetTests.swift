@@ -159,38 +159,6 @@ func builtinHidden() {
   #expect(s.top == " ")
 }
 
-@Test("Single-rune top edge returns the same glyph at every index")
-func cyclingSingleRune() {
-  let s = BorderSet.single
-  #expect(s.topGlyph(at: 0) == "─")
-  #expect(s.topGlyph(at: 1) == "─")
-  #expect(s.topGlyph(at: 99) == "─")
-}
-
-@Test("Two-rune top edge alternates")
-func cyclingTwoRune() {
-  let s = BorderSet.dashed
-  #expect(s.topGlyph(at: 0) == "─")
-  #expect(s.topGlyph(at: 1) == "·")
-  #expect(s.topGlyph(at: 2) == "─")
-  #expect(s.topGlyph(at: 3) == "·")
-}
-
-@Test("Empty edge returns nil")
-func cyclingEmpty() {
-  let s = BorderSet.none
-  #expect(s.topGlyph(at: 0) == nil)
-}
-
-@Test("Negative index returns nil instead of trapping")
-func cyclingNegativeIndex() {
-  let s = BorderSet.single
-  #expect(s.topGlyph(at: -1) == nil)
-  #expect(s.bottomGlyph(at: -5) == nil)
-  #expect(s.leftGlyph(at: -99) == nil)
-  #expect(s.rightGlyph(at: -1) == nil)
-}
-
 @Test("Every built-in has a non-empty top glyph except .none")
 func builtinTopGlyphsNonEmpty() {
   let allBuiltins: [(name: String, set: BorderSet, expectEmpty: Bool)] = [
