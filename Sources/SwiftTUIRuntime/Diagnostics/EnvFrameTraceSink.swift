@@ -40,7 +40,7 @@ import Synchronization
 
   #if !canImport(WASILibc)
     private init?(path: String) {
-      let fd = unsafe path.withCString { pathPointer in
+      let fd = path.withCString { pathPointer in
         #if canImport(ucrt)
           {
             var descriptor: CInt = -1

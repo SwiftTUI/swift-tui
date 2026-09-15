@@ -68,7 +68,7 @@ package func systemClipboardText() -> String? {
     }
 
     var processID = pid_t()
-    let spawnResult = unsafe arguments.withUnsafeMutableBufferPointer { buffer in
+    let spawnResult = arguments.withUnsafeMutableBufferPointer { buffer in
       guard let baseAddress = buffer.baseAddress,
         let executable = unsafe baseAddress[0]
       else {
@@ -108,7 +108,7 @@ package func systemClipboardText() -> String? {
     var bytes: [UInt8] = []
     var buffer = [UInt8](repeating: 0, count: 4096)
     while true {
-      let count = unsafe buffer.withUnsafeMutableBytes { rawBuffer in
+      let count = buffer.withUnsafeMutableBytes { rawBuffer in
         unsafe read(fileDescriptor, rawBuffer.baseAddress, rawBuffer.count)
       }
       guard count > 0 else {

@@ -113,7 +113,7 @@
       guard connectResult == 0 else { throw .connectionFailed(errno) }
 
       // Send request
-      let sent = unsafe request.withCString { ptr in
+      let sent = request.withCString { ptr in
         let byteCount = unsafe strlen(ptr)
         return unsafe sceneWrite(fd, ptr, byteCount)
       }
@@ -154,7 +154,7 @@
 
     private static func sortKey(for path: String, identifier: String) -> InstanceSortKey {
       var fileStatus = stat()
-      let result = unsafe path.withCString { cPath in
+      let result = path.withCString { cPath in
         unsafe lstat(cPath, &fileStatus)
       }
       guard result == 0 else {

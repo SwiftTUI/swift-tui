@@ -148,3 +148,10 @@ cmp -s "$fixture_root/full-summary" "$fixture_root/summary-fields" ||
   fail "full report reader changed metadata"
 
 printf 'PASS: result records round-trip five consecutive records; all three report readers preserve metadata and accounting\n'
+
+# Concurrent compiler/test output may split a UTF-8 glyph. Keep raw bytes
+# intact while locating the ASCII step markers in the full report.
+printf '\360warning: interleaved stderr\n\237 Test event\n' >>"$fixture_body"
+write_full_log_report "$fixture_body" "$results_file" "$fixture_report" 'sh gate' 7
+LC_ALL=C awk '/^Raw run log:$/ { body = 1; next } body { print }' "$fixture_report" >"$fixture_root/raw-body"
+cmp -s "$fixture_body" "$fixture_root/raw-body" || fail "full report changed split UTF-8 bytes"

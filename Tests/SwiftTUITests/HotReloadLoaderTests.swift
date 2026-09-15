@@ -198,10 +198,10 @@
       let fixture = try ReloadImageFixture()
       defer { fixture.clean() }
       let pending = fixture.root.appendingPathComponent("pending").path
-      #expect(unsafe pending.withCString { unsafe mkfifo($0, 0o600) } == 0)
+      #expect(pending.withCString { unsafe mkfifo($0, 0o600) } == 0)
       #expect(throws: HotReloadLoadError.self) { try fixture.loader.loadPending() }
       let image = fixture.root.appendingPathComponent(HotReloadLoader.imageName(1)).path
-      #expect(unsafe image.withCString { unsafe mkfifo($0, 0o600) } == 0)
+      #expect(image.withCString { unsafe mkfifo($0, 0o600) } == 0)
       try fixture.publish(1)
       #expect(throws: HotReloadLoadError.self) { try fixture.loader.loadPending() }
     }

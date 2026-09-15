@@ -38,7 +38,7 @@
         return fd
       }
       var enable: Int32 = 1
-      _ = unsafe withUnsafePointer(to: &enable) { pointer in
+      _ = withUnsafePointer(to: &enable) { pointer in
         unsafe setsockopt(
           fd, SOL_SOCKET, SO_REUSEADDR, pointer, socklen_t(MemoryLayout<Int32>.size))
       }
@@ -54,7 +54,7 @@
     ) {
       #if canImport(Darwin)
         var enable: Int32 = 1
-        _ = unsafe withUnsafePointer(to: &enable) { pointer in
+        _ = withUnsafePointer(to: &enable) { pointer in
           unsafe setsockopt(
             fd, SOL_SOCKET, SO_NOSIGPIPE, pointer, socklen_t(MemoryLayout<Int32>.size))
         }
@@ -75,14 +75,14 @@
       address.sin_family = sa_family_t(AF_INET)
       address.sin_port = in_port_t(port.bigEndian)
 
-      let converted = unsafe bindAddress.withCString { pointer in
+      let converted = bindAddress.withCString { pointer in
         unsafe inet_pton(AF_INET, pointer, &address.sin_addr)
       }
       guard converted == 1 else {
         return (false, 0, true)
       }
 
-      let bound = unsafe withUnsafePointer(to: &address) { pointer in
+      let bound = withUnsafePointer(to: &address) { pointer in
         unsafe systemBind(
           fd,
           unsafe UnsafeRawPointer(pointer).assumingMemoryBound(to: sockaddr.self),
@@ -103,7 +103,7 @@
     ) -> Int? {
       var address = sockaddr_in()
       var length = socklen_t(MemoryLayout<sockaddr_in>.size)
-      let result = unsafe withUnsafeMutablePointer(to: &address) { pointer in
+      let result = withUnsafeMutablePointer(to: &address) { pointer in
         unsafe getsockname(
           fd,
           unsafe UnsafeMutableRawPointer(pointer).assumingMemoryBound(to: sockaddr.self),
@@ -153,7 +153,7 @@
       into buffer: inout [UInt8]
     ) -> Int {
       while true {
-        let readCount = unsafe buffer.withUnsafeMutableBufferPointer { storage in
+        let readCount = buffer.withUnsafeMutableBufferPointer { storage in
           unsafe recv(fd, storage.baseAddress, storage.count, 0)
         }
         if readCount >= 0 {
@@ -182,7 +182,7 @@
           return false
         }
 
-        let written = unsafe bytes.withUnsafeBufferPointer { storage in
+        let written = bytes.withUnsafeBufferPointer { storage in
           unsafe send(fd, storage.baseAddress! + offset, bytes.count - offset, noSignalSendFlags)
         }
         if written > 0 {

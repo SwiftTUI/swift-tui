@@ -150,7 +150,7 @@ write_full_log_report() {
   marker_file=$(mktemp "/tmp/swift-tui-$runner_name-markers.XXXXXX")
   header_file=$(mktemp "/tmp/swift-tui-$runner_name-header.XXXXXX")
 
-  awk '
+  LC_ALL=C awk '
     /^==> / {
       title = substr($0, 5)
       if (!(title in seen)) {

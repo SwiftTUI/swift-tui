@@ -522,7 +522,7 @@ import Synchronization
     }
 
     private static func writeFile(_ contents: String, to path: String) throws {
-      let descriptor = unsafe path.withCString { cPath in
+      let descriptor = path.withCString { cPath in
         unsafe open(cPath, O_WRONLY | O_CREAT | O_TRUNC, 0o600)
       }
       guard descriptor >= 0 else {
@@ -542,7 +542,7 @@ import Synchronization
         String(getpid()), heartbeatPath,
       ]
       var cArguments: [UnsafeMutablePointer<CChar>?] = unsafe arguments.map { argument in
-        unsafe argument.withCString { cString in
+        argument.withCString { cString in
           unsafe strdup(cString)
         }
       }
@@ -573,7 +573,7 @@ import Synchronization
         )
       }
       defer { _ = unsafe posix_spawn_file_actions_destroy(&fileActions) }
-      let nullResult = unsafe "/dev/null".withCString { devNull in
+      let nullResult = "/dev/null".withCString { devNull in
         unsafe posix_spawn_file_actions_addopen(&fileActions, STDIN_FILENO, devNull, O_RDONLY, 0)
       }
       guard nullResult == 0 else {
@@ -597,7 +597,7 @@ import Synchronization
 
       var processIdentifier = pid_t()
       let environment = unsafe environ
-      let spawnResult: Int32 = unsafe cArguments.withUnsafeMutableBufferPointer { buffer in
+      let spawnResult: Int32 = cArguments.withUnsafeMutableBufferPointer { buffer in
         guard let baseAddress = buffer.baseAddress, let executable = unsafe baseAddress[0] else {
           return ENOENT
         }
@@ -677,7 +677,7 @@ import Synchronization
     var totalBytesWritten = 0
     RealTerminalJourneyWatchdog.registered(for: fileDescriptor)?.noteActivity()
 
-    try unsafe bytes.withUnsafeBytes { rawBuffer in
+    try bytes.withUnsafeBytes { rawBuffer in
       guard let baseAddress = rawBuffer.baseAddress else {
         return
       }

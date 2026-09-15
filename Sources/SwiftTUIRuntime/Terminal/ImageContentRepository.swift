@@ -243,7 +243,7 @@ private struct ImageFileRevision: Hashable, Sendable {
   #if !os(Windows) && !canImport(WASILibc)
     static func read(_ path: String) -> Self? {
       var info = stat()
-      let result = unsafe path.withCString { unsafe stat($0, &info) }
+      let result = path.withCString { unsafe stat($0, &info) }
       guard result == 0 else { return nil }
       #if canImport(Darwin)
         let modified = info.st_mtimespec

@@ -22,7 +22,7 @@ import Synchronization
 
     package func perform() {
       if !resetBytes.isEmpty {
-        unsafe resetBytes.withUnsafeBytes { bytes in
+        resetBytes.withUnsafeBytes { bytes in
           guard let baseAddress = bytes.baseAddress else {
             return
           }

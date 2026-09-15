@@ -276,7 +276,7 @@ private func boundCopy<V>(
       return view
     }
     var copy = view
-    unsafe withUnsafeMutablePointer(to: &copy) { base in
+    withUnsafeMutablePointer(to: &copy) { base in
       unsafe applyCaptureBinders(
         binders,
         atBase: UnsafeMutableRawPointer(base),

@@ -169,14 +169,14 @@
       address.sin_port = in_port_t(UInt16(port).bigEndian)
 
       guard
-        unsafe host.withCString({ unsafe socketInetPton(AF_INET, $0, &address.sin_addr) })
+        host.withCString({ unsafe socketInetPton(AF_INET, $0, &address.sin_addr) })
           == 1
       else {
         socketClose(fd)
         throw WebSocketTestClientError.invalidURL
       }
 
-      let result = unsafe withUnsafePointer(to: &address) { pointer in
+      let result = withUnsafePointer(to: &address) { pointer in
         unsafe socketConnect(
           fd,
           unsafe UnsafeRawPointer(pointer).assumingMemoryBound(to: sockaddr.self),
@@ -244,7 +244,7 @@
         )
 
         var buffer = [UInt8](repeating: 0, count: 4096)
-        let readCount = unsafe buffer.withUnsafeMutableBufferPointer { storage in
+        let readCount = buffer.withUnsafeMutableBufferPointer { storage in
           unsafe recv(fileDescriptor, storage.baseAddress, storage.count, 0)
         }
         if readCount > 0 {
@@ -273,7 +273,7 @@
           timeoutError: .writeTimedOut(webSocketIOTimeoutMilliseconds)
         )
 
-        let written = unsafe bytes.withUnsafeBufferPointer { storage in
+        let written = bytes.withUnsafeBufferPointer { storage in
           unsafe send(
             fileDescriptor,
             storage.baseAddress! + offset,

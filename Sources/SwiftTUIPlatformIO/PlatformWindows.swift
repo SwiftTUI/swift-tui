@@ -21,7 +21,7 @@
     // the non-variadic form. `_O_BINARY` keeps the byte stream faithful —
     // the CRT's default text mode rewrites "\n" as "\r\n".
     var descriptor: CInt = -1
-    let openError = unsafe path.withCString { cPath in
+    let openError = path.withCString { cPath in
       unsafe _sopen_s(&descriptor, cPath, flags | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE)
     }
     return openError == 0 ? descriptor : -1
@@ -52,7 +52,7 @@
   package func sceneUnlink(
     _ path: String
   ) -> Int32 {
-    unsafe path.withCString { cPath in
+    path.withCString { cPath in
       unsafe _unlink(cPath)
     }
   }
@@ -61,7 +61,7 @@
     _ path: String,
     _ mode: Int32
   ) -> Int32 {
-    unsafe path.withCString { cPath in
+    path.withCString { cPath in
       unsafe _access(cPath, mode)
     }
   }

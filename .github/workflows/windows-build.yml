@@ -88,8 +88,8 @@ jobs:
         uses: compnerd/gha-setup-swift@v0.4.0
         with:
           source: swift.org
-          swift-version: swift-6.3.3-release
-          swift-build: 6.3.3-RELEASE
+          swift-version: swift-6.4.0-release
+          swift-build: 6.4.0-RELEASE
           build_arch: ${{ matrix.arch }}
 
       - uses: actions/checkout@v4
@@ -98,9 +98,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .build
-          key: windows-${{ matrix.arch }}-swift-6.3.3-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          key: windows-${{ matrix.arch }}-swift-6.4.0-${{ hashFiles('Package.swift', 'Package.resolved') }}
           restore-keys: |
-            windows-${{ matrix.arch }}-swift-6.3.3-
+            windows-${{ matrix.arch }}-swift-6.4.0-
 
       - name: Drop cached dependency checkouts
         shell: pwsh

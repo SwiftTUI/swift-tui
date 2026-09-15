@@ -15,13 +15,14 @@
 # IMPORTANT: keep these defaults in sync with .swift-version and the
 # SWIFTLY_* / WASM_SDK_* vars at the top of Scripts/linux.sh.
 
-ARG SWIFT_VERSION=6.3.3
-FROM swift:${SWIFT_VERSION}
+ARG BASE_IMAGE=ubuntu:24.04
+FROM ${BASE_IMAGE}
 
-ARG SWIFT_VERSION=6.3.3
-ARG SWIFTLY_VERSION=1.1.3
-ARG WASM_SDK_URL=https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz
-ARG WASM_SDK_CHECKSUM=cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
+ARG SWIFT_VERSION=6.4.0
+ARG SWIFTLY_VERSION=1.1.4
+ARG BUN_VERSION=1.3.14
+ARG WASM_SDK_URL=https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz
+ARG WASM_SDK_CHECKSUM=f07b7be3c586d92d7a07051fc6d303b87ebea67eadc40640ba59d5a8b79aa86d
 ARG BUN_INSTALL=/usr/local/bun
 
 LABEL org.opencontainers.image.title="swift-tui-linux" \
@@ -39,8 +40,8 @@ ENV PATH="${BUN_INSTALL}/bin:${SWIFTLY_BIN_DIR}:${PATH}"
 # not source it through Docker's default /bin/sh.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# System dependencies. The upstream swift image ships a slim Ubuntu base, so
-# we add the tools the SwiftTUI Linux workflow and local primary-repo checks use:
+# System dependencies for the Swiftly-managed toolchain on Ubuntu 24.04,
+# plus the tools the SwiftTUI Linux workflow and local checks use:
 #   - curl/unzip:    bun installer + general fetch
 #   - libcurl dev:   Swiftly's downloaded Swift toolchains require it
 #   - ca-certificates+git: SwiftPM dependency resolution over HTTPS
@@ -57,10 +58,26 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # /var/lib/apt/lists in the same RUN so it never lands in a layer.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
+      binutils \
       ca-certificates \
       curl \
       git \
+      gnupg2 \
+      libc6-dev \
       libcurl4-openssl-dev \
+      libedit2 \
+      libgcc-13-dev \
+      libncurses-dev \
+      libncurses6 \
+      libpython3-dev \
+      libsqlite3-0 \
+      libstdc++-13-dev \
+      libxml2-dev \
+      libz3-dev \
+      pkg-config \
+      rsync \
+      tzdata \
+      zlib1g-dev \
       unzip \
       ripgrep \
       binaryen \
@@ -74,14 +91,14 @@ RUN apt-get update \
 # defaults to ~/.bun. We pin it to /usr/local/bun so it isn't shadowed when a
 # user mounts a volume at /root/.bun, and symlink the binaries into a
 # directory that's already on $PATH for any new shell.
-RUN curl -fsSL https://bun.sh/install | bash \
+RUN curl -fsSL https://bun.sh/install | bash -s -- "bun-v${BUN_VERSION}" \
  && ln -sf "${BUN_INSTALL}/bin/bun"  /usr/local/bin/bun \
  && ln -sf "${BUN_INSTALL}/bin/bunx" /usr/local/bin/bunx
 
 # Swiftly, installed before the Wasm SDK so all SwiftPM work goes through the
-# same toolchain manager used by the host-side repo workflow. The upstream
-# swift:<version> base provides enough Swift runtime support for the swiftly
-# bootstrap binary; swiftly then installs and selects the repo-pinned toolchain.
+# same toolchain manager used by the host-side repo workflow. Starting from
+# Ubuntu lets us use a Swift release as soon as its toolchain is available,
+# without waiting for the upstream Swift Docker image to be published.
 RUN swiftly_archive="swiftly-${SWIFTLY_VERSION}-$(uname -m).tar.gz" \
  && curl -fsSLO "https://download.swift.org/swiftly/linux/${swiftly_archive}" \
  && tar -zxf "${swiftly_archive}" \

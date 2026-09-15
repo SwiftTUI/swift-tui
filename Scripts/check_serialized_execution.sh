@@ -38,7 +38,9 @@ repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 # top-level test events count; a serial lane measures peak 1, a parallel lane
 # measures peak ~1600.
 measure_log() {
-  awk '
+  # Concurrent stdout/stderr writes can split a UTF-8 test-status glyph.
+  # Match the ASCII event text without asking awk to decode those bytes.
+  LC_ALL=C awk '
     /Test run /                                { next }
     / Suite /                                  { next }
     / Test case /                              { next }
@@ -132,6 +134,11 @@ Build complete! (1.23s)
 EOF
   if ! sh "$0" "$work_dir/serial.log" >/dev/null 2>&1; then
     fail "serial swift-testing log with parameterized cases should pass"
+  fi
+
+  printf '\360warning: interleaved stderr\n\237 Test splitGlyph() started.\n\377 Test splitGlyph() passed after 0.001 seconds.\n' >>"$work_dir/serial.log"
+  if ! sh "$0" "$work_dir/serial.log" >/dev/null 2>&1; then
+    fail "split UTF-8 status glyphs must preserve ASCII test events"
   fi
 
   # Parallel swift-testing log: many starts before any completion.

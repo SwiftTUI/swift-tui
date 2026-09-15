@@ -29,7 +29,7 @@
         try await pair.write(Array("hello\n".utf8))
 
         var buffer = [UInt8](repeating: 0, count: 16)
-        let n = unsafe buffer.withUnsafeMutableBufferPointer { buf in
+        let n = buffer.withUnsafeMutableBufferPointer { buf in
           unsafe read(handles.slaveFD, buf.baseAddress, buf.count)
         }
         #expect(n >= 5)

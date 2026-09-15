@@ -1768,7 +1768,7 @@ private func stripEndMarker(from line: String, marker: Character) -> String {
   }
 #else
   private func fileExists(at path: String) -> Bool {
-    unsafe path.withCString { unsafe access($0, F_OK) == 0 }
+    path.withCString { unsafe access($0, F_OK) == 0 }
   }
 
   private func isDirectory(at path: String) -> Bool {
@@ -1825,7 +1825,7 @@ private func stripEndMarker(from line: String, marker: Character) -> String {
     guard bufferCount > 0 else {
       return []
     }
-    let bytesRead = unsafe buffer.withUnsafeMutableBytes { bytes in
+    let bytesRead = buffer.withUnsafeMutableBytes { bytes in
       unsafe fread(bytes.baseAddress!, 1, bufferCount, file)
     }
 

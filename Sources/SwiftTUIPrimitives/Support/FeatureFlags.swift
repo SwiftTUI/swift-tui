@@ -235,7 +235,7 @@ package enum FeatureFlags {
   /// Reads a process environment variable. First access wins (the value is
   /// latched by each gate's `static var`), matching the prior getenv semantics.
   package static func environmentValue(named name: String) -> String? {
-    unsafe name.withCString { cName in
+    name.withCString { cName in
       #if os(Windows)
         // getenv is CRT-deprecated on Windows (C4996); _dupenv_s is the
         // conformant spelling. Success with a nil buffer means the variable

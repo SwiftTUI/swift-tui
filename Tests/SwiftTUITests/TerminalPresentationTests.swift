@@ -1824,7 +1824,7 @@ private final class PresentationMockTerminalController: TerminalControlling {
     writeDescriptor: Int32,
     chunk: [UInt8]
   ) throws {
-    try unsafe chunk.withUnsafeBytes { rawBuffer in
+    try chunk.withUnsafeBytes { rawBuffer in
       guard let baseAddress = rawBuffer.baseAddress else {
         return
       }

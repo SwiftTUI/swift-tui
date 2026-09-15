@@ -641,7 +641,7 @@ private func hexNibble(
 private func openReadOnlyFile(
   _ path: String
 ) -> Int32 {
-  unsafe path.withCString { cPath in
+  path.withCString { cPath in
     #if canImport(Darwin)
       unsafe Darwin.open(cPath, O_RDONLY)
     #elseif canImport(Glibc)

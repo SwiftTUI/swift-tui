@@ -394,8 +394,8 @@ extension MemoValueComparator {
   private static func podBytesEqual(_ lhs: Any, _ rhs: Any) -> Bool {
     func open<T>(_ lhsValue: T) -> Bool {
       guard let rhsValue = rhs as? T else { return false }
-      return unsafe withUnsafeBytes(of: lhsValue) { lhsBytes in
-        unsafe withUnsafeBytes(of: rhsValue) { rhsBytes in
+      return withUnsafeBytes(of: lhsValue) { lhsBytes in
+        withUnsafeBytes(of: rhsValue) { rhsBytes in
           unsafe lhsBytes.elementsEqual(rhsBytes)
         }
       }
@@ -410,8 +410,8 @@ extension MemoValueComparator {
   ) -> Bool {
     func open<T>(_ lhsValue: T) -> Bool {
       guard let rhsValue = rhs as? T else { return false }
-      return unsafe withUnsafePointer(to: lhsValue) { lhsPointer in
-        unsafe withUnsafePointer(to: rhsValue) { rhsPointer in
+      return withUnsafePointer(to: lhsValue) { lhsPointer in
+        withUnsafePointer(to: rhsValue) { rhsPointer in
           unsafe MemoComparisonPlanCache.fieldsEqual(
             comparators,
             UnsafeRawPointer(lhsPointer),

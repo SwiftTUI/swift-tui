@@ -73,7 +73,7 @@
 
             let n = unsafe sceneRead(STDIN_FILENO, &buffer, buffer.count)
             if n <= 0 { break }
-            _ = unsafe buffer.withUnsafeBufferPointer { buf in
+            _ = buffer.withUnsafeBufferPointer { buf in
               unsafe sceneWrite(slaveFD, buf.baseAddress!, n)
             }
           }
@@ -89,7 +89,7 @@
 
             let n = unsafe sceneRead(slaveFD, &buffer, buffer.count)
             if n <= 0 { break }
-            _ = unsafe buffer.withUnsafeBufferPointer { buf in
+            _ = buffer.withUnsafeBufferPointer { buf in
               unsafe sceneWrite(STDOUT_FILENO, buf.baseAddress!, n)
             }
           }

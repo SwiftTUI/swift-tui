@@ -13,7 +13,7 @@ for product in SwiftTUIViews SwiftTUIRuntime; do
   # JSON string quoting also handles spaces/backslashes in the local package path.
   bun -e '
     const [root, product, consumer] = process.argv.slice(1);
-    await Bun.write(`${consumer}/Package.swift`, `// swift-tools-version: 6.3
+    await Bun.write(`${consumer}/Package.swift`, `// swift-tools-version: 6.4
 import PackageDescription
 let package = Package(
   name: "ImportConsumer",

@@ -128,7 +128,7 @@ public enum RenderOnce {
   private static func ioctlTerminalWidth() -> Int? {
     #if canImport(Darwin) || canImport(Glibc) || canImport(Android)
       var size = winsize()
-      let result = unsafe withUnsafeMutablePointer(to: &size) { pointer in
+      let result = withUnsafeMutablePointer(to: &size) { pointer in
         unsafe ioctl(STDOUT_FILENO, UInt(TIOCGWINSZ), pointer)
       }
       guard result == 0, size.ws_col > 0 else { return nil }

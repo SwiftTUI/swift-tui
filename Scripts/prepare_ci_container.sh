@@ -47,7 +47,11 @@ if ! printf '%s' "$expected" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
   exit 1
 fi
 actual="$(swiftly run swift --version 2>&1 | head -n 1)"
-escaped="$(printf '%s' "$expected" | sed 's/\./\\./g')"
+# Release toolchains can print 6.4 for the exact 6.4.0 release pin.
+escaped="$(printf '%s' "${expected%.0}" | sed 's/\./\\./g')"
+if [ "$expected" != "${expected%.0}" ]; then
+  escaped="${escaped}(\\.0)?"
+fi
 if ! printf '%s' "$actual" | grep -Eq "Swift version ${escaped}([^0-9.]|$)"; then
   echo "::error::toolchain drift: .swift-version pins ${expected} but the container image runs '${actual}'. Bump the image tag in the workflow together with .swift-version (build-linux-image.yml publishes swift-<version> tags)."
   exit 1

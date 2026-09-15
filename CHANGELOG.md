@@ -8,6 +8,22 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-09-15
+
+### Changed
+
+- Require Swift 6.4 and use the 6.4.0 toolchain across native, WebAssembly,
+  and Android builds. Update strict memory-safety and concurrency annotations
+  for the new compiler (STUI-494).
+- Keep hot reload and diagnostic tooling on SwiftPM's native build engine,
+  preserving the artifact layout those tools consume.
+
+### Fixed
+
+- Preserve child-process PTY output when the child exits before the first
+  read, and install Darwin signal replay before handing off signal disposition
+  (STUI-184, STUI-185).
+
 ## [0.13.3] - 2026-09-14
 
 ### Added
@@ -1954,7 +1970,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.3...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.4...HEAD
+[0.13.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.4
 [0.13.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.3
 [0.13.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.2
 [0.12.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.12.1

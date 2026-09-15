@@ -73,7 +73,7 @@
 
     func write(_ text: String) throws {
       let bytes = Array(text.utf8)
-      let written = unsafe bytes.withUnsafeBufferPointer {
+      let written = bytes.withUnsafeBufferPointer {
         unsafe _write(output, $0.baseAddress, UInt32($0.count))
       }
       try #require(written == bytes.count)

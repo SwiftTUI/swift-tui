@@ -51,7 +51,7 @@
       }
       // Open the console input buffer directly: stdin may be a pipe under a
       // non-interactive launcher, but CONIN$ is the real record queue.
-      let coninHandle = unsafe "CONIN$".withCString(encodedAs: UTF16.self) { name in
+      let coninHandle = "CONIN$".withCString(encodedAs: UTF16.self) { name in
         unsafe CreateFileW(
           name, DWORD(GENERIC_READ) | DWORD(GENERIC_WRITE),
           DWORD(FILE_SHARE_READ) | DWORD(FILE_SHARE_WRITE),
@@ -113,7 +113,7 @@
       var consumed = 0
       for injectionCase in cases {
         var written: DWORD = 0
-        _ = unsafe injectionCase.records.withUnsafeBufferPointer { buffer in
+        _ = injectionCase.records.withUnsafeBufferPointer { buffer in
           unsafe WriteConsoleInputW(conin, buffer.baseAddress, DWORD(buffer.count), &written)
         }
 

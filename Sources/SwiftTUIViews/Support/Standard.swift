@@ -248,7 +248,7 @@ public enum Standard {
         // `internal` under InternalImportsByDefault, so it can't appear in a
         // public signature. Take a UInt16 publicly and cast at the call site
         // — every target width accepts it.
-        let fd = unsafe path.withCString { pathPointer in
+        let fd = path.withCString { pathPointer in
           unsafe systemOpen(
             pathPointer,
             appendOpenFlags(create: create),

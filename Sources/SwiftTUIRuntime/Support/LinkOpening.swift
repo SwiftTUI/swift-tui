@@ -50,7 +50,7 @@ package func openLinkInSystem(
   ) -> Bool {
     var pid = pid_t()
     var cArguments: [UnsafeMutablePointer<CChar>?] = unsafe arguments.map { argument in
-      unsafe argument.withCString { cString in
+      argument.withCString { cString in
         unsafe strdup(cString)
       }
     }
@@ -67,7 +67,7 @@ package func openLinkInSystem(
     }
 
     let environment = unsafe environ
-    let spawnResult: Int32 = unsafe cArguments.withUnsafeMutableBufferPointer { buffer in
+    let spawnResult: Int32 = cArguments.withUnsafeMutableBufferPointer { buffer in
       guard let baseAddress = buffer.baseAddress else {
         return ENOENT
       }
@@ -86,7 +86,7 @@ package func openLinkInSystem(
         )
       }
 
-      return unsafe command.withCString { commandCString in
+      return command.withCString { commandCString in
         unsafe posix_spawn(
           &pid,
           commandCString,

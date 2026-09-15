@@ -2,7 +2,7 @@
 
 **SwiftUI semantics, drawn in terminal cells.**
 
-![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)
+![Swift 6.4](https://img.shields.io/badge/Swift-6.4-F05138?logo=swift&logoColor=white)
 ![Status](https://img.shields.io/badge/status-beta-DAA520)
 ![License](https://img.shields.io/badge/license-MIT-3DA639)
 
@@ -78,14 +78,14 @@ that changed. Ctrl-C quits and restores your shell.
 
 ### Run it
 
-Any Swift 6.3+ toolchain builds and runs SwiftTUI apps from the command line on
+Any Swift 6.4+ toolchain builds and runs SwiftTUI apps from the command line on
 macOS 15+, Linux, and Windows 10 1809+ ([swiftly](https://www.swift.org/swiftly/),
 a current Xcode, or the [swift.org installer](https://www.swift.org/install/windows/)).
 Add the package, depend on its `SwiftTUI` product, and `swift run`:
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.13.3")),
+.package(url: "https://github.com/SwiftTUI/swift-tui", .upToNextMinor(from: "0.13.4")),
 // in your executable target:
 .product(name: "SwiftTUI", package: "swift-tui"),
 ```
@@ -198,7 +198,7 @@ Shipping something with SwiftTUI? Add it to
 [Projects using SwiftTUI](#projects-using-swifttui) so others can find it.
 
 Small, well-scoped issues and pull requests are easiest to review. The repo
-uses the pinned Swift 6.3.3 toolchain through `swiftly`: `swiftly run swift
+uses the pinned Swift 6.4.0 toolchain through `swiftly`: `swiftly run swift
 test` for the unit tests. Read [CONTRIBUTING.md](CONTRIBUTING.md)  
 Please join the [Discord](https://discord.gg/8j35kYDFxn) to discuss changes.
 

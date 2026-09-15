@@ -5,15 +5,15 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_BASENAME="$(basename "$REPO_DIR")"
 
-WASM_SDK_ID="${WASM_SDK_ID:-swift-6.3.3-RELEASE_wasm}"
-WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz}"
-WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7}"
-SWIFTLY_VERSION="${SWIFTLY_VERSION:-1.1.3}"
+WASM_SDK_ID="${WASM_SDK_ID:-swift-6.4.0-RELEASE_wasm}"
+WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz}"
+WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-f07b7be3c586d92d7a07051fc6d303b87ebea67eadc40640ba59d5a8b79aa86d}"
+SWIFTLY_VERSION="${SWIFTLY_VERSION:-1.1.4}"
 
 CONTAINER_TOOL=""
 # Default to the prebuilt image published by .github/workflows/build-linux-image.yml.
-# Override with LINUX_IMAGE=swift:6.3.3 (or any other base) to fall back to lazy
-# provisioning of swiftly, bun, and the Wasm SDK at runtime.
+# Override LINUX_IMAGE to use a locally built image or another Swift base.
+# Swift bases support lazy provisioning of swiftly, bun, and the Wasm SDK.
 DEFAULT_IMAGE="ghcr.io/swifttui/swift-tui-linux:latest"
 IMAGE="${LINUX_IMAGE:-$DEFAULT_IMAGE}"
 IMAGE_SLUG="$(printf '%s' "$IMAGE" | tr '/:' '--')"
@@ -48,7 +48,7 @@ LINUX_SWIFT_SCRATCH_DIR="${LINUX_SWIFT_SCRATCH_DIR:-$CONTAINER_DIR/.build-linux}
 LINUX_IMAGE_DOCKERFILE="${LINUX_IMAGE_DOCKERFILE:-$SCRIPT_DIR/linux/Dockerfile}"
 LINUX_IMAGE_CONTEXT="${LINUX_IMAGE_CONTEXT:-$SCRIPT_DIR/linux}"
 LINUX_IMAGE_BUILD_TAG="${LINUX_IMAGE_BUILD_TAG:-$IMAGE}"
-LINUX_SWIFT_VERSION="${LINUX_SWIFT_VERSION:-6.3.3}"
+LINUX_SWIFT_VERSION="${LINUX_SWIFT_VERSION:-6.4.0}"
 
 usage() {
   cat <<EOF
@@ -82,9 +82,9 @@ Repo-aware:
 Environment:
   LINUX_CONTAINER_TOOL  Force docker or podman
   LINUX_IMAGE           Override the image (default: $IMAGE)
-                       Set to e.g. swift:6.3.3 to fall back to the upstream
-                       Swift base image; swiftly, bun, and the Wasm SDK will be
-                       installed lazily on first use.
+                       Set to a locally built tag when GHCR is unavailable.
+                       Upstream Swift base images also support lazy installation
+                       of swiftly, bun, and the Wasm SDK on first use.
   LINUX_PLATFORM        Platform passed to docker/podman pull/create/build
                        (default: ${PLATFORM:-<unset>})
                        Unset by default so Docker uses the host-native

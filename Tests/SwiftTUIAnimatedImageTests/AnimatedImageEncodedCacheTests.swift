@@ -44,8 +44,8 @@ struct AnimatedImageEncodedCacheTests {
     // Same storage instance proves the second read was a cache hit rather
     // than a fresh encode (equal values could come from either).
     #expect(
-      unsafe first.withUnsafeBufferPointer { firstBuffer in
-        unsafe second.withUnsafeBufferPointer { secondBuffer in
+      first.withUnsafeBufferPointer { firstBuffer in
+        second.withUnsafeBufferPointer { secondBuffer in
           unsafe firstBuffer.baseAddress == secondBuffer.baseAddress
         }
       }

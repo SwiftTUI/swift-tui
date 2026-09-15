@@ -148,7 +148,7 @@ extension InputReader {
             await operation()
           }
         }
-      ) { continuation in
+      ) { [self] continuation in
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode,
           currentMouseCoordinateMode: { [weak self] in
@@ -242,7 +242,7 @@ extension InputReader {
             await operation()
           }
         }
-      ) { continuation in
+      ) { [self] continuation in
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
           currentMouseCoordinateMode: { [weak self] in
@@ -308,7 +308,7 @@ extension InputReader {
             await operation()
           }
         }
-      ) { continuation in
+      ) { [self] continuation in
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode,
           currentMouseCoordinateMode: { [weak self] in
@@ -402,7 +402,7 @@ extension InputReader {
             await operation()
           }
         }
-      ) { continuation in
+      ) { [self] continuation in
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
           currentMouseCoordinateMode: { [weak self] in
@@ -466,7 +466,7 @@ extension InputReader {
     }
   #else
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
-      makeManagedAsyncStream { continuation in
+      makeManagedAsyncStream { [self] continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
         let controlChannelEnabled = self.controlChannelEnabled
@@ -613,7 +613,7 @@ extension InputReader {
       transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event],
       flushTransform: @escaping @Sendable (inout TerminalInputParser) -> [Event]
     ) -> AsyncStream<Event> {
-      makeManagedAsyncStream { continuation in
+      makeManagedAsyncStream { [self] continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
         let controlChannelEnabled = self.controlChannelEnabled

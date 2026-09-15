@@ -162,7 +162,7 @@ import SwiftTUICore
             chunkEnd = min(offset + 8192, bytes.count)
           }
         }
-        let written: Int = try unsafe bytes.withUnsafeBytes { rawBuffer in
+        let written: Int = try bytes.withUnsafeBytes { rawBuffer in
           guard let base = rawBuffer.baseAddress else { return 0 }
           var chunkWritten: DWORD = 0
           let ok = unsafe WriteFile(
@@ -221,7 +221,7 @@ import SwiftTUICore
 
       var records = [INPUT_RECORD](repeating: INPUT_RECORD(), count: 128)
       var recordCount: DWORD = 0
-      let ok = unsafe records.withUnsafeMutableBufferPointer { buffer in
+      let ok = records.withUnsafeMutableBufferPointer { buffer in
         unsafe ReadConsoleInputW(handle, buffer.baseAddress, DWORD(buffer.count), &recordCount)
       }
       guard ok else { return [] }

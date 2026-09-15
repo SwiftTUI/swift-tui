@@ -54,7 +54,7 @@ concurrency:
 
 env:
   BUN_VERSION: "1.3.14"
-  SWIFTLY_VERSION: "1.1.3"
+  SWIFTLY_VERSION: "1.1.4"
 
 jobs:
   public-api-baseline:

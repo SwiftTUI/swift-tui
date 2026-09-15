@@ -267,7 +267,7 @@
   }
 
   private func duplicateCString(_ string: String) -> UnsafeMutablePointer<CChar>? {
-    unsafe string.withCString { cString in
+    string.withCString { cString in
       unsafe strdup(cString)
     }
   }

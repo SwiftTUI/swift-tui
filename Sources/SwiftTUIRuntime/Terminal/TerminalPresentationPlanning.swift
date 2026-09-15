@@ -508,8 +508,8 @@ struct TerminalPresentationPlanner {
     guard !currentRow.isEmpty else {
       return true
     }
-    return unsafe currentRow.withUnsafeBufferPointer { current in
-      unsafe previousRow.withUnsafeBufferPointer { previous in
+    return currentRow.withUnsafeBufferPointer { current in
+      previousRow.withUnsafeBufferPointer { previous in
         unsafe current.baseAddress == previous.baseAddress
       }
     }

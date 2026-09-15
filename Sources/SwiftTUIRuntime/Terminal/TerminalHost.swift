@@ -783,7 +783,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       try writeLock.withLock { _ in
         var written = 0
         while written < bytes.count {
-          let result = unsafe bytes.withUnsafeBytes { rawBuffer in
+          let result = bytes.withUnsafeBytes { rawBuffer in
             let baseAddress = unsafe rawBuffer.baseAddress?.advanced(by: written)
             return unsafe terminalPlatformWrite(
               outputFD,
@@ -923,7 +923,7 @@ package func currentProcessEnvironment() -> [String: String] {
   private func environmentValue(
     named key: String
   ) -> String? {
-    unsafe key.withCString { cKey in
+    key.withCString { cKey in
       guard let rawValue = unsafe getenv(cKey) else {
         return nil
       }

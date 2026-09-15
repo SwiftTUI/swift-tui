@@ -5,7 +5,7 @@ state in the running process.
 
 ## Run the driver
 
-`swifttui-dev` supports debug terminal apps on macOS and Linux with Swift 6.3.3
+`swifttui-dev` supports debug terminal apps on macOS and Linux with Swift 6.4.0
 managed by Swiftly. Build the executable from this package, then point it at a
 Swift package containing one executable target:
 

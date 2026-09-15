@@ -119,7 +119,7 @@
       contract = try contractSnapshot()
       dependencies = try dependencySnapshot()
       message("Building \(options.product). During the session, follow compiler diagnostics at \(spool.path)/diagnostics.log")
-      _ = try await swift(["build", "-c", "debug", "--product", options.product,
+      _ = try await swift(["build", "--build-system", "native", "-c", "debug", "--product", options.product,
         "-Xswiftc", "-DSWIFTTUI_HOT_RELOAD",
         "-Xlinker", scalarObject.path, "-Xlinker", exportFlag])
       try validateBuildInputs()
@@ -317,7 +317,7 @@
         node.dependencies.flatMap { [URL(fileURLWithPath: $0.path)] + paths($0) }
       }
       dependencyDirectories = Array(Set(paths(root))).sorted { $0.path < $1.path }
-      let path = try await swift(["build", "-c", "debug", "--show-bin-path"])
+      let path = try await swift(["build", "--build-system", "native", "-c", "debug", "--show-bin-path"])
         .trimmingCharacters(in: .whitespacesAndNewlines)
       binaryDirectory = URL(fileURLWithPath: path)
     }

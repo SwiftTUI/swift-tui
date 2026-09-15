@@ -1,7 +1,7 @@
 import SwiftTUICore
 import SwiftTUIViews
 
-extension RunLoop: AccessibilityAnnouncementSink {
+extension RunLoop {
   package func announceAccessibility(_ announcement: AccessibilityAnnouncement) {
     guard publishesAccessibilityAnnouncements else {
       return

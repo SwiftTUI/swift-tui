@@ -281,9 +281,9 @@ struct SoundnessFailureChannelTests {
       // value removes the variable.
       _ = unsafe _putenv_s(name, value ?? "")
     #else
-      unsafe name.withCString { namePointer in
+      name.withCString { namePointer in
         if let value {
-          unsafe value.withCString { valuePointer in
+          value.withCString { valuePointer in
             _ = unsafe setenv(namePointer, valuePointer, 1)
           }
         } else {

@@ -177,7 +177,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     container:
       # Tracks .swift-version — bump together. See the header comment.
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
       # The step watchdog's hang diagnostics attach gdb to a process that is
       # not its descendant; yama ptrace_scope=1 refuses that without the
       # capability, and the default container capability set omits it.
@@ -273,7 +273,7 @@ jobs:
     name: Runtime shard ${{ matrix.shard }} (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     container:
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
       options: --cap-add=SYS_PTRACE
     timeout-minutes: 30
     strategy:
@@ -373,7 +373,7 @@ jobs:
     name: wasm32-wasi cross-compile
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
     timeout-minutes: 20
 
     steps:

@@ -199,7 +199,7 @@ Runs the exhaustive checked-in repo verification surface:
   - Tools/TermUIPerf tests
 
 The script also checks required environment dependencies up front:
-  - Swift 6.3.x via `swiftly`
+  - Swift 6.4.x via `swiftly`
   - Bun availability
   - Bun workspace dependencies via `bun install --frozen-lockfile` at the repo root
 
@@ -293,7 +293,7 @@ derive_failure_count() {
   fi
 
   count=$(
-    awk '
+    LC_ALL=C awk '
       function first_number(text) {
         if (match(text, /[0-9]+/)) {
           return substr(text, RSTART, RLENGTH)
@@ -405,6 +405,16 @@ if [ "$lane" = runtime ]; then
 fi
 
 run_swift() {
+  # Trace audits and hot-reload tooling consume SwiftPM's native artifact layout.
+  # Swift 6.4 defaults to Swift Build, which uses a different layout.
+  case "${1:-}" in
+  build | test | run)
+    swift_subcommand=$1
+    shift
+    set -- "$swift_subcommand" --build-system native "$@"
+    ;;
+  esac
+
   # Opt-in test-run modifiers, composed onto any `swift test` invocation. Both
   # default off, so the gate's behaviour is unchanged unless an operator sets
   # them deliberately (e.g. to bisect a load-sensitive flake such as the
@@ -708,12 +718,12 @@ check_swift_environment() {
   echo "$version_output"
 
   case "$version_output" in
-  *"Swift version 6.3"* | *"Apple Swift version 6.3"*)
+  *"Swift version 6.4"* | *"Apple Swift version 6.4"*)
     return 0
     ;;
   *)
     >&2 echo ""
-    >&2 echo "Expected Swift 6.3.x for this repository."
+    >&2 echo "Expected Swift 6.4.x for this repository."
     >&2 echo "Use 'swiftly run swift ...' for repo-local package builds and tests."
     return 1
     ;;

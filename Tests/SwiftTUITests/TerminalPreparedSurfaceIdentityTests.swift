@@ -29,8 +29,8 @@ struct TerminalPreparedSurfaceIdentityTests {
 
     #expect(prepared.cells.count == surface.cells.count)
     for row in surface.cells.indices {
-      let sharesStorage = unsafe surface.cells[row].withUnsafeBufferPointer { original in
-        unsafe prepared.cells[row].withUnsafeBufferPointer { preparedRow in
+      let sharesStorage = surface.cells[row].withUnsafeBufferPointer { original in
+        prepared.cells[row].withUnsafeBufferPointer { preparedRow in
           unsafe original.baseAddress == preparedRow.baseAddress
         }
       }

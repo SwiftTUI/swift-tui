@@ -5127,7 +5127,7 @@ private func writeAllBytes(
 ) throws {
   var totalBytesWritten = 0
 
-  try unsafe bytes.withUnsafeBytes { rawBuffer in
+  try bytes.withUnsafeBytes { rawBuffer in
     guard let baseAddress = rawBuffer.baseAddress else {
       return
     }

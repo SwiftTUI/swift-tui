@@ -21,7 +21,7 @@
   package func webSurfaceOpenRead(
     _ path: String
   ) -> Int32 {
-    unsafe path.withCString { pathPointer in
+    path.withCString { pathPointer in
       unsafe Darwin.open(pathPointer, O_RDONLY)
     }
   }
@@ -51,7 +51,7 @@
   package func webSurfaceOpenRead(
     _ path: String
   ) -> Int32 {
-    unsafe path.withCString { pathPointer in
+    path.withCString { pathPointer in
       unsafe Android.open(pathPointer, Android.O_RDONLY)
     }
   }
@@ -81,7 +81,7 @@
   package func webSurfaceOpenRead(
     _ path: String
   ) -> Int32 {
-    unsafe path.withCString { pathPointer in
+    path.withCString { pathPointer in
       unsafe Musl.open(pathPointer, Musl.O_RDONLY)
     }
   }
@@ -111,7 +111,7 @@
   package func webSurfaceOpenRead(
     _ path: String
   ) -> Int32 {
-    unsafe path.withCString { pathPointer in
+    path.withCString { pathPointer in
       unsafe Glibc.open(pathPointer, Glibc.O_RDONLY)
     }
   }
@@ -141,7 +141,7 @@
   package func webSurfaceOpenRead(
     _ path: String
   ) -> Int32 {
-    unsafe path.withCString { pathPointer in
+    path.withCString { pathPointer in
       var descriptor: CInt = -1
       _ = unsafe _sopen_s(&descriptor, pathPointer, _O_RDONLY | _O_BINARY, _SH_DENYNO, 0)
       return descriptor
@@ -173,7 +173,7 @@
   package func webSurfaceOpenRead(
     _ path: String
   ) -> Int32 {
-    unsafe path.withCString { pathPointer in
+    path.withCString { pathPointer in
       unsafe WASILibc.open(pathPointer, WASILibc.O_RDONLY)
     }
   }

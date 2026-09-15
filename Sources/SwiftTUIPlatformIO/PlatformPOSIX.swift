@@ -37,7 +37,7 @@
   package func sceneOpenDirectory(
     _ path: String
   ) -> SceneDirectoryHandle? {
-    unsafe path.withCString { cPath in
+    path.withCString { cPath in
       unsafe opendir(cPath)
     }
   }
@@ -60,7 +60,7 @@
   package func sceneUnlink(
     _ path: String
   ) -> Int32 {
-    unsafe path.withCString { cPath in
+    path.withCString { cPath in
       unsafe unlink(cPath)
     }
   }
@@ -77,7 +77,7 @@
     _ path: String,
     _ flags: Int32
   ) -> Int32 {
-    let fileDescriptor = unsafe path.withCString { cPath in
+    let fileDescriptor = path.withCString { cPath in
       unsafe open(cPath, flags)
     }
     sceneConfigureNoSigPipe(fileDescriptor)
@@ -120,7 +120,7 @@
     _ path: String,
     _ mode: Int32
   ) -> Int32 {
-    unsafe path.withCString { cPath in
+    path.withCString { cPath in
       unsafe access(cPath, mode)
     }
   }
@@ -133,8 +133,8 @@
     address.sun_family = sa_family_t(AF_UNIX)
 
     let sunPathSize = MemoryLayout.size(ofValue: address.sun_path)
-    unsafe withUnsafeMutablePointer(to: &address.sun_path) { pointer in
-      unsafe path.withCString { cPath in
+    withUnsafeMutablePointer(to: &address.sun_path) { pointer in
+      path.withCString { cPath in
         _ = unsafe strncpy(
           unsafe UnsafeMutableRawPointer(pointer).assumingMemoryBound(to: CChar.self),
           cPath,
@@ -151,7 +151,7 @@
     _ fileDescriptor: Int32,
     _ address: inout sockaddr_un
   ) -> Int32 {
-    unsafe withUnsafePointer(to: &address) { pointer in
+    withUnsafePointer(to: &address) { pointer in
       unsafe bind(
         fileDescriptor,
         unsafe UnsafeRawPointer(pointer).assumingMemoryBound(to: sockaddr.self),
@@ -165,7 +165,7 @@
     _ fileDescriptor: Int32,
     _ address: inout sockaddr_un
   ) -> Int32 {
-    unsafe withUnsafePointer(to: &address) { pointer in
+    withUnsafePointer(to: &address) { pointer in
       unsafe connect(
         fileDescriptor,
         unsafe UnsafeRawPointer(pointer).assumingMemoryBound(to: sockaddr.self),

@@ -62,7 +62,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$modules_dir" ]; then
-  host_bin_path=$(swiftly run swift build --show-bin-path 2>/dev/null || true)
+  host_bin_path=$(swiftly run swift build --build-system native --show-bin-path 2>/dev/null || true)
   if [ -n "$host_bin_path" ] && [ -d "$host_bin_path/Modules" ]; then
     modules_dir="$host_bin_path/Modules"
   else

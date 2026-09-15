@@ -767,7 +767,7 @@ extension DynamicPropertyFieldShim: DynamicPropertyFieldUpdating where T: Dynami
     guard var copy = property as? T else {
       return (.uncertified, false)
     }
-    return unsafe withUnsafeMutablePointer(to: &copy) { pointer in
+    return withUnsafeMutablePointer(to: &copy) { pointer in
       // Snapshot and compare at the SAME address: a value-witness copy into a
       // second buffer leaves padding indeterminate, which would make the
       // comparison report phantom mutations.
@@ -855,13 +855,13 @@ private func withMutableConcreteValue<V>(
 ) -> DynamicPropertyUpdateResult {
   let concreteType = type(of: value)
   if V.self == concreteType {
-    return unsafe withUnsafeMutablePointer(to: &value) { pointer in
+    return withUnsafeMutablePointer(to: &value) { pointer in
       unsafe body(UnsafeMutableRawPointer(pointer), concreteType)
     }
   }
   func open<P>(_ opened: P) -> (Any, DynamicPropertyUpdateResult) {
     var copy = opened
-    let result = unsafe withUnsafeMutablePointer(to: &copy) { pointer in
+    let result = withUnsafeMutablePointer(to: &copy) { pointer in
       unsafe body(UnsafeMutableRawPointer(pointer), P.self)
     }
     return (copy, result)

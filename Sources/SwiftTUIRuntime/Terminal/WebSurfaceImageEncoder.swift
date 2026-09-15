@@ -217,7 +217,7 @@ func imageContentReadFileBytes(
   var buffer = [UInt8](repeating: 0, count: 8 * 1024)
   let bufferCount = buffer.count
   while true {
-    let readCount = unsafe buffer.withUnsafeMutableBytes { rawBuffer in
+    let readCount = buffer.withUnsafeMutableBytes { rawBuffer in
       unsafe webSurfaceRead(
         fileDescriptor,
         rawBuffer.baseAddress,

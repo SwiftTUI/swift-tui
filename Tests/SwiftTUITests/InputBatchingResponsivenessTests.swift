@@ -158,7 +158,7 @@
     @Test("dispatch-source InputReader yields scroll events fed through a pipe")
     func dispatchSourceReaderYieldsScrollEventsFromPipe() async throws {
       var pipeFDs: [Int32] = [0, 0]
-      let pipeResult = unsafe pipeFDs.withUnsafeMutableBufferPointer { buffer in
+      let pipeResult = pipeFDs.withUnsafeMutableBufferPointer { buffer in
         unsafe pipe(buffer.baseAddress!)
       }
       try #require(pipeResult == 0)
@@ -184,7 +184,7 @@
       let inputEvents = reader.inputEvents()
 
       let scrollEventBytes: [UInt8] = Array("\u{1B}[<64;5;5M".utf8)
-      let bytesWritten = unsafe scrollEventBytes.withUnsafeBufferPointer { buffer in
+      let bytesWritten = scrollEventBytes.withUnsafeBufferPointer { buffer in
         unsafe write(writeEnd, buffer.baseAddress, buffer.count)
       }
       #expect(bytesWritten == scrollEventBytes.count)
@@ -264,7 +264,7 @@
 
   private func makeNonblockingPipe() throws -> (readEnd: Int32, writeEnd: Int32) {
     var pipeFDs: [Int32] = [0, 0]
-    let pipeResult = unsafe pipeFDs.withUnsafeMutableBufferPointer { buffer in
+    let pipeResult = pipeFDs.withUnsafeMutableBufferPointer { buffer in
       unsafe pipe(buffer.baseAddress!)
     }
     try #require(pipeResult == 0)
@@ -281,7 +281,7 @@
     _ bytes: [UInt8],
     to fileDescriptor: Int32
   ) throws {
-    try unsafe bytes.withUnsafeBufferPointer { buffer in
+    try bytes.withUnsafeBufferPointer { buffer in
       var written = 0
       while written < bytes.count {
         let result = unsafe write(

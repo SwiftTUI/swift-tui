@@ -119,7 +119,7 @@ package enum DebugLogRouter {
       // the non-variadic form. `_O_BINARY` keeps appended bytes faithful —
       // the CRT's default text mode rewrites "\n" as "\r\n" on every `_write`.
       var descriptor: CInt = -1
-      let openError = unsafe path.withCString { pathPointer in
+      let openError = path.withCString { pathPointer in
         unsafe _sopen_s(
           &descriptor,
           pathPointer,
@@ -152,7 +152,7 @@ package enum DebugLogRouter {
         return true
       }
     #else
-      let descriptor = unsafe path.withCString { pathPointer in
+      let descriptor = path.withCString { pathPointer in
         unsafe open(pathPointer, O_WRONLY | O_CREAT | O_APPEND, 0o644)
       }
       guard descriptor >= 0 else {
@@ -194,7 +194,7 @@ package enum DebugLogRouter {
         _ = unsafe write(STDERR_FILENO, base, buffer.count)
       }
     #elseif canImport(WASILibc) || canImport(ucrt)
-      unsafe message.withCString { cMessage in
+      message.withCString { cMessage in
         _ = unsafe fputs(cMessage, stderr)
       }
     #endif
@@ -223,7 +223,7 @@ package enum DebugLogRouter {
             continue
           }
         #endif
-        let result = unsafe partial.withCString { pathPointer in
+        let result = partial.withCString { pathPointer in
           #if canImport(ucrt)
             unsafe _mkdir(pathPointer)
           #else

@@ -3,7 +3,7 @@ import SwiftTUIViews
 
 @MainActor
 /// Drives an interactive terminal session for a state-backed view tree.
-public final class RunLoop<State: Equatable & Sendable, Content: View> {
+public final class RunLoop<State: Equatable & Sendable, Content: View>: AccessibilityAnnouncementSink {
   package let rootIdentity: Identity
   package let renderer: DefaultRenderer
   package var hotReloadSession: HotReloadSession?

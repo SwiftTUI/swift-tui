@@ -160,7 +160,7 @@
             Int(swift_tui_android_copy_latest_frame(handle, nil, 0))
           } else {
             Int(
-              unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+              bytes.withUnsafeMutableBufferPointer { buffer in
                 unsafe swift_tui_android_copy_latest_frame(
                   handle,
                   buffer.baseAddress,

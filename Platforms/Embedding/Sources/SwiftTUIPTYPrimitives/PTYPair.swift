@@ -65,7 +65,7 @@
 
       var offset = 0
       while offset < bytes.count {
-        let written = unsafe bytes.withUnsafeBufferPointer { buffer -> Int in
+        let written = bytes.withUnsafeBufferPointer { buffer -> Int in
           guard let baseAddress = buffer.baseAddress else {
             return 0
           }
@@ -183,7 +183,7 @@
 
       var buffer = [UInt8](repeating: 0, count: 4096)
       while true {
-        let readCount = unsafe buffer.withUnsafeMutableBufferPointer { storage -> Int in
+        let readCount = buffer.withUnsafeMutableBufferPointer { storage -> Int in
           guard let baseAddress = storage.baseAddress else {
             return 0
           }

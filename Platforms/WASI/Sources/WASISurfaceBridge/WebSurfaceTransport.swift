@@ -224,7 +224,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     try writeLock.withLock { _ in
       var written = 0
       while written < bytes.count {
-        let result = unsafe bytes.withUnsafeBytes { rawBuffer in
+        let result = bytes.withUnsafeBytes { rawBuffer in
           let baseAddress = unsafe rawBuffer.baseAddress?.advanced(by: written)
           return unsafe webSurfaceWrite(
             outputFileDescriptor,

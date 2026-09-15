@@ -65,7 +65,7 @@
 
   private func ttyName(_ fd: Int32) -> String? {
     var buffer = [CChar](repeating: 0, count: 4096)
-    let result = unsafe buffer.withUnsafeMutableBufferPointer { storage in
+    let result = buffer.withUnsafeMutableBufferPointer { storage in
       guard let baseAddress = storage.baseAddress else {
         return ERANGE
       }
@@ -77,7 +77,7 @@
       return nil
     }
 
-    return unsafe buffer.withUnsafeBufferPointer { storage in
+    return buffer.withUnsafeBufferPointer { storage in
       guard let baseAddress = storage.baseAddress else {
         return nil
       }

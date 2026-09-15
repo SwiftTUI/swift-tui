@@ -33,7 +33,8 @@ set -eu
 # (`Test Case '-[M.C t]' passed (1.2 seconds)`). Suite and run-level lines
 # are excluded; parameterized `Test case` lines never carry a duration.
 list_durations() {
-  awk '
+  # Test-status glyphs can be split by concurrent stderr writes.
+  LC_ALL=C awk '
     /Test run /      { next }
     / Suite /        { next }
     / Test case /    { next }
@@ -141,6 +142,11 @@ Build complete! (1.23s)
 LOG
   if ! sh "$0" "$work_dir/fast.log" 20 10 >/dev/null 2>&1; then
     fail "log with every test under the bounds should pass"
+  fi
+
+  printf '\360warning: interleaved stderr\n\237 Test splitGlyph() passed after 0.001 seconds.\n' >>"$work_dir/fast.log"
+  if ! sh "$0" "$work_dir/fast.log" 20 10 >/dev/null 2>&1; then
+    fail "split UTF-8 status glyphs must preserve ASCII duration events"
   fi
 
   cat >"$work_dir/warn.log" <<'LOG'

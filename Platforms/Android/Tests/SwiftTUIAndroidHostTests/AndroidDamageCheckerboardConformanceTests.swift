@@ -126,7 +126,7 @@
       throw HostWireConformanceError.invalid("D15 checkerboard size query returned no record")
     }
     var bytes = [UInt8](repeating: 0, count: Int(required))
-    let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+    let copied = bytes.withUnsafeMutableBufferPointer { buffer in
       unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
     }
     guard copied == required else {

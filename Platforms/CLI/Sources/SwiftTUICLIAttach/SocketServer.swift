@@ -262,7 +262,7 @@
       var current = ""
       for component in components {
         current += "/\(component)"
-        _ = unsafe current.withCString { cPath in
+        _ = current.withCString { cPath in
           unsafe mkdir(cPath, 0o755)
         }
       }
@@ -316,7 +316,7 @@
         encoded = "ERR \(error)\n"
       }
 
-      unsafe encoded.withCString { cstr in
+      encoded.withCString { cstr in
         let byteCount = unsafe strlen(cstr)
         _ = unsafe sceneWrite(fd, cstr, byteCount)
       }

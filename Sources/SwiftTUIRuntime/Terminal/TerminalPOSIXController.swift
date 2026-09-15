@@ -146,7 +146,7 @@ import SwiftTUICore
       let bytes = Array(output.utf8)
       let totalBytes = bytes.count
 
-      try unsafe bytes.withUnsafeBytes { rawBuffer in
+      try bytes.withUnsafeBytes { rawBuffer in
         guard let baseAddress = rawBuffer.baseAddress else {
           return
         }

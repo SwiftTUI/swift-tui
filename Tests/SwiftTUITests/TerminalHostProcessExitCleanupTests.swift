@@ -215,7 +215,7 @@
     var buffer = [UInt8](repeating: 0, count: 256)
 
     while true {
-      let count = unsafe buffer.withUnsafeMutableBytes { rawBuffer in
+      let count = buffer.withUnsafeMutableBytes { rawBuffer in
         unsafe read(
           fileDescriptor,
           rawBuffer.baseAddress,

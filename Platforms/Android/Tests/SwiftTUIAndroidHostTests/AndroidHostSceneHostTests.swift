@@ -72,7 +72,7 @@
     }
 
     let declaration = Array("{\"acceptsDeltaFrames\":true}".utf8)
-    let accepted = unsafe declaration.withUnsafeBufferPointer { buffer in
+    let accepted = declaration.withUnsafeBufferPointer { buffer in
       unsafe swift_tui_android_declare_capabilities(
         handle, buffer.baseAddress, Int32(buffer.count))
     }
@@ -105,7 +105,7 @@
       let required = swift_tui_android_copy_latest_frame(handle, nil, 0)
       #expect(required > 0)
       var bytes = [UInt8](repeating: 0, count: Int(required))
-      let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+      let copied = bytes.withUnsafeMutableBufferPointer { buffer in
         unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
       }
       #expect(copied == required)
@@ -117,7 +117,7 @@
     #expect(host.consumedFrameEncodeCount == 1)
 
     let malformed = Array(#"{"scope":"future"}"#.utf8)
-    let rejected = unsafe malformed.withUnsafeBufferPointer { buffer in
+    let rejected = malformed.withUnsafeBufferPointer { buffer in
       unsafe swift_tui_android_request_resync(
         handle, buffer.baseAddress, Int32(buffer.count))
     }
@@ -125,7 +125,7 @@
     #expect(host.consumedFrameEncodeCount == 1)
 
     let request = Array(#"{"scope":"keyframe"}"#.utf8)
-    let accepted = unsafe request.withUnsafeBufferPointer { buffer in
+    let accepted = request.withUnsafeBufferPointer { buffer in
       unsafe swift_tui_android_request_resync(
         handle, buffer.baseAddress, Int32(buffer.count))
     }
@@ -167,7 +167,7 @@
     #expect(host.consumedFrameEncodeCount == 1)
 
     var bytes = [UInt8](repeating: 0, count: Int(required))
-    let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+    let copied = bytes.withUnsafeMutableBufferPointer { buffer in
       unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
     }
     #expect(copied == required)
@@ -207,7 +207,7 @@
     let required = swift_tui_android_copy_latest_frame(handle, nil, 0)
     #expect(required > 0)
     var bytes = [UInt8](repeating: 0, count: Int(required))
-    let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+    let copied = bytes.withUnsafeMutableBufferPointer { buffer in
       unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
     }
     #expect(copied == required)
@@ -268,7 +268,7 @@
       let required = swift_tui_android_copy_latest_frame(handle, nil, 0)
       #expect(required > 0)
       var bytes = [UInt8](repeating: 0, count: Int(required))
-      let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+      let copied = bytes.withUnsafeMutableBufferPointer { buffer in
         unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
       }
       #expect(copied == required)
@@ -338,7 +338,7 @@
       let required = swift_tui_android_copy_latest_frame(handle, nil, 0)
       #expect(required > 0)
       var bytes = [UInt8](repeating: 0, count: Int(required))
-      let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+      let copied = bytes.withUnsafeMutableBufferPointer { buffer in
         unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
       }
       #expect(copied == required)
@@ -403,7 +403,7 @@
     #expect(required > 0)
 
     var bytes = [UInt8](repeating: 0, count: Int(required))
-    let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+    let copied = bytes.withUnsafeMutableBufferPointer { buffer in
       unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
     }
 
@@ -475,7 +475,7 @@
     #expect(required > 0)
 
     var bytes = [UInt8](repeating: 0, count: Int(required))
-    let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+    let copied = bytes.withUnsafeMutableBufferPointer { buffer in
       unsafe swift_tui_android_copy_latest_frame(handle, buffer.baseAddress, required)
     }
 
@@ -503,7 +503,7 @@
     #expect(required == expected.count)
 
     var bytes = [UInt8](repeating: 0, count: required)
-    let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+    let copied = bytes.withUnsafeMutableBufferPointer { buffer in
       unsafe host.copyPendingClipboardText(to: buffer.baseAddress, capacity: required)
     }
     #expect(copied == required)
@@ -522,7 +522,7 @@
 
     // An undersized buffer is a size query and must not drain.
     var tooSmall = [UInt8](repeating: 0, count: 1)
-    let stillNeeded = unsafe tooSmall.withUnsafeMutableBufferPointer { buffer in
+    let stillNeeded = tooSmall.withUnsafeMutableBufferPointer { buffer in
       unsafe host.copyPendingClipboardText(to: buffer.baseAddress, capacity: 1)
     }
     #expect(stillNeeded == expected.count)
@@ -545,7 +545,7 @@
     #expect(required == Int32(expected.count))
 
     var bytes = [UInt8](repeating: 0, count: Int(required))
-    let copied = unsafe bytes.withUnsafeMutableBufferPointer { buffer in
+    let copied = bytes.withUnsafeMutableBufferPointer { buffer in
       unsafe swift_tui_android_copy_clipboard_text(handle, buffer.baseAddress, required)
     }
     #expect(copied == required)

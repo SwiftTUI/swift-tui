@@ -96,7 +96,7 @@ jobs:
     container:
       # Tracks .swift-version — bump together (Scripts/prepare_ci_container.sh
       # fails loud on drift).
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
       # The step watchdog's hang diagnostics attach gdb to a process that is
       # not its descendant; yama ptrace_scope=1 refuses that without the
       # capability, and the default container capability set omits it.
@@ -186,7 +186,7 @@ jobs:
     name: Actor data-race checks variant
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/swifttui/swift-tui-linux:swift-6.3.3
+      image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
       options: --cap-add=SYS_PTRACE
     needs: changes
     if: needs.changes.outputs.changed == 'true' && (github.event_name != 'workflow_dispatch' || inputs.run_race_checks)

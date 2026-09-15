@@ -39,7 +39,7 @@
       guard spoolPath.hasPrefix("/"), !spoolPath.utf8.contains(0) else {
         throw HotReloadLoadError("Reload spool must be an absolute path")
       }
-      let fd = unsafe spoolPath.withCString { unsafe open($0, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) }
+      let fd = spoolPath.withCString { unsafe open($0, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) }
       guard fd >= 0 else { throw HotReloadLoadError("Cannot open reload spool") }
       var info = stat()
       guard unsafe fstat(fd, &info) == 0, info.st_uid == getuid(),
@@ -76,14 +76,14 @@
       guard unsafe fstat(directory, &info) == 0, info.st_uid == getuid(), info.st_mode & 0o777 == 0o700 else {
         throw HotReloadLoadError("Reload spool permissions changed; restart swifttui-dev")
       }
-      let manifest = unsafe "pending".withCString {
+      let manifest = "pending".withCString {
         unsafe openat(directory, $0, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
       }
       if manifest < 0, errno == ENOENT { return nil }
       guard manifest >= 0 else { throw HotReloadLoadError("Cannot open pending reload manifest") }
       defer {
         _ = close(manifest)
-        _ = unsafe "pending".withCString { unsafe unlinkat(directory, $0, 0) }
+        _ = "pending".withCString { unsafe unlinkat(directory, $0, 0) }
       }
       let text = try readSmallFile(manifest, maximumBytes: 4096)
       let fields = text.split(separator: "\n", omittingEmptySubsequences: false)
@@ -94,11 +94,11 @@
       pendingSequence = sequence
       lastSequence = sequence
       let name = String(fields[2])
-      defer { _ = unsafe name.withCString { unsafe unlinkat(directory, $0, 0) } }
+      defer { _ = name.withCString { unsafe unlinkat(directory, $0, 0) } }
       guard imageCount < HotReloadABI.maximumImages else {
         throw HotReloadLoadError("100 image limit reached; restart swifttui-dev")
       }
-      let imageFD = unsafe name.withCString {
+      let imageFD = name.withCString {
         unsafe openat(directory, $0, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
       }
       guard imageFD >= 0 else { throw HotReloadLoadError("Cannot open reload image") }
@@ -109,7 +109,7 @@
       #else
         let flags = RTLD_NOW | RTLD_LOCAL
       #endif
-      guard let handle = unsafe (spoolPath + "/" + name).withCString({ unsafe dlopen($0, flags) }) else {
+      guard let handle = (spoolPath + "/" + name).withCString({ unsafe dlopen($0, flags) }) else {
         let detail = unsafe dlerror().map { unsafe String(cString: $0) } ?? "unknown loader error"
         throw HotReloadLoadError("Cannot load image: \(detail)")
       }
@@ -119,7 +119,7 @@
       guard try unsafe Self.scalar("swifttui_hot_reload_abi", in: handle) == HotReloadABI.version,
         try unsafe Self.scalar("swifttui_hot_reload_toolchain", in: handle) == toolchain
       else { throw HotReloadLoadError("ABI or toolchain mismatch; restart swifttui-dev") }
-      guard let symbol = unsafe "swifttui_hot_reload_root".withCString({ unsafe dlsym(handle, $0) }) else {
+      guard let symbol = "swifttui_hot_reload_root".withCString({ unsafe dlsym(handle, $0) }) else {
         throw HotReloadLoadError("Image is missing swifttui_hot_reload_root")
       }
       let factory = unsafe unsafeBitCast(symbol, to: (@convention(c) () -> UnsafeMutableRawPointer?).self)
@@ -156,7 +156,7 @@
     }
 
     private static func scalar(_ name: String, in handle: UnsafeMutableRawPointer) throws -> UInt64 {
-      guard let symbol = unsafe name.withCString({ unsafe dlsym(handle, $0) }) else {
+      guard let symbol = name.withCString({ unsafe dlsym(handle, $0) }) else {
         throw HotReloadLoadError("Image is missing \(name)")
       }
       let read = unsafe unsafeBitCast(symbol, to: (@convention(c) () -> UInt64).self)
@@ -176,7 +176,7 @@
       var bytes = [UInt8](repeating: 0, count: maximumBytes + 1)
       var count = 0
       while count < bytes.count {
-        let amount = unsafe bytes.withUnsafeMutableBytes {
+        let amount = bytes.withUnsafeMutableBytes {
           unsafe read(fd, $0.baseAddress!.advanced(by: count), $0.count - count)
         }
         if amount < 0, errno == EINTR { continue }
@@ -191,8 +191,8 @@
     }
 
     private func writeStatus(_ value: String) {
-      _ = unsafe "status.tmp".withCString { unsafe unlinkat(directory, $0, 0) }
-      let fd = unsafe "status.tmp".withCString {
+      _ = "status.tmp".withCString { unsafe unlinkat(directory, $0, 0) }
+      let fd = "status.tmp".withCString {
         unsafe openat(directory, $0, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
       }
       guard fd >= 0 else { return }
@@ -200,15 +200,15 @@
       var bytes = Array((value + "\n").utf8)
       var count = 0
       while count < bytes.count {
-        let amount = unsafe bytes.withUnsafeMutableBytes {
+        let amount = bytes.withUnsafeMutableBytes {
           unsafe write(fd, $0.baseAddress!.advanced(by: count), $0.count - count)
         }
         if amount < 0, errno == EINTR { continue }
         guard amount > 0 else { return }
         count += amount
       }
-      _ = unsafe "status.tmp".withCString { old in
-        unsafe "status".withCString { unsafe renameat(directory, old, directory, $0) }
+      _ = "status.tmp".withCString { old in
+        "status".withCString { unsafe renameat(directory, old, directory, $0) }
       }
     }
   }

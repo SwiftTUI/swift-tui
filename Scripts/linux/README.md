@@ -2,7 +2,7 @@
 
 This directory owns the Linux build/test environment for SwiftTUI. It exists
 because most contributors develop on macOS, but the project ships on Linux
-(through `swift:6.3` on native amd64 and arm64 Ubuntu runners) and in browsers
+(through Swift 6.4.0 on native amd64 and arm64 Ubuntu runners) and in browsers
 (through the Wasm Swift SDK). Use this environment to reproduce a Linux failure
 on a Mac with one command.
 
@@ -61,13 +61,13 @@ repository at runtime.
 
 ## Image contents
 
-`Scripts/linux/Dockerfile` layers the following onto the upstream
-`swift:6.3.3` base:
+`Scripts/linux/Dockerfile` layers the following onto an `ubuntu:24.04` base.
+Swiftly installs the pinned toolchain directly from Swift.org:
 
 | Tool          | Why it is preinstalled                                      |
 |---------------|-------------------------------------------------------------|
 | Swiftly       | Selects the repo-pinned Swift toolchain                     |
-| Swift 6.3.3   | Installed and selected through Swiftly                      |
+| Swift 6.4.0   | Installed and selected through Swiftly                      |
 | bun           | Runs the repo gate scripts                                  |
 | Wasm Swift SDK| Cross-compiles Swift packages to wasm32-unknown-wasi        |
 | binaryen      | Provides `wasm-opt` for local primary-repo Wasm diagnostics |
@@ -194,7 +194,7 @@ Each successful publish emits a manifest containing both `linux/amd64` and
 | Tag                | When                              | Purpose                       |
 |--------------------|-----------------------------------|-------------------------------|
 | `:latest`          | `main` only                       | What `linux.sh` defaults to   |
-| `:swift-6.3.3`     | every successful build            | Pin to a Swift toolchain      |
+| `:swift-6.4.0`     | every successful build            | Pin to a Swift toolchain      |
 | `:sha-<7-char-sha> | every successful build            | Pin to an exact image build   |
 
 Pin to `:sha-…` from `linux.sh`:
@@ -273,25 +273,19 @@ environment causes the difference in 99% of cases, not the image. See
 
 ---
 
-## Falling back to a vanilla Swift image
+## Building locally when GHCR is unavailable
 
 If GHCR is unavailable (rate limits, auth issues, fork without write
-access), point `LINUX_IMAGE` at the upstream image:
+access), build the checked-in Dockerfile and use its local tag:
 
 ```bash
-LINUX_IMAGE=swift:6.3.3 ./Scripts/linux.sh start
-LINUX_IMAGE=swift:6.3.3 ./Scripts/linux.sh full
+LINUX_IMAGE=swifttui-linux-local ./Scripts/linux.sh build
+LINUX_IMAGE=swifttui-linux-local ./Scripts/linux.sh full
 ```
 
-`linux.sh` keeps lazy installers for Swiftly, bun, and the Wasm SDK
-(`ensure_swiftly`, `ensure_bun`, `ensure_wasm_sdk`) specifically so this
-fallback continues to work. The first command that needs Swift will install
-Swiftly and the pinned Swift toolchain. The first command that needs Bun will
-install Bun and its apt prerequisites. Subsequent runs reuse what got installed
-inside the container until `nuke`.
-
-Use this path only as a fallback. Each run downloads approximately 200 MB of
-toolchain data.
+The Dockerfile installs the pinned Swift toolchain, Bun, and WebAssembly SDK
+directly on Ubuntu. This path does not depend on an upstream Swift Docker image
+being available for the current release. Later builds reuse Docker's layers.
 
 ---
 
@@ -376,14 +370,14 @@ The image manifest usually changed while the named container kept an older
 configuration. Rerun `./Scripts/linux.sh shell`. The current script recreates
 containers whose bind mount or work directory does not match.
 
-### Switching between the prebuilt image and a vanilla one mid-session
+### Switching between prebuilt and local images mid-session
 
 The container name contains the image and requested platform. If you change
 `LINUX_IMAGE` or `LINUX_PLATFORM`, the script creates a *second* container. It does not
 reconfigure the first container. To free disk space after this change, run:
 
 ```bash
-LINUX_IMAGE=swift:6.3.3 ./Scripts/linux.sh nuke
+LINUX_IMAGE=swifttui-linux-local ./Scripts/linux.sh nuke
 ```
 
 If you pulled the old amd64-only `:latest` image on Apple Silicon, `linux.sh`
@@ -411,8 +405,8 @@ command is:
 docker build \
   -f Scripts/linux/Dockerfile \
   -t ghcr.io/swifttui/swift-tui-linux:latest \
-  --build-arg SWIFT_VERSION=6.3.3 \
-  --build-arg SWIFTLY_VERSION=1.1.3 \
+  --build-arg SWIFT_VERSION=6.4.0 \
+  --build-arg SWIFTLY_VERSION=1.1.4 \
   Scripts/linux
 ```
 

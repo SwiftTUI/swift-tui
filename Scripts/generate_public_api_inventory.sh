@@ -65,6 +65,7 @@ MANIFEST_JSON="${SYMBOLGRAPH_SCRATCH_DIR}/package-description.json"
 swiftly run swift package describe --type json >"${MANIFEST_JSON}"
 
 SWIFT_PACKAGE_ARGS=(
+  --build-system native
   --scratch-path "${SYMBOLGRAPH_SCRATCH_DIR}"
 )
 PUBLIC_API_SWIFT_JOBS="${SWIFTTUI_PUBLIC_API_SWIFT_JOBS:-}"

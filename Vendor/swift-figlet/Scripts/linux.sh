@@ -4,12 +4,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
-WASM_SDK_ID="${WASM_SDK_ID:-swift-6.3-RELEASE_wasm}"
-WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.3-release/wasm-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_wasm.artifactbundle.tar.gz}"
-WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-9fa4016ee632c7e9e906608ec3b55cf13dfc4dff44e47574c5af58064dc33fd9}"
+WASM_SDK_ID="${WASM_SDK_ID:-swift-6.4.0-RELEASE_wasm}"
+WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.4.0-release/wasm-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_wasm.artifactbundle.tar.gz}"
+WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-f07b7be3c586d92d7a07051fc6d303b87ebea67eadc40640ba59d5a8b79aa86d}"
 
 CONTAINER_TOOL=""
-IMAGE="${LINUX_IMAGE:-swift:6.3}"
+IMAGE="${LINUX_IMAGE:-ghcr.io/swifttui/swift-tui-linux:swift-6.4.0}"
 IMAGE_SLUG="$(printf '%s' "$IMAGE" | tr '/:' '--')"
 CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-figlet-${IMAGE_SLUG}}"
 CONTAINER_DIR="${LINUX_CONTAINER_DIR:-/swift-figlet-workspace}"

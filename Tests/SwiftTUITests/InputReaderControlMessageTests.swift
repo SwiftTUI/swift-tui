@@ -349,7 +349,7 @@
   ) throws {
     var bytesWritten = 0
     while bytesWritten < bytes.count {
-      let written = unsafe bytes.withUnsafeBytes { buffer -> Int in
+      let written = bytes.withUnsafeBytes { buffer -> Int in
         guard let baseAddress = buffer.baseAddress else {
           return 0
         }
