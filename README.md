@@ -17,7 +17,7 @@ terminal itself. The result is a native executable for the platform you build fo
 > All changes are documented in the [CHANGELOG](https://github.com/SwiftTUI/swift-tui/blob/main/CHANGELOG.md).  
 > Pin with `.upToNextMinor`.
 
-[<img width="545" height="321" alt="counter-demo" src="https://github.com/user-attachments/assets/15cd2cb5-e907-4456-b699-2906dc3682b1" />](https://swifttui.sh/webexample/)
+[<img width="586" height="473" alt="counter-demo" src="https://github.com/user-attachments/assets/189867e4-9938-4735-88a0-81ef9b53ae40" />](https://swifttui.sh/webexample/)
 <dl>
   <dt>
     Try it first
