@@ -51,7 +51,9 @@ fi
 
 rm -rf "$output_path"
 
-set -- package \
+# Preserve the package-scoped symbol graphs used by the published reference.
+# Swift Build includes re-exported dependency symbols in each target graph.
+set -- package --build-system native \
   --allow-writing-to-directory "$output_path" \
   generate-documentation
 
