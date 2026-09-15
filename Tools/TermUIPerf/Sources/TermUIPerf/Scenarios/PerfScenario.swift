@@ -19,7 +19,7 @@ func monotonicSeconds() -> Double {
 
 func environmentValue(_ key: String) -> String? {
   #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
-    return unsafe key.withCString { name in
+    return key.withCString { name in
       guard let value = unsafe getenv(name) else {
         return nil
       }
@@ -34,13 +34,13 @@ func setEnvironmentValue(_ value: String?, for key: String) throws {
   #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
     let result: Int32
     if let value {
-      result = unsafe key.withCString { name in
-        unsafe value.withCString { rawValue in
+      result = key.withCString { name in
+        value.withCString { rawValue in
           setenv(name, rawValue, 1)
         }
       }
     } else {
-      result = unsafe key.withCString { name in
+      result = key.withCString { name in
         unsetenv(name)
       }
     }
@@ -863,7 +863,7 @@ public enum PerfScenarioRunner {
 
   private static func environmentValue(_ key: String) -> String? {
     #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
-      return unsafe key.withCString { name in
+      return key.withCString { name in
         guard let value = unsafe getenv(name) else {
           return nil
         }
@@ -878,13 +878,13 @@ public enum PerfScenarioRunner {
     #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
       let result: Int32
       if let value {
-        result = unsafe key.withCString { name in
-          unsafe value.withCString { rawValue in
+        result = key.withCString { name in
+          value.withCString { rawValue in
             setenv(name, rawValue, 1)
           }
         }
       } else {
-        result = unsafe key.withCString { name in
+        result = key.withCString { name in
           unsetenv(name)
         }
       }
