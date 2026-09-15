@@ -66,17 +66,6 @@ public struct BorderEdgeStyle: Equatable, Sendable {
     self.bottom = AnyShapeStyle(bottom)
     self.left = AnyShapeStyle(left)
   }
-
-  package init(
-    all style: AnyShapeStyle?
-  ) {
-    self.init(
-      top: style,
-      right: style,
-      bottom: style,
-      left: style
-    )
-  }
 }
 
 extension BorderEdgeStyle {
