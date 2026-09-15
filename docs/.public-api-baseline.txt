@@ -955,7 +955,6 @@ SwiftTUIPrimitives.BorderSet.ascii
 SwiftTUIPrimitives.BorderSet.block
 SwiftTUIPrimitives.BorderSet.bottom
 SwiftTUIPrimitives.BorderSet.bottomDisplayWidth
-SwiftTUIPrimitives.BorderSet.bottomGlyph(at:)
 SwiftTUIPrimitives.BorderSet.bottomLeading
 SwiftTUIPrimitives.BorderSet.bottomTrailing
 SwiftTUIPrimitives.BorderSet.dashed
@@ -968,7 +967,6 @@ SwiftTUIPrimitives.BorderSet.init(top:bottom:left:right:topLeading:topTrailing:b
 SwiftTUIPrimitives.BorderSet.innerHalfBlock
 SwiftTUIPrimitives.BorderSet.left
 SwiftTUIPrimitives.BorderSet.leftDisplayWidth
-SwiftTUIPrimitives.BorderSet.leftGlyph(at:)
 SwiftTUIPrimitives.BorderSet.markdown
 SwiftTUIPrimitives.BorderSet.middle
 SwiftTUIPrimitives.BorderSet.middleBottom
@@ -979,13 +977,11 @@ SwiftTUIPrimitives.BorderSet.none
 SwiftTUIPrimitives.BorderSet.outerHalfBlock
 SwiftTUIPrimitives.BorderSet.right
 SwiftTUIPrimitives.BorderSet.rightDisplayWidth
-SwiftTUIPrimitives.BorderSet.rightGlyph(at:)
 SwiftTUIPrimitives.BorderSet.rounded
 SwiftTUIPrimitives.BorderSet.single
 SwiftTUIPrimitives.BorderSet.singleDouble
 SwiftTUIPrimitives.BorderSet.top
 SwiftTUIPrimitives.BorderSet.topDisplayWidth
-SwiftTUIPrimitives.BorderSet.topGlyph(at:)
 SwiftTUIPrimitives.BorderSet.topLeading
 SwiftTUIPrimitives.BorderSet.topTrailing
 SwiftTUIPrimitives.BoxedPath

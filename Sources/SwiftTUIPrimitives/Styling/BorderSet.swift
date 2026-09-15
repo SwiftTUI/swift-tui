@@ -72,19 +72,6 @@ extension BorderSet {
 }
 
 extension BorderSet {
-  public func topGlyph(at index: Int) -> Character? { Self.cycle(top, at: index) }
-  public func bottomGlyph(at index: Int) -> Character? { Self.cycle(bottom, at: index) }
-  public func leftGlyph(at index: Int) -> Character? { Self.cycle(left, at: index) }
-  public func rightGlyph(at index: Int) -> Character? { Self.cycle(right, at: index) }
-
-  private static func cycle(_ edge: String, at index: Int) -> Character? {
-    guard index >= 0, !edge.isEmpty else { return nil }
-    let chars = Array(edge)
-    return chars[index % chars.count]
-  }
-}
-
-extension BorderSet {
   public static let single = BorderSet(
     top: "─", bottom: "─", left: "│", right: "│",
     topLeading: "┌", topTrailing: "┐",
