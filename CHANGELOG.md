@@ -8,6 +8,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.13.5] - 2026-09-16
+
+### Changed
+
+- Refresh the bundled browser host provenance for coordinated release 0.13.5.
+  Framework APIs and behavior are unchanged from 0.13.4.
+
 ## [0.13.4] - 2026-09-15
 
 ### Changed
@@ -1970,7 +1977,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.4...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.5...HEAD
+[0.13.5]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.5
 [0.13.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.4
 [0.13.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.3
 [0.13.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.2
