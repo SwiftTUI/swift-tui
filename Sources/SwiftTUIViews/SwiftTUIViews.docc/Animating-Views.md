@@ -334,6 +334,27 @@ an unpainted segment are left alone, so the lower border shows through the gaps
 of the upper one. The same style animates on `Rectangle().stroke(style:)` and on
 a `Divider`.
 
+## Draw An Outline On
+
+A trim's interval is animatable on a stroke, so an outline can draw itself on:
+
+```swift
+struct Ring: View {
+  @State private var progress = 0.0
+
+  var body: some View {
+    Circle()
+      .trim(from: 0, to: progress)
+      .stroke(.tint)
+      .onAppear {
+        withAnimation(.easeOut(duration: .seconds(1))) { progress = 1 }
+      }
+  }
+}
+```
+
+Like a dash phase, the interval never affects layout.
+
 ## Cycle Through Phases
 
 ``PhaseAnimator`` steps through a phase sequence, animating each step. With

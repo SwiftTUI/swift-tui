@@ -42,6 +42,7 @@ extension Rasterizer {
         colorMode: foregroundColorMode,
         stroke: true,
         strokeBorder: strokeBorder,
+        strokeStyle: strokeStyle,
         environment: environment,
         cells: &cells,
         clip: clip,
@@ -66,8 +67,6 @@ extension Rasterizer {
       startsAtTrailingEdge = false
     }
     let pen = StrokePen(borderSet: strokeStyle.borderSet, roundsCorners: roundsCorners)
-    let dash = StrokeDashPattern(dash: strokeStyle.effectiveDash, phase: strokeStyle.dashPhase)
-
     let lineWidth = max(1, strokeStyle.lineWidth)
     for inset in 0..<lineWidth {
       let insetRect = insetBounds(shapeBounds, by: inset)
@@ -81,10 +80,11 @@ extension Rasterizer {
       )
       track.forEachGlyph(
         pen: pen,
-        dash: dash,
         // SwiftUI starts a rounded rectangle's path at the middle of its
         // trailing edge, and a rectangle's at its top-leading corner.
-        dashOrigin: startsAtTrailingEdge ? track.trailingEdgeMidpoint : 0,
+        mask: startsAtTrailingEdge
+          ? StrokeMask(strokeStyle, origin: track.trailingEdgeMidpoint)
+          : StrokeMask(strokeStyle, trimOrigin: track.leadingCornerVertex),
         // Per-row cull (D70).
         rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(insetRect.origin.y + $0) } }
       ) { cell, glyph in
@@ -157,7 +157,7 @@ extension Rasterizer {
     track.forEachGlyph(
       pen: StrokePen(
         borderSet: strokeStyle.borderSet, roundsCorners: strokeStyle.lineJoin == .round),
-      dash: StrokeDashPattern(dash: strokeStyle.effectiveDash, phase: strokeStyle.dashPhase),
+      mask: StrokeMask(strokeStyle),
       // Per-row cull (D70).
       rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(line.origin.y + $0) } }
     ) { cell, glyph in

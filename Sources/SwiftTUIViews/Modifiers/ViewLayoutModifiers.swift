@@ -68,7 +68,7 @@ extension View {
   /// separately to constrain interaction. Multiple clips intersect.
   public func clipShape<S: Shape>(_ shape: S) -> some View {
     var metadata = DrawMetadata(clipsToBounds: true)
-    metadata.shapeClips = [.init(geometry: shape.geometry, insetAmount: shape.insetAmount)]
+    metadata.shapeClips = [.init(geometry: shape.fillGeometry, insetAmount: shape.insetAmount)]
     return drawMetadata(metadata)
   }
 

@@ -1600,6 +1600,7 @@ SwiftTUIPrimitives.Path.isInterpolable(to:)
 SwiftTUIPrimitives.Path.move(to:)
 SwiftTUIPrimitives.Path.scaledBy(sx:sy:)
 SwiftTUIPrimitives.Path.translatedBy(dx:dy:)
+SwiftTUIPrimitives.Path.trimmedPath(from:to:tolerance:)
 SwiftTUIPrimitives.Phase
 SwiftTUIPrimitives.Phase.commit
 SwiftTUIPrimitives.Phase.draw
@@ -4532,6 +4533,11 @@ SwiftTUIViews.Shape.stroke(_:style:)
 SwiftTUIViews.Shape.stroke(_:style:background:)
 SwiftTUIViews.Shape.stroke(style:)
 SwiftTUIViews.Shape.stroke(style:background:)
+SwiftTUIViews.Shape.trim(from:to:)
+SwiftTUIViews.Shape.trimEnd
+SwiftTUIViews.Shape.trimEnd
+SwiftTUIViews.Shape.trimStart
+SwiftTUIViews.Shape.trimStart
 SwiftTUIViews.ShapeStyle.linearGradient(colors:startPoint:endPoint:)
 SwiftTUIViews.ShapeStyle.linearGradient(stops:startPoint:endPoint:)
 SwiftTUIViews.ShapeStyle.radialGradient(colors:center:startRadius:endRadius:)
@@ -5097,6 +5103,17 @@ SwiftTUIViews.TransactionKey.Value
 SwiftTUIViews.TransactionKey.defaultValue
 SwiftTUIViews.TransactionModifier
 SwiftTUIViews.TransitionRegistrationModifier
+SwiftTUIViews.TrimmedShape
+SwiftTUIViews.TrimmedShape.base
+SwiftTUIViews.TrimmedShape.from
+SwiftTUIViews.TrimmedShape.geometry
+SwiftTUIViews.TrimmedShape.init(base:from:to:)
+SwiftTUIViews.TrimmedShape.insetAmount
+SwiftTUIViews.TrimmedShape.kindName
+SwiftTUIViews.TrimmedShape.path(in:)
+SwiftTUIViews.TrimmedShape.to
+SwiftTUIViews.TrimmedShape.trimEnd
+SwiftTUIViews.TrimmedShape.trimStart
 SwiftTUIViews.TupleView
 SwiftTUIViews.TupleView.body
 SwiftTUIViews.UnderlineTabViewStyle

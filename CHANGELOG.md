@@ -19,6 +19,11 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 - `View.border(_:style:placement:sides:)` takes a `StrokeStyle`. A border, a
   rectangle stroke and a `Divider` now draw through one renderer, so the same
   style draws the same cells on all three.
+- `Shape.trim(from:to:)` keeps part of a shape's outline, and
+  `Path.trimmedPath(from:to:)` does the same for a path. Start points and
+  direction match SwiftUI as measured. The interval is animatable on a stroke.
+- Curved shapes and custom paths honor `dash` and `dashPhase`, in Braille dots
+  and in the same unit as a rectangle's dash. They ignored the stroke style.
 - `StrokeStyle` has a preset for every glyph palette: `.singleDouble`,
   `.doubleSingle`, `.outerHalfBlock`, `.none`, `.dashed` and `.dashedHeavy` join
   the existing ones.

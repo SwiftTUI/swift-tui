@@ -9,12 +9,12 @@
 /// A primitive that implements only `geometry` gets a generated `path(in:)` value.
 /// Implement at least one. If you implement neither, the defaults recurse.
 ///
-/// ``kindName`` and ``insetAmount`` are rendering plumbing with defaults, so a
-/// conforming type normally never touches them. They are plain (defaulted)
+/// ``kindName``, ``insetAmount``, ``trimStart`` and ``trimEnd`` are rendering
+/// plumbing with defaults, so a conforming type normally never touches them. They are plain (defaulted)
 /// requirements rather than SPI. Thus, types *outside* this module can conform.
 /// An `@_spi` requirement has no visible default witness across a module boundary.
-/// `insetAmount` must also dispatch dynamically through
-/// ``InsetShape``, so it cannot be a non-requirement helper.
+/// `insetAmount` must also dispatch dynamically through ``InsetShape``, and the
+/// trim through ``TrimmedShape``, so they cannot be non-requirement helpers.
 ///
 /// The runtime evaluates `path(in:)` against the unit rectangle (`0,0,1,1`) during resolve.
 /// During rasterization, it scales the normalized path into the placed frame.
@@ -25,6 +25,12 @@ public protocol Shape: View {
   func path(in rect: Rect) -> Path
   var kindName: String { get }
   var insetAmount: Int { get }
+  /// The fraction of the outline where the shape starts, from `0` to `1`.
+  /// ``trim(from:to:)`` sets it. An untrimmed shape starts at `0`.
+  var trimStart: Double { get }
+  /// The fraction of the outline where the shape ends, from `0` to `1`.
+  /// ``trim(from:to:)`` sets it. An untrimmed shape ends at `1`.
+  var trimEnd: Double { get }
 }
 
 /// A shape that can be inset geometrically before being rendered.
@@ -83,13 +89,42 @@ extension Shape {
     0
   }
 
+  public var trimStart: Double {
+    0
+  }
+
+  public var trimEnd: Double {
+    1
+  }
+
+  /// The trim a stroke of this shape carries, or `nil` for the whole outline.
+  package var strokeTrim: StrokeTrim? {
+    let trim = StrokeTrim(from: trimStart, to: trimEnd)
+    return trim.from <= 0 && trim.to >= 1 ? nil : trim
+  }
+
+  /// The geometry a fill or a clip of this shape uses.
+  ///
+  /// A stroke keeps the analytic geometry and trims its outline at raster time,
+  /// so the analytic primitives keep their cell-aspect correction. A fill has
+  /// no outline to window: SwiftUI closes the trimmed path with a chord and
+  /// fills that, so a trimmed fill takes the path route.
+  package var fillGeometry: ShapeGeometry {
+    guard strokeTrim != nil else {
+      return geometry
+    }
+    return .path(
+      BoxedPath(path(in: Rect(origin: Point(x: 0, y: 0), size: Size(width: 1, height: 1)))),
+      .nonZero)
+  }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
       resolveLeafNode(
         kindName: kindName,
         drawPayload: .shape(
           .init(
-            geometry: geometry,
+            geometry: fillGeometry,
             insetAmount: insetAmount,
             operation: .fill(style: nil, mode: .full)
           )

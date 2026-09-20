@@ -156,4 +156,43 @@ struct StrokeDashPhaseAnimationTests {
       node(.border, stroke: end, identity: identity), transaction: transaction, timestamp: t0)
     #expect(!controller.hasLayoutAffectingPropertyAnimation)
   }
+
+  // MARK: - Trim
+
+  /// Seeds the controller with a trim of `0...0.2`, presents `0...1` under an
+  /// explicit animation, and samples the linear curve at its midpoint.
+  private func interpolatedTrim(from start: StrokeTrim?, to end: StrokeTrim?) -> (
+    node: ResolvedNode, pending: Bool
+  ) {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(1000))
+    controller.register(animation)
+    let identity = Identity(components: [.named("trim")])
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(
+      node(.shapeStroke, stroke: StrokeStyle().trimmed(to: start), identity: identity),
+      transaction: .init(), timestamp: t0)
+    var frame = node(.shapeStroke, stroke: StrokeStyle().trimmed(to: end), identity: identity)
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame, transaction: transaction, timestamp: t0)
+    let result = controller.applyInterpolations(
+      to: &frame, at: t0.advanced(by: .milliseconds(500)))
+    return (frame, result.hasPendingWork)
+  }
+
+  @Test("withAnimation interpolates a trim, which is how an outline draws itself on")
+  func trimInterpolates() throws {
+    let result = interpolatedTrim(
+      from: StrokeTrim(from: 0, to: 0.2), to: StrokeTrim(from: 0, to: 1))
+    #expect(result.pending)
+    let trim = try #require(AnimatableSnapshot.strokeStyle(of: result.node)?.trim)
+    #expect(abs(trim.from) < 0.02, "got \(trim.from)")
+    #expect(abs(trim.to - 0.6) < 0.03, "got \(trim.to)")
+  }
+
+  @Test("an untrimmed stroke has no trim to animate")
+  func untrimmedStrokeHasNoTrimSlot() {
+    #expect(!interpolatedTrim(from: nil, to: nil).pending)
+  }
 }

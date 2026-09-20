@@ -15,6 +15,8 @@ struct StrokeTrackTests {
     dash: [Double] = [],
     dashPhase: Double = 0,
     dashOrigin: Double = 0,
+    trim: StrokeTrim? = nil,
+    roundedStart: Bool = false,
     aspectRatio: Double = 2
   ) -> [String] {
     let track = RectangleStrokeTrack(width: width, height: height, aspectRatio: aspectRatio)
@@ -24,8 +26,9 @@ struct StrokeTrackTests {
     track.forEachGlyph(
       pen: pen,
       sides: sides,
-      dash: pattern,
-      dashOrigin: dashOrigin
+      mask: StrokeMask(
+        dash: pattern, trim: trim, origin: dashOrigin,
+        trimOrigin: roundedStart ? dashOrigin : track.leadingCornerVertex)
     ) { cell, glyph in
       grid[cell.y][cell.x] = glyph
     }
@@ -230,5 +233,96 @@ struct StrokeTrackTests {
     // One dash, 4 units long, starting half way down the trailing edge and
     // running clockwise: two vertical cells.
     #expect(lines.map { String($0.suffix(1)) } == [" ", " ", "│", "│", " "])
+  }
+
+  // MARK: - Trim
+
+  @Test("a quarter trim of a rectangle is its top edge, from the corner's vertex")
+  func trimFirstQuarter() {
+    // 9 x 4 at an aspect ratio of 2 is 28 units round, and the top edge is 8 of
+    // them, vertex to vertex. A quarter is 7: half of the corner cell, six
+    // whole cells and half of the eighth. The arm that points down the leading
+    // edge belongs to the end of the path, so the trim does not draw it.
+    #expect(
+      render(width: 9, height: 4, trim: StrokeTrim(from: 0, to: 0.25)) == [
+        "╶──────╴ ",
+        "         ",
+        "         ",
+        "         ",
+      ])
+  }
+
+  @Test("the second half of a rectangle is its bottom and leading edges")
+  func trimSecondHalf() {
+    #expect(
+      render(width: 9, height: 4, trim: StrokeTrim(from: 0.5, to: 1)) == [
+        "╷        ",
+        "│        ",
+        "│        ",
+        "└───────╴",
+      ])
+  }
+
+  @Test("the whole trim draws the whole ring, and an empty one draws nothing")
+  func trimExtremes() {
+    #expect(
+      render(width: 5, height: 3, trim: StrokeTrim(from: 0, to: 1))
+        == render(width: 5, height: 3))
+    #expect(
+      render(width: 5, height: 3, trim: StrokeTrim(from: 0.5, to: 0.5))
+        == ["     ", "     ", "     "])
+    #expect(
+      render(width: 5, height: 3, trim: StrokeTrim(from: 0.75, to: 0.25))
+        == ["     ", "     ", "     "])
+  }
+
+  @Test("a dash on a trimmed stroke falls where the untrimmed dash does")
+  func trimWithDash() {
+    #expect(
+      render(width: 9, height: 4, dash: [2, 1], trim: StrokeTrim(from: 0, to: 0.5)) == [
+        "╶─ ── ──╷",
+        "        ╵",
+        "        │",
+        "         ",
+      ])
+  }
+
+  @Test("a rounded rectangle is trimmed from the middle of its trailing edge")
+  func trimRoundedRectangle() {
+    let track = RectangleStrokeTrack(width: 9, height: 5, aspectRatio: 2)
+    #expect(
+      render(
+        width: 9, height: 5, roundsCorners: true,
+        dashOrigin: track.trailingEdgeMidpoint, trim: StrokeTrim(from: 0, to: 0.25),
+        roundedStart: true) == [
+          "         ",
+          "         ",
+          "        │",
+          "        │",
+          "     ───╯",
+        ])
+  }
+
+  @Test("a dash's seam falls at the start of the path, not at the top-leading corner")
+  func dashSeamIsAtTheStartOfThePath() {
+    // 9 x 5 is 32 units round. A period of 5 does not divide it, so the pattern
+    // has a seam where it restarts. Measured from the middle of the trailing
+    // edge, the seam is there: the cell just before it, (8, 1), is 30 to 32
+    // units along the path, which is inside a dash, so it is whole. If positions
+    // did not wrap round the track, that cell would read as -2 to 0, its second
+    // half would fall in a gap, and it would draw `╵`.
+    let track = RectangleStrokeTrack(width: 9, height: 5, aspectRatio: 2)
+    let lines = render(
+      width: 9, height: 5, dash: [4, 1], dashOrigin: track.trailingEdgeMidpoint,
+      roundedStart: true)
+    #expect(lines[1].last == "│")
+    #expect(lines[2].last == "│")
+  }
+
+  @Test("a trim clamps its fractions")
+  func trimClamps() {
+    #expect(StrokeTrim(from: -1, to: 2) == StrokeTrim(from: 0, to: 1))
+    #expect(StrokeTrim(from: .nan, to: .infinity) == StrokeTrim(from: 0, to: 1))
+    #expect(StrokeTrim(from: 0.6, to: 0.4).isEmpty)
   }
 }

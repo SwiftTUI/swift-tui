@@ -667,8 +667,17 @@ are omitted even when SwiftUI exposes a corresponding API.
   bridged. The five analytic primitives carry exact, fixture-pinned cell
   output and cell-aspect correction that sampled paths cannot promise; see
   <doc:AspectCorrectShapes>.
+- **`trim(from:to:)` measures the outline on screen.** *Ratified (parity).* Start
+  points and direction match SwiftUI as measured: a `Rectangle` starts at its
+  top-leading corner, a `RoundedRectangle`, a `Circle`, an `Ellipse` and a
+  `Capsule` at the middle of their trailing edge, all clockwise. A fraction is a
+  share of the outline's length in cell widths, with a vertical cell counted as
+  the snapped cell aspect ratio, so a quarter is a quarter of the way round on
+  screen. A stroke is trimmed at raster time, so the analytic primitives keep
+  their cell-aspect correction. A trimmed fill takes the custom-path route: it
+  stretches to its frame and its interval does not animate smoothly.
 - **No path/vector transform adapters yet.** *Provisional.*
-  `trim(from:to:)`, `offset`, `rotation`, `scale`, and `transform` shape
+  `offset`, `rotation`, `scale`, and `transform` shape
   adapters are absent. SwiftTUI's continuous cell-space paths can support
   additive transforms before rasterization, with the result quantized at the
   cell boundary; they are an open direction, not part of the current API.
@@ -681,7 +690,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   cell aspect ratio, snapped to the nearest half, so a dash is the same physical
   length on every edge and two terminals with slightly different fonts dash
   alike. A dash end inside a cell draws a half-line glyph; the double palette
-  has none and dashes in whole cells. An unpainted segment leaves its cells as
+  has none and dashes in whole cells. Curved and custom-path strokes dash in
+  Braille dots, in the same unit. An unpainted segment leaves its cells as
   they were. Start points and direction match SwiftUI as measured: a `Rectangle`
   and a view's `border` start at the top-leading corner, a `RoundedRectangle` at
   the middle of its trailing edge, both clockwise.
@@ -693,8 +703,6 @@ are omitted even when SwiftUI exposes a corresponding API.
   corners where the glyph palette has them, which is the light weight only. A
   `RoundedRectangle` draws them with either join, and the size of its
   `cornerRadius` has no other effect. No glyph draws a bevel.
-- **Curved and custom-path strokes do not dash.** *Gap.* They stroke onto the
-  Braille grid, which does not receive the stroke style yet.
 - **Arcs use explicit angle and sweep contracts.** *Ratified.* `Angle`
   stores unnormalized radians and offers degree conversion. `Path.addArc`
   connects the current pen to its start and emits cubic segments of at most

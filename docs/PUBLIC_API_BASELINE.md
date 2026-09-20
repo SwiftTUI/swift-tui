@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 60 | 511 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 414 | 2506 |
+| `SwiftTUIViews` | 415 | 2522 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 170 | 1495 |
+| `SwiftTUIPrimitives` | 170 | 1496 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -126,7 +126,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 ## SwiftTUIViews
 
-### Canonical surface (414)
+### Canonical surface (415)
 
 - `AccessibilityAnnouncer` — enum — 1 member
 - `ActionScope` — extension — 7 members
@@ -439,7 +439,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `SegmentedPickerStyle` — struct — 4 members
 - `SemanticMetadataModifier` — struct
 - `SequenceGesture` — struct — 8 members
-- `Shape` — protocol — 15 members
+- `Shape` — protocol — 20 members
 - `ShapeStyle` — extension — 4 members
 - `SheetStyle` — protocol — 6 members
 - `SheetStyleConfiguration` — struct — 4 members
@@ -517,6 +517,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `TransactionKey` — protocol — 2 members
 - `TransactionModifier` — struct
 - `TransitionRegistrationModifier` — struct
+- `TrimmedShape` — struct — 10 members
 - `TupleView` — struct — 1 member
 - `UnderlinedLinkStyle` — struct — 3 members
 - `UnderlineTabViewStyle` — struct — 4 members
@@ -791,7 +792,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `OklabColor` — struct — 5 members
 - `OklchColor` — struct — 5 members
 - `OutlineStylePresentation` — struct — 10 members
-- `Path` — struct — 31 members
+- `Path` — struct — 32 members
 - `Phase` — enum — 8 members
 - `PixelPoint` — struct — 4 members
 - `PixelSize` — struct — 4 members

@@ -224,6 +224,69 @@ public struct Path: Equatable, Sendable {
     )
   }
 
+  /// Returns the part of the path between two fractions of its length.
+  ///
+  /// The fractions are of the path's whole length, measured along its
+  /// subpaths in the order they were added, as in SwiftUI. Both are clamped to
+  /// `0...1`. The result is empty when `from` is not less than `to` or when
+  /// either is not finite. Curves are flattened first, so the result is made of
+  /// straight segments, and a closed subpath that is cut comes back open.
+  ///
+  /// Lengths are in this path's own coordinate units. A stroke that is trimmed
+  /// on screen is measured in cell widths instead, so that a fraction is the
+  /// same physical share of the outline; see `Shape.trim(from:to:)`.
+  public func trimmedPath(from: Double, to: Double, tolerance: Double = 0.01) -> Path {
+    var result = Path()
+    guard from.isFinite, to.isFinite else {
+      return result
+    }
+    let lower = min(1, max(0, from))
+    let upper = min(1, max(0, to))
+    guard lower < upper else {
+      return result
+    }
+
+    let subpaths = flattened(tolerance: tolerance)
+    func distance(_ a: Point, _ b: Point) -> Double {
+      let dx = b.x - a.x
+      let dy = b.y - a.y
+      return (dx * dx + dy * dy).squareRoot()
+    }
+    var total = 0.0
+    for points in subpaths {
+      for index in points.indices.dropFirst() {
+        total += distance(points[index - 1], points[index])
+      }
+    }
+    guard total > 0 else {
+      return result
+    }
+
+    let start = lower * total
+    let end = upper * total
+    var travelled = 0.0
+    for points in subpaths {
+      var penDown = false
+      for index in points.indices.dropFirst() {
+        let a = points[index - 1]
+        let b = points[index]
+        let length = distance(a, b)
+        defer { travelled += length }
+        guard length > 0, travelled + length > start, travelled < end else {
+          continue
+        }
+        let t0 = max(0, (start - travelled) / length)
+        let t1 = min(1, (end - travelled) / length)
+        if !penDown {
+          result.move(to: Point(x: a.x + (b.x - a.x) * t0, y: a.y + (b.y - a.y) * t0))
+          penDown = true
+        }
+        result.addLine(to: Point(x: a.x + (b.x - a.x) * t1, y: a.y + (b.y - a.y) * t1))
+      }
+    }
+    return result
+  }
+
   /// Flattens the path to one polyline per subpath, subdividing curves until
   /// they are within `tolerance` (in this path's own coordinate units) of a
   /// straight segment. Explicitly-closed subpaths repeat their start point as

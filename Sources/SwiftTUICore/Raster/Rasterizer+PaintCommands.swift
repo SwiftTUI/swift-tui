@@ -405,6 +405,7 @@ extension Rasterizer {
     colorMode: ResolvedShapeColorMode,
     stroke: Bool,
     strokeBorder: Bool = false,
+    strokeStyle: StrokeStyle? = nil,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: CellRect?,
@@ -431,6 +432,15 @@ extension Rasterizer {
     let cx = (subW - 1) / 2
     let cy = (subH - 1) / 2
 
+    // A dash or a trim keeps part of the outline. The stroke is rasterized as
+    // it always was, and the mask then clears the lit subpixels it turns off,
+    // so a solid stroke is untouched. Each branch records its ordered outline
+    // only when there is a mask to apply.
+    let mask = stroke ? strokeStyle.map { StrokeMask($0) } : nil
+    let needsOutline = mask.map { !$0.isSolid } ?? false
+    let aspectRatio = environment.cellPixelMetrics.aspectRatio
+    var outline: SampledStrokeTrack?
+
     switch geometry {
     case .circle:
       let radii = Self.subpixelCircleRadii(
@@ -445,6 +455,10 @@ extension Rasterizer {
       let ry = max(0, radii.ry - 1)
       if stroke {
         canvas.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+        if needsOutline {
+          outline = .ellipse(
+            centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, aspectRatio: aspectRatio)
+        }
       } else {
         canvas.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
       }
@@ -463,17 +477,33 @@ extension Rasterizer {
       let ry = max(0, halfHeightPx / subpixelPxHeight - 1)
       if stroke {
         canvas.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+        if needsOutline {
+          outline = .ellipse(
+            centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, aspectRatio: aspectRatio)
+        }
       } else {
         canvas.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
       }
     case .capsule:
       drawCapsule(into: &canvas, stroke: stroke, metrics: environment.cellPixelMetrics)
+      if needsOutline, subW > 1, subH > 1 {
+        let cap = Self.capsuleCapParameters(
+          subpixelWidth: subW, subpixelHeight: subH, metrics: environment.cellPixelMetrics)
+        outline = .capsule(
+          subpixelWidth: subW, subpixelHeight: subH,
+          isHorizontal: cap.isHorizontal, radiusX: cap.radiusX, radiusY: cap.radiusY,
+          aspectRatio: aspectRatio)
+      }
     case .path(let boxed, let rule):
       if stroke {
         if strokeBorder {
           strokeBorderPath(boxed.path, rule: rule, into: &canvas)
         } else {
           strokePath(boxed.path, into: &canvas)
+        }
+        if needsOutline {
+          outline = .path(
+            boxed.path, subpixelWidth: subW, subpixelHeight: subH, aspectRatio: aspectRatio)
         }
       } else {
         fillPath(boxed.path, rule: rule, into: &canvas)
@@ -482,6 +512,10 @@ extension Rasterizer {
       // Not reachable: the caller dispatches these to the cell-aligned
       // paint path.  We still need the case for exhaustiveness.
       return
+    }
+
+    if let mask, let outline {
+      outline.apply(mask, to: &canvas)
     }
 
     // Walk each Braille cell and emit the glyph with the shape's

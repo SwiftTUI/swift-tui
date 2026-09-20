@@ -40,6 +40,79 @@ package struct StrokeDashPattern: Equatable, Sendable {
   }
 }
 
+/// The test a stroke applies to each position along its track.
+///
+/// A trim and a dash are both tests on position. Both are measured from the
+/// start of the path, which SwiftUI puts at the top-leading corner of a
+/// `Rectangle` and at the middle of the trailing edge of a rounded shape. The
+/// dash is measured from the start of the trimmed part, as in SwiftUI.
+package struct StrokeMask: Equatable, Sendable {
+  package var dash: StrokeDashPattern?
+  package var trim: StrokeTrim?
+  /// The track position the dash pattern is measured from.
+  package var origin: Double
+  /// The track position of the start of the path, which the trim is measured
+  /// from.
+  ///
+  /// On a rectangle the two differ by half a cell. The dash is measured from
+  /// the leading edge of the corner cell, so that whole-number dashes land on
+  /// whole cells. The path starts at the corner's vertex, in the middle of that
+  /// cell, between its two arms. Measuring the trim from the vertex keeps the
+  /// arm that points down the leading edge out of a trim that starts along the
+  /// top.
+  package var trimOrigin: Double
+
+  package init(
+    dash: StrokeDashPattern? = nil,
+    trim: StrokeTrim? = nil,
+    origin: Double = 0,
+    trimOrigin: Double? = nil
+  ) {
+    self.dash = dash
+    self.trim = trim
+    self.origin = origin
+    self.trimOrigin = trimOrigin ?? origin
+  }
+
+  package init(_ style: StrokeStyle, origin: Double = 0, trimOrigin: Double? = nil) {
+    self.init(
+      dash: StrokeDashPattern(dash: style.effectiveDash, phase: style.dashPhase),
+      trim: style.trim,
+      origin: origin,
+      trimOrigin: trimOrigin
+    )
+  }
+
+  /// Whether every position is on, so the stroke can skip the test.
+  package var isSolid: Bool {
+    dash == nil && trim == nil
+  }
+
+  package func isOn(at position: Double, trackLength: Double) -> Bool {
+    guard trackLength > 0 else {
+      return dash?.isOn(at: position) ?? true
+    }
+    // Positions wrap round a closed track, so the seam of a pattern that does
+    // not divide the length falls at the start of the path.
+    func wrapped(_ value: Double) -> Double {
+      let remainder = value.truncatingRemainder(dividingBy: trackLength)
+      return remainder < 0 ? remainder + trackLength : remainder
+    }
+    guard let trim else {
+      return dash?.isOn(at: wrapped(position - origin)) ?? true
+    }
+    let fromStart = wrapped(position - trimOrigin)
+    let start = trim.from * trackLength
+    guard !trim.isEmpty, fromStart >= start, fromStart < trim.to * trackLength else {
+      return false
+    }
+    // The dash is measured from the start of the trimmed part, as in SwiftUI.
+    // With nothing trimmed from the start it falls where the untrimmed dash
+    // does.
+    return dash?.isOn(at: fromStart - start + (trimOrigin - origin)) ?? true
+  }
+}
+
 /// The ordered cells along the outline of a rectangle, which is what a border
 /// or a rectangle stroke draws.
 ///
@@ -221,6 +294,13 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
     }
   }
 
+  /// The track position of the top-leading corner's vertex: the middle of the
+  /// corner cell, where its two arms meet. SwiftUI starts a `Rectangle` path
+  /// there.
+  package var leadingCornerVertex: Double {
+    isRing ? 0.5 : 0
+  }
+
   /// The track position of the middle of the trailing edge.
   ///
   /// SwiftUI starts a `Rectangle` path at its top-leading corner, which is
@@ -236,27 +316,29 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
 
   /// Applies the mask to one cell.
   ///
-  /// `sides` and `dash` are both tests on position along the track. An arm is
-  /// drawn when its edge is selected and the dash is on where the arm sits.
+  /// `sides`, the dash and the trim are all tests on position along the track.
+  /// An arm is drawn when its edge is selected and the mask is on where the arm
+  /// sits.
   ///
-  /// - Parameters:
-  ///   - dashOrigin: The track position the dash pattern is measured from.
-  ///   - samplesEachArm: Samples the dash at each arm's midpoint, which gives
-  ///     half-cell resolution. A pen without half-line glyphs passes `false`
-  ///     and the dash is sampled once, at the middle of the cell.
+  /// - Parameter samplesEachArm: Samples the mask at each arm's midpoint, which
+  ///   gives half-cell resolution. A pen without half-line glyphs passes `false`
+  ///   and the mask is sampled once, at the middle of the cell.
   package func resolve(
     _ cell: Cell,
     sides: Edge.Set,
-    dash: StrokeDashPattern?,
-    dashOrigin: Double = 0,
+    mask: StrokeMask = .init(),
     samplesEachArm: Bool
   ) -> ResolvedCell {
     let incomingSelected = includes(cell.incoming.side, in: sides)
     let outgoingSelected = includes(cell.outgoing.side, in: sides)
-    let incomingSample = (samplesEachArm ? cell.incomingMidpoint : cell.midpoint) - dashOrigin
-    let outgoingSample = (samplesEachArm ? cell.outgoingMidpoint : cell.midpoint) - dashOrigin
-    let incomingOn = incomingSelected && (dash?.isOn(at: incomingSample) ?? true)
-    let outgoingOn = outgoingSelected && (dash?.isOn(at: outgoingSample) ?? true)
+    let incomingSample = samplesEachArm ? cell.incomingMidpoint : cell.midpoint
+    let outgoingSample = samplesEachArm ? cell.outgoingMidpoint : cell.midpoint
+    let solid = mask.isSolid
+    let trackLength = length
+    let incomingOn =
+      incomingSelected && (solid || mask.isOn(at: incomingSample, trackLength: trackLength))
+    let outgoingOn =
+      outgoingSelected && (solid || mask.isOn(at: outgoingSample, trackLength: trackLength))
 
     var resolved = ResolvedCell()
     resolved[cell.incoming.direction] = incomingOn
@@ -321,8 +403,7 @@ extension RectangleStrokeTrack {
   package func forEachGlyph(
     pen: StrokePen,
     sides: Edge.Set = .all,
-    dash: StrokeDashPattern? = nil,
-    dashOrigin: Double = 0,
+    mask: StrokeMask = .init(),
     rows: ((Int) -> Bool)? = nil,
     _ body: (Cell, Character) -> Void
   ) {
@@ -334,8 +415,7 @@ extension RectangleStrokeTrack {
       let resolved = resolve(
         cell,
         sides: sides,
-        dash: dash,
-        dashOrigin: dashOrigin,
+        mask: mask,
         samplesEachArm: samplesEachArm
       )
       if let glyph = pen.glyph(for: cell, resolved: resolved) {

@@ -165,7 +165,40 @@ them, which in Unicode is the light weight only. A `RoundedRectangle` draws them
 with either join. The size of its `cornerRadius` has no other effect: a cell
 grid has one size of rounded corner.
 
-Curved shapes and custom paths stroke onto the Braille grid and do not dash yet.
+Curved shapes and custom paths dash too, in Braille dots, and in the same unit:
+`dash: [2, 2]` is the same length on a `Circle` as on a `Rectangle`.
+
+## Trim A Shape
+
+`trim(from:to:)` keeps the part of a shape's outline between two fractions of
+its length. It is how a progress ring and a line that draws itself on are built:
+
+```swift
+Circle()
+  .trim(from: 0, to: progress)
+  .stroke(.tint)
+```
+
+The outline starts where SwiftUI starts it and runs clockwise. A `Rectangle`
+starts at its top-leading corner. A `RoundedRectangle`, a `Circle`, an `Ellipse`
+and a `Capsule` start at the middle of their trailing edge and go down first. A
+custom path starts where you authored it to. A fraction is a share of the
+outline's length on screen, so a quarter of a rectangle is a quarter of the way
+round it, whatever its proportions in cells.
+
+```swift
+Rectangle().trim(from: 0, to: 0.25).stroke(style: .single)   // 9 x 4
+//  ╶──────╴
+```
+
+On a line glyph palette, a trim end that falls inside a cell draws a half-line,
+as a dash end does. A dash on a trimmed stroke is measured from the start of the
+trimmed part. The interval animates on a stroke; see <doc:Animating-Views>.
+
+A fill of a trimmed shape closes the trimmed outline with a straight line and
+fills it, as SwiftUI does. It takes the custom-path route, so it stretches to its
+frame: a trimmed `Circle` fill is not aspect-corrected the way a `Circle` fill
+is, and its interval does not animate smoothly.
 
 ## Differences from SwiftUI
 
@@ -173,8 +206,8 @@ SwiftTUI shapes target a cell grid rasterized to Braille subpixels, not a
 resolution-independent vector canvas. Some of SwiftUI's `Shape` API is therefore
 **deliberately absent, not missing**:
 
-- **No SwiftUI-style shape transform modifiers.** `trim(from:to:)`, shape
-  `rotation`, `scale`, and `transform` modifiers are absent. To author a path
+- **No SwiftUI-style shape transform modifiers.** Shape `rotation`, `scale`,
+  `offset` and `transform` modifiers are absent. `trim(from:to:)` exists. To author a path
   in a different coordinate space, use `Path.scaledBy(sx:sy:)` and
   `Path.translatedBy(dx:dy:)`. View-level `.offset` moves the placed result.
 - **No `lineWidth:` stroke overloads.** Terminal strokes are one cell wide.

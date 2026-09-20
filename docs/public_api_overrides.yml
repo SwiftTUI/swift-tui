@@ -596,6 +596,7 @@ classifications:
     - SwiftTUIViews.ForEachBindingElement
     - SwiftTUIViews.InsetShape
     - SwiftTUIViews.InsettableShape
+    - SwiftTUIViews.TrimmedShape
     - "SwiftTUIViews.neverBody()"
     - SwiftTUIViews.Shape
 

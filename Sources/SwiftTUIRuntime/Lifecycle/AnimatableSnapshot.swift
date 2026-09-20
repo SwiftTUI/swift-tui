@@ -95,6 +95,13 @@ package struct AnimatableSnapshot: Sendable {
       snapshot[.strokeDashPhase] = AnyAnimatable(stroke.dashPhase)
     }
 
+    // A trimmed stroke animates its interval, which is how an outline draws
+    // itself on. An untrimmed stroke has no slot, for the reason a solid stroke
+    // has no dash-phase slot.
+    if let trim = Self.strokeStyle(of: node)?.trim {
+      snapshot[.shapeTrim] = AnyAnimatable(AnimatablePair(trim.from, trim.to))
+    }
+
     // A `Text` that resolved with a content transition: the at-rest roll
     // value carries the string so a string change starts a roll. Nodes
     // without the stamp (the default `.identity`) have no slot and cut.
@@ -178,23 +185,55 @@ package struct AnimatableSnapshot: Sendable {
     self[.frameHeight]?.unwrap(as: Int.self)
   }
 
-  /// The stroke style a node dashes with, from whichever of the three places
+  /// The stroke style a node draws with, from whichever of the three places
   /// carries it: a border keeps its join and dash in the draw metadata, and a
   /// shape stroke and a rule keep theirs in the draw payload.
-  package static func dashedStroke(of node: ResolvedNode) -> StrokeStyle? {
-    let stroke: StrokeStyle?
+  package static func strokeStyle(of node: ResolvedNode) -> StrokeStyle? {
     if case .border = node.layoutBehavior {
-      stroke = node.drawMetadata.layoutBorderStroke
-    } else if case .shape(let payload) = node.drawPayload,
+      return node.drawMetadata.layoutBorderStroke
+    }
+    if case .shape(let payload) = node.drawPayload,
       case .stroke(_, let strokeStyle, _, _) = payload.operation
     {
-      stroke = strokeStyle
-    } else if case .rule(let strokeStyle) = node.drawPayload {
-      stroke = strokeStyle
-    } else {
-      stroke = nil
+      return strokeStyle
     }
-    guard let stroke, !stroke.effectiveDash.isEmpty else {
+    if case .rule(let strokeStyle) = node.drawPayload {
+      return strokeStyle
+    }
+    return nil
+  }
+
+  /// Writes a stroke style back to the place ``strokeStyle(of:)`` read it from.
+  /// None of the three is layout state, so a dash phase or a trim that changes
+  /// every tick cannot invalidate layout.
+  package static func setStrokeStyle(_ stroke: StrokeStyle, on node: inout ResolvedNode) {
+    if case .border = node.layoutBehavior {
+      var drawMetadata = node.drawMetadata
+      drawMetadata.layoutBorderStroke = stroke
+      node.drawMetadata = drawMetadata
+    } else if case .shape(let payload) = node.drawPayload,
+      case .stroke(let style, _, let strokeBorder, let backgroundStyle) = payload.operation
+    {
+      node.drawPayload = .shape(
+        ShapePayload(
+          geometry: payload.geometry,
+          insetAmount: payload.insetAmount,
+          operation: .stroke(
+            style: style,
+            strokeStyle: stroke,
+            strokeBorder: strokeBorder,
+            backgroundStyle: backgroundStyle
+          )
+        )
+      )
+    } else if case .rule = node.drawPayload {
+      node.drawPayload = .rule(stroke)
+    }
+  }
+
+  /// The stroke style a node dashes with, or `nil` for a solid stroke.
+  package static func dashedStroke(of node: ResolvedNode) -> StrokeStyle? {
+    guard let stroke = strokeStyle(of: node), !stroke.effectiveDash.isEmpty else {
       return nil
     }
     return stroke

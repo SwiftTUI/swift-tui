@@ -342,32 +342,16 @@ package enum AnimationPropertyValueApplication {
         return
       }
       stroke.dashPhase = phase
-      // Write the phase back to the place `dashedStroke(of:)` read it from.
-      // None of the three is layout state, so a phase that changes every tick
-      // cannot invalidate layout.
-      if case .border = node.layoutBehavior {
-        var drawMetadata = node.drawMetadata
-        drawMetadata.layoutBorderStroke = stroke
-        node.drawMetadata = drawMetadata
-      } else if case .shape(let shapePayload) = node.drawPayload,
-        case .stroke(let style, _, let strokeBorder, let backgroundStyle) =
-          shapePayload.operation
-      {
-        node.drawPayload = .shape(
-          ShapePayload(
-            geometry: shapePayload.geometry,
-            insetAmount: shapePayload.insetAmount,
-            operation: .stroke(
-              style: style,
-              strokeStyle: stroke,
-              strokeBorder: strokeBorder,
-              backgroundStyle: backgroundStyle
-            )
-          )
-        )
-      } else if case .rule = node.drawPayload {
-        node.drawPayload = .rule(stroke)
+      AnimatableSnapshot.setStrokeStyle(stroke, on: &node)
+
+    case .shapeTrim:
+      guard let interval = value.unwrap(as: AnimatablePair<Double, Double>.self),
+        var stroke = AnimatableSnapshot.strokeStyle(of: node), stroke.trim != nil
+      else {
+        return
       }
+      stroke.trim = StrokeTrim(from: interval.first, to: interval.second)
+      AnimatableSnapshot.setStrokeStyle(stroke, on: &node)
 
     case .textRoll:
       // The roll only decorates a node whose payload is the string it rolls

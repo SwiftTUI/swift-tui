@@ -56,6 +56,13 @@ public struct StrokeStyle: Equatable, Sendable {
   /// clockwise, as in SwiftUI.
   public var dashPhase: Double
 
+  /// The part of the outline the stroke keeps. `Shape.trim(from:to:)` sets it.
+  ///
+  /// SwiftUI trims the shape, not the stroke style, and so does the public API
+  /// here. The interval travels on the style because a trim is the same kind of
+  /// thing as a dash: a test on position along the outline.
+  package var trim: StrokeTrim?
+
   public enum Placement: Equatable, Sendable {
     case outset
     case inset
@@ -86,6 +93,13 @@ public struct StrokeStyle: Equatable, Sendable {
 }
 
 extension StrokeStyle {
+  /// This style, keeping only part of the outline. `nil` keeps all of it.
+  package func trimmed(to trim: StrokeTrim?) -> StrokeStyle {
+    var copy = self
+    copy.trim = trim
+    return copy
+  }
+
   /// The dash the stroke draws.
   ///
   /// `BorderSet.dashed` and `BorderSet.dashedHeavy` carry their rhythm as a
@@ -124,6 +138,26 @@ extension StrokeStyle {
   public static let dashed = StrokeStyle(borderSet: .single, dash: [1, 1])
   /// A heavy line, one cell width on and one off.
   public static let dashedHeavy = StrokeStyle(borderSet: .heavy, dash: [1, 1])
+}
+
+/// The part of a stroke's outline that is drawn, as fractions of its length.
+package struct StrokeTrim: Equatable, Sendable {
+  package var from: Double
+  package var to: Double
+
+  /// Both fractions are clamped to `0...1`. A value that is not finite reads as
+  /// the nearer end, so the interval is always ordered or empty.
+  package init(from: Double, to: Double) {
+    func clamped(_ value: Double, fallback: Double) -> Double {
+      value.isFinite ? min(1, max(0, value)) : fallback
+    }
+    self.from = clamped(from, fallback: 0)
+    self.to = clamped(to, fallback: 1)
+  }
+
+  package var isEmpty: Bool {
+    !(from < to)
+  }
 }
 
 /// Per-edge background styling used behind stroked borders.

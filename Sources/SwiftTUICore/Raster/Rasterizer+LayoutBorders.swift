@@ -101,7 +101,7 @@ extension Rasterizer {
     track.forEachGlyph(
       pen: StrokePen(borderSet: set, roundsCorners: stroke.lineJoin == .round),
       sides: drawnSides,
-      dash: StrokeDashPattern(dash: stroke.effectiveDash, phase: stroke.dashPhase),
+      mask: StrokeMask(stroke),
       // Per-row cull (D70).
       rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(outer.origin.y + $0) } }
     ) { cell, glyph in

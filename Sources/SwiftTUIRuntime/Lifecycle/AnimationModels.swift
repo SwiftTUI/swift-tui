@@ -42,6 +42,7 @@ package enum AnimatableSlot: Hashable, Sendable {
   case borderShapeStyle
   case borderBlendPhase
   case strokeDashPhase
+  case shapeTrim
   case padding
   case offset
   case position

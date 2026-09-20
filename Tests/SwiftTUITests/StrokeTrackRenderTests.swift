@@ -254,4 +254,21 @@ struct StrokeTrackRenderTests {
     #expect(cells[0][2].style?.foregroundColor == Color.black)
     #expect(cells[0][3].style?.foregroundColor == Color.black)
   }
+
+  @Test(
+    "a dashed Divider draws the cells a dashed one-row stroke draws",
+    arguments: [
+      StrokeStyle(borderSet: .single, dash: [1, 1]),
+      StrokeStyle(borderSet: .heavy, dash: [1, 1]),
+      StrokeStyle(borderSet: .dashed),
+      StrokeStyle(borderSet: .single, dash: [3, 2], dashPhase: 1),
+    ])
+  func dividerMatchesStroke(style: StrokeStyle) {
+    // STUI-519: a rule and a shape stroke both read only the first glyph of a
+    // dashed set, so both drew solid. One walk draws them now.
+    let rule = lines(VStack { Divider(strokeStyle: style) }, width: 10, height: 1)
+    #expect(rule == lines(Rectangle().stroke(style: style), width: 10, height: 1))
+    #expect(rule == lines(Rectangle().strokeBorder(style: style), width: 10, height: 1))
+    #expect(rule != lines(VStack { Divider() }, width: 10, height: 1))
+  }
 }

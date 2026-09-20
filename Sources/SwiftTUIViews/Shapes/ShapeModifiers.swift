@@ -7,7 +7,7 @@ extension Shape {
   public func fill<S: ShapeStyle>(_ style: S) -> some View {
     ShapeRenderView(
       kindName: kindName,
-      geometry: geometry,
+      geometry: fillGeometry,
       insetAmount: insetAmount,
       operation: .fill(style: AnyShapeStyle(style), mode: .full)
     )
@@ -21,7 +21,7 @@ extension Shape {
   public func fill() -> some View {
     ShapeRenderView(
       kindName: kindName,
-      geometry: geometry,
+      geometry: fillGeometry,
       insetAmount: insetAmount,
       operation: .fill(style: nil, mode: .full)
     )
@@ -90,7 +90,7 @@ extension Shape {
       insetAmount: insetAmount,
       operation: .stroke(
         style: AnyShapeStyle(style),
-        strokeStyle: strokeStyle,
+        strokeStyle: strokeStyle.trimmed(to: strokeTrim),
         strokeBorder: false,
         backgroundStyle: backgroundStyle
       )
@@ -107,7 +107,7 @@ extension Shape {
       insetAmount: insetAmount,
       operation: .stroke(
         style: nil,
-        strokeStyle: strokeStyle,
+        strokeStyle: strokeStyle.trimmed(to: strokeTrim),
         strokeBorder: false,
         backgroundStyle: backgroundStyle
       )
@@ -181,7 +181,7 @@ extension InsettableShape {
       insetAmount: insetAmount,
       operation: .stroke(
         style: AnyShapeStyle(style),
-        strokeStyle: strokeStyle,
+        strokeStyle: strokeStyle.trimmed(to: strokeTrim),
         strokeBorder: true,
         backgroundStyle: backgroundStyle
       )
@@ -198,7 +198,7 @@ extension InsettableShape {
       insetAmount: insetAmount,
       operation: .stroke(
         style: nil,
-        strokeStyle: strokeStyle,
+        strokeStyle: strokeStyle.trimmed(to: strokeTrim),
         strokeBorder: true,
         backgroundStyle: backgroundStyle
       )
