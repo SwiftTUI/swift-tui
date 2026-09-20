@@ -18,7 +18,7 @@ struct CurvedInteriorFillTests {
         DefaultRenderer().render(
           EmptyView().frame(width: width, height: 6, alignment: .topLeading)
             .background(fill)
-            .overlay { shape.strokeBorder(Color.white, style: StrokeStyle(lineWidth: 2)) },
+            .overlay { shape.strokeBorder(Color.white, style: StrokeStyle(legacyLineWidth: 2)) },
           context: .init(identity: testIdentity("T267")))
       }
       return gradient ? renderBackground(background) : renderBackground(Color.blue)

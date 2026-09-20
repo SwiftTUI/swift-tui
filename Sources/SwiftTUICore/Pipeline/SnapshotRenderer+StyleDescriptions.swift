@@ -208,7 +208,7 @@ extension SnapshotRenderer {
 
   func describe(_ strokeStyle: StrokeStyle) -> String {
     var description =
-      "width:\(strokeStyle.lineWidth),set:\(describeBorderSetName(strokeStyle.borderSet))"
+      "width:\(strokeStyle.legacyLineWidth),set:\(describeBorderSetName(strokeStyle.borderSet))"
     // Only a non-default join or dash is described, so a solid stroke reads as
     // it always did.
     if strokeStyle.lineJoin == .round {

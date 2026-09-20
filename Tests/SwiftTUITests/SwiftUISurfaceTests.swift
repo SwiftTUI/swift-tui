@@ -1720,7 +1720,7 @@ struct SwiftUISurfaceTests {
   func explicitBorderBackgroundOnlyStylesBorderRing() {
     let artifacts = DefaultRenderer().render(
       RoundedRectangle(cornerRadius: 1)
-        .strokeBorder(.danger, background: AnyShapeStyle(.warning))
+        .strokeBorder(.danger, background: BorderBackgroundStyle(AnyShapeStyle(.warning)))
         .frame(width: 5, height: 3, alignment: .topLeading),
       context: .init(identity: testIdentity("BorderBackground"))
     )
@@ -1735,8 +1735,9 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.cells[1][2].style == nil)
   }
 
-  @Test("public strokeBorder background styles the full border ring")
+  @Test("the deprecated strokeBorder background still styles the full border ring")
   @MainActor
+  @available(*, deprecated)
   func publicStrokeBorderBackgroundStylesBorderRing() {
     let artifacts = DefaultRenderer().render(
       RoundedRectangle(cornerRadius: 1)
@@ -6442,7 +6443,7 @@ struct SwiftUISurfaceTests {
         }
         .overlay {
           RoundedRectangle(cornerRadius: 1)
-            .strokeBorder(.separator, background: .warning)
+            .strokeBorder(.separator, background: BorderBackgroundStyle(.warning))
         },
       context: .init(identity: testIdentity("TightFrame")),
       proposal: .init(width: 8, height: 1)
@@ -6586,7 +6587,7 @@ struct SwiftUISurfaceTests {
             }
             .overlay {
               RoundedRectangle(cornerRadius: 1)
-                .strokeBorder(.separator, background: .warning)
+                .strokeBorder(.separator, background: BorderBackgroundStyle(.warning))
             }
         }
       }

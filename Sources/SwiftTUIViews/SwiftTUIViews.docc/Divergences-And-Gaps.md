@@ -681,9 +681,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   adapters are absent. SwiftTUI's continuous cell-space paths can support
   additive transforms before rasterization, with the result quantized at the
   cell boundary; they are an open direction, not part of the current API.
-- **Strokes are one cell wide.** *Ratified.* There are no `lineWidth:` stroke
-  overloads; authors select apparent weight through the glyph palette via
-  `borderSet`.
+- **Strokes are one cell wide.** *Ratified.* SwiftUI's `lineWidth: 1` is a
+  hairline, and the thinnest ink a cell holds is a line glyph, so a cell grid
+  has no line width to set. There are no `lineWidth:` stroke overloads, and
+  `StrokeStyle.lineWidth` is deprecated. Authors select apparent weight through
+  the glyph palette via `borderSet`. A thick border is a fill: fill a shape,
+  and fill a smaller one inside it with `inset(by:)`.
 - **Dash lengths are cell widths, measured round the outline.** *Ratified.*
   SwiftUI measures `dash` and `dashPhase` in points. SwiftTUI measures them in
   cell widths along the stroke's outline. A cell on a vertical run counts as the

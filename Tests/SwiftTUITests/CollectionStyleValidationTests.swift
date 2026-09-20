@@ -51,7 +51,7 @@ struct CollectionStyleValidationTests {
     }
     for width in [0, Int.max] {
       var value = ListStylePresentation.insetGrouped
-      value.container?.strokeStyle.lineWidth = width
+      value.container?.strokeStyle.legacyLineWidth = width
       invalid.append(value)
     }
     for value in invalid {

@@ -130,7 +130,7 @@ extension LayoutEngine {
   /// request borders on a subset of edges (e.g. top only).
   package func borderLayoutInsets(
     set: BorderSet,
-    placement: StrokeStyle.Placement,
+    placement: BorderPlacement,
     sides: Edge.Set
   ) -> EdgeInsets {
     guard placement != .inset else { return EdgeInsets() }

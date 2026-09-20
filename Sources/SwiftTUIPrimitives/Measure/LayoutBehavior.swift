@@ -50,7 +50,7 @@ package enum LayoutBehavior: Sendable {
   /// (see the 1024-deep ResolvedNode regression tests).
   indirect case border(
     BorderSet,
-    placement: StrokeStyle.Placement,
+    placement: BorderPlacement,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
     blend: BorderBlend?,
@@ -194,7 +194,7 @@ extension LayoutBehavior {
     }
 
     // `.border` measurement depends on the chosen ``BorderSet``,
-    // the ``Placement``, and the active ``Edge.Set`` — all three feed
+    // the ``BorderPlacement``, and the active ``Edge.Set`` — all three feed
     // ``borderLayoutInsets``, the single function the layout engine
     // consults at lines 489 and 733 of ``LayoutEngine``.
     // Specifically: `.inset` placement returns zero ``EdgeInsets()``,

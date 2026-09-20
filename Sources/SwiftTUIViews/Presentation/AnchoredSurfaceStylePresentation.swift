@@ -70,7 +70,7 @@ public struct AnchoredSurfaceStylePresentation: Sendable, Equatable {
     maximumWidth: Int? = nil,
     maximumHeight: Int = .max,
     backgroundStyle: AnyShapeStyle = AnyShapeStyle(.terminalSurfaceBackground),
-    borderStroke: StrokeStyle = StrokeStyle(borderSet: .innerHalfBlock, placement: .outset),
+    borderStroke: StrokeStyle = .innerHalfBlock,
     borderStyle: AnyShapeStyle? = nil
   ) {
     self.contentInsets = contentInsets

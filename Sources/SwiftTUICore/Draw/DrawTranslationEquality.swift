@@ -162,7 +162,7 @@ extension DrawCommand {
   package var inkRects: [CellRect] {
     switch self {
     case .stroke(let bounds, .rectangle, 0, _, let strokeStyle, _, nil):
-      return Self.perimeterRects(of: bounds, thickness: max(1, strokeStyle.lineWidth))
+      return Self.perimeterRects(of: bounds, thickness: max(1, strokeStyle.legacyLineWidth))
     case .border(let bounds, _, _, nil, _, _, let sides):
       var rects: [CellRect] = []
       if sides.contains(.top) {

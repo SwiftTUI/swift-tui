@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 171 | 1513 |
+| `SwiftTUIPrimitives` | 172 | 1516 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -877,8 +877,9 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `Visibility` — enum — 4 members
 - `XYZColor` — struct — 6 members
 
-### Package-only seams (1)
+### Package-only seams (2)
 
+- `BorderPlacement` — enum — 2 members
 - `BoxedPath` — struct
 
 ## SwiftTUIGraph

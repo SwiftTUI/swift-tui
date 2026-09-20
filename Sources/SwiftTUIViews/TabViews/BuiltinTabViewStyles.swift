@@ -565,7 +565,7 @@ private struct LiteralTabsOverflowMenuView: View {
       {
         if let backgroundStyle = overflow.backgroundStyle {
           RoundedRectangle(cornerRadius: overflow.cornerRadius)
-            .strokeBorder(borderStyle, background: backgroundStyle)
+            .strokeBorder(borderStyle, background: BorderBackgroundStyle(backgroundStyle))
         } else {
           RoundedRectangle(cornerRadius: overflow.cornerRadius)
             .strokeBorder(borderStyle)

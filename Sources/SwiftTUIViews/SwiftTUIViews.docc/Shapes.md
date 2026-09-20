@@ -261,8 +261,9 @@ resolution-independent vector canvas. Some of SwiftUI's `Shape` API is therefore
   `offset` and `transform` modifiers are absent. `trim(from:to:)` exists. To author a path
   in a different coordinate space, use `Path.scaledBy(sx:sy:)` and
   `Path.translatedBy(dx:dy:)`. View-level `.offset` moves the placed result.
-- **No `lineWidth:` stroke overloads.** Terminal strokes are one cell wide.
-  `StrokeStyle` carries `lineWidth` only as a reserved field.
+- **No `lineWidth:` stroke overloads.** Terminal strokes are one cell wide,
+  and `StrokeStyle.lineWidth` is deprecated. For a thick border, fill a shape
+  and fill a smaller one inside it with `inset(by:)`.
   Stroke weight is expressed through the glyph palette (`borderSet`: `.single`,
   `.heavy`, `.double`, …) instead. A thick solid band is a fill: fill the shape,
   then fill `inset(by:)` over it.

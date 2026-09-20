@@ -202,7 +202,8 @@ private struct BorderedPortalSurface<Content: View>: View {
         Rectangle().strokeBorder(
           borderStyle ?? AnyShapeStyle(.terminalBorder(.accent)),
           style: borderStroke,
-          background: backgroundStyle ?? AnyShapeStyle(.terminalSurfaceBackground))
+          background: BorderBackgroundStyle(
+            backgroundStyle ?? AnyShapeStyle(.terminalSurfaceBackground)))
       }
       .frame(
         minWidth: .finite(minimumWidth),

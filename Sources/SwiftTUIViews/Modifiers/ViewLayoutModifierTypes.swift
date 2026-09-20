@@ -166,7 +166,7 @@ public struct SafeAreaInsetModifier<Inset: View>: IterativePrimitiveViewModifier
 /// The rasterizer paints the glyphs into the reserved cells.
 public struct BorderModifier: IterativePrimitiveViewModifier, Sendable, Equatable {
   package var set: BorderSet
-  package var placement: StrokeStyle.Placement
+  package var placement: BorderPlacement
   package var foreground: BorderEdgeStyle?
   package var background: BorderBackgroundStyle?
   package var blend: BorderBlend?

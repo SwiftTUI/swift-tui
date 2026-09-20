@@ -23,27 +23,24 @@ func strokeStyleInitDefaultIsSquareSingleLine() {
   #expect(style.dashPhase == 0)
 }
 
-@Test("StrokeStyle.init defaults placement to .inset")
-func strokeStyleInitDefaultPlacementIsInset() {
-  let style = StrokeStyle()
-  #expect(style.placement == .inset)
-}
-
-@Test("StrokeStyle static conveniences inherit inset placement")
-func strokeStyleStaticConveniencesDefaultToInset() {
-  let styles: [StrokeStyle] = [
-    .rounded, .heavy, .single, .double, .singleDouble, .doubleSingle, .ascii, .block,
-    .innerHalfBlock, .outerHalfBlock, .hidden, .none, .markdown, .dashed, .dashedHeavy,
-  ]
-  #expect(styles.allSatisfy { $0.placement == .inset })
-}
-
-@Test("StrokeStyle keeps explicit outset placement")
-func strokeStyleSupportsExplicitOutset() {
-  #expect(StrokeStyle(placement: .outset).placement == .outset)
-}
-
-@Test("StrokeStyle.init lineWidth defaults to 1")
-func strokeStyleInitDefaultLineWidth() {
+@Test("the deprecated lineWidth and placement still read and write, for the deprecation window")
+@available(*, deprecated)
+func deprecatedLineWidthAndPlacement() {
   #expect(StrokeStyle().lineWidth == 1)
+  #expect(StrokeStyle().placement == .inset)
+  #expect(StrokeStyle(placement: .outset).placement == .outset)
+  #expect(StrokeStyle(lineWidth: 2).lineWidth == 2)
+  // A width below one is one.
+  #expect(StrokeStyle(lineWidth: 0).lineWidth == 1)
+
+  var style = StrokeStyle()
+  style.lineWidth = 3
+  style.placement = .outset
+  #expect(style == StrokeStyle(legacyLineWidth: 3, legacyPlacement: .outset))
+  style.lineWidth = -4
+  #expect(style.lineWidth == 1)
+
+  // The old spelling of the type names the new one.
+  let placement: StrokeStyle.Placement = .outset
+  #expect(placement == BorderPlacement.outset)
 }

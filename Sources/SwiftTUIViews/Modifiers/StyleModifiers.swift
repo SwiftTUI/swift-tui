@@ -1350,7 +1350,7 @@ extension View {
   public func border<S: ShapeStyle>(
     _ style: S = SemanticShapeStyle.foreground,
     set: BorderSet,
-    placement: StrokeStyle.Placement = .inset,
+    placement: BorderPlacement = .inset,
     sides: Edge.Set = .all
   ) -> some View {
     borderModified(
@@ -1391,7 +1391,7 @@ extension View {
   public func border<S: ShapeStyle>(
     _ style: S = SemanticShapeStyle.foreground,
     style strokeStyle: StrokeStyle = .init(),
-    placement: StrokeStyle.Placement = .inset,
+    placement: BorderPlacement = .inset,
     sides: Edge.Set = .all
   ) -> some View {
     borderModified(
@@ -1426,7 +1426,7 @@ extension View {
   public func border(
     _ style: BorderEdgeStyle,
     set: BorderSet = .single,
-    placement: StrokeStyle.Placement = .inset,
+    placement: BorderPlacement = .inset,
     sides: Edge.Set = .all
   ) -> some View {
     edgeStyledBorder(style, set: set, placement: placement, sides: sides)
@@ -1439,7 +1439,7 @@ extension View {
   package func edgeStyledBorder(
     _ style: BorderEdgeStyle,
     set: BorderSet = .single,
-    placement: StrokeStyle.Placement = .inset,
+    placement: BorderPlacement = .inset,
     sides: Edge.Set = .all
   ) -> some View {
     borderModified(
@@ -1473,7 +1473,7 @@ extension View {
   public func border(
     blend: BorderBlend,
     set: BorderSet = .single,
-    placement: StrokeStyle.Placement = .inset,
+    placement: BorderPlacement = .inset,
     sides: Edge.Set = .all,
     phase: Double = 0
   ) -> some View {
@@ -1489,7 +1489,7 @@ extension View {
   package func blendBorder(
     blend: BorderBlend,
     set: BorderSet = .single,
-    placement: StrokeStyle.Placement = .inset,
+    placement: BorderPlacement = .inset,
     sides: Edge.Set = .all,
     phase: Double = 0
   ) -> some View {
@@ -1506,7 +1506,7 @@ extension View {
 
   private func borderModified(
     set: BorderSet,
-    placement: StrokeStyle.Placement,
+    placement: BorderPlacement,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
     blend: BorderBlend?,

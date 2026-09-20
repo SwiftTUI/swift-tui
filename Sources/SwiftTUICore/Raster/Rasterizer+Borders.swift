@@ -68,7 +68,7 @@ extension Rasterizer {
       startsAtTrailingEdge = false
     }
     let pen = StrokePen(borderSet: strokeStyle.borderSet, roundsCorners: roundsCorners)
-    let lineWidth = max(1, strokeStyle.lineWidth)
+    let lineWidth = max(1, strokeStyle.legacyLineWidth)
     for inset in 0..<lineWidth {
       let insetRect = insetBounds(shapeBounds, by: inset)
       guard insetRect.size.width > 0, insetRect.size.height > 0 else {

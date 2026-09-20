@@ -66,6 +66,17 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   `BorderEdgeStyle`. Stack one `border(_:sides:)` for each color. The borders
   join at their corners, and a corner takes the color of the border applied
   last.
+- `StrokeStyle.lineWidth` and `StrokeStyle.init(lineWidth:…)`. A stroke is one
+  cell wide: SwiftUI's `lineWidth: 1` is a hairline, and the thinnest ink a cell
+  holds is a line glyph. For a thick border, fill a shape and fill a smaller one
+  inside it with `inset(by:)`. `StrokeStyle.init(borderSet:lineJoin:dash:dashPhase:)`
+  is the initializer to use.
+- `StrokeStyle.placement`, which nothing read, and the `StrokeStyle.Placement`
+  name. The type is now `BorderPlacement`, and `placement: .outset` on
+  `View.border` is unchanged.
+- The `background:` overloads of `Shape.stroke` and `Shape.strokeBorder`. A
+  stroke keeps the background of the cells it draws on, so put a fill or a
+  `background` under it.
 - `View.border(_:set:placement:sides:)`. Pass a `StrokeStyle`: `set: .double`
   becomes `style: .double`. The `set:` argument no longer has a default. The
   spelling stays for one release so that code can build against both this

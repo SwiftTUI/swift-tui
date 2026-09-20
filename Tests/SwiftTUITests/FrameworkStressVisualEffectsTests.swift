@@ -460,7 +460,7 @@ extension FrameworkStressVisualEffectsTests {
 extension FrameworkStressVisualEffectsTests {
   @Test("stress visual effects 009 shape stroke follows inset and outset placement")
   func visualEffects009ShapeStrokeFollowsInsetAndOutsetPlacement() {
-    // Hypothesis: retained shape payloads can preserve StrokeStyle.Placement independently from
+    // Hypothesis: retained shape payloads can preserve BorderPlacement independently from
     // their current border glyph set, shifting a live stroke by one cell after placement churn.
     struct Root: View {
       let generation: Int
@@ -470,20 +470,20 @@ extension FrameworkStressVisualEffectsTests {
           .stroke(
             Color.yellow,
             style: StrokeStyle(
-              lineWidth: 1,
+              legacyLineWidth: 1,
               borderSet: .single,
-              placement: generation.isMultiple(of: 2) ? .outset : .inset
+              legacyPlacement: generation.isMultiple(of: 2) ? .outset : .inset
             )
           )
           .frame(width: 20, height: 8)
       }
     }
 
-    func placement(in node: ResolvedNode) -> StrokeStyle.Placement? {
+    func placement(in node: ResolvedNode) -> BorderPlacement? {
       if case .shape(let payload) = node.drawPayload,
         case .stroke(_, let style, _, _) = payload.operation
       {
-        return style.placement
+        return style.legacyPlacement
       }
       for child in node.children {
         if let value = placement(in: child) {
@@ -536,7 +536,7 @@ extension FrameworkStressVisualEffectsTests {
 
       var body: some View {
         Capsule()
-          .stroke(Color.white, style: .double, background: background)
+          .stroke(Color.white, style: .double, background: BorderBackgroundStyle(background))
           .frame(width: 24, height: 9)
       }
     }

@@ -967,6 +967,9 @@ SwiftTUIPrimitives.BorderEdgeStyle.init(topBottom:leftRight:)
 SwiftTUIPrimitives.BorderEdgeStyle.left
 SwiftTUIPrimitives.BorderEdgeStyle.right
 SwiftTUIPrimitives.BorderEdgeStyle.top
+SwiftTUIPrimitives.BorderPlacement
+SwiftTUIPrimitives.BorderPlacement.inset
+SwiftTUIPrimitives.BorderPlacement.outset
 SwiftTUIPrimitives.BorderSet
 SwiftTUIPrimitives.BorderSet.ascii
 SwiftTUIPrimitives.BorderSet.block
@@ -1909,8 +1912,6 @@ SwiftTUIPrimitives.StrokeStyle.LineJoin
 SwiftTUIPrimitives.StrokeStyle.LineJoin.miter
 SwiftTUIPrimitives.StrokeStyle.LineJoin.round
 SwiftTUIPrimitives.StrokeStyle.Placement
-SwiftTUIPrimitives.StrokeStyle.Placement.inset
-SwiftTUIPrimitives.StrokeStyle.Placement.outset
 SwiftTUIPrimitives.StrokeStyle.ascii
 SwiftTUIPrimitives.StrokeStyle.block
 SwiftTUIPrimitives.StrokeStyle.borderSet
@@ -1922,6 +1923,8 @@ SwiftTUIPrimitives.StrokeStyle.double
 SwiftTUIPrimitives.StrokeStyle.doubleSingle
 SwiftTUIPrimitives.StrokeStyle.heavy
 SwiftTUIPrimitives.StrokeStyle.hidden
+SwiftTUIPrimitives.StrokeStyle.init(borderSet:lineJoin:dash:dashPhase:)
+SwiftTUIPrimitives.StrokeStyle.init(borderSet:placement:lineJoin:dash:dashPhase:)
 SwiftTUIPrimitives.StrokeStyle.init(lineWidth:borderSet:placement:lineJoin:dash:dashPhase:)
 SwiftTUIPrimitives.StrokeStyle.innerHalfBlock
 SwiftTUIPrimitives.StrokeStyle.lineJoin

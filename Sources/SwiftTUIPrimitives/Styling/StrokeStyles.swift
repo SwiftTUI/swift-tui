@@ -6,27 +6,49 @@
 ///   them)
 /// - a ``dash`` pattern and a ``dashPhase``, measured along the outline in
 ///   cell widths. Changing the phase moves the pattern round the outline.
-/// - a numeric `lineWidth` (currently always 1, reserved for future use)
-/// - a ``Placement`` (`.outset` reserves a cell on each side for the
-///   border. `.inset` draws the border into the outermost
-///   cells of the content frame).
+///
+/// A stroke is one cell wide. SwiftUI's `lineWidth: 1` is a hairline, and the
+/// thinnest ink a cell can hold is a line glyph, so there is no width to set.
+/// For a thick border, fill a shape and fill a smaller one inside it with
+/// `inset(by:)`.
 ///
 /// A border, a rectangle stroke and a `Divider` draw through one renderer, so
 /// the same style draws the same cells on all three.
 ///
-/// The default (``init(lineWidth:borderSet:placement:lineJoin:dash:dashPhase:)``
-/// with no arguments) is a solid ``BorderSet/single`` line with square corners,
-/// which is what SwiftUI's default stroke looks like. For rounded corners use
-/// ``rounded``, or stroke a `RoundedRectangle`. The built-in controls ask for
-/// rounded corners themselves, so they do not depend on this default.
+/// The default (``init(borderSet:lineJoin:dash:dashPhase:)`` with no arguments)
+/// is a solid ``BorderSet/single`` line with square corners, which is what
+/// SwiftUI's default stroke looks like. For rounded corners use ``rounded``, or
+/// stroke a `RoundedRectangle`. The built-in controls ask for rounded corners
+/// themselves, so they do not depend on this default.
 ///
-/// The default placement is `.inset`, so a stroke does not change layout
-/// allocation. Request `.outset` on a view's `border` when the border must
-/// reserve cells around content.
+/// A stroke does not change layout allocation. A view's `border` takes a
+/// ``BorderPlacement``, and `.outset` there reserves cells around the content.
 public struct StrokeStyle: Equatable, Sendable {
-  public var lineWidth: Int
+  /// The number of concentric rings a rectangle stroke draws. It backs the
+  /// deprecated ``lineWidth`` and goes with it.
+  package var legacyLineWidth: Int
   public var borderSet: BorderSet
-  public var placement: Placement
+  /// It backs the deprecated ``placement``, which nothing reads, and goes with
+  /// it.
+  package var legacyPlacement: BorderPlacement
+
+  @available(
+    *, deprecated,
+    message: "A stroke is one cell wide. For a thick border, fill a shape and inset it."
+  )
+  public var lineWidth: Int {
+    get { legacyLineWidth }
+    set { legacyLineWidth = max(1, newValue) }
+  }
+
+  @available(
+    *, deprecated,
+    message: "A stroke's placement has no effect. Pass placement: to the border modifier."
+  )
+  public var placement: BorderPlacement {
+    get { legacyPlacement }
+    set { legacyPlacement = newValue }
+  }
 
   /// How the stroke turns a corner.
   ///
@@ -63,10 +85,8 @@ public struct StrokeStyle: Equatable, Sendable {
   /// thing as a dash: a test on position along the outline.
   package var trim: StrokeTrim?
 
-  public enum Placement: Equatable, Sendable {
-    case outset
-    case inset
-  }
+  @available(*, deprecated, renamed: "BorderPlacement")
+  public typealias Placement = BorderPlacement
 
   public enum LineJoin: Equatable, Sendable {
     /// Square corners (`┌┐└┘`).
@@ -76,20 +96,77 @@ public struct StrokeStyle: Equatable, Sendable {
   }
 
   public init(
-    lineWidth: Int = 1,
     borderSet: BorderSet = .single,
-    placement: Placement = .inset,
     lineJoin: LineJoin = .miter,
     dash: [Double] = [],
     dashPhase: Double = 0
   ) {
-    self.lineWidth = max(1, lineWidth)
+    self.init(
+      legacyLineWidth: 1, borderSet: borderSet, legacyPlacement: .inset,
+      lineJoin: lineJoin, dash: dash, dashPhase: dashPhase)
+  }
+
+  @available(
+    *, deprecated,
+    message: "A stroke is one cell wide. For a thick border, fill a shape and inset it."
+  )
+  public init(
+    lineWidth: Int,
+    borderSet: BorderSet = .single,
+    placement: BorderPlacement = .inset,
+    lineJoin: LineJoin = .miter,
+    dash: [Double] = [],
+    dashPhase: Double = 0
+  ) {
+    self.init(
+      legacyLineWidth: lineWidth, borderSet: borderSet, legacyPlacement: placement,
+      lineJoin: lineJoin, dash: dash, dashPhase: dashPhase)
+  }
+
+  @available(
+    *, deprecated,
+    message: "A stroke's placement has no effect. Pass placement: to the border modifier."
+  )
+  public init(
+    borderSet: BorderSet = .single,
+    placement: BorderPlacement,
+    lineJoin: LineJoin = .miter,
+    dash: [Double] = [],
+    dashPhase: Double = 0
+  ) {
+    self.init(
+      legacyLineWidth: 1, borderSet: borderSet, legacyPlacement: placement,
+      lineJoin: lineJoin, dash: dash, dashPhase: dashPhase)
+  }
+
+  /// Every field, including the two behind the deprecated `lineWidth` and
+  /// `placement`. The deprecated initializers forward here, and so do the
+  /// framework's own tests, because the repository gate builds with warnings
+  /// as errors.
+  package init(
+    legacyLineWidth: Int,
+    borderSet: BorderSet = .single,
+    legacyPlacement: BorderPlacement = .inset,
+    lineJoin: LineJoin = .miter,
+    dash: [Double] = [],
+    dashPhase: Double = 0
+  ) {
+    self.legacyLineWidth = max(1, legacyLineWidth)
     self.borderSet = borderSet
-    self.placement = placement
+    self.legacyPlacement = legacyPlacement
     self.lineJoin = lineJoin
     self.dash = dash
     self.dashPhase = dashPhase
   }
+}
+
+/// Whether a view's `border` reserves cells for itself.
+public enum BorderPlacement: Equatable, Sendable {
+  /// The border reserves a cell on each side it draws, around the content.
+  case outset
+  /// The border draws into the outermost cells of the content's frame, and
+  /// does not change layout.
+  case inset
 }
 
 extension StrokeStyle {
@@ -161,6 +238,10 @@ package struct StrokeTrim: Equatable, Sendable {
 }
 
 /// Per-edge background styling used behind stroked borders.
+///
+/// The `stroke` and `strokeBorder` modifiers that take a `background:` are
+/// deprecated. A stroke keeps the background of the cells it draws on, so put a
+/// fill or a `background` under the stroke.
 public struct BorderBackgroundStyle: Equatable, Sendable {
   public var top: AnyShapeStyle?
   public var right: AnyShapeStyle?

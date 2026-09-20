@@ -45,6 +45,7 @@ extension Shape {
 
   /// Strokes the shape's outline with an explicit shape style and a border
   /// background.
+  @available(*, deprecated, message: "Put a fill or a background under the stroke.")
   public func stroke<S: ShapeStyle, B: ShapeStyle>(
     _ style: S,
     style strokeStyle: StrokeStyle = .init(),
@@ -69,6 +70,7 @@ extension Shape {
 
   /// Strokes the shape's outline with the inherited foreground style and a
   /// border background.
+  @available(*, deprecated, message: "Put a fill or a background under the stroke.")
   public func stroke<B: ShapeStyle>(
     style strokeStyle: StrokeStyle = .init(),
     background backgroundStyle: B
@@ -132,6 +134,7 @@ extension InsettableShape {
 
   /// Strokes a border inside the shape with an explicit shape style and a
   /// border background.
+  @available(*, deprecated, message: "Put a fill or a background under the stroke.")
   public func strokeBorder<S: ShapeStyle, B: ShapeStyle>(
     _ style: S,
     style strokeStyle: StrokeStyle = .init(),
@@ -160,6 +163,7 @@ extension InsettableShape {
 
   /// Strokes a border inside the shape with the inherited foreground style and
   /// a border background.
+  @available(*, deprecated, message: "Put a fill or a background under the stroke.")
   public func strokeBorder<B: ShapeStyle>(
     style strokeStyle: StrokeStyle = .init(),
     background backgroundStyle: B

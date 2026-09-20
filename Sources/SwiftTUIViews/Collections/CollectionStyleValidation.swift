@@ -8,7 +8,7 @@ extension ListStylePresentation {
       if !(0...maximum).contains(container.insetAmount) {
         problems.append("container.insetAmount must be a nonnegative, representable cell count")
       }
-      if !(1...maximum).contains(container.strokeStyle.lineWidth) {
+      if !(1...maximum).contains(container.strokeStyle.legacyLineWidth) {
         problems.append("container.strokeStyle.lineWidth must be positive and representable")
       }
       if case .interior(let width) = container.fillMode, !(0...maximum).contains(width) {

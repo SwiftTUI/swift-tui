@@ -6,11 +6,10 @@
 /// - **`BorderSet`** is *what* glyphs to draw. Top, bottom, side, and
 ///   corner characters. It also specifies optional middle-junction glyphs for tables and
 ///   subdivided containers.
-/// - **`StrokeStyle`** is *how* to draw them: line width, layout
-///   placement (``StrokeStyle/Placement/outset`` or
-///   ``StrokeStyle/Placement/inset``), and which `BorderSet` to use.
+/// - **`StrokeStyle`** is *how* to draw them: which `BorderSet` to use, how
+///   corners join, and the dash pattern.
 ///
-/// The framework's default (``StrokeStyle/init(lineWidth:borderSet:placement:lineJoin:dash:dashPhase:)``
+/// The framework's default (``StrokeStyle/init(borderSet:lineJoin:dash:dashPhase:)``
 /// with no arguments) selects ``single``, a line with square corners, as in
 /// SwiftUI. Callers who want rounded corners pass ``rounded``, and callers who
 /// want half-block chrome pass ``outerHalfBlock``. There is *no* implicit

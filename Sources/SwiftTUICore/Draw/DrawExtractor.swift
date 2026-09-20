@@ -216,7 +216,7 @@ extension DrawExtractor {
           drawMetadata.borderShapeStyle != nil,
           !drawsRule
         {
-          .interior(strokeWidth: borderStrokeStyle.lineWidth)
+          .interior(strokeWidth: borderStrokeStyle.legacyLineWidth)
         } else if drawMetadata.borderShapeStyle != nil, !drawsRule {
           .interior(strokeWidth: 1)
         } else {
@@ -587,7 +587,7 @@ extension DrawExtractor {
         bounds: placed.bounds,
         geometry: payload.geometry,
         insetAmount: payload.insetAmount,
-        strokeWidth: max(1, strokeStyle.lineWidth)
+        strokeWidth: max(1, strokeStyle.legacyLineWidth)
       )
     }
 
@@ -599,7 +599,7 @@ extension DrawExtractor {
       bounds: placed.bounds,
       geometry: .rectangle,
       insetAmount: 0,
-      strokeWidth: max(1, placed.drawMetadata.borderStrokeStyle?.lineWidth ?? 1)
+      strokeWidth: max(1, placed.drawMetadata.borderStrokeStyle?.legacyLineWidth ?? 1)
     )
   }
 
