@@ -6738,7 +6738,7 @@ private struct AnimationSkipScrollFocusContent: View {
           }
         }
         .frame(width: 72, height: 8, alignment: .topLeading)
-        .border(set: .rounded)
+        .border(style: .rounded)
         Text(lastCommand)
       }
       .padding(1)

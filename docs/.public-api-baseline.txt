@@ -1898,7 +1898,10 @@ SwiftTUIPrimitives.StrokeStyle.block
 SwiftTUIPrimitives.StrokeStyle.borderSet
 SwiftTUIPrimitives.StrokeStyle.dash
 SwiftTUIPrimitives.StrokeStyle.dashPhase
+SwiftTUIPrimitives.StrokeStyle.dashed
+SwiftTUIPrimitives.StrokeStyle.dashedHeavy
 SwiftTUIPrimitives.StrokeStyle.double
+SwiftTUIPrimitives.StrokeStyle.doubleSingle
 SwiftTUIPrimitives.StrokeStyle.heavy
 SwiftTUIPrimitives.StrokeStyle.hidden
 SwiftTUIPrimitives.StrokeStyle.init(lineWidth:borderSet:placement:lineJoin:dash:dashPhase:)
@@ -1906,9 +1909,12 @@ SwiftTUIPrimitives.StrokeStyle.innerHalfBlock
 SwiftTUIPrimitives.StrokeStyle.lineJoin
 SwiftTUIPrimitives.StrokeStyle.lineWidth
 SwiftTUIPrimitives.StrokeStyle.markdown
+SwiftTUIPrimitives.StrokeStyle.none
+SwiftTUIPrimitives.StrokeStyle.outerHalfBlock
 SwiftTUIPrimitives.StrokeStyle.placement
 SwiftTUIPrimitives.StrokeStyle.rounded
 SwiftTUIPrimitives.StrokeStyle.single
+SwiftTUIPrimitives.StrokeStyle.singleDouble
 SwiftTUIPrimitives.StyleEnvironmentSnapshot
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.==(_:_:)
 SwiftTUIPrimitives.StyleEnvironmentSnapshot.appearance

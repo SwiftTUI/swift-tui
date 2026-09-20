@@ -10,7 +10,7 @@ struct BorderModifierLayoutTests {
   @Test("public .border defaults to non-layout-affecting inset placement")
   func borderDefaultsToInsetLayout() {
     let artifacts = DefaultRenderer().render(
-      Text("hi").border(set: .single),
+      Text("hi").border(style: .single),
       context: .init(identity: testIdentity("BorderDefaultsToInset"))
     )
 
@@ -26,7 +26,7 @@ struct BorderModifierLayoutTests {
   @Test("explicit outset placement keeps the layout-growing behavior")
   func explicitOutsetGrowsLayout() {
     let artifacts = DefaultRenderer().render(
-      Text("hi").border(set: .single, placement: .outset),
+      Text("hi").border(style: .single, placement: .outset),
       context: .init(identity: testIdentity("BorderExplicitOutset"))
     )
 
@@ -41,7 +41,7 @@ struct BorderModifierLayoutTests {
 
   @Test("STUI-126: padded inset borders preserve text without an occlusion diagnostic")
   func paddedBorderKeepsInterior() {
-    let artifacts = DefaultRenderer().render(Text("hi").padding(1).border(set: .single))
+    let artifacts = DefaultRenderer().render(Text("hi").padding(1).border(style: .single))
     #expect(artifacts.rasterSurface.lines.joined().contains("hi"))
     #expect(
       !artifacts.diagnostics.runtime.issues.contains {
@@ -59,7 +59,7 @@ struct BorderModifierLayoutTests {
     }
 
     let styled = DefaultRenderer().render(
-      content.border(Color.red, set: .single),
+      content.border(Color.red, style: .single),
       context: .init(identity: testIdentity("BorderStyleOverloadDefault"))
     )
     let perEdge = DefaultRenderer().render(
@@ -97,14 +97,14 @@ struct BorderModifierLayoutTests {
     )
     let inset = renderedWidth(
       HStack(spacing: 0) {
-        Text("abc").border(set: .ascii)
+        Text("abc").border(style: .ascii)
         Text("xyz")
       },
       name: "BorderSiblingInset"
     )
     let outset = renderedWidth(
       HStack(spacing: 0) {
-        Text("abc").border(set: .ascii, placement: .outset)
+        Text("abc").border(style: .ascii, placement: .outset)
         Text("xyz")
       },
       name: "BorderSiblingOutset"
@@ -123,7 +123,7 @@ struct BorderModifierLayoutTests {
         Text("def")
         Text("ghi")
       }
-      .border(set: .ascii),
+      .border(style: .ascii),
       context: .init(identity: testIdentity("BorderDefaultASCIIRaster"))
     )
 
@@ -148,7 +148,7 @@ struct BorderModifierLayoutTests {
         Text("def")
         Text("ghi")
       }
-      .border(set: .ascii)
+      .border(style: .ascii)
       .gesture(TapGesture().onEnded {}),
       context: context
     )

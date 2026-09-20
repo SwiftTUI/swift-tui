@@ -463,7 +463,7 @@ public struct ButtonMenuStyle: MenuStyle {
       MenuButtonTrigger(configuration: configuration)
         .padding(.horizontal, 1)
         .border(
-          menuTriggerChrome(for: configuration).borderStyle, set: .rounded, placement: .outset)
+          menuTriggerChrome(for: configuration).borderStyle, style: .rounded, placement: .outset)
     }
   }
 }

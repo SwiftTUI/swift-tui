@@ -9,7 +9,7 @@ protocol.
 Styling in SwiftTUI composes in three layers. Concrete `ShapeStyle` values —
 `Color`, `LinearGradient`, `RadialGradient`, `MeshGradient` — color content
 directly through modifiers such as `.foregroundStyle(_:)`, `.background(_:)`,
-`.tint(_:)`, and `.border(_:set:placement:sides:)`. Semantic roles
+`.tint(_:)`, and `.border(_:style:placement:sides:)`. Semantic roles
 (`.primary`, `.tint`, `.success`, …) are shape styles too, but resolve at
 render time through the active `Theme`, so the same view adapts to light,
 dark, and high-contrast terminals. Above both sit the control style
@@ -33,7 +33,7 @@ struct Banner: View {
     Text(" SwiftTUI ")
       .foregroundStyle(.white)
       .background(Self.plum)
-      .border(Self.plum.opacity(0.5), set: .rounded)
+      .border(Self.plum.opacity(0.5), style: .rounded)
   }
 }
 ```
@@ -95,7 +95,7 @@ Rectangle()
     )
   )
   .frame(width: 18, height: 6)
-  .border(set: .rounded)
+  .border(style: .rounded)
 ```
 
 ## Applying built-in control styles

@@ -407,7 +407,9 @@ extension DrawExtractor {
           geometry: .rectangle,
           insetAmount: 0,
           style: faded(borderShapeStyle),
-          strokeStyle: drawMetadata.borderStrokeStyle ?? .init(),
+          // Control chrome that names a border paint but no stroke keeps its
+          // rounded corners. The public default stroke is square.
+          strokeStyle: drawMetadata.borderStrokeStyle ?? .rounded,
           strokeBorder: true,
           backgroundStyle: nil
         )

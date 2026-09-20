@@ -166,7 +166,7 @@ struct StrokeTrackRenderTests {
       "╶ ─ ─ ─ ┘",
     ]
     #expect(
-      lines(EmptyView().frame(width: 9, height: 4).border(set: .dashed), width: 9, height: 4)
+      lines(EmptyView().frame(width: 9, height: 4).border(style: .dashed), width: 9, height: 4)
         == expected)
     // Audit render B: the same set through a shape stroke drew a solid ring.
     #expect(
@@ -194,11 +194,40 @@ struct StrokeTrackRenderTests {
         == ["┌────────", "│        ", "│        ", "│        "])
   }
 
-  @Test("the default border is unchanged until the default corner ruling lands")
-  func defaultBorder() {
+  @Test("the default border and the default stroke have square corners, as in SwiftUI")
+  func defaultsAreSquare() {
+    let square = ["┌───┐", "│   │", "└───┘"]
+    #expect(lines(EmptyView().frame(width: 5, height: 3).border(), width: 5, height: 3) == square)
+    #expect(lines(Rectangle().stroke(), width: 5, height: 3) == square)
+    #expect(lines(Rectangle().strokeBorder(), width: 5, height: 3) == square)
+    #expect(StrokeStyle() == .single)
+  }
+
+  @Test("rounded corners are asked for: by the preset, the join or the geometry")
+  func roundedIsExplicit() {
+    let rounded = ["╭───╮", "│   │", "╰───╯"]
     #expect(
-      lines(EmptyView().frame(width: 5, height: 3).border(), width: 5, height: 3)
-        == ["╭───╮", "│   │", "╰───╯"])
+      lines(EmptyView().frame(width: 5, height: 3).border(style: .rounded), width: 5, height: 3)
+        == rounded)
+    #expect(
+      lines(
+        EmptyView().frame(width: 5, height: 3).border(style: StrokeStyle(lineJoin: .round)),
+        width: 5, height: 3) == rounded)
+    #expect(lines(RoundedRectangle(cornerRadius: 1).stroke(), width: 5, height: 3) == rounded)
+  }
+
+  @Test("the deprecated set: spelling still draws, for the deprecation window")
+  @available(*, deprecated)
+  func deprecatedSetSpelling() {
+    // The examples repository builds against both the last tag and framework
+    // main, so `set:` has to outlive the release that adds `style:`.
+    #expect(
+      lines(EmptyView().frame(width: 5, height: 3).border(set: .double), width: 5, height: 3)
+        == ["╔═══╗", "║   ║", "╚═══╝"])
+    #expect(
+      lines(
+        EmptyView().frame(width: 5, height: 3).border(Color.red, set: .rounded),
+        width: 5, height: 3) == ["╭───╮", "│   │", "╰───╯"])
   }
 
   @Test("two stacked borders show the lower one through the upper one's gaps")

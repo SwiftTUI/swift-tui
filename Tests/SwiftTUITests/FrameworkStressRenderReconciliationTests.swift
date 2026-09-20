@@ -859,7 +859,7 @@ extension FrameworkStressRenderReconciliationTests {
       var body: some View {
         Text("B")
           .frame(width: 5, height: 3)
-          .border(Color.green, set: set, placement: .inset, sides: sides)
+          .border(Color.green, style: StrokeStyle(borderSet: set), placement: .inset, sides: sides)
       }
     }
 

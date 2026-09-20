@@ -137,7 +137,7 @@ private struct PagedWorkbenchFixture: View {
           }
           .padding(1)
           .clipped()
-          .border(set: .double)
+          .border(style: .double)
         TextFigure("SLIDE", font: .smBlock)
           .opacity(0)
           .overlay {
@@ -149,7 +149,7 @@ private struct PagedWorkbenchFixture: View {
           }
           .padding(1)
           .clipped()
-          .border(set: .double)
+          .border(style: .double)
       }
       Text("state: showFade=\(showOpacityFigure) showSlide=\(showSlideFigure)")
         .foregroundStyle(.separator)

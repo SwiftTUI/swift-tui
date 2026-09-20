@@ -367,7 +367,7 @@ private struct ButtonStyleChromeBorder: View {
 
   @ViewBuilder
   var body: some View {
-    let strokeStyle: StrokeStyle = focusActive ? .heavy : .init()
+    let strokeStyle: StrokeStyle = focusActive ? .heavy : .rounded
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
       RoundedRectangle(cornerRadius: 1).strokeBorder(

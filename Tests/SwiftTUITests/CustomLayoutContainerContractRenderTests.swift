@@ -137,7 +137,7 @@ struct CustomLayoutContainerContractRenderTests {
       // `│[X]│` — the outset border hugs the three text cells.
       #expect(boxLine.contains("│[X]│"), "\(joined)")
       let borderedRows = surface.lines.filter {
-        $0.contains("│") || $0.contains("╭") || $0.contains("╰")
+        $0.contains("│") || $0.contains("┌") || $0.contains("└")
       }
       #expect(borderedRows.count == 3, "\(joined)")
     }

@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 170 | 1489 |
+| `SwiftTUIPrimitives` | 170 | 1495 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -830,7 +830,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `ShapeStyle` — protocol — 37 members
 - `Size` — struct — 4 members
 - `Spacing` — struct — 4 members
-- `StrokeStyle` — struct — 22 members
+- `StrokeStyle` — struct — 28 members
 - `StyleEnvironmentSnapshot` — struct — 12 members
 - `TableBorderGlyphs` — struct — 18 members
 - `TableCellAlignment` — enum — 4 members

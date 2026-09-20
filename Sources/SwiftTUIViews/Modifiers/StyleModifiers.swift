@@ -1337,21 +1337,19 @@ extension View {
     }
   }
 
-  /// Draws a border around this view.
+  /// Draws a border around this view with a glyph palette.
   ///
-  /// The default chrome is `BorderSet.rounded` in
-  /// `StrokeStyle.Placement.inset` placement. The border draws into the
-  /// outermost cells of the content frame without changing layout allocation.
-  ///
-  /// Pass `placement: .outset` to reserve additional cells outside the
-  /// content frame so the border does not occlude its outermost cells.
-  ///
-  /// For other glyph palettes (single-line, half-block, double-line,
-  /// or heavy) pass an explicit `set:`. See `BorderSet` for the
-  /// full catalog.
+  /// Use `border(_:style:placement:sides:)`. A `StrokeStyle` carries the palette
+  /// together with the corner join and the dash, and has a preset for every
+  /// palette, so `set: .double` becomes `style: .double`.
+  @available(
+    *, deprecated,
+    message:
+      "Pass a StrokeStyle: border(_:style:placement:sides:). set: .double becomes style: .double."
+  )
   public func border<S: ShapeStyle>(
     _ style: S = SemanticShapeStyle.foreground,
-    set: BorderSet = .rounded,
+    set: BorderSet,
     placement: StrokeStyle.Placement = .inset,
     sides: Edge.Set = .all
   ) -> some View {
@@ -1366,9 +1364,17 @@ extension View {
     )
   }
 
-  /// Draws a border around this view with a stroke style.
+  /// Draws a border around this view.
+  ///
+  /// The default is a single line with square corners, as in SwiftUI. It is
+  /// drawn in `.inset` placement: into the outermost cells of the content frame,
+  /// without changing layout allocation. Pass `placement: .outset` to reserve
+  /// cells outside the content frame, so the border does not cover the
+  /// content's outermost cells.
   ///
   /// The stroke style chooses the glyph palette, the corner join and the dash.
+  /// `StrokeStyle` has a preset for every palette: `.rounded`, `.heavy`,
+  /// `.double`, `.innerHalfBlock` and the rest.
   /// Changing `dashPhase` moves the dash pattern round all four edges, which is
   /// how a marching-ants border is built:
   ///
@@ -1384,7 +1390,7 @@ extension View {
   /// style's own `placement` is not read.
   public func border<S: ShapeStyle>(
     _ style: S = SemanticShapeStyle.foreground,
-    style strokeStyle: StrokeStyle,
+    style strokeStyle: StrokeStyle = .init(),
     placement: StrokeStyle.Placement = .inset,
     sides: Edge.Set = .all
   ) -> some View {
@@ -1403,7 +1409,7 @@ extension View {
   /// Draws a border around this view using a per-side foreground style.
   public func border(
     _ style: BorderEdgeStyle,
-    set: BorderSet = .rounded,
+    set: BorderSet = .single,
     placement: StrokeStyle.Placement = .inset,
     sides: Edge.Set = .all
   ) -> some View {
@@ -1429,7 +1435,7 @@ extension View {
   /// frame.
   public func border(
     blend: BorderBlend,
-    set: BorderSet = .rounded,
+    set: BorderSet = .single,
     placement: StrokeStyle.Placement = .inset,
     sides: Edge.Set = .all,
     phase: Double = 0

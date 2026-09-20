@@ -8,6 +8,43 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- `StrokeStyle` carries SwiftUI's `dash`, `dashPhase` and `lineJoin`. Dash
+  lengths are cell widths measured round the outline, a dash end inside a cell
+  draws a half-line glyph (`╴╶╵╷`), and an unpainted segment leaves its cells as
+  they were. `dashPhase` is animatable, so `withAnimation` moves the pattern
+  round all four edges: a marching-ants border. `lineJoin: .round` draws the arc
+  corners where the glyph palette has them.
+- `View.border(_:style:placement:sides:)` takes a `StrokeStyle`. A border, a
+  rectangle stroke and a `Divider` now draw through one renderer, so the same
+  style draws the same cells on all three.
+- `StrokeStyle` has a preset for every glyph palette: `.singleDouble`,
+  `.doubleSingle`, `.outerHalfBlock`, `.none`, `.dashed` and `.dashedHeavy` join
+  the existing ones.
+
+### Changed
+
+- **The default border and the default stroke have square corners (`┌`), as in
+  SwiftUI.** They were rounded (`╭`). `StrokeStyle()` is now `.single`, and
+  `border()`, `stroke()` and `strokeBorder()` follow it. The built-in controls
+  ask for rounded corners themselves and look as they did. Pass
+  `style: .rounded` to keep rounded corners on your own borders.
+- A `RoundedRectangle` stroke draws rounded corners whatever the palette's own
+  corners are. It drew square corners under `.single`.
+- `BorderSet.dashed` and `.dashedHeavy` dash round the perimeter, one cell
+  width on and one off, without the `·` gap glyph. They restarted their pattern
+  on every edge. Through `Shape.stroke` they drew a solid ring, which is fixed.
+- A rectangle stroke one row high draws a line. It drew `┌──┐`.
+- `DrawCommand.border` carries the `StrokeStyle` in place of the `BorderSet`.
+
+### Deprecated
+
+- `View.border(_:set:placement:sides:)`. Pass a `StrokeStyle`: `set: .double`
+  becomes `style: .double`. The `set:` argument no longer has a default. The
+  spelling stays for one release so that code can build against both this
+  release and the last one.
+
 ## [0.13.5] - 2026-09-16
 
 ### Changed

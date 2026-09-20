@@ -15,15 +15,14 @@
 /// the same style draws the same cells on all three.
 ///
 /// The default (``init(lineWidth:borderSet:placement:lineJoin:dash:dashPhase:)``
-/// with no arguments) produces ``BorderSet/rounded`` glyphs in `.inset`
-/// placement, so a stroke does not change layout allocation. Request
-/// `.outset` explicitly when the border must reserve cells around content.
+/// with no arguments) is a solid ``BorderSet/single`` line with square corners,
+/// which is what SwiftUI's default stroke looks like. For rounded corners use
+/// ``rounded``, or stroke a `RoundedRectangle`. The built-in controls ask for
+/// rounded corners themselves, so they do not depend on this default.
 ///
-/// For a single-line look matching pre-2026-04 framework defaults,
-/// pass `borderSet: .single` explicitly. For the half-block look
-/// matching the previous framework default, pass
-/// `borderSet: .outerHalfBlock`. No implicit upgrade occurs.
-/// The renderer draws the specified border set.
+/// The default placement is `.inset`, so a stroke does not change layout
+/// allocation. Request `.outset` on a view's `border` when the border must
+/// reserve cells around content.
 public struct StrokeStyle: Equatable, Sendable {
   public var lineWidth: Int
   public var borderSet: BorderSet
@@ -52,8 +51,9 @@ public struct StrokeStyle: Equatable, Sendable {
   /// How far into the dash pattern the stroke starts, in the same units as
   /// ``dash``.
   ///
-  /// A `Rectangle` and a view's `border` start at the top-leading corner. A `RoundedRectangle` starts at the middle of its
-  /// trailing edge. Both run clockwise, as in SwiftUI.
+  /// A `Rectangle` and a view's `border` start at the top-leading corner. A
+  /// `RoundedRectangle` starts at the middle of its trailing edge. Both run
+  /// clockwise, as in SwiftUI.
   public var dashPhase: Double
 
   public enum Placement: Equatable, Sendable {
@@ -70,7 +70,7 @@ public struct StrokeStyle: Equatable, Sendable {
 
   public init(
     lineWidth: Int = 1,
-    borderSet: BorderSet = .rounded,
+    borderSet: BorderSet = .single,
     placement: Placement = .inset,
     lineJoin: LineJoin = .miter,
     dash: [Double] = [],
@@ -104,15 +104,26 @@ extension BorderSet {
 }
 
 extension StrokeStyle {
+  /// A single line with rounded corners (`╭╮╰╯`).
   public static let rounded = StrokeStyle(borderSet: .rounded)
   public static let heavy = StrokeStyle(borderSet: .heavy)
   public static let single = StrokeStyle(borderSet: .single)
   public static let double = StrokeStyle(borderSet: .double)
+  public static let singleDouble = StrokeStyle(borderSet: .singleDouble)
+  public static let doubleSingle = StrokeStyle(borderSet: .doubleSingle)
   public static let ascii = StrokeStyle(borderSet: .ascii)
   public static let block = StrokeStyle(borderSet: .block)
   public static let innerHalfBlock = StrokeStyle(borderSet: .innerHalfBlock)
+  public static let outerHalfBlock = StrokeStyle(borderSet: .outerHalfBlock)
   public static let hidden = StrokeStyle(borderSet: .hidden)
+  /// Reserves no cells and draws nothing. The "no border" value, **not** to be
+  /// confused with `Optional<StrokeStyle>.none`.
+  public static let none = StrokeStyle(borderSet: .none)
   public static let markdown = StrokeStyle(borderSet: .markdown)
+  /// A single line, one cell width on and one off.
+  public static let dashed = StrokeStyle(borderSet: .single, dash: [1, 1])
+  /// A heavy line, one cell width on and one off.
+  public static let dashedHeavy = StrokeStyle(borderSet: .heavy, dash: [1, 1])
 }
 
 /// Per-edge background styling used behind stroked borders.

@@ -102,5 +102,5 @@ extension AnchoredSurfaceStylePresentation: PortalStylePresentation {}
 
 extension AnchoredSurfaceStylePresentation {
   /// Popovers keep their rounded stroke; Menu's shared value has its own baseline.
-  package static var popoverBaseline: Self { .init(borderStroke: StrokeStyle()) }
+  package static var popoverBaseline: Self { .init(borderStroke: .rounded) }
 }

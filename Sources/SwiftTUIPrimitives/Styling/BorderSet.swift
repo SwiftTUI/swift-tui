@@ -10,12 +10,11 @@
 ///   placement (``StrokeStyle/Placement/outset`` or
 ///   ``StrokeStyle/Placement/inset``), and which `BorderSet` to use.
 ///
-/// The framework's canonical default (``StrokeStyle/init(lineWidth:borderSet:placement:lineJoin:dash:dashPhase:)``
-/// with no arguments) selects ``rounded``. Callers who want the legacy
-/// single-line look pass ``single`` explicitly, and callers who want
-/// half-block chrome pass ``outerHalfBlock`` explicitly. There is *no*
-/// implicit transformation between `BorderSet`s: what you ask for is
-/// what you get drawn.
+/// The framework's default (``StrokeStyle/init(lineWidth:borderSet:placement:lineJoin:dash:dashPhase:)``
+/// with no arguments) selects ``single``, a line with square corners, as in
+/// SwiftUI. Callers who want rounded corners pass ``rounded``, and callers who
+/// want half-block chrome pass ``outerHalfBlock``. There is *no* implicit
+/// transformation between `BorderSet`s: what you ask for is what you get drawn.
 public struct BorderSet: Equatable, Sendable {
   public var top: String
   public var bottom: String

@@ -11,10 +11,10 @@ import Testing
 /// `BorderModifierLayoutTests`.
 @MainActor
 struct BorderRenderingTests {
-  @Test(".border(set: .single) writes the expected corner and edge glyphs")
+  @Test(".border(style: .single) writes the expected corner and edge glyphs")
   func singleBorderDrawsBoxGlyphs() {
     let artifacts = DefaultRenderer().render(
-      Text("hi").border(set: .single, placement: .outset),
+      Text("hi").border(style: .single, placement: .outset),
       context: .init(identity: testIdentity("BorderSingleBox"))
     )
 
@@ -27,10 +27,10 @@ struct BorderRenderingTests {
     )
   }
 
-  @Test(".border(set: .single) interior text is unmodified")
+  @Test(".border(style: .single) interior text is unmodified")
   func singleBorderInteriorIsUnmodified() {
     let artifacts = DefaultRenderer().render(
-      Text("hi").border(set: .single, placement: .outset),
+      Text("hi").border(style: .single, placement: .outset),
       context: .init(identity: testIdentity("BorderInterior"))
     )
 
@@ -38,10 +38,10 @@ struct BorderRenderingTests {
     #expect(artifacts.rasterSurface.cells[1][2].character == "i")
   }
 
-  @Test(".border(set: .single) paints each corner in the expected position")
+  @Test(".border(style: .single) paints each corner in the expected position")
   func singleBorderCornerGlyphs() {
     let artifacts = DefaultRenderer().render(
-      Text("hi").border(set: .single, placement: .outset),
+      Text("hi").border(style: .single, placement: .outset),
       context: .init(identity: testIdentity("BorderCorners"))
     )
 
@@ -52,10 +52,10 @@ struct BorderRenderingTests {
     #expect(cells[2][3].character == "┘")
   }
 
-  @Test(".border(set: .dashed) dashes round the perimeter")
+  @Test(".border(style: .dashed) dashes round the perimeter")
   func dashedBorderDashesRoundThePerimeter() {
     let artifacts = DefaultRenderer().render(
-      Text("aaaa").border(set: .dashed, placement: .outset),
+      Text("aaaa").border(style: .dashed, placement: .outset),
       context: .init(identity: testIdentity("BorderDashed"))
     )
 
@@ -80,7 +80,7 @@ struct BorderRenderingTests {
   @Test(".border(sides: [.top]) draws only the top edge")
   func topOnlyBorderDrawsOnlyTopEdge() {
     let artifacts = DefaultRenderer().render(
-      Text("hi").border(set: .single, placement: .outset, sides: [.top]),
+      Text("hi").border(style: .single, placement: .outset, sides: [.top]),
       context: .init(identity: testIdentity("BorderTopEdge"))
     )
 
@@ -92,13 +92,13 @@ struct BorderRenderingTests {
     )
   }
 
-  @Test(".border(set: .innerHalfBlock, placement: .inset) draws into the view's outermost cells")
+  @Test(".border(style: .innerHalfBlock, placement: .inset) draws into the view's outermost cells")
   func innerHalfBlockDrawsIntoOutermostCells() {
     // Explicit .inset placement means the frame does not grow —
     // the border glyphs overdraw the outermost child cells.  Rendering
     // should paint the inset glyphs without pushing the content around.
     let artifacts = DefaultRenderer().render(
-      Text("hello").border(set: .innerHalfBlock, placement: .inset),
+      Text("hello").border(style: .innerHalfBlock, placement: .inset),
       context: .init(identity: testIdentity("BorderInnerHalfBlock"))
     )
 
@@ -113,7 +113,7 @@ struct BorderRenderingTests {
   @Test(".border foreground style applies to all four edges")
   func borderForegroundStyleApplies() {
     let artifacts = DefaultRenderer().render(
-      Text("hi").border(Color.red, set: .single, placement: .outset),
+      Text("hi").border(Color.red, style: .single, placement: .outset),
       context: .init(identity: testIdentity("BorderForegroundStyle"))
     )
 
@@ -153,7 +153,7 @@ struct BorderRenderingTests {
         Text("mid")
         Text("bot")
       }
-      .border(set: .innerHalfBlock, placement: .inset),
+      .border(style: .innerHalfBlock, placement: .inset),
       context: .init(identity: testIdentity("BorderInsetMultiRow"))
     )
 

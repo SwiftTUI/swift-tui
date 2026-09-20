@@ -823,7 +823,8 @@ private struct ToastPresentationView: View {
     }
     .overlay {
       Rectangle().strokeBorder(
-        presentation.borderStyle
+        presentation.borderStyle,
+        style: .rounded
       )
     }
     .frame(

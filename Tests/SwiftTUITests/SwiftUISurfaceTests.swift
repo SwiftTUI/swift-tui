@@ -1608,9 +1608,9 @@ struct SwiftUISurfaceTests {
 
     #expect(
       artifacts.rasterSurface.lines == [
-        "╭──╮",
+        "┌──┐",
         "│  │",
-        "╰──╯",
+        "└──┘",
       ])
     #expect(
       artifacts.rasterSurface.cells[0][0].style
@@ -1769,7 +1769,7 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("DirectionalBorderBackground"))
     )
 
-    #expect(artifacts.rasterSurface.lines == ["╭───╮", "│   │", "│   │", "╰───╯"])
+    #expect(artifacts.rasterSurface.lines == ["┌───┐", "│   │", "│   │", "└───┘"])
     #expect(artifacts.rasterSurface.cells[0][0].style?.backgroundColor == Color.yellow)
     #expect(artifacts.rasterSurface.cells[1][0].style?.backgroundColor == Color.red)
     #expect(artifacts.rasterSurface.cells[1][4].style?.backgroundColor == Color.blue)
@@ -6067,6 +6067,8 @@ struct SwiftUISurfaceTests {
       ])
   }
 
+  // `StrokeStyle()` is not a row here: it equals `.single`, which is the first
+  // row. `StrokeTrackRenderTests.defaultsAreSquare` pins the default.
   @Test(
     "StrokeStyle exposes lipgloss border presets with the expected glyph families",
     arguments: [
@@ -6076,7 +6078,6 @@ struct SwiftUISurfaceTests {
       (StrokeStyle.double, ["╔══╗", "║Hi║", "╚══╝"]),
       (StrokeStyle.ascii, ["+--+", "|Hi|", "+--+"]),
       (StrokeStyle.block, ["████", "█Hi█", "████"]),
-      (StrokeStyle(), ["╭──╮", "│Hi│", "╰──╯"]),
       (StrokeStyle.innerHalfBlock, ["▗▄▄▖", "▐Hi▌", "▝▀▀▘"]),
       (StrokeStyle.hidden, ["    ", " Hi ", "    "]),
       (StrokeStyle.markdown, ["|--|", "|Hi|", "|--|"]),
@@ -6494,10 +6495,10 @@ struct SwiftUISurfaceTests {
           HStack(spacing: 0) {
             Text("A")
               .frame(width: 3, height: 1, alignment: .topLeading)
-              .border(.separator, set: .single, placement: .outset)
+              .border(.separator, style: .single, placement: .outset)
             Text("B")
               .frame(width: 3, height: 1, alignment: .topLeading)
-              .border(.separator, set: .single, placement: .outset)
+              .border(.separator, style: .single, placement: .outset)
           }
         }.scrollIndicators(.hidden)
       },
