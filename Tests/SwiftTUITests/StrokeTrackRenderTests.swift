@@ -200,4 +200,29 @@ struct StrokeTrackRenderTests {
       lines(EmptyView().frame(width: 5, height: 3).border(), width: 5, height: 3)
         == ["╭───╮", "│   │", "╰───╯"])
   }
+
+  @Test("two stacked borders show the lower one through the upper one's gaps")
+  func twoColorMarchingAnts() throws {
+    // The recipe in Animating-Views. The dashes are complementary: 9 x 4 is 28
+    // units round, which the period of 4 divides, and every arm is on in exactly
+    // one of the two borders. Together they draw the whole ring.
+    let lower = StrokeStyle(borderSet: .single, dash: [2, 2])
+    let upper = StrokeStyle(borderSet: .single, dash: [2, 2], dashPhase: 2)
+    let cells = DefaultRenderer().render(
+      EmptyView().frame(width: 9, height: 4)
+        .border(Color.white, style: lower)
+        .border(Color.black, style: upper),
+      context: .init(identity: testIdentity("StrokeTrackRenderTwoColor")),
+      proposal: .init(width: 9, height: 4)
+    ).rasterSurface.cells
+    #expect(
+      cells.map { row in String(row.map(\.character)) }
+        == ["┌───────┐", "│       │", "│       │", "└───────┘"])
+    // The first two units belong to the lower border and the next two to the
+    // upper one.
+    #expect(cells[0][0].style?.foregroundColor == Color.white)
+    #expect(cells[0][1].style?.foregroundColor == Color.white)
+    #expect(cells[0][2].style?.foregroundColor == Color.black)
+    #expect(cells[0][3].style?.foregroundColor == Color.black)
+  }
 }

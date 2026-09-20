@@ -675,6 +675,26 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **Strokes are one cell wide.** *Ratified.* There are no `lineWidth:` stroke
   overloads; authors select apparent weight through the glyph palette via
   `borderSet`.
+- **Dash lengths are cell widths, measured round the outline.** *Ratified.*
+  SwiftUI measures `dash` and `dashPhase` in points. SwiftTUI measures them in
+  cell widths along the stroke's outline. A cell on a vertical run counts as the
+  cell aspect ratio, snapped to the nearest half, so a dash is the same physical
+  length on every edge and two terminals with slightly different fonts dash
+  alike. A dash end inside a cell draws a half-line glyph; the double palette
+  has none and dashes in whole cells. An unpainted segment leaves its cells as
+  they were. Start points and direction match SwiftUI as measured: a `Rectangle`
+  and a view's `border` start at the top-leading corner, a `RoundedRectangle` at
+  the middle of its trailing edge, both clockwise.
+- **`border` takes a `StrokeStyle`.** *Ratified.* SwiftUI's `border` takes a
+  `width:`. A cell grid has no line width, so SwiftTUI's takes the stroke style
+  that a shape stroke takes: glyph palette, join, dash and dash phase. A border
+  and a rectangle stroke with the same style draw the same cells.
+- **`lineJoin` is `.miter` or `.round`.** *Ratified.* `.round` draws the arc
+  corners where the glyph palette has them, which is the light weight only. A
+  `RoundedRectangle` draws them with either join, and the size of its
+  `cornerRadius` has no other effect. No glyph draws a bevel.
+- **Curved and custom-path strokes do not dash.** *Gap.* They stroke onto the
+  Braille grid, which does not receive the stroke style yet.
 - **Arcs use explicit angle and sweep contracts.** *Ratified.* `Angle`
   stores unnormalized radians and offers degree conversion. `Path.addArc`
   connects the current pen to its start and emits cubic segments of at most

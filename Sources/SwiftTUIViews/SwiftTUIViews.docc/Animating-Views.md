@@ -301,6 +301,39 @@ writes are needed before a release carries velocity. A spring retargeted
 mid-flight carries its current velocity the same way. Both are behind the
 `SWIFTTUI_ANIMATION_VELOCITY` kill switch (default on).
 
+## March A Dashed Border
+
+`StrokeStyle.dashPhase` is animatable. Changing it moves the dash pattern round
+all four edges of a border, which is a marching-ants selection:
+
+```swift
+struct Selection: View {
+  @State private var phase = 0.0
+
+  var body: some View {
+    Text("selected")
+      .padding(1)
+      .border(style: StrokeStyle(borderSet: .single, dash: [2, 1], dashPhase: phase))
+      .onAppear {
+        withAnimation(.linear(duration: .seconds(1)).repeatForever(autoreverses: false)) {
+          phase = -3
+        }
+      }
+  }
+}
+```
+
+Animate the phase by a whole number of pattern lengths, here `2 + 1`, so the
+loop has no jump. A positive phase starts further into the pattern, which moves
+the dashes toward the top-leading corner. A negative phase marches them
+clockwise. The phase never affects layout, so the border's content is not
+measured again while it moves.
+
+For two colors, stack two borders whose phases differ by one dash. The cells of
+an unpainted segment are left alone, so the lower border shows through the gaps
+of the upper one. The same style animates on `Rectangle().stroke(style:)` and on
+a `Divider`.
+
 ## Cycle Through Phases
 
 ``PhaseAnimator`` steps through a phase sequence, animating each step. With

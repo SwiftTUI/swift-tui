@@ -134,6 +134,39 @@ Adding a segment or changing a line into a curve is not a morph. In particular,
 changing an arc's sweep can change its cubic segment count. Use stable segments
 or a cross-fade when the outlines have different structures.
 
+## Dash And Join A Stroke
+
+`StrokeStyle` carries SwiftUI's `dash`, `dashPhase` and `lineJoin`. A border, a
+rectangle stroke and a `Divider` draw through one renderer, so the same style
+draws the same cells on all three.
+
+```swift
+Rectangle().stroke(style: StrokeStyle(borderSet: .single, dash: [2, 1]))
+//  ┌─ ── ──╷
+//  ╵       ╵
+//  │       │
+//  ╶─ ── ──
+```
+
+Dash lengths are measured along the outline in cell widths. A cell is about
+twice as tall as it is wide, so a vertical cell counts as about two units and a
+dash is the same physical length on every edge: the `╷` over `╵` above is one
+dash, as long as `──`. A dash end that falls inside a cell draws a half-line
+(`╴╶╵╷`). The double palette has no half-line glyphs, so it dashes in whole
+cells. The cells of an unpainted segment are left as they were. Put a fill or a
+`background` under the stroke to paint them.
+
+The pattern runs clockwise. A `Rectangle` and a view's `border` measure it from
+the top-leading corner, and a `RoundedRectangle` from the middle of its trailing
+edge, as SwiftUI does. `dashPhase` animates; see <doc:Animating-Views>.
+
+`lineJoin: .round` draws the arc corners (`╭╮╰╯`) where the glyph palette has
+them, which in Unicode is the light weight only. A `RoundedRectangle` draws them
+with either join. The size of its `cornerRadius` has no other effect: a cell
+grid has one size of rounded corner.
+
+Curved shapes and custom paths stroke onto the Braille grid and do not dash yet.
+
 ## Differences from SwiftUI
 
 SwiftTUI shapes target a cell grid rasterized to Braille subpixels, not a
@@ -147,7 +180,9 @@ resolution-independent vector canvas. Some of SwiftUI's `Shape` API is therefore
 - **No `lineWidth:` stroke overloads.** Terminal strokes are one cell wide.
   `StrokeStyle` carries `lineWidth` only as a reserved field.
   Stroke weight is expressed through the glyph palette (`borderSet`: `.single`,
-  `.heavy`, `.double`, …) instead.
+  `.heavy`, `.double`, …) instead. A thick solid band is a fill: fill the shape,
+  then fill `inset(by:)` over it.
+- **`lineJoin` has two cases.** `.miter` and `.round`. No glyph draws a bevel.
 - **Clipping uses cell coverage.** It is not a pixel-antialiased mask and does
   not alter interaction regions.
 - **Path morphing needs compatible topology.** Dissimilar paths snap rather
