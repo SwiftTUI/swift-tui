@@ -1,14 +1,21 @@
 /// The stroke configuration for outlines and rules.
 ///
 /// `StrokeStyle` pairs:
-/// - a numeric `lineWidth` (currently always 1, reserved for future use)
 /// - a ``BorderSet`` (the glyph palette. See ``BorderSet`` for details.)
+/// - a ``LineJoin`` (square corners, or rounded ones where the palette has
+///   them)
+/// - a ``dash`` pattern and a ``dashPhase``, measured along the outline in
+///   cell widths. Changing the phase moves the pattern round the outline.
+/// - a numeric `lineWidth` (currently always 1, reserved for future use)
 /// - a ``Placement`` (`.outset` reserves a cell on each side for the
 ///   border. `.inset` draws the border into the outermost
 ///   cells of the content frame).
 ///
-/// The default (``init(lineWidth:borderSet:placement:)`` with no
-/// arguments) produces ``BorderSet/rounded`` glyphs in `.inset`
+/// A border, a rectangle stroke and a `Divider` draw through one renderer, so
+/// the same style draws the same cells on all three.
+///
+/// The default (``init(lineWidth:borderSet:placement:lineJoin:dash:dashPhase:)``
+/// with no arguments) produces ``BorderSet/rounded`` glyphs in `.inset`
 /// placement, so a stroke does not change layout allocation. Request
 /// `.outset` explicitly when the border must reserve cells around content.
 ///
@@ -45,8 +52,7 @@ public struct StrokeStyle: Equatable, Sendable {
   /// How far into the dash pattern the stroke starts, in the same units as
   /// ``dash``.
   ///
-  /// A `Rectangle` and a `View/border(_:set:placement:sides:)` start at the
-  /// top-leading corner. A `RoundedRectangle` starts at the middle of its
+  /// A `Rectangle` and a view's `border` start at the top-leading corner. A `RoundedRectangle` starts at the middle of its
   /// trailing edge. Both run clockwise, as in SwiftUI.
   public var dashPhase: Double
 

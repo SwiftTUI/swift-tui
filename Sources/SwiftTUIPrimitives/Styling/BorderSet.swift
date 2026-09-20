@@ -10,7 +10,7 @@
 ///   placement (``StrokeStyle/Placement/outset`` or
 ///   ``StrokeStyle/Placement/inset``), and which `BorderSet` to use.
 ///
-/// The framework's canonical default (``StrokeStyle/init(lineWidth:borderSet:placement:)``
+/// The framework's canonical default (``StrokeStyle/init(lineWidth:borderSet:placement:lineJoin:dash:dashPhase:)``
 /// with no arguments) selects ``rounded``. Callers who want the legacy
 /// single-line look pass ``single`` explicitly, and callers who want
 /// half-block chrome pass ``outerHalfBlock`` explicitly. There is *no*
