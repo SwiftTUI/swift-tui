@@ -166,31 +166,6 @@ extension Rasterizer {
   /// values rather than the multi-rune edge strings that power the
   /// layout-aware border path. Derived glyphs fall back to a space if the
   /// underlying edge is empty (``BorderSet/none`` style).
-  internal struct BorderGlyphSet {
-    let top: Character
-    let bottom: Character
-    let left: Character
-    let right: Character
-    let topLeading: Character
-    let topTrailing: Character
-    let bottomLeading: Character
-    let bottomTrailing: Character
-
-    var horizontal: Character { top }
-    var vertical: Character { left }
-
-    init(borderSet: BorderSet) {
-      self.top = borderSet.top.first ?? " "
-      self.bottom = borderSet.bottom.first ?? " "
-      self.left = borderSet.left.first ?? " "
-      self.right = borderSet.right.first ?? " "
-      self.topLeading = borderSet.topLeading.first ?? " "
-      self.topTrailing = borderSet.topTrailing.first ?? " "
-      self.bottomLeading = borderSet.bottomLeading.first ?? " "
-      self.bottomTrailing = borderSet.bottomTrailing.first ?? " "
-    }
-  }
-
   internal func write(
     _ character: Character,
     width: Int = 1,

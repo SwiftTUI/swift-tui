@@ -56,166 +56,47 @@ extension Rasterizer {
       break
     }
 
+    let roundsCorners: Bool
+    let startsAtTrailingEdge: Bool
+    if case .roundedRectangle(let cornerRadius) = geometry, cornerRadius > 0 {
+      roundsCorners = true
+      startsAtTrailingEdge = true
+    } else {
+      roundsCorners = strokeStyle.lineJoin == .round
+      startsAtTrailingEdge = false
+    }
+    let pen = StrokePen(borderSet: strokeStyle.borderSet, roundsCorners: roundsCorners)
+    let dash = StrokeDashPattern(dash: strokeStyle.dash, phase: strokeStyle.dashPhase)
+
     let lineWidth = max(1, strokeStyle.lineWidth)
     for inset in 0..<lineWidth {
       let insetRect = insetBounds(shapeBounds, by: inset)
       guard insetRect.size.width > 0, insetRect.size.height > 0 else {
         continue
       }
-
-      let resolvedSet = strokeStyle.borderSet
-      let glyphs = BorderGlyphSet(borderSet: resolvedSet)
-
-      let minX = insetRect.origin.x
-      let maxX = insetRect.origin.x + insetRect.size.width - 1
-      let minY = insetRect.origin.y
-      let maxY = insetRect.origin.y + insetRect.size.height - 1
-
-      // Per-row cull (D70). The top and bottom edges each occupy a single fixed
-      // row, so the decision is hoisted out of the column loop rather than
-      // retested per cell; the left/right edges are guarded per row below.
-      let paintsTopRow = dirtyRows?.contains(minY) ?? true
-      let paintsBottomRow = dirtyRows?.contains(maxY) ?? true
-
-      if paintsTopRow || paintsBottomRow {
-        for x in minX...maxX {
-          if paintsTopRow {
-            writeStrokeGlyph(
-              glyphs.top,
-              foregroundColorMode: foregroundColorMode,
-              backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
-              environment: environment,
-              bounds: shapeBounds,
-              x: x,
-              y: minY,
-              cells: &cells,
-              clip: clip,
-              blendMode: blendMode,
-              dirtyRows: dirtyRows,
-              presentationRecorder: presentationRecorder,
-              presentationEffects: presentationEffects
-            )
-          }
-          if maxY != minY, paintsBottomRow {
-            writeStrokeGlyph(
-              glyphs.bottom,
-              foregroundColorMode: foregroundColorMode,
-              backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
-              environment: environment,
-              bounds: shapeBounds,
-              x: x,
-              y: maxY,
-              cells: &cells,
-              clip: clip,
-              blendMode: blendMode,
-              dirtyRows: dirtyRows,
-              presentationRecorder: presentationRecorder,
-              presentationEffects: presentationEffects
-            )
-          }
-        }
-      }
-
-      if maxY - minY > 1 {
-        for y in (minY + 1)..<maxY {
-          // Per-row cull (D70): the side edges walk rows, so each clean row
-          // skips two `writeStrokeGlyph` calls and their colour resolution.
-          if let dirtyRows, !dirtyRows.contains(y) {
-            continue
-          }
-          writeStrokeGlyph(
-            glyphs.left,
-            foregroundColorMode: foregroundColorMode,
-            backgroundStyle: backgroundStyle?.backgroundStyle(for: .left),
-            environment: environment,
-            bounds: shapeBounds,
-            x: minX,
-            y: y,
-            cells: &cells,
-            clip: clip,
-            blendMode: blendMode,
-            dirtyRows: dirtyRows,
-            presentationRecorder: presentationRecorder,
-            presentationEffects: presentationEffects
-          )
-          if maxX != minX {
-            writeStrokeGlyph(
-              glyphs.right,
-              foregroundColorMode: foregroundColorMode,
-              backgroundStyle: backgroundStyle?.backgroundStyle(for: .right),
-              environment: environment,
-              bounds: shapeBounds,
-              x: maxX,
-              y: y,
-              cells: &cells,
-              clip: clip,
-              blendMode: blendMode,
-              dirtyRows: dirtyRows,
-              presentationRecorder: presentationRecorder,
-              presentationEffects: presentationEffects
-            )
-          }
-        }
-      }
-
-      writeStrokeGlyph(
-        glyphs.topLeading,
-        foregroundColorMode: foregroundColorMode,
-        backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
-        environment: environment,
-        bounds: shapeBounds,
-        x: minX,
-        y: minY,
-        cells: &cells,
-        clip: clip,
-        blendMode: blendMode,
-        dirtyRows: dirtyRows,
-        presentationRecorder: presentationRecorder,
-        presentationEffects: presentationEffects
+      let track = RectangleStrokeTrack(
+        width: insetRect.size.width,
+        height: insetRect.size.height,
+        aspectRatio: environment.cellPixelMetrics.aspectRatio
       )
-      if maxX != minX {
+      track.forEachGlyph(
+        pen: pen,
+        dash: dash,
+        // SwiftUI starts a rounded rectangle's path at the middle of its
+        // trailing edge, and a rectangle's at its top-leading corner.
+        dashOrigin: startsAtTrailingEdge ? track.trailingEdgeMidpoint : 0,
+        // Per-row cull (D70).
+        rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(insetRect.origin.y + $0) } }
+      ) { cell, glyph in
+        let side = track.paintSide(for: cell, sides: .all)
         writeStrokeGlyph(
-          glyphs.topTrailing,
+          glyph,
           foregroundColorMode: foregroundColorMode,
-          backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
+          backgroundStyle: backgroundStyle?.backgroundStyle(for: side),
           environment: environment,
           bounds: shapeBounds,
-          x: maxX,
-          y: minY,
-          cells: &cells,
-          clip: clip,
-          blendMode: blendMode,
-          dirtyRows: dirtyRows,
-          presentationRecorder: presentationRecorder,
-          presentationEffects: presentationEffects
-        )
-      }
-      if maxY != minY {
-        writeStrokeGlyph(
-          glyphs.bottomLeading,
-          foregroundColorMode: foregroundColorMode,
-          backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
-          environment: environment,
-          bounds: shapeBounds,
-          x: minX,
-          y: maxY,
-          cells: &cells,
-          clip: clip,
-          blendMode: blendMode,
-          dirtyRows: dirtyRows,
-          presentationRecorder: presentationRecorder,
-          presentationEffects: presentationEffects
-        )
-      }
-      if maxX != minX, maxY != minY {
-        writeStrokeGlyph(
-          glyphs.bottomTrailing,
-          foregroundColorMode: foregroundColorMode,
-          backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
-          environment: environment,
-          bounds: shapeBounds,
-          x: maxX,
-          y: maxY,
+          x: insetRect.origin.x + cell.x,
+          y: insetRect.origin.y + cell.y,
           cells: &cells,
           clip: clip,
           blendMode: blendMode,
@@ -249,8 +130,6 @@ extension Rasterizer {
       environment: environment,
       bounds: bounds
     )
-    let resolvedSet = strokeStyle.borderSet
-    let glyphs = BorderGlyphSet(borderSet: resolvedSet)
     let drawsHorizontal =
       switch stackAxis {
       case .vertical?:
@@ -260,53 +139,43 @@ extension Rasterizer {
       case nil:
         bounds.size.width >= bounds.size.height
       }
-    if drawsHorizontal {
-      let y = bounds.origin.y + (bounds.size.height / 2)
-      // Per-row cull (D70): a horizontal rule lives on one row, so one test
-      // replaces the whole column walk.
-      if let dirtyRows, !dirtyRows.contains(y) {
-        return
-      }
-      for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
-        writeStrokeGlyph(
-          glyphs.horizontal,
-          foregroundColorMode: foregroundColorMode,
-          backgroundStyle: nil,
-          environment: environment,
-          bounds: bounds,
-          x: x,
-          y: y,
-          cells: &cells,
-          clip: clip,
-          blendMode: blendMode,
-          dirtyRows: dirtyRows,
-          presentationRecorder: presentationRecorder,
-          presentationEffects: presentationEffects
-        )
-      }
-    } else {
-      let x = bounds.origin.x + (bounds.size.width / 2)
-      for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
-        // Per-row cull (D70).
-        if let dirtyRows, !dirtyRows.contains(y) {
-          continue
-        }
-        writeStrokeGlyph(
-          glyphs.vertical,
-          foregroundColorMode: foregroundColorMode,
-          backgroundStyle: nil,
-          environment: environment,
-          bounds: bounds,
-          x: x,
-          y: y,
-          cells: &cells,
-          clip: clip,
-          blendMode: blendMode,
-          dirtyRows: dirtyRows,
-          presentationRecorder: presentationRecorder,
-          presentationEffects: presentationEffects
-        )
-      }
+    // A rule is a rectangle one row high or one column wide, which the track
+    // walks as a line.
+    let line: CellRect =
+      drawsHorizontal
+      ? CellRect(
+        origin: .init(x: bounds.origin.x, y: bounds.origin.y + (bounds.size.height / 2)),
+        size: .init(width: bounds.size.width, height: 1))
+      : CellRect(
+        origin: .init(x: bounds.origin.x + (bounds.size.width / 2), y: bounds.origin.y),
+        size: .init(width: 1, height: bounds.size.height))
+    let track = RectangleStrokeTrack(
+      width: line.size.width,
+      height: line.size.height,
+      aspectRatio: environment.cellPixelMetrics.aspectRatio
+    )
+    track.forEachGlyph(
+      pen: StrokePen(
+        borderSet: strokeStyle.borderSet, roundsCorners: strokeStyle.lineJoin == .round),
+      dash: StrokeDashPattern(dash: strokeStyle.dash, phase: strokeStyle.dashPhase),
+      // Per-row cull (D70).
+      rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(line.origin.y + $0) } }
+    ) { cell, glyph in
+      writeStrokeGlyph(
+        glyph,
+        foregroundColorMode: foregroundColorMode,
+        backgroundStyle: nil,
+        environment: environment,
+        bounds: bounds,
+        x: line.origin.x + cell.x,
+        y: line.origin.y + cell.y,
+        cells: &cells,
+        clip: clip,
+        blendMode: blendMode,
+        dirtyRows: dirtyRows,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects
+      )
     }
   }
 

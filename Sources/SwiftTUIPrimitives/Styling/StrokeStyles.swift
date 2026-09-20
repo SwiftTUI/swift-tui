@@ -22,19 +22,60 @@ public struct StrokeStyle: Equatable, Sendable {
   public var borderSet: BorderSet
   public var placement: Placement
 
+  /// How the stroke turns a corner.
+  ///
+  /// ``LineJoin/round`` draws the arc glyphs (`╭╮╰╯`) where the glyph palette
+  /// has them, which in Unicode is the light weight only. A shape whose
+  /// geometry is rounded, such as `RoundedRectangle`, draws them with either
+  /// join.
+  public var lineJoin: LineJoin
+
+  /// The lengths of the painted and unpainted segments of a dashed stroke.
+  ///
+  /// One unit is the width of a cell. A cell is about twice as tall as it is
+  /// wide, so a vertical cell is about two units long and a dash is the same
+  /// physical length on every edge. An empty array is a solid stroke. An odd
+  /// count repeats to make an even one.
+  ///
+  /// A line glyph palette draws a dash end that falls inside a cell as a
+  /// half-line (`╴╶╵╷`). The cells of an unpainted segment are left as they
+  /// were, so content under a gap stays visible.
+  public var dash: [Double]
+
+  /// How far into the dash pattern the stroke starts, in the same units as
+  /// ``dash``.
+  ///
+  /// A `Rectangle` and a `View/border(_:set:placement:sides:)` start at the
+  /// top-leading corner. A `RoundedRectangle` starts at the middle of its
+  /// trailing edge. Both run clockwise, as in SwiftUI.
+  public var dashPhase: Double
+
   public enum Placement: Equatable, Sendable {
     case outset
     case inset
   }
 
+  public enum LineJoin: Equatable, Sendable {
+    /// Square corners (`┌┐└┘`).
+    case miter
+    /// Rounded corners (`╭╮╰╯`) where the glyph palette has them.
+    case round
+  }
+
   public init(
     lineWidth: Int = 1,
     borderSet: BorderSet = .rounded,
-    placement: Placement = .inset
+    placement: Placement = .inset,
+    lineJoin: LineJoin = .miter,
+    dash: [Double] = [],
+    dashPhase: Double = 0
   ) {
     self.lineWidth = max(1, lineWidth)
     self.borderSet = borderSet
     self.placement = placement
+    self.lineJoin = lineJoin
+    self.dash = dash
+    self.dashPhase = dashPhase
   }
 }
 

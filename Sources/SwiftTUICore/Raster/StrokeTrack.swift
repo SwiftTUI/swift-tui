@@ -293,6 +293,58 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
   }
 }
 
+extension RectangleStrokeTrack {
+  /// The edge whose paint a cell takes.
+  ///
+  /// A corner takes the paint of its horizontal edge when that edge is drawn,
+  /// so a border with a highlighted top edge has highlighted top corners.
+  package func paintSide(for cell: Cell, sides: Edge.Set) -> BorderSide {
+    guard isRing else {
+      return height == 1 ? .top : .left
+    }
+    if cell.y == 0, sides.contains(.top) {
+      return .top
+    }
+    if cell.y == height - 1, sides.contains(.bottom) {
+      return .bottom
+    }
+    return cell.x == 0 ? .left : .right
+  }
+
+  /// Calls `body` for each cell the stroke draws, with its glyph.
+  ///
+  /// This is the one walk behind a border, a rectangle stroke and a rule. A
+  /// cell the mask turns off is skipped, so whatever it held is left alone.
+  ///
+  /// - Parameter rows: The rows, relative to the rectangle, that need painting.
+  ///   `nil` paints every row.
+  package func forEachGlyph(
+    pen: StrokePen,
+    sides: Edge.Set = .all,
+    dash: StrokeDashPattern? = nil,
+    dashOrigin: Double = 0,
+    rows: ((Int) -> Bool)? = nil,
+    _ body: (Cell, Character) -> Void
+  ) {
+    let samplesEachArm = pen.samplesEachArm
+    forEachCell { cell in
+      if let rows, !rows(cell.y) {
+        return
+      }
+      let resolved = resolve(
+        cell,
+        sides: sides,
+        dash: dash,
+        dashOrigin: dashOrigin,
+        samplesEachArm: samplesEachArm
+      )
+      if let glyph = pen.glyph(for: cell, resolved: resolved) {
+        body(cell, glyph)
+      }
+    }
+  }
+}
+
 /// How a stroke turns the arms of a track cell into a glyph.
 ///
 /// A line pen picks its glyph from the arms, so a corner, a half-line and a

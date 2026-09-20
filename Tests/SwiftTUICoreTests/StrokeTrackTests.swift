@@ -4,8 +4,8 @@ import Testing
 
 @Suite
 struct StrokeTrackTests {
-  /// Draws a track into lines of text with the same three calls the rasterizer
-  /// makes: walk the cells, resolve the mask, ask the pen for a glyph.
+  /// Draws a track into lines of text through `forEachGlyph`, the same walk the
+  /// rasterizer paints with.
   private func render(
     width: Int,
     height: Int,
@@ -21,17 +21,13 @@ struct StrokeTrackTests {
     let pen = StrokePen(borderSet: borderSet, roundsCorners: roundsCorners)
     let pattern = StrokeDashPattern(dash: dash, phase: dashPhase)
     var grid = Array(repeating: Array(repeating: Character(" "), count: width), count: height)
-    track.forEachCell { cell in
-      let resolved = track.resolve(
-        cell,
-        sides: sides,
-        dash: pattern,
-        dashOrigin: dashOrigin,
-        samplesEachArm: pen.samplesEachArm
-      )
-      if let glyph = pen.glyph(for: cell, resolved: resolved) {
-        grid[cell.y][cell.x] = glyph
-      }
+    track.forEachGlyph(
+      pen: pen,
+      sides: sides,
+      dash: pattern,
+      dashOrigin: dashOrigin
+    ) { cell, glyph in
+      grid[cell.y][cell.x] = glyph
     }
     return grid.map { String($0) }
   }
