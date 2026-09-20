@@ -8,6 +8,12 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-20
+
+Borders, strokes and dividers now draw through one renderer. This release breaks
+no source. It changes one default look, and it deprecates the APIs that the
+next minor release removes.
+
 ### Added
 
 - `StrokeStyle` carries SwiftUI's `dash`, `dashPhase` and `lineJoin`. Dash
@@ -34,8 +40,9 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   in `├`, two lines that cross draw `┼`, and borders on single sides meet in a
   corner. Borders, rectangle strokes and dividers all join, in any order, and
   the junction takes the color of the stroke drawn last. `Text`, the half-block
-  palettes and Braille strokes do not join. The last stroke to reach a cell used
-  to replace the one under it.
+  palettes and Braille strokes do not join. The `.ascii` palette joins in its
+  own glyphs: `-` and `|` make `+`. The last stroke to reach a cell used to
+  replace the one under it.
 - `StrokeStyle` has a preset for every glyph palette: `.singleDouble`,
   `.doubleSingle`, `.outerHalfBlock`, `.none`, `.dashed` and `.dashedHeavy` join
   the existing ones.
@@ -56,6 +63,9 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 - `DrawCommand.border` carries the `StrokeStyle` in place of the `BorderSet`.
 
 ### Deprecated
+
+The next minor release removes everything in this section. Each entry names its
+replacement, and the replacement is available now.
 
 - `View.border(blend:set:placement:sides:phase:)` and `BorderBlend`. Paint the
   border with an `AngularGradient`, such as
@@ -2051,7 +2061,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.13.5...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.14.0...HEAD
+[0.14.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.14.0
 [0.13.5]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.5
 [0.13.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.4
 [0.13.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.3
