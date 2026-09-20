@@ -335,6 +335,40 @@ package enum AnimationPropertyValueApplication {
         )
       )
 
+    case .strokeDashPhase:
+      guard let phase = value.unwrap(as: Double.self),
+        var stroke = AnimatableSnapshot.dashedStroke(of: node)
+      else {
+        return
+      }
+      stroke.dashPhase = phase
+      // Write the phase back to the place `dashedStroke(of:)` read it from.
+      // None of the three is layout state, so a phase that changes every tick
+      // cannot invalidate layout.
+      if case .border = node.layoutBehavior {
+        var drawMetadata = node.drawMetadata
+        drawMetadata.layoutBorderStroke = stroke
+        node.drawMetadata = drawMetadata
+      } else if case .shape(let shapePayload) = node.drawPayload,
+        case .stroke(let style, _, let strokeBorder, let backgroundStyle) =
+          shapePayload.operation
+      {
+        node.drawPayload = .shape(
+          ShapePayload(
+            geometry: shapePayload.geometry,
+            insetAmount: shapePayload.insetAmount,
+            operation: .stroke(
+              style: style,
+              strokeStyle: stroke,
+              strokeBorder: strokeBorder,
+              backgroundStyle: backgroundStyle
+            )
+          )
+        )
+      } else if case .rule = node.drawPayload {
+        node.drawPayload = .rule(stroke)
+      }
+
     case .textRoll:
       // The roll only decorates a node whose payload is the string it rolls
       // toward; a payload that moved on under an unanimated write keeps its

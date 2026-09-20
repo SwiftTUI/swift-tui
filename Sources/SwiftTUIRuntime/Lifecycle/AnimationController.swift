@@ -635,7 +635,8 @@ package final class AnimationController: Sendable {
       case .padding, .offset, .position, .frameWidth, .frameHeight:
         return true
       case .opacity, .foregroundShapeStyle, .backgroundShapeStyle, .borderShapeStyle,
-        .borderBlendPhase, .shapeFillStyle, .shapeStrokeStyle, .shapePath, .textRoll,
+        .borderBlendPhase, .strokeDashPhase, .shapeFillStyle, .shapeStrokeStyle, .shapePath,
+        .textRoll,
         .tintShapeStyle:
         return false
       }

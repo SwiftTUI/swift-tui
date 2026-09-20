@@ -88,6 +88,13 @@ package struct AnimatableSnapshot: Sendable {
       }
     }
 
+    // A dashed stroke animates its phase, which is how a marching-ants border
+    // moves. A solid stroke has no slot: its phase draws nothing, and a static
+    // zero would create a phantom diff on a stroke that later gains a dash.
+    if let stroke = Self.dashedStroke(of: node) {
+      snapshot[.strokeDashPhase] = AnyAnimatable(stroke.dashPhase)
+    }
+
     // A `Text` that resolved with a content transition: the at-rest roll
     // value carries the string so a string change starts a roll. Nodes
     // without the stamp (the default `.identity`) have no slot and cut.
@@ -169,6 +176,28 @@ package struct AnimatableSnapshot: Sendable {
 
   package var frameHeight: Int? {
     self[.frameHeight]?.unwrap(as: Int.self)
+  }
+
+  /// The stroke style a node dashes with, from whichever of the three places
+  /// carries it: a border keeps its join and dash in the draw metadata, and a
+  /// shape stroke and a rule keep theirs in the draw payload.
+  package static func dashedStroke(of node: ResolvedNode) -> StrokeStyle? {
+    let stroke: StrokeStyle?
+    if case .border = node.layoutBehavior {
+      stroke = node.drawMetadata.layoutBorderStroke
+    } else if case .shape(let payload) = node.drawPayload,
+      case .stroke(_, let strokeStyle, _, _) = payload.operation
+    {
+      stroke = strokeStyle
+    } else if case .rule(let strokeStyle) = node.drawPayload {
+      stroke = strokeStyle
+    } else {
+      stroke = nil
+    }
+    guard let stroke, !stroke.effectiveDash.isEmpty else {
+      return nil
+    }
+    return stroke
   }
 
   /// Unwraps an ``AnyShapeStyle`` to a concrete animatable value
