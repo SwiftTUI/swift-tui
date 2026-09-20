@@ -200,10 +200,19 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
   package let height: Int
   package let verticalCellLength: Double
 
-  package init(width: Int, height: Int, aspectRatio: Double) {
+  /// Whether a track one cell thick runs along a row. It means nothing for a
+  /// ring.
+  private let isHorizontalLine: Bool
+
+  /// - Parameter lineAxis: Which way a rule runs. It matters for one cell
+  ///   only: a 1 x 1 rectangle is one row high and one column wide at once, so
+  ///   its size cannot say whether it is a horizontal rule or a vertical one.
+  ///   Without an axis it is horizontal.
+  package init(width: Int, height: Int, aspectRatio: Double, lineAxis: Axis? = nil) {
     self.width = max(0, width)
     self.height = max(0, height)
     verticalCellLength = Self.snappedAspectRatio(aspectRatio)
+    isHorizontalLine = height == 1 && !(width == 1 && lineAxis == .vertical)
   }
 
   /// The cell aspect ratio a track measures with: the reported ratio snapped to
@@ -227,7 +236,7 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
     if isRing {
       return 2 * Double(width - 1) + 2 * verticalCellLength * Double(height - 1)
     }
-    if height == 1 {
+    if isHorizontalLine {
       return Double(width)
     }
     return verticalCellLength * Double(height)
@@ -289,7 +298,7 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
   }
 
   private func forEachLineCell(_ body: (Cell) -> Void) {
-    if height == 1 {
+    if isHorizontalLine {
       for x in 0..<width {
         body(
           Cell(
@@ -388,7 +397,7 @@ package struct RectangleStrokeTrack: Equatable, Sendable {
   /// cells. Either edge selects it.
   private func includes(_ side: BorderSide, in sides: Edge.Set) -> Bool {
     if !isRing {
-      return height == 1
+      return isHorizontalLine
         ? sides.contains(.top) || sides.contains(.bottom)
         : sides.contains(.leading) || sides.contains(.trailing)
     }
@@ -408,7 +417,7 @@ extension RectangleStrokeTrack {
   /// so a border with a highlighted top edge has highlighted top corners.
   package func paintSide(for cell: Cell, sides: Edge.Set) -> BorderSide {
     guard isRing else {
-      return height == 1 ? .top : .left
+      return isHorizontalLine ? .top : .left
     }
     if cell.y == 0, sides.contains(.top) {
       return .top

@@ -157,7 +157,8 @@ extension Rasterizer {
     let track = RectangleStrokeTrack(
       width: line.size.width,
       height: line.size.height,
-      aspectRatio: environment.cellPixelMetrics.aspectRatio
+      aspectRatio: environment.cellPixelMetrics.aspectRatio,
+      lineAxis: drawsHorizontal ? .horizontal : .vertical
     )
     track.forEachInk(
       pen: StrokePen(

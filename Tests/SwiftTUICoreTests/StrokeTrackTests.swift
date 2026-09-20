@@ -17,9 +17,11 @@ struct StrokeTrackTests {
     dashOrigin: Double = 0,
     trim: StrokeTrim? = nil,
     roundedStart: Bool = false,
-    aspectRatio: Double = 2
+    aspectRatio: Double = 2,
+    lineAxis: Axis? = nil
   ) -> [String] {
-    let track = RectangleStrokeTrack(width: width, height: height, aspectRatio: aspectRatio)
+    let track = RectangleStrokeTrack(
+      width: width, height: height, aspectRatio: aspectRatio, lineAxis: lineAxis)
     let pen = StrokePen(borderSet: borderSet, roundsCorners: roundsCorners)
     let pattern = StrokeDashPattern(dash: dash, phase: dashPhase)
     var grid = Array(repeating: Array(repeating: Character(" "), count: width), count: height)
@@ -199,6 +201,15 @@ struct StrokeTrackTests {
     #expect(render(width: 5, height: 1) == ["─────"])
     #expect(render(width: 1, height: 3) == ["│", "│", "│"])
     #expect(render(width: 5, height: 1, sides: .bottom) == ["─────"])
+    // One cell is one row high and one column wide at once, so only the caller
+    // knows which way a 1 x 1 rule runs.
+    #expect(render(width: 1, height: 1) == ["─"])
+    #expect(render(width: 1, height: 1, lineAxis: .horizontal) == ["─"])
+    #expect(render(width: 1, height: 1, lineAxis: .vertical) == ["│"])
+    #expect(render(width: 1, height: 1, sides: .leading, lineAxis: .vertical) == ["│"])
+    // The axis never overrides the shape of a longer line.
+    #expect(render(width: 3, height: 1, lineAxis: .vertical) == ["───"])
+    #expect(render(width: 1, height: 2, lineAxis: .horizontal) == ["│", "│"])
     #expect(render(width: 5, height: 1, sides: .leading) == ["     "])
   }
 

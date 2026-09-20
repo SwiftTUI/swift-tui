@@ -65,6 +65,29 @@ struct StrokeTrackRenderTests {
     #expect(shifted[0] == "┌ ── ── ┐")
   }
 
+  @Test("a vertical divider one cell tall is still vertical")
+  func oneCellVerticalDivider() {
+    // A 1 x 1 rule is one row high and one column wide at once. Only the stack
+    // axis says which way it runs. It drew `─`, which put `─` between the
+    // segments of a segmented picker.
+    #expect(
+      lines(
+        HStack(spacing: 0) {
+          Text("a")
+          Divider()
+          Text("b")
+        }, width: 3, height: 1)
+        == ["a│b"])
+    #expect(
+      lines(
+        VStack(spacing: 0) {
+          Text("a")
+          Divider()
+          Text("b")
+        }, width: 1, height: 3)
+        == ["a", "─", "b"])
+  }
+
   @Test("a rounded rectangle rounds its corners whatever the palette's own corners")
   func roundedGeometry() {
     // Audit render E1: this drew square corners, because the corner came from
