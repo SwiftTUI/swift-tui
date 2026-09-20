@@ -381,7 +381,7 @@ struct RasterizerTests {
       postCommands: [
         .border(
           bounds: bounds,
-          set: .single,
+          stroke: .single,
           foreground: .init(.red),
           background: nil,
           blend: nil,

@@ -52,23 +52,29 @@ struct BorderRenderingTests {
     #expect(cells[2][3].character == "┘")
   }
 
-  @Test(".border(set: .dashed) cycles glyphs along the top edge")
-  func dashedBorderCyclesTopEdge() {
+  @Test(".border(set: .dashed) dashes round the perimeter")
+  func dashedBorderDashesRoundThePerimeter() {
     let artifacts = DefaultRenderer().render(
       Text("aaaa").border(set: .dashed, placement: .outset),
       context: .init(identity: testIdentity("BorderDashed"))
     )
 
-    // .dashed top edge is "─·" which cycles at each position along the
-    // top.  Trimmed width = 4 (text) + 2 (borders) = 6.  Top edge cells
-    // are at x=1..=4.
-    let cells = artifacts.rasterSurface.cells
-    #expect(cells[0][0].character == "┌")
-    #expect(cells[0][1].character == "─")
-    #expect(cells[0][2].character == "·")
-    #expect(cells[0][3].character == "─")
-    #expect(cells[0][4].character == "·")
-    #expect(cells[0][5].character == "┐")
+    // `.dashed` carries its rhythm as a second glyph in each edge string
+    // (`"─·"`). A stroke draws one glyph per palette entry, so the set dashes
+    // one unit on and one unit off instead, and the `·` gap glyph is gone.
+    //
+    // This test used to pin `┌─·─·┐`: the cycle restarted after each corner, so
+    // the top and bottom edges both ran left to right and a phase could not
+    // circulate. The pattern is now measured clockwise from the top-leading
+    // corner. A vertical cell is two units long, so it is half drawn: `╷` is
+    // its lower half. The 6 x 3 ring is 18 units round.
+    let rows = artifacts.rasterSurface.cells.map { row in String(row.map(\.character)) }
+    #expect(
+      rows == [
+        "┌ ─ ─╷",
+        "╷aaaa╷",
+        "╶ ─ ─ ",
+      ])
   }
 
   @Test(".border(sides: [.top]) draws only the top edge")

@@ -165,7 +165,7 @@ func meshGradientBorderRaster() throws {
       postCommands: [
         .border(
           bounds: bounds,
-          set: .single,
+          stroke: .single,
           foreground: BorderEdgeStyle(rasterTestMesh()),
           background: nil,
           blend: nil,

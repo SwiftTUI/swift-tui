@@ -122,4 +122,82 @@ struct StrokeTrackRenderTests {
     let dashBackground = try #require(cells[0][1].style?.backgroundColor)
     #expect(gapBackground == dashBackground)
   }
+
+  // MARK: - View.border
+
+  private func bordered(_ style: StrokeStyle, sides: Edge.Set = .all) -> some View {
+    EmptyView().frame(width: 9, height: 4).border(style: style, sides: sides)
+  }
+
+  @Test(
+    "a border and a rectangle stroke draw the same cells",
+    arguments: [
+      StrokeStyle.single, .heavy, .double, .innerHalfBlock, .ascii,
+      StrokeStyle(borderSet: .single, lineJoin: .round),
+      StrokeStyle(borderSet: .single, dash: [2, 1]),
+      StrokeStyle(borderSet: .heavy, dash: [3, 2], dashPhase: 1.5),
+      StrokeStyle(borderSet: .double, dash: [2, 1]),
+    ])
+  func borderMatchesStroke(style: StrokeStyle) {
+    #expect(
+      lines(bordered(style), width: 9, height: 4)
+        == lines(Rectangle().stroke(style: style), width: 9, height: 4))
+  }
+
+  @Test("a dashed border draws the render derived in the proposal")
+  func dashedBorder() {
+    #expect(
+      lines(bordered(StrokeStyle(borderSet: .single, dash: [2, 1])), width: 9, height: 4) == [
+        "┌─ ── ──╷",
+        "╵       ╵",
+        "│       │",
+        "╶─ ── ── ",
+      ])
+  }
+
+  @Test("the dashed set dashes round the perimeter, without its gap glyph")
+  func dashedSet() {
+    // The set used to restart its `─·` cycle on every edge, so the top and
+    // bottom edges both ran left to right and a phase could not circulate.
+    let expected = [
+      "┌ ─ ─ ─ ╴",
+      "╷       ╵",
+      "╷       ╵",
+      "╶ ─ ─ ─ ┘",
+    ]
+    #expect(
+      lines(EmptyView().frame(width: 9, height: 4).border(set: .dashed), width: 9, height: 4)
+        == expected)
+    // Audit render B: the same set through a shape stroke drew a solid ring.
+    #expect(
+      lines(Rectangle().stroke(style: StrokeStyle(borderSet: .dashed)), width: 9, height: 4)
+        == expected)
+  }
+
+  @Test("the dash phase moves a border's pattern round all four edges")
+  func borderDashPhase() {
+    let base = lines(
+      bordered(StrokeStyle(borderSet: .single, dash: [2, 1])), width: 9, height: 4)
+    let shifted = lines(
+      bordered(StrokeStyle(borderSet: .single, dash: [2, 1], dashPhase: 1)), width: 9, height: 4)
+    #expect(base != shifted)
+    #expect(shifted[0] == "┌ ── ── ┐")
+  }
+
+  @Test("sides is a mask on the same track")
+  func borderSides() {
+    #expect(
+      lines(bordered(.single, sides: .top), width: 9, height: 4)
+        == ["─────────", "         ", "         ", "         "])
+    #expect(
+      lines(bordered(.single, sides: [.top, .leading]), width: 9, height: 4)
+        == ["┌────────", "│        ", "│        ", "│        "])
+  }
+
+  @Test("the default border is unchanged until the default corner ruling lands")
+  func defaultBorder() {
+    #expect(
+      lines(EmptyView().frame(width: 5, height: 3).border(), width: 5, height: 3)
+        == ["╭───╮", "│   │", "╰───╯"])
+  }
 }

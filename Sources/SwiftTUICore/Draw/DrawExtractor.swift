@@ -460,9 +460,13 @@ extension DrawExtractor {
           return faded
         }
       }
+      // The layout behavior owns the glyph palette, because the palette decides
+      // how many cells the border reserves. The draw metadata owns the rest.
+      var stroke = drawMetadata.layoutBorderStroke ?? StrokeStyle(borderSet: set)
+      stroke.borderSet = set
       let borderCommand: DrawCommand = .border(
         bounds: bounds,
-        set: set,
+        stroke: stroke,
         foreground: fadedForeground,
         background: fadedBorderBackground(background, effectiveOpacity: effectiveOpacity),
         blend: fadedBlend,

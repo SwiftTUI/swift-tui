@@ -196,7 +196,17 @@ extension SnapshotRenderer {
   }
 
   func describe(_ strokeStyle: StrokeStyle) -> String {
-    "width:\(strokeStyle.lineWidth),set:\(describeBorderSetName(strokeStyle.borderSet))"
+    var description =
+      "width:\(strokeStyle.lineWidth),set:\(describeBorderSetName(strokeStyle.borderSet))"
+    // Only a non-default join or dash is described, so a solid stroke reads as
+    // it always did.
+    if strokeStyle.lineJoin == .round {
+      description += ",join:round"
+    }
+    if !strokeStyle.dash.isEmpty {
+      description += ",dash:\(strokeStyle.dash),phase:\(strokeStyle.dashPhase)"
+    }
+    return description
   }
 
   private func describeBorderSetName(_ set: BorderSet) -> String {

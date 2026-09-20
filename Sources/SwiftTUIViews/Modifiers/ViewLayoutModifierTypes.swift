@@ -172,12 +172,17 @@ public struct BorderModifier: IterativePrimitiveViewModifier, Sendable, Equatabl
   package var blend: BorderBlend?
   package var blendPhase: Double
   package var sides: Edge.Set
+  /// The join, the dash and the dash phase. `nil` draws a solid border with
+  /// the palette's own corners.
+  package var stroke: StrokeStyle? = nil
 
   @inline(never)
   package func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
+    var drawMetadata = DrawMetadata()
+    drawMetadata.layoutBorderStroke = stroke
     return resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
@@ -197,7 +202,8 @@ public struct BorderModifier: IterativePrimitiveViewModifier, Sendable, Equatabl
             blend: blend,
             blendPhase: blendPhase,
             sides: sides
-          )
+          ),
+          drawMetadata: drawMetadata
         )
       ]
 

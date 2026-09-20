@@ -66,7 +66,7 @@ extension Rasterizer {
       startsAtTrailingEdge = false
     }
     let pen = StrokePen(borderSet: strokeStyle.borderSet, roundsCorners: roundsCorners)
-    let dash = StrokeDashPattern(dash: strokeStyle.dash, phase: strokeStyle.dashPhase)
+    let dash = StrokeDashPattern(dash: strokeStyle.effectiveDash, phase: strokeStyle.dashPhase)
 
     let lineWidth = max(1, strokeStyle.lineWidth)
     for inset in 0..<lineWidth {
@@ -157,7 +157,7 @@ extension Rasterizer {
     track.forEachGlyph(
       pen: StrokePen(
         borderSet: strokeStyle.borderSet, roundsCorners: strokeStyle.lineJoin == .round),
-      dash: StrokeDashPattern(dash: strokeStyle.dash, phase: strokeStyle.dashPhase),
+      dash: StrokeDashPattern(dash: strokeStyle.effectiveDash, phase: strokeStyle.dashPhase),
       // Per-row cull (D70).
       rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(line.origin.y + $0) } }
     ) { cell, glyph in

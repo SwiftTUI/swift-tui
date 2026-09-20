@@ -97,7 +97,7 @@ public indirect enum DrawCommand: Equatable, Sendable {
   /// point around the perimeter for chasing-light animation.
   case border(
     bounds: CellRect,
-    set: BorderSet,
+    stroke: StrokeStyle,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
     blend: BorderBlend?,

@@ -1366,6 +1366,40 @@ extension View {
     )
   }
 
+  /// Draws a border around this view with a stroke style.
+  ///
+  /// The stroke style chooses the glyph palette, the corner join and the dash.
+  /// Changing `dashPhase` moves the dash pattern round all four edges, which is
+  /// how a marching-ants border is built:
+  ///
+  /// ```swift
+  /// content
+  ///   .border(style: StrokeStyle(borderSet: .single, dash: [2, 1], dashPhase: phase))
+  /// ```
+  ///
+  /// The cells of an unpainted dash segment are left as they were. Put a
+  /// `background` under the border to paint them.
+  ///
+  /// `placement` is a layout decision and belongs to the border, so the stroke
+  /// style's own `placement` is not read.
+  public func border<S: ShapeStyle>(
+    _ style: S = SemanticShapeStyle.foreground,
+    style strokeStyle: StrokeStyle,
+    placement: StrokeStyle.Placement = .inset,
+    sides: Edge.Set = .all
+  ) -> some View {
+    borderModified(
+      set: strokeStyle.borderSet,
+      placement: placement,
+      foreground: BorderEdgeStyle(AnyShapeStyle(style)),
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: sides,
+      stroke: strokeStyle
+    )
+  }
+
   /// Draws a border around this view using a per-side foreground style.
   public func border(
     _ style: BorderEdgeStyle,
@@ -1418,7 +1452,8 @@ extension View {
     background: BorderBackgroundStyle?,
     blend: BorderBlend?,
     blendPhase: Double,
-    sides: Edge.Set
+    sides: Edge.Set,
+    stroke: StrokeStyle? = nil
   ) -> some View {
     modifier(
       BorderModifier(
@@ -1428,7 +1463,8 @@ extension View {
         background: background,
         blend: blend,
         blendPhase: blendPhase,
-        sides: sides
+        sides: sides,
+        stroke: stroke
       )
     )
   }

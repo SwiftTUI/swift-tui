@@ -63,6 +63,7 @@ package struct DrawMetadata: Equatable, Sendable {
     var baseStyle: BaseStyle
     var borderShapeStyle: AnyShapeStyle?
     var borderStrokeStyle: StrokeStyle?
+    var layoutBorderStroke: StrokeStyle?
     var scrollIndicatorAxes: AxisSet?
     var focusedScrollIndicatorAxes: AxisSet?
     var scrollIndicatorForegroundStyle: AnyShapeStyle?
@@ -326,6 +327,14 @@ package struct DrawMetadata: Equatable, Sendable {
   package var borderStrokeStyle: StrokeStyle? {
     get { heavyFields.value.borderStrokeStyle }
     set { heavyFields.value.borderStrokeStyle = newValue }
+  }
+
+  /// How a `LayoutBehavior.border` is drawn: its join, its dash and its dash
+  /// phase. The layout behavior keeps only what reserves cells, so a dash phase
+  /// that changes every animation tick cannot invalidate layout.
+  package var layoutBorderStroke: StrokeStyle? {
+    get { heavyFields.value.layoutBorderStroke }
+    set { heavyFields.value.layoutBorderStroke = newValue }
   }
 
   package var scrollIndicatorAxes: AxisSet? {

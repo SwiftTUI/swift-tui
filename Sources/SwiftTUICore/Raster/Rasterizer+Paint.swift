@@ -929,7 +929,7 @@ extension Rasterizer {
         )
       case .border(
         let bounds,
-        let set,
+        let stroke,
         let foreground,
         let background,
         let blend,
@@ -938,7 +938,7 @@ extension Rasterizer {
       ):
         drawLayoutBorder(
           in: bounds,
-          set: set,
+          stroke: stroke,
           foreground: foreground,
           background: background,
           blend: blend,

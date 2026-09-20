@@ -80,6 +80,24 @@ public struct StrokeStyle: Equatable, Sendable {
 }
 
 extension StrokeStyle {
+  /// The dash the stroke draws.
+  ///
+  /// `BorderSet.dashed` and `BorderSet.dashedHeavy` carry their rhythm as a
+  /// second glyph in each edge string. A stroke draws one glyph per palette
+  /// entry, so such a set dashes one unit on and one unit off instead, unless
+  /// the stroke names its own pattern.
+  package var effectiveDash: [Double] {
+    dash.isEmpty && borderSet.impliesDash ? [1, 1] : dash
+  }
+}
+
+extension BorderSet {
+  package var impliesDash: Bool {
+    top.count > 1 || bottom.count > 1 || left.count > 1 || right.count > 1
+  }
+}
+
+extension StrokeStyle {
   public static let rounded = StrokeStyle(borderSet: .rounded)
   public static let heavy = StrokeStyle(borderSet: .heavy)
   public static let single = StrokeStyle(borderSet: .single)
