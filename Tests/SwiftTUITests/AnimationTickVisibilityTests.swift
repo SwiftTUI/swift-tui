@@ -7,7 +7,7 @@ import Testing
 
 /// Property pins for ``AnimationTickResult.redrawIdentities``.
 ///
-/// Background: a `.border(blend:)` whose phase is driven by
+/// Background: a `.blendBorder(blend:)` whose phase is driven by
 /// `withAnimation(.linear.repeatForever)` schedules a 30 FPS tick.
 /// `redrawIdentities` describes which view identities the tick
 /// touched, which downstream consumers (the incremental presentation
@@ -57,7 +57,7 @@ struct AnimationTickVisibilityTests {
           Text("chasing")
             .padding(1)
             .frame(width: 10, height: 3)
-            .border(
+            .blendBorder(
               blend: blend,
               set: .single,
               phase: phase
@@ -144,7 +144,7 @@ struct AnimationTickVisibilityTests {
           Text("chasing")
             .padding(1)
             .frame(width: 10, height: 3)
-            .border(
+            .blendBorder(
               blend: blend,
               set: .single,
               phase: phase

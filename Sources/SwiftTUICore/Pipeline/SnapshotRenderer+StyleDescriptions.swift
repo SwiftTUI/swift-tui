@@ -55,6 +55,8 @@ extension SnapshotRenderer {
       return "linearGradient(\(describe(gradient)))"
     case .radialGradient(let gradient):
       return "radialGradient(\(describe(gradient)))"
+    case .angularGradient(let gradient):
+      return "angularGradient(\(describe(gradient)))"
     case .meshGradient(let gradient):
       return "meshGradient(\(describe(gradient)))"
     case .tileStyle(let tile):
@@ -107,6 +109,15 @@ extension SnapshotRenderer {
     return
       "start=(\(gradient.startPoint.x),\(gradient.startPoint.y))"
       + "->end=(\(gradient.endPoint.x),\(gradient.endPoint.y)):[\(stops)]"
+  }
+
+  private func describe(_ gradient: AngularGradient) -> String {
+    [
+      "stops:\(gradient.gradient.stops.count)",
+      "center:\(gradient.center.x),\(gradient.center.y)",
+      "start:\(gradient.startAngle.radians)",
+      "end:\(gradient.endAngle.radians)",
+    ].joined(separator: ",")
   }
 
   private func describe(_ gradient: RadialGradient) -> String {

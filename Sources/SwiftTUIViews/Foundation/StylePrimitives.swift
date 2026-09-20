@@ -191,3 +191,68 @@ extension ShapeStyle where Self == RadialGradient {
     )
   }
 }
+
+extension ShapeStyle where Self == AngularGradient {
+  /// An angular gradient interpolating evenly through the given colors, between
+  /// two angles.
+  ///
+  /// The dot-shorthand form, for use where a `ShapeStyle` is expected. An angle
+  /// of zero points along the trailing `x` axis and angles increase clockwise.
+  /// A span of less than one turn leaves a missing area, which splits at its
+  /// midpoint between the last color and the first.
+  ///
+  /// - Parameters:
+  ///   - colors: The colors to interpolate, spaced evenly from the start angle
+  ///     to the end angle.
+  ///   - center: The center of the gradient in unit space. Defaults to the
+  ///     shape's center.
+  ///   - startAngle: The angle at which the first color sits.
+  ///   - endAngle: The angle at which the last color sits.
+  /// - Returns: The angular gradient.
+  public static func angularGradient(
+    colors: [Color],
+    center: UnitPoint = .center,
+    startAngle: Angle,
+    endAngle: Angle
+  ) -> Self {
+    .init(colors: colors, center: center, startAngle: startAngle, endAngle: endAngle)
+  }
+
+  /// An angular gradient interpolating through explicitly located stops, between
+  /// two angles.
+  public static func angularGradient(
+    stops: [Gradient.Stop],
+    center: UnitPoint = .center,
+    startAngle: Angle,
+    endAngle: Angle
+  ) -> Self {
+    .init(stops: stops, center: center, startAngle: startAngle, endAngle: endAngle)
+  }
+
+  /// A conic gradient: one full turn through the given colors, starting at
+  /// `angle`.
+  ///
+  /// On a border this is a chasing light. Animate `angle` to move it:
+  ///
+  /// ```swift
+  /// content.border(.conicGradient(colors: [.red, .blue, .red], angle: .degrees(turn)))
+  /// ```
+  ///
+  /// Repeat the first color as the last, so the turn closes without a seam.
+  public static func conicGradient(
+    colors: [Color],
+    center: UnitPoint = .center,
+    angle: Angle = .radians(0)
+  ) -> Self {
+    .init(colors: colors, center: center, angle: angle)
+  }
+
+  /// A conic gradient through explicitly located stops, starting at `angle`.
+  public static func conicGradient(
+    stops: [Gradient.Stop],
+    center: UnitPoint = .center,
+    angle: Angle = .radians(0)
+  ) -> Self {
+    .init(stops: stops, center: center, angle: angle)
+  }
+}

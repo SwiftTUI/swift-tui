@@ -5,20 +5,20 @@ import Testing
 @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
-/// Cell-level assertions for the new `.border(blend:set:sides:phase:)`
+/// Cell-level assertions for the new `.blendBorder(blend:set:sides:phase:)`
 /// modifier.  Pinned by M5.A: when a `BorderBlend` is attached, the
 /// rasterizer samples colors continuously around the rectangle's
 /// perimeter and assigns one color per perimeter cell, walking
 /// clockwise from the top-left corner.
 @MainActor
 struct BorderGradientTests {
-  @Test(".border(blend:) writes perimeter-sampled colors on a small rect")
+  @Test(".blendBorder(blend:) writes perimeter-sampled colors on a small rect")
   func borderBlendBasicRendering() {
     // A 4x3 frame with a red→blue→red closed loop.  Each corner and
     // edge cell should have a non-nil foreground color, and at least
     // one cell should differ from pure red (the gradient sweeps
     // through blue at the perimeter midpoint).
-    let view = Text("hi").border(
+    let view = Text("hi").blendBorder(
       blend: BorderBlend([Color.red, Color.blue, Color.red]),
       set: .single,
       placement: .outset
@@ -50,18 +50,18 @@ struct BorderGradientTests {
     #expect(nonRedCount > 0)
   }
 
-  @Test(".border(blend:) with phase rotation shifts the gradient start")
+  @Test(".blendBorder(blend:) with phase rotation shifts the gradient start")
   func borderBlendPhaseShiftsStart() {
     // Render the same view at phase 0 and phase 0.5; at least one
     // perimeter cell should differ.
     let blend = BorderBlend([Color.red, Color.green, Color.blue, Color.red])
-    let view0 = Text("hi").border(
+    let view0 = Text("hi").blendBorder(
       blend: blend,
       set: .single,
       placement: .outset,
       phase: 0
     )
-    let viewHalf = Text("hi").border(
+    let viewHalf = Text("hi").blendBorder(
       blend: blend,
       set: .single,
       placement: .outset,
@@ -171,7 +171,7 @@ struct BorderGradientTests {
     // `phase: 1.0` under a `withAnimation` transaction — after a seed
     // frame with `phase: 0` — must leave the controller holding an
     // active animation request.  This pins the wiring from
-    //   .border(blend:set:phase:) modifier
+    //   .blendBorder(blend:set:phase:) modifier
     //   → ResolvedNode.layoutBehavior.border(blendPhase:)
     //   → AnimationController diff
     //   → active animation queue
@@ -195,7 +195,7 @@ struct BorderGradientTests {
 
     // Frame 1 (seed): phase 0, no animation intent.
     _ = renderer.render(
-      Text("hi").border(
+      Text("hi").blendBorder(
         blend: blend,
         set: .single,
         placement: .outset,
@@ -209,7 +209,7 @@ struct BorderGradientTests {
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
     _ = renderer.render(
-      Text("hi").border(
+      Text("hi").blendBorder(
         blend: blend,
         set: .single,
         placement: .outset,
@@ -223,11 +223,11 @@ struct BorderGradientTests {
     )
   }
 
-  @Test(".border(blend:) respects sides mask by drawing only enabled edges")
+  @Test(".blendBorder(blend:) respects sides mask by drawing only enabled edges")
   func borderBlendSidesMask() {
     // With sides: [.top], only the top row should carry a border
     // glyph; the layout shrinks to "content + top inset only".
-    let view = Text("hi").border(
+    let view = Text("hi").blendBorder(
       blend: BorderBlend([Color.red, Color.blue]),
       set: .single,
       placement: .outset,

@@ -137,6 +137,11 @@ private func resolveStyleColorResult(
       return .failure(.emptyGradient)
     }
     return .success(firstColor)
+  case .angularGradient(let gradient):
+    guard let firstColor = gradient.gradient.stops.first?.color else {
+      return .failure(.emptyGradient)
+    }
+    return .success(firstColor)
   case .meshGradient(let gradient):
     guard let firstColor = gradient.colors.first else {
       return .failure(.emptyGradient)

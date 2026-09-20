@@ -115,6 +115,115 @@ public struct RadialGradient: ShapeStyle, Equatable, Sendable {
   }
 }
 
+/// A gradient that sweeps round a center point, by angle.
+///
+/// Angles follow SwiftUI as measured. An angle of zero points along the
+/// trailing `x` axis, at three o'clock, and angles increase clockwise on
+/// screen. They are geometric: measured in aspect-corrected cell space, so a
+/// quarter turn is a quarter turn on screen whatever the shape's proportions in
+/// cells.
+///
+/// On a stroke this paints a color by where each cell sits round the center,
+/// which is how a chasing-light border is built: animate ``startAngle`` and
+/// ``endAngle`` together, or use ``init(gradient:center:angle:)`` and animate
+/// the angle.
+public struct AngularGradient: ShapeStyle, Equatable, Sendable {
+  public var gradient: Gradient
+  public var center: UnitPoint
+  public var startAngle: Angle
+  public var endAngle: Angle
+
+  public init(
+    gradient: Gradient,
+    center: UnitPoint = .center,
+    startAngle: Angle,
+    endAngle: Angle
+  ) {
+    self.gradient = gradient
+    self.center = center
+    self.startAngle = startAngle
+    self.endAngle = endAngle
+  }
+
+  /// A conic gradient: one full turn, starting at `angle`.
+  public init(gradient: Gradient, center: UnitPoint = .center, angle: Angle = .radians(0)) {
+    self.init(
+      gradient: gradient,
+      center: center,
+      startAngle: angle,
+      endAngle: .radians(angle.radians + 2 * .pi)
+    )
+  }
+
+  public init(
+    colors: [Color],
+    center: UnitPoint = .center,
+    startAngle: Angle,
+    endAngle: Angle
+  ) {
+    self.init(
+      gradient: Gradient(colors: colors), center: center,
+      startAngle: startAngle, endAngle: endAngle)
+  }
+
+  public init(colors: [Color], center: UnitPoint = .center, angle: Angle = .radians(0)) {
+    self.init(gradient: Gradient(colors: colors), center: center, angle: angle)
+  }
+
+  public init(
+    stops: [Gradient.Stop],
+    center: UnitPoint = .center,
+    startAngle: Angle,
+    endAngle: Angle
+  ) {
+    self.init(
+      gradient: Gradient(stops: stops), center: center,
+      startAngle: startAngle, endAngle: endAngle)
+  }
+
+  public init(stops: [Gradient.Stop], center: UnitPoint = .center, angle: Angle = .radians(0)) {
+    self.init(gradient: Gradient(stops: stops), center: center, angle: angle)
+  }
+
+  public func eraseToAnyShapeStyle() -> AnyShapeStyle {
+    .angularGradient(self)
+  }
+
+  /// The gradient location, from `0` to `1`, at a screen angle in radians.
+  ///
+  /// The three rules were measured against SwiftUI:
+  /// - A span of one turn or more draws its last complete turn, and location is
+  ///   still the angle's share of the whole span.
+  /// - A span of less than one turn leaves a missing area, which splits at its
+  ///   midpoint: the half next to the end angle takes the last color and the
+  ///   half next to the start angle takes the first.
+  /// - A negative span runs the gradient counter-clockwise.
+  package func location(atAngle angle: Double) -> Double {
+    let turn = 2 * Double.pi
+    let start = startAngle.radians
+    let span = endAngle.radians - start
+    guard angle.isFinite, span.isFinite, start.isFinite else {
+      return 0
+    }
+    let magnitude = abs(span)
+    let direction: Double = span < 0 ? -1 : 1
+    func sweep(from origin: Double) -> Double {
+      // How far round from `origin` to `angle`, in the gradient's direction.
+      let remainder = ((angle - origin) * direction).truncatingRemainder(dividingBy: turn)
+      return remainder < 0 ? remainder + turn : remainder
+    }
+    if magnitude >= turn {
+      let lastTurnStart = endAngle.radians - direction * turn
+      return min(1, (abs(lastTurnStart - start) + sweep(from: lastTurnStart)) / magnitude)
+    }
+    let swept = sweep(from: start)
+    if magnitude > 0, swept <= magnitude {
+      return swept / magnitude
+    }
+    return swept - magnitude < (turn - magnitude) / 2 ? 1 : 0
+  }
+}
+
 /// A two-dimensional grid of colors whose control points can deform the
 /// resulting surface.
 ///

@@ -334,6 +334,34 @@ an unpainted segment are left alone, so the lower border shows through the gaps
 of the upper one. The same style animates on `Rectangle().stroke(style:)` and on
 a `Divider`.
 
+## Chase A Light Round A Border
+
+An `AngularGradient` paints by angle round a center, so on a border it colors
+each cell by where it sits round the view. Animate its angle and the colors
+chase round the edge:
+
+```swift
+struct Chase: View {
+  @State private var turn = 0.0
+
+  var body: some View {
+    Text("working")
+      .padding(1)
+      .border(.conicGradient(colors: [.cyan, .blue, .cyan], angle: .degrees(turn)))
+      .onAppear {
+        withAnimation(.linear(duration: .seconds(2)).repeatForever(autoreverses: false)) {
+          turn = 360
+        }
+      }
+  }
+}
+```
+
+Repeat the first color as the last, so the turn closes without a seam. Angles
+follow SwiftUI: zero is at three o'clock and they increase clockwise. They are
+measured on screen, so a quarter turn is a quarter turn whatever the view's
+proportions in cells. The same paint animates on `Rectangle().stroke(_:)`.
+
 ## Draw An Outline On
 
 A trim's interval is animatable on a stroke, so an outline can draw itself on:

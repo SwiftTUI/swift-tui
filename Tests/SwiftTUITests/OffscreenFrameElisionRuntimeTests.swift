@@ -1809,7 +1809,7 @@ private struct OffscreenAnimatedProbe: View {
         Text("chasing")
           .padding(1)
           .frame(width: 10, height: 3)
-          .border(
+          .blendBorder(
             blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .red]),
             set: .single,
             phase: phase
@@ -1847,7 +1847,7 @@ private struct OffscreenCompletingProbe: View {
         Text("chasing")
           .padding(1)
           .frame(width: 10, height: 3)
-          .border(
+          .blendBorder(
             blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .red]),
             set: .single,
             phase: phase
@@ -1915,7 +1915,7 @@ private struct OnScreenAnimatedProbe: View {
         Text("chasing")
           .padding(1)
           .frame(width: 10, height: 3)
-          .border(
+          .blendBorder(
             blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .red]),
             set: .single,
             phase: phase
@@ -1996,7 +1996,7 @@ private struct InterleavedOffscreenBorder: View {
     Text("chasing")
       .padding(1)
       .frame(width: 10, height: 3)
-      .border(
+      .blendBorder(
         blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .red]),
         set: .single,
         phase: phase

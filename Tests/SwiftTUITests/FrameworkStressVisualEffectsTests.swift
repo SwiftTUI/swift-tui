@@ -1197,7 +1197,7 @@ extension FrameworkStressVisualEffectsTests {
       var body: some View {
         Text("retained border blend")
           .frame(width: 28, height: 7)
-          .border(
+          .blendBorder(
             blend: blend,
             set: .single,
             phase: Double(generation % 11) / 11

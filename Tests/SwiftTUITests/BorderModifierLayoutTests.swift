@@ -67,7 +67,7 @@ struct BorderModifierLayoutTests {
       context: .init(identity: testIdentity("BorderEdgeOverloadDefault"))
     )
     let blended = DefaultRenderer().render(
-      content.border(
+      content.blendBorder(
         blend: BorderBlend([Color.red, Color.blue]),
         set: .single
       ),

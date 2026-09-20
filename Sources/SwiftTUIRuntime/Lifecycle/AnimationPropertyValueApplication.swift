@@ -335,6 +335,32 @@ package enum AnimationPropertyValueApplication {
         )
       )
 
+    case .borderForegroundStyle:
+      guard let style = unwrapShapeStyle(value) else { return }
+      if case .border(
+        let set,
+        let placement,
+        _,
+        let background,
+        let blend,
+        let blendPhase,
+        let sides
+      ) = node.layoutBehavior {
+        // The paint is not read when a border is measured, so an angle that
+        // changes every tick does not invalidate layout.
+        node.setLayoutBehaviorPreservingDerivedState(
+          .border(
+            set,
+            placement: placement,
+            foreground: BorderEdgeStyle(style),
+            background: background,
+            blend: blend,
+            blendPhase: blendPhase,
+            sides: sides
+          )
+        )
+      }
+
     case .strokeDashPhase:
       guard let phase = value.unwrap(as: Double.self),
         var stroke = AnimatableSnapshot.dashedStroke(of: node)
@@ -377,6 +403,9 @@ package enum AnimationPropertyValueApplication {
     }
     if let radial = value.unwrap(as: RadialGradient.self) {
       return .radialGradient(radial)
+    }
+    if let angular = value.unwrap(as: AngularGradient.self) {
+      return .angularGradient(angular)
     }
     if let mesh = value.unwrap(as: MeshGradient.self) {
       return .meshGradient(mesh)

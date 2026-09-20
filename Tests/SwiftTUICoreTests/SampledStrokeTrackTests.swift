@@ -119,4 +119,34 @@ struct SampledStrokeTrackTests {
     #expect(track.position(nearestToX: 10, y: 0) < 10)
     #expect(track.position(nearestToX: 10, y: 8) > 10)
   }
+
+  @Test("a dash on a circle is as long as the pattern says, in cell widths")
+  func dashLengthMatchesThePattern() throws {
+    // STUI-523: the same `[4, 4]` that is four cells on a rectangle's top edge.
+    var canvas = strokedCircle()
+    let track = circleTrack
+    let dash = try #require(StrokeDashPattern(dash: [4, 4], phase: 0))
+    track.apply(StrokeMask(dash: dash), to: &canvas)
+    // Sort the surviving subpixels by where they sit along the outline and split
+    // them into runs at every gap wider than a subpixel step.
+    let positions = litPixels(canvas).map { track.position(nearestToX: $0.x, y: $0.y) }.sorted()
+    var runs: [Double] = []
+    var runStart = try #require(positions.first)
+    var previous = runStart
+    for position in positions.dropFirst() {
+      if position - previous > 1.5 {
+        runs.append(previous - runStart)
+        runStart = position
+      }
+      previous = position
+    }
+    runs.append(previous - runStart)
+    // The outline is 18 pi, about 56.5 units: seven dashes of four.
+    #expect(runs.count == 7 || runs.count == 8)
+    // A subpixel is half a unit, so a run's measured extent is within one unit
+    // of the four the pattern asks for. The last run may be cut by the seam.
+    for run in runs.dropLast() {
+      #expect(abs(run - 4) <= 1, "run of \(run)")
+    }
+  }
 }

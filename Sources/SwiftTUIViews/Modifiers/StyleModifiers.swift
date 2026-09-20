@@ -1427,13 +1427,37 @@ extension View {
   /// Draws a border whose foreground color is sampled continuously
   /// around the perimeter from a `BorderBlend`.
   ///
-  /// The blend's stops are interpolated as the rasterizer walks the
-  /// rectangle's edges clockwise (top L→R, right T→B, bottom R→L,
-  /// left B→T).  The `phase` parameter shifts the gradient start point
-  /// around the perimeter. Changing `phase` inside `withAnimation { … }` drives the pipeline's
-  /// animation controller to interpolate the phase smoothly frame by
-  /// frame.
+  /// Use an `AngularGradient` as the border's paint. It sweeps by angle, as
+  /// SwiftUI's does, works on shape strokes and fills as well, and animates
+  /// through its `angle`:
+  ///
+  /// ```swift
+  /// content.border(.conicGradient(colors: [.red, .blue, .red], angle: .degrees(turn)))
+  /// ```
+  ///
+  /// A blend starts at the top-leading corner and an angular gradient at three
+  /// o'clock. Both run clockwise.
+  @available(
+    *, deprecated,
+    message: "Pass an AngularGradient as the border's paint, such as .conicGradient(colors:angle:)."
+  )
   public func border(
+    blend: BorderBlend,
+    set: BorderSet = .single,
+    placement: StrokeStyle.Placement = .inset,
+    sides: Edge.Set = .all,
+    phase: Double = 0
+  ) -> some View {
+    blendBorder(blend: blend, set: set, placement: placement, sides: sides, phase: phase)
+  }
+
+  /// The perimeter-blend border behind the deprecated
+  /// `border(blend:set:placement:sides:phase:)`.
+  ///
+  /// The framework's animation and frame-elision tests use a blend border as
+  /// something whose paint animates. They call this, which is not deprecated,
+  /// because the repository gate builds with warnings as errors.
+  package func blendBorder(
     blend: BorderBlend,
     set: BorderSet = .single,
     placement: StrokeStyle.Placement = .inset,

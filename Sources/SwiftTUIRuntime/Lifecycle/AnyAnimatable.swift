@@ -81,6 +81,9 @@ private func animatableStructureDiffers<T>(_ lhs: T, _ rhs: T) -> Bool {
   if let lhs = lhs as? RadialGradient, let rhs = rhs as? RadialGradient {
     return lhs.gradient.stops.count != rhs.gradient.stops.count
   }
+  if let lhs = lhs as? AngularGradient, let rhs = rhs as? AngularGradient {
+    return lhs.gradient.stops.count != rhs.gradient.stops.count
+  }
   if let lhs = lhs as? Gradient, let rhs = rhs as? Gradient {
     return lhs.stops.count != rhs.stops.count
   }

@@ -2000,7 +2000,7 @@ private struct StressLL033Sheet: View {
       Text("sheet repeat forever probe")
         .padding(1)
         .frame(width: 32, height: 3)
-        .border(
+        .blendBorder(
           blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red]),
           set: .rounded,
           phase: phase

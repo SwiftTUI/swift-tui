@@ -98,6 +98,7 @@ cell-space values.
 - ``Gradient``
 - ``LinearGradient``
 - ``RadialGradient``
+- ``AngularGradient``
 - ``MeshGradient``
 - ``StrokeStyle``
 - ``BorderSet``

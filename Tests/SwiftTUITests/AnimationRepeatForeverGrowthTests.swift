@@ -147,7 +147,7 @@ struct AnimationRepeatForeverGrowthTests {
             Text("chasing light")
               .padding(1)
               .frame(width: 30, height: 3)
-              .border(
+              .blendBorder(
                 blend: blend,
                 set: .rounded,
                 phase: phase
@@ -652,7 +652,7 @@ private struct OnAppearRepeatForeverProbe: View {
     Text("probe")
       .padding(1)
       .frame(width: 20, height: 3)
-      .border(
+      .blendBorder(
         blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red]),
         set: .rounded,
         phase: phase
@@ -708,7 +708,7 @@ private struct NestedChildOwnedRepeatForeverCard: View {
     Text("nested probe")
       .padding(1)
       .frame(width: 20, height: 3)
-      .border(
+      .blendBorder(
         blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red]),
         set: .rounded,
         phase: phase

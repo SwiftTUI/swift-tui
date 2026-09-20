@@ -241,7 +241,8 @@ extension AnyShapeStyle {
       return true
     case .opacity(let inner, _):
       return inner.containsTileStyle
-    case .semantic, .color, .linearGradient, .radialGradient, .meshGradient, .terminalChrome:
+    case .semantic, .color, .linearGradient, .radialGradient, .angularGradient, .meshGradient,
+      .terminalChrome:
       return false
     }
   }
@@ -253,6 +254,8 @@ extension AnyShapeStyle {
     case .linearGradient(let gradient):
       return gradient.gradient.stops.first?.color
     case .radialGradient(let gradient):
+      return gradient.gradient.stops.first?.color
+    case .angularGradient(let gradient):
       return gradient.gradient.stops.first?.color
     case .meshGradient(let gradient):
       return gradient.colors.first
@@ -270,6 +273,8 @@ extension AnyShapeStyle {
     case (.linearGradient(let a), .linearGradient(let b)):
       return a.gradient.stops.count == b.gradient.stops.count
     case (.radialGradient(let a), .radialGradient(let b)):
+      return a.gradient.stops.count == b.gradient.stops.count
+    case (.angularGradient(let a), .angularGradient(let b)):
       return a.gradient.stops.count == b.gradient.stops.count
     case (.meshGradient(let a), .meshGradient(let b)):
       return a.isInterpolable(to: b)
@@ -319,6 +324,22 @@ extension AnyShapeStyle {
       data += delta
       a.animatableData = data
       return .radialGradient(a)
+
+    case (.angularGradient(var a), .angularGradient(let b)):
+      guard
+        a.gradient.animatableData.isInterpolable(
+          to: b.gradient.animatableData
+        )
+      else {
+        return .angularGradient(b)
+      }
+      var delta = b.animatableData
+      delta -= a.animatableData
+      delta.scale(by: t)
+      var data = a.animatableData
+      data += delta
+      a.animatableData = data
+      return .angularGradient(a)
 
     case (.meshGradient(var a), .meshGradient(let b)):
       guard a.isInterpolable(to: b) else {

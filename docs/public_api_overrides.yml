@@ -782,6 +782,7 @@ classifications:
     - SwiftTUIPrimitives.ProposedDimension
     - SwiftTUIPrimitives.ProposedSize
     - SwiftTUIPrimitives.RadialGradient
+    - SwiftTUIPrimitives.AngularGradient
     - SwiftTUIPrimitives.RasterCell
     - SwiftTUIPrimitives.RasterImageBackdrop
     - SwiftTUIPrimitives.RasterImageBackdropCell

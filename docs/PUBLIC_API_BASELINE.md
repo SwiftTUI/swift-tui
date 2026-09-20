@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 60 | 511 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 415 | 2522 |
+| `SwiftTUIViews` | 415 | 2526 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
 | `SwiftTUICore` | 40 | 272 |
-| `SwiftTUIPrimitives` | 170 | 1496 |
+| `SwiftTUIPrimitives` | 171 | 1513 |
 | `SwiftTUIGraph` | 60 | 357 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -440,7 +440,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `SemanticMetadataModifier` — struct
 - `SequenceGesture` — struct — 8 members
 - `Shape` — protocol — 20 members
-- `ShapeStyle` — extension — 4 members
+- `ShapeStyle` — extension — 8 members
 - `SheetStyle` — protocol — 6 members
 - `SheetStyleConfiguration` — struct — 4 members
 - `SheetSurfaceContainer` — enum — 2 members
@@ -704,17 +704,18 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (169)
+### Canonical surface (170)
 
 - `adapt(_:to:method:)` — func
 - `Alignment` — struct — 16 members
 - `AlignmentID` — protocol — 1 member
 - `Angle` — struct — 8 members
+- `AngularGradient` — struct — 15 members
 - `Animatable` — protocol — 2 members
 - `AnimatableArray` — struct — 10 members
 - `AnimatablePair` — struct — 12 members
 - `AnyID` — struct — 2 members
-- `AnyShapeStyle` — enum — 10 members
+- `AnyShapeStyle` — enum — 11 members
 - `AppearanceSource` — enum — 5 members
 - `Axis` — enum — 3 members
 - `AxisSet` — struct — 4 members

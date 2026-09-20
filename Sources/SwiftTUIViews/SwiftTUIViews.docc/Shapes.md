@@ -166,7 +166,9 @@ with either join. The size of its `cornerRadius` has no other effect: a cell
 grid has one size of rounded corner.
 
 Curved shapes and custom paths dash too, in Braille dots, and in the same unit:
-`dash: [2, 2]` is the same length on a `Circle` as on a `Rectangle`.
+`dash: [2, 2]` is the same length on a `Circle` as on a `Rectangle`. They have no
+line glyphs to choose, so the stroke style's `borderSet` and `lineJoin` have no
+effect on them.
 
 ## Trim A Shape
 

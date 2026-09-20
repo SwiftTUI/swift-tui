@@ -75,6 +75,7 @@ package struct Rasterizer: Sendable {
     /// falloff in device-pixel space without threading metrics through every
     /// `resolveColor` caller.
     case sampledRadial(RadialGradient, aspectRatio: Double)
+    case sampledAngular(AngularGradient, aspectRatio: Double)
     case sampledMesh(PreparedMeshGradient)
     case tile(ResolvedTileColorMode)
   }

@@ -7,7 +7,7 @@ protocol.
 ## Overview
 
 Styling in SwiftTUI composes in three layers. Concrete `ShapeStyle` values —
-`Color`, `LinearGradient`, `RadialGradient`, `MeshGradient` — color content
+`Color`, `LinearGradient`, `RadialGradient`, `AngularGradient`, `MeshGradient` — color content
 directly through modifiers such as `.foregroundStyle(_:)`, `.background(_:)`,
 `.tint(_:)`, and `.border(_:style:placement:sides:)`. Semantic roles
 (`.primary`, `.tint`, `.success`, …) are shape styles too, but resolve at
@@ -63,8 +63,9 @@ VStack(alignment: .leading) {
 ## Gradients
 
 Gradients are ordinary shape styles. `LinearGradient` interpolates colors
-between two `UnitPoint`s; `MeshGradient` interpolates a grid of control
-points and colors, and both animate under `withAnimation`:
+between two `UnitPoint`s, `AngularGradient` sweeps them round a center by
+angle, and `MeshGradient` interpolates a grid of control points and colors. All
+of them animate under `withAnimation`:
 
 ```swift
 Rectangle()

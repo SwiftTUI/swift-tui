@@ -100,7 +100,7 @@ extension Rasterizer {
       constantColor = color
       isTranslucent = (color?.alpha ?? 0) < 1
       tileStyle = nil
-    case .sampled, .sampledRadial, .sampledMesh:
+    case .sampled, .sampledRadial, .sampledAngular, .sampledMesh:
       constantColor = nil
       // Sampled (gradient) fills may have per-stop alpha.
       isTranslucent = false

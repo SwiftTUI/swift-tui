@@ -124,7 +124,7 @@ package struct AnimatableSnapshot: Sendable {
     case .frame(let width, let height, _):
       if let width { snapshot[.frameWidth] = AnyAnimatable(width) }
       if let height { snapshot[.frameHeight] = AnyAnimatable(height) }
-    case .border(_, _, _, _, let blend, let blendPhase, _):
+    case .border(_, _, let foreground, _, let blend, let blendPhase, _):
       // Only populate the phase slot when a ``BorderBlend`` is attached.
       // `.border` layouts without a blend have nothing to animate here —
       // the static zero default would otherwise create a phantom
@@ -132,6 +132,16 @@ package struct AnimatableSnapshot: Sendable {
       // a blend to a plain foreground.
       if blend != nil {
         snapshot[.borderBlendPhase] = AnyAnimatable(blendPhase)
+      } else if let foreground,
+        foreground.top == foreground.right, foreground.top == foreground.bottom,
+        foreground.top == foreground.left,
+        let paint = Self.extractAnimatableShapeStyle(from: foreground.top)
+      {
+        // A border painted with one style animates that paint, as a shape
+        // stroke does. It is how a conic gradient's angle chases round a
+        // border. A border with a different paint on each side does not
+        // animate, because a slot holds one value.
+        snapshot[.borderForegroundStyle] = paint
       }
     case .flexibleFrame(
       let minWidth, let idealWidth, let maxWidth,
@@ -253,6 +263,8 @@ package struct AnimatableSnapshot: Sendable {
     case .linearGradient(let gradient):
       return AnyAnimatable(gradient)
     case .radialGradient(let gradient):
+      return AnyAnimatable(gradient)
+    case .angularGradient(let gradient):
       return AnyAnimatable(gradient)
     case .meshGradient(let gradient):
       return AnyAnimatable(gradient)

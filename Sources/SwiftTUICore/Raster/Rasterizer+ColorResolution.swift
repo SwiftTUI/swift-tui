@@ -346,6 +346,11 @@ extension Rasterizer {
         gradient,
         aspectRatio: environment.cellPixelMetrics.aspectRatio
       )
+    case .angularGradient(let gradient):
+      return .sampledAngular(
+        gradient,
+        aspectRatio: environment.cellPixelMetrics.aspectRatio
+      )
     case .meshGradient(let gradient):
       let input = MeshGradientRasterInput(
         width: gradient.width,
@@ -462,6 +467,18 @@ extension Rasterizer {
           endRadius: gradient.endRadius
         )
         return .sampledRadial(faded, aspectRatio: aspectRatio)
+      case .sampledAngular(let gradient, let aspectRatio):
+        return .sampledAngular(
+          AngularGradient(
+            gradient: Gradient(
+              stops: gradient.gradient.stops.map {
+                .init(color: $0.color.opacity(amount), location: $0.location)
+              }),
+            center: gradient.center,
+            startAngle: gradient.startAngle,
+            endAngle: gradient.endAngle
+          ),
+          aspectRatio: aspectRatio)
       case .sampledMesh(let gradient):
         return .sampledMesh(gradient.applyingOpacity(amount))
       case .tile(let tile):
@@ -492,6 +509,14 @@ extension Rasterizer {
         y: sampleY
       )
     case .sampledRadial(let gradient, let aspectRatio):
+      return sample(
+        gradient,
+        in: bounds,
+        aspectRatio: aspectRatio,
+        x: sampleX,
+        y: sampleY
+      )
+    case .sampledAngular(let gradient, let aspectRatio):
       return sample(
         gradient,
         in: bounds,
@@ -586,6 +611,18 @@ extension Rasterizer {
           center: gradient.center,
           startRadius: gradient.startRadius,
           endRadius: gradient.endRadius
+        ),
+        aspectRatio: aspectRatio)
+    case .sampledAngular(let gradient, let aspectRatio):
+      return .sampledAngular(
+        AngularGradient(
+          gradient: Gradient(
+            stops: gradient.gradient.stops.map {
+              .init(color: $0.color.opacity(amount), location: $0.location)
+            }),
+          center: gradient.center,
+          startAngle: gradient.startAngle,
+          endAngle: gradient.endAngle
         ),
         aspectRatio: aspectRatio)
     case .sampledMesh(let gradient):

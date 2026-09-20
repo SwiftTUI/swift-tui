@@ -302,7 +302,7 @@ extension AnyShapeStyle {
         for: chromeStyle,
         appearance: environment.appearance
       ).isPositionIndependent(in: environment, depth: depth + 1)
-    case .linearGradient, .radialGradient, .meshGradient, .tileStyle:
+    case .linearGradient, .radialGradient, .angularGradient, .meshGradient, .tileStyle:
       return false
     }
   }

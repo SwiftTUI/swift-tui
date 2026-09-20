@@ -24,6 +24,12 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   direction match SwiftUI as measured. The interval is animatable on a stroke.
 - Curved shapes and custom paths honor `dash` and `dashPhase`, in Braille dots
   and in the same unit as a rectangle's dash. They ignored the stroke style.
+- `AngularGradient`, with SwiftUI's initializers and the `.angularGradient` and
+  `.conicGradient` shorthands. Angles follow SwiftUI as measured: zero at three
+  o'clock, increasing clockwise, geometric on screen. It paints fills, strokes
+  and borders, and its angles animate.
+- A border painted with one animatable style animates that paint under
+  `withAnimation`, as a shape stroke's paint does. A border's paint used to snap.
 - `StrokeStyle` has a preset for every glyph palette: `.singleDouble`,
   `.doubleSingle`, `.outerHalfBlock`, `.none`, `.dashed` and `.dashedHeavy` join
   the existing ones.
@@ -45,6 +51,11 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ### Deprecated
 
+- `View.border(blend:set:placement:sides:phase:)` and `BorderBlend`. Paint the
+  border with an `AngularGradient`, such as
+  `.conicGradient(colors:angle:)`, and animate its angle. A blend starts at the
+  top-leading corner and an angular gradient at three o'clock; both run
+  clockwise.
 - `View.border(_:set:placement:sides:)`. Pass a `StrokeStyle`: `set: .double`
   becomes `style: .double`. The `set:` argument no longer has a default. The
   spelling stays for one release so that code can build against both this

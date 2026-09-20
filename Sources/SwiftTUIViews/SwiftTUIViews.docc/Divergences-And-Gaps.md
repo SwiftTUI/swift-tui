@@ -695,6 +695,13 @@ are omitted even when SwiftUI exposes a corresponding API.
   they were. Start points and direction match SwiftUI as measured: a `Rectangle`
   and a view's `border` start at the top-leading corner, a `RoundedRectangle` at
   the middle of its trailing edge, both clockwise.
+- **`AngularGradient` follows SwiftUI as measured.** *Ratified (parity).* Zero is
+  at three o'clock and angles increase clockwise. A span of less than one turn
+  leaves a missing area that splits at its midpoint between the last color and
+  the first, a span of more than one turn draws its last complete turn, and a
+  negative span runs counter-clockwise. Angles are geometric: measured in
+  aspect-corrected cell space, so a quarter turn is a quarter turn on screen. A
+  border painted with one animatable style animates it, as a shape stroke does.
 - **`border` takes a `StrokeStyle`.** *Ratified.* SwiftUI's `border` takes a
   `width:`. A cell grid has no line width, so SwiftTUI's takes the stroke style
   that a shape stroke takes: glyph palette, join, dash and dash phase. A border
@@ -994,8 +1001,9 @@ capabilities in the vision document. The others follow the same stance:
 - `EnvironmentValues.requestTermination` and
   `EnvironmentValues.terminalHandoff`, recorded as runtime-injected verbs
   that expose host-owned actions without putting host mechanics in views.
-- Per-side border styling (`BorderEdgeStyle`) and animatable perimeter
-  gradients (`BorderBlend`).
+- Per-side border styling (`BorderEdgeStyle`). Perimeter gradients
+  (`BorderBlend`) are deprecated in favor of `AngularGradient`, which SwiftUI
+  has.
 - `ProgressView(value:total:barWidth:)`, a terminal-cell width control on an
   otherwise SwiftUI-shaped control.
 - The deliberately public environment members `\.isFocused` (with a setter,

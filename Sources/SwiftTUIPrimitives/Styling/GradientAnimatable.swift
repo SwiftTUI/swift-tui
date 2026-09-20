@@ -91,6 +91,39 @@ extension RadialGradient: Animatable {
   }
 }
 
+extension AngularGradient: Animatable {
+  /// Start and end angle, in radians, as a paired animatable unit.
+  public typealias AnglesData = AnimatablePair<Double, Double>
+
+  public typealias GeometryData = AnimatablePair<
+    UnitPoint.AnimatableData,
+    AnglesData
+  >
+
+  public typealias AnimatableData = AnimatablePair<
+    Gradient.AnimatableData,
+    GeometryData
+  >
+
+  public var animatableData: AnimatableData {
+    get {
+      AnimatablePair(
+        gradient.animatableData,
+        GeometryData(
+          center.animatableData,
+          AnglesData(startAngle.radians, endAngle.radians)
+        )
+      )
+    }
+    set {
+      gradient.animatableData = newValue.first
+      center.animatableData = newValue.second.first
+      startAngle = .radians(newValue.second.second.first)
+      endAngle = .radians(newValue.second.second.second)
+    }
+  }
+}
+
 extension MeshGradient: Animatable {
   public typealias PointData = AnimatablePair<Double, Double>
   public typealias PointsData = AnimatableArray<PointData>

@@ -96,6 +96,7 @@ public enum AnyShapeStyle: Equatable, Sendable {
   case color(Color)
   case linearGradient(LinearGradient)
   case radialGradient(RadialGradient)
+  case angularGradient(AngularGradient)
   case meshGradient(MeshGradient)
   indirect case tileStyle(TileStyle)
   case terminalChrome(TerminalChromeStyle)
@@ -138,6 +139,17 @@ extension ShapeStyle {
           center: gradient.center,
           startRadius: gradient.startRadius,
           endRadius: gradient.endRadius
+        ))
+    case .angularGradient(let gradient):
+      let fadedStops = gradient.gradient.stops.map {
+        Gradient.Stop(color: $0.color.opacity(clamped), location: $0.location)
+      }
+      return .angularGradient(
+        .init(
+          gradient: .init(stops: fadedStops),
+          center: gradient.center,
+          startAngle: gradient.startAngle,
+          endAngle: gradient.endAngle
         ))
     case .meshGradient(let gradient):
       return .meshGradient(

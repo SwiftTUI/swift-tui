@@ -52,7 +52,7 @@ struct Stage2PublicShapeClosureTests {
       BorderEdgeStyle(Color.red),
       placement: .outset
     )
-    _ = Text("blend").border(
+    _ = Text("blend").blendBorder(
       blend: BorderBlend([Color.red, Color.blue]),
       placement: .outset
     )

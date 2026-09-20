@@ -1133,7 +1133,7 @@ struct AsyncFrameTailRenderingTests {
       AsyncFrameTailSendableLayout(recorder: recorder) {
         Text("tick")
           .padding(1)
-          .border(
+          .blendBorder(
             blend: blend,
             set: .rounded,
             phase: phase
