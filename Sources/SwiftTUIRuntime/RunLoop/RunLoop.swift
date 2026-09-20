@@ -3,7 +3,9 @@ import SwiftTUIViews
 
 @MainActor
 /// Drives an interactive terminal session for a state-backed view tree.
-public final class RunLoop<State: Equatable & Sendable, Content: View>: AccessibilityAnnouncementSink {
+public final class RunLoop<State: Equatable & Sendable, Content: View>:
+  AccessibilityAnnouncementSink
+{
   package let rootIdentity: Identity
   package let renderer: DefaultRenderer
   package var hotReloadSession: HotReloadSession?
@@ -621,14 +623,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>: Accessib
                 return false
               }())
           if shouldFlushBeforeExit {
-            // Cooperative exits (exit key, input end) keep the unbounded
-            // flush: events handled in this batch may present across several
-            // chained frames, and app-runtime tests pin that convergence. A
-            // signal exit is an external kill and must be frame-bounded
-            // instead: an ongoing self-invalidating animation keeps ready
-            // frames coming (the deadline-arm cut cannot withhold
-            // invalidation-caused frames), and an unbounded flush replays
-            // that animation to completion before the signal is honored.
+            // Cooperative exits allow the normal bounded drain so short
+            // follow-up chains can present the input handled in this batch.
+            // They cannot wait for quiescence: a periodic state writer can
+            // keep invalidating faster than frames render (STUI-529).
+            // Signals retain the stricter single-acquisition flush.
             let signalExit: Bool = {
               if case .signal = exitReason {
                 return true

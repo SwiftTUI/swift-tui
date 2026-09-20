@@ -4,6 +4,15 @@ import SwiftTUIViews
 extension RunLoop {
   // MARK: - Frame driver (F2: unified sync/async per-frame body, ADR-0021)
 
+  /// Allows short state/focus follow-up chains to settle while guaranteeing
+  /// a return to input and termination handling. Periodic state writers can
+  /// invalidate faster than frames render; the deadline-arm cut does not
+  /// constrain those writes. Count acquisitions, including skipped frames,
+  /// so cancellation cannot evade the bound either (STUI-529).
+  /// Sixteen acquisitions leave room for the existing two-cancel/two-drop
+  /// progress bounds (at most nine acquisitions to a forced commit).
+  package static var maxFramesPerDrainPass: Int { 16 }
+
   /// Synchronous frame driver, retained as a test entry point.
   ///
   /// This driver predates off-screen frame elision and intentionally does not
@@ -39,12 +48,14 @@ extension RunLoop {
       hasFrameSink || runtimeConfiguration.debug
     )
     let drainPass = beginDeadlineDrainPass()
-    while true {
+    var consumedScheduledFrames = 0
+    while consumedScheduledFrames < Self.maxFramesPerDrainPass {
       processPendingHotReload()
       let consumedAt = frameClock()
       guard var scheduledFrame = consumeReadyFrame(for: drainPass, at: consumedAt) else {
         break
       }
+      consumedScheduledFrames += 1
       let frameInstant = deriveFrameInstant(for: scheduledFrame, consumedAt: consumedAt)
       // Transfer-and-clear: everything dispatched before this acquisition is
       // what this frame answers. Inputs arriving during the frame belong to
@@ -442,16 +453,16 @@ extension RunLoop {
       hasFrameSink || runtimeConfiguration.debug
     )
     let drainPass = beginDeadlineDrainPass()
+    let frameBudget = frameBudget ?? Self.maxFramesPerDrainPass
     var consumedScheduledFrames = 0
     frameLoop: while true {
       if terminalHandoffInProgress {
         break frameLoop
       }
-      // The deadline-arm cut only bounds deadline-armed frames; frames made
-      // ready by fresh invalidations (a self-invalidating animation) pass it
-      // freely, so a caller that must not linger — the exit flush — bounds
-      // the pass by frame count instead.
-      if let frameBudget, consumedScheduledFrames >= frameBudget {
+      // Leave unconsumed work in the scheduler for the next pass. Even a
+      // cooperative exit flush must return when a periodic producer keeps
+      // invalidating during every frame on a slow machine.
+      if consumedScheduledFrames >= frameBudget {
         break frameLoop
       }
       processPendingHotReload()

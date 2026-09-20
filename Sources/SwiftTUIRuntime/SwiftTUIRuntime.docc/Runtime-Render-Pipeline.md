@@ -425,6 +425,16 @@ foreground glyphs into a pixel backdrop. It uses deterministic block, braille,
 and centered text approximations. Terminal graphics protocols and all hosts
 then draw the variant through their normal image routes.
 
+## Frame drain fairness
+
+Each run-loop drain admits at most 16 frame acquisitions, including cancelled
+and dropped frames, before returning to input and termination handling. Pending
+work stays in the scheduler for the next pass. The deadline-arm cut also defers
+deadlines armed during the pass. Both bounds are needed: periodic state writes
+can keep invalidating faster than frames render, without consuming a deadline.
+Cooperative exit flushes use the same finite drain; signal exits admit only one
+acquisition. Short state and focus follow-up chains can settle within a pass.
+
 ## Diagnostics
 
 With no sink installed, frame diagnostics are a branch in the committed-frame
