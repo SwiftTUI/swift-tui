@@ -141,8 +141,34 @@ struct StrokeTrackTests {
   func edgePalettes() {
     #expect(
       render(width: 4, height: 3, borderSet: .outerHalfBlock) == ["▛▀▀▜", "▌  ▐", "▙▄▄▟"])
-    #expect(render(width: 4, height: 3, borderSet: .ascii) == ["+--+", "|  |", "+--+"])
     #expect(render(width: 3, height: 2, borderSet: .none) == ["   ", "   "])
+  }
+
+  @Test("a palette of three glyphs is a plain line pen, and draws what it always drew")
+  func plainLinePalettes() {
+    #expect(
+      StrokePen(borderSet: .ascii, roundsCorners: false)
+        == .plainLine(horizontal: "-", vertical: "|", junction: "+"))
+    #expect(
+      StrokePen(borderSet: .markdown, roundsCorners: false)
+        == .plainLine(horizontal: "-", vertical: "|", junction: "|"))
+    #expect(render(width: 4, height: 3, borderSet: .ascii) == ["+--+", "|  |", "+--+"])
+    #expect(render(width: 4, height: 3, borderSet: .markdown) == ["|--|", "|  |", "|--|"])
+    // An edge that ends at a corner is still drawn to the far side of the cell.
+    #expect(
+      render(width: 4, height: 3, borderSet: .ascii, sides: [.top, .leading])
+        == ["+---", "|   ", "|   "])
+    #expect(render(width: 4, height: 3, borderSet: .ascii, sides: .top)[0] == "----")
+  }
+
+  @Test("a palette that draws nothing, or differs from side to side, is an edge pen")
+  func edgePenClassification() {
+    for borderSet in [BorderSet.hidden, .none, .innerHalfBlock, .outerHalfBlock] {
+      guard case .edge = StrokePen(borderSet: borderSet, roundsCorners: false) else {
+        Issue.record("\(borderSet) is not an edge pen")
+        continue
+      }
+    }
   }
 
   @Test("the geometry or the join can ask for rounded corners")

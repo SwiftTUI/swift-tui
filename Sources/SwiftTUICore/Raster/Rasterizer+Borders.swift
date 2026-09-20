@@ -13,7 +13,8 @@ extension Rasterizer {
     blendMode: BlendMode? = nil,
     dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
-    presentationEffects: [DrawEffect] = []
+    presentationEffects: [DrawEffect] = [],
+    lineArms: LineArmsTable? = nil
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -78,7 +79,7 @@ extension Rasterizer {
         height: insetRect.size.height,
         aspectRatio: environment.cellPixelMetrics.aspectRatio
       )
-      track.forEachGlyph(
+      track.forEachInk(
         pen: pen,
         // SwiftUI starts a rounded rectangle's path at the middle of its
         // trailing edge, and a rectangle's at its top-leading corner.
@@ -87,10 +88,13 @@ extension Rasterizer {
           : StrokeMask(strokeStyle, trimOrigin: track.leadingCornerVertex),
         // Per-row cull (D70).
         rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(insetRect.origin.y + $0) } }
-      ) { cell, glyph in
+      ) { ink in
+        let cell = ink.cell
         let side = track.paintSide(for: cell, sides: .all)
         writeStrokeGlyph(
-          glyph,
+          mergedGlyph(
+            ink, atX: insetRect.origin.x + cell.x, y: insetRect.origin.y + cell.y,
+            cells: cells, clip: clip, dirtyRows: dirtyRows, lineArms: lineArms),
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: side),
           environment: environment,
@@ -119,7 +123,8 @@ extension Rasterizer {
     blendMode: BlendMode? = nil,
     dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
-    presentationEffects: [DrawEffect] = []
+    presentationEffects: [DrawEffect] = [],
+    lineArms: LineArmsTable? = nil
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -154,15 +159,18 @@ extension Rasterizer {
       height: line.size.height,
       aspectRatio: environment.cellPixelMetrics.aspectRatio
     )
-    track.forEachGlyph(
+    track.forEachInk(
       pen: StrokePen(
         borderSet: strokeStyle.borderSet, roundsCorners: strokeStyle.lineJoin == .round),
       mask: StrokeMask(strokeStyle),
       // Per-row cull (D70).
       rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(line.origin.y + $0) } }
-    ) { cell, glyph in
+    ) { ink in
+      let cell = ink.cell
       writeStrokeGlyph(
-        glyph,
+        mergedGlyph(
+          ink, atX: line.origin.x + cell.x, y: line.origin.y + cell.y,
+          cells: cells, clip: clip, dirtyRows: dirtyRows, lineArms: lineArms),
         foregroundColorMode: foregroundColorMode,
         backgroundStyle: nil,
         environment: environment,
@@ -177,6 +185,32 @@ extension Rasterizer {
         presentationEffects: presentationEffects
       )
     }
+  }
+
+  /// The glyph a stroke draws in a cell, merged with any line stroke that drew
+  /// there earlier in the pass. Without a table it is the stroke's own glyph.
+  ///
+  /// A cell that `write` would skip records nothing: a stroke that is clipped
+  /// away, or culled by the dirty rows, put no arms on the surface.
+  internal func mergedGlyph(
+    _ ink: RectangleStrokeTrack.Ink,
+    atX x: Int,
+    y: Int,
+    cells: [[RasterCell]],
+    clip: CellRect?,
+    dirtyRows: Set<Int>?,
+    lineArms: LineArmsTable?
+  ) -> Character {
+    guard let lineArms, cells.indices.contains(y), cells[y].indices.contains(x) else {
+      return ink.glyph
+    }
+    if let dirtyRows, !dirtyRows.contains(y) {
+      return ink.glyph
+    }
+    if let clip, !clip.contains(CellPoint(x: x, y: y)) {
+      return ink.glyph
+    }
+    return lineArms.glyph(merging: ink, atX: x, y: y, current: cells[y][x].character)
   }
 
   internal func writeStrokeGlyph(

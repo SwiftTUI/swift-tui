@@ -1253,7 +1253,7 @@ extension FrameworkStressVisualEffectsTests {
       var body: some View {
         Text("edge rotation")
           .frame(width: 24, height: 7)
-          .border(style, set: .double)
+          .edgeStyledBorder(style, set: .double)
       }
     }
 

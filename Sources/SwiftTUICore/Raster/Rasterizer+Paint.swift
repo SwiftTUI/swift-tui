@@ -74,7 +74,8 @@ extension Rasterizer {
     dirtyRows: Set<Int>?,
     dirtySpans: DirtyRowSpans?,
     visibleIdentities: inout Set<Identity>,
-    presentationRecorder: RasterPresentationLayerRecorder?
+    presentationRecorder: RasterPresentationLayerRecorder?,
+    lineArms: LineArmsTable? = nil
   ) {
     // Two frame kinds.  A `.visit` frame paints the node's `commands`
     // (pre-child commands) and then pushes its children plus, if the
@@ -114,7 +115,8 @@ extension Rasterizer {
           dirtyRows: context.dirtyRows,
           dirtySpans: context.dirtySpans,
           presentationRecorder: presentationRecorder,
-          presentationEffects: context.presentationEffects
+          presentationEffects: context.presentationEffects,
+          lineArms: lineArms
         )
       case .visit(let node, let context):
         var nodeContext = context
@@ -222,7 +224,8 @@ extension Rasterizer {
           dirtyRows: nodeContext.dirtyRows,
           dirtySpans: nodeContext.dirtySpans,
           presentationRecorder: presentationRecorder,
-          presentationEffects: nodeContext.presentationEffects
+          presentationEffects: nodeContext.presentationEffects,
+          lineArms: lineArms
         )
 
         // Schedule post-children commands first so they pop LAST
@@ -356,7 +359,10 @@ extension Rasterizer {
       dirtyRows: context.dirtyRows,
       dirtySpans: context.dirtySpans,
       visibleIdentities: &visibleIdentities,
-      presentationRecorder: nil
+      presentationRecorder: nil,
+      // A layer paints into its own cells, so its strokes merge with each
+      // other and not with the strokes beneath the layer.
+      lineArms: LineArmsTable()
     )
     compositeLayer(
       layer,
@@ -501,7 +507,8 @@ extension Rasterizer {
     dirtyRows: Set<Int>? = nil,
     dirtySpans: DirtyRowSpans? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
-    presentationEffects: [DrawEffect] = []
+    presentationEffects: [DrawEffect] = [],
+    lineArms: LineArmsTable? = nil
   ) {
     struct Frame {
       let command: DrawCommand
@@ -911,7 +918,8 @@ extension Rasterizer {
           blendMode: blendMode,
           dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
-          presentationEffects: presentationEffects
+          presentationEffects: presentationEffects,
+          lineArms: lineArms
         )
       case .rule(let bounds, let style, let strokeStyle, let stackAxis):
         paintRule(
@@ -925,7 +933,8 @@ extension Rasterizer {
           blendMode: blendMode,
           dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
-          presentationEffects: presentationEffects
+          presentationEffects: presentationEffects,
+          lineArms: lineArms
         )
       case .border(
         let bounds,
@@ -950,7 +959,8 @@ extension Rasterizer {
           blendMode: blendMode,
           dirtyRows: dirtyRows,
           presentationRecorder: presentationRecorder,
-          presentationEffects: presentationEffects
+          presentationEffects: presentationEffects,
+          lineArms: lineArms
         )
       case .canvas(let bounds, let payload, let foregroundStyle):
         paintCanvasDrawing(

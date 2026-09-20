@@ -266,7 +266,8 @@ package struct Rasterizer: Sendable {
       dirtyRows: nil,
       dirtySpans: nil,
       visibleIdentities: &visibleIdentities,
-      presentationRecorder: presentationRecorder
+      presentationRecorder: presentationRecorder,
+      lineArms: LineArmsTable()
     )
     RasterImageOcclusion.apply(
       to: &imageAttachments,
@@ -388,7 +389,8 @@ package struct Rasterizer: Sendable {
       dirtyRows: dirtyRows,
       dirtySpans: dirtySpans,
       visibleIdentities: &visibleIdentities,
-      presentationRecorder: presentationRecorder
+      presentationRecorder: presentationRecorder,
+      lineArms: LineArmsTable()
     )
     // Recomputed from the merged (retained + fresh) sidecar every raster:
     // retained attachments converge to the trim they already carried, and a

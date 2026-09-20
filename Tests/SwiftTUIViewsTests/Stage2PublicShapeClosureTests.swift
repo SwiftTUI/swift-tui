@@ -48,7 +48,7 @@ struct Stage2PublicShapeClosureTests {
   func borderPlacementsCompile() {
     _ = Text("inset").border()
     _ = Text("outset").border(placement: .outset)
-    _ = Text("styled").border(
+    _ = Text("styled").edgeStyledBorder(
       BorderEdgeStyle(Color.red),
       placement: .outset
     )

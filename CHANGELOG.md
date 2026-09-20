@@ -30,6 +30,12 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   and borders, and its angles animate.
 - A border painted with one animatable style animates that paint under
   `withAnimation`, as a shape stroke's paint does. A border's paint used to snap.
+- Line strokes that share a cell join. A `Divider` that runs into a border ends
+  in `├`, two lines that cross draw `┼`, and borders on single sides meet in a
+  corner. Borders, rectangle strokes and dividers all join, in any order, and
+  the junction takes the color of the stroke drawn last. `Text`, the half-block
+  palettes and Braille strokes do not join. The last stroke to reach a cell used
+  to replace the one under it.
 - `StrokeStyle` has a preset for every glyph palette: `.singleDouble`,
   `.doubleSingle`, `.outerHalfBlock`, `.none`, `.dashed` and `.dashedHeavy` join
   the existing ones.
@@ -56,6 +62,10 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   `.conicGradient(colors:angle:)`, and animate its angle. A blend starts at the
   top-leading corner and an angular gradient at three o'clock; both run
   clockwise.
+- `View.border(_: BorderEdgeStyle, set:placement:sides:)` and
+  `BorderEdgeStyle`. Stack one `border(_:sides:)` for each color. The borders
+  join at their corners, and a corner takes the color of the border applied
+  last.
 - `View.border(_:set:placement:sides:)`. Pass a `StrokeStyle`: `set: .double`
   becomes `style: .double`. The `set:` argument no longer has a default. The
   spelling stays for one release so that code can build against both this

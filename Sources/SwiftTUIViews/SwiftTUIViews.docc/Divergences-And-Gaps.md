@@ -706,6 +706,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   `width:`. A cell grid has no line width, so SwiftTUI's takes the stroke style
   that a shape stroke takes: glyph palette, join, dash and dash phase. A border
   and a rectangle stroke with the same style draw the same cells.
+- **Line strokes that share a cell join.** *Ratified.* SwiftUI composites
+  strokes at pixel resolution, so overlapping lines simply overlap. A cell holds
+  one glyph, so SwiftTUI draws the glyph for the union of the lines in it: a
+  `Divider` that runs into a border ends in `├`, and two lines that cross draw
+  `┼`. The junction takes the color of the stroke drawn last. `Text`, the
+  half-block palettes and Braille strokes do not join. See <doc:Shapes>.
 - **`lineJoin` is `.miter` or `.round`.** *Ratified.* `.round` draws the arc
   corners where the glyph palette has them, which is the light weight only. A
   `RoundedRectangle` draws them with either join, and the size of its
@@ -1001,9 +1007,10 @@ capabilities in the vision document. The others follow the same stance:
 - `EnvironmentValues.requestTermination` and
   `EnvironmentValues.terminalHandoff`, recorded as runtime-injected verbs
   that expose host-owned actions without putting host mechanics in views.
-- Per-side border styling (`BorderEdgeStyle`). Perimeter gradients
-  (`BorderBlend`) are deprecated in favor of `AngularGradient`, which SwiftUI
-  has.
+- Per-side border styling (`BorderEdgeStyle`) and perimeter gradients
+  (`BorderBlend`) are both deprecated. Borders on single sides join at their
+  corners, so stacked `border(_:sides:)` calls color each side, and
+  `AngularGradient`, which SwiftUI has, replaces the blend.
 - `ProgressView(value:total:barWidth:)`, a terminal-cell width control on an
   otherwise SwiftUI-shaped control.
 - The deliberately public environment members `\.isFocused` (with a setter,

@@ -6,6 +6,9 @@
 /// borders, such as a highlighted top edge. The 1/2/3/4-argument shorthand
 /// initializers mirror CSS's border-color rules so that common cases
 /// stay terse at the call site.
+///
+/// The `border` modifier that takes this type is deprecated. Borders on single
+/// sides join at their corners, so stack one `border(_:sides:)` for each color.
 public struct BorderEdgeStyle: Equatable, Sendable {
   public var top: AnyShapeStyle?
   public var right: AnyShapeStyle?

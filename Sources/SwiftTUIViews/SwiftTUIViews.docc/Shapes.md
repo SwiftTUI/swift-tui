@@ -170,6 +170,55 @@ Curved shapes and custom paths dash too, in Braille dots, and in the same unit:
 line glyphs to choose, so the stroke style's `borderSet` and `lineJoin` have no
 effect on them.
 
+## Join Lines That Share A Cell
+
+A cell holds one glyph. Where two line strokes reach the same cell, SwiftTUI
+draws the glyph that shows both, so a `Divider` joins the border it runs into:
+
+```swift
+VStack(alignment: .leading, spacing: 0) {
+  Text(" title")
+  Divider()
+  Text(" body")
+}
+.padding(.vertical, 1)
+.border(.foreground)
+//  ┌───────┐
+//  │title  │
+//  ├───────┤
+//  │body   │
+//  └───────┘
+```
+
+Borders, rectangle strokes and dividers all join, in any order. Two lines that
+cross draw `┼`. The junction takes the color of the stroke drawn last, because a
+cell has one foreground.
+
+The end of a `Divider` is drawn to the edge of its cell, so that a lone divider
+is `─` from end to end. That cap gives way to a line that crosses it, which is
+why the divider above ends in `├` and not `┼`. It is also how borders on single
+sides meet in a corner, and that is the way to color the sides of a border
+differently:
+
+```swift
+content
+  .border(.red, sides: .top)
+  .border(.blue, sides: .leading)
+//  ┌────     the corner is blue, as the leading border is drawn last
+//  │
+```
+
+Light joins heavy, and light joins double where each axis keeps one weight
+(`╟`). Unicode has no glyph for the other mixes, such as heavy with double. Every
+arm in the cell then takes the weight of the stroke drawn last. The `.ascii`
+palette joins in its own glyphs: `-` and `|` make `+`.
+
+Only strokes join. `Text` that contains box-drawing characters is text, and a
+stroke that reaches it draws over it. The half-block palettes draw against a
+side of the cell and not through its middle, so they do not join. Braille
+strokes on curved shapes do not join. Lines in neighboring cells do not join:
+two bordered views side by side are `┐┌`, not `┬`.
+
 ## Trim A Shape
 
 `trim(from:to:)` keeps the part of a shape's outline between two fractions of

@@ -26,7 +26,8 @@ extension Rasterizer {
     blendMode: BlendMode? = nil,
     dirtyRows: Set<Int>? = nil,
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
-    presentationEffects: [DrawEffect] = []
+    presentationEffects: [DrawEffect] = [],
+    lineArms: LineArmsTable? = nil
   ) {
     guard outer.size.width > 0, outer.size.height > 0 else {
       return
@@ -98,15 +99,18 @@ extension Rasterizer {
       height: outer.size.height,
       aspectRatio: environment.cellPixelMetrics.aspectRatio
     )
-    track.forEachGlyph(
+    track.forEachInk(
       pen: StrokePen(borderSet: set, roundsCorners: stroke.lineJoin == .round),
       sides: drawnSides,
       mask: StrokeMask(stroke),
       // Per-row cull (D70).
       rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(outer.origin.y + $0) } }
-    ) { cell, glyph in
+    ) { ink in
+      let cell = ink.cell
       let x = outer.origin.x + cell.x
       let y = outer.origin.y + cell.y
+      let glyph = mergedGlyph(
+        ink, atX: x, y: y, cells: cells, clip: clip, dirtyRows: dirtyRows, lineArms: lineArms)
       let side = track.paintSide(for: cell, sides: drawnSides)
       let cellForeground =
         perimeterColor(

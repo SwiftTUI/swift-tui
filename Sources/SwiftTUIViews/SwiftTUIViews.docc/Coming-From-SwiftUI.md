@@ -231,9 +231,9 @@ stance or breaks an idiom.
 When you find yourself porting a desktop habit, also check the register's
 surface-extension list for the terminal-native tool you would not think to
 look for: terminal-program embedding (`TerminalView`), `toast` and
-`popoverTip`, `TextFigure` banners, per-side border styling, animated
-perimeter gradients, dashed borders whose phase animates, and open style protocols including families SwiftUI
-keeps closed.
+`popoverTip`, `TextFigure` banners, lines that join where they meet, dashed
+borders whose phase animates, and open style protocols including families
+SwiftUI keeps closed.
 
 ## Where to go deeper
 

@@ -1407,7 +1407,36 @@ extension View {
   }
 
   /// Draws a border around this view using a per-side foreground style.
+  ///
+  /// Stack single-side borders. Line strokes that share a cell join, so the
+  /// sides meet in a corner, which takes the color of the border applied last:
+  ///
+  /// ```swift
+  /// content
+  ///   .border(.red, sides: .top)
+  ///   .border(.blue, sides: .leading)   // the corner draws ┌ in blue
+  /// ```
+  ///
+  /// For a border that reserves cells, pad once and stack inset borders:
+  /// `.padding(1).border(...).border(...)`.
+  @available(
+    *, deprecated,
+    message: "Stack a border(_:sides:) for each color. They join at the corners."
+  )
   public func border(
+    _ style: BorderEdgeStyle,
+    set: BorderSet = .single,
+    placement: StrokeStyle.Placement = .inset,
+    sides: Edge.Set = .all
+  ) -> some View {
+    edgeStyledBorder(style, set: set, placement: placement, sides: sides)
+  }
+
+  /// The per-side border behind the deprecated
+  /// `border(_:set:placement:sides:)` that takes a `BorderEdgeStyle`. The
+  /// framework's own tests call this, which is not deprecated, because the
+  /// repository gate builds with warnings as errors.
+  package func edgeStyledBorder(
     _ style: BorderEdgeStyle,
     set: BorderSet = .single,
     placement: StrokeStyle.Placement = .inset,

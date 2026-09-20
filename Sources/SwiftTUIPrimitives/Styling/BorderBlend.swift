@@ -11,6 +11,9 @@
 /// where `location` is in `[0, 1]`. To produce a closed loop (the
 /// typical chasing-light effect), repeat the first color as the last stop.
 /// For example, `BorderBlend([.red, .blue, .red])` fades red → blue → red around the perimeter.
+///
+/// The `border` modifier that takes this type is deprecated. Paint the border
+/// with an `AngularGradient` and animate its angle.
 public struct BorderBlend: Equatable, Sendable {
   public var stops: [Gradient.Stop]
 
