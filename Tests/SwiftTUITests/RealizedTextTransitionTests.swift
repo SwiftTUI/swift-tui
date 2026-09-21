@@ -7,6 +7,85 @@ import Testing
 @MainActor
 @Suite
 struct RealizedTextTransitionTests {
+  @MainActor
+  private final class CompletionProbe {
+    var count = 0
+  }
+
+  private struct DepartingRows: View {
+    var probe: CompletionProbe
+    var criteria: AnimationCompletionCriteria
+    @State private var digit = "7"
+    @State private var showRows = true
+    @State private var firstRow = 0
+
+    var body: some View {
+      VStack {
+        HStack {
+          Button("roll") {
+            withAnimation(.linear(duration: .seconds(30)), completionCriteria: criteria) {
+              digit = "0"
+            } completion: {
+              probe.count += 1
+            }
+          }
+          Button("remove") { showRows = false }
+          Button("replace") { firstRow = 100 }
+        }
+        if showRows {
+          List(firstRow..<(firstRow + 100), id: \.self) { row in
+            Text("row \(row): \(digit)").contentTransition(.numericText())
+          }
+        }
+      }
+    }
+  }
+
+  @Test(
+    "removing an indexed List drops its in-flight numeric-text completion",
+    arguments: [AnimationCompletionCriteria.logicallyComplete, .removed])
+  func teardownDropsCompletion(criteria: AnimationCompletionCriteria) throws {
+    let probe = CompletionProbe()
+    let harness = try AnimatorRuntimeHarness(size: .init(width: 40, height: 9)) {
+      DepartingRows(probe: probe, criteria: criteria)
+    }
+    defer { harness.shutdown() }
+    let controller = harness.runLoop.renderer.internalAnimationController
+    try withAnimationSinks(controller) { _ = try harness.clickText("roll") }
+    #expect(controller.activeAnimationCount > 0)
+    #expect(!controller.debugStateSnapshot().completionClosureBatchIDs.isEmpty)
+    #expect(probe.count == 0)
+
+    try harness.clickText("remove")
+    #expect(!harness.frame.contains("row 0:"))
+    #expect(controller.activeAnimationCount == 0)
+    #expect(controller.debugStateSnapshot().completionClosureBatchIDs.isEmpty)
+    #expect(!controller.requiresContinuedAnimationFrames)
+    #expect(probe.count == 0)
+  }
+
+  @Test(
+    "replacing the viewport of a surviving List completes its departed numeric-text rolls",
+    arguments: [AnimationCompletionCriteria.logicallyComplete, .removed])
+  func viewportDepartureCompletes(criteria: AnimationCompletionCriteria) throws {
+    let probe = CompletionProbe()
+    let harness = try AnimatorRuntimeHarness(size: .init(width: 40, height: 9)) {
+      DepartingRows(probe: probe, criteria: criteria)
+    }
+    defer { harness.shutdown() }
+    let controller = harness.runLoop.renderer.internalAnimationController
+    try withAnimationSinks(controller) { _ = try harness.clickText("roll") }
+    #expect(controller.activeAnimationCount > 0)
+    #expect(probe.count == 0)
+
+    try harness.clickText("replace")
+    #expect(harness.frame.contains("row 100: 0"))
+    #expect(controller.activeAnimationCount == 0)
+    #expect(controller.debugStateSnapshot().completionClosureBatchIDs.isEmpty)
+    #expect(!controller.requiresContinuedAnimationFrames)
+    #expect(probe.count == 1)
+  }
+
   private struct RuntimeRows: View {
     @State private var digit = "7"
     @State private var complete = false

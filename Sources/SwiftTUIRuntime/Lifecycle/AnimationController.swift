@@ -1619,7 +1619,8 @@ package final class AnimationController: Sendable {
       !newIdentities.contains(key.identity)
         && !exitOverlayIdentities.contains(key.identity)
         && !(key.scope == .property(.textRoll)
-          && previousFrame.realizedTextTargets[key.identity] != nil)
+          && previousFrame.realizedTextOwners[key.identity].map { newIdentities.contains($0) }
+            == true)
     }
     var departedBatchCounts: [AnimationBatchID: Int] = [:]
     for key in departedKeys {
@@ -2345,11 +2346,13 @@ package final class AnimationController: Sendable {
     at timestamp: MonotonicInstant
   ) -> [Identity: TextRollValue] {
     var targets: [Identity: AnyAnimatable] = [:]
+    var owners: [Identity: Identity] = [:]
     var rolls: [Identity: TextRollValue] = [:]
-    var pending = [placed]
-    while let node = pending.popLast() {
+    var pending: [(node: PlacedNode, resolvedOwner: Identity?)] = [(placed, nil)]
+    while let (node, inheritedOwner) = pending.popLast() {
       guard !node.isTransient else { continue }
-      pending.append(contentsOf: node.children)
+      let owner = previousIdentities.contains(node.identity) ? node.identity : inheritedOwner
+      pending.append(contentsOf: node.children.map { ($0, owner) })
       guard case .text(let text) = node.drawPayload,
         let transition = node.drawMetadata.contentTransition
       else { continue }
@@ -2368,6 +2371,7 @@ package final class AnimationController: Sendable {
       }
       let target = AnyAnimatable(TextRollValue(text: text, transition: transition))
       targets[node.identity] = target
+      owners[node.identity] = owner
       rolls[node.identity] = target.unwrap(as: TextRollValue.self)
       var transaction = node.textAnimationTransaction ?? .init()
       let frameTransaction = transactionPlan.transaction(for: node.identity)
@@ -2398,6 +2402,7 @@ package final class AnimationController: Sendable {
       }
     }
     previousFrame.realizedTextTargets = targets
+    previousFrame.realizedTextOwners = owners
 
     var keysToRemove: [AnimationKey] = []
     var completedBatches: [CompletedBatchRelease] = []
