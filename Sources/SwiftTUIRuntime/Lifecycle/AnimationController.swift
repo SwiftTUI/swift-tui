@@ -2046,7 +2046,7 @@ package final class AnimationController: Sendable {
         activeAnimations[key]?.resolvedIdentity = node.identity
       }
     }
-    let snapshot = AnimatableSnapshot.extract(from: node)
+    var snapshot = AnimatableSnapshot.extract(from: node)
     let previous = previousSnapshots[node.identity]
 
     // Determine the effective transaction. A resolved node normally already
@@ -2097,27 +2097,32 @@ package final class AnimationController: Sendable {
       }
     }
 
-    if let previous {
-      var styleIntents: [AnimatableSlot: ScopedStyleAnimationIntent] = [:]
-      if !effectiveTransaction.customValues.isEmpty {
-        for (slot, key) in [
-          (
-            AnimatableSlot.foregroundShapeStyle,
-            ObjectIdentifier(ScopedForegroundStyleAnimationKey.self)
-          ),
-          (AnimatableSlot.tintShapeStyle, ObjectIdentifier(ScopedTintStyleAnimationKey.self)),
-        ] {
-          if slot == .foregroundShapeStyle, node.drawMetadata.baseStyle.foregroundStyle != nil {
-            continue
-          }
-          if let intent = effectiveTransaction.customValues[key]?.unwrap(
-            as: ScopedStyleAnimationIntent.self),
-            intent.isScoped
-          {
-            styleIntents[slot] = intent
-          }
+    var styleIntents: [AnimatableSlot: ScopedStyleAnimationIntent] = [:]
+    if !effectiveTransaction.customValues.isEmpty {
+      for (slot, key) in [
+        (
+          AnimatableSlot.foregroundShapeStyle,
+          ObjectIdentifier(ScopedForegroundStyleAnimationKey.self)
+        ),
+        (AnimatableSlot.tintShapeStyle, ObjectIdentifier(ScopedTintStyleAnimationKey.self)),
+      ] {
+        guard
+          let intent = effectiveTransaction.customValues[key]?.unwrap(
+            as: ScopedStyleAnimationIntent.self), intent.isScoped
+        else { continue }
+        if node.drawPayload == .none {
+          // Scoped environment writes pass through nonpainting wrappers.
+          // Exclude their slots as well as their intents: falling back to the
+          // node's transaction would still animate a wrapper inside the scope.
+          snapshot[slot] = nil
+        } else if slot != .foregroundShapeStyle
+          || node.drawMetadata.baseStyle.foregroundStyle == nil
+        {
+          styleIntents[slot] = intent
         }
       }
+    }
+    if let previous {
       diffAndEnqueue(
         identity: node.identity,
         viewNodeID: node.viewNodeID,

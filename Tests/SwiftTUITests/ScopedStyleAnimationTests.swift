@@ -20,6 +20,78 @@ struct ScopedStyleAnimationTests {
     }
   }
 
+  @MainActor
+  private final class CompletionProbe {
+    var count = 0
+  }
+
+  private struct RuntimeBaseOverride: View {
+    var probe: CompletionProbe
+    var animated: Bool
+    @State private var changed = false
+
+    var body: some View {
+      VStack {
+        Button("change") {
+          if animated {
+            withAnimation(.linear(duration: .milliseconds(100))) {
+              changed.toggle()
+            } completion: {
+              probe.count += 1
+            }
+          } else {
+            changed.toggle()
+          }
+        }
+        Rectangle().foregroundStyle(changed ? Color.green : .yellow)
+          .frame(width: 4, height: 1)
+          .animation(.linear(duration: .seconds(30))) { view in
+            view.foregroundStyle(changed ? Color.blue : .red)
+          }
+      }
+    }
+  }
+
+  @Test("an overridden scoped style quiesces immediately after runtime input")
+  func overriddenScopeQuiesces() throws {
+    let harness = try AnimatorRuntimeHarness {
+      RuntimeBaseOverride(probe: CompletionProbe(), animated: false)
+    }
+    defer { harness.shutdown() }
+    let controller = harness.runLoop.renderer.internalAnimationController
+    try withAnimationSinks(controller) { _ = try harness.clickText("change") }
+    #expect(controller.activeAnimationCount == 0)
+    #expect(!controller.requiresContinuedAnimationFrames)
+  }
+
+  @Test("an overridden scope does not extend the outer animation completion")
+  func overriddenScopeCompletionFollowsOuter() async throws {
+    let probe = CompletionProbe()
+    let harness = try AnimatorRuntimeHarness {
+      RuntimeBaseOverride(probe: probe, animated: true)
+    }
+    defer { harness.shutdown() }
+    let controller = harness.runLoop.renderer.internalAnimationController
+    try withAnimationSinks(controller) { _ = try harness.clickText("change") }
+    let boxes = controller.debugStateSnapshot().activeAnimationBoxesByKey.values
+    #expect(!boxes.isEmpty)
+    #expect(boxes.allSatisfy { $0.unwrap(as: Animation.self)?.totalDuration == .milliseconds(100) })
+    try await harness.wait { probe.count == 1 }
+    #expect(controller.activeAnimationCount == 0)
+    #expect(!controller.requiresContinuedAnimationFrames)
+  }
+
+  private func expectPaintingStyleOwners(_ controller: AnimationController) throws {
+    let state = controller.debugStateSnapshot()
+    let tree = try #require(state.previousTreeRoot)
+    for key in state.activeAnimationKeys
+    where key.scope == .property(.foregroundShapeStyle) || key.scope == .property(.tintShapeStyle) {
+      let node = try #require(
+        AnimationTreeQueries.findResolvedSubtree(in: tree, identity: key.identity))
+      #expect(node.drawPayload != .none, "nonpainting style owner: \(key.identity.path)")
+    }
+  }
+
   @Test("input starts the scoped style animation without animating base geometry")
   func runtimeInput() async throws {
     let harness = try AnimatorRuntimeHarness { RuntimeStyle() }
@@ -29,6 +101,7 @@ struct ScopedStyleAnimationTests {
     let keys = controller.debugStateSnapshot().activeAnimationKeys
     #expect(keys.contains { $0.scope == .property(.foregroundShapeStyle) })
     #expect(!keys.contains { $0.scope == .property(.offset) })
+    try expectPaintingStyleOwners(controller)
     try await harness.wait { controller.activeAnimationCount == 0 }
   }
 
@@ -94,6 +167,7 @@ struct ScopedStyleAnimationTests {
         Foreground(changed: true, explicitBase: true), context: .init(identity: root))
     }
     let state = controller.debugStateSnapshot()
+    #expect(state.activeAnimationKeys.isEmpty)
     for key in state.activeAnimationKeys {
       if let tree = state.previousTreeRoot,
         let node = AnimationTreeQueries.findResolvedSubtree(in: tree, identity: key.identity)
@@ -117,18 +191,19 @@ struct ScopedStyleAnimationTests {
   }
 
   @Test("scoped transaction tint gets its own animatable style channel")
-  func tint() {
+  func tint() throws {
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
     let root = testIdentity("scoped-tint")
     let start = MonotonicInstant(offset: .seconds(100))
-    withAnimationSinks(controller) {
+    try withAnimationSinks(controller) {
       _ = renderer.render(Tint(changed: false), context: .init(identity: root), frameInstant: start)
       _ = renderer.render(Tint(changed: true), context: .init(identity: root), frameInstant: start)
       #expect(
         controller.debugStateSnapshot().activeAnimationKeys.contains {
           $0.scope == .property(.tintShapeStyle)
         })
+      try expectPaintingStyleOwners(controller)
       _ = renderer.render(
         Tint(changed: true), context: .init(identity: root),
         frameInstant: start.advanced(by: .milliseconds(1500)))
