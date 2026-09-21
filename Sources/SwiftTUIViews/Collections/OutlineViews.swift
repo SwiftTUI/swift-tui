@@ -424,12 +424,8 @@ private struct OutlineRow<Content: View>: PrimitiveView, IterativeResolvableView
 
   func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let isHosted = context.environmentValues.isResolvingHostedCollectionContent
-    let renderedPrefix =
-      isHosted
-      ? String(prefix.drop(while: \.isWhitespace))
-      : prefix
     return resolveDeclaredChildrenWork(
-      rowBody(prefix: renderedPrefix, spacing: isHosted ? 1 : 0),
+      rowBody(prefix: prefix, spacing: isHosted ? 1 : 0),
       in: context.child(component: .named("Content")),
       kindName: "OutlineRow"
     ).map { children in

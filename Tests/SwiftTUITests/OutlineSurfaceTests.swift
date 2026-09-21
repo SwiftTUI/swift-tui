@@ -106,9 +106,11 @@ struct OutlineSurfaceTests {
     #expect(surface.contains("  │ ├─  App.swift"))
     #expect(surface.contains("  │ ╰─  Tests"))
     #expect(surface.contains("  Package.swift"))
-    #expect(registry.dispatch(identity: testIdentity("OutlineList"), keyPress: KeyPress(.arrowDown)))
+    #expect(
+      registry.dispatch(identity: testIdentity("OutlineList"), keyPress: KeyPress(.arrowDown)))
     #expect(box.value == "app")
-    #expect(registry.dispatch(identity: testIdentity("OutlineList"), keyPress: KeyPress(.arrowDown)))
+    #expect(
+      registry.dispatch(identity: testIdentity("OutlineList"), keyPress: KeyPress(.arrowDown)))
     #expect(box.value == "tests")
   }
 
@@ -145,6 +147,6 @@ struct OutlineSurfaceTests {
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(surface.contains("  Root"))
-    #expect(surface.contains("▌ ╰─  Leaf"))
+    #expect(surface.contains("▌   ╰─  Leaf"))
   }
 }
