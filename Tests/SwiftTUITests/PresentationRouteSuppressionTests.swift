@@ -8,8 +8,7 @@ import Testing
 
 /// Runtime route-suppression coverage for the gallery "Presentation Lab overlays
 /// are sometimes unclosable; in that state the background remains interactive"
-/// failure (root `TODO.md`, reduced per
-/// `docs/reports/2026-06-29-swifttui-gallery-coverage-deep-dive.md`).
+/// failure (STUI-229, formerly T142).
 ///
 /// These drive a real `RunLoop` and dispatch live pointer/Escape events. That is
 /// the distinction the coverage report calls for: a *static* semantic-snapshot
@@ -106,7 +105,7 @@ struct PresentationRouteSuppressionTests {
 
   /// The same suppression contract, but with the routing content hosted inside a
   /// `TabView(.literalTabs)` — the gallery "Presentation Lab" seam. This is the
-  /// configuration that actually reproduced the root-`TODO.md` unclosable-overlay
+  /// configuration that actually reproduced the STUI-229 unclosable-overlay
   /// bug: behind the shell a suppressed background click was mis-routed into the
   /// overlay's own dismiss handler (pointer-activation reached *down* into the
   /// focused modal scope), so the overlay vanished from an outside click. The

@@ -7,8 +7,7 @@ import Testing
 @testable import SwiftTUIViews
 
 /// Runtime lifecycle coverage for the gallery "transitioning off of the Logo
-/// Breaker tab takes forever" failure (root `TODO.md`, reduced per
-/// `docs/reports/2026-06-29-swifttui-gallery-coverage-deep-dive.md`).
+/// Breaker tab takes forever" failure (STUI-230, formerly T143).
 ///
 /// The reported symptom is a surviving autonomous task: Logo Breaker runs a
 /// ~25 Hz geometry-driven `.task(id:)` loop, and if that task is not cancelled

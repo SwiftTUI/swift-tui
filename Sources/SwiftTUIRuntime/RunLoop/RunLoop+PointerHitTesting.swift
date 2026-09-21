@@ -343,7 +343,7 @@ extension RunLoop {
   /// it is physically over — the unconstrained descendant walk would otherwise
   /// reach *down* into a focused scope (e.g. an open sheet) and dispatch its sole
   /// handler when the click landed on suppressed background chrome, dismissing
-  /// the overlay from an outside click (root `TODO.md`: "Presentation Lab
+  /// the overlay from an outside click (STUI-229, formerly T142: "Presentation Lab
   /// overlays are sometimes unclosable; the background remains interactive").
   /// Keyboard activation keeps using the location-free `activationIdentity(for:)`
   /// because Enter/Space legitimately activates the focused scope's action.

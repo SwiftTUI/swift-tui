@@ -674,7 +674,7 @@ struct AppRuntimeTests {
 
   /// Direct framework reduction of the gallery "Presentation Lab overlays are
   /// sometimes unclosable; in that state the background remains interactive"
-  /// bug (root `TODO.md`). Unlike
+  /// bug (STUI-229, formerly T142). Unlike
   /// `PresentationRouteSuppressionTests` (a bare `@State` fixture that passes),
   /// this drives the sheet behind the `TabView(.literalTabs)` shell — the seam
   /// the gallery integration oracle reproduces — and clicks the *background*
