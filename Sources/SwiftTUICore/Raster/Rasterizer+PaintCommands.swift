@@ -468,13 +468,10 @@ extension Rasterizer {
       // inclusive-bound semantics so the outline stays within (0...sub-1).
       // At 8x16 metrics (the default), this reproduces the pre-correction
       // output exactly because sub-pixels are square.
-      let metrics = environment.cellPixelMetrics
-      let subpixelPxWidth = max(1, metrics.width / 2)
-      let subpixelPxHeight = max(1, metrics.height / 4)
-      let halfWidthPx = (cellW * metrics.width) / 2
-      let halfHeightPx = (cellH * metrics.height) / 2
-      let rx = max(0, halfWidthPx / subpixelPxWidth - 1)
-      let ry = max(0, halfHeightPx / subpixelPxHeight - 1)
+      let radii = Self.subpixelEllipseRadii(
+        frameCells: shapeBounds.size, metrics: environment.cellPixelMetrics)
+      let rx = max(0, radii.rx - 1)
+      let ry = max(0, radii.ry - 1)
       if stroke {
         canvas.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
         if needsOutline {

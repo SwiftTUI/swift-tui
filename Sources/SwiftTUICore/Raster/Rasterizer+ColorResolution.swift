@@ -144,8 +144,9 @@ extension Rasterizer {
       return dx * dx + dy * dy <= 1
     case .ellipse:
       // Matches `paintBrailleShape`'s ellipse case.
-      let rx = max(0, (subW - 1) / 2)
-      let ry = max(0, (subH - 1) / 2)
+      let radii = Self.subpixelEllipseRadii(frameCells: bounds.size, metrics: metrics)
+      let rx = max(0, radii.rx - 1)
+      let ry = max(0, radii.ry - 1)
       guard rx > 0, ry > 0 else { return false }
       let cxSub = Double((subW - 1) / 2)
       let cySub = Double((subH - 1) / 2)

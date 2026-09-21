@@ -23,4 +23,20 @@ extension Rasterizer {
       ry: radiusPx / subpixelPxHeight
     )
   }
+
+  /// Converts a frame's pixel semi-axes to Braille sub-pixel units. Both
+  /// solid fills and cell masks subtract one for inclusive-bound semantics.
+  package static func subpixelEllipseRadii(
+    frameCells: CellSize,
+    metrics: CellPixelMetrics
+  ) -> SubpixelRadii {
+    let subpixelPxWidth = max(1, metrics.width / 2)
+    let subpixelPxHeight = max(1, metrics.height / 4)
+    let halfWidthPx = (frameCells.width * metrics.width) / 2
+    let halfHeightPx = (frameCells.height * metrics.height) / 2
+    return SubpixelRadii(
+      rx: halfWidthPx / subpixelPxWidth,
+      ry: halfHeightPx / subpixelPxHeight
+    )
+  }
 }
