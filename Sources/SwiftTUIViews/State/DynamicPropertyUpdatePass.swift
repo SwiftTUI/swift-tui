@@ -265,8 +265,9 @@ package enum DynamicPropertyDescriptorCache {
       switch RuntimeFieldReflection.metadataKind(of: field.fieldType) {
       case 0x303:
         fieldsByIndex[index] = .init(index: index, label: field.name)
-      case 0, 0x203, 0x305:
-        // Native/foreign classes and Objective-C class wrappers.
+      case 0, 0x203, 0x204, 0x305:
+        // Native, foreign, and imported C++ reference classes plus Objective-C
+        // class wrappers, matching StateSlot's reference-payload classification.
         hasOpaqueReferenceStorage = true
       default:
         continue
