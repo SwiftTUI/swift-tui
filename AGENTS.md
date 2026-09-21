@@ -17,9 +17,13 @@ swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests/testName    # 
 swift format format -i --configuration .swift-format.json Sources/ Tests/     # Format
 ```
 
-Always run `bun run test` after changes that touch shared code, platform
-products, or repository tooling. Make sure that it passes before you complete
-the work. Example-package coverage lives in `SwiftTUI/swift-tui-examples`.
+Run `bun run test` after changes to executable shared code, platform products,
+or repository tooling. Comment-only and documentation-only changes, including
+comments in source/test files, do not require the full gate or the Linux lane.
+Review the diff and check affected links, citations, and formatting. Changes to
+manifests, fixtures, compiler/tool directives, or gate-parsed policy data still
+require their applicable gates. Example-package coverage lives in
+`SwiftTUI/swift-tui-examples`.
 Do not run repo-local builds or tests with bare `swift` or `xcrun swift` — use
 `swiftly run swift ...` so runs match the pinned toolchain. See
 [DEVELOPMENT.md](https://github.com/SwiftTUI/swift-tui-org/blob/main/docs/swift-tui/DEVELOPMENT.md)
