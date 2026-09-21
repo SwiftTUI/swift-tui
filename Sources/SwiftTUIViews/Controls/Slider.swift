@@ -161,9 +161,10 @@ extension Slider {
             step: trackStep
           )
           return .claimed
-        case .scrolled:
-          return valueAdjustmentWheelOutcome(event, adjust: adjust)
         default:
+          // Wheel input belongs to the primitive's root handler. Its accepted
+          // route is the invalidation backstop for untracked bindings, and
+          // must refresh the captured value label as well as this track.
           return .ignored
         }
       }
