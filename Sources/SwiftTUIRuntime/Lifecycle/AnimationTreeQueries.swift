@@ -1,29 +1,6 @@
 import SwiftTUICore
 
 enum AnimationTreeQueries {
-  /// Walks the placed tree and records the bounds and identity of
-  /// every node tagged with a ``MatchedGeometryKey``. Nodes whose
-  /// config is `isSource: false` never contribute their bounds:
-  /// they still receive match translations on frames where their
-  /// key is swapped to another identity, but a non-source instance
-  /// cannot make another instance animate by disappearing.
-  ///
-  /// If multiple source-contributing nodes carry the same key in
-  /// one frame, the last-walked entry wins.
-  static func collectMatchedGeometry(
-    _ node: PlacedNode,
-    bounds: inout [MatchedGeometryKey: CellRect],
-    identities: inout [MatchedGeometryKey: Identity]
-  ) {
-    if let config = node.matchedGeometry, config.isSource {
-      bounds[config.key] = node.bounds
-      identities[config.key] = node.identity
-    }
-    for child in node.children {
-      collectMatchedGeometry(child, bounds: &bounds, identities: &identities)
-    }
-  }
-
   /// Pre-order walk recording every matched-geometry node — sources and
   /// non-sources alike — for co-present adoption pairing. Transient nodes
   /// (exit overlays) are skipped: a frozen clone is neither a source nor an
