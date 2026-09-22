@@ -3,14 +3,12 @@ import SwiftTUICore
 package struct SkippedFrameReconciliation: Equatable, Sendable {
   package enum Mode: String, Equatable, Sendable {
     case emptyVisualOnly = "empty_visual_only"
-    case appliedSideEffects = "applied_side_effects"
     case blocked
   }
 
   package enum BlockReason: String, Equatable, Sendable {
     case orderedCommitPolicy = "ordered_commit_policy"
     case dropEligibilityBlockers = "drop_eligibility_blockers"
-    case nonEmptyReconciliationUnavailable = "non_empty_reconciliation_unavailable"
     case progressStarvation = "progress_starvation"
   }
 
@@ -32,16 +30,6 @@ package struct SkippedFrameReconciliation: Equatable, Sendable {
   }
 
   package static let emptyVisualOnly = Self(mode: .emptyVisualOnly)
-
-  package static func appliedSideEffects(
-    effectSummary: String
-  ) -> Self {
-    Self(
-      mode: .appliedSideEffects,
-      blockReason: .nonEmptyReconciliationUnavailable,
-      effectSummary: effectSummary
-    )
-  }
 
   package static func blocked(
     reason: BlockReason,

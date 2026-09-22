@@ -3417,12 +3417,6 @@ struct AsyncFrameTailRenderingTests {
     #expect(blockedDecision.action == .blocked)
     #expect(blockedDecision.reconciliation.mode == .blocked)
     #expect(!blockedDecision.canSkipCompletedFrame)
-
-    let appliedSideEffects = SkippedFrameReconciliation.appliedSideEffects(
-      effectSummary: "lifecycle"
-    )
-    #expect(appliedSideEffects.mode == .appliedSideEffects)
-    #expect(!appliedSideEffects.isAvailableToRuntimePolicy)
   }
 
   @Test("completed frame policy compares candidate and newest desired generations")
