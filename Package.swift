@@ -381,7 +381,6 @@ let package = Package(
         "SwiftTUICore",
         "SwiftTUIRuntime",
       ],
-      path: "Tests/Support",
       swiftSettings: swiftSettings()
     ),
 
@@ -569,7 +568,8 @@ let package = Package(
       linkerSettings: [
         // Debug reload images resolve against the test executable's sole
         // framework copy, just like swifttui-dev's initial application link.
-        .unsafeFlags(["-Xlinker", "--export-dynamic"], .when(platforms: [.linux], configuration: .debug))
+        .unsafeFlags(
+          ["-Xlinker", "--export-dynamic"], .when(platforms: [.linux], configuration: .debug))
       ]
     ),
     .testTarget(

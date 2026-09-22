@@ -19,7 +19,7 @@ import Synchronization
   // the raster path and must stall its own thread until `release()`. A
   // semaphore is the correct primitive — this is not the async-bridge
   // anti-pattern the test-sync ratchet targets, which is why this helper
-  // lives in Tests/Support, the sanctioned (regex-excluded) home of the
+  // lives in Sources/SwiftTUITestSupport, the sanctioned (regex-excluded) home of the
   // shared synchronisation primitives.
   private let releaseSemaphore = DispatchSemaphore(value: 0)
 

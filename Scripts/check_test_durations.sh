@@ -7,7 +7,7 @@ set -eu
 #
 # Every hot-path test is expected to finish in <= 10 s; the churn loops that
 # used to take 12-55 s read their iteration count from
-# `stressIterations(full:hotPath:)` (Tests/Support/StressIterations.swift) and
+# `stressIterations(full:hotPath:)` (Sources/SwiftTUITestSupport/StressIterations.swift) and
 # run the full count only under SWIFTTUI_STRESS_FULL=1 (the nightly and tag
 # lanes). This script parses a `swift test` log and reports every test whose
 # `passed/failed after N seconds` line exceeds the WARN bound, and fails the

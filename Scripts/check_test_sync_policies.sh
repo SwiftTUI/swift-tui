@@ -21,7 +21,7 @@
 #
 # Baseline composition (16): 5 DispatchSemaphore barriers
 # (TerminalPresentationTests x4, TerminalHostPresentationBatchingTests x1 —
-# the AsyncFrameTailRenderingTests worker gate moved to Tests/Support as the
+# the AsyncFrameTailRenderingTests worker gate moved to Sources/SwiftTUITestSupport as the
 # shared AsyncFrameTailBlockingGate, where sanctioned primitives live) + 4 fixed sleeps
 # (InteractiveRuntimeTests x2 usleep, AnimationRepeatForeverGrowthTests x1
 # usleep, RenderDiffTests x1 Thread.sleep) + 3 process/loop watchdogs
@@ -84,7 +84,7 @@
 # not "convert" them to signals — that would defeat the latency they inject.
 # They are grandfathered into the baseline so the ratchet still blocks *new*
 # fixed sleeps. The lasting fix is to route latency injection through a named
-# Tests/Support helper the regex can exclude (then drop the baseline to 6); the
+# Sources/SwiftTUITestSupport helper the regex can exclude (then drop the baseline to 6); the
 # DispatchSemaphore barriers are the genuine sync anti-pattern to ratchet down.
 
 set -eu
@@ -96,13 +96,13 @@ baseline_file="Scripts/data/test-sync-policy-baseline.txt"
 baseline=$(tr -d '[:space:]' < "$baseline_file")
 
 # Count lines containing a timeout-driven synchronisation primitive across
-# every test directory. Tests/Support is excluded: it is the sanctioned home
+# every test directory. Sources/SwiftTUITestSupport is outside these roots:
+# it is the sanctioned home
 # of the shared helpers, including the legacy `waitUntil` that callers are
 # being migrated off of.
 count=$(
   rg -c \
     --glob '*.swift' \
-    --glob '!Tests/Support/**' \
     --glob '!**/.build/**' \
     --glob '!**/.swiftpm/**' \
     --regexp 'waitUntil\(' \
@@ -126,12 +126,11 @@ if [ "$count" -gt "$baseline" ]; then
   >&2 echo "  - AsyncStream             — pull observations as they are produced"
   >&2 echo "  - an explicit onReady/completion callback the test can await"
   >&2 echo ""
-  >&2 echo "All three live in Tests/Support (SwiftTUITestSupport)."
+  >&2 echo "All three live in Sources/SwiftTUITestSupport (SwiftTUITestSupport)."
   >&2 echo ""
   >&2 echo "Offending occurrences:"
   rg -n \
     --glob '*.swift' \
-    --glob '!Tests/Support/**' \
     --glob '!**/.build/**' \
     --glob '!**/.swiftpm/**' \
     --regexp 'waitUntil\(' \

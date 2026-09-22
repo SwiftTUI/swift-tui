@@ -439,6 +439,7 @@ so nested declarations reach presentation reconciliation before layout.
 ```
 Sources/
   SwiftTUIPrimitives/  Geometry, Support, Pointer, Styling (values), Content
+  SwiftTUITestSupport/ Published test helpers and their DocC catalog
                        (value models), Draw (payload value cluster), Measure
                        (LayoutBehavior/LayoutMetadata), Animation (math)
   SwiftTUIGraph/       Resolve, Runtime, Pipeline/Scheduler, Animation (intent),

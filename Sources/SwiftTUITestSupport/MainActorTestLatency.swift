@@ -9,7 +9,7 @@ import Foundation
 /// large surface, slow terminal writes). The calling test's actual waits stay
 /// signal-based (`MainActorConditionSignal`, `AsyncEvent`).
 ///
-/// It lives in `Tests/Support` because the test-sync ratchet
+/// It lives in `Sources/SwiftTUITestSupport` because the test-sync ratchet
 /// (`Scripts/check_test_sync_policies.sh`) excludes this directory as the
 /// sanctioned home of shared primitives; a bare `Thread.sleep` in a test file
 /// would trip the ratchet even when it injects load rather than synchronises

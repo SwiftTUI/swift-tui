@@ -9,7 +9,7 @@ import Synchronization
 /// writer's own dispatch queue; to keep a frame in flight, that thread must
 /// genuinely stall. A semaphore is the correct primitive for that — this is not
 /// the async-bridge anti-pattern the test-sync ratchet targets, which is why
-/// this helper lives in `Tests/Support`, the sanctioned (regex-excluded) home
+/// this helper lives in `Sources/SwiftTUITestSupport`, the sanctioned (regex-excluded) home
 /// of the shared synchronisation primitives. The *waiter* side is still a
 /// direct signal: ``waitUntilBlocked()`` awaits an ``AsyncEvent`` fired from
 /// inside the blocked write, never a poll under a timeout.

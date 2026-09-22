@@ -16,7 +16,7 @@ package import SwiftTUIViews
 /// the `.taskStart` blocker makes every frame must-commit, hiding the
 /// disposal arm from tests.
 ///
-/// Lives in Tests/Support because the tick's `Task.sleep` is the *workload
+/// Lives in Sources/SwiftTUITestSupport because the tick's `Task.sleep` is the *workload
 /// under test* — an autonomous producer, not a waiter (the same sanctioned
 /// autonomous-workload-tick shape as the `TaskReadsUnbodiedStateTests` game
 /// loop and the GeometryReader 20 ms probe). Tests that consume it must

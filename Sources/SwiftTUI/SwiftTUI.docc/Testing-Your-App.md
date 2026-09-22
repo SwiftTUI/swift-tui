@@ -172,7 +172,7 @@ article.
 ## The SwiftTUITestSupport Product
 
 `Package.swift` exports one more product for tests: `SwiftTUITestSupport`
-(sources under `Tests/Support/`), the toolkit the framework's own suites
+(sources under `Sources/SwiftTUITestSupport/`), the toolkit the framework's own suites
 use to wait for runtime state without polling a predicate on a timer. Its
 entire surface is `@_spi(Testing)` — test scaffolding, deliberately outside
 the supported public API, and its API reference is not yet published on
