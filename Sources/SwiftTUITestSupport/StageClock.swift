@@ -75,13 +75,19 @@ private let stageBudgetWallClockCeilingNanoseconds: UInt64 = 30_000_000_000
   on clock: some StageClock,
   _ operation: @escaping @Sendable () async -> R
 ) async throws -> R {
+  try Task.checkCancellation()
   let deadline = await clock.currentStage() + budget.stages
   return try await withThrowingTaskGroup(of: R.self) { group in
     group.addTask {
-      await operation()
+      let result = await operation()
+      try Task.checkCancellation()
+      return result
     }
     group.addTask {
       await clock.waitForStage(atLeast: deadline)
+      // StageClock waiters also return on cancellation; that return is not
+      // evidence that the stage deadline elapsed.
+      try Task.checkCancellation()
       throw StageBudgetExceeded(label: label, stages: budget.stages)
     }
     group.addTask {
@@ -93,8 +99,10 @@ private let stageBudgetWallClockCeilingNanoseconds: UInt64 = 30_000_000_000
     }
     defer { group.cancelAll() }
     guard let result = try await group.next() else {
+      try Task.checkCancellation()
       throw StageBudgetExceeded(label: label, stages: budget.stages)
     }
+    try Task.checkCancellation()
     return result
   }
 }
