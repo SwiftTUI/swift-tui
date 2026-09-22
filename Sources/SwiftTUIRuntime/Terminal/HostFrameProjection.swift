@@ -15,16 +15,8 @@ import SwiftTUICore
 /// Historically each host's encoder reached into `SemanticHostFrame`/
 /// `SemanticSnapshot` independently, so a field added to the host contract
 /// had to be wired into two encoders by hand — and a forgotten one silently
-/// dropped data on one host with no compile error. `HostFrameProjection` is the single seam both
-/// encoders read a frame through, and it names the host-serialized surface
-/// explicitly:
-/// - the host-serialized semantic lists are surfaced as the named accessors
-///   ``accessibilityNodes`` / ``accessibilityAnnouncements`` / ``scrollRoutes``
-///   (the enumerable "what a host emits" contract, anchored by
-///   `HostFrameProjectionContractTests`);
-/// - the focus presentation is **derived once here** so hosts that surface it
-///   (Android) and hosts that surface only the focused identity (WASI) share one
-///   derivation.
+/// dropped data on one host with no compile error. `HostFrameProjection` is
+/// the single seam both encoders read a frame through.
 ///
 /// The projection carries values untransformed — each encoder keeps its own
 /// serialization, so its exact wire bytes are unchanged. The shared
@@ -46,9 +38,10 @@ package struct HostFrameProjection: Equatable, Sendable {
   /// outer layout system. `nil` when unavailable.
   package var preferredLayoutSize: CellSize?
 
-  /// The frame's semantic snapshot. Carried whole so snapshot-threaded encoders
-  /// (WASI) pass it through byte-identically; hosts should read the
-  /// host-serialized fields via the named accessors below, not reach past them.
+  /// The frame's semantic snapshot. Carried whole so the shared
+  /// ``HostWireFrameModel`` can derive the host-serialized surface
+  /// (accessibility nodes, announcements, scroll routes, focus presentation)
+  /// from it once per frame.
   package var semantics: SemanticSnapshot
 
   /// The focused identity, for per-node `isFocused` attribution.
@@ -56,27 +49,6 @@ package struct HostFrameProjection: Equatable, Sendable {
 
   /// Per-frame raster damage relative to the previous committed frame.
   package var rasterDamage: PresentationDamage?
-
-  /// Accessibility tree nodes — the host-serialized semantic surface (1 of 3)…
-  package var accessibilityNodes: [AccessibilityNode] {
-    semantics.accessibilityNodes
-  }
-
-  /// …live-region announcements (2 of 3)…
-  package var accessibilityAnnouncements: [AccessibilityAnnouncement] {
-    semantics.accessibilityAnnouncements
-  }
-
-  /// …and scroll regions (3 of 3).
-  package var scrollRoutes: [ScrollRoute] {
-    semantics.scrollRoutes
-  }
-
-  /// The derived focus presentation (focused identity + semantics + text-input
-  /// preference), computed once so every host shares one derivation.
-  package var focusPresentation: FocusPresentation {
-    semantics.focusPresentation(for: focusedIdentity)
-  }
 
   /// Projects `frame` for host serialization. The single seam through which both
   /// host encoders read frame/semantic data.
