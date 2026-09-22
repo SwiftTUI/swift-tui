@@ -509,19 +509,6 @@ struct PipelineContractTests {
     #expect(blockers == [.animationTransaction])
   }
 
-  @Test(.disabled("closed by Stage 6: worker and recursion safety"))
-  func frameTailAvoidsUnboundedWorkerAndRecursiveDestructionPaths() {
-    Issue.record(
-      "Stage 6 must prove worker dispatch and deep tree processing are bounded."
-    )
-  }
-
-  @Test(.disabled("closed by Stage 7: presentation seam split"))
-  func semanticHostFramesDoNotInheritTerminalCommandObligations() {
-    Issue.record(
-      "Stage 7 must split semantic host-frame delivery from terminal command obligations."
-    )
-  }
 }
 
 private struct PipelineContractCommandView: View {

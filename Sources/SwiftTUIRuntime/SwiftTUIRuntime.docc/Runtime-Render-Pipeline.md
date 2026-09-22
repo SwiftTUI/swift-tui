@@ -207,6 +207,25 @@ while destroying an otherwise successfully resolved deep value tree; the
 
 ### Commit
 
+The executable safety coverage has separate owners:
+
+- `FrameTailWorkerFallbackTests` checks exactly-once worker and fallback execution.
+  `AsyncFrameTailRenderingTests.queuedFrameTailCancelsBeforeWorkerLayoutStarts`
+  checks cancellation before dispatch; its worker-layout cases exercise the
+  offloaded production path.
+- `StackSafetyRegressionTests` exercises deep resolve-product traversal,
+  measure, place and raster paths. These tests do not claim that arbitrary
+  recursive value destruction is safe: the opt-in `flattenForRelease()`
+  contract and limits above still apply.
+- `PipelineContractTests.semanticHostFramesKeepContiguousSequenceAndCurrentPayload`
+  delivers two frames to a semantic host and asserts that neither raster-only
+  presentation entry point is called, while verifying frame sequence, pixels,
+  focus and semantic payload. This covers the presentation seam without
+  requiring terminal commands from the host.
+
+These enabled tests replace the former disabled Stage 6 and Stage 7 placeholder
+cases. A disabled placeholder is not evidence of an additional safety guarantee.
+
 Commit turns a completed draft into a committed frame candidate. It packages
 lifecycle events, semantic handlers, runtime registrations, transaction effects,
 retained frame-tail state, and diagnostics. A completed candidate can be:
