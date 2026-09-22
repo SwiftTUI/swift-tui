@@ -61,17 +61,26 @@
         }
       }
 
-      @Test func cancelOnSignal() async throws {
+      @Test(arguments: [false, true])
+      func cancelOnSignal(delayConsumer: Bool) async throws {
         enum GroupResult {
           case timedOut
           case cancelled
           case caughtSignal
         }
 
+        // The async initializer acknowledges DispatchSource registration on
+        // Darwin and Linux. Sending is safe even if the consumer has not run.
+        let signals = await UnixSignalsSequence(trapping: .sigalrm)
+        let start = AsyncStream<Void>.makeStream()
+        defer { start.continuation.finish() }
+
         try await withThrowingTaskGroup(of: GroupResult.self) { group in
+          defer { group.cancelAll() }
           group.addTask {
             do {
-              try await Task.sleep(nanoseconds: 5_000_000_000)
+              // Diagnostic hang bound, not an expected scheduling duration.
+              try await Task.sleep(for: .seconds(60))
               return .timedOut
             } catch {
               #expect(error is CancellationError)
@@ -80,16 +89,20 @@
           }
 
           group.addTask {
-            for await _ in await UnixSignalsSequence(trapping: .sigalrm) {
+            if delayConsumer {
+              for await _ in start.stream { break }
+            }
+            for await _ in signals {
               return .caughtSignal
             }
-            fatalError()
+            return .cancelled
           }
 
-          // Allow 10ms for the tasks to start.
-          try await Task.sleep(nanoseconds: 10_000_000)
           let pid = getpid()
           kill(pid, UnixSignal.sigalrm.rawValue)  // ignore-unacceptable-language
+          // Exercise signal buffering with the consumer deliberately held
+          // until after delivery, without a sleep or scheduler-speed premise.
+          start.continuation.yield(())
 
           let first = try await group.next()
           #expect(first == .caughtSignal)
