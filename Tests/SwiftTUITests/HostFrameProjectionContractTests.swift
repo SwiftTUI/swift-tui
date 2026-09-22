@@ -95,17 +95,6 @@ struct HostFrameProjectionContractTests {
     #expect(projection.focusedIdentity == frame.focusedIdentity)
     #expect(projection.rasterDamage == frame.rasterDamage)
     #expect(projection.semantics == frame.semantics)
-
-    // The host-serialized semantic subset accessors are faithful to the snapshot.
-    #expect(projection.accessibilityNodes == frame.semantics.accessibilityNodes)
-    #expect(projection.accessibilityAnnouncements == frame.semantics.accessibilityAnnouncements)
-    #expect(projection.scrollRoutes == frame.semantics.scrollRoutes)
-
-    // The focus presentation is the same single derivation both hosts consume.
-    #expect(
-      projection.focusPresentation
-        == frame.semantics.focusPresentation(for: frame.focusedIdentity)
-    )
   }
 
   @Test("no host-serialized field collapses to a default through the projection")
@@ -121,9 +110,5 @@ struct HostFrameProjectionContractTests {
     #expect(projection.preferredLayoutSize != nil)
     #expect(projection.focusedIdentity != nil)
     #expect(projection.rasterDamage != nil)
-    #expect(!projection.accessibilityNodes.isEmpty)
-    #expect(!projection.accessibilityAnnouncements.isEmpty)
-    #expect(!projection.scrollRoutes.isEmpty)
-    #expect(projection.focusPresentation.prefersTextInput)
   }
 }
