@@ -25,6 +25,7 @@ extension RunLoop {
   ) -> FrameAcquisitionOutcome? {
     switch renderOutcome.tailJobState {
     case .cancelledBeforeStart:
+      defer { reportNewSoundnessProbeViolations() }
       // Only newer-intent cancels count toward the forward-progress bound: a
       // stale-baseline skip means a sibling frame committed (progress
       // happened), so it resets the run instead.
@@ -60,6 +61,7 @@ extension RunLoop {
       )
       return .skipped
     case .droppedCompleted:
+      defer { reportNewSoundnessProbeViolations() }
       // The tail ran to completion — the pre-start cancel run is broken.
       // Drop starvation is separately bounded by `progress_starvation`.
       consecutivePreStartCancelCount = 0

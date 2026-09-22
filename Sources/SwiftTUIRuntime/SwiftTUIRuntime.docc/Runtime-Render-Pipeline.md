@@ -207,6 +207,14 @@ while destroying an otherwise successfully resolved deep value tree; the
 
 ### Commit
 
+Soundness probe growth reaches `RuntimeIssueSink` on applied frames, cancelled
+or dropped acquisitions, at the end of both frame drivers, and after session
+shutdown cleanup. Delivery therefore does not require a successful presentation.
+Each session baselines existing process-wide totals before starting. Reporting
+publishes its new counter baseline before calling the host sink, so reentrant
+reporting does not duplicate the same violations. Counter resets lower the
+baseline; enabled per-recorder traces and CI scanning remain independent.
+
 The executable safety coverage has separate owners:
 
 - `FrameTailWorkerFallbackTests` checks exactly-once worker and fallback execution.

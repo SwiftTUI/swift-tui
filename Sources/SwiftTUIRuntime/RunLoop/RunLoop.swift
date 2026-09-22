@@ -435,6 +435,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     // See ``SoundnessViolationCounts/currentTotals()``: report only
     // violations recorded during this run loop's own lifetime.
     lastSeenSoundnessViolationCounts = .currentTotals()
+    // Runs after all session cleanup, even if setup/presentation throws.
+    // Shutdown can record violations without leaving a frame to apply.
+    defer { reportNewSoundnessProbeViolations() }
     stateContainer.invalidator = scheduler
     isSessionActive = true
     installFocusTrackerInvalidator()

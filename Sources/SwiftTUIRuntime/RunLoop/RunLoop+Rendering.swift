@@ -27,6 +27,7 @@ extension RunLoop {
     }
     defer {
       endTerminalRenderPass()
+      reportNewSoundnessProbeViolations()
     }
     // Committed `withAnimation` completions queue during the pass and fire
     // after each frame's lifecycle dispatch (`applyAcquiredFrame`); the
@@ -431,6 +432,7 @@ extension RunLoop {
     }
     defer {
       endTerminalRenderPass()
+      reportNewSoundnessProbeViolations()
     }
     // Committed `withAnimation` completions queue during the pass and fire
     // after each frame's lifecycle dispatch (`applyAcquiredFrame`) or at the
