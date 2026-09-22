@@ -634,6 +634,7 @@ The principal Swift sources for this contract are:
 - `Sources/SwiftTUIRuntime/Terminal/HostWireCapabilities.swift`
 - `Sources/SwiftTUIRuntime/Terminal/HostWireFrameModel.swift`
 - `Sources/SwiftTUIRuntime/Terminal/HostWireStyleTable.swift`
+- `Sources/SwiftTUIRuntime/Terminal/HostWireBudget.swift`
 - `Sources/SwiftTUIRuntime/Terminal/WebSurfaceFrameEncoder.swift`
 - `Sources/SwiftTUIRuntime/Terminal/WebSurfaceImageEncoder.swift`
 - `Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceInputParser.swift`
