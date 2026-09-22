@@ -224,7 +224,9 @@ The executable safety coverage has separate owners:
 - `StackSafetyRegressionTests` exercises deep resolve-product traversal,
   measure, place and raster paths. These tests do not claim that arbitrary
   recursive value destruction is safe: the opt-in `flattenForRelease()`
-  contract and limits above still apply.
+  contract and limits above still apply. `DeepTreeTeardownTests` separately
+  verifies that contract for resolved, measured, placed and draw chains using
+  child-process exit tests on bounded worker stacks, plus drain semantics.
 - `PipelineContractTests.semanticHostFramesKeepContiguousSequenceAndCurrentPayload`
   delivers two frames to a semantic host and asserts that neither raster-only
   presentation entry point is called, while verifying frame sequence, pixels,
