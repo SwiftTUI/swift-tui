@@ -230,6 +230,13 @@ run_repo_policy_phase() {
     "bun test Scripts/lib/generate_public_api_inventory.test.ts" \
     bun test Scripts/lib/generate_public_api_inventory.test.ts
 
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Test advisory source inventory" \
+    "python3 Scripts/test_source_inventory.py" \
+    python3 Scripts/test_source_inventory.py
+
   if [ "${SWIFTTUI_SKIP_PUBLIC_API_BASELINE:-0}" = "1" ]; then
     skip_repo_policy_check \
       "$mode" \

@@ -8,6 +8,9 @@ DerivedData/
 # Bun
 node_modules/
 
+# Python policy/reporting tools
+__pycache__/
+
 # Perf harness artifacts (Scripts/run_perf_smoke.sh, TermUIPerf runs)
 .perf/
 

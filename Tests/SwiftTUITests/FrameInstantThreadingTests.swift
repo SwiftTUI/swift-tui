@@ -87,7 +87,7 @@ struct FrameInstantThreadingTests {
 struct FrameInstantWallClockGuardTests {
   private static let frameScopedFiles = [
     "Sources/SwiftTUIRuntime/Rendering/DefaultRendererFrameHeadCoordinator.swift",
-    "Sources/SwiftTUIRuntime/SwiftTUI.swift",
+    "Sources/SwiftTUIRuntime/DefaultRenderer.swift",
     "Sources/SwiftTUIRuntime/RunLoop/RunLoop+PostCommitSupport.swift",
     "Sources/SwiftTUIRuntime/RunLoop/RunLoop+ResolveContext.swift",
     // The two drivers: `RunLoop+Rendering` derives `frameInstant` and threads

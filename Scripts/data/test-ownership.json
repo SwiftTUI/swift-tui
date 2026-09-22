@@ -1,0 +1,3210 @@
+{
+  "format": 1,
+  "scope": "SwiftPM test source files containing @Test; source policy, integration and shared-fixture ownership are explicit. New unmatched files are unclassified.",
+  "files": {
+    "Platforms/Android/Tests/SwiftTUIAndroidHostTests/AndroidDamageCheckerboardConformanceTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Android/Tests/SwiftTUIAndroidHostTests/AndroidHostSceneHostTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Android/Tests/SwiftTUIAndroidHostTests/HostWireConformanceStreamRecorder.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Android/Tests/SwiftTUIAndroidHostTests/HostWireConformanceTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Arguments/Tests/SwiftTUIArgumentsTests/ApproachableConcurrencyConformanceTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Arguments/Tests/SwiftTUIArgumentsTests/CompletionsCommandTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Arguments/Tests/SwiftTUIArgumentsTests/FrameworkStressArgumentResolutionTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Arguments/Tests/SwiftTUIArgumentsTests/RootCommandDispatchTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Arguments/Tests/SwiftTUIArgumentsTests/SwiftTUICommandTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Arguments/Tests/SwiftTUIArgumentsTests/SwiftTUIOptionsParseTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Arguments/Tests/SwiftTUIArgumentsTests/SwiftTUIOptionsResolutionTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/CLIModeTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/READMECounterFixtureTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/RenderOnceTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/SceneInfoRegistryTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/SceneLifecycleTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/ScenePtyCharacterizationTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/ScenePtyTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/SceneRuntimeTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/SignalReaderArmingTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/SocketDiscoveryTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/SocketProtocolTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/SwiftTUILauncherTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/TerminalRunnerConfigurationTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Embedding/Tests/SwiftTUIPTYPrimitivesTests/ChildProcessPtyTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/Embedding/Tests/SwiftTUIPTYPrimitivesTests/PTYPairTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WASI/Tests/SwiftTUIWASITests/WASIRenderAsyncTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WASI/Tests/SwiftTUIWASITests/WASIRunnerTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WASI/Tests/SwiftTUIWASITests/WASITerminalHandoffTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceCapabilityIngressTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceInputBudgetTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfacePackageTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceTransportTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceWireTotalityTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/PackageGraphIsolationTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostBrowserBundleTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostCLIRunnerTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostLoopbackWireTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostOutboundBudgetTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostRunnerTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostSceneChannelTerminalLifecycleTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostSecurityTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebHostServerTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebSocketInputConnectionIsolationTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebSocketInputReaderTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebSocketSurfaceTransportTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/EntryPointLaunchTests/EntryPointLaunchTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIAnimatedImageTests/AnimatedImageEncodedCacheTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIAnimatedImageTests/AnimatedImageLoopTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIAnimatedImageTests/AnimatedImageTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIAnimatedImageTests/FrameworkStressAnimatedImageCodecTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUICoreTests/AccessibilityNodeExtractionTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/AccessibilityRoleTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/ActionScopeTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/AngularGradientTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/AnimatableArrayTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/AnimationSchedulerTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/AnimationSinkStorageTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/BorderBlendTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/BorderEdgeStyleTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/BorderSetTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/BorderStrokeDefaultsTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/BrailleCanvasTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/CanonicalDrawSnapshotTests.swift": {
+      "category": "core-rendering",
+      "reason": "Canonical draw equivalence and raster diagnostics over Core phase products."
+    },
+    "Tests/SwiftTUICoreTests/CanvasGridTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/CellPixelMetricsTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/CheckedMainActorAccessTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/ColorAnimatableTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/ColorCompositingTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/CommandRegistryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/DeepTreeTeardownTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/DirtyRowSpanCullingTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/DrawExtractorTraversalTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/DropDestinationRegistryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/DroppedPathParsingTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/DroppedPathTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/EdgeInsetsAnimatableTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/EnvironmentReaderAliasingTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FeatureGateRegistryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FocusPresentationTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FocusTrackerTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/ForeignSurfaceTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameDropDroppabilityTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameDropEligibilityTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameSchedulerConcurrencyTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameSchedulerIntentCoalescingTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameTailWalkerStackSafetyTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameworkStressBrailleBoundaryGeometryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameworkStressColorManagementTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameworkStressDroppedPathParsingTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameworkStressMeasurementCacheTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/FrameworkStressRasterDamageTopologyTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Geometry/CellGeometryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Geometry/PointTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Geometry/RectContainsTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/GradientAnimatableTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Graph/RetainedFrameIndexPatchTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Graph/RetainedFrameStructuralIndexTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/InvalidationSourceTraceTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/LayoutBehaviorBorderEqualityTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/LayoutEngineTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/LayoutShadowOracleTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/LineArmsTableTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/LineArmsTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/LocalGestureRegistryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/LocalPointerHandlerRegistryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/LocalScrollPositionRegistryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/MeasureSizeStabilityCutoffTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/MeasurementCacheWitnessRefreshTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/MemoValueComparatorTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/MemoryMetricRegistryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/MeshGradientRasterTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/MeshGradientTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/MeshGradientTextPaintTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/OffscreenFrameElisionTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/PathArcTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/PathConstructionTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/PathReuseEqualityTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/PathTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/PathTrimTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Phase0FoundationTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Phase2CommitPlannerTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Phase2LifecycleFixtureTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/PlacedNodeMirrorTotalityTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Pointer/PointerLocationTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Pointer/RoutePairingRegistryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/PointerEventTimestampTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/PreparedMeshGradientCacheTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/PreparedMeshGradientTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RadialGradientTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RasterBackdropCoverageTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RasterImageOcclusionTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RasterSurfaceDamageDiffTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RasterizerAspectCorrectionTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RasterizerOffsetDamageTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RasterizerStrokeBackgroundTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RasterizerStrokeMergeTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RasterizerTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/ResolvedNodeOffloadSummaryTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/ResolvedNodePhaseOwnershipTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RetainedDrawDuplicateIdentityTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RetainedPhaseExtractionTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RetainedReuseInvariantTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RetainedValidationWorkTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/ReuseDenialTraceTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/RichTextLayoutCacheTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/SampledStrokeTrackTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/ScrollIndicatorSupportTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/StackSafetyRegressionTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/StrokeTrackTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/StyleEnvironmentSnapshotEqualityTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/SurfaceTopologySignatureTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/SynthesizedThemeMemoTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/TextLayoutCacheTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/TextLayoutRowBudgetTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/TextLayoutTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/TextRollValueTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/TileStyleAnimatableTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/TileStyleTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/TransactionSnapshotTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/UnitPointTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUIGraphTests/AnchorTypesTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ChangeObservationPassStabilityTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ChildDescriptorTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/CommittedFreshnessTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/CommittedHandlerInventoryTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/CommittedHandlerResolutionOracleTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/DebugLogRouterTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/DeclaredChildRecompositionTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/DependencyTrackerTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/DuplicateRegistrationProbeTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/EffectRegistrationOwnerIndexTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/EntityRoutedOwnerPreparationTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/FocusParticipationPolicyTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/FrameDropEligibilityBlockerTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/FrameSchedulerArmOrdinalTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/FrameSchedulerSupersededBatchTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/FrameworkStressGraphPlanningAndRoutingTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/FrameworkStressPrimitiveNormalizationTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/FrameworkStressResolvedTraversalTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/FrameworkStressViewportLifecyclePlanningTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/GesturePairedRouteLivenessTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/GraphStatelessOperatorTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/HotReloadReplayTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/IdentityKeyedRegistryStorageTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/IdentityValueCurrencyTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/InvalidationSummaryTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/LifecycleHandlerDispatchTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/LifetimeAnchorIndexTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/LifetimeRelationConsumerTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/LiveStateOwnerNodeTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/LiveViewGraphRegistryTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/LocalFocusedValuesRegistryTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/LocalTerminationRegistryTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/MemoComparatorAgreementTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/MemoComparisonPlanTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/MemoReadCertificateTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/MemoReadOwnerLifetimeTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/MemoSoundnessAlarmTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/MergePressurePacingTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/NodeCheckpointImageStoreTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/OwnedDormantStateTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ParentDetachedKeepGuardBarrierTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/PresentationOverlayEntryIdentitySchemeTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/RegistryMatcherFamilyLockTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ResolveLifetimeScopeTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ResolvedNodeComparatorTotalityTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ResolvedNodeReuseCacheTraceTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ReuseCacheCascadeEvictionTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/RuntimeNodeIDStampingTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/RuntimeRegistrationKindTotalityTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/RuntimeRegistrationOwnerPathTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/RuntimeRegistrationRestoreScopingTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/RuntimeRegistrationRestoreWalkTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/RuntimeRegistrationTargetIdentityTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/RuntimeRegistryLifecycleParameterizedTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/SoundnessFailureChannelTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/SoundnessProbeConfigurationTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/SparedVisitedDescentBarrierTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/StateSlotTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/StrandedListingProbeTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/StructuralDiffTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/StructuralEquivalenceLockTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/SubtreeRemovalPolicyTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/TaskLifecycleDiffTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/TeardownBarrierFixedPointTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/TeardownContextEquivalenceTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/TeardownReachabilityBaselineTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ViewGraphCheckpointRestoreTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ViewGraphCheckpointTotalityTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ViewGraphTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIGraphTests/ViewNodeSnapshotRebuildTests.swift": {
+      "category": "graph",
+      "reason": "Graph state, identity and reconciliation; existing ownership retained."
+    },
+    "Tests/SwiftTUIProfilingTests/CPUSamplerTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIProfilingTests/EnvProfileParserTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIProfilingTests/FrameworkStressProfilingGrammarTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIProfilingTests/MemoryMetricCollectorTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIProfilingTests/PresentationWriteTSVSinkTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIProfilingTests/ProfileActivationTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIProfilingTests/ProfileSinkTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIProfilingTests/RunLoopProgressLogTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIProfilingTests/TSVFileSinkTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUIProfilingTests/ViewGraphOccupancyTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUITests/AccessibilityRuntimePolicyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ActorIsolationSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AmbientCollectionAttributeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AmbientPropagationContractTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnchorPreferenceSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AngularGradientRenderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimatedOverflowRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationCompletionBarrierTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationCompletionConcurrencyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationCompletionLifecycleOrderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationCompletionRegistrationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationCompletionStateWriteTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationControllerTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationEpicLifecycleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationInterpolationConeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationLedgerLifetimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationLogicalCompletionAsyncTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationLongRunLeakProbeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationRemovedCompletionAsyncTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationRepeatForeverGrowthTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationResolvedTreeSkipTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationScopedReuseRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationTickVisibilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationTransactionSegmentationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnimationVelocityChannelTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AnyViewResilienceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AppRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AppSceneConfigurationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AsyncEventTests.swift": {
+      "category": "test-support",
+      "reason": "Tests shared synchronization, soundness or clock support used by runtime tests."
+    },
+    "Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AsyncLifecycleGenerationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AsyncStreamTeardownTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AsyncTaskDrivenFrameRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AutonomousWakeTerminalInputTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BindingProjectionRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BorderGradientTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BorderModifierLayoutTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BorderRenderingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BoundControlStyleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BoundStyleFixtureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BoundedLRUCacheTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BoundedReconciliationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BoundedStackDeficitTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BracketedPasteParserTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BranchMountTaskSingleStartTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BuilderSlotIdentityMigrationRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ButtonFocusStabilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ButtonSystemHintTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CanvasViewTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CaptureBindingChurnJourneyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CaptureBindingLiveStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CaptureOnPressTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CapturedSubviewStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CircleAspectFixtureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CircleEllipseCapsuleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CollectionBookkeepingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CollectionProbeArmingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CollectionResolveReuseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CollectionScrollCharacterizationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CollectionScrollCurrencyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CollectionStyleCharacterizationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CollectionStyleValidationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CommittedScrollTranslationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CompletedFrameProgressGuardTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CompositionalLazyJourneyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CompositionalLazyStackTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ConcurrentRegistrationCarryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ConditionSignalTests.swift": {
+      "category": "test-support",
+      "reason": "Tests shared synchronization, soundness or clock support used by runtime tests."
+    },
+    "Tests/SwiftTUITests/ConditionalHostTaskStartSkipTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/Configuration/EnvironmentResolverTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/Configuration/RuntimeConfigurationBuilderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/Configuration/RuntimeConfigurationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ConservativeMemoBoundaryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ContentShapeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ContentTransitionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ControlChannelGateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ControlGroupRelocationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ControlWheelInvalidationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CoordinateSpaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CurvedInteriorFillTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CustomLayoutContainerContractRenderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DataDrivenPresentationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DebugBundleTests.swift": {
+      "category": "source-policy",
+      "reason": "Reads repository sources or manifests to check a structural contract."
+    },
+    "Tests/SwiftTUITests/DefaultPaletteVisibleWindowTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DefaultPresenceTransitionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DeferredResolveDeepTaskTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DiagnosticsAndCacheTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DirectionalCommandRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DirtyTrackingCoherenceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DisclosureGroupPointerActivationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DispatchBackstopInvalidationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DormantTabStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DrawingPublicContractTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DrawingRenderingRegressionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DropDestinationDispatchTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DropDestinationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DynamicPropertyPublicSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/DynamicStylePropertyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/EllipseMetricContainmentTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/EntityRoutingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/EquatableViewReuseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/EscapeFallThroughParserTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/EventPumpBurstTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FocusChromeOnlyMemberTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FocusContextClickDispatchTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FocusContextRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FocusPresentationInertSlotTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FocusStateFlipInvalidationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FocusSyncSelectiveRerenderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FocusTargetScopedReaderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FocusTransitionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FocusedKeyOwnershipTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ForEachBindingRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ForEachGroupRowExactIdentityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ForEachObservableProducerTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ForEachSingleElementEntityClaimTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ForeignSurfaceRenderDiffTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameHeadDraftProjectionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameInstantThreadingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameTailOverlayApplyHookTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameTailPresentationDamageProducerTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameTailPresentationDamageReachabilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameTailQueueExitReleaseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameTailWorkerFallbackTests.swift": {
+      "category": "source-policy",
+      "reason": "Reads repository sources or manifests to check a structural contract."
+    },
+    "Tests/SwiftTUITests/FrameworkStressAccessibilityFocusTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressAnimationTemporalTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressCacheStateMachineTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressCancellationStateMachineTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressCollectionLayoutTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressComponentCompositionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressControlBindingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressEnvironmentStyleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressFramePipelineTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressGestureScrollTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressInputRoutingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressKittyCommandEnvelopeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressKittyPlacementGeometryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressLayoutLifecycleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressLayoutProposalTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressModifierInteractionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressNavigationPresentationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressObservationEffectsTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressPopoverTipLifecycleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressPresentationSemanticsTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressRasterGeometryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressRenderReconciliationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressRuntimeTransportTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressSafeAreaGeometryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressSceneHostTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressSixelEncodingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressStateIdentityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressStyleTransportTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressTabCommandTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressTableOutlineTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressTerminalAppearanceQueryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressTerminalBoundaryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressTerminalGraphicsResponseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressTerminalInputCapabilityResponseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressTerminalProtocolBoundaryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressTextContentTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressToastLifecycleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressToolbarChromeLeakTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/FrameworkStressUnicodeTextEditingTests.swift": {
+      "category": "test-support",
+      "reason": "Tests shared synchronization, soundness or clock support used by runtime tests."
+    },
+    "Tests/SwiftTUITests/FrameworkStressVisualEffectsTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GalleryStyleDispatchTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GeometryReaderSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GestureIntegrationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GestureRearmTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GestureResetAndReplayTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GestureRunLoopDispatchTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GestureStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GestureTeardownTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GestureTransactionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GestureViewModifierTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/GradientAnimationIntegrationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HandlerDescriptorIntakeTotalityTests.swift": {
+      "category": "source-policy",
+      "reason": "Reads repository sources or manifests to check a structural contract."
+    },
+    "Tests/SwiftTUITests/HostFrameProjectionContractTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HostWireBudgetTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HostWireCapabilitiesTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HostWireLinkTableTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HostWireNegotiationTotalityTests.swift": {
+      "category": "source-policy",
+      "reason": "Reads repository sources or manifests to check a structural contract."
+    },
+    "Tests/SwiftTUITests/HostWireSchemaContractTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HostedCollectionHintWindowingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HostedFrameHistoryRetentionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HostedSceneSessionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HostedSurfaceSizeNegotiatorTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HotReloadFidelityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HotReloadHostTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HotReloadLoaderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/IdentityGuardTests.swift": {
+      "category": "source-policy",
+      "reason": "Reads repository sources or manifests to check a structural contract."
+    },
+    "Tests/SwiftTUITests/ImageAssetRepositoryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ImageBlendCompositorTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ImageBlendFastPixelsTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ImageContentOwnershipTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ImageLookupKeySamplingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ImageSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ImperativeAuthoringContextDispatchTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ImplicitMemoReuseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/IncrementalRasterMismatchDetailTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/IncrementalRasterReachabilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InjectedTerminalInputReaderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InputBatchingResponsivenessTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InputLatencyStampingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InputParserModifierTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InputParserOverflowTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InputPollBackoffTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InputPresentationRegressionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InputReaderControlMessageTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InteractionGateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/InteractiveRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/JSONFrameRendererTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/KeyCommandTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/KeyPressModifierTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/KeyboardScrollCoalescedFramePinTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/KeyframeAnimatorRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/KittyKeyboardProtocolParserTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LayoutAndRenderingPipelineTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LayoutDependentContainerHardeningTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LayoutEpicScrollJourneyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LayoutReuseAncestorInvalidationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LazyStackDocumentWindowingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LazyStackIdealPassWindowingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LegacyValueControlCompositionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LifecycleCoordinatorSkipTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LifecycleSelectiveEvaluationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/LinearAccessibilityRendererTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ListLayoutProductTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ListRowFocusRebuildTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MainActorConditionSignalTests.swift": {
+      "category": "test-support",
+      "reason": "Tests shared synchronization, soundness or clock support used by runtime tests."
+    },
+    "Tests/SwiftTUITests/MatchedGeometryAdoptionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MatchedGeometrySizeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MatchedGeometryTransitionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MemoBoundaryRegistrationAdoptionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MemoReadReuseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MemoReadWorkloadTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MenuAnchorPlacementTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MenuCompositionStyleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MenuStyleFallbackTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MenuStyleFixtureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MenuStyleRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MenuSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MergePressurePacingRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MeshGradientAnimationIntegrationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MotionAndProgressPolicyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/MultipleTaskModifiersTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/NavigationCollectionsTabSwitchTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/NavigationDestinationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/NestedMatchedGeometryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/NestedPresentationOrderingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/NestedScrollExtentTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/NodeHostedCollectionRowsTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/NonAggregatingViewFixtureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ObservationDraftWindowRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ObservationFlagOutputStabilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/OffscreenFrameElisionRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/OnLongPressGestureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/OnTapGestureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/OrderedImageCompositionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/OutlineIndentationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/OutlineSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PaletteCloseFramePinTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PaletteCommandTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PaletteSheetAbsorptionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PaletteStyleFixtureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PaletteStyleReuseTests.swift": {
+      "category": "consumer-fixture-integration",
+      "reason": "Shares public-import consumer style fixtures with runtime rendering/interaction suites; retained together to avoid divergent fixture copies."
+    },
+    "Tests/SwiftTUITests/PaletteStyleRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PanelTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PassiveCompositionStyleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PassiveStyleFixtureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PasteActivationGuardTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PathAnimationIntegrationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PathCustomShapeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PathFillTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PathFrameReactivityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PathStrokeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PerTickPresentCadenceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/Phase1PresentationIntegrationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/Phase4ObservationAndEnvironmentTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/Phase4StateReliabilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/Phase5ReliabilityGatesTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PhaseAnimatorRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PickerMenuFocusEffectTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PickerOptionDiagnosticsTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PickerStyleLabelRowTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PickerStyleParityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PipelineContractTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PipelineDriverParityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PointerHoverTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PointerInteractionStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PopoverPresentationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PortalContentLifecycleParityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PortalIdentityTriageTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PortalPrimitiveTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PortalStyleParityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PortalStyleReuseTests.swift": {
+      "category": "consumer-fixture-integration",
+      "reason": "Shares public-import consumer style fixtures with runtime rendering/interaction suites; retained together to avoid divergent fixture copies."
+    },
+    "Tests/SwiftTUITests/PortalStyleRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PortalStyleValueTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PreStartCancelForwardProgressTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PreferenceSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PresentationActionScopeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PresentationContinuityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PresentationEscapeDismissTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PresentationOverlayCoexistenceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PresentationPortalForceQueueTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PresentationRouteSuppressionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PresentationSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PresentationTriggerSplitTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PresentationWriteRecordTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ProgressViewSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PublicErrorConformanceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/PublicSemanticDifferentialTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Shared public semantic fixtures driven through the run loop and lifecycle commit harness."
+    },
+    "Tests/SwiftTUITests/PublicStyleContractTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RGBAImagePixelTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RadialGradientRenderingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RasterizerTranslationBlitTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ReRootedControlCommittedValueAnchorTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ReaderScopedEnvironmentReuseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RealTerminalJourneySupportTests.swift": {
+      "category": "test-support",
+      "reason": "Tests shared synchronization, soundness or clock support used by runtime tests."
+    },
+    "Tests/SwiftTUITests/RealizedTextTransitionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RenderDriverCharacterizationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RenderDriverInstrumentationCostTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RenderPipelineStructureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RenderedTextFixtureSupportTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RendererOwnershipLifetimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ResolvePurityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ResolveReuseAncestorInvalidationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RetainedPhaseProductGateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RetainedSubtreeReuseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RetainedValidationFormattingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RunLoopDrainFairnessTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RunLoopInputEndedTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RunLoopSoundnessReportingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RuntimeIssueScreenRoutingTests.swift": {
+      "category": "source-policy",
+      "reason": "Reads repository sources or manifests to check a structural contract."
+    },
+    "Tests/SwiftTUITests/RuntimeRenderPipelineTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SafeAreaSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScaleTransitionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SceneActionScopeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SceneBuilderBackboneTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SceneConfigurationAccessTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SceneManifestTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScopedStyleAnimationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScopedTransactionBodyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScrollCurrencyABMeasurement.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScrollHostedControlActivationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScrollIndicatorDraggingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScrollLinkStyleReuseTests.swift": {
+      "category": "consumer-fixture-integration",
+      "reason": "Shares public-import consumer style fixtures with runtime rendering/interaction suites; retained together to avoid divergent fixture copies."
+    },
+    "Tests/SwiftTUITests/ScrollLinkStyleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScrollMomentumTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScrollPanningHostCapabilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScrollTranslationCandidateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScrollViewViewportSizingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ScrollWheelStallReproTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SecureFieldSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SegmentedButtonRowCompositionStressTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SegmentedButtonRowIncrementalRasterTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SegmentedButtonRowSheetJourneyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SelectivePreferenceRippleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SelectiveServedHostParityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ShapeClippingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ShapeForegroundStyleOverloadTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SheetStyleDescriptorTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SkipOraclePagedWorkbenchTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SkippedFrameAnimationRearmTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SoundnessAssertPromotionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SoundnessGuardConcurrencyTests.swift": {
+      "category": "test-support",
+      "reason": "Tests shared synchronization, soundness or clock support used by runtime tests."
+    },
+    "Tests/SwiftTUITests/SpacerCrossAxisFlexibilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SpinnerCancellationRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SpinnerStyleRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SpinnerStyleValidationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StackedPresentationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StageClockTests.swift": {
+      "category": "test-support",
+      "reason": "Tests shared synchronization, soundness or clock support used by runtime tests."
+    },
+    "Tests/SwiftTUITests/StaleBaselineFrameHeadTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StatePersistenceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StateSlotClaimWindowTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StrokeDashPhaseAnimationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StrokeMergeRenderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StrokeTrackRenderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StrokeTrimRenderTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StyleFixtureConstructionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StyleRegistrationRestoreCostTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StyleRelocationLifetimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StyleRouteContractTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StyledControlAccessibilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/StylingGuardTests.swift": {
+      "category": "source-policy",
+      "reason": "Reads repository sources or manifests to check a structural contract."
+    },
+    "Tests/SwiftTUITests/SubmitClosureLiveStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SurfaceDamageContractTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SwiftTUIConvenienceImportTests.swift": {
+      "category": "consumer-import",
+      "reason": "Checks the convenience product import contract."
+    },
+    "Tests/SwiftTUITests/SwiftTUIRuntimeStandardImportTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SwiftTUIStandardImportTests.swift": {
+      "category": "consumer-import",
+      "reason": "Checks the convenience product import contract."
+    },
+    "Tests/SwiftTUITests/SwiftUISurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/SynchronousReentryRegistrationScopeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabAutonomousTaskRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabOverflowMenuTeardownLeakTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabStripPresentationWriteNarrowingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabStripReuseStampCoherenceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabStripValueVerifiedSlotTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabTaskActivationRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabViewLifecycleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabViewStyleParityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabViewStyleValidationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TabViewSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TableColumnWidthPassTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TableLayoutProductTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TableScrollViewportRectTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TaskReadsUnbodiedStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TaskRunnerCancellationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TaskRunnerTransferTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalCapabilityProfileApplyingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalHandoffRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalHostProcessExitCleanupTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalImageKittyPayloadTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalImageOcclusionEmissionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalImageOcclusionPlacementTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalInputPollGateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalKittyKeyboardProtocolTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalPreparedSurfaceIdentityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalPresentationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminalRenderStyleCodecTests.swift": {
+      "category": "source-policy",
+      "reason": "Reads repository sources or manifests to check a structural contract."
+    },
+    "Tests/SwiftTUITests/TerminalScrollRegionEmissionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TerminationRequestTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TextEditorSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TextFieldStyleStateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TextFigureSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TextInputRuntimeIntegrationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TextInputSubmitTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TileStyleRenderingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TimelineTabSwitchTeardownLeakTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TimelineTaskStartSkipRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TimingDiagnosticsTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ToastStyleCompositionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ToastStyleValidationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ToolbarStripPublicationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ToolbarTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TransactionContinuityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TransactionDescentTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TransactionKeyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TransactionSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TypedNavigationPathTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/VT220FunctionKeyParserTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ValueControlStyleTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ValueOnlyTransitionChildTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ValueStyleFixtureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ViewThatFitsSurfaceTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ViewportLifecycleMigrationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/ViewportUnderRealizationRegressionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/VirtualRowCountTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/WindowedLineGenerationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/WindowsInputPipeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/WindowsInputRecordPumpTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/WindowsStackFloorDiagnosticTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUIViewsTests/AccessibilityMetadataModifierTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/AmbientTextAttributeResolveTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/AnimationSolverTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/AnimationVelocityTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/BindingCollectionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/BindingDependencyModelTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/BindingProjectionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/BlendModeModifierTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/BranchingFactorOracleTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/BuilderSlotStructuralIdentityTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/BuilderStructureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/CellPixelMetricsEnvironmentTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/CollectionSupportTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ContinuationResolveParityTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ControlStyleAPIRemovalTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/CustomLayoutContainerContractTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DeclaredChildConsumptionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DeclaredChildTraversalParityTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DependencyModelTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DismissStackTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DragGestureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DroppedElementAnchoringTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DynamicPropertyLeaseTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DynamicPropertyMemoClassificationTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DynamicPropertySlotIdentityTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DynamicPropertyUpdatePassTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DynamicPropertyUpdatePlanTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/DynamicPropertyWorkingCopyTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/EnvironmentKeyClassificationTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/EnvironmentRuntimeStateTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/EnvironmentSnapshotDebugProjectionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/EnvironmentSnapshotFastPathTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/EnvironmentTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ErasedViewTypeIDTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ExclusiveGestureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/FlattenedStateOwnerClaimTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/FocusStateOwnerLifetimeTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/FocusedValueReaderAttributionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ForEachBindingCurrencyTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ForEachBindingTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ForEachIterationParityTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/FrameResolveStateTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/FrameworkStressBuilderIdentityTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/FrameworkStressControlInteractionAuthoringTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/FrameworkStressControlValueMathTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/FrameworkStressStateFocusAuthoringTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/GestureCompositionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/GestureModifiersTests.swift": {
+      "category": "view-authoring",
+      "reason": "Gesture modifier recognizers, callbacks and state-reset behavior without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/GesturePointerCapturePolicyTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/GestureProtocolTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/GestureStateRemintTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/HandlerIntakeAmbientScopeTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ImperativeAuthoringContextPreservationTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ImperativeStateGraphResolutionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/IndexedChildSourceArtifactsTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/IndexedChildSourceIsolationTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/IssuedProposalRecordTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/IterativeResolveDepthTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/KeyCommandModifierlessDiagnosticTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/KeyframeTimelineTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/LeanRetainedReuseGateTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/LongPressGestureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/MemoObservationCertificateTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/MemoObservationDraftTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ObservationFlagCombinationMatrixTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ObservationOffMainMarshalTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ObservationRegistrationLifetimeTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/OverlayStackTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/PersistentCustomLayoutCacheTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/PointerInputEnvironmentTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/PointerPathTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/PortalStyleFixtureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/PresentationTriggerAttributionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/PublicModifierSendableTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ResolveContextDraftSurvivalTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ResolveContextFrameInputRefreshTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ResolveContextStorageTotalityTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ResolveReuseIndexingTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ResolveWorkTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ScrollLinkStyleFixtureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ScrollViewLayoutInsetSeedTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/SpatialTapGestureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/SpinnerTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/Stage2PublicShapeClosureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/StateCaptureBindingTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/StateInvalidationDependencyTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/StyleBodyViewNodeTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/StyleEnvironmentDefaultsTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/StyleEnvironmentSnapshotTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/StyleMisuseTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/StyleReuseTransparencyTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/TabSelectionStateTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/TapGestureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/TextFigureResolutionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/TextInputLayoutMapTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/TextInputReducerTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/TimelineViewTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ToolbarStyleErasureTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/TypedReuseEqualityTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ViewCompositionSurfaceTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ViewModifierAlgebraTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ViewProtocolShapeTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/ViewResolutionTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/WithAnimationCompletionIsolationTests.swift": {
+      "category": "view-authoring",
+      "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    }
+  }
+}

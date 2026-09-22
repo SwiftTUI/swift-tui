@@ -127,10 +127,13 @@ struct AsyncFrameTailRenderingTests {
   func internalStateMutationDuringSuspendedAsyncTailSurvivesCommit() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailInternalStateRoot")
     let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let trigger = AsyncFrameTailInternalStateTrigger()
     let renderer = DefaultRenderer()
     renderer.setFrameTailRenderHooks(
       .init(beforeRaster: {
+        trigger.record("worker raster entry")
         gate.beforeRaster()
+        trigger.record("worker raster exit")
       })
     )
     defer {
@@ -139,7 +142,6 @@ struct AsyncFrameTailRenderingTests {
     }
 
     let terminal = AsyncFrameTailTerminalHost()
-    let trigger = AsyncFrameTailInternalStateTrigger()
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
@@ -159,6 +161,13 @@ struct AsyncFrameTailRenderingTests {
         )
       }
     )
+    let progress = RunLoopProgressProbe()
+    runLoop.progressProbe = progress
+    defer {
+      print("[async-state] sequence: \(trigger.events)")
+      print("[async-state] progress: \(progress.events)")
+      print("[async-state] frames: \(terminal.frames)")
+    }
     let eventPump = runLoop.makeEventPump()
     defer {
       eventPump.cancel()
@@ -187,13 +196,24 @@ struct AsyncFrameTailRenderingTests {
     }
 
     await gate.waitUntilBlocked()
+    trigger.record("worker blocked")
     trigger.fire()
+    // Resuming the task's continuation does not execute its state write.
+    // Keep the worker suspended until the authored mutation acknowledges it;
+    // otherwise the old frame can finish before the mutation runs (STUI-531).
+    try await valueWithTimeout {
+      await trigger.waitForMutation()
+    }
+    trigger.record("worker release")
     gate.release()
 
     _ = try await valueWithTimeout {
       try await renderTask.value
     }
 
+    let mutationIndex = try #require(trigger.events.firstIndex(of: "mutation acknowledged"))
+    let releaseIndex = try #require(trigger.events.firstIndex(of: "worker release"))
+    #expect(mutationIndex < releaseIndex, "the authored write must occur while the tail is blocked")
     #expect(
       terminal.frames.last?.contains("phase 1 count 1") == true,
       "frames: \(terminal.frames)"
@@ -284,6 +304,9 @@ struct AsyncFrameTailRenderingTests {
 
     await gate.waitUntilBlocked()
     trigger.fire()
+    try await valueWithTimeout {
+      await trigger.waitForMutation()
+    }
     gate.release()
 
     _ = try await valueWithTimeout {
@@ -3760,15 +3783,33 @@ private struct AsyncFrameTailStressView: View {
   }
 }
 
-private final class AsyncFrameTailInternalStateTrigger {
+private final class AsyncFrameTailInternalStateTrigger: Sendable {
   private let event = AsyncEvent()
+  private let mutation = AsyncEvent()
+  private let history = Mutex<[String]>([])
+
+  var events: [String] { history.withLock { $0 } }
+
+  func record(_ event: String) {
+    history.withLock { $0.append(event) }
+  }
 
   func fire() {
+    record("mutation requested")
     event.fire()
   }
 
   func wait() async {
     await event.wait()
+  }
+
+  func didMutate() {
+    record("mutation acknowledged")
+    mutation.fire()
+  }
+
+  func waitForMutation() async {
+    await mutation.wait()
   }
 }
 
@@ -3783,6 +3824,7 @@ private struct AsyncFrameTailInternalStateMutationView: View {
       .task {
         await trigger.wait()
         count = 1
+        trigger.didMutate()
       }
   }
 }
@@ -3807,6 +3849,7 @@ private struct AsyncFrameTailFocusMutationView: View {
     .task {
       await trigger.wait()
       focusedField = .second
+      trigger.didMutate()
     }
   }
 }

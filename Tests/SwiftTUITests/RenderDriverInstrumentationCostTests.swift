@@ -47,7 +47,7 @@ struct RenderDriverInstrumentationCostTests {
   func artifactConstructionDoesNotCallFrameDiagnosticsSummarize() throws {
     let root = try repositoryRoot()
     let rendererSource = try String(
-      contentsOf: root.appendingPathComponent("Sources/SwiftTUIRuntime/SwiftTUI.swift"),
+      contentsOf: root.appendingPathComponent("Sources/SwiftTUIRuntime/DefaultRenderer.swift"),
       encoding: .utf8
     )
 

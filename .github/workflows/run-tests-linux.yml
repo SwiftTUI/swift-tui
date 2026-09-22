@@ -235,6 +235,31 @@ jobs:
           set -euo pipefail
           sh ./Scripts/test_gate.sh --lane core
 
+      - name: Record unsupported Apple semantic oracle on Linux
+        shell: bash
+        run: python3 Scripts/run_public_semantics.py
+
+      - name: Upload public semantic skip evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-semantics-linux-${{ matrix.arch }}
+          path: .build/public-semantics
+
+      - name: Source structure observations
+        if: always()
+        shell: bash
+        run: |
+          python3 Scripts/source_inventory.py --compare docs/source-structure.json --output .build/source-observations/census.json
+          cat .build/source-observations/census.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload source observations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: source-observations-linux-${{ matrix.arch }}
+          path: .build/source-observations
+
       # Only the amd64 lanes feed the merged scan: the ledger counts every
       # suite once, and an arm64 run would double them.
       - name: Upload soundness traces

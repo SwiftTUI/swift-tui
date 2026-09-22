@@ -147,7 +147,7 @@ if rg -U -n -P --quiet -- '@MainActor\s+public func resolve<' \
 fi
 
 if ! rg -U -n -P --quiet -- '@MainActor\s+public func render<' \
-  Sources/SwiftTUIRuntime/SwiftTUI.swift; then
+  Sources/SwiftTUIRuntime/DefaultRenderer.swift; then
   fail "DefaultRenderer.render must stay @MainActor."
 fi
 

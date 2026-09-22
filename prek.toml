@@ -36,7 +36,7 @@ hooks = [
     name = "enforce public surface and documentation guardrails",
     entry = "./Scripts/check_public_surface_policies.sh",
     language = "system",
-    files = '^(Package\.swift|README\.md|AGENTS\.md|docs/(ARCHITECTURE|PUBLIC-API)\.md|Sources/.*\.swift|Platforms/.*\.swift|Sources/SwiftTUIViews/SwiftTUIViews\.docc/Authoring-Views\.md|Sources/SwiftTUIRuntime/SwiftTUIRuntime\.docc/Running-Apps\.md|Tests/SwiftTUIViewsTests/ActorIsolationSurfaceTests\.swift|Tests/SwiftTUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
+    files = '^(Package\.swift|README\.md|AGENTS\.md|docs/(ARCHITECTURE|PUBLIC-API)\.md|Sources/.*\.swift|Platforms/.*\.swift|Sources/SwiftTUIViews/SwiftTUIViews\.docc/Authoring-Views\.md|Sources/SwiftTUIRuntime/SwiftTUIRuntime\.docc/Running-Apps\.md|Tests/SwiftTUIViewsTests/(ActorIsolationSurfaceTests|CollectionSupportTests|ViewCompositionSurfaceTests)\.swift|Tests/SwiftTUICoreTests/Phase0FoundationTests\.swift|Tests/SwiftTUITests/(AppRuntimeTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|Support/InteractiveDemoTestSupport)\.swift)$',
     pass_filenames = false
   },
   {

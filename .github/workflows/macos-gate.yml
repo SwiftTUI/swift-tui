@@ -143,6 +143,31 @@ jobs:
           set -euo pipefail
           sh ./Scripts/test_gate.sh --skip-bun-install
 
+      - name: Public semantic differential fixtures
+        shell: bash
+        run: python3 Scripts/run_public_semantics.py
+
+      - name: Upload public semantic observations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-semantics-macos
+          path: .build/public-semantics
+
+      - name: Source structure observations
+        if: always()
+        shell: bash
+        run: |
+          python3 Scripts/source_inventory.py --compare docs/source-structure.json --output .build/source-observations/census.json
+          cat .build/source-observations/census.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload source observations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: source-observations-macos
+          path: .build/source-observations
+
   record:
     name: Record green verdict
     runs-on: ubuntu-24.04

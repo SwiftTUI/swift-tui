@@ -87,9 +87,9 @@ ordinary public API (tracked separately in [.spi-api-baseline.txt](.spi-api-base
 | `SwiftTUICore` | `SwiftTUIPrimitives` | `always` | Testing | [source](../Sources/SwiftTUICore/PrimitivesExports.swift) |
 | `SwiftTUIGraph` | `SwiftTUIPrimitives` | `always` | Testing | [source](../Sources/SwiftTUIGraph/PrimitivesExports.swift) |
 | `SwiftTUIPrimitives` | `SwiftTUIVendorFigletEmbeddedFonts` | `always` | none | [source](../Sources/SwiftTUIPrimitives/Content/TextFigurePayload.swift) |
-| `SwiftTUIRuntime` | `SwiftTUICore` | `always` | none | [source](../Sources/SwiftTUIRuntime/SwiftTUI.swift) |
-| `SwiftTUIRuntime` | `SwiftTUIVendorFigletEmbeddedFonts` | `always` | none | [source](../Sources/SwiftTUIRuntime/SwiftTUI.swift) |
-| `SwiftTUIRuntime` | `SwiftTUIViews` | `always` | none | [source](../Sources/SwiftTUIRuntime/SwiftTUI.swift) |
+| `SwiftTUIRuntime` | `SwiftTUICore` | `always` | none | [source](../Sources/SwiftTUIRuntime/DefaultRenderer.swift) |
+| `SwiftTUIRuntime` | `SwiftTUIVendorFigletEmbeddedFonts` | `always` | none | [source](../Sources/SwiftTUIRuntime/DefaultRenderer.swift) |
+| `SwiftTUIRuntime` | `SwiftTUIViews` | `always` | none | [source](../Sources/SwiftTUIRuntime/DefaultRenderer.swift) |
 | `SwiftTUITerminalCLI` | `SwiftTUIPlatformIO` | `(os(macOS) \|\| os(iOS) \|\| os(Linux) \|\| os(Android))` | none | [source](../Platforms/CLI/Sources/SwiftTUITerminalCLI/SignalReader.swift) |
 | `SwiftTUITerminalCLI` | `SwiftTUIRuntime` | `always` | none | [source](../Platforms/CLI/Sources/SwiftTUITerminalCLI/SwiftTUITerminalCLI.swift) |
 | `SwiftTUIVendorUnixSignals` | `SwiftTUIPlatformIO` | `always` | none | [source](../Vendor/UnixSignals/Sources/UnixSignals/UnixSignal.swift) |

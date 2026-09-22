@@ -7,7 +7,7 @@ import SwiftTUIViews
 // frame pipeline — preparing a frame head, rendering a tail, previewing or
 // committing a completed-frame candidate — so cancellation, drop-eligibility,
 // and reconciliation behavior can be exercised in isolation. They carry no
-// production call sites; keeping them out of `SwiftTUI.swift` keeps the
+// production call sites; keeping them out of `DefaultRenderer.swift` keeps the
 // production rendering surface easier to read.
 extension DefaultRenderer {
   @MainActor

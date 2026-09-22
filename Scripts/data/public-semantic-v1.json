@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "qualification": "macOS 27 / Xcode 27 / Swift 6.4; Apple event order is a bounded observation, not a claim about all OS releases.",
+  "fixtures": {
+    "anyview-same-type": {
+      "status": "parity",
+      "reason": "The same erased concrete type retains its count across a parent input change.",
+      "events": {
+        "swiftui": [
+          "count:1",
+          "retained:A:1",
+          "final:1:0:7"
+        ],
+        "swifttui": [
+          "count:1",
+          "retained:A:1",
+          "final:1:0:7"
+        ]
+      }
+    },
+    "anyview-type-change": {
+      "status": "ratified-divergence",
+      "reason": "Replacing the erased concrete type tears down the old leaf and initializes the new leaf; SwiftTUI retains its tested teardown-first ordering.",
+      "events": {
+        "swiftui": [
+          "count:1",
+          "appear:B:0",
+          "disappear:A",
+          "final:0:0:7"
+        ],
+        "swifttui": [
+          "count:1",
+          "disappear:A",
+          "appear:B:0",
+          "final:0:0:7"
+        ]
+      }
+    },
+    "binding-projection": {
+      "status": "parity",
+      "reason": "The projected count becomes 3 while sibling value 7 is preserved.",
+      "events": {
+        "swiftui": [
+          "pair:3:7",
+          "final:0:3:7"
+        ],
+        "swifttui": [
+          "pair:3:7",
+          "final:0:3:7"
+        ]
+      }
+    },
+    "equal-value-write": {
+      "status": "parity",
+      "reason": "Writing the current value emits no onChange event and retains value 0.",
+      "events": {
+        "swiftui": [
+          "final:0:0:7"
+        ],
+        "swifttui": [
+          "final:0:0:7"
+        ]
+      }
+    },
+    "explicit-identity-reset": {
+      "status": "ratified-divergence",
+      "reason": "State resets to zero; SwiftTUI preserves its tested disappearance-before-appearance commit order, unlike this Apple observation.",
+      "events": {
+        "swiftui": [
+          "count:1",
+          "appear:A:0",
+          "disappear:A",
+          "final:0:0:7"
+        ],
+        "swifttui": [
+          "count:1",
+          "disappear:A",
+          "appear:A:0",
+          "final:0:0:7"
+        ]
+      }
+    },
+    "state-batching": {
+      "status": "parity",
+      "reason": "Two synchronous writes before the next host update publish only the final observed value 2.",
+      "events": {
+        "swiftui": [
+          "count:2",
+          "final:2:0:7"
+        ],
+        "swifttui": [
+          "count:2",
+          "final:2:0:7"
+        ]
+      }
+    }
+  }
+}

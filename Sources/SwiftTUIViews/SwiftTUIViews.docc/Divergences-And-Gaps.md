@@ -102,6 +102,15 @@ are omitted even when SwiftUI exposes a corresponding API.
 
 ## Data flow and observation
 
+- **Replacement lifecycle ordering.** *Ratified.* SwiftTUI commits old
+  disappearance before replacement appearance, as pinned by the lifecycle
+  planner and `Phase2LifecycleFixtureTests`. The version-1 public-semantic
+  probes for explicit identity reset and erased concrete-type replacement
+  observe Apple SwiftUI on macOS 27 delivering the replacement appearance
+  first. Both engines reset the replaced state. This is an observed ordering
+  difference, not a claim that Apple's ordering is guaranteed on every OS.
+  The differential fixture retains each engine's exact sequence separately.
+
 - **Observation-only data flow.** *Ratified.* The state surface is `State`,
   `Binding`, `Bindable`, `Environment`, and `FocusState`. The Combine-era
   object family (`ObservableObject`, `@Published`, `@StateObject`,

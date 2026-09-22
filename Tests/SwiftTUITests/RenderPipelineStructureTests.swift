@@ -87,7 +87,7 @@ struct RenderPipelineStructureTests {
   @Test("render-tail strategy entry surface is shared")
   func renderTailStrategyEntrySurfaceIsShared() throws {
     let source = try String(
-      contentsOf: Self.sourceURL("Sources/SwiftTUIRuntime/SwiftTUI.swift"),
+      contentsOf: Self.sourceURL("Sources/SwiftTUIRuntime/DefaultRenderer.swift"),
       encoding: .utf8
     )
     let completedFrameSource = try String(
