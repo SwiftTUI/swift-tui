@@ -3731,6 +3731,218 @@ function stableDOMId(id) {
   }).join("");
 }
 
+// src/SurfacePaintScheduler.ts
+function defaultAnimationFrameScheduler() {
+  const request = globalThis.requestAnimationFrame;
+  const cancel = globalThis.cancelAnimationFrame;
+  if (typeof request !== "function" || typeof cancel !== "function") {
+    return;
+  }
+  return {
+    requestAnimationFrame: (callback) => request.call(globalThis, callback),
+    cancelAnimationFrame: (handle) => cancel.call(globalThis, handle)
+  };
+}
+
+class SurfacePaintScheduler {
+  animationFrames;
+  paint;
+  pending;
+  lastPaintedFrame;
+  handle;
+  disposed = false;
+  presentedFrames = 0;
+  paints = 0;
+  coalescedFrames = 0;
+  constructor(animationFrames, paint) {
+    this.animationFrames = animationFrames;
+    this.paint = paint;
+  }
+  get statistics() {
+    return {
+      presentedFrames: this.presentedFrames,
+      paints: this.paints,
+      coalescedFrames: this.coalescedFrames,
+      pending: this.pending !== undefined
+    };
+  }
+  get batchesPaints() {
+    return this.animationFrames !== undefined;
+  }
+  present(frame, recoveredImagePayloadIds = []) {
+    if (this.disposed) {
+      return;
+    }
+    this.presentedFrames += 1;
+    const pending = this.pending;
+    const previous = pending ? pending.frame : this.lastPaintedFrame;
+    const damage = promotesToFullRepaint(previous, frame) ? undefined : pending ? unionSurfaceDamage(pending.damage, frame.damage) : frame.damage;
+    const next = pending ?? {
+      frame: undefined,
+      damage: undefined,
+      carriedImagePayloads: new Map,
+      recoveredImagePayloadIds: new Set,
+      accessibilityAnnouncements: [],
+      coalescedFrameCount: 0
+    };
+    if (pending?.frame && pending.frame !== this.lastPaintedFrame) {
+      for (const image of pending.frame.images ?? []) {
+        if (image.dataBase64 !== undefined) {
+          next.carriedImagePayloads.set(image.id, image.dataBase64);
+        }
+      }
+      next.coalescedFrameCount += 1;
+      this.coalescedFrames += 1;
+    }
+    next.frame = frame;
+    next.damage = damage;
+    for (const id of recoveredImagePayloadIds) {
+      next.recoveredImagePayloadIds.add(id);
+    }
+    next.accessibilityAnnouncements.push(...frame.accessibilityAnnouncements ?? []);
+    this.pending = next;
+    this.schedule();
+  }
+  requestRepaint() {
+    if (this.disposed) {
+      return;
+    }
+    this.promoteToFullRepaint();
+    this.schedule();
+  }
+  repaintNow() {
+    if (this.disposed) {
+      return;
+    }
+    this.promoteToFullRepaint();
+    this.flush();
+  }
+  flush() {
+    if (this.disposed) {
+      return;
+    }
+    this.cancelScheduled();
+    const pending = this.pending;
+    if (!pending) {
+      return;
+    }
+    this.pending = undefined;
+    const frame = pending.frame ? spliceCarriedImagePayloads(pending.frame, pending.carriedImagePayloads) : undefined;
+    this.lastPaintedFrame = frame;
+    this.paints += 1;
+    this.paint({
+      frame,
+      damage: pending.damage,
+      recoveredImagePayloadIds: [...pending.recoveredImagePayloadIds].sort(),
+      accessibilityAnnouncements: pending.accessibilityAnnouncements,
+      coalescedFrameCount: pending.coalescedFrameCount
+    });
+  }
+  dispose() {
+    if (this.disposed) {
+      return;
+    }
+    this.cancelScheduled();
+    this.pending = undefined;
+    this.lastPaintedFrame = undefined;
+    this.disposed = true;
+  }
+  promoteToFullRepaint() {
+    if (this.pending) {
+      this.pending.damage = undefined;
+      return;
+    }
+    this.pending = {
+      frame: this.lastPaintedFrame,
+      damage: undefined,
+      carriedImagePayloads: new Map,
+      recoveredImagePayloadIds: new Set,
+      accessibilityAnnouncements: [],
+      coalescedFrameCount: 0
+    };
+  }
+  schedule() {
+    if (!this.animationFrames) {
+      this.flush();
+      return;
+    }
+    if (this.handle !== undefined) {
+      return;
+    }
+    this.handle = this.animationFrames.requestAnimationFrame(() => {
+      this.handle = undefined;
+      this.flush();
+    });
+  }
+  cancelScheduled() {
+    if (this.handle === undefined) {
+      return;
+    }
+    this.animationFrames?.cancelAnimationFrame(this.handle);
+    this.handle = undefined;
+  }
+}
+function promotesToFullRepaint(previous, frame) {
+  return previous === undefined || previous.width !== frame.width || previous.height !== frame.height || previous.epoch !== frame.epoch || frame.damage === undefined;
+}
+function spliceCarriedImagePayloads(frame, carried) {
+  if (carried.size === 0 || !frame.images?.length) {
+    return frame;
+  }
+  let spliced = false;
+  const images = frame.images.map((image) => {
+    if (image.dataBase64 !== undefined) {
+      return image;
+    }
+    const payload = carried.get(image.id);
+    if (payload === undefined) {
+      return image;
+    }
+    spliced = true;
+    return { ...image, dataBase64: payload };
+  });
+  return spliced ? { ...frame, images } : frame;
+}
+function unionSurfaceDamage(a, b) {
+  if (!a || !b) {
+    return;
+  }
+  const rows = new Map;
+  for (const [row, ranges] of [...a.textRows, ...b.textRows]) {
+    const existing = rows.get(row);
+    if (existing === "full") {
+      continue;
+    }
+    if (ranges.length === 0) {
+      rows.set(row, "full");
+      continue;
+    }
+    rows.set(row, existing ? [...existing, ...ranges] : [...ranges]);
+  }
+  const textRows = [...rows.entries()].sort(([left], [right]) => left - right).map(([row, ranges]) => [
+    row,
+    ranges === "full" ? [] : mergeDamageRanges(ranges)
+  ]);
+  return {
+    textRows,
+    requiresFullTextRepaint: a.requiresFullTextRepaint || b.requiresFullTextRepaint,
+    requiresFullGraphicsReplay: a.requiresFullGraphicsReplay || b.requiresFullGraphicsReplay
+  };
+}
+function mergeDamageRanges(ranges) {
+  const sorted = [...ranges].sort(([left], [right]) => left - right);
+  const merged = [];
+  for (const [start, end] of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && start <= last[1]) {
+      merged[merged.length - 1] = [last[0], Math.max(last[1], end)];
+    } else {
+      merged.push([start, end]);
+    }
+  }
+  return merged;
+}
+
 // src/WebHostSceneRuntime.ts
 function legacyWheelMode(captureWheelInput) {
   if (captureWheelInput === undefined) {
@@ -3764,6 +3976,7 @@ class WebHostSceneRuntime {
   rendererKind;
   sceneFrame;
   painter;
+  paintScheduler;
   inputEncoder = new InputEventEncoder;
   currentStyle;
   canvas;
@@ -3806,6 +4019,8 @@ class WebHostSceneRuntime {
       return this.bridge?.requestImagePayloads?.(ids);
     };
     this.painter = this.rendererKind === "dom" ? new DomSurfacePainter({ onImagePayloadMiss }) : new CanvasSurfacePainter({ onImagePayloadMiss });
+    const paintScheduling = options.paintScheduling ?? defaultAnimationFrameScheduler();
+    this.paintScheduler = new SurfacePaintScheduler(paintScheduling === "synchronous" ? undefined : paintScheduling, (request) => this.paint(request));
     this.onOpenHyperlink = options.onOpenHyperlink;
     this.suspendWhenHidden = options.suspendWhenHidden ?? true;
     this.element = document.createElement("section");
@@ -3837,7 +4052,7 @@ class WebHostSceneRuntime {
       canvas.className = "webhost-scene__surface";
       canvas.setAttribute("aria-hidden", "true");
       this.canvas = canvas;
-      this.painter.attach(canvas, () => this.draw());
+      this.painter.attach(canvas, () => this.paintScheduler.requestRepaint());
     }
     this.accessibilityTree = new AccessibilityTreeMounter;
     this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
@@ -3856,8 +4071,6 @@ class WebHostSceneRuntime {
     this.sendPointerCapabilitiesIfChanged(coarsePrimaryPointer());
     this.measureCells();
     this.resizeToMount();
-    this.draw();
-    this.syncAccessibilityTree();
   }
   setVisible(visible) {
     this.isVisible = visible;
@@ -3871,8 +4084,15 @@ class WebHostSceneRuntime {
     this.updateRuntimeSuspension();
   }
   setDocumentVisible(visible) {
+    const becameVisible = visible && !this.documentVisible;
     this.documentVisible = visible;
     this.updateRuntimeSuspension();
+    if (becameVisible && this.paintScheduler.statistics.pending) {
+      this.paintScheduler.repaintNow();
+    }
+  }
+  get paintStatistics() {
+    return this.paintScheduler.statistics;
   }
   updateRuntimeSuspension() {
     const suspended = this.suspendWhenHidden && (!this.isVisible || !this.documentVisible);
@@ -3889,15 +4109,11 @@ class WebHostSceneRuntime {
     this.bridge?.updateRenderStyle(this.currentStyle);
     this.measureCells();
     this.resizeToMount();
-    this.draw();
-    this.syncAccessibilityTree();
   }
   resize(columns, rows) {
     this.columns = Math.max(1, Math.round(columns));
     this.rows = Math.max(1, Math.round(rows));
-    this.resizeSurface();
-    this.draw();
-    this.syncAccessibilityTree();
+    this.paintScheduler.repaintNow();
   }
   writeOutput(text) {
     if (!this.diagnosticText) {
@@ -3928,6 +4144,7 @@ class WebHostSceneRuntime {
     this.onInput(chunk);
   }
   dispose() {
+    this.paintScheduler.dispose();
     this.painter.dispose();
     this.detachInputHandlers?.();
     this.detachPointerParadigmObserver?.();
@@ -3955,13 +4172,10 @@ class WebHostSceneRuntime {
     };
   }
   presentSurface(frame, recoveredImagePayloadIds) {
-    const previousFrame = this.currentFrame;
     this.currentFrame = frame;
     this.columns = Math.max(1, Math.round(frame.width));
     this.rows = Math.max(1, Math.round(frame.height));
-    const resized = this.resizeSurface();
-    this.draw(previousFrame && !resized ? frame.damage : undefined, recoveredImagePayloadIds);
-    this.syncAccessibilityTree();
+    this.paintScheduler.present(frame, recoveredImagePayloadIds);
   }
   get preferredGridSize() {
     const frame = this.currentFrame;
@@ -4169,9 +4383,7 @@ class WebHostSceneRuntime {
     this.columns = nextColumns;
     this.rows = nextRows;
     this.sendResizeIfNeeded();
-    this.resizeSurface();
-    this.draw();
-    this.syncAccessibilityTree();
+    this.paintScheduler.repaintNow();
   }
   sendResizeIfNeeded() {
     const current = {
@@ -4232,18 +4444,20 @@ class WebHostSceneRuntime {
     this.cellWidth = Math.max(1, Math.ceil(context.measureText("W").width));
     this.cellHeight = Math.max(1, Math.ceil(this.currentStyle.fontSize * 1.35));
   }
-  draw(damage, recoveredImagePayloadIds) {
-    this.painter.paint(this.surfaceMetrics(), this.currentFrame, damage, recoveredImagePayloadIds);
+  paint(request) {
+    const resized = this.resizeSurface();
+    this.painter.paint(this.surfaceMetrics(), request.frame, resized ? undefined : request.damage, request.recoveredImagePayloadIds);
+    this.syncAccessibilityTree(request.frame, request.accessibilityAnnouncements);
   }
-  syncAccessibilityTree() {
+  syncAccessibilityTree(frame, announcements) {
     const tree = this.accessibilityTree;
-    if (!tree || !this.currentFrame) {
+    if (!tree || !frame) {
       return;
     }
-    tree.present(this.currentFrame.accessibilityTree ?? [], {
+    tree.present(frame.accessibilityTree ?? [], {
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight
-    }, this.currentFrame.accessibilityAnnouncements ?? [], {
+    }, [...announcements], {
       synchronizeFocus: this.synchronizeAccessibilityFocus
     });
   }
@@ -4293,7 +4507,8 @@ async function createWebHostApp(options) {
     suspendHiddenScenes: options.suspendHiddenScenes,
     visibilityDocument: options.visibilityDocument ?? defaultVisibilityDocument(),
     renderer: options.renderer,
-    sceneFrame: options.sceneFrame
+    sceneFrame: options.sceneFrame,
+    paintScheduling: options.paintScheduling
   });
   await controller.initialize();
   return controller;
@@ -4314,6 +4529,7 @@ class InternalWebHostAppController {
   suspendHiddenScenes;
   renderer;
   sceneFrame;
+  paintScheduling;
   visibilityDocument;
   detachVisibilityListener;
   constructor(options) {
@@ -4326,6 +4542,7 @@ class InternalWebHostAppController {
     this.suspendHiddenScenes = options.suspendHiddenScenes;
     this.renderer = options.renderer;
     this.sceneFrame = options.sceneFrame ?? "fill";
+    this.paintScheduling = options.paintScheduling;
     this.visibilityDocument = options.visibilityDocument;
     this.scenes = options.manifest.scenes;
     this.selectedSceneId = options.initialSceneId && options.manifest.scenes.some((scene) => scene.id === options.initialSceneId) ? options.initialSceneId : options.manifest.scenes.find((scene) => scene.id === options.manifest.defaultSceneId)?.id ?? options.manifest.defaultSceneId;
@@ -4419,7 +4636,8 @@ class InternalWebHostAppController {
       onInput: (chunk) => bridge.sendInput(chunk),
       suspendWhenHidden: this.suspendHiddenScenes,
       renderer: this.renderer,
-      sceneFrame: this.sceneFrame
+      sceneFrame: this.sceneFrame,
+      paintScheduling: this.paintScheduling
     });
     this.bridges.set(id, bridge);
     this.runtimes.set(id, runtime);
