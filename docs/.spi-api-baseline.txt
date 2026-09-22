@@ -228,6 +228,7 @@ SwiftTUITestSupport.ConditionSignal
 SwiftTUITestSupport.ConditionSignal.init()
 SwiftTUITestSupport.ConditionSignal.notify()
 SwiftTUITestSupport.ConditionSignal.wait(until:)
+SwiftTUITestSupport.ConditionSignal.wait(until:for:within:on:)
 SwiftTUITestSupport.ExhaustedStageClock
 SwiftTUITestSupport.ExhaustedStageClock.currentStage()
 SwiftTUITestSupport.ExhaustedStageClock.init()
