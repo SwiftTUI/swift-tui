@@ -196,15 +196,17 @@
           Issue.record("no current client to close")
           return
         }
-        connections.withLock { $0.clients[token] }?.yield(.normalClose)
-        // Bounded condition wait: the close travels the real receive path.
-        for _ in 0..<512 {
-          if await channel.currentConnectionToken() == nil {
-            return
-          }
-          await Task.yield()
+        guard let client = connections.withLock({ $0.clients[token] }) else {
+          Issue.record("the current client has no input continuation")
+          return
         }
-        Issue.record("the current client never detached")
+        // STUI-536: a yield budget can expire before the receive task runs.
+        // The channel acknowledges only after handling this real close record,
+        // including clearing its current token; no parser assertion is relaxed.
+        let nextCallback = await channel.processedInboundCallbackCount() + 1
+        client.yield(.normalClose)
+        await channel.waitForProcessedInboundCallbacks(atLeast: nextCallback)
+        #expect(await channel.currentConnectionToken() == nil)
       }
 
       func feed(

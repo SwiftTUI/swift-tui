@@ -15646,9 +15646,9 @@
         "reason": "Tests the named SwiftPM target and its declared dependencies."
       },
       "kind": "test",
-      "lines": 296,
+      "lines": 298,
       "path": "Platforms/WebHost/Tests/SwiftTUIWebHostTests/WebSocketInputConnectionIsolationTests.swift",
-      "sha256": "a18efc2d9968640eb0abe2b02bb441b926860490d7716d0a5482a74e70479eb4",
+      "sha256": "679fbe80de75373357bf22b16155bc46bc6ff42c8ca108f9718161486f7c1173",
       "target": "SwiftTUIWebHostTests"
     },
     {
@@ -15742,5 +15742,5 @@
     "SwiftTUIWebHostCLI",
     "SwiftTUIWebHostTests"
   ],
-  "sourceRevision": "162f3a22434a8d023f4b18baf3824715480f05f2"
+  "sourceRevision": "8426e6fd25945ca10805e0c3ea17d36b2a5b808a"
 }
