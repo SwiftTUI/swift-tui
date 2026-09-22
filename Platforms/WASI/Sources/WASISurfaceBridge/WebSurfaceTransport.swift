@@ -55,7 +55,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     self.wireCapabilities = wireCapabilities
     state = Mutex(
       State(
-        surfaceSize: surfaceSize,
+        surfaceSize: HostWireBudget.initialSize(surfaceSize),
         renderStyle: renderStyle,
         graphicsCapabilities: .none,
         pointerInputCapabilities: Self.pointerInputCapabilities(
@@ -92,6 +92,7 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     _ surfaceSize: CellSize,
     cellPixelSize: PixelSize? = nil
   ) {
+    guard HostWireBudget.admits(surfaceSize) else { return }
     state.withLock { state in
       state.surfaceSize = surfaceSize
       state.graphicsCapabilities.cellPixelSize = cellPixelSize
@@ -160,7 +161,9 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
   @discardableResult
   @MainActor
   package func writeClipboard(_ text: String) throws -> Bool {
-    let bytes = Array(WebSurfaceFrameEncoder.encodeClipboard(text).utf8)
+    let output = WebSurfaceFrameEncoder.encodeClipboard(text)
+    guard output != HostWireBudget.rejectionRecord else { return false }
+    let bytes = Array(output.utf8)
     try writeBytes(bytes)
     return true
   }

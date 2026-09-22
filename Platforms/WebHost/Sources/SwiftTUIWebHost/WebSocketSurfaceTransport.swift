@@ -93,7 +93,7 @@
       self.pump = ByteSinkPump(sink: sink, sendTimeoutNanoseconds: sendTimeoutNanoseconds)
       state = Mutex(
         State(
-          surfaceSize: surfaceSize,
+          surfaceSize: HostWireBudget.initialSize(surfaceSize),
           renderStyle: renderStyle,
           graphicsCapabilities: .none,
           pointerInputCapabilities: .cellOnly,
@@ -207,6 +207,7 @@
       _ surfaceSize: CellSize,
       cellPixelSize: PixelSize? = nil
     ) {
+      guard HostWireBudget.admits(surfaceSize) else { return }
       state.withLock { state in
         state.surfaceSize = surfaceSize
         state.graphicsCapabilities.cellPixelSize = cellPixelSize
@@ -247,7 +248,9 @@
     @discardableResult
     @MainActor
     package func writeClipboard(_ text: String) throws -> Bool {
-      sendBytes(Array(WebSurfaceFrameEncoder.encodeClipboard(text).utf8))
+      let output = WebSurfaceFrameEncoder.encodeClipboard(text)
+      guard output != HostWireBudget.rejectionRecord else { return false }
+      return sendBytes(Array(output.utf8))
     }
 
     package func notifyRuntimeIssue(_ issue: RuntimeIssue) throws {

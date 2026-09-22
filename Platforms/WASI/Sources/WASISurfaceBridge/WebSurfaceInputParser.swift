@@ -17,6 +17,7 @@ package struct WebSurfaceInputParser {
   private static let introducer: UInt8 = 0x1E
 
   private var bufferedCommand: [UInt8]?
+  private var discardingCommand = false
   private var terminalInputParser = TerminalInputParser()
   private var cellPixelSize: PixelSize?
 
@@ -37,11 +38,17 @@ package struct WebSurfaceInputParser {
     _ bytes: [UInt8]
   ) -> (events: [InputEvent], controlMessages: [WebSurfaceInputControlMessage]) {
     var payload: [UInt8] = []
-    payload.reserveCapacity(bytes.count)
+    // A chunk can consist entirely of a refused command. Do not reserve an
+    // ordinary-input copy proportional to those discarded bytes.
+    payload.reserveCapacity(min(bytes.count, 4096))
     var events: [InputEvent] = []
     var controlMessages: [WebSurfaceInputControlMessage] = []
 
     for byte in bytes {
+      if discardingCommand {
+        if byte == 0x0A { discardingCommand = false }
+        continue
+      }
       if bufferedCommand != nil {
         if byte == 0x0A {
           let command = String(decoding: bufferedCommand ?? [], as: UTF8.self)
@@ -50,7 +57,12 @@ package struct WebSurfaceInputParser {
           controlMessages.append(contentsOf: parsed.controlMessages)
           bufferedCommand = nil
         } else {
-          bufferedCommand?.append(byte)
+          if (bufferedCommand?.count ?? 0) >= HostWireBudget.recordBytes - 1 {
+            bufferedCommand = nil
+            discardingCommand = true
+          } else {
+            bufferedCommand?.append(byte)
+          }
         }
         continue
       }
@@ -110,7 +122,8 @@ package struct WebSurfaceInputParser {
     guard components.count == 3 || components.count == 5,
       components[0] == "resize",
       let width = Int(components[1]),
-      let height = Int(components[2])
+      let height = Int(components[2]),
+      HostWireBudget.admits(.init(width: max(1, width), height: max(1, height)))
     else {
       return nil
     }

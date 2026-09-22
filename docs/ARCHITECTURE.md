@@ -252,6 +252,12 @@ reader cannot move its backlog into a downstream unbounded stream. See the
 
 ## Source layout
 
+`SwiftTUIRuntime/Terminal/HostWireBudget.swift` owns shared producer grid and
+record admission, bounded component collection, and the encoded-byte builder.
+`WebSurfaceFrameEncoder` applies it transactionally; the WASI, WebHost, and
+Android ingresses apply grid/record limits before wire-driven allocation.
+The shipped limits and refusal behavior are in [HOST-WIRE-CONTRACT.md](HOST-WIRE-CONTRACT.md#allocation-budgets).
+
 The passive composition families live beside their primitives in
 `SwiftTUIViews/Primitives/`: `LabeledContainers.swift` captures authored slots,
 and `LabelStyles.swift`, `LabeledContentStyles.swift`, and `GroupBoxStyles.swift`

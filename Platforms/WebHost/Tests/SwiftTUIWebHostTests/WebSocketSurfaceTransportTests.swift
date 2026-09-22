@@ -139,9 +139,7 @@
         try !transport.writeClipboard(
           String(repeating: "x", count: WebHostOutboundBudget.byteLimit)))
       #expect(transport.outboundBacklog.bytes == 0)
-      await #expect(throws: WebHostByteSinkError.outboundBacklogExceeded) {
-        try await transport.drain()
-      }
+      try await transport.drain()
       #expect(await sink.strings().isEmpty)
     }
 
@@ -398,7 +396,7 @@
       let metrics = try hostFrameSurface.present(
         SemanticHostFrame(
           sequence: 22,
-          raster: Self.basicSurface("OK"),
+          raster: RasterSurface(size: .init(width: 2, height: 2), lines: ["OK", "  "]),
           semantics: SemanticSnapshot(),
           focusedIdentity: nil,
           rasterDamage: damage

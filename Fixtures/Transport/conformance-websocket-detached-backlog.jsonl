@@ -1,4 +1,4 @@
-{"formatVersion":1,"manifestSHA256":"8c94aaea8629f2f3ced5eb704b2289399f77087a9af6c33aaa8da01050295c0b","bodySHA256":"3c48916e3a87f7426a4d28f3e37b4df1eb22a1938890eadc8bd7d1c4a85829cd"}
+{"formatVersion":1,"manifestSHA256":"c53abc525b57dde37166b118c471e34010ce51330293fb92963b6fc7b8fbd285","bodySHA256":"3c48916e3a87f7426a4d28f3e37b4df1eb22a1938890eadc8bd7d1c4a85829cd"}
 {"channel":{"action":"clientChunk","bytesBase64":"HmNhcHM6eyJhY2NlcHRzRGVsdGE=","token":1}}
 {"channel":{"action":"closeClient","token":1}}
 {"emit":"\u001eruntimeIssue:{\"severity\":\"warning\",\"code\":\"conformance.detached\",\"message\":\"buffered while detached\",\"description\":\"SwiftTUI runtime warning [conformance.detached] buffered while detached\"}\n"}

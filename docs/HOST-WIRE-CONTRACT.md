@@ -93,6 +93,92 @@ Browser and Android decoders reject a `surface` version newer than the newest
 shape they understand. This skew guard is separate from capability
 negotiation. There is no encoder-side version ceiling.
 
+## Allocation budgets
+
+The wire has fixed admission limits, independent of version/capability
+negotiation. These limits apply to legacy unstamped records too. Ordinary
+records keep their existing bytes; over-budget records that older hosts
+accepted are now refused. Native terminal grids are outside this host-wire
+policy.
+
+| Resource | Inclusive limit | Admission point |
+| --- | --- | --- |
+| Encoded record | 4 MiB (4,194,304 UTF-8 bytes), including RS and record name, excluding terminal LF | Browser byte framing before text decoding/JSON parsing; Android before JSON parsing and before allocating ABI copy buffers; Swift before growing encoded output |
+| Incomplete input/output record | Same 4 MiB; the input introducer counts as one byte | Swift WASI/WebHost input parser and browser output parser, across arbitrary chunk boundaries |
+| WebSocket message envelope | 8 MiB, possibly containing several records | Server frame/message admission; browser before copying a string or Blob to bytes |
+| Grid | Each axis 0…1,024 cells; area at most 65,536 cells | Producer size ingress before raster creation; consumer before baseline retention, row expansion, or painting |
+| Full rows / delta rows | At most grid height; delta row indexes unique and inside the grid | Before copying a delta baseline |
+| Cells in a row | At most grid width; ordered, nonoverlapping positive spans contained in the row | Before row retention or expansion |
+| Cell text | 256 UTF-8 bytes per lead cell | Before producer escaping or consumer row retention |
+| Retained styles | `max(1,024, grid area + 1)` entries, including null; append base plus append count must fit | Before concatenating an appended table |
+| One style's content | 1,024 accounting units: 8 for each JSON value (including strings and containers), plus UTF-8 bytes in object keys and string values | Before retaining a style; avoids host-specific JSON number spelling or slash escaping |
+| Image placements / recovery IDs | 1,024 entries; image/recovery ID at most 1,024 UTF-8 bytes | Before image mapping/retention and recovery admission |
+| Accessibility nodes, announcements, scroll regions, link targets | 65,536 entries per table, also subject to the record byte cap | Before consumer model construction |
+| Link and damage rows/ranges | At most grid height rows, unique row indexes; at most grid width ranges per row, endpoints within grid | Before range expansion; link runs ordered/nonoverlapping, damage ranges may be unordered/overlapping |
+| Preferred grid dimensions | Same axis/area limits as the grid when both dimensions are supplied | Before passing preferences to host layout |
+| Consumer JSON nesting | 32 object/array levels, including unknown additive values | Lexical scan before JSON parsing |
+| Raster/image dimensions | At most 8,192 pixels per axis and 16,777,216 pixels per bitmap | Before browser canvas sizing; before default browser PNG/GIF/JPEG decode or Android bitmap decode; also checked on declared image pixel sizes |
+
+Product checks use bounded operands or widened arithmetic. A dense 256×256
+text frame remains supported. A 65,537-cell rectangular grid cannot be formed
+within the axis limit (65,537 is prime); the shared corpus therefore tests
+255×257, 256×256, and the next fixed-height size, 257×256.
+
+Transport backlog limits apply in addition to record admission. WebHost's
+existing 4 MiB outbound budget includes terminal LF and active writes, so an
+otherwise empty queue can carry at most 4,194,303 record bytes plus LF. A
+decoder-admissible record that exceeds available outbound capacity follows
+the existing WebHost backlog-disconnect policy below.
+
+Browser framing counts incoming bytes, including incomplete UTF-8 sequences,
+without first decoding or concatenating the entire incoming chunk. On overflow
+it drops the buffered fragment, emits one small `surfaceDropped` record, and
+discards bytes through the next LF. RS inside the rejected line does not restart
+framing. EOF clears that discard state. A refused WebSocket envelope is dropped
+as a whole and resets its incomplete fragment. Swift input framing follows the
+same discard-through-LF rule and produces no input event for a rejected command.
+Rejected resizes retain the current grid; an oversized configured initial grid
+uses 80×24. Android rejects oversized size-query and retry results before
+`ByteArray` allocation.
+
+Consumer refusal never replaces the last accepted baseline or advances its
+generation. Budget failures request one deduplicated keyframe repair until a
+full frame arrives; there is no diagnostic copy of rejected payload bytes.
+Browser deltas that still name the retained baseline can apply; Android waits
+for the full frame while its repair is pending. Invalid delta row/span/style
+metadata is refused before mutation. Android also builds the complete candidate
+frame before committing its baseline and consumed generation.
+
+Swift encoding uses candidate delivery state, bounded component collection,
+and a byte-counted output builder. Renderer damage from an older grid or
+with duplicate rows is clipped and normalized before wire encoding. Failed
+surface encoding emits a fixed
+`surface.budgetExceeded` runtime issue, preserves generation/style/image
+delivery state, and forces the next admitted surface to be full. Over-budget
+clipboard writes return false before queue admission. Image transmit-once
+history is capped at 1,024 IDs; forgetting history causes a later payload
+retransmission. Android recovery tracking also caps admission and releases IDs
+when payloads arrive or placements disappear.
+
+Canvas backing stores reduce their rendering scale to fit the pixel budget;
+CSS geometry and input coordinates retain their original scale. Image decode
+admission reads actual container dimensions rather than trusting `pixelSize`.
+Malformed/unsupported image containers are omitted by the default painter,
+using the existing bounded image-recovery behavior. Custom browser image
+decoders remain responsible for their own native allocations.
+
+These are per-resource limits, not a total process-memory promise. JSON object
+overhead, caller-owned input chunks/strings, authored raster/image sources,
+image decompressor scratch/animation storage, and OS buffers have separate
+lifetimes. Retained row text and appended styles are bounded even across an
+arbitrarily long stream; the record cap alone would not achieve that.
+
+`Fixtures/Transport/wire-budget-boundaries.json` contains shared boundary
+recipes (not multi-megabyte padding files). Swift tests verify the policy and
+producer/input paths; both consumer suites materialize the same recipes,
+including non-ASCII byte boundaries, and test refusal/recovery. The coordination
+fixture-sync gate byte-compares all three copies.
+
 ## String token vocabularies
 
 `HostWireSchema` owns the frozen emitted sets for focus semantics,
@@ -344,8 +430,8 @@ Every delta-capable consumer is required to:
 4. Request selected image payloads after bounded decode retries or cache
    misses while bounding admission and retained unresolved data. Browser can
    defer overflow and deduplicates an admitted ID until payload, disappearance,
-   or epoch reset, while Android deduplicates until payload or epoch reset. An
-   unavailable Android JNI request remains outstanding instead of being
+   or epoch reset, while Android deduplicates until payload, disappearance, or
+   restart. An unavailable Android JNI request remains outstanding instead of being
    retried or cleared by an incidental keyframe.
 5. Accept the complete accumulated style table on every delta.
 
@@ -365,10 +451,11 @@ admitted outstanding request IDs. Capacity overflow can be deferred for
 a later frame. A browser request is cleared by payload repair, disappearance
 from a presented frame, or epoch reset. Android keeps its 8 MiB `LruCache` and
 drains missing payload IDs into image-resync requests. It suppresses another
-successful request for an ID until a payload-carrying record clears it. When
-the Android resync entry point is unavailable, the ID remains outstanding
-until payload repair or an encoding epoch reset or restart. An incidental
-keyframe does not clear it. Browser and Android accept unknown string tokens
+successful request for an ID until a payload-carrying record or disappearance
+clears it. When the Android resync entry point is unavailable, the ID remains outstanding
+until payload repair, disappearance, or restart. An incidental
+keyframe retaining the placement does not clear it. Browser and Android accept
+unknown string tokens
 structurally. Browser consumption applies the defaults above. Android retains
 focus, accessibility, and scaling strings, omits image format from its model,
 and applies host-side defaults.

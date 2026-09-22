@@ -18,12 +18,26 @@ package enum WebSurfaceFrameEncoder {
   package static func encodeClipboard(
     _ text: String
   ) -> String {
-    "\u{001E}clipboard:{\"text\":\(jsonString(text))}\n"
+    guard let bytes = try? HostWireBudget.jsonStringBytes(text),
+      bytes <= HostWireBudget.recordBytes - "\u{001E}clipboard:{\"text\":}".utf8.count
+    else { return HostWireBudget.rejectionRecord }
+    return "\u{001E}clipboard:{\"text\":\(jsonString(text))}\n"
   }
 
   package static func encodeRuntimeIssue(
     _ issue: RuntimeIssue
   ) -> String {
+    let strings = [
+      issue.severity.rawValue, issue.code, issue.message, issue.description,
+      issue.identity?.path ?? "", issue.source ?? "",
+    ]
+    var bytes = 128
+    for string in strings {
+      guard let count = try? HostWireBudget.jsonStringBytes(string),
+        count <= HostWireBudget.recordBytes - bytes
+      else { return HostWireBudget.rejectionRecord }
+      bytes += count
+    }
     var fields = [
       "\"severity\":\(jsonString(issue.severity.rawValue))",
       "\"code\":\(jsonString(issue.code))",
@@ -42,10 +56,18 @@ package enum WebSurfaceFrameEncoder {
   package static func encodeFrameDiagnostic(
     _ record: FrameDiagnosticRecord
   ) -> String {
-    "\u{001E}frameDiagnostic:{"
+    let fields = FrameDiagnosticsTSVFormatting.fields(for: record)
+    var bytes = 1024
+    for field in fields {
+      guard let count = try? HostWireBudget.jsonStringBytes(field),
+        count <= HostWireBudget.recordBytes - bytes
+      else { return HostWireBudget.rejectionRecord }
+      bytes += count
+    }
+    return "\u{001E}frameDiagnostic:{"
       + "\"format\":\"swift-tui-frame-diagnostics-v1\","
       + "\"header\":[\(FrameDiagnosticsTSVFormatting.headerFields.map(jsonString).joined(separator: ","))],"
-      + "\"fields\":[\(FrameDiagnosticsTSVFormatting.fields(for: record).map(jsonString).joined(separator: ","))]"
+      + "\"fields\":[\(fields.map(jsonString).joined(separator: ","))]"
       + "}\n"
   }
 
@@ -145,9 +167,27 @@ package enum WebSurfaceFrameEncoder {
     fallbackBackground: Color,
     state: inout HostWireEncodingState
   ) -> String {
+    var candidate = state
+    do {
+      try HostWireBudget.validate(model)
+      let output = try encodeAdmitted(
+        model, fallbackBackground: fallbackBackground, state: &candidate)
+      state = candidate
+      return output
+    } catch {
+      state.hasBaseline = false
+      return HostWireBudget.rejectionRecord
+    }
+  }
+
+  private static func encodeAdmitted(
+    _ model: HostWireFrameModel,
+    fallbackBackground: Color,
+    state: inout HostWireEncodingState
+  ) throws -> String {
     guard state.deltaEnabled else {
       let generation = state.nextGen()
-      return encodeFull(
+      return try encodeFull(
         model,
         fallbackBackground: fallbackBackground,
         epochID: state.epochID,
@@ -159,7 +199,7 @@ package enum WebSurfaceFrameEncoder {
     switch model.deltaDecision(for: state) {
     case .full:
       let generation = state.nextGen()
-      let full = encodeFull(
+      let full = try encodeFull(
         model,
         fallbackBackground: fallbackBackground,
         epochID: state.epochID,
@@ -169,7 +209,7 @@ package enum WebSurfaceFrameEncoder {
       state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
       return full.output
     case .delta(let damage):
-      if let output = encodeDelta(
+      if let output = try encodeDelta(
         model,
         damage: damage,
         fallbackBackground: fallbackBackground,
@@ -179,7 +219,7 @@ package enum WebSurfaceFrameEncoder {
         return output
       }
       let generation = state.nextGen()
-      let full = encodeFull(
+      let full = try encodeFull(
         model,
         fallbackBackground: fallbackBackground,
         epochID: state.epochID,
@@ -197,28 +237,31 @@ package enum WebSurfaceFrameEncoder {
     epochID: UInt32,
     generation: UInt64,
     knownImageIDs: inout Set<String>
-  ) -> (output: String, styles: HostWireStyleTable) {
+  ) throws -> (output: String, styles: HostWireStyleTable) {
     var styles = HostWireStyleTable(gridSize: model.gridSize)
     var rows: [String] = []
     rows.reserveCapacity(model.surface.cells.count)
+    var rowBytes = 0
     for row in model.surface.cells {
       guard let encoded = encodeRow(row, interningInto: &styles) else {
         preconditionFailure("one full frame exceeded its grid-sized wire-style budget")
       }
+      rowBytes += encoded.utf8.count + 1
+      guard rowBytes <= HostWireBudget.recordBytes else { throw HostWireBudget.Exceeded.limit }
       rows.append(encoded)
     }
-    let accessibilityTree = encodeAccessibilityTree(model.accessibilityNodes)
-    let accessibilityAnnouncements = encodeAccessibilityAnnouncements(
+    let accessibilityTree = try encodeAccessibilityTree(model.accessibilityNodes)
+    let accessibilityAnnouncements = try encodeAccessibilityAnnouncements(
       model.accessibilityAnnouncements
     )
-    let scrollRegions = encodeScrollRegions(model.scrollRegions)
+    let scrollRegions = try encodeScrollRegions(model.scrollRegions)
     let hasV2Fields =
       model.sequence != nil || !accessibilityTree.isEmpty
       || !accessibilityAnnouncements.isEmpty
       || !scrollRegions.isEmpty
     let version = hasV2Fields ? 2 : 1
 
-    var json = "\u{001E}surface:{"
+    var json = HostWireRecord("\u{001E}surface:{")
     json += "\"version\":\(version)"
     json += ",\"epoch\":\(epochID)"
     json += ",\"gen\":\(generation)"
@@ -228,13 +271,13 @@ package enum WebSurfaceFrameEncoder {
     json += ",\"width\":\(max(0, model.gridSize.width))"
     json += ",\"height\":\(max(0, model.gridSize.height))"
     json += ",\"styles\":["
-    json += styles.encodedElements.joined(separator: ",")
+    json += try HostWireBudget.joined(styles.encodedElements)
     json += "]"
     json += ",\"rows\":["
     json += rows.joined(separator: ",")
     json += "]"
     json += ",\"images\":["
-    json += encodeImages(
+    json += try encodeImagesBounded(
       model.imageAttachments,
       fallbackBackground: fallbackBackground,
       knownImageIDs: &knownImageIDs,
@@ -243,7 +286,7 @@ package enum WebSurfaceFrameEncoder {
     json += "]"
     if let damage = model.damage {
       json += ",\"damage\":"
-      json += encodeDamage(damage)
+      json += try encodeDamage(damage)
     }
     if !accessibilityTree.isEmpty {
       json += ",\"accessibilityTree\":["
@@ -260,9 +303,9 @@ package enum WebSurfaceFrameEncoder {
       json += scrollRegions.joined(separator: ",")
       json += "]"
     }
-    json += encodeAdditiveFields(for: model)
+    json += try encodeAdditiveFields(for: model)
     json += "}\n"
-    return (json, styles)
+    return (try json.finish(), styles)
   }
 
   private static func encodeDelta(
@@ -270,13 +313,14 @@ package enum WebSurfaceFrameEncoder {
     damage: PresentationDamage,
     fallbackBackground: Color,
     state: inout HostWireEncodingState
-  ) -> String? {
+  ) throws -> String? {
     var candidate = state
     // Captured before the interning loop grows the table: everything at or
     // after this index is new in *this* record.
     let styleBase = state.persistentStyles.count
     var deltaRows: [String] = []
     deltaRows.reserveCapacity(model.deltaRowIndexes.count)
+    var rowBytes = 0
     for rowIndex in model.deltaRowIndexes {
       guard
         let encodedRow = encodeRow(
@@ -286,17 +330,19 @@ package enum WebSurfaceFrameEncoder {
       else {
         return nil
       }
+      rowBytes += encodedRow.utf8.count + 32
+      guard rowBytes <= HostWireBudget.recordBytes else { throw HostWireBudget.Exceeded.limit }
       deltaRows.append("[\(rowIndex),\(encodedRow)]")
     }
-    let accessibilityTree = encodeAccessibilityTree(model.accessibilityNodes)
-    let accessibilityAnnouncements = encodeAccessibilityAnnouncements(
+    let accessibilityTree = try encodeAccessibilityTree(model.accessibilityNodes)
+    let accessibilityAnnouncements = try encodeAccessibilityAnnouncements(
       model.accessibilityAnnouncements
     )
-    let scrollRegions = encodeScrollRegions(model.scrollRegions)
+    let scrollRegions = try encodeScrollRegions(model.scrollRegions)
     let baselineGeneration = candidate.recordsEncoded
     let generation = candidate.nextGen()
 
-    var json = "\u{001E}surface:{"
+    var json = HostWireRecord("\u{001E}surface:{")
     json += "\"version\":3"
     json += ",\"encoding\":\"delta\""
     json += ",\"epoch\":\(candidate.epochID)"
@@ -314,19 +360,19 @@ package enum WebSurfaceFrameEncoder {
       // 69.7% of late-record bytes in a style-churning epoch.
       json += ",\"stylesBase\":\(styleBase)"
       json += ",\"styles\":["
-      json += candidate.persistentStyles.encodedElements.dropFirst(styleBase)
-        .joined(separator: ",")
+      json += try HostWireBudget.joined(
+        candidate.persistentStyles.encodedElements.dropFirst(styleBase))
       json += "]"
     } else {
       json += ",\"styles\":["
-      json += candidate.persistentStyles.encodedElements.joined(separator: ",")
+      json += try HostWireBudget.joined(candidate.persistentStyles.encodedElements)
       json += "]"
     }
     json += ",\"deltaRows\":["
     json += deltaRows.joined(separator: ",")
     json += "]"
     json += ",\"images\":["
-    json += encodeImages(
+    json += try encodeImagesBounded(
       model.imageAttachments,
       fallbackBackground: fallbackBackground,
       knownImageIDs: &candidate.knownImageIDs,
@@ -334,7 +380,7 @@ package enum WebSurfaceFrameEncoder {
     ).joined(separator: ",")
     json += "]"
     json += ",\"damage\":"
-    json += encodeDamage(damage)
+    json += try encodeDamage(damage)
     if !accessibilityTree.isEmpty {
       json += ",\"accessibilityTree\":["
       json += accessibilityTree.joined(separator: ",")
@@ -350,10 +396,10 @@ package enum WebSurfaceFrameEncoder {
       json += scrollRegions.joined(separator: ",")
       json += "]"
     }
-    json += encodeAdditiveFields(for: model)
+    json += try encodeAdditiveFields(for: model)
     json += "}\n"
     state = candidate
-    return json
+    return try json.finish()
   }
 
   /// The F19 additive fields, shared by the full and delta record shapes. All
@@ -362,9 +408,9 @@ package enum WebSurfaceFrameEncoder {
   /// `HostWireSchema` wire-evolution policy.
   private static func encodeAdditiveFields(
     for model: HostWireFrameModel
-  ) -> String {
-    var json = ""
-    if let links = encodeLinks(for: model) {
+  ) throws -> String {
+    var json = HostWireRecord("")
+    if let links = try encodeLinks(for: model) {
       json += ",\"links\":[\(links.rows)]"
       json += ",\"linkTargets\":[\(links.targets)]"
     }
@@ -380,7 +426,7 @@ package enum WebSurfaceFrameEncoder {
     if let terminalStyle = model.terminalStyle {
       json += ",\"terminalStyle\":\(encodeTerminalStyle(terminalStyle))"
     }
-    return json
+    return try json.finish()
   }
 
   /// The resolved terminal appearance, emitted only on streams whose host
@@ -403,20 +449,21 @@ package enum WebSurfaceFrameEncoder {
   /// frozen `[y,[[start,span,target]…]]` tuple shape.
   private static func encodeLinks(
     for model: HostWireFrameModel
-  ) -> (rows: String, targets: String)? {
+  ) throws -> (rows: String, targets: String)? {
     let table = model.linkTable()
     guard !table.rows.isEmpty else {
       return nil
     }
-    let rows = table.rows.map { row in
-      let runs = row.runs.map { run in
-        "[\(run.start),\(run.span),\(run.target)]"
-      }.joined(separator: ",")
-      return "[\(row.y),[\(runs)]]"
-    }
+    let rows = try HostWireBudget.collect(
+      table.rows.lazy.map { row in
+        let runs = row.runs.map { run in
+          "[\(run.start),\(run.span),\(run.target)]"
+        }.joined(separator: ",")
+        return "[\(row.y),[\(runs)]]"
+      })
     return (
       rows.joined(separator: ","),
-      table.targets.map(jsonString).joined(separator: ",")
+      try HostWireBudget.joined(table.targets.lazy.map(jsonString))
     )
   }
 
@@ -436,9 +483,9 @@ package enum WebSurfaceFrameEncoder {
 
   private static func encodeDamage(
     _ damage: PresentationDamage
-  ) -> String {
+  ) throws -> String {
     let fields = [
-      "\"textRows\":[\(damage.textRows.map(encodeDamageTextRow).joined(separator: ","))]",
+      "\"textRows\":[\(try HostWireBudget.joined(damage.textRows.lazy.map(encodeDamageTextRow)))]",
       "\"requiresFullTextRepaint\":\(damage.requiresFullTextRepaint ? "true" : "false")",
       "\"requiresFullGraphicsReplay\":\(damage.requiresFullGraphicsReplay ? "true" : "false")",
     ]
@@ -482,34 +529,35 @@ package enum WebSurfaceFrameEncoder {
 
   private static func encodeAccessibilityTree(
     _ nodes: [HostWireFrameModel.WireAccessibilityNode]
-  ) -> [String] {
-    nodes.map { node in
-      var fields = [
-        "\"id\":\(jsonString(node.idPath))",
-        "\"rect\":\(encodeRect(node.rect))",
-        "\"role\":\(jsonString(node.roleToken))",
-        "\"isFocused\":\(node.isFocused ? "true" : "false")",
-      ]
-      if let parentIDPath = node.parentIDPath {
-        fields.append("\"parentId\":\(jsonString(parentIDPath))")
-      }
-      if let label = node.label {
-        fields.append("\"label\":\(jsonString(label))")
-      }
-      if let hint = node.hint {
-        fields.append("\"hint\":\(jsonString(hint))")
-      }
-      if node.hidden {
-        fields.append("\"hidden\":true")
-      }
-      if let liveRegionToken = node.liveRegionToken {
-        fields.append("\"liveRegion\":\(jsonString(liveRegionToken))")
-      }
-      if let cursorAnchor = node.cursorAnchor {
-        fields.append("\"cursorAnchor\":\(encodePoint(cursorAnchor))")
-      }
-      return "{" + fields.joined(separator: ",") + "}"
-    }
+  ) throws -> [String] {
+    try HostWireBudget.collect(
+      nodes.lazy.map { node in
+        var fields = [
+          "\"id\":\(jsonString(node.idPath))",
+          "\"rect\":\(encodeRect(node.rect))",
+          "\"role\":\(jsonString(node.roleToken))",
+          "\"isFocused\":\(node.isFocused ? "true" : "false")",
+        ]
+        if let parentIDPath = node.parentIDPath {
+          fields.append("\"parentId\":\(jsonString(parentIDPath))")
+        }
+        if let label = node.label {
+          fields.append("\"label\":\(jsonString(label))")
+        }
+        if let hint = node.hint {
+          fields.append("\"hint\":\(jsonString(hint))")
+        }
+        if node.hidden {
+          fields.append("\"hidden\":true")
+        }
+        if let liveRegionToken = node.liveRegionToken {
+          fields.append("\"liveRegion\":\(jsonString(liveRegionToken))")
+        }
+        if let cursorAnchor = node.cursorAnchor {
+          fields.append("\"cursorAnchor\":\(encodePoint(cursorAnchor))")
+        }
+        return "{" + fields.joined(separator: ",") + "}"
+      })
   }
 
   /// Encodes per-region scroll extents for scroll-chaining: the viewport rect,
@@ -520,26 +568,28 @@ package enum WebSurfaceFrameEncoder {
   /// `docs/proposals/EMBEDDED_WEB_SCROLL_CHAINING.md` in the coordination root.
   private static func encodeScrollRegions(
     _ regions: [HostWireFrameModel.WireScrollRegion]
-  ) -> [String] {
-    regions.map { region in
-      "{"
-        + "\"id\":\(jsonString(region.idPath)),"
-        + "\"rect\":\(encodeRect(region.viewportRect)),"
-        + "\"offset\":\(encodePoint(region.contentOffset)),"
-        + "\"content\":[\(region.contentSize.width),\(region.contentSize.height)]"
-        + "}"
-    }
+  ) throws -> [String] {
+    try HostWireBudget.collect(
+      regions.lazy.map { region in
+        "{"
+          + "\"id\":\(jsonString(region.idPath)),"
+          + "\"rect\":\(encodeRect(region.viewportRect)),"
+          + "\"offset\":\(encodePoint(region.contentOffset)),"
+          + "\"content\":[\(region.contentSize.width),\(region.contentSize.height)]"
+          + "}"
+      })
   }
 
   private static func encodeAccessibilityAnnouncements(
     _ announcements: [HostWireFrameModel.WireAnnouncement]
-  ) -> [String] {
-    announcements.map { announcement in
-      "{"
-        + "\"message\":\(jsonString(announcement.message)),"
-        + "\"politeness\":\(jsonString(announcement.politenessToken))"
-        + "}"
-    }
+  ) throws -> [String] {
+    try HostWireBudget.collect(
+      announcements.lazy.map { announcement in
+        "{"
+          + "\"message\":\(jsonString(announcement.message)),"
+          + "\"politeness\":\(jsonString(announcement.politenessToken))"
+          + "}"
+      })
   }
 
   // Widened from `private` to `package` so `WebSurfaceImageEncoder.swift` can

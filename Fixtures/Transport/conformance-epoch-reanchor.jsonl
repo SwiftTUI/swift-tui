@@ -1,4 +1,4 @@
-{"formatVersion":1,"manifestSHA256":"8c94aaea8629f2f3ced5eb704b2289399f77087a9af6c33aaa8da01050295c0b","bodySHA256":"582b034623538fd683fbc9fb1d35350a7a0c2c38a8466c659829827d2893d57f"}
+{"formatVersion":1,"manifestSHA256":"c53abc525b57dde37166b118c471e34010ce51330293fb92963b6fc7b8fbd285","bodySHA256":"582b034623538fd683fbc9fb1d35350a7a0c2c38a8466c659829827d2893d57f"}
 {"emit":"\u001esurface:{\"version\":2,\"epoch\":103,\"gen\":1,\"sequence\":1,\"width\":1,\"height\":1,\"styles\":[null,{\"fg\":\"#E05757FF\"}],\"rows\":[[[0,\"A\",1,1]]],\"images\":[]}\n"}
 {"emit":"\u001esurface:{\"version\":2,\"epoch\":103,\"gen\":2,\"sequence\":2,\"width\":1,\"height\":1,\"styles\":[null,{\"fg\":\"#5BA3FFFF\"}],\"rows\":[[[0,\"C\",1,1]]],\"images\":[],\"damage\":{\"textRows\":[[0,[[0,1]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
 {"expect":{"imagesVisible":[],"resyncRequests":[],"rows":[{"cells":[{"column":0,"span":1,"text":"C"}],"row":0}],"styleRuns":[{"resolvedStyle":{"fg":"#5BA3FFFF"},"row":0,"span":1,"startColumn":0,"text":"C"}]}}

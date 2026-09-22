@@ -56,8 +56,8 @@ package struct HostWireStyleTable: Sendable {
     let width = max(0, gridSize.width)
     let height = max(0, gridSize.height)
     let (area, areaOverflow) = width.multipliedReportingOverflow(by: height)
-    guard !areaOverflow else {
-      return Int.max
+    guard !areaOverflow, HostWireBudget.admits(gridSize) else {
+      return 1_024
     }
     let (frameBudget, additionOverflow) = area.addingReportingOverflow(1)
     return max(1_024, additionOverflow ? Int.max : frameBudget)

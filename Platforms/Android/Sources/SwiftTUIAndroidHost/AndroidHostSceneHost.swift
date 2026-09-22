@@ -383,12 +383,12 @@ public final class AndroidHostSceneHost {
 
     let state = AndroidHostSceneHostStateBox(
       AndroidHostSceneHostState(
-        surfaceSize: style.initialSurfaceSize,
+        surfaceSize: HostWireBudget.initialSize(style.initialSurfaceSize),
         cellPixelSize: nil
       )
     )
     let surface = HostedRasterSurface(
-      surfaceSize: style.initialSurfaceSize,
+      surfaceSize: HostWireBudget.initialSize(style.initialSurfaceSize),
       appearance: style.renderStyle.appearance,
       theme: style.renderStyle.theme,
       frameDelivery: .assumedMainActor,
@@ -587,6 +587,11 @@ public final class AndroidHostSceneHost {
     cellPixelWidth: Double,
     cellPixelHeight: Double
   ) {
+    guard HostWireBudget.admits(.init(width: max(1, columns), height: max(1, rows))),
+      cellPixelWidth.isFinite, cellPixelHeight.isFinite,
+      cellPixelWidth >= 0, cellPixelWidth <= Double(HostWireBudget.gridDimension),
+      cellPixelHeight >= 0, cellPixelHeight <= Double(HostWireBudget.gridDimension)
+    else { return }
     let size = CellSize(
       width: max(1, columns),
       height: max(1, rows)

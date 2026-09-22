@@ -363,6 +363,155 @@ function encodeBase64(value) {
   return Buffer.from(value, "utf8").toString("base64");
 }
 
+// src/HostWireBudget.ts
+var HOST_WIRE_MAX_RECORD_BYTES = 4 * 1024 * 1024;
+var HOST_WIRE_MAX_GRID_DIMENSION = 1024;
+var HOST_WIRE_MAX_GRID_CELLS = 65536;
+var HOST_WIRE_MAX_IMAGES = 1024;
+var HOST_WIRE_MAX_METADATA_ENTRIES = 65536;
+var HOST_WIRE_MAX_CELL_TEXT_BYTES = 256;
+var HOST_WIRE_MAX_STYLE_BYTES = 1024;
+var HOST_WIRE_MAX_JSON_DEPTH = 32;
+function fitsUTF8(text, limit) {
+  let bytes = 0;
+  for (const scalar of text) {
+    const code = scalar.codePointAt(0);
+    bytes += code <= 127 ? 1 : code <= 2047 ? 2 : code <= 65535 ? 3 : 4;
+    if (bytes > limit)
+      return false;
+  }
+  return true;
+}
+function fitsWireGrid(width, height) {
+  return Number.isInteger(width) && Number.isInteger(height) && width >= 0 && height >= 0 && width <= HOST_WIRE_MAX_GRID_DIMENSION && height <= HOST_WIRE_MAX_GRID_DIMENSION && width * height <= HOST_WIRE_MAX_GRID_CELLS;
+}
+function wireStyleLimit(width, height) {
+  return Math.max(1024, width * height + 1);
+}
+function fitsStyleContent(style) {
+  let remaining = HOST_WIRE_MAX_STYLE_BYTES;
+  const chargeString = (text) => {
+    for (const scalar of text) {
+      const code = scalar.codePointAt(0);
+      remaining -= code <= 127 ? 1 : code <= 2047 ? 2 : code <= 65535 ? 3 : 4;
+      if (remaining < 0)
+        return false;
+    }
+    return true;
+  };
+  const visit = (value) => {
+    remaining -= 8;
+    if (remaining < 0)
+      return false;
+    if (typeof value === "string")
+      return chargeString(value);
+    if (Array.isArray(value))
+      return value.every(visit);
+    if (value !== null && typeof value === "object") {
+      return Object.entries(value).every(([key, item]) => chargeString(key) && visit(item));
+    }
+    return true;
+  };
+  return visit(style);
+}
+function fitsJSONDepth(text) {
+  let depth = 0;
+  let quoted = false;
+  let escaped = false;
+  for (const character of text) {
+    if (quoted) {
+      if (escaped)
+        escaped = false;
+      else if (character === "\\")
+        escaped = true;
+      else if (character === '"')
+        quoted = false;
+    } else if (character === '"')
+      quoted = true;
+    else if (character === "[" || character === "{") {
+      if (++depth > HOST_WIRE_MAX_JSON_DEPTH)
+        return false;
+    } else if (character === "]" || character === "}")
+      depth--;
+  }
+  return true;
+}
+function fitsSurfaceBudget(frame) {
+  const { width, height } = frame;
+  if (!fitsWireGrid(width, height))
+    return false;
+  if (frame.styles.length + (frame.stylesBase ?? 0) > wireStyleLimit(width, height))
+    return false;
+  if (!frame.styles.every(fitsStyleContent))
+    return false;
+  if ((frame.rows?.length ?? 0) > height || (frame.deltaRows?.length ?? 0) > height)
+    return false;
+  const validCells = (cells) => {
+    if (cells.length > width)
+      return false;
+    let end = 0;
+    for (const [x, text, span, style] of cells) {
+      if (!Number.isInteger(x) || !Number.isInteger(span) || x < end || span < 1 || x > width - span || !fitsUTF8(text, HOST_WIRE_MAX_CELL_TEXT_BYTES) || !Number.isInteger(style) || style < 0 || style >= frame.styles.length + (frame.stylesBase ?? 0))
+        return false;
+      end = x + span;
+    }
+    return true;
+  };
+  if (frame.rows && !frame.rows.every(validCells))
+    return false;
+  const seen = new Set;
+  for (const [y, cells] of frame.deltaRows ?? []) {
+    if (y < 0 || y >= height || seen.has(y) || !validCells(cells))
+      return false;
+    seen.add(y);
+  }
+  if ((frame.images?.length ?? 0) > HOST_WIRE_MAX_IMAGES)
+    return false;
+  for (const image of frame.images ?? []) {
+    if (!fitsUTF8(image.id, 1024))
+      return false;
+    if (image.pixelSize) {
+      const [w, h] = image.pixelSize;
+      if (!Number.isInteger(w) || !Number.isInteger(h) || w < 0 || h < 0 || w > 8192 || h > 8192 || w * h > 16 * 1024 * 1024)
+        return false;
+    }
+  }
+  for (const entries of [
+    frame.accessibilityTree,
+    frame.accessibilityAnnouncements,
+    frame.scrollRegions,
+    frame.linkTargets
+  ]) {
+    if ((entries?.length ?? 0) > HOST_WIRE_MAX_METADATA_ENTRIES)
+      return false;
+  }
+  for (const dimension of [frame.preferredGridWidth, frame.preferredGridHeight]) {
+    if (dimension !== undefined && dimension > HOST_WIRE_MAX_GRID_DIMENSION)
+      return false;
+  }
+  if (!fitsWireGrid(frame.preferredGridWidth ?? 0, frame.preferredGridHeight ?? 0))
+    return false;
+  if ((frame.links?.length ?? 0) > height || (frame.damage?.textRows.length ?? 0) > height)
+    return false;
+  for (const rows of [frame.links, frame.damage?.textRows]) {
+    const seenRows = new Set;
+    for (const [y, ranges] of rows ?? []) {
+      if (!Number.isInteger(y) || y < 0 || y >= height || seenRows.has(y) || ranges.length > width)
+        return false;
+      seenRows.add(y);
+      let end = 0;
+      for (const range of ranges) {
+        const [start, lengthOrEnd] = range;
+        const stop = range.length === 3 ? start + lengthOrEnd : lengthOrEnd;
+        if (!Number.isInteger(start) || !Number.isInteger(stop) || start < 0 || range.length === 3 && start < end || stop < start || stop > width)
+          return false;
+        end = stop;
+      }
+    }
+  }
+  return true;
+}
+
 // src/WebHostSurfaceTransport.ts
 var recordPrefix = "\x1E";
 var textEncoder = new TextEncoder;
@@ -376,6 +525,8 @@ var SUPPORTED_SURFACE_VERSION = 3;
 class WebHostOutputDecoder {
   textDecoder = new TextDecoder;
   bufferedText = "";
+  bufferedBytes = 0;
+  discardingLine = false;
   lastSurfaceFrame;
   lastEpoch;
   lastGen;
@@ -385,31 +536,58 @@ class WebHostOutputDecoder {
   imageResyncOutstandingIds = new Set;
   imageResyncPendingIds = new Set;
   feed(chunk) {
-    this.bufferedText += this.textDecoder.decode(chunk, { stream: true });
     const records = [];
-    while (true) {
-      const newlineIndex = this.bufferedText.indexOf(`
-`);
-      if (newlineIndex < 0) {
-        break;
+    let offset = 0;
+    while (offset < chunk.length) {
+      const newline = chunk.indexOf(10, offset);
+      const end = newline < 0 ? chunk.length : newline;
+      if (!this.discardingLine) {
+        if (end - offset > HOST_WIRE_MAX_RECORD_BYTES - this.bufferedBytes) {
+          this.bufferedText = "";
+          this.bufferedBytes = 0;
+          this.textDecoder.decode();
+          this.discardingLine = true;
+          records.push(this.refuseBudget());
+        } else {
+          this.bufferedBytes += end - offset;
+          this.bufferedText += this.textDecoder.decode(chunk.subarray(offset, end), { stream: true });
+        }
       }
-      const line = this.bufferedText.slice(0, newlineIndex);
-      this.bufferedText = this.bufferedText.slice(newlineIndex + 1);
-      records.push(this.decodeLine(line));
+      if (newline >= 0) {
+        if (!this.discardingLine) {
+          this.bufferedText += this.textDecoder.decode();
+          records.push(this.decodeLine(this.bufferedText));
+        }
+        this.bufferedText = "";
+        this.bufferedBytes = 0;
+        this.discardingLine = false;
+      }
+      offset = end + 1;
     }
     if (this.bufferedText.length > 4096 && !this.bufferedText.startsWith(recordPrefix)) {
       records.push({ type: "text", text: this.bufferedText });
       this.bufferedText = "";
+      this.bufferedBytes = 0;
     }
     return records;
   }
   flush() {
+    this.bufferedText += this.textDecoder.decode();
+    this.bufferedBytes = 0;
+    this.discardingLine = false;
     if (!this.bufferedText) {
       return [];
     }
     const text = this.bufferedText;
     this.bufferedText = "";
     return [this.decodeLine(text)];
+  }
+  rejectOversizedMessage() {
+    this.bufferedText = "";
+    this.bufferedBytes = 0;
+    this.discardingLine = false;
+    this.textDecoder.decode();
+    return this.refuseBudget();
   }
   takeResyncRequest(maximumEncodedBytes) {
     if (this.keyframeResyncPending) {
@@ -476,6 +654,9 @@ class WebHostOutputDecoder {
     }
   }
   decodeLine(line) {
+    if (line.startsWith(recordPrefix) && !fitsJSONDepth(line)) {
+      return this.refuseBudget();
+    }
     if (line.startsWith(`${recordPrefix}clipboard:`)) {
       try {
         const record = JSON.parse(line.slice(`${recordPrefix}clipboard:`.length));
@@ -524,6 +705,8 @@ class WebHostOutputDecoder {
         };
       }
       if (isWebHostSurfaceFrame(frame)) {
+        if (!fitsSurfaceBudget(frame))
+          return this.refuseBudget();
         this.lastSurfaceFrame = frame;
         this.lastEpoch = frame.epoch;
         this.lastGen = frame.gen;
@@ -532,6 +715,8 @@ class WebHostOutputDecoder {
         return { type: "surface", frame };
       }
       if (isWebHostSurfaceDeltaFrame(frame)) {
+        if (!fitsSurfaceBudget(frame))
+          return this.refuseBudget();
         const carriesDeliveryStamps = frame.epoch !== undefined || frame.gen !== undefined || frame.baselineGen !== undefined;
         if (!this.lastSurfaceFrame || this.lastSurfaceFrame.width !== frame.width || this.lastSurfaceFrame.height !== frame.height) {
           if (carriesDeliveryStamps) {
@@ -550,6 +735,7 @@ class WebHostOutputDecoder {
           this.lastGen = frame.gen;
           return { type: "surface", frame: materialized };
         }
+        this.requestKeyframeResync();
       }
     } catch {}
     return { type: "text", text: `${line}
@@ -561,6 +747,10 @@ class WebHostOutputDecoder {
     }
     this.keyframeResyncOutstanding = true;
     this.keyframeResyncPending = true;
+  }
+  refuseBudget() {
+    this.requestKeyframeResync();
+    return { type: "surfaceDropped", reason: "budgetExceeded" };
   }
   resetImageResyncForEpoch(epoch) {
     if (epoch === undefined || epoch === this.lastPresentedEpoch) {
@@ -1329,7 +1519,14 @@ class WebSocketSceneBridge {
     if (this.disposed) {
       return;
     }
-    const bytes = await bytesFromWebSocketMessage(message);
+    const limit = HOST_WIRE_MAX_RECORD_BYTES * 2;
+    const oversized = typeof message === "string" ? !fitsUTF8(message, limit) : message instanceof ArrayBuffer || ArrayBuffer.isView(message) ? message.byteLength > limit : typeof Blob !== "undefined" && message instanceof Blob ? message.size > limit : false;
+    const bytes = await (oversized ? undefined : bytesFromWebSocketMessage(message));
+    if (oversized) {
+      this.deliver(this.decoder.rejectOversizedMessage());
+      this.sendPendingResyncRequests();
+      return;
+    }
     if (!bytes) {
       return;
     }
@@ -2119,6 +2316,80 @@ function registerDomSurfacePainterConformanceControl(painter, control) {
   domControls.set(painter, control);
 }
 
+// src/RasterAllocationBudget.ts
+var MAX_RASTER_DIMENSION = 8192;
+var MAX_RASTER_PIXELS = 16 * 1024 * 1024;
+function boundedCanvasSize(cssWidth, cssHeight, scale) {
+  if (![cssWidth, cssHeight, scale].every((value) => Number.isFinite(value) && value > 0)) {
+    return { width: 1, height: 1, scale: 1 };
+  }
+  const requestedWidth = Math.ceil(cssWidth * scale);
+  const requestedHeight = Math.ceil(cssHeight * scale);
+  if (requestedWidth <= MAX_RASTER_DIMENSION && requestedHeight <= MAX_RASTER_DIMENSION && requestedWidth * requestedHeight <= MAX_RASTER_PIXELS) {
+    return { width: requestedWidth, height: requestedHeight, scale };
+  }
+  const boundedScale = Math.min(scale, MAX_RASTER_DIMENSION / cssWidth, MAX_RASTER_DIMENSION / cssHeight, Math.sqrt(MAX_RASTER_PIXELS / cssWidth / cssHeight));
+  return {
+    width: Math.max(1, Math.floor(cssWidth * boundedScale)),
+    height: Math.max(1, Math.floor(cssHeight * boundedScale)),
+    scale: boundedScale
+  };
+}
+
+// src/ImageAllocationBudget.ts
+function admitsImageBytes(bytes) {
+  const size = imageSize(bytes);
+  return size !== undefined && admitsImageSize(...size);
+}
+function admitsImageSize(width, height) {
+  return Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= MAX_RASTER_DIMENSION && height <= MAX_RASTER_DIMENSION && width * height <= MAX_RASTER_PIXELS;
+}
+function admitsImagePayload(payload) {
+  if (payload.length > HOST_WIRE_MAX_RECORD_BYTES)
+    return false;
+  try {
+    const binary = atob(payload);
+    return admitsImageBytes(Uint8Array.from(binary, (character) => character.charCodeAt(0)));
+  } catch {
+    return false;
+  }
+}
+function imageSize(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.length >= 24 && view.getUint32(0) === 2303741511 && view.getUint32(4) === 218765834 && view.getUint32(12) === 1229472850) {
+    return [view.getUint32(16), view.getUint32(20)];
+  }
+  if (bytes.length >= 10 && view.getUint32(0) === 1195984440 && (bytes[4] === 55 || bytes[4] === 57) && bytes[5] === 97) {
+    return [view.getUint16(6, true), view.getUint16(8, true)];
+  }
+  if (bytes.length < 4 || view.getUint16(0) !== 65496)
+    return;
+  let offset = 2;
+  while (offset < bytes.length) {
+    if (bytes[offset++] !== 255)
+      return;
+    while (bytes[offset] === 255)
+      offset++;
+    const marker = bytes[offset++];
+    if (marker === undefined || marker === 218 || marker === 217)
+      return;
+    if (marker === 1 || marker >= 208 && marker <= 215)
+      continue;
+    if (offset + 2 > bytes.length)
+      return;
+    const length = view.getUint16(offset);
+    if (length < 2 || offset + length > bytes.length)
+      return;
+    if (marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204) {
+      if (length < 8)
+        return;
+      return [view.getUint16(offset + 5), view.getUint16(offset + 3)];
+    }
+    offset += length;
+  }
+  return;
+}
+
 // src/CanvasSurfacePainter.ts
 var MAX_IMAGE_DECODE_ATTEMPTS = 3;
 var MAX_UNRESOLVED_IMAGE_CACHE_ENTRIES = 256;
@@ -2197,7 +2468,7 @@ class CanvasSurfacePainter {
       this.prepareImages(frame?.images ?? [], recoveredPayloadIds);
       return;
     }
-    const scale = globalThis.window?.devicePixelRatio || 1;
+    const scale = metrics.pixelScale ?? (globalThis.window?.devicePixelRatio || 1);
     context.setTransform(scale, 0, 0, scale, 0, 0);
     context.textBaseline = "alphabetic";
     context.fillStyle = webTUITerminalBackgroundColor(metrics.style);
@@ -2621,6 +2892,8 @@ function cellRect(metrics, x, y, span) {
 }
 async function decodeImage(dataBase64, format) {
   const bytes = decodeBase64Bytes(dataBase64);
+  if (!admitsImageBytes(bytes))
+    throw new Error("Image exceeds the raster budget or has an unsupported container");
   const blob = new Blob([bytes], { type: `image/${format}` });
   if (typeof createImageBitmap === "function") {
     return createImageBitmap(blob);
@@ -2874,6 +3147,8 @@ class DomSurfacePainter {
       const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
       const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
       const existing = this.renderedImages.get(image.id);
+      if (image.dataBase64 !== undefined && !admitsImagePayload(image.dataBase64))
+        continue;
       if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
         continue;
       }
@@ -3492,6 +3767,7 @@ class WebHostSceneRuntime {
   inputEncoder = new InputEventEncoder;
   currentStyle;
   canvas;
+  canvasScale = 1;
   domSurfaceRoot;
   lastDomSurfaceSize;
   accessibilityTree;
@@ -3929,11 +4205,13 @@ class WebHostSceneRuntime {
     const scale = globalThis.window?.devicePixelRatio || 1;
     const cssWidth = Math.max(1, this.surfaceCSSWidth ?? gridCSSWidth);
     const cssHeight = Math.max(1, this.surfaceCSSHeight ?? gridCSSHeight);
-    const width = Math.ceil(cssWidth * scale);
-    const height = Math.ceil(cssHeight * scale);
+    const bounded = boundedCanvasSize(cssWidth, cssHeight, scale);
+    const { width, height } = bounded;
+    const scaleChanged = this.canvasScale !== bounded.scale;
+    this.canvasScale = bounded.scale;
     const styleWidth = "100%";
     const styleHeight = "100%";
-    if (this.canvas.width === width && this.canvas.height === height && this.canvas.style.width === styleWidth && this.canvas.style.height === styleHeight) {
+    if (this.canvas.width === width && this.canvas.height === height && this.canvas.style.width === styleWidth && this.canvas.style.height === styleHeight && !scaleChanged) {
       return false;
     }
     this.canvas.width = width;
@@ -3975,6 +4253,7 @@ class WebHostSceneRuntime {
       rows: this.rows,
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight,
+      pixelScale: this.canvasScale,
       style: this.currentStyle
     };
   }

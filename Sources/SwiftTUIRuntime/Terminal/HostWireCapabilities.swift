@@ -91,6 +91,7 @@ package struct HostWireCapabilities: Equatable, Sendable {
   package static func fromDeclarationJSON(
     _ text: String
   ) -> HostWireCapabilities? {
+    guard text.utf8.count <= HostWireBudget.recordBytes else { return nil }
     var scanner = CapsJSONScanner(text)
     scanner.skipWhitespace()
     guard scanner.consume("{") else {
@@ -170,6 +171,7 @@ package struct HostWireResyncRequest: Equatable, Sendable {
   package static func fromRequestJSON(
     _ text: String
   ) -> HostWireResyncRequest? {
+    guard text.utf8.count <= HostWireBudget.recordBytes else { return nil }
     var scanner = CapsJSONScanner(text)
     scanner.skipWhitespace()
     guard scanner.consume("{") else {

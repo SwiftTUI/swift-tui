@@ -160,7 +160,7 @@ package struct HostWireFrameModel {
     gridSize = surface.size
     self.preferredLayoutSize = preferredLayoutSize
     self.focusedIdentity = focusedIdentity
-    self.damage = damage
+    self.damage = HostWireBudget.clippedDamage(damage, in: surface.size)
     focusPresentation = semanticSnapshot?.focusPresentation(for: focusedIdentity)
     self.terminalStyle = terminalStyle
     accessibilityNodes = (semanticSnapshot?.accessibilityNodes ?? []).map { node in

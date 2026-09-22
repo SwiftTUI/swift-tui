@@ -849,7 +849,12 @@
     }
 
     private static func imageSurface() -> RasterSurface {
-      let bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01]
+      // Real PNG bytes exercise the consumer's pre-decode dimension admission.
+      let bytes = Array(
+        Data(
+          base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AP8AAP//AAD/AP8AAP//AAD/R8oH+YOsvdsAAAAASUVORK5CYII="
+        )!)
       return RasterSurface(
         size: .init(width: 1, height: 1),
         cells: [[.empty]],
@@ -859,7 +864,7 @@
             bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
             source: .data(bytes),
             resolvedReference: .embeddedImage(bytes),
-            pixelSize: .init(width: 1, height: 1)
+            pixelSize: .init(width: 2, height: 2)
           )
         ]
       )

@@ -33,6 +33,16 @@
     #expect(host.surface.pointerInputCapabilities.supportsHover)
     #expect(host.surface.pointerInputCapabilities.supportsPreciseScroll)
     #expect(host.surface.pointerInputCapabilities.supportsScrollPanning)
+
+    for (columns, rows) in [(1025, 1), (257, 256), (Int.max, Int.max)] {
+      host.resize(columns: columns, rows: rows, cellPixelWidth: 9, cellPixelHeight: 18)
+      #expect(host.surfaceSize == CellSize(width: 120, height: 40))
+    }
+    for metric in [Double.nan, .infinity, Double(Int.max)] {
+      host.resize(columns: 1, rows: 1, cellPixelWidth: metric, cellPixelHeight: 18)
+      #expect(host.surfaceSize == CellSize(width: 120, height: 40))
+      #expect(host.cellPixelSize == PixelSize(width: 9, height: 18))
+    }
   }
 
   @MainActor
@@ -79,6 +89,12 @@
 
     #expect(accepted == 1)
     #expect(host.wireCapabilities == HostWireCapabilities(acceptsDeltaFrames: true))
+    declaration.withUnsafeBufferPointer { buffer in
+      // Refusal must happen before dereferencing the advertised oversized span.
+      #expect(unsafe swift_tui_android_declare_capabilities(handle, buffer.baseAddress, .max) == 0)
+      #expect(unsafe swift_tui_android_request_resync(handle, buffer.baseAddress, .max) == 0)
+      unsafe swift_tui_android_send_input(handle, buffer.baseAddress, .max)
+    }
   }
 
   @MainActor

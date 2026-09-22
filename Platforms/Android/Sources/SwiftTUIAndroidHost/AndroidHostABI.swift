@@ -156,7 +156,7 @@ public func swift_tui_android_send_input(
 ) {
   guard let host = AndroidHostHandleRegistry.host(for: handle),
     let bytes = unsafe bytes,
-    count > 0
+    count > 0, Int(count) <= HostWireBudget.recordBytes
   else {
     return
   }
@@ -175,7 +175,7 @@ public func swift_tui_android_declare_capabilities(
 ) -> Int32 {
   guard let host = AndroidHostHandleRegistry.host(for: handle),
     let bytes = unsafe bytes,
-    count > 0
+    count > 0, Int(count) <= HostWireBudget.recordBytes
   else {
     return 0
   }
@@ -195,7 +195,7 @@ public func swift_tui_android_request_resync(
 ) -> Int32 {
   guard let host = AndroidHostHandleRegistry.host(for: handle),
     let bytes = unsafe bytes,
-    count > 0
+    count > 0, Int(count) <= HostWireBudget.recordBytes
   else {
     return 0
   }

@@ -48,18 +48,42 @@ extension WebSurfaceFrameEncoder {
     contentRepository: ImageContentRepository = .shared,
     presentationLayers: [RasterPresentationLayer] = []
   ) -> [String] {
+    (try? encodeImagesBounded(
+      attachments, fallbackBackground: fallbackBackground, knownImageIDs: &knownImageIDs,
+      contentRepository: contentRepository, presentationLayers: presentationLayers
+    )) ?? []
+  }
+
+  package static func encodeImagesBounded(
+    _ attachments: [RasterImageAttachment],
+    fallbackBackground: Color,
+    knownImageIDs: inout Set<String>,
+    contentRepository: ImageContentRepository = .shared,
+    presentationLayers: [RasterPresentationLayer] = []
+  ) throws -> [String] {
+    guard attachments.count <= HostWireBudget.images else { throw HostWireBudget.Exceeded.limit }
     var surface = RasterSurface(size: .zero, cells: [], imageAttachments: attachments)
     surface.presentationLayers = presentationLayers
     let prepared = webSurfaceImageBlendCompositor.orderedAttachments(
       in: surface, fallbackBackground: fallbackBackground)
-    return prepared.compactMap { attachment in
-      encodeImage(
+    var result: [String] = []
+    var bytes = 0
+    for attachment in prepared {
+      if let encoded = try encodeImage(
         attachment,
         fallbackBackground: fallbackBackground,
         knownImageIDs: &knownImageIDs,
         contentRepository: contentRepository
-      )
+      ) {
+        let count = encoded.utf8.count + (result.isEmpty ? 0 : 1)
+        guard count <= HostWireBudget.recordBytes - bytes else {
+          throw HostWireBudget.Exceeded.limit
+        }
+        bytes += count
+        result.append(encoded)
+      }
     }
+    return result
   }
 
   private static func encodeImage(
@@ -67,7 +91,7 @@ extension WebSurfaceFrameEncoder {
     fallbackBackground: Color,
     knownImageIDs: inout Set<String>,
     contentRepository: ImageContentRepository
-  ) -> String? {
+  ) throws -> String? {
     guard !attachment.visibleBounds.isEmpty else {
       return nil
     }
@@ -82,6 +106,15 @@ extension WebSurfaceFrameEncoder {
     }
 
     let imageID = payload.id
+    guard imageID.utf8.count <= 1024 else { throw HostWireBudget.Exceeded.limit }
+    _ = try HostWireBudget.jsonStringBytes(imageID)
+    guard payload.bytes.count <= (HostWireBudget.recordBytes - 2) / 4 * 3 else {
+      throw HostWireBudget.Exceeded.limit
+    }
+    if !knownImageIDs.contains(imageID), knownImageIDs.count >= HostWireBudget.images {
+      // Forgetting transmit-once history is safe: subsequent uses carry bytes again.
+      knownImageIDs.removeAll(keepingCapacity: true)
+    }
     let shouldTransmitData = knownImageIDs.insert(imageID).inserted
     var fields = [
       "\"id\":\(jsonString(imageID))",
