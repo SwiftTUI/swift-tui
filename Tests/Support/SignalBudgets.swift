@@ -35,3 +35,19 @@ extension MainActorConditionSignal {
     }
   }
 }
+
+extension ConditionSignal {
+  /// Waits for cross-isolation progress with a named diagnostic budget.
+  /// The budget cancels and joins the losing wait before returning.
+  @_spi(Testing) public func wait(
+    until predicate: @escaping @Sendable () -> Bool,
+    for label: String,
+    within budget: ProgressBudget,
+    on clock: some StageClock
+  ) async throws {
+    try await withStageBudget(label, within: budget, on: clock) {
+      await self.wait(until: predicate)
+    }
+    try Task.checkCancellation()
+  }
+}

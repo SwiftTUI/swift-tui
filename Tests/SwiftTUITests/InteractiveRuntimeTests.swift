@@ -5674,29 +5674,29 @@ private final class RuntimeLifecycleRecorder: Sendable {
   }
 
   /// Waits for a recorded event without polling, returning `false` if cancelled.
-  /// Cancellation makes only this waiter's predicate true, so the signal's
-  /// normal notification path removes and resumes it without retaining a task.
   /// `onWaiting` acknowledges a false predicate under the signal's registration
-  /// lock: a concurrent cancellation notification must wait for registration.
+  /// lock. ConditionSignal owns cancellation and exactly-once removal.
   func waitForEvent(
     _ event: String,
     onWaiting: (@Sendable () -> Void)? = nil
   ) async -> Bool {
-    let cancelled = LockedBox(Task.isCancelled)
-    return await withTaskCancellationHandler {
-      await eventSignal.wait(until: {
-        let shouldResume = cancelled.value || self.contains(event)
-        if !shouldResume {
-          onWaiting?()
-        }
-        return shouldResume
-      })
-      return !cancelled.value
-    } onCancel: {
-      cancelled.withLock { $0 = true }
-      // Release the flag lock before notifying: predicates take the locks in
-      // the opposite direction (signal, then flag).
-      self.eventSignal.notify()
+    do {
+      try await eventSignal.wait(
+        until: {
+          let observed = self.contains(event)
+          if !observed { onWaiting?() }
+          return observed
+        },
+        for: "InteractiveRuntime lifecycle event '\(event)'",
+        within: ProgressBudget(stages: 1),
+        on: ManualStageClock()
+      )
+      return true
+    } catch is CancellationError {
+      return false
+    } catch {
+      Issue.record("\(error); observed events: \(orderedEvents)")
+      return false
     }
   }
 

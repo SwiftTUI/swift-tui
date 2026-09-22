@@ -12,11 +12,13 @@ import Synchronization
 /// always lock in the order `ConditionSignal` → observed-state.
 @_spi(Testing) public final class ConditionSignal: Sendable {
   private struct Waiter {
+    let id: UInt64
     let predicate: @Sendable () -> Bool
     let continuation: CheckedContinuation<Void, Never>
   }
 
   private struct State {
+    var nextID: UInt64 = 0
     var waiters: [Waiter] = []
   }
 
@@ -47,19 +49,36 @@ import Synchronization
   /// Suspends until `predicate` holds.
   ///
   /// Returns immediately if the predicate already holds; otherwise resumes on
-  /// the first `notify()` that makes it true.
+  /// the first `notify()` that makes it true. Cancellation also returns,
+  /// removing only this waiter; callers must check `Task.isCancelled` before
+  /// interpreting return as observed progress. Cancel and join waits during
+  /// teardown: a suspended call retains the signal until it completes.
   @_spi(Testing) public func wait(until predicate: @escaping @Sendable () -> Bool) async {
-    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-      let alreadyHolds = state.withLock { state -> Bool in
-        if predicate() {
-          return true
+    let id = state.withLock { state -> UInt64 in
+      defer { state.nextID &+= 1 }
+      return state.nextID
+    }
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        let resumeImmediately = state.withLock { state -> Bool in
+          if Task.isCancelled || predicate() {
+            return true
+          }
+          state.waiters.append(Waiter(id: id, predicate: predicate, continuation: continuation))
+          return false
         }
-        state.waiters.append(Waiter(predicate: predicate, continuation: continuation))
-        return false
+        if resumeImmediately {
+          continuation.resume()
+        }
       }
-      if alreadyHolds {
-        continuation.resume()
+    } onCancel: {
+      let continuation = state.withLock { state -> CheckedContinuation<Void, Never>? in
+        guard let index = state.waiters.firstIndex(where: { $0.id == id }) else {
+          return nil
+        }
+        return state.waiters.remove(at: index).continuation
       }
+      continuation?.resume()
     }
   }
 }

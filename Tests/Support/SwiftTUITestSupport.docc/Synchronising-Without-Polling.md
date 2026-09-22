@@ -25,6 +25,12 @@ state lives and whether the wait carries a failure bound.
   counterpart of ``MainActorConditionSignal``. Call `notify()` outside any lock
   the predicate itself acquires, so the two always lock in the same order.
 
+All three resume on cancellation. A plain wait returning does not prove its
+predicate held: check cancellation before asserting progress. During teardown,
+cancel and join every task that owns a wait; an active call retains its signal.
+`ConditionSignal` removes cancelled predicates under its lock and resumes
+continuations after releasing it. Predicates must not re-enter that signal.
+
 None of these three carries a timeout. That is deliberate: a starved producer
 must *delay* a waiter, never *fail* it. The test synchronises on the state
 change, not on the wall clock.
@@ -42,12 +48,17 @@ runs out first. The bound is a stage *count*, so it is identical on a fast
 laptop and a slow CI runner. The same budget can finish in 6 s on the laptop and
 30 s under load. Both runs pass.
 
-Budgeted overloads on ``AsyncEvent`` and ``MainActorConditionSignal`` let a
+Budgeted overloads on ``AsyncEvent``, ``MainActorConditionSignal`` and
+``ConditionSignal`` let a
 bounded wait read as a single call:
 
 ```swift
 try await event.wait(for: "runtime start", within: budget, on: clock)
 ```
+
+Name the owning test stage and expected event in the label. The budget cancels
+and joins losing work. Its 30-second wall-clock backstop diagnoses a completely
+idle progress clock; it is not a scheduling-speed expectation.
 
 To do a unit test of budget logic, drive a ``ManualStageClock`` by hand. Or use
 ``ExhaustedStageClock`` to exercise the budget-exceeded path deterministically
