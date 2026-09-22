@@ -827,6 +827,12 @@ if lane_runs_policy; then
   run_repo_policy_phase "$repo_root" test-all
 
   run_step \
+    "Self-test release soak verdicts" \
+    "$repo_root" \
+    "bash Scripts/check_release_soak.sh" \
+    bash Scripts/check_release_soak.sh
+
+  run_step \
     "Run layout work-stack guardrails" \
     "$repo_root" \
     "Scripts/check_layout_work_stack_guardrails.sh" \

@@ -45,11 +45,9 @@
 #                      minus the isolated suites and the load-flaky run-loop
 #                      suites documented in
 #                      swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md.
-#   --flaky-only       ONLY those load-flaky suites, serialized. Run from a
-#                      continue-on-error step: a SIGSEGV here is flake #1
-#                      (swift-tui#12) signal, and in release the checked
-#                      isolation traps can convert it into an attributable
-#                      preconditionIsolated failure.
+#   --flaky-only       ONLY those historically load-flaky suites, serialized.
+#                      The name is retained for command compatibility. Every
+#                      failure is gating; diagnose its actual signature.
 #   --race-checks      stress + reconciliation subset rebuilt with
 #                      -enable-actor-data-race-checks, serialized.
 #   --dry-run          print every swift invocation instead of running it
@@ -102,7 +100,7 @@ runtime_shard_manifest=$repo_root/Scripts/data/runtime-shards.txt
 
 # The load-flaky run-loop suites (flake #1's usual homes) plus the
 # high-contention async suites the debug gate also isolates. Both sets run
-# only in --flaky-only, the signal-only step; the parts skip them.
+# only in --flaky-only, the gating runtime soak; the parts skip them.
 FLAKY_SUITES="InteractiveRuntimeTests PortalPrimitiveTests ActorIsolationSurfaceTests"
 ISOLATED_ASYNC_SUITES="AsyncLifecycleGenerationTests AsyncFrameTailRenderingTests TaskReadsUnbodiedStateTests"
 
