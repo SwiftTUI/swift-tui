@@ -20,6 +20,10 @@ set -euo pipefail
 repo_root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
 
+# Checkout's safe.directory entry lives in its temporary Git configuration.
+# Trust this runner-owned checkout in the configuration used by later steps.
+git config --global --add safe.directory "$repo_root"
+
 swiftly_home="${SWIFTLY_HOME_DIR:-/root/.local/share/swiftly}"
 swiftly_bin="${SWIFTLY_BIN_DIR:-/root/.local/bin}"
 bun_bin="${BUN_INSTALL:-/usr/local/bun}/bin"
