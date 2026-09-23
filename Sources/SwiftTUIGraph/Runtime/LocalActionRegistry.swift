@@ -1,15 +1,20 @@
 @MainActor
 package final class LocalActionRegistry: Equatable {
   package typealias Handler = @MainActor () -> Bool
+  package typealias AccessibilityHandler =
+    @MainActor (AccessibilityAction) -> AccessibilityActionOutcome
   package struct Registration {
     package var handler: Handler
+    package var accessibilityHandler: AccessibilityHandler?
     package var followUpInvalidationIdentity: Identity?
 
     package init(
       handler: @escaping Handler,
+      accessibilityHandler: AccessibilityHandler? = nil,
       followUpInvalidationIdentity: Identity? = nil
     ) {
       self.handler = handler
+      self.accessibilityHandler = accessibilityHandler
       self.followUpInvalidationIdentity = followUpInvalidationIdentity
     }
   }
@@ -25,16 +30,19 @@ package final class LocalActionRegistry: Equatable {
   package func register(
     identity: Identity,
     handler: @escaping Handler,
+    accessibilityHandler: AccessibilityHandler? = nil,
     followUpInvalidationIdentity: Identity? = nil
   ) {
     let registration = Registration(
       handler: handler,
+      accessibilityHandler: accessibilityHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity
     )
     store.set(registration, for: identity, owner: .current(identity: identity))
     ViewNodeContext.current?.recordActionRegistration(
       identity: identity,
       handler: handler,
+      accessibilityHandler: accessibilityHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity
     )
   }
@@ -48,6 +56,15 @@ package final class LocalActionRegistry: Equatable {
       return false
     }
     return registration.handler()
+  }
+
+  package func dispatchAccessibility(identity: Identity, action: AccessibilityAction)
+    -> AccessibilityActionOutcome
+  {
+    guard let registration = store[identity] else { return .unsupported }
+    if let handler = registration.accessibilityHandler { return handler(action) }
+    guard action == .activate else { return .unsupported }
+    return registration.handler() ? .changed : .unchanged
   }
 
   package func followUpInvalidationIdentity(

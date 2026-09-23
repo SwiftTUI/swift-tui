@@ -153,13 +153,16 @@ package func focusableControlMetadata(
   scrollRole: ScrollRole? = nil,
   accessibilityRole: AccessibilityRole? = nil
 ) -> SemanticMetadata {
-  .init(
+  var metadata = SemanticMetadata(
     isFocusable: isFocusable,
     focusInteractions: focusInteractions,
     participatesInPointerHitTesting: true,
     scrollRole: scrollRole,
     accessibilityRole: accessibilityRole
   )
+  metadata.accessibilityControl = .init(
+    actions: focusInteractions == .activate ? [.focus, .activate] : [.focus])
+  return metadata
 }
 
 /// Semantics for a scroll view container.
@@ -550,5 +553,13 @@ public struct EnvironmentTransformModifier<Value>: IterativePrimitiveViewModifie
       }
     }
     return recordingScopedStyleWrite(keyPath, in: transformed)
+  }
+}
+
+extension SemanticMetadata {
+  package func accessibilityControl(_ control: AccessibilityControlState) -> Self {
+    var copy = self
+    copy.accessibilityControl = control
+    return copy
   }
 }

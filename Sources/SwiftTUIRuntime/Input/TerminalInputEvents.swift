@@ -90,6 +90,7 @@ public enum InputEvent: Equatable, Sendable {
   case key(KeyPress)
   case mouse(MouseEvent)
   case paste(PasteEvent)
+  case accessibility(AccessibilityActionRequest)
   case drop(paths: [DroppedPath], context: DropContext)
 
   /// Convenience for creating a key event with optional modifiers.

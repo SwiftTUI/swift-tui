@@ -784,7 +784,7 @@
           }
         case .paste(let paste):
           return "\u{001E}paste:\(paste.content)\n"
-        case .mouse, .drop:
+        case .mouse, .drop, .accessibility:
           return "\u{001E}unsupported-observation\n"
         }
       }

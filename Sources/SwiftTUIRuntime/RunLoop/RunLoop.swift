@@ -142,6 +142,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// itself bounded by `progress_starvation`).
   package static var maxConsecutivePreStartCancels: Int { 2 }
   package var nextSemanticHostFrameSequence: UInt64 = 0
+  package var latestAccessibilityActionResponse: AccessibilityActionResponse?
   /// Arrival envelopes of inputs dispatched since the last frame acquisition
   /// whose dispatch asked the scheduler for work (see
   /// ``handle(_:arrival:)``). Transferred into the frame at acquisition and

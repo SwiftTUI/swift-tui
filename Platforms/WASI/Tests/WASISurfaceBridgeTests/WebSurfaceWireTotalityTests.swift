@@ -99,6 +99,15 @@ struct WebSurfaceWireTotalityTests {
       Set(try #require(nodes.first).keys) == HostWireSchema.WebWire.accessibilityNodeKeys
     )
 
+    let control = try #require(nodes.first)
+    #expect(control["actionTarget"] as? String == "fixture-token")
+    #expect(control["actions"] as? [String] == ["focus", "setValue"])
+    #expect(control["isEnabled"] as? Bool == false)
+    let value = try #require(control["value"] as? [String: Any])
+    #expect(value["type"] as? String == "text")
+    #expect(value["value"] as? String == "Current")
+    #expect(control["valueMax"] as? Double == 10)
+
     let announcements = try #require(record["accessibilityAnnouncements"] as? [[String: Any]])
     #expect(
       Set(try #require(announcements.first).keys)
@@ -371,7 +380,17 @@ struct WebSurfaceWireTotalityTests {
     )
   ) -> SemanticHostFrame {
     let focused = Identity(components: ["root", "field"])
-    return SemanticHostFrame(
+    var controlNode = AccessibilityNode(
+      identity: focused, parentIdentity: Identity(components: ["root"]),
+      rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)),
+      role: .textField, label: "Field", hint: "Type here", hidden: true,
+      liveRegion: .polite, cursorAnchor: CellPoint(x: 1, y: 0))
+    controlNode.actionTarget = "fixture-token"
+    controlNode.control = .init(
+      actions: [.focus, .setValue], value: .text("Current"),
+      minimum: 0, maximum: 10, step: 1)
+    controlNode.isEnabled = false
+    var frame = SemanticHostFrame(
       sequence: sequence,
       raster: Self.linkedRasterSurface(),
       semantics: SemanticSnapshot(
@@ -390,19 +409,7 @@ struct WebSurfaceWireTotalityTests {
             contentOffset: CellPoint(x: 0, y: 2)
           )
         ],
-        accessibilityNodes: [
-          AccessibilityNode(
-            identity: focused,
-            parentIdentity: Identity(components: ["root"]),
-            rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)),
-            role: .textField,
-            label: "Field",
-            hint: "Type here",
-            hidden: true,
-            liveRegion: .polite,
-            cursorAnchor: CellPoint(x: 1, y: 0)
-          )
-        ],
+        accessibilityNodes: [controlNode],
         accessibilityAnnouncements: [
           AccessibilityAnnouncement(message: "Ready", politeness: .assertive)
         ]
@@ -411,6 +418,9 @@ struct WebSurfaceWireTotalityTests {
       rasterDamage: damage,
       preferredLayoutSize: CellSize(width: 9, height: 8)
     )
+    frame.semantics.accessibilityActionResponse = .init(
+      requestID: 7, target: "fixture-token", result: .accepted)
+    return frame
   }
 
   /// Four columns, two rows: an "ab" link run and a "c" link on row 0, a wide

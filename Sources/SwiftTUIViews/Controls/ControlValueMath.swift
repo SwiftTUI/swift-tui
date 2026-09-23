@@ -17,6 +17,7 @@ import SwiftTUICore
 protocol AdjustableControlValue: Comparable, SignedNumeric, Sendable {
   init(_ value: Int)
   var controlDoubleValue: Double { get }
+  static func accessibilityValue(_ value: Double) -> Self?
   static func sanitizedControlStep(_ step: Self) -> Self
   static func steppedControlValue(
     from value: Self,
@@ -38,6 +39,7 @@ protocol AdjustableControlValue: Comparable, SignedNumeric, Sendable {
 
 extension Int: AdjustableControlValue {
   var controlDoubleValue: Double { Double(self) }
+  static func accessibilityValue(_ value: Double) -> Int? { Int(exactly: value) }
 
   static func sanitizedControlStep(_ step: Int) -> Int {
     Swift.max(1, abs(step))
@@ -79,6 +81,7 @@ extension Int: AdjustableControlValue {
 
 extension Double: AdjustableControlValue {
   var controlDoubleValue: Double { self }
+  static func accessibilityValue(_ value: Double) -> Double? { value.isFinite ? value : nil }
 
   static func sanitizedControlStep(_ step: Double) -> Double {
     let magnitude = abs(step)

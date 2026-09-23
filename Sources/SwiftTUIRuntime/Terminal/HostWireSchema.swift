@@ -172,6 +172,11 @@ package enum HostWireSchema {
         wire: .derived("pre-blended PNG payload replaces the raw source when compositing is set")),
     ],
     "AccessibilityNode": [
+      .init("actionTarget", wire: .key("actionTarget")),
+      .init("control", wire: .derived("actions/value/valueMin/valueMax/valueStep")),
+      .init("isEnabled", wire: .key("isEnabled")),
+      .init(
+        "actionIdentity", wire: .notSerialized("runtime dispatch uses the opaque actionTarget")),
       .init(
         "viewNodeID",
         wire: .notSerialized("package-internal graph plumbing")),
@@ -245,7 +250,7 @@ package enum HostWireSchema {
     ]
     package static let fullFrameOptionalKeys: Set<String> = [
       "epoch", "gen", "sequence", "damage", "accessibilityTree",
-      "accessibilityAnnouncements",
+      "accessibilityAnnouncements", "accessibilityActionResponse",
       "scrollRegions", "links", "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
     ]
@@ -255,7 +260,8 @@ package enum HostWireSchema {
     ]
     package static let deltaFrameOptionalKeys: Set<String> = [
       "epoch", "gen", "baselineGen", "sequence", "accessibilityTree",
-      "accessibilityAnnouncements", "scrollRegions", "links", "linkTargets", "focusPresentation",
+      "accessibilityAnnouncements", "accessibilityActionResponse", "scrollRegions", "links",
+      "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
       // Present only when `styleAppend` is negotiated. Optional in the manifest
       // because absence is the deployed shape; its *presence* changes how
@@ -276,7 +282,8 @@ package enum HostWireSchema {
     ]
     package static let accessibilityNodeKeys: Set<String> = [
       "id", "rect", "role", "isFocused", "parentId", "label", "hint", "hidden",
-      "liveRegion", "cursorAnchor",
+      "liveRegion", "cursorAnchor", "actionTarget", "actions", "isEnabled", "value",
+      "valueMin", "valueMax", "valueStep",
     ]
     package static let accessibilityAnnouncementKeys: Set<String> = [
       "message", "politeness",

@@ -646,3 +646,144 @@ private func rect(
     size: CellSize(width: width, height: height)
   )
 }
+
+@MainActor
+@Suite("Semantic action dispatch")
+struct AccessibilityActionRuntimeTests {
+  @Test("Rejected and no-op correlated requests still publish an acknowledgement")
+  func actionAcknowledgements() throws {
+    let surface = SemanticHostFrameDispatchSurface()
+    let root = testIdentity("SemanticHostFrameDispatchRoot")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = semanticHostFrameDispatchRunLoop(
+      rootIdentity: root, surface: surface, focusTracker: focus)
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    _ = loop.handle(
+      .input(.accessibility(.init(target: "missing", action: .activate, requestID: 1))))
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(
+      surface.semanticFrames.last?.semantics.accessibilityActionResponse
+        == .init(requestID: 1, target: "missing", result: .staleTarget))
+    let target = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first {
+        $0.role == .button
+      }?.actionTarget)
+    _ = loop.handle(.input(.accessibility(.init(target: target, action: .focus, requestID: 2))))
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(
+      surface.semanticFrames.last?.semantics.accessibilityActionResponse
+        == .init(requestID: 2, target: target, result: .accepted))
+  }
+
+  @Test("Assistive requests reach retained controls and publish typed values")
+  func retainedControlActions() throws {
+    let root = testIdentity("AssistiveRoot")
+    let size = CellSize(width: 60, height: 24)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: size, focusTracker: focus
+    ) { AssistiveControls() }
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+
+    func node(_ name: String) throws -> AccessibilityNode {
+      try #require(
+        loop.latestSemanticSnapshot.accessibilityNodes.first {
+          $0.identity == testIdentity(name)
+        })
+    }
+    func request(_ name: String, _ action: AccessibilityAction) throws
+      -> AccessibilityActionResult
+    {
+      loop.handleAccessibilityAction(
+        .init(target: try #require(node(name).actionTarget), action: action))
+    }
+    let sliderTarget = try #require(node("Gain").actionTarget)
+    #expect(try request("Toggle", .activate) == .accepted)
+    #expect(try request("Gain", .increment) == .accepted)
+    #expect(try request("Count", .decrement) == .accepted)
+    #expect(try request("Name", .setValue(.text("Ada"))) == .accepted)
+    #expect(try request("Secret", .setValue(.text("hidden value"))) == .accepted)
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(try node("Toggle").control?.value == .boolean(true))
+    #expect(try node("Gain").control?.value == .number(3))
+    #expect(try node("Count").control?.value == .number(4))
+    #expect(try node("Name").control?.value == .text("Ada"))
+    #expect(try node("Secret").control?.value == nil)
+    #expect(!String(describing: loop.latestSemanticSnapshot).contains("hidden value"))
+    #expect(try node("Gain").actionTarget == sliderTarget)
+    #expect(try request("Gain", .setValue(.number(8))) == .accepted)
+    #expect(try request("Toggle", .setValue(.boolean(false))) == .accepted)
+    #expect(try request("Name", .focus) == .accepted)
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(focus.currentFocusIdentity == testIdentity("Name"))
+    #expect(try node("Gain").control?.value == .number(8))
+    #expect(try node("Toggle").control?.value == .boolean(false))
+    let priorFrames = frames
+    #expect(try request("Name", .focus) == .accepted)
+    #expect(try request("Name", .setValue(.text("Ada"))) == .accepted)
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(frames == priorFrames)
+
+    #expect(try request("Disabled", .activate) == .disabled)
+    #expect(try request("Gain", .activate) == .unsupported)
+    #expect(try request("Gain", .setValue(.text("bad"))) == .invalidValue)
+    #expect(try request("Gain", .setValue(.number(.nan))) == .invalidValue)
+    #expect(try request("Gain", .setValue(.number(11))) == .invalidValue)
+    #expect(try request("Gain", .setValue(.number(2.5))) == .invalidValue)
+    #expect(
+      loop.handleAccessibilityAction(.init(target: "missing", action: .activate)) == .staleTarget)
+
+    _ = try request("Visibility", .activate)
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(
+      loop.handleAccessibilityAction(.init(target: sliderTarget, action: .increment))
+        == .staleTarget)
+    _ = try request("Visibility", .activate)
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(try node("Gain").actionTarget != sliderTarget)
+    #expect(
+      loop.handleAccessibilityAction(.init(target: sliderTarget, action: .increment))
+        == .staleTarget)
+    let button = try #require(node("Toggle").actionTarget)
+    _ = loop.handle(.input(.accessibility(.init(target: button, action: .activate))))
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(try node("Toggle").control?.value == .boolean(true))
+    _ = try request("Modal", .activate)
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(try request("Toggle", .activate) == .outOfScope)
+    #expect(try request("ModalChild", .focus) == .accepted)
+  }
+}
+
+private struct AssistiveControls: View {
+  @State private var enabled = false
+  @State private var gain = 2
+  @State private var count = 5
+  @State private var name = ""
+  @State private var secret = ""
+  @State private var visible = true
+  @State private var modal = false
+
+  var body: some View {
+    VStack {
+      Toggle("Enabled", isOn: $enabled).id(testIdentity("Toggle"))
+      if visible { Slider("Gain", value: $gain, in: 0...10).id(testIdentity("Gain")) }
+      Stepper("Count", value: $count, in: 0...10).id(testIdentity("Count"))
+      TextField("Name", text: $name).id(testIdentity("Name"))
+      SecureField("Secret", text: $secret).id(testIdentity("Secret"))
+      Button("Disabled") {}.disabled(true).id(testIdentity("Disabled"))
+      Button("Visibility") { visible.toggle() }.id(testIdentity("Visibility"))
+      Button("Modal") { modal = true }.id(testIdentity("Modal"))
+        .sheet(isPresented: $modal) {
+          Button("Close") { modal = false }.id(testIdentity("ModalChild"))
+        }
+    }
+  }
+}

@@ -72,6 +72,9 @@ package struct HostWireFrameModel {
     package let liveRegionToken: String?
     package let cursorAnchor: CellPoint?
     package let isFocused: Bool
+    package let actionTarget: String?
+    package let control: AccessibilityControlState?
+    package let isEnabled: Bool
 
     package init(
       _ node: AccessibilityNode,
@@ -87,6 +90,9 @@ package struct HostWireFrameModel {
       liveRegionToken = node.liveRegion?.description
       cursorAnchor = node.cursorAnchor
       isFocused = node.identity == focusedIdentity
+      actionTarget = node.actionTarget
+      control = node.control
+      isEnabled = node.isEnabled
     }
   }
 
@@ -120,6 +126,7 @@ package struct HostWireFrameModel {
 
   package let accessibilityNodes: [WireAccessibilityNode]
   package let accessibilityAnnouncements: [WireAnnouncement]
+  package let accessibilityActionResponse: AccessibilityActionResponse?
   package let scrollRegions: [WireScrollRegion]
 
   // MARK: - Images
@@ -166,6 +173,7 @@ package struct HostWireFrameModel {
     accessibilityNodes = (semanticSnapshot?.accessibilityNodes ?? []).map { node in
       WireAccessibilityNode(node, focusedIdentity: focusedIdentity)
     }
+    accessibilityActionResponse = semanticSnapshot?.accessibilityActionResponse
     accessibilityAnnouncements = (semanticSnapshot?.accessibilityAnnouncements ?? [])
       .map(WireAnnouncement.init)
     scrollRegions = (semanticSnapshot?.scrollRoutes ?? []).map(WireScrollRegion.init)

@@ -19,7 +19,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 60 | 511 |
+| `SwiftTUIRuntime` | 60 | 512 |
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 415 | 2531 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
@@ -32,9 +32,9 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 15 | 43 |
-| `SwiftTUICore` | 40 | 272 |
+| `SwiftTUICore` | 40 | 273 |
 | `SwiftTUIPrimitives` | 172 | 1516 |
-| `SwiftTUIGraph` | 60 | 357 |
+| `SwiftTUIGraph` | 67 | 404 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -67,7 +67,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `HostLengthSize` — struct — 3 members
 - `HotReloadExport` — enum — 1 member
 - `InProcessSignalReader` — class — 4 members
-- `InputEvent` — enum — 5 members
+- `InputEvent` — enum — 6 members
 - `InputReader` — class — 3 members
 - `InputReading` — protocol — 1 member
 - `KeyHandlingResult` — enum — 3 members
@@ -688,7 +688,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `RenderGeneration` — struct — 4 members
 - `ResolvedTextStyle` — extension — 3 members
 - `SelectionRoute` — struct — 3 members
-- `SemanticSnapshot` — struct — 10 members
+- `SemanticSnapshot` — struct — 11 members
 - `TextCluster` — struct — 3 members
 - `TextLayoutLine` — struct — 4 members
 - `TextLayoutOptions` — struct — 5 members
@@ -890,7 +890,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 ### Canonical surface (57)
 
-- `AccessibilityNode` — struct — 10 members
+- `AccessibilityNode` — struct — 13 members
 - `AccessibilityPoliteness` — enum — 4 members
 - `AccessibilityRole` — enum — 39 members
 - `AccessibilityVisualContent` — struct — 2 members
@@ -948,8 +948,15 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `TransactionSnapshot` — struct — 2 members
 - `WakeCause` — enum — 6 members
 
-### Package-only seams (3)
+### Package-only seams (10)
 
+- `AccessibilityAction` — enum — 6 members
+- `AccessibilityActionKind` — enum — 6 members
+- `AccessibilityActionRequest` — struct — 4 members
+- `AccessibilityActionResponse` — struct — 4 members
+- `AccessibilityActionResult` — enum — 7 members
+- `AccessibilityControlState` — class — 7 members
+- `AccessibilityValue` — enum — 3 members
 - `DeadlineArmCut` — struct — 2 members
 - `DrainPassDeadlineCutting` — protocol — 2 members
 - `parseDroppedPaths(_:)` — func

@@ -410,6 +410,10 @@ package enum WebSurfaceFrameEncoder {
     for model: HostWireFrameModel
   ) throws -> String {
     var json = HostWireRecord("")
+    if let response = model.accessibilityActionResponse {
+      json +=
+        ",\"accessibilityActionResponse\":{\"requestID\":\(jsonString(String(response.requestID))),\"target\":\(jsonString(response.target)),\"result\":\(jsonString(response.result.rawValue))}"
+    }
     if let links = try encodeLinks(for: model) {
       json += ",\"links\":[\(links.rows)]"
       json += ",\"linkTargets\":[\(links.targets)]"
@@ -555,6 +559,35 @@ package enum WebSurfaceFrameEncoder {
         }
         if let cursorAnchor = node.cursorAnchor {
           fields.append("\"cursorAnchor\":\(encodePoint(cursorAnchor))")
+        }
+        if let target = node.actionTarget, let control = node.control {
+          fields.append("\"actionTarget\":\(jsonString(target))")
+          fields.append(
+            "\"actions\":[\(control.actions.map { jsonString($0.rawValue) }.joined(separator: ","))]"
+          )
+          fields.append("\"isEnabled\":\(node.isEnabled ? "true" : "false")")
+          if let value = control.value {
+            let kind: String
+            let encoded: String
+            switch value {
+            case .boolean(let flag):
+              kind = "boolean"
+              encoded = flag ? "true" : "false"
+            case .number(let number):
+              kind = "number"
+              encoded = number.isFinite ? String(number) : "null"
+            case .text(let text):
+              kind = "text"
+              encoded = jsonString(text)
+            }
+            fields.append("\"value\":{\"type\":\(jsonString(kind)),\"value\":\(encoded)}")
+          }
+          for (key, value) in [
+            ("valueMin", control.minimum), ("valueMax", control.maximum),
+            ("valueStep", control.step),
+          ] {
+            if let value, value.isFinite { fields.append("\(jsonString(key)):\(value)") }
+          }
         }
         return "{" + fields.joined(separator: ",") + "}"
       })

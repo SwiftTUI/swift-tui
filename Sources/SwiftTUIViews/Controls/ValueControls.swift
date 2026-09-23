@@ -52,7 +52,19 @@ extension Toggle {
         context: context,
         fallbackAuthoringScope: authoringScope
       )
-      intake.registerAction(identity: context.identity) {
+      intake.registerAction(
+        identity: context.identity,
+        accessibilityHandler: { action in
+          switch action {
+          case .activate: binding.wrappedValue.toggle()
+          case .setValue(.boolean(let next)):
+            guard binding.wrappedValue != next else { return .unchanged }
+            binding.wrappedValue = next
+          default: return .unsupported
+          }
+          return .changed
+        }
+      ) {
         binding.wrappedValue.toggle()
         return true
       }
@@ -81,7 +93,8 @@ extension Toggle {
         semanticMetadata: focusableControlMetadata(
           focusInteractions: .activate,
           accessibilityRole: .toggle
-        ).namingControl(with: label)
+        ).namingControl(with: label).accessibilityControl(
+          .init(actions: [.focus, .activate, .setValue], value: .boolean(binding.wrappedValue)))
       )
 
     }
@@ -211,7 +224,9 @@ extension TextField {
           focusInteractions: .edit,
           accessibilityRole: .textField
         ).namingControl(with: label).merging(
-          SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
+          SemanticMetadata(accessibilityLabel: titleAccessibilityLabel)
+        ).accessibilityControl(
+          .init(actions: [.focus, .setValue], value: .text(synchronizedValue.text)))
       )
 
     }
@@ -276,7 +291,19 @@ extension DisclosureGroup {
         context: context,
         fallbackAuthoringScope: authoringScope
       )
-      intake.registerAction(identity: context.identity) {
+      intake.registerAction(
+        identity: context.identity,
+        accessibilityHandler: { action in
+          switch action {
+          case .activate: binding.wrappedValue.toggle()
+          case .setValue(.boolean(let next)):
+            guard binding.wrappedValue != next else { return .unchanged }
+            binding.wrappedValue = next
+          default: return .unsupported
+          }
+          return .changed
+        }
+      ) {
         binding.wrappedValue.toggle()
         return true
       }
@@ -318,7 +345,8 @@ extension DisclosureGroup {
       var metadata = focusableControlMetadata(
         focusInteractions: .activate,
         accessibilityRole: .disclosureGroup
-      ).namingControl(with: label)
+      ).namingControl(with: label).accessibilityControl(
+        .init(actions: [.focus, .activate, .setValue], value: .boolean(expanded)))
       // Keep geometric evidence that the keyboard action has no pointer area of
       // its own. Merely omitting the region permits the runtime's
       // ancestor-action fallback, which collapsed the group from a press on its

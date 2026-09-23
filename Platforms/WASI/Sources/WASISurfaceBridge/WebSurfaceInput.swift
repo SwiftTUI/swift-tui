@@ -99,7 +99,7 @@ private func coalescedWebSurfaceInputEvents(
 
   for event in events {
     switch event {
-    case .key, .paste, .drop:
+    case .key, .paste, .drop, .accessibility:
       flushPendingMouseEvent()
       coalesced.append(event)
     case .mouse(let mouseEvent):

@@ -1037,15 +1037,15 @@ capabilities in the vision document. The others follow the same stance:
 The semantic substrate, terminal cursor-follows-focus mode, Web/WASI ARIA tree,
 SwiftUI-host overlay, and Android Compose semantics overlay all ship. They
 present roles, labels, hints, live regions, and runtime-originated focus. The
-shared node model does not yet carry assistive-technology activation,
-adjustment, value/state, or focus-return routes. (The former linear accessible
+shared node model carries typed assistive focus, activation, adjustment and
+value-setting requests; host adapters must connect their native callbacks. (The former linear accessible
 *output mode* was removed as unusable; its renderer survives only as the
 `SwiftTUITestSupport` assistive-output assertion seam.)
 
-- **Assistive-technology interaction is one-way.** *Gap.* Focus flows runtime
-  → VoiceOver/TalkBack/browser only. Assistive-technology-originated focus
-  traversal is not fed back into SwiftTUI's runtime focus, and semantic nodes
-  carry no activation, adjustment, or control-value route.
+- **Assistive host adapters remain unconnected.** *Gap.* The shared runtime
+  accepts node-targeted focus, activation, adjustment and typed value requests
+  (STUI-129). VoiceOver, TalkBack and browser adapters still need to connect
+  their callbacks and qualify real assistive journeys.
 - **No WCAG conformance suite or automated screen-reader testing.** *Gap.*
   Unit tests and guardrail scripts cover semantic presentation. The
   coordination-root report

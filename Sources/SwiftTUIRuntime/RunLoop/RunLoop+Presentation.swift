@@ -67,10 +67,9 @@ extension RunLoop {
   private func semanticSnapshotWithScrollOffsets(
     _ snapshot: SemanticSnapshot
   ) -> SemanticSnapshot {
-    guard !snapshot.scrollRoutes.isEmpty else {
-      return snapshot
-    }
     var enriched = snapshot
+    enriched.accessibilityActionResponse = latestAccessibilityActionResponse
+    guard !snapshot.scrollRoutes.isEmpty else { return enriched }
     enriched.scrollRoutes = localScrollPositionRegistry.routesWithCurrentOffsets(
       snapshot.scrollRoutes
     )

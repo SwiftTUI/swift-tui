@@ -129,7 +129,12 @@ extension Slider {
         context: context,
         fallbackAuthoringScope: authoringScope
       )
-      intake.registerAction(identity: context.identity) {
+      intake.registerAction(
+        identity: context.identity,
+        accessibilityHandler: { action in
+          accessibilityNumericAction(action, binding: binding, bounds: bounds, step: adjustmentStep)
+        }
+      ) {
         let next = steppedControlValue(
           from: binding.wrappedValue,
           delta: 1,
@@ -197,7 +202,13 @@ extension Slider {
         semanticMetadata: focusableControlMetadata(
           focusInteractions: .edit,
           accessibilityRole: .slider
-        ).namingControl(with: label)
+        ).namingControl(with: label).accessibilityControl(
+          .init(
+            actions: [.focus, .increment, .decrement, .setValue],
+            value: .number(currentValue.controlDoubleValue),
+            minimum: bounds.lowerBound.controlDoubleValue,
+            maximum: bounds.upperBound.controlDoubleValue,
+            step: adjustmentStep.controlDoubleValue))
       )
 
     }

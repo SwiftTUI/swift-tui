@@ -443,7 +443,7 @@ Sources/
                        (LayoutBehavior/LayoutMetadata), Animation (math)
   SwiftTUITestSupport/ Published test helpers and their DocC catalog
   SwiftTUIGraph/       Resolve, Runtime, Pipeline/Scheduler, Animation (intent),
-                       Semantics (regions/roles), Geometry/AnchorTypes
+                       Semantics (regions/roles/AccessibilityAction), Geometry/AnchorTypes
   SwiftTUICore/        Measure, Place, Semantics (extractor/FocusTracker), Draw
                        (extractor), Raster, Commit, Content (text engine),
                        Styling (resolution), Pipeline (drop/elision/snapshots),

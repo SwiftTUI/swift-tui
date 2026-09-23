@@ -49,3 +49,24 @@ func updateBoundControlValue<Value: AdjustableControlValue>(
   binding.wrappedValue = next
   return true
 }
+
+@MainActor
+func accessibilityNumericAction<Value: AdjustableControlValue>(
+  _ action: AccessibilityAction, binding: Binding<Value>, bounds: ClosedRange<Value>?,
+  step: Value
+) -> AccessibilityActionOutcome {
+  switch action {
+  case .activate, .increment:
+    return updateBoundControlValue(binding, delta: 1, step: step, bounds: bounds)
+      ? .changed : .unchanged
+  case .decrement:
+    return updateBoundControlValue(binding, delta: -1, step: step, bounds: bounds)
+      ? .changed : .unchanged
+  case .setValue(.number(let number)):
+    guard let next = Value.accessibilityValue(number) else { return .invalidValue }
+    guard next != binding.wrappedValue else { return .unchanged }
+    binding.wrappedValue = clampedControlValue(next, to: bounds)
+    return .changed
+  default: return .unsupported
+  }
+}

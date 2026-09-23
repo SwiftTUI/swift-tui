@@ -305,7 +305,7 @@ extension SemanticExtractor {
       return nil
     }
 
-    return AccessibilityNode(
+    var result = AccessibilityNode(
       viewNodeID: node.viewNodeID,
       // Reported identity is occurrence-free: duplicate siblings compare
       // equal, as authored, and per-owner attribution rides `viewNodeID`.
@@ -324,6 +324,13 @@ extension SemanticExtractor {
       liveRegion: node.semanticMetadata.accessibilityLiveRegion,
       cursorAnchor: textInputCursorAnchors[node.identity] ?? accessibilityCursorAnchor(for: node)
     )
+    result.control = node.semanticMetadata.accessibilityControl
+    result.isEnabled = node.environmentSnapshot.style.isEnabled
+    if let owner = node.viewNodeID, result.control != nil {
+      result.actionTarget = "\(owner.rawValue):\(node.identity.path)"
+      result.actionIdentity = node.identity
+    }
+    return result
   }
 
   private func textInputAccessibilityCursorAnchors(

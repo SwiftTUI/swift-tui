@@ -157,13 +157,27 @@ TTY state at session start. The full list and its precedence rules live in
 the `SwiftTUIRuntime` article
 [Environment Variables](https://swifttui.sh/docs/documentation/swifttuiruntime/environment-variables).
 
-### Current Limits
+### Host action contract
 
-Assistive-technology interaction is currently one-way. Runtime focus is
-presented to VoiceOver, TalkBack, and the browser tree, but focus traversal
-is not fed back into SwiftTUI's runtime, and there is no action, adjustment,
-or control-value route, so native and browser accessibility trees present
-the interface but do not yet activate or adjust SwiftTUI controls.
+Semantic control nodes publish an opaque `actionTarget`, supported `actions`,
+enabled state, and a typed value where applicable. Hosts return an
+`InputEvent.accessibility(AccessibilityActionRequest)` to the owning scene.
+The runtime resolves that token against its committed tree and active focus
+scope before dispatching through the control's retained action registration.
+Removed/recreated targets, disabled controls, hidden content, modal background
+controls, unsupported actions, and invalid value types are rejected.
+
+Buttons support focus and activation. Toggle and DisclosureGroup also accept
+boolean values. Slider and Stepper accept increment, decrement, and numeric
+values within their bounds. TextField and TextEditor accept replacement text;
+SecureField accepts replacement text but never publishes its contents. Input
+normalization remains owned by the control (including single-line editing).
+Repeated focus and value echoes do not write the binding or schedule new work.
+
+See `docs/ACCESSIBILITY.md` in the source repository for the additive host-wire
+format. The browser and native host packages must connect their assistive
+callbacks to this contract before those interfaces become operable. Shared
+runtime tests do not establish VoiceOver, TalkBack, or WCAG conformance.
 
 ## See Also
 

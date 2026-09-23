@@ -59,6 +59,11 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var scrollRole: ScrollRole?
   public var sectionRole: SectionRole?
   public var accessibilityRole: AccessibilityRole?
+  private var authoredAccessibility: AuthoredAccessibilityMetadata?
+  package var accessibilityControl: AccessibilityControlState? {
+    get { authoredAccessibility?.control }
+    set { authoredAccessibility = .init(title: accessibilityTitle, control: newValue) }
+  }
   public var accessibilityLabel: String?
   /// Authored label slots contribute names only to their nearest primitive owner.
   package var accessibilityLabelSource: AccessibilityLabelSource? {
@@ -76,7 +81,10 @@ public struct SemanticMetadata: Equatable, Sendable {
     set { setFlag(Self.usesAuthoredAccessibilityLabelFlag, to: newValue) }
   }
   /// A literal title remains available when a style omits its visual label slot.
-  package var accessibilityTitle: String?
+  package var accessibilityTitle: String? {
+    get { authoredAccessibility?.title }
+    set { authoredAccessibility = .init(title: newValue, control: accessibilityControl) }
+  }
   public var accessibilityHint: String?
   public var accessibilityLiveRegion: AccessibilityPoliteness?
   package var accessibilityVisualContent: AccessibilityVisualContent?
@@ -355,6 +363,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     merged.usesAuthoredAccessibilityLabel =
       usesAuthoredAccessibilityLabel || other.usesAuthoredAccessibilityLabel
     merged.accessibilityTitle = other.accessibilityTitle ?? accessibilityTitle
+    merged.accessibilityControl = other.accessibilityControl ?? accessibilityControl
     merged.allowsFocusWhenDisabled = allowsFocusWhenDisabled || other.allowsFocusWhenDisabled
     return merged
   }
@@ -531,5 +540,21 @@ private func mergedInteractionAvailability(
     current
   case (.enabled, .enabled):
     .enabled
+  }
+}
+
+/// Sparse primitive-owned metadata; ordinary layout nodes carry only a pointer.
+private final class AuthoredAccessibilityMetadata: Equatable, Sendable {
+  let title: String?
+  let control: AccessibilityControlState?
+
+  init?(title: String?, control: AccessibilityControlState?) {
+    guard title != nil || control != nil else { return nil }
+    self.title = title
+    self.control = control
+  }
+
+  static func == (lhs: AuthoredAccessibilityMetadata, rhs: AuthoredAccessibilityMetadata) -> Bool {
+    lhs === rhs || (lhs.title == rhs.title && lhs.control == rhs.control)
   }
 }

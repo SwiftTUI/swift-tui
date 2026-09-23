@@ -121,6 +121,8 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var namedCoordinateSpaces: [NamedCoordinateSpace: CellRect]
   public var accessibilityNodes: [AccessibilityNode]
   public var accessibilityAnnouncements: [AccessibilityAnnouncement]
+  /// Presentation-only acknowledgement; the runtime fills this after commit.
+  public var accessibilityActionResponse: AccessibilityActionResponse? = nil
   package var accessibilityWarnings: [AccessibilityWarning]
   /// Scope chain of the **active/visible context** — the unambiguous chain of
   /// command/chrome-hosting regions (`Panel`, `NavigationStack`, …) visible this

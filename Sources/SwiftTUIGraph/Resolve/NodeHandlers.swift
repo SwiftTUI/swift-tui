@@ -68,12 +68,14 @@ package struct ActionNodeRecord: RuntimeNodeRecord {
   package mutating func record(
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,
+    accessibilityHandler: LocalActionRegistry.AccessibilityHandler? = nil,
     followUpInvalidationIdentity: Identity?,
     owner: RuntimeRegistrationOwnerKey
   ) {
     owners[identity] = owner
     registrations[identity] = .init(
       handler: handler,
+      accessibilityHandler: accessibilityHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity
     )
   }
@@ -779,11 +781,13 @@ package struct NodeHandlers {
   package mutating func recordAction(
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,
+    accessibilityHandler: LocalActionRegistry.AccessibilityHandler? = nil,
     followUpInvalidationIdentity: Identity?
   ) {
     recordAction(
       identity: identity,
       handler: handler,
+      accessibilityHandler: accessibilityHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity,
       owner: .current(identity: identity)
     )
@@ -792,12 +796,14 @@ package struct NodeHandlers {
   package mutating func recordAction(
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,
+    accessibilityHandler: LocalActionRegistry.AccessibilityHandler? = nil,
     followUpInvalidationIdentity: Identity?,
     owner: RuntimeRegistrationOwnerKey
   ) {
     action.record(
       identity: identity,
       handler: handler,
+      accessibilityHandler: accessibilityHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity,
       owner: owner
     )

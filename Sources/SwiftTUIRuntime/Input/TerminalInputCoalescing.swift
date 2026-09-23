@@ -24,7 +24,7 @@ func coalescedInputEvents(
     case .key:
       flushPendingMouseEvent()
       coalesced.append(event)
-    case .paste, .drop:
+    case .paste, .drop, .accessibility:
       flushPendingMouseEvent()
       coalesced.append(event)
     case .mouse(let mouseEvent):

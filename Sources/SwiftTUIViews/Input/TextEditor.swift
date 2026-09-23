@@ -136,6 +136,8 @@ extension TextEditor {
       // through the scroll role, and caret-driven scrolling uses the editor's own
       // scroll-position binding, none of which need descendant focus regions.
       metadata.sealsFocusDescendants = true
+      metadata.accessibilityControl = .init(
+        actions: [.focus, .setValue], value: .text(text.wrappedValue))
       return ResolvedNode(
         identity: context.identity,
         kind: .view("TextEditor"),

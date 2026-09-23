@@ -8,6 +8,14 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- Host-neutral semantic accessibility actions for focus, activation, numeric
+  adjustment, and typed control values. Requests target live scene-local tokens,
+  reject stale/disabled/out-of-scope controls, and acknowledge without publishing
+  secure text. Host frames include additive action capabilities and typed state;
+  WebSocket and WASI input accept the same framed action records (STUI-129).
+
 ## [0.14.0] - 2026-09-20
 
 Borders, strokes and dividers now draw through one renderer. This release breaks

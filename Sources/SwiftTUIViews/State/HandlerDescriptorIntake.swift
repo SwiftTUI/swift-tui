@@ -154,9 +154,16 @@ package struct HandlerDescriptorIntake {
   package func registerAction(
     identity: Identity,
     followUpInvalidationIdentity followUp: Identity?? = nil,
+    accessibilityHandler: LocalActionRegistry.AccessibilityHandler? = nil,
     handler: @escaping @MainActor () -> Bool
   ) {
     let scope = dispatchScope
+    var wrappedAccessibility: LocalActionRegistry.AccessibilityHandler?
+    if let accessibilityHandler {
+      wrappedAccessibility = { action in
+        withImperativeAuthoringContext(scope) { accessibilityHandler(action) }
+      }
+    }
     context.localActionRegistry?.register(
       identity: identity,
       handler: {
@@ -164,6 +171,7 @@ package struct HandlerDescriptorIntake {
           handler()
         }
       },
+      accessibilityHandler: wrappedAccessibility,
       followUpInvalidationIdentity: followUp ?? followUpInvalidationIdentity
     )
   }

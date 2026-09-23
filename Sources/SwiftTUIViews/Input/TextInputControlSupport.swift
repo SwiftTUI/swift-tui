@@ -18,6 +18,20 @@ package func registerTextInputBinding(
     fallbackAuthoringScope: authoringScope
   )
 
+  intake.registerAction(
+    identity: context.identity,
+    accessibilityHandler: { action in
+      guard case .setValue(.text(let next)) = action else { return .unsupported }
+      guard binding.wrappedValue != next else { return .unchanged }
+      var selected = value.wrappedValue.synchronized(with: binding.wrappedValue)
+      selected.selection = .init(anchor: .init(0), head: .init(selected.text.count))
+      value.wrappedValue = selected
+      return applyTextInputCommand(
+        .insertText(next), binding: binding, value: value, traits: traits, layout: layout,
+        clipboardWriteAction: context.environmentValues.clipboardWriteAction,
+        clipboardReadAction: context.environmentValues.clipboardReadAction) ? .changed : .unchanged
+    }, handler: { false })
+
   let submitAction = context.environmentValues.submitAction
   let applyEditingCommand: @MainActor (KeyPress) -> Bool = { keyPress in
     guard let command = textInputCommand(for: keyPress, traits: traits) else {

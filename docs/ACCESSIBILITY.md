@@ -58,15 +58,76 @@ A fifth consumer lives outside the runtime: the `SwiftTUITestSupport` seam
 reading-order string (via the internal `LinearAccessibilityRenderer`) so
 external packages can assert on assistive output for their views.
 
+## Assistive action contract
+
+`AccessibilityNode.actionTarget` identifies one live control in one scene. It
+is opaque: adapters must echo the published token, never derive it from the
+public authored identity, and discard tokens when the scene ends. A recreated
+control gets a new token even if its authored identity is reused. Requests
+resolve against the latest committed semantic tree and active focus regions.
+They do not synthesize keyboard events or invoke ancestor key handlers.
+
+`control.actions` advertises focus, activate, increment, decrement, and/or
+setValue. `control.value` is boolean, number, or text. Numeric controls publish
+optional minimum, maximum and step. SecureField omits its value entirely.
+The runtime rejects stale, disabled, hidden/out-of-scope and unsupported targets,
+wrong value types, nonfinite numbers and numbers outside published bounds.
+The owning control compares against its live binding so value echoes are inert,
+including multiple requests before the next render. Focus echoes are also inert.
+
+Supported primitive routes:
+
+| Control | Actions besides focus | Published value |
+| --- | --- | --- |
+| Button and activating controls | activate | none |
+| Toggle, DisclosureGroup | activate, setValue | boolean |
+| Slider, Stepper | increment, decrement, setValue | number |
+| TextField, TextEditor | setValue | text |
+| SecureField | setValue | omitted |
+
+### Wire compatibility
+
+Full and delta records add optional node fields `actionTarget`, `actions`,
+`isEnabled`, `value` (`{type: "boolean"|"number"|"text", value: ...}`),
+`valueMin`, `valueMax`, and `valueStep`. Existing presentation-only nodes omit
+these fields. A host must require an action token and advertised action before
+sending a request; this also detects older runtimes without action support.
+Unknown optional fields remain ignorable by older hosts.
+
+The shared WASI/WebSocket input parser accepts newline-terminated records
+introduced by RS (`0x1e`):
+
+```text
+accessibility:<percent-encoded-target>:focus
+accessibility:<percent-encoded-target>:activate
+accessibility:<percent-encoded-target>:increment
+accessibility:<percent-encoded-target>:decrement
+accessibility:<percent-encoded-target>:setValue:<boolean|number|text>:<percent-encoded-value>
+```
+
+Encode UTF-8 bytes using URI-component escaping, including colons, newlines,
+percent signs, and RS. Invalid or oversized records are discarded under the
+existing input budget. A host can insert a decimal request ID immediately after `accessibility:`.
+The next presented frame includes `accessibilityActionResponse` with that ID
+(as a decimal string), target token, and result. The response is a persistent
+watermark for the last processed request, including rejections and no-ops;
+coalesced or polled frames therefore acknowledge every earlier request on the
+same ordered scene channel. It never repeats submitted values. Hosts use it
+to keep an unacknowledged edit from being overwritten by an older frame and to
+restore authoritative state after rejection. IDs belong to one scene session.
+Values and focus in subsequent frames remain runtime-authoritative; adapters
+must suppress callbacks while reflecting them.
+The Swift entry point is `HostedSceneSession.send(.accessibility(request))`.
+The request has no authority outside its owning scene and must use that scene's
+input channel. Host-specific adapters and actual assistive acceptance are
+separate from this shared dispatch implementation.
+
 ## Known gaps
 
-Assistive-technology interaction is one-way. Runtime focus is pushed to
-VoiceOver, TalkBack, and the browser tree, but assistive-origin focus traversal
-is not fed back into SwiftTUI. The shared node model also carries no activation,
-adjustment, enabled/selected state, or control-value route, so the host overlays
-present semantics without yet activating or adjusting runtime controls. These
-gaps, and the absence of a WCAG conformance suite, are tracked in the
-[divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
+Browser, SwiftUI and Android overlays need assistive callbacks connected to the
+shared contract. A WCAG conformance suite and screen-reader listening evidence
+are not established by semantic snapshots or runtime tests. Current gaps are
+tracked in the [divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).
 
 The manual screen-reader listening review protocol lives in
 `Tests/SwiftTUITests/Accessibility/README.md`.

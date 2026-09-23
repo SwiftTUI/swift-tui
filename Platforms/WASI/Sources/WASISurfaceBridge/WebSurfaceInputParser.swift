@@ -109,7 +109,9 @@ package struct WebSurfaceInputParser {
     if let resync = parseResyncCommand(text) {
       return ([], [resync])
     }
-    if let event = parseKeyCommand(text) ?? parseMouseCommand(text) ?? parsePasteCommand(text) {
+    if let event = parseAccessibilityCommand(text) ?? parseKeyCommand(text) ?? parseMouseCommand(
+      text) ?? parsePasteCommand(text)
+    {
       return ([event], [])
     }
     return ([], [])
@@ -313,6 +315,44 @@ package struct WebSurfaceInputParser {
         y: y * Double(cellPixelSize.height)
       )
     )
+  }
+
+  private func parseAccessibilityCommand(_ text: String) -> InputEvent? {
+    var parts = splitCommand(text)
+    var requestID: UInt64?
+    if parts.count == 4 || parts.count == 6 {
+      guard let parsedID = UInt64(parts[1]) else { return nil }
+      requestID = parsedID
+      parts.remove(at: 1)
+    }
+    guard parts.count >= 3, parts[0] == "accessibility",
+      let target = percentDecodedString(parts[1]), !target.isEmpty,
+      let kind = AccessibilityActionKind(rawValue: parts[2])
+    else { return nil }
+    let action: AccessibilityAction
+    switch kind {
+    case .focus, .activate, .increment, .decrement:
+      guard parts.count == 3 else { return nil }
+      switch kind {
+      case .focus: action = .focus
+      case .activate: action = .activate
+      case .increment: action = .increment
+      default: action = .decrement
+      }
+    case .setValue:
+      guard parts.count == 5, let rawValue = percentDecodedString(parts[4]) else { return nil }
+      switch parts[3] {
+      case "text": action = .setValue(.text(rawValue))
+      case "boolean":
+        guard rawValue == "true" || rawValue == "false" else { return nil }
+        action = .setValue(.boolean(rawValue == "true"))
+      case "number":
+        guard let number = Double(rawValue), number.isFinite else { return nil }
+        action = .setValue(.number(number))
+      default: return nil
+      }
+    }
+    return .accessibility(.init(target: target, action: action, requestID: requestID))
   }
 
   private func parsePasteCommand(

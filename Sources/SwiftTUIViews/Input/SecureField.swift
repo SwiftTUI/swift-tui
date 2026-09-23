@@ -122,7 +122,9 @@ extension SecureField {
           focusInteractions: .edit,
           accessibilityRole: .secureField
         ).namingControl(with: label).merging(
-          SemanticMetadata(accessibilityLabel: titleAccessibilityLabel))
+          SemanticMetadata(accessibilityLabel: titleAccessibilityLabel)
+        ).accessibilityControl(
+          .init(actions: [.focus, .setValue]))
       )
 
     }

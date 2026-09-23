@@ -1610,6 +1610,7 @@ package final class ViewNode {
   package func recordActionRegistration(
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,
+    accessibilityHandler: LocalActionRegistry.AccessibilityHandler? = nil,
     followUpInvalidationIdentity: Identity?
   ) {
     flagDuplicateRecordIfInCaptureSession(
@@ -1621,6 +1622,7 @@ package final class ViewNode {
     registeredHandlers.recordAction(
       identity: identity,
       handler: handler,
+      accessibilityHandler: accessibilityHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity
     )
     refreshCommittedHandlerInventoryOutsideCapture()
@@ -1629,6 +1631,7 @@ package final class ViewNode {
   package func recordActionRegistration(
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,
+    accessibilityHandler: LocalActionRegistry.AccessibilityHandler? = nil,
     followUpInvalidationIdentity: Identity?,
     owner: RuntimeRegistrationOwnerKey
   ) {
@@ -1641,6 +1644,7 @@ package final class ViewNode {
     registeredHandlers.recordAction(
       identity: identity,
       handler: handler,
+      accessibilityHandler: accessibilityHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity,
       owner: owner
     )

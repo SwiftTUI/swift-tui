@@ -150,7 +150,12 @@ extension Stepper {
           bounds: bounds
         )
       }
-      intake.registerAction(identity: context.identity) {
+      intake.registerAction(
+        identity: context.identity,
+        accessibilityHandler: { action in
+          accessibilityNumericAction(action, binding: binding, bounds: bounds, step: step)
+        }
+      ) {
         adjust(1)
       }
       registerValueAdjustmentInput(intake: intake, identity: context.identity, adjust: adjust)
@@ -208,7 +213,13 @@ extension Stepper {
         semanticMetadata: focusableControlMetadata(
           focusInteractions: .edit,
           accessibilityRole: .stepper
-        ).namingControl(with: label)
+        ).namingControl(with: label).accessibilityControl(
+          .init(
+            actions: [.focus, .increment, .decrement, .setValue],
+            value: .number(currentValue.controlDoubleValue),
+            minimum: bounds?.lowerBound.controlDoubleValue,
+            maximum: bounds?.upperBound.controlDoubleValue,
+            step: step.controlDoubleValue))
       )
 
     }

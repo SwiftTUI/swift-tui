@@ -75,6 +75,17 @@ extension RunLoop {
           scheduler.requestInput()
         }
         return nil
+      case .accessibility(let request):
+        let result = handleAccessibilityAction(request)
+        if let requestID = request.requestID {
+          latestAccessibilityActionResponse = .init(
+            requestID: requestID, target: request.target, result: result)
+          // Even a rejected/no-op request needs an authoritative acknowledgement.
+          scheduler.requestInput()
+        } else if result != .accepted {
+          scheduler.requestInput()
+        }
+        return nil
       case .paste(let pasteEvent):
         scheduler.requestInput()
         handlePaste(pasteEvent)

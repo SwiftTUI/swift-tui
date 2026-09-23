@@ -167,6 +167,11 @@ package struct ScrollTargetQuery: Equatable, Sendable {
 /// Public consumers must not treat `==` as
 /// visible-field equality.
 public struct AccessibilityNode: Equatable, Sendable {
+  /// Opaque live-node token. Never synthesize this from the authored identity.
+  public var actionTarget: String? = nil
+  public var control: AccessibilityControlState? = nil
+  public var isEnabled: Bool = true
+  package var actionIdentity: Identity? = nil
   package var viewNodeID: ViewNodeID?
   public var identity: Identity
   public var parentIdentity: Identity?
