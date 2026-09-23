@@ -517,7 +517,9 @@ private func refreshToolbarItemActionRegistrations(
         item.action()
         return true
       },
-      followUpInvalidationIdentity: item.sourceIdentity,
+      // sourceIdentity locates the contribution, not the body that authored
+      // its action. Untracked writes need the runtime's root backstop.
+      followUpInvalidationIdentity: nil,
       in: stripContext.localActionRegistry
     )
   }
@@ -713,7 +715,18 @@ private struct ToolbarItemsStrip: PrimitiveView, ResolvableView {
       .background {
         Rectangle().fill(AnyShapeStyle(.terminalSurfaceBackground))
       }
-    return strip.resolveWork(in: context).map { [$0] }
+    return strip.resolveWork(in: context).map { resolved in
+      // Fresh buttons are authored by ToolbarItemButton, whose identity is
+      // also below the contributor's body. Apply the same action backstop as
+      // the reuse path so the next activation cannot strand untracked writes.
+      let enabledItems = items.filter(\.isEnabled)
+      let identities =
+        context.viewGraph?.actionRegistrationIdentities(inReusedSubtree: resolved) ?? []
+      if identities.count == enabledItems.count {
+        refreshToolbarItemActionRegistrations(enabledItems, at: identities, in: context)
+      }
+      return [resolved]
+    }
   }
 }
 

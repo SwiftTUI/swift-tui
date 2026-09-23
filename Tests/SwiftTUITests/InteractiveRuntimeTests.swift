@@ -7426,3 +7426,76 @@ extension ResolvedNode {
     return nil
   }
 }
+
+extension InteractiveRuntimeTests {
+  @Test(
+    "Wheel notch consumed by a child onScrollWheel handler cancels an enclosing fling (touch-to-stop parity)"
+  )
+  func wheelConsumedByChildHandlerCancelsEnclosingFling() throws {
+    final class Box { var position = ScrollCellOffset.zero }
+    final class WheelCounter {
+      private(set) var count = 0
+      func tick() { count += 1 }
+    }
+    let box = Box()
+    let wheels = WheelCounter()
+    let terminalSize = CellSize(width: 20, height: 12)
+    let rootIdentity = testIdentity("WheelFlingFixture")
+    let scrollID = testIdentity("WheelFlingFixture", "Scroll")
+    @MainActor func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<200) { _ in
+            Text("Wheel row")
+              .onScrollWheel { _ in
+                wheels.tick()
+                return .handled
+              }
+          }
+        }
+      }
+      .id(scrollID)
+      .frame(width: 12, height: 6, alignment: .topLeading)
+    }
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollID, in: makeView(),
+        rootIdentity: rootIdentity, terminalSize: terminalSize))
+
+    let t0 = MonotonicInstant.now()
+    let clock = VirtualFrameClock(t0)
+    let runLoop = try mountedMomentumRunLoop(
+      terminalSize: terminalSize, rootIdentity: rootIdentity,
+      clock: clock, viewBuilder: makeView)
+
+    var frames = 0
+    let top = topPoint(of: scrollRect)
+
+    let bindingSourceID = runLoop.localScrollPositionRegistry.bindingSourceID(for: scrollID)
+    let started = runLoop.scrollMomentum.begin(
+      identity: scrollID, offsetVelocity: Vector(dx: 0, dy: 30),
+      canScrollX: false, canScrollY: true, now: t0, bindingSourceID: bindingSourceID)
+    #expect(started)
+    #expect(runLoop.scrollMomentum.hasActiveMomentum)
+
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: top, timestamp: t0))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(wheels.count == 1)
+    #expect(!runLoop.scrollMomentum.hasActiveMomentum)
+
+    let restarted = runLoop.scrollMomentum.begin(
+      identity: scrollID, offsetVelocity: Vector(dx: 0, dy: 30),
+      canScrollX: false, canScrollY: true, now: t0, bindingSourceID: bindingSourceID)
+    #expect(restarted)
+    #expect(runLoop.scrollMomentum.hasActiveMomentum)
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .down(.primary), location: top, timestamp: t0))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(!runLoop.scrollMomentum.hasActiveMomentum)
+  }
+}

@@ -39,8 +39,6 @@ extension ViewGraph {
     entityIdentity: EntityIdentity? = nil
   ) -> ViewNode {
 
-
-
     if let entityIdentity,
       let routedNodeID = entityRoutingTable.route(entityIdentity)
     {
@@ -113,7 +111,13 @@ extension ViewGraph {
           bindEntityRoute(entityIdentity, to: existing.viewNodeID)
           return existing
         }
-        // A different entity (or none) occupies this `Identity` slot. A
+        // Dormant restoration seeds occurrence-qualified state placeholders
+        // without entity routes. Every occurrence must adopt its own seed.
+        if existingEntityIdentity == nil {
+          bindEntityRoute(entityIdentity, to: existing.viewNodeID)
+          return existing
+        }
+        // A different entity occupies this `Identity` slot. A
         // duplicate-occurrence sibling (`occurrence > 0`, e.g. the second `7`
         // in `ForEach([7, 7])`) shares an `Identity` with the primary
         // (`occurrence == 0`) sibling but is a *distinct* runtime lifetime: it
@@ -126,16 +130,11 @@ extension ViewGraph {
         // (`nodesByNodeID`), entity routing, and parent→child teardown all
         // track both siblings.
         if entityIdentity.occurrence == 0 {
-          if existingEntityIdentity != nil {
-            // The displaced occupant's resolved subtree departs right here.
-            // The eviction's descent covers committed values, live children,
-            // and hosted-detached edges. The arriving entity mints a distinct
-            // runtime lifetime below.
-            removeSubtree(rootedAt: existing)
-          } else {
-            bindEntityRoute(entityIdentity, to: existing.viewNodeID)
-            return existing
-          }
+          // The displaced occupant's resolved subtree departs right here.
+          // The eviction's descent covers committed values, live children,
+          // and hosted-detached edges. The arriving entity mints a distinct
+          // runtime lifetime below.
+          removeSubtree(rootedAt: existing)
         }
       } else {
         // Single-child flattening tiebreak: the occupant is the absorber

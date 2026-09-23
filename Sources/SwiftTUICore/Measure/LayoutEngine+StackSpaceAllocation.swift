@@ -199,7 +199,8 @@ extension LayoutEngine {
     var spacerSuffixMinimums = [Int](repeating: 0, count: order.count)
     for position in order.indices.reversed() {
       let childIndex = order[position]
-      let isAxisSpacer = isSpacer(children[childIndex]) && maximums[childIndex] == nil
+      let isAxisSpacer =
+        isStackSpacer(children[childIndex], axis: axis) && maximums[childIndex] == nil
       let next = position + 1
       let (nextClaimants, nextSpacerMinimums) =
         next < groupEndPositions[position]
@@ -434,7 +435,7 @@ extension LayoutEngine {
       "stack allocation completed with missing child measurements"
     )
 
-    for index in children.indices where isSpacer(children[index]) {
+    for index in children.indices where isStackSpacer(children[index], axis: axis) {
       allocatedMeasurements[index].measuredSize = settingMainDimension(
         of: allocatedMeasurements[index].measuredSize,
         for: axis,

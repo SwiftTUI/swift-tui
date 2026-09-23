@@ -65,11 +65,7 @@ extension RunLoop {
         else {
           return false
         }
-        let scrollsHorizontally = route.contentBounds.size.width > route.viewportRect.size.width
-        let scrollsVertically = route.contentBounds.size.height > route.viewportRect.size.height
-        if deltaX != 0, !scrollsHorizontally { return false }
-        if deltaY != 0, !scrollsVertically { return false }
-        return scrollsHorizontally || scrollsVertically
+        return scrollRouteOverflows(route, deltaX: deltaX, deltaY: deltaY)
       }
 
     let scrollViewIdentities = Set(
@@ -79,6 +75,14 @@ extension RunLoop {
     )
     return routes.last { scrollViewIdentities.contains($0.identity) }
       ?? routes.last
+  }
+
+  package func scrollRouteOverflows(_ route: ScrollRoute, deltaX: Int, deltaY: Int) -> Bool {
+    let horizontal = route.contentBounds.size.width > route.viewportRect.size.width
+    let vertical = route.contentBounds.size.height > route.viewportRect.size.height
+    if deltaX != 0, !horizontal { return false }
+    if deltaY != 0, !vertical { return false }
+    return horizontal || vertical
   }
 
   package func hitTarget(

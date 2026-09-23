@@ -258,7 +258,7 @@ extension LayoutEngine {
         // size is the allocated value (forced at completion), so charge
         // that; everyone else charges the actual measured response.
         let consumed =
-          isSpacer(children[childIndex])
+          isStackSpacer(children[childIndex], axis: axis)
           ? state.allocatedMainSizes[childIndex]
           : mainDimension(of: measurement.measuredSize, for: axis)
         state.remainingMain = max(0, state.remainingMain - consumed)
@@ -321,7 +321,13 @@ extension LayoutEngine {
           replacements: replacements
         )
         for (index, measurement) in zip(replacementIndices, replacements) {
-          measurements[index] = measurement
+          var reconciled = measurement
+          if isStackSpacer(children[index], axis: axis) {
+            reconciled.measuredSize = settingMainDimension(
+              of: reconciled.measuredSize, for: axis,
+              to: mainDimension(of: measurements[index].measuredSize, for: axis))
+          }
+          measurements[index] = reconciled
         }
         results.append(
           makeMeasuredNode(

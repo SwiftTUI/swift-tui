@@ -1954,3 +1954,102 @@ private struct DormantTextEditorFixture: View {
     }
   }
 }
+@MainActor
+private struct DuplicateForEachTabFixture: View {
+  let model: DormantTabModel
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") { DuplicateForEachContent() }
+      Tab("B", value: "B") { Text("B plain") }
+    }
+  }
+}
+
+@MainActor
+private struct DuplicateForEachContent: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      ForEach(
+        [DormantPair(index: 0, id: 7), DormantPair(index: 1, id: 7)],
+        id: \.id
+      ) { pair in
+        DuplicateForEachRow(index: pair.index)
+      }
+    }
+  }
+}
+
+@MainActor
+private struct DuplicateForEachRow: View {
+  let index: Int
+  @State private var count = 0
+  var body: some View {
+    HStack(spacing: 1) {
+      Text("row\(index) count \(count)")
+      Button("Increment row\(index)") { count += 1 }
+        .id(testIdentity("DormantRowInc-\(index)"))
+    }
+  }
+}
+
+private struct DormantPair: Hashable, Sendable {
+  let index: Int
+  let id: Int
+}
+
+extension DormantTabStateTests {
+  @Test("duplicate ForEach occurrence per-row @State survives tab dormancy")
+  func duplicateForEachOccurrenceStateSurvivesDormancy() {
+    let model = DormantTabModel()
+    let renderer = DefaultRenderer()
+    let root = testIdentity("DormantDuplicateForEach")
+
+    func render(_ actions: LocalActionRegistry) -> RenderSnapshot {
+      renderer.render(
+        DuplicateForEachTabFixture(model: model),
+        context: dormantContext(root: root, actions: actions)
+      )
+    }
+
+    var actions = LocalActionRegistry()
+    let first = render(actions)
+    #expect(surfaceText(first).contains("row0 count 0"))
+    #expect(surfaceText(first).contains("row1 count 0"))
+
+    #expect(actions.dispatch(identity: testIdentity("DormantRowInc-0")))
+    actions = LocalActionRegistry()
+    #expect(surfaceText(render(actions)).contains("row0 count 1"))
+    #expect(actions.dispatch(identity: testIdentity("DormantRowInc-0")))
+    actions = LocalActionRegistry()
+    #expect(surfaceText(render(actions)).contains("row0 count 2"))
+    #expect(actions.dispatch(identity: testIdentity("DormantRowInc-0")))
+    actions = LocalActionRegistry()
+    #expect(surfaceText(render(actions)).contains("row0 count 3"))
+    #expect(actions.dispatch(identity: testIdentity("DormantRowInc-1")))
+    actions = LocalActionRegistry()
+    let bumped = render(actions)
+    #expect(surfaceText(bumped).contains("row0 count 3"))
+    #expect(surfaceText(bumped).contains("row1 count 1"))
+
+    model.selection = "B"
+    actions = LocalActionRegistry()
+    let away = render(actions)
+    #expect(surfaceText(away).contains("B plain"))
+    #expect(!surfaceText(away).contains("row0 count"))
+
+    let archived = tabDormantRegistrySnapshot(in: renderer.viewGraph.nodeForIdentity(root))
+    #expect(archived.archivedTabCount == 1)
+    #expect(archived.persistentSlotCount >= 2)
+
+    model.selection = "A"
+    actions = LocalActionRegistry()
+    let restored = render(actions)
+    assertNoDormantRestorePlaceholders(in: renderer.viewGraph)
+    #expect(
+      surfaceText(restored).contains("row0 count 3"),
+      "row0 occurrence state lost at restore: \(surfaceText(restored))")
+    #expect(
+      surfaceText(restored).contains("row1 count 1"),
+      "row1 occurrence state lost at restore: \(surfaceText(restored))")
+  }
+}

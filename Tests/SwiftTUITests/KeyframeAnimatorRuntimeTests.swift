@@ -227,6 +227,23 @@ struct KeyframeAnimatorRuntimeTests {
 
   // MARK: - Reduce motion
 
+  @Test("a repeating animator settles on a mid-run Reduce Motion flip and resumes from rest")
+  func repeatingMotionFlipSettlesAndRestarts() async throws {
+    let probe = KeyframeValueProbe()
+    let harness = try AnimatorRuntimeHarness { KeyframeMotionFlipFixture(probe: probe) }
+    defer { harness.shutdown() }
+    try await harness.wait(until: { (probe.values.last ?? 0) > 2 })
+    try harness.clickText("flip")
+    try await harness.wait(until: { probe.values.last == 0 })
+    let settledCount = probe.values.count
+    try await harness.hold(for: .milliseconds(100))
+    #expect(probe.values.dropFirst(settledCount).allSatisfy { $0 == 0 })
+    let restoredCount = probe.values.count
+    try harness.clickText("flip")
+    #expect(probe.values.dropFirst(restoredCount).first == 0)
+    try await harness.wait(until: { (probe.values.last ?? 0) > 2 })
+  }
+
   @Test("under reduce motion a trigger change snaps to the end value")
   func reduceMotionSnapsTriggerToEnd() async throws {
     let probe = KeyframeValueProbe()
@@ -410,5 +427,22 @@ private struct KeyframeOuterStateFixture: View {
         LinearKeyframe(10.0, duration: .milliseconds(600))
       }
     }
+  }
+}
+
+private struct KeyframeMotionFlipFixture: View {
+  let probe: KeyframeValueProbe
+  @State private var reduced = false
+  var body: some View {
+    VStack {
+      Button("flip") { reduced.toggle() }
+      KeyframeAnimator(initialValue: 0.0) { value in
+        let _ = probe.record(value)
+        Text("value=\(Int(value))")
+      } keyframes: { _ in
+        LinearKeyframe(10, duration: .seconds(1))
+      }
+    }
+    .environment(\.accessibilityReduceMotion, reduced)
   }
 }

@@ -429,3 +429,37 @@ private final class HoverSignalReader: SignalReading {
     AsyncStream { $0.finish() }
   }
 }
+
+extension ScrollWheelTests {
+  @Test("non-overflowing scroll ancestors receive refused wheel events", arguments: [false, true])
+  func nonOverflowingAncestorWheelHandlerWithClampedInner(atEdge: Bool) throws {
+    let events = ScrollWheelEventBox()
+    let inner = WheelPositionBox(y: atEdge ? 5 : 0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NonOverflowingAncestorWheel"), size: .init(width: 30, height: 8)
+    ) {
+      ScrollView(.vertical) {  // The fixed inner viewport fits without outer overflow.
+        ScrollView(.vertical, position: inner.binding) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<8) { row in Text("Inner \(row)") }
+          }
+        }
+        .scrollIndicators(.hidden)
+        .frame(width: 20, height: 3, alignment: .topLeading)
+      }
+      .onScrollWheel { event in
+        events.append(event)
+        return .handled
+      }
+      .scrollIndicators(.hidden)
+      .frame(width: 24, height: 6, alignment: .topLeading)
+    }
+    defer { harness.shutdown() }
+    let initialFrame = harness.frame
+    let point = try #require(harness.point(forText: atEdge ? "Inner 6" : "Inner 1"))
+    let frame = try harness.scrollPointer(at: point, deltaY: 1)
+    #expect(events.values == (atEdge ? [ScrollWheelEvent(deltaX: 0, deltaY: 1)] : []))
+    #expect(inner.value.y == (atEdge ? 5 : 1))
+    #expect((frame == initialFrame) == atEdge)
+  }
+}

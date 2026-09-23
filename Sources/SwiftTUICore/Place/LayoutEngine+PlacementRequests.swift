@@ -234,7 +234,13 @@ extension LayoutEngine {
       if placement == .inset, bounds.size.width > 0, bounds.size.height > 0,
         childMeasurement.measuredSize.width > 0, childMeasurement.measuredSize.height > 0
       {
-        let occupied = borderLayoutInsets(set: set, placement: .outset, sides: sides)
+        // Horizontal edge glyph widths are columns, but each edge paints
+        // only one row. Outset reservation insets are not physical overdraw.
+        let occupied = EdgeInsets(
+          top: sides.contains(.top) && set.topDisplayWidth > 0 ? 1 : 0,
+          leading: sides.contains(.leading) ? set.leftDisplayWidth : 0,
+          bottom: sides.contains(.bottom) && set.bottomDisplayWidth > 0 ? 1 : 0,
+          trailing: sides.contains(.trailing) ? set.rightDisplayWidth : 0)
         if occupied.horizontal >= bounds.size.width || occupied.vertical >= bounds.size.height {
           passContext?.recordRuntimeIssue(
             .init(

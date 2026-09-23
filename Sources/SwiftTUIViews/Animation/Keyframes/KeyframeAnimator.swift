@@ -144,7 +144,16 @@ where KeyframePath.Value == Value {
         }
     case .onAppear(let repeating):
       if reduceMotion {
-        keyframeContent
+        if flight != nil {
+          keyframeContent
+            .task { @MainActor in
+              guard !Task.isCancelled else { return }
+              value = initialValue
+              flight = nil
+            }
+        } else {
+          keyframeContent
+        }
       } else {
         keyframeContent
           .task { @MainActor in

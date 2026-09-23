@@ -436,6 +436,10 @@ extension RunLoop {
     // identities can make nested scroll routes siblings, so body dispatch must
     // retain the spatial ordering below.
     let initialScrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY)
+    // Touch-to-stop also applies when a content handler consumes the notch.
+    if let initialScrollRoute {
+      cancelScrollMomentum(containing: initialScrollRoute.identity)
+    }
     var visitedHandlerRoutes: Set<RouteID> = []
     if let hitTarget = hitTarget(at: location) {
       let event = LocalPointerEvent(
@@ -532,6 +536,7 @@ extension RunLoop {
     includesPreferredScrollBody: Bool,
     visitedHandlerRoutes: inout Set<RouteID>
   ) -> Bool {
+    guard case .scrolled(let deltaX, let deltaY) = event.kind else { return false }
     let candidates =
       [preferredRouteID]
       + fallbackPrimaryRouteIDs(
@@ -541,6 +546,11 @@ extension RunLoop {
       let isScrollBody = latestSemanticSnapshot.scrollRoutes.contains { route in
         primaryRouteID(for: route.identity, ownerNodeID: route.viewNodeID)
           .pairsIgnoringOwner(with: candidate)
+          // First refusal excludes every scroll body. After the preferred
+          // body refuses, ancestors the spatial retry cannot reach must be
+          // allowed to bubble here (including non-overflowing ScrollViews).
+          && (!includesPreferredScrollBody
+            || scrollRouteOverflows(route, deltaX: deltaX, deltaY: deltaY))
       }
       if isScrollBody && !(includesPreferredScrollBody && candidate == preferredRouteID) {
         continue

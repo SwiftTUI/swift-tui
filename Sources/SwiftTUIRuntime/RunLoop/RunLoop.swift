@@ -649,6 +649,13 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
               )
             }
           }
+          if let programmatic = consumeProgrammaticTerminationRequest() {
+            return RunLoopResult(
+              finalState: stateContainer.state,
+              renderedFrames: renderedFrames,
+              exitReason: programmatic
+            )
+          }
           if terminationDisposition(for: exitReason) == .cancel {
             scheduler.requestInvalidation(of: [rootIdentity])
             handledNonExitEvent = true

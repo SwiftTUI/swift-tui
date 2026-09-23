@@ -7,6 +7,27 @@ import Testing
 /// Layout, raster, and interaction assertions for the public inset default.
 @MainActor
 struct BorderModifierLayoutTests {
+  @Test(
+    "wide horizontal border glyphs occupy one row per edge", arguments: [false, true],
+    [false, true])
+  func wideHorizontalEdgesUsePhysicalRows(topOnly: Bool, hasInterior: Bool) {
+    var border = BorderSet.single
+    border.top = "界"
+    border.bottom = "界"
+    let height = (topOnly ? 1 : 2) + (hasInterior ? 1 : 0)
+    let artifacts = DefaultRenderer().render(
+      Text("visible").frame(width: 12, height: height, alignment: .bottom)
+        .border(style: StrokeStyle(borderSet: border), sides: topOnly ? .top : [.top, .bottom]),
+      context: .init(identity: testIdentity("WideHorizontalBorder")))
+    #expect(
+      artifacts.diagnostics.runtime.issues.contains {
+        $0.code == "layout.insetBorderOccludesContent"
+      } == !hasInterior)
+    if topOnly && hasInterior {
+      #expect(artifacts.rasterSurface.lines.joined().contains("visible"))
+    }
+  }
+
   @Test("public .border defaults to non-layout-affecting inset placement")
   func borderDefaultsToInsetLayout() {
     let artifacts = DefaultRenderer().render(

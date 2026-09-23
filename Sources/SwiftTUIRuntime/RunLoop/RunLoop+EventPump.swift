@@ -261,6 +261,9 @@ extension RunLoop {
         if shouldFlushBeforeExit {
           try renderPendingFrames(renderedFrames: &renderedFrames)
         }
+        if let programmatic = consumeProgrammaticTerminationRequest() {
+          return programmatic
+        }
         if terminationDisposition(for: exitReason) == .cancel {
           scheduler.requestInvalidation(of: [rootIdentity])
           handledNonExitEvent = true

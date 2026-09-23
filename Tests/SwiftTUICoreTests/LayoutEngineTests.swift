@@ -6,6 +6,41 @@ import Testing
 
 @Suite
 struct LayoutEngineTests {
+  @Test("wrapped along-axis Spacers consume their stack allocation")
+  func wrappedSpacersConsumeAllocation() {
+    for axis: Axis in [.horizontal, .vertical] {
+      let wrappers: [LayoutBehavior] = [
+        .padding(.init(top: 8, leading: 8, bottom: 8, trailing: 8)),
+        .border(
+          .single, placement: .outset, foreground: nil, background: nil,
+          blend: nil, blendPhase: 0, sides: .all),
+        .offset(x: 2, y: 2),
+        .frame(width: nil, height: nil, alignment: .center),
+        .decoration(primaryIndex: 0, alignment: .center),
+        .safeAreaIgnoring(.init(), fillsProposal: false),
+        .flexibleFrame(
+          minWidth: nil, idealWidth: nil, maxWidth: nil,
+          minHeight: nil, idealHeight: nil, maxHeight: nil, alignment: .center),
+      ]
+      for (index, behavior) in wrappers.enumerated() {
+        for hasSibling in [false, true] {
+          let wrapped = ResolvedNode(
+            identity: testIdentity("wrapped-\(index)"), kind: .view("Wrapper"),
+            children: [spacer("inside")], layoutBehavior: behavior)
+          let resolved = stack(
+            "stack", axis: axis,
+            children: hasSibling ? [wrapped, spacer("sibling")] : [wrapped])
+          let engine = LayoutEngine()
+          let measured = engine.measure(resolved, proposal: .init(width: 100, height: 100))
+          #expect(engine.mainDimension(of: measured.measuredSize, for: axis) == 100)
+          #expect(
+            engine.mainDimension(of: measured.childMeasurements[0].measuredSize, for: axis)
+              == (hasSibling ? 50 : 100))
+        }
+      }
+    }
+  }
+
   @Test("STUI-505: decoration minimums come only from the primary child")
   func decorationMinimumUsesPrimary() {
     for axis: Axis in [.horizontal, .vertical] {

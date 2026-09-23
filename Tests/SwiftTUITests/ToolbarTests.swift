@@ -7,6 +7,24 @@ import Testing
 @MainActor
 @Suite
 struct ToolbarTests {
+  @Test("toolbar actions with untracked writes refresh their authoring body")
+  func untrackedToolbarActionRefreshesOwner() throws {
+    let box = UntrackedToolbarBox()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("UntrackedToolbar"), size: .init(width: 40, height: 8)
+    ) { UntrackedToolbarFixture(box: box) }
+    defer { harness.shutdown() }
+    #expect(harness.frame.contains("count:0"))
+    let button = try #require(harness.runLoop.latestSemanticSnapshot.focusRegions.last)
+    harness.runLoop.focusTracker.setFocus(to: button.identity)
+    _ = try harness.render()
+    for expected in 1...2 {
+      _ = try harness.pressKey(KeyPress(.space))
+      #expect(box.value == expected)
+      #expect(harness.frame.contains("count:\(expected)"))
+    }
+  }
+
   @Test("DefaultTopToolbarStyle and DefaultBottomToolbarStyle conform to ToolbarStyle")
   func defaultStylesExist() {
     let top: any ToolbarStyle = DefaultTopToolbarStyle()
@@ -863,4 +881,18 @@ private func render<V: View>(
       height: terminalSize.height
     )
   )
+}
+
+@MainActor
+private final class UntrackedToolbarBox { var value = 0 }
+
+private struct UntrackedToolbarFixture: View {
+  let box: UntrackedToolbarBox
+  var body: some View {
+    Panel(id: "scope") {
+      Text("count:\(box.value)")
+        .toolbarItem(.init(title: "Bump", action: { box.value += 1 }))
+    }
+    .toolbar().toolbarStyle(DefaultBottomToolbarStyle())
+  }
 }

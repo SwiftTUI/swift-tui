@@ -8,6 +8,60 @@ import Testing
 @MainActor
 @Suite("Termination requests")
 struct TerminationRequestTests {
+  @Test(
+    "programmatic termination from a drained action precedes a later exit key",
+    arguments: [false, true], [false, true])
+  func programmaticRequestPrecedesBatchedExit(cancelProgrammatic: Bool, synchronous: Bool)
+    async throws
+  {
+    let recorder = TerminationRecorder()
+    let exitKey = KeyPress(.character("c"), modifiers: .ctrl)
+    let root = testIdentity("BatchedProgrammaticTermination")
+    let runLoop = RunLoop(
+      rootIdentity: root,
+      presentationSurface: TerminationTestTerminalHost(),
+      terminalInputReader: TerminationTestInputReader(
+        events: [.key(KeyPress(.space)), .key(exitKey)]),
+      signalReader: TerminationTestSignalReader(signals: []),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      viewBuilder: { _, _ in
+        ButtonTerminationFixture()
+          .onTerminationRequest { request in
+            recorder.requests.append(request)
+            return cancelProgrammatic && request == .programmatic ? .cancel : .allow
+          }
+      }
+    )
+    let exitReason: RunLoopExitReason?
+    if synchronous {
+      runLoop.isSessionActive = true
+      defer {
+        runLoop.isSessionActive = false
+        runLoop.lifecycleCoordinator.shutdown()
+      }
+      var frames = 0
+      runLoop.scheduler.requestInvalidation(of: [root])
+      try runLoop.renderPendingFrames(renderedFrames: &frames)
+      let buffer = EventPumpBuffer()
+      _ = buffer.enqueue(.input(.key(KeyPress(.space))))
+      _ = buffer.enqueue(.input(.key(exitKey)))
+      exitReason = try runLoop.processPendingEventsSynchronously(
+        from: .init(
+          stream: AsyncStream { $0.finish() },
+          drainEvents: { buffer.drain() }, hasPendingEvents: { buffer.hasPendingEvents() },
+          cancel: {}, scheduleDeadlineWake: { _ in }),
+        renderedFrames: &frames)
+    } else {
+      exitReason = try await runLoop.run().exitReason
+    }
+    #expect(exitReason == (cancelProgrammatic ? .userExit(exitKey) : .programmatic))
+    #expect(
+      recorder.requests
+        == (cancelProgrammatic ? [.programmatic, .userExit(exitKey)] : [.programmatic]))
+  }
+
   @Test("onTerminationRequest can cancel an exit key and allow a later one")
   func terminationRequestCanCancelExitKey() async throws {
     let recorder = TerminationRecorder()
@@ -206,6 +260,13 @@ private func runTerminationHarness(
 
 private final class AnimationProgressBox: Sendable {
   let finished = Mutex<Bool>(false)
+}
+
+private struct ButtonTerminationFixture: View {
+  @Environment(\.requestTermination) private var requestTermination
+  var body: some View {
+    Button("Quit") { requestTermination() }
+  }
 }
 
 /// Drives an invalidation-caused frame per iteration — the frame source the

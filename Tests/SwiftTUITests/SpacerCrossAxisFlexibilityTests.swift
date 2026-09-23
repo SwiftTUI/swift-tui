@@ -18,6 +18,44 @@ import Testing
 /// break — a spacer still has to stretch along its own axis.
 @MainActor
 struct SpacerCrossAxisFlexibilityTests {
+  @Test("wrapped Spacers fill public stacks without propagating underfill to their parent")
+  func wrappedSpacerFillsParent() {
+    let rendered = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        HStack(spacing: 0) {
+          Spacer().padding(.horizontal, 8)
+          Spacer()
+        }
+        Text("end")
+      }, proposal: .init(width: 100, height: 4))
+    #expect(rendered.placedTree.bounds.size.width == 100)
+  }
+
+  @Test("cross-axis reconciliation preserves wrapped Spacer allocation")
+  func wrappedSpacerKeepsMainSizeDuringCrossReconciliation() {
+    let rendered = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Spacer().frame(maxHeight: .infinity)
+        Text("end")
+      }, proposal: .init(width: 20, height: .unspecified))
+    #expect(rendered.placedTree.bounds.size.width == 20)
+    #expect(rendered.rasterSurface.lines.first?.hasSuffix("end") == true)
+  }
+
+  @Test("wrapped Spacer constraints remain bounded", arguments: [false, true])
+  func wrappedSpacerKeepsConstraints(fixedSize: Bool) {
+    let rendered = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        if fixedSize {
+          Spacer().padding(.horizontal, 2).fixedSize()
+        } else {
+          Spacer().padding(.horizontal, 2).frame(width: 4)
+        }
+        Text("end")
+      }, proposal: .init(width: 20, height: 1))
+    #expect(rendered.placedTree.bounds.size.width == 7)
+  }
+
   private struct VerticalSkeleton: View {
     var body: some View {
       VStack(alignment: .leading, spacing: 0) {
