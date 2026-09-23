@@ -8,12 +8,11 @@
 
 SwiftTUI is a Swift framework for building terminal user interfaces on macOS,
 Linux, and Windows. You write `View` types with `@State`, stacks, controls,
-focus, gestures, and animation — the declarative model SwiftUI has proven at
-platform scale — and the framework owns layout, input, redraw, and the
-terminal itself. The result is a native executable for the platform you build for.
+focus, gestures, and animation — the declarative model SwiftUI has proven — 
+and the framework owns layout, input, drawing, and the terminal itself.
 
 > [!important]
-> **Public beta.** The API is still being proven, and breaking changes can occur.
+> **Public beta.** The API is still being proven out, and breaking changes might still occur.
 > All changes are documented in the [CHANGELOG](https://github.com/SwiftTUI/swift-tui/blob/main/CHANGELOG.md).  
 > Pin with `.upToNextMinor`.
 
