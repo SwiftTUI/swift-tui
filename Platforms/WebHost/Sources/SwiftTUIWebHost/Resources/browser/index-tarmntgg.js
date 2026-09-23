@@ -2526,6 +2526,90 @@ function dirtyRegionIntersectsCellRect(region, x, y, width, height) {
   return false;
 }
 
+// src/DomCellMetrics.ts
+function measureDomCells(mount, style) {
+  const probe = document.createElement("span");
+  probe.setAttribute("aria-hidden", "true");
+  Object.assign(probe.style, {
+    position: "absolute",
+    visibility: "hidden",
+    pointerEvents: "none",
+    userSelect: "none",
+    whiteSpace: "pre",
+    font: fontForStyle(style),
+    fontVariantLigatures: "none",
+    letterSpacing: "0px",
+    lineHeight: "normal"
+  });
+  probe.textContent = "W".repeat(64);
+  mount.appendChild(probe);
+  const rect = probe.getBoundingClientRect?.();
+  const mountRect = mount.getBoundingClientRect?.();
+  const scale = mount.offsetWidth > 0 && mountRect?.width ? mountRect.width / mount.offsetWidth : 1;
+  probe.remove();
+  if (!rect || rect.width <= 0 || rect.height <= 0)
+    return;
+  const advance = rect.width / scale / 64;
+  return {
+    width: Math.max(1, Math.ceil(advance)),
+    height: Math.max(1, Math.ceil(rect.height / scale)),
+    advance
+  };
+}
+
+// src/DomGlyphBackground.ts
+class DomGlyphBackground {
+  cache = new Map;
+  clear() {
+    this.cache.clear();
+  }
+  image(text, color, width, height) {
+    if (!canRenderBoxDrawing(text))
+      return;
+    const key = JSON.stringify([text, color, width, height]);
+    const cached = this.cache.get(key);
+    if (cached)
+      return cached;
+    const shapes = [];
+    let path = "";
+    let dash = [];
+    const context = {
+      lineWidth: 1,
+      lineCap: "butt",
+      fillRect(x, y, w, h) {
+        shapes.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}"/>`);
+      },
+      beginPath() {
+        path = "";
+      },
+      moveTo(x, y) {
+        path += `M${x} ${y}`;
+      },
+      lineTo(x, y) {
+        path += `L${x} ${y}`;
+      },
+      bezierCurveTo(a, b, c, d, x, y) {
+        path += `C${a} ${b} ${c} ${d} ${x} ${y}`;
+      },
+      setLineDash(value) {
+        dash = value;
+      },
+      stroke() {
+        shapes.push(`<path d="${path}" fill="none" stroke="currentColor" stroke-width="${this.lineWidth}" stroke-linecap="${this.lineCap}" stroke-dasharray="${dash.join(" ")}"/>`);
+      }
+    };
+    if (!drawBoxDrawing(context, text, { x: 0, y: 0, width, height }))
+      return;
+    const escapedColor = color.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" color="${escapedColor}" fill="currentColor">${shapes.join("")}</svg>`;
+    const result = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+    if (this.cache.size >= 512)
+      this.cache.delete(this.cache.keys().next().value);
+    this.cache.set(key, result);
+    return result;
+  }
+}
+
 // src/DomSurfacePainter.ts
 class DomSurfacePainter {
   onImagePayloadMiss;
@@ -2533,15 +2617,22 @@ class DomSurfacePainter {
   rowsLayer;
   imagesLayer;
   rowElements = [];
+  cells = [];
   renderedImages = new Map;
   appliedMetricsKey;
   renderedGridKey;
+  renderedLinksKey;
+  linkCells = new Map;
   hasRenderedFrame = false;
   letterSpacing;
   reportedMissingImageIds = new Set;
   lastImageRecoveryFrame;
   lastEpoch;
+  glyphs = new DomGlyphBackground;
+  styleCache = new Map;
+  onOpenHyperlink;
   constructor(options = {}) {
+    this.onOpenHyperlink = options.onOpenHyperlink;
     this.onImagePayloadMiss = options.onImagePayloadMiss ?? (() => {});
     registerDomSurfacePainterConformanceControl(this, {
       evictImages: (ids) => {
@@ -2567,9 +2658,11 @@ class DomSurfacePainter {
     this.imagesLayer = imagesLayer;
     root.replaceChildren(rowsLayer, imagesLayer);
     this.rowElements = [];
+    this.cells = [];
     this.renderedImages = new Map;
     this.appliedMetricsKey = undefined;
     this.renderedGridKey = undefined;
+    this.renderedLinksKey = undefined;
     this.hasRenderedFrame = false;
     this.reportedMissingImageIds.clear();
     this.lastImageRecoveryFrame = undefined;
@@ -2588,24 +2681,56 @@ class DomSurfacePainter {
     const metricsKey = metricsKeyFor(metrics);
     const metricsChanged = metricsKey !== this.appliedMetricsKey;
     if (metricsChanged) {
+      this.styleCache.clear();
+      this.glyphs.clear();
       this.applyRootStyle(root, metrics);
       this.appliedMetricsKey = metricsKey;
     }
     if (!frame) {
+      clearChangedSelection(rowsLayer);
       this.rowElements = [];
+      this.cells = [];
+      this.linkCells.clear();
       rowsLayer.replaceChildren();
       this.lastImageRecoveryFrame = undefined;
       this.reconcileImages([], metrics, false);
       this.renderedGridKey = undefined;
+      this.renderedLinksKey = undefined;
       this.hasRenderedFrame = false;
       return;
     }
     const gridKey = `${frame.width}x${frame.height}x${frame.rows.length}`;
-    const fullRepaint = metricsChanged || !this.hasRenderedFrame || gridKey !== this.renderedGridKey || !damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay;
+    const linksKey = JSON.stringify([
+      frame.width,
+      frame.links,
+      frame.linkTargets
+    ]);
+    const linksChanged = linksKey !== this.renderedLinksKey;
+    this.renderedLinksKey = linksKey;
+    if (linksChanged) {
+      this.linkCells.clear();
+      for (const [y, runs] of frame.links ?? []) {
+        for (const [x, span, targetIndex] of runs) {
+          const target = frame.linkTargets?.[targetIndex];
+          if (target === undefined)
+            continue;
+          for (let column = Math.max(0, x);column < Math.min(frame.width, x + span); column += 1) {
+            const key = y * frame.width + column;
+            if (!this.linkCells.has(key))
+              this.linkCells.set(key, target);
+          }
+        }
+      }
+    }
+    const fullRepaint = linksChanged || metricsChanged || !this.hasRenderedFrame || gridKey !== this.renderedGridKey || !damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay;
     this.renderedGridKey = gridKey;
     if (fullRepaint) {
       for (let y = this.rowElements.length;y > frame.rows.length; y -= 1) {
-        this.rowElements[y - 1]?.remove();
+        const row = this.rowElements[y - 1];
+        if (row)
+          clearChangedSelection(row);
+        row?.remove();
+        this.cells.pop();
       }
       this.rowElements.length = Math.min(this.rowElements.length, frame.rows.length);
       for (let y = 0;y < frame.rows.length; y += 1) {
@@ -2624,26 +2749,96 @@ class DomSurfacePainter {
     this.reconcileImages(frame.images ?? [], metrics, allowRecoveryRequests);
     this.hasRenderedFrame = true;
   }
+  invalidateFontMetrics() {
+    this.letterSpacing = undefined;
+    this.appliedMetricsKey = undefined;
+  }
   dispose() {
+    this.styleCache.clear();
+    this.glyphs.clear();
+    this.linkCells.clear();
     this.root?.replaceChildren();
     this.root = undefined;
     this.rowsLayer = undefined;
     this.imagesLayer = undefined;
     this.rowElements = [];
+    this.cells = [];
     this.renderedImages.clear();
     this.reportedMissingImageIds.clear();
     this.lastImageRecoveryFrame = undefined;
   }
   rebuildRow(y, frame, metrics) {
     const rowElement = this.ensureRowElement(y, metrics);
-    const children = [];
-    for (const [x, text, span, styleIndex] of frame.rows[y] ?? []) {
-      const cellElement = buildCellElement(x, text, span, frame.styles[styleIndex] ?? undefined, metrics);
-      if (cellElement) {
-        children.push(cellElement);
+    const previous = this.cells[y] ?? new Map;
+    const next = new Map;
+    const retainedColumns = new Set((frame.rows[y] ?? []).map((cell) => cell[0]));
+    for (const [x, element] of previous) {
+      if (!retainedColumns.has(x)) {
+        clearChangedSelection(element);
+        element.remove();
       }
     }
-    rowElement.replaceChildren(...children);
+    let position = 0;
+    for (const [x, text, span, styleIndex] of frame.rows[y] ?? []) {
+      const cellStyle = frame.styles[styleIndex] ?? undefined;
+      const target = this.linkCells.get(y * frame.width + x);
+      const isLink = target !== undefined && (/^https?:/i.test(target) || !!this.onOpenHyperlink);
+      const tag = isLink ? "A" : "SPAN";
+      let element = previous.get(x);
+      if (element && element.tagName !== tag) {
+        clearChangedSelection(element);
+        element.remove();
+        element = undefined;
+      }
+      if (!element)
+        element = createElement(tag.toLowerCase());
+      if (element.textContent !== text) {
+        clearChangedSelection(element);
+        element.textContent = text;
+      }
+      const key = JSON.stringify(cellStyle ?? null);
+      let resolved = this.styleCache.get(key);
+      if (!resolved) {
+        resolved = resolveCellStyle(cellStyle, metrics);
+        if (this.styleCache.size >= 512)
+          this.styleCache.delete(this.styleCache.keys().next().value);
+        this.styleCache.set(key, resolved);
+      }
+      Object.assign(element.style, resolved, {
+        left: `${x * metrics.cellWidth}px`,
+        width: `${Math.max(1, span) * metrics.cellWidth}px`
+      });
+      const glyph = this.glyphs.image(text, resolved.color ?? "", Math.max(1, span) * metrics.cellWidth, metrics.cellHeight);
+      element.style.backgroundImage = glyph ?? "none";
+      element.style.backgroundSize = "100% 100%";
+      element.style.backgroundRepeat = "no-repeat";
+      element.style.color = glyph ? "transparent" : resolved.color ?? "";
+      if (isLink && target !== undefined) {
+        element.setAttribute("data-surface-link", target);
+        element.setAttribute("tabindex", "-1");
+        element.setAttribute("rel", "noopener noreferrer");
+        element.setAttribute("target", "_blank");
+        element.setAttribute("href", /^https?:/i.test(target) ? target : "#");
+        const activate = (event) => {
+          if (event.altKey || document.getSelection()?.isCollapsed === false) {
+            event.preventDefault();
+          } else if (this.onOpenHyperlink) {
+            event.preventDefault();
+            this.onOpenHyperlink(target);
+          } else if (!/^https?:/i.test(target)) {
+            event.preventDefault();
+          }
+        };
+        element.onclick = activate;
+        element.onauxclick = activate;
+      }
+      next.set(x, element);
+      if (rowElement.children[position] !== element) {
+        rowElement.insertBefore(element, rowElement.children[position] ?? null);
+      }
+      position += 1;
+    }
+    this.cells[y] = next;
   }
   ensureRowElement(y, metrics) {
     let rowElement = this.rowElements[y];
@@ -2677,17 +2872,15 @@ class DomSurfacePainter {
     if (this.letterSpacing?.key === key) {
       return this.letterSpacing.value;
     }
-    let value = "0px";
-    const canvas = createElement("canvas");
-    const context = canvas.getContext?.("2d");
-    if (context) {
-      context.font = font;
-      const advance = context.measureText("W").width;
-      const correction = metrics.cellWidth - advance;
-      if (advance > 0 && Math.abs(correction) >= 0.01) {
-        value = `${Math.round(correction * 1000) / 1000}px`;
+    let advance = this.root ? measureDomCells(this.root, metrics.style)?.advance : undefined;
+    if (advance === undefined) {
+      const context = createElement("canvas").getContext?.("2d");
+      if (context) {
+        context.font = font;
+        advance = context.measureText("W").width;
       }
     }
+    const value = advance && advance > 0 ? `${Math.round((metrics.cellWidth - advance) * 1000) / 1000}px` : "0px";
     this.letterSpacing = { key, value };
     return value;
   }
@@ -2790,38 +2983,23 @@ function metricsKeyFor(metrics) {
     metrics.style.backgroundOpacity
   ].join("|");
 }
-function buildCellElement(x, text, span, style, metrics) {
-  const background = resolvedSurfaceBackground(style, metrics.style);
-  const hasDecoration = Boolean(style?.underline || style?.strikethrough);
-  if (!background && !hasDecoration && text.trim() === "") {
-    return;
-  }
-  const element = createElement("span");
-  element.textContent = text;
-  const elementStyle = element.style;
-  elementStyle.position = "absolute";
-  elementStyle.left = `${x * metrics.cellWidth}px`;
-  elementStyle.top = "0";
-  elementStyle.width = `${Math.max(1, span) * metrics.cellWidth}px`;
-  elementStyle.height = "100%";
-  elementStyle.whiteSpace = "pre";
-  elementStyle.color = resolvedSurfaceForeground(style, metrics.style);
-  if (background) {
-    elementStyle.backgroundColor = background;
-  }
-  const emphasis = style?.em ?? 0;
-  if (emphasis & 1) {
-    elementStyle.fontWeight = "700";
-  }
-  if (emphasis & 2) {
-    elementStyle.fontStyle = "italic";
-  }
-  const opacity = style?.opacity ?? 1;
-  if (opacity !== 1) {
-    elementStyle.opacity = String(opacity);
-  }
+function resolveCellStyle(style, metrics) {
+  const elementStyle = {
+    position: "absolute",
+    top: "0",
+    height: "100%",
+    whiteSpace: "pre",
+    color: resolvedSurfaceForeground(style, metrics.style),
+    backgroundColor: resolvedSurfaceBackground(style, metrics.style) ?? "transparent",
+    fontWeight: (style?.em ?? 0) & 1 ? "700" : "normal",
+    fontStyle: (style?.em ?? 0) & 2 ? "italic" : "normal",
+    opacity: String(style?.opacity ?? 1),
+    textDecorationLine: "none",
+    textDecorationStyle: "solid",
+    textDecorationColor: resolvedSurfaceForeground(style, metrics.style)
+  };
   applyTextDecoration(elementStyle, style);
-  return element;
+  return elementStyle;
 }
 function applyTextDecoration(elementStyle, style) {
   const lines = [];
@@ -2882,6 +3060,17 @@ function createElement(tagName) {
     throw new Error("document is not available");
   }
   return document.createElement(tagName);
+}
+function clearChangedSelection(element) {
+  const selection = globalThis.document?.getSelection?.();
+  if (!selection || selection.isCollapsed)
+    return;
+  for (let index = 0;index < selection.rangeCount; index += 1) {
+    if (selection.getRangeAt(index).intersectsNode(element)) {
+      selection.removeAllRanges();
+      return;
+    }
+  }
 }
 
 // src/InputEventEncoder.ts
@@ -3344,6 +3533,8 @@ class WebHostSceneRuntime {
   accessibilityTree;
   diagnosticText;
   resizeObserver;
+  detachMetricObservers;
+  nativePointerGesture = false;
   detachInputHandlers;
   currentFrame;
   columns = 80;
@@ -3376,7 +3567,10 @@ class WebHostSceneRuntime {
     const onImagePayloadMiss = (ids) => {
       return this.bridge?.requestImagePayloads?.(ids);
     };
-    this.painter = this.rendererKind === "dom" ? new DomSurfacePainter({ onImagePayloadMiss }) : new CanvasSurfacePainter({ onImagePayloadMiss });
+    this.painter = this.rendererKind === "dom" ? new DomSurfacePainter({
+      onImagePayloadMiss,
+      onOpenHyperlink: options.onOpenHyperlink
+    }) : new CanvasSurfacePainter({ onImagePayloadMiss });
     const paintScheduling = options.paintScheduling ?? defaultAnimationFrameScheduler();
     this.paintScheduler = new SurfacePaintScheduler(paintScheduling === "synchronous" ? undefined : paintScheduling, (request) => this.paint(request));
     this.onOpenHyperlink = options.onOpenHyperlink;
@@ -3507,6 +3701,7 @@ class WebHostSceneRuntime {
     this.detachInputHandlers?.();
     this.detachPointerParadigmObserver?.();
     this.resizeObserver?.disconnect();
+    this.detachMetricObservers?.();
     this.element.remove();
   }
   sendPointerCapabilitiesIfChanged(supportsScrollPanning) {
@@ -3623,17 +3818,40 @@ class WebHostSceneRuntime {
     this.element.style.setProperty("display", this.isVisible ? "grid" : "none", "important");
   }
   installResizeObserver() {
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-    this.resizeObserver = new ResizeObserver(() => {
+    const refresh = () => {
+      if (this.painter instanceof DomSurfacePainter)
+        this.painter.invalidateFontMetrics();
       this.resizeToMount();
-    });
-    this.resizeObserver.observe(this.terminalMount);
+    };
+    if (typeof ResizeObserver !== "undefined") {
+      this.resizeObserver = new ResizeObserver(refresh);
+      this.resizeObserver.observe(this.terminalMount);
+    }
+    const fonts = document.fonts;
+    fonts?.addEventListener?.("loadingdone", refresh);
+    globalThis.window?.addEventListener?.("resize", refresh);
+    globalThis.window?.visualViewport?.addEventListener("resize", refresh);
+    let dpr;
+    const watchDpr = () => {
+      dpr?.removeEventListener?.("change", changedDpr);
+      dpr = globalThis.matchMedia?.(`(resolution: ${globalThis.devicePixelRatio || 1}dppx)`);
+      dpr?.addEventListener?.("change", changedDpr);
+    };
+    const changedDpr = () => {
+      watchDpr();
+      refresh();
+    };
+    watchDpr();
+    this.detachMetricObservers = () => {
+      fonts?.removeEventListener?.("loadingdone", refresh);
+      globalThis.window?.removeEventListener?.("resize", refresh);
+      globalThis.window?.visualViewport?.removeEventListener("resize", refresh);
+      dpr?.removeEventListener?.("change", changedDpr);
+    };
   }
   installInputHandlers() {
     const handleKeyDown = (event) => {
-      if (event.metaKey || event.isComposing) {
+      if (event.metaKey || event.isComposing || this.rendererKind === "dom" && event.ctrlKey && (event.key.toLowerCase() === "f" || event.key.toLowerCase() === "c" && document.getSelection?.()?.isCollapsed === false)) {
         return;
       }
       const message = this.inputEncoder.encodeKey(event);
@@ -3655,13 +3873,15 @@ class WebHostSceneRuntime {
       if (event.pointerType === "touch" || event.pointerType === "mouse") {
         this.sendPointerCapabilitiesIfChanged(event.pointerType === "touch");
       }
-      if (this.allowsNativeTextSelection(event)) {
+      if (this.allowsNativeTextSelection(event) || this.isNativeLink(event)) {
+        this.nativePointerGesture = true;
         return;
       }
       const location = this.cellLocation(event);
       if (!location) {
         return;
       }
+      this.nativePointerGesture = false;
       const button = this.inputEncoder.pointerButton(event.button);
       this.activePointerButton = button;
       this.hasCapturedPointer = true;
@@ -3672,7 +3892,8 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePointerUp = (event) => {
-      if (!this.hasCapturedPointer && this.allowsNativeTextSelection(event)) {
+      if (!this.hasCapturedPointer && (this.nativePointerGesture || this.allowsNativeTextSelection(event) || this.isNativeLink(event))) {
+        this.nativePointerGesture = false;
         return;
       }
       const location = this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
@@ -3691,7 +3912,7 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePointerMove = (event) => {
-      if (!this.hasCapturedPointer && this.allowsNativeTextSelection(event)) {
+      if (!this.hasCapturedPointer && (this.nativePointerGesture || this.allowsNativeTextSelection(event) || this.isNativeLink(event))) {
         return;
       }
       const location = event.buttons && this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
@@ -3717,6 +3938,11 @@ class WebHostSceneRuntime {
       this.onInput(this.inputEncoder.encodeWheel(location, event));
       event.preventDefault();
     };
+    const endNativeDrag = () => {
+      this.nativePointerGesture = false;
+    };
+    document.addEventListener?.("pointerup", endNativeDrag);
+    document.addEventListener?.("pointercancel", endNativeDrag);
     this.terminalMount.addEventListener("keydown", handleKeyDown);
     this.terminalMount.addEventListener("paste", handlePaste);
     this.terminalMount.addEventListener("pointerdown", handlePointerDown);
@@ -3726,6 +3952,8 @@ class WebHostSceneRuntime {
       passive: false
     });
     this.detachInputHandlers = () => {
+      document.removeEventListener?.("pointerup", endNativeDrag);
+      document.removeEventListener?.("pointercancel", endNativeDrag);
       this.terminalMount.removeEventListener("keydown", handleKeyDown);
       this.terminalMount.removeEventListener("paste", handlePaste);
       this.terminalMount.removeEventListener("pointerdown", handlePointerDown);
@@ -3737,8 +3965,8 @@ class WebHostSceneRuntime {
   resizeToMount() {
     this.measureCells();
     const rect = this.terminalMount.getBoundingClientRect?.();
-    const width = rect?.width && rect.width > 0 ? rect.width : this.columns * this.cellWidth;
-    const height = rect?.height && rect.height > 0 ? rect.height : this.rows * this.cellHeight;
+    const width = this.terminalMount.clientWidth || (rect?.width && rect.width > 0 ? rect.width : this.columns * this.cellWidth);
+    const height = this.terminalMount.clientHeight || (rect?.height && rect.height > 0 ? rect.height : this.rows * this.cellHeight);
     this.surfaceCSSWidth = width;
     this.surfaceCSSHeight = height;
     const nextColumns = Math.max(1, Math.floor(width / this.cellWidth));
@@ -3796,6 +4024,14 @@ class WebHostSceneRuntime {
     return true;
   }
   measureCells() {
+    if (this.domSurfaceRoot) {
+      const measured = measureDomCells(this.terminalMount, this.currentStyle);
+      if (measured) {
+        this.cellWidth = measured.width;
+        this.cellHeight = measured.height;
+        return;
+      }
+    }
     const canvas = this.canvas ?? document.createElement("canvas");
     const context = canvas.getContext?.("2d");
     if (!context) {
@@ -3835,13 +4071,17 @@ class WebHostSceneRuntime {
     };
   }
   pointerMetrics() {
+    const domRect = this.domSurfaceRoot?.getBoundingClientRect?.();
     return {
       rect: this.surfaceElement?.getBoundingClientRect?.() ?? this.terminalMount.getBoundingClientRect?.(),
-      cellWidth: this.cellWidth,
-      cellHeight: this.cellHeight,
+      cellWidth: domRect?.width ? domRect.width / this.columns : this.cellWidth,
+      cellHeight: domRect?.height ? domRect.height / this.rows : this.cellHeight,
       columns: this.columns,
       rows: this.rows
     };
+  }
+  isNativeLink(event) {
+    return this.rendererKind === "dom" && !!event.target?.closest?.("a[data-surface-link]");
   }
   allowsNativeTextSelection(event) {
     return this.rendererKind === "dom" && event.altKey;
@@ -4350,23 +4590,26 @@ function collectWasmEngineProbeSignals() {
   const probe = new Error("wasm-engine-probe");
   const wasm = globalThis.WebAssembly;
   return {
-    errorStack: typeof probe.stack === "string" ? probe.stack : "",
-    errorHasGeckoFileName: "fileName" in probe,
-    errorHasJSCSourceURL: "sourceURL" in probe,
-    wasmSuspendingType: typeof wasm?.Suspending,
-    wasmPromisingType: typeof wasm?.promising
+    errorStack: readProbe(() => typeof probe.stack === "string" ? probe.stack : "", ""),
+    errorHasGeckoFileName: readProbe(() => ("fileName" in probe), false),
+    errorHasJSCSourceURL: readProbe(() => ("sourceURL" in probe), false),
+    wasmSuspendingType: readProbe(() => typeof wasm?.Suspending, "undefined"),
+    wasmPromisingType: readProbe(() => typeof wasm?.promising, "undefined")
   };
 }
 function classifyWasmEngineFamily(signals) {
-  if (/^\s*at /m.test(signals.errorStack)) {
+  const v8 = /^\s*at /m.test(signals.errorStack);
+  const atFrames = /^[^\n]*@/m.test(signals.errorStack);
+  const gecko = signals.errorHasGeckoFileName;
+  const jsc = signals.errorHasJSCSourceURL;
+  if (Number(v8) + Number(gecko) + Number(jsc) > 1 || v8 && atFrames)
+    return "unknown";
+  if (v8)
     return "v8";
-  }
-  if (signals.errorHasGeckoFileName) {
+  if (gecko)
     return "gecko";
-  }
-  if (signals.errorHasJSCSourceURL || /^[^\n]*@/m.test(signals.errorStack)) {
+  if (jsc)
     return "jsc";
-  }
   return "unknown";
 }
 function resolveWasmEngineCapabilities(signals = collectWasmEngineProbeSignals()) {
@@ -4382,6 +4625,13 @@ function stackProfileEnvironmentDefaults(capabilities) {
     return { SWIFTTUI_STACK_LEAN_PROFILE: "0" };
   }
   return { SWIFTTUI_LEAN_RETAINED_REUSE: "1" };
+}
+function readProbe(read, fallback) {
+  try {
+    return read();
+  } catch {
+    return fallback;
+  }
 }
 
 // src/wasi/BrowserWASIBridge.ts
