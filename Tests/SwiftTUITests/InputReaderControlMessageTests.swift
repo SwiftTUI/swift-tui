@@ -18,6 +18,36 @@
   @MainActor
   @Suite
   struct InputReaderControlMessageTests {
+    @Test(
+      "STUI-510: EOF resolves pending escape prefixes on both streams",
+      arguments: [false, true], ["\u{1B}", "\u{1B}]", "\u{1B}P", "\u{1B}]unfinished"])
+    func escapeAtEOF(terminalEvents: Bool, suffix: String) async throws {
+      var descriptors: [Int32] = [-1, -1]
+      try #require(unsafe pipe(&descriptors) == 0)
+      let readerFD = descriptors[0]
+      defer { _ = close(readerFD) }
+      let flags = fcntl(readerFD, F_GETFL)
+      try #require(fcntl(readerFD, F_SETFL, flags | O_NONBLOCK) == 0)
+      try writeAllBytes(Array(("q" + suffix).utf8), to: descriptors[1])
+      _ = close(descriptors[1])
+      let reader = InputReader(fileDescriptor: readerFD)
+      var received: [InputEvent] = []
+      if terminalEvents {
+        for await event in reader.inputEvents() { received.append(event) }
+      } else {
+        for await key in reader.events() { received.append(.key(key)) }
+      }
+      var expected: [InputEvent] = [.key(.character("q"))]
+      switch suffix {
+      case "\u{1B}": expected.append(.key(.escape))
+      case "\u{1B}]": expected.append(.key(KeyPress(.character("]"), modifiers: .alt)))
+      case "\u{1B}P": expected.append(.key(KeyPress(.character("P"), modifiers: .alt)))
+      default: break
+      }
+      #expect(received == expected)
+      #expect(reader.liveReadSourceCount == 0)
+    }
+
     #if os(Linux)
       @Test("STUI-73: PTY bytes preceding EIO reach both input streams", arguments: [false, true])
       func ptyFinalBytesBeforeReadFailure(terminalEvents: Bool) async throws {

@@ -18,6 +18,28 @@
 
   @Suite(.serialized)
   struct SocketDiscoveryTests {
+    @Test("STUI-512: discovery returns every scene in a response larger than 64 KiB")
+    func largeSceneList() async throws {
+      let scenes = (0..<1200).map {
+        SceneInfo(
+          id: "scene-\($0)", title: "Scene \($0) with a descriptive title",
+          ptyPath: "/dev/pts/\($0)", isAttached: false)
+      }
+      let server = SceneDiscoveryServer(
+        appName: uniqueAppName(), identifier: "large",
+        sceneProvider: { scenes }, attachHandler: { _ in .error("unsupported") })
+      let task = await startServer(server)
+      defer { task.cancel() }
+      let response = try sendListRequest(socketPath: server.socketPath, request: "LIST\n")
+      #expect(response.utf8.count > 65536)
+      #expect(response.hasSuffix("\n"))
+      let decoded = try JSONDecoder().decode(
+        [SceneInfo].self, from: Data(response.dropFirst(3).utf8))
+      #expect(decoded.map(\.id) == scenes.map(\.id))
+      task.cancel()
+      _ = try? await task.value
+    }
+
     @Test("Duplicate live instance identifiers are rejected")
     func duplicateIdentifiersRejected() async throws {
       let appName = uniqueAppName()

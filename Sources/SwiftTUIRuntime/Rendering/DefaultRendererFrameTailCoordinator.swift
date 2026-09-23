@@ -47,7 +47,7 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
   ) -> (placed: PlacedNode, overlay: PlacedAnimationOverlaySnapshot) {
     let placed = layout.baselinePlaced
     let animationController = draft.animationDraft.controller
-    let textRolls = animationController.processRealizedText(
+    let samples = animationController.processRealizedPresentation(
       in: placed,
       transactionPlan: .init(
         base: draft.frameContext.transaction,
@@ -60,7 +60,8 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       surfaceSize: animationSurfaceSize(for: draft.frameTailInput.proposal),
       adoption: adoption
     )
-    animationOverlaySnapshot.textRolls = textRolls
+    animationOverlaySnapshot.textRolls = samples.textRolls
+    animationOverlaySnapshot.tintStyles = samples.tintStyles
     return (placed, animationOverlaySnapshot)
   }
 

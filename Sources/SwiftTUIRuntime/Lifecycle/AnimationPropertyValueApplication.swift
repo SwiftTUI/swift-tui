@@ -394,7 +394,7 @@ package enum AnimationPropertyValueApplication {
     }
   }
 
-  private static func unwrapShapeStyle(_ value: AnyAnimatable) -> AnyShapeStyle? {
+  static func unwrapShapeStyle(_ value: AnyAnimatable) -> AnyShapeStyle? {
     if let color = value.unwrap(as: Color.self) {
       return .color(color)
     }

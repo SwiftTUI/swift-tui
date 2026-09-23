@@ -33,7 +33,16 @@ private final class EncodedFrameStore: Sendable {
 
 /// A finite set of pre-composed frames and display delays.
 public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
+  /// The sequence's frames. Replacements must keep the frame count and have
+  /// matching pixel sizes; construct a new sequence to change frames and delays together.
   public var frames: [AnimatedImageFrame] {
+    willSet {
+      precondition(
+        newValue.count == delayNanoseconds.count,
+        "AnimatedImageSequence requires one delay per frame; construct a new sequence to change the count"
+      )
+      Self.validateFrames(newValue)
+    }
     didSet {
       encodedFrameStore = EncodedFrameStore()
     }
@@ -124,17 +133,10 @@ public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
     frames: [AnimatedImageFrame],
     delayNanoseconds: [UInt64], loopCount: Int? = 0
   ) {
-    precondition(!frames.isEmpty, "AnimatedImageSequence requires at least one frame")
+    Self.validateFrames(frames)
     precondition(
       frames.count == delayNanoseconds.count,
       "AnimatedImageSequence requires one delay per frame"
-    )
-    let firstSize = frames[0].pixelSize
-    precondition(
-      frames.allSatisfy {
-        $0.pixelSize.width == firstSize.width && $0.pixelSize.height == firstSize.height
-      },
-      "AnimatedImageSequence requires all frames to have the same pixel size"
     )
     self.frames = frames
     self.delayNanoseconds = delayNanoseconds.map { max(1, $0) }
@@ -145,6 +147,14 @@ public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
   private static func validateLoopCount(_ value: Int?) {
     precondition(
       value == nil || (0...65535).contains(value!), "GIF loop count must be absent or in 0...65535")
+  }
+
+  private static func validateFrames(_ frames: [AnimatedImageFrame]) {
+    precondition(!frames.isEmpty, "AnimatedImageSequence requires at least one frame")
+    let firstSize = frames[0].pixelSize
+    precondition(
+      frames.allSatisfy { $0.pixelSize == firstSize },
+      "AnimatedImageSequence requires all frames to have the same pixel size")
   }
 
   private static func nanoseconds(

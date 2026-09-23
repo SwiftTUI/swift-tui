@@ -119,24 +119,31 @@
       }
       guard sent > 0 else { throw .sendFailed(errno) }
 
-      var readDescriptor = pollfd(
-        fd: fd,
-        events: Int16(POLLIN),
-        revents: 0
-      )
-      let ready = unsafe poll(&readDescriptor, 1, timeoutMilliseconds)
-      guard ready > 0 else {
-        if ready == 0 {
-          throw .readTimedOut
+      var received: [UInt8] = []
+      var buffer = [UInt8](repeating: 0, count: 4096)
+      while true {
+        var readDescriptor = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+        let ready = unsafe poll(&readDescriptor, 1, timeoutMilliseconds)
+        if ready < 0 && errno == EINTR { continue }
+        guard ready > 0 else {
+          if ready == 0 { throw .readTimedOut }
+          throw .readFailed(errno)
         }
-        throw .readFailed(errno)
+        let bytesRead = unsafe sceneRead(fd, &buffer, buffer.count)
+        if bytesRead < 0 && errno == EINTR { continue }
+        guard bytesRead >= 0 else { throw .readFailed(errno) }
+        guard bytesRead > 0 else {
+          // A closed stream without its line terminator is an incomplete
+          // protocol response, never a successful partial scene list.
+          throw .unexpectedResponse(String(decoding: received, as: UTF8.self))
+        }
+        let chunk = buffer.prefix(bytesRead)
+        if let newline = chunk.firstIndex(of: 10) {
+          received.append(contentsOf: chunk[...newline])
+          return String(decoding: received, as: UTF8.self)
+        }
+        received.append(contentsOf: chunk)
       }
-
-      // Read response (up to 64 KB)
-      var buffer = [UInt8](repeating: 0, count: 65536)
-      let bytesRead = unsafe sceneRead(fd, &buffer, 65536)
-      guard bytesRead > 0 else { throw .readFailed(errno) }
-      return String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
     }
 
     // MARK: - Private helpers

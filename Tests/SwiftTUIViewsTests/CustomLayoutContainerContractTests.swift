@@ -15,6 +15,45 @@ import Testing
 @MainActor
 @Suite("Custom layout container contract (plan 2026-08-31-001)")
 struct CustomLayoutContainerContractTests {
+  private struct AnchoredLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout ())
+      -> LayoutSize
+    {
+      .init(width: 20, height: 20)
+    }
+    func placeSubviews(
+      in bounds: LayoutRect, proposal: ProposedViewSize,
+      subviews: LayoutSubviews, cache: inout ()
+    ) {
+      for subview in subviews {
+        subview.place(at: .init(x: 10, y: 10), anchor: .topLeading, proposal: .unspecified)
+      }
+    }
+  }
+
+  @Test(
+    "STUI-509: anchored custom placement honors leaf and propagated guides",
+    arguments: [false, true])
+  func anchoredPlacementHonorsGuides(wrapped: Bool) {
+    var child = leaf("guided", width: 2, height: 2)
+    child.layoutMetadata = LayoutMetadata()
+      .settingHorizontalAlignmentGuide(.leading, debugName: "leading", computeValue: { _ in 5 })
+      .settingVerticalAlignmentGuide(.top, debugName: "top", computeValue: { _ in 3 })
+    if wrapped {
+      child = ResolvedNode(
+        identity: testIdentity("padding"), kind: .view("Padding"),
+        children: [child], layoutBehavior: .padding(.init(top: 1, leading: 1)))
+    }
+    let root = ResolvedNode(
+      identity: testIdentity("anchor-layout"), kind: .view("Custom"),
+      children: [child], layoutBehavior: AnyLayout(AnchoredLayout()).resolvedBehavior)
+    let engine = LayoutEngine()
+    let context = LayoutPassContext()
+    let measured = engine.measure(root, passContext: context)
+    let placed = engine.place(root, measured: measured, origin: .zero, passContext: context)
+    #expect(placed.children[0].bounds.origin == .init(x: wrapped ? 4 : 5, y: wrapped ? 6 : 7))
+  }
+
   @Test("STUI-87: custom layouts return unused offers to flexible siblings")
   func customLayoutUnusedOfferReachesSpacer() {
     for axis: SwiftTUICore.Axis in [.horizontal, .vertical] {
@@ -56,17 +95,16 @@ struct CustomLayoutContainerContractTests {
   func placementAnchorMatchesDimensions() {
     for width in 1...4 {
       for height in 1...4 {
-        let size = LayoutSize(width: width, height: height)
         let dimensions = ViewDimensions(width: width, height: height)
         for anchor: Alignment in [.center, .topLeading, .bottomTrailing] {
-          let origin = placedOrigin(for: size, at: .init(x: 7, y: 8), anchor: anchor)
+          let origin = placedOrigin(for: dimensions, at: .init(x: 7, y: 8), anchor: anchor)
           #expect(origin.x + dimensions[anchor.horizontal] == 7)
           #expect(origin.y + dimensions[anchor.vertical] == 8)
         }
         let fallback = defaultPlacement(
           in: .init(origin: .init(x: 2, y: 3), size: .init(width: 10, height: 10)),
           proposal: .unspecified)
-        let origin = placedOrigin(for: size, at: fallback.position, anchor: fallback.anchor)
+        let origin = placedOrigin(for: dimensions, at: fallback.position, anchor: fallback.anchor)
         #expect(origin.x + dimensions[HorizontalAlignment.center] == 7)
         #expect(origin.y + dimensions[VerticalAlignment.center] == 8)
       }

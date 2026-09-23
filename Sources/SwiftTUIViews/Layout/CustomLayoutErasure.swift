@@ -661,12 +661,18 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
           pending.append(contentsOf: candidate.childMeasurements.reversed())
         }
       }
+      // Built-in layout records already contain their final top-left geometry;
+      // author-issued anchored placements use the child's explicit guides.
+      let childDimensions =
+        placement.exactSize.map {
+          ViewDimensions(width: $0.width, height: $0.height)
+        } ?? engine.viewDimensions(for: child, measured: childMeasurement, passContext: passContext)
       var placed = engine.place(
         child,
         measured: childMeasurement,
         in: LayoutRect(
           origin: placedOrigin(
-            for: placement.exactSize ?? childMeasurement.measuredSize,
+            for: childDimensions,
             at: placement.position,
             anchor: placement.anchor
           ),

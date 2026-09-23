@@ -253,7 +253,7 @@ package struct AnimatableSnapshot: Sendable {
   /// the controller can interpolate.  Returns `nil` for shape
   /// styles that can't be reduced to a single animatable
   /// conformance (semantic tokens, terminal chrome, etc.).
-  private static func extractAnimatableShapeStyle(
+  static func extractAnimatableShapeStyle(
     from style: AnyShapeStyle?
   ) -> AnyAnimatable? {
     guard let style else { return nil }

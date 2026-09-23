@@ -140,8 +140,14 @@ extension LayoutEngine {
     var measurements: [MeasuredNode] = []
     children.reserveCapacity(sourceIndices.count)
     measurements.reserveCapacity(sourceIndices.count)
+    let childWidth: Int
+    if case .table(let payload) = node.drawPayload {
+      childWidth = max(0, concreteSize.width - payload.style.contentInsets.horizontal)
+    } else {
+      childWidth = max(0, concreteSize.width)
+    }
     let childProposal = ProposedSize(
-      width: .finite(max(0, concreteSize.width)),
+      width: .finite(childWidth),
       height: .unspecified
     )
     for index in sourceIndices {

@@ -219,6 +219,9 @@ extension InputReader {
             continue
           case .endOfFile, .failure:
             flushPendingMouseEvents()
+            for event in decoder.flushEscape() {
+              continuation.yield(event)
+            }
             continuation.finish()
             return
           }
@@ -287,6 +290,9 @@ extension InputReader {
             backoff.recordIdlePoll()
             continue
           case .endOfFile, .failure:
+            for event in decoder.flushEscape() {
+              continuation.yield(event)
+            }
             continuation.finish()
             return
           }
@@ -582,8 +588,8 @@ extension InputReader {
           }
 
           if drainResult.shouldFinish {
-            scheduledEscapeFlush?.cancel()
-            scheduledEscapeFlush = nil
+            flushPendingMouseEvents()
+            flushPendingEscape()
             source.cancel()
           }
         }
@@ -679,6 +685,9 @@ extension InputReader {
           if drainResult.shouldFinish {
             scheduledEscapeFlush?.cancel()
             scheduledEscapeFlush = nil
+            for event in decoder.flushEscape() {
+              continuation.yield(event)
+            }
             source.cancel()
           }
         }

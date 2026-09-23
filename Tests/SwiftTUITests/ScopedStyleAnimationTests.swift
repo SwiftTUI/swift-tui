@@ -7,6 +7,85 @@ import Testing
 @MainActor
 @Suite
 struct ScopedStyleAnimationTests {
+  private struct RuntimeTintRows: View {
+    @State private var changed = false
+    @State private var visible = true
+    var body: some View {
+      VStack {
+        Button("change") { changed.toggle() }
+        Button("remove") { visible = false }
+        if visible { TintRows(changed: changed, indexed: true) }
+      }
+    }
+  }
+
+  @Test("STUI-513: input animates realized tint and removal releases its curves")
+  func runtimeTintRemoval() throws {
+    let harness = try AnimatorRuntimeHarness { RuntimeTintRows() }
+    defer { harness.shutdown() }
+    let controller = harness.runLoop.renderer.internalAnimationController
+    try withAnimationSinks(controller) { _ = try harness.clickText("change") }
+    #expect(
+      controller.debugStateSnapshot().activeAnimationKeys.contains {
+        $0.scope == .property(.tintShapeStyle)
+      })
+    try withAnimationSinks(controller) { _ = try harness.clickText("remove") }
+    #expect(controller.activeAnimationCount == 0)
+    #expect(!controller.requiresContinuedAnimationFrames)
+  }
+
+  private struct TintRows: View {
+    var changed: Bool
+    var indexed: Bool
+    var body: some View {
+      Group {
+        if indexed {
+          List(0..<10, id: \.self) { Text("row \($0)").foregroundStyle(.tint) }
+        } else {
+          List { ForEach(0..<10, id: \.self) { Text("row \($0)").foregroundStyle(.tint) } }
+        }
+      }
+      .animation(.linear(duration: .seconds(1))) { $0.tint(changed ? Color.blue : .red) }
+    }
+  }
+
+  @Test(
+    "STUI-513: scoped tint interpolates in both eager and viewport-backed rows",
+    arguments: [false, true])
+  func realizedTintRows(indexed: Bool) {
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let root = testIdentity("realized-tint")
+    let start = MonotonicInstant(offset: .seconds(100))
+    let proposal = ProposedSize(width: 20, height: 6)
+    withAnimationSinks(controller) {
+      _ = renderer.render(
+        TintRows(changed: false, indexed: indexed),
+        context: .init(identity: root), proposal: proposal, frameInstant: start)
+      _ = renderer.render(
+        TintRows(changed: true, indexed: indexed),
+        context: .init(identity: root), proposal: proposal, frameInstant: start)
+      let halfway = renderer.render(
+        TintRows(changed: true, indexed: indexed),
+        context: .init(identity: root), proposal: proposal,
+        frameInstant: start.advanced(by: .milliseconds(500)))
+      let colors = halfway.rasterSurface.cells.flatMap { $0 }.compactMap {
+        $0.style?.foregroundColor
+      }
+      let expected = Color.red.interpolated(to: .blue, progress: 0.5, method: .perceptual)
+      #expect(
+        colors.contains {
+          abs($0.red - expected.red) < 0.001 && abs($0.green - expected.green) < 0.001
+            && abs($0.blue - expected.blue) < 0.001
+        }, "\(Set(colors))")
+      _ = renderer.render(
+        TintRows(changed: true, indexed: indexed),
+        context: .init(identity: root), proposal: proposal,
+        frameInstant: start.advanced(by: .seconds(2)))
+      #expect(controller.activeAnimationCount == 0)
+    }
+  }
+
   private struct RuntimeStyle: View {
     @State private var changed = false
     var body: some View {

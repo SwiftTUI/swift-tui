@@ -315,7 +315,7 @@ struct RetainedReuseInvariantTests {
         "layoutBehavior",
         "isTransient",
         "matchedGeometry",
-        "textAnimationTransaction",
+        "presentationAnimationTransaction",
       ])
   }
 
@@ -330,13 +330,19 @@ struct RetainedReuseInvariantTests {
     var placed = PlacedNode(
       identity: text.identity, resolvedMetadata: metadata,
       bounds: .init(origin: .zero, size: .init(width: 1, height: 1)))
-    #expect(placed.textAnimationTransaction?.animationRequest == .disabled)
+    #expect(placed.presentationAnimationTransaction?.animationRequest == .disabled)
     text.transactionSnapshot.animationRequest = .inherit
     placed.synchronizeResolvedPhaseMetadata(from: text, semanticRole: .generic)
-    #expect(placed.textAnimationTransaction?.animationRequest == .inherit)
+    #expect(placed.presentationAnimationTransaction?.animationRequest == .inherit)
     text.drawMetadata.contentTransition = nil
     placed.synchronizeResolvedPhaseMetadata(from: text, semanticRole: .generic)
-    #expect(placed.textAnimationTransaction == nil)
+    #expect(placed.presentationAnimationTransaction == nil)
+    text.environmentSnapshot.style.tintStyle = AnyShapeStyle(Color.red)
+    placed.synchronizeResolvedPhaseMetadata(from: text, semanticRole: .generic)
+    #expect(placed.presentationAnimationTransaction?.animationRequest == .inherit)
+    text.drawPayload = .none
+    placed.synchronizeResolvedPhaseMetadata(from: text, semanticRole: .generic)
+    #expect(placed.presentationAnimationTransaction == nil)
   }
 }
 

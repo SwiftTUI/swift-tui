@@ -51,11 +51,10 @@ func defaultPlacement(
 }
 
 func placedOrigin(
-  for childSize: LayoutSize,
+  for dimensions: ViewDimensions,
   at position: LayoutPoint,
   anchor: Alignment
 ) -> LayoutPoint {
-  let dimensions = ViewDimensions(width: childSize.width, height: childSize.height)
   let xOffset = dimensions[anchor.horizontal]
   let yOffset = dimensions[anchor.vertical]
 

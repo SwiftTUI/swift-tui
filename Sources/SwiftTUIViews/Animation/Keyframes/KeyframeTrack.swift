@@ -49,6 +49,8 @@ extension KeyframeTrack: KeyframesLowering {
   ) {
     var specs: [KeyframeSegmentSpec<TrackValue>] = []
     lowerKeyframeTrackContent(content, into: &specs)
+    // Empty conditional branches must not overwrite values from earlier tracks.
+    guard !specs.isEmpty else { return }
     let timeline = KeyframeTrackTimeline(
       initialValue: initialValue[keyPath: keyPath],
       specs: specs

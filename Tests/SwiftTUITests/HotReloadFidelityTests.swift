@@ -36,14 +36,16 @@ private struct ReloadTabRoot: View {
   @State private var selection = 0
   var body: some View {
     TabView(selection: $selection) {
-      Tab("A", value: 0) { ReloadTabCounter(label: "A", probe: probe) }
-      Tab("B", value: 1) { ReloadTabCounter(label: "B", probe: probe) }
+      Tab("A", value: 0) { ReloadTabCounter(label: "A", probe: probe).padding(0) }
+      Tab("B", value: 1) { ReloadTabCounter(label: "B", probe: probe).padding(0) }
     }
     .onAppear { probe.select = { selection = $0 } }
   }
 }
 
-private struct ReloadTabCounter: View {
+// STUI-506: a transparent wrapper forwards this DynamicProperty payload at
+// its canonical root path, including when replaying a dormant tab.
+private struct ReloadTabCounter: View, DynamicProperty {
   let label: String
   let probe: ReloadFidelityProbe
   @State private var count = 0
@@ -51,6 +53,29 @@ private struct ReloadTabCounter: View {
     Text("\(label) count=\(count)")
       .onAppear { probe.increment = { count += 1 } }
       .task { await suspendUntilCancelled() }
+  }
+}
+
+private struct ReloadCounterModifier: ViewModifier, DynamicProperty {
+  let probe: ReloadFidelityProbe
+  @State private var count = 0
+  func body(content: Content) -> some View {
+    content
+      .overlay { Text("forwarded=\(count)") }
+      .onAppear { probe.increment = { count += 1 } }
+  }
+}
+
+private struct ReloadForwardedTabRoot: View {
+  let probe: ReloadFidelityProbe
+  @State private var selection = 0
+  var body: some View {
+    TabView(selection: $selection) {
+      Tab("A", value: 0) {
+        Text("counter").frame(width: 20).modifier(ReloadCounterModifier(probe: probe))
+      }
+      Tab("B", value: 1) { Text("other tab") }
+    }.onAppear { probe.select = { selection = $0 } }
   }
 }
 
@@ -86,6 +111,24 @@ private final class ReloadFidelityHarness {
 @MainActor
 @Suite("Hot-reload runtime fidelity", .serialized, FailOnSoundnessViolationGrowth())
 struct HotReloadFidelityTests {
+  @Test("STUI-506: dormant forwarded DynamicProperty state retains canonical slot paths")
+  func dormantForwardedModifier() throws {
+    let probe = ReloadFidelityProbe()
+    let harness = try ReloadFidelityHarness { ReloadForwardedTabRoot(probe: probe) }
+    defer { harness.loop.lifecycleCoordinator.shutdown() }
+    probe.increment?()
+    try harness.drain()
+    #expect(harness.surface.frames.last?.contains("forwarded=1") == true)
+    probe.select?(1)
+    try harness.drain()
+    try harness.reload { ReloadForwardedTabRoot(probe: probe) }
+    probe.select?(0)
+    try harness.drain()
+    #expect(
+      harness.surface.frames.last?.contains("forwarded=1") == true,
+      "\(harness.surface.frames.last ?? "")\n\(harness.session.lastReport)")
+  }
+
   @Test func oneWrapperEditPreservesTheUniqueOwner() throws {
     let probe = ReloadFidelityProbe()
     let harness = try ReloadFidelityHarness { ReloadTabCounter(label: "C", probe: probe) }

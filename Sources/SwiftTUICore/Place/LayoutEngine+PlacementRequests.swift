@@ -608,10 +608,8 @@ extension LayoutEngine {
   /// The visible layout to place a hosted Table against, on the same terms as
   /// ``hostedListVisibleLayout(for:measured:payload:in:)``.
   ///
-  /// A table's layout covers its whole bounds rather than an inset sub-rect,
-  /// so the "does the measured product still cover these bounds" test is a
-  /// plain size comparison: a table's line widths are baked from the column
-  /// widths, so a parent that stretched either axis invalidates the product.
+  /// Compare the inset area with the measured product. Line widths are baked
+  /// from column widths, so a parent stretching either axis invalidates it.
   func hostedTableVisibleLayout(
     measured: MeasuredNode,
     payload: TablePayload,
@@ -619,7 +617,7 @@ extension LayoutEngine {
   ) -> TableVisibleLayout {
     guard
       let stored = measured.containerAllocationSnapshot?.hostedCollection?.tableLayout,
-      stored.contentBounds.size == bounds.size
+      stored.contentBounds.size == DrawExtractor().tableInsetBounds(for: payload, in: bounds).size
     else {
       return DrawExtractor().visibleTableLayout(
         for: payload,

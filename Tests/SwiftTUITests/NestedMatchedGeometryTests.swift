@@ -7,6 +7,62 @@ import Testing
 @MainActor
 @Suite
 struct NestedMatchedGeometryTests {
+  @Test("STUI-495: mutually dependent sources still suppress their cyclic edges")
+  func mutuallyDependentAdoptions() throws {
+    var tree = leaf(
+      "root", x: 0,
+      children: [
+        leaf(
+          "a", x: 0, key: "a", source: false,
+          children: [leaf("sourceB", x: 2, key: "b")]),
+        leaf(
+          "b", x: 10, key: "b", source: false,
+          children: [leaf("sourceA", x: 12, key: "a")]),
+      ])
+    AnimationController().applyPlacedOverlays(to: &tree, at: .now())
+    #expect(try placed("a", in: tree).bounds.origin.x == 0)
+    #expect(try placed("b", in: tree).bounds.origin.x == 10)
+  }
+
+  @Test(
+    "STUI-495: a cyclic ancestor does not suppress an independent adopter",
+    arguments: [false, true])
+  func cyclicAncestorWithBystander(reversed: Bool) throws {
+    let source = leaf("target", x: 50, key: "independent")
+    let ancestor = leaf(
+      "outer", x: 0, key: "cycle", source: false,
+      children: [
+        leaf(
+          "mid", x: 1, key: "independent", source: false,
+          children: [
+            leaf("innerSource", x: 3, key: "cycle")
+          ])
+      ])
+    var tree = leaf("root", x: 0, children: reversed ? [ancestor, source] : [source, ancestor])
+    AnimationController().applyPlacedOverlays(to: &tree, at: .now())
+    #expect(try placed("outer", in: tree).bounds.origin.x == 0)
+    #expect(try placed("mid", in: tree).bounds.origin.x == 50)
+    #expect(try placed("innerSource", in: tree).bounds.origin.x == 52)
+  }
+
+  @Test(
+    "STUI-495: sharing a source with a cyclic ancestor preserves adoption",
+    arguments: [false, true])
+  func sharedSourceCycle(reversed: Bool) throws {
+    let bystander = leaf("bystander", x: 30, key: "shared", source: false)
+    let ancestor = leaf(
+      "outer", x: 0, key: "shared", source: false,
+      children: [
+        leaf("source", x: 2, key: "shared")
+      ])
+    var tree = leaf(
+      "root", x: 0,
+      children: reversed ? [ancestor, bystander] : [bystander, ancestor])
+    AnimationController().applyPlacedOverlays(to: &tree, at: .now())
+    #expect(try placed("outer", in: tree).bounds.origin.x == 0)
+    #expect(try placed("bystander", in: tree).bounds.origin.x == 2)
+  }
+
   private func leaf(
     _ name: String, x: Int, key: String? = nil, source: Bool = true,
     children: [PlacedNode] = []

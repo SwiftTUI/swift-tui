@@ -9,7 +9,7 @@ public import SwiftTUICore
 /// ``MoveKeyframe``; conform your own type to reuse a keyframe run.
 public protocol KeyframeTrackContent<Value> {
   /// The animated property type.
-  associatedtype Value
+  associatedtype Value = Body.Value
   /// The composed keyframes this type expands to.
   associatedtype Body: KeyframeTrackContent
   /// The composed keyframes.

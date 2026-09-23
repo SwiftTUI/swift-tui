@@ -6,6 +6,27 @@ import Testing
 
 @Suite
 struct LayoutEngineTests {
+  @Test("STUI-505: decoration minimums come only from the primary child")
+  func decorationMinimumUsesPrimary() {
+    for axis: Axis in [.horizontal, .vertical] {
+      for primaryIndex in [0, 1, 5] {
+        let engine = LayoutEngine()
+        let children = [2, 10].enumerated().map { index, size in
+          leaf(
+            "child-\(index)", size: .init(width: size, height: size),
+            layoutMetadata: .init(minimumWidth: size, minimumHeight: size))
+        }
+        let node = ResolvedNode(
+          identity: testIdentity("decoration"), kind: .view("Background"), children: children,
+          layoutBehavior: .decoration(primaryIndex: primaryIndex, alignment: .center))
+        #expect(
+          engine.derivedMinimumMainSize(
+            for: node, idealMeasurement: engine.measure(node), axis: axis)
+            == (primaryIndex == 0 ? 2 : 10))
+      }
+    }
+  }
+
   @Test("STUI-55: lazy fallback placement uses the caller's custom alignment context")
   func lazyFallbackUsesAlignmentContext() throws {
     let engine = LayoutEngine()

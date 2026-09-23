@@ -22,7 +22,7 @@ public import SwiftTUICore
 /// ```
 public protocol Keyframes<Value> {
   /// The type whose properties the tracks animate.
-  associatedtype Value
+  associatedtype Value = Body.Value
   /// The composed keyframes this type expands to.
   associatedtype Body: Keyframes
   /// The composed keyframes.
@@ -167,6 +167,39 @@ extension KeyframesBuilder where Value: Animatable {
   public typealias WholeValueTrack = KeyframeTrack<
     Value, Value, KeyframeTrackContentSequence<Value>
   >
+
+  /// An empty branch contributes no segments to the whole-value track.
+  public static func buildBlock() -> WholeValueTrack {
+    KeyframeTrack(keyPath: \.self, content: KeyframeTrackContentSequence(entries: []))
+  }
+
+  /// Keeps an empty optional branch composable with explicit tracks.
+  @_disfavoredOverload
+  public static func buildOptional(_ component: WholeValueTrack?) -> KeyframeSequence<Value> {
+    KeyframeSequence(entries: component.map { [AnyKeyframes($0)] } ?? [])
+  }
+
+  /// Keeps an empty first branch composable with explicit tracks.
+  @_disfavoredOverload
+  public static func buildEither(first component: WholeValueTrack) -> KeyframeSequence<Value> {
+    KeyframeSequence(entries: [AnyKeyframes(component)])
+  }
+
+  /// Keeps an empty second branch composable with explicit tracks.
+  @_disfavoredOverload
+  public static func buildEither(second component: WholeValueTrack) -> KeyframeSequence<Value> {
+    KeyframeSequence(entries: [AnyKeyframes(component)])
+  }
+
+  /// Keeps conditional segments composable after explicit tracks.
+  public static func buildPartialBlock(
+    accumulated: KeyframeSequence<Value>,
+    next: KeyframeTrackContentSequence<Value>
+  ) -> KeyframeSequence<Value> {
+    var sequence = accumulated
+    sequence.entries.append(AnyKeyframes(KeyframeTrack(keyPath: \.self, content: next)))
+    return sequence
+  }
 
   /// Conditional bare keyframes remain segments of the enclosing track.
   public static func buildOptional(

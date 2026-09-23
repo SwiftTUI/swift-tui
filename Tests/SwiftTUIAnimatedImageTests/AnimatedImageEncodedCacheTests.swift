@@ -8,6 +8,17 @@ import Testing
 /// same storage, and mutating `frames` invalidates.
 @Suite
 struct AnimatedImageEncodedCacheTests {
+  @Test("STUI-504: growing frames is rejected at the mutation boundary")
+  func countMutationRejected() async {
+    await #expect(processExitsWith: .failure) {
+      let frame = AnimatedImageFrame(
+        width: 1, height: 1,
+        pixels: [.init(red: 0, green: 0, blue: 0, alpha: 255)])
+      var sequence = AnimatedImageSequence(frames: [frame], framesPerSecond: 30)
+      sequence.frames.append(frame)
+    }
+  }
+
   private static func makeFrame(seed: UInt8) -> AnimatedImageFrame {
     let width = 8
     let height = 4

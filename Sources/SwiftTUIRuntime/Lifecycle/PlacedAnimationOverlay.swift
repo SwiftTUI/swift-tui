@@ -14,6 +14,7 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
   package var adoptionOffsets: [PlacedAnimationOverlayOffset]
   /// Current text samples, including at-rest values that clear a cached roll.
   package var textRolls: [Identity: TextRollValue]
+  package var tintStyles: [Identity: AnyShapeStyle]
 
   package init(
     removalOverlays: [PlacedRemovalOverlaySnapshot] = [],
@@ -21,7 +22,8 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
     insertionScales: [PlacedAnimationOverlayScale] = [],
     matchedGeometryOffsets: [PlacedAnimationOverlayOffset] = [],
     adoptionOffsets: [PlacedAnimationOverlayOffset] = [],
-    textRolls: [Identity: TextRollValue] = [:]
+    textRolls: [Identity: TextRollValue] = [:],
+    tintStyles: [Identity: AnyShapeStyle] = [:]
   ) {
     self.removalOverlays = removalOverlays
     self.insertionOffsets = insertionOffsets
@@ -29,11 +31,12 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
     self.matchedGeometryOffsets = matchedGeometryOffsets
     self.adoptionOffsets = adoptionOffsets
     self.textRolls = textRolls
+    self.tintStyles = tintStyles
   }
 
   /// No channel at all: the effective tree is the baseline.
   package var isEmpty: Bool {
-    !hasTransientDecoration && adoptionOffsets.isEmpty && textRolls.isEmpty
+    !hasTransientDecoration && adoptionOffsets.isEmpty && textRolls.isEmpty && tintStyles.isEmpty
   }
 
   /// Whether an animation *sample* decorates the tree this frame: an exit
@@ -48,6 +51,7 @@ package struct PlacedAnimationOverlaySnapshot: Sendable {
       || !insertionScales.isEmpty
       || !matchedGeometryOffsets.isEmpty
       || textRolls.values.contains(where: \.isRolling)
+      || !tintStyles.isEmpty
   }
 }
 
@@ -117,10 +121,13 @@ package func applyPlacedAnimationOverlaySnapshot(
   _ snapshot: PlacedAnimationOverlaySnapshot,
   to tree: inout PlacedNode
 ) {
-  if !snapshot.textRolls.isEmpty {
+  if !snapshot.textRolls.isEmpty || !snapshot.tintStyles.isEmpty {
     func applyText(to node: inout PlacedNode) {
       if let roll = snapshot.textRolls[node.identity] {
         node.drawMetadata.textRoll = roll
+      }
+      if let tint = snapshot.tintStyles[node.identity] {
+        node.environmentSnapshot.style.tintStyle = tint
       }
       for index in node.children.indices { applyText(to: &node.children[index]) }
     }

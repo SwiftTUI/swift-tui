@@ -115,6 +115,12 @@ struct GestureModifiersTests {
     #expect(box.currentValue() == false)
     #expect(!recognizer.handleDeadline(at: deadline))
     #expect(values == [true])
+    // STUI-483: drain the second long press after the composite has ended.
+    let lastDeadline = try #require(deadlines.max())
+    #expect(!recognizer.handleDeadline(at: lastDeadline))
+    #expect(values == [true])
+    #expect(box.currentValue() == false)
+    #expect(!recognizer.isActive)
     recognizer.tearDown()
   }
 

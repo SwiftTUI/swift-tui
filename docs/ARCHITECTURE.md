@@ -528,12 +528,13 @@ dependencies in displayed coordinates. The placed overlay walk composes nested
 offsets, and frozen removal snapshots retain each descendant's absolute adoption
 displacement while the retained layout baseline stays unchanged.
 
-The same main-actor seam after layout enrolls numeric text from realized
-collection rows in the animation ledger and reprojects the head's current text
-sample onto eager rows. `PlacedNodeResolvedMetadata.textAnimationTransaction`
-carries only the relevant text's authored intent through the sparse placed
-metadata storage. Retained layout keeps destination text and geometry; the
-placed overlay snapshot owns each frame's draw-time roll.
+The same main-actor seam after layout enrolls numeric text and tint from realized
+collection rows in the animation ledger and reprojects the head's current
+samples onto eager rows. `PlacedNodeResolvedMetadata.presentationAnimationTransaction`
+carries text transitions' and tinted painting nodes' authored intent through
+sparse placed metadata storage. Retained layout keeps destination values and geometry; the placed
+overlay snapshot owns each frame's text roll and tint sample. Eviction drops
+the realized row's curves and completion ownership.
 
 `Animation/ScopedStyleAnimation.swift` records the authoring transaction for
 foreground and tint writes in scoped modifier bodies. Placeholder restoration

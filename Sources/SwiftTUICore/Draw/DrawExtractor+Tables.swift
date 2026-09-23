@@ -236,6 +236,7 @@ extension DrawExtractor {
       return nil
     }
     let chrome = tableChromeLineCounts(for: payload)
+    let bounds = tableInsetBounds(for: payload, in: bounds)
     return CellRect(
       origin: .init(x: bounds.origin.x, y: bounds.origin.y + chrome.top),
       size: .init(
@@ -243,6 +244,16 @@ extension DrawExtractor {
         height: max(0, bounds.size.height - chrome.top - chrome.bottom)
       )
     )
+  }
+
+  /// The frame and all table lines occupy the area inside the style's insets.
+  func tableInsetBounds(for payload: TablePayload, in bounds: CellRect) -> CellRect {
+    let insets = payload.style.contentInsets
+    return CellRect(
+      origin: .init(x: bounds.origin.x + insets.leading, y: bounds.origin.y + insets.top),
+      size: .init(
+        width: max(0, bounds.size.width - insets.horizontal),
+        height: max(0, bounds.size.height - insets.vertical)))
   }
 
   /// The visible display lines for `payload` inside `bounds`, with each line's
@@ -268,6 +279,7 @@ extension DrawExtractor {
     rowWindow: Range<Int>? = nil
   ) -> TableVisibleLayout {
     TableLayoutDerivationProbe.recordDerivation()
+    let bounds = tableInsetBounds(for: payload, in: bounds)
     let widths =
       columnWidths
       ?? measureTableColumnWidths(

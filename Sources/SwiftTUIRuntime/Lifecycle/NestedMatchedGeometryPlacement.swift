@@ -16,6 +16,8 @@ struct NestedMatchedGeometryPlacement {
   private var resolved: [Identity: CellRect] = [:]
   private var offsets: [Identity: PlacedAnimationOverlayOffset] = [:]
   private var visiting: Set<Identity> = []
+  private var visitOrder: [Identity] = []
+  private var resolvingAdoptions: Set<Identity> = []
   private var cyclicAdoptees: Set<Identity> = []
 
   static func offsets(
@@ -35,13 +37,27 @@ struct NestedMatchedGeometryPlacement {
         pending.append((child, node.identity))
       }
     }
-    for pair in pairs { placement.pairs[pair.nonSource] = pair }
+    for pair in pairs {
+      placement.pairs[pair.nonSource] = pair
+      // Adoption into one's own descendant lacks an independent target.
+      // Other adopters on that parent path must retain their own source edges.
+      var ancestor: Identity? = pair.source
+      var seen: Set<Identity> = []
+      while let identity = ancestor, seen.insert(identity).inserted {
+        if identity == pair.nonSource {
+          placement.cyclicAdoptees.insert(pair.nonSource)
+          break
+        }
+        ancestor = placement.entries[identity]?.parent
+      }
+    }
     placement.liveOffsets = Dictionary(grouping: liveOffsets, by: \.identity)
     placement.liveScales = Dictionary(grouping: liveScales, by: \.identity)
+    let structurallyCyclicCount = placement.cyclicAdoptees.count
     for pair in pairs { _ = placement.rect(for: pair.nonSource) }
-    if !placement.cyclicAdoptees.isEmpty {
-      // A source inside its own adopting ancestor has no independent target.
-      // Suppress the cyclic adoption edges, then resolve from clean caches.
+    if placement.cyclicAdoptees.count > structurallyCyclicCount {
+      // Mutually dependent pairs can also cycle across separate subtrees.
+      // Recompute after dropping only adoption edges used by those cycles.
       placement.resolved.removeAll(keepingCapacity: true)
       placement.offsets.removeAll(keepingCapacity: true)
       for pair in pairs { _ = placement.rect(for: pair.nonSource) }
@@ -53,10 +69,16 @@ struct NestedMatchedGeometryPlacement {
     if let rect = resolved[identity] { return rect }
     guard let entry = entries[identity] else { return nil }
     guard visiting.insert(identity).inserted else {
-      cyclicAdoptees.formUnion(visiting.filter { pairs[$0] != nil })
+      if let start = visitOrder.firstIndex(of: identity) {
+        cyclicAdoptees.formUnion(visitOrder[start...].filter { resolvingAdoptions.contains($0) })
+      }
       return entry.bounds
     }
-    defer { visiting.remove(identity) }
+    visitOrder.append(identity)
+    defer {
+      visitOrder.removeLast()
+      visiting.remove(identity)
+    }
     var rect = entry.bounds
     if let parent = entry.parent, let parentEntry = entries[parent],
       let parentRect = self.rect(for: parent)
@@ -65,16 +87,19 @@ struct NestedMatchedGeometryPlacement {
       rect.origin.y += parentRect.origin.y - parentEntry.bounds.origin.y
       if entry.bounds == parentEntry.bounds { rect.size = parentRect.size }
     }
-    if let pair = pairs[identity], !cyclicAdoptees.contains(identity),
-      let source = self.rect(for: pair.source), !cyclicAdoptees.contains(identity)
-    {
-      let adopted = MatchedGeometryAdoption.adoptedRect(
-        nonSource: rect, source: source, properties: pair.properties, anchor: pair.anchor)
-      offsets[identity] = .init(
-        identity: identity, dx: adopted.origin.x - rect.origin.x,
-        dy: adopted.origin.y - rect.origin.y,
-        size: pair.properties.contains(.size) ? adopted.size : nil)
-      rect = adopted
+    if let pair = pairs[identity], !cyclicAdoptees.contains(identity) {
+      resolvingAdoptions.insert(identity)
+      let source = self.rect(for: pair.source)
+      resolvingAdoptions.remove(identity)
+      if let source, !cyclicAdoptees.contains(identity) {
+        let adopted = MatchedGeometryAdoption.adoptedRect(
+          nonSource: rect, source: source, properties: pair.properties, anchor: pair.anchor)
+        offsets[identity] = .init(
+          identity: identity, dx: adopted.origin.x - rect.origin.x,
+          dy: adopted.origin.y - rect.origin.y,
+          size: pair.properties.contains(.size) ? adopted.size : nil)
+        rect = adopted
+      }
     }
     for offset in liveOffsets[identity] ?? [] {
       rect.origin.x += offset.dx

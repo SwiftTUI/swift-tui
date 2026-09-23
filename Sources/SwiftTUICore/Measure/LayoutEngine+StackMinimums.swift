@@ -275,7 +275,12 @@ extension LayoutEngine {
         return min(1, mainDimension(of: idealMeasurement.measuredSize, for: axis))
       }
       return childMinimums.max() ?? 0
-    case .overlay, .offset, .position, .decoration, .safeAreaIgnoring:
+    case .decoration(let primaryIndex, _):
+      guard childMinimums.indices.contains(primaryIndex) else {
+        return childMinimums.max() ?? 0
+      }
+      return childMinimums[primaryIndex]
+    case .overlay, .offset, .position, .safeAreaIgnoring:
       return childMinimums.max() ?? 0
     case .safeAreaInset(let edge, _, let spacing, let safeArea):
       let baseMinimum = childMinimums.first ?? 0

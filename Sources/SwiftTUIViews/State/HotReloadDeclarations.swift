@@ -27,8 +27,11 @@ package func validateDormantHotReloadDeclarations<Value>(in value: Value) {
       }
       return
     }
+    let traversalOwner = value as? any AdditionalDynamicPropertyUpdating
     for (index, child) in Mirror(reflecting: value).children.enumerated()
-    where child.value is any DynamicProperty {
+    where child.value is any DynamicProperty
+      && traversalOwner?.ownsDynamicPropertyTraversal(ofStoredFieldAt: index) != true
+    {
       if let declaration = child.value as? any HotReloadSlotDeclaring {
         if let (slot, type) = declaration.hotReloadDeclaration(path: path) {
           if slots.updateValue(type, forKey: slot) != nil { ambiguous = true }

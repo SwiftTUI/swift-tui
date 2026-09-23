@@ -318,7 +318,20 @@
 
       encoded.withCString { cstr in
         let byteCount = unsafe strlen(cstr)
-        _ = unsafe sceneWrite(fd, cstr, byteCount)
+        var offset = 0
+        while offset < byteCount && !Task.isCancelled {
+          let written = unsafe sceneWrite(fd, cstr.advanced(by: offset), byteCount - offset)
+          if written > 0 {
+            offset += written
+            continue
+          }
+          if written < 0 && errno == EINTR { continue }
+          guard written < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) else { return }
+          var descriptor = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
+          let ready = unsafe poll(&descriptor, 1, 500)
+          if ready < 0 && errno == EINTR { continue }
+          guard ready > 0 else { return }
+        }
       }
     }
   }

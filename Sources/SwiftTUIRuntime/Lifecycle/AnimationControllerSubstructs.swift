@@ -20,13 +20,13 @@ extension AnimationController {
   /// insertions, removals, and matched-geometry swaps on the next frame.
   package struct PreviousFrameState: Sendable {
     package var snapshots: [Identity: AnimatableSnapshot] = [:]
-    /// Text realized during layout is absent from the resolved-tree snapshot.
+    /// Presentation values realized during layout are absent from the head snapshot.
     /// Keep only the placed window; offscreen/replaced rows are pruned at the tail.
-    package var realizedTextTargets: [Identity: AnyAnimatable] = [:]
+    package var realizedPresentationTargets: [AnimationKey: AnyAnimatable] = [:]
     /// The nearest resolved ancestor owns a layout-realized row's lifetime.
-    /// A surviving owner permits viewport eviction to complete its rolls;
+    /// A surviving owner permits viewport eviction to complete its animations;
     /// a departed owner makes them part of the orphan-completion prune.
-    package var realizedTextOwners: [Identity: Identity] = [:]
+    package var realizedPresentationOwners: [Identity: Identity] = [:]
     /// Per-slot rings of values written under `Transaction.tracksVelocity`,
     /// seeding the next `.animate(spring)` on the same slot (plan
     /// 2026-08-25-002 T4). Lives here so the frame-head draft's samples ride
@@ -66,8 +66,8 @@ extension AnimationController {
     /// and set members so a reset on the hot path doesn't re-allocate.
     package mutating func reset() {
       snapshots.removeAll(keepingCapacity: true)
-      realizedTextTargets.removeAll(keepingCapacity: true)
-      realizedTextOwners.removeAll(keepingCapacity: true)
+      realizedPresentationTargets.removeAll(keepingCapacity: true)
+      realizedPresentationOwners.removeAll(keepingCapacity: true)
       velocitySamplers.removeAll(keepingCapacity: true)
       treeRoot = nil
       placedRoot = nil

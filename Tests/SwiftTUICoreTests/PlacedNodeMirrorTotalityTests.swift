@@ -57,7 +57,7 @@ struct PlacedNodeMirrorTotalityTests {
       "subtreeBounds": "derived cache recomputed from placement geometry",
       "placementMetadata":
         "allocation products are placement-owned; the sparse text animation transaction "
-        + "is separately mirrored by textAnimationTransaction",
+        + "is separately mirrored by presentationAnimationTransaction",
     ],
   ]
 

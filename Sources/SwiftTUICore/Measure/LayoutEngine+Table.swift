@@ -21,7 +21,9 @@ extension LayoutEngine {
       width: nil
     ).size.width
     let widestChild = childMeasurements.map(\.measuredSize.width).max() ?? 0
-    idealSize.width = max(idealSize.width, leftWidth + 1 + widestChild + 1 + rightWidth)
+    idealSize.width = max(
+      idealSize.width,
+      leftWidth + 1 + widestChild + 1 + rightWidth + payload.style.contentInsets.horizontal)
 
     return CellSize(
       width: resolvedExpandingListDimension(idealSize.width, proposal: proposal.width),
@@ -75,8 +77,8 @@ extension LayoutEngine {
     }
 
     return CellSize(
-      width: lineMetrics.width,
-      height: lineMetrics.height
+      width: lineMetrics.width + payload.style.contentInsets.horizontal,
+      height: lineMetrics.height + payload.style.contentInsets.vertical
     )
   }
 

@@ -13,6 +13,53 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct TableLayoutProductTests {
+  private struct InsetStyle: TableStyle {
+    var snapshotLabel: String { "test-insets" }
+    func resolvePresentation(for configuration: TableStyleConfiguration) -> TableStylePresentation {
+      var result = TableStylePresentation.bordered
+      result.contentInsets = .init(top: 1, leading: 2, bottom: 2, trailing: 3)
+      return result
+    }
+  }
+
+  @Test("STUI-507: table insets reach borders, hosted rows, and the scroll viewport")
+  func styleInsetsReachEveryPhase() throws {
+    let artifacts = DefaultRenderer().render(
+      Table(0..<20, id: \.self, columns: [.init("V", width: 4)]) { Text("r\($0)") }
+        .tableStyle(InsetStyle()),
+      context: .init(identity: testIdentity("inset-table")),
+      proposal: .init(width: 20, height: 12))
+    let table = try #require(firstPlacedTable(in: artifacts.placedTree))
+    let layout = try #require(table.hostedTableVisibleLayout)
+    #expect(
+      layout.contentBounds.origin
+        == .init(
+          x: table.bounds.origin.x + 2,
+          y: table.bounds.origin.y + 1))
+    #expect(layout.contentBounds.size == .init(width: 15, height: 9))
+    #expect(table.scrollViewportRect?.size.height == 5)
+    let surface = artifacts.rasterSurface.lines
+    #expect(surface[0].allSatisfy { $0 == " " })
+    #expect(surface[1].hasPrefix("  ┌"))
+    #expect(surface[4].contains("r0"))
+    #expect(table.children.first?.bounds.origin.x == table.bounds.origin.x + 4)
+  }
+
+  @Test("STUI-507: payload-only tables include insets in ideal size and line bounds")
+  func payloadInsets() {
+    var payload = TablePayload(
+      columns: [.init(title: "V", width: 4)],
+      rows: [.init(cells: [.init(text: "r0")])], selectedRowIndex: nil, style: .bordered)
+    let baseline = LayoutEngine().measuredTableIdealSize(for: payload)
+    payload.style.contentInsets = .init(top: 1, leading: 2, bottom: 2, trailing: 3)
+    let ideal = LayoutEngine().measuredTableIdealSize(for: payload)
+    #expect(ideal == .init(width: baseline.width + 5, height: baseline.height + 3))
+    let layout = DrawExtractor().visibleTableLayout(
+      for: payload,
+      in: .init(origin: .init(x: 7, y: 9), size: ideal))
+    #expect(layout.contentBounds == .init(origin: .init(x: 9, y: 10), size: baseline))
+  }
+
   @Test("T-36: a 2-line table row keeps its borders, content, and successors aligned")
   func tallRowsStayAligned() throws {
     let artifacts = DefaultRenderer().render(

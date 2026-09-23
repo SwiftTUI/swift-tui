@@ -121,9 +121,10 @@ final class SimultaneousGestureRecognizer<First: Gesture, Second: Gesture>: Gest
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
+    let alreadyTerminal = phase.isTerminal
     let a = first.handleDeadline(at: instant)
     let b = second.handleDeadline(at: instant)
-    return a || b
+    return !alreadyTerminal && (a || b)
   }
 
   func currentValue() -> Value? {

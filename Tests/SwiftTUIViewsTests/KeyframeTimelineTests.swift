@@ -20,6 +20,66 @@ struct KeyframeTimelineTests {
 
   // MARK: - Linear
 
+  private struct InferredFrames: Keyframes {
+    var body: some Keyframes<Marker> {
+      KeyframeTrack(\.y) { InferredTrack() }
+    }
+  }
+
+  private struct InferredTrack: KeyframeTrackContent {
+    var body: some KeyframeTrackContent<Double> {
+      LinearKeyframe(4, duration: .seconds(1))
+    }
+  }
+
+  @Test("STUI-503: composed keyframes infer Value from their body")
+  func inferredComposedValue() {
+    let timeline = KeyframeTimeline(initialValue: Marker(), keyframes: InferredFrames())
+    #expect(timeline.duration == .seconds(1))
+    #expect(timeline.value(time: .milliseconds(500)).y == 2)
+  }
+
+  @Test("STUI-481: empty bare-keyframe branches are no-ops", arguments: [false, true])
+  func emptyBareKeyframeBranches(included: Bool) {
+    let timeline = KeyframeTimeline(initialValue: 0.0) {
+      LinearKeyframe(1, duration: .seconds(1))
+      if included {}
+      if included {
+        LinearKeyframe(2, duration: .seconds(1))
+      } else {
+      }
+      if included {
+      } else {
+        LinearKeyframe(2, duration: .seconds(1))
+      }
+      LinearKeyframe(3, duration: .seconds(1))
+    }
+    #expect(timeline.duration == .seconds(3))
+    #expect(timeline.value(time: .seconds(2)) == 2)
+    #expect(timeline.value(time: .seconds(3)) == 3)
+  }
+
+  @Test(
+    "STUI-481: explicit whole-value tracks still accept empty branches",
+    arguments: [false, true])
+  func emptyExplicitTrackBranch(included: Bool) {
+    let timeline = KeyframeTimeline(
+      initialValue: 0.0,
+      content: {
+        KeyframeTrack(\.self) { LinearKeyframe(2, duration: .seconds(1)) }
+        if included {
+          KeyframeTrack(\.self) { LinearKeyframe(4, duration: .seconds(1)) }
+        } else {
+        }
+        if included {}
+        if included {
+          if included {}
+        }
+      })
+    #expect(timeline.duration == .seconds(1))
+    #expect(timeline.value(time: .seconds(1)) == (included ? 4 : 2))
+  }
+
   @Test("T245: bare keyframes preserve sequential timing through control flow")
   func bareKeyframeControlFlow() {
     for included in [false, true] {

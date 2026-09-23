@@ -1618,8 +1618,10 @@ package final class AnimationController: Sendable {
     let departedKeys = activeAnimations.keys.filter { key in
       !newIdentities.contains(key.identity)
         && !exitOverlayIdentities.contains(key.identity)
-        && !(key.scope == .property(.textRoll)
-          && previousFrame.realizedTextOwners[key.identity].map { newIdentities.contains($0) }
+        && !(previousFrame.realizedPresentationTargets[key] != nil
+          && previousFrame.realizedPresentationOwners[key.identity].map {
+            newIdentities.contains($0)
+          }
             == true)
     }
     var departedBatchCounts: [AnimationBatchID: Int] = [:]
@@ -2342,79 +2344,96 @@ package final class AnimationController: Sendable {
     activeAnimations[AnimationKey(identity: identity, slot: slot)]?.initialVelocity
   }
 
-  /// Diffs only text that the layout phase realized outside the head's tree.
-  /// Returns presentation metadata; canonical layout and text width stay at
-  /// their destination values. The draft owns all state until frame commit.
-  package func processRealizedText(
+  /// Diffs presentation values realized outside the head's resolved tree.
+  /// The frame draft owns their targets and curves until commit; layout keeps
+  /// destination values while this pass returns the current painted samples.
+  package func processRealizedPresentation(
     in placed: PlacedNode,
     transactionPlan: FrameAnimationTransactionPlan,
     at timestamp: MonotonicInstant
-  ) -> [Identity: TextRollValue] {
-    var targets: [Identity: AnyAnimatable] = [:]
+  ) -> (textRolls: [Identity: TextRollValue], tintStyles: [Identity: AnyShapeStyle]) {
+    var targets: [AnimationKey: AnyAnimatable] = [:]
     var owners: [Identity: Identity] = [:]
-    var rolls: [Identity: TextRollValue] = [:]
+    var samples: [AnimationKey: AnyAnimatable] = [:]
+    var baselineTints: [Identity: AnyShapeStyle] = [:]
     var pending: [(node: PlacedNode, resolvedOwner: Identity?)] = [(placed, nil)]
     while let (node, inheritedOwner) = pending.popLast() {
       guard !node.isTransient else { continue }
-      let owner = previousIdentities.contains(node.identity) ? node.identity : inheritedOwner
+      let isResolved = previousIdentities.contains(node.identity)
+      let owner = isResolved ? node.identity : inheritedOwner
       pending.append(contentsOf: node.children.map { ($0, owner) })
-      guard case .text(let text) = node.drawPayload,
+      var values: [AnimatableSlot: AnyAnimatable] = [:]
+      if case .text(let text) = node.drawPayload,
         let transition = node.drawMetadata.contentTransition
-      else { continue }
-      if previousIdentities.contains(node.identity) {
-        // Eager hosted rows may reuse layout captured at the first sample.
-        // Re-project the head's current text presentation, including its
-        // at-rest target, instead of drawing that captured sample forever.
-        let byNode = node.viewNodeID.flatMap {
-          currentResolvedPresentationProjection.interpolatedByNodeID[$0]?[.textRoll]
-        }
-        rolls[node.identity] =
-          (byNode
-          ?? currentResolvedPresentationProjection.interpolatedByIdentity[node.identity]?[.textRoll]
-          ?? previousSnapshots[node.identity]?[.textRoll])?.unwrap(as: TextRollValue.self)
-        continue
-      }
-      let target = AnyAnimatable(TextRollValue(text: text, transition: transition))
-      targets[node.identity] = target
-      owners[node.identity] = owner
-      rolls[node.identity] = target.unwrap(as: TextRollValue.self)
-      var transaction = node.textAnimationTransaction ?? .init()
-      let frameTransaction = transactionPlan.transaction(for: node.identity)
-      if transaction.animationRequest == .inherit {
-        transaction.animationRequest = frameTransaction.animationRequest
-        transaction.animationBatchID = frameTransaction.animationBatchID
-      }
-      if case .animate(let box) = transaction.animationRequest,
-        registeredAnimations[box] == nil, let animation = box.unwrap(as: Animation.self)
       {
-        registeredAnimations[box] = animation
+        values[.textRoll] = AnyAnimatable(TextRollValue(text: text, transition: transition))
       }
-      enqueueSlotChangeIfNeeded(
-        identity: node.identity, viewNodeID: node.viewNodeID, slot: .textRoll,
-        previous: previousFrame.realizedTextTargets[node.identity], current: target,
-        request: transaction.animationRequest, batchID: transaction.animationBatchID,
-        tracksVelocity: false, timestamp: timestamp)
+      if node.drawPayload != .none,
+        let tint = AnimatableSnapshot.extractAnimatableShapeStyle(
+          from: node.environmentSnapshot.style.tintStyle)
+      {
+        values[.tintShapeStyle] = tint
+        baselineTints[node.identity] = node.environmentSnapshot.style.tintStyle
+      }
+      for (slot, target) in values {
+        let key = AnimationKey(identity: node.identity, slot: slot)
+        if isResolved {
+          // Retained eager placement can carry an earlier head sample.
+          let byNode = node.viewNodeID.flatMap {
+            currentResolvedPresentationProjection.interpolatedByNodeID[$0]?[slot]
+          }
+          samples[key] =
+            byNode
+            ?? currentResolvedPresentationProjection.interpolatedByIdentity[node.identity]?[slot]
+            ?? previousSnapshots[node.identity]?[slot]
+          continue
+        }
+        targets[key] = target
+        owners[node.identity] = owner
+        samples[key] = target
+        var transaction = node.presentationAnimationTransaction ?? .init()
+        let frameTransaction = transactionPlan.transaction(for: node.identity)
+        if transaction.animationRequest == .inherit {
+          transaction.animationRequest = frameTransaction.animationRequest
+          transaction.animationBatchID = frameTransaction.animationBatchID
+        }
+        if slot == .tintShapeStyle,
+          let intent = transaction.customValues[ObjectIdentifier(ScopedTintStyleAnimationKey.self)]?
+            .unwrap(as: ScopedStyleAnimationIntent.self), intent.isScoped
+        {
+          if intent.request != .inherit { transaction.animationRequest = intent.request }
+          transaction.animationBatchID = intent.batchID ?? transaction.animationBatchID
+        }
+        if case .animate(let box) = transaction.animationRequest,
+          registeredAnimations[box] == nil, let animation = box.unwrap(as: Animation.self)
+        {
+          registeredAnimations[box] = animation
+        }
+        enqueueSlotChangeIfNeeded(
+          identity: node.identity, viewNodeID: node.viewNodeID, slot: slot,
+          previous: previousFrame.realizedPresentationTargets[key], current: target,
+          request: transaction.animationRequest, batchID: transaction.animationBatchID,
+          tracksVelocity: transaction.tracksVelocity, timestamp: timestamp)
+      }
     }
 
-    // A row leaving the placed window stops owning a presentation animation.
-    // Re-entry starts from its current model text, with no retained offscreen roll.
+    // Leaving the realized window releases both the curve and its completion
+    // ownership. Re-entry starts at the current model, without an offscreen sample.
     var completedBoxes: Set<AnimationBox> = []
-    for identity in previousFrame.realizedTextTargets.keys where targets[identity] == nil {
-      let key = AnimationKey(identity: identity, slot: .textRoll)
+    for key in previousFrame.realizedPresentationTargets.keys where targets[key] == nil {
       if let entry = activeAnimations.removeValue(forKey: key) {
         completedBoxes.insert(entry.animationBox)
         releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
       }
     }
-    previousFrame.realizedTextTargets = targets
-    previousFrame.realizedTextOwners = owners
+    previousFrame.realizedPresentationTargets = targets
+    previousFrame.realizedPresentationOwners = owners
 
     var keysToRemove: [AnimationKey] = []
     var completedBatches: [CompletedBatchRelease] = []
     var logicallyCompletedBatches: [AnimationBatchID] = []
     var redraw: Set<Identity> = []
-    for identity in targets.keys {
-      let key = AnimationKey(identity: identity, slot: .textRoll)
+    for key in targets.keys {
       guard let entry = activeAnimations[key], case .property(let from, let to) = entry.kind else {
         continue
       }
@@ -2426,9 +2445,8 @@ package final class AnimationController: Sendable {
       case .unregistered, .completed:
         break
       case .progressed(let progress):
-        rolls[identity] = AnimationPropertyValueApplication.interpolate(
-          from: from, to: to, progress: progress
-        ).unwrap(as: TextRollValue.self)
+        samples[key] = AnimationPropertyValueApplication.interpolate(
+          from: from, to: to, progress: progress)
       }
     }
     for key in keysToRemove { activeAnimations.removeValue(forKey: key) }
@@ -2438,9 +2456,7 @@ package final class AnimationController: Sendable {
     }
     pruneCompletedAnimationRegistrations(completedBoxes)
     lastTickResult.redrawIdentities.formUnion(redraw)
-    if targets.keys.contains(where: {
-      activeAnimations[.init(identity: $0, slot: .textRoll)] != nil
-    }) {
+    if targets.keys.contains(where: { activeAnimations[$0] != nil }) {
       lastTickResult.hasPendingWork = true
       let next = timestamp.advanced(by: frameInterval)
       lastTickResult.nextDeadline = min(lastTickResult.nextDeadline ?? next, next)
@@ -2450,7 +2466,18 @@ package final class AnimationController: Sendable {
       lastTickResult.hasPendingWork = false
       lastTickResult.nextDeadline = nil
     }
-    return rolls
+    var rolls: [Identity: TextRollValue] = [:]
+    var tints: [Identity: AnyShapeStyle] = [:]
+    for (key, sample) in samples {
+      if key.scope == .property(.textRoll) {
+        rolls[key.identity] = sample.unwrap(as: TextRollValue.self)
+      } else if let tint = AnimationPropertyValueApplication.unwrapShapeStyle(sample),
+        tint != baselineTints[key.identity]
+      {
+        tints[key.identity] = tint
+      }
+    }
+    return (rolls, tints)
   }
 
   private func retainBatch(_ batchID: AnimationBatchID?) {
@@ -2601,8 +2628,7 @@ package final class AnimationController: Sendable {
     for (key, animation) in activeAnimations {
       switch animation.kind {
       case .property(let from, let to):
-        if key.scope == .property(.textRoll), previousFrame.realizedTextTargets[key.identity] != nil
-        {
+        if previousFrame.realizedPresentationTargets[key] != nil {
           // The tail owns this curve's single evaluation after row realization.
           hasPendingWork = true
           latestDeadline = timestamp.advanced(by: frameInterval)
