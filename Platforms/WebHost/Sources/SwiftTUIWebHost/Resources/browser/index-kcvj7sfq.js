@@ -124,12 +124,20 @@ function isSupportedImageFormat(value) {
 
 // src/AccessibilityTree.ts
 class AccessibilityTreeMounter {
+  sendAction;
   element;
   announcerElement;
   nodesById = new Map;
   previousLabelsById = new Map;
   hasLiveRegionBaseline = false;
-  constructor() {
+  modelsById = new Map;
+  presenting = false;
+  nextRequestID = 0n;
+  acknowledgedRequestID = 0n;
+  pendingValues = new Map;
+  pendingFocus;
+  constructor(sendAction) {
+    this.sendAction = sendAction;
     this.element = document.createElement("div");
     this.element.className = "webhost-scene__accessibility-tree";
     applyScreenReaderOnlyStyle(this.element);
@@ -147,33 +155,143 @@ class AccessibilityTreeMounter {
       ...announcement,
       politeness: normalizePoliteness(announcement.politeness)
     }));
+    this.presenting = true;
+    if (options.actionResponse) {
+      const acknowledged = BigInt(options.actionResponse.requestID);
+      if (acknowledged > this.acknowledgedRequestID)
+        this.acknowledgedRequestID = acknowledged;
+    }
     const previousById = this.nodesById;
     const nextById = new Map;
     for (const node of visibleNodes) {
       const existing = previousById.get(node.id);
-      const element = existing ?? document.createElement("div");
+      const tag = this.elementTag(node);
+      const previousModel = this.modelsById.get(node.id);
+      const reusable = existing?.tagName.toLowerCase() === tag && previousModel?.actionTarget === node.actionTarget;
+      const element = reusable ? existing : this.createElement(node, tag);
+      if (!reusable) {
+        existing?.remove();
+        this.pendingValues.delete(node.id);
+        if (this.pendingFocus?.id === node.id)
+          this.pendingFocus = undefined;
+      }
       this.applyNodeAttributes(element, node, metrics);
       nextById.set(node.id, element);
     }
     for (const id of previousById.keys()) {
       if (!nextById.has(id)) {
         previousById.get(id)?.remove();
+        this.pendingValues.delete(id);
+        if (this.pendingFocus?.id === id)
+          this.pendingFocus = undefined;
       }
     }
     this.nodesById = nextById;
+    this.modelsById = new Map(visibleNodes.map((node) => [node.id, node]));
+    const childOffsets = new Map;
     for (const node of visibleNodes) {
       const element = nextById.get(node.id);
       if (!element) {
         continue;
       }
       const parent = node.parentId ? nextById.get(node.parentId) : undefined;
-      (parent ?? this.element).appendChild(element);
+      const container = parent ?? this.element;
+      const offset = childOffsets.get(container) ?? 0;
+      if (container.children[offset] !== element) {
+        container.insertBefore(element, container.children[offset] ?? null);
+      }
+      childOffsets.set(container, offset + 1);
     }
     this.announceLiveRegionChanges(visibleNodes, normalizedAnnouncements);
     const focused = visibleNodes.find((node) => node.isFocused);
-    if ((options.synchronizeFocus ?? true) && focused) {
-      this.nodesById.get(focused.id)?.focus?.({ preventScroll: true });
+    if (this.pendingFocus !== undefined && this.pendingFocus.requestID <= this.acknowledgedRequestID) {
+      this.pendingFocus = undefined;
     }
+    if ((options.synchronizeFocus ?? true) && focused && this.pendingFocus === undefined) {
+      const element = this.nodesById.get(focused.id);
+      if (element && document.activeElement !== element)
+        element.focus?.({ preventScroll: true });
+    }
+    this.presenting = false;
+  }
+  elementTag(node) {
+    if (!node.actionTarget || !this.sendAction)
+      return "div";
+    if (node.role === "textEditor")
+      return "textarea";
+    if (["textField", "secureField", "slider", "stepper"].includes(node.role))
+      return "input";
+    return "div";
+  }
+  createElement(node, tag) {
+    const element = document.createElement(tag);
+    if (!node.actionTarget || !this.sendAction)
+      return element;
+    const current = () => this.nodesById.get(node.id) === element ? this.modelsById.get(node.id) : undefined;
+    const send = (request) => {
+      const model = current();
+      if (this.presenting || !model?.actionTarget || model.isEnabled === false || !model.actions?.includes(request.action))
+        return;
+      const requestID = ++this.nextRequestID;
+      if (request.action === "setValue")
+        this.pendingValues.set(node.id, requestID);
+      if (request.action === "focus")
+        this.pendingFocus = { id: node.id, requestID };
+      this.sendAction?.(model.actionTarget, request, String(requestID));
+    };
+    element.addEventListener("focus", () => send({ action: "focus" }));
+    element.addEventListener("click", (event) => {
+      event.stopPropagation();
+      send({ action: "activate" });
+    });
+    element.addEventListener("keydown", (event) => {
+      const model = current();
+      if (!model || event.key === "Tab" || event.key === "Escape")
+        return;
+      if (tag !== "div" && event.key === "Enter" && model.role !== "textEditor")
+        return;
+      event.stopPropagation();
+      let request;
+      if (model.actions?.includes("increment") && ["ArrowRight", "ArrowUp"].includes(event.key)) {
+        request = { action: "increment" };
+      } else if (model.actions?.includes("decrement") && ["ArrowLeft", "ArrowDown"].includes(event.key)) {
+        request = { action: "decrement" };
+      } else if ((model.role === "slider" || model.role === "stepper") && (event.key === "Home" || event.key === "End")) {
+        const value = event.key === "Home" ? model.valueMin : model.valueMax;
+        if (value !== undefined)
+          request = { action: "setValue", value: { type: "number", value } };
+      } else if (tag === "div" && (event.key === "Enter" || event.key === " ")) {
+        request = { action: "activate" };
+      }
+      if (request) {
+        event.preventDefault();
+        send(request);
+      }
+    });
+    if (tag !== "div") {
+      element.addEventListener("blur", () => {
+        if (current()?.role === "secureField")
+          element.value = "";
+      });
+      element.addEventListener("paste", (event) => event.stopPropagation());
+      element.addEventListener("input", () => {
+        const model = current();
+        if (!model)
+          return;
+        const value = element.value;
+        if (model.role === "slider" || model.role === "stepper") {
+          const number = Number(value);
+          if (value !== "" && Number.isFinite(number))
+            send({
+              action: "setValue",
+              value: { type: "number", value: number }
+            });
+        } else {
+          send({ action: "setValue", value: { type: "text", value } });
+        }
+      });
+    }
+    return element;
   }
   applyNodeAttributes(element, node, metrics) {
     element.id = `swifttui-a11y-${stableDOMId(node.id)}`;
@@ -189,6 +307,29 @@ class AccessibilityTreeMounter {
       element.dataset.focused = "true";
     } else {
       delete element.dataset.focused;
+    }
+    setOrRemoveAttribute(element, "aria-disabled", node.isEnabled === false ? "true" : undefined);
+    setOrRemoveAttribute(element, "aria-checked", node.role === "toggle" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
+    setOrRemoveAttribute(element, "aria-expanded", node.role === "disclosureGroup" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
+    setOrRemoveAttribute(element, "aria-valuenow", node.value?.type === "number" ? String(node.value.value) : undefined);
+    setOrRemoveAttribute(element, "aria-valuemin", node.valueMin === undefined ? undefined : String(node.valueMin));
+    setOrRemoveAttribute(element, "aria-valuemax", node.valueMax === undefined ? undefined : String(node.valueMax));
+    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+      const input = element;
+      if (element.tagName === "INPUT") {
+        input.type = node.role === "secureField" ? "password" : node.role === "slider" ? "range" : node.role === "stepper" ? "number" : "text";
+      }
+      input.disabled = node.isEnabled === false;
+      setOrRemoveAttribute(element, "min", node.valueMin === undefined ? undefined : String(node.valueMin));
+      setOrRemoveAttribute(element, "max", node.valueMax === undefined ? undefined : String(node.valueMax));
+      setOrRemoveAttribute(element, "step", node.valueStep === undefined ? undefined : String(node.valueStep));
+      const value = node.value ? String(node.value.value) : "";
+      const pending = this.pendingValues.get(node.id);
+      if (pending === undefined || pending <= this.acknowledgedRequestID) {
+        this.pendingValues.delete(node.id);
+        if (node.role !== "secureField" && input.value !== value)
+          input.value = value;
+      }
     }
     const [x, y, width, height] = node.rect;
     element.style.position = "absolute";
@@ -1387,6 +1528,11 @@ function encodeBase64(value) {
 }
 
 // src/WebHostSurfaceTransport.ts
+function encodeAccessibilityActionMessage(target, request, requestID) {
+  const value = request.action === "setValue" ? `:${request.value.type}:${encodeURIComponent(String(request.value.value))}` : "";
+  return new TextEncoder().encode(`\x1Eaccessibility:${requestID === undefined ? "" : `${requestID}:`}${encodeURIComponent(target)}:${request.action}${value}
+`);
+}
 var recordPrefix = "\x1E";
 var textEncoder = new TextEncoder;
 var MAX_IMAGE_RECOVERY_ID_BYTES = 1024;
@@ -1694,6 +1840,7 @@ class WebHostOutputDecoder {
       images: frame.images,
       damage: frame.damage,
       accessibilityTree: frame.accessibilityTree,
+      accessibilityActionResponse: frame.accessibilityActionResponse,
       accessibilityAnnouncements: frame.accessibilityAnnouncements,
       scrollRegions: frame.scrollRegions,
       links: frame.links,
@@ -1832,14 +1979,14 @@ function isWebHostSurfaceFrame(value) {
     return false;
   }
   const frame = value;
-  return (frame.version === 1 || frame.version === 2) && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.rows) && frame.rows.every(isWebHostSurfaceRow) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+  return (frame.version === 1 || frame.version === 2) && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.rows) && frame.rows.every(isWebHostSurfaceRow) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityActionResponse === undefined || isAccessibilityActionResponse(frame.accessibilityActionResponse)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
 }
 function isWebHostSurfaceDeltaFrame(value) {
   if (!value || typeof value !== "object") {
     return false;
   }
   const frame = value;
-  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && isOptionalSafeInteger(frame.baselineGen) && isOptionalSafeInteger(frame.stylesBase) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && isOptionalSafeInteger(frame.baselineGen) && isOptionalSafeInteger(frame.stylesBase) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityActionResponse === undefined || isAccessibilityActionResponse(frame.accessibilityActionResponse)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
 }
 function isSurfaceGridDimension(value) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 2147483647;
@@ -1890,7 +2037,35 @@ function isWebHostAccessibilityNode(value) {
     return false;
   }
   const node = value;
-  return typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean");
+  return typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
+}
+function isAccessibilityActionResponse(value) {
+  if (!value || typeof value !== "object")
+    return false;
+  const response = value;
+  return typeof response.requestID === "string" && /^[0-9]{1,20}$/.test(response.requestID) && typeof response.target === "string" && typeof response.result === "string" && [
+    "accepted",
+    "staleTarget",
+    "disabled",
+    "outOfScope",
+    "unsupported",
+    "invalidValue"
+  ].includes(response.result);
+}
+function isAccessibilityValue(value) {
+  if (!value || typeof value !== "object")
+    return false;
+  const candidate = value;
+  switch (candidate.type) {
+    case "text":
+      return typeof candidate.value === "string";
+    case "boolean":
+      return typeof candidate.value === "boolean";
+    case "number":
+      return typeof candidate.value === "number" && Number.isFinite(candidate.value);
+    default:
+      return false;
+  }
 }
 function isWebHostAccessibilityPoint(value) {
   return Array.isArray(value) && value.length === 2 && value.every((entry) => typeof entry === "number");
@@ -3606,7 +3781,9 @@ class WebHostSceneRuntime {
       this.canvas = canvas;
       this.painter.attach(canvas, () => this.paintScheduler.requestRepaint());
     }
-    this.accessibilityTree = new AccessibilityTreeMounter;
+    this.accessibilityTree = new AccessibilityTreeMounter((target, request, requestID) => {
+      this.onInput(encodeAccessibilityActionMessage(target, request, requestID));
+    });
     this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
     this.installInputHandlers();
     this.installResizeObserver();
@@ -4057,7 +4234,8 @@ class WebHostSceneRuntime {
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight
     }, [...announcements], {
-      synchronizeFocus: this.synchronizeAccessibilityFocus
+      synchronizeFocus: this.synchronizeAccessibilityFocus,
+      actionResponse: frame.accessibilityActionResponse
     });
   }
   surfaceMetrics() {
