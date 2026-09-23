@@ -640,6 +640,18 @@ public final class AndroidHostSceneHost {
     session.sendInput(bytes)
   }
 
+  /// Queues one complete RS/newline-framed semantic action record. The return
+  /// value reports ingress validity; the next frame carries runtime acceptance.
+  @MainActor
+  package func sendAccessibilityAction(_ bytes: [UInt8]) -> Bool {
+    guard bytes.first == 0x1E, bytes.last == 0x0A,
+      let command = String(validating: bytes.dropFirst().dropLast(), as: UTF8.self),
+      let request = AccessibilityActionWire.parseCommand(command)
+    else { return false }
+    session.send(.accessibility(request))
+    return true
+  }
+
   public func copyLatestFrameBytes(
     to outBuffer: UnsafeMutablePointer<UInt8>?,
     capacity: Int

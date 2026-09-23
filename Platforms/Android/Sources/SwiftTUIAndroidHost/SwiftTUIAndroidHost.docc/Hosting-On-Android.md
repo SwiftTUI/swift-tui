@@ -38,3 +38,13 @@ For where the Android presentation sits in the host matrix — what is bridged,
 what is preview-only, and how it compares to the SwiftUI and browser hosts —
 see
 [Hosts and Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms).
+
+### Semantic actions
+
+`swift_tui_android_accessibility_action` accepts one complete UTF-8
+RS/newline-framed `accessibility` command, using the same typed values and
+percent encoding as the browser. Call it on the host main thread. Its return
+value reports command validity and queuing, while `accessibilityActionResponse`
+in the next frame reports runtime acceptance or rejection. Commands never pass
+through the terminal keyboard parser. Older host libraries lack the symbol;
+the Android JNI adapter then returns unsupported.

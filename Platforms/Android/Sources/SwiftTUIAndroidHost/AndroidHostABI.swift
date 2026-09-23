@@ -167,6 +167,24 @@ public func swift_tui_android_send_input(
   }
 }
 
+/// Queues a complete UTF-8 semantic action record. Returns 1 for valid ingress;
+/// runtime acceptance or rejection is correlated in the next semantic frame.
+@_cdecl("swift_tui_android_accessibility_action")
+public func swift_tui_android_accessibility_action(
+  _ handle: Int64,
+  _ bytes: UnsafePointer<UInt8>?,
+  _ count: Int32
+) -> Int32 {
+  guard let host = AndroidHostHandleRegistry.host(for: handle),
+    let bytes = unsafe bytes,
+    count > 0, Int(count) <= HostWireBudget.recordBytes
+  else { return 0 }
+  let payload = unsafe Array(UnsafeBufferPointer(start: bytes, count: Int(count)))
+  return withCheckedMainActorAccess("swift_tui_android_accessibility_action") {
+    host.sendAccessibilityAction(payload) ? 1 : 0
+  }
+}
+
 @_cdecl("swift_tui_android_declare_capabilities")
 public func swift_tui_android_declare_capabilities(
   _ handle: Int64,
