@@ -78,21 +78,37 @@ await createWebHostApp({
 });
 ```
 
-The runtime paints through a canvas or DOM engine and mounts an ARIA
-accessibility tree alongside the rendered cells. Renderer selection, styling,
-and the transport details are documented in the `@swifttui/web` package's own
-README.
+The runtime uses Canvas by default and mounts an ARIA accessibility tree
+alongside the rendered cells. Set `renderer: "dom"` on `createWebHostApp` to
+opt into the **experimental DOM renderer**. It presents the same WASM app and
+fixed cell layout using selectable browser text, with SVG decoration geometry
+and HTML images. Alt/Option-drag selects the visible text.
+
+DOM mode is not a production-qualified or WCAG-conformant host profile.
+Chromium native find cannot join words across separate wire cells, and complete
+browser/assistive-technology, physical-device and performance qualification is
+incomplete. Find and print cover only the mounted viewport. The runtime's
+[renderer documentation](https://github.com/SwiftTUI/swift-tui-web/tree/main/packages/web#renderers)
+covers setup, packaged and custom fonts, sizing, clipping, selection, resources,
+execution requirements and current limits. Documentation at repository HEAD
+includes features beyond the earlier DOM presenter in released 0.14.0.
+
+The counter template provides `npm run build:dom` and `npm run dev:dom`; every
+web build also contains `/dom.html`, sharing the Canvas demo's WASM artifact.
 
 ## Serve With the Required Headers
 
-The WASI runtime uses `SharedArrayBuffer`-backed stdin, so the hosting page
-must be served with cross-origin isolation headers. Without them the mount
-stays blank:
+Worker execution uses `SharedArrayBuffer`-backed stdin, so serve the hosting
+page with cross-origin isolation headers:
 
 ```text
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
+
+The browser runtime can use its main-thread path when JSPI is available.
+Without worker prerequisites or JSPI, startup reports an execution capability
+error. Choosing DOM changes presentation, not these execution requirements.
 
 ## Start From the Reference Template
 

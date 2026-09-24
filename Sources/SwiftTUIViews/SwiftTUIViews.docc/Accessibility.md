@@ -175,9 +175,22 @@ normalization remains owned by the control (including single-line editing).
 Repeated focus and value echoes do not write the binding or schedule new work.
 
 See `docs/ACCESSIBILITY.md` in the source repository for the additive host-wire
-format. The native host packages must connect their assistive
-callbacks to this contract before those interfaces become operable. Shared
-runtime tests do not establish VoiceOver, TalkBack, or WCAG conformance.
+format. The current `@swifttui/web` adapter connects assistive focus,
+activation, adjustment and supported value edits to this contract. It mounts
+one semantic sidecar for either presenter; the visible DOM text does not create
+a duplicate accessible control tree. Older tagged hosts and producers may
+provide only semantic presentation. Native host packages must connect their
+assistive callbacks before those interfaces become operable; they have their
+own qualification boundaries.
+
+The browser's DOM presenter is **experimental and opt-in** (`renderer: "dom"`);
+Canvas remains the default. The complete DOM control/assistive-technology
+journey, Windows High Contrast and physical mobile acceptance are not qualified.
+IME/composition is outside the current browser input contract. Shared runtime
+tests and browser automation do not establish VoiceOver, TalkBack, or WCAG
+conformance. The browser package's
+[DOM support statement](https://github.com/SwiftTUI/swift-tui-web/tree/main/packages/web#experimental-support-boundary)
+documents the tested profile, selection/find limits, and other known exclusions.
 
 ## See Also
 

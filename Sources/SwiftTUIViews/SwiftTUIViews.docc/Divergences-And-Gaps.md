@@ -1042,10 +1042,13 @@ value-setting requests; host adapters must connect their native callbacks. (The 
 *output mode* was removed as unusable; its renderer survives only as the
 `SwiftTUITestSupport` assistive-output assertion seam.)
 
-- **Assistive host adapters remain unconnected.** *Gap.* The shared runtime
+- **Assistive host qualification remains incomplete.** *Gap.* The shared runtime
   accepts node-targeted focus, activation, adjustment and typed value requests
-  (STUI-129). VoiceOver and TalkBack adapters still need to connect
-  their callbacks and qualify real assistive journeys.
+  (STUI-129). The current browser adapter connects those callbacks to the shared
+  contract. Its DOM presenter is experimental; complete control/assistive
+  journeys, Windows High Contrast and physical mobile acceptance remain
+  unqualified. Native adapters retain their own integration gaps. Shared
+  runtime tests do not establish host conformance.
 - **No WCAG conformance suite or automated screen-reader testing.** *Gap.*
   Unit tests and guardrail scripts cover semantic presentation. The
   coordination-root report
