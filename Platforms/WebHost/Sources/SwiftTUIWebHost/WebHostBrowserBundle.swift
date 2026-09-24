@@ -61,6 +61,8 @@
         return "application/json; charset=utf-8"
       case "wasm":
         return "application/wasm"
+      case "woff2":
+        return "font/woff2"
       case "svg":
         return "image/svg+xml"
       case "png":

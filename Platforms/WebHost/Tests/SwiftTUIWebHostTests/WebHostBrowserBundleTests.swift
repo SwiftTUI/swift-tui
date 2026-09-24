@@ -44,6 +44,24 @@
       #expect(html.contains("?token=test-token"))
     }
 
+    @Test("browser bundle serves all DOM font faces and their license")
+    func browserBundleServesDOMFonts() throws {
+      let paths = try WebHostBrowserBundle.assetPaths()
+      let fonts = paths.filter { $0.hasSuffix(".woff2") }
+      #expect(fonts.count == 4)
+      var totalBytes = 0
+      for path in fonts {
+        let resource = try WebHostBrowserBundle.resource(for: "/\(path)")
+        #expect(resource.contentType == "font/woff2")
+        #expect(resource.data.starts(with: Array("wOF2".utf8)))
+        totalBytes += resource.data.count
+      }
+      #expect(totalBytes == 273700)
+      let licensePath = try #require(paths.first { $0.hasSuffix("/LICENSE.md") })
+      let license = try WebHostBrowserBundle.resource(for: "/\(licensePath)")
+      #expect(String(decoding: license.data, as: UTF8.self).contains("SIL OPEN FONT LICENSE"))
+    }
+
     @Test("browser bundle records the swift-tui-web revision it was built from")
     func browserBundleRecordsBuildProvenance() throws {
       // Scripts/update_webhost_bundle.sh writes this stamp; the coordination

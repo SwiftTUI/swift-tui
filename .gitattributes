@@ -4,3 +4,6 @@
 # carriage returns. `text=auto` keeps binary detection; eol=lf pins the
 # working-tree line ending on every platform.
 * text=auto eol=lf
+
+# Preserve upstream font notices byte-for-byte: the asset manifest hashes them.
+Platforms/WebHost/Sources/SwiftTUIWebHost/Resources/browser/assets/swifttui-fonts/**/LICENSE.md -text

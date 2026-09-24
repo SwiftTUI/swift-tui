@@ -1,3 +1,122 @@
+// src/DomFontResources.ts
+var DOM_FONT_FAMILY = "SwiftTUI Source Code Pro";
+var DOM_FONT_ASSET_PATH = "assets/swifttui-fonts/2184c1f2bac4/";
+var DOM_FONT_FALLBACK = '"Menlo", "Consolas", "Liberation Mono", monospace';
+var DOM_UNICODE_FALLBACK = '"PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace';
+var DOM_FONT_FACES = [
+  { file: "SourceCodePro-Regular.ttf.woff2", weight: "400", style: "normal" },
+  { file: "SourceCodePro-Bold.ttf.woff2", weight: "700", style: "normal" },
+  { file: "SourceCodePro-It.ttf.woff2", weight: "400", style: "italic" },
+  { file: "SourceCodePro-BoldIt.ttf.woff2", weight: "700", style: "italic" }
+];
+var documents = new WeakMap;
+var nextAlias = 0;
+
+class DomFontResources {
+  disposed = false;
+  releaseFaces;
+  cancelWait;
+  ready;
+  constructor(doc, family, size, options = {}) {
+    this.ready = this.load(doc, family, size, options).catch(() => {
+      this.releaseFaces?.();
+      this.releaseFaces = undefined;
+      return {
+        status: this.disposed ? "disposed" : "fallback",
+        family: DOM_FONT_FALLBACK,
+        diagnostic: "DOM font configuration failed; using the measured system monospace fallback."
+      };
+    });
+  }
+  async load(doc, family, size, options) {
+    if (!doc.fonts || typeof FontFace === "undefined")
+      return {
+        status: "fallback",
+        family: DOM_FONT_FALLBACK,
+        diagnostic: "Font loading is unavailable; using the measured system monospace fallback."
+      };
+    let desiredFamily = family;
+    let readiness;
+    if (family === DOM_FONT_FAMILY) {
+      let base;
+      try {
+        base = new URL(String(options.assetBase ?? DOM_FONT_ASSET_PATH), doc.baseURI);
+      } catch {
+        return {
+          status: "fallback",
+          family: DOM_FONT_FALLBACK,
+          diagnostic: "Invalid DOM font asset base; using the measured system monospace fallback."
+        };
+      }
+      if (!base.pathname.endsWith("/"))
+        base.pathname += "/";
+      const key = base.href;
+      const shared = documents.get(doc) ?? new Map;
+      documents.set(doc, shared);
+      let entry = shared.get(key);
+      if (!entry) {
+        const alias = `SwiftTUIFont${++nextAlias}`;
+        const faces = DOM_FONT_FACES.map((face) => new FontFace(alias, `url(${JSON.stringify(new URL(face.file, base).href)})`, { weight: face.weight, style: face.style }));
+        entry = { refs: 0, alias, faces, ready: Promise.resolve() };
+        const owned2 = entry;
+        entry.ready = Promise.all(faces.map((face) => face.load())).then(() => {
+          if (owned2.refs > 0)
+            for (const face of faces)
+              doc.fonts.add(face);
+        });
+        shared.set(key, entry);
+      }
+      entry.refs++;
+      const owned = entry;
+      let released = false;
+      this.releaseFaces = () => {
+        if (released)
+          return;
+        released = true;
+        if (--owned.refs === 0) {
+          for (const face of owned.faces)
+            doc.fonts.delete(face);
+          if (shared.get(key) === owned)
+            shared.delete(key);
+        }
+      };
+      desiredFamily = `"${entry.alias}", ${DOM_UNICODE_FALLBACK}`;
+      readiness = entry.ready;
+    } else {
+      readiness = Promise.all(["", "700 ", "italic ", "italic 700 "].map((prefix) => doc.fonts.load(`${prefix}${size}px ${family}`, "Wé")));
+    }
+    const waitMs = Math.max(0, Math.min(1e4, Number.isFinite(options.timeoutMs) ? options.timeoutMs : 2000));
+    let timer;
+    const interrupted = new Promise((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), waitMs);
+      this.cancelWait = () => resolve("disposed");
+    });
+    const outcome = await Promise.race([
+      readiness.then(() => "ready", () => "failed"),
+      interrupted
+    ]);
+    clearTimeout(timer);
+    this.cancelWait = undefined;
+    if (this.disposed || outcome === "disposed")
+      return { status: "disposed", family: DOM_FONT_FALLBACK };
+    if (outcome === "ready")
+      return { status: "ready", family: desiredFamily };
+    this.releaseFaces?.();
+    this.releaseFaces = undefined;
+    return {
+      status: "fallback",
+      family: DOM_FONT_FALLBACK,
+      diagnostic: `DOM font ${outcome === "timeout" ? "readiness timed out" : "loading failed"}; using the measured system monospace fallback for this session.`
+    };
+  }
+  dispose() {
+    this.disposed = true;
+    this.cancelWait?.();
+    this.releaseFaces?.();
+    this.releaseFaces = undefined;
+  }
+}
+
 // src/WebHostSceneManifest.ts
 function normalizeWebHostSceneManifest(source) {
   const scenes = normalizeSceneDescriptors(source);
@@ -488,6 +607,14 @@ function stableDOMId(id) {
     }
     return `-${character.codePointAt(0)?.toString(16) ?? "0"}-`;
   }).join("");
+}
+
+// src/SurfaceTypography.ts
+function fontForStyle(terminalStyle, style) {
+  const emphasis = style?.em ?? 0;
+  const italic = (emphasis & 2) !== 0 ? "italic " : "";
+  const weight = (emphasis & 1) !== 0 ? "700 " : "";
+  return `${italic}${weight}${terminalStyle.fontSize}px ${terminalStyle.fontFamily}`;
 }
 
 // src/BoxDrawingRenderer.ts
@@ -2631,12 +2758,6 @@ function isPaintableSurfaceImage(image) {
   const [, , clipWidth, clipHeight] = image.visibleBounds;
   return isSupportedImageFormat(image.format) && boundsWidth > 0 && boundsHeight > 0 && clipWidth > 0 && clipHeight > 0;
 }
-function fontForStyle(terminalStyle, style) {
-  const emphasis = style?.em ?? 0;
-  const italic = (emphasis & 2) !== 0 ? "italic " : "";
-  const weight = (emphasis & 1) !== 0 ? "700 " : "";
-  return `${italic}${weight}${terminalStyle.fontSize}px ${terminalStyle.fontFamily}`;
-}
 function cellRect(metrics, x, y, span) {
   return {
     x: x * metrics.cellWidth,
@@ -2719,34 +2840,254 @@ function dirtyRegionIntersectsCellRect(region, x, y, width, height) {
 }
 
 // src/DomCellMetrics.ts
-function measureDomCells(mount, style) {
-  const probe = document.createElement("span");
-  probe.setAttribute("aria-hidden", "true");
-  Object.assign(probe.style, {
-    position: "absolute",
-    visibility: "hidden",
-    pointerEvents: "none",
-    userSelect: "none",
-    whiteSpace: "pre",
-    font: fontForStyle(style),
-    fontVariantLigatures: "none",
-    letterSpacing: "0px",
-    lineHeight: "normal"
-  });
-  probe.textContent = "W".repeat(64);
-  mount.appendChild(probe);
-  const rect = probe.getBoundingClientRect?.();
-  const mountRect = mount.getBoundingClientRect?.();
-  const scale = mount.offsetWidth > 0 && mountRect?.width ? mountRect.width / mount.offsetWidth : 1;
-  probe.remove();
-  if (!rect || rect.width <= 0 || rect.height <= 0)
+class DomCellProbe {
+  mount;
+  element;
+  faces;
+  styleKey;
+  constructor(mount) {
+    this.mount = mount;
+    const doc = mount.ownerDocument ?? document;
+    this.element = doc.createElement("div");
+    this.element.setAttribute("aria-hidden", "true");
+    Object.assign(this.element.style, {
+      position: "absolute",
+      visibility: "hidden",
+      pointerEvents: "none",
+      userSelect: "none",
+      width: "max-content",
+      height: "auto",
+      left: "0",
+      top: "0",
+      overflow: "hidden",
+      contain: "layout style",
+      margin: "0",
+      padding: "0",
+      border: "0"
+    });
+    this.faces = [0, 1, 2, 3].map(() => {
+      const line = doc.createElement("div");
+      const text = doc.createElement("span");
+      const baseline = doc.createElement("span");
+      Object.assign(baseline.style, {
+        display: "inline-block",
+        width: "0",
+        height: "0",
+        padding: "0",
+        margin: "0",
+        border: "0",
+        verticalAlign: "baseline"
+      });
+      line.append(text, baseline);
+      this.element.appendChild(line);
+      return { line, text, baseline };
+    });
+    mount.appendChild(this.element);
+  }
+  configure(style) {
+    const key = fontForStyle(style);
+    if (key === this.styleKey)
+      return;
+    this.styleKey = key;
+    this.faces.forEach(({ line, text }, em) => {
+      Object.assign(line.style, {
+        display: "block",
+        width: "max-content",
+        height: "auto",
+        padding: "0",
+        margin: "0",
+        border: "0",
+        font: fontForStyle(style, { em }),
+        lineHeight: "1.5",
+        whiteSpace: "pre"
+      });
+      Object.assign(text.style, {
+        display: "inline",
+        font: "inherit",
+        lineHeight: "1.5",
+        padding: "0",
+        margin: "0",
+        border: "0",
+        fontVariantLigatures: "none",
+        fontKerning: "none",
+        fontSynthesis: "none",
+        letterSpacing: "0px",
+        wordSpacing: "0px",
+        whiteSpace: "pre",
+        direction: "ltr",
+        unicodeBidi: "isolate"
+      });
+      text.textContent = "W".repeat(64);
+    });
+  }
+  measure(style, scaleX = 1, scaleY = scaleX) {
+    this.configure(style);
+    let width = 0, height = 0, baseline = 0;
+    for (const face2 of this.faces) {
+      const rect = face2.text.getBoundingClientRect();
+      const line = face2.line.getBoundingClientRect();
+      if (!(rect.width > 0 && line.height > 0))
+        return;
+      width = Math.max(width, rect.width / scaleX / 64);
+      height = Math.max(height, line.height / scaleY);
+      baseline = Math.max(baseline, (face2.baseline.getBoundingClientRect().top - line.top) / scaleY);
+    }
+    const baseAdvance = width;
+    const face = this.faces[0];
+    for (const [sample, span] of [
+      [" ", 1],
+      ["é", 1],
+      ["漢", 2],
+      ["\uD83D\uDE42", 2],
+      ["\uD83D\uDC69‍\uD83D\uDCBB", 2]
+    ]) {
+      face.text.textContent = sample;
+      const rect = face.text.getBoundingClientRect();
+      width = Math.max(width, rect.width / scaleX / span);
+      height = Math.max(height, face.line.getBoundingClientRect().height / scaleY);
+    }
+    face.text.textContent = "W".repeat(64);
+    if (![width, height, baseline].every(Number.isFinite) || width <= 0 || height <= 0)
+      return;
+    const computed = this.mount.ownerDocument?.defaultView?.getComputedStyle(face.text);
+    return {
+      width: Math.ceil(width - 1 / 32),
+      height: Math.ceil(height - 1 / 32),
+      advance: baseAdvance,
+      baseline,
+      fontSize: Number.parseFloat(computed?.fontSize ?? "") || style.fontSize
+    };
+  }
+  dispose() {
+    this.element.remove();
+  }
+}
+
+// src/DomGeometry.ts
+function makeDomGeometry(revision, fontIdentity, cells, content) {
+  const numbers = [
+    revision,
+    cells.width,
+    cells.height,
+    cells.baseline,
+    cells.fontSize,
+    ...Object.values(content)
+  ];
+  if (!Number.isSafeInteger(revision) || revision < 1 || !numbers.every(Number.isFinite) || content.width <= 0 || content.height <= 0 || cells.width <= 0 || cells.height <= 0 || content.scaleX <= 0 || content.scaleY <= 0)
     return;
-  const advance = rect.width / scale / 64;
+  const cellWidth = Math.ceil(cells.width), cellHeight = Math.ceil(cells.height);
+  const requestedColumns = Math.floor(content.width / cellWidth), requestedRows = Math.floor(content.height / cellHeight);
+  if (requestedColumns < 1 || requestedRows < 1)
+    return;
+  const columns = Math.min(HOST_WIRE_MAX_GRID_DIMENSION, requestedColumns);
+  const rows = Math.min(HOST_WIRE_MAX_GRID_DIMENSION, requestedRows, Math.floor(HOST_WIRE_MAX_GRID_CELLS / columns));
+  return Object.freeze({
+    revision,
+    fontIdentity,
+    fontSize: cells.fontSize,
+    cellWidth,
+    cellHeight,
+    baseline: cells.baseline,
+    columns,
+    rows,
+    content: Object.freeze({ ...content }),
+    bounded: columns !== requestedColumns || rows !== requestedRows
+  });
+}
+function validateTransforms(mount) {
+  const view = mount.ownerDocument?.defaultView;
+  if (!view)
+    return;
+  for (let node = mount;node; node = node.parentElement) {
+    const css = view.getComputedStyle(node);
+    if (css.perspective !== "none" || css.rotate && css.rotate !== "none" && css.rotate !== "0deg")
+      throw new Error("DOM host supports positive axis-aligned scale and translation; rotation, skew and perspective require a different embedding.");
+    if (css.scale && css.scale !== "none" && css.scale.split(/\s+/).some((v) => Number(v) <= 0))
+      throw new Error("DOM host requires a positive embedding scale.");
+    if (css.transform !== "none") {
+      const matrix = new DOMMatrixReadOnly(css.transform);
+      if (!matrix.is2D || Math.abs(matrix.b) > 0.00000001 || Math.abs(matrix.c) > 0.00000001 || matrix.a <= 0 || matrix.d <= 0)
+        throw new Error("DOM host supports positive axis-aligned scale and translation; rotation, skew and perspective require a different embedding.");
+    }
+  }
+}
+function measureDomContentBox(mount) {
+  const rect = mount.getBoundingClientRect();
+  if (!(rect.width > 0 && rect.height > 0))
+    return;
+  validateTransforms(mount);
+  const css = mount.ownerDocument?.defaultView?.getComputedStyle(mount);
+  const number = (value) => Number.parseFloat(value ?? "") || 0;
+  const pl = number(css?.paddingLeft), pr = number(css?.paddingRight), pt = number(css?.paddingTop), pb = number(css?.paddingBottom);
+  const bl = number(css?.borderLeftWidth), br = number(css?.borderRightWidth), bt = number(css?.borderTopWidth), bb = number(css?.borderBottomWidth);
+  const borderBox = css?.boxSizing === "border-box";
+  const width = css ? number(css.width) - (borderBox ? pl + pr + bl + br : 0) : rect.width;
+  const height = css ? number(css.height) - (borderBox ? pt + pb + bt + bb : 0) : rect.height;
+  const scaleX = rect.width / (width + pl + pr + bl + br), scaleY = rect.height / (height + pt + pb + bt + bb);
+  if (!(width > 0 && height > 0 && scaleX > 0 && scaleY > 0))
+    return;
   return {
-    width: Math.max(1, Math.ceil(advance)),
-    height: Math.max(1, Math.ceil(rect.height / scale)),
-    advance
+    width,
+    height,
+    scaleX,
+    scaleY,
+    left: rect.left + (bl + pl) * scaleX,
+    top: rect.top + (bt + pt) * scaleY,
+    offsetX: pl,
+    offsetY: pt
   };
+}
+
+class DomGeometryController {
+  mount;
+  probe;
+  pending;
+  presented;
+  typography;
+  constructor(mount) {
+    this.mount = mount;
+    this.probe = new DomCellProbe(mount);
+  }
+  measure(style) {
+    const content = measureDomContentBox(this.mount);
+    if (!content)
+      return;
+    let cells = this.probe.measure(style, content.scaleX, content.scaleY);
+    if (!cells)
+      return;
+    const prior = this.typography;
+    if (prior?.identity === style.fontFamily && prior.cells.fontSize === cells.fontSize && Math.abs(prior.cells.advance - cells.advance) <= 1 / 32 && prior.cells.height === cells.height) {
+      cells = prior.cells;
+    } else
+      this.typography = { identity: style.fontFamily, cells };
+    const previous = this.pending;
+    const next = makeDomGeometry(previous?.revision ?? 1, style.fontFamily, cells, content);
+    if (!next)
+      return;
+    const layoutChanged = previous && [
+      "fontIdentity",
+      "fontSize",
+      "cellWidth",
+      "cellHeight",
+      "columns",
+      "rows"
+    ].some((key) => previous[key] !== next[key]);
+    if (layoutChanged && previous.revision >= Number.MAX_SAFE_INTEGER)
+      throw new Error("DOM geometry revision exhausted; remount the scene.");
+    this.pending = Object.freeze({
+      ...next,
+      revision: next.revision + (layoutChanged ? 1 : 0)
+    });
+    return this.pending;
+  }
+  present(snapshot) {
+    this.presented = snapshot;
+  }
+  dispose() {
+    this.probe.dispose();
+    this.pending = undefined;
+    this.presented = undefined;
+  }
 }
 
 // src/DomGlyphBackground.ts
@@ -2816,12 +3157,12 @@ class DomSurfacePainter {
   renderedLinksKey;
   linkCells = new Map;
   hasRenderedFrame = false;
-  letterSpacing;
   reportedMissingImageIds = new Set;
   lastImageRecoveryFrame;
   lastEpoch;
   glyphs = new DomGlyphBackground;
   styleCache = new Map;
+  appliedCellStyles = new WeakMap;
   onOpenHyperlink;
   constructor(options = {}) {
     this.onOpenHyperlink = options.onOpenHyperlink;
@@ -2866,6 +3207,7 @@ class DomSurfacePainter {
     if (!root || !rowsLayer) {
       return;
     }
+    const clearSelection = selectionInvalidator();
     if (frame?.epoch !== undefined && frame.epoch !== this.lastEpoch) {
       this.lastEpoch = frame.epoch;
       this.reportedMissingImageIds.clear();
@@ -2874,12 +3216,13 @@ class DomSurfacePainter {
     const metricsChanged = metricsKey !== this.appliedMetricsKey;
     if (metricsChanged) {
       this.styleCache.clear();
+      this.appliedCellStyles = new WeakMap;
       this.glyphs.clear();
       this.applyRootStyle(root, metrics);
       this.appliedMetricsKey = metricsKey;
     }
     if (!frame) {
-      clearChangedSelection(rowsLayer);
+      clearSelection(rowsLayer);
       this.rowElements = [];
       this.cells = [];
       this.linkCells.clear();
@@ -2920,20 +3263,20 @@ class DomSurfacePainter {
       for (let y = this.rowElements.length;y > frame.rows.length; y -= 1) {
         const row = this.rowElements[y - 1];
         if (row)
-          clearChangedSelection(row);
+          clearSelection(row);
         row?.remove();
         this.cells.pop();
       }
       this.rowElements.length = Math.min(this.rowElements.length, frame.rows.length);
       for (let y = 0;y < frame.rows.length; y += 1) {
-        this.rebuildRow(y, frame, metrics);
+        this.rebuildRow(y, frame, metrics, clearSelection);
       }
     } else {
       for (const [row] of damage.textRows) {
         if (row < 0 || row >= frame.rows.length) {
           continue;
         }
-        this.rebuildRow(row, frame, metrics);
+        this.rebuildRow(row, frame, metrics, clearSelection);
       }
     }
     const allowRecoveryRequests = frame !== this.lastImageRecoveryFrame;
@@ -2942,11 +3285,11 @@ class DomSurfacePainter {
     this.hasRenderedFrame = true;
   }
   invalidateFontMetrics() {
-    this.letterSpacing = undefined;
     this.appliedMetricsKey = undefined;
   }
   dispose() {
     this.styleCache.clear();
+    this.appliedCellStyles = new WeakMap;
     this.glyphs.clear();
     this.linkCells.clear();
     this.root?.replaceChildren();
@@ -2959,14 +3302,14 @@ class DomSurfacePainter {
     this.reportedMissingImageIds.clear();
     this.lastImageRecoveryFrame = undefined;
   }
-  rebuildRow(y, frame, metrics) {
+  rebuildRow(y, frame, metrics, clearSelection) {
     const rowElement = this.ensureRowElement(y, metrics);
     const previous = this.cells[y] ?? new Map;
     const next = new Map;
     const retainedColumns = new Set((frame.rows[y] ?? []).map((cell) => cell[0]));
     for (const [x, element] of previous) {
       if (!retainedColumns.has(x)) {
-        clearChangedSelection(element);
+        clearSelection(element);
         element.remove();
       }
     }
@@ -2978,14 +3321,14 @@ class DomSurfacePainter {
       const tag = isLink ? "A" : "SPAN";
       let element = previous.get(x);
       if (element && element.tagName !== tag) {
-        clearChangedSelection(element);
+        clearSelection(element);
         element.remove();
         element = undefined;
       }
       if (!element)
         element = createElement(tag.toLowerCase());
       if (element.textContent !== text) {
-        clearChangedSelection(element);
+        clearSelection(element);
         element.textContent = text;
       }
       const key = JSON.stringify(cellStyle ?? null);
@@ -2996,15 +3339,20 @@ class DomSurfacePainter {
           this.styleCache.delete(this.styleCache.keys().next().value);
         this.styleCache.set(key, resolved);
       }
-      Object.assign(element.style, resolved, {
-        left: `${x * metrics.cellWidth}px`,
-        width: `${Math.max(1, span) * metrics.cellWidth}px`
-      });
-      const glyph = this.glyphs.image(text, resolved.color ?? "", Math.max(1, span) * metrics.cellWidth, metrics.cellHeight);
-      element.style.backgroundImage = glyph ?? "none";
-      element.style.backgroundSize = "100% 100%";
-      element.style.backgroundRepeat = "no-repeat";
-      element.style.color = glyph ? "transparent" : resolved.color ?? "";
+      const geometricText = canRenderBoxDrawing(text) ? text : "";
+      const presentationKey = JSON.stringify([key, x, span, geometricText]);
+      if (this.appliedCellStyles.get(element) !== presentationKey) {
+        Object.assign(element.style, resolved, {
+          left: `${x * metrics.cellWidth}px`,
+          width: `${Math.max(1, span) * metrics.cellWidth}px`
+        });
+        const glyph = this.glyphs.image(geometricText, resolved.color ?? "", Math.max(1, span) * metrics.cellWidth, metrics.cellHeight);
+        element.style.backgroundImage = glyph ?? "none";
+        element.style.backgroundSize = "100% 100%";
+        element.style.backgroundRepeat = "no-repeat";
+        element.style.color = glyph ? "transparent" : resolved.color ?? "";
+        this.appliedCellStyles.set(element, presentationKey);
+      }
       if (isLink && target !== undefined) {
         element.setAttribute("data-surface-link", target);
         element.setAttribute("tabindex", "-1");
@@ -3037,6 +3385,12 @@ class DomSurfacePainter {
     if (!rowElement) {
       rowElement = createElement("div");
       rowElement.className = "webhost-scene__surface-row";
+      Object.assign(rowElement.style, scopedBoxStyle, {
+        font: "inherit",
+        lineHeight: "inherit",
+        letterSpacing: "0px",
+        wordSpacing: "0px"
+      });
       rowElement.style.position = "absolute";
       rowElement.style.left = "0";
       this.rowElements[y] = rowElement;
@@ -3049,32 +3403,20 @@ class DomSurfacePainter {
   }
   applyRootStyle(root, metrics) {
     const style = root.style;
+    Object.assign(style, scopedBoxStyle);
     style.position = "relative";
     style.overflow = "hidden";
     style.background = webTUITerminalBackgroundColor(metrics.style);
     style.font = fontForStyle(metrics.style);
     style.lineHeight = `${metrics.cellHeight}px`;
-    style.letterSpacing = this.letterSpacingFor(metrics);
+    style.letterSpacing = "0px";
+    style.wordSpacing = "0px";
+    style.fontKerning = "none";
+    style.fontSynthesis = "none";
+    style.direction = "ltr";
+    style.unicodeBidi = "isolate";
     style.fontVariantLigatures = "none";
     style.userSelect = "text";
-  }
-  letterSpacingFor(metrics) {
-    const font = fontForStyle(metrics.style);
-    const key = `${font}|${metrics.cellWidth}`;
-    if (this.letterSpacing?.key === key) {
-      return this.letterSpacing.value;
-    }
-    let advance = this.root ? measureDomCells(this.root, metrics.style)?.advance : undefined;
-    if (advance === undefined) {
-      const context = createElement("canvas").getContext?.("2d");
-      if (context) {
-        context.font = font;
-        advance = context.measureText("W").width;
-      }
-    }
-    const value = advance && advance > 0 ? `${Math.round((metrics.cellWidth - advance) * 1000) / 1000}px` : "0px";
-    this.letterSpacing = { key, value };
-    return value;
   }
   reconcileImages(images, metrics, allowRecoveryRequests) {
     const layer = this.imagesLayer;
@@ -3178,9 +3520,27 @@ function metricsKeyFor(metrics) {
 function resolveCellStyle(style, metrics) {
   const elementStyle = {
     position: "absolute",
+    display: "block",
+    boxSizing: "border-box",
+    padding: "0",
+    margin: "0",
+    border: "0",
+    textIndent: "0",
+    textTransform: "none",
+    fontFamily: "inherit",
+    fontSize: "inherit",
+    lineHeight: "inherit",
+    letterSpacing: "0px",
+    wordSpacing: "0px",
+    fontKerning: "none",
+    fontSynthesis: "none",
+    fontVariantLigatures: "none",
     top: "0",
     height: "100%",
     whiteSpace: "pre",
+    overflow: "hidden",
+    direction: "ltr",
+    unicodeBidi: "isolate",
     color: resolvedSurfaceForeground(style, metrics.style),
     backgroundColor: resolvedSurfaceBackground(style, metrics.style) ?? "transparent",
     fontWeight: (style?.em ?? 0) & 1 ? "700" : "normal",
@@ -3229,6 +3589,10 @@ function decorationStyleFor(pattern) {
   }
 }
 function fillContainer(style) {
+  Object.assign(style, scopedBoxStyle, {
+    font: "inherit",
+    lineHeight: "inherit"
+  });
   style.position = "absolute";
   style.left = "0";
   style.top = "0";
@@ -3238,31 +3602,43 @@ function fillContainer(style) {
 function makeImageEntry() {
   const container = createElement("div");
   container.className = "webhost-scene__surface-image";
+  Object.assign(container.style, scopedBoxStyle);
   container.style.position = "absolute";
   container.style.overflow = "hidden";
   const image = createElement("img");
+  Object.assign(image.style, scopedBoxStyle);
   image.style.position = "absolute";
   image.setAttribute("alt", "");
   image.setAttribute("draggable", "false");
   container.appendChild(image);
   return { container, image, source: "" };
 }
+var scopedBoxStyle = {
+  boxSizing: "border-box",
+  margin: "0",
+  padding: "0",
+  border: "0",
+  textAlign: "left",
+  textIndent: "0",
+  textTransform: "none"
+};
 function createElement(tagName) {
   if (typeof document === "undefined") {
     throw new Error("document is not available");
   }
   return document.createElement(tagName);
 }
-function clearChangedSelection(element) {
-  const selection = globalThis.document?.getSelection?.();
+function selectionInvalidator() {
+  let selection = globalThis.document?.getSelection?.();
   if (!selection || selection.isCollapsed)
-    return;
-  for (let index = 0;index < selection.rangeCount; index += 1) {
-    if (selection.getRangeAt(index).intersectsNode(element)) {
+    return () => {};
+  const ranges = Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index));
+  return (element) => {
+    if (selection && ranges.some((range) => range.intersectsNode(element))) {
       selection.removeAllRanges();
-      return;
+      selection = null;
     }
-  }
+  };
 }
 
 // src/InputEventEncoder.ts
@@ -3490,6 +3866,7 @@ class SurfacePaintScheduler {
   lastPaintedFrame;
   handle;
   disposed = false;
+  held = false;
   presentedFrames = 0;
   paints = 0;
   coalescedFrames = 0;
@@ -3557,7 +3934,7 @@ class SurfacePaintScheduler {
     this.flush();
   }
   flush() {
-    if (this.disposed) {
+    if (this.disposed || this.held) {
       return;
     }
     this.cancelScheduled();
@@ -3601,6 +3978,8 @@ class SurfacePaintScheduler {
     };
   }
   schedule() {
+    if (this.held)
+      return;
     if (!this.animationFrames) {
       this.flush();
       return;
@@ -3619,6 +3998,15 @@ class SurfacePaintScheduler {
     }
     this.animationFrames?.cancelAnimationFrame(this.handle);
     this.handle = undefined;
+  }
+  setHeld(held) {
+    if (this.disposed || held === this.held)
+      return;
+    this.held = held;
+    if (held)
+      this.cancelScheduled();
+    else if (this.pending)
+      this.schedule();
   }
 }
 function promotesToFullRepaint(previous, frame) {
@@ -3722,6 +4110,17 @@ class WebHostSceneRuntime {
   canvasScale = 1;
   domSurfaceRoot;
   lastDomSurfaceSize;
+  domGeometry;
+  embeddingMount;
+  geometryRefreshHandle;
+  geometryDiagnostic;
+  disposed = false;
+  domFontOptions;
+  fontResources;
+  activeFontResources;
+  fontPending = false;
+  fontResult;
+  loadingFont;
   accessibilityTree;
   diagnosticText;
   resizeObserver;
@@ -3748,7 +4147,9 @@ class WebHostSceneRuntime {
   detachPointerParadigmObserver;
   constructor(options) {
     this.descriptor = options.descriptor;
-    this.currentStyle = normalizeWebHostTerminalStyle(options.style);
+    this.embeddingMount = options.mount;
+    this.currentStyle = normalizeWebHostTerminalStyle(options.renderer === "dom" && !options.style.fontFamily ? { ...options.style, fontFamily: DOM_FONT_FAMILY } : options.style);
+    this.domFontOptions = options.domFont;
     this.bridge = options.bridge;
     this.onInput = options.onInput;
     this.onFrameDiagnostic = options.onFrameDiagnostic;
@@ -3802,6 +4203,10 @@ class WebHostSceneRuntime {
       this.onInput(encodeAccessibilityActionMessage(target, request, requestID));
     });
     this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
+    if (this.domSurfaceRoot) {
+      this.domGeometry = new DomGeometryController(this.terminalMount);
+      this.paintScheduler.setHeld(true);
+    }
     this.installInputHandlers();
     this.installResizeObserver();
     this.bridge?.bindOutput({
@@ -3813,6 +4218,8 @@ class WebHostSceneRuntime {
       writeError: (text) => this.writeOutput(text)
     });
     this.applyStyle(this.currentStyle);
+    if (this.domGeometry)
+      this.loadDomFont(this.currentStyle);
     this.installPointerParadigmObserver();
     this.sendPointerCapabilitiesIfChanged(coarsePrimaryPointer());
     this.measureCells();
@@ -3850,7 +4257,12 @@ class WebHostSceneRuntime {
   }
   onRuntimeSuspensionChange(_suspended) {}
   setStyle(style) {
-    this.currentStyle = normalizeWebHostTerminalStyle(style);
+    const next = normalizeWebHostTerminalStyle(this.domGeometry && !style.fontFamily ? { ...style, fontFamily: DOM_FONT_FAMILY } : style);
+    if (this.domGeometry) {
+      this.loadDomFont(next);
+      return;
+    }
+    this.currentStyle = next;
     this.applyStyle(this.currentStyle);
     this.bridge?.updateRenderStyle(this.currentStyle);
     this.measureCells();
@@ -3865,10 +4277,27 @@ class WebHostSceneRuntime {
     if (!this.diagnosticText) {
       const diagnosticText = document.createElement("pre");
       diagnosticText.className = "webhost-scene__diagnostic";
+      if (this.rendererKind === "dom") {
+        diagnosticText.setAttribute("role", "status");
+        Object.assign(diagnosticText.style, {
+          position: "absolute",
+          inset: "auto 0 0",
+          zIndex: "5",
+          boxSizing: "border-box",
+          margin: "0",
+          padding: "8px",
+          maxHeight: "50%",
+          overflow: "auto",
+          whiteSpace: "pre-wrap",
+          font: "12px/1.4 system-ui, sans-serif",
+          color: "#fff",
+          background: "#402020"
+        });
+      }
       this.diagnosticText = diagnosticText;
       this.terminalMount.appendChild(diagnosticText);
     }
-    this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`;
+    this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`.slice(-16384);
   }
   notifyRuntimeIssue(issue) {
     this.writeOutput(`${issue.description}
@@ -3890,6 +4319,13 @@ class WebHostSceneRuntime {
     this.onInput(chunk);
   }
   dispose() {
+    this.disposed = true;
+    this.fontResources?.dispose();
+    if (this.activeFontResources !== this.fontResources)
+      this.activeFontResources?.dispose();
+    if (this.geometryRefreshHandle !== undefined)
+      globalThis.cancelAnimationFrame?.(this.geometryRefreshHandle);
+    this.domGeometry?.dispose();
     this.paintScheduler.dispose();
     this.painter.dispose();
     this.detachInputHandlers?.();
@@ -3980,6 +4416,7 @@ class WebHostSceneRuntime {
     this.element.style.gap = "0.5rem";
     this.element.style.gridTemplateRows = "auto minmax(0, 1fr)";
     this.terminalMount.style.position = "relative";
+    this.terminalMount.style.gridRow = "2";
     this.terminalMount.style.boxSizing = "border-box";
     this.terminalMount.style.width = "100%";
     if (this.sceneFrame === "resizable") {
@@ -4013,6 +4450,10 @@ class WebHostSceneRuntime {
   }
   installResizeObserver() {
     const refresh = () => {
+      if (this.domGeometry) {
+        this.refreshGeometry();
+        return;
+      }
       if (this.painter instanceof DomSurfacePainter)
         this.painter.invalidateFontMetrics();
       this.resizeToMount();
@@ -4020,9 +4461,14 @@ class WebHostSceneRuntime {
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(refresh);
       this.resizeObserver.observe(this.terminalMount);
+      if (this.domGeometry)
+        this.resizeObserver.observe(this.embeddingMount);
+      if (this.domGeometry)
+        this.resizeObserver.observe(this.domGeometry.probe.element);
     }
     const fonts = document.fonts;
     fonts?.addEventListener?.("loadingdone", refresh);
+    fonts?.addEventListener?.("loadingerror", refresh);
     globalThis.window?.addEventListener?.("resize", refresh);
     globalThis.window?.visualViewport?.addEventListener("resize", refresh);
     let dpr;
@@ -4038,6 +4484,7 @@ class WebHostSceneRuntime {
     watchDpr();
     this.detachMetricObservers = () => {
       fonts?.removeEventListener?.("loadingdone", refresh);
+      fonts?.removeEventListener?.("loadingerror", refresh);
       globalThis.window?.removeEventListener?.("resize", refresh);
       globalThis.window?.visualViewport?.removeEventListener("resize", refresh);
       dpr?.removeEventListener?.("change", changedDpr);
@@ -4157,6 +4604,42 @@ class WebHostSceneRuntime {
     };
   }
   resizeToMount() {
+    if (this.disposed)
+      return;
+    if (this.fontPending)
+      return;
+    if (this.domGeometry) {
+      let snapshot;
+      try {
+        snapshot = this.domGeometry.measure(this.currentStyle);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message !== this.geometryDiagnostic)
+          this.writeOutput(`${message}
+`);
+        this.geometryDiagnostic = message;
+      }
+      if (!snapshot) {
+        this.paintScheduler.setHeld(true);
+        return;
+      }
+      this.cellWidth = snapshot.cellWidth;
+      this.cellHeight = snapshot.cellHeight;
+      this.columns = snapshot.columns;
+      this.rows = snapshot.rows;
+      this.surfaceCSSWidth = snapshot.content.width;
+      this.surfaceCSSHeight = snapshot.content.height;
+      if (snapshot.bounded && this.geometryDiagnostic !== "bounded") {
+        this.writeOutput(`DOM viewport exceeds the supported grid; showing a bounded viewport.
+`);
+        this.geometryDiagnostic = "bounded";
+      } else if (!snapshot.bounded)
+        this.geometryDiagnostic = undefined;
+      this.sendResizeIfNeeded();
+      this.paintScheduler.setHeld(false);
+      this.paintScheduler.repaintNow();
+      return;
+    }
     this.measureCells();
     const rect = this.terminalMount.getBoundingClientRect?.();
     const width = this.terminalMount.clientWidth || (rect?.width && rect.width > 0 ? rect.width : this.columns * this.cellWidth);
@@ -4219,12 +4702,7 @@ class WebHostSceneRuntime {
   }
   measureCells() {
     if (this.domSurfaceRoot) {
-      const measured = measureDomCells(this.terminalMount, this.currentStyle);
-      if (measured) {
-        this.cellWidth = measured.width;
-        this.cellHeight = measured.height;
-        return;
-      }
+      return;
     }
     const canvas = this.canvas ?? document.createElement("canvas");
     const context = canvas.getContext?.("2d");
@@ -4238,6 +4716,28 @@ class WebHostSceneRuntime {
     this.cellHeight = Math.max(1, Math.ceil(this.currentStyle.fontSize * 1.35));
   }
   paint(request) {
+    if (this.domGeometry?.pending) {
+      const pending = this.domGeometry.pending;
+      const snapshot = Object.freeze({
+        ...pending,
+        columns: request.frame?.width ?? pending.columns,
+        rows: request.frame?.height ?? pending.rows
+      });
+      this.domGeometry.present(snapshot);
+      this.cellWidth = snapshot.cellWidth;
+      this.cellHeight = snapshot.cellHeight;
+      this.columns = Math.max(1, snapshot.columns);
+      this.rows = Math.max(1, snapshot.rows);
+      if (this.accessibilityTree) {
+        Object.assign(this.accessibilityTree.element.style, {
+          inset: "auto",
+          left: `${snapshot.content.offsetX}px`,
+          top: `${snapshot.content.offsetY}px`,
+          width: `${this.columns * snapshot.cellWidth}px`,
+          height: `${this.rows * snapshot.cellHeight}px`
+        });
+      }
+    }
     const resized = this.resizeSurface();
     this.painter.paint(this.surfaceMetrics(), request.frame, resized ? undefined : request.damage, request.recoveredImagePayloadIds);
     this.syncAccessibilityTree(request.frame, request.accessibilityAnnouncements);
@@ -4267,13 +4767,77 @@ class WebHostSceneRuntime {
   }
   pointerMetrics() {
     const domRect = this.domSurfaceRoot?.getBoundingClientRect?.();
+    const presented = this.domGeometry?.presented;
+    const columns = presented?.columns ?? this.columns;
+    const rows = presented?.rows ?? this.rows;
     return {
       rect: this.surfaceElement?.getBoundingClientRect?.() ?? this.terminalMount.getBoundingClientRect?.(),
-      cellWidth: domRect?.width ? domRect.width / this.columns : this.cellWidth,
-      cellHeight: domRect?.height ? domRect.height / this.rows : this.cellHeight,
-      columns: this.columns,
-      rows: this.rows
+      cellWidth: domRect?.width ? domRect.width / columns : this.cellWidth,
+      cellHeight: domRect?.height ? domRect.height / rows : this.cellHeight,
+      columns,
+      rows
     };
+  }
+  refreshGeometry() {
+    if (this.disposed || this.geometryRefreshHandle !== undefined)
+      return;
+    if (!globalThis.requestAnimationFrame) {
+      this.resizeToMount();
+      return;
+    }
+    this.geometryRefreshHandle = requestAnimationFrame(() => {
+      this.geometryRefreshHandle = undefined;
+      this.resizeToMount();
+    });
+  }
+  get geometrySnapshot() {
+    return this.domGeometry?.presented;
+  }
+  get fontStatus() {
+    return this.fontResult;
+  }
+  get fontReady() {
+    return this.fontResources?.ready;
+  }
+  loadDomFont(style) {
+    if (this.fontResources !== this.activeFontResources)
+      this.fontResources?.dispose();
+    this.fontPending = true;
+    this.paintScheduler.setHeld(true);
+    this.terminalMount.setAttribute("aria-busy", "true");
+    if (!this.loadingFont) {
+      this.loadingFont = document.createElement("div");
+      this.loadingFont.setAttribute("role", "status");
+      this.loadingFont.textContent = "Loading display font…";
+      this.terminalMount.appendChild(this.loadingFont);
+    }
+    const resources = new DomFontResources(this.terminalMount.ownerDocument ?? document, style.fontFamily, style.fontSize, this.domFontOptions);
+    this.fontResources = resources;
+    resources.ready.then((result) => {
+      if (this.disposed || resources !== this.fontResources || result.status === "disposed")
+        return;
+      this.fontResult = result;
+      const previousResources = this.activeFontResources;
+      this.activeFontResources = resources;
+      this.fontPending = false;
+      this.loadingFont?.remove();
+      this.loadingFont = undefined;
+      this.terminalMount.removeAttribute("aria-busy");
+      this.currentStyle = { ...style, fontFamily: result.family };
+      this.applyStyle(this.currentStyle);
+      this.bridge?.updateRenderStyle(this.currentStyle);
+      if (result.diagnostic)
+        this.writeOutput(`${result.diagnostic}
+`);
+      this.resizeToMount();
+      previousResources?.dispose();
+    }).catch((error) => {
+      if (this.disposed || resources !== this.fontResources)
+        return;
+      this.fontPending = false;
+      this.writeOutput(`DOM font configuration failed: ${String(error)}
+`);
+    });
   }
   isNativeLink(event) {
     return this.rendererKind === "dom" && !!event.target?.closest?.("a[data-surface-link]");
@@ -4974,6 +5538,7 @@ async function createWebHostApp(options) {
     suspendHiddenScenes: options.suspendHiddenScenes,
     visibilityDocument: options.visibilityDocument ?? defaultVisibilityDocument(),
     renderer: options.renderer,
+    domFont: options.domFont,
     sceneFrame: options.sceneFrame,
     paintScheduling: options.paintScheduling
   });
@@ -4995,13 +5560,15 @@ class InternalWebHostAppController {
   bridges = new Map;
   suspendHiddenScenes;
   renderer;
+  domFont;
   sceneFrame;
   paintScheduling;
   visibilityDocument;
   detachVisibilityListener;
   constructor(options) {
     this.mount = options.mount;
-    this.style = normalizeWebHostTerminalStyle(options.style ?? {});
+    this.style = normalizeWebHostTerminalStyle(options.renderer === "dom" && !options.style?.fontFamily ? { ...options.style, fontFamily: DOM_FONT_FAMILY } : options.style ?? {});
+    this.domFont = options.domFont;
     this.environment = options.environment;
     this.embeddedHost = options.embeddedHost;
     this.bridgeFactory = options.bridgeFactory;
@@ -5103,6 +5670,7 @@ class InternalWebHostAppController {
       onInput: (chunk) => bridge.sendInput(chunk),
       suspendWhenHidden: this.suspendHiddenScenes,
       renderer: this.renderer,
+      domFont: this.domFont,
       sceneFrame: this.sceneFrame,
       paintScheduling: this.paintScheduling
     });
