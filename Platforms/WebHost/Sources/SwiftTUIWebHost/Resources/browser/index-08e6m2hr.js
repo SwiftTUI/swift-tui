@@ -136,6 +136,7 @@ class AccessibilityTreeMounter {
   acknowledgedRequestID = 0n;
   pendingValues = new Map;
   pendingFocus;
+  runtimeFocusedElement;
   constructor(sendAction) {
     this.sendAction = sendAction;
     this.element = document.createElement("div");
@@ -150,6 +151,7 @@ class AccessibilityTreeMounter {
     applyScreenReaderOnlyStyle(this.announcerElement);
   }
   present(nodes, metrics, announcements = [], options = {}) {
+    const activeBeforePresentation = document.activeElement;
     const visibleNodes = nodes.filter((node) => !node.hidden).map((node) => ({
       ...node,
       liveRegion: normalizeLiveRegion(node.liveRegion)
@@ -172,15 +174,15 @@ class AccessibilityTreeMounter {
       const tag = this.elementTag(node);
       const previousModel = this.modelsById.get(node.id);
       const reusable = existing?.tagName.toLowerCase() === tag && previousModel?.actionTarget === node.actionTarget;
-      const element = reusable ? existing : this.createElement(node, tag);
+      const element2 = reusable ? existing : this.createElement(node, tag);
       if (!reusable) {
         existing?.remove();
         this.pendingValues.delete(node.id);
         if (this.pendingFocus?.id === node.id)
           this.pendingFocus = undefined;
       }
-      this.applyNodeAttributes(element, node, metrics, node.parentId ? modelsById.get(node.parentId) : undefined);
-      nextById.set(node.id, element);
+      this.applyNodeAttributes(element2, node, metrics, node.parentId ? modelsById.get(node.parentId) : undefined);
+      nextById.set(node.id, element2);
     }
     for (const id of previousById.keys()) {
       if (!nextById.has(id)) {
@@ -194,26 +196,30 @@ class AccessibilityTreeMounter {
     this.modelsById = modelsById;
     const childOffsets = new Map;
     for (const node of visibleNodes) {
-      const element = nextById.get(node.id);
-      if (!element) {
+      const element2 = nextById.get(node.id);
+      if (!element2) {
         continue;
       }
       const parent = node.parentId ? nextById.get(node.parentId) : undefined;
       const container = parent ?? this.element;
       const offset = childOffsets.get(container) ?? 0;
-      if (container.children[offset] !== element) {
-        container.insertBefore(element, container.children[offset] ?? null);
+      if (container.children[offset] !== element2) {
+        container.insertBefore(element2, container.children[offset] ?? null);
       }
       childOffsets.set(container, offset + 1);
     }
     this.announceLiveRegionChanges(visibleNodes, normalizedAnnouncements);
     const focused = visibleNodes.find((node) => node.isFocused);
-    if (this.pendingFocus !== undefined && this.pendingFocus.requestID <= this.acknowledgedRequestID) {
+    const element = focused ? this.nodesById.get(focused.id) : undefined;
+    const pending = this.pendingFocus;
+    const focusAcknowledged = pending !== undefined && pending.requestID <= this.acknowledgedRequestID;
+    const synchronize = focusAcknowledged ? activeBeforePresentation === this.nodesById.get(pending.id) : element !== this.runtimeFocusedElement || element === activeBeforePresentation;
+    this.runtimeFocusedElement = element;
+    if (focusAcknowledged) {
       this.pendingFocus = undefined;
     }
-    if ((options.synchronizeFocus ?? true) && focused && this.pendingFocus === undefined) {
-      const element = this.nodesById.get(focused.id);
-      if (element && document.activeElement !== element)
+    if ((options.synchronizeFocus ?? true) && synchronize && element && this.pendingFocus === undefined) {
+      if (document.activeElement !== element)
         element.focus?.({ preventScroll: true });
     }
     this.presenting = false;
