@@ -51,9 +51,17 @@
       theme = decodedTheme
     }
 
+    let reduceMotion: Bool?
+    switch object["reduceMotion"] {
+    case nil, .some(.null): reduceMotion = nil
+    case .some(.string("true")): reduceMotion = true
+    case .some(.string("false")): reduceMotion = false
+    default: return nil
+    }
     return .init(
       appearance: appearance,
-      theme: theme
+      theme: theme,
+      reduceMotion: reduceMotion
     )
   }
 
@@ -178,6 +186,11 @@
     var fields = ["\"appearance\":\(encodeAppearance(style.appearance))"]
     if let theme = style.theme {
       fields.append("\"theme\":\(encodeTheme(theme))")
+    }
+    if let reduceMotion = style.reduceMotion {
+      // String tokens keep older style parsers usable: they understand only
+      // objects, strings and null, and ignore unknown string-valued fields.
+      fields.append("\"reduceMotion\":\"\(reduceMotion ? "true" : "false")\"")
     }
     return "{\(fields.joined(separator: ","))}"
   }

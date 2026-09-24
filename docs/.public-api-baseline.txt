@@ -2189,7 +2189,9 @@ SwiftTUIPrimitives.TerminalPalette.yellow
 SwiftTUIPrimitives.TerminalRenderStyle
 SwiftTUIPrimitives.TerminalRenderStyle.appearance
 SwiftTUIPrimitives.TerminalRenderStyle.init(appearance:theme:)
+SwiftTUIPrimitives.TerminalRenderStyle.init(appearance:theme:reduceMotion:)
 SwiftTUIPrimitives.TerminalRenderStyle.init(from:)
+SwiftTUIPrimitives.TerminalRenderStyle.reduceMotion
 SwiftTUIPrimitives.TerminalRenderStyle.resolvedTheme
 SwiftTUIPrimitives.TerminalRenderStyle.theme
 SwiftTUIPrimitives.TerminalTone

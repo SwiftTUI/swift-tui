@@ -43,6 +43,7 @@ package struct HostLayoutConfiguration: Sendable {
   package let graphics: TerminalGraphicsCapabilities
   package let pointer: PointerInputCapabilities
   package let geometry: HostGeometryStamp?
+  package let reduceMotion: Bool?
 
   package init(
     size: CellSize,
@@ -50,7 +51,8 @@ package struct HostLayoutConfiguration: Sendable {
     theme: Theme?,
     graphics: TerminalGraphicsCapabilities,
     pointer: PointerInputCapabilities,
-    geometry: HostGeometryStamp? = nil
+    geometry: HostGeometryStamp? = nil,
+    reduceMotion: Bool? = nil
   ) {
     self.size = size
     self.appearance = appearance
@@ -58,6 +60,7 @@ package struct HostLayoutConfiguration: Sendable {
     self.graphics = graphics
     self.pointer = pointer
     self.geometry = geometry
+    self.reduceMotion = reduceMotion
   }
 }
 

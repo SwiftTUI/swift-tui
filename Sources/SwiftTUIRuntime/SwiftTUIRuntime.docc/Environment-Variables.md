@@ -182,7 +182,7 @@ listed for completeness and for driving the wasm binary directly.
 | `SWIFTTUI_FRAME_DIAGNOSTICS` | boolean | Enables wire frame diagnostics. Falls back to `SWIFTTUI_DIAGNOSTICS`; `off`/`false`/`none`/`0`/empty disable. |
 | `SWIFTTUI_MODE` | `manifest` | Prints the app's scene manifest as JSON and exits without launching a scene. |
 | `SWIFTTUI_SCENE` | scene selector | Selects the scene to launch. Falls back to the first command-line argument. |
-| `SWIFTTUI_RENDER_STYLE` | base64 | A base64-encoded terminal render style forwarded by the host. |
+| `SWIFTTUI_RENDER_STYLE` | base64 | A base64-encoded terminal render style forwarded by the host. Its optional `reduceMotion` string (`"true"` / `"false"`) initializes the browser motion preference; subsequent host style controls update it live. Explicit runtime reduced motion still wins. |
 | `SWIFTTUI_COLUMNS` / `SWIFTTUI_ROWS` | integers | Surface size fallbacks, consulted after the standard `COLUMNS`/`LINES`. Clamped to at least 40×20; defaults 120×36. |
 
 ### Repository tooling

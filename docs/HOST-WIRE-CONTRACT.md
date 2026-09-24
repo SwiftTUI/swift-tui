@@ -15,6 +15,17 @@ not consume this serialized stream.
 
 ## Record framing and shapes
 
+Browser host render-style controls and `SWIFTTUI_RENDER_STYLE` accept optional
+`reduceMotion: "true" | "false"`. The string tokens are intentional: older
+style codecs accept unknown string fields, while an unknown boolean would
+invalidate their whole style record. Absence preserves runtime configuration.
+The layout snapshot captures this preference with geometry and theme;
+`SWIFTTUI_REDUCE_MOTION=1` still forces reduced motion regardless of host input.
+Browser media-query changes update this style live. `AnimatedImage` then emits
+its first PNG frame while reduced, and the browser presents the producer's
+selected frames while active. Raw GIF payloads are static first-frame images
+in both browser presenters; they have no independent browser animation clock.
+
 Every typed record is UTF-8 and has the same outer framing:
 
 ```text

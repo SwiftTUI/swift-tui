@@ -32,7 +32,8 @@ extension RunLoop {
     effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
-    effectiveEnvironmentValues.accessibilityReduceMotion = runtimeConfiguration.motion == .reduced
+    effectiveEnvironmentValues.accessibilityReduceMotion =
+      runtimeConfiguration.motion == .reduced || hostConfiguration.reduceMotion == true
     effectiveEnvironmentValues.stableOutput = runtimeConfiguration.stableOutput
     effectiveEnvironmentValues.cursorFollowsFocus =
       runtimeConfiguration.cursorFollowsFocus

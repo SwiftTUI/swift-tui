@@ -162,13 +162,24 @@ public struct Theme: Equatable, Sendable, Codable {
 public struct TerminalRenderStyle: Equatable, Sendable, Codable {
   public var appearance: TerminalAppearance
   public var theme: Theme?
+  /// Host motion preference. Absence preserves the runtime configuration.
+  public var reduceMotion: Bool?
 
   public init(
     appearance: TerminalAppearance,
     theme: Theme? = nil
   ) {
+    self.init(appearance: appearance, theme: theme, reduceMotion: nil)
+  }
+
+  public init(
+    appearance: TerminalAppearance,
+    theme: Theme? = nil,
+    reduceMotion: Bool?
+  ) {
     self.appearance = appearance
     self.theme = theme
+    self.reduceMotion = reduceMotion
   }
 
   public var resolvedTheme: Theme {

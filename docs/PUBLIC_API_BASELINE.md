@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 16 | 44 |
 | `SwiftTUICore` | 40 | 273 |
-| `SwiftTUIPrimitives` | 172 | 1516 |
+| `SwiftTUIPrimitives` | 172 | 1518 |
 | `SwiftTUIGraph` | 68 | 416 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -854,7 +854,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `TerminalMouseInputResolution` — enum — 3 members
 - `TerminalMouseInputTrustPolicy` — enum — 5 members
 - `TerminalPalette` — struct — 24 members
-- `TerminalRenderStyle` — struct — 5 members
+- `TerminalRenderStyle` — struct — 7 members
 - `TerminalTone` — enum — 7 members
 - `TextFigureColorMode` — struct — 8 members
 - `TextFigureFont` — typealias

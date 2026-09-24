@@ -6,6 +6,27 @@ import Testing
 
 @MainActor
 @Suite struct HostGeometryRuntimeTests {
+  @Test func hostMotionPreferenceUpdatesLiveWithoutChangingGeometry() throws {
+    let host = GeometryTestSurface()
+    let root = testIdentity("HostMotion")
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in EnvironmentReader(\.accessibilityReduceMotion) { Text($0 ? "Reduced" : "Normal") } }
+    var rendered = 0
+    for preference in [false, true, false] {
+      host.reduceMotion = preference
+      loop.scheduler.requestSignal(named: "SIGWINCH")
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+      #expect(
+        host.frames.last?.raster.lines.joined().contains(preference ? "Reduced" : "Normal") == true)
+      let style = TerminalRenderStyle(appearance: .fallback, reduceMotion: preference)
+      let encoded = try #require(TerminalRenderStyleCodec.encodeBase64(style))
+      #expect(TerminalRenderStyleCodec.decodeBase64(encoded)?.reduceMotion == preference)
+    }
+  }
   @Test(arguments: [false, true])
   func captureSurvivesHostChangeDuringAcquisition(asynchronous: Bool) async throws {
     let host = GeometryTestSurface()
@@ -138,6 +159,7 @@ private final class GeometryTestSurface: HostGeometryPresentationSurface,
   SemanticHostFramePresentationSurface
 {
   var revision: UInt64 = 1
+  var reduceMotion: Bool?
   var size = CellSize(width: 24, height: 6)
   var pitch = PixelSize(width: 9, height: 21)
   var frames: [SemanticHostFrame] = []
@@ -148,7 +170,7 @@ private final class GeometryTestSurface: HostGeometryPresentationSurface,
     .init(
       size: size, appearance: appearance, theme: nil,
       graphics: .init(cellPixelSize: pitch), pointer: .cellOnly,
-      geometry: .init(session: 7, revision: revision))
+      geometry: .init(session: 7, revision: revision), reduceMotion: reduceMotion)
   }
   func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     frames.append(frame)

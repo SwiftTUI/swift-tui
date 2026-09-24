@@ -13,6 +13,10 @@ var documents = new WeakMap;
 var nextAlias = 0;
 
 class DomFontResources {
+  faceLeaseCount = 0;
+  get ownedFaceLeases() {
+    return this.faceLeaseCount;
+  }
   disposed = false;
   releaseFaces;
   cancelWait;
@@ -67,12 +71,14 @@ class DomFontResources {
         shared.set(key, entry);
       }
       entry.refs++;
+      this.faceLeaseCount = entry.faces.length;
       const owned = entry;
       let released = false;
       this.releaseFaces = () => {
         if (released)
           return;
         released = true;
+        this.faceLeaseCount = 0;
         if (--owned.refs === 0) {
           for (const face of owned.faces)
             doc.fonts.delete(face);
@@ -609,6 +615,75 @@ function stableDOMId(id) {
   }).join("");
 }
 
+// src/StaticGif.ts
+function firstGifFrame(bytes) {
+  const fail = () => {
+    throw new Error("Invalid GIF container");
+  };
+  if (bytes.length < 13 || String.fromCharCode(...bytes.subarray(0, 6)) !== "GIF89a" && String.fromCharCode(...bytes.subarray(0, 6)) !== "GIF87a")
+    return fail();
+  let offset = 13 + (bytes[10] & 128 ? 3 * 2 ** ((bytes[10] & 7) + 1) : 0);
+  if (offset > bytes.length)
+    return fail();
+  const header = bytes.slice(0, offset);
+  let control = new Uint8Array(0);
+  const subBlocks = () => {
+    while (offset < bytes.length) {
+      const size = bytes[offset++];
+      if (!size)
+        return;
+      offset += size;
+      if (offset > bytes.length)
+        return fail();
+    }
+    return fail();
+  };
+  while (offset < bytes.length) {
+    const start = offset;
+    const marker = bytes[offset++];
+    if (marker === 33) {
+      const label = bytes[offset++];
+      if (label === 249 && bytes[offset] !== 4)
+        return fail();
+      subBlocks();
+      if (label === 249)
+        control = bytes.slice(start, offset);
+    } else if (marker === 44) {
+      if (offset + 9 > bytes.length)
+        return fail();
+      const word = (at) => bytes[at] | bytes[at + 1] << 8;
+      const width = word(offset + 4), height = word(offset + 6);
+      if (!width || !height || word(offset) + width > word(6) || word(offset + 2) + height > word(8))
+        return fail();
+      const packed = bytes[offset + 8];
+      offset += 9 + (packed & 128 ? 3 * 2 ** ((packed & 7) + 1) : 0);
+      if (offset >= bytes.length)
+        return fail();
+      if (bytes[offset] < 2 || bytes[offset] > 8)
+        return fail();
+      offset++;
+      subBlocks();
+      const frame = bytes.subarray(start, offset);
+      const result = new Uint8Array(header.length + control.length + frame.length + 1);
+      result.set(header);
+      result.set(control, header.length);
+      result.set(frame, header.length + control.length);
+      result[result.length - 1] = 59;
+      return result;
+    } else
+      return fail();
+  }
+  return fail();
+}
+function staticGifBase64(payload) {
+  const bytes = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
+  const first = firstGifFrame(bytes);
+  let binary = "";
+  for (let offset = 0;offset < first.length; offset += 16384)
+    binary += String.fromCharCode(...first.subarray(offset, offset + 16384));
+  return btoa(binary);
+}
+
 // src/SurfaceTypography.ts
 function fontForStyle(terminalStyle, style) {
   const emphasis = style?.em ?? 0;
@@ -617,7 +692,55 @@ function fontForStyle(terminalStyle, style) {
   return `${italic}${weight}${terminalStyle.fontSize}px ${terminalStyle.fontFamily}`;
 }
 
-// src/BoxDrawingRenderer.ts
+// src/TextDecorationGeometry.ts
+function emitTextDecoration(sink, pattern, x, y, width, phaseX = x) {
+  if (pattern === "double") {
+    sink.fillRect(x, y - 1.5, width, 1);
+    sink.fillRect(x, y + 0.5, width, 1);
+    return;
+  }
+  if (pattern === "curly") {
+    const period2 = 6;
+    const start = x - positiveRemainder(phaseX, period2);
+    sink.lineWidth = 1;
+    sink.lineCap = "butt";
+    sink.setLineDash([]);
+    sink.beginPath();
+    sink.moveTo(start, y);
+    for (let p2 = start;p2 < x + width; p2 += period2) {
+      sink.bezierCurveTo(p2 + 1, y - 2, p2 + 2, y - 2, p2 + 3, y);
+      sink.bezierCurveTo(p2 + 4, y + 2, p2 + 5, y + 2, p2 + 6, y);
+    }
+    sink.stroke();
+    return;
+  }
+  const patternLengths = {
+    solid: [width],
+    dot: [1, 3],
+    dash: [4, 3],
+    dashDot: [4, 3, 1, 3],
+    dashDotDot: [4, 3, 1, 3, 1, 3]
+  }[pattern] ?? [width];
+  if (pattern === "solid") {
+    sink.fillRect(x, y - 0.5, width, 1);
+    return;
+  }
+  const period = patternLengths.reduce((sum, value) => sum + value, 0);
+  let p = x - positiveRemainder(phaseX, period);
+  while (p < x + width) {
+    for (const [index, length] of patternLengths.entries()) {
+      const left = Math.max(x, p), right = Math.min(x + width, p + length);
+      if (index % 2 === 0 && right > left)
+        sink.fillRect(left, y - 0.5, right - left, 1);
+      p += length;
+    }
+  }
+}
+function positiveRemainder(value, divisor) {
+  return (value % divisor + divisor) % divisor;
+}
+
+// src/GlyphGeometry.ts
 var none = 0;
 var light = 1;
 var heavy = 2;
@@ -733,14 +856,14 @@ var lineSpecs = {
   9598: [none, light, none, heavy],
   9599: [heavy, none, light, none]
 };
-function canRenderBoxDrawing(text) {
+function canRenderGeometricGlyph(text) {
   const codePoint = singleCodePoint(text);
   if (codePoint === undefined) {
     return false;
   }
   return codePoint >= 9472 && codePoint <= 9631 || codePoint >= 10240 && codePoint <= 10495;
 }
-function drawBoxDrawing(context, text, rect) {
+function emitGlyphGeometry(context, text, rect) {
   const codePoint = singleCodePoint(text);
   if (codePoint === undefined) {
     return false;
@@ -1160,7 +1283,6 @@ function drawBraille(context, codePoint, rect) {
   }
   return true;
 }
-
 // src/HostWireBudget.ts
 var HOST_WIRE_MAX_RECORD_BYTES = 4 * 1024 * 1024;
 var HOST_WIRE_MAX_GRID_DIMENSION = 1024;
@@ -1341,14 +1463,22 @@ function admitsImageBytes(bytes) {
 function admitsImageSize(width, height) {
   return Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= MAX_RASTER_DIMENSION && height <= MAX_RASTER_DIMENSION && width * height <= MAX_RASTER_PIXELS;
 }
-function admitsImagePayload(payload) {
+function imagePayloadMetrics(payload) {
   if (payload.length > HOST_WIRE_MAX_RECORD_BYTES)
-    return false;
+    return;
   try {
     const binary = atob(payload);
-    return admitsImageBytes(Uint8Array.from(binary, (character) => character.charCodeAt(0)));
+    const size = imageSize(Uint8Array.from(binary, (character) => character.charCodeAt(0)));
+    if (!size || !admitsImageSize(...size))
+      return;
+    return {
+      width: size[0],
+      height: size[1],
+      decodedBytes: size[0] * size[1] * 4,
+      payloadBytes: payload.length * 2
+    };
   } catch {
-    return false;
+    return;
   }
 }
 function imageSize(bytes) {
@@ -1479,6 +1609,7 @@ function normalizeWebHostTerminalStyle(style = {}) {
     cursorStyle: style.cursorStyle ?? "block",
     cursorBlink: style.cursorBlink ?? false,
     backgroundOpacity: normalizeOpacity(style.backgroundOpacity ?? 1),
+    ...style.reduceMotion === undefined ? {} : { reduceMotion: style.reduceMotion },
     palette,
     theme
   };
@@ -1494,7 +1625,11 @@ function mergeWebHostTerminalStyle(base, patch) {
 }
 function resolveWebHostTerminalRenderStyle(style) {
   const normalized = normalizeWebHostTerminalStyle(style);
+  const reduceMotion = normalized.reduceMotion ?? globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   return {
+    ...reduceMotion === undefined ? {} : {
+      reduceMotion: reduceMotion ? "true" : "false"
+    },
     appearance: {
       foregroundColor: normalized.theme.foreground,
       backgroundColor: normalized.theme.background,
@@ -2679,7 +2814,7 @@ class CanvasSurfacePainter {
         if (text !== " ") {
           context.fillStyle = foreground;
           context.strokeStyle = foreground;
-          if (!canRenderBoxDrawing(text) || !drawBoxDrawing(context, text, {
+          if (!canRenderGeometricGlyph(text) || !emitGlyphGeometry(context, text, {
             x: rectX,
             y: rectY,
             width,
@@ -2733,20 +2868,9 @@ class CanvasSurfacePainter {
       return;
     }
     context.strokeStyle = line.color ?? fallbackColor;
-    context.lineWidth = line.pattern === "double" ? 2 : 1;
-    if (line.pattern === "dot") {
-      context.setLineDash([1, 3]);
-    } else if (line.pattern === "dash") {
-      context.setLineDash([4, 3]);
-    } else {
-      context.setLineDash([]);
-    }
+    context.fillStyle = line.color ?? fallbackColor;
     const lineY = placement === "underline" ? y + metrics.cellHeight - 2 : y + Math.floor(metrics.cellHeight / 2);
-    context.beginPath();
-    context.moveTo(x, lineY);
-    context.lineTo(x + width, lineY);
-    context.stroke();
-    context.setLineDash([]);
+    emitTextDecoration(context, line.pattern, x, lineY, width);
   }
 }
 function cacheLimit(value, fallback) {
@@ -2785,9 +2909,11 @@ function cellRect(metrics, x, y, span) {
   };
 }
 async function decodeImage(dataBase64, format) {
-  const bytes = decodeBase64Bytes(dataBase64);
+  let bytes = decodeBase64Bytes(dataBase64);
   if (!admitsImageBytes(bytes))
     throw new Error("Image exceeds the raster budget or has an unsupported container");
+  if (format === "gif")
+    bytes = firstGifFrame(bytes);
   const blob = new Blob([bytes], { type: `image/${format}` });
   if (typeof createImageBitmap === "function") {
     return createImageBitmap(blob);
@@ -3108,52 +3234,85 @@ class DomGeometryController {
   }
 }
 
+// src/SvgGeometrySink.ts
+class SvgGeometrySink {
+  lineWidth = 1;
+  lineCap = "butt";
+  color = "currentColor";
+  shapes = [];
+  path = "";
+  dash = [];
+  fillRect(x, y, width, height) {
+    this.shapes.push(`<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${escapeAttribute(safeColor(this.color))}"/>`);
+  }
+  beginPath() {
+    this.path = "";
+  }
+  moveTo(x, y) {
+    this.path += `M${x} ${y}`;
+  }
+  lineTo(x, y) {
+    this.path += `L${x} ${y}`;
+  }
+  bezierCurveTo(a, b, c, d, x, y) {
+    this.path += `C${a} ${b} ${c} ${d} ${x} ${y}`;
+  }
+  setLineDash(value) {
+    this.dash = value;
+  }
+  stroke() {
+    this.shapes.push(`<path d="${this.path}" fill="none" stroke="${escapeAttribute(safeColor(this.color))}" stroke-width="${this.lineWidth}" stroke-linecap="${escapeAttribute(this.lineCap)}" stroke-dasharray="${this.dash.join(" ")}"/>`);
+  }
+  image(width, height) {
+    return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${this.shapes.join("")}</svg>`)}")`;
+  }
+}
+function escapeAttribute(value) {
+  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+}
+function safeColor(value) {
+  return /^(?:#[0-9a-f]{3,4}|#[0-9a-f]{6}|#[0-9a-f]{8}|[a-z]+|rgba?\([0-9.,% /+-]+\)|hsla?\([0-9.,% /+-]+\))$/i.test(value) ? value : "none";
+}
+
 // src/DomGlyphBackground.ts
 class DomGlyphBackground {
   cache = new Map;
+  get size() {
+    return this.cache.size;
+  }
   clear() {
     this.cache.clear();
   }
-  image(text, color, width, height) {
-    if (!canRenderBoxDrawing(text))
+  image(text, color, width, height, style, phaseX = 0) {
+    const geometric = canRenderGeometricGlyph(text);
+    if (!geometric && !style?.underline && !style?.strikethrough)
       return;
-    const key = JSON.stringify([text, color, width, height]);
+    const key = JSON.stringify([
+      text,
+      color,
+      width,
+      height,
+      style?.underline,
+      style?.strikethrough,
+      phaseX
+    ]);
     const cached = this.cache.get(key);
     if (cached)
       return cached;
-    const shapes = [];
-    let path = "";
-    let dash = [];
-    const context = {
-      lineWidth: 1,
-      lineCap: "butt",
-      fillRect(x, y, w, h) {
-        shapes.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}"/>`);
-      },
-      beginPath() {
-        path = "";
-      },
-      moveTo(x, y) {
-        path += `M${x} ${y}`;
-      },
-      lineTo(x, y) {
-        path += `L${x} ${y}`;
-      },
-      bezierCurveTo(a, b, c, d, x, y) {
-        path += `C${a} ${b} ${c} ${d} ${x} ${y}`;
-      },
-      setLineDash(value) {
-        dash = value;
-      },
-      stroke() {
-        shapes.push(`<path d="${path}" fill="none" stroke="currentColor" stroke-width="${this.lineWidth}" stroke-linecap="${this.lineCap}" stroke-dasharray="${dash.join(" ")}"/>`);
-      }
-    };
-    if (!drawBoxDrawing(context, text, { x: 0, y: 0, width, height }))
-      return;
-    const escapedColor = color.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" color="${escapedColor}" fill="currentColor">${shapes.join("")}</svg>`;
-    const result = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+    const sink = new SvgGeometrySink;
+    sink.color = color;
+    if (geometric)
+      emitGlyphGeometry(sink, text, { x: 0, y: 0, width, height });
+    for (const [line, y] of [
+      [style?.underline, height - 2],
+      [style?.strikethrough, Math.floor(height / 2)]
+    ]) {
+      if (!line)
+        continue;
+      sink.color = line.color ?? color;
+      emitTextDecoration(sink, line.pattern, 0, y, width, phaseX);
+    }
+    const result = sink.image(width, height);
     if (this.cache.size >= 512)
       this.cache.delete(this.cache.keys().next().value);
     this.cache.set(key, result);
@@ -3162,13 +3321,21 @@ class DomGlyphBackground {
 }
 
 // src/DomSurfacePainter.ts
+var MAX_DOM_IMAGE_ENTRIES = 256;
+var MAX_DOM_IMAGE_BYTES = 64 * 1024 * 1024;
+
 class DomSurfacePainter {
+  rejectedImages = 0;
+  forcedColors = false;
+  forcedForeground = "CanvasText";
+  reportedLimits = new Set;
   onImagePayloadMiss;
   root;
   rowsLayer;
   imagesLayer;
   rowElements = [];
   cells = [];
+  rowBreaks = [];
   renderedImages = new Map;
   appliedMetricsKey;
   renderedGridKey;
@@ -3182,22 +3349,65 @@ class DomSurfacePainter {
   styleCache = new Map;
   appliedCellStyles = new WeakMap;
   onOpenHyperlink;
+  copySelection = (event) => {
+    const selection = document.getSelection();
+    if (!this.root || !selection || selection.isCollapsed || !event.clipboardData)
+      return;
+    const ranges = Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index));
+    if (ranges.some((range) => !this.root.contains(range.commonAncestorContainer)))
+      return;
+    event.clipboardData.setData("text/plain", ranges.map((range) => range.cloneContents().textContent ?? "").join(`
+`));
+    event.preventDefault();
+  };
   constructor(options = {}) {
+    this.onResourceLimit = options.onResourceLimit ?? (() => {});
     this.onOpenHyperlink = options.onOpenHyperlink;
     this.onImagePayloadMiss = options.onImagePayloadMiss ?? (() => {});
     registerDomSurfacePainterConformanceControl(this, {
       evictImages: (ids) => {
-        for (const id of ids) {
-          this.renderedImages.get(id)?.container.remove();
-          this.renderedImages.delete(id);
-          this.reportedMissingImageIds.delete(id);
+        for (const [key, entry] of this.renderedImages) {
+          if (!ids.includes(entry.id))
+            continue;
+          entry.container.remove();
+          releaseImageEntry(entry);
+          this.renderedImages.delete(key);
+          this.reportedMissingImageIds.delete(entry.id);
         }
       },
-      visibleImageIDs: () => [...this.renderedImages.keys()].sort()
+      visibleImageIDs: () => [
+        ...new Set([...this.renderedImages.values()].map((entry) => entry.id))
+      ].sort()
     });
+  }
+  onResourceLimit;
+  get statistics() {
+    const images = [...this.renderedImages.values()];
+    return {
+      rows: this.rowElements.length,
+      cells: this.cells.reduce((sum, cells) => sum + cells.size, 0),
+      rowSeparators: this.rowBreaks.length,
+      decorationNodes: 0,
+      imageNodes: images.length * 2,
+      styleCacheEntries: this.styleCache.size,
+      geometryCacheEntries: this.glyphs.size,
+      decodedImageBytes: images.reduce((sum, image) => sum + image.decodedBytes, 0),
+      retainedPayloadBytes: images.reduce((sum, image) => sum + image.payloadBytes, 0),
+      pendingImages: images.filter((image) => image.state === "pending").length,
+      failedImages: images.filter((image) => image.state === "failed").length,
+      rejectedImages: this.rejectedImages
+    };
+  }
+  rejectImage(reason) {
+    this.rejectedImages = Math.min(Number.MAX_SAFE_INTEGER, this.rejectedImages + 1);
+    if (this.reportedLimits.has(reason))
+      return;
+    this.reportedLimits.add(reason);
+    this.onResourceLimit(reason);
   }
   attach(root) {
     this.root = root;
+    document.addEventListener?.("copy", this.copySelection);
     const rowsLayer = createElement("div");
     rowsLayer.className = "webhost-scene__surface-rows";
     fillContainer(rowsLayer.style);
@@ -3210,6 +3420,7 @@ class DomSurfacePainter {
     root.replaceChildren(rowsLayer, imagesLayer);
     this.rowElements = [];
     this.cells = [];
+    this.rowBreaks = [];
     this.renderedImages = new Map;
     this.appliedMetricsKey = undefined;
     this.renderedGridKey = undefined;
@@ -3230,19 +3441,25 @@ class DomSurfacePainter {
       this.lastEpoch = frame.epoch;
       this.reportedMissingImageIds.clear();
     }
-    const metricsKey = metricsKeyFor(metrics);
-    const metricsChanged = metricsKey !== this.appliedMetricsKey;
+    const forcedColors = globalThis.matchMedia?.("(forced-colors: active)").matches ?? false;
+    const currentForcedForeground = forcedColors && this.forcedColors ? globalThis.getComputedStyle?.(root).color : undefined;
+    this.forcedColors = forcedColors;
+    const metricsKey = `${metricsKeyFor(metrics)}|${forcedColors}`;
+    const metricsChanged = metricsKey !== this.appliedMetricsKey || currentForcedForeground !== undefined && currentForcedForeground !== this.forcedForeground;
     if (metricsChanged) {
       this.styleCache.clear();
       this.appliedCellStyles = new WeakMap;
       this.glyphs.clear();
       this.applyRootStyle(root, metrics);
+      if (forcedColors)
+        this.forcedForeground = globalThis.getComputedStyle?.(root).color ?? "CanvasText";
       this.appliedMetricsKey = metricsKey;
     }
     if (!frame) {
       clearSelection(rowsLayer);
       this.rowElements = [];
       this.cells = [];
+      this.rowBreaks = [];
       this.linkCells.clear();
       rowsLayer.replaceChildren();
       this.lastImageRecoveryFrame = undefined;
@@ -3284,6 +3501,7 @@ class DomSurfacePainter {
           clearSelection(row);
         row?.remove();
         this.cells.pop();
+        this.rowBreaks.pop();
       }
       this.rowElements.length = Math.min(this.rowElements.length, frame.rows.length);
       for (let y = 0;y < frame.rows.length; y += 1) {
@@ -3306,6 +3524,7 @@ class DomSurfacePainter {
     this.appliedMetricsKey = undefined;
   }
   dispose() {
+    document.removeEventListener?.("copy", this.copySelection);
     this.styleCache.clear();
     this.appliedCellStyles = new WeakMap;
     this.glyphs.clear();
@@ -3316,6 +3535,9 @@ class DomSurfacePainter {
     this.imagesLayer = undefined;
     this.rowElements = [];
     this.cells = [];
+    this.rowBreaks = [];
+    for (const entry of this.renderedImages.values())
+      releaseImageEntry(entry);
     this.renderedImages.clear();
     this.reportedMissingImageIds.clear();
     this.lastImageRecoveryFrame = undefined;
@@ -3324,7 +3546,8 @@ class DomSurfacePainter {
     const rowElement = this.ensureRowElement(y, metrics);
     const previous = this.cells[y] ?? new Map;
     const next = new Map;
-    const retainedColumns = new Set((frame.rows[y] ?? []).map((cell) => cell[0]));
+    const rowCells = copyableRow(frame.rows[y] ?? [], frame.width);
+    const retainedColumns = new Set(rowCells.map((cell) => cell[0]));
     for (const [x, element] of previous) {
       if (!retainedColumns.has(x)) {
         clearSelection(element);
@@ -3332,7 +3555,7 @@ class DomSurfacePainter {
       }
     }
     let position = 0;
-    for (const [x, text, span, styleIndex] of frame.rows[y] ?? []) {
+    for (const [x, text, span, styleIndex] of rowCells) {
       const cellStyle = frame.styles[styleIndex] ?? undefined;
       const target = this.linkCells.get(y * frame.width + x);
       const isLink = target !== undefined && (/^https?:/i.test(target) || !!this.onOpenHyperlink);
@@ -3347,28 +3570,37 @@ class DomSurfacePainter {
         element = createElement(tag.toLowerCase());
       if (element.textContent !== text) {
         clearSelection(element);
-        element.textContent = text;
+        const node = element.firstChild;
+        if (node?.nodeType === 3)
+          node.nodeValue = text;
+        else
+          element.textContent = text;
       }
       const key = JSON.stringify(cellStyle ?? null);
       let resolved = this.styleCache.get(key);
       if (!resolved) {
-        resolved = resolveCellStyle(cellStyle, metrics);
+        resolved = resolveCellStyle(cellStyle, metrics, this.forcedColors ? this.forcedForeground : undefined);
         if (this.styleCache.size >= 512)
           this.styleCache.delete(this.styleCache.keys().next().value);
         this.styleCache.set(key, resolved);
       }
-      const geometricText = canRenderBoxDrawing(text) ? text : "";
+      const geometricText = canRenderGeometricGlyph(text) ? text : "";
       const presentationKey = JSON.stringify([key, x, span, geometricText]);
       if (this.appliedCellStyles.get(element) !== presentationKey) {
         Object.assign(element.style, resolved, {
           left: `${x * metrics.cellWidth}px`,
-          width: `${Math.max(1, span) * metrics.cellWidth}px`
+          width: `${Math.max(1, span) * metrics.cellWidth}px`,
+          marginRight: `${-Math.max(1, span) * metrics.cellWidth}px`
         });
-        const glyph = this.glyphs.image(geometricText, resolved.color ?? "", Math.max(1, span) * metrics.cellWidth, metrics.cellHeight);
+        const glyph = this.glyphs.image(geometricText, resolved.color ?? "", Math.max(1, span) * metrics.cellWidth, metrics.cellHeight, this.forcedColors ? {
+          ...cellStyle,
+          underline: cellStyle?.underline ? { ...cellStyle.underline, color: this.forcedForeground } : undefined,
+          strikethrough: cellStyle?.strikethrough ? { ...cellStyle.strikethrough, color: this.forcedForeground } : undefined
+        } : cellStyle, x * metrics.cellWidth);
         element.style.backgroundImage = glyph ?? "none";
         element.style.backgroundSize = "100% 100%";
         element.style.backgroundRepeat = "no-repeat";
-        element.style.color = glyph ? "transparent" : resolved.color ?? "";
+        element.style.color = geometricText ? "transparent" : resolved.color ?? "";
         this.appliedCellStyles.set(element, presentationKey);
       }
       if (isLink && target !== undefined && element.getAttribute("data-surface-link") !== target) {
@@ -3397,6 +3629,19 @@ class DomSurfacePainter {
       position += 1;
     }
     this.cells[y] = next;
+    let rowBreak = this.rowBreaks[y];
+    if (y < frame.rows.length - 1) {
+      if (!rowBreak) {
+        rowBreak = document.createTextNode(`
+`);
+        rowElement.appendChild(rowBreak);
+        this.rowBreaks[y] = rowBreak;
+      }
+    } else if (rowBreak) {
+      clearSelection(rowElement);
+      rowBreak.remove();
+      this.rowBreaks.length = y;
+    }
   }
   ensureRowElement(y, metrics) {
     let rowElement = this.rowElements[y];
@@ -3407,16 +3652,24 @@ class DomSurfacePainter {
         font: "inherit",
         lineHeight: "inherit",
         letterSpacing: "0px",
-        wordSpacing: "0px"
+        wordSpacing: "0px",
+        whiteSpace: "pre",
+        contain: "strict"
       });
       rowElement.style.position = "absolute";
       rowElement.style.left = "0";
       this.rowElements[y] = rowElement;
       this.rowsLayer?.appendChild(rowElement);
     }
-    rowElement.style.top = `${y * metrics.cellHeight}px`;
-    rowElement.style.height = `${metrics.cellHeight}px`;
-    rowElement.style.width = `${metrics.columns * metrics.cellWidth}px`;
+    const geometry = {
+      top: `${y * metrics.cellHeight}px`,
+      height: `${metrics.cellHeight}px`,
+      width: `${metrics.columns * metrics.cellWidth}px`
+    };
+    for (const key of ["top", "height", "width"]) {
+      if (rowElement.style[key] !== geometry[key])
+        rowElement.style[key] = geometry[key];
+    }
     return rowElement;
   }
   applyRootStyle(root, metrics) {
@@ -3425,6 +3678,9 @@ class DomSurfacePainter {
     style.position = "relative";
     style.overflow = "hidden";
     style.background = webTUITerminalBackgroundColor(metrics.style);
+    if (this.forcedColors)
+      style.background = "Canvas";
+    style.color = this.forcedColors ? "CanvasText" : metrics.style.theme.foreground;
     style.font = fontForStyle(metrics.style);
     style.lineHeight = `${metrics.cellHeight}px`;
     style.letterSpacing = "0px";
@@ -3444,23 +3700,30 @@ class DomSurfacePainter {
     const next = new Map;
     const currentMissingImageIds = new Set;
     const newlyMissingImageIds = new Set;
+    let decodedBytes = 0, payloadBytes = 0;
+    const occurrences = new Map;
+    const previousPayloads = new Map([...this.renderedImages.values()].map((entry) => [entry.id, entry]));
+    const currentPayloads = new Map(images.filter((image) => image.dataBase64 !== undefined).map((image) => [image.id, image.dataBase64]));
     for (const rawImage of images) {
       if (!isSupportedImageFormat(rawImage.format)) {
         continue;
       }
       const image = {
         ...rawImage,
+        dataBase64: rawImage.dataBase64 ?? currentPayloads.get(rawImage.id),
         scalingMode: normalizeScalingMode(rawImage.scalingMode)
       };
       const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
       const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
-      const existing = this.renderedImages.get(image.id);
-      if (image.dataBase64 !== undefined && !admitsImagePayload(image.dataBase64))
-        continue;
+      const occurrence = occurrences.get(image.id) ?? 0;
+      occurrences.set(image.id, occurrence + 1);
+      const placementKey = JSON.stringify([image.id, occurrence]);
+      const existing = this.renderedImages.get(placementKey);
+      const previousPayload = previousPayloads.get(image.id);
       if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
         continue;
       }
-      if (!existing && image.dataBase64 === undefined) {
+      if (!existing && !previousPayload && image.dataBase64 === undefined) {
         if (!isWebHostImageRecoveryId(image.id)) {
           continue;
         }
@@ -3470,7 +3733,20 @@ class DomSurfacePainter {
         }
         continue;
       }
-      const entry = existing ?? makeImageEntry();
+      const source = image.dataBase64 === undefined ? previousPayload?.source : `data:image/${image.format};base64,${image.dataBase64}`;
+      const changed = source !== existing?.source;
+      const allocation = image.dataBase64 !== undefined && source !== previousPayload?.source ? imagePayloadMetrics(image.dataBase64) : previousPayload;
+      if (!allocation || !source) {
+        this.rejectImage("An image payload has invalid or excessive dimensions.");
+        continue;
+      }
+      if (next.size >= MAX_DOM_IMAGE_ENTRIES || decodedBytes + allocation.decodedBytes > MAX_DOM_IMAGE_BYTES || payloadBytes + allocation.payloadBytes > MAX_DOM_IMAGE_BYTES) {
+        this.rejectImage("The visible image set exceeds the 256-image or 64 MiB image budget.");
+        continue;
+      }
+      decodedBytes += allocation.decodedBytes;
+      payloadBytes += allocation.payloadBytes;
+      const entry = existing ?? makeImageEntry(image.id);
       entry.container.style.left = `${clipX * metrics.cellWidth}px`;
       entry.container.style.top = `${clipY * metrics.cellHeight}px`;
       entry.container.style.width = `${clipWidth * metrics.cellWidth}px`;
@@ -3480,20 +3756,50 @@ class DomSurfacePainter {
       entry.image.style.width = `${boundsWidth * metrics.cellWidth}px`;
       entry.image.style.height = `${boundsHeight * metrics.cellHeight}px`;
       entry.image.style.opacity = String(normalizedImageOpacity2(image.opacity));
-      if (image.dataBase64) {
-        const source = `data:image/${image.format};base64,${image.dataBase64}`;
-        if (entry.source !== source) {
-          entry.image.setAttribute("src", source);
-          entry.source = source;
+      if (changed) {
+        const generation = ++entry.generation;
+        entry.source = source;
+        entry.decodedBytes = allocation.decodedBytes;
+        entry.payloadBytes = allocation.payloadBytes;
+        entry.state = "pending";
+        entry.container.setAttribute("data-image-state", "pending");
+        entry.image.onload = () => {
+          if (this.renderedImages.get(placementKey) !== entry || entry.generation !== generation)
+            return;
+          const img = entry.image;
+          const actualBytes = img.naturalWidth * img.naturalHeight * 4;
+          if (actualBytes <= 0 || actualBytes > entry.decodedBytes) {
+            entry.state = "failed";
+            this.rejectImage("Decoded image dimensions exceed their admitted container dimensions.");
+          } else
+            entry.state = "ready";
+          entry.container.setAttribute("data-image-state", entry.state);
+        };
+        entry.image.onerror = () => {
+          if (this.renderedImages.get(placementKey) !== entry || entry.generation !== generation)
+            return;
+          entry.state = "failed";
+          entry.container.setAttribute("data-image-state", "failed");
+        };
+        try {
+          const displayedSource = image.format === "gif" ? `data:image/gif;base64,${staticGifBase64(source.slice(source.indexOf(",") + 1))}` : source;
+          entry.image.setAttribute("src", displayedSource);
+        } catch {
+          entry.image.removeAttribute("src");
+          entry.image.onload = null;
+          entry.image.onerror = null;
+          entry.state = "failed";
+          entry.container.setAttribute("data-image-state", "failed");
+          this.rejectImage("An image payload has an invalid GIF container.");
         }
       }
-      if (!existing) {
-        layer.appendChild(entry.container);
-      }
-      next.set(image.id, entry);
+      if (layer.children[next.size] !== entry.container)
+        layer.insertBefore(entry.container, layer.children[next.size] ?? null);
+      next.set(placementKey, entry);
     }
     for (const [id, entry] of this.renderedImages) {
       if (!next.has(id)) {
+        releaseImageEntry(entry);
         entry.container.remove();
       }
     }
@@ -3535,14 +3841,23 @@ function metricsKeyFor(metrics) {
     metrics.style.backgroundOpacity
   ].join("|");
 }
-function resolveCellStyle(style, metrics) {
+function resolveCellStyle(style, metrics, forcedForeground) {
+  const forcedColors = forcedForeground !== undefined;
   const elementStyle = {
-    position: "absolute",
-    display: "block",
+    position: "relative",
+    display: "inline-block",
+    verticalAlign: "top",
+    contain: "size",
     boxSizing: "border-box",
     padding: "0",
     margin: "0",
     border: "0",
+    textAlign: "left",
+    float: "none",
+    minWidth: "0",
+    maxWidth: "none",
+    minHeight: "0",
+    maxHeight: "none",
     textIndent: "0",
     textTransform: "none",
     fontFamily: "inherit",
@@ -3559,52 +3874,17 @@ function resolveCellStyle(style, metrics) {
     overflow: "hidden",
     direction: "ltr",
     unicodeBidi: "isolate",
-    color: resolvedSurfaceForeground(style, metrics.style),
-    backgroundColor: resolvedSurfaceBackground(style, metrics.style) ?? "transparent",
+    color: forcedForeground ?? resolvedSurfaceForeground(style, metrics.style),
+    backgroundColor: forcedColors ? "Canvas" : resolvedSurfaceBackground(style, metrics.style) ?? "transparent",
     fontWeight: (style?.em ?? 0) & 1 ? "700" : "normal",
     fontStyle: (style?.em ?? 0) & 2 ? "italic" : "normal",
-    opacity: String(style?.opacity ?? 1),
+    opacity: forcedColors ? "1" : String(style?.opacity ?? 1),
+    forcedColorAdjust: forcedColors ? "none" : "auto",
     textDecorationLine: "none",
     textDecorationStyle: "solid",
     textDecorationColor: resolvedSurfaceForeground(style, metrics.style)
   };
-  applyTextDecoration(elementStyle, style);
   return elementStyle;
-}
-function applyTextDecoration(elementStyle, style) {
-  const lines = [];
-  if (style?.underline) {
-    lines.push("underline");
-  }
-  if (style?.strikethrough) {
-    lines.push("line-through");
-  }
-  if (lines.length === 0) {
-    return;
-  }
-  elementStyle.textDecorationLine = lines.join(" ");
-  const pattern = style?.underline?.pattern ?? style?.strikethrough?.pattern;
-  elementStyle.textDecorationStyle = decorationStyleFor(pattern);
-  const color = style?.underline?.color ?? style?.strikethrough?.color;
-  if (color) {
-    elementStyle.textDecorationColor = color;
-  }
-}
-function decorationStyleFor(pattern) {
-  switch (pattern) {
-    case "dot":
-      return "dotted";
-    case "dash":
-    case "dashDot":
-    case "dashDotDot":
-      return "dashed";
-    case "double":
-      return "double";
-    case "curly":
-      return "wavy";
-    default:
-      return "solid";
-  }
 }
 function fillContainer(style) {
   Object.assign(style, scopedBoxStyle, {
@@ -3617,7 +3897,7 @@ function fillContainer(style) {
   style.width = "100%";
   style.height = "100%";
 }
-function makeImageEntry() {
+function makeImageEntry(id) {
   const container = createElement("div");
   container.className = "webhost-scene__surface-image";
   Object.assign(container.style, scopedBoxStyle);
@@ -3629,10 +3909,34 @@ function makeImageEntry() {
   image.setAttribute("alt", "");
   image.setAttribute("draggable", "false");
   container.appendChild(image);
-  return { container, image, source: "" };
+  return {
+    id,
+    container,
+    image,
+    source: "",
+    decodedBytes: 0,
+    payloadBytes: 0,
+    generation: 0,
+    state: "pending"
+  };
+}
+function releaseImageEntry(entry) {
+  entry.generation++;
+  entry.state = "evicted";
+  entry.image.onload = null;
+  entry.image.onerror = null;
+  entry.image.removeAttribute("src");
+  entry.source = "";
+  entry.decodedBytes = entry.payloadBytes = 0;
 }
 var scopedBoxStyle = {
+  display: "block",
   boxSizing: "border-box",
+  float: "none",
+  minWidth: "0",
+  maxWidth: "none",
+  minHeight: "0",
+  maxHeight: "none",
   margin: "0",
   padding: "0",
   border: "0",
@@ -3657,6 +3961,19 @@ function selectionInvalidator() {
       selection = null;
     }
   };
+}
+function copyableRow(cells, width) {
+  const result = [];
+  let end = 0;
+  for (const cell of cells) {
+    if (cell[0] > end)
+      result.push([end, " ".repeat(cell[0] - end), cell[0] - end, -1]);
+    result.push(cell);
+    end = cell[0] + Math.max(1, cell[2]);
+  }
+  if (end < width)
+    result.push([end, " ".repeat(width - end), width - end, -1]);
+  return result;
 }
 
 // src/HostGeometrySession.ts
@@ -3935,6 +4252,7 @@ class SurfacePaintScheduler {
   animationFrames;
   paint;
   canPresent;
+  onResourceLimit;
   pending;
   lastPaintedFrame;
   handle;
@@ -3943,17 +4261,25 @@ class SurfacePaintScheduler {
   presentedFrames = 0;
   paints = 0;
   coalescedFrames = 0;
-  constructor(animationFrames, paint, canPresent = () => true) {
+  resourceLimitExceeded = false;
+  constructor(animationFrames, paint, canPresent = () => true, onResourceLimit = () => {}) {
     this.animationFrames = animationFrames;
     this.paint = paint;
     this.canPresent = canPresent;
+    this.onResourceLimit = onResourceLimit;
   }
   get statistics() {
     return {
       presentedFrames: this.presentedFrames,
       paints: this.paints,
       coalescedFrames: this.coalescedFrames,
-      pending: this.pending !== undefined
+      pending: this.pending !== undefined,
+      carriedImagePayloadBytes: [
+        ...this.pending?.carriedImagePayloads.values() ?? []
+      ].reduce((total, value) => total + value.length * 2, 0),
+      queuedAnnouncements: this.pending?.accessibilityAnnouncements.length ?? 0,
+      queuedAnnouncementBytes: this.pending?.announcementBytes ?? 0,
+      resourceLimitExceeded: this.resourceLimitExceeded
     };
   }
   get batchesPaints() {
@@ -3974,7 +4300,8 @@ class SurfacePaintScheduler {
       carriedImagePayloads: new Map,
       recoveredImagePayloadIds: new Set,
       accessibilityAnnouncements: [],
-      coalescedFrameCount: 0
+      coalescedFrameCount: 0,
+      announcementBytes: 0
     };
     if (pending?.frame && pending.frame !== this.lastPaintedFrame) {
       for (const image of pending.frame.images ?? []) {
@@ -3995,10 +4322,33 @@ class SurfacePaintScheduler {
       next.frame = frame;
       next.damage = damage;
     }
+    const visibleIDs = new Set(next.frame?.images?.map((image) => image.id));
+    let carriedBytes = 0;
+    for (const [id, payload] of next.carriedImagePayloads) {
+      const bytes2 = payload.length * 2;
+      if (!visibleIDs.has(id) || carriedBytes + bytes2 > 64 * 1024 * 1024)
+        next.carriedImagePayloads.delete(id);
+      else
+        carriedBytes += bytes2;
+    }
+    for (const id of next.recoveredImagePayloadIds)
+      if (!visibleIDs.has(id))
+        next.recoveredImagePayloadIds.delete(id);
     for (const id of recoveredImagePayloadIds) {
+      if (next.recoveredImagePayloadIds.size >= 1024)
+        next.recoveredImagePayloadIds.delete(next.recoveredImagePayloadIds.values().next().value);
       next.recoveredImagePayloadIds.add(id);
     }
-    next.accessibilityAnnouncements.push(...frame.accessibilityAnnouncements ?? []);
+    const announcements = frame.accessibilityAnnouncements ?? [];
+    const bytes = announcements.reduce((total, item) => total + item.message.length * 2, 0);
+    if (next.accessibilityAnnouncements.length + announcements.length > 1024 || next.announcementBytes + bytes > 256 * 1024) {
+      this.resourceLimitExceeded = true;
+      this.dispose();
+      this.onResourceLimit("WebHost stopped: the pending announcement queue exceeded 1,024 messages or 256 KiB. Reload the scene to restart.");
+      return;
+    }
+    next.announcementBytes += bytes;
+    next.accessibilityAnnouncements.push(...announcements);
     this.pending = next;
     this.schedule();
   }
@@ -4076,7 +4426,8 @@ class SurfacePaintScheduler {
       carriedImagePayloads: new Map,
       recoveredImagePayloadIds: new Set,
       accessibilityAnnouncements: [],
-      coalescedFrameCount: 0
+      coalescedFrameCount: 0,
+      announcementBytes: 0
     };
   }
   schedule() {
@@ -4272,11 +4623,17 @@ class WebHostSceneRuntime {
       return this.bridge?.requestImagePayloads?.(ids);
     };
     this.painter = this.rendererKind === "dom" ? new DomSurfacePainter({
+      onResourceLimit: (message) => this.writeOutput(`${message}
+`),
       onImagePayloadMiss,
       onOpenHyperlink: options.onOpenHyperlink
     }) : new CanvasSurfacePainter({ onImagePayloadMiss });
     const paintScheduling = options.paintScheduling ?? defaultAnimationFrameScheduler();
-    this.paintScheduler = new SurfacePaintScheduler(paintScheduling === "synchronous" ? undefined : paintScheduling, (request) => this.paint(request), (frame) => !this.domGeometry || this.geometrySession.canPresent(frame));
+    this.paintScheduler = new SurfacePaintScheduler(paintScheduling === "synchronous" ? undefined : paintScheduling, (request) => this.paint(request), (frame) => !this.domGeometry || this.geometrySession.canPresent(frame), (message) => {
+      this.writeOutput(`${message}
+`);
+      this.bridge?.dispose();
+    });
     this.onOpenHyperlink = options.onOpenHyperlink;
     this.suspendWhenHidden = options.suspendWhenHidden ?? true;
     this.element = document.createElement("section");
@@ -4366,6 +4723,14 @@ class WebHostSceneRuntime {
   }
   get paintStatistics() {
     return this.paintScheduler.statistics;
+  }
+  get resourceStatistics() {
+    return {
+      dom: this.painter instanceof DomSurfacePainter ? this.painter.statistics : undefined,
+      semanticNodes: this.terminalMount.querySelectorAll(".webhost-scene__accessibility-tree *").length,
+      fontFaceLeases: (this.fontResources?.ownedFaceLeases ?? 0) + (this.activeFontResources !== this.fontResources ? this.activeFontResources?.ownedFaceLeases ?? 0 : 0),
+      paintQueue: this.paintScheduler.statistics
+    };
   }
   updateRuntimeSuspension() {
     const suspended = this.suspendWhenHidden && (!this.isVisible || !this.documentVisible);
@@ -4611,7 +4976,21 @@ class WebHostSceneRuntime {
       refresh();
     };
     watchDpr();
+    const preferences = [
+      "(forced-colors: active)",
+      "(prefers-color-scheme: dark)",
+      "(prefers-reduced-motion: reduce)"
+    ].map((query) => globalThis.matchMedia?.(query)).filter((query) => query !== undefined);
+    const preferenceChanged = () => {
+      this.bridge?.updateRenderStyle?.(this.currentStyle);
+      refresh();
+      this.paintScheduler.requestRepaint();
+    };
+    for (const query of preferences)
+      query.addEventListener?.("change", preferenceChanged);
     this.detachMetricObservers = () => {
+      for (const query of preferences)
+        query.removeEventListener?.("change", preferenceChanged);
       fonts?.removeEventListener?.("loadingdone", refresh);
       fonts?.removeEventListener?.("loadingerror", refresh);
       globalThis.window?.removeEventListener?.("resize", refresh);
@@ -5088,6 +5467,8 @@ class WebSocketSceneBridge {
   queuedOutput = [];
   sink;
   disposed = false;
+  resourceFailure;
+  queuedOutputBytes = 0;
   reconnectAttempts = 0;
   reconnectTimer;
   lastRenderStyleMessage;
@@ -5140,6 +5521,9 @@ class WebSocketSceneBridge {
   }
   bindOutput(sink) {
     this.sink = sink;
+    if (this.resourceFailure)
+      sink.writeError?.(this.resourceFailure);
+    this.queuedOutputBytes = 0;
     while (this.queuedOutput.length > 0) {
       this.deliver(this.queuedOutput.shift());
     }
@@ -5163,6 +5547,8 @@ class WebSocketSceneBridge {
     if (this.disposed) {
       return;
     }
+    if (!this.admitsQueuedInput([chunk]))
+      return;
     const copy = new Uint8Array(chunk);
     this.queuedInput.push(copy);
     if (this.socket.readyState === socketOpenState) {
@@ -5190,6 +5576,7 @@ class WebSocketSceneBridge {
     this.detachSocket(this.socket);
     this.queuedInput.length = 0;
     this.queuedOutput.length = 0;
+    this.queuedOutputBytes = 0;
     this.socket.close(1000, "WebHost scene disposed");
   }
   attachSocket(socket) {
@@ -5240,6 +5627,8 @@ class WebSocketSceneBridge {
     if (this.lastPointerCapabilitiesMessage) {
       handshake.push(this.lastPointerCapabilitiesMessage);
     }
+    if (!this.admitsQueuedInput(handshake))
+      return;
     this.queuedInput.unshift(...handshake.map((chunk) => new Uint8Array(chunk)));
     if (this.socket.readyState === socketOpenState) {
       this.flushQueuedInput();
@@ -5252,6 +5641,7 @@ class WebSocketSceneBridge {
     this.pendingReceiveBytes = 0;
     this.decoder = new WebHostOutputDecoder;
     this.queuedOutput.length = 0;
+    this.queuedOutputBytes = 0;
     this.sink?.resetSurfaceSession?.();
   }
   async receive(message, generation) {
@@ -5277,8 +5667,17 @@ class WebSocketSceneBridge {
     this.sendPendingResyncRequests();
   }
   deliver(record) {
+    if (this.disposed)
+      return;
     const sink = this.sink;
     if (!sink) {
+      const bytes = JSON.stringify(record).length * 2;
+      if (this.queuedOutput.length >= 256 || this.queuedOutputBytes + bytes > 16 * 1024 * 1024) {
+        this.failResourceLimit(`WebHost stopped: unbound output exceeded 256 records or 16 MiB. Reload the scene to restart.
+`);
+        return;
+      }
+      this.queuedOutputBytes += bytes;
       this.queuedOutput.push(record);
       return;
     }
@@ -5314,6 +5713,21 @@ class WebSocketSceneBridge {
         return;
       }
     }
+  }
+  failResourceLimit(message) {
+    if (this.disposed)
+      return;
+    this.resourceFailure = message;
+    this.sink?.writeError?.(message);
+    this.dispose();
+  }
+  admitsQueuedInput(chunks) {
+    const bytes = [...this.queuedInput, ...chunks].reduce((total, item) => total + item.byteLength, 0);
+    if (this.queuedInput.length + chunks.length <= 1024 && bytes <= 1024 * 1024)
+      return true;
+    this.failResourceLimit(`WebHost stopped: disconnected input exceeded 1,024 records or 1 MiB. Reload the scene to restart.
+`);
+    return false;
   }
   sendPendingResyncRequests() {
     while (true) {

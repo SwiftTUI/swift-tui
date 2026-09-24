@@ -95,7 +95,8 @@ package final class WebSurfaceTransport: HostGeometryPresentationSurface,
         size: state.surfaceSize, appearance: state.renderStyle.appearance,
         theme: state.renderStyle.theme, graphics: state.graphicsCapabilities,
         pointer: state.pointerInputCapabilities,
-        geometry: HostGeometryStamp(session: 0, revision: state.geometryRevision)
+        geometry: HostGeometryStamp(session: 0, revision: state.geometryRevision),
+        reduceMotion: state.renderStyle.reduceMotion
       )
     }
   }

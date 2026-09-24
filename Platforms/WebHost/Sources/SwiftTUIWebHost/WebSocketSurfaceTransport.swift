@@ -225,7 +225,8 @@
           theme: state.renderStyle.theme, graphics: state.graphicsCapabilities,
           pointer: state.pointerInputCapabilities,
           geometry: HostGeometryStamp(
-            session: state.geometrySessionToken, revision: state.geometryRevision)
+            session: state.geometrySessionToken, revision: state.geometryRevision),
+          reduceMotion: state.renderStyle.reduceMotion
         )
       }
     }
