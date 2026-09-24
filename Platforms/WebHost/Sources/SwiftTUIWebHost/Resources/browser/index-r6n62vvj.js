@@ -308,7 +308,7 @@ class AccessibilityTreeMounter {
     element.dataset.accessibilityId = node.id;
     element.tabIndex = node.isFocused ? 0 : -1;
     const role = roleMapping(node.role);
-    setOrRemoveAttribute(element, "role", role.role);
+    setOrRemoveAttribute(element, "role", node.role === "secureField" && element.tagName === "INPUT" ? undefined : role.role);
     setOrRemoveAttribute(element, "aria-level", role.level !== undefined ? String(role.level) : undefined);
     setOrRemoveAttribute(element, "aria-label", node.label || undefined);
     setOrRemoveAttribute(element, "aria-description", node.hint || undefined);
