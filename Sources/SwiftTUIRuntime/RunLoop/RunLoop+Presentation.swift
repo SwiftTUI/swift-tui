@@ -14,7 +14,8 @@ extension RunLoop {
 
   package func presentCommittedFrame(
     _ artifacts: FrameArtifacts,
-    damage: PresentationDamage?
+    damage: PresentationDamage?,
+    geometry: HostGeometryStamp? = nil
   ) throws -> TerminalPresentationMetrics {
     if runtimeConfiguration.output == .json {
       return try presentJSONFrame(
@@ -29,16 +30,16 @@ extension RunLoop {
     {
       let sequence = nextSemanticHostFrameSequence
       nextSemanticHostFrameSequence &+= 1
-      metrics = try semanticHostFrameSurface.present(
-        SemanticHostFrame(
-          sequence: sequence,
-          raster: artifacts.rasterSurface,
-          semantics: semanticSnapshotWithScrollOffsets(artifacts.semanticSnapshot),
-          focusedIdentity: focusTracker.currentFocusIdentity,
-          rasterDamage: damage,
-          preferredLayoutSize: preferredHostLayoutSize(for: artifacts)
-        )
+      var frame = SemanticHostFrame(
+        sequence: sequence,
+        raster: artifacts.rasterSurface,
+        semantics: semanticSnapshotWithScrollOffsets(artifacts.semanticSnapshot),
+        focusedIdentity: focusTracker.currentFocusIdentity,
+        rasterDamage: damage,
+        preferredLayoutSize: preferredHostLayoutSize(for: artifacts)
       )
+      frame.hostGeometryStamp = geometry
+      metrics = try semanticHostFrameSurface.present(frame)
     } else if let damageAwareHost = presentationSurface as? any DamageAwarePresentationSurface {
       metrics = try damageAwareHost.present(
         artifacts.rasterSurface,

@@ -11,6 +11,49 @@
   @testable import SwiftTUIWebHost
 
   struct WebSocketSurfaceTransportTests {
+    @Test("geometry acknowledgements and captured revisions survive deltas and reconnects")
+    func geometryNegotiationCaptureAndReconnect() async throws {
+      let sink = RecordingByteSink()
+      let host = WebSocketSurfaceTransport(surfaceSize: .init(width: 2, height: 1), sink: sink)
+      let first = try #require(
+        HostGeometryRequest(
+          revision: 1,
+          size: .init(width: 2, height: 1), cellPixelSize: .init(width: 9, height: 21)))
+      #expect(!host.updateGeometry(first, connectionToken: 1))
+      host.declareCapabilities(
+        .init(acceptsDeltaFrames: true, geometryRevisions: true), connectionToken: 1)
+      try host.present(Self.steadyFrame(sequence: 1))
+      #expect(host.updateGeometry(first, connectionToken: 1))
+      let captured = host.captureHostLayoutConfiguration()
+      #expect(captured.size == first.size)
+      #expect(captured.graphics.cellPixelSize == first.cellPixelSize)
+      #expect(!host.updateGeometry(first, connectionToken: 1))
+      let second = try #require(
+        HostGeometryRequest(
+          revision: 2,
+          size: first.size, cellPixelSize: .init(width: 12, height: 24)))
+      #expect(host.updateGeometry(second, connectionToken: 1))
+      host.updateSurfaceSize(.init(width: 80, height: 24))
+      #expect(host.surfaceSize == first.size)
+      var oldFrame = Self.steadyFrame(sequence: 2)
+      oldFrame.hostGeometryStamp = captured.geometry
+      try host.present(oldFrame)
+      try await host.drain()
+      let originalRecords = try await sink.strings().map { try decodedSurfaceFrame($0) }
+      #expect(originalRecords.map { $0["geometryRevision"] as? Int } == [0, 1])
+      host.beginGeometrySession(2)
+      #expect(host.captureHostLayoutConfiguration().geometry == .init(session: 2, revision: 0))
+      host.declareCapabilities(
+        .init(acceptsDeltaFrames: true, geometryRevisions: true), connectionToken: 2)
+      host.requestSurfaceRefresh()
+      try await host.drain()
+      let outputs = await sink.strings()
+      let records = try outputs.map { try decodedSurfaceFrame($0) }
+      #expect(records.last?["geometryRevision"] as? Int == 0)
+      #expect(!host.updateGeometry(second, connectionToken: 1))
+      #expect(host.updateGeometry(first, connectionToken: 2))
+    }
+
     @Test("slow progressing sockets stay bounded and reconnect with the latest full image frame")
     func slowProgressOverflowAndReconnect() async throws {
       let channel = WebHostSceneChannel()

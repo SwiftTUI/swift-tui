@@ -354,12 +354,13 @@ Its ratchet is therefore coupled to delivery. See
 ## Capability ingress
 
 `HostWireSchema.capabilityMappings` is the canonical mapping. There are
-currently two named bits:
+currently three named bits:
 
 | Capability | Default | Effect |
 | --- | --- | --- |
 | `acceptsDeltaFrames` | `false` | Permits v3 delta records after a full baseline. |
 | `styleAppend` | `false` | A delta carries `stylesBase` plus only the styles it added, instead of the whole accumulated table. |
+| `geometryRevisions` | `false` | Full and delta frames acknowledge geometry support with revision zero, then echo the positive revision captured before layout. |
 
 Absence begins with full-frame output. A rejected declaration leaves the
 existing state unchanged. Each accepted declaration constructs the whole
@@ -371,8 +372,8 @@ The ingress lifecycle differs by transport:
   once when the transport is built. Runtime `caps` input is deliberately
   ignored because reload creates a new in-process transport.
 - **Localhost WebHost: once per connection, before any surface record.** The
-  browser client sends one `caps:{"acceptsDeltaFrames":true}` record after
-  opening a socket. That is now the only accepted shape. The channel accepts a
+  browser client sends one `caps` object declaring the named bits after
+  opening a socket. Unknown keys and mistyped known values are ignored. The channel accepts a
   declaration from the current connection only while the connection is in the
   pre-capabilities phase. A second declaration on the same connection does not
   start a new epoch. An accepted declaration clears the delta baseline and transmitted-image
@@ -384,6 +385,43 @@ The ingress lifecycle differs by transport:
 
 `SWIFTTUI_SURFACE_MAX_VERSION` is retired and inert. Versions are decoder
 shape guards, not negotiated ceilings.
+
+## Captured browser geometry
+
+The browser declares `geometryRevisions` in WebSocket `caps`, or sets
+`SWIFTTUI_GEOMETRY_REVISIONS=1` when constructing WASI. A capable producer
+first emits optional `geometryRevision: 0` on a surface frame. The browser
+waits for this acknowledgement before sending the new controls; older producers
+ignore the declaration and keep the legacy `resize`/`mouse` path.
+
+All controls are RS-prefixed and LF-terminated:
+
+```text
+geometry:<revision>:<columns>:<rows>:<cellWidth>:<cellHeight>
+mouseGeometry:<revision>:<kind>:<x>:<y>:<button>:<deltaX>:<deltaY>:<modifiers>
+```
+
+Positive revisions are strictly increasing JavaScript-safe integers
+(1…9,007,199,254,740,991), parsed as `UInt64` on wasm32. Grid dimensions use
+`HostWireBudget`; cell pitches are integral CSS pixels in 1…8192. Coordinates
+are finite fractional cell coordinates. The transport atomically captures grid,
+cell metrics, appearance, theme, pointer capabilities and revision before each
+layout acquisition. Full and delta frames echo that captured revision, including
+same-grid metric changes and empty damage. Revisions do not replace delivery
+`epoch`/`gen`, and every delivered delta must still be decoded.
+
+After the first positive request, a transport ignores legacy resizes. Pointer
+records retain their revision through parsing, coalescing and the async input
+queue. Application-time routing requires both the current geometry request and
+the applied interaction map to match. Geometry changes cancel pressed, gesture,
+hover and momentum state without synthesizing an activation. WebSocket input
+also carries a private session token, so a reconnect cannot reuse another
+connection's queued pointer event. Reconnect acknowledges revision zero again.
+
+A DOM host retains its previous presentation while waiting, then paints the
+matching text, accessibility bounds and pointer geometry together. It rejects
+old responses as paint candidates without skipping transport decoding. Android
+has no geometry input ingress; declaring this optional field yields zero only.
 
 ## Delivery repair uplink
 

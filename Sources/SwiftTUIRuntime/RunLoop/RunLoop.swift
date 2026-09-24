@@ -92,6 +92,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// tuple coherently and a missed field can't mis-route the next gesture. See
   /// ``PointerInteractionState``.
   package var pointerInteraction = PointerInteractionState()
+  package var observedHostGeometry: HostGeometryStamp?
+  package var appliedHostGeometry: HostGeometryStamp?
+  package var rejectedHostGeometryPointerCount: UInt64 = 0
+  package var cancelledHostGeometryGestureCount: UInt64 = 0
   /// Run-loop-owned scroll momentum (fling) physics. Ticked on the animation
   /// deadline cadence and fed integer offset deltas into
   /// `localScrollPositionRegistry`; momentum is physics, not an animation tween,

@@ -41,12 +41,14 @@
     }
   }
 
-  package final class WebSocketSurfaceTransport: PresentationSurfaceMetricsProvider,
+  package final class WebSocketSurfaceTransport: HostGeometryPresentationSurface,
     RasterPresentationSurface,
     ClipboardWritingPresentationSurface,
     SemanticHostFramePresentationSurface, Sendable
   {
     private struct State: Sendable {
+      var geometryRevision: UInt64 = 0
+      var geometrySessionToken: UInt64 = 0
       var surfaceSize: CellSize
       var renderStyle: TerminalRenderStyle
       var graphicsCapabilities: TerminalGraphicsCapabilities
@@ -133,8 +135,18 @@
         state.wireCapabilities = capabilities
         state.encodingState = capabilities.negotiatedEncodingState()
         state.connectionToken = connectionToken
+        state.geometryRevision = 0
+        state.geometrySessionToken = connectionToken ?? 0
         pump.beginConnection(connectionToken: connectionToken)
         state.encodingGeneration = pump.generation
+      }
+    }
+
+    /// Retire queued pointer events as soon as a new socket opens, before its caps arrive.
+    package func beginGeometrySession(_ token: UInt64) {
+      state.withLock { state in
+        state.geometrySessionToken = token
+        state.geometryRevision = 0
       }
     }
 
@@ -169,7 +181,10 @@
               fallbackBackground: background,
               state: &state.encodingState
             ).utf8)
-        case .semantic(let frame):
+        case .semantic(var frame):
+          if frame.hostGeometryStamp?.session != state.connectionToken {
+            frame.hostGeometryStamp = nil
+          }
           bytes = Array(
             WebSurfaceFrameEncoder.encode(
               frame,
@@ -203,12 +218,42 @@
       state.withLock(\.pointerInputCapabilities)
     }
 
+    package func captureHostLayoutConfiguration() -> HostLayoutConfiguration {
+      state.withLock { state in
+        HostLayoutConfiguration(
+          size: state.surfaceSize, appearance: state.renderStyle.appearance,
+          theme: state.renderStyle.theme, graphics: state.graphicsCapabilities,
+          pointer: state.pointerInputCapabilities,
+          geometry: HostGeometryStamp(
+            session: state.geometrySessionToken, revision: state.geometryRevision)
+        )
+      }
+    }
+
+    /// Refuse delayed, repeated or undeclared requests without mutating any layout input.
+    @discardableResult
+    package func updateGeometry(_ request: HostGeometryRequest, connectionToken: UInt64) -> Bool {
+      state.withLock { state in
+        guard state.wireCapabilities.geometryRevisions, request.revision > state.geometryRevision,
+          state.connectionToken == connectionToken
+        else { return false }
+        state.geometryRevision = request.revision
+        state.surfaceSize = request.size
+        state.graphicsCapabilities.cellPixelSize = request.cellPixelSize
+        state.pointerInputCapabilities = Self.pointerInputCapabilities(
+          for: request.cellPixelSize, supportsScrollPanning: state.supportsScrollPanning
+        )
+        return true
+      }
+    }
+
     package func updateSurfaceSize(
       _ surfaceSize: CellSize,
       cellPixelSize: PixelSize? = nil
     ) {
       guard HostWireBudget.admits(surfaceSize) else { return }
       state.withLock { state in
+        guard state.geometryRevision == 0 else { return }
         state.surfaceSize = surfaceSize
         state.graphicsCapabilities.cellPixelSize = cellPixelSize
         state.pointerInputCapabilities = Self.pointerInputCapabilities(
@@ -289,6 +334,10 @@
     @discardableResult
     package func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
       let bytes = state.withLock { state -> [UInt8] in
+        var frame = frame
+        if frame.hostGeometryStamp?.session != state.connectionToken {
+          frame.hostGeometryStamp = nil
+        }
         state.lastPresentedFrame = .semantic(frame)
         guard prepareEncoding(&state) else { return [] }
         let bytes = Array(

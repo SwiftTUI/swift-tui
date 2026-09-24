@@ -306,6 +306,8 @@
       )
       reader = WebSocketInputReader(source: gate, hooks: hooks) { message, token in
         switch message {
+        case .geometry(let request):
+          _ = transport.updateGeometry(request, connectionToken: token)
         case .resize(let size, let cellPixelSize):
           transport.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
         case .style(let style):

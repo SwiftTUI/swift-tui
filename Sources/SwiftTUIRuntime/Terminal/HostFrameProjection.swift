@@ -28,6 +28,7 @@ import SwiftTUICore
 /// `package`-scoped: an internal intermediate used inside the encoders, never
 /// part of any host's public API.
 package struct HostFrameProjection: Equatable, Sendable {
+  package var hostGeometryStamp: HostGeometryStamp?
   /// Monotonic producer sequence; hosts use it to detect stale async work.
   package var sequence: UInt64
 
@@ -53,6 +54,7 @@ package struct HostFrameProjection: Equatable, Sendable {
   /// Projects `frame` for host serialization. The single seam through which both
   /// host encoders read frame/semantic data.
   package init(_ frame: SemanticHostFrame) {
+    hostGeometryStamp = frame.hostGeometryStamp
     sequence = frame.sequence
     raster = frame.raster
     preferredLayoutSize = frame.preferredLayoutSize

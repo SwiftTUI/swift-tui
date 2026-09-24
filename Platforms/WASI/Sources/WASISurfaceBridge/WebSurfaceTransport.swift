@@ -1,12 +1,13 @@
 @_spi(Runners) package import SwiftTUIRuntime
 import Synchronization
 
-package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
+package final class WebSurfaceTransport: HostGeometryPresentationSurface,
   RasterPresentationSurface, ClipboardWritingPresentationSurface,
   SemanticHostFramePresentationSurface,
   Sendable
 {
   private struct State: Sendable {
+    var geometryRevision: UInt64 = 0
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
@@ -88,12 +89,41 @@ package final class WebSurfaceTransport: PresentationSurfaceMetricsProvider,
     state.withLock(\.pointerInputCapabilities)
   }
 
+  package func captureHostLayoutConfiguration() -> HostLayoutConfiguration {
+    state.withLock { state in
+      HostLayoutConfiguration(
+        size: state.surfaceSize, appearance: state.renderStyle.appearance,
+        theme: state.renderStyle.theme, graphics: state.graphicsCapabilities,
+        pointer: state.pointerInputCapabilities,
+        geometry: HostGeometryStamp(session: 0, revision: state.geometryRevision)
+      )
+    }
+  }
+
+  /// Refuse delayed, repeated or undeclared requests without mutating any layout input.
+  @discardableResult
+  package func updateGeometry(_ request: HostGeometryRequest) -> Bool {
+    state.withLock { state in
+      guard wireCapabilities.geometryRevisions, request.revision > state.geometryRevision else {
+        return false
+      }
+      state.geometryRevision = request.revision
+      state.surfaceSize = request.size
+      state.graphicsCapabilities.cellPixelSize = request.cellPixelSize
+      state.pointerInputCapabilities = Self.pointerInputCapabilities(
+        for: request.cellPixelSize, supportsScrollPanning: state.supportsScrollPanning
+      )
+      return true
+    }
+  }
+
   package func updateSurfaceSize(
     _ surfaceSize: CellSize,
     cellPixelSize: PixelSize? = nil
   ) {
     guard HostWireBudget.admits(surfaceSize) else { return }
     state.withLock { state in
+      guard state.geometryRevision == 0 else { return }
       state.surfaceSize = surfaceSize
       state.graphicsCapabilities.cellPixelSize = cellPixelSize
       state.pointerInputCapabilities = Self.pointerInputCapabilities(

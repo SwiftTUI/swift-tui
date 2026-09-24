@@ -26,6 +26,7 @@ extension RunLoop {
   func presentCommittedFrameWithDiagnosticsTiming(
     _ artifacts: FrameArtifacts,
     damage: PresentationDamage?,
+    geometry: HostGeometryStamp? = nil,
     translationCandidate: ScrollTranslationCandidate? = nil,
     hasFrameSink: Bool,
     frameOrdinal: Int
@@ -51,7 +52,8 @@ extension RunLoop {
       try PresentingScrollTranslation.$current.withValue(translationCandidate) {
         try presentCommittedFrame(
           artifacts,
-          damage: damage
+          damage: damage,
+          geometry: geometry
         )
       }
     }

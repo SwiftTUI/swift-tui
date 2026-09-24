@@ -1,1 +1,1 @@
-caps:{"acceptsDeltaFrames":true,"styleAppend":true}
+caps:{"acceptsDeltaFrames":true,"styleAppend":true,"geometryRevisions":true}

@@ -21,6 +21,9 @@ public struct MouseEvent: Equatable, Sendable {
     case scrolled(deltaX: Int, deltaY: Int)
   }
 
+  /// Captured at input ingress and retained through the application queue.
+  package var hostGeometryStamp: HostGeometryStamp?
+
   public var kind: Kind
   public var location: PointerLocation
   public var modifiers: Modifiers
@@ -69,6 +72,7 @@ public struct MouseEvent: Equatable, Sendable {
     lhs.kind == rhs.kind
       && lhs.location == rhs.location
       && lhs.modifiers == rhs.modifiers
+      && lhs.hostGeometryStamp == rhs.hostGeometryStamp
   }
 }
 

@@ -27,13 +27,18 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
           if bytesRead > 0 {
             backoff.recordInput()
             let chunk = Array(buffer.prefix(Int(bytesRead)))
-            let parsed = parser.feed(chunk)
-            for controlMessage in parsed.controlMessages {
-              controlHandler(controlMessage)
+            let records = parser.feedRecords(chunk)
+            var pending: [InputEvent] = []
+            for record in records {
+              switch record {
+              case .input(let event): pending.append(event)
+              case .control(let message):
+                for event in coalescedWebSurfaceInputEvents(pending) { continuation.yield(event) }
+                pending.removeAll(keepingCapacity: true)
+                controlHandler(message)
+              }
             }
-            for event in coalescedWebSurfaceInputEvents(parsed.events) {
-              continuation.yield(event)
-            }
+            for event in coalescedWebSurfaceInputEvents(pending) { continuation.yield(event) }
             await Task.yield()
             continue
           }
@@ -56,8 +61,14 @@ package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   }
 }
 
+package enum WebSurfaceInputRecord: Equatable, Sendable {
+  case input(InputEvent)
+  case control(WebSurfaceInputControlMessage)
+}
+
 package enum WebSurfaceInputControlMessage: Equatable, Sendable {
   case resize(CellSize, cellPixelSize: PixelSize?)
+  case geometry(HostGeometryRequest)
   case style(TerminalRenderStyle)
   /// A pointer-paradigm declaration (`pointer:panning=1`), sent by the page
   /// when it resolves the pointer type and again whenever it changes — a
@@ -129,7 +140,8 @@ private func mergeWebSurfaceMouseEvents(
   _ rhs: MouseEvent
 ) -> MouseEvent? {
   guard lhs.location.precision == rhs.location.precision,
-    lhs.modifiers == rhs.modifiers
+    lhs.modifiers == rhs.modifiers,
+    lhs.hostGeometryStamp == rhs.hostGeometryStamp
   else {
     return nil
   }
@@ -137,11 +149,12 @@ private func mergeWebSurfaceMouseEvents(
   switch (lhs.kind, rhs.kind) {
   case (.scrolled(let lhsDeltaX, let lhsDeltaY), .scrolled(let rhsDeltaX, let rhsDeltaY))
   where lhs.location.cell == rhs.location.cell:
-    return .init(
-      kind: .scrolled(deltaX: lhsDeltaX + rhsDeltaX, deltaY: lhsDeltaY + rhsDeltaY),
-      location: rhs.location,
-      modifiers: rhs.modifiers
-    )
+    let (deltaX, overflowX) = lhsDeltaX.addingReportingOverflow(rhsDeltaX)
+    let (deltaY, overflowY) = lhsDeltaY.addingReportingOverflow(rhsDeltaY)
+    guard !overflowX, !overflowY else { return nil }
+    var merged = rhs
+    merged.kind = .scrolled(deltaX: deltaX, deltaY: deltaY)
+    return merged
   case (.moved, .moved):
     return rhs
   case (.dragged(let lhsButton), .dragged(let rhsButton)) where lhsButton == rhsButton:

@@ -40,6 +40,10 @@
     }
   }
 
+  package struct WebSocketInputReaderLifecycle: Sendable {
+    package var connectionOpened: @Sendable (UInt64) -> Void
+  }
+
   /// Reads client bytes into scene input, owning parser state for exactly one
   /// connection at a time.
   ///
@@ -68,6 +72,7 @@
 
     private let source: any WebHostByteSource
     private let controlHandler: @Sendable (WebSurfaceInputControlMessage, UInt64) async -> Void
+    private let connectionOpened: @Sendable (UInt64) -> Void
     private let hooks: WebSocketInputReaderTestHooks?
     private let state = Mutex(ReaderState())
 
@@ -77,11 +82,17 @@
     init(
       source: any WebHostByteSource,
       hooks: WebSocketInputReaderTestHooks? = nil,
+      lifecycle: WebSocketInputReaderLifecycle? = nil,
       controlHandler: @escaping @Sendable (WebSurfaceInputControlMessage, UInt64) async -> Void = {
         _, _ in
       }
     ) {
       self.source = source
+      if let lifecycle {
+        self.connectionOpened = lifecycle.connectionOpened
+      } else {
+        self.connectionOpened = { (_: UInt64) in }
+      }
       self.hooks = hooks
       self.controlHandler = controlHandler
     }
@@ -96,8 +107,15 @@
       signalReader: InProcessSignalReader? = nil,
       hooks: WebSocketInputReaderTestHooks? = nil
     ) {
-      self.init(source: channel, hooks: hooks) { message, token in
+      self.init(
+        source: channel, hooks: hooks,
+        lifecycle: .init(connectionOpened: { transport.beginGeometrySession($0) })
+      ) { message, token in
         switch message {
+        case .geometry(let request):
+          if transport.updateGeometry(request, connectionToken: token) {
+            signalReader?.send("SIGWINCH")
+          }
         case .resize(let size, let cellPixelSize):
           transport.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
           signalReader?.send("SIGWINCH")
@@ -161,10 +179,11 @@
     private func openConnection(
       token: UInt64
     ) async {
+      connectionOpened(token)
       let abandoned = state.withLock { state -> (token: UInt64, bytes: [UInt8])? in
         let leftover = state.parser.bufferedCommandBytes
         let previousToken = state.parserToken
-        state.parser = WebSurfaceInputParser()
+        state.parser = WebSurfaceInputParser(session: token)
         state.parserToken = token
         state.streamToken = token
         guard !leftover.isEmpty, let previousToken, previousToken != token else {
@@ -197,25 +216,23 @@
 
       let parsed = state.withLock { state in
         state.parserToken = token
-        return state.parser.feed(bytes)
+        return state.parser.feedRecords(bytes)
       }
       hooks?.parserStateDidChange?(token, state.withLock(\.parser.bufferedCommandBytes).count)
 
-      for message in parsed.controlMessages {
-        if case .capabilities = message {
-          await hooks?.beforeApplyParsedRecord?(token, .caps)
-          guard await source.currentConnectionToken() == token else {
-            continue
+      for record in parsed {
+        switch record {
+        case .control(let message):
+          if case .capabilities = message {
+            await hooks?.beforeApplyParsedRecord?(token, .caps)
           }
+          guard await source.currentConnectionToken() == token else { continue }
+          await controlHandler(message, token)
+        case .input(let event):
+          await hooks?.beforeApplyParsedRecord?(token, .terminalInput)
+          guard await source.currentConnectionToken() == token else { continue }
+          continuation.yield(event)
         }
-        await controlHandler(message, token)
-      }
-      for event in parsed.events {
-        await hooks?.beforeApplyParsedRecord?(token, .terminalInput)
-        guard await source.currentConnectionToken() == token else {
-          continue
-        }
-        continuation.yield(event)
       }
     }
   }

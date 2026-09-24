@@ -192,6 +192,7 @@ package enum WebSurfaceFrameEncoder {
         fallbackBackground: fallbackBackground,
         epochID: state.epochID,
         generation: generation,
+        geometryRevisionsEnabled: state.geometryRevisionsEnabled,
         knownImageIDs: &state.knownImageIDs
       ).output
     }
@@ -204,6 +205,7 @@ package enum WebSurfaceFrameEncoder {
         fallbackBackground: fallbackBackground,
         epochID: state.epochID,
         generation: generation,
+        geometryRevisionsEnabled: state.geometryRevisionsEnabled,
         knownImageIDs: &state.knownImageIDs
       )
       state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
@@ -224,6 +226,7 @@ package enum WebSurfaceFrameEncoder {
         fallbackBackground: fallbackBackground,
         epochID: state.epochID,
         generation: generation,
+        geometryRevisionsEnabled: state.geometryRevisionsEnabled,
         knownImageIDs: &state.knownImageIDs
       )
       state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
@@ -236,6 +239,7 @@ package enum WebSurfaceFrameEncoder {
     fallbackBackground: Color,
     epochID: UInt32,
     generation: UInt64,
+    geometryRevisionsEnabled: Bool,
     knownImageIDs: inout Set<String>
   ) throws -> (output: String, styles: HostWireStyleTable) {
     var styles = HostWireStyleTable(gridSize: model.gridSize)
@@ -265,6 +269,9 @@ package enum WebSurfaceFrameEncoder {
     json += "\"version\":\(version)"
     json += ",\"epoch\":\(epochID)"
     json += ",\"gen\":\(generation)"
+    if geometryRevisionsEnabled {
+      json += ",\"geometryRevision\":\(model.geometryRevision ?? 0)"
+    }
     if let sequence = model.sequence {
       json += ",\"sequence\":\(sequence)"
     }
@@ -348,6 +355,9 @@ package enum WebSurfaceFrameEncoder {
     json += ",\"epoch\":\(candidate.epochID)"
     json += ",\"gen\":\(generation)"
     json += ",\"baselineGen\":\(baselineGeneration)"
+    if candidate.geometryRevisionsEnabled {
+      json += ",\"geometryRevision\":\(model.geometryRevision ?? 0)"
+    }
     if let sequence = model.sequence {
       json += ",\"sequence\":\(sequence)"
     }

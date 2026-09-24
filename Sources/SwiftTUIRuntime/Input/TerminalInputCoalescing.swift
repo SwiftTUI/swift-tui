@@ -120,7 +120,8 @@ extension MouseEvent {
   func merged(
     with next: MouseEvent
   ) -> MouseEvent? {
-    guard modifiers == next.modifiers,
+    guard hostGeometryStamp == next.hostGeometryStamp,
+      modifiers == next.modifiers,
       location.precision == next.location.precision
     else {
       return nil
@@ -133,14 +134,12 @@ extension MouseEvent {
       return next
     case (.scrolled(let lhsDeltaX, let lhsDeltaY), .scrolled(let rhsDeltaX, let rhsDeltaY))
     where location.cell == next.location.cell && location.precision == next.location.precision:
-      return .init(
-        kind: .scrolled(
-          deltaX: lhsDeltaX + rhsDeltaX,
-          deltaY: lhsDeltaY + rhsDeltaY
-        ),
-        location: next.location,
-        modifiers: modifiers
-      )
+      let (deltaX, overflowX) = lhsDeltaX.addingReportingOverflow(rhsDeltaX)
+      let (deltaY, overflowY) = lhsDeltaY.addingReportingOverflow(rhsDeltaY)
+      guard !overflowX, !overflowY else { return nil }
+      var merged = next
+      merged.kind = .scrolled(deltaX: deltaX, deltaY: deltaY)
+      return merged
     default:
       return nil
     }

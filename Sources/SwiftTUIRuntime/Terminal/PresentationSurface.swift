@@ -241,6 +241,7 @@ public struct SemanticHostFrameCapabilities: OptionSet, Sendable {
 /// host's raster surface minimum is applied. Native hosts can use it as an
 /// ideal size when negotiating with an outer layout system.
 public struct SemanticHostFrame: Equatable, Sendable {
+  package var hostGeometryStamp: HostGeometryStamp?
   public var sequence: UInt64
   public var raster: RasterSurface
   public var semantics: SemanticSnapshot

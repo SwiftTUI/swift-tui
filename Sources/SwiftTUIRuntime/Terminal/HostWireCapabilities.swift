@@ -32,12 +32,17 @@ package struct HostWireCapabilities: Equatable, Sendable {
   /// byte.
   package var styleAppend: Bool
 
+  /// Host accepts captured geometry revisions and the revision-zero acknowledgement.
+  package var geometryRevisions: Bool
+
   package init(
     acceptsDeltaFrames: Bool = false,
-    styleAppend: Bool = false
+    styleAppend: Bool = false,
+    geometryRevisions: Bool = false
   ) {
     self.acceptsDeltaFrames = acceptsDeltaFrames
     self.styleAppend = styleAppend
+    self.geometryRevisions = geometryRevisions
   }
 
   /// The encoding state a host with these capabilities receives.
@@ -51,6 +56,7 @@ package struct HostWireCapabilities: Equatable, Sendable {
   package func negotiatedEncodingState() -> HostWireEncodingState {
     HostWireEncodingState(
       deltaEnabled: acceptsDeltaFrames,
+      geometryRevisionsEnabled: geometryRevisions,
       styleAppendEnabled: styleAppend
     )
   }
@@ -68,6 +74,7 @@ package struct HostWireCapabilities: Equatable, Sendable {
   ) -> HostWireEncodingState {
     HostWireEncodingState(
       deltaEnabled: acceptsDeltaFrames,
+      geometryRevisionsEnabled: geometryRevisions,
       styleAppendEnabled: styleAppend,
       epochID: epochID
     )
@@ -120,6 +127,12 @@ package struct HostWireCapabilities: Equatable, Sendable {
       case "acceptsDeltaFrames":
         if let value = scanner.consumeBool() {
           capabilities.acceptsDeltaFrames = value
+        } else {
+          guard scanner.skipValue() else { return nil }
+        }
+      case "geometryRevisions":
+        if let value = scanner.consumeBool() {
+          capabilities.geometryRevisions = value
         } else {
           guard scanner.skipValue() else { return nil }
         }

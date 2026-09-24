@@ -74,6 +74,9 @@ package enum HostWireSchema {
   /// type's `Mirror` children exactly, in both directions.
   package static let sourceFieldMappings: [String: [FieldMapping]] = [
     "HostFrameProjection": [
+      .init(
+        "hostGeometryStamp",
+        wire: .derived("geometryRevision when negotiated; private session is not serialized")),
       .init("sequence", wire: .key("sequence")),
       .init(
         "raster",
@@ -254,7 +257,7 @@ package enum HostWireSchema {
       "version", "width", "height", "styles", "rows", "images",
     ]
     package static let fullFrameOptionalKeys: Set<String> = [
-      "epoch", "gen", "sequence", "damage", "accessibilityTree",
+      "geometryRevision", "epoch", "gen", "sequence", "damage", "accessibilityTree",
       "accessibilityAnnouncements", "accessibilityActionResponse",
       "scrollRegions", "links", "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
@@ -264,7 +267,7 @@ package enum HostWireSchema {
       "damage",
     ]
     package static let deltaFrameOptionalKeys: Set<String> = [
-      "epoch", "gen", "baselineGen", "sequence", "accessibilityTree",
+      "geometryRevision", "epoch", "gen", "baselineGen", "sequence", "accessibilityTree",
       "accessibilityAnnouncements", "accessibilityActionResponse", "scrollRegions", "links",
       "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
@@ -321,7 +324,7 @@ package enum HostWireSchema {
   package enum DeliveryUplink {
     package static let recordTypes: Set<String> = ["caps", "resync"]
     package static let capabilityKeys: Set<String> = [
-      "acceptsDeltaFrames", "styleAppend",
+      "acceptsDeltaFrames", "styleAppend", "geometryRevisions",
     ]
     package static let resyncRequiredKeys: Set<String> = ["scope"]
     package static let resyncOptionalKeys: Set<String> = ["ids"]
@@ -394,6 +397,14 @@ package enum HostWireSchema {
   /// record-shape capability, so it is manifest-owned by ``DeliveryUplink``
   /// and does not add a capability bit.
   package static let capabilityMappings: [CapabilityMapping] = [
+    .init(
+      "geometryRevisions",
+      defaultValue: "false",
+      wasi: "env SWIFTTUI_GEOMETRY_REVISIONS",
+      webSocket: "caps record key geometryRevisions",
+      android:
+        "declareCapabilities key geometryRevisions (revision zero; no geometry input ingress)"
+    ),
     .init(
       "acceptsDeltaFrames",
       defaultValue: "false",

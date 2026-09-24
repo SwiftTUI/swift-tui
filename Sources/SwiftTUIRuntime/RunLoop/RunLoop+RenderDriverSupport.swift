@@ -23,6 +23,7 @@ extension RunLoop {
   /// Strategy state describing how the async path acquired a frame; the
   /// synchronous path always supplies `.completed` / `nil`.
   struct FrameAcquisitionState {
+    var geometry: HostGeometryStamp?
     var tailJobState: FrameTailJobState = .completed
     var completedFrameDropDecision: CompletedFrameDropDecision?
   }

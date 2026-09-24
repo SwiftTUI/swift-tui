@@ -20,8 +20,11 @@ package struct WebSurfaceInputParser {
   private var discardingCommand = false
   private var terminalInputParser = TerminalInputParser()
   private var cellPixelSize: PixelSize?
+  private var latestGeometryRevision: UInt64 = 0
 
-  package init() {}
+  private let session: UInt64
+
+  package init(session: UInt64 = 0) { self.session = session }
 
   /// The bytes of a control record the parser is still holding, waiting for
   /// its terminating newline. Empty when nothing is buffered.
@@ -34,16 +37,22 @@ package struct WebSurfaceInputParser {
     bufferedCommand ?? []
   }
 
+  /// Compatibility projection for callers that inspect record kinds separately.
+  /// Production readers use `feedRecords` to retain controls as queue barriers.
   package mutating func feed(
     _ bytes: [UInt8]
   ) -> (events: [InputEvent], controlMessages: [WebSurfaceInputControlMessage]) {
-    var payload: [UInt8] = []
-    // A chunk can consist entirely of a refused command. Do not reserve an
-    // ordinary-input copy proportional to those discarded bytes.
-    payload.reserveCapacity(min(bytes.count, 4096))
-    var events: [InputEvent] = []
-    var controlMessages: [WebSurfaceInputControlMessage] = []
+    let records = feedRecords(bytes)
+    return (
+      records.compactMap { if case .input(let event) = $0 { event } else { nil } },
+      records.compactMap { if case .control(let message) = $0 { message } else { nil } }
+    )
+  }
 
+  package mutating func feedRecords(_ bytes: [UInt8]) -> [WebSurfaceInputRecord] {
+    var payload: [UInt8] = []
+    payload.reserveCapacity(min(bytes.count, 4096))
+    var records: [WebSurfaceInputRecord] = []
     for byte in bytes {
       if discardingCommand {
         if byte == 0x0A { discardingCommand = false }
@@ -51,49 +60,44 @@ package struct WebSurfaceInputParser {
       }
       if bufferedCommand != nil {
         if byte == 0x0A {
-          let command = String(decoding: bufferedCommand ?? [], as: UTF8.self)
-          let parsed = parseCommand(command)
-          events.append(contentsOf: parsed.events)
-          controlMessages.append(contentsOf: parsed.controlMessages)
+          let parsed = parseCommand(String(decoding: bufferedCommand ?? [], as: UTF8.self))
+          records.append(contentsOf: parsed.controlMessages.map(WebSurfaceInputRecord.control))
+          records.append(contentsOf: parsed.events.map(WebSurfaceInputRecord.input))
           bufferedCommand = nil
+        } else if (bufferedCommand?.count ?? 0) >= HostWireBudget.recordBytes - 1 {
+          bufferedCommand = nil
+          discardingCommand = true
         } else {
-          if (bufferedCommand?.count ?? 0) >= HostWireBudget.recordBytes - 1 {
-            bufferedCommand = nil
-            discardingCommand = true
-          } else {
-            bufferedCommand?.append(byte)
-          }
+          bufferedCommand?.append(byte)
         }
         continue
       }
-
       if byte == Self.introducer {
         if !payload.isEmpty {
-          events.append(contentsOf: terminalInputParser.feed(payload))
+          records.append(
+            contentsOf: terminalInputParser.feed(payload).map(WebSurfaceInputRecord.input))
           payload.removeAll(keepingCapacity: true)
         }
+        // An escape before a control belongs before it, including at chunk boundaries.
+        records.append(contentsOf: terminalInputParser.flush().map(WebSurfaceInputRecord.input))
         bufferedCommand = []
-        continue
+      } else {
+        payload.append(byte)
       }
-
-      payload.append(byte)
     }
-
     if !payload.isEmpty {
-      events.append(contentsOf: terminalInputParser.feed(payload))
+      records.append(contentsOf: terminalInputParser.feed(payload).map(WebSurfaceInputRecord.input))
     }
-
-    // The web surface delivers input as complete messages, so a lone ESC the
-    // byte parser is holding for escape disambiguation is a finished Escape
-    // keypress — flush it now rather than stranding it until the next message.
-    events.append(contentsOf: terminalInputParser.flush())
-
-    return (events, controlMessages)
+    records.append(contentsOf: terminalInputParser.flush().map(WebSurfaceInputRecord.input))
+    return records
   }
 
   private mutating func parseCommand(
     _ text: String
   ) -> (events: [InputEvent], controlMessages: [WebSurfaceInputControlMessage]) {
+    if let geometry = parseGeometryCommand(text) {
+      return ([], [.geometry(geometry)])
+    }
     if let resize = parseResizeCommand(text) {
       return ([], [resize])
     }
@@ -115,6 +119,22 @@ package struct WebSurfaceInputParser {
       return ([event], [])
     }
     return ([], [])
+  }
+
+  private mutating func parseGeometryCommand(_ text: String) -> HostGeometryRequest? {
+    let parts = splitCommand(text)
+    guard parts.count == 6, parts[0] == "geometry",
+      let revision = UInt64(parts[1]), let width = Int(parts[2]), let height = Int(parts[3]),
+      let cellWidth = Int(parts[4]), let cellHeight = Int(parts[5]),
+      let request = HostGeometryRequest(
+        revision: revision, size: .init(width: width, height: height),
+        cellPixelSize: .init(width: cellWidth, height: cellHeight)
+      )
+    else { return nil }
+    guard request.revision > latestGeometryRevision else { return nil }
+    latestGeometryRevision = request.revision
+    cellPixelSize = request.cellPixelSize
+    return request
   }
 
   private mutating func parseResizeCommand(
@@ -142,7 +162,7 @@ package struct WebSurfaceInputParser {
     } else {
       cellPixelSize = nil
     }
-    self.cellPixelSize = cellPixelSize
+    if latestGeometryRevision == 0 { self.cellPixelSize = cellPixelSize }
 
     return .resize(
       .init(width: max(1, width), height: max(1, height)),
@@ -250,11 +270,21 @@ package struct WebSurfaceInputParser {
   private func parseMouseCommand(
     _ text: String
   ) -> InputEvent? {
-    let components = splitCommand(text)
+    var components = splitCommand(text)
+    var stamp: HostGeometryStamp? =
+      session == 0 ? nil : HostGeometryStamp(session: session, revision: 0)
+    if components.first == "mouseGeometry" {
+      guard components.count == 9, let revision = UInt64(components[1]),
+        revision > 0, revision <= HostGeometryRequest.maximumRevision
+      else { return nil }
+      stamp = HostGeometryStamp(session: session, revision: revision)
+      components.remove(at: 1)
+      components[0] = "mouse"
+    }
     guard components.count == 8,
       components[0] == "mouse",
       let x = Double(components[2]),
-      let y = Double(components[3]),
+      let y = Double(components[3]), x.isFinite, y.isFinite,
       let deltaX = Int(components[5]),
       let deltaY = Int(components[6])
     else {
@@ -281,13 +311,12 @@ package struct WebSurfaceInputParser {
       return nil
     }
 
-    return .mouse(
-      MouseEvent(
-        kind: kind,
-        location: pointerLocation(x: x, y: y),
-        modifiers: parseModifiers(components[7])
-      )
+    var event = MouseEvent(
+      kind: kind, location: pointerLocation(x: x, y: y),
+      modifiers: parseModifiers(components[7])
     )
+    event.hostGeometryStamp = stamp
+    return .mouse(event)
   }
 
   private func pointerLocation(

@@ -12,6 +12,51 @@ import Testing
 /// missing on web) and a manifest entry the encoder never learned both fail.
 @Suite
 struct WebSurfaceWireTotalityTests {
+  @Test("canonical geometry corpus is produced by the shared encoder")
+  func geometryFixtureMatchesEncoderOutput() throws {
+    let caps = HostWireCapabilities(
+      acceptsDeltaFrames: true, styleAppend: true, geometryRevisions: true)
+    var state = caps.negotiatedEncodingState(epochID: 701)
+    var frame = Self.fullyPopulatedFrame()
+    var cases: [[String: Any]] = []
+    func append(_ name: String, revision: UInt64, expected: String = "surface") {
+      frame.hostGeometryStamp = .init(session: 1, revision: revision)
+      let record = WebSurfaceFrameEncoder.encode(frame, state: &state)
+      cases.append([
+        "name": name, "record": record, "expected": expected, "geometryRevision": revision,
+      ])
+      frame.sequence += 1
+      frame.rasterDamage = PresentationDamage()
+    }
+    append("acknowledgement", revision: 0)
+    append("first-layout", revision: 1)
+    append("same-grid-font", revision: 2)
+    append("late-old-layout", revision: 1)
+    append("latest-layout", revision: 3)
+    // Skip one delivery to exercise the actual delta-gap recovery guard.
+    _ = WebSurfaceFrameEncoder.encode(frame, state: &state)
+    append("lost-baseline", revision: 3, expected: "surfaceDropped")
+    state.requestResync(.init(scope: .keyframe))
+    append("recovered-keyframe", revision: 3)
+    state = caps.negotiatedEncodingState(epochID: 702)
+    append("new-session-acknowledgement", revision: 0)
+    append("maximum-safe-revision", revision: HostGeometryRequest.maximumRevision)
+    let corpus: [String: Any] = [
+      "schemaVersion": 1,
+      "producer": "SwiftTUIRuntime.WebSurfaceFrameEncoder",
+      "generator": "WebSurfaceWireTotalityTests.geometryFixtureMatchesEncoderOutput",
+      "cases": cases,
+    ]
+    var bytes = try JSONSerialization.data(
+      withJSONObject: corpus, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+    bytes.append(0x0A)
+    let url = Self.fixtureURL("web-geometry-revisions.json")
+    if ProcessInfo.processInfo.environment["SWIFTTUI_REGENERATE_TRANSPORT_FIXTURES"] == "1" {
+      try bytes.write(to: url)
+    }
+    #expect(try Data(contentsOf: url) == bytes)
+  }
+
   @Test("emitted wire vocabularies equal the frozen manifest sets")
   func emittedWireVocabulariesEqualTheFrozenManifestSets() {
     #expect(
@@ -52,7 +97,7 @@ struct WebSurfaceWireTotalityTests {
 
   @Test("a fully-populated full frame emits exactly the manifest key sets")
   func fullFrameEmitsExactlyTheManifestSurface() throws {
-    var state = HostWireEncodingState(deltaEnabled: false, epochID: 1)
+    var state = HostWireCapabilities(geometryRevisions: true).negotiatedEncodingState(epochID: 1)
     let record = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         HostWireFrameModel(
@@ -170,8 +215,10 @@ struct WebSurfaceWireTotalityTests {
     // Every optional delta key must be emitted for the manifest comparison to
     // be exact, and `stylesBase` appears only under a negotiated
     // `styleAppend` — so the fully-populated delta is a fully-negotiated one.
-    var state = HostWireCapabilities(acceptsDeltaFrames: true, styleAppend: true)
-      .negotiatedEncodingState(epochID: 2)
+    var state = HostWireCapabilities(
+      acceptsDeltaFrames: true, styleAppend: true, geometryRevisions: true
+    )
+    .negotiatedEncodingState(epochID: 2)
     _ = WebSurfaceFrameEncoder.encode(
       HostWireFrameModel(
         Self.fullyPopulatedFrame().hostProjection,

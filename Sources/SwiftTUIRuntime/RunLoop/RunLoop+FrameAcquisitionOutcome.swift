@@ -11,7 +11,8 @@ extension RunLoop {
   /// so the frame must reschedule the next deadline and emit its diagnostic
   /// without running the tail or presenting.
   enum FrameAcquisitionOutcome {
-    case rendered(FrameArtifacts, FrameTailJobState, CompletedFrameDropDecision?)
+    case rendered(
+      FrameArtifacts, FrameTailJobState, CompletedFrameDropDecision?, HostGeometryStamp?)
     case skipped
     case elided
   }

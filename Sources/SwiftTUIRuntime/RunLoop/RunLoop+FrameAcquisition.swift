@@ -69,6 +69,8 @@ extension RunLoop {
     renderedFrames: Int,
     convergence: FocusSyncConvergenceState
   ) async -> FrameAcquisitionOutcome {
+    let hostConfiguration = presentationSurface.hostLayoutConfiguration()
+    reconcileHostGeometry(hostConfiguration.geometry)
     if renderMode == .sync {
       switch renderer.renderEliding(
         viewBuilder(
@@ -76,15 +78,17 @@ extension RunLoop {
             state: currentState,
             focusedIdentity: focusTracker.currentFocusIdentity
           )),
-        context: resolveContext(for: scheduledFrame, frameInstant: frameInstant),
-        proposal: proposal(),
+        context: resolveContext(
+          for: scheduledFrame, frameInstant: frameInstant, hostConfiguration: hostConfiguration),
+        proposal: proposal(hostConfiguration: hostConfiguration),
         frameInstant: frameInstant,
-        elisionCauses: scheduledFrame.causes,
+        elisionCauses: hostConfiguration.geometry != appliedHostGeometry
+          ? scheduledFrame.causes.union([.signal]) : scheduledFrame.causes,
         elisionHasExplicitAnimationTransactions: scheduledFrame
           .hasExplicitAnimationTransactions
       ) {
       case .rendered(let renderedArtifacts):
-        return .rendered(renderedArtifacts, .completed, nil)
+        return .rendered(renderedArtifacts, .completed, nil, hostConfiguration.geometry)
       case .elided:
         return .elided
       }
@@ -96,15 +100,17 @@ extension RunLoop {
             state: currentState,
             focusedIdentity: focusTracker.currentFocusIdentity
           )),
-        context: resolveContext(for: scheduledFrame, frameInstant: frameInstant),
-        proposal: proposal(),
+        context: resolveContext(
+          for: scheduledFrame, frameInstant: frameInstant, hostConfiguration: hostConfiguration),
+        proposal: proposal(hostConfiguration: hostConfiguration),
         frameInstant: frameInstant,
-        elisionCauses: scheduledFrame.causes,
+        elisionCauses: hostConfiguration.geometry != appliedHostGeometry
+          ? scheduledFrame.causes.union([.signal]) : scheduledFrame.causes,
         elisionHasExplicitAnimationTransactions: scheduledFrame
           .hasExplicitAnimationTransactions
       ) {
       case .rendered(let renderedArtifacts):
-        return .rendered(renderedArtifacts, .completed, nil)
+        return .rendered(renderedArtifacts, .completed, nil, hostConfiguration.geometry)
       case .elided:
         return .elided
       }
@@ -115,7 +121,8 @@ extension RunLoop {
       scheduledFrame: scheduledFrame,
       frameInstant: frameInstant,
       currentState: currentState,
-      renderIntentDiagnostics: renderIntentDiagnostics
+      renderIntentDiagnostics: renderIntentDiagnostics,
+      hostConfiguration: hostConfiguration
     ) {
     case .rendered(let outcome):
       renderOutcome = outcome
@@ -139,7 +146,8 @@ extension RunLoop {
     return .rendered(
       outcomeArtifacts,
       renderOutcome.tailJobState,
-      renderOutcome.completedFrameDropDecision
+      renderOutcome.completedFrameDropDecision,
+      hostConfiguration.geometry
     )
   }
 
@@ -147,7 +155,8 @@ extension RunLoop {
     scheduledFrame: ScheduledFrame,
     frameInstant: MonotonicInstant,
     currentState: State,
-    renderIntentDiagnostics: RenderIntentCoalescingDiagnostics
+    renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
+    hostConfiguration: HostLayoutConfiguration
   ) async -> CancellableRenderExecutionResult {
     await renderer.renderAsyncCancellableEliding(
       viewBuilder(
@@ -155,10 +164,12 @@ extension RunLoop {
           state: currentState,
           focusedIdentity: focusTracker.currentFocusIdentity
         )),
-      context: resolveContext(for: scheduledFrame, frameInstant: frameInstant),
-      proposal: proposal(),
+      context: resolveContext(
+        for: scheduledFrame, frameInstant: frameInstant, hostConfiguration: hostConfiguration),
+      proposal: proposal(hostConfiguration: hostConfiguration),
       frameInstant: frameInstant,
-      elisionCauses: scheduledFrame.causes,
+      elisionCauses: hostConfiguration.geometry != appliedHostGeometry
+        ? scheduledFrame.causes.union([.signal]) : scheduledFrame.causes,
       elisionHasExplicitAnimationTransactions: scheduledFrame
         .hasExplicitAnimationTransactions,
       newestDesiredGeneration: {

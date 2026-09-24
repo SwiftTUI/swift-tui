@@ -90,6 +90,9 @@ package enum HostWireBudget {
       model.accessibilityAnnouncements.count <= metadataEntries,
       model.scrollRegions.count <= metadataEntries
     else { throw Exceeded.limit }
+    if let revision = model.geometryRevision, revision > HostGeometryRequest.maximumRevision {
+      throw Exceeded.limit
+    }
     if let preferred = model.preferredLayoutSize, !admits(preferred) {
       throw Exceeded.limit
     }

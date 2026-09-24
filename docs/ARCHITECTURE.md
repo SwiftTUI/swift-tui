@@ -261,6 +261,14 @@ reader cannot move its backlog into a downstream unbounded stream. See the
 
 ## Source layout
 
+`SwiftTUIRuntime/Terminal/HostGeometry.swift` defines the atomic host layout
+configuration and private session/revision stamp. WASI and WebSocket transports
+capture them under their configuration lock; `RunLoop/` carries that capture
+from acquisition through presentation. `RunLoop+HostGeometry.swift` cancels
+coordinate gestures and rejects pointers whose stamp does not match both the
+current request and applied interaction map. The negotiated wire contract is
+documented in [HOST-WIRE-CONTRACT.md](HOST-WIRE-CONTRACT.md).
+
 `SwiftTUIRuntime/Terminal/HostWireBudget.swift` owns shared producer grid and
 record admission, bounded component collection, and the encoded-byte builder.
 `WebSurfaceFrameEncoder` applies it transactionally; the WASI, WebHost, and

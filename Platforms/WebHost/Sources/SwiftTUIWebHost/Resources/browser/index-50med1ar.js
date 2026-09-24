@@ -1411,6 +1411,21 @@ function resolvedSurfaceBackground(style, terminalStyle) {
   return style?.bg;
 }
 
+// src/HostGeometryProtocol.ts
+var MAX_HOST_CELL_PITCH = 8192;
+function isGeometryRevision(value, allowAcknowledgement = false) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= (allowAcknowledgement ? 0 : 1);
+}
+function isHostGeometryRequest(request) {
+  return isGeometryRevision(request.revision) && request.columns > 0 && request.rows > 0 && fitsWireGrid(request.columns, request.rows) && [request.cellWidth, request.cellHeight].every((value) => Number.isInteger(value) && value > 0 && value <= MAX_HOST_CELL_PITCH);
+}
+function encodeGeometryControlMessage(request) {
+  if (!isHostGeometryRequest(request))
+    throw new RangeError("Invalid host geometry request");
+  return new TextEncoder().encode(`\x1Egeometry:${request.revision}:${request.columns}:${request.rows}:${request.cellWidth}:${request.cellHeight}
+`);
+}
+
 // src/WebHostTerminalStyle.ts
 var defaultFontFamily = '"SFMono-Regular", "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono", monospace';
 var defaultANSI = {
@@ -1977,6 +1992,7 @@ class WebHostOutputDecoder {
       epoch: frame.epoch,
       gen: frame.gen,
       sequence: frame.sequence,
+      geometryRevision: frame.geometryRevision,
       width: frame.width,
       height: frame.height,
       styles,
@@ -2074,7 +2090,7 @@ function encodeRenderStyleControlMessage(style) {
 `);
 }
 function encodeCapabilitiesControlMessage() {
-  return textEncoder.encode(`${recordPrefix}caps:{"acceptsDeltaFrames":true,"styleAppend":true}
+  return textEncoder.encode(`${recordPrefix}caps:{"acceptsDeltaFrames":true,"styleAppend":true,"geometryRevisions":true}
 `);
 }
 function encodePointerCapabilitiesControlMessage(supportsScrollPanning) {
@@ -2102,9 +2118,11 @@ function encodePasteInputMessage(text) {
   return textEncoder.encode(`${recordPrefix}paste:${encodeURIComponent(text)}
 `);
 }
-function encodeMouseInputMessage(input) {
+function encodeMouseInputMessage(input, geometryRevision) {
+  if (geometryRevision !== undefined && !isGeometryRevision(geometryRevision))
+    throw new RangeError("Invalid pointer geometry revision");
   return textEncoder.encode(recordPrefix + [
-    "mouse",
+    ...geometryRevision === undefined ? ["mouse"] : ["mouseGeometry", geometryRevision],
     input.kind,
     formatCellCoordinate(input.x),
     formatCellCoordinate(input.y),
@@ -2136,7 +2154,7 @@ function isSurfaceGridDimension(value) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 2147483647;
 }
 function hasValidAdditiveFrameFields(frame) {
-  return isOptionalSafeInteger(frame.epoch) && isOptionalSafeInteger(frame.gen) && (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
+  return isOptionalSafeInteger(frame.epoch) && isOptionalSafeInteger(frame.gen) && (frame.geometryRevision === undefined || isGeometryRevision(frame.geometryRevision, true)) && (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
 }
 function isOptionalSafeInteger(value) {
   return value === undefined || Number.isSafeInteger(value);
@@ -3641,6 +3659,60 @@ function selectionInvalidator() {
   };
 }
 
+// src/HostGeometrySession.ts
+class HostGeometrySession {
+  acknowledged = false;
+  sentRevision;
+  latest;
+  presentedRevision;
+  hasPresentedFrame = false;
+  get negotiated() {
+    return this.acknowledged;
+  }
+  get allowsPointer() {
+    return this.hasPresentedFrame;
+  }
+  get pointerRevision() {
+    return this.acknowledged ? this.presentedRevision : undefined;
+  }
+  request(geometry) {
+    if (!isHostGeometryRequest(geometry))
+      throw new RangeError("Invalid host geometry request");
+    if (this.latest && geometry.revision < this.latest.revision)
+      throw new RangeError("Geometry revision cannot regress");
+    if (this.latest && geometry.revision === this.latest.revision && ["columns", "rows", "cellWidth", "cellHeight"].some((key) => this.latest[key] !== geometry[key]))
+      throw new RangeError("A geometry revision cannot name different metrics");
+    this.latest = Object.freeze({ ...geometry });
+  }
+  observe(frame) {
+    if (frame.geometryRevision === 0)
+      this.acknowledged = true;
+  }
+  takeRequest() {
+    if (!this.acknowledged || !this.latest || this.sentRevision === this.latest.revision)
+      return;
+    this.sentRevision = this.latest.revision;
+    return this.latest;
+  }
+  canPresent(frame) {
+    if (!this.acknowledged)
+      return frame?.geometryRevision === undefined;
+    return !!frame && !!this.latest && frame.geometryRevision === this.latest.revision && frame.width === this.latest.columns && frame.height === this.latest.rows;
+  }
+  didPresent(frame) {
+    if (!this.canPresent(frame))
+      throw new Error("Presentation does not match requested geometry");
+    this.presentedRevision = frame?.geometryRevision;
+    this.hasPresentedFrame = frame !== undefined;
+  }
+  resetConnection() {
+    this.acknowledged = false;
+    this.sentRevision = undefined;
+    this.presentedRevision = undefined;
+    this.hasPresentedFrame = false;
+  }
+}
+
 // src/InputEventEncoder.ts
 class InputEventEncoder {
   encodeKey(event) {
@@ -3656,34 +3728,34 @@ class InputEventEncoder {
   encodePaste(text) {
     return encodePasteInputMessage(text);
   }
-  encodePointerDown(location, button, event) {
+  encodePointerDown(location, button, event, geometryRevision) {
     return encodeMouseInputMessage({
       kind: "down",
       x: location.x,
       y: location.y,
       button,
       modifiers: modifierMask(event)
-    });
+    }, geometryRevision);
   }
-  encodePointerUp(location, button, event) {
+  encodePointerUp(location, button, event, geometryRevision) {
     return encodeMouseInputMessage({
       kind: "up",
       x: location.x,
       y: location.y,
       button,
       modifiers: modifierMask(event)
-    });
+    }, geometryRevision);
   }
-  encodePointerMove(location, button, event) {
+  encodePointerMove(location, button, event, geometryRevision) {
     return encodeMouseInputMessage({
       kind: event.buttons ? "dragged" : "moved",
       x: location.x,
       y: location.y,
       button,
       modifiers: modifierMask(event)
-    });
+    }, geometryRevision);
   }
-  encodeWheel(location, event) {
+  encodeWheel(location, event, geometryRevision) {
     return encodeMouseInputMessage({
       kind: "scrolled",
       x: location.x,
@@ -3691,7 +3763,7 @@ class InputEventEncoder {
       deltaX: normalizedWheelDelta(event.deltaX),
       deltaY: normalizedWheelDelta(event.deltaY),
       modifiers: modifierMask(event)
-    });
+    }, geometryRevision);
   }
   pointerButton(button) {
     return pointerButton(button);
@@ -3862,6 +3934,7 @@ function defaultAnimationFrameScheduler() {
 class SurfacePaintScheduler {
   animationFrames;
   paint;
+  canPresent;
   pending;
   lastPaintedFrame;
   handle;
@@ -3870,9 +3943,10 @@ class SurfacePaintScheduler {
   presentedFrames = 0;
   paints = 0;
   coalescedFrames = 0;
-  constructor(animationFrames, paint) {
+  constructor(animationFrames, paint, canPresent = () => true) {
     this.animationFrames = animationFrames;
     this.paint = paint;
+    this.canPresent = canPresent;
   }
   get statistics() {
     return {
@@ -3891,6 +3965,7 @@ class SurfacePaintScheduler {
     }
     this.presentedFrames += 1;
     const pending = this.pending;
+    const keepEligibleCandidate = !this.canPresent(frame) && pending?.frame !== undefined && this.canPresent(pending.frame);
     const previous = pending ? pending.frame : this.lastPaintedFrame;
     const damage = promotesToFullRepaint(previous, frame) ? undefined : pending ? unionSurfaceDamage(pending.damage, frame.damage) : frame.damage;
     const next = pending ?? {
@@ -3910,8 +3985,16 @@ class SurfacePaintScheduler {
       next.coalescedFrameCount += 1;
       this.coalescedFrames += 1;
     }
-    next.frame = frame;
-    next.damage = damage;
+    if (keepEligibleCandidate) {
+      for (const image of frame.images ?? []) {
+        if (image.dataBase64 !== undefined)
+          next.carriedImagePayloads.set(image.id, image.dataBase64);
+      }
+      next.damage = undefined;
+    } else {
+      next.frame = frame;
+      next.damage = damage;
+    }
     for (const id of recoveredImagePayloadIds) {
       next.recoveredImagePayloadIds.add(id);
     }
@@ -3942,6 +4025,8 @@ class SurfacePaintScheduler {
     if (!pending) {
       return;
     }
+    if (!this.canPresent(pending.frame))
+      return;
     this.pending = undefined;
     const frame = pending.frame ? spliceCarriedImagePayloads(pending.frame, pending.carriedImagePayloads) : undefined;
     this.lastPaintedFrame = frame;
@@ -3953,6 +4038,23 @@ class SurfacePaintScheduler {
       accessibilityAnnouncements: pending.accessibilityAnnouncements,
       coalescedFrameCount: pending.coalescedFrameCount
     });
+  }
+  reprojectVisible() {
+    if (this.disposed || !this.lastPaintedFrame)
+      return;
+    this.paints++;
+    this.paint({
+      frame: this.lastPaintedFrame,
+      damage: undefined,
+      recoveredImagePayloadIds: [],
+      accessibilityAnnouncements: [],
+      coalescedFrameCount: 0
+    });
+  }
+  resetSession() {
+    this.cancelScheduled();
+    this.pending = undefined;
+    this.lastPaintedFrame = undefined;
   }
   dispose() {
     if (this.disposed) {
@@ -3979,6 +4081,8 @@ class SurfacePaintScheduler {
   }
   schedule() {
     if (this.held)
+      return;
+    if (this.pending && !this.canPresent(this.pending.frame))
       return;
     if (!this.animationFrames) {
       this.flush();
@@ -4010,7 +4114,7 @@ class SurfacePaintScheduler {
   }
 }
 function promotesToFullRepaint(previous, frame) {
-  return previous === undefined || previous.width !== frame.width || previous.height !== frame.height || previous.epoch !== frame.epoch || frame.damage === undefined;
+  return previous === undefined || previous.width !== frame.width || previous.height !== frame.height || previous.epoch !== frame.epoch || previous.geometryRevision !== frame.geometryRevision || frame.damage === undefined;
 }
 function spliceCarriedImagePayloads(frame, carried) {
   if (carried.size === 0 || !frame.images?.length) {
@@ -4111,10 +4215,17 @@ class WebHostSceneRuntime {
   domSurfaceRoot;
   lastDomSurfaceSize;
   domGeometry;
+  geometrySession = new HostGeometrySession;
   embeddingMount;
   geometryRefreshHandle;
   geometryDiagnostic;
+  geometryMeasurable = false;
+  capturedPointerId;
+  canceledPointerId;
   disposed = false;
+  stagedFontChange = false;
+  reprojecting = false;
+  geometryWaitTimer;
   domFontOptions;
   fontResources;
   activeFontResources;
@@ -4165,7 +4276,7 @@ class WebHostSceneRuntime {
       onOpenHyperlink: options.onOpenHyperlink
     }) : new CanvasSurfacePainter({ onImagePayloadMiss });
     const paintScheduling = options.paintScheduling ?? defaultAnimationFrameScheduler();
-    this.paintScheduler = new SurfacePaintScheduler(paintScheduling === "synchronous" ? undefined : paintScheduling, (request) => this.paint(request));
+    this.paintScheduler = new SurfacePaintScheduler(paintScheduling === "synchronous" ? undefined : paintScheduling, (request) => this.paint(request), (frame) => !this.domGeometry || this.geometrySession.canPresent(frame));
     this.onOpenHyperlink = options.onOpenHyperlink;
     this.suspendWhenHidden = options.suspendWhenHidden ?? true;
     this.element = document.createElement("section");
@@ -4210,6 +4321,15 @@ class WebHostSceneRuntime {
     this.installInputHandlers();
     this.installResizeObserver();
     this.bridge?.bindOutput({
+      resetSurfaceSession: () => {
+        this.finishGeometryWait();
+        this.geometrySession.resetConnection();
+        this.paintScheduler.resetSession();
+        this.terminalMount.setAttribute("aria-busy", "true");
+        this.lastSentResize = undefined;
+        this.cancelGeometryPointer();
+        this.refreshGeometry();
+      },
       presentSurface: (frame, recoveredImagePayloadIds) => this.presentSurface(frame, recoveredImagePayloadIds),
       writeClipboard: (text) => this.writeClipboard(text),
       notifyRuntimeIssue: (issue) => this.notifyRuntimeIssue(issue),
@@ -4259,6 +4379,7 @@ class WebHostSceneRuntime {
   setStyle(style) {
     const next = normalizeWebHostTerminalStyle(this.domGeometry && !style.fontFamily ? { ...style, fontFamily: DOM_FONT_FAMILY } : style);
     if (this.domGeometry) {
+      this.stagedFontChange = true;
       this.loadDomFont(next);
       return;
     }
@@ -4320,6 +4441,7 @@ class WebHostSceneRuntime {
   }
   dispose() {
     this.disposed = true;
+    this.finishGeometryWait();
     this.fontResources?.dispose();
     if (this.activeFontResources !== this.fontResources)
       this.activeFontResources?.dispose();
@@ -4355,9 +4477,16 @@ class WebHostSceneRuntime {
     };
   }
   presentSurface(frame, recoveredImagePayloadIds) {
-    this.currentFrame = frame;
-    this.columns = Math.max(1, Math.round(frame.width));
-    this.rows = Math.max(1, Math.round(frame.height));
+    if (this.disposed)
+      return;
+    if (this.domGeometry) {
+      this.geometrySession.observe(frame);
+      this.sendGeometryIfNeeded();
+    } else {
+      this.currentFrame = frame;
+      this.columns = Math.max(1, Math.round(frame.width));
+      this.rows = Math.max(1, Math.round(frame.height));
+    }
     this.paintScheduler.present(frame, recoveredImagePayloadIds);
   }
   get preferredGridSize() {
@@ -4523,16 +4652,22 @@ class WebHostSceneRuntime {
         return;
       }
       this.nativePointerGesture = false;
+      this.canceledPointerId = undefined;
       const button = this.inputEncoder.pointerButton(event.button);
       this.activePointerButton = button;
       this.hasCapturedPointer = true;
+      this.capturedPointerId = event.pointerId;
       this.pointerDownLinkTarget = button === "primary" ? this.linkTarget(location) : undefined;
       this.terminalMount.focus?.({ preventScroll: true });
       this.terminalMount.setPointerCapture?.(event.pointerId);
-      this.onInput(this.inputEncoder.encodePointerDown(location, button, event));
+      this.onInput(this.inputEncoder.encodePointerDown(location, button, event, this.geometrySession.pointerRevision));
       event.preventDefault();
     };
     const handlePointerUp = (event) => {
+      if (event.pointerId === this.canceledPointerId) {
+        this.canceledPointerId = undefined;
+        return;
+      }
       if (!this.hasCapturedPointer && (this.nativePointerGesture || this.allowsNativeTextSelection(event) || this.isNativeLink(event))) {
         this.nativePointerGesture = false;
         return;
@@ -4540,19 +4675,22 @@ class WebHostSceneRuntime {
       const location = this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
       this.terminalMount.releasePointerCapture?.(event.pointerId);
       this.hasCapturedPointer = false;
+      this.capturedPointerId = undefined;
       const downLinkTarget = this.pointerDownLinkTarget;
       this.pointerDownLinkTarget = undefined;
       if (!location) {
         return;
       }
       const button = this.inputEncoder.pointerButton(event.button) ?? this.activePointerButton;
-      this.onInput(this.inputEncoder.encodePointerUp(location, button, event));
+      this.onInput(this.inputEncoder.encodePointerUp(location, button, event, this.geometrySession.pointerRevision));
       if (downLinkTarget !== undefined && this.linkTarget(location) === downLinkTarget) {
         this.openHyperlink(downLinkTarget);
       }
       event.preventDefault();
     };
     const handlePointerMove = (event) => {
+      if (event.pointerId === this.canceledPointerId)
+        return;
       if (!this.hasCapturedPointer && (this.nativePointerGesture || this.allowsNativeTextSelection(event) || this.isNativeLink(event))) {
         return;
       }
@@ -4563,7 +4701,7 @@ class WebHostSceneRuntime {
       if (!this.hasCapturedPointer) {
         this.terminalMount.style.cursor = this.linkTarget(location) !== undefined ? "pointer" : "";
       }
-      this.onInput(this.inputEncoder.encodePointerMove(location, this.activePointerButton, event));
+      this.onInput(this.inputEncoder.encodePointerMove(location, this.activePointerButton, event, this.geometrySession.pointerRevision));
     };
     const handleWheel = (event) => {
       if (this.wheelMode === "passive") {
@@ -4576,7 +4714,7 @@ class WebHostSceneRuntime {
       if (this.wheelMode === "chain" && !wheelTargetCanScroll(this.currentFrame?.scrollRegions, location, event.deltaX, event.deltaY)) {
         return;
       }
-      this.onInput(this.inputEncoder.encodeWheel(location, event));
+      this.onInput(this.inputEncoder.encodeWheel(location, event, this.geometrySession.pointerRevision));
       event.preventDefault();
     };
     const endNativeDrag = () => {
@@ -4610,6 +4748,7 @@ class WebHostSceneRuntime {
       return;
     if (this.domGeometry) {
       let snapshot;
+      this.geometryMeasurable = false;
       try {
         snapshot = this.domGeometry.measure(this.currentStyle);
       } catch (error) {
@@ -4620,23 +4759,48 @@ class WebHostSceneRuntime {
         this.geometryDiagnostic = message;
       }
       if (!snapshot) {
+        this.cancelGeometryPointer();
         this.paintScheduler.setHeld(true);
         return;
       }
+      const previous = this.domGeometry.presented;
+      const userTypographyChanged = !this.stagedFontChange && previous && this.currentFrame && (previous.cellWidth !== snapshot.cellWidth || previous.cellHeight !== snapshot.cellHeight || previous.baseline !== snapshot.baseline || previous.fontSize !== snapshot.fontSize);
       this.cellWidth = snapshot.cellWidth;
       this.cellHeight = snapshot.cellHeight;
       this.columns = snapshot.columns;
       this.rows = snapshot.rows;
       this.surfaceCSSWidth = snapshot.content.width;
       this.surfaceCSSHeight = snapshot.content.height;
+      try {
+        if (this.domGeometry.presented?.revision !== snapshot.revision)
+          this.cancelGeometryPointer();
+        this.geometrySession.request(snapshot);
+      } catch (error) {
+        this.writeOutput(`${String(error)}
+`);
+        this.paintScheduler.setHeld(true);
+        return;
+      }
+      this.geometryMeasurable = true;
       if (snapshot.bounded && this.geometryDiagnostic !== "bounded") {
         this.writeOutput(`DOM viewport exceeds the supported grid; showing a bounded viewport.
 `);
         this.geometryDiagnostic = "bounded";
       } else if (!snapshot.bounded)
         this.geometryDiagnostic = undefined;
-      this.sendResizeIfNeeded();
+      if (this.geometrySession.negotiated)
+        this.sendGeometryIfNeeded();
+      else
+        this.sendResizeIfNeeded();
       this.paintScheduler.setHeld(false);
+      if (userTypographyChanged && this.geometrySession.negotiated && !this.geometrySession.canPresent(this.currentFrame)) {
+        this.reprojecting = true;
+        try {
+          this.paintScheduler.reprojectVisible();
+        } finally {
+          this.reprojecting = false;
+        }
+      }
       this.paintScheduler.repaintNow();
       return;
     }
@@ -4665,6 +4829,40 @@ class WebHostSceneRuntime {
     }
     this.lastSentResize = current;
     this.bridge?.resize(current.columns, current.rows, current.cellWidth, current.cellHeight);
+  }
+  cancelGeometryPointer() {
+    if (this.capturedPointerId !== undefined) {
+      this.canceledPointerId = this.capturedPointerId;
+      if (this.terminalMount.hasPointerCapture?.(this.capturedPointerId)) {
+        this.terminalMount.releasePointerCapture?.(this.capturedPointerId);
+      }
+    }
+    this.capturedPointerId = undefined;
+    this.hasCapturedPointer = false;
+    this.pointerDownLinkTarget = undefined;
+  }
+  finishGeometryWait() {
+    if (this.geometryWaitTimer !== undefined)
+      clearTimeout(this.geometryWaitTimer);
+    this.geometryWaitTimer = undefined;
+    this.terminalMount.removeAttribute("data-geometry-pending");
+  }
+  sendGeometryIfNeeded() {
+    const request = this.geometrySession.takeRequest();
+    if (!request)
+      return;
+    this.terminalMount.setAttribute("aria-busy", "true");
+    this.terminalMount.setAttribute("data-geometry-pending", String(request.revision));
+    if (this.geometryWaitTimer === undefined) {
+      this.geometryWaitTimer = setTimeout(() => {
+        this.geometryWaitTimer = undefined;
+        if (!this.disposed && this.terminalMount.getAttribute("data-geometry-pending")) {
+          this.writeOutput(`Waiting for the app to finish layout for the requested display geometry.
+`);
+        }
+      }, 1000);
+    }
+    this.onInput(encodeGeometryControlMessage(request));
   }
   resizeSurface() {
     const gridCSSWidth = Math.max(1, this.columns * this.cellWidth);
@@ -4718,8 +4916,13 @@ class WebHostSceneRuntime {
   paint(request) {
     if (this.domGeometry?.pending) {
       const pending = this.domGeometry.pending;
+      if (!this.reprojecting)
+        this.geometrySession.didPresent(request.frame);
+      this.currentFrame = request.frame;
       const snapshot = Object.freeze({
         ...pending,
+        sourceRevision: request.frame?.geometryRevision,
+        projected: this.reprojecting || undefined,
         columns: request.frame?.width ?? pending.columns,
         rows: request.frame?.height ?? pending.rows
       });
@@ -4741,6 +4944,15 @@ class WebHostSceneRuntime {
     const resized = this.resizeSurface();
     this.painter.paint(this.surfaceMetrics(), request.frame, resized ? undefined : request.damage, request.recoveredImagePayloadIds);
     this.syncAccessibilityTree(request.frame, request.accessibilityAnnouncements);
+    if (this.domGeometry && !this.fontPending && !this.reprojecting) {
+      this.stagedFontChange = false;
+      this.finishGeometryWait();
+      const previous = this.activeFontResources;
+      this.activeFontResources = this.fontResources;
+      if (previous !== this.activeFontResources)
+        previous?.dispose();
+      this.terminalMount.removeAttribute("aria-busy");
+    }
   }
   syncAccessibilityTree(frame, announcements) {
     const tree = this.accessibilityTree;
@@ -4817,8 +5029,6 @@ class WebHostSceneRuntime {
       if (this.disposed || resources !== this.fontResources || result.status === "disposed")
         return;
       this.fontResult = result;
-      const previousResources = this.activeFontResources;
-      this.activeFontResources = resources;
       this.fontPending = false;
       this.loadingFont?.remove();
       this.loadingFont = undefined;
@@ -4830,7 +5040,6 @@ class WebHostSceneRuntime {
         this.writeOutput(`${result.diagnostic}
 `);
       this.resizeToMount();
-      previousResources?.dispose();
     }).catch((error) => {
       if (this.disposed || resources !== this.fontResources)
         return;
@@ -4846,9 +5055,13 @@ class WebHostSceneRuntime {
     return this.rendererKind === "dom" && event.altKey;
   }
   cellLocation(event) {
+    if (this.domGeometry && (!this.geometryMeasurable || !this.geometrySession.allowsPointer))
+      return;
     return cellLocationForEvent(event, this.pointerMetrics());
   }
   rawCellLocation(event) {
+    if (this.domGeometry && (!this.geometryMeasurable || !this.geometrySession.allowsPointer))
+      return;
     return rawCellLocationForEvent(event, this.pointerMetrics());
   }
 }
@@ -4867,6 +5080,10 @@ class WebSocketSceneBridge {
   createSocket;
   reconnectDelayMilliseconds;
   decoder = new WebHostOutputDecoder;
+  receiveGeneration = 0;
+  receiveTail = Promise.resolve();
+  pendingReceives = 0;
+  pendingReceiveBytes = 0;
   queuedInput = [];
   queuedOutput = [];
   sink;
@@ -4881,12 +5098,31 @@ class WebSocketSceneBridge {
     this.flushQueuedInput();
   };
   handleMessage = (event) => {
-    this.receive(event.data);
+    const generation = this.receiveGeneration;
+    const message = event.data;
+    const bytes = typeof message === "string" ? message.length * 3 : message instanceof Blob ? message.size : message instanceof ArrayBuffer || ArrayBuffer.isView(message) ? message.byteLength : 0;
+    const retainedBytes = Math.min(bytes, HOST_WIRE_MAX_RECORD_BYTES * 2);
+    if (this.pendingReceives >= 32 || this.pendingReceiveBytes + retainedBytes > HOST_WIRE_MAX_RECORD_BYTES * 4) {
+      this.socket.close(1009, "WebHost receive backlog exceeded");
+      this.resetReceiveSession();
+      return;
+    }
+    this.pendingReceives++;
+    this.pendingReceiveBytes += retainedBytes;
+    this.receiveTail = this.receiveTail.then(() => this.receive(message, generation)).catch(() => {
+      if (!this.disposed && generation === this.receiveGeneration) {
+        this.deliver(this.decoder.rejectOversizedMessage());
+        this.sendPendingResyncRequests();
+      }
+    }).finally(() => {
+      if (generation === this.receiveGeneration) {
+        this.pendingReceives--;
+        this.pendingReceiveBytes -= retainedBytes;
+      }
+    });
   };
   handleClose = (event) => {
-    for (const record of this.decoder.flush()) {
-      this.deliver(record);
-    }
+    this.resetReceiveSession();
     if (this.disposed || event.code === normalClosureCode) {
       return;
     }
@@ -4946,6 +5182,7 @@ class WebSocketSceneBridge {
       return;
     }
     this.disposed = true;
+    this.resetReceiveSession();
     if (this.reconnectTimer !== undefined) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
@@ -5008,13 +5245,24 @@ class WebSocketSceneBridge {
       this.flushQueuedInput();
     }
   }
-  async receive(message) {
-    if (this.disposed) {
+  resetReceiveSession() {
+    this.receiveGeneration++;
+    this.receiveTail = Promise.resolve();
+    this.pendingReceives = 0;
+    this.pendingReceiveBytes = 0;
+    this.decoder = new WebHostOutputDecoder;
+    this.queuedOutput.length = 0;
+    this.sink?.resetSurfaceSession?.();
+  }
+  async receive(message, generation) {
+    if (this.disposed || generation !== this.receiveGeneration) {
       return;
     }
     const limit = HOST_WIRE_MAX_RECORD_BYTES * 2;
     const oversized = typeof message === "string" ? !fitsUTF8(message, limit) : message instanceof ArrayBuffer || ArrayBuffer.isView(message) ? message.byteLength > limit : typeof Blob !== "undefined" && message instanceof Blob ? message.size > limit : false;
     const bytes = await (oversized ? undefined : bytesFromWebSocketMessage(message));
+    if (this.disposed || generation !== this.receiveGeneration)
+      return;
     if (oversized) {
       this.deliver(this.decoder.rejectOversizedMessage());
       this.sendPendingResyncRequests();
@@ -5411,6 +5659,7 @@ class BrowserWASIBridge {
       SWIFTTUI_MODE: "browser",
       SWIFTTUI_TRANSPORT: "surface",
       SWIFTTUI_SURFACE_DELTA: "1",
+      SWIFTTUI_GEOMETRY_REVISIONS: "1",
       SWIFTTUI_SCENE: options.sceneId,
       SWIFTTUI_COLUMNS: String(Math.max(1, options.columns)),
       SWIFTTUI_ROWS: String(Math.max(1, options.rows)),
@@ -5711,8 +5960,6 @@ class InternalWebHostAppController {
   applyHostFrameStyle() {
     this.mount.style.background = "linear-gradient(180deg, #0f172a 0%, #111827 100%)";
     this.mount.style.boxSizing = "border-box";
-    this.mount.style.width = "100%";
-    this.mount.style.height = "100%";
     this.mount.style.minWidth = "0";
     this.mount.style.minHeight = "0";
     this.mount.style.overflow = "hidden";

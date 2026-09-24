@@ -6,17 +6,19 @@ import SwiftTUIViews
 extension RunLoop {
   package func resolveContext(
     for scheduledFrame: ScheduledFrame,
-    frameInstant: MonotonicInstant = .now()
+    frameInstant: MonotonicInstant = .now(),
+    hostConfiguration: HostLayoutConfiguration? = nil
   ) -> ResolveContext {
+    let hostConfiguration = hostConfiguration ?? presentationSurface.hostLayoutConfiguration()
     let causeSummary = scheduledFrame.causes
       .map(\.rawValue)
       .sorted()
       .joined(separator: "+")
     var effectiveEnvironmentValues = environmentValues
-    effectiveEnvironmentValues.terminalAppearance = presentationSurface.appearance
-    effectiveEnvironmentValues.theme = presentationSurface.theme
-    effectiveEnvironmentValues.terminalSize = presentationSurface.surfaceSize
-    if let cellPixelSize = presentationSurface.graphicsCapabilities.cellPixelSize {
+    effectiveEnvironmentValues.terminalAppearance = hostConfiguration.appearance
+    effectiveEnvironmentValues.theme = hostConfiguration.theme
+    effectiveEnvironmentValues.terminalSize = hostConfiguration.size
+    if let cellPixelSize = hostConfiguration.graphics.cellPixelSize {
       effectiveEnvironmentValues.cellPixelMetrics = CellPixelMetrics(
         width: cellPixelSize.width,
         height: cellPixelSize.height,
@@ -26,7 +28,7 @@ extension RunLoop {
       effectiveEnvironmentValues.cellPixelMetrics = .estimated
     }
     effectiveEnvironmentValues.pointerInputCapabilities =
-      presentationSurface.pointerInputCapabilities
+      hostConfiguration.pointer
     effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
@@ -123,12 +125,12 @@ extension RunLoop {
     return context
   }
 
-  package func proposal() -> ProposedSize {
+  package func proposal(hostConfiguration: HostLayoutConfiguration? = nil) -> ProposedSize {
     if let proposalOverride {
       return proposalOverride
     }
 
-    let size = presentationSurface.surfaceSize
+    let size = hostConfiguration?.size ?? presentationSurface.surfaceSize
     return .init(width: size.width, height: size.height)
   }
 }

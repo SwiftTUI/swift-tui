@@ -80,6 +80,7 @@ extension RunLoop {
       convergence.lifecycleCarryForward = deferredLifecycleCarryForward
       deferredLifecycleCarryForward.removeAll(keepingCapacity: true)
 
+      var geometry: HostGeometryStamp?
       var artifacts: FrameArtifacts?
       while true {
         applyRenderPassEvaluationPolicy(convergence: convergence)
@@ -98,14 +99,19 @@ extension RunLoop {
         // was shorter than the real cost of the frames around it completed
         // early. That is what purged the removal overlay in
         // `OffscreenFrameElisionRuntimeTests` on slow/loaded machines.
+        let hostConfiguration = presentationSurface.hostLayoutConfiguration()
+        reconcileHostGeometry(hostConfiguration.geometry)
+        geometry = hostConfiguration.geometry
         let renderedArtifacts = renderer.renderArtifacts(
           viewBuilder(
             (
               state: currentState,
               focusedIdentity: focusTracker.currentFocusIdentity
             )),
-          context: resolveContext(for: passScheduledFrame, frameInstant: frameInstant),
-          proposal: proposal(),
+          context: resolveContext(
+            for: passScheduledFrame, frameInstant: frameInstant,
+            hostConfiguration: hostConfiguration),
+          proposal: proposal(hostConfiguration: hostConfiguration),
           frameInstant: frameInstant
         )
         artifacts = renderedArtifacts
@@ -144,7 +150,7 @@ extension RunLoop {
         frameInstant: frameInstant,
         renderIntentDiagnostics: renderIntentDiagnostics,
         convergence: convergence,
-        acquisition: FrameAcquisitionState(),
+        acquisition: FrameAcquisitionState(geometry: geometry),
         answeredInputs: answeredInputs,
         hasFrameSink: hasFrameSink,
         renderedFrames: &renderedFrames
@@ -291,9 +297,11 @@ extension RunLoop {
       for: artifacts,
       frameOrdinal: renderedFrames + 1
     )
+    appliedHostGeometry = acquisition.geometry
     let presentationResult = try presentCommittedFrameWithDiagnosticsTiming(
       artifacts,
       damage: presentationDamage(for: artifacts, convergence: convergence),
+      geometry: acquisition.geometry,
       translationCandidate: presentationScrollTranslationCandidate(
         committed: artifacts.committedScrollTranslation,
         presentTime: scrollTranslation.candidate,
@@ -577,7 +585,8 @@ extension RunLoop {
           )
           previousRenderedState = currentState
           continue frameLoop
-        case .rendered(let renderedArtifacts, let tailJobState, let dropDecision):
+        case .rendered(let renderedArtifacts, let tailJobState, let dropDecision, let geometry):
+          acquisition.geometry = geometry
           acquisition.tailJobState = tailJobState
           acquisition.completedFrameDropDecision = dropDecision
           progressProbe?.record(

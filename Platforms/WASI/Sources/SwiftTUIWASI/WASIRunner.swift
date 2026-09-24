@@ -62,7 +62,8 @@ package func wasiHostWireCapabilities(
   environmentValue: (String) -> String?
 ) -> HostWireCapabilities {
   HostWireCapabilities(
-    acceptsDeltaFrames: wasiSurfaceDeltaEnabled(environmentValue: environmentValue)
+    acceptsDeltaFrames: wasiSurfaceDeltaEnabled(environmentValue: environmentValue),
+    geometryRevisions: environmentValue("SWIFTTUI_GEOMETRY_REVISIONS") == "1"
   )
 }
 
@@ -183,6 +184,8 @@ public enum WASIRunner {
       )
       let inputReader = WebSurfaceInputReader { message in
         switch message {
+        case .geometry(let request):
+          if host.updateGeometry(request) { signalReader.send("SIGWINCH") }
         case .resize(let size, let cellPixelSize):
           host.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
           signalReader.send("SIGWINCH")

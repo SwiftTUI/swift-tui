@@ -40,6 +40,7 @@ extension RunLoop {
   }
 
   package func handle(_ event: RuntimeEvent) -> RunLoopExitReason? {
+    reconcileHostGeometry(presentationSurface.hostLayoutConfiguration().geometry)
     switch event {
     case .inputEnded:
       return .inputEnded
@@ -57,6 +58,7 @@ extension RunLoop {
         scheduler.requestInput()
         return handleKeyPress(keyPress)
       case .mouse(let mouseEvent):
+        guard acceptsHostPointer(mouseEvent) else { return nil }
         let schedulesInput = shouldScheduleFrame(for: mouseEvent)
         let bypassPacing =
           !schedulesInput
