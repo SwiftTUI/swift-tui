@@ -124,7 +124,7 @@ separate from this shared dispatch implementation.
 
 ## Known gaps
 
-Browser, SwiftUI and Android overlays need assistive callbacks connected to the
+SwiftUI and Android overlays need assistive callbacks connected to the
 shared contract. A WCAG conformance suite and screen-reader listening evidence
 are not established by semantic snapshots or runtime tests. Current gaps are
 tracked in the [divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Divergences-And-Gaps.md).

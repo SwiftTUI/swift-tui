@@ -175,7 +175,7 @@ normalization remains owned by the control (including single-line editing).
 Repeated focus and value echoes do not write the binding or schedule new work.
 
 See `docs/ACCESSIBILITY.md` in the source repository for the additive host-wire
-format. The browser and native host packages must connect their assistive
+format. The native host packages must connect their assistive
 callbacks to this contract before those interfaces become operable. Shared
 runtime tests do not establish VoiceOver, TalkBack, or WCAG conformance.
 
