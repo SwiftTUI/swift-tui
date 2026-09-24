@@ -7,6 +7,46 @@ import Testing
 @MainActor
 @Suite
 struct TextInputRuntimeIntegrationTests {
+  @Test(
+    "shifted text inserts through the runtime for every text control",
+    arguments: [
+      "PasteTextField", "PasteSecureField", "PasteTextEditor",
+    ])
+  func shiftedTextInsertsThroughRuntime(control: String) throws {
+    let box = PasteTextBox()
+    let runtime = makeTextInputRunLoop {
+      if control == "PasteTextField" {
+        PasteTextFieldFixture(box: box)
+      } else if control == "PasteSecureField" {
+        PasteSecureFieldFixture(box: box)
+      } else {
+        PasteTextEditorFixture(box: box)
+      }
+    }
+    defer { runtime.runLoop.lifecycleCoordinator.shutdown() }
+    try renderInitial(runtime.runLoop)
+    _ = runtime.runLoop.focusTracker.setFocus(to: testIdentity(control))
+    try renderPending(runtime.runLoop)
+
+    for character in ";.-" {
+      #expect(runtime.runLoop.handleKeyPress(KeyPress(.character(character))) == nil)
+    }
+    for character in ":_?AZ!@" {
+      #expect(
+        runtime.runLoop.handleKeyPress(KeyPress(.character(character), modifiers: .shift)) == nil)
+    }
+    #expect(runtime.runLoop.handleKeyPress(KeyPress(.space, modifiers: .shift)) == nil)
+    #expect(box.value == ";.-:_?AZ!@ ")
+
+    // Shift still extends a selection; the following shifted character replaces it.
+    #expect(runtime.runLoop.handleKeyPress(KeyPress(.arrowLeft, modifiers: .shift)) == nil)
+    #expect(runtime.runLoop.handleKeyPress(KeyPress(.character("?"), modifiers: .shift)) == nil)
+    #expect(box.value == ";.-:_?AZ!@?")
+    #expect(runtime.runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl)) == nil)
+    #expect(runtime.runLoop.handleKeyPress(KeyPress(.character("Z"), modifiers: .shift)) == nil)
+    #expect(box.value == "Z")
+  }
+
   @Test("T244: fallback caret stays on its glyph through real key input")
   func fallbackCaretHasNoTrailingMarker() throws {
     let box = PasteTextBox()

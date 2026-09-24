@@ -174,8 +174,8 @@ extension RunLoop {
         latestSemanticSnapshot.focusRegions.first(where: { $0.identity == identity })
       }?.focusInteractions ?? .automatic
 
-    // Exit bindings under text-edit focus. A *modified* chord is never text, so
-    // the focused editor (and the handlers stacked above it) may claim it as an
+    // Exit bindings under text-edit focus. For a modified exit binding, the
+    // focused editor (and the handlers stacked above it) may claim it as an
     // edit first: `Ctrl+C` — the default exit key — copies a non-empty
     // selection and the session continues, while with nothing to copy the
     // editor declines and the same key exits. A bare character configured as

@@ -331,6 +331,26 @@ struct TextInputReducerTests {
     )
   }
 
+  @Test("text insertion accepts Shift but does not consume Control or Alt chords")
+  func shiftedTextPreservesCommandModifiers() {
+    for traits in [TextInputTraits.singleLine, .multiline, .secureField] {
+      for character: Character in [":", "_", "?", "Z"] {
+        #expect(
+          textInputCommand(for: KeyPress(.character(character), modifiers: .shift), traits: traits)
+            == .insertText(String(character)))
+        for modifiers: EventModifiers in [.ctrl, .alt, [.ctrl, .shift], [.alt, .shift]] {
+          #expect(
+            textInputCommand(
+              for: KeyPress(.character(character), modifiers: modifiers), traits: traits)
+              == nil)
+        }
+      }
+      #expect(
+        textInputCommand(for: KeyPress(.space, modifiers: .shift), traits: traits)
+          == .insertText(" "))
+    }
+  }
+
   @Test("home and end move within current line")
   func homeAndEndMoveWithinCurrentLine() {
     let value = TextInputValue(

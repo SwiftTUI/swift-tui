@@ -161,14 +161,10 @@ package func textInputCommand(
 
   switch keyPress.key {
   case .character(let character):
-    guard !isSelecting else {
-      return nil
-    }
+    // Hosts already supply the produced character, including Shift's effect.
+    // Shift extends navigation selections; it must not suppress printable text.
     return .insertText(String(character))
   case .space:
-    guard !isSelecting else {
-      return nil
-    }
     return .insertText(" ")
   case .return where traits.isMultiline && traits.submitBehavior == .newline:
     guard !isSelecting else {
