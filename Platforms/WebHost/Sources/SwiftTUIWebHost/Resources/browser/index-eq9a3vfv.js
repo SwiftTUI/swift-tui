@@ -3353,7 +3353,7 @@ class DomSurfacePainter {
         element.style.color = glyph ? "transparent" : resolved.color ?? "";
         this.appliedCellStyles.set(element, presentationKey);
       }
-      if (isLink && target !== undefined) {
+      if (isLink && target !== undefined && element.getAttribute("data-surface-link") !== target) {
         element.setAttribute("data-surface-link", target);
         element.setAttribute("tabindex", "-1");
         element.setAttribute("rel", "noopener noreferrer");
