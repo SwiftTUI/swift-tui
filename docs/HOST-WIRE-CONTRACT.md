@@ -42,9 +42,11 @@ The Swift encoder currently emits four record types:
 | `frameDiagnostic` | A JSON object containing the format plus its header and fields. |
 
 The input parser accepts terminal bytes mixed with RS-prefixed `resize`,
-`style`, `caps`, `resync`, `pointer`, `key`, `mouse`, and `paste` control
-records. It buffers a partial control record until newline. Malformed or
-unknown controls are dropped. They are not terminal input.
+`style`, `caps`, `resync`, `pointer`, `key`, `mouse`, `paste`, and
+`accessibility` control records. It buffers a partial control record until
+newline. Malformed or unknown controls are dropped. They are not terminal
+input. The `accessibility` record format is documented in
+[ACCESSIBILITY.md](ACCESSIBILITY.md).
 
 `pointer` is the only control record whose payload is `key=value` tokens
 rather than positional fields:
