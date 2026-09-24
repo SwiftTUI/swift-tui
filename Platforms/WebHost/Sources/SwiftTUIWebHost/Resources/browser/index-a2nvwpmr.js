@@ -140,7 +140,10 @@ class AccessibilityTreeMounter {
     this.sendAction = sendAction;
     this.element = document.createElement("div");
     this.element.className = "webhost-scene__accessibility-tree";
-    applyScreenReaderOnlyStyle(this.element);
+    this.element.style.position = "absolute";
+    this.element.style.inset = "0";
+    this.element.style.opacity = "0";
+    this.element.style.pointerEvents = "none";
     this.announcerElement = document.createElement("div");
     this.announcerElement.className = "webhost-scene__accessibility-announcer";
     this.announcerElement.setAttribute("aria-atomic", "true");
@@ -163,6 +166,7 @@ class AccessibilityTreeMounter {
     }
     const previousById = this.nodesById;
     const nextById = new Map;
+    const modelsById = new Map(visibleNodes.map((node) => [node.id, node]));
     for (const node of visibleNodes) {
       const existing = previousById.get(node.id);
       const tag = this.elementTag(node);
@@ -175,7 +179,7 @@ class AccessibilityTreeMounter {
         if (this.pendingFocus?.id === node.id)
           this.pendingFocus = undefined;
       }
-      this.applyNodeAttributes(element, node, metrics);
+      this.applyNodeAttributes(element, node, metrics, node.parentId ? modelsById.get(node.parentId) : undefined);
       nextById.set(node.id, element);
     }
     for (const id of previousById.keys()) {
@@ -187,7 +191,7 @@ class AccessibilityTreeMounter {
       }
     }
     this.nodesById = nextById;
-    this.modelsById = new Map(visibleNodes.map((node) => [node.id, node]));
+    this.modelsById = modelsById;
     const childOffsets = new Map;
     for (const node of visibleNodes) {
       const element = nextById.get(node.id);
@@ -293,7 +297,7 @@ class AccessibilityTreeMounter {
     }
     return element;
   }
-  applyNodeAttributes(element, node, metrics) {
+  applyNodeAttributes(element, node, metrics, parent) {
     element.id = `swifttui-a11y-${stableDOMId(node.id)}`;
     element.dataset.accessibilityId = node.id;
     element.tabIndex = node.isFocused ? 0 : -1;
@@ -332,11 +336,18 @@ class AccessibilityTreeMounter {
       }
     }
     const [x, y, width, height] = node.rect;
+    const [parentX, parentY] = parent?.rect ?? [0, 0];
     element.style.position = "absolute";
-    element.style.left = `${x * metrics.cellWidth}px`;
-    element.style.top = `${y * metrics.cellHeight}px`;
+    element.style.left = `${(x - parentX) * metrics.cellWidth}px`;
+    element.style.top = `${(y - parentY) * metrics.cellHeight}px`;
     element.style.width = `${Math.max(1, width) * metrics.cellWidth}px`;
     element.style.height = `${Math.max(1, height) * metrics.cellHeight}px`;
+    element.style.boxSizing = "border-box";
+    element.style.margin = "0";
+    element.style.padding = "0";
+    element.style.border = "0";
+    element.style.minWidth = "0";
+    element.style.minHeight = "0";
   }
   announceLiveRegionChanges(nodes, announcements) {
     const candidates = nodes.filter((node) => node.liveRegion && node.liveRegion !== "off" && node.label);
