@@ -6,19 +6,22 @@ package struct TextInputContent: View, Sendable {
   package var ownerIdentity: Identity?
   package var caretAnchor: CellPoint?
   package var wrappedCaretOffset: Int?
+  package var accessibilityText: TextInputAccessibilityText?
 
   nonisolated package init(
     displayText: String,
     displayRuns: [TextInputDisplayRun]? = nil,
     ownerIdentity: Identity? = nil,
     caretAnchor: CellPoint? = nil,
-    wrappedCaretOffset: Int? = nil
+    wrappedCaretOffset: Int? = nil,
+    accessibilityText: TextInputAccessibilityText? = nil
   ) {
     self.displayText = displayText
     self.displayRuns = displayRuns ?? Self.unselectedRuns(for: displayText)
     self.ownerIdentity = ownerIdentity
     self.caretAnchor = caretAnchor
     self.wrappedCaretOffset = wrappedCaretOffset
+    self.accessibilityText = accessibilityText
   }
 
   @ViewBuilder
@@ -31,7 +34,8 @@ package struct TextInputContent: View, Sendable {
               ownerIdentity: ownerIdentity,
               anchor: caretAnchor,
               wrappedText: wrappedCaretOffset == nil ? nil : displayText,
-              characterOffset: wrappedCaretOffset ?? 0
+              characterOffset: wrappedCaretOffset ?? 0,
+              text: accessibilityText
             )
           )
         )

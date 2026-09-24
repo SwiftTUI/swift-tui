@@ -30,6 +30,15 @@ or terminal bytes.
 
 ## Modules and the dependency graph
 
+Native text accessibility uses the sparse `AccessibilityTextInput` snapshot
+payload in `SwiftTUIGraph/Semantics/`. `SwiftTUICore/Content/AccessibilityTextInputLayout.swift`
+converts primitive selection offsets to UTF-16 and places grapheme bounds using
+the renderer's text wrapping. `TextField` and `TextEditor` supply source state
+through their protected content slots; `SecureField` supplies none. Native hosts
+can read text ranges and caret geometry without inferring selection from pixels.
+This payload is native snapshot metadata; the host wire retains its existing
+value and cursor-anchor representation.
+
 Collection-binding `ForEach` lookup lives in
 `SwiftTUIViews/Collections/ForEachBinding.swift`. Rows share an ID-to-indices
 map certified by a stored-value token from `Binding`. `State` exposes the

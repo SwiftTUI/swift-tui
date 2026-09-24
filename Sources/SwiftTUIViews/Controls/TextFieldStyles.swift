@@ -158,12 +158,14 @@ public struct TextFieldStyleConfiguration: Sendable {
     package var displayRuns: [TextInputDisplayRun]
     package var ownerIdentity: Identity?
     package var caretAnchor: CellPoint?
+    package var accessibilityText: TextInputAccessibilityText?
 
     nonisolated package init(
       displayText: String,
       displayRuns: [TextInputDisplayRun]? = nil,
       ownerIdentity: Identity? = nil,
-      caretAnchor: CellPoint? = nil
+      caretAnchor: CellPoint? = nil,
+      accessibilityText: TextInputAccessibilityText? = nil
     ) {
       self.displayText = displayText
       self.displayRuns =
@@ -172,6 +174,7 @@ public struct TextFieldStyleConfiguration: Sendable {
         ]
       self.ownerIdentity = ownerIdentity
       self.caretAnchor = caretAnchor
+      self.accessibilityText = accessibilityText
     }
 
     /// Field content for a fixture-constructed configuration: it shows
@@ -192,7 +195,8 @@ public struct TextFieldStyleConfiguration: Sendable {
         displayText: displayText,
         displayRuns: displayRuns,
         ownerIdentity: ownerIdentity,
-        caretAnchor: caretAnchor
+        caretAnchor: caretAnchor,
+        accessibilityText: accessibilityText
       )
     }
   }

@@ -507,25 +507,29 @@ package final class TextInputAccessibilityCursorAnchor: Equatable, Sendable {
   package let anchor: CellPoint
   package let wrappedText: String?
   package let characterOffset: Int
+  package let text: TextInputAccessibilityText?
 
   package static func == (
     lhs: TextInputAccessibilityCursorAnchor, rhs: TextInputAccessibilityCursorAnchor
   ) -> Bool {
     lhs === rhs
       || (lhs.ownerIdentity == rhs.ownerIdentity && lhs.anchor == rhs.anchor
-        && lhs.wrappedText == rhs.wrappedText && lhs.characterOffset == rhs.characterOffset)
+        && lhs.wrappedText == rhs.wrappedText && lhs.characterOffset == rhs.characterOffset
+        && lhs.text == rhs.text)
   }
 
   package init(
     ownerIdentity: Identity,
     anchor: CellPoint,
     wrappedText: String? = nil,
-    characterOffset: Int = 0
+    characterOffset: Int = 0,
+    text: TextInputAccessibilityText? = nil
   ) {
     self.ownerIdentity = ownerIdentity
     self.anchor = anchor
     self.wrappedText = wrappedText
     self.characterOffset = characterOffset
+    self.text = text
   }
 }
 

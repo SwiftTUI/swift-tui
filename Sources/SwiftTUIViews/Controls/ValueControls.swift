@@ -197,7 +197,12 @@ extension TextField {
         displayText: presentation.displayText,
         displayRuns: presentation.displayRuns,
         ownerIdentity: context.identity,
-        caretAnchor: presentation.caretAnchor
+        caretAnchor: presentation.caretAnchor,
+        accessibilityText: .init(
+          text: synchronizedValue.text,
+          anchor: synchronizedValue.selection.anchor.rawValue,
+          head: synchronizedValue.selection.head.rawValue,
+          displayText: presentation.displayText)
       ),
       isShowingPrompt: presentation.isShowingPrompt,
       label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },

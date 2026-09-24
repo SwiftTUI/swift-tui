@@ -620,6 +620,7 @@ classifications:
     - SwiftTUIGraph.ActionScope
     - SwiftTUICore.AccessibilityAnnouncement
     - SwiftTUIGraph.AccessibilityNode
+    - SwiftTUIGraph.AccessibilityTextInput
     - SwiftTUIGraph.AccessibilityPoliteness
     - SwiftTUIGraph.AccessibilityRole
     - SwiftTUIGraph.AccessibilityVisualContent

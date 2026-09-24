@@ -94,7 +94,12 @@ extension TextEditor {
               displayRuns: presentation.displayRuns,
               ownerIdentity: ownerIdentity,
               caretAnchor: presentation.caretAnchor,
-              wrappedCaretOffset: synchronizedValue.selection.head.rawValue
+              wrappedCaretOffset: synchronizedValue.selection.head.rawValue,
+              accessibilityText: .init(
+                text: synchronizedValue.text,
+                anchor: synchronizedValue.selection.anchor.rawValue,
+                head: synchronizedValue.selection.head.rawValue,
+                displayText: presentation.displayText)
             )
             .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(chrome.foregroundStyle)

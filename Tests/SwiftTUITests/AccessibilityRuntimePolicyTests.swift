@@ -274,6 +274,8 @@ struct AccessibilityRuntimePolicyTests {
     let cursorAnchor = try #require(node.cursorAnchor)
 
     #expect(focusTracker.currentFocusIdentity == textFieldID)
+    #expect(node.textInput?.selection == 3..<3)
+    #expect(node.textInput?.endAnchor == cursorAnchor)
     #expect(cursorAnchor != node.rect.origin)
     #expect(terminal.movedCursorPoints.last == cursorAnchor)
     #expect(!(terminal.latestSurface?.lines.joined(separator: "\n").contains("abc_") ?? false))
@@ -310,6 +312,7 @@ struct AccessibilityRuntimePolicyTests {
     let surface = terminal.latestSurface?.lines.joined(separator: "\n") ?? ""
 
     #expect(focusTracker.currentFocusIdentity == secureFieldID)
+    #expect(node.textInput == nil)
     #expect(terminal.movedCursorPoints.last == cursorAnchor)
     #expect(!surface.contains("secret"))
     #expect(
@@ -346,8 +349,17 @@ struct AccessibilityRuntimePolicyTests {
     let cursorAnchor = try #require(node.cursorAnchor)
 
     #expect(focusTracker.currentFocusIdentity == textEditorID)
+    #expect(node.textInput?.selection == 4..<4)
+    #expect(node.textInput?.endAnchor == cursorAnchor)
+    #expect(node.textInput?.clusters.count == 4)
+    _ = runLoop.handle(.input(.key(.init(.arrowLeft))))
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    let moved = try #require(
+      runLoop.latestSemanticSnapshot.accessibilityNodes.first { $0.identity == textEditorID })
+    #expect(moved.textInput?.selection == 3..<3)
+    #expect(moved.cursorAnchor?.x == cursorAnchor.x - 1)
     #expect(cursorAnchor != node.rect.origin)
-    #expect(terminal.movedCursorPoints.last == cursorAnchor)
+    #expect(terminal.movedCursorPoints.last == moved.cursorAnchor)
     #expect(!(terminal.latestSurface?.lines.joined(separator: "\n").contains("bc_") ?? false))
   }
 

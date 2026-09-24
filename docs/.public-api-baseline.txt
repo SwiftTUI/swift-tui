@@ -461,6 +461,7 @@ SwiftTUIGraph.AccessibilityNode.liveRegion
 SwiftTUIGraph.AccessibilityNode.parentIdentity
 SwiftTUIGraph.AccessibilityNode.rect
 SwiftTUIGraph.AccessibilityNode.role
+SwiftTUIGraph.AccessibilityNode.textInput
 SwiftTUIGraph.AccessibilityPoliteness
 SwiftTUIGraph.AccessibilityPoliteness.assertive
 SwiftTUIGraph.AccessibilityPoliteness.description
@@ -506,6 +507,17 @@ SwiftTUIGraph.AccessibilityRole.textEditor
 SwiftTUIGraph.AccessibilityRole.textField
 SwiftTUIGraph.AccessibilityRole.timer
 SwiftTUIGraph.AccessibilityRole.toggle
+SwiftTUIGraph.AccessibilityTextInput
+SwiftTUIGraph.AccessibilityTextInput.==(_:_:)
+SwiftTUIGraph.AccessibilityTextInput.Cluster
+SwiftTUIGraph.AccessibilityTextInput.Cluster.init(range:rect:)
+SwiftTUIGraph.AccessibilityTextInput.Cluster.range
+SwiftTUIGraph.AccessibilityTextInput.Cluster.rect
+SwiftTUIGraph.AccessibilityTextInput.clusters
+SwiftTUIGraph.AccessibilityTextInput.endAnchor
+SwiftTUIGraph.AccessibilityTextInput.init(selection:insertionOffset:clusters:endAnchor:)
+SwiftTUIGraph.AccessibilityTextInput.insertionOffset
+SwiftTUIGraph.AccessibilityTextInput.selection
 SwiftTUIGraph.AccessibilityValue
 SwiftTUIGraph.AccessibilityValue.boolean(_:)
 SwiftTUIGraph.AccessibilityValue.number(_:)

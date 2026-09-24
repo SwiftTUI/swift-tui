@@ -182,6 +182,8 @@ public struct AccessibilityNode: Equatable, Sendable {
   public var hidden: Bool
   public var liveRegion: AccessibilityPoliteness?
   public var cursorAnchor: CellPoint?
+  /// Native text reading and selection metadata. Absent for secure inputs.
+  public var textInput: AccessibilityTextInput? = nil
 
   public init(
     identity: Identity,

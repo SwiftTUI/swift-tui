@@ -191,6 +191,11 @@ package enum HostWireSchema {
       .init("hidden", wire: .key("hidden")),
       .init("liveRegion", wire: .key("liveRegion")),
       .init("cursorAnchor", wire: .key("cursorAnchor")),
+      .init(
+        "textInput",
+        wire: .notSerialized(
+          "native text-range queries use placed grapheme geometry; wire hosts retain value/cursorAnchor"
+        )),
     ],
     "AccessibilityAnnouncement": [
       .init("message", wire: .key("message")),

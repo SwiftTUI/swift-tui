@@ -55,13 +55,18 @@ private struct AuthoredAccessibilityLabelSummary {
   }
 }
 
+private struct TextInputAccessibilityPresentation {
+  let anchor: CellPoint
+  let textInput: AccessibilityTextInput?
+}
+
 extension SemanticExtractor {
   func accessibilityNodesAndVisualLabelRoutes(
     from root: PlacedNode,
     focusRegions: [FocusRegion]
   ) -> (nodes: [AccessibilityNode], visualLabelRoutes: AccessibilityVisualLabelRoutes) {
     let focusIdentities = accessibilityFocusIdentities(from: focusRegions)
-    let textInputCursorAnchors = textInputAccessibilityCursorAnchors(from: root)
+    let textInputPresentations = textInputAccessibilityPresentations(from: root)
     var visualLabelRoutes = AccessibilityVisualLabelRoutes()
     var visualCandidateSummaries: [Int: AccessibilityVisualCandidateSummary] = [:]
     var labelSummaries: [Int: AuthoredAccessibilityLabelSummary] = [:]
@@ -187,7 +192,7 @@ extension SemanticExtractor {
           parentIdentity: frame.emittedParentIdentity,
           hasEmittedChild: hasEmittedChild,
           focusIdentities: focusIdentities,
-          textInputCursorAnchors: textInputCursorAnchors,
+          textInputPresentations: textInputPresentations,
           inferredVisualRole:
             visualLabelRoutes.inferredRolesByTraversalOrdinal[traversalOrdinal],
           authoredLabel: authoredLabels[traversalOrdinal]
@@ -265,7 +270,7 @@ extension SemanticExtractor {
   private func accessibilitySelfIsRelevant(
     _ node: PlacedNode,
     focusIdentities: Set<Identity>,
-    textInputCursorAnchors: [Identity: CellPoint] = [:]
+    textInputPresentations: [Identity: TextInputAccessibilityPresentation] = [:]
   ) -> Bool {
     if accessibilityVisualContentIsUnlabeled(node) {
       return false
@@ -276,7 +281,7 @@ extension SemanticExtractor {
       || node.semanticMetadata.accessibilityHint != nil
       || node.semanticMetadata.accessibilityLiveRegion != nil
       || node.semanticMetadata.accessibilityCursorAnchor != nil
-      || textInputCursorAnchors[node.identity] != nil
+      || textInputPresentations[node.identity] != nil
       || focusIdentities.contains(node.identity)
   }
 
@@ -285,14 +290,14 @@ extension SemanticExtractor {
     parentIdentity: Identity?,
     hasEmittedChild: Bool,
     focusIdentities: Set<Identity>,
-    textInputCursorAnchors: [Identity: CellPoint],
+    textInputPresentations: [Identity: TextInputAccessibilityPresentation],
     inferredVisualRole: AccessibilityRole?,
     authoredLabel: String?
   ) -> AccessibilityNode? {
     let selfIsRelevant = accessibilitySelfIsRelevant(
       node,
       focusIdentities: focusIdentities,
-      textInputCursorAnchors: textInputCursorAnchors
+      textInputPresentations: textInputPresentations
     )
     guard
       let role = accessibilityRole(
@@ -322,8 +327,10 @@ extension SemanticExtractor {
       // not hide its visible control (or ancestors) in browser/native hosts.
       hidden: false,
       liveRegion: node.semanticMetadata.accessibilityLiveRegion,
-      cursorAnchor: textInputCursorAnchors[node.identity] ?? accessibilityCursorAnchor(for: node)
+      cursorAnchor: textInputPresentations[node.identity]?.anchor
+        ?? accessibilityCursorAnchor(for: node)
     )
+    result.textInput = role == .secureField ? nil : textInputPresentations[node.identity]?.textInput
     result.control = node.semanticMetadata.accessibilityControl
     result.isEnabled = node.environmentSnapshot.style.isEnabled
     if let owner = node.viewNodeID, result.control != nil {
@@ -333,10 +340,10 @@ extension SemanticExtractor {
     return result
   }
 
-  private func textInputAccessibilityCursorAnchors(
+  private func textInputAccessibilityPresentations(
     from root: PlacedNode
-  ) -> [Identity: CellPoint] {
-    var anchors: [Identity: CellPoint] = [:]
+  ) -> [Identity: TextInputAccessibilityPresentation] {
+    var anchors: [Identity: TextInputAccessibilityPresentation] = [:]
     var stack = [root]
 
     while let node = stack.popLast() {
@@ -350,9 +357,11 @@ extension SemanticExtractor {
           route.wrappedText.map {
             wrappedTextCursorAnchor($0, offset: route.characterOffset, width: bounds.size.width)
           } ?? route.anchor
-        anchors[route.ownerIdentity] = CellPoint(
-          x: bounds.origin.x + anchor.x,
-          y: bounds.origin.y + anchor.y
+        anchors[route.ownerIdentity] = TextInputAccessibilityPresentation(
+          anchor: CellPoint(x: bounds.origin.x + anchor.x, y: bounds.origin.y + anchor.y),
+          textInput: route.text.map {
+            accessibilityTextInput($0, bounds: bounds, wraps: route.wrappedText != nil)
+          }
         )
       }
 
