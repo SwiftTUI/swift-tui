@@ -136,8 +136,8 @@ damage diff exists, steady-state frames ship as v3 `deltaRows` patches against
 the previously presented surface instead.
 
 Hosts declare wire capabilities through one Swift-side currency
-(`HostWireCapabilities`) with one ingress per transport. Its only field at
-`HEAD` is the named `acceptsDeltaFrames` bit. Absence keeps the default
+(`HostWireCapabilities`) with one ingress per transport. Its fields at
+`HEAD` are capability bits such as `acceptsDeltaFrames`. Absence keeps the default
 full-frame bytes. The canonical field/ingress manifest is
 `HostWireSchema.capabilityMappings`. The normative state and delivery rules
 are maintained in the repository's
