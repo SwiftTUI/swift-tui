@@ -1044,7 +1044,7 @@ value-setting requests; host adapters must connect their native callbacks. (The 
 
 - **Assistive host adapters remain unconnected.** *Gap.* The shared runtime
   accepts node-targeted focus, activation, adjustment and typed value requests
-  (STUI-129). VoiceOver, TalkBack and browser adapters still need to connect
+  (STUI-129). VoiceOver and TalkBack adapters still need to connect
   their callbacks and qualify real assistive journeys.
 - **No WCAG conformance suite or automated screen-reader testing.** *Gap.*
   Unit tests and guardrail scripts cover semantic presentation. The
