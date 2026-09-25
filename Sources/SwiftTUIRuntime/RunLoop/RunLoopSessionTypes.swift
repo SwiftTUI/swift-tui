@@ -79,6 +79,7 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     var continuation: AsyncStream<String>.Continuation?
     var continuationGeneration: UInt64 = 0
     var directHandler: (@Sendable (String) -> Void)?
+    var directFinishHandler: (@Sendable () -> Void)?
     // Hosted transports can publish their initial resize while the run loop
     // is still installing its event streams. Preserve that wake instead of
     // leaving the first frame at the fallback grid until unrelated input.
@@ -145,39 +146,53 @@ public final class InProcessSignalReader: SignalReading, Sendable {
   }
 
   public func finish() {
-    let continuation = state.withLock { state in
+    let (continuation, directFinishHandler) = state.withLock { state in
       let continuation = state.continuation
       state.continuation = nil
       state.directHandler = nil
+      let directFinishHandler = state.directFinishHandler
+      state.directFinishHandler = nil
       state.pendingSignals.removeAll(keepingCapacity: false)
       state.isFinished = true
-      return continuation
+      return (continuation, directFinishHandler)
     }
     continuation?.finish()
+    directFinishHandler?()
   }
 
+  /// Routes signals to `handler` instead of the ``events()`` stream, and
+  /// reports the reader's end to `onFinish` exactly once: from ``finish()``,
+  /// or right away when the reader has already finished. This is the direct
+  /// path's counterpart of the stream finishing. ``clearDirectHandler()``
+  /// detaches both.
   package func installDirectHandler(
-    _ handler: @escaping @Sendable (String) -> Void
+    _ handler: @escaping @Sendable (String) -> Void,
+    onFinish: @escaping @Sendable () -> Void
   ) {
     // Flush outside the lock for the same re-entrancy reason as send(): a
     // buffered signal's synchronous handling can send follow-up signals.
-    let pendingSignals = state.withLock { state -> [String] in
+    let (pendingSignals, isFinished) = state.withLock { state -> ([String], Bool) in
       guard !state.isFinished else {
-        return []
+        return ([], true)
       }
       state.directHandler = handler
+      state.directFinishHandler = onFinish
       let pending = state.pendingSignals
       state.pendingSignals.removeAll(keepingCapacity: true)
-      return pending
+      return (pending, false)
     }
     for signalName in pendingSignals {
       handler(signalName)
+    }
+    if isFinished {
+      onFinish()
     }
   }
 
   package func clearDirectHandler() {
     state.withLock { state in
       state.directHandler = nil
+      state.directFinishHandler = nil
     }
   }
 }

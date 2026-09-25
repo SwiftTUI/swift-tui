@@ -18,6 +18,7 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     var activeEscapeFlushToken: UInt64?
     var nextEscapeFlushToken: UInt64 = 0
     var directHandler: (@Sendable (InputEvent) -> Void)?
+    var directFinishHandler: (@Sendable () -> Void)?
     var finished = false
   }
 
@@ -134,20 +135,38 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     yieldInjectedEvent(event)
   }
 
+  /// Routes input to `handler` instead of the ``inputEvents()`` stream,
+  /// starting with the events buffered before any consumer attached, and
+  /// reports the end of input to `onFinish` exactly once: from ``finish()``,
+  /// or right away when the reader has already finished. This is the direct
+  /// path's counterpart of the stream finishing. Both closures run outside
+  /// the lock, so they may re-enter `send`.
+  /// ``clearDirectHandler()`` detaches both.
   package func installDirectHandler(
-    _ handler: @escaping @Sendable (InputEvent) -> Void
-  ) -> [InputEvent] {
-    state.withLock { state in
-      state.directHandler = handler
+    _ handler: @escaping @Sendable (InputEvent) -> Void,
+    onFinish: @escaping @Sendable () -> Void
+  ) {
+    let (pendingEvents, isFinished) = state.withLock { state in
       let pendingEvents = state.pendingEvents
       state.pendingEvents.removeAll(keepingCapacity: true)
-      return pendingEvents
+      if !state.finished {
+        state.directHandler = handler
+        state.directFinishHandler = onFinish
+      }
+      return (pendingEvents, state.finished)
+    }
+    for event in pendingEvents {
+      handler(event)
+    }
+    if isFinished {
+      onFinish()
     }
   }
 
   package func clearDirectHandler() {
     state.withLock { state in
       state.directHandler = nil
+      state.directFinishHandler = nil
     }
   }
 
@@ -164,30 +183,34 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
   }
 
   package func finish() {
-    let (continuation, pendingMouseEvents):
+    let (continuation, pendingMouseEvents, directFinishHandler):
       (
         AsyncStream<InputEvent>.Continuation?,
-        [InputEvent]
+        [InputEvent],
+        (@Sendable () -> Void)?
       ) = state.withLock { state in
         guard !state.finished else {
-          return (nil, [])
+          return (nil, [], nil)
         }
 
         state.finished = true
         let continuation = state.continuation
         state.continuation = nil
         state.directHandler = nil
+        let directFinishHandler = state.directFinishHandler
+        state.directFinishHandler = nil
         let pendingMouseEvents = coalescedInputEvents(state.pendingMouseEvents)
         state.pendingMouseEvents.removeAll(keepingCapacity: true)
         state.activeMouseFlushToken = nil
         state.activeEscapeFlushToken = nil
-        return (continuation, pendingMouseEvents)
+        return (continuation, pendingMouseEvents, directFinishHandler)
       }
 
     for event in pendingMouseEvents {
       continuation?.yield(event)
     }
     continuation?.finish()
+    directFinishHandler?()
   }
 
   @discardableResult

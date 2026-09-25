@@ -35,6 +35,32 @@ package final class DeadlineWakeState: Sendable {
   }
 }
 
+/// Finishes the event pump's wake stream once every input source feeding it
+/// has ended.
+///
+/// Not nested in the generic ``RunLoop``: the Android direct path reports
+/// its readers' end from `@Sendable` finish handlers, which must not capture
+/// the run loop's non-`Sendable` generic metatypes.
+package final class EventPumpCompletion: Sendable {
+  private let remainingStreams: Mutex<Int>
+
+  init(remainingStreams: Int) {
+    self.remainingStreams = Mutex(remainingStreams)
+  }
+
+  func streamFinished<Element>(
+    _ continuation: AsyncStream<Element>.Continuation
+  ) {
+    let shouldFinish = remainingStreams.withLock { remainingStreams in
+      remainingStreams -= 1
+      return remainingStreams == 0
+    }
+    if shouldFinish {
+      continuation.finish()
+    }
+  }
+}
+
 extension RunLoop {
   enum EventPumpTiming {
     static var coalescedPointerDrainYieldCount: Int { 4 }
@@ -43,26 +69,6 @@ extension RunLoop {
   package struct RenderEventDrain {
     var events: [PumpedEvent]
     var coalescedEventBatches: Int
-  }
-
-  package final class EventPumpCompletion: Sendable {
-    private let remainingStreams: Mutex<Int>
-
-    init(remainingStreams: Int) {
-      self.remainingStreams = Mutex(remainingStreams)
-    }
-
-    func streamFinished<Element>(
-      _ continuation: AsyncStream<Element>.Continuation
-    ) {
-      let shouldFinish = remainingStreams.withLock { remainingStreams in
-        remainingStreams -= 1
-        return remainingStreams == 0
-      }
-      if shouldFinish {
-        continuation.finish()
-      }
-    }
   }
 
   package func isCoalesciblePointerRuntimeEvent(

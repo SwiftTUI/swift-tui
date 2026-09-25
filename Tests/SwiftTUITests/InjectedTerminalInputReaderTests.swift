@@ -235,4 +235,62 @@ struct InjectedTerminalInputReaderTests {
         .key(.character("q")),
       ])
   }
+
+  // The Android event pump consumes the reader through its direct handler,
+  // so no stream ever finishes there: `finish()` (the host's stop) must reach
+  // the pump through `onFinish`, or the run loop never learns input ended.
+  @Test("finishing the injected reader reports end of input to its direct handler once")
+  func finishReportsEndOfInputToDirectHandlerOnce() {
+    let inputReader = InjectedTerminalInputReader()
+    let log = Mutex<[String]>([])
+    inputReader.installDirectHandler { event in
+      log.withLock { $0.append("event \(event)") }
+    } onFinish: {
+      log.withLock { $0.append("finished") }
+    }
+
+    inputReader.send(.key(.character("a")))
+    inputReader.finish()
+    inputReader.finish()
+    inputReader.send(.key(.character("b")))
+
+    #expect(log.withLock { $0 } == ["event \(InputEvent.key(.character("a")))", "finished"])
+  }
+
+  @Test("a direct handler installed after finish receives buffered input, then end of input")
+  func directHandlerInstalledAfterFinishDrainsThenEnds() {
+    let inputReader = InjectedTerminalInputReader()
+    inputReader.send([.key(.character("a")), .key(.character("b"))])
+    inputReader.finish()
+
+    let log = Mutex<[String]>([])
+    inputReader.installDirectHandler { event in
+      log.withLock { $0.append("event \(event)") }
+    } onFinish: {
+      log.withLock { $0.append("finished") }
+    }
+
+    #expect(
+      log.withLock { $0 } == [
+        "event \(InputEvent.key(.character("a")))",
+        "event \(InputEvent.key(.character("b")))",
+        "finished",
+      ]
+    )
+  }
+
+  @Test("clearing the direct handler also detaches its end-of-input report")
+  func clearedDirectHandlerIsNotToldOfFinish() {
+    let inputReader = InjectedTerminalInputReader()
+    let finishCount = Mutex(0)
+    inputReader.installDirectHandler { _ in
+    } onFinish: {
+      finishCount.withLock { $0 += 1 }
+    }
+
+    inputReader.clearDirectHandler()
+    inputReader.finish()
+
+    #expect(finishCount.withLock { $0 } == 0)
+  }
 }

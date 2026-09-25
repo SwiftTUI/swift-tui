@@ -32,6 +32,7 @@ struct AsyncLifecycleGenerationTests {
       if signalName == "SIGWINCH" {
         reader?.send("SIGUSR1")
       }
+    } onFinish: {
     }
     reader.send("SIGWINCH")
 
@@ -50,10 +51,43 @@ struct AsyncLifecycleGenerationTests {
       if signalName == "SIGWINCH" {
         reader?.send("SIGUSR1")
       }
+    } onFinish: {
     }
 
     #expect(received.withLock { $0 } == ["SIGWINCH", "SIGUSR1"])
     reader.finish()
+  }
+
+  @Test("finishing the signal reader reports its end to the direct handler once")
+  func signalReaderFinishReportsEndToDirectHandlerOnce() {
+    let reader = InProcessSignalReader()
+    let log = Mutex<[String]>([])
+    reader.installDirectHandler { signalName in
+      log.withLock { $0.append(signalName) }
+    } onFinish: {
+      log.withLock { $0.append("finished") }
+    }
+
+    reader.send("SIGWINCH")
+    reader.finish()
+    reader.finish()
+    reader.send("SIGWINCH")
+
+    #expect(log.withLock { $0 } == ["SIGWINCH", "finished"])
+  }
+
+  @Test("a signal direct handler installed after finish is told the reader ended")
+  func signalReaderDirectHandlerInstalledAfterFinishIsToldAtOnce() {
+    let reader = InProcessSignalReader()
+    reader.finish()
+    let finishCount = Mutex(0)
+
+    reader.installDirectHandler { _ in
+    } onFinish: {
+      finishCount.withLock { $0 += 1 }
+    }
+
+    #expect(finishCount.withLock { $0 } == 1)
   }
 
   @Test("signal reader ignores stale stream teardown after replacement")

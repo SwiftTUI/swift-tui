@@ -277,9 +277,11 @@ extension FrameworkStressRuntimeTransportTests {
     reader.send(buffered)
 
     let directEvents = Mutex<[InputEvent]>([])
-    let drained = reader.installDirectHandler { event in
+    reader.installDirectHandler { event in
       directEvents.withLock { $0.append(event) }
+    } onFinish: {
     }
+    #expect(directEvents.withLock { $0 } == buffered)
     reader.send([.key(.character("c")), .key(.character("d"))])
     reader.clearDirectHandler()
 
@@ -293,8 +295,9 @@ extension FrameworkStressRuntimeTransportTests {
     reader.send(.key(.character("e")))
     reader.finish()
 
-    #expect(drained == buffered)
-    #expect(directEvents.withLock { $0 } == [.key(.character("c")), .key(.character("d"))])
+    #expect(
+      directEvents.withLock { $0 } == buffered + [.key(.character("c")), .key(.character("d"))]
+    )
     #expect(await task.value == [.key(.character("e"))])
   }
 }

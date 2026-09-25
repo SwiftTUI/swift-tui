@@ -74,21 +74,20 @@ extension RunLoop {
       } else {
         #if os(Android)
           if let directInputReader {
-            let pendingEvents = directInputReader.installDirectHandler { event in
+            directInputReader.installDirectHandler { event in
               renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
               if buffer.enqueue(.input(event)) {
                 directWake?()
                 continuation.yield()
               }
               ingressDiagnostics.recordPumpEnqueue(depth: buffer.pendingBatchCount())
-            }
-            for event in pendingEvents {
-              renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
-              if buffer.enqueue(.input(event)) {
-                directWake?()
+            } onFinish: {
+              // The host's stop finishes the reader. That ends input exactly
+              // as the stream path's EOF does; without it the loop never wakes.
+              if buffer.enqueue(.inputEnded) {
                 continuation.yield()
               }
-              ingressDiagnostics.recordPumpEnqueue(depth: buffer.pendingBatchCount())
+              completion.streamFinished(continuation)
             }
           } else {
             let inputEvents = terminalInputReader.inputEvents()
@@ -131,6 +130,8 @@ extension RunLoop {
               directWake?()
               continuation.yield()
             }
+          } onFinish: {
+            completion.streamFinished(continuation)
           }
         } else {
           let signalEvents =
