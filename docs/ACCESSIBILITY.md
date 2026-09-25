@@ -90,8 +90,10 @@ Supported primitive routes:
 
 Full and delta records add optional node fields `actionTarget`, `actions`,
 `isEnabled`, `value` (`{type: "boolean"|"number"|"text", value: ...}`),
-`valueMin`, `valueMax`, and `valueStep`. Existing presentation-only nodes omit
-these fields. A host must require an action token and advertised action before
+`valueMin`, `valueMax`, and `valueStep`. Presentation-only nodes omit these
+fields, except that any node under a disabled environment carries
+`isEnabled: false`, control or not; hosts read an absent `isEnabled` as
+enabled. A host must require an action token and advertised action before
 sending a request; this also detects older runtimes without action support.
 Unknown optional fields remain ignorable by older hosts.
 

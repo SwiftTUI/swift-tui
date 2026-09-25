@@ -598,6 +598,11 @@ package enum WebSurfaceFrameEncoder {
           ] {
             if let value, value.isFinite { fields.append("\(jsonString(key)):\(value)") }
           }
+        } else if !node.isEnabled {
+          // The enabled state comes from the environment, not the control, so
+          // a disabled non-control node (a group or heading under `.disabled`)
+          // must still say so; hosts read an absent key as enabled.
+          fields.append("\"isEnabled\":false")
         }
         return "{" + fields.joined(separator: ",") + "}"
       })

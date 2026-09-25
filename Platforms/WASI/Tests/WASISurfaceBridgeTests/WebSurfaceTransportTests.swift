@@ -846,6 +846,46 @@
       #expect(mixedNode["hidden"] as? Bool == true)
     }
 
+    @Test("encoder emits the disabled state of non-control accessibility nodes")
+    func encoderEmitsDisabledStateOfNonControlNodes() throws {
+      let root = Identity(components: ["root"])
+      let rect = CellRect(origin: .zero, size: .init(width: 2, height: 1))
+      var disabledGroup = AccessibilityNode(
+        identity: root.child("group"), parentIdentity: root, rect: rect, role: .group,
+        label: "Settings")
+      disabledGroup.isEnabled = false
+      var disabledHeading = AccessibilityNode(
+        identity: root.child("group").child("title"), parentIdentity: root.child("group"),
+        rect: rect, role: .heading(level: 1), label: "Title")
+      disabledHeading.isEnabled = false
+      var disabledButton = AccessibilityNode(
+        identity: root.child("group").child("save"), parentIdentity: root.child("group"),
+        rect: rect, role: .button, label: "Save")
+      disabledButton.actionTarget = "save-token"
+      disabledButton.control = .init(actions: [.focus, .activate])
+      disabledButton.isEnabled = false
+      let enabledStatus = AccessibilityNode(
+        identity: root.child("status"), parentIdentity: root, rect: rect, role: .status,
+        label: "Ready")
+      let record = WebSurfaceFrameEncoder.encode(
+        SemanticHostFrame(
+          sequence: 1,
+          raster: Self.basicSurface(),
+          semantics: SemanticSnapshot(
+            accessibilityNodes: [disabledGroup, disabledHeading, disabledButton, enabledStatus]
+          ),
+          focusedIdentity: nil
+        )
+      )
+      let tree = try #require(
+        try Self.decodedSurfaceFrame(record)["accessibilityTree"] as? [[String: Any]])
+      #expect(tree.map { $0["isEnabled"] as? Bool } == [false, false, false, nil])
+      #expect(tree[0]["actionTarget"] == nil)
+      #expect(tree[1]["actions"] == nil)
+      // A disabled control keeps its established key order: after `actions`.
+      #expect(record.contains("\"actions\":[\"focus\",\"activate\"],\"isEnabled\":false"))
+    }
+
     @Test("encoder emits v2 imperative accessibility announcements")
     func encoderEmitsAccessibilityAnnouncements() throws {
       let frame = try Self.decodedSurfaceFrame(
