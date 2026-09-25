@@ -74,6 +74,23 @@ extension SnapshotRenderer {
       return
         "StyleHeavyFields(appearance:\(try canonicalValue(value.appearance)),theme:\(try canonicalValue(value.theme)))"
     }
+    if let value = value as? MeshGradient {
+      // The mesh keeps its fields in boxed storage, and a `SIMD2` point has
+      // no reflectable fields. The public accessors are the whole value.
+      let points = try value.points.map {
+        "(\(try canonicalValue($0.x)),\(try canonicalValue($0.y)))"
+      }
+      let fields = [
+        "\"width\":\(try canonicalValue(value.width))",
+        "\"height\":\(try canonicalValue(value.height))",
+        "\"points\":[\(points.joined(separator: ","))]",
+        "\"colors\":\(try canonicalValue(value.colors))",
+        "\"background\":\(try canonicalValue(value.background))",
+        "\"smoothsColors\":\(try canonicalValue(value.smoothsColors))",
+        "\"colorSpace\":\(try canonicalValue(value.colorSpace))",
+      ]
+      return "\(String(reflecting: MeshGradient.self)){\(fields.joined(separator: ","))}"
+    }
     if let command = value as? DrawCommand {
       switch command {
       case .canvas, .foreignSurface:

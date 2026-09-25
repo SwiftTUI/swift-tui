@@ -108,6 +108,32 @@ struct CanonicalDrawSnapshotTests {
     #expect(try printer.canonicalDrawTree(nested) != printer.canonicalDrawTree(tree()))
   }
 
+  @Test("mesh gradients in commands and styles serialize structurally")
+  func meshGradientValues() throws {
+    let printer = SnapshotRenderer()
+    func mesh(corner: Color = .yellow, x: Float = 1) -> MeshGradient {
+      MeshGradient(
+        width: 2, height: 2,
+        points: [SIMD2(0, 0), SIMD2(x, 0), SIMD2(0, 1), SIMD2(1, 1)],
+        colors: [.red, .blue, .green, corner])
+    }
+    func filled(_ mesh: MeshGradient) -> DrawNode {
+      tree([
+        .fill(
+          bounds: bounds, geometry: .rectangle, insetAmount: 0, style: .meshGradient(mesh),
+          mode: .full)
+      ])
+    }
+    let first = try printer.canonicalDrawTree(filled(mesh()))
+    #expect(first.contains("MeshGradient{\"width\":2,\"height\":2,"))
+    #expect(try first == printer.canonicalDrawTree(filled(mesh())))
+    #expect(try first != printer.canonicalDrawTree(filled(mesh(corner: .white))))
+    #expect(try first != printer.canonicalDrawTree(filled(mesh(x: 0.5))))
+    var styled = tree()
+    styled.environmentSnapshot.style.foregroundStyle = .meshGradient(mesh())
+    #expect(try printer.canonicalDrawTree(styled).contains("MeshGradient{"))
+  }
+
   @Test("overlapping image order, bytes, identity and opacity remain distinct")
   func images() throws {
     let printer = SnapshotRenderer()
