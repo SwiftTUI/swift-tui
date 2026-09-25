@@ -258,6 +258,41 @@ struct KeyframeAnimatorRuntimeTests {
       Set(probe.values) == [0, 10], "intermediate values under reduce motion: \(probe.values)")
   }
 
+  @Test("under reduce motion a one-shot started on appearance shows its end value")
+  func reduceMotionShowsOneShotEnd() async throws {
+    let probe = KeyframeValueProbe()
+    let harness = try AnimatorRuntimeHarness(motion: .reduced) {
+      KeyframeOneShotFixture(probe: probe)
+    }
+    defer { harness.shutdown() }
+
+    // The first frame already shows the end, so an entrance never renders
+    // its hidden start.
+    #expect(harness.frame.contains("v=10"), "\(harness.frame)")
+    try await harness.wait(until: { harness.activeTaskCount == 0 })
+    #expect(Set(probe.values) == [10], "\(probe.values)")
+  }
+
+  @Test(
+    "a one-shot settles at its end on a mid-run Reduce Motion flip and does not replay after")
+  func oneShotMotionFlipSettlesAtEnd() async throws {
+    let probe = KeyframeValueProbe()
+    let harness = try AnimatorRuntimeHarness {
+      KeyframeMotionFlipFixture(probe: probe, repeating: false)
+    }
+    defer { harness.shutdown() }
+    try await harness.wait(until: { (probe.values.last ?? 0) > 2 })
+    try harness.clickText("flip")
+    try await harness.wait(until: { probe.values.last == 10 && harness.activeTaskCount == 0 })
+    let settledCount = probe.values.count
+    try harness.clickText("flip")
+    try await harness.hold(for: .milliseconds(200))
+    #expect(
+      probe.values.dropFirst(settledCount).allSatisfy { $0 == 10 },
+      "restoring motion replayed the one-shot: \(probe.values.dropFirst(settledCount))")
+    #expect(harness.frame.contains("value=10"), "\(harness.frame)")
+  }
+
   @Test("under reduce motion repeating mode never writes")
   func reduceMotionRestsRepeatingMode() async throws {
     let probe = KeyframeValueProbe()
@@ -351,6 +386,20 @@ private struct KeyframeRepeatingFixture: View {
 }
 
 @MainActor
+private struct KeyframeOneShotFixture: View {
+  let probe: KeyframeValueProbe
+
+  var body: some View {
+    KeyframeAnimator(initialValue: 0.0, repeating: false) { value in
+      let _ = probe.record(value)
+      Text("v=\(Int(value.rounded()))")
+    } keyframes: { _ in
+      LinearKeyframe(10.0, duration: .milliseconds(400))
+    }
+  }
+}
+
+@MainActor
 private struct KeyframeAncestorAnimationFixture: View {
   let probe: KeyframeValueProbe
   @State private var bumps = 0
@@ -432,11 +481,12 @@ private struct KeyframeOuterStateFixture: View {
 
 private struct KeyframeMotionFlipFixture: View {
   let probe: KeyframeValueProbe
+  var repeating = true
   @State private var reduced = false
   var body: some View {
     VStack {
       Button("flip") { reduced.toggle() }
-      KeyframeAnimator(initialValue: 0.0) { value in
+      KeyframeAnimator(initialValue: 0.0, repeating: repeating) { value in
         let _ = probe.record(value)
         Text("value=\(Int(value))")
       } keyframes: { _ in

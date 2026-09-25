@@ -784,13 +784,15 @@ are omitted even when SwiftUI exposes a corresponding API.
   and `Animation.logicallyComplete(after:)` take Swift `Duration` values
   where SwiftUI takes `TimeInterval` seconds.
 - **Keyframe content does not animate implicitly, and reduce motion snaps a
-  triggered keyframe animation to its end value and rests a repeating one at
-  its initial value.** *Ratified.* `KeyframeAnimator` writes every sample
-  under a `disablesAnimations` transaction, so an enclosing `withAnimation`
-  scope or `.animation(_:value:)` never layers a curve on the keyframe-driven
-  values; transitions inside keyframe content are suppressed as a
-  consequence. A trigger change under reduce motion writes the end value at
-  once; repeating mode starts no task.
+  triggered or non-repeating keyframe animation to its end value and rests a
+  repeating one at its initial value.** *Ratified.* `KeyframeAnimator`
+  writes every sample under a `disablesAnimations` transaction, so an
+  enclosing `withAnimation` scope or `.animation(_:value:)` never layers a
+  curve on the keyframe-driven values; transitions inside keyframe content
+  are suppressed as a consequence. A trigger change under reduce motion
+  writes the end value at once, a `repeating: false` run started on
+  appearance shows its end value from its first frame, and repeating mode
+  starts no task.
 - **`Transaction` residue: `isContinuous` not consumed and
   `TransactionKey.Value` narrowed.** *Ratified.* `Transaction` carries
   animation intent, `disablesAnimations`, `isContinuous`, `tracksVelocity`,

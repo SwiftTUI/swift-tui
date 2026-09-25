@@ -38,7 +38,8 @@ import SwiftTUICore
 ///
 /// `init(initialValue:repeating:content:keyframes:)` starts on appearance;
 /// with `repeating: true` (the default) the keyframes loop from
-/// `initialValue` for as long as the view is on screen.
+/// `initialValue` for as long as the view is on screen, and with
+/// `repeating: false` they run once.
 ///
 /// ### How it animates
 ///
@@ -60,6 +61,9 @@ import SwiftTUICore
 ///
 /// Under reduce motion a trigger change writes the keyframes' end value at
 /// once, and repeating mode rests at `initialValue` without starting a task.
+/// A non-repeating run started on appearance shows its end value from the
+/// first frame, and one that reduce motion settles mid-run lands there too.
+/// Restoring motion does not replay it.
 public struct KeyframeAnimator<Value: Sendable, KeyframePath: Keyframes, Content: View>: View
 where KeyframePath.Value == Value {
   private enum Mode {
@@ -85,6 +89,9 @@ where KeyframePath.Value == Value {
   @State private var lastRunTrigger: KeyframeTriggerKey?
   /// The timeline in flight, for retrigger continuity.
   @State private var flight: KeyframeFlight<Value>?
+  /// Whether reduce motion settled a non-repeating appearance run at its
+  /// end, so restoring motion leaves it there.
+  @State private var oneShotSettled = false
 
   /// Creates an animator that runs its keyframes once per `trigger` change.
   public init(
@@ -135,6 +142,7 @@ where KeyframePath.Value == Value {
     // trick): a first access from inside `.task` would land on the seed.
     _ = lastRunTrigger
     _ = flight
+    _ = oneShotSettled
     switch mode {
     case .trigger(let trigger):
       keyframeContent
@@ -144,7 +152,18 @@ where KeyframePath.Value == Value {
         }
     case .onAppear(let repeating):
       if reduceMotion {
-        if flight != nil {
+        if !repeating {
+          // A single run has an end, so it shows there at once, as a trigger
+          // change does, rather than resting at a start the keyframes leave.
+          let end = oneShotSettled ? value : oneShotEndValue
+          keyframeContent(showing: end)
+            .task { @MainActor in
+              guard !Task.isCancelled, !oneShotSettled else { return }
+              value = end
+              flight = nil
+              oneShotSettled = true
+            }
+        } else if flight != nil {
           keyframeContent
             .task { @MainActor in
               guard !Task.isCancelled else { return }
@@ -154,6 +173,8 @@ where KeyframePath.Value == Value {
         } else {
           keyframeContent
         }
+      } else if !repeating, oneShotSettled {
+        keyframeContent
       } else {
         keyframeContent
           .task { @MainActor in
@@ -170,9 +191,21 @@ where KeyframePath.Value == Value {
   private var keyframeContent: some View {
     // Read this animator's own slot under its own context, then evaluate the
     // enclosing view's closure under the context that authored it.
-    let current = value
-    return withAuthoringContext(contentAuthoringContext) { content(current) }
+    keyframeContent(showing: value)
+  }
+
+  private func keyframeContent(showing current: Value) -> some View {
+    withAuthoringContext(contentAuthoringContext) { content(current) }
       .transaction { $0.disablesAnimations = true }
+  }
+
+  /// Where a non-repeating appearance run ends: the end of the run in
+  /// flight, or of a fresh run from `initialValue`.
+  private var oneShotEndValue: Value {
+    let timeline =
+      flight?.timeline
+      ?? KeyframeTimeline(initialValue: initialValue, keyframes: keyframes(initialValue))
+    return timeline.value(time: timeline.duration)
   }
 
   // MARK: - Drivers

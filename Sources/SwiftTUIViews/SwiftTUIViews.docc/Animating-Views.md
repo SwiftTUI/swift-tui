@@ -492,8 +492,9 @@ for charts and tests. Two things to know:
 - `Int` properties step, because integer `VectorArithmetic` scaling
   truncates. Use `Double` tracks and round in the content closure.
 
-Under reduce motion a trigger change writes the end value at once and
-repeating mode rests at its initial value.
+Under reduce motion a trigger change writes the end value at once,
+repeating mode rests at its initial value, and a `repeating: false` run
+shows its end value from its first frame.
 
 ## Redraw On A Schedule
 
@@ -637,11 +638,11 @@ reference. Every built-in animation then renders in static form:
   `withAnimation` completions still fire.
 - ``View/contentTransition(_:)`` cuts to the new string instead of rolling.
 - ``PhaseAnimator`` rests at its first phase instead of cycling.
-- A triggered ``KeyframeAnimator`` settles at its final value; a repeating
-  animator rests at its initial value. Changing Reduce Motion during a run
-  settles its value immediately, so restoring motion does not reveal a stale
-  intermediate sample. A triggered phase animator similarly settles at its
-  first phase.
+- A triggered or non-repeating ``KeyframeAnimator`` settles at its final
+  value; a repeating animator rests at its initial value. Changing Reduce
+  Motion during a run settles its value immediately, so restoring motion
+  does not reveal a stale intermediate sample. A triggered phase animator
+  similarly settles at its first phase.
 - ``TimelineView`` schedules run at a low cadence — the `.animation`
   schedule drops to about four updates per second, and periodic schedules
   fire at most once per second.
