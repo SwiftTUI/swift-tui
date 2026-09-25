@@ -6750,6 +6750,80 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.lines == ["", "", "  X", "", ""])
   }
 
+  @Test(
+    "oversized frame content overflows around its alignment",
+    arguments: [
+      (Alignment.leading, 0, "ABCD"), (.center, -3, "DEFG"), (.trailing, -6, "GHIJ"),
+    ])
+  func oversizedFrameContentOverflowsAroundItsAlignment(
+    alignment: Alignment, originX: Int, visible: String
+  ) {
+    let artifacts = DefaultRenderer().render(
+      Text("ABCDEFGHIJ").fixedSize().frame(width: 4, height: 1, alignment: alignment),
+      context: .init(identity: testIdentity("Root"))
+    )
+    #expect(artifacts.placedTree.children.first?.bounds.origin == .init(x: originX, y: 0))
+
+    let clipped = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Text("|")
+        Text("ABCDEFGHIJ").fixedSize().frame(width: 4, height: 1, alignment: alignment)
+          .clipped()
+        Text("|")
+      },
+      context: .init(identity: testIdentity("Clipped"))
+    )
+    #expect(clipped.rasterSurface.lines == ["|\(visible)|"])
+  }
+
+  @Test("centred oversized content leaves an odd overflow cell trailing and below")
+  func centeredOversizedContentLeavesOddOverflowTrailing() {
+    let artifacts = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        Text("ABCDEFGHI")
+        Text("2")
+        Text("3")
+        Text("4")
+      }
+      .fixedSize()
+      .frame(width: 4, height: 1),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    // (4 - 9) / 2 and (1 - 4) / 2 truncate to -2 and -1, just as (9 - 4) / 2
+    // truncates to 2 for undersized content: the odd cell always falls on the
+    // frame's trailing and bottom side.
+    #expect(artifacts.placedTree.children.first?.bounds.origin == .init(x: -2, y: -1))
+  }
+
+  @Test("centred overlays and backgrounds overflow their primary symmetrically")
+  func centeredDecorationsOverflowPrimarySymmetrically() {
+    let overlaid = DefaultRenderer().render(
+      Text("abcd").overlay { Text("ABCDEFGHIJ").fixedSize() },
+      context: .init(identity: testIdentity("Overlay"))
+    )
+    #expect(overlaid.placedTree.children.map(\.bounds.origin) == [.zero, .init(x: -3, y: 0)])
+
+    let backed = DefaultRenderer().render(
+      Text("abcd").background { Text("ABCDEFGHIJ").fixedSize() },
+      context: .init(identity: testIdentity("Background"))
+    )
+    #expect(
+      backed.placedTree.children.map(\.bounds.origin).sorted { $0.x < $1.x } == [
+        .init(x: -3, y: 0), .zero,
+      ])
+
+    let clipped = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Text("|")
+        Text("abcd").overlay { Text("ABCDEFGHIJ").fixedSize() }.clipped()
+        Text("|")
+      },
+      context: .init(identity: testIdentity("ClippedOverlay"))
+    )
+    #expect(clipped.rasterSurface.lines == ["|DEFG|"])
+  }
+
   @Test("ZStack supports arbitrary combined alignment guides")
   func zStackSupportsCombinedAlignmentGuides() {
     let alignment = Alignment(horizontal: .trailing, vertical: .firstTextBaseline)

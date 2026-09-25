@@ -20,12 +20,16 @@ extension LayoutEngine {
     in bounds: CellRect,
     alignment: Alignment
   ) -> CellPoint {
+    // Content larger than its container overflows both edges, as in SwiftUI,
+    // so centred and trailing offsets go negative. Integer division truncates
+    // toward zero, so an odd cell falls on the container's trailing (or
+    // bottom) side whether it is a gap or an overflow.
     let x =
       if alignment.horizontal == .center,
         referenceDimensions.explicitValue(for: HorizontalAlignment.center) == nil,
         childDimensions.explicitValue(for: HorizontalAlignment.center) == nil
       {
-        bounds.origin.x + max(0, (referenceDimensions.width - childDimensions.width) / 2)
+        bounds.origin.x + (referenceDimensions.width - childDimensions.width) / 2
       } else {
         bounds.origin.x
           + referenceDimensions[alignment.horizontal]
@@ -37,7 +41,7 @@ extension LayoutEngine {
         referenceDimensions.explicitValue(for: VerticalAlignment.center) == nil,
         childDimensions.explicitValue(for: VerticalAlignment.center) == nil
       {
-        bounds.origin.y + max(0, (referenceDimensions.height - childDimensions.height) / 2)
+        bounds.origin.y + (referenceDimensions.height - childDimensions.height) / 2
       } else {
         bounds.origin.y
           + referenceDimensions[alignment.vertical]
@@ -187,9 +191,9 @@ extension LayoutEngine {
     case .leading:
       return origin
     case .center:
-      return origin + max(0, (availableSize - childSize) / 2)
+      return origin + (availableSize - childSize) / 2
     case .trailing:
-      return origin + max(0, availableSize - childSize)
+      return origin + availableSize - childSize
     default:
       return nil
     }
@@ -210,9 +214,9 @@ extension LayoutEngine {
     case .top:
       return origin
     case .center:
-      return origin + max(0, (availableSize - childSize) / 2)
+      return origin + (availableSize - childSize) / 2
     case .bottom:
-      return origin + max(0, availableSize - childSize)
+      return origin + availableSize - childSize
     default:
       return nil
     }
