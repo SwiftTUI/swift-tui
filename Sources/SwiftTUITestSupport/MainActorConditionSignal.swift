@@ -1,3 +1,5 @@
+import Synchronization
+
 /// A `MainActor`-isolated, poll-free condition waiter for tests.
 ///
 /// `MainActorConditionSignal` replaces the "poll a predicate on a timer until a
@@ -11,18 +13,36 @@
 /// synchronises on the state change, not on the wall clock.
 @MainActor
 @_spi(Testing) public final class MainActorConditionSignal {
+  /// Set by the cancellation handler, which runs synchronously on the
+  /// cancelling executor, so `notify()` stops evaluating a cancelled waiter's
+  /// predicate before the MainActor hop that unregisters it has run.
+  private final class Cancellation: Sendable {
+    private let flag = Atomic(false)
+
+    var isCancelled: Bool {
+      flag.load(ordering: .acquiring)
+    }
+
+    func cancel() {
+      flag.store(true, ordering: .releasing)
+    }
+  }
+
   private final class Waiter {
     let id: UInt64
     let predicate: @MainActor () -> Bool
+    let cancellation: Cancellation
     let continuation: CheckedContinuation<Void, Never>
 
     init(
       id: UInt64,
       predicate: @escaping @MainActor () -> Bool,
+      cancellation: Cancellation,
       continuation: CheckedContinuation<Void, Never>
     ) {
       self.id = id
       self.predicate = predicate
+      self.cancellation = cancellation
       self.continuation = continuation
     }
   }
@@ -37,6 +57,9 @@
 
   /// Re-evaluates every pending waiter, resuming those whose predicate now holds.
   ///
+  /// A waiter whose task has been cancelled is skipped: its predicate never
+  /// runs again, and the cancellation hop resumes it.
+  ///
   /// Call this after every change to the state the waiters observe.
   @_spi(Testing) public func notify() {
     guard !waiters.isEmpty else {
@@ -46,7 +69,9 @@
     var remaining: [Waiter] = []
     var ready: [Waiter] = []
     for waiter in waiters {
-      if waiter.predicate() {
+      if waiter.cancellation.isCancelled {
+        remaining.append(waiter)
+      } else if waiter.predicate() {
         ready.append(waiter)
       } else {
         remaining.append(waiter)
@@ -71,6 +96,7 @@
     }
     let id = nextID
     nextID &+= 1
+    let cancellation = Cancellation()
     await withTaskCancellationHandler {
       await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
         if Task.isCancelled {
@@ -78,13 +104,20 @@
           return
         }
         waiters.append(
-          Waiter(id: id, predicate: predicate, continuation: continuation)
+          Waiter(
+            id: id,
+            predicate: predicate,
+            cancellation: cancellation,
+            continuation: continuation
+          )
         )
       }
     } onCancel: {
-      // `onCancel` runs synchronously on an arbitrary executor; hop back to
+      // `onCancel` runs synchronously on an arbitrary executor. Mark the
+      // waiter cancelled right away so `notify()` skips it, then hop back to
       // the MainActor to unregister the waiter and resume it. The hop task is
       // unstructured, so it still runs even though the parent task is cancelled.
+      cancellation.cancel()
       Task { @MainActor in
         guard let index = self.waiters.firstIndex(where: { $0.id == id }) else {
           return

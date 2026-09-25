@@ -30,6 +30,9 @@ predicate held: check cancellation before asserting progress. During teardown,
 cancel and join every task that owns a wait; an active call retains its signal.
 `ConditionSignal` removes cancelled predicates under its lock and resumes
 continuations after releasing it. Predicates must not re-enter that signal.
+`MainActorConditionSignal` resumes a cancelled waiter on a later `MainActor`
+turn, but `notify()` never evaluates that waiter's predicate after the
+cancellation.
 
 None of these three carries a timeout. That is deliberate: a starved producer
 must *delay* a waiter, never *fail* it. The test synchronises on the state
