@@ -144,9 +144,12 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
   }
 
   func currentValue() -> V? {
-    if first.phase == .ended, let v: V = first.currentValue() { return v }
-    if second.phase == .ended, let v: V = second.currentValue() { return v }
-    return nil
+    // The child whose phase the composite reports supplies its value, including
+    // mid-gesture: `first` until it gives up, then the `second` fallback.
+    if first.phase == .failed || first.phase == .cancelled {
+      return second.recognizingValue(as: V.self)
+    }
+    return first.recognizingValue(as: V.self)
   }
 
   func tearDown() {

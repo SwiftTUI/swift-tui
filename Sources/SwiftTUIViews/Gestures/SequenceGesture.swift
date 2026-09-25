@@ -5,7 +5,7 @@ public import SwiftTUICore
 /// ends. If either child fails, the whole sequence fails.
 public struct SequenceGesture<First: Gesture, Second: Gesture>: Gesture {
   /// The value of a gesture sequence, with the same structure as SwiftUI.
-  /// The value is `.first` while only the first gesture has recognized.
+  /// The value is `.first` while the first gesture is recognizing or has recognized.
   /// It is `.second` after the second stage starts.
   /// The value of the second stage is `nil` until that stage produces a value.
   public enum Value {
@@ -124,11 +124,11 @@ final class SequenceGestureRecognizer<First: Gesture, Second: Gesture>: GestureR
   }
 
   func currentValue() -> Value? {
-    guard let firstValue: First.Value = first.currentValue(as: First.Value.self) else {
+    guard let firstValue = first.recognizingValue(as: First.Value.self) else {
       return nil
     }
     guard first.phase == .ended else {
-      return nil
+      return .first(firstValue)
     }
     if second.phase == .ended || second.phase == .began || second.phase == .changed {
       return .second(firstValue, second.currentValue(as: Second.Value.self))

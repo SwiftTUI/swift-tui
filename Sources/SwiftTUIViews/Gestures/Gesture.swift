@@ -84,3 +84,18 @@ extension Never: Gesture {
 public enum GestureBuilder {
   public static func buildBlock<G: Gesture>(_ gesture: G) -> G { gesture }
 }
+
+extension AnyGestureRecognizer {
+  /// Reads a composite gesture's child value: the value while the child is
+  /// recognizing (`.began`, `.changed`) or once it has recognized (`.ended`),
+  /// and `nil` before it begins or after it fails or is cancelled. SwiftUI's
+  /// composites surface in-progress child values, so `.updating`,
+  /// `.onChanged`, and `.map` observe a continuous child such as a drag
+  /// mid-gesture, not only when it ends.
+  func recognizingValue<V>(as type: V.Type) -> V? {
+    switch phase {
+    case .began, .changed, .ended: currentValue(as: type)
+    case .possible, .failed, .cancelled: nil
+    }
+  }
+}

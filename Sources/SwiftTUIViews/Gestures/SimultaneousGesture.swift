@@ -6,7 +6,8 @@ public import SwiftTUICore
 /// both children have given up.
 public struct SimultaneousGesture<First: Gesture, Second: Gesture>: Gesture {
   /// The value of a simultaneous gesture.
-  /// A child that recognized the gesture contains its value. The other child contains `nil`.
+  /// A child that is recognizing or has recognized its gesture contains its current value.
+  /// A child that has not begun, has failed, or was cancelled contains `nil`.
   public struct Value {
     public var first: First.Value?
     public var second: Second.Value?
@@ -128,10 +129,8 @@ final class SimultaneousGestureRecognizer<First: Gesture, Second: Gesture>: Gest
   }
 
   func currentValue() -> Value? {
-    let firstValue: First.Value? =
-      first.phase == .ended ? first.currentValue(as: First.Value.self) : nil
-    let secondValue: Second.Value? =
-      second.phase == .ended ? second.currentValue(as: Second.Value.self) : nil
+    let firstValue = first.recognizingValue(as: First.Value.self)
+    let secondValue = second.recognizingValue(as: Second.Value.self)
     guard firstValue != nil || secondValue != nil else { return nil }
     return Value(first: firstValue, second: secondValue)
   }
