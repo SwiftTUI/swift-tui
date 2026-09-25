@@ -50,18 +50,18 @@ func updateBoundControlValue<Value: AdjustableControlValue>(
   return true
 }
 
+/// Assistive steps go through the same live adjustment policy as the
+/// keyboard and wheel, so each control keeps one rule for every input vector.
 @MainActor
 func accessibilityNumericAction<Value: AdjustableControlValue>(
   _ action: AccessibilityAction, binding: Binding<Value>, bounds: ClosedRange<Value>?,
-  step: Value
+  adjust: @MainActor (Int) -> Bool
 ) -> AccessibilityActionOutcome {
   switch action {
   case .activate, .increment:
-    return updateBoundControlValue(binding, delta: 1, step: step, bounds: bounds)
-      ? .changed : .unchanged
+    return adjust(1) ? .changed : .unchanged
   case .decrement:
-    return updateBoundControlValue(binding, delta: -1, step: step, bounds: bounds)
-      ? .changed : .unchanged
+    return adjust(-1) ? .changed : .unchanged
   case .setValue(.number(let number)):
     guard let next = Value.accessibilityValue(number) else { return .invalidValue }
     guard next != binding.wrappedValue else { return .unchanged }

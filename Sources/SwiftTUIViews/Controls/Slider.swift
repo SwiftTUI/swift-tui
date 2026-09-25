@@ -129,10 +129,13 @@ extension Slider {
         context: context,
         fallbackAuthoringScope: authoringScope
       )
+      let adjust: @MainActor @Sendable (Int) -> Bool = { delta in
+        updateBoundControlValue(binding, delta: delta, step: adjustmentStep, bounds: bounds)
+      }
       intake.registerAction(
         identity: context.identity,
         accessibilityHandler: { action in
-          accessibilityNumericAction(action, binding: binding, bounds: bounds, step: adjustmentStep)
+          accessibilityNumericAction(action, binding: binding, bounds: bounds, adjust: adjust)
         }
       ) {
         let next = steppedControlValue(
@@ -146,9 +149,6 @@ extension Slider {
         }
         binding.wrappedValue = next
         return true
-      }
-      let adjust: @MainActor @Sendable (Int) -> Bool = { delta in
-        updateBoundControlValue(binding, delta: delta, step: adjustmentStep, bounds: bounds)
       }
       registerValueAdjustmentInput(intake: intake, identity: context.identity, adjust: adjust)
       let trackRouteID = runtimePrimaryRouteID(

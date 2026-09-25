@@ -153,7 +153,7 @@ extension Stepper {
       intake.registerAction(
         identity: context.identity,
         accessibilityHandler: { action in
-          accessibilityNumericAction(action, binding: binding, bounds: bounds, step: step)
+          accessibilityNumericAction(action, binding: binding, bounds: bounds, adjust: adjust)
         }
       ) {
         adjust(1)

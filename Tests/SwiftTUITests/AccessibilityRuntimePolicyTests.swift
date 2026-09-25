@@ -903,6 +903,68 @@ struct AccessibilityActionRuntimeTests {
     #expect(try request("Toggle", .activate) == .outOfScope)
     #expect(try request("ModalChild", .focus) == .accepted)
   }
+
+  @Test(
+    "Assistive steps in a bounds-blocked direction leave an out-of-range Stepper model untouched",
+    arguments: 0..<4)
+  func blockedAssistiveStepperStepPreservesOutOfRangeModel(combination: Int) throws {
+    let useDouble = combination % 2 == 1
+    let below = combination / 2 == 1
+    let raw = below ? -5 : 10
+    let integer = AssistiveValueProbe(raw)
+    let floating = AssistiveValueProbe(Double(raw))
+    let root = testIdentity("AssistiveBoundsRoot")
+    let size = CellSize(width: 40, height: 4)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: size, focusTracker: focus
+    ) {
+      if useDouble {
+        Stepper("Bounded", value: floating.binding(), in: 0.0...5.0).id(testIdentity("Bounded"))
+      } else {
+        Stepper("Bounded", value: integer.binding(), in: 0...5).id(testIdentity("Bounded"))
+      }
+    }
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+
+    let target = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first {
+        $0.identity == testIdentity("Bounded")
+      }?.actionTarget)
+    let result = loop.handleAccessibilityAction(
+      .init(target: target, action: below ? .decrement : .increment))
+    try loop.renderPendingFrames(renderedFrames: &frames)
+
+    #expect(result == .accepted)
+    #expect(integer.value == raw)
+    #expect(floating.value == Double(raw))
+    #expect(integer.writes.isEmpty)
+    #expect(floating.writes.isEmpty)
+  }
+}
+
+@MainActor
+private final class AssistiveValueProbe<Value> {
+  var value: Value
+  var writes: [Value] = []
+
+  init(_ value: Value) {
+    self.value = value
+  }
+
+  func binding() -> Binding<Value> {
+    Binding(
+      get: { self.value },
+      set: {
+        self.value = $0
+        self.writes.append($0)
+      }
+    )
+  }
 }
 
 private struct AssistiveControls: View {
