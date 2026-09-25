@@ -62,8 +62,17 @@
 /// becomes a zero-length yield).
 @_spi(Testing) public func testSleep(microseconds: UInt32) {
   #if os(Windows)
-    Sleep(max(1, (microseconds &+ 999) / 1000))
+    Sleep(testSleepMilliseconds(microseconds: microseconds))
   #else
     _ = usleep(microseconds)
   #endif
+}
+
+/// The Windows `Sleep` argument for a ``testSleep(microseconds:)`` request:
+/// whole milliseconds rounded up, and at least one. Exact across the whole
+/// `UInt32` range (`UInt32.max` microseconds is 4,294,968 ms). Kept outside
+/// the platform branch so every platform can test it.
+package func testSleepMilliseconds(microseconds: UInt32) -> UInt32 {
+  let (milliseconds, remainder) = microseconds.quotientAndRemainder(dividingBy: 1000)
+  return max(1, remainder == 0 ? milliseconds : milliseconds + 1)
 }

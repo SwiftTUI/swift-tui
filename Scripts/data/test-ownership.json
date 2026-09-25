@@ -2694,6 +2694,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/TestPipeSupportTests.swift": {
+      "category": "test-support",
+      "reason": "Tests shared synchronization, soundness or clock support used by runtime tests."
+    },
     "Tests/SwiftTUITests/TextEditorSurfaceTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
