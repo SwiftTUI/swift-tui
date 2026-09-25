@@ -587,7 +587,8 @@ change what a second one resolves), so realized children are input to the
 fresh pass exactly as the resolved tree is, and the observe-only contract
 holds by construction. Second, the scratch context carries the production
 session as `measurementSeedSession`, consumed only by the custom-layout
-hysteresis-seeding seam (`RetainedMeasurementSeedableLayout`). The scroll
+hysteresis-seeding seam (`RetainedMeasurementSeedableLayout`) and the hosted
+collections' retained tall-row heights. The scroll
 indicator gutter is bistable by design — a confirmed seed keeps the previous
 frame's fixed point as anti-flicker hysteresis — so an unseeded shadow would
 re-decide knife-edge content and report a legitimate fixed-point difference as
