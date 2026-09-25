@@ -372,11 +372,15 @@ package enum AnimationPropertyValueApplication {
 
     case .shapeTrim:
       guard let interval = value.unwrap(as: AnimatablePair<Double, Double>.self),
-        var stroke = AnimatableSnapshot.strokeStyle(of: node), stroke.trim != nil
+        AnimatableSnapshot.shapeStrokeTrim(of: node) != nil,
+        var stroke = AnimatableSnapshot.strokeStyle(of: node)
       else {
         return
       }
-      stroke.trim = StrokeTrim(from: interval.first, to: interval.second)
+      // The whole outline goes back to no trim, as a shape resolves it, so a
+      // finished draw-on strokes exactly like the untrimmed shape.
+      let trim = StrokeTrim(from: interval.first, to: interval.second)
+      stroke.trim = trim.isWhole ? nil : trim
       AnimatableSnapshot.setStrokeStyle(stroke, on: &node)
 
     case .textRoll:

@@ -100,7 +100,7 @@ extension Shape {
   /// The trim a stroke of this shape carries, or `nil` for the whole outline.
   package var strokeTrim: StrokeTrim? {
     let trim = StrokeTrim(from: trimStart, to: trimEnd)
-    return trim.from <= 0 && trim.to >= 1 ? nil : trim
+    return trim.isWhole ? nil : trim
   }
 
   /// The geometry a fill or a clip of this shape uses.

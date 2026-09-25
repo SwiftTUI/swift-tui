@@ -235,6 +235,14 @@ package struct StrokeTrim: Equatable, Sendable {
   package var isEmpty: Bool {
     !(from < to)
   }
+
+  /// The whole outline, which a stroke draws as though it had no trim.
+  package static let whole = StrokeTrim(from: 0, to: 1)
+
+  /// Whether the interval keeps the whole outline.
+  package var isWhole: Bool {
+    from <= 0 && to >= 1
+  }
 }
 
 /// Per-edge background styling used behind stroked borders.

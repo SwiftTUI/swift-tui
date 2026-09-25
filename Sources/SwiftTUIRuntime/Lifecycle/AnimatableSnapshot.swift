@@ -95,10 +95,12 @@ package struct AnimatableSnapshot: Sendable {
       snapshot[.strokeDashPhase] = AnyAnimatable(stroke.dashPhase)
     }
 
-    // A trimmed stroke animates its interval, which is how an outline draws
-    // itself on. An untrimmed stroke has no slot, for the reason a solid stroke
-    // has no dash-phase slot.
-    if let trim = Self.strokeStyle(of: node)?.trim {
+    // A shape stroke animates its trim interval, which is how an outline draws
+    // itself on. Unlike a solid stroke's dash phase, an untrimmed stroke's
+    // interval is real: it draws the whole outline, `0...1`. A shape resolves
+    // that interval as no trim, so the slot carries it explicitly; otherwise a
+    // draw-on that ends at `to: 1`, or an undraw that starts there, would snap.
+    if let trim = Self.shapeStrokeTrim(of: node) {
       snapshot[.shapeTrim] = AnyAnimatable(AnimatablePair(trim.from, trim.to))
     }
 
@@ -239,6 +241,18 @@ package struct AnimatableSnapshot: Sendable {
     } else if case .rule = node.drawPayload {
       node.drawPayload = .rule(stroke)
     }
+  }
+
+  /// The part of the outline a shape stroke keeps: the whole outline when the
+  /// stroke carries no trim, or `nil` for a node that is not a shape stroke.
+  /// Borders and rules are never trimmed.
+  package static func shapeStrokeTrim(of node: ResolvedNode) -> StrokeTrim? {
+    guard case .shape(let payload) = node.drawPayload,
+      case .stroke(_, let strokeStyle, _, _) = payload.operation
+    else {
+      return nil
+    }
+    return strokeStyle.trim ?? .whole
   }
 
   /// The stroke style a node dashes with, or `nil` for a solid stroke.
