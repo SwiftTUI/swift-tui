@@ -2,6 +2,7 @@
 import Synchronization
 
 #if os(Android)
+  import Android
   @_spi(MainActorUtilities) import _Concurrency
 #endif
 
@@ -409,6 +410,14 @@ public final class AndroidHostSceneHost {
       sceneID: selectedSceneID,
       surface: surface,
       renderMode: .sync,
+      runtimeIssueSink: RuntimeIssueSink { issue in
+        #if os(Android)
+          let priority = issue.severity == .error ? ANDROID_LOG_ERROR : ANDROID_LOG_WARN
+          _ = unsafe __android_log_write(Int32(priority.rawValue), "SwiftTUI", issue.description)
+        #else
+          RuntimeIssueSink.standardError.report(issue)
+        #endif
+      },
       onFocusPresentationChange: { presentation in
         state.updateFocusPresentation(presentation)
       }

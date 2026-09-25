@@ -191,7 +191,7 @@ extension RunLoop {
       {
         return nil
       }
-      return .userExit(keyPress)
+      return configuredUserExit(keyPress)
     }
 
     // Intercept from the enclosing hosting scope toward the focused target,
@@ -223,7 +223,7 @@ extension RunLoop {
     // key outside these checks; consumers that pass ``ExitKeyBindings.none``
     // opt out of framework-provided exits entirely.
     if exitKeyBindings.contains(keyPress) {
-      return .userExit(keyPress)
+      return configuredUserExit(keyPress)
     }
 
     if let keyHandler {

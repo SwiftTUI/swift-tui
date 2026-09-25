@@ -160,6 +160,9 @@ public protocol PresentationSurfaceMetricsProvider: AnyObject {
   var theme: Theme? { get }
   var graphicsCapabilities: TerminalGraphicsCapabilities { get }
   var pointerInputCapabilities: PointerInputCapabilities { get }
+  /// Whether a configured exit key may end this host's interactive session.
+  /// Retained browser and native hosts keep running and report a runtime error instead.
+  var supportsUserExit: Bool { get }
 }
 
 /// Terminal-control role for presentation targets that emit terminal bytes.
@@ -283,6 +286,10 @@ extension SemanticHostFramePresentationSurface {
 }
 
 extension PresentationSurfaceMetricsProvider {
+  public var supportsUserExit: Bool {
+    false
+  }
+
   public var theme: Theme? {
     nil
   }
@@ -301,6 +308,10 @@ extension TerminalCommandPresentationSurface {
 }
 
 extension PresentationSurface {
+  public var supportsUserExit: Bool {
+    true
+  }
+
   public var theme: Theme? {
     nil
   }

@@ -139,6 +139,8 @@ public struct WindowGroup<Content: View>: Scene {
   /// to `bindings`. The call replaces any previously configured set in
   /// full (there is no accumulation), so chained calls behave as
   /// last-write-wins.
+  /// Retained browser and native hosts consume unclaimed exit keys and report
+  /// a runtime error instead of ending the session.
   ///
   /// Pass ``ExitKeyBindings/none`` (or `[]`) to disable framework-level
   /// exits entirely. The window will then only exit in response to OS

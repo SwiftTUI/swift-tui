@@ -40,6 +40,26 @@ sibling repositories: [`swift-tui-web`](https://github.com/SwiftTUI/swift-tui-we
 (Gradle/Maven AAR + plugin). Tagged releases or released artifacts couple them
 back to this package.
 
+## Exit Keys And Host Lifecycle
+
+Configured exit keys (`Ctrl+C` by default) end terminal-native sessions.
+Browser, SwiftUI, and Android hosts retain their sessions: an unclaimed exit
+key is consumed and reports `lifecycle.userExitUnsupported` with error severity.
+Input, rendering, and view tasks continue. Repeated identical issues are
+reported once per run loop, like other runtime issues.
+
+The browser reports these errors through `console.error` and its diagnostic
+output, SwiftUI uses OSLog, and Android uses Logcat with the `SwiftTUI` tag.
+Commands and focused handlers still get their usual opportunity to claim a
+key first; `Ctrl+C` on a selected text range still copies it. Host-driven
+teardown, input completion, signals, and explicit programmatic termination
+keep their existing behavior.
+
+Custom surfaces declare `PresentationSurfaceMetricsProvider.supportsUserExit`.
+Its default is `false`; the terminal-shaped `PresentationSurface` aggregate
+defaults to `true`. The WASI ANSI adapter explicitly keeps it `false`, since
+terminal byte output does not give a browser ownership of app termination.
+
 ## 0.9 Preview Support Contract
 
 | Surface | 0.9 tier | Supported boundary |

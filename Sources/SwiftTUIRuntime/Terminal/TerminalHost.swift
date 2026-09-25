@@ -634,6 +634,8 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
   public final class WebTerminalHost: PresentationSurface, ClipboardWritingPresentationSurface,
     ClipboardReadingPresentationSurface, TerminalCursorFocusPresentationSurface, Sendable
   {
+    public var supportsUserExit: Bool { false }
+
     private struct State {
       var surfaceSize: CellSize
       var renderStyle: TerminalRenderStyle

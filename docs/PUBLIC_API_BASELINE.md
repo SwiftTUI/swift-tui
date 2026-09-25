@@ -19,7 +19,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 60 | 512 |
+| `SwiftTUIRuntime` | 60 | 515 |
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 415 | 2531 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
@@ -77,8 +77,8 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `Never` — extension — 2 members
 - `PasteEvent` — struct — 2 members
 - `PresentationMetrics` — typealias
-- `PresentationSurface` — protocol — 5 members
-- `PresentationSurfaceMetricsProvider` — protocol — 9 members
+- `PresentationSurface` — protocol — 6 members
+- `PresentationSurfaceMetricsProvider` — protocol — 11 members
 - `RasterPresentationSurface` — protocol — 1 member
 - `RenderSnapshot` — struct — 6 members
 - `RunLoop` — class — 11 members

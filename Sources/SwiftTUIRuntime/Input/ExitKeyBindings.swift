@@ -2,6 +2,8 @@ public import SwiftTUICore
 
 /// The set of key presses that cause the interactive run loop to exit
 /// with ``RunLoopExitReason/userExit(_:)``.
+/// Only terminal hosts support these exits. Retained browser and native hosts
+/// consume an unclaimed exit key, report a runtime error, and keep running.
 ///
 /// Configure per `WindowGroup` with ``WindowGroup/exitOnKeys(_:)`` or
 /// ``WindowGroup/exitOnKey(_:modifiers:)``. Each call replaces the

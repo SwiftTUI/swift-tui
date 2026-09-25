@@ -4788,6 +4788,11 @@ class WebHostSceneRuntime {
     this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`.slice(-16384);
   }
   notifyRuntimeIssue(issue) {
+    if (issue.severity === "error") {
+      console.error(issue.description);
+    } else {
+      console.warn(issue.description);
+    }
     this.writeOutput(`${issue.description}
 `);
   }

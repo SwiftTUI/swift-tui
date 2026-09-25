@@ -255,12 +255,16 @@ public enum WASIRunner {
         }
       }
 
-      return .init(
+      let resources = SceneSessionResources(
         presentationSurface: host,
         terminalInputReader: inputReader,
         signalReader: signalReader,
         surfaceName: "ghostty-web"
       )
+      resources.runtimeIssueSink = RuntimeIssueSink { issue in
+        try? host.write(WebSurfaceFrameEncoder.encodeRuntimeIssue(issue))
+      }
+      return resources
     }
 
     private static func wasiTransportMode() -> WASITransportMode {

@@ -586,14 +586,14 @@ extension FrameworkStressSceneHostTests {
     }
 
     _ = await surface.waitForFrame()
-    session.send(.key(KeyPress(.character("c"), modifiers: .ctrl)))
+    session.stop()
 
     var results: [RunLoopExitReason] = []
     for caller in callers {
       results.append(try await caller.value)
     }
     #expect(results.count == 8)
-    let expected = RunLoopExitReason.userExit(KeyPress(.character("c"), modifiers: .ctrl))
+    let expected = RunLoopExitReason.inputEnded
     #expect(results.allSatisfy { $0 == expected })
   }
 }

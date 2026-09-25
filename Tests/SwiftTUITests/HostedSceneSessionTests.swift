@@ -95,6 +95,87 @@ struct HostedSceneSessionTests {
     }
   }
 
+  private struct ExitBindingApp: App {
+    var exitKey = KeyPress(.character("c"), modifiers: .ctrl)
+    var editsText = false
+
+    init() {}
+
+    init(exitKey: KeyPress, editsText: Bool) {
+      self.exitKey = exitKey
+      self.editsText = editsText
+    }
+
+    var body: some Scene {
+      WindowGroup("Primary", id: WindowIdentifier("primary")) {
+        ExitBindingView(editsText: editsText)
+      }
+      .exitOnKeys([exitKey])
+    }
+  }
+
+  private struct ExitBindingView: View {
+    let editsText: Bool
+    @State private var count = 0
+    @State private var text = "hello"
+
+    var body: some View {
+      Panel(id: "exit-test") {
+        VStack {
+          Text("Count \(count)")
+          if editsText {
+            TextEditor(text: $text).frame(width: 12, height: 3)
+          } else {
+            Text("Focus").focusable(true)
+          }
+        }
+      }
+      .keyCommand("Increment", key: .character("i"), modifiers: .ctrl) {
+        count += 1
+      }
+    }
+  }
+
+  @Test(
+    "unclaimed hosted exit keys report an error and keep accepting input",
+    .timeLimit(.minutes(1)),
+    arguments: [
+      KeyPress(.character("c"), modifiers: .ctrl),
+      KeyPress(.character("q"), modifiers: .ctrl),
+      KeyPress(.character("q")),
+    ], [false, true]
+  )
+  func hostedExitKeysKeepSessionAlive(exitKey: KeyPress, editsText: Bool) async throws {
+    let recorder = SurfaceRecorder()
+    var issues: [RuntimeIssue] = []
+    let session = try HostedSceneSession(
+      for: ExitBindingApp(exitKey: exitKey, editsText: editsText),
+      sceneID: WindowIdentifier("primary"),
+      surface: hostedSurface(surfaceRecorder: recorder),
+      runtimeIssueSink: RuntimeIssueSink { issues.append($0) }
+    )
+    let task = Task { try await session.start() }
+    defer { session.stop() }
+    await recorder.updates.wait { recorder.surfaceCount >= 1 }
+
+    session.send(.key(exitKey))
+    session.send(.key(exitKey))
+    session.send(.key(.init(.character("i"), modifiers: .ctrl)))
+    await recorder.updates.wait {
+      recorder.latestSurface?.lines.contains(where: { $0.contains("Count 1") }) == true
+    }
+
+    #expect(issues.count == 1)
+    #expect(issues.first?.severity == .error)
+    #expect(issues.first?.code == "lifecycle.userExitUnsupported")
+    if editsText {
+      #expect(recorder.latestSurface?.lines.contains(where: { $0.contains("hello") }) == true)
+      #expect(recorder.latestSurface?.lines.contains(where: { $0.contains("qhello") }) == false)
+    }
+    session.stop()
+    #expect(try await task.value == .inputEnded)
+  }
+
   @Test("hosted scene session rerenders when the hosted raster surface refreshes")
   func hostedSceneSessionRerendersOnSurfaceRefresh() async throws {
     let recorder = SurfaceRecorder()
@@ -118,17 +199,17 @@ struct HostedSceneSessionTests {
       recorder.surfaceCount >= 2 && recorder.latestSurface?.size == .init(width: 32, height: 8)
     }
 
-    session.sendInput([0x03])  // Ctrl+C
+    session.stop()
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(exitReason == .inputEnded)
   }
 
   @Test("hosted scene session publishes raster surfaces and accepts direct input events")
   func hostedSurfaceSessionPublishesRasterSurfaceAndAcceptsDirectInputEvents() async throws {
     let recorder = SurfaceRecorder()
     let session = try HostedSceneSession(
-      for: HostedApp(),
+      for: CounterSurfaceApp(),
       sceneID: WindowIdentifier("primary"),
       surface: hostedSurface(surfaceRecorder: recorder)
     )
@@ -139,12 +220,17 @@ struct HostedSceneSessionTests {
 
     await recorder.updates.wait { recorder.surfaceCount >= 1 }
 
-    #expect(recorder.latestSurface?.lines.first?.contains("Primary") == true)
+    #expect(recorder.latestSurface?.lines.contains(where: { $0.contains("Count 0") }) == true)
 
-    session.send(.key(.init(.character("c"), modifiers: .ctrl)))
+    session.send(.key(.init(.character("i"), modifiers: .ctrl)))
+    await recorder.updates.wait {
+      recorder.latestSurface?.lines.contains(where: { $0.contains("Count 1") }) == true
+    }
+
+    session.stop()
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(exitReason == .inputEnded)
   }
 
   @Test("hosted scene session forwards live scroll-region offsets in semantic frames")
@@ -182,7 +268,7 @@ struct HostedSceneSessionTests {
     }
     #expect(recorder.latestSnapshot?.scrollRoutes.first?.contentOffset.y == 2)
 
-    session.send(.key(.init(.character("c"), modifiers: .ctrl)))
+    session.stop()
     _ = try await task.value
   }
 
@@ -190,13 +276,15 @@ struct HostedSceneSessionTests {
   func hostedRasterSurfaceForwardsFocusedTextClipboardWrites() async throws {
     let surfaceRecorder = SurfaceRecorder()
     let clipboardRecorder = ClipboardRecorder()
+    var issues: [RuntimeIssue] = []
     let session = try HostedSceneSession(
       for: ClipboardSurfaceApp(),
       sceneID: WindowIdentifier("primary"),
       surface: hostedSurface(
         surfaceRecorder: surfaceRecorder,
         clipboardRecorder: clipboardRecorder
-      )
+      ),
+      runtimeIssueSink: RuntimeIssueSink { issues.append($0) }
     )
 
     let task = Task {
@@ -210,12 +298,10 @@ struct HostedSceneSessionTests {
 
     await clipboardRecorder.updates.wait { clipboardRecorder.writes == ["hello"] }
 
-    // Copy leaves the selection in place, so a second Ctrl+C would copy again.
-    // Collapse the selection first; Ctrl+C with nothing selected is the exit.
-    session.send(.key(.init(.arrowRight)))
-    session.send(.key(.init(.character("c"), modifiers: .ctrl)))
+    #expect(issues.isEmpty)
+    session.stop()
     let exitReason = try await task.value
-    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(exitReason == .inputEnded)
   }
 
   @Test("hosted raster surface publishes damage-bearing semantic frames beside raster surfaces")
@@ -369,10 +455,10 @@ struct HostedSceneSessionTests {
 
     await recorder.updates.wait { recorder.surfaceCount >= 2 }
 
-    session.sendInput([0x03])  // Ctrl+C
+    session.stop()
     let exitReason = try await task.value
 
-    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(exitReason == .inputEnded)
   }
 
   @Test("hosted scene session publishes committed focus presentation changes")

@@ -1,6 +1,20 @@
 import SwiftTUICore
 
 extension RunLoop {
+  package func configuredUserExit(_ keyPress: KeyPress) -> RunLoopExitReason? {
+    guard presentationSurface.supportsUserExit else {
+      reportRuntimeIssue(
+        RuntimeIssue(
+          severity: .error,
+          code: "lifecycle.userExitUnsupported",
+          message: "Exit keys cannot end an app on this host. The session is still running."
+        )
+      )
+      return nil
+    }
+    return .userExit(keyPress)
+  }
+
   package var runtimeRegistrations: RuntimeRegistrationSet {
     RuntimeRegistrationSet(
       actionRegistry: localActionRegistry,

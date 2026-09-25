@@ -372,7 +372,8 @@ let package = Package(
         "SwiftTUIRuntime"
       ],
       path: "Platforms/Android/Sources/SwiftTUIAndroidHost",
-      swiftSettings: swiftSettings()
+      swiftSettings: swiftSettings(),
+      linkerSettings: [.linkedLibrary("log", .when(platforms: [.android]))]
     ),
     .target(
       name: "SwiftTUITestSupport",
