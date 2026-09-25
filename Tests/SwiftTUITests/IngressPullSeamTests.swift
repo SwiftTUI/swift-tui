@@ -86,7 +86,12 @@ struct IngressPullSeamTests {
     // them, and no committed frame answered zero inputs while `b`/`c` were
     // queued: the pass yielded rather than rendering ahead of them.
     let samples = harness.sink.committed
-    #expect(samples.contains { $0.ingress.counters.pullEvents == 2 }, "\(samples.map(\.ingress))")
+    // The first input can coalesce into the same commit as the next two
+    // (STUI-633). Account for every pull without requiring a separate frame
+    // for `a`; the acquisition assertion below owns the service-order check.
+    let pullCounts = samples.map { $0.ingress.counters.pullEvents }
+    #expect(pullCounts.reduce(0, +) == 3, "\(samples.map(\.ingress))")
+    #expect(pullCounts.contains { $0 >= 2 }, "\(samples.map(\.ingress))")
     #expect(
       !samples.contains { $0.ingress.acquisition.pumpBatches > 0 && $0.answeredInputs == nil },
       "a frame was acquired while input waited in the pump: \(samples.map(\.ingress))"
