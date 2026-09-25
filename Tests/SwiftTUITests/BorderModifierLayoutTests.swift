@@ -28,6 +28,21 @@ struct BorderModifierLayoutTests {
     }
   }
 
+  @Test("wide horizontal border glyphs reserve one outset row per edge")
+  func wideHorizontalOutsetEdgesReserveOneRow() {
+    var border = BorderSet.single
+    border.top = "界"
+    border.bottom = "界"
+    let artifacts = DefaultRenderer().render(
+      Text("hi").border(style: StrokeStyle(borderSet: border), placement: .outset),
+      context: .init(identity: testIdentity("WideHorizontalOutsetBorder")))
+
+    #expect(artifacts.measuredTree.measuredSize == CellSize(width: 4, height: 3))
+    #expect(artifacts.placedTree.children.first?.bounds.origin == CellPoint(x: 1, y: 1))
+    #expect(artifacts.rasterSurface.lines.count == 3)
+    #expect(artifacts.rasterSurface.lines.dropFirst().first?.contains("hi") == true)
+  }
+
   @Test("public .border defaults to non-layout-affecting inset placement")
   func borderDefaultsToInsetLayout() {
     let artifacts = DefaultRenderer().render(

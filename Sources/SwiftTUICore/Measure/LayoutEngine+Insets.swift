@@ -134,10 +134,17 @@ extension LayoutEngine {
     sides: Edge.Set
   ) -> EdgeInsets {
     guard placement != .inset else { return EdgeInsets() }
-    return EdgeInsets(
-      top: sides.contains(.top) ? set.topDisplayWidth : 0,
+    return borderEdgeCells(set: set, sides: sides)
+  }
+
+  /// The cells each drawn border edge occupies. Vertical edges are as wide
+  /// as their widest glyph; horizontal edge glyph widths are columns, but
+  /// each horizontal edge paints exactly one row.
+  package func borderEdgeCells(set: BorderSet, sides: Edge.Set) -> EdgeInsets {
+    EdgeInsets(
+      top: sides.contains(.top) && set.topDisplayWidth > 0 ? 1 : 0,
       leading: sides.contains(.leading) ? set.leftDisplayWidth : 0,
-      bottom: sides.contains(.bottom) ? set.bottomDisplayWidth : 0,
+      bottom: sides.contains(.bottom) && set.bottomDisplayWidth > 0 ? 1 : 0,
       trailing: sides.contains(.trailing) ? set.rightDisplayWidth : 0
     )
   }
