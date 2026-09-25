@@ -56,6 +56,34 @@ struct SpacerCrossAxisFlexibilityTests {
     #expect(rendered.placedTree.bounds.size.width == 7)
   }
 
+  @Test("a fixedSize Spacer stays at its ideal length along its stack's axis")
+  func fixedSizeSpacerIsRigidAlongStackAxis() {
+    let row = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Spacer().fixedSize(horizontal: true, vertical: false)
+        Text("end")
+      }, proposal: .init(width: 20, height: 1))
+    #expect(row.placedTree.bounds.size.width == 3)
+
+    let column = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        Spacer().fixedSize(horizontal: false, vertical: true)
+        Text("end")
+      }, proposal: .init(width: 3, height: 10))
+    #expect(column.placedTree.bounds.size.height == 1)
+  }
+
+  @Test("a Spacer fixed only on the cross axis still expands along its stack's axis")
+  func crossAxisFixedSizeSpacerStillExpands() {
+    let rendered = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Spacer().fixedSize(horizontal: false, vertical: true)
+        Text("end")
+      }, proposal: .init(width: 20, height: 1))
+    #expect(rendered.placedTree.bounds.size.width == 20)
+    #expect(rendered.rasterSurface.lines.first?.hasSuffix("end") == true)
+  }
+
   private struct VerticalSkeleton: View {
     var body: some View {
       VStack(alignment: .leading, spacing: 0) {

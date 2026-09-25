@@ -116,7 +116,11 @@ extension LayoutEngine {
           continue
         }
       case .stack(let stackAxis, _, _, _), .lazyStack(let stackAxis, _, _, _):
-        if stackAxis == axis, current.children.contains(where: isSpacer) {
+        if stackAxis == axis,
+          current.children.contains(where: {
+            isSpacer($0) && !isFixedSize($0.layoutMetadata, on: axis)
+          })
+        {
           return true
         }
       case .decoration(let primaryIndex, _):

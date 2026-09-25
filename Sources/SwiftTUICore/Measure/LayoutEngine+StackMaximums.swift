@@ -94,6 +94,11 @@ extension LayoutEngine {
     if node.layoutRealizedContent != nil {
       return DirectMaximum(value: nil)
     }
+    // Before the Spacer rule: `.fixedSize()` merges onto the Spacer node
+    // itself, and a fixed Spacer is rigid at its ideal length.
+    if isFixedSize(node.layoutMetadata, on: axis) {
+      return DirectMaximum(value: idealMain)
+    }
     if isSpacer(node) {
       // A Spacer absorbs unbounded space only along its own stack's axis —
       // the same rule the `.rule` (Divider) branch below applies. Reporting
@@ -105,9 +110,6 @@ extension LayoutEngine {
         return DirectMaximum(value: idealMain)
       }
       return DirectMaximum(value: nil)
-    }
-    if isFixedSize(node.layoutMetadata, on: axis) {
-      return DirectMaximum(value: idealMain)
     }
     // An indexed-source lazy stack deliberately stores no child measurements
     // (`storedChildMeasurements`), so the composite walk below would zip its

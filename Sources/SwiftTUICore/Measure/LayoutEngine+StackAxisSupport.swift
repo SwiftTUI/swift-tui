@@ -95,11 +95,13 @@ extension LayoutEngine {
   func isStackSpacer(_ node: ResolvedNode, axis: Axis) -> Bool {
     var current = node
     while true {
+      // `.fixedSize()` merges onto the node it modifies, so a fixed Spacer
+      // is one node: check the flag first or it never pins the Spacer.
+      if isFixedSize(current.layoutMetadata, on: axis) { return false }
       if isSpacer(current) {
         return current.drawMetadata.leafStackAxis == nil
           || current.drawMetadata.leafStackAxis == axis
       }
-      if isFixedSize(current.layoutMetadata, on: axis) { return false }
       let childIndex: Int
       switch current.layoutBehavior {
       case .padding, .border, .offset:

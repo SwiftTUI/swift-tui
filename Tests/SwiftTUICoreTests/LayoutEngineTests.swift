@@ -587,6 +587,29 @@ struct LayoutEngineTests {
     #expect(measured.childMeasurements.map(\.measuredSize.width) == [1, 9])
   }
 
+  @Test("a Spacer fixed on its stack's axis is rigid to allocation and flexibility probes")
+  func fixedSizeSpacerIsRigidOnItsStackAxis() {
+    let engine = LayoutEngine()
+    var fixedSpacer = spacer("fixed-spacer")
+    fixedSpacer.layoutMetadata = .init(fixedSizeHorizontal: true)
+    let measured = engine.measure(
+      stack("row", axis: .horizontal, children: [fixedSpacer, spacer("absorbing")]),
+      proposal: .init(width: 10, height: 1)
+    )
+    #expect(measured.childMeasurements.map(\.measuredSize.width) == [0, 10])
+
+    // The rigid row cannot claim a wider cross in an enclosing VStack, so
+    // cross reconciliation must not re-measure it.
+    let rigidRow = stack(
+      "rigid-row", axis: .horizontal,
+      children: [fixedSpacer, leaf("label", size: .init(width: 3, height: 1))])
+    let flexibleRow = stack(
+      "flexible-row", axis: .horizontal,
+      children: [spacer("flexible-spacer"), leaf("label", size: .init(width: 3, height: 1))])
+    #expect(engine.stackChildRemeasurementIsNoop(rigidRow, parentStackAxis: .vertical))
+    #expect(!engine.stackChildRemeasurementIsNoop(flexibleRow, parentStackAxis: .vertical))
+  }
+
   @Test("stack compression divides space equally within a priority tier")
   func stackCompressionDividesEquallyWithinPriorityTier() {
     let engine = LayoutEngine()
