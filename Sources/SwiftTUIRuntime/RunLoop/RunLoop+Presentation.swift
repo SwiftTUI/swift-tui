@@ -89,35 +89,42 @@ extension RunLoop {
       return
     }
 
-    let focusedNode = focusedAccessibilityNode(in: semanticSnapshot)
-    let usesTextInputCursor =
-      focusedNode?.cursorAnchor != nil
-      || currentFocusPresentation.prefersTextInput
-    guard runtimeConfiguration.cursorFollowsFocus || usesTextInputCursor else {
-      return
-    }
-
-    let cursorPoint =
-      if runtimeConfiguration.cursorFollowsFocus {
-        AccessibilityRuntimePolicy().focusedCursorPoint(
-          in: semanticSnapshot,
-          focusedIdentity: focusTracker.currentFocusIdentity
-        )
-      } else {
-        focusedNode?.cursorAnchor
+    let cursorPoint: CellPoint?
+    if runtimeConfiguration.cursorFollowsFocus {
+      cursorPoint = AccessibilityRuntimePolicy().focusedCursorPoint(
+        in: semanticSnapshot,
+        focusedIdentity: focusTracker.currentFocusIdentity
+      )
+    } else {
+      // By default the hardware cursor is only a text caret. Show it at the
+      // focused text input's caret; otherwise leave it untouched, except to
+      // hide a caret shown on an earlier frame so it does not linger where
+      // focus left. Editing controls without a caret (Slider, Stepper,
+      // Picker) and authored cursor anchors (used only when cursor-following)
+      // write nothing.
+      cursorPoint = focusedTextInputCaret(in: semanticSnapshot)
+      guard cursorPoint != nil || terminalCursorFocusShowsCursor else {
+        return
       }
+    }
     try terminalSurface.presentAccessibilityCursorFocus(at: cursorPoint)
+    terminalCursorFocusShowsCursor = cursorPoint != nil
   }
 
-  private func focusedAccessibilityNode(
+  /// The focused text input's caret cell. A SecureField withholds its
+  /// `textInput` value but still anchors the cursor at its caret.
+  private func focusedTextInputCaret(
     in semanticSnapshot: SemanticSnapshot
-  ) -> AccessibilityNode? {
-    guard let focusedIdentity = focusTracker.currentFocusIdentity else {
+  ) -> CellPoint? {
+    guard let focusedIdentity = focusTracker.currentFocusIdentity,
+      let node = semanticSnapshot.accessibilityNodes.first(where: {
+        $0.identity == focusedIdentity
+      }),
+      node.textInput != nil || node.role == .secureField
+    else {
       return nil
     }
-    return semanticSnapshot.accessibilityNodes.first { node in
-      node.identity == focusedIdentity
-    }
+    return node.cursorAnchor
   }
 
   private func presentJSONFrame(

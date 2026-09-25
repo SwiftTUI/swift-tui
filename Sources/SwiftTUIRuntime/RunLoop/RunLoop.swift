@@ -164,6 +164,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// itself bounded by `progress_starvation`).
   package static var maxConsecutivePreStartCancels: Int { 2 }
   package var nextSemanticHostFrameSequence: UInt64 = 0
+  /// Whether the terminal cursor focus policy's last write showed the
+  /// hardware cursor, so the default policy hides only a cursor it showed.
+  package var terminalCursorFocusShowsCursor = false
   package var latestAccessibilityActionResponse: AccessibilityActionResponse?
   /// Arrival envelopes of inputs dispatched since the last frame acquisition
   /// whose dispatch asked the scheduler for work (see

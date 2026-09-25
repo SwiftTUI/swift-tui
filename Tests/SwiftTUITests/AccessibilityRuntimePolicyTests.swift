@@ -119,6 +119,137 @@ struct AccessibilityRuntimePolicyTests {
     #expect(!terminal.writes.contains("\u{001B}[?25l"))
   }
 
+  @Test(
+    "run loop leaves terminal cursor untouched by default for focus without a text caret",
+    arguments: [false, true])
+  func runLoopLeavesCursorUntouchedForCaretlessFocusByDefault(
+    authoredCursorAnchor: Bool
+  ) throws {
+    let terminalSize = CellSize(width: 24, height: 6)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("CaretlessCursorRoot")
+    let focusedID = testIdentity("CaretlessCursorFocus")
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = cursorFocusRunLoop(
+      rootIdentity: rootIdentity,
+      terminal: terminal,
+      terminalSize: terminalSize,
+      focusTracker: focusTracker
+    ) {
+      // An editing control without a caret, or an authored cursor anchor,
+      // which the terminal uses only when cursor-following is enabled.
+      if authoredCursorAnchor {
+        Button("Run") {}
+          .accessibilityCursorAnchor(CellPoint(x: 1, y: 0))
+          .id(focusedID)
+      } else {
+        Slider("Volume", value: .constant(5), in: 0...10)
+          .id(focusedID)
+      }
+    }
+
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    // Without a text caret there is no cursor to show, on the focusing
+    // frame or after it.
+    #expect(focusTracker.currentFocusIdentity == focusedID)
+    #expect(runLoop.currentFocusPresentation.prefersTextInput == !authoredCursorAnchor)
+    #expect(terminal.movedCursorPoints.isEmpty)
+    #expect(!terminal.writes.contains("\u{001B}[?25h"))
+    #expect(!terminal.writes.contains("\u{001B}[?25l"))
+  }
+
+  @Test("run loop shows terminal cursor at a SecureField caret by default")
+  func runLoopShowsCursorAtSecureFieldCaretByDefault() throws {
+    let terminalSize = CellSize(width: 32, height: 6)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("DefaultSecureFieldCursorRoot")
+    let secureFieldID = testIdentity("DefaultSecureFieldCursor")
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = cursorFocusRunLoop(
+      rootIdentity: rootIdentity,
+      terminal: terminal,
+      terminalSize: terminalSize,
+      focusTracker: focusTracker
+    ) {
+      SecureField("Password", text: .constant("secret"))
+        .id(secureFieldID)
+        .frame(width: 16)
+    }
+
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    // The secure field withholds `textInput` but still owns a text caret.
+    let node = try #require(
+      runLoop.latestSemanticSnapshot.accessibilityNodes.first { $0.identity == secureFieldID }
+    )
+    #expect(focusTracker.currentFocusIdentity == secureFieldID)
+    #expect(node.textInput == nil)
+    #expect(terminal.movedCursorPoints.last == node.cursorAnchor)
+    #expect(terminal.writes.last == "\u{001B}[?25h")
+  }
+
+  @Test(
+    "run loop hides the text caret cursor by default once focus leaves the field",
+    arguments: [false, true])
+  func runLoopHidesTextCaretCursorWhenFocusLeavesField(toValueControl: Bool) throws {
+    let terminalSize = CellSize(width: 32, height: 6)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("CaretHandOffRoot")
+    let fieldID = testIdentity("CaretHandOffField")
+    let otherID = testIdentity("CaretHandOffOther")
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = cursorFocusRunLoop(
+      rootIdentity: rootIdentity,
+      terminal: terminal,
+      terminalSize: terminalSize,
+      focusTracker: focusTracker
+    ) {
+      VStack {
+        TextField("Name", text: .constant("abc"))
+          .id(fieldID)
+          .frame(width: 14)
+        if toValueControl {
+          Slider("Volume", value: .constant(5), in: 0...10)
+            .id(otherID)
+        } else {
+          Button("Run") {}
+            .id(otherID)
+        }
+      }
+    }
+
+    focusTracker.invalidator = runLoop.scheduler
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(focusTracker.currentFocusIdentity == fieldID)
+    #expect(terminal.writes.last == "\u{001B}[?25h")
+
+    // The caret this policy showed must not linger once focus moves to a
+    // control without one.
+    _ = focusTracker.setFocus(to: otherID)
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(focusTracker.currentFocusIdentity == otherID)
+    #expect(terminal.writes.last == "\u{001B}[?25l")
+
+    // With the caret hidden, later frames leave the cursor untouched.
+    let writesAfterHide = terminal.writes.count
+    let cursorMovesAfterHide = terminal.movedCursorPoints.count
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(terminal.writes.count == writesAfterHide)
+    #expect(terminal.movedCursorPoints.count == cursorMovesAfterHide)
+  }
+
   @Test("run loop moves and shows terminal cursor when cursor focus-following is enabled")
   func runLoopMovesCursorWhenFocusFollowingEnabled() throws {
     let terminalSize = CellSize(width: 24, height: 6)

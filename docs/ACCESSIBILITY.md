@@ -39,7 +39,8 @@ flowchart TD
 1. **Terminal cursor-follows-focus.** When `cursorFollowsFocus` is enabled
    (directly or through the `SWIFTTUI_ACCESSIBLE` alias), the terminal cursor
    tracks the focused node's `cursorAnchor`, so a terminal screen reader
-   follows focus. This is opt-in and off by default.
+   follows focus. This is opt-in and off by default. When it is off, the
+   hardware cursor shows only at a focused text input's caret.
 2. **Web / WASI ARIA.** The `web-surface` wire frame carries the
    `accessibilityTree` as JSON (a v2 frame when the tree is present). In the
    browser, the canvas is `aria-hidden` and a sibling DOM tree is populated

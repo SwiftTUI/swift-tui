@@ -86,7 +86,8 @@ assistive technology always reads the current value.
 In cursor-follows-focus terminal mode, the hardware cursor parks on the
 focused view's origin by default; `.accessibilityCursorAnchor(_:)` moves that
 anchor to another `CellPoint` within the view's bounds when a different cell
-reads better.
+reads better. Outside that mode, the hardware cursor shows only at a focused
+text input's caret.
 
 ### Announcements
 
