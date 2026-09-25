@@ -88,6 +88,57 @@ struct RadialGradientRenderingTests {
     #expect(right != downUncorrected)
   }
 
+  /// Full-surface comparison of overlapping screen-blended ripples over text
+  /// (STUI-618): the support walk and the reference walk must agree on every
+  /// cell and every presentation-record fragment through the composed
+  /// renderer, not only through the bare rasterizer.
+  @Test("Overlapping screen-blended radial fills over text raster identically on both walks")
+  func screenBlendedRipplesMatchReferenceWalk() {
+    func render() -> RasterSurface {
+      DefaultRenderer().render(
+        // Ripples below, text above: a sampled fill writes a blank glyph
+        // with its blended background, so content it covers must sit on top,
+        // as the counter demo places its label over its ripple layers.
+        ZStack {
+          ForEach(0..<6, id: \.self) { index in
+            Rectangle()
+              .fill(
+                RadialGradient(
+                  gradient: Gradient(stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: Color.cyan.opacity(0.8 - Double(index) * 0.1), location: 0.6),
+                    .init(color: .clear, location: 1),
+                  ]),
+                  center: .center,
+                  startRadius: Double(index * 5),
+                  endRadius: Double(8 + index * 6)
+                )
+              )
+              .blendMode(.screen)
+          }
+          VStack(alignment: .leading, spacing: 0) {
+            Text("counter 0042").bold()
+            Text("increment")
+          }
+        }
+        .frame(width: 60, height: 18),
+        context: .init(identity: testIdentity("RadialGradientScreenBlend"))
+      ).rasterSurface
+    }
+    let reference = Rasterizer.$forceReferenceRadialWalk.withValue(true) { render() }
+    let optimized = render()
+    #expect(reference.cells == optimized.cells)
+    #expect(reference.presentationLayers == optimized.presentationLayers)
+    #expect(reference == optimized)
+    // The blend actually happened: a cell under two rings differs from a
+    // cell under one, and the text survives underneath.
+    let painted = optimized.cells.flatMap { $0 }.filter { $0.style?.backgroundColor != nil }
+    #expect(painted.count > 40)
+    #expect(Set(painted.compactMap { $0.style?.backgroundColor }).count > 4)
+    let text = optimized.cells.map { row in String(row.map(\.character)) }.joined(separator: "\n")
+    #expect(text.contains("counter 0042"))
+  }
+
   @Test("Radial gradient in a wide frame still samples by distance")
   func radialGradientWideFrame() {
     let view =

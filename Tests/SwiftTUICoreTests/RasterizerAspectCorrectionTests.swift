@@ -35,6 +35,37 @@ struct RasterizerAspectCorrectionTests {
     #expect(radii.ry == 7)
   }
 
+  /// The prepared radial sampler applies the same aspect correction as the
+  /// reference sampler: cells at equal *device-pixel* distance from the
+  /// centre resolve to equal colours, and the raw-cell offset does not
+  /// (STUI-618).
+  @Test("prepared radial sampling is aspect-corrected like the reference")
+  func preparedRadialSamplingIsAspectCorrected() {
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 21, height: 21))
+    let gradient = RadialGradient(
+      colors: [.red, .blue], center: .center, startRadius: 0, endRadius: 8)
+    for metrics in [
+      CellPixelMetrics.estimated, CellPixelMetrics(width: 10, height: 15, source: .reported),
+    ] {
+      let prepared = PreparedRadialGradient(
+        gradient, aspectRatio: metrics.aspectRatio, bounds: bounds)
+      let rasterizer = Rasterizer()
+      for y in 0..<21 {
+        for x in 0..<21 {
+          #expect(
+            prepared.color(atCellX: x, y: y)
+              == rasterizer.sample(
+                gradient, in: bounds, aspectRatio: metrics.aspectRatio, x: x, y: y),
+            "cell (\(x), \(y)) at \(metrics)")
+        }
+      }
+    }
+    // At 2:1 metrics four cells right equals two cells down in pixel space.
+    let prepared = PreparedRadialGradient(gradient, aspectRatio: 2, bounds: bounds)
+    #expect(prepared.color(atCellX: 14, y: 10) == prepared.color(atCellX: 10, y: 12))
+    #expect(prepared.color(atCellX: 14, y: 10) != prepared.color(atCellX: 10, y: 14))
+  }
+
   /// At aspectRatio=2.0 the helper must produce rx == ry so existing
   /// Circle fixtures at the default metrics are preserved.
   @Test("aspectRatio 2.0 produces symmetric radii")

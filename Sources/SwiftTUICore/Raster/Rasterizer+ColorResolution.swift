@@ -344,8 +344,11 @@ extension Rasterizer {
       return .sampled(gradient)
     case .radialGradient(let gradient):
       return .sampledRadial(
-        gradient,
-        aspectRatio: environment.cellPixelMetrics.aspectRatio
+        PreparedRadialGradient(
+          gradient,
+          aspectRatio: environment.cellPixelMetrics.aspectRatio,
+          bounds: bounds
+        )
       )
     case .angularGradient(let gradient):
       return .sampledAngular(
@@ -457,7 +460,11 @@ extension Rasterizer {
           endPoint: gradient.endPoint
         )
         return .sampled(faded)
-      case .sampledRadial(let gradient, let aspectRatio):
+      case .sampledRadial(let prepared):
+        // Fade the authored stops, then prepare again: the faded stop colors
+        // are what the sampler mixes, so the prepared endpoints and the
+        // transparent support must be derived from them.
+        let gradient = prepared.gradient
         let faded = RadialGradient(
           gradient: Gradient(
             stops: gradient.gradient.stops.map {
@@ -467,7 +474,9 @@ extension Rasterizer {
           startRadius: gradient.startRadius,
           endRadius: gradient.endRadius
         )
-        return .sampledRadial(faded, aspectRatio: aspectRatio)
+        return .sampledRadial(
+          PreparedRadialGradient(
+            faded, aspectRatio: prepared.aspectRatio, bounds: prepared.bounds))
       case .sampledAngular(let gradient, let aspectRatio):
         return .sampledAngular(
           AngularGradient(
@@ -509,14 +518,21 @@ extension Rasterizer {
         x: sampleX,
         y: sampleY
       )
-    case .sampledRadial(let gradient, let aspectRatio):
-      return sample(
-        gradient,
-        in: bounds,
-        aspectRatio: aspectRatio,
-        x: sampleX,
-        y: sampleY
-      )
+    case .sampledRadial(let prepared):
+      // The prepared sampler is bit-exact with the reference for the bounds
+      // it was prepared against. A caller sampling under different bounds —
+      // none does today — gets the reference so the invariant cannot drift
+      // silently; the equivalence switch routes there too.
+      guard !Rasterizer.forceReferenceRadialWalk, bounds == prepared.bounds else {
+        return sample(
+          prepared.gradient,
+          in: bounds,
+          aspectRatio: prepared.aspectRatio,
+          x: sampleX,
+          y: sampleY
+        )
+      }
+      return prepared.color(atCellX: sampleX, y: sampleY)
     case .sampledAngular(let gradient, let aspectRatio):
       return sample(
         gradient,
@@ -602,18 +618,21 @@ extension Rasterizer {
           startPoint: gradient.startPoint,
           endPoint: gradient.endPoint
         ))
-    case .sampledRadial(let gradient, let aspectRatio):
+    case .sampledRadial(let prepared):
+      let gradient = prepared.gradient
       return .sampledRadial(
-        RadialGradient(
-          gradient: Gradient(
-            stops: gradient.gradient.stops.map {
-              .init(color: $0.color.opacity(amount), location: $0.location)
-            }),
-          center: gradient.center,
-          startRadius: gradient.startRadius,
-          endRadius: gradient.endRadius
-        ),
-        aspectRatio: aspectRatio)
+        PreparedRadialGradient(
+          RadialGradient(
+            gradient: Gradient(
+              stops: gradient.gradient.stops.map {
+                .init(color: $0.color.opacity(amount), location: $0.location)
+              }),
+            center: gradient.center,
+            startRadius: gradient.startRadius,
+            endRadius: gradient.endRadius
+          ),
+          aspectRatio: prepared.aspectRatio,
+          bounds: prepared.bounds))
     case .sampledAngular(let gradient, let aspectRatio):
       return .sampledAngular(
         AngularGradient(

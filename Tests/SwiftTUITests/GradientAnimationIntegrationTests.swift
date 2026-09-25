@@ -246,6 +246,81 @@ struct GradientAnimationIntegrationTests {
     #expect(abs(gradient.endPoint.y - 1) < 0.05)
   }
 
+  /// A radial gradient interpolated mid-animation carries partially
+  /// interpolated stop alphas and radii. Rasterizing that intermediate
+  /// gradient must be identical on the support walk and the reference walk
+  /// (STUI-618): the counter demo's ripples are exactly such intermediates
+  /// on every animated frame.
+  @Test("Interpolated RadialGradient fills raster identically on both walks")
+  func interpolatedRadialGradientRastersIdentically() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(1_600))
+    _ = controller.register(animation)
+    let leafIdentity = Identity(components: [.named("ripple-leaf")])
+
+    func ripple(_ progress: Double) -> ShapePayload {
+      ShapePayload(
+        geometry: .rectangle,
+        insetAmount: 0,
+        operation: .fill(
+          style: .radialGradient(
+            RadialGradient(
+              gradient: Gradient(stops: [
+                .init(color: .clear, location: 0),
+                .init(color: Color.cyan.opacity(0.9 * (1 - progress)), location: 0.6),
+                .init(color: .clear, location: 1),
+              ]),
+              center: .center,
+              startRadius: 60 * progress * 0.7,
+              endRadius: 4 + 60 * progress
+            )
+          ),
+          mode: .full
+        )
+      )
+    }
+    let frame1 = ResolvedNode(
+      identity: leafIdentity, kind: .view("Rectangle"), drawPayload: .shape(ripple(0)))
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+    let frame2 = ResolvedNode(
+      identity: leafIdentity, kind: .view("Rectangle"), drawPayload: .shape(ripple(1)))
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    for elapsed in [Duration.milliseconds(160), .milliseconds(640), .milliseconds(1_280)] {
+      var frame = frame2
+      _ = controller.applyInterpolations(to: &frame, at: t0.advanced(by: elapsed))
+      guard case .shape(let payload) = frame.drawPayload,
+        case .fill(let style?, _) = payload.operation,
+        case .radialGradient(let gradient) = style
+      else {
+        Issue.record("expected an interpolated radial gradient at \(elapsed)")
+        return
+      }
+      #expect(gradient.endRadius > 4 && gradient.endRadius < 64)
+      let bounds = CellRect(origin: .zero, size: CellSize(width: 120, height: 36))
+      let node = DrawNode(
+        identity: testIdentity("ripple-raster"),
+        bounds: bounds,
+        drawEffects: DrawEffects([.blendMode(.screen)]),
+        commands: [
+          .fill(
+            bounds: bounds, geometry: .rectangle, insetAmount: 0, style: .radialGradient(gradient),
+            mode: .full)
+        ])
+      let reference = Rasterizer.$forceReferenceRadialWalk.withValue(true) {
+        Rasterizer().rasterize(node)
+      }
+      let optimized = Rasterizer().rasterize(node)
+      #expect(reference == optimized, "at \(elapsed)")
+      #expect(
+        optimized.cells.flatMap { $0 }.contains { $0.style?.backgroundColor != nil },
+        "at \(elapsed)")
+    }
+  }
+
   @Test("Shape fill TileStyle gradient foreground animates through drawPayload path")
   func shapeFillTileStyleGradientForegroundAnimates() throws {
     let controller = AnimationController()

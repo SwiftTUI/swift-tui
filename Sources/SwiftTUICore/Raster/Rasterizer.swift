@@ -73,8 +73,10 @@ package struct Rasterizer: Sendable {
     /// The cell aspect ratio is captured when the style is resolved, where
     /// the style environment is in scope, so the per-cell sampler can measure
     /// falloff in device-pixel space without threading metrics through every
-    /// `resolveColor` caller.
-    case sampledRadial(RadialGradient, aspectRatio: Double)
+    /// `resolveColor` caller. Prepared once per resolution: center, radius
+    /// normalization, stop colors in the mixing space, and the transparent
+    /// support (STUI-618).
+    case sampledRadial(PreparedRadialGradient)
     case sampledAngular(AngularGradient, aspectRatio: Double)
     case sampledMesh(PreparedMeshGradient)
     case tile(ResolvedTileColorMode)

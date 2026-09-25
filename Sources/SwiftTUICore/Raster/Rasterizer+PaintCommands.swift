@@ -91,6 +91,21 @@ extension Rasterizer {
       break
     }
 
+    // Walk only the cells the writers could touch (STUI-618). `write` and
+    // `tintCell` already no-op outside the surface and the clip and skip
+    // non-dirty rows, so intersecting the walked rectangle with those first
+    // changes no output; it only stops the geometry test and the per-cell
+    // colour resolution from running for cells that were always going to be
+    // dropped. The gradient stays anchored to `shapeBounds`: narrowing the
+    // walk must not move its centre or change its colours.
+    guard let walkRect = fillWalkRect(shapeBounds: shapeBounds, clip: clip, cells: cells) else {
+      return
+    }
+    var work = RasterWorkCounters()
+    work.fills = 1
+    let probe = RasterWorkProbe.active()
+    defer { probe?.record(work) }
+
     // Detect whether this fill carries alpha for the tint path.
     let constantColor: Color?
     let isTranslucent: Bool
@@ -111,15 +126,44 @@ extension Rasterizer {
       tileStyle = tile
     }
 
-    for y in shapeBounds.origin.y..<(shapeBounds.origin.y + shapeBounds.size.height) {
+    // A radial fill whose stops prove a bounded transparent support visits
+    // only the cells inside that support (§4C). Every other fill — and every
+    // fill under the equivalence switch — takes the full walk below.
+    if tileStyle == nil, constantColor == nil, !isTranslucent,
+      case .sampledRadial(let prepared) = colorMode,
+      let support = prepared.support,
+      !Rasterizer.forceReferenceRadialWalk
+    {
+      paintRadialSupportFill(
+        prepared: prepared,
+        support: support,
+        walkRect: walkRect,
+        shapeBounds: shapeBounds,
+        geometry: geometry,
+        mode: mode,
+        environment: environment,
+        cells: &cells,
+        clip: clip,
+        blendMode: blendMode,
+        dirtyRows: dirtyRows,
+        presentationRecorder: presentationRecorder,
+        presentationEffects: presentationEffects,
+        work: &work
+      )
+      return
+    }
+
+    let rowStart = max(walkRect.origin.x, 0)
+    for y in walkRect.origin.y..<(walkRect.origin.y + walkRect.size.height) {
       // Per-row cull (D70): skips `shapeContains` and the per-cell colour
       // resolution below for rows `write` would clamp away anyway.
       if let dirtyRows, !dirtyRows.contains(y) {
         continue
       }
-      var x = shapeBounds.origin.x
-      let rowEnd = shapeBounds.origin.x + shapeBounds.size.width
+      var x = rowStart
+      let rowEnd = min(walkRect.origin.x + walkRect.size.width, cells[y].count)
       while x < rowEnd {
+        work.visitedCells += 1
         guard
           shapeContains(
             pointX: x,
@@ -165,6 +209,7 @@ extension Rasterizer {
           if let color = constantColor, color.alpha > 0 {
             if let blendMode {
               let resolvedStyle = ResolvedTextStyle(backgroundColor: color)
+              work.blendedWrites += 1
               write(
                 " ",
                 style: resolvedStyle.isDefault ? nil : resolvedStyle,
@@ -194,6 +239,9 @@ extension Rasterizer {
         } else if let constantColor {
           // Opaque constant fill: overwrite cell.
           let resolvedStyle = ResolvedTextStyle(backgroundColor: constantColor)
+          if blendMode != nil {
+            work.blendedWrites += 1
+          }
           write(
             " ",
             style: resolvedStyle.isDefault ? nil : resolvedStyle,
@@ -214,58 +262,285 @@ extension Rasterizer {
             sampleX: x,
             sampleY: y
           )
-          if let fillColor, fillColor.alpha < 1 {
-            if fillColor.alpha > 0 {
-              if let blendMode {
-                let resolvedStyle = ResolvedTextStyle(backgroundColor: fillColor)
-                write(
-                  " ",
-                  style: resolvedStyle.isDefault ? nil : resolvedStyle,
-                  atX: x,
-                  y: y,
-                  cells: &cells,
-                  clip: clip,
-                  blendMode: blendMode,
-                  dirtyRows: dirtyRows,
-                  presentationRecorder: presentationRecorder,
-                  presentationEffects: presentationEffects
-                )
-              } else {
-                tintCell(
-                  atX: x,
-                  y: y,
-                  with: fillColor,
-                  cells: &cells,
-                  clip: clip,
-                  dirtyRows: dirtyRows,
-                  presentationRecorder: presentationRecorder,
-                  presentationEffects: presentationEffects
-                )
-              }
-            }
-          } else {
-            write(
-              " ",
-              style: resolvedBackgroundTextStyle(
-                colorMode: colorMode,
-                bounds: shapeBounds,
-                x: x,
-                y: y
-              ),
-              atX: x,
-              y: y,
-              cells: &cells,
-              clip: clip,
-              blendMode: blendMode,
-              dirtyRows: dirtyRows,
-              presentationRecorder: presentationRecorder,
-              presentationEffects: presentationEffects
-            )
+          if case .sampledRadial = colorMode {
+            work.radialSamples += 1
           }
+          paintSampledFillCell(
+            fillColor,
+            colorMode: colorMode,
+            shapeBounds: shapeBounds,
+            atX: x,
+            y: y,
+            cells: &cells,
+            clip: clip,
+            blendMode: blendMode,
+            dirtyRows: dirtyRows,
+            presentationRecorder: presentationRecorder,
+            presentationEffects: presentationEffects,
+            work: &work
+          )
         }
         x += 1
       }
     }
+  }
+
+  /// The rectangle a fill's cell walk has to visit: `shapeBounds` clipped to
+  /// the surface's rows and to `clip`. Columns are clamped per row by the
+  /// callers (`cells[y].count`), so a ragged surface is handled the way
+  /// `write` handles it. `nil` when nothing can be painted.
+  private func fillWalkRect(
+    shapeBounds: CellRect,
+    clip: CellRect?,
+    cells: [[RasterCell]]
+  ) -> CellRect? {
+    let surfaceRows = CellRect(
+      origin: CellPoint(x: shapeBounds.origin.x, y: 0),
+      size: CellSize(width: shapeBounds.size.width, height: cells.count)
+    )
+    guard let onSurface = intersect(shapeBounds, surfaceRows) else {
+      return nil
+    }
+    guard let clip else {
+      return onSurface
+    }
+    return intersect(onSurface, clip)
+  }
+
+  /// Paints one sampled-fill cell from the colour already resolved for it.
+  ///
+  /// Mirrors the reference per-cell body: a partially transparent sample
+  /// blends (or tints) the cell, a fully transparent one writes nothing and
+  /// records nothing, and an opaque sample overwrites the cell. The reference
+  /// resolved an opaque sample a second time to build its style; the sampler
+  /// is a pure function of the colour mode, bounds, and cell, so the style
+  /// built from the sample in hand is the same style. Under the equivalence
+  /// switch the second resolution is kept so the switch reproduces the
+  /// reference byte for byte.
+  private func paintSampledFillCell(
+    _ fillColor: Color?,
+    colorMode: ResolvedShapeColorMode,
+    shapeBounds: CellRect,
+    atX x: Int,
+    y: Int,
+    cells: inout [[RasterCell]],
+    clip: CellRect?,
+    blendMode: BlendMode?,
+    dirtyRows: Set<Int>?,
+    presentationRecorder: RasterPresentationLayerRecorder?,
+    presentationEffects: [DrawEffect],
+    work: inout RasterWorkCounters
+  ) {
+    if let fillColor, fillColor.alpha < 1 {
+      if fillColor.alpha > 0 {
+        if let blendMode {
+          let resolvedStyle = ResolvedTextStyle(backgroundColor: fillColor)
+          work.blendedWrites += 1
+          write(
+            " ",
+            style: resolvedStyle.isDefault ? nil : resolvedStyle,
+            atX: x,
+            y: y,
+            cells: &cells,
+            clip: clip,
+            blendMode: blendMode,
+            dirtyRows: dirtyRows,
+            presentationRecorder: presentationRecorder,
+            presentationEffects: presentationEffects
+          )
+        } else {
+          tintCell(
+            atX: x,
+            y: y,
+            with: fillColor,
+            cells: &cells,
+            clip: clip,
+            dirtyRows: dirtyRows,
+            presentationRecorder: presentationRecorder,
+            presentationEffects: presentationEffects
+          )
+        }
+      } else {
+        work.zeroAlphaSkips += 1
+      }
+      return
+    }
+
+    let style: ResolvedTextStyle?
+    if Rasterizer.forceReferenceRadialWalk {
+      style = resolvedBackgroundTextStyle(
+        colorMode: colorMode,
+        bounds: shapeBounds,
+        x: x,
+        y: y
+      )
+    } else {
+      let resolvedStyle = ResolvedTextStyle(backgroundColor: fillColor)
+      style = resolvedStyle.isDefault ? nil : resolvedStyle
+    }
+    if blendMode != nil {
+      work.blendedWrites += 1
+    }
+    write(
+      " ",
+      style: style,
+      atX: x,
+      y: y,
+      cells: &cells,
+      clip: clip,
+      blendMode: blendMode,
+      dirtyRows: dirtyRows,
+      presentationRecorder: presentationRecorder,
+      presentationEffects: presentationEffects
+    )
+  }
+
+  /// Walks a radial fill's transparent support only (§4C).
+  ///
+  /// For each row the aspect-corrected vertical offset from the centre is
+  /// fixed, so the cells whose centre distance can fall inside the open
+  /// annulus `(inner, outer)` form at most two horizontal spans: the outer
+  /// circle's chord, minus the inner circle's chord when the row crosses the
+  /// hole. Each span is widened by one whole cell (the hole narrowed by one),
+  /// and every candidate cell still goes through the reference sampler and the
+  /// reference zero-alpha skip. That is why floating-point rounding in the
+  /// chord arithmetic cannot omit a contributing cell: the arithmetic is
+  /// accurate to far better than a cell, and a cell that lands inside the
+  /// margin but samples to zero alpha is dropped by the same test the full
+  /// walk applies. Rows are visited top to bottom and spans left to right,
+  /// so the surviving writes — and their presentation-record fragments — occur
+  /// in exactly the reference order.
+  private func paintRadialSupportFill(
+    prepared: PreparedRadialGradient,
+    support: PreparedRadialGradient.Support,
+    walkRect: CellRect,
+    shapeBounds: CellRect,
+    geometry: ShapeGeometry,
+    mode: ShapeFillMode,
+    environment: StyleEnvironmentSnapshot,
+    cells: inout [[RasterCell]],
+    clip: CellRect?,
+    blendMode: BlendMode?,
+    dirtyRows: Set<Int>?,
+    presentationRecorder: RasterPresentationLayerRecorder?,
+    presentationEffects: [DrawEffect],
+    work: inout RasterWorkCounters
+  ) {
+    let outerRadius = support.outerRadius
+    let innerRadius = support.innerRadius
+    // Whole-layer cull. The farthest cell centre is a corner cell (the
+    // distance is convex), and half a cell of margin absorbs rounding.
+    if outerRadius <= 0
+      || innerRadius > prepared.farthestCellCenterDistance(in: walkRect) + 0.5
+    {
+      work.culledLayers += 1
+      return
+    }
+    let outerSquared = outerRadius * outerRadius
+    let innerSquared = innerRadius * innerRadius
+    let centerX = prepared.centerX
+    let rowStart = max(walkRect.origin.x, 0)
+    var segmentHint = 0
+
+    for y in walkRect.origin.y..<(walkRect.origin.y + walkRect.size.height) {
+      if let dirtyRows, !dirtyRows.contains(y) {
+        work.skippedRows += 1
+        continue
+      }
+      let rowEnd = min(walkRect.origin.x + walkRect.size.width, cells[y].count)
+      guard rowStart < rowEnd else {
+        continue
+      }
+      let dy = (Double(y) + 0.5 - prepared.centerY) * prepared.aspectRatio
+      let dySquared = dy * dy
+      guard dySquared < outerSquared else {
+        work.skippedRows += 1
+        continue
+      }
+      work.spanRows += 1
+
+      // Cells with `|dx| < outerHalfWidth` are the only candidates; in cell
+      // indices that is the open interval `(cx - w - 0.5, cx + w - 0.5)`,
+      // widened here by one cell on each side.
+      let outerHalfWidth = (outerSquared - dySquared).squareRoot()
+      let spanStart = Self.clampedCell(
+        (centerX - outerHalfWidth - 0.5).rounded(.down),
+        lower: rowStart, upper: rowEnd)
+      let spanEnd = Self.clampedCell(
+        (centerX + outerHalfWidth - 0.5).rounded(.up) + 1,
+        lower: rowStart, upper: rowEnd)
+      guard spanStart < spanEnd else {
+        continue
+      }
+
+      // The hole: cells with `|dx| ≤ innerHalfWidth` sample inside the inner
+      // radius. The closed interval `[cx - w - 0.5, cx + w - 0.5]` is
+      // narrowed by one cell on each side before being cut out.
+      var holeStart = spanEnd
+      var holeEnd = spanEnd
+      if innerSquared > dySquared {
+        let innerHalfWidth = (innerSquared - dySquared).squareRoot()
+        holeStart = Self.clampedCell(
+          (centerX - innerHalfWidth - 0.5).rounded(.up) + 1,
+          lower: spanStart, upper: spanEnd)
+        holeEnd = Self.clampedCell(
+          (centerX + innerHalfWidth - 0.5).rounded(.down),
+          lower: spanStart, upper: spanEnd)
+        if holeStart >= holeEnd {
+          holeStart = spanEnd
+          holeEnd = spanEnd
+        }
+      }
+
+      for span in [spanStart..<holeStart, holeEnd..<spanEnd] where !span.isEmpty {
+        for x in span {
+          work.visitedCells += 1
+          guard
+            shapeContains(
+              pointX: x,
+              pointY: y,
+              in: shapeBounds,
+              geometry: geometry,
+              fillMode: mode,
+              metrics: environment.cellPixelMetrics
+            )
+          else {
+            continue
+          }
+          work.radialSamples += 1
+          let fillColor = prepared.color(atCellX: x, y: y, segmentHint: &segmentHint)
+          paintSampledFillCell(
+            fillColor,
+            colorMode: .sampledRadial(prepared),
+            shapeBounds: shapeBounds,
+            atX: x,
+            y: y,
+            cells: &cells,
+            clip: clip,
+            blendMode: blendMode,
+            dirtyRows: dirtyRows,
+            presentationRecorder: presentationRecorder,
+            presentationEffects: presentationEffects,
+            work: &work
+          )
+        }
+      }
+    }
+  }
+
+  /// Converts a chord endpoint to a cell index, saturating at the row's
+  /// bounds so an enormous radius cannot overflow the conversion.
+  private static func clampedCell(_ value: Double, lower: Int, upper: Int) -> Int {
+    guard !value.isNaN else {
+      return lower
+    }
+    if value <= Double(lower) {
+      return lower
+    }
+    if value >= Double(upper) {
+      return upper
+    }
+    return Int(value)
   }
 
   /// Paints a ``Canvas`` view's drawing into the raster buffer.

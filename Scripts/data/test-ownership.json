@@ -522,6 +522,10 @@
       "category": "core-rendering",
       "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
     },
+    "Tests/SwiftTUICoreTests/RadialGradientRasterEquivalenceTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
     "Tests/SwiftTUICoreTests/RadialGradientTests.swift": {
       "category": "core-rendering",
       "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
@@ -2247,6 +2251,10 @@
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
     "Tests/SwiftTUITests/RGBAImagePixelTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/RadialGradientRasterBenchmarkTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
