@@ -547,10 +547,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     #if os(Android)
       if renderMode == .sync {
         try renderPendingFrames(renderedFrames: &renderedFrames)
-        directPumpState.renderedFrames = renderedFrames
       } else {
         try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
-        directPumpState.renderedFrames = renderedFrames
       }
     #else
       try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
@@ -585,7 +583,17 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
       scheduleNextWakeIfNeeded(using: eventPump)
     }
 
+    #if os(Android)
+      // `directWake` renders while this task is suspended and counts its
+      // frames in the pump state. Sync the loop's own count with it on both
+      // sides of each point where `directWake` can run (`iterator.next()` and
+      // the yields in `drainPendingEvents`), so neither side's frames are lost.
+      directPumpState.sync(loopFrames: &renderedFrames)
+    #endif
     while await iterator.next() != nil {
+      #if os(Android)
+        directPumpState.sync(loopFrames: &renderedFrames)
+      #endif
       if let exitReason = consumeProgrammaticTerminationRequest() {
         return RunLoopResult(
           finalState: stateContainer.state,
@@ -604,9 +612,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
             exitReason: exitReason
           )
         }
-        renderedFrames = directPumpState.renderedFrames
       #endif
       let pendingEvents = await drainPendingEvents(from: eventPump)
+      #if os(Android)
+        directPumpState.sync(loopFrames: &renderedFrames)
+      #endif
       guard !pendingEvents.isEmpty else {
         if scheduler.hasPendingFrame(at: .now()) {
           if let exitReason = try await renderPendingFramesAsync(
@@ -621,7 +631,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
           }
         }
         #if os(Android)
-          directPumpState.renderedFrames = renderedFrames
+          directPumpState.sync(loopFrames: &renderedFrames)
         #endif
         if let nextWake = scheduler.nextWakeInstant(after: .now()),
           nextWake > .now()
@@ -714,7 +724,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
         )
       }
       #if os(Android)
-        directPumpState.renderedFrames = renderedFrames
+        directPumpState.sync(loopFrames: &renderedFrames)
       #endif
       if let nextWake = scheduler.nextWakeInstant(after: .now()),
         nextWake > .now()
@@ -726,6 +736,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
       }
     }
 
+    #if os(Android)
+      directPumpState.sync(loopFrames: &renderedFrames)
+    #endif
     _ = terminationDisposition(for: .inputEnded)
     return RunLoopResult(
       finalState: stateContainer.state,
@@ -753,10 +766,23 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   @MainActor
   private final class AndroidDirectRunLoopPumpState<Pump> {
     var eventPump: Pump?
+    /// Frames committed this session, by `directWake` and by the run loop.
     var renderedFrames = 0
     var isProcessing = false
     var exitReason: RunLoopExitReason?
     var error: (any Error)?
+    /// The run loop's own count as of its last ``sync(loopFrames:)``.
+    private var syncedLoopFrames = 0
+
+    /// Adds the frames the run loop committed since its last sync to
+    /// `renderedFrames`, then sets the loop's count to that total, which
+    /// includes the frames `directWake` committed in the meantime.
+    /// Overwriting the total with the loop's count instead would drop them.
+    func sync(loopFrames: inout Int) {
+      renderedFrames += loopFrames - syncedLoopFrames
+      loopFrames = renderedFrames
+      syncedLoopFrames = loopFrames
+    }
   }
 #endif
 
