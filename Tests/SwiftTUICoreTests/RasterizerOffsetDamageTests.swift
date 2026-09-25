@@ -124,6 +124,9 @@ struct RasterizerOffsetDamageTests {
       #expect(result.surface.lines.contains("NEW"))
       #expect(result.visibleIdentities.contains(testIdentity("offset-wrapper", "child")))
     }
-    #expect(!result.visibleIdentities.contains(testIdentity("offset-wrapper")))
+    // The wrapper's own slot is clipped out, but it counts as drawn exactly
+    // when its translated content paints: a paint-only animation keyed to the
+    // wrapper repaints that content, so its deadline ticks must not elide.
+    #expect(result.visibleIdentities.contains(testIdentity("offset-wrapper")) == !explicitlyClipped)
   }
 }

@@ -167,7 +167,15 @@ extension Rasterizer {
         // A geometry slot can move content into view from an invisible
         // wrapper, so its prior visibility cannot justify elision (T252).
         // Keep this set descriptive of positive post-clip paint extent.
-        if visibility.bounds.size.width > 0, visibility.bounds.size.height > 0 {
+        //
+        // The extent is the node's subtree, not its own bounds: an
+        // `.offset`/`.position` wrapper keeps its untranslated slot, which
+        // can sit wholly outside a clip its translated content paints
+        // inside, and a paint-only animation keyed to the wrapper (an
+        // outer `.opacity`) repaints that content. `paintVisibility` has
+        // already culled a subtree that misses the clip, so a non-empty
+        // subtree here paints inside it.
+        if !node.subtreeBounds.isEmpty {
           visibleIdentities.insert(node.identity)
         }
 
@@ -264,7 +272,8 @@ extension Rasterizer {
     if let clip {
       // An offset/position wrapper can be invisible while its translated
       // descendant paints inside this clip. Cull only the whole subtree;
-      // keep the wrapper's own visible extent empty for the visibility set.
+      // keep the wrapper's own visible extent empty (the visibility set
+      // records it through its subtree).
       guard intersect(node.subtreeBounds, clip) != nil else {
         return nil
       }

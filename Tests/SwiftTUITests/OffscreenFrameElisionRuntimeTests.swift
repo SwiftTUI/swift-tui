@@ -1096,6 +1096,88 @@ struct OffscreenFrameElisionRuntimeTests {
     }
   }
 
+  /// A paint-only animation keyed to an `.offset` wrapper reaches the surface
+  /// through the wrapper's translated content even when the wrapper's own
+  /// slot is clipped out, so the wrapper counts as drawn and its deadline
+  /// ticks keep rendering instead of freezing on the first sample.
+  @Test("a paint-only animation on a clipped offset wrapper with visible content is NOT elided")
+  func offsetWrapperWithVisibleContentRenders() async throws {
+    let terminalSize = CellSize(width: 20, height: 2)
+    let rootIdentity = testIdentity("ElisionOffsetWrapper", "Root")
+    let terminal = ElisionProbeTerminalHost(surfaceSize: terminalSize)
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      presentationSurface: terminal,
+      terminalInputReader: ElisionEmptyInputReader(),
+      signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        OffsetWrapperPulseProbe()
+      }
+    )
+    let clock = VirtualFrameClock(MonotonicInstant.now())
+    runLoop.frameClock = { [clock] in clock.now }
+
+    try await withAnimationSinks(runLoop.renderer.internalAnimationController) {
+      // Synchronous setup, as in the sibling tests: the onAppear follow-up
+      // frame registers the animation and must not be dropped.
+      scheduler.requestInvalidation(of: [rootIdentity])
+      var renderedFrames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      runLoop.renderer.enableSelectiveEvaluation()
+      while scheduler.hasPendingFrame(at: clock.now) {
+        try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+
+      let controller = runLoop.renderer.internalAnimationController
+      #expect(
+        controller.activeAnimationCount > 0,
+        "the pulse must be in flight before the deadline ticks")
+      #expect(!controller.hasLayoutAffectingPropertyAnimation, "the pulse must be paint-only")
+      #expect(Self.surfaceContains("pulse", terminal), "the translated text must be on screen")
+
+      let elidedBefore = runLoop.renderer.elidedFrameCount
+      let presentsBefore = terminal.presentCount
+      for _ in 0..<3 {
+        scheduler.requestDeadline(clock.advance(by: .milliseconds(100)))
+        _ = try await runLoop.renderPendingFramesAsync(
+          renderedFrames: &renderedFrames,
+          eventPump: nil
+        )
+      }
+
+      let redraw = controller.lastTickResult.redrawIdentities
+      let drawn = runLoop.renderer.frameTailRenderer.previousDrawnIdentities
+      #expect(!redraw.isDisjoint(with: drawn), "redraw=\(redraw)")
+      #expect(
+        runLoop.renderer.elidedFrameCount == elidedBefore,
+        """
+        the pulse's deadline ticks must not elide; elidedBefore=\(elidedBefore) \
+        after=\(runLoop.renderer.elidedFrameCount)
+        """
+      )
+      #expect(
+        terminal.presentCount >= presentsBefore + 3,
+        "presentsBefore=\(presentsBefore) after=\(terminal.presentCount)"
+      )
+    }
+  }
+
   // MARK: - Off-screen LAYOUT animation soundness
 
   /// Even a size animation that happens to remain clipped must take the
@@ -1929,6 +2011,36 @@ private struct OnScreenAnimatedProbe: View {
           .repeatForever(autoreverses: false)
       ) {
         phase = 1.0
+      }
+    }
+  }
+}
+
+/// A `repeatForever` opacity pulse authored outside an `.offset` that lifts
+/// its text from below a 2-row ScrollView viewport into it: the wrapper's own
+/// slot is clipped out while the translated text paints, and the pulse keys
+/// to the wrapper.
+private struct OffsetWrapperPulseProbe: View {
+  @State private var faded = false
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<10, id: \.self) { _ in
+          Text("filler")
+        }
+        Text("pulse")
+          .offset(x: 0, y: -10)
+          .opacity(faded ? 0.2 : 1)
+      }
+    }
+    .frame(width: 20, height: 2)
+    .onAppear {
+      withAnimation(
+        .linear(duration: .milliseconds(3000))
+          .repeatForever(autoreverses: true)
+      ) {
+        faded = true
       }
     }
   }
