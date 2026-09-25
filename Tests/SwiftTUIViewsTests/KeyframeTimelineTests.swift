@@ -313,6 +313,34 @@ struct KeyframeTimelineTests {
     #expect(timeline.value(time: .seconds(1)) == 10)
   }
 
+  // MARK: - Retrigger continuity
+
+  @Test(
+    "a retrigger seeds from the displayed track when several tracks share a key path",
+    arguments: [false, true])
+  func continuingSeedsFromDisplayedTrack(nextOverrides: Bool) {
+    // Same-key-path tracks write in order, so the override is the one on
+    // screen: `y` moves at 6 per second, not the base track's 3.
+    let previous = KeyframeTimeline(initialValue: Marker()) {
+      KeyframeTrack(\.y) { LinearKeyframe(3, duration: .seconds(1)) }
+      KeyframeTrack(\.y) { LinearKeyframe(6, duration: .seconds(1)) }
+    }
+    let retrigger = Self.seconds(0.5)
+    let current = previous.value(time: retrigger)
+    #expect(current.y == 3)
+
+    let next = KeyframeTimeline(initialValue: current) {
+      KeyframeTrack(\.y) { CubicKeyframe(0, duration: .seconds(1)) }
+      if nextOverrides {
+        KeyframeTrack(\.y) { CubicKeyframe(-1, duration: .seconds(1)) }
+      }
+    }.continuing(from: previous, at: retrigger)
+
+    let epsilon = 1e-4
+    let slope = (next.value(time: Self.seconds(epsilon)).y - current.y) / epsilon
+    #expect(abs(slope - 6) < 1e-2, "slope \(slope)")
+  }
+
   // MARK: - UnitCurve
 
   @Test(

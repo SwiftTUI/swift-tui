@@ -71,13 +71,15 @@ public struct KeyframeTimeline<Value> {
   /// This timeline with each track's first cubic or spring segment seeded by
   /// the velocity the matching track of `previous` carried at `time`, so a
   /// timeline rebuilt mid-flight continues without a velocity discontinuity.
-  /// Tracks are matched by key path; unmatched tracks are unchanged.
+  /// Tracks are matched by key path, against the last `previous` track for
+  /// it: ``value(time:)`` writes tracks in order, so that is the one on
+  /// screen. Unmatched tracks are unchanged.
   package func continuing(
     from previous: KeyframeTimeline<Value>,
     at time: Duration
   ) -> KeyframeTimeline<Value> {
     let seeded = tracks.map { track -> AnyKeyframeTrack<Value> in
-      guard let match = previous.tracks.first(where: { $0.keyPath == track.keyPath }) else {
+      guard let match = previous.tracks.last(where: { $0.keyPath == track.keyPath }) else {
         return track
       }
       return track.continuing(match, time) ?? track
