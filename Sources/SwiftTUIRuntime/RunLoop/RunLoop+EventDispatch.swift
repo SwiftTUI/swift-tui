@@ -379,12 +379,9 @@ extension RunLoop {
     // (ZWJ emoji, combining sequences) must arrive as one key event.
     for character in pasteEvent.content {
       // Skip control characters (including \n and \t — see the gate
-      // comment above). Multi-scalar clusters are never control
-      // characters.
-      if character.unicodeScalars.count == 1,
-        let scalar = character.unicodeScalars.first,
-        scalar.value < 0x20 || scalar.value == 0x7F
-      {
+      // comment above). Test scalars, not cluster length: a CR+LF pair
+      // coalesces into one Character ("\r\n") of two control scalars.
+      if character.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) {
         continue
       }
       let key: KeyEvent =

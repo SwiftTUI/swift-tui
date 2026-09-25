@@ -71,6 +71,26 @@ struct PasteActivationGuardTests {
       "paste into a key-handler view lost its text compat path; frame:\n\(frame)"
     )
   }
+
+  @Test("a paste into a focused key-handler view drops CRLF line endings")
+  func pasteIntoKeyHandlerViewDropsCRLF() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PasteCRLFRoot"),
+      size: .init(width: 60, height: 6)
+    ) {
+      PasteGuardKeyLogFixture(requiresFocus: true)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("console")
+    // "\r\n" iterates as ONE Character holding two control scalars (UAX #29
+    // GB3), so the control filter must look at scalars, not cluster length.
+    let frame = try harness.paste("ab\r\nc\rd\te")
+    #expect(
+      frame.contains("log [a, b, c, d, e]"),
+      "paste leaked line-ending control characters into the key handler; frame:\n\(frame)"
+    )
+  }
 }
 
 @MainActor
