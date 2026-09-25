@@ -34,7 +34,7 @@
       // 2,000 key presses alternate so order is observable, well past the
       // stream adapter's 512-byte read.
       let bytes = (0..<2_000).map { UInt8($0.isMultiple(of: 2) ? 0x78 : 0x79) }
-      try pipe.write(bytes)
+      try pipe.writeAll(bytes)
 
       let delivered = reader.pullPendingInput()
       #expect(delivered == 2_000)
@@ -60,7 +60,7 @@
       reader.installPullDelivery(recorder.sink)
       defer { reader.uninstallPullDelivery() }
 
-      try pipe.write(Array("a\u{1E}resize:80:24\nb".utf8))
+      try pipe.writeAll(Array("a\u{1E}resize:80:24\nb".utf8))
       #expect(reader.pullPendingInput() == 2)
       #expect(sequence.entries == ["a", "resize", "b"])
     }
@@ -73,7 +73,7 @@
       reader.installPullDelivery(recorder.sink)
       defer { reader.uninstallPullDelivery() }
 
-      try pipe.write(Array("q".utf8))
+      try pipe.writeAll(Array("q".utf8))
       pipe.closeWriteEnd()
 
       // The same pull that drains the last byte sees EOF and reports it,
@@ -95,7 +95,7 @@
       reader.installPullDelivery(recorder.sink)
       defer { reader.uninstallPullDelivery() }
 
-      try pipe.write(Array("zz".utf8))
+      try pipe.writeAll(Array("zz".utf8))
       // Signal-driven: the recorder notifies on each delivery; the deadline
       // event is only the failure bound.
       let deadline = AsyncEvent.firing(after: AsyncTestTimeouts.scaled(.seconds(5)))
@@ -180,11 +180,17 @@
       closedWriteEnd = Box()
     }
 
-    func write(_ bytes: [UInt8]) throws {
+    /// Writes every byte through the platform libc (`Darwin`, `Glibc`, or
+    /// `Musl`); named to keep the unqualified libc call unambiguous.
+    func writeAll(_ bytes: [UInt8]) throws {
       var offset = 0
       while offset < bytes.count {
-        let written = bytes[offset...].withUnsafeBufferPointer { buffer in
-          unsafe Darwin.write(writeEnd, buffer.baseAddress, buffer.count)
+        let written = bytes.withUnsafeBytes { buffer -> Int in
+          guard let baseAddress = buffer.baseAddress else {
+            return 0
+          }
+          let next = unsafe baseAddress.advanced(by: offset)
+          return unsafe write(writeEnd, next, bytes.count - offset)
         }
         try #require(written > 0)
         offset += written
