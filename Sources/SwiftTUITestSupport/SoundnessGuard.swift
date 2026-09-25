@@ -19,11 +19,22 @@ package struct FailOnSoundnessViolationGrowth: TestTrait, SuiteTrait, TestScopin
     guard test.isSuite else {
       return
     }
+    let gate = SoundnessCounterScopeGate.shared
+    // The runner copies this recursive trait onto nested suites, but not the
+    // no-argument `.serialized`, which serializes descendants through its
+    // scope instead. A suite inside a guarded suite is covered by the check
+    // made there: planning prepares a suite before the suites it contains.
+    let isNestedInGuardedSuite: Bool
+    if let parentID = test.id.parent {
+      isNestedInGuardedSuite = await gate.belongsToGuardedSuite(parentID)
+    } else {
+      isNestedInGuardedSuite = false
+    }
     precondition(
-      test.traits.contains { $0 is ParallelizationTrait },
+      isNestedInGuardedSuite || test.traits.contains { $0 is ParallelizationTrait },
       "FailOnSoundnessViolationGrowth requires a .serialized containing suite"
     )
-    await SoundnessCounterScopeGate.shared.registerGuardedSuite(test.id)
+    await gate.registerGuardedSuite(test.id)
   }
 
   package func provideScope(
