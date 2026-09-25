@@ -126,6 +126,10 @@
       "category": "target-contract",
       "reason": "Tests the named SwiftPM target and its declared dependencies."
     },
+    "Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceInputPullTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
     "Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfacePackageTests.swift": {
       "category": "target-contract",
       "reason": "Tests the named SwiftPM target and its declared dependencies."
@@ -998,6 +1002,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/AnimationCohortElapsedTimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
     "Tests/SwiftTUITests/AnimationCompletionBarrierTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
@@ -1446,6 +1454,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/FrameInstantSamplingTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
     "Tests/SwiftTUITests/FrameInstantThreadingTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
@@ -1775,6 +1787,10 @@
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
     "Tests/SwiftTUITests/IncrementalRasterReachabilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/IngressPullSeamTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },

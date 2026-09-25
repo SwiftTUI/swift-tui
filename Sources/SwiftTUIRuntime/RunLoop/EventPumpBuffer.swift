@@ -71,6 +71,18 @@ package final class EventPumpBuffer: Sendable {
     state.withLock { !$0.pendingBatches.isEmpty }
   }
 
+  /// Batches waiting to be drained. One batch is one dispatch unit: a single
+  /// non-coalescible event, or a run of merged pointer events.
+  package func pendingBatchCount() -> Int {
+    state.withLock { $0.pendingBatches.count }
+  }
+
+  /// Enqueue instant of the oldest pending event, for the ingress
+  /// diagnostics' oldest-pending-age column; `nil` when empty.
+  package func oldestPendingArrival() -> MonotonicInstant? {
+    state.withLock { $0.pendingBatches.first?.first?.arrival.first }
+  }
+
   private func mergedEvent(
     _ current: RuntimeEvent,
     with next: RuntimeEvent

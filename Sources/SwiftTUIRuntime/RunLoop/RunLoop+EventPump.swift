@@ -11,6 +11,16 @@ extension RunLoop {
     var hasPendingEvents: () -> Bool
     var cancel: () -> Void
     var scheduleDeadlineWake: @Sendable (Duration) -> Void
+    /// Synchronously reads, parses, and enqueues whatever a
+    /// ``SynchronousInputPulling`` reader's source holds, returning the number
+    /// of events delivered. A no-op returning `0` for stream-adapter readers.
+    /// Called at the start of each outer-loop turn and before each frame
+    /// acquisition in a drain pass (plan 2026-09-24-001 §4D, STUI-618).
+    var pullInput: @MainActor () -> Int = { 0 }
+    /// Batches waiting in the pump buffer right now.
+    var pendingBatchCount: () -> Int = { 0 }
+    /// Enqueue instant of the oldest pending pump entry, if any.
+    var oldestPendingArrival: () -> MonotonicInstant? = { nil }
   }
 
   package func makeEventPump(
@@ -25,61 +35,94 @@ extension RunLoop {
     let completion = EventPumpCompletion(remainingStreams: 2)
     let buffer = EventPumpBuffer()
     let renderSuspensionDiagnostics = renderSuspensionDiagnostics
+    let ingressDiagnostics = ingressDiagnostics
     var inputTask: Task<Void, Never>?
     var signalTask: Task<Void, Never>?
     let deadlineState = DeadlineWakeState()
+    // A pulling reader (the WASI stdin ring) is drained synchronously by the
+    // run loop and by the reader's own idle poll; the stream adapter stays
+    // for blocking readers. Exactly one delivery path per reader (plan
+    // 2026-09-24-001 §4D, STUI-618).
+    let pullingReader = terminalInputReader as? any SynchronousInputPulling
 
     // The buffer and scheduler own the work; wake tokens carry no payload.
     // One pending wake suffices, including bursts during an in-flight frame.
     let stream = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
       deadlineState.setContinuation(continuation)
 
-      #if os(Android)
-        if let directInputReader {
-          let pendingEvents = directInputReader.installDirectHandler { event in
-            renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
-            if buffer.enqueue(.input(event)) {
-              directWake?()
-              continuation.yield()
+      if let pullingReader {
+        pullingReader.installPullDelivery(
+          InputPullDeliverySink(
+            deliver: { event in
+              renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
+              if buffer.enqueue(.input(event)) {
+                continuation.yield()
+              }
+              ingressDiagnostics.recordPumpEnqueue(depth: buffer.pendingBatchCount())
+            },
+            inputEnded: {
+              if buffer.enqueue(.inputEnded) {
+                continuation.yield()
+              }
+              completion.streamFinished(continuation)
+            },
+            recordSourceRead: { bytes, events in
+              ingressDiagnostics.recordSourceRead(bytes: bytes, events: events)
+            }
+          )
+        )
+      } else {
+        #if os(Android)
+          if let directInputReader {
+            let pendingEvents = directInputReader.installDirectHandler { event in
+              renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
+              if buffer.enqueue(.input(event)) {
+                directWake?()
+                continuation.yield()
+              }
+              ingressDiagnostics.recordPumpEnqueue(depth: buffer.pendingBatchCount())
+            }
+            for event in pendingEvents {
+              renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
+              if buffer.enqueue(.input(event)) {
+                directWake?()
+                continuation.yield()
+              }
+              ingressDiagnostics.recordPumpEnqueue(depth: buffer.pendingBatchCount())
+            }
+          } else {
+            let inputEvents = terminalInputReader.inputEvents()
+            inputTask = Task.immediate { @MainActor in
+              for await event in inputEvents {
+                renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
+                if buffer.enqueue(.input(event)) {
+                  continuation.yield()
+                }
+                ingressDiagnostics.recordPumpEnqueue(depth: buffer.pendingBatchCount())
+              }
+              if buffer.enqueue(.inputEnded) {
+                continuation.yield()
+              }
+              completion.streamFinished(continuation)
             }
           }
-          for event in pendingEvents {
-            renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
-            if buffer.enqueue(.input(event)) {
-              directWake?()
-              continuation.yield()
-            }
-          }
-        } else {
+        #else
           let inputEvents = terminalInputReader.inputEvents()
-          inputTask = Task.immediate { @MainActor in
+          inputTask = Task {
             for await event in inputEvents {
               renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
               if buffer.enqueue(.input(event)) {
                 continuation.yield()
               }
+              ingressDiagnostics.recordPumpEnqueue(depth: buffer.pendingBatchCount())
             }
             if buffer.enqueue(.inputEnded) {
               continuation.yield()
             }
             completion.streamFinished(continuation)
           }
-        }
-      #else
-        let inputEvents = terminalInputReader.inputEvents()
-        inputTask = Task {
-          for await event in inputEvents {
-            renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
-            if buffer.enqueue(.input(event)) {
-              continuation.yield()
-            }
-          }
-          if buffer.enqueue(.inputEnded) {
-            continuation.yield()
-          }
-          completion.streamFinished(continuation)
-        }
-      #endif
+        #endif
+      }
 
       #if os(Android)
         if let directSignalReader {
@@ -140,6 +183,7 @@ extension RunLoop {
       cancel: {
         inputTask?.cancel()
         signalTask?.cancel()
+        pullingReader?.uninstallPullDelivery()
         #if os(Android)
           directInputReader?.clearDirectHandler()
           directSignalReader?.clearDirectHandler()
@@ -147,13 +191,28 @@ extension RunLoop {
         deadlineState.cancel()
         wakeNotifyingScheduler?.setWakeHandler(nil)
       },
-      scheduleDeadlineWake: scheduleDeadlineWake
+      scheduleDeadlineWake: scheduleDeadlineWake,
+      pullInput: {
+        guard let pullingReader else { return 0 }
+        let delivered = pullingReader.pullPendingInput()
+        ingressDiagnostics.recordPullDelivered(delivered)
+        return delivered
+      },
+      pendingBatchCount: {
+        buffer.pendingBatchCount()
+      },
+      oldestPendingArrival: {
+        buffer.oldestPendingArrival()
+      }
     )
   }
 
   package func drainPendingEvents(
     from eventPump: EventPump
   ) async -> [PumpedEvent] {
+    // Turn-boundary pull: whatever a pulling reader's source holds is parsed
+    // and enqueued here, synchronously, before this turn decides what to do.
+    _ = eventPump.pullInput()
     var drainedEvents = eventPump.drainEvents()
 
     guard drainedEvents.allSatisfy(isCoalesciblePointerPumpedEvent) else {
@@ -227,9 +286,10 @@ extension RunLoop {
       return exitReason
     }
 
+    _ = eventPump.pullInput()
     let pendingEvents = eventPump.drainEvents()
     guard !pendingEvents.isEmpty else {
-      try renderPendingFrames(renderedFrames: &renderedFrames)
+      try renderPendingFrames(renderedFrames: &renderedFrames, eventPump: eventPump)
       return consumeProgrammaticTerminationRequest()
     }
 
@@ -259,7 +319,8 @@ extension RunLoop {
               return false
             }())
         if shouldFlushBeforeExit {
-          try renderPendingFrames(renderedFrames: &renderedFrames)
+          try renderPendingFrames(
+            renderedFrames: &renderedFrames, eventPump: eventPump, appliesWorkBudget: false)
         }
         if let programmatic = consumeProgrammaticTerminationRequest() {
           return programmatic
@@ -274,7 +335,7 @@ extension RunLoop {
       handledNonExitEvent = true
     }
 
-    try renderPendingFrames(renderedFrames: &renderedFrames)
+    try renderPendingFrames(renderedFrames: &renderedFrames, eventPump: eventPump)
     return consumeProgrammaticTerminationRequest()
   }
 

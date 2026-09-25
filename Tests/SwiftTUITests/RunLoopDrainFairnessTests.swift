@@ -34,6 +34,40 @@ struct RunLoopDrainFairnessTests {
     #expect(!harness.scheduler.hasPendingFrame(at: harness.clock.now))
   }
 
+  @Test(
+    "with an event pump attached and the budget set, a pass yields once it is spent",
+    arguments: [
+      (renderCost: Duration.milliseconds(40), framesPerPass: 1),
+      (renderCost: Duration.milliseconds(5), framesPerPass: 4),
+    ]
+  )
+  func elapsedWorkBudgetBoundsAPass(renderCost: Duration, framesPerPass: Int) async throws {
+    // The producer ticks at least once per commit, so every pass has more
+    // work than the budget admits.
+    let harness = DrainFairnessHarness(renderCost: renderCost, tickInterval: renderCost)
+    harness.runLoop.drainPassWorkBudget = .milliseconds(16)
+    let pump = harness.runLoop.makeEventPump()
+    defer { pump.cancel() }
+    harness.ticks.isActive = true
+    harness.scheduler.requestInvalidation(of: [harness.rootIdentity])
+    var frames = 0
+
+    _ = try await harness.runLoop.renderPendingFramesAsync(
+      renderedFrames: &frames, eventPump: pump)
+
+    // 16 ms of frame-clock work per pass: one 40 ms frame overshoots it at
+    // once; 5 ms frames fit four acquisitions (0, 5, 10, 15 ms elapsed)
+    // before the fifth check trips. The producer still has work pending.
+    #expect(frames == framesPerPass, "frames: \(frames)")
+    #expect(harness.scheduler.hasPendingFrame(at: harness.clock.now))
+
+    // The synchronous driver applies the same budget when given the pump.
+    harness.ticks.isActive = true
+    var syncFrames = 0
+    try harness.runLoop.renderPendingFrames(renderedFrames: &syncFrames, eventPump: pump)
+    #expect(syncFrames == framesPerPass, "sync frames: \(syncFrames)")
+  }
+
   @Test("end of input flushes the input change without draining a periodic producer forever")
   func inputEndBoundsPeriodicFlush() async throws {
     let harness = DrainFairnessHarness()
@@ -60,9 +94,10 @@ private final class DrainFairnessHarness {
   let ticks: PeriodicInvalidationSink
   let runLoop: RunLoop<Int, Text>
 
-  init() {
+  init(renderCost: Duration = .milliseconds(40), tickInterval: Duration = .milliseconds(33)) {
     let ticks = PeriodicInvalidationSink(
-      scheduler: scheduler, identity: rootIdentity, clock: clock)
+      scheduler: scheduler, identity: rootIdentity, clock: clock, renderCost: renderCost,
+      tickInterval: tickInterval)
     self.ticks = ticks
     runLoop = RunLoop(
       rootIdentity: rootIdentity,
@@ -96,21 +131,29 @@ private final class PeriodicInvalidationSink: FrameDiagnosticSink {
   private let scheduler: FrameScheduler
   private let identity: Identity
   private let clock: VirtualFrameClock
+  private let renderCost: Duration
+  private let tickInterval: Duration
   private var nextTick: MonotonicInstant
 
-  init(scheduler: FrameScheduler, identity: Identity, clock: VirtualFrameClock) {
+  init(
+    scheduler: FrameScheduler, identity: Identity, clock: VirtualFrameClock,
+    renderCost: Duration = .milliseconds(40),
+    tickInterval: Duration = .milliseconds(33)
+  ) {
     self.scheduler = scheduler
     self.identity = identity
     self.clock = clock
-    nextTick = clock.now.advanced(by: .milliseconds(33))
+    self.renderCost = renderCost
+    self.tickInterval = tickInterval
+    nextTick = clock.now.advanced(by: tickInterval)
   }
 
   func record(_ sample: RuntimeFrameSample) {
     guard case .committed = sample, isActive else { return }
-    clock.advance(by: .milliseconds(40))
+    clock.advance(by: renderCost)
     guard clock.now >= nextTick else { return }
     tickCount += 1
-    nextTick = clock.now.advanced(by: .milliseconds(33))
+    nextTick = clock.now.advanced(by: tickInterval)
     if tickCount < Self.safetyLimit {
       scheduler.requestInvalidation(of: [identity])
     }

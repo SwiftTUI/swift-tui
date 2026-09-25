@@ -175,10 +175,7 @@ struct AsyncFrameTailRenderingTests {
 
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var initialFrames = 0
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &initialFrames,
-      eventPump: eventPump
-    )
+    try await renderUntilQuiescent(runLoop, eventPump: eventPump, renderedFrames: &initialFrames)
     #expect(terminal.frames.last?.contains("phase 0 count 0") == true)
 
     runLoop.stateContainer.mutate { phase in
@@ -210,6 +207,10 @@ struct AsyncFrameTailRenderingTests {
     _ = try await valueWithTimeout {
       try await renderTask.value
     }
+    // The write's own frame follows the released pass (see
+    // `renderUntilQuiescent`).
+    var followUpFrames = 0
+    try await renderUntilQuiescent(runLoop, eventPump: eventPump, renderedFrames: &followUpFrames)
 
     let mutationIndex = try #require(trigger.events.firstIndex(of: "mutation acknowledged"))
     let releaseIndex = try #require(trigger.events.firstIndex(of: "worker release"))
@@ -277,10 +278,7 @@ struct AsyncFrameTailRenderingTests {
 
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var initialFrames = 0
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &initialFrames,
-      eventPump: eventPump
-    )
+    try await renderUntilQuiescent(runLoop, eventPump: eventPump, renderedFrames: &initialFrames)
     #expect(terminal.frames.last?.contains("phase 0 field first") == true)
 
     renderer.setFrameTailRenderHooks(
@@ -317,10 +315,7 @@ struct AsyncFrameTailRenderingTests {
     // is consumed by a re-resolve's registration snapshot, not by the
     // resumed frame itself).
     var followUpFrames = 0
-    _ = try await runLoop.renderPendingFramesAsync(
-      renderedFrames: &followUpFrames,
-      eventPump: eventPump
-    )
+    try await renderUntilQuiescent(runLoop, eventPump: eventPump, renderedFrames: &followUpFrames)
 
     // The authored request lands on the live shared storage while the
     // phase-1 frame's tail is suspended; the resumed frame's focus-sync
@@ -5110,4 +5105,25 @@ private struct DeepHostedRowNesting<Content: View>: View {
       }
     }
   }
+}
+
+/// Drives passes until the scheduler is idle, as `run()`'s outer loop does.
+/// Since STUI-618 a pass with an event pump may yield between acquisitions
+/// (pending input, or `drainPassWorkBudget` when a scenario sets it), so a
+/// scenario that asserts the settled result drives to quiescence rather than
+/// assuming one pass settles a chain.
+@MainActor
+private func renderUntilQuiescent<State, Content>(
+  _ runLoop: SwiftTUIRuntime.RunLoop<State, Content>,
+  eventPump: SwiftTUIRuntime.RunLoop<State, Content>.EventPump,
+  renderedFrames: inout Int
+) async throws {
+  var passes = 0
+  repeat {
+    _ = try await runLoop.renderPendingFramesAsync(
+      renderedFrames: &renderedFrames,
+      eventPump: eventPump
+    )
+    passes += 1
+  } while runLoop.scheduler.hasPendingFrame(at: .now()) && passes < 8
 }

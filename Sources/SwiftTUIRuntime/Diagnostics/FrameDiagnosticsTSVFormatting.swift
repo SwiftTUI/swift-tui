@@ -28,6 +28,33 @@ import SwiftTUICore
 /// writer's queue. It is reported in the sibling `presents.tsv`, joined to this
 /// file on the `frame` column.
 ///
+/// ## Animation clock columns
+///
+/// `frame_instant_lag_ms` is `consume reading − frame instant`: how far
+/// behind the clock the frame's animation time sat. `animation_time_delta_ms`
+/// is `frame instant − previous frame instant`: the animation time the frame
+/// advanced. Under the sampled-clock rule (STUI-618) the lag is `0` and the
+/// delta tracks elapsed active time, so a 160 ms frame shows a delta near
+/// 160; the earlier deadline rule showed a growing lag and a fixed 33 ms
+/// delta, which is what prolonged finite animations under load.
+///
+/// ## Ingress columns
+///
+/// Where input waited on its way to dispatch, since the previous committed
+/// frame (STUI-618): `ingress_ring_bytes` / `ingress_ring_reads` /
+/// `ingress_events_read` are the source reads a pulling reader made (the WASI
+/// stdin ring; `0` for stream-adapter readers, which do not report reads),
+/// `ingress_pull_events` how many of those events a run-loop turn-boundary
+/// pull delivered rather than the idle poll, `ingress_pump_batches` the
+/// batches waiting in the pump when this frame was acquired,
+/// `ingress_pump_high_water` the deepest the pump got between the two
+/// frames, and `ingress_oldest_pending_ms` the age of the oldest pump entry
+/// at acquisition (`-` when empty). `ingress_stream_waiting` is reserved for
+/// a stream adapter that reports yields; today it is always `-`.
+/// `drain_pass_frame_index` / `drain_pass_elapsed_ms` place the acquisition
+/// in its drain pass, so a frame that answered nothing while input was
+/// queued can be attributed to a pass that had not yet yielded.
+///
 /// ## Collection probe columns
 ///
 /// `realized_rows` and `list_layout_derivations` are magnitude counters for
@@ -181,6 +208,18 @@ package enum FrameDiagnosticsTSVFormatting {
     "input_to_commit_first_ms",
     "input_to_commit_last_ms",
     "committed_at_ms",
+    "frame_instant_lag_ms",
+    "animation_time_delta_ms",
+    "ingress_ring_bytes",
+    "ingress_ring_reads",
+    "ingress_events_read",
+    "ingress_pull_events",
+    "ingress_stream_waiting",
+    "ingress_pump_batches",
+    "ingress_pump_high_water",
+    "ingress_oldest_pending_ms",
+    "drain_pass_frame_index",
+    "drain_pass_elapsed_ms",
     "present_strategy",
     "present_ms",
     "present_bytes",
@@ -424,6 +463,18 @@ package enum FrameDiagnosticsTSVFormatting {
       formatMs(record.inputToCommitFirst),
       formatMs(record.inputToCommitLast),
       formatMs(record.committedAt),
+      formatMs(record.frameInstantLag),
+      formatMs(record.animationTimeDelta),
+      String(record.ingress.counters.sourceBytes),
+      String(record.ingress.counters.sourceReads),
+      String(record.ingress.counters.sourceEvents),
+      String(record.ingress.counters.pullEvents),
+      "-",
+      String(record.ingress.acquisition.pumpBatches),
+      String(record.ingress.counters.pumpHighWater),
+      formatMs(record.ingress.acquisition.oldestPendingAge),
+      String(record.ingress.acquisition.drainPassFrameIndex),
+      formatMs(record.ingress.acquisition.drainPassElapsed),
       record.presentationStrategy,
       presentMs,
       String(record.presentationBytesWritten),

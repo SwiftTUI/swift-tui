@@ -159,6 +159,11 @@ package enum FrameRecordDerivation {
     // the presents join is keyed on frame ordinal, and a momentum frame's write
     // latency is as real as a notch frame's.
     record.committedAt = sample.commitInstant.offset
+    record.frameInstantLag = sample.frameInstant.duration(to: sample.consumedAt)
+    record.animationTimeDelta = sample.previousFrameInstant.map {
+      $0.duration(to: sample.frameInstant)
+    }
+    record.ingress = sample.ingress
     record.rasterPath = diag.presentation.rasterReuse?.path ?? "-"
     record.rasterReuseBarriers = diag.presentation.rasterReuse?.barriers ?? []
     record.runtimePublicationMode = publication.publicationMode

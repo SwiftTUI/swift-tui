@@ -135,9 +135,12 @@ struct AnimationCompletionBarrierTests {
   }
 }
 
-/// Drives the harness through every deadline the controller arms: the frame
-/// instant is the armed deadline, so wall time only advances one frame per
-/// render and a probe must render each turn to reach a later instant.
+/// Drives the harness through every deadline the controller arms, stepping
+/// the injected frame clock to each armed wake before rendering it. The
+/// sampled frame instant is therefore exactly the wake instant, so virtual
+/// time advances one armed turn per render and a probe must render each turn
+/// to reach a later instant (STUI-618: the run loop samples the clock at
+/// every acquisition rather than adopting the deadline itself).
 @MainActor
 private final class DeadlineDrivenFrameClock<Content: View> {
   private let harness: StressRuntimeHarness<Content>

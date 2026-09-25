@@ -130,6 +130,17 @@ public struct FrameDiagnosticRecord: Sendable {
   /// completion. Without it the two files share no origin and arrival→write
   /// can only be bounded, never measured.
   package var committedAt: Duration?
+  /// Consume reading minus the frame instant: how far behind the clock this
+  /// frame's animation time sat. Zero under the sampled-clock rule unless the
+  /// non-decreasing guard held the instant at the previous frame's; the old
+  /// deadline rule made this the accumulated armed-chain lag (STUI-618).
+  package var frameInstantLag: Duration?
+  /// Frame instant minus the previous acquisition's frame instant: the
+  /// animation time this frame advanced. `nil` on the session's first frame.
+  package var animationTimeDelta: Duration?
+  /// Ingress counters since the previous committed frame and the pump's
+  /// state at acquisition — the `ingress_*` and `drain_pass_*` columns.
+  package var ingress: IngressFrameSample = .init()
   public var presentationStrategy: String
   public var presentationBytesWritten: Int
   public var presentationLinesTouched: Int

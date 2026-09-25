@@ -48,6 +48,13 @@ final class AnimatorRuntimeHarness<Content: View> {
     )
     focusTracker.invalidator = scheduler
     runLoop.frameSink = frameSink
+    // Wall-clock pacing with a bounded per-frame step: these scenarios assert
+    // intermediate poses (a dimmed cross-fade column, a digit rolling through
+    // `8`) that a starved parallel runner would otherwise skip now that every
+    // frame animates to the sampled clock (STUI-618). See
+    // `BoundedStepFrameClock`.
+    let frameClock = BoundedStepFrameClock()
+    runLoop.frameClock = { [frameClock] in frameClock.now() }
     self.terminal = terminal
     self.runLoop = runLoop
     self.scheduler = scheduler

@@ -18,6 +18,10 @@ extension RunLoop {
     presentationMetrics: PresentationMetrics,
     presentationDuration: Duration,
     answeredInputs: AnsweredInputs?,
+    frameInstant: MonotonicInstant,
+    consumedAt: MonotonicInstant,
+    previousFrameInstant: MonotonicInstant?,
+    ingressAcquisition: IngressAcquisitionSnapshot,
     translationCandidate: ScrollTranslationCandidate?,
     committedTranslation: CommittedScrollTranslation?,
     renderedFrames: Int
@@ -33,6 +37,10 @@ extension RunLoop {
     // Also past the guard: reading the probes is cheap, but an unprofiled run
     // should touch nothing it will not report.
     let collectionProbes = CollectionProbeSample.sampleAtCommit()
+    let ingress = IngressFrameSample(
+      counters: ingressDiagnostics.drainCounters(),
+      acquisition: ingressAcquisition
+    )
     let inputEventsQueuedDuringRenderSuspension =
       renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
     let dropEligibilityBlockers = frameDropEligibilityBlockers(
@@ -66,6 +74,10 @@ extension RunLoop {
       presentationDuration: presentationDuration,
       answeredInputs: answeredInputs,
       commitInstant: commitInstant,
+      frameInstant: frameInstant,
+      consumedAt: consumedAt,
+      previousFrameInstant: previousFrameInstant,
+      ingress: ingress,
       collectionProbes: collectionProbes,
       translationCandidate: translationCandidate,
       committedTranslation: committedTranslation

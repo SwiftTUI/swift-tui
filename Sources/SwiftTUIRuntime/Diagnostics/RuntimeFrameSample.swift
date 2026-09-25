@@ -86,6 +86,19 @@ import SwiftTUICore
   /// produce the two input→commit latency columns. Sampled through
   /// `RunLoop.frameClock` so a virtual-clock test is deterministic.
   package var commitInstant: MonotonicInstant
+  /// The instant this frame animated to. Equal to `consumedAt` under the
+  /// sampled-clock rule unless the non-decreasing guard held it at the
+  /// previous frame's instant; published so `frame_instant_lag_ms` can show
+  /// the relationship directly rather than by inference (STUI-618).
+  package var frameInstant: MonotonicInstant
+  /// The `RunLoop.frameClock` reading the frame was consumed at.
+  package var consumedAt: MonotonicInstant
+  /// The previous acquisition's frame instant, for `animation_time_delta_ms`.
+  /// `nil` on the session's first frame.
+  package var previousFrameInstant: MonotonicInstant?
+  /// Ingress counters since the previous committed frame and the pump's
+  /// state at this frame's acquisition (STUI-618).
+  package var ingress: IngressFrameSample
   /// Rows realized and list layouts derived during this frame, when the
   /// collection probes are armed. Both `nil` in an unarmed release run.
   package var collectionProbes: CollectionProbeSample
@@ -117,6 +130,10 @@ import SwiftTUICore
     presentationDuration: Duration,
     answeredInputs: AnsweredInputs? = nil,
     commitInstant: MonotonicInstant = .zero,
+    frameInstant: MonotonicInstant = .zero,
+    consumedAt: MonotonicInstant = .zero,
+    previousFrameInstant: MonotonicInstant? = nil,
+    ingress: IngressFrameSample = .init(),
     collectionProbes: CollectionProbeSample = .init(
       realizedRows: nil,
       listLayoutDerivations: nil
@@ -143,6 +160,10 @@ import SwiftTUICore
     self.presentationDuration = presentationDuration
     self.answeredInputs = answeredInputs
     self.commitInstant = commitInstant
+    self.frameInstant = frameInstant
+    self.consumedAt = consumedAt
+    self.previousFrameInstant = previousFrameInstant
+    self.ingress = ingress
     self.collectionProbes = collectionProbes
     self.translationCandidate = translationCandidate
     self.committedTranslation = committedTranslation

@@ -2,7 +2,7 @@
 import Testing
 
 @testable import SwiftTUICore
-@testable import SwiftTUIRuntime
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
@@ -45,6 +45,34 @@ struct EventPumpBurstTests {
     #expect(batch.map(\.arrival.id) == (0..<2_000).map(UInt64.init))
     #expect(batch.reduce(0) { $0 + $1.arrival.count } == 2_000)
     #expect(!buffer.hasPendingEvents())
+  }
+
+  @Test("the buffer reports its depth and oldest pending arrival for the ingress columns")
+  func bufferReportsDepthAndOldestArrival() throws {
+    let clock = VirtualFrameClock(MonotonicInstant(offset: .seconds(5)))
+    let buffer = EventPumpBuffer(clock: { MainActor.assumeIsolated { clock.now } })
+    #expect(buffer.pendingBatchCount() == 0)
+    #expect(buffer.oldestPendingArrival() == nil)
+
+    let first = clock.now
+    #expect(buffer.enqueue(.input(.key(.character("a")))))
+    clock.advance(by: .milliseconds(7))
+    #expect(buffer.enqueue(.input(.key(.character("b")))))
+    // Coalescible motion joins a batch of its own after the keys.
+    clock.advance(by: .milliseconds(1))
+    #expect(buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 1, y: 1))))))
+    clock.advance(by: .milliseconds(1))
+    #expect(!buffer.enqueue(.input(.mouse(.init(kind: .moved, location: .init(x: 2, y: 1))))))
+
+    #expect(buffer.pendingBatchCount() == 3)
+    #expect(buffer.oldestPendingArrival() == first)
+    _ = buffer.drain()
+    #expect(buffer.pendingBatchCount() == 2)
+    #expect(buffer.oldestPendingArrival() == first.advanced(by: .milliseconds(7)))
+    _ = buffer.drain()
+    _ = buffer.drain()
+    #expect(buffer.pendingBatchCount() == 0)
+    #expect(buffer.oldestPendingArrival() == nil)
   }
 
   @Test("scheduler bursts retain bounded wake tokens while preserving pending work")

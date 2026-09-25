@@ -21,7 +21,11 @@ extension RunLoop {
   /// fully wired to the elision gate via `acquireFrameArtifactsAsync`. This
   /// function is only invoked from synchronous test helpers; adding elision
   /// complexity here would serve no production path.
-  package func renderPendingFrames(renderedFrames: inout Int) throws {
+  package func renderPendingFrames(
+    renderedFrames: inout Int,
+    eventPump: EventPump? = nil,
+    appliesWorkBudget: Bool = true
+  ) throws {
     guard beginTerminalRenderPassIfAvailable() else {
       return
     }
@@ -50,14 +54,30 @@ extension RunLoop {
     )
     let drainPass = beginDeadlineDrainPass()
     var consumedScheduledFrames = 0
+    var passStartedAt: MonotonicInstant?
     while consumedScheduledFrames < Self.maxFramesPerDrainPass {
+      if consumedScheduledFrames > 0,
+        shouldYieldDrainPass(
+          to: eventPump, passStartedAt: passStartedAt, appliesWorkBudget: appliesWorkBudget)
+      {
+        break
+      }
       processPendingHotReload()
       let consumedAt = frameClock()
       guard var scheduledFrame = consumeReadyFrame(for: drainPass, at: consumedAt) else {
         break
       }
       consumedScheduledFrames += 1
-      let frameInstant = deriveFrameInstant(for: scheduledFrame, consumedAt: consumedAt)
+      let passStart = passStartedAt ?? consumedAt
+      passStartedAt = passStart
+      let ingressAcquisition = ingressAcquisitionSnapshot(
+        eventPump: eventPump,
+        consumedAt: consumedAt,
+        passStartedAt: passStart,
+        drainPassFrameIndex: consumedScheduledFrames
+      )
+      let previousFrameInstant = previousFrameInstant
+      let frameInstant = deriveFrameInstant(consumedAt: consumedAt)
       // Transfer-and-clear: everything dispatched before this acquisition is
       // what this frame answers. Inputs arriving during the frame belong to
       // the next one.
@@ -148,9 +168,11 @@ extension RunLoop {
         scheduledFrame: scheduledFrame,
         consumedAt: consumedAt,
         frameInstant: frameInstant,
+        previousFrameInstant: previousFrameInstant,
         renderIntentDiagnostics: renderIntentDiagnostics,
         convergence: convergence,
         acquisition: FrameAcquisitionState(geometry: geometry),
+        ingressAcquisition: ingressAcquisition,
         answeredInputs: answeredInputs,
         hasFrameSink: hasFrameSink,
         renderedFrames: &renderedFrames
@@ -218,33 +240,115 @@ extension RunLoop {
     pendingAnsweredInputs.fold(answeredInputs)
   }
 
-  /// The instant this frame is *about*: its triggering deadline when it has
-  /// one, otherwise the reading it was consumed at. Deadline-triggered frames
-  /// use the deadline so a frame that ran late still animates to the time it
-  /// was scheduled for, rather than to the time it happened to be serviced.
+  /// Whether a drain pass that has already acquired a frame should return to
+  /// the outer loop before acquiring another (plan 2026-09-24-001 §4D).
   ///
-  /// A non-deadline wake (a state write, input, or signal) is additionally
-  /// clamped to the nearest still-armed deadline when that deadline is
-  /// already due. On a loop running slower than the animation cadence the
-  /// deadline rule makes the armed chain lag the wall clock; sampling a
-  /// wake frame at the wall clock would then advance every in-flight
-  /// animation by the whole accumulated lag in one frame — a spring with a
-  /// second left to run completes on the spot, and its `.removed` barrier
-  /// fires right behind it (the gallery section 19 snap: a state write from
-  /// an early `.logicallyComplete` closure ended the spring it completed
-  /// for; org tracker T5). On a loop keeping cadence the nearest armed
-  /// deadline lies in the future and the clamp changes nothing.
+  /// Two triggers, checked in this order:
+  /// - **Input is waiting.** A turn-boundary pull runs first so the check
+  ///   sees fresh input from a pulling reader, not only what a stream copy
+  ///   task happened to move while the loop was suspended. Interactive
+  ///   rendering may enqueue more frames while a key or pointer event is
+  ///   already buffered; yielding here keeps task/animation invalidations
+  ///   from running ahead of user input. This used to run only after a
+  ///   committed async frame; a skipped or elided acquisition spends time
+  ///   too, so all three paths reach it now.
+  /// - **The elapsed-work budget is spent**, when `drainPassWorkBudget` is
+  ///   set: that much frame-clock time since the pass's first acquisition.
+  ///   The count bound (`maxFramesPerDrainPass`) is not a wall-time
+  ///   responsiveness bound; this one is. It is off by default (see the
+  ///   property) and is a measurement knob for the §5 lanes.
+  ///
+  /// Without an event pump there is no input to serve (manual drivers and
+  /// tests), so only the count bound applies. Returning leaves pending
+  /// scheduler intent intact; the outer loop re-enters a fresh pass for it.
+  private func shouldYieldDrainPass(
+    to eventPump: EventPump?,
+    passStartedAt: MonotonicInstant?,
+    appliesWorkBudget: Bool
+  ) -> Bool {
+    guard let eventPump else {
+      return false
+    }
+    _ = eventPump.pullInput()
+    if eventPump.hasPendingEvents() {
+      return true
+    }
+    guard appliesWorkBudget, let passStartedAt, let workBudget = drainPassWorkBudget else {
+      return false
+    }
+    return passStartedAt.duration(to: frameClock()) >= workBudget
+  }
+
+  /// The pump's depth and oldest-entry age, and the acquisition's position in
+  /// its drain pass, for the `ingress_*` / `drain_pass_*` columns. Reads the
+  /// pump only when a frame sink will report it.
+  private func ingressAcquisitionSnapshot(
+    eventPump: EventPump?,
+    consumedAt: MonotonicInstant,
+    passStartedAt: MonotonicInstant,
+    drainPassFrameIndex: Int
+  ) -> IngressAcquisitionSnapshot {
+    guard frameSink != nil else {
+      return IngressAcquisitionSnapshot(drainPassFrameIndex: drainPassFrameIndex)
+    }
+    return IngressAcquisitionSnapshot(
+      pumpBatches: eventPump?.pendingBatchCount() ?? 0,
+      oldestPendingAge: eventPump?.oldestPendingArrival().map { $0.duration(to: consumedAt) },
+      drainPassFrameIndex: drainPassFrameIndex,
+      drainPassElapsed: passStartedAt.duration(to: consumedAt)
+    )
+  }
+
+  /// The instant this frame is *about*: the `frameClock` reading it was
+  /// consumed at, made non-decreasing across acquisitions.
+  ///
+  /// Every kind of frame — deadline, input, invalidation, signal, external —
+  /// samples the same host monotonic clock, so animation progress follows
+  /// elapsed active time (plan 2026-09-24-001 §4B, STUI-618). A frame that
+  /// took 160 ms advances every in-flight animation by about 160 ms at the
+  /// next acquisition rather than by the 33 ms its armed deadline nominally
+  /// stood for; missed visual samples are skipped, never replayed, so slow
+  /// rendering cannot prolong a finite animation and retain its work. The
+  /// re-arm chain stays `frameInstant + 33 ms` and is self-correcting: a
+  /// deadline armed during a long frame is already overdue when armed, fires
+  /// at once, and the next acquisition samples the elapsed time.
+  ///
+  /// Two earlier rules lived here and both mixed time domains:
+  ///
+  /// - A deadline-triggered frame animated to its *scheduled* instant. Under
+  ///   load the armed chain lagged the clock by a growing amount, so a 1.6 s
+  ///   effect needed about 49 rendered ticks however long each one took —
+  ///   the counter demo's ripple backlog.
+  /// - A non-deadline wake was clamped to the nearest overdue armed deadline
+  ///   so it would not jump the lagging chain to the clock in one frame (the
+  ///   gallery section 19 spring snap; org tracker T5). That snap arose only
+  ///   because the two kinds of frame read different domains; with one
+  ///   sampled domain there is no accumulated lag to jump, and
+  ///   `AnimationLogicalCompletionAsyncTests` still pins the journey. The
+  ///   clamp also pinned animation time to whichever scheduler deadline
+  ///   happened to be first — a long-press or momentum timer with nothing to
+  ///   do with animation.
+  ///
+  /// `ScheduledFrame.triggeredDeadline` remains the routing key for
+  /// gesture-deadline drains and scroll momentum, which read it separately;
+  /// it is no longer a time domain for animation.
+  ///
+  /// Non-decreasing is guaranteed here rather than assumed of the clock: the
+  /// pause-aware production clock is monotonic, but the synchronous driver
+  /// and tests can install any closure, and a frame must never animate
+  /// backwards relative to the frame before it. Elided and skipped
+  /// acquisitions derive their instant here too, so the guarantee covers them.
   private func deriveFrameInstant(
-    for scheduledFrame: ScheduledFrame,
     consumedAt: MonotonicInstant
   ) -> MonotonicInstant {
-    if let triggeredDeadline = scheduledFrame.triggeredDeadline {
-      return triggeredDeadline
-    }
-    if let nextDeadline = scheduledFrame.nextDeadline, nextDeadline < consumedAt {
-      return nextDeadline
-    }
-    return consumedAt
+    let frameInstant =
+      if let previousFrameInstant, previousFrameInstant > consumedAt {
+        previousFrameInstant
+      } else {
+        consumedAt
+      }
+    previousFrameInstant = frameInstant
+    return frameInstant
   }
 
   /// Publishes this run loop's `currentFocusedValues` as the live
@@ -273,9 +377,11 @@ extension RunLoop {
     scheduledFrame: ScheduledFrame,
     consumedAt: MonotonicInstant,
     frameInstant: MonotonicInstant,
+    previousFrameInstant: MonotonicInstant?,
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
     convergence: FocusSyncConvergenceState,
     acquisition: FrameAcquisitionState,
+    ingressAcquisition: IngressAcquisitionSnapshot,
     answeredInputs: AnsweredInputs?,
     hasFrameSink: Bool,
     renderedFrames: inout Int
@@ -397,6 +503,10 @@ extension RunLoop {
       presentationMetrics: presentationResult.metrics,
       presentationDuration: presentationResult.duration,
       answeredInputs: answeredInputs,
+      frameInstant: frameInstant,
+      consumedAt: consumedAt,
+      previousFrameInstant: previousFrameInstant,
+      ingressAcquisition: ingressAcquisition,
       translationCandidate: scrollTranslation.candidate,
       committedTranslation: artifacts.committedScrollTranslation,
       renderedFrames: renderedFrames
@@ -430,10 +540,19 @@ extension RunLoop {
     )
   }
 
+  /// - Parameters:
+  ///   - frameBudget: the acquisition cap for this pass; defaults to
+  ///     `maxFramesPerDrainPass`.
+  ///   - appliesWorkBudget: whether `drainPassWorkBudget` (when set) bounds
+  ///     this pass. The cooperative exit flush passes `false` so a short
+  ///     follow-up chain still presents the input handled in its batch before
+  ///     exit — there is no further input to serve, so the budget has no
+  ///     purpose there.
   package func renderPendingFramesAsync(
     renderedFrames: inout Int,
     eventPump: EventPump?,
-    frameBudget: Int? = nil
+    frameBudget: Int? = nil,
+    appliesWorkBudget: Bool = true
   ) async throws -> RunLoopExitReason? {
     guard beginTerminalRenderPassIfAvailable() else {
       return nil
@@ -465,6 +584,7 @@ extension RunLoop {
     let drainPass = beginDeadlineDrainPass()
     let frameBudget = frameBudget ?? Self.maxFramesPerDrainPass
     var consumedScheduledFrames = 0
+    var passStartedAt: MonotonicInstant?
     frameLoop: while true {
       if terminalHandoffInProgress {
         break frameLoop
@@ -475,13 +595,32 @@ extension RunLoop {
       if consumedScheduledFrames >= frameBudget {
         break frameLoop
       }
+      // Input service between acquisitions: runs after committed, skipped,
+      // and elided acquisitions alike (a frame that presented nothing still
+      // spent the time), pulls fresh input first, and also honors the
+      // elapsed-work budget.
+      if consumedScheduledFrames > 0,
+        shouldYieldDrainPass(
+          to: eventPump, passStartedAt: passStartedAt, appliesWorkBudget: appliesWorkBudget)
+      {
+        break frameLoop
+      }
       processPendingHotReload()
       let consumedAt = frameClock()
       guard var scheduledFrame = consumeReadyFrame(for: drainPass, at: consumedAt) else {
         break frameLoop
       }
-      let frameInstant = deriveFrameInstant(for: scheduledFrame, consumedAt: consumedAt)
+      let previousFrameInstant = previousFrameInstant
+      let frameInstant = deriveFrameInstant(consumedAt: consumedAt)
       consumedScheduledFrames += 1
+      let passStart = passStartedAt ?? consumedAt
+      passStartedAt = passStart
+      let ingressAcquisition = ingressAcquisitionSnapshot(
+        eventPump: eventPump,
+        consumedAt: consumedAt,
+        passStartedAt: passStart,
+        drainPassFrameIndex: consumedScheduledFrames
+      )
       // Transfer-and-clear (see the synchronous driver): this frame answers
       // what was dispatched before its acquisition.
       let answeredInputs = takePendingAnsweredInputs()
@@ -621,21 +760,18 @@ extension RunLoop {
         scheduledFrame: scheduledFrame,
         consumedAt: consumedAt,
         frameInstant: frameInstant,
+        previousFrameInstant: previousFrameInstant,
         renderIntentDiagnostics: renderIntentDiagnostics,
         convergence: convergence,
         acquisition: acquisition,
+        ingressAcquisition: ingressAcquisition,
         answeredInputs: answeredInputs,
         hasFrameSink: hasFrameSink,
         renderedFrames: &renderedFrames
       )
       previousRenderedState = currentState
-
-      // Interactive rendering may enqueue more frames while a key or
-      // pointer event is already buffered. Yield between committed frames
-      // so task/animation invalidations cannot run ahead of user input.
-      if eventPump?.hasPendingEvents() == true {
-        break
-      }
+      // The pending-input yield that used to sit here runs at the top of the
+      // loop, so skipped and elided acquisitions are covered too.
     }
     progressProbe?.record(.schedulerIdle, frameNumber: renderedFrames)
     return nil

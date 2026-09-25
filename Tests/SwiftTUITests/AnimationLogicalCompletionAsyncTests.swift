@@ -17,15 +17,17 @@ import Testing
 /// frame that renders `logical=1`, with `.removed` following one frame
 /// later — a second of remaining bounce swallowed by the write.
 ///
-/// The trigger is pacing, not the surrounding tree: deadline-triggered
-/// frames deliberately animate to their *scheduled* instant, so on a loop
-/// whose per-frame cost exceeds the cadence the armed deadline chain lags
-/// the wall clock. A non-deadline wake (the closure's state write) then
-/// derived its frame instant from the wall clock and advanced every
-/// in-flight animation by the whole accumulated lag at once. The harness
-/// spends deliberate main-actor time on every presented frame (as the
-/// gallery's frame-strip predicates do) to hold the loop below cadence;
-/// `deriveFrameInstant` now clamps wake frames to the armed chain.
+/// The trigger was pacing, not the surrounding tree: deadline-triggered
+/// frames used to animate to their *scheduled* instant, so on a loop whose
+/// per-frame cost exceeded the cadence the armed deadline chain lagged the
+/// wall clock. A non-deadline wake (the closure's state write) then derived
+/// its frame instant from the wall clock and advanced every in-flight
+/// animation by the whole accumulated lag at once. The harness spends
+/// deliberate main-actor time on every presented frame (as the gallery's
+/// frame-strip predicates do) to hold the loop below cadence. Every frame
+/// now samples the same clock at acquisition (STUI-618), so there is no
+/// lagging chain for a wake frame to jump; this journey stays pinned so a
+/// future clock-policy change cannot reintroduce the snap.
 @MainActor
 @Suite(.serialized)
 struct AnimationLogicalCompletionAsyncTests {
@@ -52,6 +54,13 @@ struct AnimationLogicalCompletionAsyncTests {
         }
       }
     )
+    // Bounded per-frame animation steps keep the journey deterministic on a
+    // starved runner: a frame that took longer than the spring's remaining
+    // second would otherwise legitimately land both barriers in one frame,
+    // and a step wider than the cadence lands the logical frame in the
+    // bouncy spring's overshoot, where the clamped bar already reads 40.
+    let frameClock = BoundedStepFrameClock()
+    runLoop.frameClock = { [frameClock] in frameClock.now() }
     let result = try await runLoop.run()
     #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 

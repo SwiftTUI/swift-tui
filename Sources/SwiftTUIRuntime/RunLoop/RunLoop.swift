@@ -54,6 +54,24 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   package var pendingAccessibilityAnnouncements: [AccessibilityAnnouncement] = []
   package let observationBridge = ObservationBridge()
   package let renderSuspensionDiagnostics = RenderSuspensionDiagnostics()
+  /// Source-read, pull, and pump-enqueue counters for the `ingress_*`
+  /// diagnostic columns (STUI-618). Recorded by the event pump's delivery
+  /// closures, drained by each committed frame's sample.
+  package let ingressDiagnostics = IngressDiagnostics()
+  /// Optional elapsed-work bound on a drain pass with an event pump attached
+  /// (plan 2026-09-24-001 §4D, STUI-618): once a pass has acquired a frame
+  /// and this much frame-clock time has elapsed since that first
+  /// acquisition, the pass returns to input handling before acquiring
+  /// another. `nil` (the default) leaves only the acquisition-count bound.
+  ///
+  /// Off by default because the per-acquisition pull and pending-input check
+  /// already give a pulling reader its service opportunity at every frame
+  /// boundary, and a stream-adapter reader's copy task runs only on a real
+  /// suspension, which a bare pass return does not provide; the plan reserves
+  /// this bound for "where measurement still shows a gap". Setting it splits
+  /// a short follow-up chain across passes on a slow machine, which the
+  /// outer loop re-enters at once. The cooperative exit flush ignores it.
+  package var drainPassWorkBudget: Duration?
   package var terminalHandoffInProgress = false
   package var terminalRenderPassInProgress = false
   package var terminalRenderPassWaiters: [CheckedContinuation<Void, Never>] = []
@@ -160,6 +178,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// and the latency columns stay empty.
   package let schedulerIntentTally: (any IntentRequestTallying)?
   package var previousPresentedRasterSurface: RasterSurface?
+  /// The instant the previous acquisition animated to. `deriveFrameInstant`
+  /// clamps each new frame instant to be no earlier than this, so animation
+  /// time never runs backwards whatever clock closure a driver installs; the
+  /// diagnostics derive the per-frame animation-time delta from it.
+  package var previousFrameInstant: MonotonicInstant?
   /// Scroll state of the previously *presented* frame — the baseline the
   /// scroll-translation candidate (R2.2) diffs against. `nil` until a frame
   /// with scroll routes presents, and cleared again by a route-free frame.
@@ -176,7 +199,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// stay invisible to the drain and cannot perturb frame counts under load.
   ///
   /// Sampled **once per frame**, at the consume, and carried from there as
-  /// `frameInstant` (`scheduledFrame.triggeredDeadline ?? consumedAt`). Every
+  /// `frameInstant` (the consume reading, made non-decreasing across
+  /// acquisitions — see `deriveFrameInstant`; deadline-triggered frames no
+  /// longer animate to their scheduled instant, STUI-618). Every
   /// frame-scoped consumer reads that value rather than the clock: readiness,
   /// the animation timestamp, deadline re-arms, superseded-batch parks, and
   /// the pre-start-cancel / supersession gates. Re-sampling inside a frame is
@@ -645,7 +670,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
             if let flushedExitReason = try await renderPendingFramesAsync(
               renderedFrames: &renderedFrames,
               eventPump: eventPump,
-              frameBudget: signalExit ? 1 : nil
+              frameBudget: signalExit ? 1 : nil,
+              appliesWorkBudget: false
             ) {
               return RunLoopResult(
                 finalState: stateContainer.state,

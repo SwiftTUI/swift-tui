@@ -8,8 +8,39 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- Every frame now animates to the host monotonic instant it was consumed at,
+  made non-decreasing across acquisitions. Deadline-triggered frames no longer
+  animate to their scheduled instant and non-deadline wakes are no longer
+  clamped to an overdue deadline, so a run loop rendering slower than the 33 ms
+  cadence advances finite animations by elapsed time and skips missed visual
+  samples instead of replaying them; a 1.6 s effect ends after 1.6 s, not after
+  49 rendered ticks. The re-arm chain is unchanged and self-correcting. Tests
+  that assert intermediate poses on the wall clock can install
+  `BoundedStepFrameClock` (`@_spi(Runners)`) to keep one bounded animation
+  step per rendered frame on a starved runner (STUI-618).
+- A drain pass with an event pump attached now yields to input handling after
+  a skipped or elided acquisition as well as a committed one, and pulls fresh
+  input from a synchronously pullable reader before deciding. An optional
+  elapsed-work bound (`RunLoop.drainPassWorkBudget`, off by default) returns
+  the pass to input handling after a set amount of frame-clock work; the
+  cooperative exit flush ignores it (STUI-618).
+
 ### Added
 
+- `SynchronousInputPulling`: a package seam for readers over an immediately
+  visible non-blocking queue. The run loop drains such a reader itself at the
+  start of each outer-loop turn and before each frame acquisition, and the
+  reader's main-actor idle poll wakes a quiet loop through the same pull, so
+  ingress no longer depends on the reader task and the pump copy task getting
+  executor time while the loop renders. The WASI web-surface reader adopts it;
+  in the counter burst every committed frame used to admit at most one
+  activation however many were queued (STUI-618).
+- `frames.tsv` gains `frame_instant_lag_ms` and `animation_time_delta_ms` (the
+  clock columns), the `ingress_*` columns (source bytes/reads/events, pull
+  deliveries, pump depth, high water, oldest pending age), and
+  `drain_pass_frame_index` / `drain_pass_elapsed_ms` (STUI-618).
 - Host-neutral semantic accessibility actions for focus, activation, numeric
   adjustment, and typed control values. Requests target live scene-local tokens,
   reject stale/disabled/out-of-scope controls, and acknowledge without publishing
