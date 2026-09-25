@@ -8,6 +8,21 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-09-25
+
+A dependency-only patch. No framework source changes.
+
+### Changed
+
+- `swift-collections` is now required as `"1.6.0"..<"1.7.0"` instead of
+  `from: "1.6.0"`. Building against swift-collections 1.7.0 with the Swift 6.4
+  toolchain emits a strong reference to the `swift_initBorrow` runtime symbol,
+  which macOS 26 and iOS 26 do not ship, so test bundles and executables that
+  resolve 1.7.0 fail to load on those systems with `Symbol not found:
+  _swift_initBorrow` (apple/swift-collections#733). The framework itself uses
+  only `DequeModule` and needs nothing from 1.7.0. The cap will be lifted once
+  a swift-collections release without the borrow helpers is available.
+
 ## [0.15.0] - 2026-09-25
 
 The framework keeps animation time and input service honest under overload:
@@ -2144,7 +2159,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.15.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.15.1...HEAD
+[0.15.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.15.1
 [0.15.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.15.0
 [0.14.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.14.0
 [0.13.5]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.5

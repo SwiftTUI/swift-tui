@@ -57,7 +57,11 @@ let packageDependencies: [Package.Dependency] = [
   ),
   .package(
     url: "https://github.com/apple/swift-collections.git",
-    from: "1.6.0"
+    // 1.7.0 makes the Swift 6.4 compiler emit a strong reference to the
+    // `swift_initBorrow` runtime symbol, which macOS 26 / iOS 26 lack, so
+    // binaries fail to load there (apple/swift-collections#733). Lift the cap
+    // once 1.7.1 ships without the borrow helpers.
+    "1.6.0"..<"1.7.0"
   ),
   .package(
     url: "https://github.com/apple/swift-async-algorithms.git",
