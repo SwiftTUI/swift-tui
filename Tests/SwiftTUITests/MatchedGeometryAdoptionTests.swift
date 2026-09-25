@@ -497,6 +497,111 @@ struct MatchedGeometryAdoptionTests {
       "\(nested.bounds)")
   }
 
+  @Test("a matched destination inside an adopted subtree travels to its adopted rect")
+  func matchedDestinationInsideAdoptedSubtree() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(1))
+    controller.register(animation)
+    let outerKey = MatchedGeometryKey(id: "outer")
+    let root = testIdentity("MatchedAdoption", "AdoptedDestination", "Root")
+    let outerSource = testIdentity("MatchedAdoption", "AdoptedDestination", "OuterSource")
+    let outer = testIdentity("MatchedAdoption", "AdoptedDestination", "Outer")
+    let departing = testIdentity("MatchedAdoption", "AdoptedDestination", "Departing")
+    let destination = testIdentity("MatchedAdoption", "AdoptedDestination", "Destination")
+    let departingNodeID = ViewNodeID(rawValue: 8_101)
+    let start = MonotonicInstant(offset: .seconds(540))
+    let row = CellSize(width: 10, height: 1)
+    let heroSize = CellSize(width: 2, height: 1)
+    let departingBounds = CellRect(origin: CellPoint(x: 50, y: 0), size: heroSize)
+
+    func resolved(heroInOuter: Bool) -> ResolvedNode {
+      var outerSourceNode = ResolvedNode(identity: outerSource, kind: .view("Leaf"))
+      outerSourceNode.matchedGeometry = MatchedGeometryConfig(key: outerKey)
+      var hero = ResolvedNode(identity: destination, kind: .view("Leaf"))
+      hero.matchedGeometry = MatchedGeometryConfig(key: Self.key)
+      var outerNode = ResolvedNode(
+        identity: outer, kind: .view("Frame"), children: heroInOuter ? [hero] : [])
+      outerNode.matchedGeometry = MatchedGeometryConfig(key: outerKey, isSource: false)
+      var children = [outerSourceNode, outerNode]
+      if !heroInOuter {
+        var departingNode = ResolvedNode(
+          viewNodeID: departingNodeID, identity: departing, kind: .view("Leaf"),
+          children: [], layoutBehavior: .intrinsic, drawMetadata: DrawMetadata())
+        departingNode.matchedGeometry = MatchedGeometryConfig(key: Self.key)
+        children.append(departingNode)
+      }
+      return ResolvedNode(identity: root, kind: .view("Root"), children: children)
+    }
+    func placed(heroInOuter: Bool) -> PlacedNode {
+      var children = [
+        PlacedNode(
+          identity: outerSource, bounds: CellRect(origin: CellPoint(x: 10, y: 0), size: row),
+          matchedGeometry: MatchedGeometryConfig(key: outerKey)),
+        PlacedNode(
+          identity: outer, bounds: CellRect(origin: CellPoint(x: 0, y: 0), size: row),
+          children: heroInOuter
+            ? [
+              PlacedNode(
+                identity: destination,
+                bounds: CellRect(origin: CellPoint(x: 2, y: 0), size: heroSize),
+                matchedGeometry: MatchedGeometryConfig(key: Self.key))
+            ] : [],
+          matchedGeometry: MatchedGeometryConfig(key: outerKey, isSource: false)),
+      ]
+      if !heroInOuter {
+        children.append(
+          PlacedNode(
+            identity: departing, bounds: departingBounds,
+            matchedGeometry: MatchedGeometryConfig(key: Self.key)))
+      }
+      return PlacedNode(identity: root, bounds: Self.surface, children: children)
+    }
+
+    // Frame 1: the hero key lives outside the adopted subtree.
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: departing, viewNodeID: departingNodeID, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      resolved(heroInOuter: false), transaction: .init(), timestamp: start)
+    controller.capturePlacedTree(placed(heroInOuter: false))
+
+    // Frame 2: the key moves, animated, to a destination whose ancestor is
+    // adopted 10 cells right onto its source; at rest it is drawn at x 12.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      resolved(heroInOuter: true), transaction: transaction, timestamp: start)
+    #expect(controller.activeMatchedGeometryCount == 1)
+    let arrived = placed(heroInOuter: true)
+    func drawn(at elapsed: Duration) throws -> (destination: CellRect, departing: CellRect?) {
+      let snapshot = controller.placedAnimationOverlaySnapshot(
+        for: arrived, at: start.advanced(by: elapsed))
+      var tree = arrived
+      applyPlacedAnimationOverlaySnapshot(snapshot, to: &tree)
+      return (
+        try #require(Self.node(destination, in: tree)).bounds,
+        Self.node(departing, in: tree)?.bounds
+      )
+    }
+
+    let atStart = try drawn(at: .zero)
+    #expect(atStart.destination == departingBounds, "\(atStart.destination)")
+    let halfway = try drawn(at: .milliseconds(500))
+    #expect(
+      halfway.destination == CellRect(origin: CellPoint(x: 31, y: 0), size: heroSize),
+      "\(halfway.destination)")
+    #expect(
+      halfway.departing == halfway.destination,
+      "the exit overlay left the destination's path: \(String(describing: halfway.departing))")
+    let settled = try drawn(at: .milliseconds(1_500))
+    #expect(
+      settled.destination == CellRect(origin: CellPoint(x: 12, y: 0), size: heroSize),
+      "\(settled.destination)")
+  }
+
   // MARK: - 3, 6, 7. Semantics, incremental raster, and reduce motion through the pipeline
 
   @Test("an adopted button hit-tests and focuses at the drawn rect, above the source")

@@ -14,10 +14,21 @@ package enum PlacedAnimationOverlaySampling {
     adoption: [MatchedGeometryAdoptionPair]? = nil
   ) -> PlacedAnimationOverlaySamplingResult {
     let effectiveSurfaceSize = surfaceSize ?? tree.bounds.size
+    let adoptionPairs = adoption ?? MatchedGeometryAdoption.pairs(in: tree)
+    // Matched travel ends where its destination rests. Adoption is applied
+    // before the matched channel, so a destination that is, or sits inside,
+    // an adopted non-source rests at its adopted rect; a target read from
+    // the un-adopted baseline would carry that displacement twice.
+    let hasMatchedTravel =
+      activeAnimations.keys.contains { $0.scope == .matchedGeometry }
+      || removingNodes.values.contains { $0.matchedTravel != nil }
+    let restingTree =
+      hasMatchedTravel && !adoptionPairs.isEmpty
+      ? restingPlacement(of: tree, pairs: adoptionPairs) : tree
     let removalResult = sampleRemovalOverlays(
       removingNodes: removingNodes,
       registeredAnimations: registeredAnimations,
-      tree: tree,
+      restingTree: restingTree,
       timestamp: timestamp,
       surfaceSize: effectiveSurfaceSize
     )
@@ -36,7 +47,7 @@ package enum PlacedAnimationOverlaySampling {
     let matchedResult = sampleMatchedGeometryOffsets(
       activeAnimations: activeAnimations,
       registeredAnimations: registeredAnimations,
-      tree: tree,
+      restingTree: restingTree,
       timestamp: timestamp
     )
 
@@ -53,7 +64,7 @@ package enum PlacedAnimationOverlaySampling {
     // this frame, and its adoptee should sit on the drawn rect.
     let adoptionOffsets = sampleAdoption(
       tree: tree,
-      pairs: adoption,
+      pairs: adoptionPairs,
       liveOffsets: insertionResult.offsets
         + NestedMatchedGeometryPlacement.localOffsets(
           in: tree, absolute: matchedResult.offsets),
@@ -91,6 +102,19 @@ package enum PlacedAnimationOverlaySampling {
       in: tree, pairs: pairs, liveOffsets: liveOffsets, liveScales: liveScales)
   }
 
+  /// `tree` with its time-free adoption applied: where every node rests
+  /// while nothing is in flight.
+  private static func restingPlacement(
+    of tree: PlacedNode,
+    pairs: [MatchedGeometryAdoptionPair]
+  ) -> PlacedNode {
+    var offsets: [Identity: PlacedAnimationOverlayOffset] = [:]
+    for offset in sampleAdoption(tree: tree, pairs: pairs) {
+      offsets[offset.identity] = offset
+    }
+    return offsets.isEmpty ? tree : translatePlacedNodesByIdentity(tree: tree, offsets: offsets)
+  }
+
   private struct RemovalSamplingResult {
     var overlays: [PlacedRemovalOverlaySnapshot] = []
     var customStates: [ViewNodeID: AnimationState] = [:]
@@ -109,10 +133,12 @@ package enum PlacedAnimationOverlaySampling {
     var completedKeys: [AnimationKey] = []
   }
 
+  /// - Parameter restingTree: the placed tree with its time-free adoption
+  ///   applied, where a traveling exit overlay's destination rests.
   private static func sampleRemovalOverlays(
     removingNodes: [ViewNodeID: RemovalEntry],
     registeredAnimations: [AnimationBox: Animation],
-    tree: PlacedNode,
+    restingTree: PlacedNode,
     timestamp: MonotonicInstant,
     surfaceSize: CellSize
   ) -> RemovalSamplingResult {
@@ -168,7 +194,7 @@ package enum PlacedAnimationOverlaySampling {
         matchedRemovalOffset(
           travel: travel,
           overlay: placedSnapshot,
-          tree: tree,
+          restingTree: restingTree,
           progress: progress
         )
       }
@@ -188,16 +214,16 @@ package enum PlacedAnimationOverlaySampling {
 
   /// The departing matched node's placed delta at `progress`: its frozen
   /// rect inside the exit overlay interpolates toward the live counterpart's
-  /// current rect under the same anchor-space rule as the live side
+  /// resting rect under the same anchor-space rule as the live side
   /// (`interpolatedMatchedRect`), so the two instances coincide while their
   /// transitions cross-fade. The delta is relative to the frozen rect, where
   /// the overlay already sits; the live side's delta is relative to its
-  /// destination. `nil` when either rect is missing — the overlay then fades
+  /// resting rect. `nil` when either rect is missing — the overlay then fades
   /// in place.
   private static func matchedRemovalOffset(
     travel: MatchedRemovalTravel,
     overlay: PlacedNode,
-    tree: PlacedNode,
+    restingTree: PlacedNode,
     progress: Double
   ) -> PlacedAnimationOverlayOffset? {
     guard
@@ -206,7 +232,7 @@ package enum PlacedAnimationOverlaySampling {
         identity: travel.matchedIdentity
       ),
       let toBounds = AnimationTreeQueries.findBounds(
-        in: tree,
+        in: restingTree,
         identity: travel.destinationIdentity
       )
     else {
@@ -276,10 +302,12 @@ package enum PlacedAnimationOverlaySampling {
     return result
   }
 
+  /// Each offset is the destination's displacement from its resting rect in
+  /// `restingTree` (its adopted rect, when adoption moves it).
   private static func sampleMatchedGeometryOffsets(
     activeAnimations: [AnimationKey: ActiveAnimation],
     registeredAnimations: [AnimationBox: Animation],
-    tree: PlacedNode,
+    restingTree: PlacedNode,
     timestamp: MonotonicInstant
   ) -> OffsetSamplingResult {
     var result = OffsetSamplingResult()
@@ -306,7 +334,7 @@ package enum PlacedAnimationOverlaySampling {
 
       guard
         let toBounds = AnimationTreeQueries.findBounds(
-          in: tree,
+          in: restingTree,
           identity: key.identity
         )
       else {

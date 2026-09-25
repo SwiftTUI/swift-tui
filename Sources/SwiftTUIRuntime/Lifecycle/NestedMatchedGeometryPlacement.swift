@@ -113,8 +113,9 @@ struct NestedMatchedGeometryPlacement {
     return rect
   }
 
-  /// Matched interpolation targets are absolute displacements from baseline.
-  /// Convert them to local channel deltas before composing parent dependencies.
+  /// Matched interpolation targets are absolute displacements from each
+  /// node's resting (adopted) rect. Convert them to local channel deltas
+  /// before composing parent dependencies.
   static func localOffsets(
     in tree: PlacedNode, absolute offsets: [PlacedAnimationOverlayOffset]
   ) -> [PlacedAnimationOverlayOffset] {
