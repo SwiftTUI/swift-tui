@@ -1003,7 +1003,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   cascade reaches descendants at extraction). A `Canvas` applies the factor
   after its drawing resolves colors, including explicit foregrounds,
   backgrounds, styled samples and direct cell writes. The default foreground
-  receives the same factor exactly once.
+  receives the same factor exactly once. A node whose factor reaches zero
+  paints nothing, so it leaves the content beneath it untouched instead of
+  replacing those cells with invisible glyphs.
 
 ## Surface extensions with no SwiftUI analog
 

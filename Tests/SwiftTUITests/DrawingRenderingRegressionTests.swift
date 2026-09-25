@@ -103,6 +103,28 @@ struct DrawingRenderingRegressionTests {
       if x > 0 { #expect(style.backgroundColor?.alpha == 0.125) }
     }
   }
+
+  @Test("STUI-592: content faded to zero opacity leaves the content beneath it untouched")
+  func transparentContentPaintsNothing() {
+    func cells(over overlay: some View) -> [[RasterCell]] {
+      DefaultRenderer().render(
+        ZStack {
+          Text("AAAA\nAAAA\nAAAA").foregroundStyle(.red)
+          overlay
+        }
+        .frame(width: 4, height: 3)
+      ).rasterSurface.cells
+    }
+    let underlay = cells(over: EmptyView())
+    let canvas = Canvas(OpacityDrawing()).frame(width: 4, height: 3)
+    #expect(cells(over: canvas.opacity(0)) == underlay)
+    #expect(cells(over: canvas.opacity(0.5).opacity(0)) == underlay)
+    #expect(cells(over: VStack { Text("BBBB") }.opacity(0)) == underlay)
+    #expect(cells(over: Rectangle().stroke(Color.blue).opacity(0)) == underlay)
+    #expect(
+      cells(over: Text("B").frame(width: 4, height: 3).border(Color.blue).opacity(0)) == underlay)
+    #expect(cells(over: canvas.opacity(0.5)) != underlay)
+  }
 }
 
 private struct OpacityDrawing: CanvasDrawing {

@@ -495,6 +495,10 @@ extension DrawExtractor {
           } ?? contentClip
       }
     }
+    // A node faded to nothing paints nothing, as in SwiftUI. A cell holds one
+    // glyph, so a glyph written at zero opacity would still erase the content
+    // beneath it.
+    let paints = effectiveOpacity > 0
     return DrawNode(
       viewNodeID: projection.viewNodeID,
       identity: identity,
@@ -503,13 +507,14 @@ extension DrawExtractor {
       clipBounds: drawMetadata.clipsToBounds ? bounds : nil,
       metadata: drawMetadata,
       drawEffects: drawEffects,
-      commands: maskedBackgroundCommands(
-        commands,
-        in: bounds,
-        inheritedBorderMask: inheritedBorderMask,
-        isInBackgroundSubtree: isInBackgroundSubtree
-      ),
-      postCommands: postCommands,
+      commands: paints
+        ? maskedBackgroundCommands(
+          commands,
+          in: bounds,
+          inheritedBorderMask: inheritedBorderMask,
+          isInBackgroundSubtree: isInBackgroundSubtree
+        ) : [],
+      postCommands: paints ? postCommands : [],
       children: clippedChildNodes
     )
   }
