@@ -49,6 +49,37 @@
         #expect(ws.ws_row == 50)
       }
     }
+
+    @Test("openPTY resolves slave paths while other threads open PTYs")
+    func concurrentOpenResolvesSlavePaths() async {
+      let failures = await withTaskGroup(of: [String].self) { group in
+        for _ in 0..<8 {
+          group.addTask {
+            var failures: [String] = []
+            for _ in 0..<50 {
+              do throws(PTYError) {
+                let handles = try openPTY()
+                if !handles.slavePath.hasPrefix("/dev/") {
+                  failures.append("unexpected slave path \(handles.slavePath)")
+                }
+                closeFD(handles.masterFD)
+                closeFD(handles.slaveFD)
+              } catch {
+                failures.append(error.description)
+              }
+            }
+            return failures
+          }
+        }
+        var failures: [String] = []
+        for await taskFailures in group {
+          failures += taskFailures
+        }
+        return failures
+      }
+      #expect(
+        failures.isEmpty, "\(failures.count) of 400 opens failed; first: \(failures.first ?? "")")
+    }
   }
 
   private func withPTYPair<R>(

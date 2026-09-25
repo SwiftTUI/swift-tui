@@ -29,7 +29,7 @@
     configureNoSigPipe(masterFD)
     configureNoSigPipe(slaveFD)
 
-    guard let slavePath = ttyName(slaveFD) else {
+    guard let slavePath = slavePath(masterFD: masterFD, slaveFD: slaveFD) else {
       closeFD(masterFD)
       closeFD(slaveFD)
       throw .slavePathUnavailable
@@ -63,14 +63,23 @@
     #endif
   }
 
-  private func ttyName(_ fd: Int32) -> String? {
+  /// The slave device path. Darwin's `ttyname_r` is not thread-safe: while
+  /// another thread resolves a terminal name it fails with `ERANGE`, which
+  /// broke parallel tests that open PTYs. `ptsname_r` on the master asks the
+  /// kernel for the same name. Glibc's `ttyname_r` reads `/proc/self/fd` and
+  /// is safe.
+  private func slavePath(masterFD: Int32, slaveFD: Int32) -> String? {
     var buffer = [CChar](repeating: 0, count: 4096)
     let result = buffer.withUnsafeMutableBufferPointer { storage in
       guard let baseAddress = storage.baseAddress else {
         return ERANGE
       }
 
-      return unsafe ttyname_r(fd, baseAddress, storage.count)
+      #if canImport(Darwin)
+        return unsafe ptsname_r(masterFD, baseAddress, storage.count)
+      #else
+        return unsafe ttyname_r(slaveFD, baseAddress, storage.count)
+      #endif
     }
 
     guard result == 0 else {
