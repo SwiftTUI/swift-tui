@@ -754,7 +754,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   sub-cell quantization of custom paths versus bit-exact primitives.
 - **`FillRule` defaults are coherent.** *Ratified.* Path rendering and
   `Path.contains` both default to non-zero winding. Authors can request
-  `.evenOdd` explicitly for both rendering and hit testing.
+  `.evenOdd` explicitly for both rendering and hit testing. Both close each
+  open subpath, so a fill, a clip mask and a hit test agree on its region.
 - **`Canvas` prefers value drawings.** *Ratified.*
   `Canvas(SomeCanvasDrawing())` is the recommended form because value
   drawings compare structurally across rerenders; the SwiftUI-shaped closure

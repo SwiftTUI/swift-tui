@@ -14,6 +14,21 @@ private struct HalfClip: InsettableShape {
   }
 }
 
+/// A triangle that leaves its last edge, back to the start, to the fill unless it
+/// `closes`.
+private struct Wedge: Shape {
+  var closes: Bool
+
+  func path(in rect: Rect) -> Path {
+    var path = Path()
+    path.move(to: rect.origin)
+    path.addLine(to: Point(x: rect.maxX, y: rect.origin.y))
+    path.addLine(to: Point(x: rect.origin.x + rect.size.width / 2, y: rect.maxY))
+    if closes { path.close() }
+    return path
+  }
+}
+
 @MainActor
 struct ShapeClippingTests {
   @Test("nested masks intersect, wide glyphs stay atomic and cell damage remains incremental")
@@ -84,5 +99,50 @@ struct ShapeClippingTests {
       masked.semanticSnapshot.interactionRegions.map(\.rect)
         == plain.semanticSnapshot.interactionRegions.map(\.rect))
     #expect(!plain.semanticSnapshot.interactionRegions.isEmpty)
+  }
+
+  @Test("open subpaths clip, cell-fill and hit-test as the region a fill paints")
+  func openSubpathsCloseLikeFill() throws {
+    func rows(_ view: some View) -> [String] {
+      DefaultRenderer().render(view).rasterSurface.cells.map { String($0.map(\.character)) }
+    }
+    let text = Text(
+      Array(repeating: String(repeating: "x", count: 12), count: 6).joined(separator: "\n"))
+    #expect(
+      rows(text.frame(width: 12, height: 6).clipShape(Wedge(closes: false)))
+        == rows(text.frame(width: 12, height: 6).clipShape(Wedge(closes: true))))
+    let tile = TileStyle(.init(rows: ["x"]), foreground: Color.red)
+    let tiled = rows(Wedge(closes: false).fill(tile).frame(width: 12, height: 6))
+    #expect(tiled == rows(Wedge(closes: true).fill(tile).frame(width: 12, height: 6)))
+    let solid = rows(Wedge(closes: false).fill(Color.red).frame(width: 12, height: 6))
+    for (tileRow, solidRow) in zip(tiled, solid) {
+      for (tile, paint) in zip(tileRow, solidRow) where tile == "x" {
+        #expect(paint != " " && paint != "\u{2800}")
+      }
+    }
+
+    var context = ResolveContext(identity: testIdentity("OpenContentShape"))
+    context.localPointerHandlerRegistry = LocalPointerHandlerRegistry()
+    context.localGestureRegistry = LocalGestureRegistry()
+    context.localGestureStateRegistry = LocalGestureStateRegistry()
+    let region = try #require(
+      DefaultRenderer().render(
+        Text("XXXXXXXX\nXXXXXXXX\nXXXXXXXX\nXXXXXXXX")
+          .contentShape(
+            Wedge(closes: false).path(in: .init(origin: .zero, size: .init(width: 8, height: 4)))
+          )
+          .gesture(TapGesture().onEnded {}),
+        context: context,
+        proposal: .init(width: 8, height: 4)
+      ).semanticSnapshot.interactionRegions.first)
+    func hits(_ x: Double, _ y: Double) -> Bool {
+      region.contains(
+        .subCell(
+          location: Point(x: x, y: y), source: .nativePixels,
+          metrics: CellPixelMetrics(width: 8, height: 16, source: .reported)))
+    }
+    #expect(hits(4, 1))
+    // Left of the implicit closing edge from (4, 4) back to (0, 0).
+    #expect(!hits(0.5, 3))
   }
 }

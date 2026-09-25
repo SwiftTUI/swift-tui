@@ -60,6 +60,33 @@ struct PathConstructionTests {
     #expect(square.contains(Point(x: 15, y: 5)) == false)
   }
 
+  @Test("contains tests an open subpath as the closed region a fill paints")
+  func openSubpathContainsItsFill() {
+    func triangle(closed: Bool) -> Path {
+      var path = Path()
+      path.move(to: Point(x: 0, y: 0))
+      path.addLine(to: Point(x: 10, y: 0))
+      path.addLine(to: Point(x: 5, y: 10))
+      if closed { path.close() }
+      return path
+    }
+    let open = triangle(closed: false)
+    let closed = triangle(closed: true)
+    // Left of the closing chord from (5, 10) back to (0, 0).
+    #expect(!open.contains(Point(x: 2, y: 5), fillRule: .nonZero))
+    #expect(!open.contains(Point(x: 2, y: 5), fillRule: .evenOdd))
+    // On the closing chord.
+    #expect(open.contains(Point(x: 2.5, y: 5)))
+    for y in stride(from: -1.0, through: 11, by: 0.5) {
+      for x in stride(from: -1.0, through: 11, by: 0.5) {
+        let point = Point(x: x, y: y)
+        for rule in [FillRule.nonZero, .evenOdd] {
+          #expect(open.contains(point, fillRule: rule) == closed.contains(point, fillRule: rule))
+        }
+      }
+    }
+  }
+
   // MARK: - Flattening
 
   @Test("a straight cubic flattens to a single segment")

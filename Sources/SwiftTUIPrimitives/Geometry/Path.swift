@@ -162,6 +162,8 @@ public struct Path: Equatable, Sendable {
   /// Whether `point` lies inside (or on the boundary of) the filled path
   /// under the given `fillRule`. The default matches shape rendering's
   /// non-zero winding rule; pass `.evenOdd` for an explicit parity fill.
+  /// Like a fill, the test closes each open subpath with a straight edge back
+  /// to its start.
   public func contains(_ point: Point, fillRule: FillRule = .nonZero) -> Bool {
     var crossings = 0
     var winding = 0
@@ -414,12 +416,19 @@ extension Path {
     var end: Point
   }
 
+  /// The edges of the filled region. A fill closes every subpath, so an open
+  /// subpath gets the edge from its last point back to its first.
   private func closedSegments() -> [Segment] {
     var segments: [Segment] = []
     for polyline in flattened() {
-      guard polyline.count >= 2 else { continue }
+      guard let first = polyline.first, let last = polyline.last, polyline.count >= 2 else {
+        continue
+      }
       for index in 0..<(polyline.count - 1) {
         segments.append(Segment(start: polyline[index], end: polyline[index + 1]))
+      }
+      if first != last {
+        segments.append(Segment(start: last, end: first))
       }
     }
     return segments
