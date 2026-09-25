@@ -26,6 +26,14 @@ private enum AccessibilityVisualCandidateSummary: Sendable {
       self = .ambiguous
     }
   }
+
+  /// An ambiguous summary keeps no members, so it stays ambiguous: an
+  /// unclaimed sibling can then only warn, never be claimed further up.
+  mutating func remove(_ candidate: AccessibilityVisualCandidate) {
+    if case .unique(let unique) = self, unique.traversalOrdinal == candidate.traversalOrdinal {
+      self = .none
+    }
+  }
 }
 
 private struct AuthoredAccessibilityLabelSummary {
@@ -69,6 +77,8 @@ extension SemanticExtractor {
     let textInputPresentations = textInputAccessibilityPresentations(from: root)
     var visualLabelRoutes = AccessibilityVisualLabelRoutes()
     var visualCandidateSummaries: [Int: AccessibilityVisualCandidateSummary] = [:]
+    // The subset of those candidates inside an authored label slot.
+    var slotCandidateSummaries: [Int: AccessibilityVisualCandidateSummary] = [:]
     var labelSummaries: [Int: AuthoredAccessibilityLabelSummary] = [:]
     var authoredLabels: [Int: String] = [:]
     var emittedSubtrees: Set<Identity> = []
@@ -129,18 +139,41 @@ extension SemanticExtractor {
         ) {
           visualCandidateSummary.merge(childSummary)
         }
-        if hasNonEmptyAccessibilityLabel(node.semanticMetadata.accessibilityLabel),
-          case .unique(let candidate) = visualCandidateSummary
-        {
+        var slotCandidateSummary =
+          slotCandidateSummaries.removeValue(forKey: traversalOrdinal) ?? .none
+        // An explicit label names everything beneath it. An authored name
+        // names only the label slot: the rest of a control is chrome or
+        // content, such as a DisclosureGroup's expanded content. A Label has
+        // no role or content, so its icon is part of what its title names.
+        let claimableSummary: AccessibilityVisualCandidateSummary =
+          if let explicit = metadata.accessibilityLabel {
+            hasNonEmptyAccessibilityLabel(explicit) ? visualCandidateSummary : .none
+          } else if hasNonEmptyAccessibilityLabel(authoredLabels[traversalOrdinal]) {
+            metadata.accessibilityRole == nil ? visualCandidateSummary : slotCandidateSummary
+          } else {
+            .none
+          }
+        if case .unique(let candidate) = claimableSummary {
           visualLabelRoutes.inferredRolesByTraversalOrdinal[traversalOrdinal] = candidate.role
           visualLabelRoutes.claimedVisualTraversalOrdinals.insert(
             candidate.traversalOrdinal
           )
-          visualCandidateSummary = .none
+          visualCandidateSummary.remove(candidate)
+        }
+        // A named node owns its slot; a slot root puts its subtree in the slot
+        // of the control that authored it.
+        if metadata.usesAuthoredAccessibilityLabel || metadata.accessibilityLabel != nil {
+          slotCandidateSummary = .none
+        }
+        if metadata.accessibilityLabelSource != nil {
+          slotCandidateSummary = visualCandidateSummary
         }
         if let parentTraversalOrdinal = frame.parentTraversalOrdinal {
           visualCandidateSummaries[parentTraversalOrdinal, default: .none].merge(
             visualCandidateSummary
+          )
+          slotCandidateSummaries[parentTraversalOrdinal, default: .none].merge(
+            slotCandidateSummary
           )
         }
 

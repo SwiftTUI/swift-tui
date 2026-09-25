@@ -456,6 +456,69 @@ struct AccessibilityNodeExtractionTests {
     #expect(snapshot.accessibilityWarnings.isEmpty)
   }
 
+  @Test("An authored name consumes the unique image in its label slot, not its content")
+  func authoredNameConsumesUniqueLabelSlotImage() throws {
+    let wrapperID = testIdentity("Details")
+    let iconID = testIdentity("Details", "Icon")
+    let contentID = testIdentity("Details", "Content")
+    let imageMetadata = SemanticMetadata(
+      accessibilityRole: .image,
+      accessibilityVisualContent: .init(kind: "Image")
+    )
+    var slotMetadata = SemanticMetadata()
+    slotMetadata.accessibilityLabelSource = .start
+    func extract(
+      role: AccessibilityRole? = .disclosureGroup,
+      title: String,
+      explicitLabel: String? = nil,
+      children: [PlacedNode]
+    ) -> SemanticSnapshot {
+      var metadata = SemanticMetadata(accessibilityRole: role, accessibilityLabel: explicitLabel)
+      metadata.usesAuthoredAccessibilityLabel = true
+      metadata.accessibilityTitle = title
+      return SemanticExtractor().extract(
+        from: placedNode(identity: wrapperID, semanticMetadata: metadata, children: children))
+    }
+    let icon = placedNode(identity: iconID, semanticMetadata: imageMetadata)
+    // The authored label slot, as `authoredAccessibilityLabel()` marks it.
+    let slot = placedNode(
+      identity: testIdentity("Details", "Slot"),
+      semanticMetadata: slotMetadata,
+      children: [
+        icon,
+        placedNode(identity: testIdentity("Details", "Title"), drawPayload: .text("Details")),
+      ]
+    )
+    let iconOnlySlot = placedNode(
+      identity: testIdentity("Details", "Slot"), semanticMetadata: slotMetadata, children: [icon])
+    let contentImage = placedNode(identity: contentID, semanticMetadata: imageMetadata)
+
+    let named = extract(title: "Details", children: [slot])
+    let node = try #require(named.accessibilityNodes.first)
+    #expect(named.accessibilityNodes.count == 1)
+    #expect(node.role == .disclosureGroup)
+    #expect(node.label == "Details")
+    #expect(named.accessibilityWarnings.isEmpty)
+
+    // A control's content image is a genuine omission, even beside a claimed icon.
+    #expect(
+      extract(title: "Details", children: [contentImage]).accessibilityWarnings.map(\.identity)
+        == [contentID])
+    #expect(
+      extract(title: "Details", children: [slot, contentImage]).accessibilityWarnings.map(
+        \.identity) == [contentID])
+    // A role-less pure label (Label) names its icon outside the title slot.
+    #expect(
+      extract(role: nil, title: "Open", children: [contentImage]).accessibilityWarnings.isEmpty)
+    // An empty authored name, or an explicit empty override, names nothing.
+    #expect(
+      extract(title: "Details", children: [iconOnlySlot]).accessibilityWarnings.map(\.identity)
+        == [iconID])
+    #expect(
+      extract(title: "Details", explicitLabel: "", children: [slot]).accessibilityWarnings.map(
+        \.identity) == [iconID])
+  }
+
   @Test("Hidden and transient images cannot drive outer role inference")
   func hiddenAndTransientImagesCannotDriveOuterRoleInference() throws {
     let wrapperID = testIdentity("HiddenArtwork")

@@ -145,6 +145,61 @@ struct StyledControlAccessibilityTests {
     }
   }
 
+  @Test("an authored name claims its one decorative icon the way an explicit label does")
+  func authoredNameClaimsDecorativeIcon() throws {
+    let icon = Image(
+      data: try makePNGBytes(
+        width: 1, height: 1, pixels: [rgbaPixel(red: 255, green: 0, blue: 0)]))
+    let named = render(
+      VStack {
+        Label("Open", image: icon)
+        Button {
+        } label: {
+          HStack {
+            icon
+            Text("Save")
+          }
+        }
+        Label("Explicit", image: icon).accessibilityLabel("Explicit")
+        DisclosureGroup(isExpanded: .constant(true)) {
+          Text("Body")
+        } label: {
+          HStack {
+            icon
+            Text("Details")
+          }
+        }
+      }
+    )
+    #expect(named.accessibilityWarnings.isEmpty)
+    #expect(named.accessibilityNodes.first { $0.role == .button }?.label == "Save")
+    #expect(named.accessibilityNodes.first { $0.role == .disclosureGroup }?.label == "Details")
+
+    // Without a usable name, or outside the label, the icon is a genuine omission.
+    let unnamed = render(
+      VStack {
+        Label("", image: icon)
+        Button {
+        } label: {
+          icon
+        }
+        Button {
+        } label: {
+          HStack {
+            icon
+            icon
+            Text("Pair")
+          }
+        }
+        DisclosureGroup("Diagram", isExpanded: .constant(true)) {
+          icon
+        }
+      }
+    )
+    #expect(unnamed.accessibilityWarnings.count == 5)
+    #expect(unnamed.accessibilityWarnings.allSatisfy { $0.kind == "Image" })
+  }
+
   private func render<V: View>(_ view: V) -> SemanticSnapshot {
     DefaultRenderer().render(
       view, context: ResolveContext(identity: testIdentity("StyledControl")),
