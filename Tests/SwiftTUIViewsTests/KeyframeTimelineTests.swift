@@ -202,6 +202,133 @@ struct KeyframeTimelineTests {
     #expect(timeline.value(time: Self.seconds(0.25)) > 2.5)
   }
 
+  /// A defaulted cubic side next to a keyframe of another kind, or next to
+  /// an authored cubic velocity: the side takes that neighbor's velocity at
+  /// the shared keyframe instead of a Catmull-Rom estimate.
+  enum CubicBoundary: CaseIterable, CustomTestStringConvertible {
+    case linearIntoCubic, cubicIntoLinear, springIntoCubic, cubicIntoSpring
+    case authoredCubicIntoCubic, cubicIntoAuthoredCubic, moveIntoCubic
+
+    var testDescription: String { "\(self)" }
+
+    var timeline: KeyframeTimeline<Double> {
+      switch self {
+      case .linearIntoCubic:
+        KeyframeTimeline(initialValue: 0.0) {
+          LinearKeyframe(1, duration: .seconds(1))
+          CubicKeyframe(100, duration: .seconds(1))
+        }
+      case .cubicIntoLinear:
+        KeyframeTimeline(initialValue: 0.0) {
+          CubicKeyframe(1, duration: .seconds(1))
+          LinearKeyframe(100, duration: .seconds(1))
+        }
+      case .springIntoCubic:
+        KeyframeTimeline(initialValue: 0.0) {
+          SpringKeyframe(10, spring: Self.spring)
+          CubicKeyframe(30, duration: .seconds(1))
+        }
+      case .cubicIntoSpring:
+        KeyframeTimeline(initialValue: 0.0) {
+          CubicKeyframe(10, duration: .seconds(1))
+          SpringKeyframe(0, spring: .smooth, startVelocity: 5)
+        }
+      case .authoredCubicIntoCubic:
+        KeyframeTimeline(initialValue: 0.0) {
+          CubicKeyframe(5, duration: .seconds(1), endVelocity: 20)
+          CubicKeyframe(0, duration: .seconds(1))
+        }
+      case .cubicIntoAuthoredCubic:
+        KeyframeTimeline(initialValue: 0.0) {
+          CubicKeyframe(5, duration: .seconds(1))
+          CubicKeyframe(0, duration: .seconds(1), startVelocity: -8)
+        }
+      case .moveIntoCubic:
+        KeyframeTimeline(initialValue: 0.0) {
+          LinearKeyframe(3, duration: .seconds(1))
+          MoveKeyframe(10)
+          CubicKeyframe(20, duration: .seconds(1))
+        }
+      }
+    }
+
+    static let spring = Spring.bouncy
+
+    /// When the shared keyframe is.
+    var boundary: Duration {
+      self == .springIntoCubic ? Self.spring.settlingDuration : .seconds(1)
+    }
+
+    /// The velocity both sides should carry at the shared keyframe.
+    var velocity: Double {
+      switch self {
+      case .linearIntoCubic: 1
+      case .cubicIntoLinear: 99
+      // The residual motion the spring still has when it is deemed settled,
+      // well away from the Catmull-Rom chord slope of about 20.
+      case .springIntoCubic:
+        Self.spring.velocity(
+          fromValue: 0.0, toValue: 10, initialVelocity: 0, time: Self.spring.settlingDuration)
+      case .cubicIntoSpring: 5
+      case .authoredCubicIntoCubic: 20
+      case .cubicIntoAuthoredCubic: -8
+      // A jump carries no motion, so the cubic leaves the new value at rest.
+      case .moveIntoCubic: 0
+      }
+    }
+
+    /// Whether the value is continuous at the shared keyframe, so the slope
+    /// just before it is comparable: a move jumps, and a spring lands on its
+    /// target from within its settling threshold.
+    var isContinuous: Bool {
+      self != .springIntoCubic && self != .moveIntoCubic
+    }
+  }
+
+  @Test(
+    "a defaulted cubic velocity takes its neighbor's velocity across keyframe kinds",
+    arguments: CubicBoundary.allCases)
+  func cubicInheritsNeighborVelocity(boundary: CubicBoundary) {
+    let timeline = boundary.timeline
+    let time = boundary.boundary
+    let epsilon = Self.seconds(1e-7)
+    let after =
+      (timeline.value(time: time + epsilon) - timeline.value(time: time)) / epsilon.totalSeconds
+    #expect(abs(after - boundary.velocity) < 1e-3, "after \(after)")
+    if boundary.isContinuous {
+      let before =
+        (timeline.value(time: time) - timeline.value(time: time - epsilon)) / epsilon.totalSeconds
+      #expect(abs(before - after) < 1e-3, "before \(before), after \(after)")
+    }
+  }
+
+  @Test("a retrigger seed reaches a defaulted cubic through the leading spring it seeds")
+  func seededSpringCarriesIntoCubic() {
+    let previous = KeyframeTimeline(initialValue: 0.0) {
+      LinearKeyframe(10, duration: .seconds(1))
+    }
+    let retrigger = Self.seconds(0.5)
+    let current = previous.value(time: retrigger)
+    let spring = Spring.bouncy
+    let handover = Duration.milliseconds(200)
+    let next = KeyframeTimeline(initialValue: current) {
+      SpringKeyframe(0, duration: handover, spring: spring)
+      CubicKeyframe(20, duration: .seconds(1))
+    }.continuing(from: previous, at: retrigger)
+
+    // The spring leaves at the inbound 10 per second, so it is moving
+    // differently from an unseeded spring when it hands over to the cubic.
+    let seeded = spring.velocity(
+      fromValue: current, toValue: 0, initialVelocity: 10, time: handover)
+    let atRest = spring.velocity(
+      fromValue: current, toValue: 0, initialVelocity: 0, time: handover)
+    #expect(abs(seeded - atRest) > 1, "seeded \(seeded), at rest \(atRest)")
+    let epsilon = Self.seconds(1e-7)
+    let slope =
+      (next.value(time: handover + epsilon) - next.value(time: handover)) / epsilon.totalSeconds
+    #expect(abs(slope - seeded) < 1e-3, "slope \(slope), seeded \(seeded)")
+  }
+
   // MARK: - Spring
 
   @Test("a spring keyframe with no duration sizes itself by the settling duration and lands")

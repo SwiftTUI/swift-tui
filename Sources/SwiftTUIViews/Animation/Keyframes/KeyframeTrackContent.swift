@@ -189,12 +189,14 @@ extension LinearKeyframe: KeyframeTrackContentLowering {
 }
 
 /// A keyframe that interpolates to its value along a cubic curve whose end
-/// velocities default to a smooth (Catmull-Rom) estimate from the
-/// neighboring keyframes.
+/// velocities default to smooth motion.
 ///
 /// Matches SwiftUI's `CubicKeyframe`. Velocities are in value units per
-/// second; the first and last keyframes of a track start and end at rest
-/// unless a velocity is given.
+/// second. Adjacent cubic keyframes with defaulted velocities form a
+/// Catmull-Rom spline. Next to another kind of keyframe, or to an authored
+/// cubic velocity, a defaulted velocity takes that segment's velocity at the
+/// shared keyframe. The first and last keyframes of a track start and end at
+/// rest unless a velocity is given.
 public struct CubicKeyframe<Value: Animatable>: KeyframeTrackContent {
   public typealias Body = Never
 

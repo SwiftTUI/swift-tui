@@ -33,11 +33,26 @@ package struct KeyframeTrackTimeline<Value: Animatable> {
   }
 
   package let initialValue: Value
-  package private(set) var segments: [Segment]
+  package let segments: [Segment]
   package let duration: Duration
+  /// The authored keyframes, kept so a retrigger seed can re-resolve the
+  /// defaults that depend on the first segment's velocity.
+  private let specs: [KeyframeSegmentSpec<Value>]
 
   package init(initialValue: Value, specs: [KeyframeSegmentSpec<Value>]) {
+    self.init(initialValue: initialValue, specs: specs, leadingVelocity: nil)
+  }
+
+  /// - Parameter leadingVelocity: the start velocity of a first cubic or
+  ///   spring segment whose own start velocity is defaulted (a retrigger
+  ///   seed); `nil` starts it at rest.
+  private init(
+    initialValue: Value,
+    specs: [KeyframeSegmentSpec<Value>],
+    leadingVelocity: Data?
+  ) {
     self.initialValue = initialValue
+    self.specs = specs
 
     // Keyframe points and times, index 0 being the initial value.
     var points: [Data] = [initialValue.animatableData]
@@ -75,6 +90,8 @@ package struct KeyframeTrackTimeline<Value: Animatable> {
       }
     }
 
+    // Every velocity except a defaulted cubic side is fixed by its own
+    // keyframe, so those sides are filled in a second pass.
     var segments: [Segment] = []
     segments.reserveCapacity(specs.count)
     for (offset, spec) in specs.enumerated() {
@@ -87,12 +104,14 @@ package struct KeyframeTrackTimeline<Value: Animatable> {
       case .cubic(let startVelocity, let endVelocity):
         startIsDefault = startVelocity == nil
         interpolator = .cubic(
-          startTangent: startVelocity?.animatableData ?? tangents[index - 1],
-          endTangent: endVelocity?.animatableData ?? tangents[index]
+          startTangent: startVelocity?.animatableData ?? .zero,
+          endTangent: endVelocity?.animatableData ?? .zero
         )
       case .spring(let spring, let startVelocity):
         startIsDefault = startVelocity == nil
-        interpolator = .spring(spring, startVelocity: startVelocity?.animatableData ?? .zero)
+        let leading = offset == 0 ? leadingVelocity : nil
+        interpolator = .spring(
+          spring, startVelocity: startVelocity?.animatableData ?? leading ?? .zero)
       case .move:
         interpolator = .move
       }
@@ -107,6 +126,44 @@ package struct KeyframeTrackTimeline<Value: Animatable> {
           template: spec.to
         )
       )
+    }
+
+    // SwiftUI's `CubicKeyframe` rule: adjacent defaulted cubic sides share
+    // the Catmull-Rom tangent, and a defaulted side next to any other
+    // velocity (another kind of keyframe, or an authored cubic side) takes
+    // that segment's velocity at the shared keyframe. The track's two ends
+    // rest unless the first segment is seeded.
+    func isDefaultedCubicSide(_ offset: Int, start: Bool) -> Bool {
+      guard case .cubic(let startVelocity, let endVelocity) = specs[offset].kind else {
+        return false
+      }
+      return (start ? startVelocity : endVelocity) == nil
+    }
+    for offset in segments.indices {
+      guard case .cubic(var startTangent, var endTangent) = segments[offset].interpolator else {
+        continue
+      }
+      if isDefaultedCubicSide(offset, start: true) {
+        if offset == 0 {
+          startTangent = leadingVelocity ?? .zero
+        } else if isDefaultedCubicSide(offset - 1, start: false) {
+          startTangent = tangents[offset]
+        } else {
+          let previous = segments[offset - 1]
+          startTangent = Self.sampleVelocity(previous, at: previous.endTime)
+        }
+      }
+      if isDefaultedCubicSide(offset, start: false) {
+        if offset == segments.count - 1 {
+          endTangent = .zero
+        } else if isDefaultedCubicSide(offset + 1, start: true) {
+          endTangent = tangents[offset + 1]
+        } else {
+          let next = segments[offset + 1]
+          endTangent = Self.sampleVelocity(next, at: next.startTime)
+        }
+      }
+      segments[offset].interpolator = .cubic(startTangent: startTangent, endTangent: endTangent)
     }
     self.segments = segments
     duration = times[times.count - 1]
@@ -133,7 +190,7 @@ package struct KeyframeTrackTimeline<Value: Animatable> {
   package func velocity(at time: Duration) -> Data {
     guard !segments.isEmpty, time >= .zero, time < duration else { return .zero }
     for segment in segments where time < segment.endTime {
-      return sampleVelocity(segment, at: time)
+      return Self.sampleVelocity(segment, at: time)
     }
     return .zero
   }
@@ -166,7 +223,7 @@ package struct KeyframeTrackTimeline<Value: Animatable> {
     }
   }
 
-  private func sampleVelocity(_ segment: Segment, at time: Duration) -> Data {
+  private static func sampleVelocity(_ segment: Segment, at time: Duration) -> Data {
     let local = time - segment.startTime
     let seconds = segment.duration.totalSeconds
     guard seconds > 0 else { return .zero }
@@ -199,18 +256,11 @@ package struct KeyframeTrackTimeline<Value: Animatable> {
   /// A copy whose first segment starts with `velocity` when that segment is
   /// a cubic or spring keyframe with a defaulted start velocity. Other first
   /// segments (linear, move, an authored velocity) are returned unchanged.
+  /// The copy is resolved afresh, so a defaulted cubic after a seeded spring
+  /// takes the spring's seeded end velocity.
   package func seedingStartVelocity(_ velocity: Data) -> KeyframeTrackTimeline<Value> {
-    guard var first = segments.first, first.startVelocityIsDefault else { return self }
-    switch first.interpolator {
-    case .cubic(_, let endTangent):
-      first.interpolator = .cubic(startTangent: velocity, endTangent: endTangent)
-    case .spring(let spring, _):
-      first.interpolator = .spring(spring, startVelocity: velocity)
-    case .linear, .move:
-      return self
-    }
-    var copy = self
-    copy.segments[0] = first
-    return copy
+    guard let first = segments.first, first.startVelocityIsDefault else { return self }
+    return KeyframeTrackTimeline(
+      initialValue: initialValue, specs: specs, leadingVelocity: velocity)
   }
 }
