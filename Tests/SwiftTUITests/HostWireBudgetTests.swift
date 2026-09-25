@@ -65,6 +65,51 @@ import Testing
     #expect(output.utf8.count <= HostWireBudget.recordBytes + 1)
   }
 
+  @Test func fullImageHistoryAdmitsANewImageWithoutResendingPlacedPayloads() throws {
+    func image(_ name: String, _ bytes: [UInt8]) -> RasterImageAttachment {
+      let bounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+      return RasterImageAttachment(
+        identity: Identity(components: [name]), bounds: bounds, visibleBounds: bounds,
+        source: .data(bytes), resolvedReference: .embeddedImage(bytes),
+        pixelSize: .init(width: 1, height: 1), isResizable: false)
+    }
+    func surface(_ images: [RasterImageAttachment]) -> RasterSurface {
+      RasterSurface(size: .init(width: 1, height: 1), lines: [" "], imageAttachments: images)
+    }
+    // Each large payload fits one record alone; all four together do not.
+    let large = (0..<4).map { index in
+      image("large\(index)", [0x89, 0x50] + Array(repeating: UInt8(index), count: 900 * 1024))
+    }
+    let history = (0..<(HostWireBudget.images - large.count)).map { index in
+      image("history\(index)", [0x89, 0x51, UInt8(index >> 8), UInt8(index & 0xFF)])
+    }
+    var state = HostWireEncodingState(deltaEnabled: false, epochID: 9)
+    for placement in large {
+      #expect(
+        WebSurfaceFrameEncoder.encode(surface([placement]), state: &state).contains("dataBase64"))
+    }
+    #expect(
+      WebSurfaceFrameEncoder.encode(surface(history), state: &state).hasPrefix("\u{1E}surface:"))
+    #expect(state.knownImageIDs.count == HostWireBudget.images)
+    let largeIDs = Set(large.compactMap { ImageContentRepository.shared.content(for: $0)?.wireID })
+    #expect(largeIDs.count == large.count)
+    #expect(largeIDs.isSubset(of: state.knownImageIDs))
+
+    // A static scene adds one new image in front of the large ones. Forgetting
+    // the placed large IDs to admit it would re-send all four payloads in one
+    // over-budget record, and a rejected record keeps the history, so every
+    // frame of the scene would be rejected alike.
+    let scene = surface([image("new", [0x89, 0x52])] + large)
+    let first = WebSurfaceFrameEncoder.encode(scene, state: &state)
+    #expect(first.hasPrefix("\u{1E}surface:"))
+    #expect(first.components(separatedBy: "dataBase64").count == 2)
+    #expect(state.knownImageIDs.count == HostWireBudget.images)
+    #expect(largeIDs.isSubset(of: state.knownImageIDs))
+    let second = WebSurfaceFrameEncoder.encode(scene, state: &state)
+    #expect(second.hasPrefix("\u{1E}surface:"))
+    #expect(!second.contains("dataBase64"))
+  }
+
   @Test func cellTextBoundaryAndDenseLargeFrame() {
     for bytes in [255, 256, 257] {
       // One extended grapheme with repeated combining scalars.

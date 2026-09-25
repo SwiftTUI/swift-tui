@@ -169,9 +169,11 @@ surface encoding emits a fixed
 `surface.budgetExceeded` runtime issue, preserves generation/style/image
 delivery state, and forces the next admitted surface to be full. Over-budget
 clipboard writes return false before queue admission. Image transmit-once
-history is capped at 1,024 IDs; forgetting history causes a later payload
-retransmission. Android recovery tracking also caps admission and releases IDs
-when payloads arrive or placements disappear.
+history is capped at 1,024 IDs. At the cap the encoder forgets only IDs that
+the record being encoded does not place, so forgetting causes a later payload
+retransmission but never re-sends a payload that record could omit. Android
+recovery tracking also caps admission and releases IDs when payloads arrive or
+placements disappear.
 
 Canvas backing stores reduce their rendering scale to fit the pixel budget;
 CSS geometry and input coordinates retain their original scale. Image decode

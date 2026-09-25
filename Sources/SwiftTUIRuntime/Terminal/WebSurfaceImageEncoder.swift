@@ -66,55 +66,65 @@ extension WebSurfaceFrameEncoder {
     surface.presentationLayers = presentationLayers
     let prepared = webSurfaceImageBlendCompositor.orderedAttachments(
       in: surface, fallbackBackground: fallbackBackground)
+    var placements: [(attachment: RasterImageAttachment, payload: ImagePayload)] = []
+    for attachment in prepared where !attachment.visibleBounds.isEmpty {
+      guard
+        let payload = imagePayload(
+          for: attachment,
+          fallbackBackground: fallbackBackground,
+          contentRepository: contentRepository
+        )
+      else { continue }
+      guard payload.id.utf8.count <= 1024 else { throw HostWireBudget.Exceeded.limit }
+      _ = try HostWireBudget.jsonStringBytes(payload.id)
+      guard payload.bytes.count <= (HostWireBudget.recordBytes - 2) / 4 * 3 else {
+        throw HostWireBudget.Exceeded.limit
+      }
+      placements.append((attachment, payload))
+    }
+    forgetUnreferencedImageIDs(
+      toAdmit: Set(placements.map(\.payload.id)), knownImageIDs: &knownImageIDs)
     var result: [String] = []
     var bytes = 0
-    for attachment in prepared {
-      if let encoded = try encodeImage(
-        attachment,
-        fallbackBackground: fallbackBackground,
-        knownImageIDs: &knownImageIDs,
-        contentRepository: contentRepository
-      ) {
-        let count = encoded.utf8.count + (result.isEmpty ? 0 : 1)
-        guard count <= HostWireBudget.recordBytes - bytes else {
-          throw HostWireBudget.Exceeded.limit
-        }
-        bytes += count
-        result.append(encoded)
+    for placement in placements {
+      let encoded = encodeImage(
+        placement.attachment, payload: placement.payload, knownImageIDs: &knownImageIDs)
+      let count = encoded.utf8.count + (result.isEmpty ? 0 : 1)
+      guard count <= HostWireBudget.recordBytes - bytes else {
+        throw HostWireBudget.Exceeded.limit
       }
+      bytes += count
+      result.append(encoded)
     }
     return result
   }
 
+  /// Keeps transmit-once history within ``HostWireBudget/images`` once this
+  /// record's IDs are admitted, by forgetting only IDs the record does not
+  /// place. Forgetting is safe (a later use carries its bytes again), but
+  /// forgetting a placed ID re-sends, in this same record, a payload the host
+  /// already holds. Re-sending every placed image at once can overflow the
+  /// record budget, and because a rejected record keeps the prior history, a
+  /// static scene would then be rejected on every frame. A record places at
+  /// most ``HostWireBudget/images`` attachments, so enough unplaced IDs exist.
+  private static func forgetUnreferencedImageIDs(
+    toAdmit referencedIDs: Set<String>,
+    knownImageIDs: inout Set<String>
+  ) {
+    let overflow =
+      knownImageIDs.count + referencedIDs.subtracting(knownImageIDs).count - HostWireBudget.images
+    guard overflow > 0 else { return }
+    for imageID in knownImageIDs.subtracting(referencedIDs).prefix(overflow) {
+      knownImageIDs.remove(imageID)
+    }
+  }
+
   private static func encodeImage(
     _ attachment: RasterImageAttachment,
-    fallbackBackground: Color,
-    knownImageIDs: inout Set<String>,
-    contentRepository: ImageContentRepository
-  ) throws -> String? {
-    guard !attachment.visibleBounds.isEmpty else {
-      return nil
-    }
-
-    let payload = imagePayload(
-      for: attachment,
-      fallbackBackground: fallbackBackground,
-      contentRepository: contentRepository
-    )
-    guard let payload else {
-      return nil
-    }
-
+    payload: ImagePayload,
+    knownImageIDs: inout Set<String>
+  ) -> String {
     let imageID = payload.id
-    guard imageID.utf8.count <= 1024 else { throw HostWireBudget.Exceeded.limit }
-    _ = try HostWireBudget.jsonStringBytes(imageID)
-    guard payload.bytes.count <= (HostWireBudget.recordBytes - 2) / 4 * 3 else {
-      throw HostWireBudget.Exceeded.limit
-    }
-    if !knownImageIDs.contains(imageID), knownImageIDs.count >= HostWireBudget.images {
-      // Forgetting transmit-once history is safe: subsequent uses carry bytes again.
-      knownImageIDs.removeAll(keepingCapacity: true)
-    }
     let shouldTransmitData = knownImageIDs.insert(imageID).inserted
     var fields = [
       "\"id\":\(jsonString(imageID))",
