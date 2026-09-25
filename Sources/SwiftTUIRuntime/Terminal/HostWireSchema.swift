@@ -208,6 +208,9 @@ package enum HostWireSchema {
       .init(
         "scrollAnchorCorrection",
         wire: .notSerialized("frame commit command applied to the owning scroll binding")),
+      .init(
+        "collectionMaximumAnchorRow",
+        wire: .notSerialized("collection scroll-currency clamp consumed by the owning view")),
       .init("identity", wire: .key("id")),
       .init(
         "viewNodeID",

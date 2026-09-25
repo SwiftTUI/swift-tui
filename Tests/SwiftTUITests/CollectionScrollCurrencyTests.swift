@@ -319,9 +319,105 @@ struct CollectionScrollCurrencyTests {
     #expect(IndexedChildRealizationProbe.realizedChildCount > 0, "rows were realized for the move")
     #expect(before.intersection(after).isEmpty, "the window advanced past the original screenful")
   }
+
+  @Test(
+    "T-11: two-line rows reach the bottom by scrollTo(edge:), End, and the wheel",
+    arguments: [true, false], [TallRowBottomMove.scrollToEdge, .endKey, .wheel])
+  func tallRowsReachTheBottom(isTable: Bool, move: TallRowBottomMove) throws {
+    // The window and the scroll clamp counted one line per row, so rows that
+    // render two lines ran out of viewport before the dataset ran out of rows:
+    // the last rows and the table's closing border were unreachable.
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TallRowBottom", isTable ? "Table" : "List", "\(move)"),
+      size: .init(width: 30, height: 16)
+    ) {
+      TallRowCurrencyCollection(isTable: isTable, showsBottomButton: move == .scrollToEdge)
+    }
+    defer { harness.shutdown() }
+
+    switch move {
+    case .scrollToEdge:
+      _ = try harness.clickText("Bottom")
+    case .endKey:
+      _ = try harness.pressKey(KeyPress(.end))
+    case .wheel:
+      let point = try #require(harness.point(forText: "«0»a"))
+      for _ in 0..<60 {
+        _ = try harness.scrollPointer(at: point, deltaY: 1)
+      }
+    }
+
+    #expect(harness.frame.contains("«48»a"), "the second-to-last row is visible:\n\(harness.frame)")
+    #expect(harness.frame.contains("«49»b"), "the last row is visible in full:\n\(harness.frame)")
+    #expect(!harness.frame.contains("«0»a"), "the first row scrolled away:\n\(harness.frame)")
+    if isTable {
+      #expect(harness.frame.contains("╰"), "the closing border is visible:\n\(harness.frame)")
+    }
+
+    // Reversing moves one row at once: no spinning in place at the bottom, and
+    // no jump past the rows the layout actually drew there.
+    if move == .wheel {
+      let point = try #require(harness.point(forText: "«49»a"))
+      _ = try harness.scrollPointer(at: point, deltaY: -1)
+      #expect(!harness.frame.contains("«49»b"), "one notch up moves the window:\n\(harness.frame)")
+      #expect(harness.frame.contains("«48»b"), "by one row:\n\(harness.frame)")
+    }
+  }
+}
+
+enum TallRowBottomMove: CustomStringConvertible, Sendable {
+  case scrollToEdge
+  case endKey
+  case wheel
+
+  var description: String {
+    switch self {
+    case .scrollToEdge: "scrollToEdge"
+    case .endKey: "endKey"
+    case .wheel: "wheel"
+    }
+  }
 }
 
 // MARK: - Fixtures
+
+@MainActor
+private struct TallRowCurrencyCollection: View {
+  let isTable: Bool
+  let showsBottomButton: Bool
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        if showsBottomButton {
+          Button("Bottom") { _ = proxy.scrollTo(edge: .bottom) }
+        }
+        if isTable {
+          Table(0..<50, id: \.self, columns: [.init("Value", width: 20)]) { row in
+            TwoLineCurrencyRow(row: row)
+          }
+          .tableHeaders(.hidden)
+        } else {
+          List(0..<50, id: \.self) { row in
+            TwoLineCurrencyRow(row: row)
+          }
+        }
+      }
+    }
+  }
+}
+
+@MainActor
+private struct TwoLineCurrencyRow: View {
+  let row: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("«\(row)»a")
+      Text("«\(row)»b")
+    }
+  }
+}
 
 @MainActor
 private struct SelectableCurrencyList: View {

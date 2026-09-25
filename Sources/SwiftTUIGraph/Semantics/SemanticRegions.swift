@@ -73,6 +73,11 @@ package struct LazyScrollAnchorCorrection: Equatable, Sendable {
 
 public struct ScrollRoute: Equatable, Sendable {
   package var scrollAnchorCorrection: LazyScrollAnchorCorrection? = nil
+  /// For a viewport-backed collection whose rows render taller than one cell,
+  /// the largest scroll anchor row whose window still ends at the last row, as
+  /// its layout drew it. The collection's scroll currency counts one line per
+  /// row and clamps against this instead, so the last rows stay reachable.
+  package var collectionMaximumAnchorRow: Int? = nil
   public var identity: Identity
   package var viewNodeID: ViewNodeID?
   public var viewportRect: CellRect

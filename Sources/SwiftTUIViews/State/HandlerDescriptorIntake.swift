@@ -328,7 +328,8 @@ package struct HandlerDescriptorIntake {
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
-    revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil
+    revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil,
+    scrollToEdge: (@MainActor (Edge) -> Bool)? = nil
   ) {
     let scope = dispatchScope
     var wrappedReveal: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)?
@@ -336,6 +337,14 @@ package struct HandlerDescriptorIntake {
       wrappedReveal = { query, anchor in
         withImperativeAuthoringContext(scope) {
           revealTarget(query, anchor)
+        }
+      }
+    }
+    var wrappedEdge: (@MainActor (Edge) -> Bool)?
+    if let scrollToEdge {
+      wrappedEdge = { edge in
+        withImperativeAuthoringContext(scope) {
+          scrollToEdge(edge)
         }
       }
     }
@@ -348,7 +357,8 @@ package struct HandlerDescriptorIntake {
         }
       },
       bindingSourceID: bindingSourceID,
-      revealTarget: wrappedReveal
+      revealTarget: wrappedReveal,
+      scrollToEdge: wrappedEdge
     )
   }
 

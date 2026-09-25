@@ -177,6 +177,16 @@ extension LayoutEngine {
     )
   }
 
+  /// The cells a hosted collection's rows known to be taller than one cell
+  /// add to its one-line-per-row ideal. The collection's own scroll route
+  /// publishes that ideal as its content extent, and without them the extent
+  /// ended before the last rows of a collection whose rows render taller.
+  private func knownTallRowExtraCells(in measured: MeasuredNode) -> Int {
+    tallRowExtraCells(
+      in: measured.containerAllocationSnapshot?.hostedCollection?.tallRowHeights ?? [:]
+    ) { _ in true }
+  }
+
   package func resolvedContentBounds(
     for resolved: ResolvedNode,
     bounds: CellRect,
@@ -192,20 +202,18 @@ extension LayoutEngine {
     case .image:
       return childContentBounds
     case .list(let payload):
+      var idealSize = measuredListIdealSize(for: payload)
+      idealSize.height += knownTallRowExtraCells(in: measured)
       return union(
         childContentBounds,
-        CellRect(
-          origin: bounds.origin,
-          size: measuredListIdealSize(for: payload)
-        )
+        CellRect(origin: bounds.origin, size: idealSize)
       )
     case .table(let payload):
+      var idealSize = measuredTableIdealSize(for: payload)
+      idealSize.height += knownTallRowExtraCells(in: measured)
       return union(
         childContentBounds,
-        CellRect(
-          origin: bounds.origin,
-          size: measuredTableIdealSize(for: payload)
-        )
+        CellRect(origin: bounds.origin, size: idealSize)
       )
     case .none:
       break

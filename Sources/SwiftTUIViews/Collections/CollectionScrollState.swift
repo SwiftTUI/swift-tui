@@ -139,10 +139,11 @@ package struct CollectionScrollCurrency {
 
   /// The row currently at the top of the viewport, from the stored anchor or —
   /// before anything has scrolled — from the selection-centred fallback the
-  /// layout still applies.
+  /// layout still applies. An anchor stored at the end of the dataset (see
+  /// ``setAnchorRow(_:)``) reads as the last anchor that fills the window.
   package var effectiveAnchorRow: Int {
     if let storedAnchorRow {
-      return storedAnchorRow
+      return min(storedAnchorRow, maxAnchorRow)
     }
     return geometry.row(atOrBeforeLine: windowMetrics(viewportLineCount).offset)
   }
@@ -151,6 +152,14 @@ package struct CollectionScrollCurrency {
   /// before the first geometry sync (frame 1).
   package var viewportLineCount: Int {
     registry?.viewportRect(scopeIdentity: identity)?.size.height ?? 0
+  }
+
+  /// The largest anchor row that still fills the window. The geometry counts
+  /// one line per row; when rows render taller the layout publishes the row
+  /// it actually drew for the bottom, and that is the bound.
+  private var maxAnchorRow: Int {
+    registry?.collectionMaximumAnchorRow(scopeIdentity: identity)
+      ?? geometry.maxAnchorRow(viewportLineCount: visibleLineCount)
   }
 
   /// The display lines the window can actually show. This is the number every
@@ -195,17 +204,24 @@ package struct CollectionScrollCurrency {
     setAnchorRow(geometry.row(atOrAfterLine: offset.y))
   }
 
+  /// Moves the top of the viewport to `rowIndex`, clamped to the rows that
+  /// still fill the window.
+  ///
+  /// A move that reaches that clamp stores the dataset's last row instead: the
+  /// clamp is only as exact as the row heights known so far (rows never
+  /// realized count as one line), and the layout, which measures the rows it
+  /// realizes, pulls an end-of-dataset anchor back to the row that shows the
+  /// last row whole. With one-line rows the two clamps agree.
   @discardableResult
   package func setAnchorRow(_ rowIndex: Int) -> Bool {
-    let clamped = min(
-      max(0, rowIndex),
-      geometry.maxAnchorRow(viewportLineCount: visibleLineCount)
-    )
-    guard clamped != effectiveAnchorRow else {
+    let maxAnchorRow = self.maxAnchorRow
+    let target = rowIndex >= maxAnchorRow ? geometry.lastRowIndex : max(0, rowIndex)
+    let moves = min(target, maxAnchorRow) != effectiveAnchorRow
+    guard moves || (storedAnchorRow.map { $0 != target } ?? false) else {
       return false
     }
     setStoredCollectionScrollAnchor(
-      CollectionScrollAnchor(firstVisibleItemIndex: clamped),
+      CollectionScrollAnchor(firstVisibleItemIndex: target),
       in: ownerNode,
       invalidationIdentity: identity
     )

@@ -210,7 +210,8 @@ extension List {
               scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
                 indexedSource?.elementIndex(matching: query)
               }
-            }
+            },
+            scrollToEdge: { scrollCurrency.scroll(toEdge: $0) }
           )
 
           let rootRouteID = runtimePrimaryRouteID(for: context.identity)

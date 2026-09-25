@@ -36,6 +36,12 @@ package struct ScrollPositionRegistrationSnapshot {
   /// nil when the query matches nothing. Absent for producers whose targets
   /// are all placed (every `ScrollView`).
   package var revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)?
+  /// Scrolls to an edge of content this route owns, reporting whether anything
+  /// moved. A viewport-backed collection answers edges itself for the same
+  /// reason it answers ``revealTarget``: its line model is not the cell
+  /// arithmetic below, and rows that render taller than one cell make the
+  /// route's content rect an estimate. Absent for every `ScrollView`.
+  package var scrollToEdge: (@MainActor (Edge) -> Bool)?
 
   package init(
     identity: Identity,
@@ -43,7 +49,8 @@ package struct ScrollPositionRegistrationSnapshot {
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
-    revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil
+    revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil,
+    scrollToEdge: (@MainActor (Edge) -> Bool)? = nil
   ) {
     self.identity = identity
     self.ownerViewNodeID = ownerViewNodeID
@@ -51,6 +58,7 @@ package struct ScrollPositionRegistrationSnapshot {
     self.applyOffset = applyOffset
     self.bindingSourceID = bindingSourceID
     self.revealTarget = revealTarget
+    self.scrollToEdge = scrollToEdge
   }
 }
 
@@ -103,7 +111,8 @@ package final class LocalScrollPositionRegistry: Equatable {
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
-    revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil
+    revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil,
+    scrollToEdge: (@MainActor (Edge) -> Bool)? = nil
   ) {
     let registration = ScrollPositionRegistrationSnapshot(
       identity: identity,
@@ -111,7 +120,8 @@ package final class LocalScrollPositionRegistry: Equatable {
       currentOffset: currentOffset,
       applyOffset: applyOffset,
       bindingSourceID: bindingSourceID,
-      revealTarget: revealTarget
+      revealTarget: revealTarget,
+      scrollToEdge: scrollToEdge
     )
     registrations[identity] = registration
     ViewNodeContext.current?.recordScrollPositionRegistration(registration)
@@ -240,6 +250,9 @@ package final class LocalScrollPositionRegistry: Equatable {
       let registration = registrations[route.identity]
     else {
       return false
+    }
+    if let scrollToEdge = registration.scrollToEdge {
+      return scrollToEdge(edge)
     }
 
     let currentOffset = registration.currentOffset()
@@ -593,6 +606,14 @@ package final class LocalScrollPositionRegistry: Equatable {
     scopeIdentity: Identity?
   ) -> CellRect? {
     firstRoute(matching: scopeIdentity)?.viewportRect
+  }
+
+  /// The largest anchor row the collection route matching `scopeIdentity`
+  /// last published (see ``ScrollRoute/collectionMaximumAnchorRow``).
+  package func collectionMaximumAnchorRow(
+    scopeIdentity: Identity?
+  ) -> Int? {
+    firstRoute(matching: scopeIdentity)?.collectionMaximumAnchorRow
   }
 
   /// Clamps `offset` against the live geometry of the route matching

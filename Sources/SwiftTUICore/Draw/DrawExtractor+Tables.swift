@@ -37,6 +37,11 @@ package struct TableVisibleLayout: Equatable, Sendable {
   /// Total cells the visible lines occupy, which exceeds `lines.count`
   /// whenever a hosted row measured taller than one cell.
   package var totalContentHeight: Int
+  /// The largest scroll anchor row whose window still ends at the last row,
+  /// when rows taller than one cell make it differ from the one-line
+  /// arithmetic the scroll currency uses; `nil` otherwise. Scroll routing
+  /// publishes it so the currency clamps against the rows actually drawn.
+  package var maximumAnchorRow: Int?
 
   package init(
     contentBounds: CellRect,
@@ -226,7 +231,7 @@ extension DrawExtractor {
   ///
   /// The overflow-indicator lines are deliberately NOT subtracted here: they
   /// live inside this rect, and the body-window arithmetic in
-  /// ``viewportBackedVisibleTableLines(for:viewportLineCount:showsIndicators:widths:)``
+  /// ``viewportBackedVisibleTableLines(for:viewportLineCount:showsIndicators:widths:rowHeights:rowWindow:)``
   /// takes exactly this height as its input.
   package func viewportBackedTableContentBounds(
     for payload: TablePayload,
@@ -291,6 +296,7 @@ extension DrawExtractor {
       viewportLineCount: bounds.size.height,
       showsIndicators: payload.showsIndicators,
       widths: widths,
+      rowHeights: rowHeights,
       rowWindow: rowWindow
     )
     var lines = generated.lines
@@ -317,12 +323,14 @@ extension DrawExtractor {
       lines[index].yOffset = (generated.linePositions?[index] ?? index) + extraCells
       extraCells += height - 1
     }
-    return TableVisibleLayout(
+    var layout = TableVisibleLayout(
       contentBounds: bounds,
       lines: lines,
       widths: widths,
       totalContentHeight: generated.totalLineCount + extraCells + extraAfter
     )
+    layout.maximumAnchorRow = generated.maximumAnchorRow
+    return layout
   }
 
   /// Generated lines, plus what the caller needs when they do not cover the
@@ -331,7 +339,8 @@ extension DrawExtractor {
   private typealias GeneratedTableLines = (
     lines: [TableDisplayLine],
     linePositions: [Int]?,
-    totalLineCount: Int
+    totalLineCount: Int,
+    maximumAnchorRow: Int?
   )
 
   private func visibleTableLines(
@@ -339,6 +348,7 @@ extension DrawExtractor {
     viewportLineCount: Int,
     showsIndicators: Bool,
     widths: [Int],
+    rowHeights: [Int: Int]?,
     rowWindow: Range<Int>?
   ) -> GeneratedTableLines {
     if payload.isViewportBacked {
@@ -347,6 +357,7 @@ extension DrawExtractor {
         viewportLineCount: viewportLineCount,
         showsIndicators: showsIndicators,
         widths: widths,
+        rowHeights: rowHeights,
         rowWindow: rowWindow
       )
     }
@@ -358,17 +369,17 @@ extension DrawExtractor {
     )
 
     guard viewportLineCount > 0 else {
-      return ([], nil, 0)
+      return ([], nil, 0, nil)
     }
     guard displayLines.count > viewportLineCount else {
-      return (displayLines, nil, displayLines.count)
+      return (displayLines, nil, displayLines.count, nil)
     }
 
     let fixedTopCount = min(displayLines.count, payload.showsHeaders ? 3 : 1)
     let fixedBottomCount = displayLines.isEmpty ? 0 : 1
     guard viewportLineCount > fixedTopCount + fixedBottomCount else {
       let clamped = Array(displayLines.prefix(viewportLineCount))
-      return (clamped, nil, clamped.count)
+      return (clamped, nil, clamped.count, nil)
     }
 
     let bodyStart = fixedTopCount
@@ -385,7 +396,7 @@ extension DrawExtractor {
         Array(displayLines.prefix(fixedTopCount))
         + bodyLines
         + Array(displayLines.suffix(fixedBottomCount))
-      return (all, nil, all.count)
+      return (all, nil, all.count, nil)
     }
 
     if !showsIndicators {
@@ -398,7 +409,7 @@ extension DrawExtractor {
         Array(displayLines.prefix(fixedTopCount))
         + window.lines
         + Array(displayLines.suffix(fixedBottomCount))
-      return (visible, nil, visible.count)
+      return (visible, nil, visible.count, nil)
     }
 
     let anchoredOffset = visibleTableBodyWindow(
@@ -445,7 +456,7 @@ extension DrawExtractor {
       Array(displayLines.prefix(fixedTopCount))
       + Array(visibleBody.prefix(bodyCapacity))
       + Array(displayLines.suffix(fixedBottomCount))
-    return (visible, nil, visible.count)
+    return (visible, nil, visible.count, nil)
   }
 
   private func viewportBackedVisibleTableLines(
@@ -453,10 +464,11 @@ extension DrawExtractor {
     viewportLineCount: Int,
     showsIndicators: Bool,
     widths: [Int],
+    rowHeights: [Int: Int]?,
     rowWindow: Range<Int>?
   ) -> GeneratedTableLines {
     guard viewportLineCount > 0 else {
-      return ([], nil, 0)
+      return ([], nil, 0, nil)
     }
 
     var chromePayload = payload
@@ -468,12 +480,21 @@ extension DrawExtractor {
     let bottom = chrome.last.map { [$0] } ?? []
     guard viewportLineCount > top.count + bottom.count else {
       let clamped = Array(top.prefix(viewportLineCount))
-      return (clamped, nil, clamped.count)
+      return (clamped, nil, clamped.count, nil)
     }
 
     let bodyLineCount = payload.rows.isEmpty ? 0 : payload.rows.count * 2 - 1
     let bodyCapacity = viewportLineCount - top.count - bottom.count
-    guard bodyLineCount > bodyCapacity else {
+    // The body's cells: a row line is as tall as its hosted row measured, so
+    // the rows `rowHeights` knows are taller add their extra cells.
+    let rowCount = payload.rows.count
+    let bodyCellCount =
+      bodyLineCount
+      + tallRowExtraCells(in: rowHeights ?? [:]) { (0..<rowCount).contains($0) }
+    func lineHeight(_ position: Int) -> Int {
+      position % 2 == 0 ? max(1, rowHeights?[position / 2] ?? 1) : 1
+    }
+    guard bodyCellCount > bodyCapacity else {
       // These bounds cover the whole content — the `ScrollView` case, and the
       // only one where windowing is sound: nothing is scrolled out, so no
       // overflow indicators shift the lines and every line's position is its
@@ -488,7 +509,7 @@ extension DrawExtractor {
             widths: widths
           )
           + bottom
-        return (all, nil, totalLineCount)
+        return (all, nil, totalLineCount, nil)
       }
 
       let windowStart = max(0, rowWindow.lowerBound * 2)
@@ -502,7 +523,7 @@ extension DrawExtractor {
             widths: widths
           )
           + bottom
-        return (all, nil, totalLineCount)
+        return (all, nil, totalLineCount, nil)
       }
 
       let body = viewportBackedTableBodyLines(
@@ -514,7 +535,7 @@ extension DrawExtractor {
         Array(0..<top.count)
         + (windowStart..<windowEnd).map { top.count + $0 }
         + (bottom.isEmpty ? [] : [top.count + bodyLineCount])
-      return (top + body + bottom, positions, totalLineCount)
+      return (top + body + bottom, positions, totalLineCount, nil)
     }
 
     let selectedLine = min(
@@ -526,28 +547,66 @@ extension DrawExtractor {
     let anchorLine = payload.scrollAnchorRowIndex.map { rowIndex in
       min(max(0, rowIndex) * 2, max(0, bodyLineCount - 1))
     }
-    func window(capacity: Int) -> (offset: Int, end: Int) {
-      let maxOffset = max(0, bodyLineCount - capacity)
+    // The window is measured in cells, so tall rows fill it sooner. With
+    // one-cell rows every line is one cell and this is plain line arithmetic.
+    func window(capacity: Int) -> (offset: Int, end: Int, maxOffset: Int) {
+      // The first line from which the rest of the body fits: the offset that
+      // shows the bottom of the table. At least the last line is shown.
+      var maxOffset = bodyLineCount
+      var tailCells = 0
+      while maxOffset > 0, tailCells + lineHeight(maxOffset - 1) <= capacity {
+        maxOffset -= 1
+        tailCells += lineHeight(maxOffset)
+      }
+      maxOffset = min(maxOffset, max(0, bodyLineCount - 1))
       let offset =
         if let anchorLine {
           min(anchorLine, maxOffset)
         } else {
           min(max(0, selectedLine - capacity / 2), maxOffset)
         }
-      return (offset, min(bodyLineCount, offset + capacity))
+      var end = offset
+      var cells = 0
+      while end < bodyLineCount, cells + lineHeight(end) <= capacity {
+        cells += lineHeight(end)
+        end += 1
+      }
+      return (offset, max(end, min(bodyLineCount, offset + 1)), maxOffset)
+    }
+    // Rows taller than one cell make the scroll currency's one-line clamp stop
+    // short of the bottom; publish the anchor row that shows the last row
+    // whole (the row at or after the bottom window's first line) instead.
+    func maximumAnchorRow(_ range: (offset: Int, end: Int, maxOffset: Int)) -> Int? {
+      bodyCellCount > bodyLineCount ? (range.maxOffset + 1) / 2 : nil
+    }
+    // A window whose next row does not fit leaves cells unused. Blank body
+    // lines fill them, so the overflow indicator and the closing border stay
+    // on the table's last lines instead of floating up under the rows.
+    func filled(_ body: [TableDisplayLine], capacity: Int) -> [TableDisplayLine] {
+      let used = body.reduce(0) { $0 + ($1.rowIndex.map { max(1, rowHeights?[$0] ?? 1) } ?? 1) }
+      guard used < capacity else {
+        return body
+      }
+      return body
+        + Array(
+          repeating: overflowIndicatorLine(widths: widths, payload: payload, symbol: ""),
+          count: capacity - used)
     }
 
     guard showsIndicators else {
       let range = window(capacity: bodyCapacity)
       let visible =
         top
-        + viewportBackedTableBodyLines(
-          positions: range.offset..<range.end,
-          payload: payload,
-          widths: widths
+        + filled(
+          viewportBackedTableBodyLines(
+            positions: range.offset..<range.end,
+            payload: payload,
+            widths: widths
+          ),
+          capacity: bodyCapacity
         )
         + bottom
-      return (visible, nil, visible.count)
+      return (visible, nil, visible.count, maximumAnchorRow(range))
     }
 
     let initial = window(capacity: bodyCapacity)
@@ -570,13 +629,15 @@ extension DrawExtractor {
         widths: widths
       )
     )
-    if range.end < bodyLineCount, visibleBody.count < bodyCapacity {
+    let hidesRowsBelow = range.end < bodyLineCount
+    visibleBody = filled(visibleBody, capacity: bodyCapacity - (hidesRowsBelow ? 1 : 0))
+    if hidesRowsBelow, visibleBody.count < bodyCapacity {
       visibleBody.append(
         overflowIndicatorLine(widths: widths, payload: payload, symbol: "↓")
       )
     }
     let visible = top + Array(visibleBody.prefix(bodyCapacity)) + bottom
-    return (visible, nil, visible.count)
+    return (visible, nil, visible.count, maximumAnchorRow(range))
   }
 
   private func viewportBackedTableBodyLines(

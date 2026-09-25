@@ -170,6 +170,10 @@ moves the window. Selection moves within it.
   step within the visible rows does not scroll.
 - ``ScrollViewProxy``'s `scrollTo(_:anchor:)` reaches a row by ID whether or not it
   is currently realized.
+- Rows that render several lines scroll the same way. The window fills with
+  whole rows by their measured height, so a row that does not fit waits for
+  the next scroll step, and **End**, the wheel, and `scrollTo(edge: .bottom)`
+  all reach the last row.
 
 > Note: before this contract, the wheel stepped the selection and the window
 > was recomputed each frame from the selected row. Code that relied on

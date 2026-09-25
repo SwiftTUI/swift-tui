@@ -60,6 +60,10 @@ package struct ListVisibleLayout: Equatable, Sendable {
   /// Total cells the visible lines occupy, which exceeds `lines.count`
   /// whenever any row measured taller than one cell.
   package var totalContentHeight: Int
+  /// The table twin's ``TableVisibleLayout/maximumAnchorRow``: the largest
+  /// scroll anchor row whose window still ends at the last row, when taller
+  /// rows make it differ from the currency's one-line arithmetic.
+  package var maximumAnchorRow: Int?
 
   package init(
     contentBounds: CellRect,

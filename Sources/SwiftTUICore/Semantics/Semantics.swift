@@ -154,6 +154,9 @@ package struct SemanticExtractor: Sendable {
             )
           )
           scrollRoutes[scrollRoutes.count - 1].scrollAnchorCorrection = anchorOffset
+          scrollRoutes[scrollRoutes.count - 1].collectionMaximumAnchorRow =
+            node.hostedTableVisibleLayout?.maximumAnchorRow
+            ?? node.hostedListVisibleLayout?.maximumAnchorRow
           selectionRoutes.append(
             SelectionRoute(identity: node.identity, role: scrollRole)
           )
