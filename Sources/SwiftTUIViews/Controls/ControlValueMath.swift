@@ -42,7 +42,8 @@ extension Int: AdjustableControlValue {
   static func accessibilityValue(_ value: Double) -> Int? { Int(exactly: value) }
 
   static func sanitizedControlStep(_ step: Int) -> Int {
-    Swift.max(1, abs(step))
+    // `Int.min` has no `Int` magnitude; it clamps to the largest step.
+    Swift.max(1, Int(clamping: step.magnitude))
   }
 
   static func steppedControlValue(
@@ -51,8 +52,21 @@ extension Int: AdjustableControlValue {
     step: Int,
     bounds: ClosedRange<Int>?
   ) -> Int {
-    let scaledDelta = delta * sanitizedControlStep(step)
-    return clampedControlValue(value + scaledDelta, to: bounds)
+    // Saturate at `Int`'s edges instead of trapping. The travel and the room
+    // left in its direction are both exact as `UInt`, and a bounded result
+    // clamps from the edge exactly as it would from the unrepresentable value.
+    let (distance, overflow) = delta.magnitude.multipliedReportingOverflow(
+      by: sanitizedControlStep(step).magnitude
+    )
+    let stepped: Int
+    if delta < 0 {
+      let room = UInt(bitPattern: value &- Int.min)
+      stepped = overflow || distance > room ? Int.min : value &- Int(bitPattern: distance)
+    } else {
+      let room = UInt(bitPattern: Int.max &- value)
+      stepped = overflow || distance > room ? Int.max : value &+ Int(bitPattern: distance)
+    }
+    return clampedControlValue(stepped, to: bounds)
   }
 
   static func controlValueFromTrack(

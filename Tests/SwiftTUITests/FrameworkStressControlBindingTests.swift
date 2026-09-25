@@ -71,6 +71,30 @@ extension FrameworkStressControlBindingTests {
     #expect(integer.writes.isEmpty)
     #expect(floating.writes.isEmpty)
   }
+
+  @Test(
+    "An Int.min step moves an integer Stepper or Slider to its bound", arguments: [false, true])
+  func intMinStepMovesToBound(useSlider: Bool) throws {
+    let probe = ControlStressProbe(5)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("IntMinStep", "Root"), size: .init(width: 42, height: 4)
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        if useSlider {
+          Slider("Extreme", value: probe.binding(), in: 0...10, step: Int.min)
+        } else {
+          Stepper("Extreme", value: probe.binding(), in: 0...10, step: Int.min)
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    #expect(harness.frame.contains("Extreme"))
+    _ = try harness.pressKey(KeyPress(.arrowRight))
+    #expect(probe.value == 10)
+    _ = try harness.pressKey(KeyPress(.arrowLeft))
+    #expect(probe.value == 0)
+    #expect(probe.writes == [10, 0])
+  }
 }
 
 // MARK: - Attempt 001: button action reinstall after enablement churn

@@ -89,4 +89,27 @@ struct FrameworkStressControlValueMathTests {
     // Hypothesis: trimming a rounded negative zero can leak the sign into authored control labels.
     #expect(formattedControlValue(-0.0, bounds: -1.0...1.0, step: 0.1) == "0")
   }
+
+  @Test("an Int.min integer step is the largest representable step")
+  func intMinIntegerStepSaturatesToLargestStep() {
+    // `Int.min` has no `Int` magnitude; it must sanitize, not trap.
+    #expect(Int.sanitizedControlStep(Int.min) == Int.max)
+    #expect(Int.sanitizedControlStep(-Int.max) == Int.max)
+    #expect(steppedControlValue(from: 5, delta: 1, step: Int.min, bounds: 0...10) == 10)
+    #expect(steppedControlValue(from: 5, delta: -1, step: Int.min, bounds: 0...10) == 0)
+  }
+
+  @Test("integer stepping saturates at Int's edges instead of trapping")
+  func integerSteppingSaturatesAtIntEdges() {
+    #expect(steppedControlValue(from: 5, delta: 1, step: Int.max, bounds: 0...10) == 10)
+    #expect(steppedControlValue(from: 5, delta: 1, step: Int.max, bounds: nil) == Int.max)
+    #expect(steppedControlValue(from: -5, delta: -1, step: Int.max, bounds: nil) == Int.min)
+    #expect(steppedControlValue(from: Int.max, delta: 1, step: 1, bounds: nil) == Int.max)
+    #expect(steppedControlValue(from: Int.min, delta: -3, step: 2, bounds: nil) == Int.min)
+    #expect(!stepperCanAdjust(Int.max, delta: 1, step: 1, bounds: nil))
+    #expect(stepperCanAdjust(Int.max, delta: -1, step: 1, bounds: nil))
+    // A result that stays representable is exact even when delta * step is not.
+    #expect(steppedControlValue(from: Int.min, delta: 2, step: Int.max, bounds: nil) == Int.max - 1)
+    #expect(steppedControlValue(from: Int.max, delta: -2, step: Int.max, bounds: nil) == -Int.max)
+  }
 }
