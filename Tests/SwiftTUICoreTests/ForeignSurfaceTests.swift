@@ -1,6 +1,6 @@
 import Testing
 
-@testable import SwiftTUICore
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUIGraph
 
 @Suite("Foreign surface rasterization")
@@ -140,5 +140,56 @@ struct ForeignSurfaceWideGlyphTests {
       surface.cells[0][3].continuationLeadX == nil,
       "a stale continuation survived the overwrite: \(surface.cells[0][3])"
     )
+  }
+}
+
+/// A foreign surface has no intrinsic size: like `Canvas` and raw shapes it
+/// fills whatever it is proposed. Stack cross-axis reconciliation must
+/// therefore re-measure it at the stack's resolved cross size; skipping it as
+/// "rigid" left the surface at the zero cross it measured under an unspecified
+/// proposal, so a populated grid painted no cells.
+@Suite("Foreign surface stack layout")
+struct ForeignSurfaceStackLayoutTests {
+  @Test(
+    "a foreign surface fills a cross-unspecified stack's resolved cross size",
+    arguments: [Axis.horizontal, .vertical])
+  func foreignSurfaceFillsStackCross(axis: Axis) {
+    let foreign = ResolvedNode(
+      identity: testIdentity("foreign"),
+      kind: .view("ForeignSurface"),
+      drawPayload: .foreignSurface(
+        ForeignSurfaceTests.StaticPayload(
+          grid: ForeignGrid(size: CellSize(width: 0, height: 0), cells: [])
+        )
+      )
+    )
+    let sibling = ResolvedNode(
+      identity: testIdentity("sibling"),
+      kind: .view("Sibling"),
+      intrinsicSize: CellSize(width: 5, height: 3)
+    )
+    let stack = ResolvedNode(
+      identity: testIdentity("stack"),
+      kind: .view(axis == .horizontal ? "HStack" : "VStack"),
+      children: [foreign, sibling],
+      layoutBehavior: .stack(
+        axis: axis,
+        spacing: 0,
+        horizontalAlignment: .leading,
+        verticalAlignment: .top
+      )
+    )
+    let proposal =
+      axis == .horizontal
+      ? ProposedSize(width: .finite(40), height: .unspecified)
+      : ProposedSize(width: .unspecified, height: .finite(40))
+
+    let measured = LayoutEngine().measure(stack, proposal: proposal)
+    let foreignSize = measured.childMeasurements.first {
+      $0.identity == testIdentity("foreign")
+    }?.measuredSize
+    let crossSize = axis == .horizontal ? foreignSize?.height : foreignSize?.width
+
+    #expect(crossSize == (axis == .horizontal ? 3 : 5))
   }
 }

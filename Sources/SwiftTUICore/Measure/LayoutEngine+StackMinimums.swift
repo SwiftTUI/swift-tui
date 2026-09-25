@@ -79,11 +79,11 @@ extension LayoutEngine {
             }
             continue
           }
-        case .shape, .canvas:
-          // Raw shape primitives (Rectangle, RoundedRectangle, ...) and
-          // Canvas views size to the proposal on every axis, so they
-          // will expand to any finite cross the reconciliation hands
-          // them.
+        case .shape, .canvas, .foreignSurface:
+          // Raw shape primitives (Rectangle, RoundedRectangle, ...),
+          // Canvas views and foreign surfaces size to the proposal on
+          // every axis, so they will expand to any finite cross the
+          // reconciliation hands them.
           return true
         default:
           break
