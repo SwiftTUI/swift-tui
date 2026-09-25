@@ -103,6 +103,61 @@ struct FrameTailPresentationDamageProducerTests {
     #expect(plan.damage?.dirtyRows == [0, 1, 2])
   }
 
+  @Test("a foreign surface whose grid changes at the same bounds damages its rows")
+  func foreignSurfaceGridChangeDamagesItsRows() {
+    let rootIdentity = testIdentity()
+    let labelIdentity = testIdentity("Label")
+    let surfaceIdentity = testIdentity("Surface")
+    let labelBounds = CellRect(origin: .zero, size: .init(width: 20, height: 1))
+    let surfaceBounds = CellRect(origin: .init(x: 0, y: 4), size: .init(width: 2, height: 1))
+    let placed = PlacedNode(
+      identity: rootIdentity,
+      kind: .root,
+      bounds: .init(origin: .zero, size: .init(width: 20, height: 6)),
+      children: [
+        PlacedNode(identity: labelIdentity, kind: .view("Text"), bounds: labelBounds),
+        PlacedNode(identity: surfaceIdentity, kind: .view("ForeignSurface"), bounds: surfaceBounds),
+      ]
+    )
+    // The label is the invalidated node; the surface's grid changes alongside it.
+    func draw(label: String, grid: String) -> DrawNode {
+      DrawNode(
+        identity: rootIdentity,
+        bounds: placed.bounds,
+        children: [
+          DrawNode(
+            identity: labelIdentity, bounds: labelBounds,
+            commands: [.preformattedText(bounds: labelBounds, lines: [label], style: .init())]),
+          DrawNode(
+            identity: surfaceIdentity, bounds: surfaceBounds,
+            commands: [
+              .foreignSurface(
+                bounds: surfaceBounds,
+                payload: GridPayload(
+                  grid: ForeignGrid(
+                    size: surfaceBounds.size,
+                    cells: [grid.map { RasterCell(character: $0) }])))
+            ]),
+        ]
+      )
+    }
+
+    let plan = FrameTailPresentationDamageResolver.resolve(
+      rootIdentity: rootIdentity,
+      placed: placed,
+      draw: draw(label: "after", grid: "CD"),
+      retainedLayout: RetainedLayoutSession(
+        previousFrameIndex: RetainedFrameIndex(frame: frameArtifacts(placed: placed)),
+        invalidatedIdentities: [labelIdentity]
+      ),
+      previousDraw: draw(label: "before", grid: "AB"),
+      previousSurfaceTopology: SurfaceTopologySignature(placedRoot: placed)
+    )
+
+    #expect(plan.barriers.isEmpty)
+    #expect(plan.damage?.dirtyRows == [0, 1, 3, 4, 5])
+  }
+
   private func placedTree(
     rootIdentity: Identity,
     wrapperIdentity: Identity,
@@ -172,4 +227,8 @@ struct FrameTailPresentationDamageProducerTests {
       children: node.children.map(drawTree(from:))
     )
   }
+}
+
+private struct GridPayload: ForeignSurfacePayload {
+  let grid: ForeignGrid
 }

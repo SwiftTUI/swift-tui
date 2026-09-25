@@ -261,8 +261,13 @@ extension DrawCommand {
       return lhsBounds == rhsBounds
         && lhsPayload == rhsPayload
         && lhsForegroundStyle == rhsForegroundStyle
-    case (.foreignSurface(let lhsBounds, _), .foreignSurface(let rhsBounds, _)):
-      return lhsBounds == rhsBounds
+    case (
+      .foreignSurface(let lhsBounds, let lhsPayload),
+      .foreignSurface(let rhsBounds, let rhsPayload)
+    ):
+      // The grid is all the rasterizer paints, and `DrawPayload` compares it
+      // the same way.
+      return lhsBounds == rhsBounds && lhsPayload.grid == rhsPayload.grid
     case (.clip(let lhsBounds, let lhsChild), .clip(let rhsBounds, let rhsChild)):
       return lhsBounds == rhsBounds && lhsChild == rhsChild
     default:

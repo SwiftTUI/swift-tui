@@ -41,6 +41,20 @@ struct ForeignSurfaceTests {
     #expect(surface.cells[2][2].character == "D")
     #expect(surface.cells[0][0].character == RasterCell.empty.character)
   }
+
+  @Test("foreign surface commands compare the grid they paint")
+  func foreignSurfaceCommandEquality() {
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 2, height: 1))
+    func command(_ characters: String) -> DrawCommand {
+      .foreignSurface(
+        bounds: bounds,
+        payload: StaticPayload(
+          grid: ForeignGrid(
+            size: bounds.size, cells: [characters.map { RasterCell(character: $0) }])))
+    }
+    #expect(command("AB") == command("AB"))
+    #expect(command("AB") != command("AC"))
+  }
 }
 
 /// F167: the non-blend foreign-surface fast path copied source cells
