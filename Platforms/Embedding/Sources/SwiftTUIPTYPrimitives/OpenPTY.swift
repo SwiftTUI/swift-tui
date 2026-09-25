@@ -1,5 +1,7 @@
 // PTY plumbing is POSIX-only; dependency edges exclude Windows.
 #if !os(Windows)
+  import Synchronization
+
   #if canImport(Darwin)
     import Darwin
   #elseif canImport(Glibc)
@@ -18,12 +20,20 @@
     }
   }
 
+  /// Darwin's `openpty` occasionally fails when two threads allocate at once
+  /// (4 of 16,000 calls in an eight-thread harness, with a negative errno), so
+  /// this process allocates one PTY at a time.
+  private let ptyAllocation = Mutex(())
+
   public func openPTY() throws(PTYError) -> PTYHandles {
     var masterFD: Int32 = -1
     var slaveFD: Int32 = -1
 
-    guard unsafe openpty(&masterFD, &slaveFD, nil, nil, nil) == 0 else {
-      throw .allocationFailed(errno: errno)
+    let allocationErrno: Int32? = ptyAllocation.withLock { _ in
+      unsafe openpty(&masterFD, &slaveFD, nil, nil, nil) == 0 ? nil : errno
+    }
+    if let allocationErrno {
+      throw .allocationFailed(errno: allocationErrno)
     }
 
     configureNoSigPipe(masterFD)
