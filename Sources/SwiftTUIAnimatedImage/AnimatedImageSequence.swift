@@ -102,7 +102,11 @@ public struct AnimatedImageSequence: Equatable, Hashable, Sendable {
       framesPerSecond.isFinite && framesPerSecond > 0,
       "AnimatedImageSequence requires a positive finite frame rate"
     )
-    let delay = UInt64(max(1, (1_000_000_000.0 / framesPerSecond).rounded()))
+    let period = (1_000_000_000.0 / framesPerSecond).rounded()
+    // A period past `UInt64` nanoseconds saturates like an enormous
+    // `frameDelays` duration. `Double(UInt64.max)` rounds up to 2^64, the
+    // first value that does not convert.
+    let delay = period >= Double(UInt64.max) ? UInt64.max : UInt64(max(1, period))
     self.init(
       frames: frames,
       delayNanoseconds: Array(repeating: delay, count: frames.count), loopCount: loopCount

@@ -274,6 +274,19 @@ struct FrameworkStressAnimatedImageCodecTests {
     #expect(attachment.resolvedReference == .embeddedImage(decoded.frames[0].imageData))
   }
 
+  @Test(
+    "stress animated image codec 026 vanishing frame rate saturates like an enormous duration",
+    arguments: [1e-11, Double.leastNonzeroMagnitude])
+  func animatedImageCodec026VanishingFrameRateSaturates(framesPerSecond: Double) {
+    let sequence = AnimatedImageSequence(
+      frames: [Self.pixelFrame(.red)], framesPerSecond: framesPerSecond)
+    let enormous = AnimatedImageSequence(
+      frames: [Self.pixelFrame(.red)], frameDelays: [.seconds(Int64.max)])
+
+    #expect(sequence.frameDelays == [.nanoseconds(Int64.max)])
+    #expect(sequence == enormous)
+  }
+
   private struct PNGChunk {
     var type: String
     var data: [UInt8]
