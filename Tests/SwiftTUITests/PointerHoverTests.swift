@@ -462,4 +462,45 @@ extension ScrollWheelTests {
     #expect(inner.value.y == (atEdge ? 5 : 1))
     #expect((frame == initialFrame) == atEdge)
   }
+
+  @Test(
+    "refused wheel notches bubble past a non-overflowing ScrollView to an overflowing ancestor",
+    arguments: [false, true], [false, true])
+  func refusedWheelBubblesPastNonOverflowingScrollView(atEdge: Bool, crossAxis: Bool) throws {
+    let inner = WheelPositionBox(y: atEdge ? 5 : 0)
+    let middle = WheelPositionBox(y: 0)
+    let outer = WheelPositionBox(y: 0)
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NonOverflowingMiddleWheel"), size: .init(width: 30, height: 10)
+    ) {
+      ScrollView(.vertical, position: outer.binding) {
+        VStack(alignment: .leading, spacing: 0) {
+          // The fixed inner viewport fits the middle vertically (overflowing
+          // it horizontally in the cross-axis case), and the middle keeps its
+          // default scroll-body wheel handler.
+          ScrollView(crossAxis ? [.horizontal, .vertical] : .vertical, position: middle.binding) {
+            ScrollView(.vertical, position: inner.binding) {
+              VStack(alignment: .leading, spacing: 0) {
+                ForEach(0..<8) { row in Text("Inner \(row)") }
+              }
+            }
+            .scrollIndicators(.hidden)
+            .frame(width: crossAxis ? 30 : 20, height: 3, alignment: .topLeading)
+          }
+          .scrollIndicators(.hidden)
+          .frame(width: 24, height: 3, alignment: .topLeading)
+          ForEach(0..<8) { row in Text("Below \(row)") }
+        }
+      }
+      .scrollIndicators(.hidden)
+      .frame(width: 28, height: 5, alignment: .topLeading)
+    }
+    defer { harness.shutdown() }
+    let point = try #require(harness.point(forText: atEdge ? "Inner 6" : "Inner 1"))
+    let frame = try harness.scrollPointer(at: point, deltaY: 1)
+    #expect(inner.value.y == (atEdge ? 5 : 1))
+    #expect(middle.value.y == 0)
+    #expect(outer.value.y == (atEdge ? 1 : 0))
+    #expect(frame.contains("Below 2") == atEdge)
+  }
 }

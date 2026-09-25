@@ -543,22 +543,33 @@ extension RunLoop {
         startingAt: identity, excluding: preferredRouteID
       )
     for candidate in candidates {
-      let isScrollBody = latestSemanticSnapshot.scrollRoutes.contains { route in
-        primaryRouteID(for: route.identity, ownerNodeID: route.viewNodeID)
-          .pairsIgnoringOwner(with: candidate)
-          // First refusal excludes every scroll body. After the preferred
-          // body refuses, ancestors the spatial retry cannot reach must be
-          // allowed to bubble here (including non-overflowing ScrollViews).
-          && (!includesPreferredScrollBody
-            || scrollRouteOverflows(route, deltaX: deltaX, deltaY: deltaY))
-      }
-      if isScrollBody && !(includesPreferredScrollBody && candidate == preferredRouteID) {
-        continue
+      var candidateEvent = event
+      if !(includesPreferredScrollBody && candidate == preferredRouteID),
+        let scrollBody = latestSemanticSnapshot.scrollRoutes.first(where: { route in
+          primaryRouteID(for: route.identity, ownerNodeID: route.viewNodeID)
+            .pairsIgnoringOwner(with: candidate)
+        })
+      {
+        // First refusal excludes every scroll body. After the preferred
+        // body refuses, ancestors the spatial retry cannot reach must be
+        // allowed to bubble here (including non-overflowing ScrollViews).
+        guard includesPreferredScrollBody,
+          !scrollRouteOverflows(scrollBody, deltaX: deltaX, deltaY: deltaY)
+        else { continue }
+        // Such an ancestor's handler clamps against its own range, not the
+        // refusing route's: a default scroll body then refuses the notch
+        // so it chains outward, while a custom `.onScrollWheel` still sees it.
+        candidateEvent.scrollContext = .init(
+          viewportRect: scrollBody.viewportRect,
+          contentBounds: scrollBody.contentBounds
+        )
       }
       guard let resolved = localPointerHandlerRegistry.handlerRouteID(pairingWith: candidate),
         visitedHandlerRoutes.insert(resolved).inserted
       else { continue }
-      if localPointerHandlerRegistry.dispatch(routeID: resolved, event: event).wantsPointerStream {
+      if localPointerHandlerRegistry.dispatch(routeID: resolved, event: candidateEvent)
+        .wantsPointerStream
+      {
         scheduler.requestInvalidation(
           of: scrollPointerInvalidationIdentities(for: resolved.identity)
         )
