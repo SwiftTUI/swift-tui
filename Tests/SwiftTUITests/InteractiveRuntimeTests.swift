@@ -7498,4 +7498,110 @@ extension InteractiveRuntimeTests {
     try runLoop.renderPendingFrames(renderedFrames: &frames)
     #expect(!runLoop.scrollMomentum.hasActiveMomentum)
   }
+
+  @Test("A diagonal wheel notch over a single-axis scroll view scrolls it and cancels its fling")
+  func diagonalWheelOverSingleAxisScrollCancelsFling() throws {
+    final class Box { var position = ScrollCellOffset.zero }
+    let box = Box()
+    let terminalSize = CellSize(width: 20, height: 12)
+    let rootIdentity = testIdentity("DiagonalWheelFixture")
+    let scrollID = testIdentity("DiagonalWheelFixture", "Scroll")
+    @MainActor func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(get: { box.position }, set: { box.position = $0 })
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<200) { _ in
+            Text("Wheel row")
+          }
+        }
+      }
+      .id(scrollID)
+      .frame(width: 12, height: 6, alignment: .topLeading)
+    }
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollID, in: makeView(),
+        rootIdentity: rootIdentity, terminalSize: terminalSize))
+
+    let t0 = MonotonicInstant.now()
+    let clock = VirtualFrameClock(t0)
+    let runLoop = try mountedMomentumRunLoop(
+      terminalSize: terminalSize, rootIdentity: rootIdentity,
+      clock: clock, viewBuilder: makeView)
+
+    var frames = 0
+    let top = topPoint(of: scrollRect)
+    let bindingSourceID = runLoop.localScrollPositionRegistry.bindingSourceID(for: scrollID)
+    let started = runLoop.scrollMomentum.begin(
+      identity: scrollID, offsetVelocity: Vector(dx: 0, dy: 30),
+      canScrollX: false, canScrollY: true, now: t0, bindingSourceID: bindingSourceID)
+    #expect(started)
+    #expect(runLoop.scrollMomentum.hasActiveMomentum)
+
+    // Host wheel events can carry both axes at once (one DOM wheel event is
+    // one `mouse:scrolled` command). The vertical-only scroll view consumes
+    // the vertical component, so the notch is an explicit reposition.
+    _ = runLoop.handle(
+      .input(.mouse(.init(kind: .scrolled(deltaX: 1, deltaY: 1), location: top, timestamp: t0))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(box.position == ScrollCellOffset(x: 0, y: 1))
+    #expect(!runLoop.scrollMomentum.hasActiveMomentum)
+  }
+
+  @Test("A diagonal wheel notch chains past a clamped single-axis scroll view")
+  func diagonalWheelChainsPastClampedSingleAxisScroll() throws {
+    final class Box {
+      var outer = ScrollCellOffset.zero
+      var inner = ScrollCellOffset(x: 0, y: 5)
+    }
+    let box = Box()
+    let terminalSize = CellSize(width: 30, height: 12)
+    let rootIdentity = testIdentity("DiagonalChainFixture")
+    // Explicit identities make the two routes identity siblings, so only the
+    // spatial chain can reach the enclosing horizontal scroll view.
+    let outerID = testIdentity("DiagonalChainFixture", "Outer")
+    let innerID = testIdentity("DiagonalChainFixture", "Inner")
+    @MainActor func makeView() -> some View {
+      ScrollView(.horizontal, position: Binding(get: { box.outer }, set: { box.outer = $0 })) {
+        HStack(alignment: .top, spacing: 0) {
+          ScrollView(.vertical, position: Binding(get: { box.inner }, set: { box.inner = $0 })) {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<8) { row in
+                Text("Inner \(row)")
+              }
+            }
+          }
+          .scrollIndicators(.hidden)
+          .id(innerID)
+          .frame(width: 8, height: 3, alignment: .topLeading)
+          Text(String(repeating: "-", count: 40))
+        }
+      }
+      .scrollIndicators(.hidden)
+      .id(outerID)
+      .frame(width: 20, height: 4, alignment: .topLeading)
+    }
+
+    let innerRect = try #require(
+      renderedScrollViewportRect(
+        for: innerID, in: makeView(),
+        rootIdentity: rootIdentity, terminalSize: terminalSize))
+    let clock = VirtualFrameClock(MonotonicInstant.now())
+    let runLoop = try mountedMomentumRunLoop(
+      terminalSize: terminalSize, rootIdentity: rootIdentity,
+      clock: clock, viewBuilder: makeView)
+
+    // The inner view sits at its bottom edge and refuses the notch; the
+    // horizontal component chains out to the enclosing scroll view.
+    var frames = 0
+    _ = runLoop.handle(
+      .input(
+        .mouse(.init(kind: .scrolled(deltaX: 1, deltaY: 1), location: topPoint(of: innerRect)))))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(box.inner == ScrollCellOffset(x: 0, y: 5))
+    #expect(box.outer == ScrollCellOffset(x: 1, y: 0))
+  }
 }

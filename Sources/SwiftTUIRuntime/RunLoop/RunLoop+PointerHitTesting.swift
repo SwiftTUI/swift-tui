@@ -77,12 +77,15 @@ extension RunLoop {
       ?? routes.last
   }
 
+  /// Whether `route` can consume the delta: it overflows along an axis the
+  /// delta moves. A diagonal delta qualifies a single-axis route, which
+  /// consumes the matching component the way the scroll body applies each
+  /// axis independently. A zero delta qualifies any overflowing route.
   package func scrollRouteOverflows(_ route: ScrollRoute, deltaX: Int, deltaY: Int) -> Bool {
     let horizontal = route.contentBounds.size.width > route.viewportRect.size.width
     let vertical = route.contentBounds.size.height > route.viewportRect.size.height
-    if deltaX != 0, !horizontal { return false }
-    if deltaY != 0, !vertical { return false }
-    return horizontal || vertical
+    guard deltaX != 0 || deltaY != 0 else { return horizontal || vertical }
+    return (deltaX != 0 && horizontal) || (deltaY != 0 && vertical)
   }
 
   package func hitTarget(
