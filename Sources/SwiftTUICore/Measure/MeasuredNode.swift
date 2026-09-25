@@ -92,6 +92,12 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
   package var listLayout: ListVisibleLayout?
   /// The table twin of ``listLayout``, on the same terms.
   package var tableLayout: TableVisibleLayout?
+  /// Every row known to be taller than one cell, by row index: the realized
+  /// rows' measured heights merged over the heights earlier frames retained.
+  /// A row the window no longer realizes keeps its last measured height, so the
+  /// collection's content extent and row positions do not change as the
+  /// window slides. Rows never measured count as one cell.
+  package var tallRowHeights: [Int: Int]
 
   package init(
     sourceIndices: [Int],
@@ -99,7 +105,8 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
     measuredWindow: Range<Int>? = nil,
     estimatedRowStride: Int? = nil,
     listLayout: ListVisibleLayout? = nil,
-    tableLayout: TableVisibleLayout? = nil
+    tableLayout: TableVisibleLayout? = nil,
+    tallRowHeights: [Int: Int] = [:]
   ) {
     self.sourceIndices = sourceIndices
     self.tableColumnWidths = tableColumnWidths
@@ -107,6 +114,7 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
     self.estimatedRowStride = estimatedRowStride
     self.listLayout = listLayout
     self.tableLayout = tableLayout
+    self.tallRowHeights = tallRowHeights
   }
 }
 

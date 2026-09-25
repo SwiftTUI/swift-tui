@@ -482,8 +482,12 @@ are omitted even when SwiftUI exposes a corresponding API.
   clamps. Low-level flattened `ListPayload`/`TablePayload` text remains a
   *Ratified* single-line representation. Use hosted `List` rows and `Table`
   cells for multiline content: their measured heights drive placement, chrome,
-  and semantics together. Maintaining a second multiline text layout inside
-  flattened payload rendering is deliberately omitted.
+  and semantics together. Inside a `ScrollView`, a row keeps its last measured
+  height after it scrolls out of the realized window, so the content extent
+  and the rows around it stay put; a row never realized counts as one line
+  until it is, the same estimate lazy stacks make. Maintaining a second
+  multiline text layout inside flattened payload rendering is deliberately
+  omitted.
 
 ## Controls and text
 

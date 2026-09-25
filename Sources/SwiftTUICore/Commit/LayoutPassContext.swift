@@ -153,8 +153,9 @@ package final class LayoutPassContext: Sendable {
   package let retainedLayout: RetainedLayoutSession?
   package let invalidatedIdentities: Set<Identity>
   /// A previous-frame session consulted ONLY by the custom-layout
-  /// hysteresis-seeding seam (`RetainedMeasurementSeedableLayout`) when
-  /// `retainedLayout` is absent. The layout shadow oracle's scratch context
+  /// hysteresis-seeding seam (`RetainedMeasurementSeedableLayout`) and the
+  /// hosted collections' retained tall-row heights when `retainedLayout` is
+  /// absent. The layout shadow oracle's scratch context
   /// carries the production session here so the fresh pass evaluates the same
   /// hysteresis inputs (for example `ScrollViewLayout`'s converged
   /// indicator-inset seed, which selects among bistable fixed points) while

@@ -269,8 +269,8 @@ extension DrawExtractor {
   /// inside a `ScrollView` the table is laid out against its own full content
   /// height, so generating "the visible lines" over those bounds builds a line
   /// per row of the whole dataset even though only a window was realized. The
-  /// skipped body lines still occupy their cells, arithmetically, because an
-  /// unrealized row is one cell tall by definition.
+  /// skipped body lines still occupy their cells, arithmetically: one each, or
+  /// the height `rowHeights` retained for a row known to be taller.
   func visibleTableLayout(
     for payload: TablePayload,
     in bounds: CellRect,
@@ -295,9 +295,19 @@ extension DrawExtractor {
     )
     var lines = generated.lines
     // `extraCells` is the cells tall rows have added so far. A line's offset is
-    // its POSITION in the content plus that, which stays correct across a gap
-    // in the generated lines because every skipped line is one cell.
-    var extraCells = 0
+    // its POSITION in the content plus that. A windowed generation starts with
+    // the known-tall rows before the window and ends with those after it.
+    let windowRows =
+      generated.linePositions == nil
+      ? [] : lines.filter { $0.role == .row }.compactMap(\.rowIndex)
+    var extraCells =
+      windowRows.min().map { first in
+        tallRowExtraCells(in: rowHeights ?? [:]) { $0 < first }
+      } ?? 0
+    let extraAfter =
+      windowRows.max().map { last in
+        tallRowExtraCells(in: rowHeights ?? [:]) { $0 > last }
+      } ?? 0
     for index in lines.indices {
       let height =
         lines[index].role == .row
@@ -311,7 +321,7 @@ extension DrawExtractor {
       contentBounds: bounds,
       lines: lines,
       widths: widths,
-      totalContentHeight: generated.totalLineCount + extraCells
+      totalContentHeight: generated.totalLineCount + extraCells + extraAfter
     )
   }
 

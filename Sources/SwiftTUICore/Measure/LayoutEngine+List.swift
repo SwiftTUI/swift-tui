@@ -7,10 +7,15 @@ extension LayoutEngine {
   /// attributed to rows 0, 1, 2, … That silent misalignment is register item
   /// D19's fifth symptom; it is invisible while every row measures one cell
   /// and wrong the moment one does not.
+  ///
+  /// `retainedTallRowHeights` are the heights earlier frames measured for rows
+  /// taller than one cell, by row index. The rows outside the measured window
+  /// keep them, so the ideal height does not change as the window slides.
   package func measuredHostedListSize(
     for payload: ListPayload,
     childMeasurements: [MeasuredNode],
     sourceIndices: [Int]? = nil,
+    retainedTallRowHeights: [Int: Int] = [:],
     proposal: ProposedSize
   ) -> CellSize {
     guard !childMeasurements.isEmpty else {
@@ -44,7 +49,11 @@ extension LayoutEngine {
       }
       return partial + max(0, pair.measurement.measuredSize.height - 1)
     }
+    let measuredIndices = Set(sourceIndices ?? [])
     idealSize.height += extraHeight
+    idealSize.height += tallRowExtraCells(in: retainedTallRowHeights) { index in
+      !measuredIndices.contains(index) && item(at: index).kind != .sectionBreak
+    }
 
     let markerWidth = payload.showsSelectionMarker ? 2 : 0
     let widestChild = pairs.reduce(0) { partial, pair in

@@ -74,7 +74,8 @@ extension LayoutEngine {
         hostedCollectionHintWindow(
           hint: passContext.currentMeasureViewportHint,
           count: resolved.indexedChildSource?.count ?? 0,
-          rowStride: rowStride
+          rowStride: rowStride,
+          tallRowHeights: hostedSnapshot.tallRowHeights
         ) == storedWindow,
         passContext.claimCurrentMeasureViewportHint(for: resolved.identity) != nil
       else {

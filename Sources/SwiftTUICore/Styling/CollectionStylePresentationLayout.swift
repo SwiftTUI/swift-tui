@@ -145,8 +145,8 @@ extension ListStylePresentation {
   /// lines" over those bounds builds one display line per row of the whole
   /// dataset even though only a window of rows was ever realized. Passing the
   /// measured window keeps the line array O(window); the skipped rows still
-  /// occupy their cells, arithmetically, because an unrealized row is one cell
-  /// tall by definition.
+  /// occupy their cells, arithmetically: one each, or the height `rowHeights`
+  /// retained for a row known to be taller.
   package func visibleListLayout(
     for payload: ListPayload,
     in bounds: CellRect,
@@ -161,7 +161,18 @@ extension ListStylePresentation {
       rowWindow: rowWindow
     )
     var lines = generated.lines
-    var cursor = generated.firstLinePosition
+    // A windowed generation covers only the realized rows, so the known-tall
+    // rows before and after it add their extra cells arithmetically.
+    let windowRows = generated.isWindowed ? lines.compactMap(\.rowIndex) : []
+    let extraBefore =
+      windowRows.min().map { first in
+        tallRowExtraCells(in: rowHeights ?? [:]) { $0 < first }
+      } ?? 0
+    let extraAfter =
+      windowRows.max().map { last in
+        tallRowExtraCells(in: rowHeights ?? [:]) { $0 > last }
+      } ?? 0
+    var cursor = generated.firstLinePosition + extraBefore
     for index in lines.indices {
       let height =
         lines[index].rowIndex.flatMap { rowHeights?[$0] }.map { max(1, $0) } ?? 1
@@ -169,7 +180,7 @@ extension ListStylePresentation {
       lines[index].yOffset = cursor
       cursor += height
     }
-    let totalContentHeight = cursor + generated.trailingLineCount
+    let totalContentHeight = cursor + generated.trailingLineCount + extraAfter
 
     return ListVisibleLayout(
       contentBounds: contentBounds,

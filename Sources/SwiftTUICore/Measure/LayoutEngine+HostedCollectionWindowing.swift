@@ -30,6 +30,11 @@ extension LayoutEngine {
       height: proposedCollectionDimension(effectiveProposal.height, fallback: fallbackSize.height)
     )
     let bounds = CellRect(origin: .zero, size: concreteSize)
+    let retainedTallRows = retainedTallRowHeights(
+      for: node,
+      source: source,
+      passContext: passContext
+    )
     let rowStride: Int
     switch (collection.kind, node.drawPayload) {
     case (.list, .list(let payload)):
@@ -84,7 +89,8 @@ extension LayoutEngine {
     } else if let window = hostedCollectionHintWindow(
       hint: hint,
       count: source.count,
-      rowStride: rowStride
+      rowStride: rowStride,
+      tallRowHeights: retainedTallRows
     ),
       passContext?.claimCurrentMeasureViewportHint(for: node.identity) != nil
     {
@@ -162,20 +168,21 @@ extension LayoutEngine {
     var tableColumnWidths: [Int]?
     var listLayout: ListVisibleLayout?
     var tableLayout: TableVisibleLayout?
+    var tallRowHeights = retainedTallRows
     switch node.drawPayload {
     case .list(let payload):
       // Derive the height-aware layout ONCE, from the real measured heights,
       // and carry it forward. `bounds` here is origin-zero; placement
       // translates.
-      let rowHeights = Dictionary(
-        uniqueKeysWithValues: zip(sourceIndices, measurements).map { index, measurement in
-          (index, max(1, measurement.measuredSize.height))
-        }
+      mergeTallRowHeights(
+        from: measurements,
+        at: sourceIndices,
+        into: &tallRowHeights
       )
       listLayout = payload.style.visibleListLayout(
         for: payload,
         in: bounds,
-        rowHeights: rowHeights,
+        rowHeights: tallRowHeights,
         // Only set on the hint path, where `bounds` is the collection's own
         // content height rather than a viewport. Without it the line model
         // would build a display line per row of the whole dataset before
@@ -186,6 +193,7 @@ extension LayoutEngine {
         for: payload,
         childMeasurements: measurements,
         sourceIndices: sourceIndices,
+        retainedTallRowHeights: retainedTallRows,
         proposal: effectiveProposal
       )
     case .table(let payload):
@@ -238,21 +246,23 @@ extension LayoutEngine {
       // Derive the height-aware layout ONCE, from the real measured heights,
       // and carry it forward. `bounds` here is origin-zero; placement
       // translates.
-      let rowHeights = Dictionary(
-        uniqueKeysWithValues: zip(sourceIndices, measurements).map { index, measurement in
-          (index, max(1, measurement.measuredSize.height))
-        }
+      mergeTallRowHeights(
+        from: measurements,
+        at: sourceIndices,
+        into: &tallRowHeights
       )
       tableLayout = DrawExtractor().visibleTableLayout(
         for: payload,
         in: bounds,
         columnWidths: tableColumnWidths,
-        rowHeights: rowHeights,
+        rowHeights: tallRowHeights,
         rowWindow: measuredWindow
       )
       measuredSize = measuredHostedTableSize(
         for: payload,
         childMeasurements: measurements,
+        sourceIndices: sourceIndices,
+        retainedTallRowHeights: retainedTallRows,
         proposal: effectiveProposal
       )
     default:
@@ -275,10 +285,64 @@ extension LayoutEngine {
           measuredWindow: measuredWindow,
           estimatedRowStride: measuredWindow == nil ? nil : rowStride,
           listLayout: listLayout,
-          tableLayout: tableLayout
+          tableLayout: tableLayout,
+          tallRowHeights: tallRowHeights
         )
       )
     )
+  }
+
+  /// The tall-row heights the previous frame measured for this collection,
+  /// when they still describe these rows (the same element ids). They are
+  /// what keeps a tall row's cells in the content extent and in every later
+  /// row's position after the window stops realizing it — without them the
+  /// extent shrinks as the row scrolls out, and a scroll view sitting at its
+  /// bottom edge snaps back. Like the lazy stacks' retained element lengths
+  /// they are estimates: a row is re-measured whenever it is realized.
+  private func retainedTallRowHeights(
+    for node: ResolvedNode,
+    source: any IndexedChildSource,
+    passContext: LayoutPassContext?
+  ) -> [Int: Int] {
+    // Scratch passes (the shadow oracle, the size-stability certificate) read
+    // the production session through the seed seam, so they reproduce the
+    // production pass's sizes.
+    guard
+      let retainedLayout = passContext?.retainedLayout ?? passContext?.measurementSeedSession
+    else {
+      return [:]
+    }
+    let previousMeasured =
+      node.viewNodeID.flatMap { retainedLayout.previousFrameIndex?.measuredByNodeID[$0] }
+      ?? retainedLayout.measuredNode(for: node.identity)
+    let previousResolved =
+      node.viewNodeID.flatMap { retainedLayout.previousFrameIndex?.resolvedByNodeID[$0] }
+      ?? retainedLayout.resolvedNode(for: node.identity)
+    guard
+      let snapshot = previousMeasured?.containerAllocationSnapshot?.hostedCollection,
+      !snapshot.tallRowHeights.isEmpty,
+      let previousSource = previousResolved?.indexedChildSource,
+      // A live retained source is only safe to read on the main actor, which a
+      // live current source proves (see `retainedLazyStackSnapshot`).
+      previousSource.canRunOnWorker || !source.canRunOnWorker,
+      previousSource.measurementSignature == source.measurementSignature
+    else {
+      return [:]
+    }
+    return snapshot.tallRowHeights
+  }
+
+  /// Records the realized rows' measured heights over the retained ones: a row
+  /// that now measures one cell is no longer tall.
+  private func mergeTallRowHeights(
+    from measurements: [MeasuredNode],
+    at sourceIndices: [Int],
+    into tallRowHeights: inout [Int: Int]
+  ) {
+    for (index, measurement) in zip(sourceIndices, measurements) {
+      let height = measurement.measuredSize.height
+      tallRowHeights[index] = height > 1 ? height : nil
+    }
   }
 
   private func proposedCollectionDimension(
@@ -316,11 +380,13 @@ extension LayoutEngine {
   ///
   /// Unlike a lazy stack, a collection needs no probe measurement for the
   /// stride — its line model is arithmetic (one line per row, two when the
-  /// style draws separators).
+  /// style draws separators), plus the extra cells of the rows
+  /// `tallRowHeights` knows are taller.
   func hostedCollectionHintWindow(
     hint: MeasureViewportHint?,
     count: Int,
-    rowStride: Int
+    rowStride: Int,
+    tallRowHeights: [Int: Int] = [:]
   ) -> Range<Int>? {
     guard let hint,
       hint.axes.contains(.vertical),
@@ -332,7 +398,10 @@ extension LayoutEngine {
     let stride = max(1, rowStride)
     let offset = max(0, hint.contentOffset.y)
     let overscan = 1
-    let anchor = min(max(0, count - 1), offset / stride)
+    let anchor = min(
+      max(0, count - 1),
+      hostedCollectionRow(atLine: offset, rowStride: stride, tallRowHeights: tallRowHeights)
+    )
     let rowsPerViewport = (hint.viewportSize.height + stride - 1) / stride
     let lower = max(0, anchor - overscan)
     let upper = min(count, anchor + rowsPerViewport + overscan + 1)
@@ -340,6 +409,41 @@ extension LayoutEngine {
       return nil
     }
     return lower..<upper
+  }
+
+  /// The row whose display lines contain content line `line`: rows are
+  /// `rowStride` lines apart, and each row `tallRowHeights` knows is taller
+  /// than one cell pushes every later row down by its extra cells.
+  func hostedCollectionRow(
+    atLine line: Int,
+    rowStride: Int,
+    tallRowHeights: [Int: Int]
+  ) -> Int {
+    var extraBefore = 0
+    for (row, height) in tallRowHeights.sorted(by: { $0.key < $1.key }) {
+      let start = row * rowStride + extraBefore
+      guard line >= start else {
+        break
+      }
+      let extra = max(0, height - 1)
+      if line < start + rowStride + extra {
+        return row
+      }
+      extraBefore += extra
+    }
+    return (line - extraBefore) / rowStride
+  }
+}
+
+/// The cells the rows `tallRowHeights` knows are taller than one cell add to a
+/// collection's one-cell-per-row line model, counting only the rows whose index
+/// satisfies `isIncluded`.
+package func tallRowExtraCells(
+  in tallRowHeights: [Int: Int],
+  where isIncluded: (Int) -> Bool
+) -> Int {
+  tallRowHeights.reduce(0) { partial, entry in
+    isIncluded(entry.key) ? partial + max(0, entry.value - 1) : partial
   }
 }
 
