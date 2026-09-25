@@ -632,6 +632,7 @@ let package = Package(
       name: "SwiftTUIWASISurfaceBridgeTests",
       dependencies: [
         "SwiftTUI",
+        "SwiftTUITestSupport",
         "SwiftTUIWASISurfaceBridge",
       ],
       path: "Platforms/WASI/Tests/WASISurfaceBridgeTests",

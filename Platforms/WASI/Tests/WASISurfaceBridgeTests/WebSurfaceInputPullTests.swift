@@ -4,6 +4,7 @@
 
   import SwiftTUICore
   @_spi(Runners) import SwiftTUIRuntime
+  @_spi(Testing) import SwiftTUITestSupport
   import Testing
 
   @testable import SwiftTUIWASISurfaceBridge
@@ -95,9 +96,14 @@
       defer { reader.uninstallPullDelivery() }
 
       try pipe.write(Array("zz".utf8))
-      let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-      while recorder.keys.count < 2, ContinuousClock.now < deadline {
-        try await Task.sleep(for: .milliseconds(2))
+      // Signal-driven: the recorder notifies on each delivery; the deadline
+      // event is only the failure bound.
+      let deadline = AsyncEvent.firing(after: AsyncTestTimeouts.scaled(.seconds(5)))
+      await withTaskGroup(of: Void.self) { group in
+        group.addTask { await recorder.delivered.wait(until: { recorder.keys.count >= 2 }) }
+        group.addTask { await deadline.wait() }
+        await group.next()
+        group.cancelAll()
       }
       #expect(recorder.keys == ["z", "z"])
     }
@@ -107,6 +113,7 @@
 
   @MainActor
   private final class PullRecorder {
+    let delivered = MainActorConditionSignal()
     private(set) var keys: [String] = []
     private(set) var sourceBytes = 0
     private(set) var sourceReads = 0
@@ -127,6 +134,7 @@
           let text = String(character)
           keys.append(text)
           onKey?(text)
+          delivered.notify()
         },
         inputEnded: { [self] in
           inputEndedReports += 1

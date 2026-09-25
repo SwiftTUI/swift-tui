@@ -4553,6 +4553,7 @@ class WebHostSceneRuntime {
   bridge;
   onInput;
   onFrameDiagnostic;
+  onSurfacePainted;
   synchronizeAccessibilityFocus;
   wheelMode;
   rendererKind;
@@ -4615,6 +4616,7 @@ class WebHostSceneRuntime {
     this.bridge = options.bridge;
     this.onInput = options.onInput;
     this.onFrameDiagnostic = options.onFrameDiagnostic;
+    this.onSurfacePainted = options.onSurfacePainted;
     this.synchronizeAccessibilityFocus = options.synchronizeAccessibilityFocus ?? true;
     this.wheelMode = options.wheelMode ?? legacyWheelMode(options.captureWheelInput);
     this.rendererKind = options.renderer ?? "canvas";
@@ -5322,6 +5324,11 @@ class WebHostSceneRuntime {
     }
     const resized = this.resizeSurface();
     this.painter.paint(this.surfaceMetrics(), request.frame, resized ? undefined : request.damage, request.recoveredImagePayloadIds);
+    this.onSurfacePainted?.({
+      frame: request.frame,
+      paintedAt: performance.now(),
+      coalescedFrameCount: request.coalescedFrameCount
+    });
     this.syncAccessibilityTree(request.frame, request.accessibilityAnnouncements);
     if (this.domGeometry && !this.fontPending && !this.reprojecting) {
       this.stagedFontChange = false;

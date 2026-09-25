@@ -30,6 +30,9 @@ SwiftTUIRuntime.BlendedImageEncodedPayload
 SwiftTUIRuntime.BlendedImageEncodedPayload.bytes
 SwiftTUIRuntime.BlendedImageEncodedPayload.id
 SwiftTUIRuntime.BlendedImageEncodedPayload.pixelSize
+SwiftTUIRuntime.BoundedStepFrameClock
+SwiftTUIRuntime.BoundedStepFrameClock.init(maximumStep:)
+SwiftTUIRuntime.BoundedStepFrameClock.now()
 SwiftTUIRuntime.CommittedFrameSample
 SwiftTUIRuntime.DebugBundle
 SwiftTUIRuntime.DebugBundle.announcementLine()

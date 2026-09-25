@@ -18,10 +18,11 @@ struct IngressPullSeamTests {
   func turnBoundaryPullDeliversQueuedInputInOrder() async throws {
     let harness = PullSeamHarness(idlePolling: false)
     harness.reader.push(.key(.character("a")), .key(.character("b")), .key(.character("c")))
-    // Nothing polls, so wake the loop the way an animation or state write
-    // would; the turn's boundary pull then finds the queued input.
+    // Nothing polls, so once the loop has mounted, wake it the way an
+    // animation or state write would; the turn's boundary pull then finds
+    // the queued input.
     Task { @MainActor in
-      await Task.yield()
+      await harness.mounted()
       harness.scheduler.requestInvalidation(of: [harness.rootIdentity])
     }
 
@@ -41,9 +42,11 @@ struct IngressPullSeamTests {
   func idlePollWakesAQuietLoop() async throws {
     let harness = PullSeamHarness(idlePolling: true)
     Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(20))
+      // Push only once the loop is quiet, and the next burst only once the
+      // first key has been presented, so each delivery exercises the poll.
+      await harness.mounted()
       harness.reader.push(.key(.character("a")))
-      try? await Task.sleep(for: .milliseconds(20))
+      await harness.presented("value 1")
       harness.reader.push(.key(.character("b")), .key(.character("c")))
     }
 
@@ -70,7 +73,7 @@ struct IngressPullSeamTests {
     }
     harness.reader.push(.key(.character("a")))
     Task { @MainActor in
-      await Task.yield()
+      await harness.mounted()
       harness.scheduler.requestInvalidation(of: [harness.rootIdentity])
     }
 
@@ -94,7 +97,7 @@ struct IngressPullSeamTests {
   func inputEndedIsReportedOnceAfterQueuedEvents() async throws {
     let harness = PullSeamHarness(idlePolling: true, finishAfter: nil)
     Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(20))
+      await harness.mounted()
       harness.reader.push(.key(.character("a")), .key(.character("b")))
       harness.reader.finish()
     }
@@ -118,6 +121,7 @@ private final class PullSeamHarness {
   let scheduler = FrameScheduler()
   let reader: ScriptedPullingReader
   let sink = IngressRecordingSink()
+  let surface = RecordingPresentationSurface(surfaceSize: .init(width: 20, height: 2))
   let runLoop: SwiftTUIRuntime.RunLoop<Int, Text>
   private let ledger = HandledLedger()
 
@@ -135,7 +139,7 @@ private final class PullSeamHarness {
     self.reader = reader
     runLoop = SwiftTUIRuntime.RunLoop(
       rootIdentity: rootIdentity,
-      presentationSurface: RecordingPresentationSurface(surfaceSize: .init(width: 20, height: 2)),
+      presentationSurface: surface,
       terminalInputReader: reader,
       scheduler: scheduler,
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
@@ -156,6 +160,18 @@ private final class PullSeamHarness {
     )
     runLoop.frameSink = sink
   }
+
+  /// Resumes once the loop has presented its first frame (frame-signal
+  /// driven, no clock).
+  func mounted() async {
+    await presented("value 0")
+  }
+
+  /// Resumes once a presented frame contains `text`.
+  func presented(_ text: String) async {
+    let surface = self.surface
+    await surface.frameSignal.wait(until: { surface.frames.contains { $0.contains(text) } })
+  }
 }
 
 @MainActor
@@ -166,6 +182,7 @@ private final class HandledLedger {
 
 /// A pulling reader over an in-memory queue. `idlePolling` mirrors the WASI
 /// reader's idle poll task; off, only the run loop's boundary pulls deliver.
+/// The poll is signal-driven rather than timed: `push`/`finish` notify it.
 @MainActor
 private final class ScriptedPullingReader: SynchronousInputPulling {
   private var queue: [InputEvent] = []
@@ -173,6 +190,7 @@ private final class ScriptedPullingReader: SynchronousInputPulling {
   private var finished = false
   private var pollingTask: Task<Void, Never>?
   private let idlePolling: Bool
+  private let arrivals = MainActorConditionSignal()
   private(set) var pullCalls = 0
   private(set) var inputEndedReports = 0
 
@@ -182,10 +200,12 @@ private final class ScriptedPullingReader: SynchronousInputPulling {
 
   func push(_ events: InputEvent...) {
     queue.append(contentsOf: events)
+    arrivals.notify()
   }
 
   func finish() {
     finished = true
+    arrivals.notify()
   }
 
   nonisolated func inputEvents() -> AsyncStream<InputEvent> {
@@ -198,8 +218,12 @@ private final class ScriptedPullingReader: SynchronousInputPulling {
     pollingTask = Task { @MainActor [weak self] in
       while !Task.isCancelled {
         guard let self else { return }
+        await self.arrivals.wait(until: { [weak self] in
+          guard let self else { return true }
+          return !self.queue.isEmpty || (self.finished && self.inputEndedReports == 0)
+        })
+        guard !Task.isCancelled else { return }
         self.pullPendingInput()
-        try? await Task.sleep(for: .milliseconds(1))
       }
     }
   }

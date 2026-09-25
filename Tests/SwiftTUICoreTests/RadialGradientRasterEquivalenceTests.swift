@@ -403,23 +403,33 @@ struct RadialFillScene: CustomTestStringConvertible, Sendable {
         gradient: ring(0.5), blend: .screen)
     ])
 
-  static let overlappingScreenLayers = RadialFillScene(
-    name: "overlapping-screen-layers-over-text",
-    surface: CellSize(width: 90, height: 30),
-    layers: (0..<12).map { index in
-      .init(
-        bounds: CellRect(origin: .zero, size: CellSize(width: 90, height: 30)),
-        gradient: ring(Double(index) / 12, color: index.isMultiple(of: 2) ? .cyan : .magenta),
-        blend: .screen)
-    },
-    textUnderneath: true)
+  static let overlappingScreenLayers: RadialFillScene = {
+    let surface = CellSize(width: 90, height: 30)
+    // Spelled out with explicit types: the closure-with-ternary form drove the
+    // type checker past its budget under the gate's build flags.
+    var layers: [Layer] = []
+    for index in 0..<12 {
+      let color: Color = index.isMultiple(of: 2) ? .cyan : .magenta
+      layers.append(
+        Layer(
+          bounds: CellRect(origin: .zero, size: surface),
+          gradient: ring(Double(index) / 12, color: color),
+          blend: .screen))
+    }
+    return RadialFillScene(
+      name: "overlapping-screen-layers-over-text",
+      surface: surface,
+      layers: layers,
+      textUnderneath: true)
+  }()
 
   static let catalog: [RadialFillScene] = {
     let surface = CellSize(width: 64, height: 20)
     let full = CellRect(origin: .zero, size: surface)
-    var scenes: [RadialFillScene] = [
-      sparseAnnulus,
-      overlappingScreenLayers,
+    // One statement per scene: a single literal of this size drove the type
+    // checker past its budget under the gate's build flags.
+    var scenes: [RadialFillScene] = [sparseAnnulus, overlappingScreenLayers]
+    scenes.append(
       RadialFillScene(
         name: "opaque-full-support",
         surface: surface,
@@ -427,7 +437,9 @@ struct RadialFillScene: CustomTestStringConvertible, Sendable {
           .init(
             bounds: full, gradient: RadialGradient(colors: [.red, .blue], endRadius: 20), blend: nil
           )
-        ]),
+        ])
+    )
+    scenes.append(
       RadialFillScene(
         name: "opaque-end-stop-under-screen",
         surface: surface,
@@ -435,18 +447,24 @@ struct RadialFillScene: CustomTestStringConvertible, Sendable {
           .init(
             bounds: full, gradient: RadialGradient(colors: [.clear, .blue], endRadius: 20),
             blend: .screen)
-        ]),
+        ])
+    )
+    scenes.append(
       RadialFillScene(
         name: "single-stop", surface: surface,
         layers: [
           .init(bounds: full, gradient: RadialGradient(colors: [.green], endRadius: 20), blend: nil)
-        ]),
+        ])
+    )
+    scenes.append(
       RadialFillScene(
         name: "no-stops", surface: surface,
         layers: [
           .init(bounds: full, gradient: RadialGradient(colors: [], endRadius: 20), blend: nil)
         ],
-        expectsPaint: false),
+        expectsPaint: false)
+    )
+    scenes.append(
       RadialFillScene(
         name: "partial-alpha-tint-no-blend", surface: surface,
         layers: [
@@ -454,7 +472,9 @@ struct RadialFillScene: CustomTestStringConvertible, Sendable {
             bounds: full,
             gradient: RadialGradient(
               colors: [.clear, Color.red.opacity(0.5), .clear], endRadius: 25), blend: nil)
-        ]),
+        ])
+    )
+    scenes.append(
       RadialFillScene(
         name: "reversed-radii", surface: surface,
         layers: [
@@ -465,7 +485,9 @@ struct RadialFillScene: CustomTestStringConvertible, Sendable {
         ],
         // Reversed radii collapse the normalized location to a step at the
         // start radius: every cell lands on a transparent end stop.
-        expectsPaint: false),
+        expectsPaint: false)
+    )
+    scenes.append(
       RadialFillScene(
         name: "equal-radii", surface: surface,
         layers: [
@@ -474,10 +496,14 @@ struct RadialFillScene: CustomTestStringConvertible, Sendable {
             gradient: RadialGradient(colors: [.clear, .red, .clear], startRadius: 8, endRadius: 8),
             blend: .screen)
         ],
-        expectsPaint: false),
+        expectsPaint: false)
+    )
+    scenes.append(
       RadialFillScene(
         name: "opacity-wrapped", surface: surface,
-        layers: [.init(bounds: full, gradient: ripple, blend: .screen, opacity: 0.4)]),
+        layers: [.init(bounds: full, gradient: ripple, blend: .screen, opacity: 0.4)])
+    )
+    scenes.append(
       RadialFillScene(
         name: "offset-bounds-and-clip", surface: surface,
         layers: [
@@ -486,27 +512,37 @@ struct RadialFillScene: CustomTestStringConvertible, Sendable {
               origin: CellPoint(x: -10, y: -5), size: CellSize(width: 90, height: 40)),
             gradient: ripple, blend: .screen,
             clip: CellRect(origin: CellPoint(x: 5, y: 3), size: CellSize(width: 40, height: 12)))
-        ]),
+        ])
+    )
+    scenes.append(
       RadialFillScene(
         name: "rounded-rectangle-geometry", surface: surface,
         layers: [
           .init(
             bounds: full, gradient: ripple, blend: .screen,
             geometry: .roundedRectangle(cornerRadius: 2))
-        ]),
+        ])
+    )
+    scenes.append(
       RadialFillScene(
         name: "interior-fill-mode", surface: surface,
         layers: [
           .init(bounds: full, gradient: ripple, blend: .screen, mode: .interior(strokeWidth: 2))
-        ]),
+        ])
+    )
+    scenes.append(
       RadialFillScene(
         name: "square-cells", surface: surface,
         layers: [.init(bounds: full, gradient: ripple, blend: .screen)],
-        metrics: CellPixelMetrics(width: 10, height: 10, source: .reported)),
+        metrics: CellPixelMetrics(width: 10, height: 10, source: .reported))
+    )
+    scenes.append(
       RadialFillScene(
         name: "tall-cells", surface: surface,
         layers: [.init(bounds: full, gradient: ripple, blend: .screen)],
-        metrics: CellPixelMetrics(width: 7, height: 21, source: .reported)),
+        metrics: CellPixelMetrics(width: 7, height: 21, source: .reported))
+    )
+    scenes.append(
       RadialFillScene(
         name: "hole-and-outer-outside-surface", surface: surface,
         layers: [
@@ -516,23 +552,26 @@ struct RadialFillScene: CustomTestStringConvertible, Sendable {
               colors: [.clear, .clear, .red, .clear], center: .init(x: 1.4, y: -0.3),
               startRadius: 30, endRadius: 90),
             blend: .screen)
-        ]),
-      RadialFillScene(
-        name: "web-host-ceiling", surface: CellSize(width: 512, height: 128),
-        layers: (0..<4).map { index in
-          .init(
-            bounds: CellRect(origin: .zero, size: CellSize(width: 512, height: 128)),
-            gradient: RadialGradient(
-              gradient: Gradient(stops: [
-                .init(color: .clear, location: 0),
-                .init(color: Color.cyan.opacity(0.7), location: 0.6),
-                .init(color: .clear, location: 1),
-              ]),
-              center: .center, startRadius: Double(40 + index * 50),
-              endRadius: Double(70 + index * 50)),
-            blend: .screen)
-        }),
-    ]
+        ])
+    )
+    let ceiling = CellSize(width: 512, height: 128)
+    var ceilingLayers: [RadialFillScene.Layer] = []
+    for index in 0..<4 {
+      let stops: [Gradient.Stop] = [
+        Gradient.Stop(color: .clear, location: 0),
+        Gradient.Stop(color: Color.cyan.opacity(0.7), location: 0.6),
+        Gradient.Stop(color: .clear, location: 1),
+      ]
+      let gradient = RadialGradient(
+        gradient: Gradient(stops: stops),
+        center: .center, startRadius: Double(40 + index * 50),
+        endRadius: Double(70 + index * 50))
+      ceilingLayers.append(
+        RadialFillScene.Layer(
+          bounds: CellRect(origin: .zero, size: ceiling), gradient: gradient, blend: .screen))
+    }
+    scenes.append(
+      RadialFillScene(name: "web-host-ceiling", surface: ceiling, layers: ceilingLayers))
     for gradient in RadialGradientRasterEquivalenceTests.gradientCatalog.enumerated() {
       scenes.append(
         RadialFillScene(
