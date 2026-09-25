@@ -182,9 +182,7 @@
               state: &state.encodingState
             ).utf8)
         case .semantic(var frame):
-          if frame.hostGeometryStamp?.session != state.connectionToken {
-            frame.hostGeometryStamp = nil
-          }
+          Self.scopeToConnection(&frame, token: state.connectionToken)
           bytes = Array(
             WebSurfaceFrameEncoder.encode(
               frame,
@@ -336,9 +334,7 @@
     package func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
       let bytes = state.withLock { state -> [UInt8] in
         var frame = frame
-        if frame.hostGeometryStamp?.session != state.connectionToken {
-          frame.hostGeometryStamp = nil
-        }
+        Self.scopeToConnection(&frame, token: state.connectionToken)
         state.lastPresentedFrame = .semantic(frame)
         guard prepareEncoding(&state) else { return [] }
         let bytes = Array(
@@ -358,6 +354,19 @@
         damage: frame.rasterDamage,
         bytesWritten: bytes.count
       )
+    }
+
+    /// Strips the session-scoped parts of a frame acquired for another
+    /// connection. The geometry stamp and the accessibility acknowledgement
+    /// both answer one connection: a reloaded page restarts its request IDs,
+    /// so a previous page's acknowledgement would mark the new page's pending
+    /// requests as already answered. The run loop drops its acknowledgement
+    /// when it observes the new session; this covers frames acquired before
+    /// that, including the retained frame a reconnect replays.
+    private static func scopeToConnection(_ frame: inout SemanticHostFrame, token: UInt64?) {
+      guard frame.hostGeometryStamp?.session != token else { return }
+      frame.hostGeometryStamp = nil
+      frame.semantics.accessibilityActionResponse = nil
     }
 
     /// Suspends until every byte batch handed to the transport has been sent.

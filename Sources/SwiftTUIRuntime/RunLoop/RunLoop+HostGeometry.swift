@@ -5,6 +5,12 @@ extension RunLoop {
   /// Called before dispatch and before rendering, including deadline renders.
   func reconcileHostGeometry(_ geometry: HostGeometryStamp?) {
     guard observedHostGeometry != geometry else { return }
+    if observedHostGeometry?.session != geometry?.session {
+      // A new host session (a reconnected WebHost page) numbers its
+      // accessibility requests afresh; the previous session's acknowledgement
+      // would read as an answer to the new session's requests.
+      latestAccessibilityActionResponse = nil
+    }
     observedHostGeometry = geometry
     if pointerInteraction.isRouting, cancelledHostGeometryGestureCount < .max {
       cancelledHostGeometryGestureCount += 1

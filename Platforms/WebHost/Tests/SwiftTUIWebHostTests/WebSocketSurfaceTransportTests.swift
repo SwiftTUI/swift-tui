@@ -54,6 +54,40 @@
       #expect(host.updateGeometry(first, connectionToken: 2))
     }
 
+    @Test("a reconnected page never receives the previous page's accessibility acknowledgement")
+    func reconnectDropsThePreviousSessionsAccessibilityAcknowledgement() async throws {
+      let sink = RecordingByteSink()
+      let host = WebSocketSurfaceTransport(surfaceSize: .init(width: 2, height: 1), sink: sink)
+      func frame(sequence: UInt64, session: UInt64, requestID: UInt64) -> SemanticHostFrame {
+        var frame = Self.steadyFrame(sequence: sequence)
+        frame.hostGeometryStamp = .init(session: session, revision: 0)
+        frame.semantics.accessibilityActionResponse = .init(
+          requestID: requestID, target: "field", result: .accepted)
+        return frame
+      }
+      func acknowledgedRequestIDs() async throws -> [String?] {
+        try await host.drain()
+        return try await sink.strings().map { record in
+          let response = try decodedSurfaceFrame(record)["accessibilityActionResponse"]
+          return (response as? [String: Any])?["requestID"] as? String
+        }
+      }
+      host.beginGeometrySession(1)
+      host.declareCapabilities(.init(), connectionToken: 1)
+      try host.present(frame(sequence: 1, session: 1, requestID: 40))
+      #expect(try await acknowledgedRequestIDs() == ["40"])
+
+      // The reloaded page numbers its requests from 1. Neither the replayed
+      // keyframe nor a frame acquired before the run loop saw session 2 may
+      // carry request 40; frames of session 2 carry their own.
+      host.beginGeometrySession(2)
+      host.declareCapabilities(.init(), connectionToken: 2)
+      host.requestSurfaceRefresh()
+      try host.present(frame(sequence: 2, session: 1, requestID: 40))
+      try host.present(frame(sequence: 3, session: 2, requestID: 1))
+      #expect(try await acknowledgedRequestIDs() == ["40", nil, nil, "1"])
+    }
+
     @Test("slow progressing sockets stay bounded and reconnect with the latest full image frame")
     func slowProgressOverflowAndReconnect() async throws {
       let channel = WebHostSceneChannel()

@@ -167,6 +167,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// Whether the terminal cursor focus policy's last write showed the
   /// hardware cursor, so the default policy hides only a cursor it showed.
   package var terminalCursorFocusShowsCursor = false
+  /// The acknowledgement of the last correlated accessibility request, stamped
+  /// on every presented semantic host frame. Scoped to one host geometry
+  /// session: `reconcileHostGeometry(_:)` clears it when the session changes.
   package var latestAccessibilityActionResponse: AccessibilityActionResponse?
   /// Arrival envelopes of inputs dispatched since the last frame acquisition
   /// whose dispatch asked the scheduler for work (see

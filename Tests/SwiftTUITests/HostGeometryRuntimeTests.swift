@@ -134,6 +134,43 @@ import Testing
     #expect(loop.reportedRuntimeIssues.contains { $0.code == "host.geometry.stalePointer" })
   }
 
+  @Test func accessibilityAcknowledgementDoesNotOutliveItsHostSession() throws {
+    let host = GeometryTestSurface()
+    let root = testIdentity("GeometryAcknowledgement")
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in Button("Activate") {} }
+    loop.scheduler.requestSignal(named: "SIGWINCH")
+    var rendered = 0
+    try loop.renderPendingFrames(renderedFrames: &rendered)
+    func request(_ requestID: UInt64) throws {
+      _ = loop.handle(
+        .input(.accessibility(.init(target: "missing", action: .activate, requestID: requestID))))
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+    }
+    func present(revision: UInt64, session: UInt64 = 7) throws -> SemanticHostFrame {
+      host.session = session
+      host.revision = revision
+      loop.scheduler.requestSignal(named: "SIGWINCH")
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+      let frame = try #require(host.frames.last)
+      #expect(frame.hostGeometryStamp == .init(session: session, revision: revision))
+      return frame
+    }
+    try request(40)
+    #expect(host.frames.last?.semantics.accessibilityActionResponse?.requestID == 40)
+    // A new geometry revision of the same session keeps the acknowledgement.
+    #expect(try present(revision: 2).semantics.accessibilityActionResponse?.requestID == 40)
+    // A reloaded page opens a new session and numbers its requests from 1, so
+    // request 40 must not acknowledge them.
+    #expect(try present(revision: 0, session: 8).semantics.accessibilityActionResponse == nil)
+    try request(1)
+    #expect(host.frames.last?.semantics.accessibilityActionResponse?.requestID == 1)
+  }
+
   @Test func wheelCoalescingKeepsGeometryAndLatestTimestamp() {
     var first = MouseEvent(kind: .scrolled(deltaX: 1, deltaY: 2), location: Point.zero)
     first.hostGeometryStamp = .init(session: 1, revision: 4)
@@ -158,6 +195,7 @@ private struct GeometryEnvironmentText: View {
 private final class GeometryTestSurface: HostGeometryPresentationSurface,
   SemanticHostFramePresentationSurface
 {
+  var session: UInt64 = 7
   var revision: UInt64 = 1
   var reduceMotion: Bool?
   var size = CellSize(width: 24, height: 6)
@@ -170,7 +208,7 @@ private final class GeometryTestSurface: HostGeometryPresentationSurface,
     .init(
       size: size, appearance: appearance, theme: nil,
       graphics: .init(cellPixelSize: pitch), pointer: .cellOnly,
-      geometry: .init(session: 7, revision: revision), reduceMotion: reduceMotion)
+      geometry: .init(session: session, revision: revision), reduceMotion: reduceMotion)
   }
   func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     frames.append(frame)

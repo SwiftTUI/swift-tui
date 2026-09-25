@@ -117,7 +117,10 @@ watermark for the last processed request, including rejections and no-ops;
 coalesced or polled frames therefore acknowledge every earlier request on the
 same ordered scene channel. It never repeats submitted values. Hosts use it
 to keep an unacknowledged edit from being overwritten by an older frame and to
-restore authoritative state after rejection. IDs belong to one scene session.
+restore authoritative state after rejection. IDs belong to one scene session
+and, on WebHost, to one connection: a reconnected page numbers its requests
+afresh, so no frame it receives, including the keyframe replayed on reconnect,
+carries the previous connection's watermark.
 Values and focus in subsequent frames remain runtime-authoritative; adapters
 must suppress callbacks while reflecting them.
 The Swift entry point is `HostedSceneSession.send(.accessibility(request))`.
