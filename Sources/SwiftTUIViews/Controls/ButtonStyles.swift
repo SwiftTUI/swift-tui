@@ -385,9 +385,10 @@ public struct AutomaticButtonStyle: Sendable, ButtonStyle {
 /// A minimal button style without surrounding border chrome.
 ///
 /// The label is drawn over the theme background in the role's foreground color,
-/// preceded by a focus rail. The rail's gutter stays reserved while the rail is
-/// hidden, so focus does not change the button's width, and a disabled button
-/// uses the placeholder color with the chrome's dimming opacity.
+/// preceded by a focus rail painted in the role's focused border tone. The
+/// rail's gutter stays reserved while the rail is hidden, so focus does not
+/// change the button's width, and a disabled button uses the placeholder color
+/// with the chrome's dimming opacity.
 public struct PlainButtonStyle: Sendable, ButtonStyle {
   /// Creates the style.
   public init() {}

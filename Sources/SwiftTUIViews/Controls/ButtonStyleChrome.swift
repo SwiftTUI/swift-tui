@@ -109,14 +109,15 @@ private func resolvedPlainButtonChrome(
     )
   }
 
-  let background = styleEnvironment.themeStyle(for: .background)
+  // The border paint is the focus rail's foreground, so it takes the focused
+  // border tone that row and control chrome use, never the row fill.
   return .init(
     foregroundStyle: plainForegroundStyle(
       styleEnvironment: styleEnvironment,
       role: role
     ),
-    contentBackgroundStyle: background,
-    borderForegroundStyle: background
+    contentBackgroundStyle: styleEnvironment.themeStyle(for: .background),
+    borderForegroundStyle: AnyShapeStyle(.terminalBorder(chromeTone(for: role)))
   )
 }
 
@@ -152,7 +153,7 @@ private func resolvedLinkChrome(
       role: role
     ),
     contentBackgroundStyle: background,
-    borderForegroundStyle: styleEnvironment.themeStyle(for: .background)
+    borderForegroundStyle: AnyShapeStyle(.terminalBorder(tone))
   )
 }
 

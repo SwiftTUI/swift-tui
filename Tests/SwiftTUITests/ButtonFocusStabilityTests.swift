@@ -488,6 +488,28 @@ struct ButtonFocusStabilityTests {
     )
   }
 
+  @Test("focused plain and link Button rails paint the role's focus border tone")
+  func focusedPlainAndLinkButtonRailsAreVisible() throws {
+    // The rail is the plain style's only focus cue, and the link style's
+    // leading cue. Painted in the row's own fill it vanishes (plain) or
+    // reads as a notch cut from the highlight (link); it must use the
+    // focused border tone that row chrome and control chrome use.
+    let cases: [(style: AnyButtonStyle, role: ButtonRole?, tone: TerminalTone)] = [
+      (.plain, nil, .accent), (.plain, .destructive, .danger), (.plain, .cancel, .neutral),
+      (.link, nil, .accent), (.link, .destructive, .danger),
+    ]
+    for (style, role, tone) in cases {
+      let rail = try Self.focusedRailCell(
+        Button("File", role: role) {}.buttonStyle(style), identity: testIdentity("RailTone"))
+      let expected = try Self.foregroundColor(painting: .terminalBorder(tone))
+      #expect(
+        rail.style?.foregroundColor == expected,
+        "\(style.snapshotLabel) \(String(describing: role)) rail must paint the \(tone) border tone"
+      )
+      #expect(rail.style?.foregroundColor != rail.style?.backgroundColor)
+    }
+  }
+
   @Test("horizontally fixed VStack reconciles cross width under finite height proposal")
   func horizontallyFixedVStackReconcilesCrossWidthWithFiniteMainProposal() throws {
     let size = CellSize(width: 40, height: 10)
@@ -530,6 +552,33 @@ struct ButtonFocusStabilityTests {
   }
 
   // MARK: - Harness plumbing
+
+  private static func focusedRailCell<V: View>(
+    _ view: V,
+    identity: Identity
+  ) throws -> RasterCell {
+    var env = EnvironmentValues()
+    env.focusedIdentity = identity
+    let artifacts = DefaultRenderer().render(
+      view.id(identity),
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 8, height: 1)
+    )
+    let row = try #require(artifacts.rasterSurface.cells.first)
+    return try #require(row.first { $0.character == "▌" })
+  }
+
+  private static func foregroundColor(
+    painting style: some ShapeStyle
+  ) throws -> Color? {
+    let artifacts = DefaultRenderer().render(
+      Text("▌").foregroundStyle(style),
+      context: .init(identity: testIdentity("Root"), environmentValues: EnvironmentValues()),
+      proposal: .init(width: 1, height: 1)
+    )
+    let cell = try #require(artifacts.rasterSurface.cells.first?.first)
+    return cell.style?.foregroundColor
+  }
 
   @MainActor
   private static func runHarness<V: View>(
