@@ -90,8 +90,8 @@ browser/assistive-technology, physical-device and performance qualification is
 incomplete. Find and print cover only the mounted viewport. The runtime's
 [renderer documentation](https://github.com/SwiftTUI/swift-tui-web/tree/main/packages/web#renderers)
 covers setup, packaged and custom fonts, sizing, clipping, selection, resources,
-execution requirements and current limits. Documentation at repository HEAD
-includes features beyond the earlier DOM presenter in released 0.14.0.
+execution requirements and current limits. Documentation at repository HEAD can
+describe DOM presenter features newer than the latest released packages.
 
 The counter template provides `npm run build:dom` and `npm run dev:dom`; every
 web build also contains `/dom.html`, sharing the Canvas demo's WASM artifact.

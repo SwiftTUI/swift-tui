@@ -8,6 +8,17 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-25
+
+The framework keeps animation time and input service honest under overload:
+every frame animates to elapsed time, the browser host's input is pulled by
+the run loop at its own turn boundaries, and radial gradient fills do only
+the work their visible support needs. The counter demo's 100-click burst at
+1440 × 1000 goes from a 9.6 s recovery to 0.1 s with the application
+unchanged. Semantic accessibility actions reach every host, the experimental
+DOM presenter ships its qualified fonts and geometry, and twenty runtime and
+layout reports are fixed. No source breaks.
+
 ### Changed
 
 - Every frame now animates to the host monotonic instant it was consumed at,
@@ -26,6 +37,18 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   elapsed-work bound (`RunLoop.drainPassWorkBudget`, off by default) returns
   the pass to input handling after a set amount of frame-clock work; the
   cooperative exit flush ignores it (STUI-618).
+- Radial gradient fills prepare their center, radius normalization, and stop
+  colors (already converted to the perceptual mixing space, bit-exactly) once
+  per paint, intersect their walk with the surface and clip, and visit only
+  the rows and spans inside the transparent support their stops prove;
+  everything else keeps the reference walk, which an equivalence suite
+  compares surface for surface and record for record. Fifty screen-blended
+  ripples at 180 × 60 cost 131 ms per release frame instead of 164 ms
+  (STUI-618).
+- The DOM host bundle honors the browser's reduced-motion preference
+  (STUI-563), captures host geometry with layout and rejects pointer input
+  stamped against stale geometry (STUI-554), and ships the qualified DOM
+  fonts and geometry host (STUI-545).
 
 ### Added
 
@@ -46,6 +69,27 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   reject stale/disabled/out-of-scope controls, and acknowledge without publishing
   secure text. Host frames include additive action capabilities and typed state;
   WebSocket and WASI input accept the same framed action records (STUI-129).
+- Android semantic actions route through the C ABI to the same typed
+  dispatch (STUI-358); the browser bundle carries assistive focus bounds
+  aligned with rendered controls (STUI-539), native password accessibility
+  semantics (STUI-541), and native text selection with placed grapheme
+  bounds.
+
+### Fixed
+
+- Text input controls accept shifted characters.
+- Cancellation is preserved through stage budgets (STUI-307), and soundness
+  issues are delivered even when no frame commits (STUI-174).
+- Twelve Detail reports across layout and runtime: keyframe inference and
+  empty branches, duplicate terminal long-press updates, matched-geometry
+  cycle isolation, scoped tint animation in indexed collection rows with
+  correct curve cleanup, decoration primaries, table insets, custom alignment
+  guides, dormant forwarded state during hot reload, animated-image frame
+  invariants, pending terminal input at EOF, and complete scene-discovery
+  responses including partial server writes (STUI-481, STUI-483, STUI-495,
+  STUI-503 to STUI-507, STUI-509, STUI-510, STUI-512, STUI-513).
+- Eight further runtime and layout reports (STUI-496 to STUI-498, STUI-500,
+  STUI-511, STUI-514, STUI-515, STUI-517).
 
 ## [0.14.0] - 2026-09-20
 
@@ -2100,7 +2144,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.14.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.15.0...HEAD
+[0.15.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.15.0
 [0.14.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.14.0
 [0.13.5]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.5
 [0.13.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.13.4
