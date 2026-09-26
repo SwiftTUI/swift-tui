@@ -1055,8 +1055,11 @@ value-setting requests; host adapters must connect their native callbacks. (The 
   accepts node-targeted focus, activation, adjustment and typed value requests
   (STUI-129). The current browser adapter connects those callbacks to the shared
   contract. Its DOM presenter is experimental; complete control/assistive
-  journeys, Windows High Contrast and physical mobile acceptance remain
-  unqualified. Native adapters retain their own integration gaps. Shared
+  journeys and VoiceOver output remain unqualified. DOM qualification is
+  currently scoped to macOS desktop. CSS text-spacing clipping and duplicate
+  native-find matches from live announcements remain known defects. Windows
+  High Contrast and physical mobile acceptance are outside that scope.
+  Native adapters retain their own integration gaps. Shared
   runtime tests do not establish host conformance.
 - **No WCAG conformance suite or automated screen-reader testing.** *Gap.*
   Unit tests and guardrail scripts cover semantic presentation. The

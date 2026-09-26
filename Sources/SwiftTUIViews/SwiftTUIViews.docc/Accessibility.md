@@ -186,8 +186,14 @@ own qualification boundaries.
 
 The browser's DOM presenter is **experimental and opt-in** (`renderer: "dom"`);
 Canvas remains the default. The complete DOM control/assistive-technology
-journey, Windows High Contrast and physical mobile acceptance are not qualified.
-IME/composition is outside the current browser input contract. Shared runtime
+journey and VoiceOver output are not qualified. Current DOM qualification is
+scoped to macOS desktop; Windows High Contrast and physical mobile acceptance
+are outside that scope. Ordinary prose passes narrow-width and doubled-text
+WASI checks, but CSS letter/word spacing can clip text and paragraph spacing
+is unqualified. Native Safari can match a live announcement as well as the
+visible text. These are experimental conformance defects.
+Shared host-native IME/pre-edit presentation is excluded. Committed Unicode,
+paste and final composition values are delivered exactly once. Shared runtime
 tests and browser automation do not establish VoiceOver, TalkBack, or WCAG
 conformance. The browser package's
 [DOM support statement](https://github.com/SwiftTUI/swift-tui-web/tree/main/packages/web#experimental-support-boundary)

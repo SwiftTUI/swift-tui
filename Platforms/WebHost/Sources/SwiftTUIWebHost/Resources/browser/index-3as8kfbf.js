@@ -1,13 +1,25 @@
 // src/DomFontResources.ts
-var DOM_FONT_FAMILY = "SwiftTUI Source Code Pro";
-var DOM_FONT_ASSET_PATH = "assets/swifttui-fonts/2184c1f2bac4/";
+var DOM_FONT_FAMILY = "SwiftTUI Core Candidate 3";
+var DOM_FONT_ASSET_PATH = "assets/swifttui-fonts/6ec060766aae/";
 var DOM_FONT_FALLBACK = '"Menlo", "Consolas", "Liberation Mono", monospace';
 var DOM_UNICODE_FALLBACK = '"PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace';
 var DOM_FONT_FACES = [
-  { file: "SourceCodePro-Regular.ttf.woff2", weight: "400", style: "normal" },
-  { file: "SourceCodePro-Bold.ttf.woff2", weight: "700", style: "normal" },
-  { file: "SourceCodePro-It.ttf.woff2", weight: "400", style: "italic" },
-  { file: "SourceCodePro-BoldIt.ttf.woff2", weight: "700", style: "italic" }
+  {
+    file: "SwiftTUICoreCandidate3-Regular.woff2",
+    weight: "400",
+    style: "normal"
+  },
+  { file: "SwiftTUICoreCandidate3-Bold.woff2", weight: "700", style: "normal" },
+  {
+    file: "SwiftTUICoreCandidate3-Italic.woff2",
+    weight: "400",
+    style: "italic"
+  },
+  {
+    file: "SwiftTUICoreCandidate3-BoldItalic.woff2",
+    weight: "700",
+    style: "italic"
+  }
 ];
 var documents = new WeakMap;
 var nextAlias = 0;
@@ -252,6 +264,7 @@ class AccessibilityTreeMounter {
   sendAction;
   element;
   announcerElement;
+  domIdentity = Array.from(crypto.getRandomValues(new Uint32Array(4)), (part) => part.toString(16)).join("-");
   nodesById = new Map;
   previousLabelsById = new Map;
   hasLiveRegionBaseline = false;
@@ -262,6 +275,26 @@ class AccessibilityTreeMounter {
   pendingValues = new Map;
   pendingFocus;
   runtimeFocusedElement;
+  compositionCommits = new WeakMap;
+  get hasInteractiveControls() {
+    return [...this.modelsById.values()].some((node) => this.isTabStop(node));
+  }
+  advanceFocus(backward) {
+    const controls = [
+      ...this.element.querySelectorAll("[tabindex='0']")
+    ];
+    const current = controls.indexOf(document.activeElement);
+    if (current < 0)
+      return false;
+    const next = controls[current + (backward ? -1 : 1)];
+    if (!next)
+      return false;
+    next.focus();
+    return true;
+  }
+  isTabStop(node) {
+    return !!this.sendAction && !!node.actionTarget && node.isEnabled !== false && !!node.actions?.includes("focus");
+  }
   constructor(sendAction) {
     this.sendAction = sendAction;
     this.element = document.createElement("div");
@@ -301,6 +334,8 @@ class AccessibilityTreeMounter {
       const reusable = existing?.tagName.toLowerCase() === tag && previousModel?.actionTarget === node.actionTarget;
       const element2 = reusable ? existing : this.createElement(node, tag);
       if (!reusable) {
+        if (existing)
+          this.clearEditable(existing);
         existing?.remove();
         this.pendingValues.delete(node.id);
         if (this.pendingFocus?.id === node.id)
@@ -311,7 +346,11 @@ class AccessibilityTreeMounter {
     }
     for (const id of previousById.keys()) {
       if (!nextById.has(id)) {
-        previousById.get(id)?.remove();
+        const removed = previousById.get(id);
+        if (removed) {
+          this.clearEditable(removed);
+          removed.remove();
+        }
         this.pendingValues.delete(id);
         if (this.pendingFocus?.id === id)
           this.pendingFocus = undefined;
@@ -348,6 +387,24 @@ class AccessibilityTreeMounter {
         element.focus?.({ preventScroll: true });
     }
     this.presenting = false;
+  }
+  dispose() {
+    for (const element of this.nodesById.values()) {
+      this.clearEditable(element);
+    }
+    this.nodesById.clear();
+    this.modelsById.clear();
+    this.previousLabelsById.clear();
+    this.pendingValues.clear();
+    this.pendingFocus = undefined;
+    this.runtimeFocusedElement = undefined;
+    this.element.replaceChildren();
+    this.announcerElement.textContent = "";
+  }
+  clearEditable(element) {
+    if (element.tagName === "INPUT" || element.tagName === "TEXTAREA")
+      element.value = "";
+    this.compositionCommits.delete(element);
   }
   elementTag(node) {
     if (!node.actionTarget || !this.sendAction)
@@ -404,12 +461,15 @@ class AccessibilityTreeMounter {
       }
     });
     if (tag !== "div") {
+      let composing = false;
       element.addEventListener("blur", () => {
+        composing = false;
+        this.compositionCommits.delete(element);
         if (current()?.role === "secureField")
           element.value = "";
       });
       element.addEventListener("paste", (event) => event.stopPropagation());
-      element.addEventListener("input", () => {
+      const commit = () => {
         const model = current();
         if (!model)
           return;
@@ -424,14 +484,34 @@ class AccessibilityTreeMounter {
         } else {
           send({ action: "setValue", value: { type: "text", value } });
         }
+      };
+      element.addEventListener("compositionstart", () => {
+        composing = true;
+        this.compositionCommits.delete(element);
+      });
+      element.addEventListener("compositionend", () => {
+        composing = false;
+        if (!current())
+          return;
+        commit();
+        this.compositionCommits.set(element, element.value);
+      });
+      element.addEventListener("input", (event) => {
+        if (composing || event.isComposing)
+          return;
+        const previous = this.compositionCommits.get(element);
+        this.compositionCommits.delete(element);
+        if (previous !== undefined && previous === element.value)
+          return;
+        commit();
       });
     }
     return element;
   }
   applyNodeAttributes(element, node, metrics, parent) {
-    element.id = `swifttui-a11y-${stableDOMId(node.id)}`;
+    element.id = `swifttui-a11y-${this.domIdentity}-${stableDOMId(node.id)}`;
     element.dataset.accessibilityId = node.id;
-    element.tabIndex = node.isFocused ? 0 : -1;
+    element.tabIndex = this.isTabStop(node) ? 0 : -1;
     const role = roleMapping(node.role);
     setOrRemoveAttribute(element, "role", node.role === "secureField" && element.tagName === "INPUT" ? undefined : role.role);
     setOrRemoveAttribute(element, "aria-level", role.level !== undefined ? String(role.level) : undefined);
@@ -462,8 +542,10 @@ class AccessibilityTreeMounter {
       const pending = this.pendingValues.get(node.id);
       if (pending === undefined || pending <= this.acknowledgedRequestID) {
         this.pendingValues.delete(node.id);
-        if (node.role !== "secureField" && input.value !== value)
+        if (node.role !== "secureField" && input.value !== value) {
+          this.compositionCommits.delete(element);
           input.value = value;
+        }
       }
     }
     const [x, y, width, height] = node.rect;
@@ -2983,6 +3065,97 @@ function dirtyRegionIntersectsCellRect(region, x, y, width, height) {
   return false;
 }
 
+// src/DomFocusPresentation.ts
+class DomFocusPresentation {
+  terminal;
+  selecting;
+  element = document.createElement("div");
+  ring = document.createElement("div");
+  caret = document.createElement("div");
+  hasFocus = false;
+  constructor(terminal, selecting) {
+    this.terminal = terminal;
+    this.selecting = selecting;
+    this.element.className = "webhost-scene__focus-layer";
+    this.element.setAttribute("aria-hidden", "true");
+    Object.assign(this.element.style, {
+      position: "absolute",
+      pointerEvents: "none",
+      userSelect: "none",
+      zIndex: "3",
+      boxSizing: "border-box",
+      margin: "0",
+      padding: "0",
+      border: "0"
+    });
+    this.ring.className = "webhost-scene__focus-ring";
+    this.caret.className = "webhost-scene__caret";
+    for (const item of [this.ring, this.caret])
+      Object.assign(item.style, {
+        position: "absolute",
+        boxSizing: "border-box",
+        margin: "0",
+        padding: "0",
+        border: "0",
+        minWidth: "0",
+        maxWidth: "none",
+        minHeight: "0",
+        maxHeight: "none",
+        pointerEvents: "none"
+      });
+    this.element.append(this.ring, this.caret);
+    this.element.hidden = true;
+    terminal.appendChild(this.element);
+    terminal.addEventListener("focusin", this.refresh);
+    terminal.addEventListener("focusout", this.refresh);
+  }
+  refresh = () => {
+    this.element.hidden = !this.hasFocus || this.selecting() || !this.terminal.contains?.(document.activeElement);
+    this.element.style.display = this.element.hidden ? "none" : "block";
+  };
+  present(frame, metrics, offsetX = 0, offsetY = 0) {
+    const focused = frame?.accessibilityTree?.find((node) => node.isFocused && !node.hidden);
+    this.hasFocus = focused !== undefined && focused.isEnabled !== false;
+    this.element.style.left = `${offsetX}px`;
+    this.element.style.top = `${offsetY}px`;
+    this.element.style.width = `${metrics.columns * metrics.cellWidth}px`;
+    this.element.style.height = `${metrics.rows * metrics.cellHeight}px`;
+    this.element.style.overflow = "hidden";
+    if (focused) {
+      const [x, y, width, height] = focused.rect;
+      const color = globalThis.matchMedia?.("(forced-colors: active)").matches ? "CanvasText" : metrics.style.theme.foreground;
+      Object.assign(this.ring.style, {
+        left: `${x * metrics.cellWidth}px`,
+        top: `${y * metrics.cellHeight}px`,
+        width: `${Math.max(1, width) * metrics.cellWidth}px`,
+        height: `${Math.max(1, height) * metrics.cellHeight}px`,
+        outline: `2px solid ${color}`,
+        outlineOffset: "-2px",
+        forcedColorAdjust: "none"
+      });
+      const anchor = focused.cursorAnchor;
+      this.caret.hidden = !anchor || !["textField", "textEditor", "secureField"].includes(focused.role);
+      this.caret.style.display = this.caret.hidden ? "none" : "block";
+      if (anchor)
+        Object.assign(this.caret.style, {
+          left: `${anchor[0] * metrics.cellWidth}px`,
+          top: `${anchor[1] * metrics.cellHeight}px`,
+          width: "2px",
+          height: `${metrics.cellHeight}px`,
+          background: color,
+          forcedColorAdjust: "none"
+        });
+    }
+    this.refresh();
+  }
+  dispose() {
+    this.terminal.removeEventListener("focusin", this.refresh);
+    this.terminal.removeEventListener("focusout", this.refresh);
+    this.hasFocus = false;
+    this.element.remove();
+  }
+}
+
 // src/DomCellMetrics.ts
 class DomCellProbe {
   mount;
@@ -3320,6 +3493,194 @@ class DomGlyphBackground {
   }
 }
 
+// src/DomTextLayout.ts
+function naturalText(text, span) {
+  return /^[\x20-\x7e]+$/.test(text) && text.length === span;
+}
+
+class DomTextLayout {
+  probe;
+  ruler;
+  config = "";
+  advances = new Map;
+  base = [0, 0, 0, 0];
+  monospace = [false, false, false, false];
+  get cacheEntries() {
+    return this.advances.size;
+  }
+  clear() {
+    this.advances.clear();
+  }
+  constructor(mount) {
+    this.probe = document.createElement("div");
+    this.probe.setAttribute("aria-hidden", "true");
+    Object.assign(this.probe.style, {
+      position: "absolute",
+      visibility: "hidden",
+      pointerEvents: "none",
+      userSelect: "none",
+      left: "0",
+      top: "0",
+      width: "max-content",
+      height: "auto",
+      margin: "0",
+      padding: "0",
+      border: "0",
+      overflow: "hidden",
+      contain: "layout style",
+      float: "none",
+      minWidth: "0",
+      maxWidth: "none",
+      minHeight: "0",
+      maxHeight: "none"
+    });
+    this.ruler = document.createElement("div");
+    Object.assign(this.ruler.style, {
+      display: "block",
+      width: "1024px",
+      height: "0",
+      margin: "0",
+      padding: "0",
+      border: "0",
+      boxSizing: "border-box",
+      float: "none",
+      minWidth: "0",
+      maxWidth: "none"
+    });
+    this.probe.appendChild(this.ruler);
+    mount.appendChild(this.probe);
+  }
+  invalidate() {
+    this.config = "";
+  }
+  dispose() {
+    this.probe.remove();
+    this.advances.clear();
+  }
+  sample(text, em, metrics, spacing) {
+    const line = document.createElement("div");
+    Object.assign(line.style, {
+      display: "block",
+      width: "max-content",
+      height: "auto",
+      margin: "0",
+      padding: "0",
+      border: "0",
+      float: "none",
+      minWidth: "0",
+      maxWidth: "none",
+      minHeight: "0",
+      maxHeight: "none",
+      whiteSpace: "pre",
+      textIndent: "0",
+      textTransform: "none",
+      textAlign: "left",
+      font: fontForStyle(metrics.style, { em }),
+      lineHeight: "1.5"
+    });
+    const span = document.createElement("span");
+    Object.assign(span.style, {
+      display: "inline",
+      font: "inherit",
+      lineHeight: "inherit",
+      whiteSpace: "pre",
+      margin: "0",
+      padding: "0",
+      border: "0",
+      float: "none",
+      textTransform: "none",
+      fontKerning: "none",
+      fontVariantLigatures: "none",
+      fontSynthesis: "none",
+      letterSpacing: `${spacing}px`,
+      wordSpacing: "0",
+      direction: "ltr",
+      unicodeBidi: "isolate"
+    });
+    span.textContent = text;
+    line.appendChild(span);
+    this.probe.appendChild(line);
+    return span;
+  }
+  spacing(text, span, em, width) {
+    return this.monospace[em & 3] && naturalText(text, span) ? width - this.base[em & 3] : 0;
+  }
+  key(text, span, em) {
+    return JSON.stringify([
+      em & 3,
+      this.monospace[em & 3] && naturalText(text, span) ? text.length : text
+    ]);
+  }
+  advance(text, span, em) {
+    return this.advances.get(this.key(text, span, em)) ?? 0;
+  }
+  prepare(frame, metrics, linkedRows) {
+    const scale = this.ruler.getBoundingClientRect().width / 1024 || 1;
+    const config = JSON.stringify([
+      fontForStyle(metrics.style),
+      metrics.cellWidth,
+      scale
+    ]);
+    if (config !== this.config) {
+      this.advances.clear();
+      const samples = [0, 1, 2, 3].map((em) => [
+        this.sample("W".repeat(64), em, metrics, 0),
+        this.sample("i".repeat(64), em, metrics, 0)
+      ]);
+      samples.forEach(([wide, narrow], em) => {
+        this.base[em] = wide.getBoundingClientRect().width / scale / 64;
+        this.monospace[em] = Math.abs(this.base[em] - narrow.getBoundingClientRect().width / scale / 64) < 0.001;
+      });
+      this.probe.replaceChildren(this.ruler);
+      this.config = config;
+    }
+    const rows = frame.rows.map((cells, y) => {
+      const spaced = [];
+      let end = 0;
+      for (const cell of cells) {
+        if (cell[0] > end)
+          spaced.push([end, " ".repeat(cell[0] - end), cell[0] - end, -1]);
+        spaced.push(cell);
+        end = cell[0] + Math.max(1, cell[2]);
+      }
+      if (end < frame.width)
+        spaced.push([
+          end,
+          " ".repeat(frame.width - end),
+          frame.width - end,
+          -1
+        ]);
+      const result = [];
+      for (const cell of spaced) {
+        const last = result.at(-1);
+        if (!linkedRows.has(y) && this.monospace[(frame.styles[cell[3]]?.em ?? 0) & 3] && last && last[3] === cell[3] && last[0] + last[2] === cell[0] && naturalText(last[1], last[2]) && naturalText(cell[1], cell[2])) {
+          last[1] += cell[1];
+          last[2] += cell[2];
+        } else
+          result.push([...cell]);
+      }
+      return result;
+    });
+    const used = new Set;
+    const missing = new Map;
+    for (const row of rows)
+      for (const [, text, span, index] of row) {
+        const em = frame.styles[index]?.em ?? 0, key = this.key(text, span, em);
+        used.add(key);
+        if (!this.advances.has(key) && !missing.has(key))
+          missing.set(key, this.sample(text, em, metrics, this.spacing(text, span, em, metrics.cellWidth)));
+      }
+    for (const [key, element] of missing)
+      this.advances.set(key, element.getBoundingClientRect().width / scale);
+    if (missing.size)
+      this.probe.replaceChildren(this.ruler);
+    for (const key of this.advances.keys())
+      if (!used.has(key))
+        this.advances.delete(key);
+    return rows;
+  }
+}
+
 // src/DomSurfacePainter.ts
 var MAX_DOM_IMAGE_ENTRIES = 256;
 var MAX_DOM_IMAGE_BYTES = 64 * 1024 * 1024;
@@ -3332,6 +3693,9 @@ class DomSurfacePainter {
   onImagePayloadMiss;
   root;
   rowsLayer;
+  graphicsLayer;
+  graphics = [];
+  textLayout;
   imagesLayer;
   rowElements = [];
   cells = [];
@@ -3387,10 +3751,11 @@ class DomSurfacePainter {
       rows: this.rowElements.length,
       cells: this.cells.reduce((sum, cells) => sum + cells.size, 0),
       rowSeparators: this.rowBreaks.length,
-      decorationNodes: 0,
+      decorationNodes: this.graphics.reduce((sum, row) => sum + row.size, 0),
       imageNodes: images.length * 2,
       styleCacheEntries: this.styleCache.size,
       geometryCacheEntries: this.glyphs.size,
+      textAdvanceCacheEntries: this.textLayout?.cacheEntries ?? 0,
       decodedImageBytes: images.reduce((sum, image) => sum + image.decodedBytes, 0),
       retainedPayloadBytes: images.reduce((sum, image) => sum + image.payloadBytes, 0),
       pendingImages: images.filter((image) => image.state === "pending").length,
@@ -3406,6 +3771,8 @@ class DomSurfacePainter {
     this.onResourceLimit(reason);
   }
   attach(root) {
+    if (this.root)
+      this.dispose();
     this.root = root;
     document.addEventListener?.("copy", this.copySelection);
     const rowsLayer = createElement("div");
@@ -3417,7 +3784,20 @@ class DomSurfacePainter {
     imagesLayer.style.pointerEvents = "none";
     this.rowsLayer = rowsLayer;
     this.imagesLayer = imagesLayer;
-    root.replaceChildren(rowsLayer, imagesLayer);
+    const graphicsLayer = createElement("div");
+    graphicsLayer.className = "webhost-scene__surface-graphics";
+    fillContainer(graphicsLayer.style);
+    graphicsLayer.setAttribute("aria-hidden", "true");
+    graphicsLayer.style.pointerEvents = "none";
+    graphicsLayer.style.userSelect = "none";
+    graphicsLayer.style.zIndex = "0";
+    rowsLayer.style.zIndex = "1";
+    imagesLayer.style.zIndex = "2";
+    this.graphicsLayer = graphicsLayer;
+    this.graphics = [];
+    this.textLayout?.dispose();
+    root.replaceChildren(rowsLayer, imagesLayer, graphicsLayer);
+    this.textLayout = new DomTextLayout(root);
     this.rowElements = [];
     this.cells = [];
     this.rowBreaks = [];
@@ -3447,6 +3827,7 @@ class DomSurfacePainter {
     const metricsKey = `${metricsKeyFor(metrics)}|${forcedColors}`;
     const metricsChanged = metricsKey !== this.appliedMetricsKey || currentForcedForeground !== undefined && currentForcedForeground !== this.forcedForeground;
     if (metricsChanged) {
+      this.textLayout?.invalidate();
       this.styleCache.clear();
       this.appliedCellStyles = new WeakMap;
       this.glyphs.clear();
@@ -3456,12 +3837,15 @@ class DomSurfacePainter {
       this.appliedMetricsKey = metricsKey;
     }
     if (!frame) {
+      this.textLayout?.clear();
       clearSelection(rowsLayer);
       this.rowElements = [];
       this.cells = [];
       this.rowBreaks = [];
       this.linkCells.clear();
       rowsLayer.replaceChildren();
+      this.graphicsLayer?.replaceChildren();
+      this.graphics = [];
       this.lastImageRecoveryFrame = undefined;
       this.reconcileImages([], metrics, false);
       this.renderedGridKey = undefined;
@@ -3494,25 +3878,28 @@ class DomSurfacePainter {
     }
     const fullRepaint = linksChanged || metricsChanged || !this.hasRenderedFrame || gridKey !== this.renderedGridKey || !damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay;
     this.renderedGridKey = gridKey;
+    const preparedRows = this.textLayout.prepare(frame, metrics, new Set((frame.links ?? []).filter(([, links]) => links.length > 0).map(([y]) => y)));
     if (fullRepaint) {
       for (let y = this.rowElements.length;y > frame.rows.length; y -= 1) {
         const row = this.rowElements[y - 1];
         if (row)
           clearSelection(row);
         row?.remove();
+        for (const graphic of this.graphics.pop()?.values() ?? [])
+          graphic.remove();
         this.cells.pop();
         this.rowBreaks.pop();
       }
       this.rowElements.length = Math.min(this.rowElements.length, frame.rows.length);
       for (let y = 0;y < frame.rows.length; y += 1) {
-        this.rebuildRow(y, frame, metrics, clearSelection);
+        this.rebuildRow(y, frame, metrics, preparedRows[y], clearSelection);
       }
     } else {
       for (const [row] of damage.textRows) {
         if (row < 0 || row >= frame.rows.length) {
           continue;
         }
-        this.rebuildRow(row, frame, metrics, clearSelection);
+        this.rebuildRow(row, frame, metrics, preparedRows[row], clearSelection);
       }
     }
     const allowRecoveryRequests = frame !== this.lastImageRecoveryFrame;
@@ -3522,6 +3909,7 @@ class DomSurfacePainter {
   }
   invalidateFontMetrics() {
     this.appliedMetricsKey = undefined;
+    this.textLayout?.invalidate();
   }
   dispose() {
     document.removeEventListener?.("copy", this.copySelection);
@@ -3529,6 +3917,10 @@ class DomSurfacePainter {
     this.appliedCellStyles = new WeakMap;
     this.glyphs.clear();
     this.linkCells.clear();
+    this.textLayout?.dispose();
+    this.textLayout = undefined;
+    this.graphics = [];
+    this.graphicsLayer = undefined;
     this.root?.replaceChildren();
     this.root = undefined;
     this.rowsLayer = undefined;
@@ -3542,18 +3934,22 @@ class DomSurfacePainter {
     this.reportedMissingImageIds.clear();
     this.lastImageRecoveryFrame = undefined;
   }
-  rebuildRow(y, frame, metrics, clearSelection) {
+  rebuildRow(y, frame, metrics, rowCells, clearSelection) {
     const rowElement = this.ensureRowElement(y, metrics);
     const previous = this.cells[y] ?? new Map;
     const next = new Map;
-    const rowCells = copyableRow(frame.rows[y] ?? [], frame.width);
+    const graphics = this.graphics[y] ?? new Map;
+    this.graphics[y] = graphics;
     const retainedColumns = new Set(rowCells.map((cell) => cell[0]));
     for (const [x, element] of previous) {
       if (!retainedColumns.has(x)) {
         clearSelection(element);
         element.remove();
+        graphics.get(x)?.remove();
+        graphics.delete(x);
       }
     }
+    let inlineOrigin = 0;
     let position = 0;
     for (const [x, text, span, styleIndex] of rowCells) {
       const cellStyle = frame.styles[styleIndex] ?? undefined;
@@ -3568,14 +3964,7 @@ class DomSurfacePainter {
       }
       if (!element)
         element = createElement(tag.toLowerCase());
-      if (element.textContent !== text) {
-        clearSelection(element);
-        const node = element.firstChild;
-        if (node?.nodeType === 3)
-          node.nodeValue = text;
-        else
-          element.textContent = text;
-      }
+      clearSelection.replaceText(element, text);
       const key = JSON.stringify(cellStyle ?? null);
       let resolved = this.styleCache.get(key);
       if (!resolved) {
@@ -3585,21 +3974,60 @@ class DomSurfacePainter {
         this.styleCache.set(key, resolved);
       }
       const geometricText = canRenderGeometricGlyph(text) ? text : "";
-      const presentationKey = JSON.stringify([key, x, span, geometricText]);
+      const left = x * metrics.cellWidth - inlineOrigin;
+      inlineOrigin += this.textLayout.advance(text, span, cellStyle?.em ?? 0);
+      const spacing = this.textLayout.spacing(text, span, cellStyle?.em ?? 0, metrics.cellWidth);
+      const presentationKey = JSON.stringify([
+        key,
+        x,
+        span,
+        geometricText,
+        left,
+        spacing,
+        naturalText(text, span)
+      ]);
       if (this.appliedCellStyles.get(element) !== presentationKey) {
         Object.assign(element.style, resolved, {
-          left: `${x * metrics.cellWidth}px`,
-          width: `${Math.max(1, span) * metrics.cellWidth}px`,
-          marginRight: `${-Math.max(1, span) * metrics.cellWidth}px`
+          left: `${left}px`,
+          position: Math.abs(left) < 0.01 ? "static" : "relative",
+          display: Math.abs(left) < 0.01 && (this.forcedColors || (cellStyle?.opacity ?? 1) === 1) ? "contents" : "inline",
+          letterSpacing: `${spacing}px`,
+          unicodeBidi: naturalText(text, span) ? "normal" : "isolate",
+          backgroundColor: "transparent"
         });
         const glyph = this.glyphs.image(geometricText, resolved.color ?? "", Math.max(1, span) * metrics.cellWidth, metrics.cellHeight, this.forcedColors ? {
           ...cellStyle,
           underline: cellStyle?.underline ? { ...cellStyle.underline, color: this.forcedForeground } : undefined,
           strikethrough: cellStyle?.strikethrough ? { ...cellStyle.strikethrough, color: this.forcedForeground } : undefined
         } : cellStyle, x * metrics.cellWidth);
-        element.style.backgroundImage = glyph ?? "none";
-        element.style.backgroundSize = "100% 100%";
-        element.style.backgroundRepeat = "no-repeat";
+        const background = resolved.backgroundColor ?? "transparent";
+        if (glyph || background !== "transparent") {
+          let graphic = graphics.get(x);
+          if (!graphic) {
+            graphic = createElement("div");
+            Object.assign(graphic.style, scopedBoxStyle);
+            graphic.setAttribute("data-row", String(y));
+            graphic.setAttribute("data-column", String(x));
+            this.graphicsLayer?.appendChild(graphic);
+            graphics.set(x, graphic);
+          }
+          Object.assign(graphic.style, {
+            position: "absolute",
+            left: `${x * metrics.cellWidth}px`,
+            top: `${y * metrics.cellHeight}px`,
+            width: `${Math.max(1, span) * metrics.cellWidth}px`,
+            height: `${metrics.cellHeight}px`,
+            backgroundColor: background,
+            backgroundImage: glyph ?? "none",
+            backgroundSize: "100% 100%",
+            backgroundRepeat: "no-repeat",
+            opacity: resolved.opacity,
+            forcedColorAdjust: this.forcedColors ? "none" : "auto"
+          });
+        } else {
+          graphics.get(x)?.remove();
+          graphics.delete(x);
+        }
         element.style.color = geometricText ? "transparent" : resolved.color ?? "";
         this.appliedCellStyles.set(element, presentationKey);
       }
@@ -3612,6 +4040,8 @@ class DomSurfacePainter {
         const activate = (event) => {
           if (event.altKey || document.getSelection()?.isCollapsed === false) {
             event.preventDefault();
+          } else if (/^https?:/i.test(target) && (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1)) {
+            return;
           } else if (this.onOpenHyperlink) {
             event.preventDefault();
             this.onOpenHyperlink(target);
@@ -3622,6 +4052,10 @@ class DomSurfacePainter {
         element.onclick = activate;
         element.onauxclick = activate;
       }
+      if (element.getAttribute("data-column") !== String(x))
+        element.setAttribute("data-column", String(x));
+      if (element.getAttribute("data-span") !== String(span))
+        element.setAttribute("data-span", String(span));
       next.set(x, element);
       if (rowElement.children[position] !== element) {
         rowElement.insertBefore(element, rowElement.children[position] ?? null);
@@ -3845,9 +4279,8 @@ function resolveCellStyle(style, metrics, forcedForeground) {
   const forcedColors = forcedForeground !== undefined;
   const elementStyle = {
     position: "relative",
-    display: "inline-block",
-    verticalAlign: "top",
-    contain: "size",
+    display: "inline",
+    verticalAlign: "baseline",
     boxSizing: "border-box",
     padding: "0",
     margin: "0",
@@ -3869,9 +4302,7 @@ function resolveCellStyle(style, metrics, forcedForeground) {
     fontSynthesis: "none",
     fontVariantLigatures: "none",
     top: "0",
-    height: "100%",
     whiteSpace: "pre",
-    overflow: "hidden",
     direction: "ltr",
     unicodeBidi: "isolate",
     color: forcedForeground ?? resolvedSurfaceForeground(style, metrics.style),
@@ -3952,28 +4383,209 @@ function createElement(tagName) {
 }
 function selectionInvalidator() {
   let selection = globalThis.document?.getSelection?.();
-  if (!selection || selection.isCollapsed)
-    return () => {};
-  const ranges = Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index));
-  return (element) => {
+  if (selection?.isCollapsed)
+    selection = null;
+  const ranges = Array.from({ length: selection?.rangeCount ?? 0 }, (_, index) => selection.getRangeAt(index));
+  const invalidate = (element) => {
     if (selection && ranges.some((range) => range.intersectsNode(element))) {
       selection.removeAllRanges();
       selection = null;
     }
   };
+  return Object.assign(invalidate, {
+    replaceText(element, value) {
+      if (element.textContent === value)
+        return;
+      const node = element.firstChild;
+      if (node?.nodeType !== 3) {
+        invalidate(element);
+        element.textContent = value;
+        return;
+      }
+      const text = node;
+      if (selection && text.length === value.length) {
+        const touched = ranges.filter((range) => range.intersectsNode(text));
+        const unchanged = touched.every((range) => {
+          const lo = range.startContainer === text ? range.startOffset : 0;
+          const hi = range.endContainer === text ? range.endOffset : text.length;
+          return text.data.slice(lo, hi) === value.slice(lo, hi);
+        });
+        if (touched.length && unchanged) {
+          for (let i = value.length - 1;i >= 0; i--)
+            if (text.data[i] !== value[i])
+              text.replaceData(i, 1, value[i]);
+          return;
+        }
+      }
+      invalidate(text);
+      text.data = value;
+    }
+  });
 }
-function copyableRow(cells, width) {
-  const result = [];
-  let end = 0;
-  for (const cell of cells) {
-    if (cell[0] > end)
-      result.push([end, " ".repeat(cell[0] - end), cell[0] - end, -1]);
-    result.push(cell);
-    end = cell[0] + Math.max(1, cell[2]);
+
+// src/DomTextSelection.ts
+class DomTextSelection {
+  terminal;
+  textRoot;
+  changed;
+  element = document.createElement("div");
+  toggle = document.createElement("button");
+  all = document.createElement("button");
+  status = document.createElement("span");
+  enabled = false;
+  get active() {
+    return this.enabled;
   }
-  if (end < width)
-    result.push([end, " ".repeat(width - end), width - end, -1]);
-  return result;
+  constructor(terminal, textRoot, changed) {
+    this.terminal = terminal;
+    this.textRoot = textRoot;
+    this.changed = changed;
+    this.element.className = "webhost-scene__selection-controls";
+    this.element.setAttribute("role", "group");
+    this.element.setAttribute("aria-label", "Text selection");
+    Object.assign(this.element.style, {
+      gridRow: "2",
+      gridColumn: "1",
+      justifySelf: "end",
+      display: "flex",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: "6px",
+      maxWidth: "100%",
+      font: "12px/1.4 system-ui, sans-serif"
+    });
+    for (const button of [this.toggle, this.all]) {
+      button.type = "button";
+      Object.assign(button.style, {
+        font: "inherit",
+        color: "ButtonText",
+        background: "ButtonFace",
+        border: "1px solid ButtonBorder",
+        borderRadius: "4px",
+        padding: "3px 8px"
+      });
+    }
+    this.toggle.textContent = "Select text";
+    this.toggle.setAttribute("aria-pressed", "false");
+    this.toggle.onclick = () => this.setActive(!this.enabled);
+    this.all.textContent = "Select all text";
+    this.all.hidden = true;
+    this.all.onclick = () => {
+      this.selectAll();
+      this.terminal.focus({ preventScroll: true });
+    };
+    this.status.setAttribute("role", "status");
+    this.status.setAttribute("aria-live", "polite");
+    this.element.append(this.status, this.toggle, this.all);
+    terminal.addEventListener("keydown", this.keyDown, true);
+    terminal.addEventListener("click", this.suppressActivation, true);
+    terminal.addEventListener("auxclick", this.suppressActivation, true);
+    terminal.addEventListener("paste", this.suppressActivation, true);
+    terminal.addEventListener("beforeinput", this.suppressActivation, true);
+  }
+  boundaries() {
+    const root = this.textRoot();
+    if (!root)
+      return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let first, last;
+    for (let node = walker.nextNode();node; node = walker.nextNode()) {
+      if (!node.textContent?.length)
+        continue;
+      first ??= node;
+      last = node;
+    }
+    return first && last ? { first, last } : undefined;
+  }
+  setActive(active) {
+    if (active === this.enabled)
+      return;
+    this.enabled = active;
+    this.toggle.setAttribute("aria-pressed", String(active));
+    this.all.hidden = !active;
+    this.status.textContent = active ? "Drag or use Shift+Arrow keys. Escape returns to the app." : "Text selection off.";
+    this.terminal.setAttribute("data-text-selection", String(active));
+    this.terminal.style.cursor = active ? "text" : "";
+    this.changed();
+    if (active) {
+      this.terminal.focus({ preventScroll: true });
+      const selection = document.getSelection();
+      if (!this.textRoot()?.contains(selection?.anchorNode ?? null)) {
+        const bounds = this.boundaries();
+        if (bounds)
+          selection?.setBaseAndExtent(bounds.first, 0, bounds.first, 0);
+      }
+    } else
+      this.toggle.focus({ preventScroll: true });
+  }
+  selectAll() {
+    const bounds = this.boundaries();
+    if (bounds)
+      document.getSelection()?.setBaseAndExtent(bounds.first, 0, bounds.last, bounds.last.length);
+  }
+  suppressActivation = (event) => {
+    if (!this.enabled)
+      return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  keyDown = (event) => {
+    if (!this.enabled)
+      return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.setActive(false);
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.selectAll();
+      return;
+    }
+    if (event.key === "Tab" || event.metaKey || event.ctrlKey)
+      return;
+    const direction = ["ArrowLeft", "ArrowUp", "Home"].includes(event.key) ? "backward" : "forward";
+    const granularity = event.key === "Home" || event.key === "End" ? "lineboundary" : event.key === "ArrowUp" || event.key === "ArrowDown" ? "line" : event.altKey ? "word" : "character";
+    if ([
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Home",
+      "End"
+    ].includes(event.key)) {
+      const selection = document.getSelection();
+      const bounds = this.boundaries();
+      if (selection && bounds) {
+        if (!this.textRoot()?.contains(selection.anchorNode))
+          selection.setBaseAndExtent(bounds.first, 0, bounds.first, 0);
+        selection.modify(event.shiftKey ? "extend" : "move", direction, granularity);
+        if (!this.textRoot()?.contains(selection.focusNode)) {
+          const end = direction === "backward" ? bounds.first : bounds.last;
+          const offset = direction === "backward" ? 0 : end.length;
+          if (event.shiftKey)
+            selection.extend(end, offset);
+          else
+            selection.setBaseAndExtent(end, offset, end, offset);
+        }
+      }
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  dispose() {
+    this.enabled = false;
+    this.toggle.onclick = null;
+    this.all.onclick = null;
+    this.terminal.removeEventListener("keydown", this.keyDown, true);
+    this.terminal.removeEventListener("click", this.suppressActivation, true);
+    this.terminal.removeEventListener("auxclick", this.suppressActivation, true);
+    this.terminal.removeEventListener("paste", this.suppressActivation, true);
+    this.terminal.removeEventListener("beforeinput", this.suppressActivation, true);
+    this.element.remove();
+  }
 }
 
 // src/HostGeometrySession.ts
@@ -4062,6 +4674,9 @@ class InputEventEncoder {
       button,
       modifiers: modifierMask(event)
     }, geometryRevision);
+  }
+  encodePointerCancel(location, geometryRevision) {
+    return encodeMouseInputMessage({ kind: "cancelled", x: location.x, y: location.y }, geometryRevision);
   }
   encodePointerMove(location, button, event, geometryRevision) {
     return encodeMouseInputMessage({
@@ -4565,6 +5180,8 @@ class WebHostSceneRuntime {
   canvas;
   canvasScale = 1;
   domSurfaceRoot;
+  textSelection;
+  domFocus;
   lastDomSurfaceSize;
   domGeometry;
   geometrySession = new HostGeometrySession;
@@ -4574,6 +5191,8 @@ class WebHostSceneRuntime {
   geometryMeasurable = false;
   capturedPointerId;
   canceledPointerId;
+  capturedPointerLocation;
+  capturedPointerRevision;
   disposed = false;
   stagedFontChange = false;
   reprojecting = false;
@@ -4649,10 +5268,21 @@ class WebHostSceneRuntime {
     this.terminalMount.className = "webhost-scene__terminal";
     this.terminalMount.tabIndex = 0;
     this.element.append(header, this.terminalMount);
+    if (this.rendererKind === "dom") {
+      header.style.gridRow = "1";
+      header.style.gridColumn = "1";
+      this.textSelection = new DomTextSelection(this.terminalMount, () => this.domSurfaceRoot?.querySelector(".webhost-scene__surface-rows") ?? undefined, () => {
+        this.cancelGeometryPointer();
+        this.domFocus?.refresh();
+      });
+      this.element.insertBefore(this.textSelection.element, this.terminalMount);
+    }
     options.mount.appendChild(this.element);
     this.applyVisibility();
   }
   async mount() {
+    if (this.disposed)
+      return;
     if (this.surfaceElement) {
       return;
     }
@@ -4673,6 +5303,8 @@ class WebHostSceneRuntime {
       this.onInput(encodeAccessibilityActionMessage(target, request, requestID));
     });
     this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
+    if (this.domSurfaceRoot)
+      this.domFocus = new DomFocusPresentation(this.terminalMount, () => this.textSelection?.active ?? false);
     if (this.domSurfaceRoot) {
       this.domGeometry = new DomGeometryController(this.terminalMount);
       this.paintScheduler.setHeld(true);
@@ -4705,6 +5337,10 @@ class WebHostSceneRuntime {
     this.resizeToMount();
   }
   setVisible(visible) {
+    if (this.disposed)
+      return;
+    if (!visible)
+      this.cancelGeometryPointer();
     this.isVisible = visible;
     this.applyVisibility();
     if (visible) {
@@ -4716,6 +5352,10 @@ class WebHostSceneRuntime {
     this.updateRuntimeSuspension();
   }
   setDocumentVisible(visible) {
+    if (this.disposed)
+      return;
+    if (!visible)
+      this.cancelGeometryPointer();
     const becameVisible = visible && !this.documentVisible;
     this.documentVisible = visible;
     this.updateRuntimeSuspension();
@@ -4744,6 +5384,8 @@ class WebHostSceneRuntime {
   }
   onRuntimeSuspensionChange(_suspended) {}
   setStyle(style) {
+    if (this.disposed)
+      return;
     const next = normalizeWebHostTerminalStyle(this.domGeometry && !style.fontFamily ? { ...style, fontFamily: DOM_FONT_FAMILY } : style);
     if (this.domGeometry) {
       this.stagedFontChange = true;
@@ -4762,6 +5404,8 @@ class WebHostSceneRuntime {
     this.paintScheduler.repaintNow();
   }
   writeOutput(text) {
+    if (this.disposed)
+      return;
     if (!this.diagnosticText) {
       const diagnosticText = document.createElement("pre");
       diagnosticText.className = "webhost-scene__diagnostic";
@@ -4788,6 +5432,8 @@ class WebHostSceneRuntime {
     this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`.slice(-16384);
   }
   notifyRuntimeIssue(issue) {
+    if (this.disposed)
+      return;
     if (issue.severity === "error") {
       console.error(issue.description);
     } else {
@@ -4812,6 +5458,7 @@ class WebHostSceneRuntime {
     this.onInput(chunk);
   }
   dispose() {
+    this.cancelGeometryPointer();
     this.disposed = true;
     this.finishGeometryWait();
     this.fontResources?.dispose();
@@ -4822,6 +5469,10 @@ class WebHostSceneRuntime {
     this.domGeometry?.dispose();
     this.paintScheduler.dispose();
     this.painter.dispose();
+    this.textSelection?.dispose();
+    this.domFocus?.dispose();
+    this.accessibilityTree?.dispose();
+    this.accessibilityTree = undefined;
     this.detachInputHandlers?.();
     this.detachPointerParadigmObserver?.();
     this.resizeObserver?.disconnect();
@@ -4915,9 +5566,9 @@ class WebHostSceneRuntime {
     this.element.style.boxShadow = "0 20px 50px rgba(0, 0, 0, 0.28)";
     this.element.style.overflow = "hidden";
     this.element.style.gap = "0.5rem";
-    this.element.style.gridTemplateRows = "auto minmax(0, 1fr)";
+    this.element.style.gridTemplateRows = this.textSelection ? "auto auto minmax(0, 1fr)" : "auto minmax(0, 1fr)";
     this.terminalMount.style.position = "relative";
-    this.terminalMount.style.gridRow = "2";
+    this.terminalMount.style.gridRow = this.textSelection ? "3" : "2";
     this.terminalMount.style.boxSizing = "border-box";
     this.terminalMount.style.width = "100%";
     if (this.sceneFrame === "resizable") {
@@ -4968,8 +5619,13 @@ class WebHostSceneRuntime {
         this.resizeObserver.observe(this.domGeometry.probe.element);
     }
     const fonts = document.fonts;
-    fonts?.addEventListener?.("loadingdone", refresh);
-    fonts?.addEventListener?.("loadingerror", refresh);
+    const refreshFonts = () => {
+      if (this.painter instanceof DomSurfacePainter)
+        this.painter.invalidateFontMetrics();
+      refresh();
+    };
+    fonts?.addEventListener?.("loadingdone", refreshFonts);
+    fonts?.addEventListener?.("loadingerror", refreshFonts);
     globalThis.window?.addEventListener?.("resize", refresh);
     globalThis.window?.visualViewport?.addEventListener("resize", refresh);
     let dpr;
@@ -4998,8 +5654,8 @@ class WebHostSceneRuntime {
     this.detachMetricObservers = () => {
       for (const query of preferences)
         query.removeEventListener?.("change", preferenceChanged);
-      fonts?.removeEventListener?.("loadingdone", refresh);
-      fonts?.removeEventListener?.("loadingerror", refresh);
+      fonts?.removeEventListener?.("loadingdone", refreshFonts);
+      fonts?.removeEventListener?.("loadingerror", refreshFonts);
       globalThis.window?.removeEventListener?.("resize", refresh);
       globalThis.window?.visualViewport?.removeEventListener("resize", refresh);
       dpr?.removeEventListener?.("change", changedDpr);
@@ -5007,9 +5663,32 @@ class WebHostSceneRuntime {
   }
   installInputHandlers() {
     const handleKeyDown = (event) => {
-      if (event.metaKey || event.isComposing || this.rendererKind === "dom" && event.ctrlKey && (event.key.toLowerCase() === "f" || event.key.toLowerCase() === "c" && document.getSelection?.()?.isCollapsed === false)) {
+      if (this.textSelection?.active || event.metaKey || event.isComposing || this.rendererKind === "dom" && event.ctrlKey && ([
+        "f",
+        "+",
+        "=",
+        "-",
+        "0",
+        "l",
+        "r",
+        "t",
+        "w",
+        "n",
+        "tab",
+        "pageup",
+        "pagedown"
+      ].includes(event.key.toLowerCase()) || event.key.toLowerCase() === "c" && document.getSelection?.()?.isCollapsed === false)) {
         return;
       }
+      if (event.key === "Tab" && this.accessibilityTree?.hasInteractiveControls) {
+        if (this.accessibilityTree.advanceFocus(event.shiftKey)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+      if (this.rendererKind === "dom" && event.altKey && ["ArrowLeft", "ArrowRight"].includes(event.key))
+        return;
       const message = this.inputEncoder.encodeKey(event);
       if (!message) {
         return;
@@ -5018,6 +5697,8 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePaste = (event) => {
+      if (this.textSelection?.active)
+        return;
       const text = event.clipboardData?.getData("text/plain") ?? "";
       if (!text) {
         return;
@@ -5043,6 +5724,8 @@ class WebHostSceneRuntime {
       this.activePointerButton = button;
       this.hasCapturedPointer = true;
       this.capturedPointerId = event.pointerId;
+      this.capturedPointerLocation = location;
+      this.capturedPointerRevision = this.geometrySession.pointerRevision;
       this.pointerDownLinkTarget = button === "primary" ? this.linkTarget(location) : undefined;
       this.terminalMount.focus?.({ preventScroll: true });
       this.terminalMount.setPointerCapture?.(event.pointerId);
@@ -5059,9 +5742,11 @@ class WebHostSceneRuntime {
         return;
       }
       const location = this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
-      this.terminalMount.releasePointerCapture?.(event.pointerId);
       this.hasCapturedPointer = false;
       this.capturedPointerId = undefined;
+      this.capturedPointerLocation = undefined;
+      this.capturedPointerRevision = undefined;
+      this.terminalMount.releasePointerCapture?.(event.pointerId);
       const downLinkTarget = this.pointerDownLinkTarget;
       this.pointerDownLinkTarget = undefined;
       if (!location) {
@@ -5090,7 +5775,7 @@ class WebHostSceneRuntime {
       this.onInput(this.inputEncoder.encodePointerMove(location, this.activePointerButton, event, this.geometrySession.pointerRevision));
     };
     const handleWheel = (event) => {
-      if (this.wheelMode === "passive") {
+      if (this.wheelMode === "passive" || this.textSelection?.active || this.rendererKind === "dom" && (event.ctrlKey || event.metaKey)) {
         return;
       }
       const location = this.cellLocation(event);
@@ -5103,11 +5788,19 @@ class WebHostSceneRuntime {
       this.onInput(this.inputEncoder.encodeWheel(location, event, this.geometrySession.pointerRevision));
       event.preventDefault();
     };
+    const cancelPointer = (event) => {
+      if (event.pointerId === this.capturedPointerId)
+        this.cancelGeometryPointer();
+    };
+    const blurPointer = () => this.cancelGeometryPointer();
     const endNativeDrag = () => {
       this.nativePointerGesture = false;
     };
     document.addEventListener?.("pointerup", endNativeDrag);
     document.addEventListener?.("pointercancel", endNativeDrag);
+    globalThis.window?.addEventListener?.("blur", blurPointer);
+    this.terminalMount.addEventListener("pointercancel", cancelPointer);
+    this.terminalMount.addEventListener("lostpointercapture", cancelPointer);
     this.terminalMount.addEventListener("keydown", handleKeyDown);
     this.terminalMount.addEventListener("paste", handlePaste);
     this.terminalMount.addEventListener("pointerdown", handlePointerDown);
@@ -5119,6 +5812,9 @@ class WebHostSceneRuntime {
     this.detachInputHandlers = () => {
       document.removeEventListener?.("pointerup", endNativeDrag);
       document.removeEventListener?.("pointercancel", endNativeDrag);
+      globalThis.window?.removeEventListener?.("blur", blurPointer);
+      this.terminalMount.removeEventListener("pointercancel", cancelPointer);
+      this.terminalMount.removeEventListener("lostpointercapture", cancelPointer);
       this.terminalMount.removeEventListener("keydown", handleKeyDown);
       this.terminalMount.removeEventListener("paste", handlePaste);
       this.terminalMount.removeEventListener("pointerdown", handlePointerDown);
@@ -5217,15 +5913,21 @@ class WebHostSceneRuntime {
     this.bridge?.resize(current.columns, current.rows, current.cellWidth, current.cellHeight);
   }
   cancelGeometryPointer() {
-    if (this.capturedPointerId !== undefined) {
-      this.canceledPointerId = this.capturedPointerId;
-      if (this.terminalMount.hasPointerCapture?.(this.capturedPointerId)) {
-        this.terminalMount.releasePointerCapture?.(this.capturedPointerId);
-      }
-    }
+    const id = this.capturedPointerId;
+    const location = this.capturedPointerLocation;
+    const revision = this.capturedPointerRevision;
     this.capturedPointerId = undefined;
+    this.capturedPointerLocation = undefined;
+    this.capturedPointerRevision = undefined;
     this.hasCapturedPointer = false;
     this.pointerDownLinkTarget = undefined;
+    if (id !== undefined) {
+      this.canceledPointerId = id;
+      if (location)
+        this.onInput(this.inputEncoder.encodePointerCancel(location, revision));
+      if (this.terminalMount.hasPointerCapture?.(id))
+        this.terminalMount.releasePointerCapture?.(id);
+    }
   }
   finishGeometryWait() {
     if (this.geometryWaitTimer !== undefined)
@@ -5335,6 +6037,7 @@ class WebHostSceneRuntime {
       coalescedFrameCount: request.coalescedFrameCount
     });
     this.syncAccessibilityTree(request.frame, request.accessibilityAnnouncements);
+    this.domFocus?.present(request.frame, this.surfaceMetrics(), this.domGeometry?.presented?.content.offsetX, this.domGeometry?.presented?.content.offsetY);
     if (this.domGeometry && !this.fontPending && !this.reprojecting) {
       this.stagedFontChange = false;
       this.finishGeometryWait();
@@ -5354,7 +6057,7 @@ class WebHostSceneRuntime {
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight
     }, [...announcements], {
-      synchronizeFocus: this.synchronizeAccessibilityFocus,
+      synchronizeFocus: this.synchronizeAccessibilityFocus && !this.textSelection?.active,
       actionResponse: frame.accessibilityActionResponse
     });
   }
@@ -5443,7 +6146,7 @@ class WebHostSceneRuntime {
     return this.rendererKind === "dom" && !!event.target?.closest?.("a[data-surface-link]");
   }
   allowsNativeTextSelection(event) {
-    return this.rendererKind === "dom" && event.altKey;
+    return this.rendererKind === "dom" && (event.altKey || this.textSelection?.active === true);
   }
   cellLocation(event) {
     if (this.domGeometry && (!this.geometryMeasurable || !this.geometrySession.allowsPointer))
@@ -5957,48 +6660,47 @@ class StdIOPipe {
   chunks = [];
   waiters = [];
   listeners = new Set;
+  consumer;
   closed = false;
+  get bufferedBytes() {
+    return this.chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+  }
   write(chunk) {
-    if (this.closed) {
+    if (this.closed)
       return false;
-    }
     const bytes = typeof chunk === "string" ? new TextEncoder().encode(chunk) : new Uint8Array(chunk);
     const waiter = this.waiters.shift();
     if (waiter) {
       waiter({ done: false, value: bytes });
       return true;
     }
-    this.chunks.push(bytes);
-    let accepted = true;
+    if (!this.consumer)
+      this.chunks.push(bytes);
+    let accepted = this.consumer?.(bytes) !== false;
     for (const listener of this.listeners) {
-      if (listener(bytes) === false) {
+      if (listener(bytes) === false)
         accepted = false;
-      }
     }
     return accepted;
   }
   close() {
-    if (this.closed) {
+    if (this.closed)
       return;
-    }
     this.closed = true;
     while (this.waiters.length > 0) {
-      const waiter = this.waiters.shift();
-      waiter?.({ done: true, value: undefined });
+      this.waiters.shift()?.({ done: true, value: undefined });
     }
   }
   async read() {
+    if (this.consumer)
+      throw new Error("The pipe already has an exclusive consumer");
     const next = this.chunks.shift();
-    if (next) {
+    if (next)
       return next;
-    }
-    if (this.closed) {
+    if (this.closed)
       return;
-    }
     return await new Promise((resolve) => {
-      this.waiters.push((result) => {
-        resolve(result.done ? undefined : result.value);
-      });
+      this.waiters.push((result) => resolve(result.done ? undefined : result.value));
     });
   }
   subscribe(listener) {
@@ -6007,12 +6709,22 @@ class StdIOPipe {
       this.listeners.delete(listener);
     };
   }
+  consume(listener) {
+    if (this.consumer || this.waiters.length > 0)
+      throw new Error("The pipe already has an exclusive consumer or pending read");
+    this.consumer = listener;
+    for (const chunk of this.chunks.splice(0))
+      listener(chunk);
+    return () => {
+      if (this.consumer === listener)
+        this.consumer = undefined;
+    };
+  }
   async* [Symbol.asyncIterator]() {
     while (true) {
       const next = await this.read();
-      if (!next) {
+      if (!next)
         return;
-      }
       yield next;
     }
   }
@@ -6105,7 +6817,7 @@ class BrowserWASIBridge {
     this.detachStdout?.();
     this.detachStderr?.();
     this.decoder = new WebHostOutputDecoder;
-    this.detachStdout = this.stdout.subscribe((chunk) => {
+    this.detachStdout = this.stdout.consume((chunk) => {
       for (const record of this.decoder.feed(chunk)) {
         switch (record.type) {
           case "surface":
@@ -6129,7 +6841,7 @@ class BrowserWASIBridge {
       }
       this.sendPendingResyncRequests();
     });
-    this.detachStderr = this.stderr.subscribe((chunk) => {
+    this.detachStderr = this.stderr.consume((chunk) => {
       sink.writeError?.(new TextDecoder().decode(chunk));
     });
   }
@@ -6240,6 +6952,7 @@ class InternalWebHostAppController {
   paintScheduling;
   visibilityDocument;
   detachVisibilityListener;
+  disposed = false;
   constructor(options) {
     this.mount = options.mount;
     this.style = normalizeWebHostTerminalStyle(options.renderer === "dom" && !options.style?.fontFamily ? { ...options.style, fontFamily: DOM_FONT_FAMILY } : options.style ?? {});
@@ -6279,6 +6992,8 @@ class InternalWebHostAppController {
     await this.switchScene(this.selectedSceneId);
   }
   async switchScene(id) {
+    if (this.disposed)
+      throw new Error("SwiftTUI host is disposed");
     const descriptor = this.scenes.find((scene) => scene.id === id);
     if (!descriptor) {
       throw new Error(`Unknown scene: ${id}`);
@@ -6287,10 +7002,14 @@ class InternalWebHostAppController {
       runtime2.setVisible(sceneId === id);
     }
     const runtime = await this.ensureRuntime(id);
+    if (this.disposed)
+      return;
     runtime.setVisible(true);
     this.selectedSceneId = id;
   }
   setStyle(style) {
+    if (this.disposed)
+      return;
     const merged = mergeWebHostTerminalStyle(this.style, style);
     this.style = merged;
     for (const runtime of this.runtimes.values()) {
@@ -6299,6 +7018,9 @@ class InternalWebHostAppController {
     this.applyHostFrameStyle();
   }
   async dispose() {
+    if (this.disposed)
+      return;
+    this.disposed = true;
     this.detachVisibilityListener?.();
     this.detachVisibilityListener = undefined;
     for (const runtime of this.runtimes.values()) {
@@ -6328,6 +7050,8 @@ class InternalWebHostAppController {
     };
   }
   async ensureRuntime(id) {
+    if (this.disposed)
+      throw new Error("SwiftTUI host is disposed");
     const existing = this.runtimes.get(id);
     if (existing) {
       return existing;

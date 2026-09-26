@@ -56,10 +56,12 @@
         #expect(resource.data.starts(with: Array("wOF2".utf8)))
         totalBytes += resource.data.count
       }
-      #expect(totalBytes == 273700)
+      #expect(totalBytes == 167584)
       let licensePath = try #require(paths.first { $0.hasSuffix("/LICENSE.md") })
       let license = try WebHostBrowserBundle.resource(for: "/\(licensePath)")
-      #expect(String(decoding: license.data, as: UTF8.self).contains("SIL OPEN FONT LICENSE"))
+      #expect(
+        String(decoding: license.data, as: UTF8.self).uppercased().contains("SIL OPEN FONT LICENSE")
+      )
     }
 
     @Test("browser bundle records the swift-tui-web revision it was built from")

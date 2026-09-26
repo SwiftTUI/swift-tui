@@ -1,0 +1,49 @@
+{
+  "family": "SwiftTUI Core Candidate 3",
+  "release": "0.3.0",
+  "source": "https://github.com/be5invis/Iosevka/archive/refs/tags/v34.8.1.zip",
+  "archiveSha256": "e0dfea6df319e06fd0acab14f8ab5a4871f8a592824221bf4fbbe6544d8fc70f",
+  "license": "SIL Open Font License 1.1",
+  "licenseSha256": "4ba53c7c1cb39279aae5f8d7d22054c485c71169920e5a36ed098b115e2e3c5d",
+  "build": {
+    "profile": "SwiftTUICoreCandidate3",
+    "epoch": 1790380800,
+    "planSHA256": "8412f7d7680e45db8b480212bdd3c6609df354e5d9a0b0fe5c232e782e703ee6",
+    "profileSHA256": "6ec060766aae4bb538c98a0be50ae5442df4e186ad9007179990ca34a3642541",
+    "corpusSHA256": "2e6f9a208252817c85d20505baef60379e9557484a4e6344d0cc548b45740b8d",
+    "sourceLockSHA256": "b50a1ac0086c6a7b4e6ad6c54d234596b4287de999d4cb8d893271c020af3661",
+    "fontToolsVersion": "4.66.0",
+    "node": "v26.10.0",
+    "unhinted": true
+  },
+  "faces": [
+    {
+      "style": "normal",
+      "file": "SwiftTUICoreCandidate3-Regular.woff2",
+      "bytes": 39308,
+      "sha256": "0dab21536f5bf3b5eae370dab9766c0755be5960c9afc48453cac492519c1033",
+      "weight": 400
+    },
+    {
+      "style": "normal",
+      "file": "SwiftTUICoreCandidate3-Bold.woff2",
+      "bytes": 39560,
+      "sha256": "c4726491cef33601dca8687c39bb532f4f0fc4d5daa6ef185cc1151b809dfeb8",
+      "weight": 700
+    },
+    {
+      "style": "italic",
+      "file": "SwiftTUICoreCandidate3-Italic.woff2",
+      "bytes": 44240,
+      "sha256": "c209526b42ec9beb8ff87bfa7838d846fea104ac6565be5afa098ef6029079e4",
+      "weight": 400
+    },
+    {
+      "style": "italic",
+      "file": "SwiftTUICoreCandidate3-BoldItalic.woff2",
+      "bytes": 44476,
+      "sha256": "272c07f118affce28be870740ef07c7e5990157e74947ad19669bc6dd1d9a769",
+      "weight": 700
+    }
+  ]
+}
