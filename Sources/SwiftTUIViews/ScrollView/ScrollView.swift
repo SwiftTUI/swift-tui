@@ -359,7 +359,7 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
         }
         return .claimed
 
-      case .up(.primary):
+      case .up(.primary), .cancelled:
         guard panBinding.wrappedValue != nil else {
           return .ignored
         }

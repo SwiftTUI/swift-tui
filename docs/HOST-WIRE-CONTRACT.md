@@ -433,6 +433,12 @@ hover and momentum state without synthesizing an activation. WebSocket input
 also carries a private session token, so a reconnect cannot reuse another
 connection's queued pointer event. Reconnect acknowledges revision zero again.
 
+The `mouse` and `mouseGeometry` kind `cancelled` ends the current pointer stream
+without activation or release momentum. Hosts send it on native pointer cancel,
+lost capture, window blur or scene suspension. It retains the presented geometry
+revision and is an ordering barrier for motion coalescing. Receivers predating
+this kind ignore it; reliable cancellation requires a receiver implementing it.
+
 A DOM host retains its previous presentation while waiting, then paints the
 matching text, accessibility bounds and pointer geometry together. It rejects
 old responses as paint candidates without skipping transport decoding. Android

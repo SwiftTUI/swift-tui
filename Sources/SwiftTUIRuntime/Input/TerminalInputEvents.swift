@@ -16,6 +16,8 @@ public struct MouseEvent: Equatable, Sendable {
   public enum Kind: Equatable, Sendable {
     case down(MouseButton)
     case up(MouseButton)
+    /// End the current pointer stream without activation or release momentum.
+    case cancelled
     case moved
     case dragged(MouseButton)
     case scrolled(deltaX: Int, deltaY: Int)

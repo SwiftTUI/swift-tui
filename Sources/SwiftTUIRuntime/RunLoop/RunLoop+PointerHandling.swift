@@ -10,7 +10,7 @@ extension RunLoop {
     // record (passive hover moves do not — they can race the frame that
     // resolves the traversal's landing).
     switch mouseEvent.kind {
-    case .down, .up, .dragged, .scrolled:
+    case .down, .up, .dragged, .scrolled, .cancelled:
       pendingFocusTraversal = nil
       pendingKeyFocus = nil
     case .moved:
@@ -21,7 +21,7 @@ extension RunLoop {
     // press). `.up` keeps it: the frame that decides whether the clicked
     // region survived lands after the release.
     switch mouseEvent.kind {
-    case .down, .dragged, .scrolled:
+    case .down, .dragged, .scrolled, .cancelled:
       pendingClickFocusRestore = nil
     case .up, .moved:
       break
@@ -31,6 +31,8 @@ extension RunLoop {
       handleMouseDown(button, location: mouseEvent.location, timestamp: mouseEvent.timestamp)
     case .up(let button):
       handleMouseUp(button, location: mouseEvent.location, timestamp: mouseEvent.timestamp)
+    case .cancelled:
+      cancelPointerInteraction()
     case .moved:
       handleMouseMove(location: mouseEvent.location, timestamp: mouseEvent.timestamp)
     case .dragged(let button):
@@ -52,7 +54,7 @@ extension RunLoop {
     case .moved:
       return localPointerHandlerRegistry.hasHoverSubscribers
         || pointerInteraction.isRouting
-    case .down, .up, .dragged:
+    case .down, .up, .dragged, .cancelled:
       return true
     case .scrolled:
       return false

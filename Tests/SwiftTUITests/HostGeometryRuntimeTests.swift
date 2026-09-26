@@ -6,6 +6,48 @@ import Testing
 
 @MainActor
 @Suite struct HostGeometryRuntimeTests {
+  @Test func explicitCancellationClearsGestureWithoutReleaseAndAllowsNextPress() throws {
+    let host = GeometryTestSurface()
+    let root = testIdentity("CancelledPointer")
+    var activations = 0
+    var dragEnds = 0
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in
+      Button("Activate") { activations += 1 }
+        .simultaneousGesture(DragGesture(minimumDistance: 0).onEnded { _ in dragEnds += 1 })
+    }
+    loop.scheduler.requestSignal(named: "SIGWINCH")
+    var rendered = 0
+    try loop.renderPendingFrames(renderedFrames: &rendered)
+    let region = try #require(
+      loop.latestSemanticSnapshot.interactionRegions.max { $0.hitTestOrder < $1.hitTestOrder })
+    let point = Point(x: Double(region.rect.origin.x), y: Double(region.rect.origin.y))
+    func send(_ kind: MouseEvent.Kind) {
+      var event = MouseEvent(kind: kind, location: point)
+      event.hostGeometryStamp = .init(session: 7, revision: 1)
+      _ = loop.handle(.input(.mouse(event)))
+    }
+    send(.down(.primary))
+    send(.dragged(.primary))
+    #expect(loop.pointerInteraction.isRouting)
+    send(.cancelled)
+    #expect(!loop.pointerInteraction.isRouting)
+    #expect(loop.localGestureRegistry.activeRecognizers().allSatisfy { !$0.1.isActive })
+    #expect(loop.pressedIdentity == nil)
+    send(.up(.primary))
+    #expect(activations == 0)
+    #expect(dragEnds == 0)
+    try loop.renderPendingFrames(renderedFrames: &rendered)
+    send(.down(.primary))
+    send(.up(.primary))
+    #expect(activations == 1)
+    #expect(dragEnds == 1)
+  }
+
   @Test func hostMotionPreferenceUpdatesLiveWithoutChangingGeometry() throws {
     let host = GeometryTestSurface()
     let root = testIdentity("HostMotion")

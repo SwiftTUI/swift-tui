@@ -300,6 +300,8 @@ package struct WebSurfaceInputParser {
     case "up":
       guard let button else { return nil }
       kind = .up(button)
+    case "cancelled":
+      kind = .cancelled
     case "moved":
       kind = .moved
     case "dragged":

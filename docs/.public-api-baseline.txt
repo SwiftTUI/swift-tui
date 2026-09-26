@@ -2657,6 +2657,7 @@ SwiftTUIRuntime.MouseButton.secondary
 SwiftTUIRuntime.MouseEvent
 SwiftTUIRuntime.MouseEvent.==(_:_:)
 SwiftTUIRuntime.MouseEvent.Kind
+SwiftTUIRuntime.MouseEvent.Kind.cancelled
 SwiftTUIRuntime.MouseEvent.Kind.down(_:)
 SwiftTUIRuntime.MouseEvent.Kind.dragged(_:)
 SwiftTUIRuntime.MouseEvent.Kind.moved

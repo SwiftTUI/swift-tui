@@ -21,6 +21,7 @@ package struct LocalPointerEvent: Equatable, Sendable {
   package enum Kind: Equatable, Sendable {
     case down(LocalPointerButton)
     case up(LocalPointerButton)
+    case cancelled
     case moved
     case dragged(LocalPointerButton)
     case scrolled(deltaX: Int, deltaY: Int)

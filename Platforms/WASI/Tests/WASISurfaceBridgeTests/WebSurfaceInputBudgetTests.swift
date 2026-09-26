@@ -4,6 +4,22 @@ import Testing
 @testable import SwiftTUIWASISurfaceBridge
 
 @Suite struct WebSurfaceInputBudgetTests {
+  @Test func cancellationPreservesItsPositionAndGeometryStamp() throws {
+    var parser = WebSurfaceInputParser(session: 31)
+    let result = parser.feed(
+      Array(
+        ("\u{1E}mouseGeometry:8:dragged:2.5:3:primary:0:0:0\n"
+          + "\u{1E}mouseGeometry:8:cancelled:2.5:3:none:0:0:0\n"
+          + "\u{1E}mouseGeometry:8:up:2.5:3:primary:0:0:0\n").utf8))
+    #expect(result.events.count == 3)
+    guard case .mouse(let event) = result.events[1] else {
+      Issue.record("Cancellation lost its place in the pointer stream")
+      return
+    }
+    #expect(event.kind == .cancelled)
+    #expect(event.hostGeometryStamp == .init(session: 31, revision: 8))
+  }
+
   @Test func geometryRecordsPreserveOrderRevisionAndValidatedMetrics() throws {
     var parser = WebSurfaceInputParser(session: 31)
     let records = parser.feedRecords(

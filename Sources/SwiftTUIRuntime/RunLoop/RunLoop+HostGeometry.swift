@@ -15,6 +15,22 @@ extension RunLoop {
     if pointerInteraction.isRouting, cancelledHostGeometryGestureCount < .max {
       cancelledHostGeometryGestureCount += 1
     }
+    cancelPointerInteraction()
+  }
+
+  /// Native cancellation and geometry replacement share the same teardown.
+  /// Notify stateful primitive handlers, then cancel gesture recognizers;
+  /// neither path synthesizes an `.up` or starts release momentum.
+  package func cancelPointerInteraction() {
+    if let route = pointerInteraction.activeRouteID,
+      let region = pairedInteractionRegion(for: route),
+      let location = lastPointerLocation
+    {
+      _ = dispatchPointerEvent(
+        preferredRouteID: region.routeID, identity: region.identity,
+        event: .init(kind: .cancelled, location: location, targetRect: region.rect)
+      )
+    }
     for (identity, recognizer) in localGestureRegistry.activeRecognizers()
     where recognizer.isActive {
       recognizer.tearDown()

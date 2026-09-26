@@ -112,7 +112,7 @@ extension MouseEvent {
     switch kind {
     case .moved, .dragged, .scrolled:
       true
-    case .down, .up:
+    case .down, .up, .cancelled:
       false
     }
   }

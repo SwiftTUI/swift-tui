@@ -281,7 +281,7 @@ private func coalescedWebSurfaceInputEvents(
           flushPendingMouseEvent()
           pendingMouseEvent = mouseEvent
         }
-      case .down, .up:
+      case .down, .up, .cancelled:
         flushPendingMouseEvent()
         coalesced.append(event)
       }
