@@ -306,6 +306,7 @@ class AccessibilityTreeMounter {
     this.announcerElement = document.createElement("div");
     this.announcerElement.className = "webhost-scene__accessibility-announcer";
     this.announcerElement.setAttribute("aria-atomic", "true");
+    this.announcerElement.setAttribute("aria-live", "polite");
     applyScreenReaderOnlyStyle(this.announcerElement);
   }
   present(nodes, metrics, announcements = [], options = {}) {
@@ -399,7 +400,7 @@ class AccessibilityTreeMounter {
     this.pendingFocus = undefined;
     this.runtimeFocusedElement = undefined;
     this.element.replaceChildren();
-    this.announcerElement.textContent = "";
+    this.announcerElement.replaceChildren();
   }
   clearEditable(element) {
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA")
@@ -594,13 +595,21 @@ class AccessibilityTreeMounter {
     }
     const politeness = assertive.length > 0 || imperativeAssertive.length > 0 ? "assertive" : "polite";
     this.announcerElement.setAttribute("aria-live", politeness);
-    this.announcerElement.textContent = ordered.map((entry) => {
+    const message = ordered.map((entry) => {
       if ("message" in entry) {
         return entry.message;
       }
       return entry.label ?? "";
     }).join(`
 `);
+    if (!message.trim()) {
+      this.announcerElement.replaceChildren();
+      return;
+    }
+    const content = document.createElement("span");
+    content.setAttribute("role", "img");
+    content.setAttribute("aria-label", message);
+    this.announcerElement.replaceChildren(content);
   }
 }
 function setOrRemoveAttribute(element, name, value) {
