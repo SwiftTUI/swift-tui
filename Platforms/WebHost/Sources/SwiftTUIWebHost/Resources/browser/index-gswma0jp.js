@@ -4058,7 +4058,7 @@ class DomSurfacePainter {
         element.setAttribute("data-span", String(span));
       next.set(x, element);
       if (rowElement.children[position] !== element) {
-        rowElement.insertBefore(element, rowElement.children[position] ?? null);
+        rowElement.insertBefore(element, rowElement.children[position] ?? this.rowBreaks[y] ?? null);
       }
       position += 1;
     }
