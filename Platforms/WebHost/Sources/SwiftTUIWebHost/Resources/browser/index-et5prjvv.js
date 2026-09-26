@@ -3623,7 +3623,7 @@ class DomTextLayout {
   advance(text, span, em) {
     return this.advances.get(this.key(text, span, em)) ?? 0;
   }
-  prepare(frame, metrics, linkedRows) {
+  prepare(frame, metrics, linkedRows, selection) {
     const scale = this.ruler.getBoundingClientRect().width / 1024 || 1;
     const config = JSON.stringify([
       fontForStyle(metrics.style),
@@ -3660,9 +3660,9 @@ class DomTextLayout {
           -1
         ]);
       const result = [];
-      for (const cell of spaced) {
+      for (const cell of spaced.flatMap((cell2) => selection.split(y, cell2))) {
         const last = result.at(-1);
-        if (!linkedRows.has(y) && this.monospace[(frame.styles[cell[3]]?.em ?? 0) & 3] && last && last[3] === cell[3] && last[0] + last[2] === cell[0] && naturalText(last[1], last[2]) && naturalText(cell[1], cell[2])) {
+        if (!linkedRows.has(y) && this.monospace[(frame.styles[cell[3]]?.em ?? 0) & 3] && last && last[3] === cell[3] && selection.allows(y, last[0], last[2]) === selection.allows(y, cell[0], cell[2]) && last[0] + last[2] === cell[0] && naturalText(last[1], last[2]) && naturalText(cell[1], cell[2])) {
           last[1] += cell[1];
           last[2] += cell[2];
         } else
@@ -3690,6 +3690,92 @@ class DomTextLayout {
   }
 }
 
+// src/DomTextSelection.ts
+var textInputs = new Set(["textField", "textEditor"]);
+var controls = new Set([
+  "button",
+  "checkbox",
+  "disclosureGroup",
+  "image",
+  "link",
+  "menuItem",
+  "picker",
+  "progressBar",
+  "secureField",
+  "separator",
+  "slider",
+  "stepper",
+  "tab",
+  "toggle"
+]);
+
+class DomTextSelection {
+  blocked = new Map;
+  fields = [];
+  key;
+  constructor(frame) {
+    const add = (y, start, end) => {
+      start = Math.max(0, start);
+      end = Math.min(frame?.width ?? 0, end);
+      if (end <= start)
+        return;
+      const row = this.blocked.get(y) ?? [];
+      row.push([start, end]);
+      this.blocked.set(y, row);
+    };
+    for (const node of frame?.accessibilityTree ?? []) {
+      if (node.hidden)
+        continue;
+      if (textInputs.has(node.role)) {
+        this.fields.push(node);
+        continue;
+      }
+      if (!controls.has(node.role) && !node.actions?.some((action) => ["activate", "increment", "decrement", "setValue"].includes(action)))
+        continue;
+      const [x, y, width, height] = node.rect;
+      for (let row = Math.max(0, y);row < Math.min(frame.height, y + height); row++)
+        add(row, x, x + width);
+    }
+    for (const [y, runs] of frame?.links ?? [])
+      for (const [x, width] of runs)
+        add(y, x, x + width);
+    for (const [y, ranges] of this.blocked) {
+      ranges.sort((a, b) => a[0] - b[0]);
+      const merged = [];
+      for (const range of ranges) {
+        const last = merged.at(-1);
+        if (last && range[0] <= last[1])
+          last[1] = Math.max(last[1], range[1]);
+        else
+          merged.push([...range]);
+      }
+      this.blocked.set(y, merged);
+    }
+    this.key = JSON.stringify([...this.blocked].sort((a, b) => a[0] - b[0]));
+  }
+  allows(y, x, span = 1) {
+    return !this.blocked.get(y)?.some(([start, end]) => x < end && x + span > start);
+  }
+  isTextInput(y, x) {
+    return this.fields.some(({ rect: [left, top, width, height], isEnabled }) => isEnabled !== false && x >= left && x < left + width && y >= top && y < top + height);
+  }
+  split(y, cell) {
+    const [x, text, span, style] = cell;
+    if (text.length !== span || !/^[\x20-\x7e]+$/.test(text))
+      return [cell];
+    const cuts = new Set([x, x + span]);
+    for (const range of this.blocked.get(y) ?? [])
+      for (const edge of range)
+        if (edge > x && edge < x + span)
+          cuts.add(edge);
+    const edges = [...cuts].sort((a, b) => a - b);
+    return edges.slice(1).map((end, i) => {
+      const start = edges[i];
+      return [start, text.slice(start - x, end - x), end - start, style];
+    });
+  }
+}
+
 // src/DomSurfacePainter.ts
 var MAX_DOM_IMAGE_ENTRIES = 256;
 var MAX_DOM_IMAGE_BYTES = 64 * 1024 * 1024;
@@ -3713,6 +3799,7 @@ class DomSurfacePainter {
   appliedMetricsKey;
   renderedGridKey;
   renderedLinksKey;
+  selection = new DomTextSelection;
   linkCells = new Map;
   hasRenderedFrame = false;
   reportedMissingImageIds = new Set;
@@ -3724,12 +3811,18 @@ class DomSurfacePainter {
   onOpenHyperlink;
   copySelection = (event) => {
     const selection = document.getSelection();
-    if (!this.root || !selection || selection.isCollapsed || !event.clipboardData)
+    if (!this.root || !selection || selection.isCollapsed || !event.clipboardData || document.activeElement?.matches?.("input, textarea, [contenteditable='true']"))
       return;
     const ranges = Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index));
     if (ranges.some((range) => !this.root.contains(range.commonAncestorContainer)))
       return;
-    event.clipboardData.setData("text/plain", ranges.map((range) => range.cloneContents().textContent ?? "").join(`
+    event.clipboardData.setData("text/plain", ranges.map((range) => {
+      const content = range.cloneContents();
+      for (const control of content.querySelectorAll('[data-text-selectable="false"]'))
+        control.remove();
+      const parent = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+      return parent?.closest('[data-text-selectable="false"]') ? "" : content.textContent ?? "";
+    }).join(`
 `));
     event.preventDefault();
   };
@@ -3859,9 +3952,13 @@ class DomSurfacePainter {
       this.reconcileImages([], metrics, false);
       this.renderedGridKey = undefined;
       this.renderedLinksKey = undefined;
+      this.selection = new DomTextSelection;
       this.hasRenderedFrame = false;
       return;
     }
+    const selection = new DomTextSelection(frame);
+    const selectionChanged = selection.key !== this.selection.key;
+    this.selection = selection;
     const gridKey = `${frame.width}x${frame.height}x${frame.rows.length}`;
     const linksKey = JSON.stringify([
       frame.width,
@@ -3885,9 +3982,9 @@ class DomSurfacePainter {
         }
       }
     }
-    const fullRepaint = linksChanged || metricsChanged || !this.hasRenderedFrame || gridKey !== this.renderedGridKey || !damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay;
+    const fullRepaint = selectionChanged || linksChanged || metricsChanged || !this.hasRenderedFrame || gridKey !== this.renderedGridKey || !damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay;
     this.renderedGridKey = gridKey;
-    const preparedRows = this.textLayout.prepare(frame, metrics, new Set((frame.links ?? []).filter(([, links]) => links.length > 0).map(([y]) => y)));
+    const preparedRows = this.textLayout.prepare(frame, metrics, new Set((frame.links ?? []).filter(([, links]) => links.length > 0).map(([y]) => y)), this.selection);
     if (fullRepaint) {
       for (let y = this.rowElements.length;y > frame.rows.length; y -= 1) {
         const row = this.rowElements[y - 1];
@@ -3916,6 +4013,20 @@ class DomSurfacePainter {
     this.reconcileImages(frame.images ?? [], metrics, allowRecoveryRequests);
     this.hasRenderedFrame = true;
   }
+  allowsTextSelection(x, y) {
+    const row = this.cells[Math.floor(y)];
+    if (!row)
+      return false;
+    for (const [start, element] of row) {
+      const span = Number(element.getAttribute("data-span"));
+      if (x >= start && x < start + span)
+        return element.getAttribute("data-text-selectable") === "true" && !!element.textContent?.trim();
+    }
+    return false;
+  }
+  isTextInput(x, y) {
+    return this.selection.isTextInput(y, x);
+  }
   invalidateFontMetrics() {
     this.appliedMetricsKey = undefined;
     this.textLayout?.invalidate();
@@ -3933,6 +4044,7 @@ class DomSurfacePainter {
     this.root?.replaceChildren();
     this.root = undefined;
     this.rowsLayer = undefined;
+    this.selection = new DomTextSelection;
     this.imagesLayer = undefined;
     this.rowElements = [];
     this.cells = [];
@@ -3983,6 +4095,15 @@ class DomSurfacePainter {
         this.styleCache.set(key, resolved);
       }
       const geometricText = canRenderGeometricGlyph(text) ? text : "";
+      const selectable = !geometricText && this.selection.allows(y, x, span);
+      if (element.getAttribute("data-text-selectable") !== String(selectable)) {
+        if (!selectable)
+          clearSelection(element);
+        element.setAttribute("data-text-selectable", String(selectable));
+        element.style.userSelect = selectable ? "text" : "none";
+        element.style.webkitUserSelect = selectable ? "text" : "none";
+        element.style.cursor = selectable ? "text" : "";
+      }
       const left = x * metrics.cellWidth - inlineOrigin;
       inlineOrigin += this.textLayout.advance(text, span, cellStyle?.em ?? 0);
       const spacing = this.textLayout.spacing(text, span, cellStyle?.em ?? 0, metrics.cellWidth);
@@ -3990,6 +4111,7 @@ class DomSurfacePainter {
         key,
         x,
         span,
+        selectable,
         geometricText,
         left,
         spacing,
@@ -3999,7 +4121,7 @@ class DomSurfacePainter {
         Object.assign(element.style, resolved, {
           left: `${left}px`,
           position: Math.abs(left) < 0.01 ? "static" : "relative",
-          display: Math.abs(left) < 0.01 && (this.forcedColors || (cellStyle?.opacity ?? 1) === 1) ? "contents" : "inline",
+          display: selectable && Math.abs(left) < 0.01 && (this.forcedColors || (cellStyle?.opacity ?? 1) === 1) ? "contents" : "inline",
           letterSpacing: `${spacing}px`,
           unicodeBidi: naturalText(text, span) ? "normal" : "isolate",
           backgroundColor: "transparent"
@@ -4047,7 +4169,7 @@ class DomSurfacePainter {
         element.setAttribute("target", "_blank");
         element.setAttribute("href", /^https?:/i.test(target) ? target : "#");
         const activate = (event) => {
-          if (event.altKey || document.getSelection()?.isCollapsed === false) {
+          if (event.altKey) {
             event.preventDefault();
           } else if (/^https?:/i.test(target) && (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1)) {
             return;
@@ -4099,6 +4221,8 @@ class DomSurfacePainter {
         whiteSpace: "pre",
         contain: "strict"
       });
+      rowElement.style.userSelect = "text";
+      rowElement.style.webkitUserSelect = "text";
       rowElement.style.position = "absolute";
       rowElement.style.left = "0";
       this.rowElements[y] = rowElement;
@@ -4133,7 +4257,8 @@ class DomSurfacePainter {
     style.direction = "ltr";
     style.unicodeBidi = "isolate";
     style.fontVariantLigatures = "none";
-    style.userSelect = "text";
+    style.userSelect = "none";
+    style.webkitUserSelect = "none";
   }
   reconcileImages(images, metrics, allowRecoveryRequests) {
     const layer = this.imagesLayer;
@@ -4430,171 +4555,6 @@ function selectionInvalidator() {
       text.data = value;
     }
   });
-}
-
-// src/DomTextSelection.ts
-class DomTextSelection {
-  terminal;
-  textRoot;
-  changed;
-  element = document.createElement("div");
-  toggle = document.createElement("button");
-  all = document.createElement("button");
-  status = document.createElement("span");
-  enabled = false;
-  get active() {
-    return this.enabled;
-  }
-  constructor(terminal, textRoot, changed) {
-    this.terminal = terminal;
-    this.textRoot = textRoot;
-    this.changed = changed;
-    this.element.className = "webhost-scene__selection-controls";
-    this.element.setAttribute("role", "group");
-    this.element.setAttribute("aria-label", "Text selection");
-    Object.assign(this.element.style, {
-      gridRow: "2",
-      gridColumn: "1",
-      justifySelf: "end",
-      display: "flex",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: "6px",
-      maxWidth: "100%",
-      font: "12px/1.4 system-ui, sans-serif"
-    });
-    for (const button of [this.toggle, this.all]) {
-      button.type = "button";
-      Object.assign(button.style, {
-        font: "inherit",
-        color: "ButtonText",
-        background: "ButtonFace",
-        border: "1px solid ButtonBorder",
-        borderRadius: "4px",
-        padding: "3px 8px"
-      });
-    }
-    this.toggle.textContent = "Select text";
-    this.toggle.setAttribute("aria-pressed", "false");
-    this.toggle.onclick = () => this.setActive(!this.enabled);
-    this.all.textContent = "Select all text";
-    this.all.hidden = true;
-    this.all.onclick = () => {
-      this.selectAll();
-      this.terminal.focus({ preventScroll: true });
-    };
-    this.status.setAttribute("role", "status");
-    this.status.setAttribute("aria-live", "polite");
-    this.element.append(this.status, this.toggle, this.all);
-    terminal.addEventListener("keydown", this.keyDown, true);
-    terminal.addEventListener("click", this.suppressActivation, true);
-    terminal.addEventListener("auxclick", this.suppressActivation, true);
-    terminal.addEventListener("paste", this.suppressActivation, true);
-    terminal.addEventListener("beforeinput", this.suppressActivation, true);
-  }
-  boundaries() {
-    const root = this.textRoot();
-    if (!root)
-      return;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    let first, last;
-    for (let node = walker.nextNode();node; node = walker.nextNode()) {
-      if (!node.textContent?.length)
-        continue;
-      first ??= node;
-      last = node;
-    }
-    return first && last ? { first, last } : undefined;
-  }
-  setActive(active) {
-    if (active === this.enabled)
-      return;
-    this.enabled = active;
-    this.toggle.setAttribute("aria-pressed", String(active));
-    this.all.hidden = !active;
-    this.status.textContent = active ? "Drag or use Shift+Arrow keys. Escape returns to the app." : "Text selection off.";
-    this.terminal.setAttribute("data-text-selection", String(active));
-    this.terminal.style.cursor = active ? "text" : "";
-    this.changed();
-    if (active) {
-      this.terminal.focus({ preventScroll: true });
-      const selection = document.getSelection();
-      if (!this.textRoot()?.contains(selection?.anchorNode ?? null)) {
-        const bounds = this.boundaries();
-        if (bounds)
-          selection?.setBaseAndExtent(bounds.first, 0, bounds.first, 0);
-      }
-    } else
-      this.toggle.focus({ preventScroll: true });
-  }
-  selectAll() {
-    const bounds = this.boundaries();
-    if (bounds)
-      document.getSelection()?.setBaseAndExtent(bounds.first, 0, bounds.last, bounds.last.length);
-  }
-  suppressActivation = (event) => {
-    if (!this.enabled)
-      return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  };
-  keyDown = (event) => {
-    if (!this.enabled)
-      return;
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      this.setActive(false);
-      return;
-    }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      this.selectAll();
-      return;
-    }
-    if (event.key === "Tab" || event.metaKey || event.ctrlKey)
-      return;
-    const direction = ["ArrowLeft", "ArrowUp", "Home"].includes(event.key) ? "backward" : "forward";
-    const granularity = event.key === "Home" || event.key === "End" ? "lineboundary" : event.key === "ArrowUp" || event.key === "ArrowDown" ? "line" : event.altKey ? "word" : "character";
-    if ([
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "ArrowDown",
-      "Home",
-      "End"
-    ].includes(event.key)) {
-      const selection = document.getSelection();
-      const bounds = this.boundaries();
-      if (selection && bounds) {
-        if (!this.textRoot()?.contains(selection.anchorNode))
-          selection.setBaseAndExtent(bounds.first, 0, bounds.first, 0);
-        selection.modify(event.shiftKey ? "extend" : "move", direction, granularity);
-        if (!this.textRoot()?.contains(selection.focusNode)) {
-          const end = direction === "backward" ? bounds.first : bounds.last;
-          const offset = direction === "backward" ? 0 : end.length;
-          if (event.shiftKey)
-            selection.extend(end, offset);
-          else
-            selection.setBaseAndExtent(end, offset, end, offset);
-        }
-      }
-    }
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  };
-  dispose() {
-    this.enabled = false;
-    this.toggle.onclick = null;
-    this.all.onclick = null;
-    this.terminal.removeEventListener("keydown", this.keyDown, true);
-    this.terminal.removeEventListener("click", this.suppressActivation, true);
-    this.terminal.removeEventListener("auxclick", this.suppressActivation, true);
-    this.terminal.removeEventListener("paste", this.suppressActivation, true);
-    this.terminal.removeEventListener("beforeinput", this.suppressActivation, true);
-    this.element.remove();
-  }
 }
 
 // src/HostGeometrySession.ts
@@ -5189,7 +5149,7 @@ class WebHostSceneRuntime {
   canvas;
   canvasScale = 1;
   domSurfaceRoot;
-  textSelection;
+  textInputPress;
   domFocus;
   lastDomSurfaceSize;
   domGeometry;
@@ -5277,15 +5237,6 @@ class WebHostSceneRuntime {
     this.terminalMount.className = "webhost-scene__terminal";
     this.terminalMount.tabIndex = 0;
     this.element.append(header, this.terminalMount);
-    if (this.rendererKind === "dom") {
-      header.style.gridRow = "1";
-      header.style.gridColumn = "1";
-      this.textSelection = new DomTextSelection(this.terminalMount, () => this.domSurfaceRoot?.querySelector(".webhost-scene__surface-rows") ?? undefined, () => {
-        this.cancelGeometryPointer();
-        this.domFocus?.refresh();
-      });
-      this.element.insertBefore(this.textSelection.element, this.terminalMount);
-    }
     options.mount.appendChild(this.element);
     this.applyVisibility();
   }
@@ -5313,7 +5264,7 @@ class WebHostSceneRuntime {
     });
     this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
     if (this.domSurfaceRoot)
-      this.domFocus = new DomFocusPresentation(this.terminalMount, () => this.textSelection?.active ?? false);
+      this.domFocus = new DomFocusPresentation(this.terminalMount, () => this.nativePointerGesture || this.hasSurfaceSelection());
     if (this.domSurfaceRoot) {
       this.domGeometry = new DomGeometryController(this.terminalMount);
       this.paintScheduler.setHeld(true);
@@ -5478,7 +5429,6 @@ class WebHostSceneRuntime {
     this.domGeometry?.dispose();
     this.paintScheduler.dispose();
     this.painter.dispose();
-    this.textSelection?.dispose();
     this.domFocus?.dispose();
     this.accessibilityTree?.dispose();
     this.accessibilityTree = undefined;
@@ -5575,9 +5525,9 @@ class WebHostSceneRuntime {
     this.element.style.boxShadow = "0 20px 50px rgba(0, 0, 0, 0.28)";
     this.element.style.overflow = "hidden";
     this.element.style.gap = "0.5rem";
-    this.element.style.gridTemplateRows = this.textSelection ? "auto auto minmax(0, 1fr)" : "auto minmax(0, 1fr)";
+    this.element.style.gridTemplateRows = "auto minmax(0, 1fr)";
     this.terminalMount.style.position = "relative";
-    this.terminalMount.style.gridRow = this.textSelection ? "3" : "2";
+    this.terminalMount.style.gridRow = "2";
     this.terminalMount.style.boxSizing = "border-box";
     this.terminalMount.style.width = "100%";
     if (this.sceneFrame === "resizable") {
@@ -5672,7 +5622,7 @@ class WebHostSceneRuntime {
   }
   installInputHandlers() {
     const handleKeyDown = (event) => {
-      if (this.textSelection?.active || event.metaKey || event.isComposing || this.rendererKind === "dom" && event.ctrlKey && ([
+      if (event.metaKey || event.isComposing || this.rendererKind === "dom" && event.ctrlKey && ([
         "f",
         "+",
         "=",
@@ -5706,8 +5656,6 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePaste = (event) => {
-      if (this.textSelection?.active)
-        return;
       const text = event.clipboardData?.getData("text/plain") ?? "";
       if (!text) {
         return;
@@ -5721,6 +5669,16 @@ class WebHostSceneRuntime {
       }
       if (this.allowsNativeTextSelection(event) || this.isNativeLink(event)) {
         this.nativePointerGesture = true;
+        const location2 = this.cellLocation(event);
+        this.textInputPress = location2 && this.painter instanceof DomSurfacePainter && this.painter.isTextInput(location2.x, location2.y) ? {
+          location: location2,
+          event,
+          moved: false,
+          revision: this.geometrySession.pointerRevision
+        } : undefined;
+        if (this.allowsNativeTextSelection(event))
+          this.terminalMount.focus?.({ preventScroll: true });
+        this.domFocus?.refresh();
         return;
       }
       const location = this.cellLocation(event);
@@ -5728,6 +5686,9 @@ class WebHostSceneRuntime {
         return;
       }
       this.nativePointerGesture = false;
+      this.textInputPress = undefined;
+      if (this.hasSurfaceSelection())
+        document.getSelection()?.removeAllRanges();
       this.canceledPointerId = undefined;
       const button = this.inputEncoder.pointerButton(event.button);
       this.activePointerButton = button;
@@ -5747,7 +5708,16 @@ class WebHostSceneRuntime {
         return;
       }
       if (!this.hasCapturedPointer && (this.nativePointerGesture || this.allowsNativeTextSelection(event) || this.isNativeLink(event))) {
+        const press = this.textInputPress;
+        this.textInputPress = undefined;
         this.nativePointerGesture = false;
+        if (press && !press.moved && press.revision === this.geometrySession.pointerRevision) {
+          if (this.hasSurfaceSelection())
+            document.getSelection()?.removeAllRanges();
+          this.onInput(this.inputEncoder.encodePointerDown(press.location, "primary", press.event, this.geometrySession.pointerRevision));
+          this.onInput(this.inputEncoder.encodePointerUp(press.location, "primary", event, this.geometrySession.pointerRevision));
+        }
+        this.domFocus?.refresh();
         return;
       }
       const location = this.hasCapturedPointer ? this.rawCellLocation(event) : this.cellLocation(event);
@@ -5771,6 +5741,9 @@ class WebHostSceneRuntime {
     const handlePointerMove = (event) => {
       if (event.pointerId === this.canceledPointerId)
         return;
+      const press = this.textInputPress;
+      if (press && Math.hypot(event.clientX - press.event.clientX, event.clientY - press.event.clientY) > 3)
+        press.moved = true;
       if (!this.hasCapturedPointer && (this.nativePointerGesture || this.allowsNativeTextSelection(event) || this.isNativeLink(event))) {
         return;
       }
@@ -5784,7 +5757,7 @@ class WebHostSceneRuntime {
       this.onInput(this.inputEncoder.encodePointerMove(location, this.activePointerButton, event, this.geometrySession.pointerRevision));
     };
     const handleWheel = (event) => {
-      if (this.wheelMode === "passive" || this.textSelection?.active || this.rendererKind === "dom" && (event.ctrlKey || event.metaKey)) {
+      if (this.wheelMode === "passive" || this.rendererKind === "dom" && (event.ctrlKey || event.metaKey)) {
         return;
       }
       const location = this.cellLocation(event);
@@ -5801,10 +5774,17 @@ class WebHostSceneRuntime {
       if (event.pointerId === this.capturedPointerId)
         this.cancelGeometryPointer();
     };
-    const blurPointer = () => this.cancelGeometryPointer();
+    const blurPointer = () => {
+      this.cancelGeometryPointer();
+      endNativeDrag();
+    };
     const endNativeDrag = () => {
       this.nativePointerGesture = false;
+      this.textInputPress = undefined;
+      this.domFocus?.refresh();
     };
+    const selectionChanged = () => this.domFocus?.refresh();
+    document.addEventListener?.("selectionchange", selectionChanged);
     document.addEventListener?.("pointerup", endNativeDrag);
     document.addEventListener?.("pointercancel", endNativeDrag);
     globalThis.window?.addEventListener?.("blur", blurPointer);
@@ -5819,6 +5799,7 @@ class WebHostSceneRuntime {
       passive: false
     });
     this.detachInputHandlers = () => {
+      document.removeEventListener?.("selectionchange", selectionChanged);
       document.removeEventListener?.("pointerup", endNativeDrag);
       document.removeEventListener?.("pointercancel", endNativeDrag);
       globalThis.window?.removeEventListener?.("blur", blurPointer);
@@ -5922,6 +5903,7 @@ class WebHostSceneRuntime {
     this.bridge?.resize(current.columns, current.rows, current.cellWidth, current.cellHeight);
   }
   cancelGeometryPointer() {
+    this.textInputPress = undefined;
     const id = this.capturedPointerId;
     const location = this.capturedPointerLocation;
     const revision = this.capturedPointerRevision;
@@ -6066,7 +6048,7 @@ class WebHostSceneRuntime {
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight
     }, [...announcements], {
-      synchronizeFocus: this.synchronizeAccessibilityFocus && !this.textSelection?.active,
+      synchronizeFocus: this.synchronizeAccessibilityFocus && !this.nativePointerGesture && !this.hasSurfaceSelection(),
       actionResponse: frame.accessibilityActionResponse
     });
   }
@@ -6154,8 +6136,15 @@ class WebHostSceneRuntime {
   isNativeLink(event) {
     return this.rendererKind === "dom" && !!event.target?.closest?.("a[data-surface-link]");
   }
+  hasSurfaceSelection() {
+    const selection = document.getSelection?.();
+    return selection?.isCollapsed === false && !!this.domSurfaceRoot?.contains(selection.anchorNode) && !!this.domSurfaceRoot?.contains(selection.focusNode);
+  }
   allowsNativeTextSelection(event) {
-    return this.rendererKind === "dom" && (event.altKey || this.textSelection?.active === true);
+    if (!(this.painter instanceof DomSurfacePainter) || event.button > 0)
+      return false;
+    const location = this.cellLocation(event);
+    return !!location && this.painter.allowsTextSelection(location.x, location.y);
   }
   cellLocation(event) {
     if (this.domGeometry && (!this.geometryMeasurable || !this.geometrySession.allowsPointer))
