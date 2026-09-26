@@ -371,7 +371,7 @@ extension AutomaticSliderStyle: ReuseTransparentStyle {}
 /// span as `━`, the current position as `●`, and the remainder as `─`. While
 /// the control is focused or pressed, the track and value take the control
 /// chrome's paints over a filled background; otherwise the track uses the
-/// separator paint. The label uses the theme's accent border role, and the
+/// separator paint. The label uses the row's foreground paint, and the
 /// whole row honors the chrome's disabled opacity.
 public struct LinearSliderStyle: SliderStyle {
   /// Creates the style.
@@ -418,7 +418,7 @@ private struct LinearSliderStyleBody: View {
     ControlStyleRow(
       chrome: chrome, focusActive: configuration.focusActive, isHighlighted: active
     ) {
-      configuration.label.foregroundStyle(.terminalBorder(.accent))
+      configuration.label.foregroundStyle(chrome.foregroundStyle)
       HStack(alignment: .center, spacing: 1) {
         configuration.track {
           Text(

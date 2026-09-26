@@ -5,12 +5,12 @@ import Testing
 @testable import SwiftTUIViews
 
 // The expected bodies retain the pre-style primitive compositions, including
-// row opacity and highlight placement, so a matching consumer implementation
-// cannot conceal a shared default-rendering regression.
+// row opacity and highlight placement, with the accessible foreground for labels.
+// A matching consumer implementation cannot conceal a shared rendering regression.
 @MainActor
 struct LegacyValueControlCompositionTests {
   @Test(
-    "automatic value-control styles preserve prior complete raster output",
+    "automatic value-control styles preserve primitive raster composition",
     arguments: [false, true], [false, true])
   func automaticEquivalence(_ enabled: Bool, _ focused: Bool) {
     var environment = EnvironmentValues()
@@ -26,7 +26,7 @@ struct LegacyValueControlCompositionTests {
       showsRail: focused, railStyle: row.borderStyle, isHighlighted: focused,
       backgroundStyle: row.backgroundStyle, reservesRailSpaceWhenHidden: true
     ) {
-      Text("Level").foregroundStyle(.terminalBorder(.accent))
+      Text("Level").foregroundStyle(row.foregroundStyle)
       highlightedControlRow(
         HStack(alignment: .center, spacing: 1) {
           Text("━━━━●───").foregroundStyle(
@@ -39,7 +39,7 @@ struct LegacyValueControlCompositionTests {
       showsRail: focused, railStyle: row.borderStyle, isHighlighted: focused,
       backgroundStyle: row.backgroundStyle, reservesRailSpaceWhenHidden: true
     ) {
-      Text("Count").foregroundStyle(.terminalBorder(.accent))
+      Text("Count").foregroundStyle(row.foregroundStyle)
       highlightedControlRow(
         HStack(alignment: .center, spacing: 1) {
           Text("◁").foregroundStyle(.placeholder)

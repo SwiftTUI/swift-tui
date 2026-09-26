@@ -339,7 +339,7 @@ extension AnyStepperStyle: TypedReuseEqualityProviding {
 /// `▶` while that direction can still move and the hollow `◁` and `▷` at a
 /// bound, where they also take the placeholder paint. While the control is
 /// focused or pressed, the controls and value take the control chrome's
-/// paints over a filled background. The label uses the theme's accent border
+/// paints over a filled background. The label uses the row's foreground
 /// role, and the row honors the chrome's disabled opacity.
 ///
 /// It is not an alias: ``CompactStepperStyle`` renders a different row.
@@ -421,7 +421,7 @@ private struct StepperStyleRow: View {
       chrome: chrome, focusActive: configuration.focusActive,
       isHighlighted: active, reservesRail: !compact
     ) {
-      configuration.label.foregroundStyle(.terminalBorder(.accent))
+      configuration.label.foregroundStyle(chrome.foregroundStyle)
       HStack(alignment: .center, spacing: 1) {
         configuration.decrement {
           Text(compact ? "−" : configuration.canDecrement ? "◀" : "◁")

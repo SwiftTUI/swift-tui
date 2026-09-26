@@ -66,7 +66,7 @@ struct ConsumerAutomaticSliderStyle: SliderStyle {
       ? min(max(configuration.fractionCompleted, 0), 1) : 0
     let position = min(width - 1, max(0, Int((fraction * Double(width - 1)).rounded())))
     ConsumerValueStyleRow(chrome: row, focused: configuration.focusActive, active: active) {
-      configuration.label.foregroundStyle(.terminalBorder(.accent))
+      configuration.label.foregroundStyle(row.foregroundStyle)
       HStack(alignment: .center, spacing: 1) {
         configuration.track {
           Text(
@@ -95,7 +95,7 @@ struct ConsumerAutomaticStepperStyle: StepperStyle {
       isPressed: configuration.isPressed)
     let accent = active ? control.borderStyle : AnyShapeStyle(.separator)
     ConsumerValueStyleRow(chrome: row, focused: configuration.focusActive, active: active) {
-      configuration.label.foregroundStyle(.terminalBorder(.accent))
+      configuration.label.foregroundStyle(row.foregroundStyle)
       HStack(alignment: .center, spacing: 1) {
         configuration.decrement {
           Text(configuration.canDecrement ? "◀" : "◁")
