@@ -123,12 +123,14 @@ package struct WebSurfaceInputParser {
 
   private mutating func parseGeometryCommand(_ text: String) -> HostGeometryRequest? {
     let parts = splitCommand(text)
-    guard parts.count == 6, parts[0] == "geometry",
+    guard parts.count == 6 || parts.count == 7, parts[0] == "geometry",
       let revision = UInt64(parts[1]), let width = Int(parts[2]), let height = Int(parts[3]),
       let cellWidth = Int(parts[4]), let cellHeight = Int(parts[5]),
+      let paragraphSpacing = parts.count == 7 ? Int(parts[6]) : 0,
       let request = HostGeometryRequest(
         revision: revision, size: .init(width: width, height: height),
-        cellPixelSize: .init(width: cellWidth, height: cellHeight)
+        cellPixelSize: .init(width: cellWidth, height: cellHeight),
+        paragraphSpacing: paragraphSpacing
       )
     else { return nil }
     guard request.revision > latestGeometryRevision else { return nil }

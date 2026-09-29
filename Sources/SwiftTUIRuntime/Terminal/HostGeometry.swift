@@ -8,17 +8,23 @@ package struct HostGeometryRequest: Equatable, Sendable {
   package let revision: UInt64
   package let size: CellSize
   package let cellPixelSize: PixelSize
+  package let paragraphSpacing: Int
 
-  package init?(revision: UInt64, size: CellSize, cellPixelSize: PixelSize) {
+  package init?(
+    revision: UInt64, size: CellSize, cellPixelSize: PixelSize,
+    paragraphSpacing: Int = 0
+  ) {
     guard revision > 0, revision <= Self.maximumRevision,
       size.width > 0, size.height > 0, HostWireBudget.admits(size),
       cellPixelSize.width > 0, cellPixelSize.height > 0,
       cellPixelSize.width <= Self.maximumCellPitch,
-      cellPixelSize.height <= Self.maximumCellPitch
+      cellPixelSize.height <= Self.maximumCellPitch,
+      (0...Self.maximumCellPitch).contains(paragraphSpacing)
     else { return nil }
     self.revision = revision
     self.size = size
     self.cellPixelSize = cellPixelSize
+    self.paragraphSpacing = paragraphSpacing
   }
 }
 
@@ -44,6 +50,7 @@ package struct HostLayoutConfiguration: Sendable {
   package let pointer: PointerInputCapabilities
   package let geometry: HostGeometryStamp?
   package let reduceMotion: Bool?
+  package let paragraphSpacing: Int
 
   package init(
     size: CellSize,
@@ -52,7 +59,8 @@ package struct HostLayoutConfiguration: Sendable {
     graphics: TerminalGraphicsCapabilities,
     pointer: PointerInputCapabilities,
     geometry: HostGeometryStamp? = nil,
-    reduceMotion: Bool? = nil
+    reduceMotion: Bool? = nil,
+    paragraphSpacing: Int = 0
   ) {
     self.size = size
     self.appearance = appearance
@@ -61,6 +69,7 @@ package struct HostLayoutConfiguration: Sendable {
     self.pointer = pointer
     self.geometry = geometry
     self.reduceMotion = reduceMotion
+    self.paragraphSpacing = paragraphSpacing
   }
 }
 

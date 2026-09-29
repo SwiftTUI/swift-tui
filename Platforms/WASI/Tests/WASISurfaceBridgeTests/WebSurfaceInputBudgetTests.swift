@@ -4,6 +4,25 @@ import Testing
 @testable import SwiftTUIWASISurfaceBridge
 
 @Suite struct WebSurfaceInputBudgetTests {
+  @Test func paragraphGeometryExtensionAcceptsOldRecordsAndClearsSpacing() throws {
+    var parser = WebSurfaceInputParser()
+    for (command, spacing) in [
+      ("geometry:1:80:24:9:21", 0),
+      ("geometry:2:80:24:9:21:2", 2), ("geometry:3:80:24:9:21:0", 0),
+    ] {
+      let records = parser.feedRecords(Array("\u{1E}\(command)\n".utf8))
+      #expect(records.count == 1)
+      guard case .control(.geometry(let request)) = records.first else {
+        Issue.record("Missing paragraph geometry")
+        return
+      }
+      #expect(request.paragraphSpacing == spacing)
+    }
+    for suffix in ["-1", "0.5", "8193", "2:3", ""] {
+      #expect(parser.feedRecords(Array("\u{1E}geometry:4:80:24:9:21:\(suffix)\n".utf8)).isEmpty)
+    }
+  }
+
   @Test func cancellationPreservesItsPositionAndGeometryStamp() throws {
     var parser = WebSurfaceInputParser(session: 31)
     let result = parser.feed(

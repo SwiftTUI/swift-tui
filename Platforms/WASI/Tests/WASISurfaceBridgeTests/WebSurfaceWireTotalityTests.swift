@@ -159,6 +159,8 @@ struct WebSurfaceWireTotalityTests {
         == HostWireSchema.WebWire.accessibilityAnnouncementKeys
     )
 
+    let paragraphs = try #require(record["paragraphs"] as? [[String: Any]])
+    #expect(Set(try #require(paragraphs.first).keys) == HostWireSchema.WebWire.paragraphKeys)
     let scrollRegions = try #require(record["scrollRegions"] as? [[String: Any]])
     #expect(
       Set(try #require(scrollRegions.first).keys) == HostWireSchema.WebWire.scrollRegionKeys
@@ -465,6 +467,11 @@ struct WebSurfaceWireTotalityTests {
       rasterDamage: damage,
       preferredLayoutSize: CellSize(width: 9, height: 8)
     )
+    frame.semantics.paragraphs = [
+      ParagraphRegion(
+        identity: Identity(components: ["root", "paragraph"]),
+        rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 2)))
+    ]
     frame.semantics.accessibilityActionResponse = .init(
       requestID: 7, target: "fixture-token", result: .accepted)
     return frame

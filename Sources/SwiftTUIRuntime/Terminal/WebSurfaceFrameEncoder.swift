@@ -261,6 +261,7 @@ package enum WebSurfaceFrameEncoder {
     let scrollRegions = try encodeScrollRegions(model.scrollRegions)
     let hasV2Fields =
       model.sequence != nil || !accessibilityTree.isEmpty
+      || !model.paragraphs.isEmpty
       || !accessibilityAnnouncements.isEmpty
       || !scrollRegions.isEmpty
     let version = hasV2Fields ? 2 : 1
@@ -294,6 +295,13 @@ package enum WebSurfaceFrameEncoder {
     if let damage = model.damage {
       json += ",\"damage\":"
       json += try encodeDamage(damage)
+    }
+    if !model.paragraphs.isEmpty {
+      let paragraphs = try HostWireBudget.collect(
+        model.paragraphs.lazy.map { paragraph in
+          "{\"id\":\(jsonString(paragraph.identity.path)),\"rect\":\(encodeRect(paragraph.rect))}"
+        })
+      json += ",\"paragraphs\":[" + paragraphs.joined(separator: ",") + "]"
     }
     if !accessibilityTree.isEmpty {
       json += ",\"accessibilityTree\":["
@@ -391,6 +399,13 @@ package enum WebSurfaceFrameEncoder {
     json += "]"
     json += ",\"damage\":"
     json += try encodeDamage(damage)
+    if !model.paragraphs.isEmpty {
+      let paragraphs = try HostWireBudget.collect(
+        model.paragraphs.lazy.map { paragraph in
+          "{\"id\":\(jsonString(paragraph.identity.path)),\"rect\":\(encodeRect(paragraph.rect))}"
+        })
+      json += ",\"paragraphs\":[" + paragraphs.joined(separator: ",") + "]"
+    }
     if !accessibilityTree.isEmpty {
       json += ",\"accessibilityTree\":["
       json += accessibilityTree.joined(separator: ",")

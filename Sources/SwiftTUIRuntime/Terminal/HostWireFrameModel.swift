@@ -126,6 +126,7 @@ package struct HostWireFrameModel {
   }
 
   package let accessibilityNodes: [WireAccessibilityNode]
+  package let paragraphs: [ParagraphRegion]
   package let accessibilityAnnouncements: [WireAnnouncement]
   package let accessibilityActionResponse: AccessibilityActionResponse?
   package let scrollRegions: [WireScrollRegion]
@@ -177,11 +178,36 @@ package struct HostWireFrameModel {
     accessibilityNodes = (semanticSnapshot?.accessibilityNodes ?? []).map { node in
       WireAccessibilityNode(node, focusedIdentity: focusedIdentity)
     }
+    paragraphs = Self.visibleParagraphs(semanticSnapshot?.paragraphs ?? [], in: surface.size)
     accessibilityActionResponse = semanticSnapshot?.accessibilityActionResponse
     accessibilityAnnouncements = (semanticSnapshot?.accessibilityAnnouncements ?? [])
       .map(WireAnnouncement.init)
     scrollRegions = (semanticSnapshot?.scrollRoutes ?? []).map(WireScrollRegion.init)
     imageAttachments = surface.imageAttachments
+  }
+
+  /// Ambiguous overlapping paragraphs are omitted as a group. Raster text is
+  /// still presented unchanged; a rectangular boundary must never claim the
+  /// text of a different authored paragraph. Work and storage stay grid-bounded.
+  private static func visibleParagraphs(_ paragraphs: [ParagraphRegion], in size: CellSize)
+    -> [ParagraphRegion]
+  {
+    guard !paragraphs.isEmpty, HostWireBudget.admits(size) else { return [] }
+    let viewport = CellRect(origin: .zero, size: size)
+    var occupied = Set<Int>()
+    var identities = Set<Identity>()
+    var result: [ParagraphRegion] = []
+    for paragraph in paragraphs {
+      guard let rect = paragraph.rect.intersection(viewport) else { continue }
+      guard identities.insert(paragraph.identity).inserted else { return [] }
+      for y in rect.origin.y..<(rect.origin.y + rect.size.height) {
+        for x in rect.origin.x..<(rect.origin.x + rect.size.width) {
+          guard occupied.insert(y * size.width + x).inserted else { return [] }
+        }
+      }
+      result.append(.init(identity: paragraph.identity, rect: rect))
+    }
+    return result
   }
 
   // MARK: - Cell-surface derivations

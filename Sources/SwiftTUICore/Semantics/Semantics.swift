@@ -28,6 +28,7 @@ package struct SemanticExtractor: Sendable {
   package func extract(from placed: PlacedNode) -> SemanticSnapshot {
     var interactionRegions: [InteractionRegion] = []
     var focusRegions: [FocusRegion] = []
+    var paragraphs: [ParagraphRegion] = []
     // Scope chains of the command/chrome-hosting regions (Role A: `Panel`,
     // `NavigationStack`, …) visible this frame. A host is a focus *scope* but
     // never a focus *target* — it does not participate in top-level focus, so it
@@ -48,6 +49,11 @@ package struct SemanticExtractor: Sendable {
         let sectionIdentity = context.sectionIdentity
         let modalFocusScopePath = context.modalFocusScopePath
         let clipRect = context.clipRect
+        if node.semanticMetadata.isParagraph,
+          let rect = interactionRect(for: node, clippedTo: clipRect)
+        {
+          paragraphs.append(.init(identity: node.identity, rect: rect))
+        }
         let sealingParentOnChain = context.sealingParentOnChain
         let interactionsDisabledOnChain = context.interactionsDisabledOnChain
         let hitTestingDisabledOnChain = context.hitTestingDisabledOnChain
@@ -209,7 +215,7 @@ package struct SemanticExtractor: Sendable {
         visualLabelRoutes: accessibilityExtraction.visualLabelRoutes
       ) : []
 
-    return SemanticSnapshot(
+    var snapshot = SemanticSnapshot(
       interactionRegions: interactionRegions,
       focusRegions: focusRegions,
       scrollRoutes: scrollRoutes,
@@ -220,6 +226,8 @@ package struct SemanticExtractor: Sendable {
       accessibilityWarnings: accessibilityWarnings,
       activeCommandScopePath: activeCommandScopePath
     )
+    snapshot.paragraphs = paragraphs
+    return snapshot
   }
 
   package func extract(

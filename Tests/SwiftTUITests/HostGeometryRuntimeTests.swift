@@ -6,6 +6,35 @@ import Testing
 
 @MainActor
 @Suite struct HostGeometryRuntimeTests {
+  @Test func paragraphSpacingIsCapturedAndClearedWithGeometry() throws {
+    let host = GeometryTestSurface()
+    host.size = .init(width: 32, height: 16)
+    let root = testIdentity("ParagraphGeometry")
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in
+      VStack(alignment: .leading, spacing: 0) {
+        Text("First").paragraph()
+        Text("Second").paragraph()
+      }
+    }
+    var rendered = 0
+    for spacing in [0, 2, 0] {
+      host.paragraphSpacing = spacing
+      host.revision += 1
+      loop.scheduler.requestSignal(named: "SIGWINCH")
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+      let frame = try #require(host.frames.last)
+      #expect(frame.hostGeometryStamp?.revision == host.revision)
+      let paragraphs = frame.semantics.paragraphs
+      #expect(paragraphs.count == 2)
+      #expect(paragraphs[1].rect.origin.y - paragraphs[0].rect.origin.y == 1 + spacing)
+    }
+  }
+
   @Test func explicitCancellationClearsGestureWithoutReleaseAndAllowsNextPress() throws {
     let host = GeometryTestSurface()
     let root = testIdentity("CancelledPointer")
@@ -240,6 +269,7 @@ private final class GeometryTestSurface: HostGeometryPresentationSurface,
   var session: UInt64 = 7
   var revision: UInt64 = 1
   var reduceMotion: Bool?
+  var paragraphSpacing = 0
   var size = CellSize(width: 24, height: 6)
   var pitch = PixelSize(width: 9, height: 21)
   var frames: [SemanticHostFrame] = []
@@ -250,7 +280,8 @@ private final class GeometryTestSurface: HostGeometryPresentationSurface,
     .init(
       size: size, appearance: appearance, theme: nil,
       graphics: .init(cellPixelSize: pitch), pointer: .cellOnly,
-      geometry: .init(session: session, revision: revision), reduceMotion: reduceMotion)
+      geometry: .init(session: session, revision: revision), reduceMotion: reduceMotion,
+      paragraphSpacing: paragraphSpacing)
   }
   func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     frames.append(frame)

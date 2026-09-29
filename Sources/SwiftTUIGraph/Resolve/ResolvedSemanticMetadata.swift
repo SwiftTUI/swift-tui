@@ -169,6 +169,12 @@ public struct SemanticMetadata: Equatable, Sendable {
     set { setFlag(Self.accessibilityHiddenFlag, to: newValue) }
   }
 
+  /// Authored text boundary; never inferred from raster rows or newlines.
+  package var isParagraph: Bool {
+    get { flag(Self.isParagraphFlag) }
+    set { setFlag(Self.isParagraphFlag, to: newValue) }
+  }
+
   public var isFocusable: Bool {
     get { explicitFocusability ?? false }
     set { explicitFocusability = newValue }
@@ -365,6 +371,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     merged.accessibilityTitle = other.accessibilityTitle ?? accessibilityTitle
     merged.accessibilityControl = other.accessibilityControl ?? accessibilityControl
     merged.allowsFocusWhenDisabled = allowsFocusWhenDisabled || other.allowsFocusWhenDisabled
+    merged.isParagraph = isParagraph || other.isParagraph
     return merged
   }
 
@@ -382,6 +389,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   private static let accessibilityLabelSourceFlag: UInt16 = 1 << 11
   private static let accessibilityLabelContinuationFlag: UInt16 = 1 << 12
   private static let usesAuthoredAccessibilityLabelFlag: UInt16 = 1 << 13
+  private static let isParagraphFlag: UInt16 = 1 << 14
 
   private func flag(_ bit: UInt16) -> Bool {
     flags & bit != 0

@@ -8,6 +8,7 @@ package final class WebSurfaceTransport: HostGeometryPresentationSurface,
 {
   private struct State: Sendable {
     var geometryRevision: UInt64 = 0
+    var paragraphSpacing: Int = 0
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
@@ -96,7 +97,8 @@ package final class WebSurfaceTransport: HostGeometryPresentationSurface,
         theme: state.renderStyle.theme, graphics: state.graphicsCapabilities,
         pointer: state.pointerInputCapabilities,
         geometry: HostGeometryStamp(session: 0, revision: state.geometryRevision),
-        reduceMotion: state.renderStyle.reduceMotion
+        reduceMotion: state.renderStyle.reduceMotion,
+        paragraphSpacing: state.paragraphSpacing
       )
     }
   }
@@ -109,6 +111,7 @@ package final class WebSurfaceTransport: HostGeometryPresentationSurface,
         return false
       }
       state.geometryRevision = request.revision
+      state.paragraphSpacing = request.paragraphSpacing
       state.surfaceSize = request.size
       state.graphicsCapabilities.cellPixelSize = request.cellPixelSize
       state.pointerInputCapabilities = Self.pointerInputCapabilities(

@@ -1058,7 +1058,8 @@ value-setting requests; host adapters must connect their native callbacks. (The 
   control journeys are qualified, while the complete assistive matrix remains
   open. DOM qualification is currently scoped to macOS desktop. Uniform CSS
   letter/word/line spacing and duplicate native-find announcement matches are
-  repaired; authored paragraph spacing remains unqualified. Windows
+  repaired. Explicit `Text.paragraph()` boundaries support uniform paragraph
+  spacing through host geometry; unmarked text has no inferred paragraphs. Windows
   High Contrast and physical mobile acceptance are outside that scope.
   Native adapters retain their own integration gaps. Shared
   runtime tests do not establish host conformance.

@@ -756,3 +756,9 @@ blend-mode replay and a new wire version are unnecessary. Hosts still paint
 final cells followed by image attachments; this is ordered image precomposition,
 not a general replay of every interleaved cell paint event. Terminal graphics
 preserve attachment order instead of sorting overlapping placements by identity.
+
+Authored paragraph boundaries originate in `SwiftTUIViews/Primitives/TextParagraph.swift`.
+`SwiftTUIGraph/Semantics/ParagraphRegion.swift` carries presentation-only bounds;
+the Core semantic extractor keeps them independent of accessibility visibility.
+The runtime captures host-requested paragraph spacing with geometry, and the
+shared wire encoder publishes clipped, unambiguous bounds without copying text.

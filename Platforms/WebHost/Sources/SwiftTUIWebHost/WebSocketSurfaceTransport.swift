@@ -48,6 +48,7 @@
   {
     private struct State: Sendable {
       var geometryRevision: UInt64 = 0
+      var paragraphSpacing: Int = 0
       var geometrySessionToken: UInt64 = 0
       var surfaceSize: CellSize
       var renderStyle: TerminalRenderStyle
@@ -136,6 +137,7 @@
         state.encodingState = capabilities.negotiatedEncodingState()
         state.connectionToken = connectionToken
         state.geometryRevision = 0
+        state.paragraphSpacing = 0
         state.geometrySessionToken = connectionToken ?? 0
         pump.beginConnection(connectionToken: connectionToken)
         state.encodingGeneration = pump.generation
@@ -147,6 +149,7 @@
       state.withLock { state in
         state.geometrySessionToken = token
         state.geometryRevision = 0
+        state.paragraphSpacing = 0
       }
     }
 
@@ -224,7 +227,8 @@
           pointer: state.pointerInputCapabilities,
           geometry: HostGeometryStamp(
             session: state.geometrySessionToken, revision: state.geometryRevision),
-          reduceMotion: state.renderStyle.reduceMotion
+          reduceMotion: state.renderStyle.reduceMotion,
+          paragraphSpacing: state.paragraphSpacing
         )
       }
     }
@@ -237,6 +241,7 @@
           state.connectionToken == connectionToken
         else { return false }
         state.geometryRevision = request.revision
+        state.paragraphSpacing = request.paragraphSpacing
         state.surfaceSize = request.size
         state.graphicsCapabilities.cellPixelSize = request.cellPixelSize
         state.pointerInputCapabilities = Self.pointerInputCapabilities(

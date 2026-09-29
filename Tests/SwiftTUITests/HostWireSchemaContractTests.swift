@@ -25,6 +25,12 @@ struct HostWireSchemaContractTests {
           )
         )
       ),
+      (
+        "ParagraphRegion",
+        ParagraphRegion(
+          identity: Identity(components: ["p"]),
+          rect: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)))
+      ),
       ("RasterSurface", RasterSurface()),
       ("RasterCell", RasterCell.empty),
       ("ResolvedTextStyle", ResolvedTextStyle()),

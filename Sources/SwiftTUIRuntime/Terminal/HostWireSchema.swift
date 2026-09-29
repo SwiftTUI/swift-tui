@@ -87,7 +87,8 @@ package enum HostWireSchema {
       .init(
         "semantics",
         wire: .decomposed(
-          "accessibilityTree/accessibilityAnnouncements/scrollRegions/focusPresentation")),
+          "accessibilityTree/accessibilityAnnouncements/scrollRegions/paragraphs/focusPresentation")
+      ),
       .init(
         "focusedIdentity",
         wire: .derived("per-node isFocused + focusPresentation.focusedIdentity")),
@@ -173,6 +174,10 @@ package enum HostWireSchema {
       .init(
         "compositing",
         wire: .derived("pre-blended PNG payload replaces the raw source when compositing is set")),
+    ],
+    "ParagraphRegion": [
+      .init("identity", wire: .derived("id")),
+      .init("rect", wire: .key("rect")),
     ],
     "AccessibilityNode": [
       .init("actionTarget", wire: .key("actionTarget")),
@@ -262,7 +267,7 @@ package enum HostWireSchema {
     package static let fullFrameOptionalKeys: Set<String> = [
       "geometryRevision", "epoch", "gen", "sequence", "damage", "accessibilityTree",
       "accessibilityAnnouncements", "accessibilityActionResponse",
-      "scrollRegions", "links", "linkTargets", "focusPresentation",
+      "scrollRegions", "paragraphs", "links", "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
     ]
     package static let deltaFrameKeys: Set<String> = [
@@ -271,7 +276,8 @@ package enum HostWireSchema {
     ]
     package static let deltaFrameOptionalKeys: Set<String> = [
       "geometryRevision", "epoch", "gen", "baselineGen", "sequence", "accessibilityTree",
-      "accessibilityAnnouncements", "accessibilityActionResponse", "scrollRegions", "links",
+      "accessibilityAnnouncements", "accessibilityActionResponse", "scrollRegions", "paragraphs",
+      "links",
       "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
       // Present only when `styleAppend` is negotiated. Optional in the manifest
@@ -280,6 +286,7 @@ package enum HostWireSchema {
       // the key additive.
       "stylesBase",
     ]
+    package static let paragraphKeys: Set<String> = ["id", "rect"]
     package static let styleKeys: Set<String> = [
       "fg", "bg", "em", "underline", "strikethrough", "opacity",
     ]

@@ -401,6 +401,32 @@ The ingress lifecycle differs by transport:
 `SWIFTTUI_SURFACE_MAX_VERSION` is retired and inert. Versions are decoder
 shape guards, not negotiated ceilings.
 
+## Authored paragraphs
+
+`Text.paragraph()` supplies optional `paragraphs: [{"id": string, "rect": [x,y,w,h]}]`
+metadata. It is independent of accessibility visibility and carries no source
+text. Full and delta records each carry a complete snapshot; absence clears the
+prior boundaries. The encoder clips regions to the viewport. Overlapping
+paragraph rectangles are ambiguous, so it omits their paragraph snapshot while
+retaining the raster. The browser validates unique ids and positive, disjoint,
+in-grid bounds before retaining them; ownership work is bounded by grid cells.
+Older browser and Android consumers ignore this additive object key.
+
+The DOM presenter groups the existing visible runs into `<p>` elements with
+`display: contents`; the row fragments retain their Swift-authored positions.
+There is no duplicated hidden prose or offscreen search index. The host measures
+uniform computed paragraph `margin-bottom` and requests its ceiling in whole
+cell rows. Swift adds that many bottom-padding rows after every marked Text;
+ordinary Text and newlines are unchanged. Authored stack spacing is additional.
+Paragraph-specific nonuniform margins and overlapping paragraph layouts are
+outside this uniform spacing contract.
+
+Receipt of paragraph metadata acknowledges support for the optional seventh
+geometry component `paragraphSpacing`, an integer in 0…8192. Hosts must omit
+that component until receipt of paragraph metadata from the producer. Old
+six-component requests imply zero; an explicit zero clears a prior override.
+Spacing is captured atomically with layout geometry and resets on reconnect.
+
 ## Captured browser geometry
 
 The browser declares `geometryRevisions` in WebSocket `caps`, or sets

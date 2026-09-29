@@ -5030,6 +5030,7 @@ SwiftTUIViews.Text.init(_:semanticMetadata:)
 SwiftTUIViews.Text.init(verbatim:)
 SwiftTUIViews.Text.italic()
 SwiftTUIViews.Text.italic(_:)
+SwiftTUIViews.Text.paragraph()
 SwiftTUIViews.Text.reverse()
 SwiftTUIViews.Text.reverse(_:)
 SwiftTUIViews.Text.semanticMetadata

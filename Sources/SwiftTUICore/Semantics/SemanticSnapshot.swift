@@ -112,6 +112,8 @@ package struct AccessibilityWarning: Equatable, Sendable {
 /// Freshness is proven by extracting from the current placed tree after any
 /// retained placement metadata synchronization.
 public struct SemanticSnapshot: Equatable, Sendable {
+  /// Visible authored text boundaries; hidden accessibility does not remove them.
+  package var paragraphs: [ParagraphRegion] = []
   public var interactionRegions: [InteractionRegion]
   public var focusRegions: [FocusRegion]
   public var navigationRoutes: [NavigationRoute]

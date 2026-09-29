@@ -190,14 +190,35 @@ human acceptance; the complete DOM assistive matrix remains open. Qualification 
 scoped to macOS desktop; Windows High Contrast and physical mobile acceptance
 are outside that scope. Ordinary prose passes narrow-width and doubled-text
 WASI checks. Uniform CSS letter/word spacing and line height renegotiate the
-Swift grid, and live announcements no longer add native Find matches. Authored
-paragraph spacing remains unqualified; there is no full WCAG conformance claim.
+Swift grid, and live announcements no longer add native Find matches.
+`Text.paragraph()` explicitly marks authored paragraphs. Supporting DOM hosts
+request uniform paragraph spacing through captured geometry; Swift reserves the
+additional whole rows. Ordinary text and newlines do not infer boundaries.
+There is no full WCAG conformance claim.
 Shared host-native IME/pre-edit presentation is excluded. Committed Unicode,
 paste and final composition values are delivered exactly once. Shared runtime
 tests and browser automation do not establish VoiceOver, TalkBack, or WCAG
 conformance. The browser package's
 [DOM support statement](https://github.com/SwiftTUI/swift-tui-web/tree/main/packages/web#experimental-support-boundary)
 documents the tested profile, selection/find limits, and other known exclusions.
+
+## Authored paragraph spacing
+
+Apply paragraph semantics after styling the text:
+
+```swift
+VStack(alignment: .leading, spacing: 1) {
+  Text("First paragraph.").bold().paragraph()
+  Text("Second paragraph.").paragraph()
+}
+```
+
+Swift owns wrapping and placement. A supporting DOM host measures uniform CSS
+paragraph margins and asks Swift to reserve extra bottom rows; removing the
+override removes those extra rows. Paragraph boundaries are independent of
+accessibility visibility. They contain no duplicate source text. Hosts without
+this negotiation retain the authored layout. Overlapping paragraph bounds and
+nonuniform paragraph margins are outside this contract.
 
 ## See Also
 

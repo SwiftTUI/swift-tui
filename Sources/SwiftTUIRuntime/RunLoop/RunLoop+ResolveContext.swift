@@ -18,6 +18,7 @@ extension RunLoop {
     effectiveEnvironmentValues.terminalAppearance = hostConfiguration.appearance
     effectiveEnvironmentValues.theme = hostConfiguration.theme
     effectiveEnvironmentValues.terminalSize = hostConfiguration.size
+    effectiveEnvironmentValues.hostParagraphSpacing = hostConfiguration.paragraphSpacing
     if let cellPixelSize = hostConfiguration.graphics.cellPixelSize {
       effectiveEnvironmentValues.cellPixelMetrics = CellPixelMetrics(
         width: cellPixelSize.width,
