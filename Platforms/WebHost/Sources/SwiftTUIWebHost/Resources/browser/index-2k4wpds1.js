@@ -3433,6 +3433,11 @@ class DomGeometryController {
     this.mount = mount;
     this.probe = new DomCellProbe(mount);
   }
+  resetParagraphs() {
+    this.paragraphSupport = false;
+    this.paragraphProbe?.remove();
+    this.paragraphProbe = undefined;
+  }
   enableParagraphs() {
     if (this.paragraphSupport)
       return false;
@@ -4838,6 +4843,8 @@ class HostGeometrySession {
     this.hasPresentedFrame = frame !== undefined;
   }
   resetConnection() {
+    if (this.latest?.paragraphSpacing !== undefined)
+      this.latest = undefined;
     this.acknowledged = false;
     this.sentRevision = undefined;
     this.presentedRevision = undefined;
@@ -5508,6 +5515,7 @@ class WebHostSceneRuntime {
     this.bridge?.bindOutput({
       resetSurfaceSession: () => {
         this.finishGeometryWait();
+        this.domGeometry?.resetParagraphs();
         this.geometrySession.resetConnection();
         this.paintScheduler.resetSession();
         this.terminalMount.setAttribute("aria-busy", "true");
