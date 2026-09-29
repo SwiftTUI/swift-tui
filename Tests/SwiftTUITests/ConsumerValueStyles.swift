@@ -73,7 +73,7 @@ struct ConsumerAutomaticSliderStyle: SliderStyle {
             String(repeating: "━", count: position) + "●"
               + String(repeating: "─", count: width - position - 1)
           )
-          .foregroundStyle(active ? control.borderStyle : AnyShapeStyle(.separator))
+          .foregroundStyle(active ? control.foregroundStyle : row.foregroundStyle)
         }
         configuration.valueLabel.foregroundStyle(
           active ? control.foregroundStyle : row.foregroundStyle)
@@ -93,7 +93,7 @@ struct ConsumerAutomaticStepperStyle: StepperStyle {
     let control = configuration.styleEnvironment.controlChrome(
       isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
       isPressed: configuration.isPressed)
-    let accent = active ? control.borderStyle : AnyShapeStyle(.separator)
+    let accent = active ? control.foregroundStyle : row.foregroundStyle
     ConsumerValueStyleRow(chrome: row, focused: configuration.focusActive, active: active) {
       configuration.label.foregroundStyle(row.foregroundStyle)
       HStack(alignment: .center, spacing: 1) {
@@ -123,7 +123,7 @@ private struct ConsumerValueStyleRow<Content: View>: View {
   var body: some View {
     HStack(alignment: .center, spacing: 1) {
       Text(focused ? "▌" : " ").foregroundStyle(
-        focused ? chrome.borderStyle : AnyShapeStyle(.background))
+        focused ? chrome.foregroundStyle : AnyShapeStyle(.background))
       content
     }
     .background { if active { Rectangle().fill(chrome.backgroundStyle) } }

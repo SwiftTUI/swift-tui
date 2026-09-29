@@ -10,9 +10,9 @@ struct ConsumerToggleStyle: ToggleStyle {
     HStack(alignment: .center, spacing: 1) {
       Text(configuration.focusActive ? "▌" : " ")
         .foregroundStyle(
-          configuration.focusActive ? chrome.borderStyle : AnyShapeStyle(.background))
+          configuration.focusActive ? chrome.foregroundStyle : AnyShapeStyle(.background))
       Text(configuration.isMixed ? "◐" : configuration.isOn ? "◉" : "○")
-        .foregroundStyle(configuration.isOn ? chrome.borderStyle : AnyShapeStyle(.separator))
+        .foregroundStyle(chrome.foregroundStyle)
       if !prefix.isEmpty { Text(prefix) }
       configuration.label
     }
@@ -39,7 +39,7 @@ struct ConsumerDisclosureGroupStyle: DisclosureGroupStyle {
         HStack(alignment: .center, spacing: 1) {
           Text(configuration.focusActive ? "▌" : " ")
             .foregroundStyle(
-              configuration.focusActive ? chrome.borderStyle : AnyShapeStyle(.background))
+              configuration.focusActive ? chrome.foregroundStyle : AnyShapeStyle(.background))
           Text(configuration.isExpanded ? "▾" : "▸")
             .foregroundStyle(
               configuration.isExpanded ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator))
@@ -78,7 +78,8 @@ struct ConsumerTextEditorStyle: TextEditorStyle {
     }
     .overlay {
       RoundedRectangle(cornerRadius: 1).strokeBorder(
-        focus.borderStyle, style: configuration.focusActive ? .heavy : .init())
+        configuration.isEnabled ? content.foregroundStyle : focus.borderStyle,
+        style: configuration.focusActive ? .heavy : .init())
     }
     .frame(minHeight: .finite(3), alignment: .topLeading)
   }

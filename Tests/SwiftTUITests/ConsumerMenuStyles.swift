@@ -37,7 +37,7 @@ private struct ConsumerAutomaticMenuBody: View {
         VStack(alignment: .leading, spacing: 0) {
           HStack(spacing: 1) {
             if configuration.focusActive {
-              Text("▌").foregroundStyle(chrome.borderStyle)
+              Text("▌").foregroundStyle(chrome.foregroundStyle)
             } else {
               Text(" ").foregroundStyle(.background)
             }

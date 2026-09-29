@@ -5,7 +5,7 @@ import Testing
 @testable import SwiftTUIViews
 
 // The expected bodies retain the pre-style primitive compositions, including
-// row opacity and highlight placement, with the accessible foreground for labels.
+// row opacity and highlight placement, with the accessible foreground for labels, identifying glyphs and focus rails.
 // A matching consumer implementation cannot conceal a shared rendering regression.
 @MainActor
 struct LegacyValueControlCompositionTests {
@@ -23,20 +23,20 @@ struct LegacyValueControlCompositionTests {
     let slider = Slider("Level", value: .constant(5), in: 0...10)
     let stepper = Stepper("Count", value: .constant(0), in: 0...10)
     let oldSlider = controlFocusRow(
-      showsRail: focused, railStyle: row.borderStyle, isHighlighted: focused,
+      showsRail: focused, railStyle: row.foregroundStyle, isHighlighted: focused,
       backgroundStyle: row.backgroundStyle, reservesRailSpaceWhenHidden: true
     ) {
       Text("Level").foregroundStyle(row.foregroundStyle)
       highlightedControlRow(
         HStack(alignment: .center, spacing: 1) {
           Text("━━━━●───").foregroundStyle(
-            focused ? control.borderStyle : AnyShapeStyle(.separator))
+            focused ? control.foregroundStyle : row.foregroundStyle)
           Text("5").foregroundStyle(focused ? control.foregroundStyle : row.foregroundStyle)
         }.drawMetadata(.init(opacity: control.opacity)),
         isHighlighted: focused, backgroundStyle: control.backgroundStyle)
     }.drawMetadata(.init(opacity: row.opacity))
     let oldStepper = controlFocusRow(
-      showsRail: focused, railStyle: row.borderStyle, isHighlighted: focused,
+      showsRail: focused, railStyle: row.foregroundStyle, isHighlighted: focused,
       backgroundStyle: row.backgroundStyle, reservesRailSpaceWhenHidden: true
     ) {
       Text("Count").foregroundStyle(row.foregroundStyle)
@@ -44,7 +44,7 @@ struct LegacyValueControlCompositionTests {
         HStack(alignment: .center, spacing: 1) {
           Text("◁").foregroundStyle(.placeholder)
           Text("0").foregroundStyle(focused ? control.foregroundStyle : row.foregroundStyle)
-          Text("▶").foregroundStyle(focused ? control.borderStyle : AnyShapeStyle(.separator))
+          Text("▶").foregroundStyle(focused ? control.foregroundStyle : row.foregroundStyle)
         }.drawMetadata(.init(opacity: control.opacity)),
         isHighlighted: focused, backgroundStyle: control.backgroundStyle)
     }.drawMetadata(.init(opacity: row.opacity))
