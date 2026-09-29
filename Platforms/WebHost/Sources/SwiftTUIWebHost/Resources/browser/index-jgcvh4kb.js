@@ -1487,6 +1487,24 @@ function fitsSurfaceBudget(frame) {
         return false;
     }
   }
+  const occupied = new Uint8Array(frame.paragraphs?.length ? width * height : 0);
+  if ((frame.paragraphs?.length ?? 0) > width * height)
+    return false;
+  for (const paragraph of frame.paragraphs ?? []) {
+    if (!fitsUTF8(paragraph.id, 1024))
+      return false;
+    const [x, y, w, h] = paragraph.rect;
+    if (![x, y, w, h].every(Number.isInteger) || x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > width || y + h > height)
+      return false;
+    for (let row = y;row < y + h; row++) {
+      for (let col = x;col < x + w; col++) {
+        const index = row * width + col;
+        if (occupied[index])
+          return false;
+        occupied[index] = 1;
+      }
+    }
+  }
   for (const entries of [
     frame.accessibilityTree,
     frame.accessibilityAnnouncements,
@@ -1638,12 +1656,12 @@ function isGeometryRevision(value, allowAcknowledgement = false) {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= (allowAcknowledgement ? 0 : 1);
 }
 function isHostGeometryRequest(request) {
-  return isGeometryRevision(request.revision) && request.columns > 0 && request.rows > 0 && fitsWireGrid(request.columns, request.rows) && [request.cellWidth, request.cellHeight].every((value) => Number.isInteger(value) && value > 0 && value <= MAX_HOST_CELL_PITCH);
+  return isGeometryRevision(request.revision) && (request.paragraphSpacing === undefined || Number.isInteger(request.paragraphSpacing) && request.paragraphSpacing >= 0 && request.paragraphSpacing <= MAX_HOST_CELL_PITCH) && request.columns > 0 && request.rows > 0 && fitsWireGrid(request.columns, request.rows) && [request.cellWidth, request.cellHeight].every((value) => Number.isInteger(value) && value > 0 && value <= MAX_HOST_CELL_PITCH);
 }
 function encodeGeometryControlMessage(request) {
   if (!isHostGeometryRequest(request))
     throw new RangeError("Invalid host geometry request");
-  return new TextEncoder().encode(`\x1Egeometry:${request.revision}:${request.columns}:${request.rows}:${request.cellWidth}:${request.cellHeight}
+  return new TextEncoder().encode(`\x1Egeometry:${request.revision}:${request.columns}:${request.rows}:${request.cellWidth}:${request.cellHeight}${request.paragraphSpacing === undefined ? "" : `:${request.paragraphSpacing}`}
 `);
 }
 
@@ -2229,6 +2247,7 @@ class WebHostOutputDecoder {
       accessibilityActionResponse: frame.accessibilityActionResponse,
       accessibilityAnnouncements: frame.accessibilityAnnouncements,
       scrollRegions: frame.scrollRegions,
+      paragraphs: frame.paragraphs,
       links: frame.links,
       linkTargets: frame.linkTargets,
       focusPresentation: frame.focusPresentation,
@@ -2367,14 +2386,14 @@ function isWebHostSurfaceFrame(value) {
     return false;
   }
   const frame = value;
-  return (frame.version === 1 || frame.version === 2) && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.rows) && frame.rows.every(isWebHostSurfaceRow) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityActionResponse === undefined || isAccessibilityActionResponse(frame.accessibilityActionResponse)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+  return (frame.version === 1 || frame.version === 2) && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.rows) && frame.rows.every(isWebHostSurfaceRow) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityActionResponse === undefined || isAccessibilityActionResponse(frame.accessibilityActionResponse)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && (frame.paragraphs === undefined || isWebHostParagraphs(frame.paragraphs)) && hasValidAdditiveFrameFields(frame);
 }
 function isWebHostSurfaceDeltaFrame(value) {
   if (!value || typeof value !== "object") {
     return false;
   }
   const frame = value;
-  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && isOptionalSafeInteger(frame.baselineGen) && isOptionalSafeInteger(frame.stylesBase) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityActionResponse === undefined || isAccessibilityActionResponse(frame.accessibilityActionResponse)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && hasValidAdditiveFrameFields(frame);
+  return frame.version === 3 && frame.encoding === "delta" && (frame.sequence === undefined || Number.isSafeInteger(frame.sequence) && frame.sequence >= 0) && isSurfaceGridDimension(frame.width) && isSurfaceGridDimension(frame.height) && Array.isArray(frame.styles) && Array.isArray(frame.deltaRows) && frame.deltaRows.every(isWebHostSurfaceDeltaRow) && isOptionalSafeInteger(frame.baselineGen) && isOptionalSafeInteger(frame.stylesBase) && (frame.images === undefined || isWebHostSurfaceImages(frame.images)) && (frame.damage === undefined || isWebHostSurfaceDamage(frame.damage)) && (frame.accessibilityActionResponse === undefined || isAccessibilityActionResponse(frame.accessibilityActionResponse)) && (frame.accessibilityTree === undefined || isWebHostAccessibilityNodes(frame.accessibilityTree)) && (frame.accessibilityAnnouncements === undefined || isWebHostAccessibilityAnnouncements(frame.accessibilityAnnouncements)) && (frame.scrollRegions === undefined || isWebHostScrollRegions(frame.scrollRegions)) && (frame.paragraphs === undefined || isWebHostParagraphs(frame.paragraphs)) && hasValidAdditiveFrameFields(frame);
 }
 function isSurfaceGridDimension(value) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 2147483647;
@@ -2493,6 +2512,17 @@ function isWebHostSurfaceDamageRange(value) {
 }
 function isWebHostSurfaceImageFormat(value) {
   return typeof value === "string";
+}
+function isWebHostParagraphs(value) {
+  if (!Array.isArray(value))
+    return false;
+  const ids = new Set;
+  return value.every((item) => {
+    if (!item || typeof item !== "object" || typeof item.id !== "string" || ids.has(item.id) || !isWebHostSurfaceRect(item.rect))
+      return false;
+    ids.add(item.id);
+    return true;
+  });
 }
 function isWebHostScrollRegions(value) {
   return Array.isArray(value) && value.every(isWebHostScrollRegion);
@@ -3396,10 +3426,51 @@ class DomGeometryController {
   probe;
   pending;
   presented;
+  paragraphProbe;
+  paragraphSupport = false;
   typography;
   constructor(mount) {
     this.mount = mount;
     this.probe = new DomCellProbe(mount);
+  }
+  enableParagraphs() {
+    if (this.paragraphSupport)
+      return false;
+    this.paragraphSupport = true;
+    return true;
+  }
+  paragraphSpacing(style, cellHeight) {
+    if (!this.paragraphSupport)
+      return;
+    const view = this.mount.ownerDocument?.defaultView;
+    if (!view)
+      return 0;
+    if (!this.paragraphProbe?.isConnected) {
+      const probe = this.mount.ownerDocument.createElement("p");
+      probe.className = "webhost-scene__paragraph";
+      probe.setAttribute("data-paragraph-probe", "");
+      probe.setAttribute("aria-hidden", "true");
+      Object.assign(probe.style, {
+        position: "absolute",
+        visibility: "hidden",
+        pointerEvents: "none",
+        width: "0",
+        height: "0",
+        margin: "0",
+        padding: "0",
+        overflow: "hidden"
+      });
+      (this.mount.querySelector(".webhost-scene__surface-rows") ?? this.mount).appendChild(probe);
+      this.paragraphProbe = probe;
+    }
+    this.paragraphProbe.style.font = fontForStyle(style);
+    let pixels = 0;
+    for (const paragraph of this.mount.querySelectorAll("p.webhost-scene__paragraph")) {
+      const margin = Number.parseFloat(view.getComputedStyle(paragraph).marginBottom);
+      if (Number.isFinite(margin))
+        pixels = Math.max(pixels, margin);
+    }
+    return Math.min(8192, Math.ceil(pixels / cellHeight));
   }
   measure(style) {
     const content = measureDomContentBox(this.mount);
@@ -3414,14 +3485,19 @@ class DomGeometryController {
     } else
       this.typography = { identity: style.fontFamily, cells };
     const previous = this.pending;
-    const next = makeDomGeometry(previous?.revision ?? 1, style.fontFamily, cells, content);
-    if (!next)
+    const measured = makeDomGeometry(previous?.revision ?? 1, style.fontFamily, cells, content);
+    if (!measured)
       return;
+    const next = {
+      ...measured,
+      paragraphSpacing: this.paragraphSpacing(style, measured.cellHeight)
+    };
     const layoutChanged = previous && [
       "fontIdentity",
       "fontSize",
       "cellWidth",
       "cellHeight",
+      "paragraphSpacing",
       "columns",
       "rows"
     ].some((key) => previous[key] !== next[key]);
@@ -3438,6 +3514,8 @@ class DomGeometryController {
   }
   dispose() {
     this.probe.dispose();
+    this.paragraphProbe?.remove();
+    this.paragraphProbe = undefined;
     this.pending = undefined;
     this.presented = undefined;
   }
@@ -3526,6 +3604,89 @@ class DomGlyphBackground {
       this.cache.delete(this.cache.keys().next().value);
     this.cache.set(key, result);
     return result;
+  }
+}
+
+// src/DomParagraphs.ts
+class DomParagraphs {
+  key;
+  rows = [];
+  owners;
+  width;
+  constructor(frame, layer) {
+    this.width = frame.width;
+    this.key = JSON.stringify([frame.width, frame.height, frame.paragraphs]);
+    this.owners = new Int32Array(frame.width * frame.height);
+    const roots = [];
+    const paragraphs = (frame.paragraphs ?? []).map((paragraph, index) => {
+      const element = document.createElement("p");
+      element.className = "webhost-scene__paragraph";
+      element.setAttribute("data-paragraph-id", paragraph.id);
+      Object.assign(element.style, {
+        display: "contents",
+        margin: "0",
+        font: "inherit"
+      });
+      const [x, y, w, h] = paragraph.rect;
+      roots.push({ x, y, element });
+      for (let row = y;row < y + h; row++)
+        this.owners.fill(index + 1, row * frame.width + x, row * frame.width + x + w);
+      return element;
+    });
+    for (let y = 0;y < frame.rows.length; y++) {
+      const fragments = [];
+      for (let x = 0;x < frame.width; ) {
+        const start = x, owner = this.owners[y * frame.width + x];
+        while (x < frame.width && this.owners[y * frame.width + x] === owner)
+          x++;
+        const element = document.createElement("span");
+        const fragment = { start, end: x, owner, element };
+        if (owner || x === frame.width && y < frame.rows.length - 1) {
+          fragment.separator = document.createTextNode(`
+`);
+          element.appendChild(fragment.separator);
+        }
+        if (owner)
+          paragraphs[owner - 1].appendChild(element);
+        else
+          roots.push({ x: start, y, element });
+        fragments.push(fragment);
+      }
+      this.rows.push(fragments);
+    }
+    roots.sort((a, b) => a.y - b.y || a.x - b.x);
+    for (const root of roots)
+      layer.appendChild(root.element);
+  }
+  owner(y, x) {
+    return this.owners[y * this.width + x] ?? 0;
+  }
+  split(y, cell) {
+    const [x, text, span, style] = cell;
+    if (text.length !== span || !/^[\x20-\x7e]*$/.test(text))
+      return [cell];
+    const result = [];
+    let start = x;
+    for (let column = x + 1;column <= x + span; column++) {
+      if (column === x + span || this.owner(y, column) !== this.owner(y, start)) {
+        result.push([
+          start,
+          text.slice(start - x, column - x),
+          column - start,
+          style
+        ]);
+        start = column;
+      }
+    }
+    return result;
+  }
+  fragment(y, x) {
+    return this.rows[y].find((item) => x >= item.start && x < item.end);
+  }
+  restyle(metrics, styleRow) {
+    for (const [y, fragments] of this.rows.entries())
+      for (const fragment of fragments)
+        styleRow(fragment.element, y, metrics);
   }
 }
 
@@ -3656,7 +3817,7 @@ class DomTextLayout {
   get hasUserSpacing() {
     return this.userSpacing.letterSpacing !== undefined || this.userSpacing.wordSpacing !== undefined;
   }
-  prepare(frame, metrics, linkedRows, selection) {
+  prepare(frame, metrics, linkedRows, selection, paragraphs) {
     const scale = this.ruler.getBoundingClientRect().width / 1024 || 1;
     this.userSpacing = readDomTextSpacing(this.mount);
     const config = JSON.stringify([
@@ -3701,9 +3862,9 @@ class DomTextLayout {
         1,
         cell[3]
       ]) : [cell]);
-      for (const cell of allocated.flatMap((cell2) => selection.split(y, cell2))) {
+      for (const cell of allocated.flatMap((cell2) => selection.split(y, cell2).flatMap((part) => paragraphs?.split(y, part) ?? [part]))) {
         const last = result.at(-1);
-        if (!this.hasUserSpacing && !linkedRows.has(y) && this.monospace[(frame.styles[cell[3]]?.em ?? 0) & 3] && last && last[3] === cell[3] && selection.allows(y, last[0], last[2]) === selection.allows(y, cell[0], cell[2]) && last[0] + last[2] === cell[0] && naturalText(last[1], last[2]) && naturalText(cell[1], cell[2])) {
+        if (!this.hasUserSpacing && !linkedRows.has(y) && this.monospace[(frame.styles[cell[3]]?.em ?? 0) & 3] && last && last[3] === cell[3] && paragraphs?.owner(y, last[0]) === paragraphs?.owner(y, cell[0]) && selection.allows(y, last[0], last[2]) === selection.allows(y, cell[0], cell[2]) && last[0] + last[2] === cell[0] && naturalText(last[1], last[2]) && naturalText(cell[1], cell[2])) {
           last[1] += cell[1];
           last[2] += cell[2];
         } else
@@ -3834,6 +3995,7 @@ class DomSurfacePainter {
   textLayout;
   imagesLayer;
   rowElements = [];
+  paragraphs;
   cells = [];
   rowBreaks = [];
   renderedImages = new Map;
@@ -3891,9 +4053,9 @@ class DomSurfacePainter {
   get statistics() {
     const images = [...this.renderedImages.values()];
     return {
-      rows: this.rowElements.length,
+      rows: this.paragraphs ? this.paragraphs.rows.reduce((n, row) => n + row.length, 0) : this.rowElements.length,
       cells: this.cells.reduce((sum, cells) => sum + cells.size, 0),
-      rowSeparators: this.rowBreaks.length,
+      rowSeparators: this.paragraphs ? this.paragraphs.rows.reduce((n, row) => n + row.filter((part) => part.separator).length, 0) : this.rowBreaks.length,
       decorationNodes: this.graphics.reduce((sum, row) => sum + row.size, 0),
       imageNodes: images.length * 2,
       styleCacheEntries: this.styleCache.size,
@@ -3941,6 +4103,7 @@ class DomSurfacePainter {
     this.textLayout?.dispose();
     root.replaceChildren(rowsLayer, imagesLayer, graphicsLayer);
     this.textLayout = new DomTextLayout(root);
+    this.paragraphs = undefined;
     this.rowElements = [];
     this.cells = [];
     this.rowBreaks = [];
@@ -3982,6 +4145,7 @@ class DomSurfacePainter {
     if (!frame) {
       this.textLayout?.clear();
       clearSelection(rowsLayer);
+      this.paragraphs = undefined;
       this.rowElements = [];
       this.cells = [];
       this.rowBreaks = [];
@@ -3997,6 +4161,21 @@ class DomSurfacePainter {
       this.hasRenderedFrame = false;
       return;
     }
+    const paragraphKey = frame.paragraphs?.length ? JSON.stringify([frame.width, frame.height, frame.paragraphs]) : undefined;
+    const paragraphsChanged = paragraphKey !== this.paragraphs?.key;
+    if (paragraphsChanged) {
+      clearSelection(rowsLayer);
+      rowsLayer.replaceChildren();
+      this.rowElements = [];
+      this.rowBreaks = [];
+      this.cells = [];
+      this.graphicsLayer?.replaceChildren();
+      this.graphics = [];
+      this.paragraphs = paragraphKey ? new DomParagraphs(frame, rowsLayer) : undefined;
+      if (this.paragraphs)
+        this.rowElements = this.paragraphs.rows.map((row) => row[0].element);
+    }
+    this.paragraphs?.restyle(metrics, styleTextRow);
     const selection = new DomTextSelection(frame);
     const selectionChanged = selection.key !== this.selection.key;
     this.selection = selection;
@@ -4023,9 +4202,9 @@ class DomSurfacePainter {
         }
       }
     }
-    const fullRepaint = selectionChanged || linksChanged || metricsChanged || !this.hasRenderedFrame || gridKey !== this.renderedGridKey || !damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay;
+    const fullRepaint = paragraphsChanged || selectionChanged || linksChanged || metricsChanged || !this.hasRenderedFrame || gridKey !== this.renderedGridKey || !damage || damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay;
     this.renderedGridKey = gridKey;
-    const preparedRows = this.textLayout.prepare(frame, metrics, new Set((frame.links ?? []).filter(([, links]) => links.length > 0).map(([y]) => y)), this.selection);
+    const preparedRows = this.textLayout.prepare(frame, metrics, new Set((frame.links ?? []).filter(([, links]) => links.length > 0).map(([y]) => y)), this.selection, this.paragraphs);
     if (fullRepaint) {
       for (let y = this.rowElements.length;y > frame.rows.length; y -= 1) {
         const row = this.rowElements[y - 1];
@@ -4087,6 +4266,7 @@ class DomSurfacePainter {
     this.rowsLayer = undefined;
     this.selection = new DomTextSelection;
     this.imagesLayer = undefined;
+    this.paragraphs = undefined;
     this.rowElements = [];
     this.cells = [];
     this.rowBreaks = [];
@@ -4111,9 +4291,15 @@ class DomSurfacePainter {
         graphics.delete(x);
       }
     }
-    let inlineOrigin = 0;
-    let position = 0;
+    const positions = new Map;
     for (const [x, text, span, styleIndex] of rowCells) {
+      const fragment = this.paragraphs?.fragment(y, x);
+      const destination = fragment?.element ?? rowElement;
+      const state = positions.get(destination) ?? {
+        inlineOrigin: 0,
+        position: 0
+      };
+      positions.set(destination, state);
       const cellStyle = frame.styles[styleIndex] ?? undefined;
       const target = this.linkCells.get(y * frame.width + x);
       const isLink = target !== undefined && (/^https?:/i.test(target) || !!this.onOpenHyperlink);
@@ -4145,8 +4331,8 @@ class DomSurfacePainter {
         element.style.webkitUserSelect = selectable ? "text" : "none";
         element.style.cursor = selectable ? "text" : "";
       }
-      const left = x * metrics.cellWidth - inlineOrigin;
-      inlineOrigin += this.textLayout.advance(text, span, cellStyle?.em ?? 0);
+      const left = x * metrics.cellWidth - state.inlineOrigin;
+      state.inlineOrigin += this.textLayout.advance(text, span, cellStyle?.em ?? 0);
       const spacing = this.textLayout.spacing(text, span, cellStyle?.em ?? 0, metrics.cellWidth);
       const presentationKey = JSON.stringify([
         key,
@@ -4229,12 +4415,14 @@ class DomSurfacePainter {
       if (element.getAttribute("data-span") !== String(span))
         element.setAttribute("data-span", String(span));
       next.set(x, element);
-      if (rowElement.children[position] !== element) {
-        rowElement.insertBefore(element, rowElement.children[position] ?? this.rowBreaks[y] ?? null);
+      if (destination.children[state.position] !== element) {
+        destination.insertBefore(element, destination.children[state.position] ?? fragment?.separator ?? this.rowBreaks[y] ?? null);
       }
-      position += 1;
+      state.position += 1;
     }
     this.cells[y] = next;
+    if (this.paragraphs)
+      return;
     let rowBreak = this.rowBreaks[y];
     if (y < frame.rows.length - 1) {
       if (!rowBreak) {
@@ -4253,31 +4441,10 @@ class DomSurfacePainter {
     let rowElement = this.rowElements[y];
     if (!rowElement) {
       rowElement = createElement("div");
-      rowElement.className = "webhost-scene__surface-row";
-      Object.assign(rowElement.style, scopedBoxStyle, {
-        font: "inherit",
-        lineHeight: "1.5",
-        letterSpacing: "0px",
-        wordSpacing: "0px",
-        whiteSpace: "pre",
-        contain: "strict"
-      });
-      rowElement.style.userSelect = "text";
-      rowElement.style.webkitUserSelect = "text";
-      rowElement.style.position = "absolute";
-      rowElement.style.left = "0";
       this.rowElements[y] = rowElement;
       this.rowsLayer?.appendChild(rowElement);
     }
-    const geometry = {
-      top: `${y * metrics.cellHeight}px`,
-      height: `${metrics.cellHeight}px`,
-      width: `${metrics.columns * metrics.cellWidth}px`
-    };
-    for (const key of ["top", "height", "width"]) {
-      if (rowElement.style[key] !== geometry[key])
-        rowElement.style[key] = geometry[key];
-    }
+    styleTextRow(rowElement, y, metrics);
     return rowElement;
   }
   applyRootStyle(root, metrics) {
@@ -4597,6 +4764,32 @@ function selectionInvalidator() {
     }
   });
 }
+function styleTextRow(rowElement, y, metrics) {
+  if (rowElement.className !== "webhost-scene__surface-row") {
+    rowElement.className = "webhost-scene__surface-row";
+    Object.assign(rowElement.style, scopedBoxStyle, {
+      font: "inherit",
+      lineHeight: "1.5",
+      letterSpacing: "0px",
+      wordSpacing: "0px",
+      whiteSpace: "pre",
+      contain: "strict",
+      userSelect: "text",
+      webkitUserSelect: "text",
+      position: "absolute",
+      display: "block",
+      left: "0"
+    });
+  }
+  const geometry = {
+    top: `${y * metrics.cellHeight}px`,
+    height: `${metrics.cellHeight}px`,
+    width: `${metrics.columns * metrics.cellWidth}px`
+  };
+  for (const key of ["top", "height", "width"])
+    if (rowElement.style[key] !== geometry[key])
+      rowElement.style[key] = geometry[key];
+}
 
 // src/HostGeometrySession.ts
 class HostGeometrySession {
@@ -4619,7 +4812,7 @@ class HostGeometrySession {
       throw new RangeError("Invalid host geometry request");
     if (this.latest && geometry.revision < this.latest.revision)
       throw new RangeError("Geometry revision cannot regress");
-    if (this.latest && geometry.revision === this.latest.revision && ["columns", "rows", "cellWidth", "cellHeight"].some((key) => this.latest[key] !== geometry[key]))
+    if (this.latest && geometry.revision === this.latest.revision && ["columns", "rows", "cellWidth", "cellHeight", "paragraphSpacing"].some((key) => this.latest[key] !== geometry[key]))
       throw new RangeError("A geometry revision cannot name different metrics");
     this.latest = Object.freeze({ ...geometry });
   }
@@ -5602,8 +5795,6 @@ class WebHostSceneRuntime {
   }
   installResizeObserver() {
     const refresh = () => {
-      if (this.painter instanceof DomSurfacePainter)
-        this.painter.invalidateFontMetrics();
       if (this.domGeometry) {
         this.refreshGeometry();
         return;
@@ -5621,7 +5812,11 @@ class WebHostSceneRuntime {
         this.resizeObserver.observe(this.domGeometry.probe.element);
     }
     const fonts = document.fonts;
-    const userStyleObserver = this.domGeometry && typeof MutationObserver !== "undefined" ? new MutationObserver(refresh) : undefined;
+    const userStyleObserver = this.domGeometry && typeof MutationObserver !== "undefined" ? new MutationObserver(() => {
+      if (this.painter instanceof DomSurfacePainter)
+        this.painter.invalidateFontMetrics();
+      refresh();
+    }) : undefined;
     if (userStyleObserver) {
       userStyleObserver.observe(document.head, {
         childList: true,
@@ -6080,6 +6275,8 @@ class WebHostSceneRuntime {
     }
     const resized = this.resizeSurface();
     this.painter.paint(this.surfaceMetrics(), request.frame, resized ? undefined : request.damage, request.recoveredImagePayloadIds);
+    if (request.frame?.paragraphs?.length && this.domGeometry?.enableParagraphs())
+      this.refreshGeometry();
     this.onSurfacePainted?.({
       frame: request.frame,
       paintedAt: performance.now(),
