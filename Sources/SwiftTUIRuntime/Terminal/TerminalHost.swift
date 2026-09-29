@@ -842,32 +842,6 @@ func fullRepaintWriteSteps(
   return writeSteps
 }
 
-func fullRepaintOutput(
-  for surface: RasterSurface,
-  capabilityProfile: TerminalCapabilityProfile,
-  origin: CellPoint = .zero,
-  terminalBackgroundColor: Color? = nil
-) -> String {
-  let writeSteps = fullRepaintWriteSteps(
-    for: surface,
-    capabilityProfile: capabilityProfile,
-    terminalBackgroundColor: terminalBackgroundColor
-  )
-  var output = ""
-  output.reserveCapacity(
-    fullRepaintBytesWritten(
-      writeSteps: writeSteps,
-      origin: origin
-    )
-  )
-  output += TerminalHostEscapeSequences.clearScreen
-  output += TerminalHostEscapeSequences.cursor(to: origin)
-  for writeStep in writeSteps {
-    output += writeStep
-  }
-  return output
-}
-
 func fullRepaintBytesWritten(
   writeSteps: [String],
   origin: CellPoint
