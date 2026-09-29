@@ -106,19 +106,19 @@ struct TerminalScrollRegionEmissionTests {
     plan: TerminalPresentationPlan
   ) {
     var screen = ANSIVisibleScreen(size: surfaceSize)
-    screen.feed(
-      Array(
-        fullRepaintOutput(for: previous, capabilityProfile: scrollRegionProfile).utf8
-      )
-    )
+    let previousRepaint =
+      TerminalHostEscapeSequences.clearScreen
+      + TerminalHostEscapeSequences.cursor(to: .zero)
+      + fullRepaintWriteSteps(for: previous, capabilityProfile: scrollRegionProfile).joined()
+    screen.feed(Array(previousRepaint.utf8))
     screen.feed(Array(emissionOutput(for: current, plan: plan).utf8))
 
     var freshScreen = ANSIVisibleScreen(size: surfaceSize)
-    freshScreen.feed(
-      Array(
-        fullRepaintOutput(for: current, capabilityProfile: scrollRegionProfile).utf8
-      )
-    )
+    let currentRepaint =
+      TerminalHostEscapeSequences.clearScreen
+      + TerminalHostEscapeSequences.cursor(to: .zero)
+      + fullRepaintWriteSteps(for: current, capabilityProfile: scrollRegionProfile).joined()
+    freshScreen.feed(Array(currentRepaint.utf8))
     #expect(screen.renderedText == freshScreen.renderedText)
   }
 
