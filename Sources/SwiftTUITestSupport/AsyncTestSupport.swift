@@ -153,52 +153,6 @@ package func waitUntil(
   return true
 }
 
-@MainActor
-@discardableResult
-package func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 5_000_000_000,
-  pollNanoseconds: UInt64 = 5_000_000,
-  condition: () async -> Bool
-) async throws -> Bool {
-  try await waitUntil(
-    label,
-    timeoutNanoseconds: timeoutNanoseconds,
-    pollNanoseconds: pollNanoseconds,
-    lastObservation: { nil },
-    condition: condition
-  )
-}
-
-@MainActor
-@discardableResult
-package func waitUntil(
-  _ label: String,
-  timeoutNanoseconds: UInt64 = 5_000_000_000,
-  pollNanoseconds: UInt64 = 5_000_000,
-  lastObservation: () async -> String?,
-  condition: () async -> Bool
-) async throws -> Bool {
-  let clock = ContinuousClock()
-  let start = clock.now
-  let scaledTimeoutNanoseconds = AsyncTestTimeouts.scaledNanoseconds(timeoutNanoseconds)
-  let timeoutDuration = Duration.nanoseconds(clampingInt64: scaledTimeoutNanoseconds)
-
-  while !(await condition()) {
-    if start.duration(to: clock.now) >= timeoutDuration {
-      throw AsyncTestTimeout(
-        label: label,
-        baseTimeoutNanoseconds: timeoutNanoseconds,
-        scaledTimeoutNanoseconds: scaledTimeoutNanoseconds,
-        timeoutScale: AsyncTestTimeouts.timeoutScale,
-        lastObservation: await lastObservation()
-      )
-    }
-    try await Task.sleep(nanoseconds: pollNanoseconds)
-  }
-  return true
-}
-
 package func valueWithTimeout<Value: Sendable>(
   _ label: String = "operation",
   timeoutNanoseconds: UInt64 = 5_000_000_000,
