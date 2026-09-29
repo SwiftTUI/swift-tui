@@ -75,23 +75,6 @@ public struct TerminalSurfaceRenderer {
       width: width
     )
   }
-
-  func renderSpan(
-    _ row: [RasterCell],
-    from start: Int,
-    to end: Int
-  ) -> String {
-    guard start < end else {
-      return ""
-    }
-    return renderCells(
-      in: row,
-      from: max(0, start),
-      to: max(start, end),
-      width: end - start,
-      preservingTrailingWhitespace: true
-    )
-  }
 }
 
 extension TerminalSurfaceRenderer {
@@ -183,41 +166,5 @@ extension TerminalSurfaceRenderer {
       width: width,
       limitingTo: candidateRanges
     )
-  }
-
-  func normalizeSpan(
-    _ span: Range<Int>,
-    previousRow: [RasterCell],
-    currentRow: [RasterCell],
-    width: Int
-  ) -> Range<Int> {
-    damageRenderer.normalizeSpan(
-      span,
-      previousRow: previousRow,
-      currentRow: currentRow,
-      width: width
-    )
-  }
-
-  func leadIndexIfContinuation(
-    at index: Int,
-    in row: [RasterCell]
-  ) -> Int {
-    damageRenderer.leadIndexIfContinuation(at: index, in: row)
-  }
-
-  func cell(
-    at index: Int,
-    in row: [RasterCell]
-  ) -> RasterCell {
-    damageRenderer.cell(at: index, in: row)
-  }
-
-  func cellsChanged(
-    in row: [RasterCell],
-    from start: Int,
-    to end: Int
-  ) -> Int {
-    damageRenderer.cellsChanged(in: row, from: start, to: end)
   }
 }

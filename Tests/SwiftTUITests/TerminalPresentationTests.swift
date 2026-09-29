@@ -631,30 +631,6 @@ struct TerminalPresentationTests {
     )
   }
 
-  @Test("renderer emits self-contained hyperlink spans for incremental updates")
-  func rendererEmitsSelfContainedHyperlinkSpans() {
-    let renderer = TerminalSurfaceRenderer(
-      capabilityProfile: .ansi16
-    )
-    let row = [
-      RasterCell(
-        character: "X",
-        style: .init(foregroundColor: .cyan),
-        hyperlink: "https://one.example"
-      ),
-      RasterCell(
-        character: "Y",
-        style: .init(foregroundColor: .magenta),
-        hyperlink: "https://two.example"
-      ),
-    ]
-
-    #expect(
-      renderer.renderSpan(row, from: 0, to: 2)
-        == "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[96mX\u{001B}]8;;\u{001B}\\\u{001B}]8;;https://two.example\u{001B}\\\u{001B}[0m\u{001B}[95mY\u{001B}]8;;\u{001B}\\\u{001B}[0m"
-    )
-  }
-
   @Test("renderer carries style and hyperlink state across row batches")
   func rendererCarriesStyleAndHyperlinkStateAcrossRowBatches() {
     let renderer = TerminalSurfaceRenderer(
