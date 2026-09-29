@@ -416,7 +416,7 @@ private struct StepperStyleRow: View {
     let contentChrome = configuration.styleEnvironment.controlChrome(
       isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
       isPressed: configuration.isPressed)
-    let accent = active ? contentChrome.borderStyle : AnyShapeStyle(.separator)
+    let accent = active ? contentChrome.foregroundStyle : chrome.foregroundStyle
     ControlStyleRow(
       chrome: chrome, focusActive: configuration.focusActive,
       isHighlighted: active, reservesRail: !compact

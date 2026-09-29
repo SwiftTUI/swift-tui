@@ -3165,6 +3165,26 @@ class DomFocusPresentation {
   }
 }
 
+// src/DomTextSpacing.ts
+function readDomTextSpacing(mount) {
+  const view = mount.ownerDocument?.defaultView;
+  if (!view)
+    return {};
+  const text = mount.querySelector(".webhost-scene__surface-row [data-column]");
+  const root = mount.querySelector(".webhost-scene__surface--dom") ?? (mount.matches?.(".webhost-scene__surface--dom") ? mount : null);
+  if (!text || !root)
+    return {};
+  const computed = view.getComputedStyle(text);
+  const result = {};
+  for (const key of ["letterSpacing", "wordSpacing", "lineHeight"]) {
+    const authored = key === "lineHeight" ? Number.parseFloat(computed.fontSize) * 1.5 : Number.parseFloat(text.style[key]) || 0;
+    const actual = Number.parseFloat(computed[key]) || 0;
+    if (Number.isFinite(actual) && Math.abs(actual - authored) > 1 / 64)
+      result[key] = actual;
+  }
+  return result;
+}
+
 // src/DomCellMetrics.ts
 class DomCellProbe {
   mount;
@@ -3248,6 +3268,12 @@ class DomCellProbe {
   }
   measure(style, scaleX = 1, scaleY = scaleX) {
     this.configure(style);
+    const spacing = readDomTextSpacing(this.mount);
+    for (const { line, text } of this.faces) {
+      line.style.lineHeight = text.style.lineHeight = spacing.lineHeight === undefined ? "1.5" : `${spacing.lineHeight}px`;
+      text.style.letterSpacing = `${spacing.letterSpacing ?? 0}px`;
+      text.style.wordSpacing = `${spacing.wordSpacing ?? 0}px`;
+    }
     let width = 0, height = 0, baseline = 0;
     for (const face2 of this.faces) {
       const rect = face2.text.getBoundingClientRect();
@@ -3281,7 +3307,8 @@ class DomCellProbe {
       height: Math.ceil(height - 1 / 32),
       advance: baseAdvance,
       baseline,
-      fontSize: Number.parseFloat(computed?.fontSize ?? "") || style.fontSize
+      fontSize: Number.parseFloat(computed?.fontSize ?? "") || style.fontSize,
+      spacingKey: JSON.stringify(spacing)
     };
   }
   dispose() {
@@ -3382,7 +3409,7 @@ class DomGeometryController {
     if (!cells)
       return;
     const prior = this.typography;
-    if (prior?.identity === style.fontFamily && prior.cells.fontSize === cells.fontSize && Math.abs(prior.cells.advance - cells.advance) <= 1 / 32 && prior.cells.height === cells.height) {
+    if (prior?.identity === style.fontFamily && prior.cells.fontSize === cells.fontSize && prior.cells.spacingKey === cells.spacingKey && Math.abs(prior.cells.advance - cells.advance) <= 1 / 32 && prior.cells.height === cells.height) {
       cells = prior.cells;
     } else
       this.typography = { identity: style.fontFamily, cells };
@@ -3508,12 +3535,14 @@ function naturalText(text, span) {
 }
 
 class DomTextLayout {
+  mount;
   probe;
   ruler;
   config = "";
   advances = new Map;
   base = [0, 0, 0, 0];
   monospace = [false, false, false, false];
+  userSpacing = {};
   get cacheEntries() {
     return this.advances.size;
   }
@@ -3521,6 +3550,7 @@ class DomTextLayout {
     this.advances.clear();
   }
   constructor(mount) {
+    this.mount = mount;
     this.probe = document.createElement("div");
     this.probe.setAttribute("aria-hidden", "true");
     Object.assign(this.probe.style, {
@@ -3601,8 +3631,8 @@ class DomTextLayout {
       fontKerning: "none",
       fontVariantLigatures: "none",
       fontSynthesis: "none",
-      letterSpacing: `${spacing}px`,
-      wordSpacing: "0",
+      letterSpacing: `${this.userSpacing.letterSpacing ?? spacing}px`,
+      wordSpacing: `${this.userSpacing.wordSpacing ?? 0}px`,
       direction: "ltr",
       unicodeBidi: "isolate"
     });
@@ -3617,18 +3647,23 @@ class DomTextLayout {
   key(text, span, em) {
     return JSON.stringify([
       em & 3,
-      this.monospace[em & 3] && naturalText(text, span) ? text.length : text
+      !this.hasUserSpacing && this.monospace[em & 3] && naturalText(text, span) ? text.length : text
     ]);
   }
   advance(text, span, em) {
     return this.advances.get(this.key(text, span, em)) ?? 0;
   }
+  get hasUserSpacing() {
+    return this.userSpacing.letterSpacing !== undefined || this.userSpacing.wordSpacing !== undefined;
+  }
   prepare(frame, metrics, linkedRows, selection) {
     const scale = this.ruler.getBoundingClientRect().width / 1024 || 1;
+    this.userSpacing = readDomTextSpacing(this.mount);
     const config = JSON.stringify([
       fontForStyle(metrics.style),
       metrics.cellWidth,
-      scale
+      scale,
+      this.userSpacing
     ]);
     if (config !== this.config) {
       this.advances.clear();
@@ -3660,9 +3695,15 @@ class DomTextLayout {
           -1
         ]);
       const result = [];
-      for (const cell of spaced.flatMap((cell2) => selection.split(y, cell2))) {
+      const allocated = spaced.flatMap((cell) => this.hasUserSpacing && naturalText(cell[1], cell[2]) ? [...cell[1]].map((text, index) => [
+        cell[0] + index,
+        text,
+        1,
+        cell[3]
+      ]) : [cell]);
+      for (const cell of allocated.flatMap((cell2) => selection.split(y, cell2))) {
         const last = result.at(-1);
-        if (!linkedRows.has(y) && this.monospace[(frame.styles[cell[3]]?.em ?? 0) & 3] && last && last[3] === cell[3] && selection.allows(y, last[0], last[2]) === selection.allows(y, cell[0], cell[2]) && last[0] + last[2] === cell[0] && naturalText(last[1], last[2]) && naturalText(cell[1], cell[2])) {
+        if (!this.hasUserSpacing && !linkedRows.has(y) && this.monospace[(frame.styles[cell[3]]?.em ?? 0) & 3] && last && last[3] === cell[3] && selection.allows(y, last[0], last[2]) === selection.allows(y, cell[0], cell[2]) && last[0] + last[2] === cell[0] && naturalText(last[1], last[2]) && naturalText(cell[1], cell[2])) {
           last[1] += cell[1];
           last[2] += cell[2];
         } else
@@ -4215,7 +4256,7 @@ class DomSurfacePainter {
       rowElement.className = "webhost-scene__surface-row";
       Object.assign(rowElement.style, scopedBoxStyle, {
         font: "inherit",
-        lineHeight: "inherit",
+        lineHeight: "1.5",
         letterSpacing: "0px",
         wordSpacing: "0px",
         whiteSpace: "pre",
@@ -5561,6 +5602,8 @@ class WebHostSceneRuntime {
   }
   installResizeObserver() {
     const refresh = () => {
+      if (this.painter instanceof DomSurfacePainter)
+        this.painter.invalidateFontMetrics();
       if (this.domGeometry) {
         this.refreshGeometry();
         return;
@@ -5578,6 +5621,20 @@ class WebHostSceneRuntime {
         this.resizeObserver.observe(this.domGeometry.probe.element);
     }
     const fonts = document.fonts;
+    const userStyleObserver = this.domGeometry && typeof MutationObserver !== "undefined" ? new MutationObserver(refresh) : undefined;
+    if (userStyleObserver) {
+      userStyleObserver.observe(document.head, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true
+      });
+      for (let node = this.embeddingMount;node; node = node.parentElement)
+        userStyleObserver.observe(node, {
+          attributes: true,
+          attributeFilter: ["style", "class"]
+        });
+    }
     const refreshFonts = () => {
       if (this.painter instanceof DomSurfacePainter)
         this.painter.invalidateFontMetrics();
@@ -5611,6 +5668,7 @@ class WebHostSceneRuntime {
     for (const query of preferences)
       query.addEventListener?.("change", preferenceChanged);
     this.detachMetricObservers = () => {
+      userStyleObserver?.disconnect();
       for (const query of preferences)
         query.removeEventListener?.("change", preferenceChanged);
       fonts?.removeEventListener?.("loadingdone", refreshFonts);

@@ -240,8 +240,8 @@ extension AnyToggleStyle: TypedReuseEqualityProviding {
 /// The `automatic` treatment for ``Toggle``: a radio glyph before the label.
 ///
 /// The row shows `○` when off, `◉` when on, and `◐` for the reserved mixed
-/// state, tinted with the row chrome's border color while on and with the
-/// separator color otherwise. The row carries the focus treatment while
+/// state, using the row chrome's foreground color for the identifying glyph.
+/// The row carries the focus treatment while
 /// ``ToggleStyleConfiguration/focusActive`` is true, and its background is
 /// highlighted while the toggle is focused or pressed. The treatment is fixed,
 /// not environment-driven, and it is not the checkbox glyph set.
@@ -372,7 +372,7 @@ private struct GlyphToggleStyleBody: View {
       isHighlighted: configuration.focusActive || configuration.isPressed
     ) {
       Text(configuration.isMixed ? glyphs.mixed : configuration.isOn ? glyphs.on : glyphs.off)
-        .foregroundStyle(configuration.isOn ? chrome.borderStyle : AnyShapeStyle(.separator))
+        .foregroundStyle(chrome.foregroundStyle)
       configuration.label
     }
   }

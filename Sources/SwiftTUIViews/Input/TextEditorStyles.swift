@@ -364,7 +364,8 @@ private struct RoundedBorderTextEditorStyleBody: View {
   var body: some View {
     let contentChrome = configuration.styleEnvironment.controlChrome(
       isEnabled: configuration.isEnabled, isFocused: false)
-    let focusChrome = configuration.styleEnvironment.controlChrome(
+    let focusChrome = textInputChrome(
+      styleEnvironment: configuration.styleEnvironment,
       isEnabled: configuration.isEnabled, isFocused: configuration.focusActive)
     configuration.editorContent
       .padding(.init(horizontal: 1, vertical: 1))

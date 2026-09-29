@@ -366,12 +366,12 @@ extension AutomaticSliderStyle: ReuseTransparentStyle {}
 /// and the formatted value.
 ///
 /// The row reserves a leading cell for the focus rail and draws the rail in
-/// the theme's border paint while the focus effect is active. The track spans
+/// the row's foreground paint while the focus effect is active. The track spans
 /// ``SliderStyleConfiguration/trackCellCount`` cells and prints the completed
 /// span as `━`, the current position as `●`, and the remainder as `─`. While
 /// the control is focused or pressed, the track and value take the control
-/// chrome's paints over a filled background; otherwise the track uses the
-/// separator paint. The label uses the row's foreground paint, and the
+/// foreground paint over a filled background; otherwise it uses the row's
+/// foreground paint. The label uses the row's foreground paint, and the
 /// whole row honors the chrome's disabled opacity.
 public struct LinearSliderStyle: SliderStyle {
   /// Creates the style.
@@ -425,7 +425,7 @@ private struct LinearSliderStyleBody: View {
             String(repeating: "━", count: position) + "●"
               + String(repeating: "─", count: width - position - 1)
           )
-          .foregroundStyle(active ? contentChrome.borderStyle : AnyShapeStyle(.separator))
+          .foregroundStyle(active ? contentChrome.foregroundStyle : chrome.foregroundStyle)
         }
         configuration.valueLabel.foregroundStyle(
           active ? contentChrome.foregroundStyle : chrome.foregroundStyle)

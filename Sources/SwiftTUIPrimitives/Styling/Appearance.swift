@@ -414,7 +414,12 @@ public struct TerminalAppearance: Equatable, Sendable, Codable {
       invert: true
     )
     let muted = backgroundColor.mixed(with: foregroundColor, amount: mutedMixAmount)
-    let placeholder = backgroundColor.mixed(with: foregroundColor, amount: placeholderMixAmount)
+    let placeholder = contrastSafe(
+      backgroundColor.mixed(with: foregroundColor, amount: placeholderMixAmount),
+      against: backgroundColor,
+      minimumContrast: 4.5,
+      fallback: foregroundColor
+    )
     let safeTint = contrastSafe(
       tintColor,
       against: backgroundColor,

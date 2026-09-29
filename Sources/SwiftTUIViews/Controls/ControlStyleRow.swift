@@ -17,7 +17,7 @@ struct ControlStyleRow<Content: View>: View {
   var body: some View {
     HStack(alignment: .center, spacing: 1) {
       if focusActive && reservesRail {
-        Text("▌").foregroundStyle(chrome.borderStyle)
+        Text("▌").foregroundStyle(chrome.foregroundStyle)
       } else if reservesRail {
         Text(" ").foregroundStyle(.background)
       }

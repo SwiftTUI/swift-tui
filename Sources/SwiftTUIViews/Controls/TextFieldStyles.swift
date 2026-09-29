@@ -332,18 +332,20 @@ package func textInputChrome(
     isEnabled: isEnabled,
     isFocused: false
   )
-  guard isEnabled, isFocused else {
+  guard isEnabled else {
     return contentChrome
   }
 
   let focusChrome = styleEnvironment.controlChrome(
     isEnabled: true,
-    isFocused: true
+    isFocused: isFocused
   )
   return ControlChrome(
     foregroundStyle: contentChrome.foregroundStyle,
     contentBackgroundStyle: contentChrome.contentBackgroundStyle,
-    borderForegroundStyle: focusChrome.borderForegroundStyle,
+    // An empty field needs its outline to identify the input area. Decorative
+    // terminal-border blends are too faint for that role in the default theme.
+    borderForegroundStyle: contentChrome.foregroundStyle,
     borderBackgroundStyle: focusChrome.borderBackgroundStyle,
     opacity: contentChrome.opacity
   )
@@ -458,7 +460,7 @@ public struct AutomaticTextFieldStyle: Sendable, TextFieldStyle {
 /// the prompt is showing and in the chrome's foreground style otherwise, with
 /// the chrome's opacity carrying any disabled dimming. When
 /// ``TextFieldStyleConfiguration/showsLabel`` is true the authored label is
-/// stacked above the field in the accent border color; the style removes the
+/// stacked above the field in the content foreground color; the style removes the
 /// chrome, not the label.
 public struct PlainTextFieldStyle: Sendable, TextFieldStyle {
   /// Creates the style.
@@ -559,7 +561,7 @@ package struct PlainTextFieldStyleBody: View {
     if configuration.showsLabel {
       VStack(alignment: .leading, spacing: 0) {
         configuration.label
-          .foregroundStyle(.terminalBorder(.accent))
+          .foregroundStyle(configuration.chrome.foregroundStyle)
         field
       }
     } else {
@@ -607,7 +609,7 @@ package struct RoundedBorderTextFieldStyleBody: View {
         if configuration.showsLabel {
           VStack(alignment: .leading, spacing: 0) {
             configuration.label
-              .foregroundStyle(.terminalBorder(.accent))
+              .foregroundStyle(configuration.chrome.foregroundStyle)
             field
           }
         } else {

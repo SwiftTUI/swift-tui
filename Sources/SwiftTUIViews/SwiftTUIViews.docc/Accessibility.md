@@ -185,13 +185,13 @@ assistive callbacks before those interfaces become operable; they have their
 own qualification boundaries.
 
 The browser's DOM presenter is **experimental and opt-in** (`renderer: "dom"`);
-Canvas remains the default. The complete DOM control/assistive-technology
-journey and VoiceOver output are not qualified. Current DOM qualification is
+Canvas remains the default. Bounded Safari/VoiceOver control journeys have
+human acceptance; the complete DOM assistive matrix remains open. Qualification is
 scoped to macOS desktop; Windows High Contrast and physical mobile acceptance
 are outside that scope. Ordinary prose passes narrow-width and doubled-text
-WASI checks, but CSS letter/word spacing can clip text and paragraph spacing
-is unqualified. Native Safari can match a live announcement as well as the
-visible text. These are experimental conformance defects.
+WASI checks. Uniform CSS letter/word spacing and line height renegotiate the
+Swift grid, and live announcements no longer add native Find matches. Authored
+paragraph spacing remains unqualified; there is no full WCAG conformance claim.
 Shared host-native IME/pre-edit presentation is excluded. Committed Unicode,
 paste and final composition values are delivered exactly once. Shared runtime
 tests and browser automation do not establish VoiceOver, TalkBack, or WCAG

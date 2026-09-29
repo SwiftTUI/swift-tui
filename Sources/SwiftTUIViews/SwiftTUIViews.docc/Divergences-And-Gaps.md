@@ -1054,10 +1054,11 @@ value-setting requests; host adapters must connect their native callbacks. (The 
 - **Assistive host qualification remains incomplete.** *Gap.* The shared runtime
   accepts node-targeted focus, activation, adjustment and typed value requests
   (STUI-129). The current browser adapter connects those callbacks to the shared
-  contract. Its DOM presenter is experimental; complete control/assistive
-  journeys and VoiceOver output remain unqualified. DOM qualification is
-  currently scoped to macOS desktop. CSS text-spacing clipping and duplicate
-  native-find matches from live announcements remain known defects. Windows
+  contract. Its DOM presenter is experimental; bounded Safari/VoiceOver
+  control journeys are qualified, while the complete assistive matrix remains
+  open. DOM qualification is currently scoped to macOS desktop. Uniform CSS
+  letter/word/line spacing and duplicate native-find announcement matches are
+  repaired; authored paragraph spacing remains unqualified. Windows
   High Contrast and physical mobile acceptance are outside that scope.
   Native adapters retain their own integration gaps. Shared
   runtime tests do not establish host conformance.
