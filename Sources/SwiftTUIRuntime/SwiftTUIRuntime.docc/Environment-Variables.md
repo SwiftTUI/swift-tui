@@ -57,7 +57,8 @@ start.
 
 Also read by `RuntimeConfiguration.detect`. The group is consulted only when
 `SWIFTTUI_WEB` is truthy; it makes the batteries-included runner serve the app
-to a browser instead of (or alongside) the terminal.
+to a browser instead of the terminal. Terminal launch does not start a companion
+server. WebHost is not included on Windows.
 
 | Variable | Values | Effect |
 | --- | --- | --- |

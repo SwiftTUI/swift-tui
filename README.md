@@ -111,7 +111,10 @@ swift run --package-path counter counter
   OSC 8 hyperlinks, and mouse reporting are probed per session and degrade
   gracefully: one binary is correct in kitty, a bare SSH session, or CI. Every
   app also ships `--accessible`, `--cursor-follows-focus`, `--reduce-motion`,
-  `--no-color`, and `--ascii`. You write views, not escape codes.
+  `--no-color`, and `--ascii`. `--accessible` enables reduced motion and cursor
+  following; it does not provide a semantic terminal reader or start a browser.
+  See [Accessibility](Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md)
+  for supported browser actions, version boundaries, and author responsibilities.
 - **One compiled binary, testable without a TTY.** Swift 6 compiles your
   interface into a single executable with checked concurrency, and tests
   render and compare integer-cell frames like the one above with no terminal

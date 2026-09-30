@@ -60,7 +60,13 @@ Its default is `false`; the terminal-shaped `PresentationSurface` aggregate
 defaults to `true`. The WASI ANSI adapter explicitly keeps it `false`, since
 terminal byte output does not give a browser ownership of app termination.
 
-## 0.9 Preview Support Contract
+## Historical 0.9 Preview Support Contract
+
+The following table records the 0.9 boundary, not current browser action support.
+Current browser producers and adapters route a finite set of typed control actions;
+see [Accessibility](https://swifttui.sh/docs/documentation/swifttuiviews/accessibility)
+for control coverage and released-versus-candidate limits. Native host support is
+qualified independently.
 
 | Surface | 0.9 tier | Supported boundary |
 | --- | --- | --- |

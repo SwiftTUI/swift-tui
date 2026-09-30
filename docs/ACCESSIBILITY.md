@@ -17,47 +17,19 @@ reconstructs a tree. The snapshot deliberately does **not** bake in focus
 state. Consumers cross-reference live focus from `FocusTracker` during
 presentation. Thus, one snapshot stays valid when focus moves.
 
-## One snapshot, four consumers
+## Snapshot consumers and their limits
 
-```mermaid
-flowchart TD
-    meta["Authored .accessibility* modifiers<br/>→ SemanticMetadata"]
-    extract["SemanticExtractor"]
-    snap["SemanticSnapshot.accessibilityNodes"]
-    meta --> extract --> snap
+| Consumer | Current behavior | Evidence boundary |
+| --- | --- | --- |
+| Terminal cursor mode | Uses focus and cursor anchors to position the hardware cursor. Off by default; text input retains its caret. | Emits terminal bytes, not a semantic tree or spoken announcement. Reader compatibility requires testing. |
+| Canvas and DOM browsers | A shared ARIA sidecar receives semantic nodes; supported controls route typed actions back to Swift. | Names, roles and unit assertions do not prove complete assistive task access. |
+| Public SwiftUI host | Presents native semantic elements and runtime-origin focus. | Presentation does not establish assistive action support; macOS and iOS require independent qualification. |
+| Android host | Serializes semantic nodes and exposes native accessibility-provider actions. | Provider tests do not establish TalkBack discovery or operation. |
+| Test support | `renderLinearAccessibilityOutput(_:)` produces a reading-order string using `LinearAccessibilityRenderer`. | A snapshot assertion utility, not a shipped interactive terminal reader or screen-reader output capture. |
 
-    snap --> cursor["Terminal: cursor-follows-focus"]
-    snap --> web["Web / WASI: accessibilityTree JSON<br/>→ ARIA DOM mounter"]
-    snap --> swiftui["SwiftUI host: HostedAccessibilityOverlay<br/>→ VoiceOver"]
-    snap --> android["Android host: Compose semantics overlay<br/>→ TalkBack"]
-
-    focus["FocusTracker"] -.cross-referenced.-> cursor
-    focus -.cross-referenced.-> swiftui
-    focus -.cross-referenced.-> android
-```
-
-1. **Terminal cursor-follows-focus.** When `cursorFollowsFocus` is enabled
-   (directly or through the `SWIFTTUI_ACCESSIBLE` alias), the terminal cursor
-   tracks the focused node's `cursorAnchor`, so a terminal screen reader
-   follows focus. This is opt-in and off by default. When it is off, the
-   hardware cursor shows only at a focused text input's caret.
-2. **Web / WASI ARIA.** The `web-surface` wire frame carries the
-   `accessibilityTree` as JSON (a v2 frame when the tree is present). In the
-   browser, the canvas is `aria-hidden` and a sibling DOM tree is populated
-   from that JSON so assistive technology reads the ARIA tree.
-3. **SwiftUI host.** `HostedAccessibilityOverlay` mounts a zero-size native
-   accessibility overlay over the raster surface. Each `AccessibilityNode`
-   becomes a native element with role-derived traits. Runtime focus is pushed
-   to VoiceOver (the overlay's focused element follows the runtime).
-4. **Android host.** `SwiftTUIAndroidHost` serializes accessibility nodes and
-   announcements into the Android frame snapshot. `AndroidGallery` mounts a
-   transparent Compose semantics overlay over the canvas so TalkBack can read
-   the semantic tree rather than a single opaque image.
-
-A fifth consumer lives outside the runtime: the `SwiftTUITestSupport` seam
-`renderLinearAccessibilityOutput(_:)` renders a snapshot to a linear
-reading-order string (via the internal `LinearAccessibilityRenderer`) so
-external packages can assert on assistive output for their views.
+The [consumer article](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md)
+records the current control, release and authoring boundaries. Native host
+packages own their adapter implementations; no browser acceptance transfers to them.
 
 ## Assistive action contract
 
@@ -67,6 +39,11 @@ public authored identity, and discard tokens when the scene ends. A recreated
 control gets a new token even if its authored identity is reused. Requests
 resolve against the latest committed semantic tree and active focus regions.
 They do not synthesize keyboard events or invoke ancestor key handlers.
+WebSocket ingress attaches its connection token to requests in process. The run
+loop drops queued requests from a retired host session before state mutation or
+acknowledgement, including when a new page reuses the same request ID. This
+provenance is package-only and does not change the wire format. Untagged requests
+from other host adapters retain their existing behavior.
 
 `control.actions` advertises focus, activate, increment, decrement, and/or
 setValue. `control.value` is boolean, number, or text. Numeric controls publish

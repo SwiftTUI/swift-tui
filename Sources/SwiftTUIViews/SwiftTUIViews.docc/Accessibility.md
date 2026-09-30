@@ -1,18 +1,18 @@
 # Accessibility
 
-Attach semantic metadata to views so terminal screen readers, browser ARIA
-trees, VoiceOver, and TalkBack can present your interface.
+SwiftTUI supplies shared semantic metadata and typed actions for supported
+built-in controls. Accessibility depends on the control, host, version, and
+application task; a label or role alone does not make a custom control operable.
 
 ## Overview
 
-Every SwiftTUI frame carries semantics alongside its rendered cells, and each
-presentation path reads the same semantics: the terminal presents them through
-cursor-follows-focus mode for terminal screen readers, the Web/WASI host
-mounts them as an ARIA tree beside the raster canvas, and the SwiftUI and
-Android hosts map them to VoiceOver and TalkBack.
-
-Most interfaces get correct semantics for free. Annotation is for custom
-controls and for visual-only content.
+Canvas and DOM browser hosts mount a semantic sidecar and route supported
+assistive actions back to Swift. Terminal cursor-following moves the hardware
+cursor; it does not publish that semantic tree, speak announcements, or provide
+an interactive linear reader. The public native SwiftUI host's semantic
+presentation does not provide the browser action adapter. iOS and Android
+assistive operation require their own qualification; browser VoiceOver evidence
+does not establish native-host support.
 
 ### When Built-Ins Are Enough
 
@@ -40,18 +40,15 @@ label as their accessible name, excluding style chrome and displayed values.
 `TextField` and `SecureField` retain their titles when showing entered text.
 `ProgressView` publishes its label with the status role. Explicit
 `accessibilityLabel(_:)` overrides take precedence. See <doc:Style-System> for
-the naming contract when a custom style omits its label. A plain form needs no
-annotation at all:
+the naming contract when a custom style omits its label. Names and roles are
+only part of the contract: Picker selection, composite navigation, and table
+relationships do not yet have complete assistive support. The following built-in
+controls register their own supported actions without extra annotations:
 
 ```swift
 VStack(alignment: .leading, spacing: 1) {
     TextField("Title", text: $title)
     Toggle("Include focused tests", isOn: $includeTests)
-    Picker("Priority", selection: $priority) {
-        ForEach(Priority.allCases, id: \.self) { priority in
-            Text(priority.rawValue).tag(priority)
-        }
-    }
     Button("Save draft") { save() }
 }
 ```
@@ -63,41 +60,27 @@ Reach for the accessibility modifiers when you:
 - surface changing status text that a screen reader should track
 - hide decorative content from assistive technology
 
-### Annotating A Custom Control
+### Choosing An Operable Adjustable Control
 
-A custom control opts into focus with `.focusable(_:interactions:)` and then
-describes itself with `.accessibilityRole(_:)`, `.accessibilityLabel(_:)`,
-and `.accessibilityHint(_:)`:
+Use a built-in `Stepper` or `Slider` for adjustment. These controls register
+increment, decrement, and value-setting actions as well as keyboard behavior:
 
 ```swift
-struct RatingPicker: View {
+struct RatingControl: View {
     @State private var rating = 3
 
     var body: some View {
-        HStack {
-            ForEach(1...5, id: \.self) { star in
-                Text(star <= rating ? "*" : ".")
-            }
-        }
-        .focusable(interactions: .edit)
-        .onKeyPress(.arrowRight) { _ in
-            rating = min(rating + 1, 5)
-            return .handled
-        }
-        .onKeyPress(.arrowLeft) { _ in
-            rating = max(rating - 1, 1)
-            return .handled
-        }
-        .accessibilityRole(.slider)
-        .accessibilityLabel("Rating: \(rating) of 5 stars")
-        .accessibilityHint("Use the left and right arrows to adjust.")
+        Stepper("Rating", value: $rating, in: 1...5)
+            .accessibilityHint("Choose one to five stars.")
     }
 }
 ```
 
-SwiftTUI has no separate value modifier, so fold the current value into the
-label, as above. Because the label is re-resolved on every state change,
-assistive technology always reads the current value.
+Adding `.accessibilityRole(.slider)` and arrow-key handlers to a custom drawing
+does not register assistive adjustment. Public custom action registration and a
+separate authored value modifier are absent. A changing label describes state;
+it cannot substitute for an action route. Prefer a styled built-in control when
+its behavior fits the task.
 
 In cursor-follows-focus terminal mode, the hardware cursor parks on the
 focused view's origin by default; `.accessibilityCursorAnchor(_:)` moves that
@@ -120,7 +103,9 @@ Button("Save draft") {
 
 `announce(_:politeness:)` accepts `AccessibilityPoliteness` values `.off`,
 `.polite` (default), and `.assertive`. Calls made outside a running SwiftTUI
-runtime are ignored.
+runtime are ignored. Delivery requires a host announcement adapter; the terminal
+cursor mode does not speak these messages. Verify ordering, repetition, and
+focus stability with the intended screen reader.
 
 ### Live Regions And Hidden Content
 
@@ -145,7 +130,9 @@ subtree conditionally.
 
 The `--reduce-motion` flag (or `SWIFTTUI_REDUCE_MOTION=1`) suppresses
 animations and spinners, and `--accessible` (`SWIFTTUI_ACCESSIBLE=1`) implies
-both `--reduce-motion` and `--cursor-follows-focus`. Built-in animated views
+both `--reduce-motion` and `--cursor-follows-focus`. It does not imply
+`--no-color` or `--ascii`, start a browser, or select a sequential reader.
+Built-in animated views
 honor the preference: `Spinner` renders static text, `PhaseAnimator` holds
 its first phase, and `SwiftTUIAnimatedImage` shows its first frame. Authored
 animation should do the same:
@@ -217,6 +204,30 @@ tests and browser automation do not establish VoiceOver, TalkBack, or WCAG
 conformance. The browser package's
 [DOM support statement](https://github.com/SwiftTUI/swift-tui-web/tree/main/packages/web#experimental-support-boundary)
 documents the tested profile, selection/find limits, and other known exclusions.
+
+## Version and application responsibilities
+
+The default public dependency is release `0.15.1`. Ordinary static-text extraction
+was added after that release in framework commit
+[`5519ebb2`](https://github.com/SwiftTUI/swift-tui/commit/5519ebb246f556df217389c599617e17bfb5f2d4).
+Its recorded Safari/VoiceOver reading journey used the DOM presenter and a
+coordination candidate, not a fresh `0.15.1` consumer. It covers reading order,
+full paragraphs, names and a button-driven count update; it does not prove
+character navigation, text selection, every control, or the Canvas listening
+journey. Pair producer and browser versions when evaluating a capability.
+
+Authors still supply meaningful names for icon-only actions, descriptions and
+alternatives for charts/images/custom Canvas drawing, useful validation messages,
+and logical task structure. Charts do not expose navigable data automatically;
+embedded TerminalView pixels do not expose the embedded program's controls or
+history as a semantic application. Provide a task-complete alternative and test
+it. Check reading, action, error recovery, focus, dynamic feedback, color and
+motion on each supported host; naming the container is insufficient.
+
+`--web` explicitly selects a browser session on platforms with the WebHost
+runner. Terminal and browser launch are mutually exclusive; terminal launch does
+not start a companion server, and Windows does not include WebHost. See
+[Hosts And Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms).
 
 ## Authored paragraph spacing
 
