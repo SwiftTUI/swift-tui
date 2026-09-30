@@ -5,6 +5,48 @@ import Testing
 
 @Suite
 struct AccessibilityNodeExtractionTests {
+  @Test(
+    "ordinary text emits full source labels in reading order, ignoring hidden and transient text")
+  func ordinaryTextReadingOrder() {
+    let rootID = testIdentity("Reading")
+    let root = placedNode(
+      identity: rootID,
+      children: [
+        placedNode(identity: rootID.child(.named("Instruction")), drawPayload: .text("Read this.")),
+        placedNode(
+          identity: rootID.child(.named("Paragraph")),
+          bounds: rect(x: 0, y: 1, width: 4, height: 2),
+          drawPayload: .text("Full paragraph source, even when its bounds are narrow.")),
+        placedNode(
+          identity: rootID.child(.named("Hidden")),
+          semanticMetadata: .init(accessibilityHidden: true), drawPayload: .text("Decoration")),
+        placedNode(
+          identity: rootID.child(.named("Transient")), drawPayload: .text("Departing"),
+          isTransient: true),
+      ])
+    let nodes = SemanticExtractor().extract(from: root).accessibilityNodes
+    #expect(
+      nodes.compactMap(\.label) == [
+        "Read this.", "Full paragraph source, even when its bounds are narrow.",
+      ])
+    #expect(nodes.dropFirst().allSatisfy { $0.role == .group && $0.parentIdentity == rootID })
+  }
+
+  @Test("an aggregate name replaces descendant prose while nested controls keep their names")
+  func namedAggregateOwnsText() {
+    let rootID = testIdentity("Aggregate")
+    let snapshot = SemanticExtractor().extract(
+      from: placedNode(
+        identity: rootID, semanticMetadata: .init(accessibilityLabel: "Authored summary"),
+        children: [
+          placedNode(identity: rootID.child(.named("Text")), drawPayload: .text("Visual detail")),
+          placedNode(
+            identity: rootID.child(.named("Action")),
+            semanticMetadata: .init(accessibilityRole: .button), drawPayload: .text("Continue")),
+        ]))
+    #expect(snapshot.accessibilityNodes.compactMap(\.label) == ["Authored summary", "Continue"])
+  }
+
   @Test("disabled dismissal focus never enables pointer routing or crosses a sealed host")
   func disabledDismissalFocus() {
     let identity = testIdentity("DismissalTarget")

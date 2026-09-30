@@ -80,6 +80,11 @@ public struct SemanticMetadata: Equatable, Sendable {
     get { flag(Self.usesAuthoredAccessibilityLabelFlag) }
     set { setFlag(Self.usesAuthoredAccessibilityLabelFlag, to: newValue) }
   }
+  /// Authored content inside a styled control is readable independently of its name and chrome.
+  package var isAccessibilityContent: Bool {
+    get { flag(Self.isAccessibilityContentFlag) }
+    set { setFlag(Self.isAccessibilityContentFlag, to: newValue) }
+  }
   /// A literal title remains available when a style omits its visual label slot.
   package var accessibilityTitle: String? {
     get { authoredAccessibility?.title }
@@ -372,6 +377,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     merged.accessibilityControl = other.accessibilityControl ?? accessibilityControl
     merged.allowsFocusWhenDisabled = allowsFocusWhenDisabled || other.allowsFocusWhenDisabled
     merged.isParagraph = isParagraph || other.isParagraph
+    merged.isAccessibilityContent = isAccessibilityContent || other.isAccessibilityContent
     return merged
   }
 
@@ -390,6 +396,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   private static let accessibilityLabelContinuationFlag: UInt16 = 1 << 12
   private static let usesAuthoredAccessibilityLabelFlag: UInt16 = 1 << 13
   private static let isParagraphFlag: UInt16 = 1 << 14
+  private static let isAccessibilityContentFlag: UInt16 = 1 << 15
 
   private func flag(_ bit: UInt16) -> Bool {
     flags & bit != 0

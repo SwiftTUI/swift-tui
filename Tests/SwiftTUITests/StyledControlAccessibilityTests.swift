@@ -15,6 +15,7 @@ struct StyledControlAccessibilityTests {
       #expect(snapshot.accessibilityNodes.first { $0.role == .button }?.label == "Increment")
       #expect(LinearAccessibilityRenderer().render(snapshot).contains("button: Increment"))
       #expect(!LinearAccessibilityRenderer().render(snapshot).contains("Ctrl+I"))
+      #expect(snapshot.accessibilityNodes.compactMap(\.label) == ["Increment"])
     }
   }
 
@@ -32,6 +33,7 @@ struct StyledControlAccessibilityTests {
     )
     #expect(snapshot.accessibilityNodes.first { $0.role == .button }?.label == "Save document")
     #expect(snapshot.accessibilityNodes.allSatisfy { !$0.hidden })
+    #expect(snapshot.accessibilityNodes.compactMap(\.label) == ["Save document"])
   }
 
   @Test("Label contributes its title without its icon, including icon-only presentation")
@@ -63,6 +65,49 @@ struct StyledControlAccessibilityTests {
       }.buttonStyle(DecoratedButtonStyle())
     )
     #expect(snapshot.accessibilityNodes.first { $0.role == .button }?.label == "Save document")
+    #expect(snapshot.accessibilityNodes.compactMap(\.label) == ["Save document"])
+  }
+
+  @Test("ordinary text, paragraphs, rich text and status read once in authored order")
+  func ordinaryReadingContent() {
+    let snapshot = render(
+      VStack {
+        Text("Instructions").accessibilityRole(.heading(level: 2))
+        Text("Read before continuing.")
+        Text("First paragraph.").bold().paragraph()
+        Text("Second paragraph.").paragraph()
+        Text("Rich \(Text("words").italic()).")
+        Text("Ready").accessibilityRole(.status)
+        Text("Visual name").accessibilityLabel("Authored name")
+        Text("Omitted").accessibilityLabel("")
+        Text("Decoration").accessibilityHidden()
+        Text("")
+        Text(" \n\t")
+        Label("Standalone title") { Text("icon glyph") }.labelStyle(.iconOnly)
+        Button("Continue") {}.buttonStyle(DecoratedButtonStyle())
+      }
+    )
+    #expect(
+      snapshot.accessibilityNodes.compactMap(\.label) == [
+        "Instructions", "Read before continuing.", "First paragraph.", "Second paragraph.",
+        "Rich words.", "Ready", "Authored name", "", "Standalone title", "Continue",
+      ])
+    #expect(
+      snapshot.accessibilityNodes.first { $0.label == "Instructions" }?.role == .heading(level: 2))
+    #expect(snapshot.accessibilityNodes.first { $0.label == "Ready" }?.liveRegion == nil)
+  }
+
+  @Test("disclosed content reopens reading while custom style chrome and labels stay owned")
+  func disclosedReadingContent() {
+    let snapshot = render(
+      DisclosureGroup("Details", isExpanded: .constant(true)) {
+        Text("Disclosed paragraph.").paragraph()
+        Button("Nested action") {}
+      }.disclosureGroupStyle(DecoratedDisclosureStyle())
+    )
+    #expect(
+      snapshot.accessibilityNodes.compactMap(\.label)
+        == ["Details", "Disclosed paragraph.", "Nested action"])
   }
 
   @Test("label-owned state updates the name without an outer control state change")
@@ -129,6 +174,10 @@ struct StyledControlAccessibilityTests {
         "Download",
       ])
     #expect(!String(describing: snapshot.accessibilityNodes).contains("private-password"))
+    #expect(
+      snapshot.accessibilityNodes.compactMap(\.label) == names.prefix(8) + [
+        "Expanded content", "Download",
+      ])
   }
 
   @Test("stateful generic label refreshes through the real input and retained graph path")
@@ -221,6 +270,22 @@ private struct DecoratedButtonStyle: ButtonStyle {
 
 private struct OmittedButtonStyle: ButtonStyle {
   func makeBody(configuration: ButtonStyleConfiguration) -> some View { Text("chrome only") }
+}
+
+private struct DecoratedDisclosureStyle: DisclosureGroupStyle {
+  func makeBody(configuration: DisclosureGroupStyleConfiguration) -> some View {
+    VStack {
+      configuration.trigger {
+        HStack {
+          Text("disclosure chrome")
+          configuration.label
+          configuration.label
+        }
+      }
+      configuration.content
+      Text("footer chrome")
+    }
+  }
 }
 
 private struct StatefulLabelFixture: View {

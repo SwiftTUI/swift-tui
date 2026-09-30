@@ -7,6 +7,16 @@ extension View {
   }
 }
 
+/// Stamp resolved content after capture has preserved the authored child census.
+/// A view wrapper here would change menu relocation and retained state ownership.
+package func markingAccessibilityContent(_ completed: [ResolvedNode]) -> [ResolvedNode] {
+  var nodes = completed
+  for index in nodes.indices {
+    nodes[index].semanticMetadata.isAccessibilityContent = true
+  }
+  return nodes
+}
+
 /// Transparent forwarding keeps the authored layout elements and graph census.
 /// Unlike a metadata modifier, this does not introduce a modifier-content node.
 private struct AuthoredAccessibilityLabel<Content: View>: PrimitiveView, IterativeResolvableView {

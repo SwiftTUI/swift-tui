@@ -203,7 +203,8 @@ public struct MenuStyleConfiguration: Sendable {
 
     private var contentBody: some View {
       VStack(alignment: .leading, spacing: 0) {
-        CapturedSubviewSequenceView(payloads: payloads, retention: retention)
+        CapturedSubviewSequenceView(
+          payloads: payloads, retention: retention, isAccessibilityContent: true)
       }
       .background { MenuStyleUsageMarker(identity: usageIdentity) }
     }

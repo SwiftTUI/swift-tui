@@ -10,6 +10,12 @@ private struct AccessibilityVisualCandidate: Sendable {
   var role: AccessibilityRole
 }
 
+private enum AccessibilityTextPresentation {
+  case independent
+  case namedAncestor
+  case primitiveOwned
+}
+
 private enum AccessibilityVisualCandidateSummary: Sendable {
   case none
   case unique(AccessibilityVisualCandidate)
@@ -88,8 +94,10 @@ extension SemanticExtractor {
         node: PlacedNode,
         traversalOrdinal: Int?,
         parentTraversalOrdinal: Int?,
-        collectingLabel: Bool
-      )] = [(root, nil, nil, false)]
+        collectingLabel: Bool,
+        textPresentation: AccessibilityTextPresentation
+      )] = [(root, nil, nil, false, .independent)]
+    var textPresentations: [Int: AccessibilityTextPresentation] = [:]
 
     while let frame = stack.popLast() {
       let node = frame.node
@@ -181,7 +189,10 @@ extension SemanticExtractor {
           for: node,
           emittedSubtrees: emittedSubtrees
         )
-        if accessibilitySelfIsRelevant(node, focusIdentities: focusIdentities)
+        if accessibilitySelfIsRelevant(
+          node, focusIdentities: focusIdentities,
+          textPresentation: frame.textPresentation
+        )
           || hasEmittedChild
         {
           emittedSubtrees.insert(node.identity)
@@ -195,9 +206,33 @@ extension SemanticExtractor {
 
         let collectingLabel =
           frame.collectingLabel || node.semanticMetadata.accessibilityLabelSource != nil
-        stack.append((node, traversalOrdinal, frame.parentTraversalOrdinal, collectingLabel))
+        let metadata = node.semanticMetadata
+        // A nested primitive retains its own actions and name. Authored content
+        // reopens reading inside a DisclosureGroup/Menu, while label slots and
+        // the rest of a primitive's style remain represented by its owner.
+        let ownsControl = accessibilityOwnsControlPresentation(node)
+        let textPresentation: AccessibilityTextPresentation =
+          metadata.isAccessibilityContent || ownsControl ? .independent : frame.textPresentation
+        if textPresentation != .independent {
+          textPresentations[traversalOrdinal] = textPresentation
+        }
+        let childPresentation: AccessibilityTextPresentation =
+          if textPresentation == .primitiveOwned || ownsControl
+            || metadata.usesAuthoredAccessibilityLabel
+          {
+            .primitiveOwned
+          } else if metadata.accessibilityLabel != nil || textPresentation == .namedAncestor {
+            .namedAncestor
+          } else {
+            .independent
+          }
+        stack.append(
+          (
+            node, traversalOrdinal, frame.parentTraversalOrdinal, collectingLabel,
+            textPresentation
+          ))
         for child in node.children.reversed() {
-          stack.append((child, nil, traversalOrdinal, collectingLabel))
+          stack.append((child, nil, traversalOrdinal, collectingLabel, childPresentation))
         }
       }
     }
@@ -228,7 +263,8 @@ extension SemanticExtractor {
           textInputPresentations: textInputPresentations,
           inferredVisualRole:
             visualLabelRoutes.inferredRolesByTraversalOrdinal[traversalOrdinal],
-          authoredLabel: authoredLabels[traversalOrdinal]
+          authoredLabel: authoredLabels[traversalOrdinal],
+          textPresentation: textPresentations[traversalOrdinal] ?? .independent
         ) {
           nodes.append(accessibilityNode)
           childParentIdentity = node.identity
@@ -303,14 +339,18 @@ extension SemanticExtractor {
   private func accessibilitySelfIsRelevant(
     _ node: PlacedNode,
     focusIdentities: Set<Identity>,
-    textInputPresentations: [Identity: TextInputAccessibilityPresentation] = [:]
+    textInputPresentations: [Identity: TextInputAccessibilityPresentation] = [:],
+    textPresentation: AccessibilityTextPresentation = .independent
   ) -> Bool {
-    if accessibilityVisualContentIsUnlabeled(node) {
+    if textPresentation == .primitiveOwned || accessibilityVisualContentIsUnlabeled(node) {
       return false
     }
 
     return node.semanticMetadata.accessibilityRole != nil
       || node.semanticMetadata.accessibilityLabel != nil
+      || node.semanticMetadata.usesAuthoredAccessibilityLabel
+      || (textPresentation == .independent
+        && hasNonEmptyAccessibilityLabel(accessibilityTextLabel(from: node.drawPayload)))
       || node.semanticMetadata.accessibilityHint != nil
       || node.semanticMetadata.accessibilityLiveRegion != nil
       || node.semanticMetadata.accessibilityCursorAnchor != nil
@@ -325,12 +365,14 @@ extension SemanticExtractor {
     focusIdentities: Set<Identity>,
     textInputPresentations: [Identity: TextInputAccessibilityPresentation],
     inferredVisualRole: AccessibilityRole?,
-    authoredLabel: String?
+    authoredLabel: String?,
+    textPresentation: AccessibilityTextPresentation
   ) -> AccessibilityNode? {
     let selfIsRelevant = accessibilitySelfIsRelevant(
       node,
       focusIdentities: focusIdentities,
-      textInputPresentations: textInputPresentations
+      textInputPresentations: textInputPresentations,
+      textPresentation: textPresentation
     )
     guard
       let role = accessibilityRole(
@@ -343,23 +385,35 @@ extension SemanticExtractor {
       return nil
     }
 
+    let suppressingPresentation = textPresentation == .primitiveOwned
+    // An explicitly named container replaces only automatic descendant text.
+    // Existing explicit child names/roles/hints still form independent items.
+    let infersTextLabel =
+      textPresentation == .independent
+      || node.semanticMetadata.accessibilityRole != nil
     var result = AccessibilityNode(
-      viewNodeID: node.viewNodeID,
+      // Static reading items have no retained owner. Allocation IDs differ
+      // between fresh and retained graphs; controls and live regions need
+      // them for stale-target rejection and per-owner attribution.
+      viewNodeID: node.semanticMetadata.accessibilityControl != nil
+        || node.semanticMetadata.accessibilityLiveRegion != nil ? node.viewNodeID : nil,
       // Reported identity is occurrence-free: duplicate siblings compare
-      // equal, as authored, and per-owner attribution rides `viewNodeID`.
+      // equal, as authored, and owner attribution rides `viewNodeID`.
       // Internal lookups (cursor anchors, focus relevance) stay on the raw
       // occurrence-qualified identity.
       identity: node.identity.strippingEntityOccurrences,
       parentIdentity: parentIdentity?.strippingEntityOccurrences,
       rect: semanticBounds(for: node),
       role: role,
-      label: node.semanticMetadata.accessibilityLabel ?? authoredLabel
-        ?? accessibilityLabel(for: node, role: role),
-      hint: node.semanticMetadata.accessibilityHint,
+      label: suppressingPresentation
+        ? nil
+        : node.semanticMetadata.accessibilityLabel ?? authoredLabel
+          ?? accessibilityLabel(for: node, role: role, infersTextLabel: infersTextLabel),
+      hint: suppressingPresentation ? nil : node.semanticMetadata.accessibilityHint,
       // Hidden subtrees were already pruned. A hidden label decoration must
       // not hide its visible control (or ancestors) in browser/native hosts.
       hidden: false,
-      liveRegion: node.semanticMetadata.accessibilityLiveRegion,
+      liveRegion: suppressingPresentation ? nil : node.semanticMetadata.accessibilityLiveRegion,
       cursorAnchor: textInputPresentations[node.identity]?.anchor
         ?? accessibilityCursorAnchor(for: node)
     )
@@ -412,10 +466,10 @@ extension SemanticExtractor {
     hasEmittedChild: Bool,
     inferredVisualRole: AccessibilityRole?
   ) -> AccessibilityRole? {
-    if let role = node.semanticMetadata.accessibilityRole {
+    if isRelevant, let role = node.semanticMetadata.accessibilityRole {
       return role
     }
-    if let inferredVisualRole {
+    if isRelevant, let inferredVisualRole {
       return inferredVisualRole
     }
     if isRelevant || hasEmittedChild {
@@ -426,12 +480,13 @@ extension SemanticExtractor {
 
   private func accessibilityLabel(
     for node: PlacedNode,
-    role: AccessibilityRole
+    role: AccessibilityRole,
+    infersTextLabel: Bool
   ) -> String? {
     if let label = node.semanticMetadata.accessibilityLabel {
       return label
     }
-    if accessibilityRoleInfersTextLabel(role),
+    if infersTextLabel, accessibilityRoleInfersTextLabel(role),
       let textLabel = accessibilityTextLabel(from: node.drawPayload)
     {
       return textLabel
@@ -448,7 +503,7 @@ extension SemanticExtractor {
     _ role: AccessibilityRole
   ) -> Bool {
     switch role {
-    case .button, .link, .tab, .menuItem, .heading, .status:
+    case .group, .button, .link, .tab, .menuItem, .heading, .status:
       true
     default:
       false
@@ -505,6 +560,18 @@ extension SemanticExtractor {
       return false
     }
     return !hasNonEmptyAccessibilityLabel(node.semanticMetadata.accessibilityLabel)
+  }
+
+  private func accessibilityOwnsControlPresentation(_ node: PlacedNode) -> Bool {
+    if node.semanticMetadata.accessibilityControl != nil { return true }
+    switch node.semanticMetadata.accessibilityRole {
+    case .button, .checkbox, .disclosureGroup, .link, .menuItem, .picker,
+      .progressBar, .secureField, .slider, .stepper, .tab, .textEditor, .textField, .toggle:
+      return true
+    default:
+      return node.semanticMetadata.usesAuthoredAccessibilityLabel
+        && node.semanticMetadata.accessibilityRole != nil
+    }
   }
 
   private func hasNonEmptyAccessibilityLabel(

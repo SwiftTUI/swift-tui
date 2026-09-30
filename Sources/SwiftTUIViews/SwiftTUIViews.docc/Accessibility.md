@@ -16,6 +16,22 @@ controls and for visual-only content.
 
 ### When Built-Ins Are Enough
 
+Ordinary `Text` publishes its full source string as a named semantic group in
+layout reading order, including styled/rich text and `Text.paragraph()`.
+Wrapping and truncation do not shorten that accessible name. An explicit role
+(such as a heading or status) and `accessibilityLabel(_:)` still take precedence;
+an empty label stays empty. Empty or whitespace-only unannotated text is omitted.
+Use `accessibilityHidden()` for decorative text.
+
+Primitive labels and style chrome are represented by their owner's accessible
+name rather than separate reading items. A standalone `Label` publishes its
+authored title, including when its style displays only the icon. Disclosed and
+menu content remains independently readable, and nested controls retain their
+own names. An explicitly named aggregate represents unannotated descendant text
+with that name; explicitly annotated children retain their own semantics.
+These semantics supply content to host adapters; actual assistive
+reading remains subject to each host's qualification boundary.
+
 Built-in controls publish their own roles: `Button`, `Toggle`, `TextField`,
 `SecureField`, `TextEditor`, `Slider`, `Stepper`, `Picker`, `Link`, `Menu`,
 and `DisclosureGroup` each attach the matching `AccessibilityRole` and

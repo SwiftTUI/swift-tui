@@ -167,7 +167,9 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
     }
 
     /// The captured authored content.
-    public var body: some View { CapturedSubviewView(payload: payload) }
+    public var body: some View {
+      CapturedSubviewView(payload: payload, isAccessibilityContent: true)
+    }
   }
 
   /// The authored label slot, ready to place in the style's trigger row.

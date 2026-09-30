@@ -209,13 +209,16 @@ package struct CapturedSubviewPayload: Sendable {
 @MainActor
 package struct CapturedSubviewView: PrimitiveView, IterativeResolvableView {
   package var payload: CapturedSubviewPayload
+  package var isAccessibilityContent: Bool
 
-  package init(payload: CapturedSubviewPayload) {
+  package init(payload: CapturedSubviewPayload, isAccessibilityContent: Bool = false) {
     self.payload = payload
+    self.isAccessibilityContent = isAccessibilityContent
   }
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
-    payload.resolveElementsWork(in: context)
+    let work = payload.resolveElementsWork(in: context)
+    return isAccessibilityContent ? work.map(markingAccessibilityContent) : work
   }
 }
 

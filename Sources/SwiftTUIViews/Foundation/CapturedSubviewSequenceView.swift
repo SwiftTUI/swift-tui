@@ -9,9 +9,13 @@ package struct CapturedSubviewSequenceView: PrimitiveView, IterativeResolvableVi
 {
   package var payloads: [ScopedContentPayload]
   package var retention: CapturedSubviewRetention? = nil
+  package var isAccessibilityContent = false
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
-    if let retention { return retention.resolveWork(payloads: payloads, in: context) }
+    if let retention {
+      let work = retention.resolveWork(payloads: payloads, in: context)
+      return isAccessibilityContent ? work.map(markingAccessibilityContent) : work
+    }
     let result = DeclaredChildrenWorkState()
     return resolveSequentially(Array(payloads.enumerated())) { index, payload in
       payload.resolveDeclaredElementsWork(
@@ -19,7 +23,7 @@ package struct CapturedSubviewSequenceView: PrimitiveView, IterativeResolvableVi
       ).map {
         result.nodes.append(contentsOf: $0)
       }
-    }.map { result.nodes }
+    }.map { isAccessibilityContent ? markingAccessibilityContent(result.nodes) : result.nodes }
   }
 
   package func appendDeclaredChildrenWork(

@@ -38,7 +38,9 @@ struct PipelineDriverParityTests {
     let proposal = ProposedSize(width: .finite(40), height: .finite(20))
     for entry in RenderDriverCharacterizationTests.matrix {
       // Synchronous entry point.
-      let syncRoot = testIdentity("ParitySyncRoot-\(entry.name)")
+      // Compare the same authored tree. Ordinary text now contributes semantic
+      // identities, so different root paths describe different snapshots.
+      let syncRoot = testIdentity("ParityRoot-\(entry.name)")
       let syncTerminal = ParityTestTerminalHost()
       let syncRunLoop = RunLoop<Int, AnyView>(
         rootIdentity: syncRoot,
@@ -56,7 +58,7 @@ struct PipelineDriverParityTests {
       try syncRunLoop.renderPendingFrames(renderedFrames: &syncFrames)
 
       // Asynchronous entry point.
-      let asyncRoot = testIdentity("ParityAsyncRoot-\(entry.name)")
+      let asyncRoot = syncRoot
       let asyncTerminal = ParityTestTerminalHost()
       let asyncRunLoop = RunLoop<Int, AnyView>(
         rootIdentity: asyncRoot,
