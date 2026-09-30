@@ -11,8 +11,10 @@ SwiftUI host.
 1. Start the gallery in accessible mode (reduced motion plus
    cursor-follows-focus, so the screen reader tracks the hardware cursor):
    `swiftly run swift run --package-path ../swift-tui-examples/gallery gallery-demo --accessible`
-2. Make sure that tab changes, focused controls, text input labels,
-   and `AccessibilityAnnouncer` messages are spoken in logical order.
+2. Make sure that tab changes, focused controls, and text input labels are
+   spoken in logical order. Terminal cursor mode does not speak
+   `AccessibilityAnnouncer` messages; check those on the browser target or
+   the SwiftUI host.
 3. Exercise visual-only screens such as images, charts, canvas demos, and
    animated content. They must expose meaningful labels or summaries, or be
    skipped when intentionally hidden.
