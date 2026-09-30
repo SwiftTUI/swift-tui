@@ -103,6 +103,29 @@
         await resumed.yieldedEvents() == [.key(.init(.character("Y"), modifiers: []))])
     }
 
+    @Test("queued assistive requests retain their originating connection")
+    func assistiveRequestsRetainConnection() async throws {
+      let harness = await IsolationHarness.make()
+      await harness.feed(token: 1, "\u{001E}accessibility:40:control:setValue:text:old\n")
+      await harness.closeCurrentClient()
+      let token = await harness.attach()
+      await harness.advanceThroughConnectionBoundary(token: token)
+      await harness.feed(token: token, "\u{001E}accessibility:1:control:setValue:text:new\n")
+      let events = await harness.yieldedEvents()
+      #expect(events.count == 2)
+      guard case .accessibility(let old) = events.first,
+        case .accessibility(let current) = events.last
+      else {
+        Issue.record("Expected both parsed accessibility requests")
+        return
+      }
+      #expect(old.hostSession == 1)
+      #expect(old.requestID == 40)
+      #expect(current.hostSession == token)
+      #expect(current.requestID == 1)
+      #expect(current.action == .setValue(.text("new")))
+    }
+
     /// A real channel, transport, and reader, stepped one tagged event at a time.
     private final class IsolationHarness: Sendable {
       let channel: WebHostSceneChannel

@@ -31,6 +31,8 @@ public enum AccessibilityAction: Equatable, Sendable {
 public struct AccessibilityActionRequest: Equatable, Sendable {
   /// Optional host correlation ID. A frame acknowledges the last processed request.
   public var requestID: UInt64?
+  /// In-process ingress provenance; never supplied by the browser wire payload.
+  package var hostSession: UInt64?
   public var target: String
   public var action: AccessibilityAction
 

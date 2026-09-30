@@ -242,6 +242,62 @@ import Testing
     #expect(host.frames.last?.semantics.accessibilityActionResponse?.requestID == 1)
   }
 
+  @Test func queuedOldSessionEditsCannotMutateOrAcknowledgeTheNewPage() throws {
+    let host = GeometryTestSurface()
+    let root = testIdentity("QueuedAccessibilitySession")
+    var text = "initial"
+    var writes = 0
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in
+      TextField(
+        "Name",
+        text: Binding(
+          get: { text },
+          set: {
+            text = $0
+            writes += 1
+          }))
+    }
+    loop.scheduler.requestSignal(named: "SIGWINCH")
+    var rendered = 0
+    try loop.renderPendingFrames(renderedFrames: &rendered)
+    let target = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first {
+        $0.label == "Name"
+      }?.actionTarget)
+    func send(_ value: String, session: UInt64, requestID: UInt64) throws {
+      var request = AccessibilityActionRequest(
+        target: target, action: .setValue(.text(value)), requestID: requestID)
+      request.hostSession = session
+      _ = loop.handle(.input(.accessibility(request)))
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+    }
+    // Both pages can issue ID 1; an ID-only browser filter cannot disambiguate them.
+    host.session = 8
+    try send("obsolete", session: 7, requestID: 1)
+    #expect(text == "initial")
+    #expect(writes == 0)
+    #expect(loop.latestAccessibilityActionResponse == nil)
+    try send("current", session: 8, requestID: 1)
+    #expect(text == "current")
+    #expect(writes == 1)
+    #expect(loop.latestAccessibilityActionResponse?.requestID == 1)
+    // A late high watermark cannot replace the current page's acknowledgement.
+    try send("obsolete again", session: 7, requestID: 40)
+    #expect(text == "current")
+    #expect(writes == 1)
+    #expect(loop.latestAccessibilityActionResponse?.requestID == 1)
+    host.revision += 1
+    try send("resized", session: 8, requestID: 2)
+    #expect(text == "resized")
+    #expect(writes == 2)
+    #expect(loop.latestAccessibilityActionResponse?.requestID == 2)
+  }
+
   @Test func wheelCoalescingKeepsGeometryAndLatestTimestamp() {
     var first = MouseEvent(kind: .scrolled(deltaX: 1, deltaY: 2), location: Point.zero)
     first.hostGeometryStamp = .init(session: 1, revision: 4)

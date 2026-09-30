@@ -231,7 +231,12 @@
         case .input(let event):
           await hooks?.beforeApplyParsedRecord?(token, .terminalInput)
           guard await source.currentConnectionToken() == token else { continue }
-          continuation.yield(event)
+          var scopedEvent = event
+          if case .accessibility(var request) = scopedEvent {
+            request.hostSession = token
+            scopedEvent = .accessibility(request)
+          }
+          continuation.yield(scopedEvent)
         }
       }
     }

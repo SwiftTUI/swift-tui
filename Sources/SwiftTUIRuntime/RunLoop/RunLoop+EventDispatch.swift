@@ -78,6 +78,11 @@ extension RunLoop {
         }
         return nil
       case .accessibility(let request):
+        // A request can outlive the reader's connection check in the input queue.
+        // Drop it before dispatch AND acknowledgement; request IDs restart per page.
+        if let session = request.hostSession, session != observedHostGeometry?.session {
+          return nil
+        }
         let result = handleAccessibilityAction(request)
         if let requestID = request.requestID {
           latestAccessibilityActionResponse = .init(
