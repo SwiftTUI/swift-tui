@@ -37,6 +37,7 @@ package enum StateSlotOrdinals {
   package static let capturedSubviewArchive = -11_000_000
   package static let capturedSubviewLocator = capturedSubviewArchive - 1
   package static let menuExpansion = -12_000_000
+  package static let tableKeyboardSelection = -13_000_000
 
   package static func authored(
     line: UInt,

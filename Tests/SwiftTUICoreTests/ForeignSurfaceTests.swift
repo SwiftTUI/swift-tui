@@ -5,6 +5,30 @@ import Testing
 
 @Suite("Foreign surface rasterization")
 struct ForeignSurfaceTests {
+  @Test("a clipped foreign glyph never leaves a lead claiming an uncopied cell")
+  func clippedWideGlyphHasNoOrphanLead() {
+    let bounds = CellRect(origin: .zero, size: .init(width: 3, height: 1))
+    let payload = StaticPayload(
+      grid: ForeignGrid(
+        size: bounds.size,
+        cells: [
+          [
+            RasterCell(character: "A"), RasterCell(character: "寿", spanWidth: 2),
+            RasterCell(character: " ", continuationLeadX: 1),
+          ]
+        ]))
+    let surface = Rasterizer().rasterize(
+      DrawNode(
+        identity: testIdentity("ClippedForeign"), bounds: bounds,
+        commands: [
+          .foreignSurface(
+            bounds: .init(origin: .zero, size: .init(width: 2, height: 1)), payload: payload)
+        ]))
+    #expect(surface.cells[0][0].character == "A")
+    #expect(surface.cells[0][1].character == " ")
+    #expect(surface.cells[0][1].spanWidth == 1)
+  }
+
   struct StaticPayload: ForeignSurfacePayload {
     let grid: ForeignGrid
   }

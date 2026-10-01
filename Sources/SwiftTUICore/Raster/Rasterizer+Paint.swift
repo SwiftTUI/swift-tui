@@ -1046,6 +1046,19 @@ extension Rasterizer {
               // rest of that glyph's span first, or a stale orphaned
               // continuation survives beside the copy.
               var copied = sourceCell
+              let leadColumn = sourceCell.continuationLeadX ?? col
+              let leadX = bounds.origin.x + leadColumn
+              let span =
+                sourceRow.indices.contains(leadColumn)
+                ? sourceRow[leadColumn].spanWidth : 0
+              let copyEnd = min(grid.size.width, bounds.size.width, sourceRow.count)
+              if leadColumn < 0 || span < 1 || leadColumn + span > copyEnd
+                || leadX < max(0, effectiveClip.origin.x)
+                || leadX + span
+                  > min(cells[y].count, effectiveClip.origin.x + effectiveClip.size.width)
+              {
+                copied = RasterCell(character: " ", style: sourceCell.style)
+              }
               if let leadX = copied.continuationLeadX {
                 copied.continuationLeadX = bounds.origin.x + leadX
               }

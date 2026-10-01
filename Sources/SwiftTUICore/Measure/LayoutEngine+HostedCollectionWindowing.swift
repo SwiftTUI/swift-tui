@@ -149,6 +149,9 @@ extension LayoutEngine {
     let childWidth: Int
     if case .table(let payload) = node.drawPayload {
       childWidth = max(0, concreteSize.width - payload.style.contentInsets.horizontal)
+    } else if case .list(let payload) = node.drawPayload {
+      let markerWidth = payload.showsSelectionMarker ? 2 : 0
+      childWidth = max(0, concreteSize.width - payload.style.contentInsets.horizontal - markerWidth)
     } else {
       childWidth = max(0, concreteSize.width)
     }

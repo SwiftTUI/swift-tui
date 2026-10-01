@@ -13,16 +13,12 @@ extension RunLoop {
   /// progress bounds (at most nine acquisitions to a forced commit).
   package static var maxFramesPerDrainPass: Int { 16 }
 
-  /// Synchronous frame driver, retained as a test entry point.
-  ///
-  /// This driver predates off-screen frame elision and intentionally does not
-  /// include an `.elided` arm. Production drives the run loop exclusively
-  /// through ``renderPendingFramesAsync(renderedFrames:eventPump:)``, which is
-  /// fully wired to the elision gate via `acquireFrameArtifactsAsync`. This
-  /// function is only invoked from synchronous test helpers; adding elision
-  /// complexity here would serve no production path.
+  /// Synchronous frame driver for direct event-pump re-entry and test helpers.
+  /// Signal termination limits this drain to one acquisition, just as the
+  /// async driver does. This path does not perform off-screen frame elision.
   package func renderPendingFrames(
     renderedFrames: inout Int,
+    frameBudget: Int? = nil,
     eventPump: EventPump? = nil,
     appliesWorkBudget: Bool = true
   ) throws {
@@ -55,7 +51,7 @@ extension RunLoop {
     let drainPass = beginDeadlineDrainPass()
     var consumedScheduledFrames = 0
     var passStartedAt: MonotonicInstant?
-    while consumedScheduledFrames < Self.maxFramesPerDrainPass {
+    while consumedScheduledFrames < (frameBudget ?? Self.maxFramesPerDrainPass) {
       if consumedScheduledFrames > 0,
         shouldYieldDrainPass(
           to: eventPump, passStartedAt: passStartedAt, appliesWorkBudget: appliesWorkBudget)
@@ -67,6 +63,7 @@ extension RunLoop {
       guard var scheduledFrame = consumeReadyFrame(for: drainPass, at: consumedAt) else {
         break
       }
+      frameClockDidAcquire?(consumedAt)
       consumedScheduledFrames += 1
       let passStart = passStartedAt ?? consumedAt
       passStartedAt = passStart
@@ -610,6 +607,7 @@ extension RunLoop {
       guard var scheduledFrame = consumeReadyFrame(for: drainPass, at: consumedAt) else {
         break frameLoop
       }
+      frameClockDidAcquire?(consumedAt)
       let previousFrameInstant = previousFrameInstant
       let frameInstant = deriveFrameInstant(consumedAt: consumedAt)
       consumedScheduledFrames += 1

@@ -5,6 +5,22 @@ import Testing
 
 @Suite
 struct PathTests {
+  @Test(
+    "leading curves include their implicit origin in the coarse hit bounds",
+    arguments: [false, true])
+  func leadingCurveBounds(cubic: Bool) throws {
+    var path = Path()
+    if cubic {
+      path.addCurve(to: Point(x: 8, y: 8), control1: Point(x: 8, y: 2), control2: Point(x: 8, y: 4))
+    } else {
+      path.addQuadCurve(to: Point(x: 8, y: 8), control: Point(x: 8, y: 2))
+    }
+    path.close()
+    let bounds = try #require(path.boundingRect)
+    #expect(bounds.origin == .zero)
+    #expect(path.contains(Point(x: 2, y: 1)))
+  }
+
   @Test("closed polygon contains interior and boundary points")
   func closedPolygonContainsInteriorAndBoundary() {
     var path = Path()

@@ -3,6 +3,22 @@ import Testing
 @testable import TermUIPerf
 
 struct FrameDiagnosticsTSVReaderTests {
+  @Test("skipped acquisitions sharing a frame ordinal do not inherit its presentation")
+  func skippedAcquisitionsDoNotJoinPresents() throws {
+    let records = try PerfFrameDiagnosticsTSVReader.parse(
+      "frame\ttail_job_state\n1\tcancelled_before_start\n1\tdropped_completed\n1\tcompleted\n",
+      presentedAt: [1: 20], presents: [1: .init(frameNumber: 1, outcome: "superseded")])
+    #expect(records.count == 3)
+    #expect(records[0].present == nil)
+    #expect(records[1].present == nil)
+    #expect(records[0].presentedAtSeconds == nil)
+    #expect(records[1].presentedAtSeconds == nil)
+    #expect(records[2].present?.outcome == "superseded")
+    let summary = SummaryReducer.reduce(
+      metadata: metadata(), events: [], cpuSamples: [], frames: records)
+    #expect(summary.supersededPresentCount == 1)
+  }
+
   @Test("reader parses diagnostic timing fields and presentation timestamps")
   func readerParsesDiagnosticFieldsAndPresentationTimestamps() throws {
     let records = try PerfFrameDiagnosticsTSVReader.parse(

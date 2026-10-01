@@ -1,9 +1,10 @@
 import SwiftTUICore
 
 /// A frame clock that follows the wall clock but never advances more than
-/// `maximumStep` per reading.
+/// `maximumStep` per successful frame acquisition.
 ///
-/// Install it with `runLoop.frameClock = { [clock] in clock.now() }`.
+/// Install `now` as `runLoop.frameClock` and `recordAcquisition` as
+/// `runLoop.frameClockDidAcquire`. Reads alone never consume another step.
 ///
 /// Since STUI-618 every frame animates to the clock reading it was consumed
 /// at, so a starved test runner that takes a second per frame legitimately
@@ -25,16 +26,27 @@ import SwiftTUICore
 @_spi(Runners) public final class BoundedStepFrameClock {
   private let maximumStep: Duration
   private var last: MonotonicInstant?
+  private let wallClock: () -> MonotonicInstant
 
-  /// - Parameter maximumStep: the most a single reading may advance past the
+  /// - Parameter maximumStep: the most an acquisition may advance past the
   ///   previous one. Defaults to the 33 ms animation cadence.
   @_spi(Runners) public init(maximumStep: Duration = .milliseconds(33)) {
     self.maximumStep = maximumStep
+    wallClock = { .now() }
+  }
+
+  package init(maximumStep: Duration, wallClock: @escaping () -> MonotonicInstant) {
+    self.maximumStep = maximumStep
+    self.wallClock = wallClock
+  }
+
+  package func recordAcquisition(_ instant: MonotonicInstant) {
+    last = last.map { max($0, instant) } ?? instant
   }
 
   /// The next reading: the wall clock, clamped to `previous + maximumStep`.
   @_spi(Runners) public func now() -> MonotonicInstant {
-    let wall = MonotonicInstant.now()
+    let wall = wallClock()
     guard let last else {
       self.last = wall
       return wall
@@ -42,7 +54,6 @@ import SwiftTUICore
     let bounded = last.advanced(by: maximumStep)
     let reading = wall < bounded ? wall : bounded
     let monotonic = reading < last ? last : reading
-    self.last = monotonic
     return monotonic
   }
 }

@@ -5,11 +5,16 @@ public import SwiftTUIViews
 /// runtime configuration.
 public enum AppLaunchError: Error, Equatable, Sendable, CustomStringConvertible {
   case noScenes
+  /// More than one declared scene resolves to the same identifier.
+  case duplicateSceneIdentifier(WindowIdentifier)
 
   public var description: String {
     switch self {
     case .noScenes:
       return "App.body did not produce any scenes."
+    case .duplicateSceneIdentifier(let identifier):
+      return
+        "Multiple scenes use identifier \(identifier.rawValue). Supply distinct explicit WindowGroup IDs."
     }
   }
 }
@@ -108,7 +113,9 @@ public struct WindowGroup<Content: View>: Scene {
   }
 
   /// Creates a window scene with a display title and optional explicit
-  /// identifier.
+  /// identifier. Titles normalize spaces and slashes to identifier separators;
+  /// provide distinct explicit IDs when titles normalize to the same identifier.
+  /// Launching an app with duplicate scene IDs throws an `AppLaunchError`.
   public init<S: StringProtocol>(
     _ title: S,
     id: WindowIdentifier? = nil,

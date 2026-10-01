@@ -63,6 +63,7 @@ package func wasiHostWireCapabilities(
 ) -> HostWireCapabilities {
   HostWireCapabilities(
     acceptsDeltaFrames: wasiSurfaceDeltaEnabled(environmentValue: environmentValue),
+    styleAppend: environmentValue("SWIFTTUI_SURFACE_STYLE_APPEND") == "1",
     geometryRevisions: environmentValue("SWIFTTUI_GEOMETRY_REVISIONS") == "1"
   )
 }
@@ -100,6 +101,7 @@ public enum WASIRunner {
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
     let selections = collectWindowSceneSelections(from: app.body)
+    try validateWindowSceneIdentifiers(selections.map(\.descriptor))
     if requestedManifestMode() {
       print(SceneManifest(for: app).jsonString)
       return

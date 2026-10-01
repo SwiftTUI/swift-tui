@@ -150,6 +150,9 @@
         state.geometrySessionToken = token
         state.geometryRevision = 0
         state.paragraphSpacing = 0
+        state.supportsScrollPanning = false
+        state.pointerInputCapabilities = Self.pointerInputCapabilities(
+          for: state.graphicsCapabilities.cellPixelSize, supportsScrollPanning: false)
       }
     }
 

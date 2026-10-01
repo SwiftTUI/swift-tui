@@ -232,6 +232,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// the seam rather than debugging the frame counts.
   /// See `swift-tui-org/docs/swift-tui/KNOWN-TEST-FLAKES.md`.
   package var frameClock: () -> MonotonicInstant = { .now() }
+  /// A virtual clock may advance its baseline only after a successful acquisition.
+  /// Observation reads and unsuccessful readiness probes do not consume a step.
+  package var frameClockDidAcquire: ((MonotonicInstant) -> Void)?
 
   /// Active per-frame diagnostics sink. Installed by the profiling product (via
   /// ``ProfilingRegistry``) or by a runner (via `SceneSessionResources.frameSink`)

@@ -721,7 +721,8 @@ extension FrameworkStressControlBindingTests {
     _ = try harness.click(Point(x: leftThumb.x + 7, y: leftThumb.y))
 
     #expect(value.value == 20)
-    #expect(value.writes == [20, 20])
+    // Press changes the value; release at the same position must not write it again.
+    #expect(value.writes == [20])
   }
 }
 

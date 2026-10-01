@@ -7,6 +7,21 @@ import Testing
 @MainActor
 @Suite
 struct ToolbarTests {
+  @Test("a nested bottom toolbar fills its allocating stack proposal")
+  func nestedBottomToolbarFillsStack() {
+    let frame = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        Text("Header")
+        Panel(id: "nested") {
+          Text("Content").toolbarItem(
+            .init(
+              title: "Save", icon: nil, position: .bottom,
+              isEnabled: true, action: {}))
+        }.toolbar().toolbarStyle(DefaultBottomToolbarStyle())
+      }, proposal: .init(width: 24, height: 10))
+    #expect(frame.rasterSurface.lines.last?.contains("Save") == true)
+  }
+
   @Test("toolbar actions with untracked writes refresh their authoring body")
   func untrackedToolbarActionRefreshesOwner() throws {
     let box = UntrackedToolbarBox()

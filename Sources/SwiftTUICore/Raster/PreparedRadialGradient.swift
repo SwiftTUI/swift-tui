@@ -66,7 +66,7 @@ internal struct PreparedRadialGradient: Sendable {
   /// the segment search then falls back to the reference's linear scan.
   let isSorted: Bool
   /// `nil` when the gradient is not eligible for the support walk: fewer
-  /// than two stops, empty bounds, unsorted or out-of-range locations,
+  /// than two stops, empty bounds, duplicate, unsorted or out-of-range locations,
   /// non-finite or non-increasing radii, an opaque last stop (unbounded
   /// support), or an unusable aspect ratio.
   let support: Support?
@@ -88,12 +88,14 @@ internal struct PreparedRadialGradient: Sendable {
     denominator = max(0.0001, gradient.endRadius - gradient.startRadius)
 
     var sorted = true
+    var strictlySorted = true
     var locationsInRange = true
     for index in stops.indices {
       let location = stops[index].location
       if !(location >= 0 && location <= 1) {
         locationsInRange = false
       }
+      if index > 0, stops[index - 1].location >= location { strictlySorted = false }
       if index > 0, stops[index - 1].location > location {
         sorted = false
       }
@@ -102,7 +104,7 @@ internal struct PreparedRadialGradient: Sendable {
 
     support = Self.deriveSupport(
       stops: stops,
-      isSorted: sorted,
+      isSorted: strictlySorted,
       locationsInRange: locationsInRange,
       hasArea: hasArea,
       startRadius: gradient.startRadius,

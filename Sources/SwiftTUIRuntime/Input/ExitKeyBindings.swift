@@ -40,6 +40,13 @@ public struct ExitKeyBindings: Sendable, Equatable {
   /// Returns `true` when `keyPress` is configured as an exit key.
   @inlinable
   public func contains(_ keyPress: KeyPress) -> Bool {
-    keys.contains(keyPress)
+    keys.contains { binding in
+      if binding.modifiers == keyPress.modifiers, keyPress.modifiers.contains(.ctrl),
+        case .character(let lhs) = binding.key, case .character(let rhs) = keyPress.key
+      {
+        return lhs.lowercased() == rhs.lowercased()
+      }
+      return binding == keyPress
+    }
   }
 }

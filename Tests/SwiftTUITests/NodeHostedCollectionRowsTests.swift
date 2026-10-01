@@ -7,6 +7,143 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct NodeHostedCollectionRowsTests {
+  @Test("multi-selection anchor follows dataset order in indexed lists and tables")
+  func indexedMultipleSelectionHasStableAnchor() {
+    let selection: Set<Int> = [10, 50, 90, 999]
+    let list = DefaultRenderer().render(
+      List(0..<100, id: \.self, selection: .constant(selection)) { Text("row \($0)") },
+      context: .init(identity: testIdentity("StableListAnchor")),
+      proposal: .init(width: 20, height: 8))
+    let table = DefaultRenderer().render(
+      Table(
+        0..<100, id: \.self, selection: .constant(selection), columns: [.init("Row", width: 12)]
+      ) { row in
+        TableRow { Text("row \(row)") }
+      }, context: .init(identity: testIdentity("StableTableAnchor")),
+      proposal: .init(width: 20, height: 8))
+    if case .list(let payload) = list.resolvedTree.drawPayload {
+      #expect(payload.selectedRowIndex == 10)
+    } else {
+      Issue.record("missing List payload")
+    }
+    if case .table(let payload) = table.resolvedTree.drawPayload {
+      #expect(payload.selectedRowIndex == 10)
+    } else {
+      Issue.record("missing Table payload")
+    }
+  }
+
+  @Test("cell-authored Table row modifiers reach the row payload")
+  func cellRowPresentationReachesTable() {
+    let result = DefaultRenderer().render(
+      Table(columns: [.init("Value", width: 8)]) {
+        TableRow {
+          Text("First").listRowSeparator(.hidden, edges: .bottom).listRowBackground(Color.red)
+        }
+        TableRow { Text("Second") }
+      })
+    guard case .table(let payload) = result.resolvedTree.drawPayload else {
+      Issue.record("missing Table payload")
+      return
+    }
+    #expect(payload.rows[0].rowSeparators.bottom == .hidden)
+    #expect(payload.rows[0].rowBackgroundStyle != nil)
+    #expect(payload.rows[1].rowSeparators.bottom == nil)
+  }
+
+  @Test("Multi-select Table moves its active row and toggles membership")
+  func multiSelectTableKeyboardNavigation() {
+    final class SelectionBox { var value: Set<String> = ["alpha"] }
+
+    let box = SelectionBox()
+    let registry = LocalKeyHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = testIdentity("MetricsTable")
+
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    _ = renderer.render(
+      Table(
+        selection: Binding(get: { box.value }, set: { box.value = $0 }),
+        columns: [
+          .init("Name", width: 8),
+          .init("Value", width: 5, alignment: .trailing),
+        ]
+      ) {
+        TableRow {
+          Text("Alpha")
+          Text("10")
+        }.tag("alpha")
+        TableRow {
+          Text("Beta")
+          Text("25")
+        }.tag("beta")
+      }
+      .id(testIdentity("MetricsTable")),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(
+      registry.dispatch(identity: testIdentity("MetricsTable"), keyPress: KeyPress(.arrowDown))
+        == true)
+    #expect(
+      registry.dispatch(identity: testIdentity("MetricsTable"), keyPress: KeyPress(.space))
+        == true)
+    #expect(box.value == ["alpha", "beta"])
+  }
+
+  @Test("multi-select Table retains its keyboard cursor across committed frames")
+  func multiSelectTableKeyboardCursorSurvivesFrames() throws {
+    final class SelectionBox { var value: Set<String> = ["alpha"] }
+    let box = SelectionBox()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TableKeyboardFrames"), size: .init(width: 24, height: 10)
+    ) {
+      Table(
+        selection: Binding(get: { box.value }, set: { box.value = $0 }),
+        columns: [.init("Name", width: 12)]
+      ) {
+        TableRow { Text("Alpha") }.tag("alpha")
+        TableRow { Text("Beta") }.tag("beta")
+        TableRow { Text("Gamma") }.tag("gamma")
+      }
+    }
+    defer { harness.shutdown() }
+    _ = try harness.pressKey(KeyPress(.arrowDown))
+    #expect(box.value == ["alpha"])
+    _ = try harness.pressKey(KeyPress(.space))
+    #expect(box.value == ["alpha", "beta"])
+    _ = try harness.pressKey(KeyPress(.arrowDown))
+    _ = try harness.pressKey(KeyPress(.space))
+    #expect(box.value == ["alpha", "beta", "gamma"])
+  }
+
+  @Test("indexed list rows fit between the marker gutter and trailing border")
+  func indexedListRowsFitContentColumn() {
+    let artifacts = DefaultRenderer().render(
+      List(0..<10, id: \.self) { _ in
+        HStack {
+          Text("Name")
+          Spacer()
+          Text("VALUE")
+        }
+      },
+      context: .init(identity: testIdentity("IndexedListContentWidth")),
+      proposal: .init(width: .finite(24), height: .finite(6))
+    )
+    let rows = artifacts.rasterSurface.lines.filter { $0.contains("Name") }
+    #expect(!rows.isEmpty)
+    for row in rows {
+      #expect(row.contains("VALUE"))
+      #expect(row.hasSuffix("│"))
+    }
+  }
+
   @Test("a Button inside List remains a committed focus and action participant")
   func listButtonRemainsCommitted() throws {
     final class Box {

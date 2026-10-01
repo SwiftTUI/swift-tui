@@ -3,6 +3,21 @@ import Foundation
 import Testing
 
 @Suite struct HostWireBudgetTests {
+  @Test func diagnosticBudgetIncludesHeaderAndEscaping() {
+    let baseline = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "")
+    let baselineBytes = WebSurfaceFrameEncoder.encodeFrameDiagnostic(baseline).utf8.count - 1
+    let available = HostWireBudget.recordBytes - baselineBytes
+    let accepted = FrameDiagnosticRecord(
+      frameNumber: 1, causeSummary: String(repeating: "x", count: available))
+    #expect(
+      WebSurfaceFrameEncoder.encodeFrameDiagnostic(accepted).utf8.count == HostWireBudget
+        .recordBytes + 1)
+    let oversized = FrameDiagnosticRecord(
+      frameNumber: 1, causeSummary: String(repeating: "x", count: available + 1))
+    #expect(
+      WebSurfaceFrameEncoder.encodeFrameDiagnostic(oversized) == HostWireBudget.rejectionRecord)
+  }
+
   @Test func sharedLimitsAndGridBoundaries() throws {
     let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()

@@ -120,28 +120,23 @@ package enum CollectionSelectionPolicy<Value: Hashable & Sendable> {
     }
   }
 
-  /// The bound selection as a tag, without consulting any row.
-  ///
-  /// A viewport-backed collection pairs this with
-  /// ``IndexedChildSource/elementIndex(forSelectionTag:)`` to locate the
-  /// selected row by id. The alternative — asking the policy about every
-  /// row's tag until one matches — is O(dataset) on the resolve path of every
-  /// frame (register item D18).
-  package func selectionTag() -> SelectionTag? {
-    let value: Value?
+  /// Locate the first selected row in dataset order without scanning unselected rows.
+  package func selectedIndex(in source: any IndexedChildSource) -> Int? {
     switch self {
     case .none:
       return nil
     case .requiredSingle(let binding):
-      value = binding.wrappedValue
+      return source.elementIndex(
+        forSelectionTag: SelectionTag(value: binding.wrappedValue, includeOptional: true))
     case .optionalSingle(let binding):
-      value = binding.wrappedValue
+      return binding.wrappedValue.flatMap {
+        source.elementIndex(forSelectionTag: SelectionTag(value: $0, includeOptional: true))
+      }
     case .multiple(let binding):
-      // Multi-selection has no single anchor; the first member is what the
-      // window and the marker follow, matching `selectedIndices.first`.
-      value = binding.wrappedValue.first
+      return binding.wrappedValue.compactMap {
+        source.elementIndex(forSelectionTag: SelectionTag(value: $0, includeOptional: true))
+      }.min()
     }
-    return value.map { SelectionTag(value: $0, includeOptional: true) }
   }
 
   package func step(

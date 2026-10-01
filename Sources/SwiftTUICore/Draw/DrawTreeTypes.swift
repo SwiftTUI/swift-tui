@@ -305,10 +305,11 @@ package struct DrawNode: Equatable, Sendable {
       recomputeSubtreeAggregates()
     }
   }
-  // A subtree always has at least one node. Its count's sign carries the mask
-  // flag without widening this hot value beyond its 256-byte stack budget.
+  // Pack extraction context in the low bit and the shape-clip flag in the sign
+  // without widening this hot value beyond its 256-byte stack budget.
   private var subtreeNodeSummary: Int
-  package var subtreeNodeCount: Int { abs(subtreeNodeSummary) }
+  package var subtreeNodeCount: Int { abs(subtreeNodeSummary) >> 1 }
+  package var hasInheritedDrawContext: Bool { abs(subtreeNodeSummary) & 1 != 0 }
   package var subtreeHasShapeClip: Bool { subtreeNodeSummary < 0 }
   /// The absolute union of this node's `bounds` and every descendant's
   /// `subtreeBounds`. `.offset`/`.position` bake their translation into the
@@ -330,7 +331,8 @@ package struct DrawNode: Equatable, Sendable {
     drawEffects: DrawEffects = .init(),
     commands: [DrawCommand] = [],
     postCommands: [DrawCommand] = [],
-    children: [DrawNode] = []
+    children: [DrawNode] = [],
+    hasInheritedDrawContext: Bool = false
   ) {
     self.viewNodeID = viewNodeID
     self.identity = identity
@@ -342,7 +344,7 @@ package struct DrawNode: Equatable, Sendable {
     self.commands = commands
     self.postCommands = postCommands
     self.children = children
-    subtreeNodeSummary = 1
+    subtreeNodeSummary = 2 | (hasInheritedDrawContext ? 1 : 0)
     subtreeBounds = bounds
     recomputeSubtreeAggregates()
   }
@@ -356,7 +358,8 @@ package struct DrawNode: Equatable, Sendable {
       hasShapeClip = hasShapeClip || child.subtreeHasShapeClip
       extent = extent.union(child.subtreeBounds)
     }
-    subtreeNodeSummary = hasShapeClip ? -count : count
+    let summary = (count << 1) | (hasInheritedDrawContext ? 1 : 0)
+    subtreeNodeSummary = hasShapeClip ? -summary : summary
     subtreeBounds = extent
   }
 }

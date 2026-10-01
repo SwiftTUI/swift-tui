@@ -16,6 +16,31 @@ import Testing
 /// still samples every cell fails it.
 @Suite("Radial gradient raster equivalence")
 struct RadialGradientRasterEquivalenceTests {
+  @Test("a transparent duplicate at the trailing support boundary is not culled")
+  func trailingTransparentDuplicateAtSupportBoundary() {
+    let surface = CellSize(width: 3, height: 3)
+    let full = CellRect(origin: .zero, size: surface)
+    var gradient = RadialGradient(
+      gradient: Gradient(stops: [
+        .init(color: .clear, location: 0),
+        .init(color: .red, location: 0.5),
+      ]),
+      center: .center, startRadius: 0, endRadius: 2)
+    gradient.gradient.stops = [
+      .init(color: .clear, location: 0),
+      .init(color: .red, location: 0.5),
+      .init(color: .clear, location: 0.5),
+      .init(color: .clear, location: 1),
+    ]
+    let scene = RadialFillScene(
+      name: "trailing-transparent-duplicate",
+      surface: surface,
+      layers: [.init(bounds: full, gradient: gradient, blend: .screen)],
+      metrics: CellPixelMetrics(width: 10, height: 10, source: .reported))  // aspect 1.0
+    let outcome = Self.rasterBothWays(scene)
+    Self.expectIdentical(outcome, scene: scene)
+  }
+
   // MARK: - Prepared perceptual mix
 
   @Test("the prepared perceptual mix is bit-identical to interpolated(to:progress:)")

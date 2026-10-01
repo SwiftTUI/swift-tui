@@ -308,7 +308,8 @@ package struct CollectionScrollCurrency {
     if targetLine + geometry.rowSpan + marginLines > anchorLine + visibleLines {
       return setAnchorRow(
         geometry.row(
-          atOrAfterLine: max(0, targetLine + geometry.rowSpan + marginLines - visibleLines)
+          atOrAfterLine: min(
+            targetLine, max(0, targetLine + geometry.rowSpan + marginLines - visibleLines))
         )
       )
     }

@@ -65,6 +65,7 @@ final class SequenceGestureRecognizer<First: Gesture, Second: Gesture>: GestureR
   }
 
   func reArm() {
+    guard phase.isTerminal else { return }
     first.reArm()
     second.reArm()
   }

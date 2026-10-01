@@ -159,12 +159,13 @@ extension Slider {
       intake.registerPointerHandler(routeID: trackRouteID) { event in
         switch event.kind {
         case .down(.primary), .dragged(.primary), .up(.primary):
-          binding.wrappedValue = sliderValue(
+          let next = sliderValue(
             at: event.location.location.x,
             in: event.targetRect,
             bounds: bounds,
             step: trackStep
           )
+          if next != binding.wrappedValue { binding.wrappedValue = next }
           return .claimed
         default:
           // Wheel input belongs to the primitive's root handler. Its accepted

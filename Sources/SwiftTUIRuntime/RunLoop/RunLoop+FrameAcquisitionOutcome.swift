@@ -50,6 +50,8 @@ extension RunLoop {
         runtimeIssues: renderOutcome.runtimeIssues,
         tailJobState: renderOutcome.tailJobState,
         tailCancelReason: renderOutcome.tailCancelReason ?? "-",
+        newestDesiredGeneration: renderOutcome.newestDesiredGeneration
+          ?? RenderGeneration(nextRenderIntentGeneration),
         animationControllerActiveAnimationCount: renderer
           .internalAnimationController.activeAnimationCount,
         animationControllerHasPendingWork: renderer

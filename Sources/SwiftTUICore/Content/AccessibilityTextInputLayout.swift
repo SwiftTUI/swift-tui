@@ -17,7 +17,7 @@ package func accessibilityTextInput(
   var offsets = [0]
   var clusters: [AccessibilityTextInput.Cluster] = []
   for (index, character) in characters.enumerated() {
-    let displayIndex = index + (hasSyntheticCaret && index > headIndex ? 1 : 0)
+    let displayIndex = index + (hasSyntheticCaret && index >= headIndex ? 1 : 0)
     let start = offsets.last!
     let end = start + String(character).utf16.count
     offsets.append(end)

@@ -2459,6 +2459,7 @@ SwiftTUIRuntime.App.body
 SwiftTUIRuntime.App.init()
 SwiftTUIRuntime.AppLaunchError
 SwiftTUIRuntime.AppLaunchError.description
+SwiftTUIRuntime.AppLaunchError.duplicateSceneIdentifier(_:)
 SwiftTUIRuntime.AppLaunchError.noScenes
 SwiftTUIRuntime.ClipboardWritingPresentationSurface
 SwiftTUIRuntime.ClipboardWritingPresentationSurface.writeClipboard(_:)

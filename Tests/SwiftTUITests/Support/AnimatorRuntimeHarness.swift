@@ -55,6 +55,7 @@ final class AnimatorRuntimeHarness<Content: View> {
     // `BoundedStepFrameClock`.
     let frameClock = BoundedStepFrameClock()
     runLoop.frameClock = { [frameClock] in frameClock.now() }
+    runLoop.frameClockDidAcquire = { [frameClock] in frameClock.recordAcquisition($0) }
     self.terminal = terminal
     self.runLoop = runLoop
     self.scheduler = scheduler

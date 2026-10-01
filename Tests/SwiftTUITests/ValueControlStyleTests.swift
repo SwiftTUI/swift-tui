@@ -6,6 +6,35 @@ import Testing
 
 @MainActor
 struct ValueControlStyleTests {
+  @Test("slider no-op press, held drag, and release do not call a custom setter")
+  func sliderNoOpPointerDoesNotWrite() throws {
+    final class Box {
+      var value = 0
+      var writes = 0
+    }
+    let box = Box()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NoOpSlider"), size: .init(width: 48, height: 10)
+    ) {
+      Slider(
+        "Level",
+        value: Binding(
+          get: { box.value },
+          set: {
+            box.value = $0
+            box.writes += 1
+          }),
+        in: 0...10)
+    }
+    defer { harness.shutdown() }
+    let point = try #require(harness.point(forText: "●"))
+    _ = try harness.sendMouse(.down(.primary), at: point)
+    for _ in 0..<3 { _ = try harness.sendMouse(.dragged(.primary), at: point) }
+    _ = try harness.sendMouse(.up(.primary), at: point)
+    #expect(box.value == 0)
+    #expect(box.writes == 0)
+  }
+
   @Test(
     "slider tracks preserve drag capture, typed stepping, and wheel handling",
     arguments: [0, 1, 2, 3])

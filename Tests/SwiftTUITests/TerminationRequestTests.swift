@@ -2,12 +2,51 @@ import Synchronization
 import Testing
 
 @_spi(Testing) @testable import SwiftTUICore
-@testable import SwiftTUIRuntime
+@_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
 @MainActor
 @Suite("Termination requests")
 struct TerminationRequestTests {
+  @Test("synchronous signal exit acquires at most one pending frame")
+  func synchronousSignalFlushIsBounded() throws {
+    let root = testIdentity("SyncSignalFlush")
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: root, presentationSurface: TerminationTestTerminalHost(),
+      terminalInputReader: TerminationTestInputReader(events: []),
+      signalReader: TerminationTestSignalReader(signals: []), scheduler: scheduler,
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      viewBuilder: { _, _ in Text("pending") })
+    runLoop.isSessionActive = true
+    defer {
+      runLoop.isSessionActive = false
+      runLoop.lifecycleCoordinator.shutdown()
+    }
+    runLoop.frameSink = SignalExitFrameSink(scheduler: scheduler, root: root)
+    scheduler.requestInvalidation(of: [root])
+    let buffer = EventPumpBuffer()
+    _ = buffer.enqueue(.signal("SIGTERM"))
+    var frames = 0
+    let exit = try runLoop.processPendingEventsSynchronously(
+      from: .init(
+        stream: AsyncStream { $0.finish() }, drainEvents: { buffer.drain() },
+        hasPendingEvents: { buffer.hasPendingEvents() }, cancel: {}, scheduleDeadlineWake: { _ in }),
+      renderedFrames: &frames)
+    #expect(exit == .signal("SIGTERM"))
+    #expect(frames == 1)
+  }
+
+  @Test("Ctrl exit letters ignore case without folding bare characters or modifiers")
+  func controlExitLetterCase() {
+    let bindings = ExitKeyBindings([KeyPress(.character("Q"), modifiers: .ctrl)])
+    #expect(bindings.contains(KeyPress(.character("q"), modifiers: .ctrl)))
+    #expect(!bindings.contains(KeyPress(.character("q"))))
+    #expect(!bindings.contains(KeyPress(.character("q"), modifiers: [.ctrl, .shift])))
+    #expect(!ExitKeyBindings([KeyPress(.character("Q"))]).contains(KeyPress(.character("q"))))
+  }
+
   @Test(
     "programmatic termination from a drained action precedes a later exit key",
     arguments: [false, true], [false, true])
@@ -346,5 +385,18 @@ private final class TerminationTestSignalReader: SignalReading {
       }
       continuation.finish()
     }
+  }
+}
+
+@MainActor
+private final class SignalExitFrameSink: FrameDiagnosticSink {
+  let scheduler: FrameScheduler
+  let root: Identity
+  init(scheduler: FrameScheduler, root: Identity) {
+    self.scheduler = scheduler
+    self.root = root
+  }
+  func record(_ sample: RuntimeFrameSample) {
+    scheduler.requestInvalidation(of: [root])
   }
 }

@@ -50,8 +50,10 @@ public final class HostedSceneSession {
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) throws {
     let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
+    let selections = collectWindowSceneSelections(from: app.body)
+    try validateWindowSceneIdentifiers(selections.map(\.descriptor))
     guard
-      let selection = collectWindowSceneSelections(from: app.body).first(where: {
+      let selection = selections.first(where: {
         $0.identifier == sceneID
       })
     else {
@@ -88,8 +90,10 @@ public final class HostedSceneSession {
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) throws {
     let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
+    let selections = collectWindowSceneSelections(from: app.body)
+    try validateWindowSceneIdentifiers(selections.map(\.descriptor))
     guard
-      let selection = collectWindowSceneSelections(from: app.body).first(where: {
+      let selection = selections.first(where: {
         $0.identifier == sceneID
       })
     else {

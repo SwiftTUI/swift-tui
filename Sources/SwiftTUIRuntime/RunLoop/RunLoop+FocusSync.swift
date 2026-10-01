@@ -381,6 +381,7 @@ extension RunLoop {
         focusChanged || focusJustEstablished || appliedFocusRequest
         || appliedDefaultFocusRequest || armedArrivalDefault || focusStateChanged
         || scrollPositionChanged
+        || previousFrameFocusIdentity != focusTracker.currentFocusIdentity
       if focusLocationChanged, !convergence.didEagerFocusLocationRerender {
         convergence.didEagerFocusLocationRerender = true
         convergence.rerenderedForFocusSync = true

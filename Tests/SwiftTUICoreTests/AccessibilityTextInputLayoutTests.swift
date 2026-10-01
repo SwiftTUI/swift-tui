@@ -3,6 +3,24 @@ import Testing
 
 @Suite
 struct AccessibilityTextInputLayoutTests {
+  @Test(arguments: ["\u{85}", "\u{2028}", "\u{2029}", "\u{B}", "\u{C}"])
+  func nonBreakingControlAtEndKeepsCursorOnRenderedLine(_ suffix: String) {
+    let text = "ABC" + suffix
+    #expect(
+      wrappedTextCursorAnchor(text, offset: text.count, width: 20)
+        == CellPoint(x: 3 + cellWidth(of: suffix.first!), y: 0))
+  }
+
+  @Test
+  func newlineClusterFollowsSyntheticCaret() {
+    let input = accessibilityTextInput(
+      .init(text: "AB\nCD", anchor: 2, head: 2, displayText: "AB_\nCD"),
+      bounds: .init(origin: .zero, size: .init(width: 20, height: 3)), wraps: true)
+    #expect(input.clusters[2].rect.origin == CellPoint(x: 3, y: 0))
+    #expect(input.clusters[3].rect.origin == CellPoint(x: 0, y: 1))
+    #expect(input.endAnchor == CellPoint(x: 2, y: 1))
+  }
+
   @Test
   func unicodeSelectionUsesUTF16AndPlacedGeometry() {
     let input = accessibilityTextInput(

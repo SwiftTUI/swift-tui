@@ -212,7 +212,12 @@ extension LayoutEngine {
         maximum = max(maximum, childMaximum)
       }
       return maximum
-    case .offset, .position, .safeAreaIgnoring:
+    case .safeAreaIgnoring(let insets, let fillsProposal):
+      if fillsProposal || (axis == .horizontal ? insets.horizontal : insets.vertical) != 0 {
+        return nil
+      }
+      return childMaximums.first ?? idealMain
+    case .offset, .position:
       guard let content = childMaximums.first else {
         return idealMain
       }

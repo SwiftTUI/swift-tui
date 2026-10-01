@@ -11,6 +11,22 @@
   @testable import SwiftTUIWebHost
 
   struct WebSocketSurfaceTransportTests {
+    @Test("a new socket resets touch panning before capability negotiation")
+    func reconnectResetsPointerParadigm() {
+      let host = WebSocketSurfaceTransport(
+        surfaceSize: .init(width: 2, height: 1), sink: RecordingByteSink())
+      host.beginGeometrySession(1)
+      host.declareCapabilities(.init(), connectionToken: 1)
+      host.updatePointerCapabilities(supportsScrollPanning: true)
+      #expect(host.pointerInputCapabilities.supportsScrollPanning)
+      host.beginGeometrySession(2)
+      #expect(!host.pointerInputCapabilities.supportsScrollPanning)
+      host.declareCapabilities(.init(), connectionToken: 2)
+      #expect(!host.pointerInputCapabilities.supportsScrollPanning)
+      host.updatePointerCapabilities(supportsScrollPanning: true)
+      #expect(host.pointerInputCapabilities.supportsScrollPanning)
+    }
+
     @Test("geometry acknowledgements and captured revisions survive deltas and reconnects")
     func geometryNegotiationCaptureAndReconnect() async throws {
       let sink = RecordingByteSink()

@@ -91,3 +91,13 @@ private struct SelectedWindowSceneCollector: WindowSceneVisitor {
     return .continue
   }
 }
+
+/// Reject ambiguous addressing before a runner selects a scene or opens a host.
+package func validateWindowSceneIdentifiers(_ descriptors: [SceneDescriptor]) throws {
+  var identifiers: Set<WindowIdentifier> = []
+  for descriptor in descriptors {
+    guard identifiers.insert(descriptor.id).inserted else {
+      throw AppLaunchError.duplicateSceneIdentifier(descriptor.id)
+    }
+  }
+}

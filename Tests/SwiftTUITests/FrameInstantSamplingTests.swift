@@ -22,6 +22,41 @@ import Testing
 @MainActor
 @Suite
 struct FrameInstantSamplingTests {
+  @Test("cancelled input-only acquisitions report the renderer's actual desired generation")
+  func cancelledInputGenerationIsNotInvented() throws {
+    let harness = try SampledClockHarness()
+    let loop = harness.runLoop
+    let scheduled = ScheduledFrame(
+      causes: [.input], invalidatedIdentities: [], signalNames: [],
+      externalReasons: [], triggeredDeadline: nil, nextDeadline: nil)
+    let intent = loop.nextRenderIntentDiagnostics(for: scheduled)
+    let sink = CancelledGenerationSink()
+    loop.frameSink = sink
+    _ = loop.recordSkippedCancellableFrame(
+      .init(
+        artifacts: nil, runtimeIssues: [], renderGeneration: RenderGeneration(9),
+        newestDesiredGeneration: RenderGeneration(intent.desiredGeneration),
+        tailJobState: .cancelledBeforeStart, tailCancelReason: "stale_baseline",
+        completedFrameDropDecision: nil),
+      scheduledFrame: scheduled, renderIntentDiagnostics: intent, renderedFrames: 1,
+      convergence: .init())
+    #expect(sink.sample?.newestDesiredAtTailResult == intent.desiredGeneration)
+    #expect(loop.nextRenderIntentGeneration == intent.desiredGeneration + 1)
+  }
+
+  @Test("bounded clock observations cannot spend additional acquisition steps")
+  func boundedClockObservationsDoNotAdvance() {
+    let start = MonotonicInstant.now()
+    var wall = start
+    let clock = BoundedStepFrameClock(maximumStep: .milliseconds(33), wallClock: { wall })
+    let first = clock.now()
+    clock.recordAcquisition(first)
+    wall = start.advanced(by: .seconds(1))
+    for _ in 0..<5 { #expect(clock.now() == start.advanced(by: .milliseconds(33))) }
+    clock.recordAcquisition(clock.now())
+    for _ in 0..<5 { #expect(clock.now() == start.advanced(by: .milliseconds(66))) }
+  }
+
   @Test("an on-time deadline frame animates to the deadline instant with no lag")
   func onTimeDeadlineFrameSamplesTheDeadline() throws {
     let harness = try SampledClockHarness()
@@ -436,5 +471,13 @@ private struct SpringBarrierFixture: View {
         .frame(maxWidth: .finite(wide ? 40 : 8), alignment: .leading)
       Text("logical=\(logical) removed=\(removed)")
     }
+  }
+}
+
+@MainActor
+private final class CancelledGenerationSink: FrameDiagnosticSink {
+  var sample: ZeroArtifactFrameSample?
+  func record(_ sample: RuntimeFrameSample) {
+    if case .zeroArtifact(let value) = sample { self.sample = value }
   }
 }

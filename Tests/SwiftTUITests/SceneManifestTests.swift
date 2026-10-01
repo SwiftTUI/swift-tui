@@ -6,6 +6,26 @@ import Testing
 @MainActor
 @Suite
 struct SceneManifestTests {
+  private struct CollidingTitlesApp: App {
+    var body: some Scene {
+      WindowGroup("Files / Recent") { Text("slash") }
+      WindowGroup("Files - Recent") { Text("dash") }
+    }
+  }
+
+  @Test("normalization collisions fail launch instead of choosing the first scene")
+  func collidingTitlesCannotSelectTheWrongScene() throws {
+    let app = CollidingTitlesApp()
+    let manifest = SceneManifest(for: app)
+    #expect(manifest.scenes[0].id == manifest.scenes[1].id)
+    #expect(throws: AppLaunchError.duplicateSceneIdentifier(manifest.defaultSceneID)) {
+      _ = try HostedSceneSession(
+        for: app, sceneID: manifest.scenes[1].id,
+        surface: HostedRasterSurface(
+          surfaceSize: .init(width: 20, height: 4), appearance: .fallback, onFrame: { _ in }))
+    }
+  }
+
   private struct MultiSceneApp: App {
     var body: some Scene {
       WindowGroup("Dashboard", id: WindowIdentifier("dashboard")) {

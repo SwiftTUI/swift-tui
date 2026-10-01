@@ -65,9 +65,11 @@ enum PerfFrameDiagnosticsTSVReader {
         )
       }
 
+      let tailState = string("tail_job_state", fields, column, default: "completed")
+      let hasNoArtifact = tailState == "cancelled_before_start" || tailState == "dropped_completed"
       return PerfFrameRecord(
         frameNumber: frameNumber,
-        presentedAtSeconds: presentedAt[frameNumber],
+        presentedAtSeconds: hasNoArtifact ? nil : presentedAt[frameNumber],
         totalMs: double("total_ms", fields, column),
         workerLayoutEnqueueMs: double("worker_layout_enqueue_ms", fields, column),
         workerLayoutComputeMs: double("worker_layout_compute_ms", fields, column),
@@ -207,7 +209,7 @@ enum PerfFrameDiagnosticsTSVReader {
         inputToCommitFirstMs: double("input_to_commit_first_ms", fields, column),
         inputToCommitLastMs: double("input_to_commit_last_ms", fields, column),
         committedAtMs: double("committed_at_ms", fields, column),
-        present: presents[frameNumber]
+        present: hasNoArtifact ? nil : presents[frameNumber]
       )
     }
   }

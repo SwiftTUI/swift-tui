@@ -15,6 +15,41 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct CollectionScrollCurrencyTests {
+  @Test("reveal keeps the target row's anchor when visibleLineCount < rowSpan")
+  func revealDoesNotOvershootAnchorPastTarget() throws {
+    let identity = testIdentity("RevealOvershootDirect")
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let ownerNode = graph.beginEvaluation(identity: identity, invalidator: nil)
+
+    let registry = LocalScrollPositionRegistry()
+    let route = ScrollRoute(
+      identity: identity,
+      viewportRect: .init(origin: .zero, size: .init(width: 20, height: 6)),
+      contentBounds: .init(origin: .zero, size: .init(width: 20, height: 19))
+    )
+    registry.updateGeometry(scrollRoutes: [route], scrollTargets: [])
+
+    let currency = CollectionScrollCurrency(
+      identity: identity,
+      geometry: CollectionScrollGeometry(rowCount: 10, rowSpan: 2, chromeInset: 0),
+      ownerNode: ownerNode,
+      registry: registry,
+      windowMetrics: { _ in (offset: 0, visibleLineCount: 1) }
+    )
+
+    #expect(currency.effectiveAnchorRow == 0, "starts at the selection-centred fallback")
+
+    // reveal(row: 5, margin: 1): the target occupies display lines 10–11; a
+    // 1-line viewport must anchor on the target row (5) or earlier to keep it
+    // visible. Overshooting to row 6 (lines 12–13) hides row 5 above the window.
+    _ = currency.reveal(row: 5, margin: 1)
+
+    #expect(
+      currency.effectiveAnchorRow <= 5,
+      "reveal must not anchor past the target row: observed \(currency.effectiveAnchorRow)"
+    )
+  }
   @Test("T-01: a selection move inside the window does not scroll; outside reveals minimally")
   func selectionFollowsTheWindow() throws {
     let harness = try StressRuntimeHarness(

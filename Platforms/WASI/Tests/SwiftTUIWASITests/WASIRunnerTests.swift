@@ -43,7 +43,11 @@ struct WASIRunnerTests {
       wasiHostWireCapabilities(environmentValue: { _ in nil })
         == HostWireCapabilities()
     )
-    // SWIFTTUI_SURFACE_DELTA is the whole WASI declaration.
+    #expect(
+      wasiHostWireCapabilities(environmentValue: { name in
+        name == "SWIFTTUI_SURFACE_STYLE_APPEND" ? "1" : nil
+      }).styleAppend)
+    // Delta frames can also be negotiated independently.
     #expect(
       wasiHostWireCapabilities(environmentValue: { name in
         name == "SWIFTTUI_SURFACE_DELTA" ? "1" : nil
@@ -85,11 +89,13 @@ struct WASIRunnerTests {
     #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in "none" }) == false)
     #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in "1" }) == true)
     #expect(wasiFrameDiagnosticsEnabled(environmentValue: { _ in "yes" }) == true)
-    #expect(wasiFrameDiagnosticsEnabled(environmentValue: { name in
-      name == "SWIFTTUI_FRAME_DIAGNOSTICS" ? "0" : "1"
-    }) == false)
-    #expect(wasiFrameDiagnosticsEnabled(environmentValue: { name in
-      name == "SWIFTTUI_DIAGNOSTICS" ? "1" : nil
-    }) == true)
+    #expect(
+      wasiFrameDiagnosticsEnabled(environmentValue: { name in
+        name == "SWIFTTUI_FRAME_DIAGNOSTICS" ? "0" : "1"
+      }) == false)
+    #expect(
+      wasiFrameDiagnosticsEnabled(environmentValue: { name in
+        name == "SWIFTTUI_DIAGNOSTICS" ? "1" : nil
+      }) == true)
   }
 }

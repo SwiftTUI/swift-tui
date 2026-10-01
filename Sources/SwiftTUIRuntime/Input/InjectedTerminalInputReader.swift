@@ -252,6 +252,7 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
           }
           state.continuation = nil
           state.activeMouseFlushToken = nil
+          state.activeEscapeFlushToken = nil
         }
       }
     }
@@ -364,6 +365,13 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
         nanoseconds: UInt64(InputReaderTiming.escapeDisambiguationDelayMilliseconds) * 1_000_000
       )
       self?.flushEscape(matching: token)
+    }
+  }
+
+  /// Drains a manually scheduled disambiguation, if its consumer still owns it.
+  package func flushPendingEscapeDisambiguation() {
+    if let token = state.withLock({ $0.activeEscapeFlushToken }) {
+      flushEscape(matching: token)
     }
   }
 

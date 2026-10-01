@@ -12,7 +12,50 @@ import Testing
   .serialized,
   FailOnSoundnessViolationGrowth()
 )
-struct FrameworkStressVisualEffectsTests {}
+struct FrameworkStressVisualEffectsTests {
+  @Test("overlay border drop under sibling-only invalidation serves a stale border mask")
+  func overlayBorderDropSiblingOnlyInvalidationServesStaleBorderMask() {
+    let renderer = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+    let rootID = testIdentity("StaleBorderMask")
+    let contentID = testIdentity("StaleBorderMask", "overlay-content")
+
+    struct Frame1: View {
+      let contentID: Identity
+      var body: some View {
+        EmptyView()
+          .frame(width: 24, height: 10, alignment: .topLeading)
+          .background(Color.blue.opacity(0.65))
+          .overlay { Capsule().strokeBorder(Color.white, style: .single).id(contentID) }
+      }
+    }
+    struct Frame2: View {
+      let contentID: Identity
+      var body: some View {
+        EmptyView()
+          .frame(width: 24, height: 10, alignment: .topLeading)
+          .background(Color.blue.opacity(0.65))
+          .overlay { EmptyView().id(contentID) }  // border removed; same identity
+      }
+    }
+
+    _ = renderer.render(Frame1(contentID: contentID), context: .init(identity: rootID))
+
+    // Only the overlay sibling is invalidated.
+    let frame2Retained = renderer.render(
+      Frame2(contentID: contentID),
+      context: .init(identity: rootID, invalidatedIdentities: [contentID])
+    )
+    let frame2Fresh = DefaultRenderer(layoutEngine: .init(cache: MeasurementCache()))
+      .render(Frame2(contentID: contentID), context: .init(identity: rootID))
+
+    #expect(
+      frame2Retained.diagnostics.work.resolvedNodesReused > 0,
+      "base subtree must be reused under sibling-only invalidation")
+    #expect(
+      frame2Retained.rasterSurface == frame2Fresh.rasterSurface,
+      "retained extraction must match a fresh frame after removing the border")
+  }
+}
 
 @MainActor
 private func visualEffectsRetainedFrame<Content: View>(

@@ -23,6 +23,23 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct FocusSyncSelectiveRerenderTests {
+  @Test("Tab publishes the new focused value in the first committed frame")
+  func tabCarriesFocusedValueOnFirstFrame() throws {
+    let harness = try SelectiveRerenderHarness(rootLabel: "TabValueSync") { _ in
+      VStack {
+        Text("First").focusable().focusedValue(\.selectiveRerenderLabel, "First")
+        Text("Second").focusable().focusedValue(\.selectiveRerenderLabel, "Second")
+        SelectiveRerenderReader()
+      }
+    }
+    defer { harness.tearDown() }
+    let before = harness.renderedFrameCount
+    try harness.press(KeyPress(.tab))
+    let first = try #require(harness.sink.committedSamples.first { $0.frameNumber > before })
+    let text = try #require(harness.frame(for: first))
+    #expect(text.contains("Focused label: Second"), "first committed frame: \(text)")
+  }
+
   @Test("sheet-open focus adoption commits a selective focus-sync rerender")
   func sheetOpenFocusAdoptionCommitsSelectively() throws {
     let harness = try SelectiveRerenderHarness(

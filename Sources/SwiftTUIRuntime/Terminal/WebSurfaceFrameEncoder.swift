@@ -57,18 +57,20 @@ package enum WebSurfaceFrameEncoder {
     _ record: FrameDiagnosticRecord
   ) -> String {
     let fields = FrameDiagnosticsTSVFormatting.fields(for: record)
-    var bytes = 1024
+    let prefix =
+      "\u{001E}frameDiagnostic:{"
+      + "\"format\":\"swift-tui-frame-diagnostics-v1\","
+      + "\"header\":[\(FrameDiagnosticsTSVFormatting.headerFields.map(jsonString).joined(separator: ","))],"
+      + "\"fields\":["
+    let suffix = "]}"
+    var bytes = prefix.utf8.count + suffix.utf8.count + max(0, fields.count - 1)
     for field in fields {
       guard let count = try? HostWireBudget.jsonStringBytes(field),
         count <= HostWireBudget.recordBytes - bytes
       else { return HostWireBudget.rejectionRecord }
       bytes += count
     }
-    return "\u{001E}frameDiagnostic:{"
-      + "\"format\":\"swift-tui-frame-diagnostics-v1\","
-      + "\"header\":[\(FrameDiagnosticsTSVFormatting.headerFields.map(jsonString).joined(separator: ","))],"
-      + "\"fields\":[\(fields.map(jsonString).joined(separator: ","))]"
-      + "}\n"
+    return prefix + fields.map(jsonString).joined(separator: ",") + suffix + "\n"
   }
 
   package static func encode(

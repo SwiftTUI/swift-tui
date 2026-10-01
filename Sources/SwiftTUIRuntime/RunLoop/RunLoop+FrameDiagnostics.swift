@@ -120,6 +120,7 @@ extension RunLoop {
     runtimeIssues: [RuntimeIssue],
     tailJobState: FrameTailJobState,
     tailCancelReason: String,
+    newestDesiredGeneration: RenderGeneration,
     animationControllerActiveAnimationCount: Int,
     animationControllerHasPendingWork: Bool
   ) {
@@ -140,7 +141,7 @@ extension RunLoop {
       staleFramePolicy: "cancel_pending_before_start",
       tailJobState: tailJobState.rawValue,
       tailCancelReason: tailCancelReason,
-      newestDesiredAtTailResult: nextRenderIntentGeneration,
+      newestDesiredAtTailResult: newestDesiredGeneration.rawValue,
       animationControllerActiveAnimationCount: animationControllerActiveAnimationCount,
       animationControllerHasPendingWork: animationControllerHasPendingWork,
       cancelledRenderCount: cancelledRenderCount,

@@ -348,6 +348,13 @@ extension RunLoop {
   ) {
     updatePointerHover(at: location)
 
+    handleArmedPointerDrag(location: location, timestamp: timestamp)
+  }
+
+  private func handleArmedPointerDrag(
+    location: PointerLocation,
+    timestamp: MonotonicInstant
+  ) {
     guard pointerInteraction.armedRouteID != nil else {
       return
     }
@@ -424,7 +431,7 @@ extension RunLoop {
       return
     }
 
-    updateArmedPointerState(at: location)
+    handleArmedPointerDrag(location: location, timestamp: timestamp)
   }
 
   package func handleMouseScroll(

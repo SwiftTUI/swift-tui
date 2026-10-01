@@ -5,6 +5,23 @@ import Testing
 
 @Suite
 struct InjectedTerminalInputReaderTests {
+  @Test("cancelled streams retire their escape flush without consuming the parser buffer")
+  func cancellationRetiresEscapeFlush() async {
+    let reader = InjectedTerminalInputReader(mouseFlushScheduling: .manual)
+    let stream = reader.inputEvents()
+    reader.send([0x1B])
+    let consumer = Task { for await _ in stream {} }
+    consumer.cancel()
+    await consumer.value
+    reader.flushPendingEscapeDisambiguation()
+    let replacement = reader.inputEvents()
+    reader.send([0x61])
+    reader.finish()
+    var events: [InputEvent] = []
+    for await event in replacement { events.append(event) }
+    #expect(events == [.key(KeyPress(.character("a"), modifiers: .alt))])
+  }
+
   @Test("injected input reader routes resize control messages without leaking them as input")
   func injectedReaderRoutesResizeMessages() async {
     let receivedMessages = Mutex<[TerminalControlMessage]>([])

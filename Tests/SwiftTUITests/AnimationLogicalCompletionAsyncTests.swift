@@ -61,6 +61,7 @@ struct AnimationLogicalCompletionAsyncTests {
     // bouncy spring's overshoot, where the clamped bar already reads 40.
     let frameClock = BoundedStepFrameClock()
     runLoop.frameClock = { [frameClock] in frameClock.now() }
+    runLoop.frameClockDidAcquire = { [frameClock] in frameClock.recordAcquisition($0) }
     let result = try await runLoop.run()
     #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 

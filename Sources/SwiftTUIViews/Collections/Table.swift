@@ -163,7 +163,7 @@ extension Table {
       // See the matching note in `List.resolvedNode` (register item D18).
       let selectedIndex: Int? =
         if let source = resolvedContent.indexedSource {
-          selectionPolicy.selectionTag().flatMap(source.elementIndex(forSelectionTag:))
+          selectionPolicy.selectedIndex(in: source)
         } else {
           resolvedRows.firstIndex { row in
             row.tag.map(selectionPolicy.contains) == true
@@ -181,6 +181,32 @@ extension Table {
 
       let ownerNode =
         ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
+      let keyboardValue: SelectionValue? = withPersistentDormantStateSlot {
+        ownerNode?.stateSlot(
+          ordinal: StateSlotOrdinals.tableKeyboardSelection,
+          seed: nil as SelectionValue?
+        ) ?? nil
+      }
+      var activeRowIndex =
+        keyboardValue.flatMap { value in
+          if let source = resolvedContent.indexedSource {
+            return source.elementIndex(
+              forSelectionTag: SelectionTag(value: value, includeOptional: true))
+          }
+          return resolvedRows.firstIndex { row in
+            row.tag.flatMap(selectionPolicy.value(from:)) == value
+          }
+        } ?? selectedIndex ?? selectableRowIndices.first
+      let setActiveRow: (Int) -> Void = { index in
+        activeRowIndex = index
+        withPersistentDormantStateSlot {
+          ownerNode?.setStateSlot(
+            ordinal: StateSlotOrdinals.tableKeyboardSelection,
+            value: resolvedRows[index].tag.flatMap(selectionPolicy.value(from:)),
+            invalidationIdentity: context.identity
+          )
+        }
+      }
       var scrollCurrency: CollectionScrollCurrency?
       if isEnabled, !resolvedRows.isEmpty {
         // A table body always alternates row/separator lines, so the row span is
@@ -260,6 +286,31 @@ extension Table {
             return false
           }
 
+          if policy.isMultiple {
+            switch event {
+            case .space, .return:
+              guard let index = activeRowIndex, let tag = resolvedRows[index].tag else {
+                return false
+              }
+              setActiveRow(index)
+              return policy.toggle(tag)
+            case .arrowUp, .arrowDown:
+              guard !selectableRowIndices.isEmpty else { return false }
+              let delta = event == .arrowDown ? 1 : -1
+              let current =
+                activeRowIndex.flatMap { selectableRowIndices.firstIndex(of: $0) }
+                ?? (delta > 0 ? -1 : selectableRowIndices.count)
+              let next = min(max(0, current + delta), selectableRowIndices.count - 1)
+              let index = selectableRowIndices[next]
+              scrollCurrency?.pinCurrentAnchor()
+              setActiveRow(index)
+              scrollCurrency?.reveal(row: index)
+              return true
+            default:
+              return false
+            }
+          }
+
           let delta: Int?
           switch event {
           case .arrowUp:
@@ -319,6 +370,7 @@ extension Table {
             intake.registerPointerHandler(routeID: routeID) { event in
               switch event.kind {
               case .down(.primary):
+                if policy.isMultiple { setActiveRow(rowIndex) }
                 _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
                 return .claimed
               case .up(.primary):
@@ -334,7 +386,7 @@ extension Table {
       var payload = TablePayload(
         columns: resolvedColumns,
         rows: resolvedRows,
-        selectedRowIndex: selectedIndex,
+        selectedRowIndex: selectionPolicy.isMultiple ? activeRowIndex : selectedIndex,
         style: tableStyle,
         foregroundStyle: chrome.foregroundStyle,
         backgroundStyle: chrome.backgroundStyle,
@@ -487,6 +539,7 @@ extension Table {
     let policy = selectionPolicy
     result.indexedSource = HostedCollectionIndexedChildSource(base: source) { rawNode, index in
       var node = rawNode
+      mergeCellRowPresentation(into: &node)
       node.semanticMetadata.accessibilityRole = nil
       let tag = node.semanticMetadata.selectionTag
       let compatibleTag = tag.flatMap { tag in
@@ -523,6 +576,14 @@ extension Table {
     return result
   }
 
+  private func mergeCellRowPresentation(into node: inout ResolvedNode) {
+    for child in node.children {
+      if let style = child.drawMetadata.listStyle {
+        node.drawMetadata.listStyle = node.drawMetadata.listStyle?.merging(style) ?? style
+      }
+    }
+  }
+
   private func collectTableRows(
     from nodes: [ResolvedNode],
     into result: inout ResolvedRows
@@ -530,6 +591,7 @@ extension Table {
     var work = Array(nodes.reversed())
     while var node = work.popLast() {
       if node.semanticMetadata.accessibilityRole == .tableRow {
+        mergeCellRowPresentation(into: &node)
         // TableRow is a structural host. Nested cell content contributes its
         // own accessibility normally; the table container owns the table role
         // and row-background selection remains a separate fallback route.

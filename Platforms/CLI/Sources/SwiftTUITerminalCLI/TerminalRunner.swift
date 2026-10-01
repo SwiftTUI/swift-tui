@@ -58,6 +58,7 @@ public enum TerminalRunner {
     }
 
     let selections = collectWindowSceneSelections(from: app.body)
+    try validateWindowSceneIdentifiers(selections.map(\.descriptor))
     guard !selections.isEmpty else {
       throw AppLaunchError.noScenes
     }

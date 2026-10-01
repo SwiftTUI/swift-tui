@@ -11,6 +11,44 @@ import Testing
 /// `SoundnessProbeConfigurationTests` and `SoundnessFailureChannelTests`.
 @Suite
 struct LayoutShadowOracleTests {
+  @Test(
+    "size-stability certification inherits the production custom-layout depth budget",
+    arguments: [1, 24])
+  func cutoffInheritsCustomLayoutDepthBudget(limit: Int) throws {
+    var nested = nestedCustomTree("cutoff-depth", customDepth: 2)
+    nested.identity = testIdentity("Root", "Dirty")
+    let tree = ResolvedNode(
+      identity: testIdentity("Root"), kind: .view("Offset"), children: [nested],
+      layoutBehavior: .offset(x: 0, y: 0))
+    let proposal = ProposedSize(width: 20, height: 10)
+    let engine = LayoutEngine()
+    let context = LayoutPassContext(customLayoutCompatibilityDepthLimit: 24)
+    let measured = engine.measure(tree, proposal: proposal, passContext: context)
+    let placed = engine.place(tree, measured: measured, passContext: context)
+    let frame = FrameArtifacts(
+      resolvedTree: tree, measuredTree: measured, placedTree: placed,
+      semanticSnapshot: .init(),
+      drawTree: .init(
+        identity: tree.identity,
+        bounds: .init(origin: .zero, size: measured.measuredSize)), rasterSurface: .init(),
+      presentationDamage: nil, commitPlan: .init())
+    let retained = RetainedLayoutSession(
+      previousFrameIndex: .init(frame: frame),
+      invalidatedIdentities: [nested.identity])
+    let current = LayoutPassContext(
+      retainedLayout: retained, invalidatedIdentities: [nested.identity],
+      customLayoutCompatibilityDepthLimit: limit)
+    var policy = MeasureCutoffPolicy()
+    policy.subtreeShareDenominator = 1
+    let result = try #require(
+      engine.preMeasureCutoffPrePass(
+        resolved: tree, passContext: current,
+        animationExcludedIdentities: [], policy: policy))
+    #expect(
+      result.metrics.deniedAbortedByCap + result.metrics.deniedSizeMismatch == (limit == 1 ? 1 : 0))
+    #expect(result.metrics.certificatesCertified == (limit == 1 ? 0 : 1))
+  }
+
   @Test("a clean production pass compares silent against its shadow")
   func cleanPassComparesSilent() {
     let engine = LayoutEngine(cache: MeasurementCache())

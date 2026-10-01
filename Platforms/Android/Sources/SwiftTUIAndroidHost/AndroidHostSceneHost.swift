@@ -377,6 +377,7 @@ public final class AndroidHostSceneHost {
     style: AndroidHostStyle = .default
   ) throws {
     let manifest = SceneManifest(for: app)
+    try validateWindowSceneIdentifiers(manifest.scenes)
     let selectedSceneID = sceneID ?? manifest.defaultSceneID
     guard let descriptor = manifest.scenes.first(where: { $0.id == selectedSceneID }) else {
       throw HostedSceneSessionError.sceneNotFound(selectedSceneID)

@@ -10,6 +10,207 @@ import Testing
 @MainActor
 @Suite
 struct GestureRunLoopDispatchTests {
+  @Test("Drag movement fails a non-capturing TapGesture through the full RunLoop path")
+  func dragMovementFailsNonCapturingTapThroughRunLoop() async throws {
+    @MainActor final class Box { var count = 0 }
+    let box = Box()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("DragFailsTapRunLoop")])
+    let view = Text("Tap")
+      .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
+      .gesture(TapGesture().onEnded { box.count += 1 })
+
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let probePointerRegistry = LocalPointerHandlerRegistry()
+    let probeGestureRegistry = LocalGestureRegistry()
+    let probeGestureStateRegistry = LocalGestureStateRegistry()
+    var probeContext = ResolveContext(identity: rootIdentity, environmentValues: env)
+    probeContext.localPointerHandlerRegistry = probePointerRegistry
+    probeContext.localGestureRegistry = probeGestureRegistry
+    probeContext.localGestureStateRegistry = probeGestureStateRegistry
+    let initial = DefaultRenderer().render(
+      view,
+      context: probeContext,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let region = try #require(initial.semanticSnapshot.interactionRegions.first)
+    let start = centerPoint(of: region.rect)
+    let dragPoint = Point(x: start.x + 2, y: start.y)
+
+    let startPointer = PointerLocation.subCell(
+      location: start, source: .nativePixels, metrics: .estimated)
+    let dragPointer = PointerLocation.subCell(
+      location: dragPoint, source: .nativePixels, metrics: .estimated)
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize, rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: startPointer))),
+        .init(event: .mouse(.init(kind: .dragged(.primary), location: dragPointer))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: startPointer))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(box.count == 0)
+  }
+
+  @Test(
+    "One-cell drag (TapGesture's discriminative boundary) fails a non-capturing TapGesture through the full RunLoop"
+  )
+  func oneCellDragFailsNonCapturingTapThroughRunLoop() async throws {
+    @MainActor final class Box { var count = 0 }
+    let box = Box()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("OneCellDragFailsTapRunLoop")])
+    let view = Text("Tap")
+      .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
+      .gesture(TapGesture().onEnded { box.count += 1 })
+
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let probePointerRegistry = LocalPointerHandlerRegistry()
+    let probeGestureRegistry = LocalGestureRegistry()
+    let probeGestureStateRegistry = LocalGestureStateRegistry()
+    var probeContext = ResolveContext(identity: rootIdentity, environmentValues: env)
+    probeContext.localPointerHandlerRegistry = probePointerRegistry
+    probeContext.localGestureRegistry = probeGestureRegistry
+    probeContext.localGestureStateRegistry = probeGestureStateRegistry
+    let initial = DefaultRenderer().render(
+      view,
+      context: probeContext,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let region = try #require(initial.semanticSnapshot.interactionRegions.first)
+    let start = centerPoint(of: region.rect)
+    let dragPoint = Point(x: start.x + 1, y: start.y)
+
+    let startPointer = PointerLocation.subCell(
+      location: start, source: .nativePixels, metrics: .estimated)
+    let dragPointer = PointerLocation.subCell(
+      location: dragPoint, source: .nativePixels, metrics: .estimated)
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize, rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: startPointer))),
+        .init(event: .mouse(.init(kind: .dragged(.primary), location: dragPointer))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: startPointer))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(box.count == 0)
+  }
+
+  @Test("Drag movement fails a non-capturing SpatialTapGesture through the full RunLoop path")
+  func dragMovementFailsNonCapturingSpatialTapThroughRunLoop() async throws {
+    @MainActor final class Box { var count = 0 }
+    let box = Box()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("DragFailsSpatialTapRunLoop")])
+    let view = Text("Tap")
+      .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
+      .gesture(SpatialTapGesture().onEnded { _ in box.count += 1 })
+
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let probePointerRegistry = LocalPointerHandlerRegistry()
+    let probeGestureRegistry = LocalGestureRegistry()
+    let probeGestureStateRegistry = LocalGestureStateRegistry()
+    var probeContext = ResolveContext(identity: rootIdentity, environmentValues: env)
+    probeContext.localPointerHandlerRegistry = probePointerRegistry
+    probeContext.localGestureRegistry = probeGestureRegistry
+    probeContext.localGestureStateRegistry = probeGestureStateRegistry
+    let initial = DefaultRenderer().render(
+      view,
+      context: probeContext,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let region = try #require(initial.semanticSnapshot.interactionRegions.first)
+    let start = centerPoint(of: region.rect)
+    let dragPoint = Point(x: start.x + 1, y: start.y)
+
+    let startPointer = PointerLocation.subCell(
+      location: start, source: .nativePixels, metrics: .estimated)
+    let dragPointer = PointerLocation.subCell(
+      location: dragPoint, source: .nativePixels, metrics: .estimated)
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize, rootIdentity: rootIdentity,
+      schedule: [
+        .init(event: .mouse(.init(kind: .down(.primary), location: startPointer))),
+        .init(event: .mouse(.init(kind: .dragged(.primary), location: dragPointer))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: startPointer))),
+      ],
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(box.count == 0)
+  }
+
+  @Test("Sequenced taps survive stage-two down and rearm through the RunLoop")
+  func sequencedTapsSurviveStageTwoDown() async throws {
+    @MainActor final class Box {
+      var count = 0
+    }
+
+    let box = Box()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("GestureRunLoopTap")])
+    let view = Text("Tap")
+      .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
+      .gesture(
+        TapGesture().sequenced(
+          before: TapGesture().onEnded {
+            box.count += 1
+          }))
+
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let probePointerRegistry = LocalPointerHandlerRegistry()
+    let probeGestureRegistry = LocalGestureRegistry()
+    let probeGestureStateRegistry = LocalGestureStateRegistry()
+    var probeContext = ResolveContext(identity: rootIdentity, environmentValues: env)
+    probeContext.localPointerHandlerRegistry = probePointerRegistry
+    probeContext.localGestureRegistry = probeGestureRegistry
+    probeContext.localGestureStateRegistry = probeGestureStateRegistry
+    let initial = DefaultRenderer().render(
+      view,
+      context: probeContext,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    let region = try #require(initial.semanticSnapshot.interactionRegions.first)
+    let point = centerPoint(of: region.rect)
+
+    let host = RecordingGestureTerminalHost(size: terminalSize)
+    let pointer = PointerLocation.subCell(
+      location: point,
+      source: .nativePixels,
+      metrics: .estimated
+    )
+    let result = try await runHarness(
+      host: host,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: Array(
+        repeating: [
+          .init(event: .mouse(.init(kind: .down(.primary), location: pointer))),
+          .init(event: .mouse(.init(kind: .up(.primary), location: pointer))),
+        ], count: 4
+      ).flatMap { $0 },
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(box.count == 2)
+  }
+
   @Test("TapGesture fires through the full RunLoop mouse path")
   func tapGestureFiresThroughRunLoop() async throws {
     @MainActor final class Box {

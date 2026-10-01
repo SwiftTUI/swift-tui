@@ -94,7 +94,8 @@ extension DrawExtractor {
         if inheritedBorderMask == nil,
           !isInBackgroundSubtree,
           input?.proof.canReuseSubtree(rootedAt: node.identity) == true,
-          let previousDraw = input?.previousDrawNode(for: node)
+          let previousDraw = input?.previousDrawNode(for: node),
+          !previousDraw.hasInheritedDrawContext
         {
           builtNodes.append(previousDraw)
           continue
@@ -515,7 +516,8 @@ extension DrawExtractor {
           isInBackgroundSubtree: isInBackgroundSubtree
         ) : [],
       postCommands: paints ? postCommands : [],
-      children: clippedChildNodes
+      children: clippedChildNodes,
+      hasInheritedDrawContext: inheritedBorderMask != nil || isInBackgroundSubtree
     )
   }
 

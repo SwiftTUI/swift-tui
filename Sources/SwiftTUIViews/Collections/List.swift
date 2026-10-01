@@ -123,7 +123,7 @@ extension List {
       // The eager path keeps the scan — it has already materialized every row.
       let selectedIndex: Int? =
         if let source = resolvedContent.indexedSource {
-          selectionPolicy.selectionTag().flatMap(source.elementIndex(forSelectionTag:))
+          selectionPolicy.selectedIndex(in: source)
         } else {
           rows.indices.first { index in
             rows[index].tag.map(selectionPolicy.contains) == true

@@ -200,19 +200,30 @@ public struct Path: Equatable, Sendable {
       maxY = max(maxY ?? point.y, point.y)
     }
 
+    var current = Point.zero
+    var subpathStart = Point.zero
     for element in elements {
       switch element {
-      case .move(let value), .line(let value):
+      case .move(let value):
         extend(value)
+        current = value
+        subpathStart = value
+      case .line(let value):
+        extend(value)
+        current = value
       case .quadCurve(let to, let control):
+        extend(current)
+        current = to
         extend(to)
         extend(control)
       case .curve(let to, let control1, let control2):
+        extend(current)
+        current = to
         extend(to)
         extend(control1)
         extend(control2)
       case .close:
-        break
+        current = subpathStart
       }
     }
 
