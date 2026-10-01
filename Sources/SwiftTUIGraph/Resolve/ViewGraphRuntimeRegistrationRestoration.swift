@@ -5,9 +5,23 @@ package enum ViewGraphRuntimeRegistrationRestorer {
     into registrations: RuntimeRegistrationSet,
     nodesByNodeID: [ViewNodeID: ViewNode]
   ) {
-    let nodes = viewNodeIDs.compactMap { nodesByNodeID[$0] }
-    for node in nodes.sorted(by: canonicalNodeOrder) {
-      node.restoreOwnRuntimeRegistrations(into: registrations)
+    // Identity ordering compares joined paths. Materialize each key once,
+    // rather than rebuilding both paths for every sort comparison on a
+    // large publication frontier. Equal identities retain the node-ID tie
+    // break; distinct identities whose paths compare equal remain equivalent.
+    let nodes = viewNodeIDs.compactMap { nodeID -> (node: ViewNode, path: String)? in
+      guard let node = nodesByNodeID[nodeID], node.registeredHandlers.hasRuntimeRegistrations else {
+        return nil
+      }
+      return (node, node.identity.path)
+    }
+    for entry in nodes.sorted(by: { lhs, rhs in
+      if lhs.node.identity == rhs.node.identity {
+        return lhs.node.viewNodeID < rhs.node.viewNodeID
+      }
+      return lhs.path < rhs.path
+    }) {
+      entry.node.restoreOwnRuntimeRegistrations(into: registrations)
     }
   }
 

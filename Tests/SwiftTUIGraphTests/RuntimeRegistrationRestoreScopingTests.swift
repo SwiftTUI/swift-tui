@@ -12,6 +12,35 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct RuntimeRegistrationRestoreScopingTests {
+  @Test("live publication preserves joined-path ordering for nontrivial identities")
+  func livePublicationPathOrdering() {
+    let identities = [
+      Identity(components: ["root", "a", "z"]),
+      Identity(components: ["root", "a-"]),
+      Identity(components: ["root", "a0"]),
+      Identity(components: ["root", ""]),
+      Identity(components: ["root", "Café"]),
+      Identity(components: ["root", "漢字"]),
+    ]
+    let graph = ViewGraph()
+    graph.beginFrame()
+    var nodes: [ViewNodeID: ViewNode] = [:]
+    for identity in identities {
+      let node = graph.beginEvaluation(identity: identity, invalidator: nil)
+      recordFocus(on: node, identity: identity, namespace: MatchedGeometryNamespace(0))
+      graph.finishEvaluation(
+        node, resolved: ResolvedNode(identity: identity, kind: .view("Focusable")),
+        accessedStateSlots: 0)
+      nodes[node.viewNodeID] = node
+    }
+    let registrations = RuntimeRegistrationSet.scratch()
+    ViewGraphRuntimeRegistrationRestorer.restoreLiveIdentities(
+      Set(nodes.keys), into: registrations, nodesByNodeID: nodes)
+    // Component-wise ordering would put a/z before a-; joined-path ordering
+    // has the opposite result and is observable in focus request precedence.
+    #expect(registrations.focusBindingRegistry?.snapshot().map(\.identity) == identities.sorted())
+  }
+
   @Test("a routed descendant restores pointer handlers recorded by its ancestor")
   func routedDescendantIncludesRecordingOwner() {
     let rootIdentity = testIdentity("Root")
