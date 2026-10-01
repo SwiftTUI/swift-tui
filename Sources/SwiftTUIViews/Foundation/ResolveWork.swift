@@ -8,12 +8,13 @@ package struct ResolveWork<Value> {
   private let start: (ResolveWorkDriver, @escaping @MainActor (Value) -> Void) -> Void
 
   private init(
+    scope: ResolveContinuationScope = ResolveContinuationScope(),
     _ start:
       @escaping @MainActor (
         ResolveWorkDriver, @escaping @MainActor (Value) -> Void
       ) -> Void
   ) {
-    scope = ResolveContinuationScope()
+    self.scope = scope
     self.start = start
   }
 
@@ -29,7 +30,7 @@ package struct ResolveWork<Value> {
     _ transform: @escaping @MainActor (Value) -> Next
   ) -> ResolveWork<Next> {
     let continuationScope = ResolveContinuationScope()
-    return ResolveWork<Next> { driver, complete in
+    return ResolveWork<Next>(scope: continuationScope) { driver, complete in
       enqueue(on: driver) { value in
         driver.enqueue(scope: continuationScope) { complete(transform(value)) }
       }
@@ -40,7 +41,7 @@ package struct ResolveWork<Value> {
     _ transform: @escaping @MainActor (Value) -> ResolveWork<Next>
   ) -> ResolveWork<Next> {
     let continuationScope = ResolveContinuationScope()
-    return ResolveWork<Next> { driver, complete in
+    return ResolveWork<Next>(scope: continuationScope) { driver, complete in
       enqueue(on: driver) { value in
         driver.enqueue(scope: continuationScope) {
           transform(value).enqueue(on: driver, complete: complete)
@@ -79,21 +80,28 @@ package struct ResolveWork<Value> {
 
 @MainActor
 private final class ResolveWorkDriver {
-  private var jobs: [@MainActor () -> Void] = []
+  private struct Job {
+    let scope: ResolveContinuationScope
+    let operation: @MainActor () -> Void
+  }
+
+  private var jobs: [Job] = []
 
   func enqueue(scope: ResolveContinuationScope, _ job: @escaping @MainActor () -> Void) {
-    jobs.append { scope.run(job) }
+    jobs.append(Job(scope: scope, operation: job))
   }
 
   func drain() {
-    while let job = jobs.popLast() { job() }
+    while let job = jobs.popLast() { job.scope.run(job.operation) }
   }
 }
 
 /// Only the effective scope is reinstalled for a step. Ancestral scopes do not
 /// add native stack frames; their mutable ledgers remain owned by continuations.
+/// The immutable capture is shared by queued work instead of copying and
+/// retaining each ambient field whenever a continuation is enqueued.
 @MainActor
-private struct ResolveContinuationScope {
+private final class ResolveContinuationScope {
   let node = ViewNodeContext.current
   let authoring = currentAuthoringContext()
   let environment = EnvironmentValuesStorage.current

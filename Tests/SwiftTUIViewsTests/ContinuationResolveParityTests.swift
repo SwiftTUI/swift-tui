@@ -6,6 +6,45 @@ import Testing
 /// State, identity, preferences and lifecycle parity across explicit continuations.
 @MainActor
 struct ContinuationResolveParityTests {
+  @Test("queued work keeps each captured scope and restores the caller after draining")
+  func queuedScopesRemainIndependent() {
+    let certificate = MemoObservationCertificate(isCurrent: { true })
+    let source: ResolveWork<Int> = withPersistentDormantStateSlot {
+      MemoObservationCertificateScope.$current.withValue(certificate) {
+        .deferred {
+          #expect(DormantStateSlotPolicyScope.current == .persistent)
+          #expect(MemoObservationCertificateScope.current === certificate)
+          #expect(ViewUpdateGuard.isUpdating)
+          return .value(7)
+        }
+      }
+    }
+    let mapped = withOwnedDormantStateSlot {
+      source.map { value in
+        #expect(DormantStateSlotPolicyScope.current == .owned)
+        #expect(MemoObservationCertificateScope.current == nil)
+        #expect(ViewUpdateGuard.isUpdating)
+        return value + 1
+      }
+    }
+    let chained = withPersistentDormantStateSlot {
+      mapped.flatMap { value in
+        #expect(DormantStateSlotPolicyScope.current == .persistent)
+        return withTransientDormantStateSlot {
+          ResolveWork<Int>.deferred {
+            #expect(DormantStateSlotPolicyScope.current == .transient)
+            return .value(value + 1)
+          }
+        }
+      }
+    }
+    #expect(chained.run() == 9)
+    #expect(chained.run() == 9)
+    #expect(DormantStateSlotPolicyScope.current == .transient)
+    #expect(MemoObservationCertificateScope.current == nil)
+    #expect(!ViewUpdateGuard.isUpdating)
+  }
+
   // MARK: - Harness
 
   private func makeContext(
