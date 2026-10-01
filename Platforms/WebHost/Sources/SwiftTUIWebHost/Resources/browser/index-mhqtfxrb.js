@@ -268,6 +268,7 @@ class AccessibilityTreeMounter {
   nodesById = new Map;
   previousLabelsById = new Map;
   hasLiveRegionBaseline = false;
+  readingText = new WeakMap;
   modelsById = new Map;
   presenting = false;
   nextRequestID = 0n;
@@ -359,6 +360,11 @@ class AccessibilityTreeMounter {
     }
     this.nodesById = nextById;
     this.modelsById = modelsById;
+    for (const node of visibleNodes) {
+      const element2 = nextById.get(node.id);
+      if (element2)
+        this.applyRelationships(element2, node, nextById);
+    }
     const childOffsets = new Map;
     for (const node of visibleNodes) {
       const element2 = nextById.get(node.id);
@@ -423,7 +429,7 @@ class AccessibilityTreeMounter {
     const current = () => this.nodesById.get(node.id) === element ? this.modelsById.get(node.id) : undefined;
     const send = (request) => {
       const model = current();
-      if (this.presenting || !model?.actionTarget || model.isEnabled === false || !model.actions?.includes(request.action))
+      if (this.presenting || !model?.actionTarget || model.isEnabled === false || model.properties?.readOnly === true && request.action !== "focus" || !model.actions?.includes(request.action))
         return;
       const requestID = ++this.nextRequestID;
       if (request.action === "setValue")
@@ -441,6 +447,11 @@ class AccessibilityTreeMounter {
       const model = current();
       if (!model || event.key === "Tab" || event.key === "Escape")
         return;
+      if (model.properties?.readOnly === true && (event.key === "Backspace" || event.key === "Delete")) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (tag !== "div" && event.key === "Enter" && model.role !== "textEditor")
         return;
       event.stopPropagation();
@@ -513,11 +524,33 @@ class AccessibilityTreeMounter {
     element.id = `swifttui-a11y-${this.domIdentity}-${stableDOMId(node.id)}`;
     element.dataset.accessibilityId = node.id;
     element.tabIndex = this.isTabStop(node) ? 0 : -1;
+    const properties = node.properties;
     const role = roleMapping(node.role);
+    if (properties?.headingLevel !== undefined) {
+      role.role = "heading";
+      role.level = properties.headingLevel;
+    } else if (properties?.textKind !== undefined) {
+      role.role = properties.textKind === "quotation" ? "blockquote" : properties.textKind;
+    }
     setOrRemoveAttribute(element, "role", node.role === "secureField" && element.tagName === "INPUT" ? undefined : role.role);
-    setOrRemoveAttribute(element, "aria-level", role.level !== undefined ? String(role.level) : undefined);
-    setOrRemoveAttribute(element, "aria-label", node.label || undefined);
-    setOrRemoveAttribute(element, "aria-description", node.hint || undefined);
+    setOrRemoveAttribute(element, "aria-level", role.level !== undefined ? String(role.level) : properties?.level?.toString());
+    const structuredText = properties?.textKind !== undefined;
+    setOrRemoveAttribute(element, "aria-label", structuredText ? undefined : node.label || undefined);
+    const text = this.readingText.get(element);
+    if (structuredText) {
+      if (text)
+        text.textContent = node.label ?? "";
+      else {
+        const content = document.createTextNode(node.label ?? "");
+        this.readingText.set(element, content);
+        element.prepend(content);
+      }
+    } else if (text) {
+      text.remove();
+      this.readingText.delete(element);
+    }
+    setOrRemoveAttribute(element, "aria-description", properties?.description ?? (node.hint || undefined));
+    setOrRemoveAttribute(element, "lang", properties?.language);
     setOrRemoveAttribute(element, "aria-live", node.liveRegion || undefined);
     if (node.isFocused) {
       element.dataset.focused = "true";
@@ -526,16 +559,33 @@ class AccessibilityTreeMounter {
     }
     setOrRemoveAttribute(element, "aria-disabled", node.isEnabled === false ? "true" : undefined);
     setOrRemoveAttribute(element, "aria-checked", node.role === "toggle" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
-    setOrRemoveAttribute(element, "aria-expanded", node.role === "disclosureGroup" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
+    setOrRemoveAttribute(element, "aria-expanded", properties?.expanded !== undefined ? String(properties.expanded) : node.role === "disclosureGroup" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
     setOrRemoveAttribute(element, "aria-valuenow", node.value?.type === "number" ? String(node.value.value) : undefined);
     setOrRemoveAttribute(element, "aria-valuemin", node.valueMin === undefined ? undefined : String(node.valueMin));
     setOrRemoveAttribute(element, "aria-valuemax", node.valueMax === undefined ? undefined : String(node.valueMax));
+    setOrRemoveAttribute(element, "aria-selected", properties?.selected?.toString());
+    setOrRemoveAttribute(element, "aria-required", properties?.required?.toString());
+    setOrRemoveAttribute(element, "aria-invalid", properties?.invalid?.toString());
+    setOrRemoveAttribute(element, "aria-busy", properties?.busy?.toString());
+    setOrRemoveAttribute(element, "aria-readonly", properties?.readOnly?.toString());
+    setOrRemoveAttribute(element, "aria-valuetext", node.role === "secureField" ? undefined : properties?.valueDescription?.toString());
+    setOrRemoveAttribute(element, "aria-posinset", properties?.positionInSet?.toString());
+    setOrRemoveAttribute(element, "aria-setsize", properties?.setSize?.toString());
+    setOrRemoveAttribute(element, "aria-rowindex", properties?.rowIndex?.toString());
+    setOrRemoveAttribute(element, "aria-colindex", properties?.columnIndex?.toString());
+    setOrRemoveAttribute(element, "aria-rowcount", properties?.rowCount?.toString());
+    setOrRemoveAttribute(element, "aria-colcount", properties?.columnCount?.toString());
+    setOrRemoveAttribute(element, "aria-rowspan", properties?.rowSpan?.toString());
+    setOrRemoveAttribute(element, "aria-colspan", properties?.columnSpan?.toString());
+    setOrRemoveAttribute(element, "aria-sort", properties?.sort?.toString());
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
       const input = element;
       if (element.tagName === "INPUT") {
         input.type = node.role === "secureField" ? "password" : node.role === "slider" ? "range" : node.role === "stepper" ? "number" : "text";
       }
       input.disabled = node.isEnabled === false;
+      input.readOnly = properties?.readOnly === true;
+      input.required = properties?.required === true;
       setOrRemoveAttribute(element, "min", node.valueMin === undefined ? undefined : String(node.valueMin));
       setOrRemoveAttribute(element, "max", node.valueMax === undefined ? undefined : String(node.valueMax));
       setOrRemoveAttribute(element, "step", node.valueStep === undefined ? undefined : String(node.valueStep));
@@ -562,6 +612,20 @@ class AccessibilityTreeMounter {
     element.style.border = "0";
     element.style.minWidth = "0";
     element.style.minHeight = "0";
+  }
+  applyRelationships(element, node, elements) {
+    const properties = node.properties;
+    const references = (ids) => {
+      const resolved = [...new Set(ids ?? [])].filter((id) => id !== node.id && elements.has(id)).map((id) => elements.get(id).id);
+      return resolved.length ? resolved.join(" ") : undefined;
+    };
+    setOrRemoveAttribute(element, "aria-labelledby", references(properties?.labelledBy));
+    setOrRemoveAttribute(element, "aria-describedby", references(properties?.describedBy));
+    setOrRemoveAttribute(element, "aria-errormessage", references(properties?.errorMessage));
+    setOrRemoveAttribute(element, "aria-controls", references(properties?.controls));
+    setOrRemoveAttribute(element, "aria-owns", references(properties?.owns));
+    setOrRemoveAttribute(element, "aria-flowto", references(properties?.flowTo));
+    setOrRemoveAttribute(element, "aria-activedescendant", references(properties?.activeDescendant === undefined ? undefined : [properties.activeDescendant]));
   }
   announceLiveRegionChanges(nodes, announcements) {
     const candidates = nodes.filter((node) => node.liveRegion && node.liveRegion !== "off" && node.label);
@@ -698,12 +762,7 @@ function roleMapping(role) {
   }
 }
 function stableDOMId(id) {
-  return Array.from(id).map((character) => {
-    if (/^[a-zA-Z0-9_-]$/.test(character)) {
-      return character;
-    }
-    return `-${character.codePointAt(0)?.toString(16) ?? "0"}-`;
-  }).join("");
+  return Array.from(id, (character) => character.codePointAt(0).toString(16)).join("-");
 }
 
 // src/StaticGif.ts
@@ -2444,7 +2503,13 @@ function isWebHostAccessibilityNode(value) {
     return false;
   }
   const node = value;
-  return typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
+  return (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
+}
+function isAccessibilityProperties(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const properties = value;
+  return (properties.selected === undefined || typeof properties.selected === "boolean") && (properties.expanded === undefined || typeof properties.expanded === "boolean") && (properties.required === undefined || typeof properties.required === "boolean") && (properties.invalid === undefined || typeof properties.invalid === "boolean") && (properties.busy === undefined || typeof properties.busy === "boolean") && (properties.readOnly === undefined || typeof properties.readOnly === "boolean") && (properties.description === undefined || typeof properties.description === "string") && (properties.valueDescription === undefined || typeof properties.valueDescription === "string") && (properties.language === undefined || typeof properties.language === "string") && (properties.headingLevel === undefined || Number.isSafeInteger(properties.headingLevel) && properties.headingLevel > 0) && (properties.level === undefined || Number.isSafeInteger(properties.level) && properties.level > 0) && (properties.positionInSet === undefined || Number.isSafeInteger(properties.positionInSet) && properties.positionInSet > 0) && (properties.setSize === undefined || Number.isSafeInteger(properties.setSize) && (properties.setSize === -1 || properties.setSize >= 0)) && (properties.rowIndex === undefined || Number.isSafeInteger(properties.rowIndex) && properties.rowIndex > 0) && (properties.columnIndex === undefined || Number.isSafeInteger(properties.columnIndex) && properties.columnIndex > 0) && (properties.rowCount === undefined || Number.isSafeInteger(properties.rowCount) && (properties.rowCount === -1 || properties.rowCount >= 0)) && (properties.columnCount === undefined || Number.isSafeInteger(properties.columnCount) && (properties.columnCount === -1 || properties.columnCount >= 0)) && (properties.rowSpan === undefined || Number.isSafeInteger(properties.rowSpan) && properties.rowSpan > 0) && (properties.columnSpan === undefined || Number.isSafeInteger(properties.columnSpan) && properties.columnSpan > 0) && (properties.textKind === undefined || ["paragraph", "code", "quotation"].includes(properties.textKind)) && (properties.sort === undefined || ["none", "ascending", "descending", "other"].includes(properties.sort)) && (properties.labelledBy === undefined || Array.isArray(properties.labelledBy) && properties.labelledBy.every((id) => typeof id === "string")) && (properties.describedBy === undefined || Array.isArray(properties.describedBy) && properties.describedBy.every((id) => typeof id === "string")) && (properties.errorMessage === undefined || Array.isArray(properties.errorMessage) && properties.errorMessage.every((id) => typeof id === "string")) && (properties.controls === undefined || Array.isArray(properties.controls) && properties.controls.every((id) => typeof id === "string")) && (properties.owns === undefined || Array.isArray(properties.owns) && properties.owns.every((id) => typeof id === "string")) && (properties.flowTo === undefined || Array.isArray(properties.flowTo) && properties.flowTo.every((id) => typeof id === "string")) && (properties.activeDescendant === undefined || typeof properties.activeDescendant === "string");
 }
 function isAccessibilityActionResponse(value) {
   if (!value || typeof value !== "object")
