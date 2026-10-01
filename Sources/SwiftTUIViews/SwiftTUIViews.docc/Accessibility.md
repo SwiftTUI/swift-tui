@@ -247,12 +247,6 @@ accessibility visibility. They contain no duplicate source text. Hosts without
 this negotiation retain the authored layout. Overlapping paragraph bounds and
 nonuniform paragraph margins are outside this contract.
 
-## See Also
-
-- <doc:Focus>
-- <doc:Authoring-Views>
-- <doc:State-Environment-And-Focus>
-
 ## Optional widget state and relationships
 
 Use `accessibilityProperties(_:)` to supply shared widget state when authoring
@@ -276,3 +270,9 @@ widget interaction pattern, or native host support. Read-only state blocks
 assistive mutations; the control author also owns keyboard and pointer editing
 policy. See the framework's `docs/ACCESSIBILITY.md` for the source-version and
 wire compatibility contract.
+
+## See Also
+
+- <doc:Focus>
+- <doc:Authoring-Views>
+- <doc:State-Environment-And-Focus>
