@@ -180,6 +180,7 @@ listed for completeness and for driving the wasm binary directly.
 | --- | --- | --- |
 | `SWIFTTUI_TRANSPORT` | `ansi`, `terminal`, `xterm`, `ghostty-web`; default surface | Selects the ANSI terminal transport instead of the structured surface transport. |
 | `SWIFTTUI_SURFACE_DELTA` | `1`/`true`/`yes`/`on` | Declares that the host accepts delta frames on the surface transport (the browser bridge's capability opt-in). |
+| `SWIFTTUI_SURFACE_STYLE_APPEND` | exactly `1` | Declares that a delta carries its appended styles plus a `stylesBase` offset instead of the whole accumulated style table (the browser bridge's capability opt-in). |
 | `SWIFTTUI_GEOMETRY_REVISIONS` | exactly `1` | Declares that the host accepts captured geometry revisions on the surface transport (the browser bridge's capability opt-in). |
 | `SWIFTTUI_FRAME_DIAGNOSTICS` | boolean | Enables wire frame diagnostics. Falls back to `SWIFTTUI_DIAGNOSTICS`; `off`/`false`/`none`/`0`/empty disable. |
 | `SWIFTTUI_MODE` | `manifest` | Prints the app's scene manifest as JSON and exits without launching a scene. |
