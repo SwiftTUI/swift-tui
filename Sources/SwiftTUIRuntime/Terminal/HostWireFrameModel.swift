@@ -74,6 +74,7 @@ package struct HostWireFrameModel {
     package let cursorAnchor: CellPoint?
     package let isFocused: Bool
     package let actionTarget: String?
+    package let properties: AccessibilityProperties?
     package let control: AccessibilityControlState?
     package let isEnabled: Bool
 
@@ -92,6 +93,7 @@ package struct HostWireFrameModel {
       cursorAnchor = node.cursorAnchor
       isFocused = node.identity == focusedIdentity
       actionTarget = node.actionTarget
+      properties = node.properties
       control = node.control
       isEnabled = node.isEnabled
     }

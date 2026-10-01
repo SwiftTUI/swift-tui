@@ -815,6 +815,9 @@ classifications:
     - SwiftTUIGraph.SectionRole
     - SwiftTUICore.SelectionRoute
     - SwiftTUIPrimitives.SelectionTag
+    - SwiftTUIGraph.AccessibilityProperties
+    - SwiftTUIGraph.AccessibilityTextKind
+    - SwiftTUIGraph.AccessibilitySortDirection
     - SwiftTUIGraph.SemanticMetadata
     - SwiftTUIPrimitives.SemanticShapeStyle
     - SwiftTUICore.SemanticSnapshot

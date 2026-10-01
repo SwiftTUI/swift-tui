@@ -68,6 +68,14 @@ extension View {
     semanticMetadata(.init(accessibilityHint: hint))
   }
 
+  /// Supplies widget states, reading structure and same-scene relationships.
+  /// Individual specified properties override earlier values in the modifier chain.
+  public func accessibilityProperties(_ properties: AccessibilityProperties) -> some View {
+    var metadata = SemanticMetadata()
+    metadata.accessibilityProperties = properties
+    return semanticMetadata(metadata)
+  }
+
   public func accessibilityHidden(_ hidden: Bool = true) -> some View {
     semanticMetadata(.init(accessibilityHidden: hidden))
   }

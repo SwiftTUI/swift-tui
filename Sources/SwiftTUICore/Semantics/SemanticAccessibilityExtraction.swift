@@ -276,6 +276,29 @@ extension SemanticExtractor {
       }
     }
 
+    // Public `.id` values participate in graph scoping; they are not exported
+    // semantic IDs. Explicit anchors let authors relate peers without knowing
+    // their structural path. Ambiguous anchors cannot name an arbitrary peer.
+    let identities = Set(nodes.map(\.identity))
+    var anchors: [Identity: Identity] = [:]
+    var ambiguousAnchors: Set<Identity> = []
+    for node in nodes {
+      if let anchor = node.properties?.identifier {
+        if let existing = anchors[anchor], existing != node.identity {
+          ambiguousAnchors.insert(anchor)
+        } else {
+          anchors[anchor] = node.identity
+        }
+      }
+    }
+    for index in nodes.indices {
+      let source = nodes[index].identity
+      nodes[index].properties = nodes[index].properties?.resolvingReferences { target in
+        guard !ambiguousAnchors.contains(target) else { return nil }
+        let identity = anchors[target] ?? target.strippingEntityOccurrences
+        return identity != source && identities.contains(identity) ? identity : nil
+      }
+    }
     return (nodes, visualLabelRoutes)
   }
 
@@ -351,6 +374,7 @@ extension SemanticExtractor {
       || node.semanticMetadata.usesAuthoredAccessibilityLabel
       || (textPresentation == .independent
         && hasNonEmptyAccessibilityLabel(accessibilityTextLabel(from: node.drawPayload)))
+      || node.semanticMetadata.accessibilityProperties != nil
       || node.semanticMetadata.accessibilityHint != nil
       || node.semanticMetadata.accessibilityLiveRegion != nil
       || node.semanticMetadata.accessibilityCursorAnchor != nil
@@ -418,6 +442,8 @@ extension SemanticExtractor {
         ?? accessibilityCursorAnchor(for: node)
     )
     result.textInput = role == .secureField ? nil : textInputPresentations[node.identity]?.textInput
+    result.properties =
+      suppressingPresentation ? nil : node.semanticMetadata.accessibilityProperties
     result.control = node.semanticMetadata.accessibilityControl
     result.isEnabled = node.environmentSnapshot.style.isEnabled
     if let owner = node.viewNodeID, result.control != nil {

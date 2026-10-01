@@ -847,6 +847,9 @@ struct AccessibilityActionRuntimeTests {
       loop.handleAccessibilityAction(
         .init(target: try #require(node(name).actionTarget), action: action))
     }
+    #expect(try request("ReadOnly", .focus) == .accepted)
+    #expect(try request("ReadOnly", .setValue(.text("must not mutate"))) == .unsupported)
+    #expect(try node("Name").control?.value == .text(""))
     let sliderTarget = try #require(node("Gain").actionTarget)
     #expect(try request("Toggle", .activate) == .accepted)
     #expect(try request("Gain", .increment) == .accepted)
@@ -982,6 +985,8 @@ private struct AssistiveControls: View {
       if visible { Slider("Gain", value: $gain, in: 0...10).id(testIdentity("Gain")) }
       Stepper("Count", value: $count, in: 0...10).id(testIdentity("Count"))
       TextField("Name", text: $name).id(testIdentity("Name"))
+      TextField("Read only", text: $name)
+        .accessibilityProperties(.init(readOnly: true)).id(testIdentity("ReadOnly"))
       SecureField("Secret", text: $secret).id(testIdentity("Secret"))
       Button("Disabled") {}.disabled(true).id(testIdentity("Disabled"))
       Button("Visibility") { visible.toggle() }.id(testIdentity("Visibility"))

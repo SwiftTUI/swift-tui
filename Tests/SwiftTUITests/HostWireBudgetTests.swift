@@ -3,6 +3,23 @@ import Foundation
 import Testing
 
 @Suite struct HostWireBudgetTests {
+  @Test func secureControlValueIsRedactedAtWireBoundary() throws {
+    var node = AccessibilityNode(
+      identity: Identity(components: ["secret"]),
+      rect: .init(origin: .zero, size: .init(width: 1, height: 1)), role: .secureField)
+    node.actionTarget = "secret-token"
+    node.control = .init(actions: [.focus, .setValue], value: .text("do-not-serialize"))
+    node.properties = .init(required: true, invalid: false)
+    let frame = SemanticHostFrame(
+      sequence: 1,
+      raster: RasterSurface(size: .init(width: 1, height: 1), cells: [[.empty]]),
+      semantics: SemanticSnapshot(accessibilityNodes: [node]), focusedIdentity: nil)
+    let encoded = WebSurfaceFrameEncoder.encode(frame)
+    #expect(!encoded.contains("do-not-serialize"))
+    #expect(!encoded.contains("\"value\":"))
+    #expect(encoded.contains("\"required\":true"))
+  }
+
   @Test func diagnosticBudgetIncludesHeaderAndEscaping() {
     let baseline = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "")
     let baselineBytes = WebSurfaceFrameEncoder.encodeFrameDiagnostic(baseline).utf8.count - 1

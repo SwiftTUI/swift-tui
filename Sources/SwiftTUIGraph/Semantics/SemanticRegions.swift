@@ -174,6 +174,7 @@ package struct ScrollTargetQuery: Equatable, Sendable {
 public struct AccessibilityNode: Equatable, Sendable {
   /// Opaque live-node token. Never synthesize this from the authored identity.
   public var actionTarget: String? = nil
+  public var properties: AccessibilityProperties? = nil
   public var control: AccessibilityControlState? = nil
   public var isEnabled: Bool = true
   package var actionIdentity: Identity? = nil

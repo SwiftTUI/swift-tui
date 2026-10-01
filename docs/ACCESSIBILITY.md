@@ -114,3 +114,61 @@ tracked in the [divergence and gap register](../Sources/SwiftTUIViews/SwiftTUIVi
 
 The manual screen-reader listening review protocol lives in
 `Tests/SwiftTUITests/Accessibility/README.md`.
+
+## Optional widget properties
+
+`AccessibilityProperties` is shared semantic metadata for control authors and
+host integrations. Attach it with `View.accessibilityProperties(_:)` or set
+`SemanticMetadata.accessibilityProperties`; extracted nodes expose `properties`.
+The payload supplies selected, expanded, required, invalid, busy and read-only
+states; descriptions and value descriptions; language and authored text kind;
+heading/tree levels; table indexes/counts/spans and sort direction; set position
+and size; and same-scene label, description, error, control, ownership, reading
+flow and active-descendant relationships. Relations use semantic `Identity`
+values. Authors can attach `.accessibilityProperties(.init(identifier: anchor))`
+to a target and use that same `Identity` anchor in a relationship. The extractor
+resolves unique visible anchors to current node IDs; missing, hidden, self and
+ambiguous targets are removed. Anchors are scene-unique and do not alter graph
+identity. Public `.id(...)` values are scoped graph IDs, not semantic anchors.
+
+Composition merges specified fields individually. `nil` preserves an earlier
+value; `false`, `""` and `[]` explicitly override it. Positions, levels and spans
+must be positive. Counts admit zero and `-1` for unknown. Invalid or non-JavaScript
+safe integers become unspecified. Supply properties appropriate to the role;
+metadata does not implement a widget's interaction pattern or validation logic.
+
+```swift
+TextField("Email", text: $email)
+  .accessibilityProperties(.init(
+    required: true,
+    invalid: emailIsInvalid,
+    description: emailIsInvalid ? "Enter a complete email address." : ""
+  ))
+
+Text("Bonjour le monde.")
+  .accessibilityProperties(.init(language: "fr", textKind: .paragraph))
+```
+
+The Canvas and DOM browser presenters use the same property adapter. Authored
+paragraph, code and quotation text uses a text node; headings expose their
+level. Relationship references resolve only to present, nonhidden elements in
+the same scene and clear when a target disappears. A read-only control remains
+focusable, but the runtime rejects assistive mutation with `unsupported`.
+This is an assistive routing policy, not a general keyboard/pointer editing lock;
+control authors must apply their own editing policy to those paths.
+
+The shared WASI/WebSocket surface encoder emits an optional `properties` object
+on each accessibility node in v2 keyframes and v3 deltas. Deltas replace the complete
+semantic tree, so absence removes previous properties. The existing action
+kinds and opaque committed target tokens are unchanged. Existing v2/v3 adapters
+(including 0.15.1) ignore the unknown object and keep their earlier behavior;
+updated adapters accept its absence and ignore unknown optional object keys.
+Malformed known fields reject the frame. Both producer and adapter source must
+include this extension for the richer behavior; it is not part of the 0.15.1
+support claim. Raster-only v1 frames are unchanged. Secure-field control values
+are omitted at the wire boundary even if an integration supplies one.
+
+These are shared contracts and authoring primitives, not completion of default
+semantics for every built-in widget, general custom action APIs, native host
+support, terminal semantic reading or new screen-reader task qualification.
+The browser mappings follow [WAI-ARIA 1.2](https://www.w3.org/TR/wai-aria-1.2/).

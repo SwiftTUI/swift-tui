@@ -558,6 +558,114 @@ package enum WebSurfaceFrameEncoder {
     return "[" + encodedCells.joined(separator: ",") + "]"
   }
 
+  private static func encodeAccessibilityProperties(_ properties: AccessibilityProperties) -> String
+  {
+    var fields: [String] = []
+    if let value = properties.selected {
+      fields.append("\"selected\":" + (value ? "true" : "false"))
+    }
+    if let value = properties.expanded {
+      fields.append("\"expanded\":" + (value ? "true" : "false"))
+    }
+    if let value = properties.required {
+      fields.append("\"required\":" + (value ? "true" : "false"))
+    }
+    if let value = properties.invalid {
+      fields.append("\"invalid\":" + (value ? "true" : "false"))
+    }
+    if let value = properties.busy {
+      fields.append("\"busy\":" + (value ? "true" : "false"))
+    }
+    if let value = properties.readOnly {
+      fields.append("\"readOnly\":" + (value ? "true" : "false"))
+    }
+    if let value = properties.description {
+      fields.append("\"description\":" + jsonString(value))
+    }
+    if let value = properties.valueDescription {
+      fields.append("\"valueDescription\":" + jsonString(value))
+    }
+    if let value = properties.language {
+      fields.append("\"language\":" + jsonString(value))
+    }
+    if let value = properties.headingLevel {
+      fields.append("\"headingLevel\":" + String(value))
+    }
+    if let value = properties.level {
+      fields.append("\"level\":" + String(value))
+    }
+    if let value = properties.positionInSet {
+      fields.append("\"positionInSet\":" + String(value))
+    }
+    if let value = properties.setSize {
+      fields.append("\"setSize\":" + String(value))
+    }
+    if let value = properties.rowIndex {
+      fields.append("\"rowIndex\":" + String(value))
+    }
+    if let value = properties.columnIndex {
+      fields.append("\"columnIndex\":" + String(value))
+    }
+    if let value = properties.rowCount {
+      fields.append("\"rowCount\":" + String(value))
+    }
+    if let value = properties.columnCount {
+      fields.append("\"columnCount\":" + String(value))
+    }
+    if let value = properties.rowSpan {
+      fields.append("\"rowSpan\":" + String(value))
+    }
+    if let value = properties.columnSpan {
+      fields.append("\"columnSpan\":" + String(value))
+    }
+    if let value = properties.textKind {
+      fields.append("\"textKind\":" + jsonString(value.rawValue))
+    }
+    if let value = properties.sort {
+      fields.append("\"sort\":" + jsonString(value.rawValue))
+    }
+    if let value = properties.labelledBy {
+      fields.append(
+        "\"labelledBy\":" + "["
+          + value.map { jsonString($0.strippingEntityOccurrences.path) }.joined(separator: ",")
+          + "]")
+    }
+    if let value = properties.describedBy {
+      fields.append(
+        "\"describedBy\":" + "["
+          + value.map { jsonString($0.strippingEntityOccurrences.path) }.joined(separator: ",")
+          + "]")
+    }
+    if let value = properties.errorMessage {
+      fields.append(
+        "\"errorMessage\":" + "["
+          + value.map { jsonString($0.strippingEntityOccurrences.path) }.joined(separator: ",")
+          + "]")
+    }
+    if let value = properties.controls {
+      fields.append(
+        "\"controls\":" + "["
+          + value.map { jsonString($0.strippingEntityOccurrences.path) }.joined(separator: ",")
+          + "]")
+    }
+    if let value = properties.owns {
+      fields.append(
+        "\"owns\":" + "["
+          + value.map { jsonString($0.strippingEntityOccurrences.path) }.joined(separator: ",")
+          + "]")
+    }
+    if let value = properties.flowTo {
+      fields.append(
+        "\"flowTo\":" + "["
+          + value.map { jsonString($0.strippingEntityOccurrences.path) }.joined(separator: ",")
+          + "]")
+    }
+    if let value = properties.activeDescendant {
+      fields.append("\"activeDescendant\":" + jsonString(value.strippingEntityOccurrences.path))
+    }
+    return "{" + fields.joined(separator: ",") + "}"
+  }
+
   private static func encodeAccessibilityTree(
     _ nodes: [HostWireFrameModel.WireAccessibilityNode]
   ) throws -> [String] {
@@ -587,13 +695,16 @@ package enum WebSurfaceFrameEncoder {
         if let cursorAnchor = node.cursorAnchor {
           fields.append("\"cursorAnchor\":\(encodePoint(cursorAnchor))")
         }
+        if let properties = node.properties {
+          fields.append("\"properties\":\(encodeAccessibilityProperties(properties))")
+        }
         if let target = node.actionTarget, let control = node.control {
           fields.append("\"actionTarget\":\(jsonString(target))")
           fields.append(
             "\"actions\":[\(control.actions.map { jsonString($0.rawValue) }.joined(separator: ","))]"
           )
           fields.append("\"isEnabled\":\(node.isEnabled ? "true" : "false")")
-          if let value = control.value {
+          if let value = control.value, node.roleToken != "secureField" {
             let kind: String
             let encoded: String
             switch value {

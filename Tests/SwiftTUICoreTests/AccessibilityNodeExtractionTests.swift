@@ -5,6 +5,54 @@ import Testing
 
 @Suite
 struct AccessibilityNodeExtractionTests {
+  @Test("authored relationship anchors resolve only unique visible current targets")
+  func relationshipAnchors() throws {
+    let sourceID = testIdentity("Source")
+    let targetID = testIdentity("Structural", "Target")
+    let anchor = testIdentity("AuthoredTarget")
+    var sourceMetadata = SemanticMetadata(accessibilityRole: .textField)
+    sourceMetadata.accessibilityProperties = .init(describedBy: [
+      anchor, testIdentity("Missing"), sourceID,
+    ])
+    var targetMetadata = SemanticMetadata(accessibilityLabel: "Help")
+    targetMetadata.accessibilityProperties = .init(identifier: anchor)
+    let source = placedNode(identity: sourceID, semanticMetadata: sourceMetadata)
+    let target = placedNode(identity: targetID, semanticMetadata: targetMetadata)
+    func extracted(_ children: [PlacedNode]) throws -> AccessibilityNode {
+      try #require(
+        SemanticExtractor().extract(
+          from: placedNode(identity: testIdentity("Root"), children: children)
+        )
+        .accessibilityNodes.first { $0.identity == sourceID })
+    }
+    #expect(try extracted([source, target]).properties?.describedBy == [targetID])
+    #expect(try extracted([source]).properties?.describedBy == [])
+    var hidden = target
+    hidden.semanticMetadata.accessibilityHidden = true
+    #expect(try extracted([source, hidden]).properties?.describedBy == [])
+    let duplicate = placedNode(identity: testIdentity("Other"), semanticMetadata: targetMetadata)
+    #expect(try extracted([source, target, duplicate]).properties?.describedBy == [])
+  }
+
+  @Test("widget properties survive extraction while hidden subtrees remain absent")
+  func widgetProperties() throws {
+    let identity = testIdentity("Properties")
+    let properties = AccessibilityProperties(
+      selected: false, expanded: true, required: true,
+      invalid: true, busy: false, readOnly: true, description: "Error detail", language: "fr",
+      rowIndex: 2, columnIndex: 3, rowCount: -1, controls: [testIdentity("Target")])
+    var metadata = SemanticMetadata()
+    metadata.accessibilityProperties = properties
+    let root = placedNode(identity: identity, semanticMetadata: metadata)
+    let node = try #require(SemanticExtractor().extract(from: root).accessibilityNodes.first)
+    #expect(node.properties == properties.resolvingReferences { _ in nil })
+    #expect(node.identity == identity)
+    #expect(node.actionTarget == nil)
+    var hidden = root
+    hidden.semanticMetadata.accessibilityHidden = true
+    #expect(SemanticExtractor().extract(from: hidden).accessibilityNodes.isEmpty)
+  }
+
   @Test(
     "ordinary text emits full source labels in reading order, ignoring hidden and transient text")
   func ordinaryTextReadingOrder() {

@@ -90,6 +90,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     get { authoredAccessibility?.title }
     set { authoredAccessibility = .init(title: newValue, control: accessibilityControl) }
   }
+  public var accessibilityProperties: AccessibilityProperties? = nil
   public var accessibilityHint: String?
   public var accessibilityLiveRegion: AccessibilityPoliteness?
   package var accessibilityVisualContent: AccessibilityVisualContent?
@@ -375,6 +376,14 @@ public struct SemanticMetadata: Equatable, Sendable {
       usesAuthoredAccessibilityLabel || other.usesAuthoredAccessibilityLabel
     merged.accessibilityTitle = other.accessibilityTitle ?? accessibilityTitle
     merged.accessibilityControl = other.accessibilityControl ?? accessibilityControl
+    merged.accessibilityProperties =
+      if let base = accessibilityProperties,
+        let override = other.accessibilityProperties
+      {
+        base.merging(override)
+      } else {
+        other.accessibilityProperties ?? accessibilityProperties
+      }
     merged.allowsFocusWhenDisabled = allowsFocusWhenDisabled || other.allowsFocusWhenDisabled
     merged.isParagraph = isParagraph || other.isParagraph
     merged.isAccessibilityContent = isAccessibilityContent || other.isAccessibilityContent

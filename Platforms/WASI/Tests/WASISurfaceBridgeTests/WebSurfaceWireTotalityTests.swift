@@ -144,6 +144,11 @@ struct WebSurfaceWireTotalityTests {
       Set(try #require(nodes.first).keys) == HostWireSchema.WebWire.accessibilityNodeKeys
     )
 
+    let properties = try #require(nodes.first?["properties"] as? [String: Any])
+    #expect(Set(properties.keys) == HostWireSchema.WebWire.accessibilityPropertyKeys)
+    #expect(properties["selected"] as? Bool == true)
+    #expect(properties["controls"] as? [String] == ["root/related"])
+    #expect(properties["language"] as? String == "Detail é\nquoted \"text\"")
     let control = try #require(nodes.first)
     #expect(control["actionTarget"] as? String == "fixture-token")
     #expect(control["actions"] as? [String] == ["focus", "setValue"])
@@ -434,6 +439,36 @@ struct WebSurfaceWireTotalityTests {
       rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)),
       role: .textField, label: "Field", hint: "Type here", hidden: true,
       liveRegion: .polite, cursorAnchor: CellPoint(x: 1, y: 0))
+    controlNode.properties = .init(
+      selected: true,
+      expanded: true,
+      required: true,
+      invalid: true,
+      busy: true,
+      readOnly: true,
+      description: "Detail é\nquoted \"text\"",
+      valueDescription: "Detail é\nquoted \"text\"",
+      language: "Detail é\nquoted \"text\"",
+      headingLevel: 2,
+      level: 2,
+      positionInSet: 2,
+      setSize: 2,
+      rowIndex: 2,
+      columnIndex: 2,
+      rowCount: 2,
+      columnCount: 2,
+      rowSpan: 2,
+      columnSpan: 2,
+      textKind: .paragraph,
+      sort: .ascending,
+      labelledBy: [Identity(components: ["root", "related"])],
+      describedBy: [Identity(components: ["root", "related"])],
+      errorMessage: [Identity(components: ["root", "related"])],
+      controls: [Identity(components: ["root", "related"])],
+      owns: [Identity(components: ["root", "related"])],
+      flowTo: [Identity(components: ["root", "related"])],
+      activeDescendant: Identity(components: ["root", "related"])
+    )
     controlNode.actionTarget = "fixture-token"
     controlNode.control = .init(
       actions: [.focus, .setValue], value: .text("Current"),

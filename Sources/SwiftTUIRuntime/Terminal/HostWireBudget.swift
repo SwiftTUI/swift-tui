@@ -120,6 +120,19 @@ package enum HostWireBudget {
       try charge(node.label)
       try charge(node.hint)
       try charge(node.liveRegionToken)
+      if let properties = node.properties {
+        try charge(properties.description)
+        try charge(properties.valueDescription)
+        try charge(properties.language)
+        for identity in properties.labelledBy ?? [] { try charge(identity.path) }
+        for identity in properties.describedBy ?? [] { try charge(identity.path) }
+        for identity in properties.errorMessage ?? [] { try charge(identity.path) }
+        for identity in properties.controls ?? [] { try charge(identity.path) }
+        for identity in properties.owns ?? [] { try charge(identity.path) }
+        for identity in properties.flowTo ?? [] { try charge(identity.path) }
+        try charge(properties.activeDescendant?.path)
+      }
+
     }
     for announcement in model.accessibilityAnnouncements {
       try charge(announcement.message)

@@ -23,6 +23,10 @@ extension RunLoop {
       })
     else { return .outOfScope }
     guard control.actions.contains(request.action.kind) else { return .unsupported }
+    // Read-only controls remain focusable, but cannot be mutated by a host.
+    guard node.properties?.readOnly != true || request.action == .focus else {
+      return .unsupported
+    }
     if case .setValue(let value) = request.action {
       switch (control.value, value, node.role) {
       case (.boolean, .boolean, _), (.text, .text, _), (nil, .text, .secureField):

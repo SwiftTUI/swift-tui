@@ -252,3 +252,27 @@ nonuniform paragraph margins are outside this contract.
 - <doc:Focus>
 - <doc:Authoring-Views>
 - <doc:State-Environment-And-Focus>
+
+## Optional widget state and relationships
+
+Use `accessibilityProperties(_:)` to supply shared widget state when authoring
+custom semantics. `AccessibilityProperties` includes selected, expanded,
+required, invalid, busy and read-only states, descriptions, language, reading
+structure, collection positions and same-scene identity relationships.
+Specified fields merge individually; explicit `false` and empty strings/lists
+override earlier values. Match properties to the element's role.
+
+```swift
+TextField("Email", text: $email)
+  .accessibilityProperties(.init(
+    required: true, invalid: emailIsInvalid,
+    description: emailIsInvalid ? "Enter a complete email address." : ""
+  ))
+```
+
+Current Canvas and DOM adapter sources consume these properties. Older browser
+adapters ignore them. This metadata does not implement custom actions, an entire
+widget interaction pattern, or native host support. Read-only state blocks
+assistive mutations; the control author also owns keyboard and pointer editing
+policy. See the framework's `docs/ACCESSIBILITY.md` for the source-version and
+wire compatibility contract.

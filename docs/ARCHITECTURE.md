@@ -30,6 +30,13 @@ or terminal bytes.
 
 ## Modules and the dependency graph
 
+Widget metadata uses the immutable `AccessibilityProperties` payload in
+`SwiftTUIGraph/Semantics/`. Metadata merging preserves unspecified fields; Core
+extracts it into the committed `AccessibilityNode`, and Runtime carries it in
+the shared WASI/WebSocket wire model. Browser hosts map the optional object to
+ARIA and authored text structure. The runtime enforces read-only assistive
+actions against that committed snapshot.
+
 Native text accessibility uses the sparse `AccessibilityTextInput` snapshot
 payload in `SwiftTUIGraph/Semantics/`. `SwiftTUICore/Content/AccessibilityTextInputLayout.swift`
 converts primitive selection offsets to UTF-16 and places grapheme bounds using

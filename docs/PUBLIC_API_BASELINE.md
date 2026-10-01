@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 60 | 517 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 415 | 2532 |
+| `SwiftTUIViews` | 415 | 2533 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -34,7 +34,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIAndroidHost` | 16 | 44 |
 | `SwiftTUICore` | 40 | 273 |
 | `SwiftTUIPrimitives` | 172 | 1518 |
-| `SwiftTUIGraph` | 68 | 416 |
+| `SwiftTUIGraph` | 71 | 462 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -528,7 +528,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 210 members
+- `View` — protocol — 211 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member
@@ -889,12 +889,15 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (58)
+### Canonical surface (61)
 
-- `AccessibilityNode` — struct — 14 members
+- `AccessibilityNode` — struct — 15 members
 - `AccessibilityPoliteness` — enum — 4 members
+- `AccessibilityProperties` — class — 32 members
 - `AccessibilityRole` — enum — 39 members
+- `AccessibilitySortDirection` — enum — 5 members
 - `AccessibilityTextInput` — class — 10 members
+- `AccessibilityTextKind` — enum — 4 members
 - `AccessibilityVisualContent` — struct — 2 members
 - `ActionScope` — protocol
 - `Anchor` — struct
@@ -939,7 +942,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `ScrollRole` — enum — 4 members
 - `ScrollRoute` — struct — 5 members
 - `SectionRole` — enum — 5 members
-- `SemanticMetadata` — struct — 19 members
+- `SemanticMetadata` — struct — 20 members
 - `StateContainer` — class — 6 members
 - `TabItemLabel` — struct — 6 members
 - `TaskDescriptor` — struct — 3 members

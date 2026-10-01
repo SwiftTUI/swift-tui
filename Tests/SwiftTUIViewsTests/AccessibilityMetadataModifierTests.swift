@@ -6,6 +6,28 @@ import Testing
 @MainActor
 @Suite
 struct AccessibilityMetadataModifierTests {
+  @Test("widget property modifiers merge per field and preserve explicit false and empty values")
+  func widgetPropertiesCompose() {
+    let resolved = Text("Value")
+      .accessibilityProperties(
+        .init(
+          selected: true, required: true, description: "Detail", controls: [testIdentity("Target")])
+      )
+      .accessibilityProperties(.init(selected: false, description: "", controls: []))
+      .resolve(in: .init(identity: testIdentity("Properties")))
+    let properties = resolved.semanticMetadata.accessibilityProperties
+    #expect(properties?.selected == false)
+    #expect(properties?.required == true)
+    #expect(properties?.description == "")
+    #expect(properties?.controls == [])
+    #expect(properties?.expanded == nil)
+    let invalid = AccessibilityProperties(
+      headingLevel: 0, positionInSet: -1, setSize: -2, rowSpan: 0)
+    #expect(invalid.headingLevel == nil && invalid.positionInSet == nil)
+    #expect(invalid.setSize == nil && invalid.rowSpan == nil)
+    #expect(AccessibilityProperties(setSize: -1).setSize == -1)
+  }
+
   @Test("SemanticMetadata stores accessibility fields")
   func semanticMetadataStoresAccessibilityFields() {
     let metadata = SemanticMetadata(

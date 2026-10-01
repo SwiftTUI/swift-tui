@@ -322,6 +322,45 @@
       #expect(metrics.bytesWritten == record.utf8.count)
     }
 
+    @Test("widget properties cross WebSocket frames and are removed on the next frame")
+    func widgetPropertiesRoundTrip() async throws {
+      let sink = RecordingByteSink()
+      let transport = WebSocketSurfaceTransport(surfaceSize: .init(width: 2, height: 1), sink: sink)
+      var node = AccessibilityNode(
+        identity: Identity(components: ["field"]),
+        rect: .init(origin: .zero, size: .init(width: 2, height: 1)), role: .textField)
+      node.properties = .init(
+        selected: false, required: true, invalid: true,
+        description: "Correct this value", language: "fr", positionInSet: 2, setSize: 5,
+        errorMessage: [Identity(components: ["error"])])
+      for sequence in 1...2 {
+        try transport.present(
+          SemanticHostFrame(
+            sequence: UInt64(sequence),
+            raster: Self.basicSurface("OK"),
+            semantics: SemanticSnapshot(accessibilityNodes: [node]),
+            focusedIdentity: nil))
+        node.properties = nil
+      }
+      try await transport.drain()
+      let records = await sink.strings()
+      #expect(records.count == 2)
+      let first = try #require(
+        decodedSurfaceFrame(records[0])["accessibilityTree"] as? [[String: Any]])
+      let properties = try #require(first.first?["properties"] as? [String: Any])
+      #expect(properties["selected"] as? Bool == false)
+      #expect(properties["required"] as? Bool == true)
+      #expect(properties["invalid"] as? Bool == true)
+      #expect(properties["description"] as? String == "Correct this value")
+      #expect(properties["language"] as? String == "fr")
+      #expect(properties["positionInSet"] as? Int == 2)
+      #expect(properties["setSize"] as? Int == 5)
+      #expect(properties["errorMessage"] as? [String] == ["error"])
+      let second = try #require(
+        decodedSurfaceFrame(records[1])["accessibilityTree"] as? [[String: Any]])
+      #expect(second.first?["properties"] == nil)
+    }
+
     @Test("a capability declaration re-anchors image transmission for the new client")
     func capabilityDeclarationReanchorsImageTransmission() async throws {
       let sink = RecordingByteSink()
