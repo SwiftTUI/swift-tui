@@ -1153,8 +1153,11 @@ package final class ViewNode {
       guard child !== self else {
         continue
       }
-      if let abandoned = child.parent, abandoned !== self {
-        abandoned.noteChildReseatedAway()
+      if child.parent !== self {
+        child.parent?.noteChildReseatedAway()
+        // Teardown can detach a still-listed child. The same-children apply
+        // must seat it again before claiming ownership; otherwise its next
+        // adopter has no old parent to notify, leaving this listing fresh.
         child.parent = self
       }
     }

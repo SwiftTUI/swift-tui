@@ -109,4 +109,30 @@ struct StrandedListingProbeTests {
     #expect(!claimant.claimsOwnershipOfListedChildren)
     #expect(graph.strandedFreshServableViolations() == [])
   }
+
+  @Test("same-child apply reclaims a detached child before a later adoption")
+  func sameChildApplyReclaimsDetachedChild() throws {
+    let (graph, claimant, child, thief) = try makeGraph()
+    child.parent = nil
+    claimant.apply(resolved: claimant.committed, children: [child])
+    #expect(child.parent === claimant)
+    #expect(claimant.claimsOwnershipOfListedChildren)
+
+    thief.apply(
+      resolved: ResolvedNode(
+        identity: thief.identity, kind: .view("Thief"), children: [child.committed]),
+      children: [child])
+    #expect(child.parent === thief)
+    #expect(!claimant.claimsOwnershipOfListedChildren)
+    #expect(graph.strandedFreshServableViolations().isEmpty)
+  }
+
+  @Test("teardown withdraws a surviving parent's listing claim")
+  func teardownWithdrawsListingClaim() throws {
+    let (graph, claimant, child, _) = try makeGraph()
+    graph.removeSubtree(rootedAt: child, policy: .barrierAdjudicated)
+    #expect(child.parent == nil)
+    #expect(claimant.children.contains { $0 === child })
+    #expect(!claimant.claimsOwnershipOfListedChildren)
+  }
 }

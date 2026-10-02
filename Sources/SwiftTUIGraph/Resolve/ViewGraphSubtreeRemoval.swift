@@ -468,6 +468,10 @@ extension ViewGraph {
 
     node.setLifecycleState(.disappearing)
     node.setCommittedPresence(false)
+    // A retained listing can outlive this node's removal (for example when a
+    // flattened style route is rebuilt). Withdraw the old parent's claim
+    // before clearing the link, so later adoption cannot strand that listing.
+    node.parent?.noteChildReseatedAway()
     node.parent = nil
     removeDependencyEdges(for: node)
     liveNodeIDs.remove(node.viewNodeID)
