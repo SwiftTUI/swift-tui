@@ -41,8 +41,8 @@ label as their accessible name, excluding style chrome and displayed values.
 `ProgressView` publishes its label with the status role. Explicit
 `accessibilityLabel(_:)` overrides take precedence. See <doc:Style-System> for
 the naming contract when a custom style omits its label. Names and roles are
-only part of the contract: Picker selection, composite navigation, and table
-relationships do not yet have complete assistive support. The following built-in
+only part of the contract: composite navigation and table relationships do not
+yet have complete assistive support. The following built-in
 controls register their own supported actions without extra annotations:
 
 ```swift
@@ -270,6 +270,27 @@ widget interaction pattern, or native host support. Read-only state blocks
 assistive mutations; the control author also owns keyboard and pointer editing
 policy. See the framework's `docs/ACCESSIBILITY.md` for the source-version and
 wire compatibility contract.
+
+## Picker selection in current source
+
+`Picker` publishes all options, including rows outside an inline visual viewport,
+with their labels, enabled state and opaque identities. Canvas and DOM use a
+native select popup for `.menu`, a native listbox for `.inline`/`.automatic`, and
+native radio groups for `.radioGroup`/`.segmented`. Browser-native popup state is
+local to the browser; selection is sent directly to the Swift binding and the
+returned frame supplies the authoritative value. No synthesized key events are
+needed. Custom styles can set `accessibilityPresentation`; the default is `.list`.
+
+Use `.disabled(true)` on an option to prevent selection through keyboard,
+pointer and assistive routes, and `.accessibilityLabel(_:)` to name an option
+without changing its visual text. Options retain identity through updates and
+reject retired IDs after removal. Repeated selection of the current option does
+not write the binding again. Whole-picker disabled, read-only, hidden and modal
+scope policies still apply. Custom styles keep these semantics even if they omit
+pointer route wrappers.
+
+These are current-source contracts requiring a matching browser runtime. They
+are not a 0.15.1 support claim or recorded Safari/VoiceOver task acceptance.
 
 ## See Also
 

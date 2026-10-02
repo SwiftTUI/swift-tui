@@ -472,7 +472,9 @@ struct WebSurfaceWireTotalityTests {
     controlNode.actionTarget = "fixture-token"
     controlNode.control = .init(
       actions: [.focus, .setValue], value: .text("Current"),
-      minimum: 0, maximum: 10, step: 1)
+      minimum: 0, maximum: 10, step: 1,
+      selection: .init(
+        presentation: .menu, options: [.init(id: "choice-1", label: "First", isEnabled: true)]))
     controlNode.isEnabled = false
     var frame = SemanticHostFrame(
       sequence: sequence,

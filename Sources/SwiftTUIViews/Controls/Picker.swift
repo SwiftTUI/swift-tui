@@ -53,6 +53,36 @@ extension Picker {
   struct Option: Sendable {
     var tag: SelectionTag
     var label: String
+    var accessibilityLabel: String
+    var identity: Identity
+    var isEnabled: Bool
+    var token: String = ""
+  }
+
+  private struct SelectionTokens: Sendable {
+    struct Key: Hashable, Sendable {
+      var identity: Identity
+      var tag: AnyID
+    }
+    var next: UInt64 = 0
+    var current: [Key: String] = [:]
+
+    mutating func assign(_ options: inout [Option]) {
+      var retained: [Key: String] = [:]
+      for index in options.indices {
+        let key = Key(identity: options[index].identity, tag: options[index].tag.identityValue)
+        let token: String
+        if let existing = current[key] {
+          token = existing
+        } else {
+          next += 1
+          token = String(next)
+        }
+        options[index].token = token
+        retained[key] = token
+      }
+      current = retained
+    }
   }
 
   private struct ResolvedOptions {
@@ -93,7 +123,15 @@ extension Picker {
     return resolvedOptions(
       in: context.child(component: .named("PickerOptions"))
     ).flatMap { resolvedOptions in
-      let options = resolvedOptions.options
+      var options = resolvedOptions.options
+      var tokens =
+        ownerNode?.stateSlot(
+          ordinal: StateSlotOrdinals.pickerSelectionTokens, seed: SelectionTokens()
+        ) ?? SelectionTokens()
+      tokens.assign(&options)
+      ownerNode?.setStateSlotSilently(
+        ordinal: StateSlotOrdinals.pickerSelectionTokens, value: tokens)
+      let enabledTags = options.filter(\.isEnabled).map(\.tag)
       let selectedIndex = options.firstIndex { option in
         pickerSelectionMatches(
           option.tag,
@@ -125,7 +163,7 @@ extension Picker {
           }
           return stepBoundSelection(
             binding,
-            orderedTags: options.map(\.tag),
+            orderedTags: enabledTags,
             delta: delta
           )
         }
@@ -140,13 +178,13 @@ extension Picker {
 
           let handled = stepBoundSelection(
             binding,
-            orderedTags: options.map(\.tag),
+            orderedTags: enabledTags,
             delta: delta
           )
           return handled ? .claimed : .ignored
         }
 
-        for (index, option) in options.enumerated() {
+        for (index, option) in options.enumerated() where option.isEnabled {
           let routeID = runtimePrimaryRouteID(
             for: pickerOptionIdentity(
               for: context.identity,
@@ -166,11 +204,27 @@ extension Picker {
           }
         }
 
-        if wantsTrigger {
-          intake.registerAction(identity: context.identity) {
-            setPickerMenuExpanded(!isActiveNavigation, in: ownerNode, identity: context.identity)
-            return true
+        let currentOptions = options
+        intake.registerAction(
+          identity: context.identity,
+          accessibilityHandler: { action in
+            guard case .setValue(.text(let token)) = action else { return .unsupported }
+            guard let option = currentOptions.first(where: { $0.token == token }),
+              option.isEnabled
+            else { return .invalidValue }
+            let before = binding.wrappedValue
+            guard setBoundSelection(binding, to: option.tag) else { return .invalidValue }
+            if wantsTrigger {
+              setPickerMenuExpanded(false, in: ownerNode, identity: context.identity)
+            }
+            return before == binding.wrappedValue ? .unchanged : .changed
           }
+        ) {
+          guard wantsTrigger else { return false }
+          setPickerMenuExpanded(!isActiveNavigation, in: ownerNode, identity: context.identity)
+          return true
+        }
+        if wantsTrigger {
           let triggerRouteID = runtimePrimaryRouteID(
             for: pickerTriggerIdentity(for: context.identity)
           )
@@ -191,7 +245,7 @@ extension Picker {
       var configuration = PickerStyleConfiguration(
         controlIdentity: context.identity,
         label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
-        options: options.map { .init(label: $0.label) },
+        options: options.map { .init(label: $0.label, isEnabled: $0.isEnabled) },
         selectedIndex: selectedIndex,
         isFocused: isFocused,
         isActiveNavigation: isActiveNavigation,
@@ -216,8 +270,20 @@ extension Picker {
           semanticMetadata: focusableControlMetadata(
             focusInteractions: .edit,
             accessibilityRole: .picker
-          ).namingControl(with: label)
+          ).namingControl(with: label).accessibilityControl(
+            .init(
+              actions: [.focus, .setValue],
+              value: .text(selectedIndex.map { options[$0].token } ?? ""),
+              selection: .init(
+                presentation: pickerStyle.accessibilityPresentation,
+                options: options.map {
+                  .init(
+                    id: $0.token, label: $0.accessibilityLabel, isEnabled: isEnabled && $0.isEnabled
+                  )
+                })))
         )
+        node.semanticMetadata.accessibilityProperties = .init(
+          valueDescription: selectedIndex.map { options[$0].accessibilityLabel })
         if !resolvedOptions.runtimeIssues.isEmpty {
           node.preferenceValues.merge(
             RuntimeIssuePreferenceKey.self,
@@ -246,9 +312,17 @@ extension Picker {
       }
 
       var result = ResolvedOptions()
+      var enabledValues = context.environmentValues
+      enabledValues.isEnabled = context.environmentValues.isEnabled
+      var disabledValues = context.environmentValues
+      disabledValues.isEnabled = false
       collectOptions(
         from: nodes,
-        expectedEnvironment: context.environment,
+        expectedEnvironments: [
+          context.environment,
+          enabledValues.applying(to: context.environment),
+          disabledValues.applying(to: context.environment),
+        ],
         expectedTransaction: context.transaction,
         // An unmodified `Text` still carries the ambient text-layout attributes
         // every text node inherits, so the representable baseline is the ambient
@@ -262,7 +336,7 @@ extension Picker {
 
   private func collectOptions(
     from nodes: [ResolvedNode],
-    expectedEnvironment: EnvironmentSnapshot,
+    expectedEnvironments: [EnvironmentSnapshot],
     expectedTransaction: TransactionSnapshot,
     expectedLayoutMetadata: LayoutMetadata,
     into result: inout ResolvedOptions
@@ -271,7 +345,7 @@ extension Picker {
       if let tag = node.semanticMetadata.selectionTag {
         let representation = optionContentRepresentation(
           for: node,
-          expectedEnvironment: expectedEnvironment,
+          expectedEnvironments: expectedEnvironments,
           expectedTransaction: expectedTransaction,
           expectedLayoutMetadata: expectedLayoutMetadata
         )
@@ -296,11 +370,16 @@ extension Picker {
             result.runtimeIssues.append(issue)
           }
         }
-        result.options.append(Option(tag: tag, label: label))
+        result.options.append(
+          Option(
+            tag: tag, label: label,
+            accessibilityLabel: node.semanticMetadata.accessibilityLabel ?? label,
+            identity: node.identity,
+            isEnabled: node.environmentSnapshot.style.isEnabled))
       } else {
         collectOptions(
           from: node.children,
-          expectedEnvironment: expectedEnvironment,
+          expectedEnvironments: expectedEnvironments,
           expectedTransaction: expectedTransaction,
           expectedLayoutMetadata: expectedLayoutMetadata,
           into: &result
@@ -315,7 +394,7 @@ extension Picker {
   /// authored structure or behavior was discarded.
   private func optionContentRepresentation(
     for node: ResolvedNode,
-    expectedEnvironment: EnvironmentSnapshot,
+    expectedEnvironments: [EnvironmentSnapshot],
     expectedTransaction: TransactionSnapshot,
     expectedLayoutMetadata: LayoutMetadata
   ) -> OptionContentRepresentation {
@@ -337,7 +416,7 @@ extension Picker {
     if node.drawMetadata != .init() || !node.drawEffects.isEmpty {
       reasons.append("visual modifier")
     }
-    if node.environmentSnapshot != expectedEnvironment {
+    if !expectedEnvironments.contains(node.environmentSnapshot) {
       reasons.append("environment modifier")
     }
     if !node.transactionSnapshot.isReuseEquivalent(to: expectedTransaction) {
@@ -346,6 +425,7 @@ extension Picker {
 
     var unsupportedSemantics = node.semanticMetadata
     unsupportedSemantics.selectionTag = nil
+    unsupportedSemantics.accessibilityLabel = nil
     if unsupportedSemantics != .init() {
       reasons.append("semantic modifier")
     }

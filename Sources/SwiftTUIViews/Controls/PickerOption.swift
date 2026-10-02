@@ -11,7 +11,8 @@
 /// ```
 ///
 /// This is equivalent to an unmodified `Text` with a selection tag. Applying
-/// visual or behavioral modifiers does not customize the picker row; implement
+/// `disabled` or `accessibilityLabel` preserves availability or the assistive
+/// name. Other visual or behavioral modifiers do not customize the row; implement
 /// `PickerStyle` to do that. Outside a picker, it displays its label as text.
 public struct PickerOption<Value: Hashable & Sendable>: View {
   private let title: String

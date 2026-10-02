@@ -704,6 +704,15 @@ package enum WebSurfaceFrameEncoder {
             "\"actions\":[\(control.actions.map { jsonString($0.rawValue) }.joined(separator: ","))]"
           )
           fields.append("\"isEnabled\":\(node.isEnabled ? "true" : "false")")
+          if let selection = control.selection {
+            let options = selection.options.map { option in
+              "{\"id\":\(jsonString(option.id)),\"label\":\(jsonString(option.label)),"
+                + "\"isEnabled\":\(option.isEnabled ? "true" : "false")}"
+            }.joined(separator: ",")
+            fields.append(
+              "\"selection\":{\"presentation\":\(jsonString(selection.presentation.rawValue)),"
+                + "\"options\":[\(options)]}")
+          }
           if let value = control.value, node.roleToken != "secureField" {
             let kind: String
             let encoded: String

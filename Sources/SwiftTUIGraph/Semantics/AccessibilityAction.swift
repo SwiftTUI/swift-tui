@@ -10,6 +10,38 @@ public enum AccessibilityValue: Equatable, Sendable {
   case text(String)
 }
 
+/// The native selection pattern used by an assistive presenter.
+public enum AccessibilitySelectionPresentation: String, Sendable {
+  case menu, list, radioGroup, segmented
+}
+
+/// An opaque choice owned by one live control. Hosts return its ID as a text
+/// value; labels and array positions are never selection commands.
+public struct AccessibilitySelectionOption: Equatable, Sendable {
+  public let id: String
+  public let label: String
+  public let isEnabled: Bool
+
+  public init(id: String, label: String, isEnabled: Bool) {
+    self.id = id
+    self.label = label
+    self.isEnabled = isEnabled
+  }
+}
+
+/// All choices, including choices outside the visual picker viewport.
+public struct AccessibilitySelection: Equatable, Sendable {
+  public let presentation: AccessibilitySelectionPresentation
+  public let options: [AccessibilitySelectionOption]
+
+  public init(
+    presentation: AccessibilitySelectionPresentation, options: [AccessibilitySelectionOption]
+  ) {
+    self.presentation = presentation
+    self.options = options
+  }
+}
+
 /// An assistive operation. Values are delivered to the owning control directly.
 public enum AccessibilityAction: Equatable, Sendable {
   case focus, activate, increment, decrement
@@ -51,22 +83,26 @@ public final class AccessibilityControlState: Equatable, Sendable {
   public let minimum: Double?
   public let maximum: Double?
   public let step: Double?
+  public let selection: AccessibilitySelection?
 
   public static func == (lhs: AccessibilityControlState, rhs: AccessibilityControlState) -> Bool {
     lhs === rhs
       || (lhs.actions == rhs.actions && lhs.value == rhs.value
-        && lhs.minimum == rhs.minimum && lhs.maximum == rhs.maximum && lhs.step == rhs.step)
+        && lhs.minimum == rhs.minimum && lhs.maximum == rhs.maximum && lhs.step == rhs.step
+        && lhs.selection == rhs.selection)
   }
 
   public init(
     actions: [AccessibilityActionKind], value: AccessibilityValue? = nil,
-    minimum: Double? = nil, maximum: Double? = nil, step: Double? = nil
+    minimum: Double? = nil, maximum: Double? = nil, step: Double? = nil,
+    selection: AccessibilitySelection? = nil
   ) {
     self.actions = actions
     self.value = value
     self.minimum = minimum
     self.maximum = maximum
     self.step = step
+    self.selection = selection
   }
 }
 

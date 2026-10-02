@@ -213,6 +213,86 @@ async function loadWebHostSceneManifestFromResponse(response) {
   return normalizeWebHostSceneManifest(await response.json());
 }
 
+// src/AccessibilitySelection.ts
+function presentSelection(element, node, synchronizeValue, interactive) {
+  const selection = node.selection;
+  const selected = node.value?.type === "text" ? node.value.value : "";
+  const enabled = interactive && node.isEnabled !== false && node.properties?.readOnly !== true;
+  const active = document.activeElement;
+  const ownedFocus = active instanceof HTMLElement && active !== element && element.contains(active);
+  const previous = new Map(Array.from(element.children, (child) => [
+    child.dataset.optionId,
+    child
+  ]));
+  const nativeSelect = element instanceof HTMLSelectElement;
+  if (nativeSelect) {
+    element.size = selection.presentation === "menu" ? 1 : Math.max(2, Math.min(8, selection.options.length));
+    element.disabled = !enabled;
+    element.tabIndex = enabled ? 0 : -1;
+    element.required = node.properties?.required === true;
+    element.removeAttribute("role");
+  } else {
+    element.setAttribute("role", "radiogroup");
+    element.setAttribute("aria-orientation", selection.presentation === "segmented" ? "horizontal" : "vertical");
+    element.tabIndex = -1;
+  }
+  selection.options.forEach((option, index) => {
+    const child = previous.get(option.id) ?? document.createElement(nativeSelect ? "option" : "input");
+    previous.delete(option.id);
+    child.dataset.optionId = option.id;
+    if (nativeSelect) {
+      const nativeOption = child;
+      nativeOption.value = option.id;
+      nativeOption.textContent = option.label;
+      nativeOption.disabled = !enabled || !option.isEnabled;
+    } else {
+      const radio = child;
+      radio.type = "radio";
+      radio.name = element.id;
+      radio.value = option.id;
+      radio.id = `${element.id}-option-${Array.from(option.id, (c) => c.codePointAt(0).toString(16)).join("-")}`;
+      radio.setAttribute("aria-label", option.label);
+      radio.setAttribute("aria-posinset", String(index + 1));
+      radio.setAttribute("aria-setsize", String(selection.options.length));
+      radio.disabled = !enabled || !option.isEnabled;
+      if (synchronizeValue)
+        radio.checked = selected === option.id;
+      radio.style.position = "absolute";
+      const horizontal = selection.presentation === "segmented";
+      radio.style.left = horizontal ? `${index * 100 / selection.options.length}%` : "0";
+      radio.style.top = horizontal ? "0" : `${index * 100 / selection.options.length}%`;
+      radio.style.width = horizontal ? `${100 / selection.options.length}%` : "100%";
+      radio.style.height = horizontal ? "100%" : `${100 / selection.options.length}%`;
+      radio.style.margin = "0";
+    }
+    if (element.children[index] !== child)
+      element.insertBefore(child, element.children[index] ?? null);
+  });
+  for (const child of previous.values())
+    child.remove();
+  if (nativeSelect) {
+    if (synchronizeValue)
+      element.value = selected;
+  } else {
+    const radios = Array.from(element.querySelectorAll("input"));
+    const tabStop = radios.find((radio) => radio.checked && !radio.disabled) ?? radios.find((radio) => !radio.disabled);
+    for (const radio of radios)
+      radio.tabIndex = radio === tabStop ? 0 : -1;
+    if (ownedFocus) {
+      const target = active instanceof HTMLInputElement && element.contains(active) && !active.disabled ? active : tabStop;
+      target?.focus({ preventScroll: true });
+    }
+  }
+}
+function selectionFocusElement(element) {
+  if (element.getAttribute("role") !== "radiogroup")
+    return element;
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && element.contains(active))
+    return active;
+  return element.querySelector("input[tabindex='0']") ?? element;
+}
+
 // src/normalizeWireTokens.ts
 function normalizeSemantics(value) {
   switch (value) {
@@ -333,7 +413,7 @@ class AccessibilityTreeMounter {
       const existing = previousById.get(node.id);
       const tag = this.elementTag(node);
       const previousModel = this.modelsById.get(node.id);
-      const reusable = existing?.tagName.toLowerCase() === tag && previousModel?.actionTarget === node.actionTarget;
+      const reusable = existing?.tagName.toLowerCase() === tag && previousModel?.actionTarget === node.actionTarget && previousModel?.selection?.presentation === node.selection?.presentation;
       const element2 = reusable ? existing : this.createElement(node, tag);
       if (!reusable) {
         if (existing)
@@ -384,14 +464,15 @@ class AccessibilityTreeMounter {
     const element = focused ? this.nodesById.get(focused.id) : undefined;
     const pending = this.pendingFocus;
     const focusAcknowledged = pending !== undefined && pending.requestID <= this.acknowledgedRequestID;
-    const synchronize = focusAcknowledged ? activeBeforePresentation === this.nodesById.get(pending.id) : element !== this.runtimeFocusedElement || element === activeBeforePresentation;
+    const synchronize = focusAcknowledged ? this.nodesById.get(pending.id)?.contains(activeBeforePresentation) ?? false : element !== this.runtimeFocusedElement || element === activeBeforePresentation;
     this.runtimeFocusedElement = element;
     if (focusAcknowledged) {
       this.pendingFocus = undefined;
     }
     if ((options.synchronizeFocus ?? true) && synchronize && element && this.pendingFocus === undefined) {
-      if (document.activeElement !== element)
-        element.focus?.({ preventScroll: true });
+      const focusElement = selectionFocusElement(element);
+      if (document.activeElement !== focusElement)
+        focusElement.focus?.({ preventScroll: true });
     }
     this.presenting = false;
   }
@@ -414,6 +495,8 @@ class AccessibilityTreeMounter {
     this.compositionCommits.delete(element);
   }
   elementTag(node) {
+    if (node.selection && ["menu", "list"].includes(node.selection.presentation))
+      return "select";
     if (!node.actionTarget || !this.sendAction)
       return "div";
     if (node.role === "textEditor")
@@ -438,7 +521,24 @@ class AccessibilityTreeMounter {
         this.pendingFocus = { id: node.id, requestID };
       this.sendAction?.(model.actionTarget, request, String(requestID));
     };
-    element.addEventListener("focus", () => send({ action: "focus" }));
+    element.addEventListener(node.selection ? "focusin" : "focus", () => send({ action: "focus" }));
+    if (node.selection) {
+      element.addEventListener("change", (event) => {
+        event.stopPropagation();
+        const input = event.target;
+        const model = current();
+        const option = model?.selection?.options.find((option2) => option2.id === input.value);
+        if (!option?.isEnabled || input instanceof HTMLInputElement && !input.checked)
+          return;
+        send({ action: "setValue", value: { type: "text", value: option.id } });
+      });
+      element.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab")
+          event.stopPropagation();
+      });
+      element.addEventListener("click", (event) => event.stopPropagation());
+      return element;
+    }
     element.addEventListener("click", (event) => {
       event.stopPropagation();
       send({ action: "activate" });
@@ -568,7 +668,7 @@ class AccessibilityTreeMounter {
     setOrRemoveAttribute(element, "aria-invalid", properties?.invalid?.toString());
     setOrRemoveAttribute(element, "aria-busy", properties?.busy?.toString());
     setOrRemoveAttribute(element, "aria-readonly", properties?.readOnly?.toString());
-    setOrRemoveAttribute(element, "aria-valuetext", node.role === "secureField" ? undefined : properties?.valueDescription?.toString());
+    setOrRemoveAttribute(element, "aria-valuetext", node.role === "secureField" || node.selection ? undefined : properties?.valueDescription?.toString());
     setOrRemoveAttribute(element, "aria-posinset", properties?.positionInSet?.toString());
     setOrRemoveAttribute(element, "aria-setsize", properties?.setSize?.toString());
     setOrRemoveAttribute(element, "aria-rowindex", properties?.rowIndex?.toString());
@@ -598,6 +698,13 @@ class AccessibilityTreeMounter {
           input.value = value;
         }
       }
+    }
+    if (node.selection) {
+      const pending = this.pendingValues.get(node.id);
+      const synchronizeValue = pending === undefined || pending <= this.acknowledgedRequestID;
+      if (synchronizeValue)
+        this.pendingValues.delete(node.id);
+      presentSelection(element, node, synchronizeValue, this.isTabStop(node) && !!node.actions?.includes("setValue"));
     }
     const [x, y, width, height] = node.rect;
     const [parentX, parentY] = parent?.rect ?? [0, 0];
@@ -2503,7 +2610,21 @@ function isWebHostAccessibilityNode(value) {
     return false;
   }
   const node = value;
-  return (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
+  return (node.selection === undefined || isAccessibilitySelection(node.selection)) && (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
+}
+function isAccessibilitySelection(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const selection = value;
+  if (!["menu", "list", "radioGroup", "segmented"].includes(selection.presentation) || !Array.isArray(selection.options) || selection.options.length > 65536)
+    return false;
+  const ids = new Set;
+  return selection.options.every((option) => {
+    if (!option || typeof option !== "object" || typeof option.id !== "string" || option.id === "" || ids.has(option.id) || typeof option.label !== "string" || typeof option.isEnabled !== "boolean")
+      return false;
+    ids.add(option.id);
+    return true;
+  });
 }
 function isAccessibilityProperties(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))

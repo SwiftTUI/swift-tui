@@ -97,7 +97,8 @@ Up and Down; `.segmented` lays them out horizontally and uses Left and
 Right; `.radioGroup` and `.menu` are also available. Terminal option
 rows are single-line text, so SwiftTUI scrapes option content to
 labeled text values: an unmodified tagged `Text` is represented
-losslessly, and anything richer keeps its extracted text and tag but
+losslessly. Option-level `disabled` and `accessibilityLabel` modifiers are also
+preserved. Other richer content keeps its extracted text and tag but
 reports a runtime issue instead of degrading silently. See
 <doc:Divergences-And-Gaps>.
 

@@ -793,6 +793,141 @@ private func rect(
 @MainActor
 @Suite("Semantic action dispatch")
 struct AccessibilityActionRuntimeTests {
+  @Test("A retained four-style form restores conditionally removed Picker options")
+  func pickerConditionalRestore() throws {
+    let root = testIdentity("PickerConditionalRoot")
+    let size = CellSize(width: 160, height: 60)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: size, focusTracker: focus
+    ) { PickerConditionalFixture() }
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    func send(_ name: String, _ action: AccessibilityAction) throws {
+      let target = try #require(
+        loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == name }?.actionTarget)
+      _ = loop.handle(
+        .input(.accessibility(.init(target: target, action: action, requestID: UInt64(frames)))))
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    for name in ["Inline mode", "Menu mode", "Radio mode", "Segmented mode"] {
+      try send(name, .focus)
+      let option = try #require(
+        loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == name }?
+          .control?.selection?.options.first { $0.label == "Second" })
+      try send(name, .setValue(.text(option.id)))
+    }
+    let fourth = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == "Segmented mode" }?
+        .control?.selection?.options.first { $0.label == "Fourth" })
+    try send("Segmented mode", .setValue(.text(fourth.id)))
+    try send("Reset choices", .focus)
+    try send("Reset choices", .activate)
+    try send("Toggle second choices", .focus)
+    try send("Toggle second choices", .activate)
+    try send("Toggle second choices", .activate)
+    #expect(
+      loop.latestSemanticSnapshot.accessibilityNodes.filter { $0.role == .picker }.allSatisfy {
+        $0.control?.selection?.options.count == 4
+      })
+  }
+
+  @Test("Picker choices route by live identity across styles and option changes", arguments: 0..<4)
+  func pickerChoices(styleIndex: Int) throws {
+    let styles: [AnyPickerStyle] = [.inline, .menu, .radioGroup, .segmented]
+    let root = testIdentity("PickerAssistiveRoot")
+    let size = CellSize(width: 70, height: 30)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var selection = 1
+    var writes = 0
+    var options = [1, 2, 3]
+    var disabled = false
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: size, focusTracker: focus
+    ) {
+      VStack {
+        Picker(
+          selection: Binding(
+            get: { selection },
+            set: {
+              selection = $0
+              writes += 1
+            })
+        ) {
+          ForEach(options, id: \.self) { option in
+            PickerOption("Visual \(option)", value: option)
+              .accessibilityLabel("Choice \(option)")
+              .disabled(option == 3)
+          }
+        } label: {
+          HStack {
+            Text("Choose")
+            Text("mode")
+          }
+        }
+        .pickerStyle(styles[styleIndex])
+        .pickerViewportLineCount(3)
+        .disabled(disabled)
+        .id(testIdentity("Choice"))
+        Picker("Other picker", selection: .constant(10)) {
+          PickerOption("Ten", value: 10)
+          PickerOption("Twenty", value: 20)
+        }
+      }
+    }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    func render() throws {
+      loop.scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    func node() throws -> AccessibilityNode {
+      try #require(
+        loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == "Choose mode" })
+    }
+    func choices() throws -> [AccessibilitySelectionOption] {
+      try #require(node().control?.selection?.options)
+    }
+    func send(_ token: String) throws -> AccessibilityActionResult {
+      loop.handleAccessibilityAction(
+        .init(
+          target: try #require(node().actionTarget), action: .setValue(.text(token))))
+    }
+    try render()
+    let initial = try choices()
+    #expect(initial.map(\.label) == ["Choice 1", "Choice 2", "Choice 3"])
+    #expect(initial.map(\.isEnabled) == [true, true, false])
+    #expect(try node().control?.value == .text(initial[0].id))
+    #expect(try send(initial[1].id) == .accepted)
+    #expect(selection == 2 && writes == 1)
+    try render()
+    #expect(try choices() == initial)
+    #expect(try node().control?.value == .text(initial[1].id))
+    #expect(try send(initial[1].id) == .accepted)
+    #expect(writes == 1)
+    #expect(try send(initial[2].id) == .invalidValue)
+    #expect(try send("not-an-option") == .invalidValue)
+    #expect(writes == 1)
+    options = [3, 2, 1]
+    try render()
+    #expect(try choices().map(\.id) == initial.reversed().map(\.id))
+    options = [3, 1]
+    try render()
+    #expect(try send(initial[1].id) == .invalidValue)
+    options = [3, 2, 1]
+    try render()
+    #expect(try choices()[1].id != initial[1].id)
+    #expect(try send(initial[1].id) == .invalidValue)
+    disabled = true
+    try render()
+    #expect(try send(initial[0].id) == .disabled)
+    #expect(writes == 1)
+  }
+
   @Test("Rejected and no-op correlated requests still publish an acknowledgement")
   func actionAcknowledgements() throws {
     let surface = SemanticHostFrameDispatchSurface()
@@ -994,6 +1129,60 @@ private struct AssistiveControls: View {
         .sheet(isPresented: $modal) {
           Button("Close") { modal = false }.id(testIdentity("ModalChild"))
         }
+    }
+  }
+}
+
+private struct PickerConditionalFixture: View {
+  @State private var inline = 1
+  @State private var menu = 1
+  @State private var radio = 1
+  @State private var segmented = 1
+  @State private var writes = 0
+  @State private var secondVisible = true
+  @State private var disabled = false
+
+  private func counted(_ value: Binding<Int>) -> Binding<Int> {
+    Binding(
+      get: { value.wrappedValue },
+      set: {
+        value.wrappedValue = $0
+        writes += 1
+      })
+  }
+
+  private func choices(_ title: String, value: Binding<Int>, style: AnyPickerStyle) -> some View {
+    Picker(title, selection: counted(value)) {
+      PickerOption("First", value: 1)
+      if secondVisible {
+        Text("Visual second").tag(2).accessibilityLabel("Second")
+      }
+      PickerOption("Unavailable", value: 3).disabled(true)
+      PickerOption("Fourth", value: 4)
+    }
+    .pickerStyle(style)
+    .pickerViewportLineCount(3)
+    .disabled(disabled)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top) {
+        choices("Inline mode", value: $inline, style: .inline)
+        choices("Menu mode", value: $menu, style: .menu)
+        choices("Radio mode", value: $radio, style: .radioGroup)
+        choices("Segmented mode", value: $segmented, style: .segmented)
+      }
+      Text("Picker writes \(writes)")
+      Text("Selections \(inline) \(menu) \(radio) \(segmented)")
+      Button("Reset choices") {
+        inline = 1
+        menu = 1
+        radio = 1
+        segmented = 1
+      }
+      Button("Toggle second choices") { secondVisible.toggle() }
+      Button("Toggle picker availability") { disabled.toggle() }
     }
   }
 }

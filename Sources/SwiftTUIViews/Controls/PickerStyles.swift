@@ -58,6 +58,9 @@ public protocol PickerStyle: Sendable {
   /// diagnostic text: reuse and identity never depend on its value.
   var snapshotLabel: String { get }
 
+  /// The assistive selection pattern. Custom styles default to a list.
+  var accessibilityPresentation: AccessibilitySelectionPresentation { get }
+
   /// Maps a key event to a step in the picker's selection.
   ///
   /// Return `-1` for the previous option, `1` for the next, or any other offset
@@ -120,6 +123,8 @@ extension PickerStyle where Self: AnyObject {
 }
 
 extension PickerStyle {
+  public var accessibilityPresentation: AccessibilitySelectionPresentation { .list }
+
   /// The reflected name of the conforming type, used when a style does not
   /// supply a label of its own.
   public var snapshotLabel: String {
@@ -211,8 +216,7 @@ public struct PickerStyleConfiguration: Sendable {
     public var isSelected: Bool
     /// Whether the picker currently accepts input.
     ///
-    /// It mirrors the picker's own ``PickerStyleConfiguration/isEnabled``:
-    /// individual options are never separately disabled.
+    /// Combines the picker environment with the authored option's disabled state.
     public var isEnabled: Bool
     private var routeIdentity: Identity?
 
@@ -226,12 +230,12 @@ public struct PickerStyleConfiguration: Sendable {
     ///
     /// - Parameter label: The text the option renders.
     public init(
-      label: String
+      label: String, isEnabled: Bool = true
     ) {
       index = 0
       self.label = label
       isSelected = false
-      isEnabled = true
+      self.isEnabled = isEnabled
       routeIdentity = nil
     }
 
@@ -352,7 +356,7 @@ public struct PickerStyleConfiguration: Sendable {
         index: index,
         label: option.label,
         isSelected: index == selectedIndex,
-        isEnabled: isEnabled
+        isEnabled: isEnabled && option.isEnabled
       )
     }
     self.selectedIndex = selectedIndex
@@ -400,6 +404,7 @@ public struct PickerStyleConfiguration: Sendable {
 /// call site write `.segmented` where an `AnyPickerStyle` is expected.
 public struct AnyPickerStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
+  package let accessibilityPresentation: AccessibilitySelectionPresentation
   private let box: any AnyPickerStyleBox
 
   /// Wraps a concrete picker style for storage in the environment.
@@ -412,6 +417,7 @@ public struct AnyPickerStyle: Sendable, CustomStringConvertible, CustomDebugStri
     _ style: S
   ) {
     snapshotLabel = style.snapshotLabel
+    accessibilityPresentation = style.accessibilityPresentation
     box = ConcreteStyleBox(style: style)
   }
 
@@ -599,6 +605,8 @@ public struct InlinePickerStyle: Sendable, PickerStyle {
 /// background. The container's border is stroked heavy while the focus effect is
 /// active.
 public struct SegmentedPickerStyle: Sendable, PickerStyle {
+  public var accessibilityPresentation: AccessibilitySelectionPresentation { .segmented }
+
   /// Creates the style.
   public init() {}
 
@@ -647,6 +655,8 @@ public struct SegmentedPickerStyle: Sendable, PickerStyle {
 /// is active. The container's border is stroked heavy while the focus effect is
 /// active.
 public struct RadioGroupPickerStyle: Sendable, PickerStyle {
+  public var accessibilityPresentation: AccessibilitySelectionPresentation { .radioGroup }
+
   /// Creates the style.
   public init() {}
 
@@ -702,6 +712,8 @@ public struct RadioGroupPickerStyle: Sendable, PickerStyle {
 /// ``wantsTriggerPointerRoute``, which is what installs the primitive's
 /// expansion actions and makes the trigger clickable.
 public struct MenuPickerStyle: Sendable, PickerStyle {
+  public var accessibilityPresentation: AccessibilitySelectionPresentation { .menu }
+
   /// Creates the style.
   public init() {}
 

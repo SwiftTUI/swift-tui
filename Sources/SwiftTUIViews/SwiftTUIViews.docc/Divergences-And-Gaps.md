@@ -449,7 +449,8 @@ are omitted even when SwiftUI exposes a corresponding API.
   rather than adopting SwiftUI's unrelated sort/customize surface.
 - **`Picker` options are scraped to text.** *Ratified.* Option content is
   extracted into labeled option values. An unmodified tagged `Text` value is
-  represented losslessly. Arbitrary structure and unsupported modifiers keep
+  represented losslessly. Option-level disabled state and assistive label
+  overrides are preserved. Arbitrary structure and unsupported modifiers keep
   their extracted text and tag routing, but emit one deduplicated
   `picker.unrepresentableOptionContent` runtime issue naming the option
   identity instead of degrading silently. Terminal option rows are

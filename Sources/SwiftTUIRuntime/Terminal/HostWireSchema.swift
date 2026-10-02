@@ -182,7 +182,7 @@ package enum HostWireSchema {
     "AccessibilityNode": [
       .init("properties", wire: .key("properties")),
       .init("actionTarget", wire: .key("actionTarget")),
-      .init("control", wire: .derived("actions/value/valueMin/valueMax/valueStep")),
+      .init("control", wire: .derived("actions/value/valueMin/valueMax/valueStep/selection")),
       .init("isEnabled", wire: .key("isEnabled")),
       .init(
         "actionIdentity", wire: .notSerialized("runtime dispatch uses the opaque actionTarget")),
@@ -302,7 +302,7 @@ package enum HostWireSchema {
     package static let accessibilityNodeKeys: Set<String> = [
       "id", "rect", "role", "isFocused", "parentId", "label", "hint", "hidden",
       "liveRegion", "cursorAnchor", "actionTarget", "actions", "isEnabled", "value",
-      "valueMin", "valueMax", "valueStep", "properties",
+      "valueMin", "valueMax", "valueStep", "properties", "selection",
     ]
     package static let accessibilityPropertyKeys: Set<String> = [
       "selected",

@@ -143,7 +143,7 @@ private func inlineRowView(
         label: option.label,
         isSelected: option.isSelected,
         isActiveNavigation: isActiveNavigation,
-        isEnabled: isEnabled,
+        isEnabled: isEnabled && option.isEnabled,
         styleEnvironment: styleEnvironment,
         lineWidth: lineWidth
       )

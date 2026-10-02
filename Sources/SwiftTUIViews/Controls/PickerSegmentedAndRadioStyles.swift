@@ -113,7 +113,7 @@ private func segmentedSegmentView(
 ) -> some View {
   let isSelected = option.isSelected
   let segmentChrome = configuration.styleEnvironment.controlChrome(
-    isEnabled: configuration.isEnabled,
+    isEnabled: option.isEnabled,
     isFocused: configuration.isActiveNavigation && configuration.showsFocusEffect && isSelected,
     isSelected: isSelected
   )

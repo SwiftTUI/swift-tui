@@ -250,7 +250,12 @@ them differently. `.automatic` is a fixed alias of `.inline`.
 
 Declare plain option metadata with `PickerOption("Label", value: value)` or
 an unmodified `Text("Label").tag(value)`. A picker extracts labels and tags;
-its style owns row content. Structured or modified tagged options still report
+its style owns row content. Option `disabled` and `accessibilityLabel` modifiers
+are preserved; the latter changes only the assistive name. Set the style's
+`accessibilityPresentation` to choose a list, menu, radio group or segmented
+assistive pattern; the default for custom styles is a list. All options remain
+available to assistive selection even when a style windows or omits its rows.
+Other structured or modified tagged options still report
 `picker.unrepresentableOptionContent` when their authored behavior would be lost.
 
 ```swift

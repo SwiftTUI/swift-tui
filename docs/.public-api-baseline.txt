@@ -442,9 +442,10 @@ SwiftTUIGraph.AccessibilityActionResult.unsupported
 SwiftTUIGraph.AccessibilityControlState
 SwiftTUIGraph.AccessibilityControlState.==(_:_:)
 SwiftTUIGraph.AccessibilityControlState.actions
-SwiftTUIGraph.AccessibilityControlState.init(actions:value:minimum:maximum:step:)
+SwiftTUIGraph.AccessibilityControlState.init(actions:value:minimum:maximum:step:selection:)
 SwiftTUIGraph.AccessibilityControlState.maximum
 SwiftTUIGraph.AccessibilityControlState.minimum
+SwiftTUIGraph.AccessibilityControlState.selection
 SwiftTUIGraph.AccessibilityControlState.step
 SwiftTUIGraph.AccessibilityControlState.value
 SwiftTUIGraph.AccessibilityNode
@@ -541,6 +542,21 @@ SwiftTUIGraph.AccessibilityRole.textEditor
 SwiftTUIGraph.AccessibilityRole.textField
 SwiftTUIGraph.AccessibilityRole.timer
 SwiftTUIGraph.AccessibilityRole.toggle
+SwiftTUIGraph.AccessibilitySelection
+SwiftTUIGraph.AccessibilitySelection.init(presentation:options:)
+SwiftTUIGraph.AccessibilitySelection.options
+SwiftTUIGraph.AccessibilitySelection.presentation
+SwiftTUIGraph.AccessibilitySelectionOption
+SwiftTUIGraph.AccessibilitySelectionOption.id
+SwiftTUIGraph.AccessibilitySelectionOption.init(id:label:isEnabled:)
+SwiftTUIGraph.AccessibilitySelectionOption.isEnabled
+SwiftTUIGraph.AccessibilitySelectionOption.label
+SwiftTUIGraph.AccessibilitySelectionPresentation
+SwiftTUIGraph.AccessibilitySelectionPresentation.init(rawValue:)
+SwiftTUIGraph.AccessibilitySelectionPresentation.list
+SwiftTUIGraph.AccessibilitySelectionPresentation.menu
+SwiftTUIGraph.AccessibilitySelectionPresentation.radioGroup
+SwiftTUIGraph.AccessibilitySelectionPresentation.segmented
 SwiftTUIGraph.AccessibilitySortDirection
 SwiftTUIGraph.AccessibilitySortDirection.ascending
 SwiftTUIGraph.AccessibilitySortDirection.descending
@@ -4229,6 +4245,7 @@ SwiftTUIViews.Menu
 SwiftTUIViews.Menu.init(_:content:)
 SwiftTUIViews.Menu.init(label:content:)
 SwiftTUIViews.MenuPickerStyle
+SwiftTUIViews.MenuPickerStyle.accessibilityPresentation
 SwiftTUIViews.MenuPickerStyle.init()
 SwiftTUIViews.MenuPickerStyle.makeBody(configuration:)
 SwiftTUIViews.MenuPickerStyle.selectionDelta(for:)
@@ -4365,6 +4382,8 @@ SwiftTUIViews.PickerOption.body
 SwiftTUIViews.PickerOption.init(_:value:)
 SwiftTUIViews.PickerStyle
 SwiftTUIViews.PickerStyle.Body
+SwiftTUIViews.PickerStyle.accessibilityPresentation
+SwiftTUIViews.PickerStyle.accessibilityPresentation
 SwiftTUIViews.PickerStyle.makeBody(configuration:)
 SwiftTUIViews.PickerStyle.selectionDelta(for:)
 SwiftTUIViews.PickerStyle.selectionDelta(for:)
@@ -4377,7 +4396,7 @@ SwiftTUIViews.PickerStyleConfiguration.Label
 SwiftTUIViews.PickerStyleConfiguration.Label.body
 SwiftTUIViews.PickerStyleConfiguration.Option
 SwiftTUIViews.PickerStyleConfiguration.Option.index
-SwiftTUIViews.PickerStyleConfiguration.Option.init(label:)
+SwiftTUIViews.PickerStyleConfiguration.Option.init(label:isEnabled:)
 SwiftTUIViews.PickerStyleConfiguration.Option.isEnabled
 SwiftTUIViews.PickerStyleConfiguration.Option.isSelected
 SwiftTUIViews.PickerStyleConfiguration.Option.label
@@ -4534,6 +4553,7 @@ SwiftTUIViews.PromptSurfaceStylePresentation.scrollMinimumHeight
 SwiftTUIViews.ProposedViewSize
 SwiftTUIViews.RadialGradient.init(stops:center:startRadius:endRadius:)
 SwiftTUIViews.RadioGroupPickerStyle
+SwiftTUIViews.RadioGroupPickerStyle.accessibilityPresentation
 SwiftTUIViews.RadioGroupPickerStyle.init()
 SwiftTUIViews.RadioGroupPickerStyle.makeBody(configuration:)
 SwiftTUIViews.RadioGroupPickerStyle.selectionDelta(for:)
@@ -4643,6 +4663,7 @@ SwiftTUIViews.SecureField
 SwiftTUIViews.SecureField.init(_:text:)
 SwiftTUIViews.SecureField.init(text:prompt:label:)
 SwiftTUIViews.SegmentedPickerStyle
+SwiftTUIViews.SegmentedPickerStyle.accessibilityPresentation
 SwiftTUIViews.SegmentedPickerStyle.init()
 SwiftTUIViews.SegmentedPickerStyle.makeBody(configuration:)
 SwiftTUIViews.SegmentedPickerStyle.selectionDelta(for:)

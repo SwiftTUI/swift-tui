@@ -51,8 +51,8 @@ struct PickerOptionDiagnosticsTests {
     let issues = artifacts.diagnostics.runtime.issues.filter {
       $0.code == "picker.unrepresentableOptionContent"
     }
-    #expect(issues.count == 3)
-    #expect(Set(issues.compactMap(\.identity)).count == 3)
+    #expect(issues.count == 2)
+    #expect(Set(issues.compactMap(\.identity)).count == 2)
     #expect(issues.allSatisfy { $0.source == "Picker" })
     #expect(issues.allSatisfy { $0.message.contains("tag remain active") })
 
@@ -60,14 +60,18 @@ struct PickerOptionDiagnosticsTests {
     #expect(frame.contains("Structured label"))
     #expect(keyRegistry.dispatch(identity: pickerIdentity, keyPress: KeyPress(.arrowDown)))
     #expect(selection.value == 2)
+    #expect(keyRegistry.dispatch(identity: pickerIdentity, keyPress: KeyPress(.arrowDown)))
+    #expect(selection.value == 3)
+    #expect(!keyRegistry.dispatch(identity: pickerIdentity, keyPress: KeyPress(.arrowDown)))
+    #expect(selection.value == 3)
   }
 
   @Test("plain Text options do not report representability issues")
   func plainTextOptionsRemainLossless() {
     let artifacts = DefaultRenderer().render(
       Picker("Mode", selection: .constant(1)) {
-        Text("One").tag(1)
-        Text("Two").tag(2)
+        Text("One").tag(1).disabled(false)
+        Text("Two").tag(2).accessibilityLabel("Second")
       },
       context: .init(identity: testIdentity("PickerPlainText")),
       proposal: .init(width: 30, height: 6)
