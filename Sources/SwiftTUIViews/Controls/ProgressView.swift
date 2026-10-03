@@ -1,6 +1,11 @@
 import SwiftTUICore
 
 /// A compact progress bar with optional label and current-value content.
+///
+/// Publishes one read-only progress indicator, independent of its style. The
+/// authored label names the task, the current-value label describes its value,
+/// and determinate progress supplies a clamped fraction. Indeterminate progress
+/// has no numeric value. Updates do not create live announcements by default.
 public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
   IterativeResolvableView
 {
@@ -106,7 +111,8 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
   }
 
   private func resolvedNode(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
-    let fraction = progressFraction(value: value, total: total)
+    let rawFraction = progressFraction(value: value, total: total)
+    let fraction = rawFraction.isFinite ? rawFraction : 0
     let animates = isIndeterminate && !context.environmentValues.renderingReduceMotion
     var tasks: [TaskDescriptor] = []
     if animates {
@@ -129,16 +135,29 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
       tasks.append(descriptor)
     }
     let configuration = ProgressViewStyleConfiguration(
-      fractionCompleted: isIndeterminate ? nil : (fraction.isFinite ? fraction : 0),
+      fractionCompleted: isIndeterminate ? nil : fraction,
       label: isEmptyView(label)
         ? nil : .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
       currentValueLabel: isEmptyView(currentValueLabel)
-        ? nil : .init(authoringContext: authoringScope) { currentValueLabel },
+        ? nil
+        : .init(authoringContext: authoringScope) {
+          currentValueLabel.authoredAccessibilityValueLabel()
+        },
       barWidth: max(1, barWidth),
       indeterminatePhase: animates ? indeterminatePhase : 0,
       accessibilityReduceMotion: context.environmentValues.renderingReduceMotion,
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
+    var semantics = SemanticMetadata(accessibilityRole: .progressBar).namingControl(with: label)
+    if isEmptyView(label) { semantics.accessibilityTitle = "Progress" }
+    semantics.accessibilityControl = .init(
+      actions: [], value: isIndeterminate ? nil : .number(fraction), minimum: 0, maximum: 1)
+    let valueText = currentValueLabel as? Text
+    semantics.accessibilityValueLabel = .owner(
+      fallback: valueText.map {
+        $0.semanticMetadata.accessibilityHidden
+          ? "" : $0.semanticMetadata.accessibilityLabel ?? $0.content
+      })
     return context.environmentValues.progressViewStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("ProgressViewBody"))
     ).map { child in
@@ -148,7 +167,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
-        semanticMetadata: SemanticMetadata(accessibilityRole: .status).namingControl(with: label),
+        semanticMetadata: semantics,
         lifecycleMetadata: .init(tasks: tasks)
       )
 

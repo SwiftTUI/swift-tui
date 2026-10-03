@@ -6,6 +6,10 @@ import SwiftTUICore
 /// `spinnerStyle(_:)` environment value; the primitive owns the animation
 /// task, iteration state, cancellation identity, stage semantics, and
 /// reduced-motion behavior. Custom frame sequences use `GlyphSpinnerStyle`.
+/// The accessible progress indicator reports stable inactive, in-progress or
+/// completed state; glyph ticks do not change its name or value description.
+/// Use `accessibilityLabel(_:)` to name the task. It has no actions, keyboard
+/// focus stop or automatic live announcements.
 ///
 /// An invalid presentation (empty active frames, a non-positive cadence,
 /// frames of mixed cell width) renders the automatic presentation instead and
@@ -40,6 +44,26 @@ public struct Spinner: View {
         }
       }
     }
+    .semanticMetadata(accessibilityMetadata)
+  }
+
+  private var accessibilityMetadata: SemanticMetadata {
+    var metadata = SemanticMetadata(accessibilityRole: .progressBar, accessibilityLabel: "Progress")
+    let value: AccessibilityValue? =
+      switch stage {
+      case .inactive: .number(0)
+      case .active: nil
+      case .finished: .number(1)
+      }
+    let description =
+      switch stage {
+      case .inactive: "Inactive"
+      case .active: "In progress"
+      case .finished: "Completed"
+      }
+    metadata.accessibilityControl = .init(actions: [], value: value, minimum: 0, maximum: 1)
+    metadata.accessibilityProperties = .init(valueDescription: description)
+    return metadata
   }
 
   @MainActor

@@ -3,7 +3,11 @@ import SwiftTUICore
 extension View {
   /// Marks the authored slot, before a style adds chrome or control values.
   package func authoredAccessibilityLabel() -> some View {
-    AuthoredAccessibilityLabel(content: self)
+    AuthoredAccessibilityLabel(content: self, isValue: false)
+  }
+
+  package func authoredAccessibilityValueLabel() -> some View {
+    AuthoredAccessibilityLabel(content: self, isValue: true)
   }
 }
 
@@ -21,6 +25,7 @@ package func markingAccessibilityContent(_ completed: [ResolvedNode]) -> [Resolv
 /// Unlike a metadata modifier, this does not introduce a modifier-content node.
 private struct AuthoredAccessibilityLabel<Content: View>: PrimitiveView, IterativeResolvableView {
   var content: Content
+  var isValue: Bool
 
   func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     return resolveViewElementsWork(content, in: context).map { completed in
@@ -30,7 +35,12 @@ private struct AuthoredAccessibilityLabel<Content: View>: PrimitiveView, Iterati
         guard !nodes[index].semanticMetadata.accessibilityHidden, !nodes[index].isTransient else {
           continue
         }
-        nodes[index].semanticMetadata.accessibilityLabelSource = startsSlot ? .start : .continuation
+        let source: AccessibilityLabelSource = startsSlot ? .start : .continuation
+        if isValue {
+          nodes[index].semanticMetadata.accessibilityValueLabel = .source(source)
+        } else {
+          nodes[index].semanticMetadata.accessibilityLabelSource = source
+        }
         startsSlot = false
       }
       return nodes

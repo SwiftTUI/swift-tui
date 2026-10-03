@@ -165,8 +165,11 @@ struct StyledControlAccessibilityTests {
       }
     )
     let names = snapshot.accessibilityNodes.filter {
-      [.toggle, .slider, .stepper, .picker, .textField, .secureField, .disclosureGroup, .status]
-        .contains($0.role)
+      [
+        .toggle, .slider, .stepper, .picker, .textField, .secureField, .disclosureGroup,
+        .progressBar,
+      ]
+      .contains($0.role)
     }.map(\.label)
     #expect(
       names == [

@@ -38,7 +38,7 @@ and `DisclosureGroup` each attach the matching `AccessibilityRole` and
 participate in focus. Styled controls publish their authored title or composed
 label as their accessible name, excluding style chrome and displayed values.
 `TextField` and `SecureField` retain their titles when showing entered text.
-`ProgressView` publishes its label with the status role. Explicit
+`ProgressView` and `Spinner` publish progress indicators as described below. Explicit
 `accessibilityLabel(_:)` overrides take precedence. See <doc:Style-System> for
 the naming contract when a custom style omits its label. Names and roles are
 only part of the contract: composite navigation and table relationships do not
@@ -59,6 +59,36 @@ Reach for the accessibility modifiers when you:
 - show visual-only content (images, charts, animation) that needs a label
 - surface changing status text that a screen reader should track
 - hide decorative content from assistive technology
+
+### Progress And Activity
+
+At current HEAD, every `ProgressView` style publishes one `progressBar` with its
+name and completed fraction in `0...1`. The value follows the visual clamp;
+indeterminate progress omits the numeric value. An unlabeled indicator is named
+“Progress”; supply a task-specific label when several tasks need distinguishing.
+The current-value label supplies value text separately from the name, including
+generic composed text. Repeated style placement does not repeat that text.
+Literal labels remain available when a custom style omits their slots; generic
+slots must be placed to contribute their content.
+
+Every `Spinner` preset, including custom glyph styles, publishes a progress
+indicator with “Inactive”, “In progress”, or “Completed” value text. The active
+stage is indeterminate; inactive and finished stages publish zero and one.
+Use `.accessibilityLabel("Sync")` to name the activity. A spinner used as style
+chrome inside another primitive does not add a second reading item.
+
+These indicators have no adjustment actions or keyboard focus stop. Names and
+value text remain available with reduced motion; changing animation glyphs do
+not change their semantic content. They are not live regions by default. Use
+`AccessibilityAnnouncer` for meaningful completion/failure milestones, or
+separate authored live status text when updates need to be announced. Do not
+announce every animation tick. Override value wording through
+`.accessibilityProperties(.init(valueDescription: "Half received"))` and hide
+pure decoration with `.accessibilityHidden()`.
+
+The existing Canvas and DOM browser adapters carry these semantics through WASI
+and native WebSocket. This describes source behavior; it does not claim a tagged
+release, actual screen-reader acceptance, or an interactive terminal reader.
 
 ### Choosing An Operable Adjustable Control
 

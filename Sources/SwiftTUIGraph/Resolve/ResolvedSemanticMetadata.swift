@@ -62,7 +62,10 @@ public struct SemanticMetadata: Equatable, Sendable {
   private var authoredAccessibility: AuthoredAccessibilityMetadata?
   package var accessibilityControl: AccessibilityControlState? {
     get { authoredAccessibility?.control }
-    set { authoredAccessibility = .init(title: accessibilityTitle, control: newValue) }
+    set {
+      authoredAccessibility = .init(
+        title: accessibilityTitle, control: newValue, valueLabel: accessibilityValueLabel)
+    }
   }
   public var accessibilityLabel: String?
   /// Authored label slots contribute names only to their nearest primitive owner.
@@ -88,7 +91,18 @@ public struct SemanticMetadata: Equatable, Sendable {
   /// A literal title remains available when a style omits its visual label slot.
   package var accessibilityTitle: String? {
     get { authoredAccessibility?.title }
-    set { authoredAccessibility = .init(title: newValue, control: accessibilityControl) }
+    set {
+      authoredAccessibility = .init(
+        title: newValue, control: accessibilityControl, valueLabel: accessibilityValueLabel)
+    }
+  }
+  /// Authored current-value content is separate from a control's name and style chrome.
+  package var accessibilityValueLabel: AccessibilityValueLabel? {
+    get { authoredAccessibility?.valueLabel }
+    set {
+      authoredAccessibility = .init(
+        title: accessibilityTitle, control: accessibilityControl, valueLabel: newValue)
+    }
   }
   public var accessibilityProperties: AccessibilityProperties? = nil
   public var accessibilityHint: String?
@@ -376,6 +390,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       usesAuthoredAccessibilityLabel || other.usesAuthoredAccessibilityLabel
     merged.accessibilityTitle = other.accessibilityTitle ?? accessibilityTitle
     merged.accessibilityControl = other.accessibilityControl ?? accessibilityControl
+    merged.accessibilityValueLabel = other.accessibilityValueLabel ?? accessibilityValueLabel
     merged.accessibilityProperties =
       if let base = accessibilityProperties,
         let override = other.accessibilityProperties
@@ -575,14 +590,23 @@ private func mergedInteractionAvailability(
 private final class AuthoredAccessibilityMetadata: Equatable, Sendable {
   let title: String?
   let control: AccessibilityControlState?
+  let valueLabel: AccessibilityValueLabel?
 
-  init?(title: String?, control: AccessibilityControlState?) {
-    guard title != nil || control != nil else { return nil }
+  init?(title: String?, control: AccessibilityControlState?, valueLabel: AccessibilityValueLabel?) {
+    guard title != nil || control != nil || valueLabel != nil else { return nil }
     self.title = title
     self.control = control
+    self.valueLabel = valueLabel
   }
 
   static func == (lhs: AuthoredAccessibilityMetadata, rhs: AuthoredAccessibilityMetadata) -> Bool {
-    lhs === rhs || (lhs.title == rhs.title && lhs.control == rhs.control)
+    lhs === rhs
+      || (lhs.title == rhs.title && lhs.control == rhs.control && lhs.valueLabel == rhs.valueLabel)
   }
+}
+
+/// The owner retains literal text when a style omits its captured value slot.
+package enum AccessibilityValueLabel: Equatable, Sendable {
+  case owner(fallback: String?)
+  case source(AccessibilityLabelSource)
 }

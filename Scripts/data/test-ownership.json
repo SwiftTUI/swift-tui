@@ -2234,6 +2234,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/ProgressAccessibilityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises styled progress semantics and retained run-loop updates across progress and spinner presentations."
+    },
     "Tests/SwiftTUITests/ProgressViewSurfaceTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."

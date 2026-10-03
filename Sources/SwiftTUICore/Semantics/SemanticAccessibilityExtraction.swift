@@ -51,20 +51,26 @@ private struct AuthoredAccessibilityLabelSummary {
 
   var text: [String] = []
   var source: Source?
+  var valueSource: Source?
 
   mutating func merge(_ other: Self) {
     text.append(contentsOf: other.text)
-    if source?.acceptsContinuation == true, let otherSource = other.source,
+    Self.mergeSource(&source, other.source)
+    Self.mergeSource(&valueSource, other.valueSource)
+  }
+
+  private static func mergeSource(_ source: inout Source?, _ otherSource: Source?) {
+    if source?.acceptsContinuation == true, let otherSource,
       otherSource.continuesPrevious
     {
       source?.text.append(contentsOf: otherSource.text)
       source?.acceptsContinuation = otherSource.acceptsContinuation
-    } else if source != nil, let otherSource = other.source, !otherSource.continuesPrevious {
+    } else if source != nil, let otherSource, !otherSource.continuesPrevious {
       // A repeated placement starts another slot. Ignore that entire slot,
       // including its later roots, rather than appending its continuation.
       source?.acceptsContinuation = false
     } else {
-      source = source ?? other.source
+      source = source ?? otherSource
     }
   }
 }
@@ -87,6 +93,7 @@ extension SemanticExtractor {
     var slotCandidateSummaries: [Int: AccessibilityVisualCandidateSummary] = [:]
     var labelSummaries: [Int: AuthoredAccessibilityLabelSummary] = [:]
     var authoredLabels: [Int: String] = [:]
+    var authoredValues: [Int: String] = [:]
     var emittedSubtrees: Set<Identity> = []
     var nextTraversalOrdinal = 0
     var stack:
@@ -118,13 +125,22 @@ extension SemanticExtractor {
         {
           labelSummary.text.insert(text, at: 0)
         }
+        if case .owner(let fallback) = metadata.accessibilityValueLabel {
+          authoredValues[traversalOrdinal] =
+            labelSummary.valueSource?.text.joined(separator: " ") ?? fallback
+        }
         // Nested controls and Label own their slots. Their chrome and sources
         // must not escape to an enclosing control's name.
         if metadata.usesAuthoredAccessibilityLabel || metadata.accessibilityLabel != nil {
           labelSummary.source = nil
+          labelSummary.valueSource = nil
         }
         if let source = metadata.accessibilityLabelSource {
           labelSummary.source = .init(
+            continuesPrevious: source == .continuation, text: labelSummary.text)
+        }
+        if case .source(let source) = metadata.accessibilityValueLabel {
+          labelSummary.valueSource = .init(
             continuesPrevious: source == .continuation, text: labelSummary.text)
         }
         if !frame.collectingLabel { labelSummary.text = [] }
@@ -204,13 +220,24 @@ extension SemanticExtractor {
           continue
         }
 
-        let collectingLabel =
-          frame.collectingLabel || node.semanticMetadata.accessibilityLabelSource != nil
         let metadata = node.semanticMetadata
+        let isValueSource: Bool
+        if case .source = metadata.accessibilityValueLabel {
+          isValueSource = true
+        } else {
+          isValueSource = false
+        }
+        let collectingLabel =
+          frame.collectingLabel || metadata.accessibilityLabelSource != nil || isValueSource
         // A nested primitive retains its own actions and name. Authored content
         // reopens reading inside a DisclosureGroup/Menu, while label slots and
         // the rest of a primitive's style remain represented by its owner.
-        let ownsControl = accessibilityOwnsControlPresentation(node)
+        // Read-only progress embedded in style chrome (including the circular
+        // progress style's Spinner) belongs to the containing primitive.
+        let ownsControl =
+          accessibilityOwnsControlPresentation(node)
+          && !(frame.textPresentation == .primitiveOwned
+            && metadata.accessibilityRole == .progressBar)
         let textPresentation: AccessibilityTextPresentation =
           metadata.isAccessibilityContent || ownsControl ? .independent : frame.textPresentation
         if textPresentation != .independent {
@@ -264,6 +291,7 @@ extension SemanticExtractor {
           inferredVisualRole:
             visualLabelRoutes.inferredRolesByTraversalOrdinal[traversalOrdinal],
           authoredLabel: authoredLabels[traversalOrdinal],
+          authoredValue: authoredValues[traversalOrdinal],
           textPresentation: textPresentations[traversalOrdinal] ?? .independent
         ) {
           nodes.append(accessibilityNode)
@@ -390,6 +418,7 @@ extension SemanticExtractor {
     textInputPresentations: [Identity: TextInputAccessibilityPresentation],
     inferredVisualRole: AccessibilityRole?,
     authoredLabel: String?,
+    authoredValue: String?,
     textPresentation: AccessibilityTextPresentation
   ) -> AccessibilityNode? {
     let selfIsRelevant = accessibilitySelfIsRelevant(
@@ -444,6 +473,10 @@ extension SemanticExtractor {
     result.textInput = role == .secureField ? nil : textInputPresentations[node.identity]?.textInput
     result.properties =
       suppressingPresentation ? nil : node.semanticMetadata.accessibilityProperties
+    if !suppressingPresentation, let authoredValue {
+      let valueProperties = AccessibilityProperties(valueDescription: authoredValue)
+      result.properties = result.properties.map { valueProperties.merging($0) } ?? valueProperties
+    }
     result.control = node.semanticMetadata.accessibilityControl
     result.isEnabled = node.environmentSnapshot.style.isEnabled
     if let owner = node.viewNodeID, result.control != nil {
