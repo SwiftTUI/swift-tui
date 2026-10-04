@@ -258,7 +258,7 @@ extension Rasterizer {
       sampleX: sampleX + max(0, width - 1) / 2,
       sampleY: sampleY
     )
-    let backgroundColor = backgroundMode.flatMap {
+    var backgroundColor = backgroundMode.flatMap {
       resolveColor(
         from: $0,
         bounds: bounds,
@@ -296,12 +296,53 @@ extension Rasterizer {
 
     var emphasis = style.emphasis
     if environment.renderingReduceMotion { emphasis.remove(.blink) }
+    let preferences = environment.accessibilityPreferences
+    let profile = preferences.colorProfile ?? .standard
+    if preferences.contrast == .increased || profile != .standard, opacity > 0 {
+      // The user-selected policy applies to explicit paints and gradients too.
+      // Inspect the composed pair, not the unblended authored color token.
+      let under = (currentCellBackground ?? environment.theme.background)
+        .composited(over: environment.theme.background)
+      var background = (backgroundColor ?? under).composited(over: under)
+        .accessibilityMapped(profile).accessibilityDisplayColor
+      var foreground = (foregroundColor ?? environment.theme.foreground)
+        .composited(over: background).accessibilityMapped(profile)
+      if environment.isEnabled {
+        let target = preferences.contrast == .increased ? 7.0 : 4.5
+        if max(Color.black.contrastRatio(to: background), Color.white.contrastRatio(to: background))
+          < target
+        {
+          // A middle-luminance background cannot support 7:1 with any text.
+          // This explicit enhanced-contrast override may change that background.
+          let textEndpoint: Color =
+            Color.black.contrastRatio(to: background)
+              >= Color.white.contrastRatio(to: background) ? .black : .white
+          background = background.accessibilityContrasting(with: textEndpoint, target: target)
+        }
+        foreground = foreground.accessibilityContrasting(with: background, target: target)
+        emphasis.remove(.faint)
+      }
+      foregroundColor = foreground.converted(to: .sRGB, gamutMapping: .clip)
+      backgroundColor = background.converted(to: .sRGB, gamutMapping: .clip)
+    }
+    func decoration(_ line: TextLineStyle?) -> TextLineStyle? {
+      guard var line, let color = line.color,
+        preferences.contrast == .increased || profile != .standard, opacity > 0
+      else { return line }
+      let background = backgroundColor ?? environment.theme.background
+      let mapped = color.composited(over: background).accessibilityMapped(profile)
+      line.color =
+        environment.isEnabled
+        ? mapped.accessibilityContrasting(with: background, target: 3)
+        : mapped.accessibilityDisplayColor
+      return line
+    }
     return ResolvedTextStyle(
       foregroundColor: foregroundColor,
       backgroundColor: backgroundColor,
       emphasis: emphasis,
-      underlineStyle: style.underlineStyle,
-      strikethroughStyle: style.strikethroughStyle,
+      underlineStyle: decoration(style.underlineStyle),
+      strikethroughStyle: decoration(style.strikethroughStyle),
       // Reset opacity to 1 after baking so presentation doesn't also
       // emit the SGR "faint" attribute on top of the blended color.
       opacity: bakeOpacityIntoForeground ? 1.0 : opacity
@@ -337,6 +378,13 @@ extension Rasterizer {
   ) -> ResolvedShapeColorMode {
     guard depth < 8 else {
       return .constant(nil)
+    }
+
+    let profile = environment.accessibilityPreferences.colorProfile ?? .standard
+    if depth == 0, profile != .standard {
+      let authored = resolvedColorMode(
+        from: style, environment: environment, bounds: bounds, depth: 1)
+      return applyingColorProfile(profile, to: authored)
     }
 
     switch style {
@@ -449,6 +497,8 @@ extension Rasterizer {
         depth: depth + 1
       )
       switch innerMode {
+      case .accessibility(let inner, let profile):
+        return .accessibility(applyingOpacity(amount, to: inner), profile)
       case .constant(let color):
         guard let color else { return .constant(nil) }
         return .constant(color.opacity(amount))
@@ -511,6 +561,9 @@ extension Rasterizer {
     sampleY: Int
   ) -> Color? {
     switch mode {
+    case .accessibility(let inner, let profile):
+      return resolveColor(from: inner, bounds: bounds, sampleX: sampleX, sampleY: sampleY)?
+        .accessibilityMapped(profile)
     case .constant(let color):
       return color
     case .sampled(let gradient):
@@ -563,7 +616,9 @@ extension Rasterizer {
     _ tile: ResolvedTileColorMode,
     bounds: CellRect,
     sampleX: Int,
-    sampleY: Int
+    sampleY: Int,
+    environment: StyleEnvironmentSnapshot,
+    currentBackground: Color?
   ) -> ResolvedTextStyle? {
     let fg = resolveColor(
       from: tile.foreground,
@@ -579,10 +634,11 @@ extension Rasterizer {
         sampleY: sampleY
       )
     }
-    let resolved = ResolvedTextStyle(
-      foregroundColor: fg,
-      backgroundColor: bg
-    )
+    let resolved = accessibilityGraphicStyle(
+      ResolvedTextStyle(
+        foregroundColor: fg,
+        backgroundColor: bg
+      ), environment: environment, currentBackground: currentBackground)
     return resolved.isDefault ? nil : resolved
   }
 
@@ -608,6 +664,8 @@ extension Rasterizer {
     to mode: ResolvedShapeColorMode
   ) -> ResolvedShapeColorMode {
     switch mode {
+    case .accessibility(let inner, let profile):
+      return .accessibility(applyingOpacity(amount, to: inner), profile)
     case .constant(let color):
       return .constant(color?.opacity(amount))
     case .sampled(let gradient):
@@ -657,6 +715,59 @@ extension Rasterizer {
           background: tile.background.map { applyingOpacity(amount, to: $0) }
         ))
     }
+  }
+
+  private func applyingColorProfile(
+    _ profile: AccessibilityColorProfile, to mode: ResolvedShapeColorMode
+  ) -> ResolvedShapeColorMode {
+    switch mode {
+    case .constant(let color):
+      return .constant(color?.accessibilityMapped(profile))
+    case .tile(let tile):
+      // Keep the tile at the outer level so its redundant glyph pattern is
+      // preserved by the shape painter, including nested/gradient paints.
+      return .tile(
+        .init(
+          pattern: tile.pattern,
+          foreground: applyingColorProfile(profile, to: tile.foreground),
+          background: tile.background.map { applyingColorProfile(profile, to: $0) }))
+    case .sampled, .sampledRadial, .sampledAngular, .sampledMesh, .accessibility:
+      return .accessibility(mode, profile)
+    }
+  }
+
+  /// Essential graphic glyphs use a 3:1 pair target. This cannot infer the
+  /// meaning of neighboring colors, arbitrary blend effects, or image bytes.
+  internal func accessibilityGraphicStyle(
+    _ style: ResolvedTextStyle, environment: StyleEnvironmentSnapshot,
+    currentBackground: Color?, target: Double = 3
+  ) -> ResolvedTextStyle {
+    let preferences = environment.accessibilityPreferences
+    let profile = preferences.colorProfile ?? .standard
+    guard preferences.contrast == .increased || profile != .standard,
+      (style.foregroundColor?.alpha ?? 1) > 0
+    else { return style }
+    let under = (currentBackground ?? environment.theme.background)
+      .composited(over: environment.theme.background)
+    var background = (style.backgroundColor ?? under).composited(over: under)
+      .accessibilityMapped(profile).accessibilityDisplayColor
+    var foreground = (style.foregroundColor ?? environment.theme.foreground)
+      .composited(over: background).accessibilityMapped(profile)
+    if environment.isEnabled {
+      if max(Color.black.contrastRatio(to: background), Color.white.contrastRatio(to: background))
+        < target
+      {
+        let endpoint: Color =
+          Color.black.contrastRatio(to: background) >= Color.white.contrastRatio(to: background)
+          ? .black : .white
+        background = background.accessibilityContrasting(with: endpoint, target: target)
+      }
+      foreground = foreground.accessibilityContrasting(with: background, target: target)
+    }
+    var result = style
+    result.foregroundColor = foreground.accessibilityDisplayColor
+    result.backgroundColor = background
+    return result
   }
 
   internal func semanticStyleCandidate(

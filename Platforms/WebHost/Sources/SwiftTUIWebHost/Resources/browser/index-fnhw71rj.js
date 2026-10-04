@@ -3884,6 +3884,7 @@ class DomFocusPresentation {
   ring = document.createElement("div");
   caret = document.createElement("div");
   hasFocus = false;
+  presentation;
   constructor(terminal, selecting) {
     this.terminal = terminal;
     this.selecting = selecting;
@@ -3921,12 +3922,21 @@ class DomFocusPresentation {
     terminal.addEventListener("focusout", this.refresh);
   }
   refresh = () => {
+    if (this.presentation)
+      this.paintFocus();
     this.element.hidden = !this.hasFocus || this.selecting() || !this.terminal.contains?.(document.activeElement);
     this.element.style.display = this.element.hidden ? "none" : "block";
   };
   present(frame, metrics, offsetX = 0, offsetY = 0) {
-    const focused = frame?.accessibilityTree?.find((node) => node.isFocused && !node.hidden);
-    this.hasFocus = focused !== undefined && focused.isEnabled !== false;
+    this.presentation = { frame, metrics, offsetX, offsetY };
+    this.refresh();
+  }
+  paintFocus() {
+    const { frame, metrics, offsetX, offsetY } = this.presentation;
+    const active = document.activeElement?.closest("[data-accessibility-id]");
+    const activeID = active && this.terminal.contains(active) ? active.dataset.accessibilityId : undefined;
+    const focused = frame?.accessibilityTree?.find((node) => !node.hidden && (activeID ? node.id === activeID : node.isFocused));
+    this.hasFocus = focused !== undefined;
     this.element.style.left = `${offsetX}px`;
     this.element.style.top = `${offsetY}px`;
     this.element.style.width = `${metrics.columns * metrics.cellWidth}px`;
@@ -3934,7 +3944,9 @@ class DomFocusPresentation {
     this.element.style.overflow = "hidden";
     if (focused) {
       const [x, y, width, height] = focused.rect;
-      const color = globalThis.matchMedia?.("(forced-colors: active)").matches ? "CanvasText" : metrics.style.theme.foreground;
+      const forced = globalThis.matchMedia?.("(forced-colors: active)").matches;
+      const color = forced ? "CanvasText" : focusColor(metrics.style.theme.background);
+      const companionColor = forced ? "Canvas" : color === "#000000" ? "#ffffff" : "#000000";
       Object.assign(this.ring.style, {
         left: `${x * metrics.cellWidth}px`,
         top: `${y * metrics.cellHeight}px`,
@@ -3942,10 +3954,11 @@ class DomFocusPresentation {
         height: `${Math.max(1, height) * metrics.cellHeight}px`,
         outline: `2px solid ${color}`,
         outlineOffset: "-2px",
+        boxShadow: `inset 0 0 0 4px ${companionColor}`,
         forcedColorAdjust: "none"
       });
       const anchor = focused.cursorAnchor;
-      this.caret.hidden = !anchor || !["textField", "textEditor", "secureField"].includes(focused.role);
+      this.caret.hidden = !anchor || !focused.isFocused || focused.isEnabled === false || !["textField", "textEditor", "secureField"].includes(focused.role);
       this.caret.style.display = this.caret.hidden ? "none" : "block";
       if (anchor)
         Object.assign(this.caret.style, {
@@ -3954,17 +3967,26 @@ class DomFocusPresentation {
           width: "2px",
           height: `${metrics.cellHeight}px`,
           background: color,
+          boxShadow: `1px 0 0 ${companionColor}`,
           forcedColorAdjust: "none"
         });
     }
-    this.refresh();
   }
   dispose() {
     this.terminal.removeEventListener("focusin", this.refresh);
     this.terminal.removeEventListener("focusout", this.refresh);
     this.hasFocus = false;
+    this.presentation = undefined;
     this.element.remove();
   }
+}
+function focusColor(background) {
+  const hex = background.match(/^#([\da-f]{6})/i)?.[1];
+  if (!hex)
+    return "#ffffff";
+  const channels = [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? "#000000" : "#ffffff";
 }
 
 // src/DomTextSpacing.ts
@@ -6311,8 +6333,7 @@ class WebHostSceneRuntime {
     }, this.onOpenHyperlink);
     this.chrome.append(this.accessibilityTree.navigationElement);
     this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
-    if (this.domSurfaceRoot)
-      this.domFocus = new DomFocusPresentation(this.terminalMount, () => this.nativePointerGesture || this.hasSurfaceSelection());
+    this.domFocus = new DomFocusPresentation(this.terminalMount, () => this.nativePointerGesture || this.hasSurfaceSelection());
     if (this.domSurfaceRoot) {
       this.domGeometry = new DomGeometryController(this.terminalMount);
       this.paintScheduler.setHeld(true);

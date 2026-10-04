@@ -229,21 +229,23 @@ extension Rasterizer {
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
-    let resolvedStyle = ResolvedTextStyle(
-      foregroundColor: resolveColor(
-        from: foregroundColorMode,
-        bounds: bounds,
-        sampleX: x,
-        sampleY: y
-      ),
-      backgroundColor: resolvedStrokeBackgroundColor(
-        explicitBackgroundStyle: backgroundStyle,
-        environment: environment,
-        bounds: bounds,
-        x: x,
-        y: y
-      )
-    )
+    let resolvedStyle = accessibilityGraphicStyle(
+      ResolvedTextStyle(
+        foregroundColor: resolveColor(
+          from: foregroundColorMode,
+          bounds: bounds,
+          sampleX: x,
+          sampleY: y
+        ),
+        backgroundColor: resolvedStrokeBackgroundColor(
+          explicitBackgroundStyle: backgroundStyle,
+          environment: environment,
+          bounds: bounds,
+          x: x,
+          y: y
+        )
+      ), environment: environment,
+      currentBackground: currentCellBackground(cells: cells, x: x, y: y))
     write(
       character,
       style: resolvedStyle.isDefault ? nil : resolvedStyle,

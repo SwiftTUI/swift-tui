@@ -295,7 +295,9 @@ extension TerminalCapabilityProfile {
   ///     sequences. Wins regardless of TTY status.
   ///   - `.always`: forces `colorLevel` to at least `.ansi16` even when
   ///     the detected profile disables color, such as for a non-TTY output.
-  ///   - `.auto`: does not override the detected level.
+  ///   - `.auto`: preserves the detected level, except explicit accessibility
+  ///     contrast/color-profile requests on ANSI palettes use terminal-default
+  ///     text colors while retaining emphasis. `.always` opts into approximation.
   /// - `RuntimeConfiguration.glyphs`:
   ///   - `.ascii`: forces `glyphLevel = .ascii`.
   ///   - `.unicode`: does not override the detected level. Unicode is the strict superset. If
@@ -317,7 +319,17 @@ extension TerminalCapabilityProfile {
         result.emitsStyleEscapeSequences = true
       }
     case .auto:
-      break
+      let preferences = configuration.accessibilityPreferences
+      if result.colorLevel == .ansi16 || result.colorLevel == .ansi256,
+        preferences.contrast == .increased
+          || (preferences.colorProfile ?? .standard) != .standard
+      {
+        // An ANSI palette may be user-redefined; quantization cannot promise
+        // the requested numerical pairs. Use the terminal's own text colors,
+        // keeping emphasis/reverse-video focus cues. Explicit .always opts
+        // into approximate palette colors; .never still disables all styling.
+        result.colorLevel = .none
+      }
     }
     switch configuration.glyphs {
     case .ascii:

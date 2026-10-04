@@ -128,6 +128,7 @@ extension Rasterizer {
         foreground: cellForeground,
         background: resolvedBorderSideColor(
           mode(backgroundModes, for: side), bounds: outer, x: x, y: y),
+        environment: environment,
         atX: x,
         y: y,
         cells: &cells,
@@ -227,6 +228,7 @@ extension Rasterizer {
     width: Int,
     foreground: Color?,
     background: Color?,
+    environment: StyleEnvironmentSnapshot,
     atX x: Int,
     y: Int,
     cells: inout [[RasterCell]],
@@ -239,6 +241,9 @@ extension Rasterizer {
     var resolved = ResolvedTextStyle()
     resolved.foregroundColor = foreground
     resolved.backgroundColor = background
+    resolved = accessibilityGraphicStyle(
+      resolved, environment: environment,
+      currentBackground: currentCellBackground(cells: cells, x: x, y: y))
     write(
       character,
       width: max(1, width),

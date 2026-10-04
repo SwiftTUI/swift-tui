@@ -629,3 +629,37 @@ then host detection. An explicit `false` or standard profile remains an override
 `nil` inherits. Browser preferences can change live, including while a scene is
 retained. Terminal environment variables are startup choices. Preferences express
 user intent; labels, patterns and control behavior still need to honor that intent.
+
+### Color and contrast
+
+The standard profile preserves authored colors. Monochrome uses encoded relative
+luminance, including gradients and tile paints. Protanopia/deuteranopia profiles
+use a blue/orange semantic vocabulary; tritanopia uses red/cyan distinctions.
+Explicit paints map to the selected palette, with neutral colors retaining their
+lightness. These choices are palette adaptations, not a simulation of a person's
+vision or a guarantee that categories remain distinguishable by hue.
+
+For a selected color profile, enabled raster text is adjusted against its composed
+background to target 4.5:1. Increased contrast targets 7:1 and may also change a
+mid-luminance background that cannot support that ratio. Adjustments measure
+eight-bit sRGB output, including authored alpha and text opacity. Stroke, tile,
+Braille and decoration pairs target 3:1; direct Canvas text cells target 4.5:1.
+Inactive controls are exempt from contrast adjustment, and invisible content
+remains invisible. The resulting raster is shared by browser and terminal hosts.
+
+Color cannot supply meaning alone: retain labels, selected/checked glyphs,
+patterns, data alternatives and useful focus indicators. Raster image bytes are
+not recolored; provide a description or structured data alternative for an image
+that carries information. Applications must audit neighboring graphic colors,
+custom blend effects, image content and external CSS separately. Numerical pair
+targets are not whole-application WCAG conformance.
+
+Terminal `capabilityProfile.colorLevel` exposes the detected color repertoire.
+With an explicit runtime color-profile/increased-contrast request, automatic
+color mode falls back to the terminal's own text colors on ANSI-16/256 hosts,
+retaining emphasis and reverse-video focus cues. `--color always` opts into
+approximate palette colors; `--color never` suppresses all styling. True-color
+terminals retain the adjusted RGB pairs. Remote/client palette customization and
+live desktop preferences still require checking the actual terminal; a local
+fallback cannot measure an emulator's user-defined palette. Browser companions
+provide a separate true-color presentation of the same state.

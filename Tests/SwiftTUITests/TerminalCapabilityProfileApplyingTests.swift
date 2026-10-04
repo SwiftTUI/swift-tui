@@ -4,6 +4,24 @@ import Testing
 
 @Suite
 struct TerminalCapabilityProfileApplyingTests {
+  @Test("accessibility colors fall back on limited palettes while preserving focus emphasis")
+  func accessibilityPaletteFallback() {
+    var configuration = RuntimeConfiguration()
+    configuration.accessibilityPreferences.contrast = .increased
+    for profile in [TerminalCapabilityProfile.ansi16, .ansi256] {
+      let fallback = profile.applying(configuration)
+      #expect(fallback.colorLevel == .none)
+      #expect(fallback.emitsStyleEscapeSequences)
+      var forced = configuration
+      forced.color = .always
+      #expect(profile.applying(forced).colorLevel == profile.colorLevel)
+    }
+    #expect(TerminalCapabilityProfile.trueColor.applying(configuration).colorLevel == .trueColor)
+    configuration.accessibilityPreferences.contrast = .standard
+    configuration.accessibilityPreferences.colorProfile = .monochrome
+    #expect(TerminalCapabilityProfile.ansi16.applying(configuration).colorLevel == .none)
+  }
+
   @Test("color=.never forces colorLevel=.none and emitsStyleEscapeSequences=false")
   func colorNeverDisablesEverything() {
     let profile = TerminalCapabilityProfile.trueColor

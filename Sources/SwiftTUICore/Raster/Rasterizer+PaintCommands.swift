@@ -115,7 +115,7 @@ extension Rasterizer {
       constantColor = color
       isTranslucent = (color?.alpha ?? 0) < 1
       tileStyle = nil
-    case .sampled, .sampledRadial, .sampledAngular, .sampledMesh:
+    case .sampled, .sampledRadial, .sampledAngular, .sampledMesh, .accessibility:
       constantColor = nil
       // Sampled (gradient) fills may have per-stop alpha.
       isTranslucent = false
@@ -190,7 +190,9 @@ extension Rasterizer {
               tileStyle,
               bounds: shapeBounds,
               sampleX: x,
-              sampleY: y
+              sampleY: y,
+              environment: environment,
+              currentBackground: currentCellBackground(cells: cells, x: x, y: y)
             ),
             atX: x,
             y: y,
@@ -608,10 +610,14 @@ extension Rasterizer {
         guard let cell = context.directCells[cellY][cellX] else {
           continue
         }
-        let cellStyle = ResolvedTextStyle(
-          foregroundColor: cell.foreground?.opacity(payload.opacity),
-          backgroundColor: cell.background?.opacity(payload.opacity)
-        )
+        let cellStyle = accessibilityGraphicStyle(
+          ResolvedTextStyle(
+            foregroundColor: cell.foreground?.opacity(payload.opacity),
+            backgroundColor: cell.background?.opacity(payload.opacity)
+          ), environment: environment,
+          currentBackground: currentCellBackground(
+            cells: cells, x: originX + cellX, y: originY + cellY),
+          target: environment.accessibilityPreferences.contrast == .increased ? 7 : 4.5)
         write(
           cell.character,
           style: cellStyle.isDefault ? nil : cellStyle,
@@ -650,6 +656,10 @@ extension Rasterizer {
         var resolvedStyle = context.gridCellStyles[cellY][cellX] ?? fallbackStyle
         resolvedStyle.foregroundColor = resolvedStyle.foregroundColor?.opacity(payload.opacity)
         resolvedStyle.backgroundColor = resolvedStyle.backgroundColor?.opacity(payload.opacity)
+        resolvedStyle = accessibilityGraphicStyle(
+          resolvedStyle, environment: environment,
+          currentBackground: currentCellBackground(
+            cells: cells, x: originX + cellX, y: originY + cellY))
         let styleToWrite: ResolvedTextStyle? =
           resolvedStyle.isDefault ? nil : resolvedStyle
         write(
@@ -823,12 +833,14 @@ extension Rasterizer {
           sampleX: targetX,
           sampleY: targetY
         )
-        let resolved = ResolvedTextStyle(
-          foregroundColor: foregroundColor,
-          backgroundColor: backgroundMode.flatMap {
-            resolveColor(from: $0, bounds: shapeBounds, sampleX: targetX, sampleY: targetY)
-          }
-        )
+        let resolved = accessibilityGraphicStyle(
+          ResolvedTextStyle(
+            foregroundColor: foregroundColor,
+            backgroundColor: backgroundMode.flatMap {
+              resolveColor(from: $0, bounds: shapeBounds, sampleX: targetX, sampleY: targetY)
+            }
+          ), environment: environment,
+          currentBackground: currentCellBackground(cells: cells, x: targetX, y: targetY))
         write(
           cell.glyph,
           style: resolved.isDefault ? nil : resolved,

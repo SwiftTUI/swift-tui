@@ -157,6 +157,147 @@ public struct Theme: Equatable, Sendable, Codable {
   }
 }
 
+extension Theme {
+  /// Resolves the closed semantic palette for the selected user preferences.
+  /// Explicit author paints are handled after compositing by the raster policy.
+  package func applyingAccessibilityPreferences(_ preferences: AccessibilityPreferences) -> Theme {
+    let profile = preferences.colorProfile ?? .standard
+    guard profile != .standard || preferences.contrast == .increased else { return self }
+    var result = self
+    switch profile {
+    case .standard:
+      break
+    case .monochrome:
+      for role in SemanticStyleRole.allCases {
+        result.setColor(color(for: role).accessibilityMonochrome, for: role)
+      }
+    case .protanopia, .deuteranopia:
+      // Okabe–Ito's blue/orange/sky-blue/purple vocabulary avoids the default
+      // success-green / danger-red opposition. Meaning still needs a label.
+      result.tint = Color(hexRGB: 0x0072B2)
+      result.link = Color(hexRGB: 0x0072B2)
+      result.success = Color(hexRGB: 0x56B4E9)
+      result.warning = Color(hexRGB: 0xE69F00)
+      result.danger = Color(hexRGB: 0xD55E00)
+      result.info = Color(hexRGB: 0xCC79A7)
+    case .tritanopia:
+      // A red/cyan vocabulary avoids relying on a blue/yellow opposition.
+      result.tint = Color(hexRGB: 0x009E73)
+      result.link = Color(hexRGB: 0x009E73)
+      result.success = Color(hexRGB: 0x56B4E9)
+      result.warning = Color(hexRGB: 0xCC79A7)
+      result.danger = Color(hexRGB: 0xD55E00)
+      result.info = Color(hexRGB: 0x009E73)
+    }
+    if preferences.contrast == .increased {
+      let dark = background.relativeLuminance < 0.5
+      result.background = dark ? .black : .white
+      result.windowBackground = result.background
+      result.foreground = dark ? .white : .black
+      result.fill = result.background
+      result.selection = result.foreground
+      result.separator = result.foreground
+      result.placeholder = result.foreground
+      result.muted = result.foreground
+    }
+    return result
+  }
+
+  private mutating func setColor(_ color: Color, for role: SemanticStyleRole) {
+    switch role {
+    case .foreground: foreground = color
+    case .background: background = color
+    case .tint: tint = color
+    case .separator: separator = color
+    case .selection: selection = color
+    case .placeholder: placeholder = color
+    case .link: link = color
+    case .fill: fill = color
+    case .windowBackground: windowBackground = color
+    case .success: success = color
+    case .warning: warning = color
+    case .danger: danger = color
+    case .info: info = color
+    case .muted: muted = color
+    }
+  }
+}
+
+extension Color {
+  package func accessibilityMapped(_ profile: AccessibilityColorProfile) -> Color {
+    guard profile != .standard else { return self }
+    if profile == .monochrome { return accessibilityMonochrome }
+    let rgb = converted(to: .sRGB, gamutMapping: .clip)
+    // Neutral colors retain their lightness rather than acquiring a tint.
+    guard max(rgb.red, rgb.green, rgb.blue) - min(rgb.red, rgb.green, rgb.blue) > 0.08
+    else { return rgb }
+    let palette: [UInt32] =
+      profile == .tritanopia
+      ? [0x009E73, 0x56B4E9, 0xCC79A7, 0xD55E00]
+      : [0xE69F00, 0x56B4E9, 0x009E73, 0xF0E442, 0x0072B2, 0xD55E00, 0xCC79A7]
+    var best = rgb
+    var distance = Double.infinity
+    for hex in palette {
+      let candidate = Color(hexRGB: hex, alpha: alpha)
+      let dr = candidate.red - rgb.red
+      let dg = candidate.green - rgb.green
+      let db = candidate.blue - rgb.blue
+      let current = dr * dr + dg * dg + db * db
+      if current < distance {
+        best = candidate
+        distance = current
+      }
+    }
+    return best
+  }
+
+  /// Blend toward the better black/white endpoint, measuring the exported
+  /// eight-bit pair at every step. Call only on the final opaque pair.
+  package func accessibilityContrasting(with background: Color, target: Double) -> Color {
+    let background = background.accessibilityDisplayColor
+    let source = accessibilityDisplayColor
+    if source.contrastRatio(to: background) >= target { return source }
+    let endpoint: Color =
+      Color.black.contrastRatio(to: background)
+        >= Color.white.contrastRatio(to: background) ? .black : .white
+    guard endpoint.contrastRatio(to: background) >= target else { return endpoint }
+    var low = 0.0
+    var high = 1.0
+    for _ in 0..<20 {
+      let middle = (low + high) / 2
+      if source.mixed(with: endpoint, amount: middle).accessibilityDisplayColor
+        .contrastRatio(to: background) >= target
+      {
+        high = middle
+      } else {
+        low = middle
+      }
+    }
+    return source.mixed(with: endpoint, amount: high).accessibilityDisplayColor
+  }
+
+  package var accessibilityDisplayColor: Color {
+    let rgb = converted(to: .sRGB, gamutMapping: .clip)
+    func channel(_ value: Double) -> Double {
+      let byte = (value * 255).rounded()
+      // Terminal SGR truncates while browser hex rounds. Keep both exporters
+      // on the same byte despite division's floating-point representation.
+      return byte == 0 || byte == 255 ? byte / 255 : (byte / 255).nextUp
+    }
+    return Color(
+      red: channel(rgb.red),
+      green: channel(rgb.green),
+      blue: channel(rgb.blue),
+      alpha: rgb.alpha)
+  }
+
+  package var accessibilityMonochrome: Color {
+    // Encode linear relative luminance back to sRGB before constructing a
+    // display color; assigning linear Y to encoded RGB would darken the image.
+    Color(white: TransferFunction.sRGB.encode(relativeLuminance), alpha: alpha)
+  }
+}
+
 /// The host-owned styling payload that pairs terminal appearance metadata with
 /// an optional semantic theme override.
 public struct TerminalRenderStyle: Equatable, Sendable, Codable {
@@ -277,7 +418,9 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
   /// synthesized from `appearance`. Resolve paints through
   /// `Theme.style(for:)` or `resolvedStyle(for:)` rather than naming literal
   /// colors, so a style follows whatever palette is in effect.
-  public var theme: Theme { heavyFields.theme }
+  public var theme: Theme {
+    heavyFields.theme.applyingAccessibilityPreferences(accessibilityPreferences)
+  }
   /// The ambient foreground paint at the styled view, or `nil` when the app
   /// set none.
   ///
