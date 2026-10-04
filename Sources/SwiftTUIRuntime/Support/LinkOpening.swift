@@ -14,6 +14,7 @@ package func systemOpenLinkAction() -> OpenLinkAction {
   OpenLinkAction(
     snapshotLabel: "OpenLinkAction.systemDefault",
     isPlaceholder: false,
+    usesHostDefault: true,
     handler: openLinkInSystem
   )
 }

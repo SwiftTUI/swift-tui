@@ -95,7 +95,8 @@ private struct AccessibilityAuthoredActionModifier: IterativePrimitiveViewModifi
       node.semanticMetadata.accessibilityControl = .init(
         actions: actions, value: previous?.value, minimum: previous?.minimum,
         maximum: previous?.maximum, step: previous?.step, selection: previous?.selection,
-        customActions: names)
+        customActions: names,
+        opensLink: kinds.contains(.activate) ? false : previous?.opensLink ?? false)
       node.semanticMetadata.isFocusable = true
       if node.semanticMetadata.accessibilityRole == nil {
         node.semanticMetadata.accessibilityRole = kinds.contains(.increment) ? .stepper : .button
@@ -140,7 +141,8 @@ private struct AccessibilityNumericValueModifier: IterativePrimitiveViewModifier
       node.semanticMetadata.accessibilityControl = .init(
         actions: previous?.actions ?? [], value: .number(value),
         minimum: bounds.lowerBound, maximum: bounds.upperBound, step: step,
-        selection: previous?.selection, customActions: previous?.customActions ?? [])
+        selection: previous?.selection, customActions: previous?.customActions ?? [],
+        opensLink: previous?.opensLink ?? false)
       if let description {
         let properties = AccessibilityProperties(valueDescription: description)
         node.semanticMetadata.accessibilityProperties =

@@ -34,7 +34,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIAndroidHost` | 16 | 44 |
 | `SwiftTUICore` | 40 | 273 |
 | `SwiftTUIPrimitives` | 172 | 1518 |
-| `SwiftTUIGraph` | 74 | 481 |
+| `SwiftTUIGraph` | 74 | 482 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -962,7 +962,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `AccessibilityActionRequest` — struct — 4 members
 - `AccessibilityActionResponse` — struct — 4 members
 - `AccessibilityActionResult` — enum — 7 members
-- `AccessibilityControlState` — class — 9 members
+- `AccessibilityControlState` — class — 10 members
 - `AccessibilitySelection` — struct — 3 members
 - `AccessibilitySelectionOption` — struct — 4 members
 - `AccessibilitySelectionPresentation` — enum — 5 members

@@ -1137,6 +1137,7 @@ struct CustomAccessibilityActionTests {
     let link = try #require(
       loop.latestSemanticSnapshot.accessibilityNodes.first { $0.role == .link })
     let target = try #require(link.actionTarget)
+    #expect(link.control?.opensLink == false)
     #expect(loop.handleAccessibilityAction(.init(target: target, action: .activate)) == .accepted)
     #expect(calls.value == 1)
   }

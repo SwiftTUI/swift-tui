@@ -61,6 +61,15 @@ struct StyledControlAccessibilityTests {
     #expect(link?.hint == "Opens documentation")
     #expect(link?.control?.value == .text("https://example.com/guide"))
     #expect(link?.control?.actions == [.focus, .activate])
+    #expect(link?.control?.opensLink == true)
+    let overridden = render(
+      Link("Guide", destination: "https://example.com/guide")
+        .accessibilityAction {})
+    #expect(overridden.accessibilityNodes.first { $0.role == .link }?.control?.opensLink == false)
+    let custom = render(
+      Link("Guide", destination: "https://example.com/guide")
+        .openLinkAction(OpenLinkAction { _ in true }))
+    #expect(custom.accessibilityNodes.first { $0.role == .link }?.control?.opensLink == false)
     let plain = render(
       Text("Title").accessibilityRole(.heading(level: 4))
         .accessibilityRemoveTraits(.isHeader))
@@ -86,6 +95,7 @@ struct StyledControlAccessibilityTests {
         "Read ", "Guide", " and ", "API", " next.",
       ])
     let links = snapshot.accessibilityNodes.filter { $0.role == .link }
+    #expect(links.allSatisfy { $0.control?.opensLink == true })
     #expect(
       links.map { $0.control?.value } == [
         .text("https://example.com/guide"), .text("https://example.com/api"),

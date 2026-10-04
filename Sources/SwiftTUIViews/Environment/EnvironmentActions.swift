@@ -62,6 +62,7 @@ private enum RequestTerminationActionKey: EnvironmentKey, FrameworkEnvironmentKe
 public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   package let isPlaceholder: Bool
+  package let usesHostDefault: Bool
   package let authoringContext: ImperativeAuthoringContextSnapshot?
   private let handler: @MainActor @Sendable (LinkDestination) -> Bool
 
@@ -72,6 +73,7 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
     let authoringContext = currentImperativeAuthoringContextSnapshot()
     snapshotLabel = "OpenLinkAction.custom"
     isPlaceholder = false
+    usesHostDefault = false
     self.authoringContext = authoringContext
     self.handler = { destination in
       withImperativeAuthoringContext(authoringContext) {
@@ -99,11 +101,13 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
   package init(
     snapshotLabel: String,
     isPlaceholder: Bool,
+    usesHostDefault: Bool = false,
     authoringContext: ImperativeAuthoringContextSnapshot? = nil,
     handler: @escaping @MainActor @Sendable (LinkDestination) -> Bool
   ) {
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
+    self.usesHostDefault = usesHostDefault
     self.authoringContext = authoringContext
     self.handler = handler
   }
@@ -111,6 +115,7 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
   package static let placeholder = Self(
     snapshotLabel: "OpenLinkAction.default",
     isPlaceholder: true,
+    usesHostDefault: true,
     handler: { _ in false }
   )
 }

@@ -207,8 +207,10 @@ traits have no implied implementation.
 separately from its name. Rich prose exposes text and links once in authored
 order; a link inside a control's label remains part of that control's name.
 The browser uses a
-native anchor for safe HTTP, HTTPS, mail and telephone destinations; activation
-still invokes the Swift `OpenLinkAction` once. Other schemes retain the typed
+native anchor for safe HTTP, HTTPS, mail and telephone destinations. Default
+links open in the browser (or its configured host link callback); a custom Swift
+`OpenLinkAction` or `accessibilityAction` instead receives activation once.
+Other schemes retain the typed
 application action without an executable browser URL.
 
 `LabeledContent` publishes a named group with its text value, excluding style

@@ -34,6 +34,7 @@ public struct RichTextRun: Equatable, Sendable {
   public var style: TextStyle
   public var destination: LinkDestination?
   package var linkIdentifier: String?
+  package var opensLinkInHost = false
 
   public init(
     text: String,

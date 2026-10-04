@@ -347,12 +347,12 @@ extension SemanticExtractor {
       case .richText(let payload) = node.drawPayload,
       payload.runs.contains(where: { $0.linkIdentifier != nil })
     else { return [] }
-    var segments: [(id: String?, destination: LinkDestination?, text: String)] = []
+    var segments: [(id: String?, destination: LinkDestination?, text: String, opensLink: Bool)] = []
     for run in payload.runs {
       if let last = segments.indices.last, segments[last].id == run.linkIdentifier {
         segments[last].text += run.text
       } else {
-        segments.append((run.linkIdentifier, run.destination, run.text))
+        segments.append((run.linkIdentifier, run.destination, run.text, run.opensLinkInHost))
       }
     }
     return segments.enumerated().compactMap { index, segment -> AccessibilityNode? in
@@ -372,7 +372,9 @@ extension SemanticExtractor {
           readOnly: parent.properties?.readOnly, language: parent.properties?.language)
       }
       if let destination = segment.destination, segment.id != nil {
-        child.control = .init(actions: [.focus, .activate], value: .text(destination.rawValue))
+        child.control = .init(
+          actions: [.focus, .activate], value: .text(destination.rawValue),
+          opensLink: segment.opensLink)
         if let owner = node.viewNodeID {
           child.actionTarget = "\(owner.rawValue):\(identity.path)"
           child.actionIdentity = identity

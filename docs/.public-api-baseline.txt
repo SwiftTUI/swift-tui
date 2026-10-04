@@ -445,9 +445,10 @@ SwiftTUIGraph.AccessibilityControlState
 SwiftTUIGraph.AccessibilityControlState.==(_:_:)
 SwiftTUIGraph.AccessibilityControlState.actions
 SwiftTUIGraph.AccessibilityControlState.customActions
-SwiftTUIGraph.AccessibilityControlState.init(actions:value:minimum:maximum:step:selection:customActions:)
+SwiftTUIGraph.AccessibilityControlState.init(actions:value:minimum:maximum:step:selection:customActions:opensLink:)
 SwiftTUIGraph.AccessibilityControlState.maximum
 SwiftTUIGraph.AccessibilityControlState.minimum
+SwiftTUIGraph.AccessibilityControlState.opensLink
 SwiftTUIGraph.AccessibilityControlState.selection
 SwiftTUIGraph.AccessibilityControlState.step
 SwiftTUIGraph.AccessibilityControlState.value

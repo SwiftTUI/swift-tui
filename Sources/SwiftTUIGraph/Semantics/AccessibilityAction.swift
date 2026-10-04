@@ -87,18 +87,22 @@ public final class AccessibilityControlState: Equatable, Sendable {
   public let step: Double?
   public let selection: AccessibilitySelection?
   public let customActions: [String]
+  /// A default link may be opened by the presentation host. Custom Swift
+  /// activation handlers leave this false and remain authoritative.
+  public let opensLink: Bool
 
   public static func == (lhs: AccessibilityControlState, rhs: AccessibilityControlState) -> Bool {
     lhs === rhs
       || (lhs.actions == rhs.actions && lhs.value == rhs.value
         && lhs.minimum == rhs.minimum && lhs.maximum == rhs.maximum && lhs.step == rhs.step
-        && lhs.selection == rhs.selection && lhs.customActions == rhs.customActions)
+        && lhs.selection == rhs.selection && lhs.customActions == rhs.customActions
+        && lhs.opensLink == rhs.opensLink)
   }
 
   public init(
     actions: [AccessibilityActionKind], value: AccessibilityValue? = nil,
     minimum: Double? = nil, maximum: Double? = nil, step: Double? = nil,
-    selection: AccessibilitySelection? = nil, customActions: [String] = []
+    selection: AccessibilitySelection? = nil, customActions: [String] = [], opensLink: Bool = false
   ) {
     self.actions = actions
     self.value = value
@@ -107,6 +111,7 @@ public final class AccessibilityControlState: Equatable, Sendable {
     self.step = step
     self.selection = selection
     self.customActions = customActions
+    self.opensLink = opensLink
   }
 }
 

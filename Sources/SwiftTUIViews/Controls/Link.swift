@@ -43,7 +43,8 @@ extension Link {
     var semantics = focusableControlMetadata(
       focusInteractions: .activate, accessibilityRole: .link)
     semantics.accessibilityControl = .init(
-      actions: [.focus, .activate], value: .text(destination.rawValue))
+      actions: [.focus, .activate], value: .text(destination.rawValue),
+      opensLink: context.environmentValues.openLinkAction.usesHostDefault)
     return ResolvedNode(
       identity: context.identity,
       kind: .view("Link"),
@@ -248,6 +249,7 @@ private struct ResolvedRichTextBuilder {
       var run = run
       run.destination = link.destination
       run.linkIdentifier = inlineIdentifier
+      run.opensLinkInHost = context.environmentValues.openLinkAction.usesHostDefault
       return run
     }
   }

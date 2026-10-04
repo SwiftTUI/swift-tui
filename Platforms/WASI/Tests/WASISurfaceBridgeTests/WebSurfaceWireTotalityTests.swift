@@ -476,7 +476,7 @@ struct WebSurfaceWireTotalityTests {
       minimum: 0, maximum: 10, step: 1,
       selection: .init(
         presentation: .menu, options: [.init(id: "choice-1", label: "First", isEnabled: true)]),
-      customActions: ["Reset"])
+      customActions: ["Reset"], opensLink: true)
     controlNode.isEnabled = false
     var frame = SemanticHostFrame(
       sequence: sequence,

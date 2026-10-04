@@ -185,6 +185,13 @@ The browser mappings follow [WAI-ARIA 1.2](https://www.w3.org/TR/wai-aria-1.2/).
 
 ### Public custom actions
 
+An optional `opensLink: true` on a link control permits the presentation host to
+open its textual destination instead of sending a second Swift activation. The
+primitive sets it only for the default opener. Authored `OpenLinkAction` and
+default `accessibilityAction` callbacks keep Swift authoritative. Browser hosts
+honor their configured link callback, otherwise use a native safe-scheme anchor.
+Disabled/read-only links cannot open. Older nodes omit this flag.
+
 An optional `customActions` array lists nonempty operation names on an actionable
 node. Its `actions` array includes `custom`. Hosts submit
 `accessibility:<requestID>:<target>:custom:name:<percent-encoded-name>` using the

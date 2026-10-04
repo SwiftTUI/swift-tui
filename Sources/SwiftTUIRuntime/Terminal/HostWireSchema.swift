@@ -184,7 +184,8 @@ package enum HostWireSchema {
       .init("actionTarget", wire: .key("actionTarget")),
       .init(
         "control",
-        wire: .derived("actions/value/valueMin/valueMax/valueStep/selection/customActions")),
+        wire: .derived(
+          "actions/value/valueMin/valueMax/valueStep/selection/customActions/opensLink")),
       .init("selectionOptionRects", wire: .derived("selection.options[].rect by opaque option ID")),
       .init("isEnabled", wire: .key("isEnabled")),
       .init(
@@ -305,7 +306,7 @@ package enum HostWireSchema {
     package static let accessibilityNodeKeys: Set<String> = [
       "id", "rect", "role", "isFocused", "parentId", "label", "hint", "hidden",
       "liveRegion", "cursorAnchor", "actionTarget", "actions", "isEnabled", "value",
-      "valueMin", "valueMax", "valueStep", "properties", "selection", "customActions",
+      "valueMin", "valueMax", "valueStep", "properties", "selection", "customActions", "opensLink",
     ]
     package static let accessibilityPropertyKeys: Set<String> = [
       "selected",

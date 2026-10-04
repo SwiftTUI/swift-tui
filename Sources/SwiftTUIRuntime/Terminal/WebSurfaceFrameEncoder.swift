@@ -704,6 +704,7 @@ package enum WebSurfaceFrameEncoder {
             "\"actions\":[\(control.actions.map { jsonString($0.rawValue) }.joined(separator: ","))]"
           )
           fields.append("\"isEnabled\":\(node.isEnabled ? "true" : "false")")
+          if control.opensLink { fields.append("\"opensLink\":true") }
           if !control.customActions.isEmpty {
             fields.append(
               "\"customActions\":[\(control.customActions.map(jsonString).joined(separator: ","))]")
