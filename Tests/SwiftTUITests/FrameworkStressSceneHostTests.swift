@@ -1091,7 +1091,7 @@ extension FrameworkStressSceneHostTests {
 
     for generation in 0..<24 {
       let environment: [String: String]
-      let expected: RuntimeConfiguration
+      var expected: RuntimeConfiguration
       switch generation % 4 {
       case 0:
         environment = base.merging([
@@ -1129,6 +1129,10 @@ extension FrameworkStressSceneHostTests {
         expected = .init(motion: .reduced)
       }
 
+      // An explicit environment choice now also survives as an optional
+      // preference, including false. The legacy accessible alias's stronger
+      // motion mode still wins when the runtime computes its effective policy.
+      expected.accessibilityPreferences.reduceMotion = generation % 4 == 3
       #expect(RuntimeConfiguration.detect(environment: environment, isStdoutTTY: true) == expected)
     }
   }
