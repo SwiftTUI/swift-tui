@@ -529,6 +529,14 @@ class AccessibilityTreeMounter {
     applyScreenReaderOnlyStyle(this.announcerElement);
   }
   present(nodes, metrics, announcements = [], options = {}) {
+    this.presenting = true;
+    try {
+      this.presentFrame(nodes, metrics, announcements, options);
+    } finally {
+      this.presenting = false;
+    }
+  }
+  presentFrame(nodes, metrics, announcements, options) {
     const activeBeforePresentation = document.activeElement;
     const visibleNodes = nodes.filter((node) => !node.hidden).map((node) => ({
       ...node,
@@ -538,7 +546,6 @@ class AccessibilityTreeMounter {
       ...announcement,
       politeness: normalizePoliteness(announcement.politeness)
     }));
-    this.presenting = true;
     if (options.actionResponse) {
       const acknowledged = BigInt(options.actionResponse.requestID);
       if (acknowledged > this.acknowledgedRequestID)
@@ -617,7 +624,6 @@ class AccessibilityTreeMounter {
       if (document.activeElement !== focusElement)
         focusElement.focus?.({ preventScroll: true });
     }
-    this.presenting = false;
   }
   dispose() {
     for (const element of this.nodesById.values()) {

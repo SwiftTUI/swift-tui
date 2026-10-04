@@ -513,6 +513,9 @@ extension List {
     }
 
     let policy = selectionPolicy
+    // Single selection is one indexed lookup, not a binding read for every
+    // realized row. Multiple selection tests only the realized viewport.
+    let selectedIndex = policy.isMultiple ? nil : policy.selectedIndex(in: source)
     let selectionOwner =
       (ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity))?.viewNodeID
     result.indexedSource = HostedCollectionIndexedChildSource(base: source) { rawNode, index in
@@ -531,7 +534,7 @@ extension List {
       )
       if let compatibleTag {
         node.semanticMetadata.hostedCollectionItem?.selection = .init(
-          isSelected: policy.contains(compatibleTag),
+          isSelected: policy.isMultiple ? policy.contains(compatibleTag) : selectedIndex == index,
           actionIdentity: listRowIdentity(for: context.identity, rowIndex: index),
           ownerNodeID: selectionOwner)
       }

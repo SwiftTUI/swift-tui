@@ -139,8 +139,15 @@ public struct SemanticMetadata: Equatable, Sendable {
   /// conditional-branch re-resolve that re-mints the chain node. Region
   /// identity, rect, and focus stay structural.
   package var explicitRouteIdentity: Identity?
-  package var hostedCollectionContainer: HostedCollectionContainerMetadata?
-  package var hostedCollectionItem: HostedCollectionItemMetadata?
+  private var hostedCollection: HostedCollectionMetadata?
+  package var hostedCollectionContainer: HostedCollectionContainerMetadata? {
+    get { hostedCollection?.container }
+    set { hostedCollection = .init(container: newValue, item: hostedCollectionItem) }
+  }
+  package var hostedCollectionItem: HostedCollectionItemMetadata? {
+    get { hostedCollection?.item }
+    set { hostedCollection = .init(container: hostedCollectionContainer, item: newValue) }
+  }
   package var isHostedCollectionRowBoundary: Bool
 
   package var focusScopeBoundary: Bool {
@@ -348,8 +355,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.namedCoordinateSpace = namedCoordinateSpace
     self.interactionAvailability = interactionAvailability
     self.pointerGesturePriority = pointerGesturePriority
-    self.hostedCollectionContainer = hostedCollectionContainer
-    self.hostedCollectionItem = hostedCollectionItem
+    self.hostedCollection = .init(container: hostedCollectionContainer, item: hostedCollectionItem)
     self.isHostedCollectionRowBoundary = isHostedCollectionRowBoundary
   }
 
@@ -673,4 +679,19 @@ package struct AccessibilityStructure: Equatable, Sendable {
   package var parent: Identity? = nil
   package var keepsVirtualChildren = false
   package init() {}
+}
+
+/// Collection metadata is sparse and potentially large. One immutable box
+/// preserves value semantics without growing every resolved node's stack cost.
+private final class HostedCollectionMetadata: Equatable, Sendable {
+  let container: HostedCollectionContainerMetadata?
+  let item: HostedCollectionItemMetadata?
+  init?(container: HostedCollectionContainerMetadata?, item: HostedCollectionItemMetadata?) {
+    guard container != nil || item != nil else { return nil }
+    self.container = container
+    self.item = item
+  }
+  static func == (lhs: HostedCollectionMetadata, rhs: HostedCollectionMetadata) -> Bool {
+    lhs === rhs || (lhs.container == rhs.container && lhs.item == rhs.item)
+  }
 }

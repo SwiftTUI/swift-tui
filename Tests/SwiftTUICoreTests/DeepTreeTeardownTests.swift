@@ -127,7 +127,9 @@ struct DeepTreeTeardownTests {
 
   @Test("phase-product node sizes stay inside the teardown budget")
   func phaseProductNodeSizesStayInsideTeardownBudget() {
-    #expect(MemoryLayout<ResolvedNode>.size <= Self.resolvedNodeSizeBudget)
+    #expect(
+      MemoryLayout<ResolvedNode>.size <= Self.resolvedNodeSizeBudget,
+      "ResolvedNode inline size: \(MemoryLayout<ResolvedNode>.size) bytes")
     #expect(MemoryLayout<MeasuredNode>.size <= Self.measuredNodeSizeBudget)
     #expect(MemoryLayout<PlacedNode>.size <= Self.placedNodeSizeBudget)
     #expect(MemoryLayout<DrawNode>.size <= Self.drawNodeSizeBudget)

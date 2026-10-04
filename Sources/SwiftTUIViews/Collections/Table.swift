@@ -476,14 +476,20 @@ extension Table {
     return rows.map { row in
       var row = row
       row.children = row.children.enumerated().map { index, cell in
-        let cell = singleLineHostedTableCell(cell)
+        // Retained rows already carry this parent's presentation wrapper.
+        // Rebuild its geometry around the authored cell, never around itself.
+        let identity = row.identity.child(.indexed("HostedTableCell", index: index))
+        let authoredCell =
+          cell.identity == identity && cell.kind == .view("HostedTableCell")
+          ? cell.children.first ?? cell : cell
+        let cell = singleLineHostedTableCell(authoredCell)
         let width = widths.indices.contains(index) ? widths[index] : 1
         let alignment =
           columns.indices.contains(index)
           ? hostedCellAlignment(columns[index].alignment)
           : Alignment.leading
         var hostedCell = ResolvedNode(
-          identity: row.identity.child(.indexed("HostedTableCell", index: index)),
+          identity: identity,
           kind: .view("HostedTableCell"),
           children: [cell],
           environmentSnapshot: cell.environmentSnapshot,
@@ -569,6 +575,9 @@ extension Table {
     }
 
     let policy = selectionPolicy
+    // Single selection is one indexed lookup, not a binding read for every
+    // realized row. Multiple selection tests only the realized viewport.
+    let selectedIndex = policy.isMultiple ? nil : policy.selectedIndex(in: source)
     let selectionOwner =
       (ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity))?.viewNodeID
     result.indexedSource = HostedCollectionIndexedChildSource(base: source) { rawNode, index in
@@ -603,7 +612,7 @@ extension Table {
       )
       if let compatibleTag {
         node.semanticMetadata.hostedCollectionItem?.selection = .init(
-          isSelected: policy.contains(compatibleTag),
+          isSelected: policy.isMultiple ? policy.contains(compatibleTag) : selectedIndex == index,
           actionIdentity: tableRowIdentity(for: context.identity, rowIndex: index),
           ownerNodeID: selectionOwner)
       }

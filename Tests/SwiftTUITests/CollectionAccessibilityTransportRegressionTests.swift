@@ -23,6 +23,11 @@ struct CollectionAccessibilityTransportRegressionTests {
       } else {
         try harness.runLoop.renderPendingFrames(renderedFrames: &frames)
       }
+      let nodes = harness.runLoop.publishedAccessibilitySnapshot.accessibilityNodes
+      #expect(Set(nodes.map(\.identity)).count == nodes.count)
+      for node in nodes {
+        #expect(node.parentIdentity != node.identity)
+      }
     }
     func press(_ label: String) async throws {
       let node = try #require(
@@ -135,6 +140,7 @@ private struct CollectionAccessibilityWorkload: View {
       .disabled(disabled)
       .accessibilityProperties(.init(readOnly: readonly))
       .accessibilityLabel("Records")
+      .frame(height: 8)
       List {
         Section("Primary records") {
           Text("Ada")
