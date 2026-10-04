@@ -242,6 +242,8 @@ package struct SemanticExtractor: Sendable {
               structuralHostChain: context.structuralHostChain
             )
           )
+          scrollRoutes[scrollRoutes.count - 1].reducesMotion =
+            node.environmentSnapshot.style.renderingReduceMotion
           scrollRoutes[scrollRoutes.count - 1].scrollAnchorCorrection = anchorOffset
           scrollRoutes[scrollRoutes.count - 1].collectionMaximumAnchorRow =
             node.hostedTableVisibleLayout?.maximumAnchorRow

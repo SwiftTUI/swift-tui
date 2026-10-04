@@ -294,10 +294,12 @@ extension Rasterizer {
       foregroundColor = fg.mixed(with: blendTarget, amount: 1 - opacity)
     }
 
+    var emphasis = style.emphasis
+    if environment.renderingReduceMotion { emphasis.remove(.blink) }
     return ResolvedTextStyle(
       foregroundColor: foregroundColor,
       backgroundColor: backgroundColor,
-      emphasis: style.emphasis,
+      emphasis: emphasis,
       underlineStyle: style.underlineStyle,
       strikethroughStyle: style.strikethroughStyle,
       // Reset opacity to 1 after baking so presentation doesn't also

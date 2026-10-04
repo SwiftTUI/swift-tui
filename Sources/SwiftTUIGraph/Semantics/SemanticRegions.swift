@@ -72,6 +72,8 @@ package struct LazyScrollAnchorCorrection: Equatable, Sendable {
 }
 
 public struct ScrollRoute: Equatable, Sendable {
+  /// Authored motion policy at this route, refreshed with each semantic frame.
+  package var reducesMotion = false
   package var scrollAnchorCorrection: LazyScrollAnchorCorrection? = nil
   /// For a viewport-backed collection whose rows render taller than one cell,
   /// the largest scroll anchor row whose window still ends at the last row, as

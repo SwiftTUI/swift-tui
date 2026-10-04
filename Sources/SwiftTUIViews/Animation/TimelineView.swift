@@ -129,8 +129,9 @@ public struct PeriodicTimelineSchedule: TimelineSchedule, Hashable, Sendable {
 // MARK: - AnimationTimelineSchedule
 
 /// A schedule designed for driving smooth animation.  Defaults to a
-/// 50 ms (~20 fps) cadence in normal mode and 250 ms (~4 fps) in
-/// ``TimelineScheduleMode/lowFrequency`` (reduce-motion).
+/// 50 ms (~20 fps) cadence in normal mode. In
+/// ``TimelineScheduleMode/lowFrequency`` (reduce-motion), it emits only the
+/// starting instant; `TimelineView` preserves its displayed instant while reduced.
 ///
 /// Set `paused = true` to freeze the timeline at the start instant.
 public struct AnimationTimelineSchedule: TimelineSchedule, Hashable, Sendable {
@@ -155,24 +156,10 @@ public struct AnimationTimelineSchedule: TimelineSchedule, Hashable, Sendable {
     from startInstant: MonotonicInstant,
     mode: TimelineScheduleMode
   ) -> Entries {
-    if paused {
+    if paused || mode == .lowFrequency {
       return Entries(start: startInstant, interval: nil)
     }
-    let normalDefault: Duration = .milliseconds(50)
-    let lowFrequencyDefault: Duration = .milliseconds(250)
-    let chosen: Duration = {
-      switch mode {
-      case .normal:
-        return minimumInterval ?? normalDefault
-      case .lowFrequency:
-        // Honor an explicit minimum if it's already coarse enough,
-        // otherwise enforce the reduce-motion floor.
-        if let minimumInterval, minimumInterval >= lowFrequencyDefault {
-          return minimumInterval
-        }
-        return lowFrequencyDefault
-      }
-    }()
+    let chosen = minimumInterval ?? .milliseconds(50)
     return Entries(start: startInstant, interval: chosen)
   }
 
@@ -325,7 +312,9 @@ public struct TimelineViewContext: Sendable, Hashable {
 /// The schedule's `entries(from:mode:)` is called when the view first
 /// appears and after the schedule itself changes.  Under reduce-motion
 /// the schedule receives ``TimelineScheduleMode/lowFrequency`` so it
-/// can throttle its emissions.
+/// can throttle its emissions. The built-in animation schedule stops until
+/// motion is enabled again; periodic/custom schedules can still update useful
+/// information and should avoid nonessential visual motion in low-frequency mode.
 public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
   /// The schedule driving updates.
   public let schedule: Schedule
@@ -377,6 +366,9 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
 
   @MainActor
   private func run(mode: TimelineScheduleMode) async {
+    // Keep the displayed pose, without an extra phase jump when policy flips.
+    // Returning to normal reanchors future ticks and never replays a backlog.
+    guard !(mode == .lowFrequency && schedule is AnimationTimelineSchedule) else { return }
     // The schedule produces an infinite-ish stream of fire instants.
     // We walk them in order, sleeping until each, and updating the
     // @State so the body re-resolves.

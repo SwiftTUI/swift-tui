@@ -1065,6 +1065,52 @@ package final class AnimationController: Sendable {
         || graphAnimationInputToken == previousFrame.graphAnimationInputToken)
   }
 
+  private func settleReducedMotion(
+    reducedIdentities: Set<Identity>,
+    currentIdentities: Set<Identity>,
+    transactions: [Identity: TransactionSnapshot],
+    timestamp: MonotonicInstant
+  ) {
+    guard !reducedIdentities.isEmpty else { return }
+    func isReduced(_ identity: Identity) -> Bool {
+      var candidate: Identity? = identity
+      while let current = candidate {
+        if currentIdentities.contains(current) { return reducedIdentities.contains(current) }
+        // A departing .id may live outside its structural parent's identity
+        // prefix. Follow the actual previous tree, not string ancestry.
+        candidate =
+          previousParentByIdentity[current]
+          ?? previousFrame.realizedPresentationOwners[current]
+      }
+      return false
+    }
+    var finishedBoxes: Set<AnimationBox> = []
+    for key in Array(activeAnimations.keys) {
+      guard let entry = activeAnimations[key], isReduced(entry.resolvedIdentity ?? key.identity)
+      else { continue }
+      activeAnimations.removeValue(forKey: key)
+      slotVelocitySamplers.removeValue(forKey: key)
+      finishedBoxes.insert(entry.animationBox)
+      releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
+    }
+    for nodeID in Array(removingNodes.keys) {
+      guard let entry = removingNodes[nodeID],
+        isReduced(entry.identity) || entry.parentIdentity.map(isReduced) == true
+          || entry.snapshot.environmentSnapshot.style.renderingReduceMotion
+      else { continue }
+      removingNodes.removeValue(forKey: nodeID)
+      if let box = entry.animationBox { finishedBoxes.insert(box) }
+      releaseBatch(entry.completionBatchID, logicalAlreadyReleased: entry.isLogicallyComplete)
+    }
+    pruneCompletedAnimationRegistrations(finishedBoxes)
+    for identity in reducedIdentities {
+      guard let batchID = transactions[identity]?.animationBatchID,
+        batchRefCounts[batchID] == nil, completions[batchID] != nil
+      else { continue }
+      pendingEmptyBatchCompletions[batchID] = timestamp
+    }
+  }
+
   /// Direct-test convenience for a frame with one base transaction and no
   /// identity-scoped scheduler segments.
   package func canSkipResolvedTreeProcessing(
@@ -1140,6 +1186,11 @@ package final class AnimationController: Sendable {
         != AnimatableSnapshot.extract(from: rhs).values
       {
         return "\(path): animatableSnapshot"
+      }
+      if lhs.environmentSnapshot.style.renderingReduceMotion
+        != rhs.environmentSnapshot.style.renderingReduceMotion
+      {
+        return "\(path): reduceMotion"
       }
       if lhs.matchedGeometry != rhs.matchedGeometry { return "\(path): matchedGeometry" }
       if lhs.children.count != rhs.children.count { return "\(path): children.count" }
@@ -1260,6 +1311,7 @@ package final class AnimationController: Sendable {
     var newMatchedConfigsByIdentity: [Identity: MatchedGeometryConfig] = [:]
     var newNodeIDByIdentity: [Identity: ViewNodeID] = [:]
     var newTransactionsByIdentity: [Identity: TransactionSnapshot] = [:]
+    var reducedMotionIdentities: Set<Identity> = []
     var newLiveNodeIDs: Set<ViewNodeID> = []
     let activeKeysByOwnerNodeID = Dictionary(
       grouping: activeAnimations.compactMap { key, animation in
@@ -1281,6 +1333,7 @@ package final class AnimationController: Sendable {
       matchedKeyAccumulator: &newMatchedConfigsByIdentity,
       nodeIDAccumulator: &newNodeIDByIdentity,
       transactionAccumulator: &newTransactionsByIdentity,
+      reducedMotionAccumulator: &reducedMotionIdentities,
       liveNodeIDAccumulator: &newLiveNodeIDs,
       activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
     )
@@ -1647,6 +1700,15 @@ package final class AnimationController: Sendable {
     if !slotVelocitySamplers.isEmpty {
       slotVelocitySamplers = slotVelocitySamplers.filter { newIdentities.contains($0.key.identity) }
     }
+
+    // A policy change is meaningful even when the authored target value did
+    // not change. End every affected channel (including frozen exits) before
+    // interpolation, releasing each completion retainer exactly once.
+    settleReducedMotion(
+      reducedIdentities: reducedMotionIdentities,
+      currentIdentities: newIdentities,
+      transactions: newTransactionsByIdentity,
+      timestamp: timestamp)
 
     previousSnapshots = newSnapshots
     previousIdentities = newIdentities
@@ -2037,6 +2099,7 @@ package final class AnimationController: Sendable {
     matchedKeyAccumulator: inout [Identity: MatchedGeometryConfig],
     nodeIDAccumulator: inout [Identity: ViewNodeID],
     transactionAccumulator: inout [Identity: TransactionSnapshot],
+    reducedMotionAccumulator: inout Set<Identity>,
     liveNodeIDAccumulator: inout Set<ViewNodeID>,
     activeKeysByOwnerNodeID: [ViewNodeID: [AnimationKey]]
   ) {
@@ -2099,8 +2162,13 @@ package final class AnimationController: Sendable {
       }
     }
 
+    let reducesMotion = node.environmentSnapshot.style.renderingReduceMotion
+    if reducesMotion {
+      reducedMotionAccumulator.insert(node.identity)
+      effectiveTransaction.animationRequest = .disabled
+    }
     var styleIntents: [AnimatableSlot: ScopedStyleAnimationIntent] = [:]
-    if !effectiveTransaction.customValues.isEmpty {
+    if !reducesMotion, !effectiveTransaction.customValues.isEmpty {
       for (slot, key) in [
         (
           AnimatableSlot.foregroundShapeStyle,
@@ -2172,6 +2240,7 @@ package final class AnimationController: Sendable {
         matchedKeyAccumulator: &matchedKeyAccumulator,
         nodeIDAccumulator: &nodeIDAccumulator,
         transactionAccumulator: &transactionAccumulator,
+        reducedMotionAccumulator: &reducedMotionAccumulator,
         liveNodeIDAccumulator: &liveNodeIDAccumulator,
         activeKeysByOwnerNodeID: activeKeysByOwnerNodeID
       )
@@ -2403,6 +2472,12 @@ package final class AnimationController: Sendable {
         {
           if intent.request != .inherit { transaction.animationRequest = intent.request }
           transaction.animationBatchID = intent.batchID ?? transaction.animationBatchID
+        }
+        if node.environmentSnapshot.style.renderingReduceMotion {
+          transaction.animationRequest = .disabled
+          if let entry = activeAnimations.removeValue(forKey: key) {
+            releaseBatch(entry.batchID, logicalAlreadyReleased: entry.isLogicallyReleased)
+          }
         }
         if case .animate(let box) = transaction.animationRequest,
           registeredAnimations[box] == nil, let animation = box.unwrap(as: Animation.self)

@@ -348,6 +348,29 @@ appearance are rejected before mutation.
 
 ### Reduced Motion
 
+A live preference change settles in-flight property, content, insertion, removal
+and matched-geometry animations at their model state. Completion barriers fire
+once after the settled frame commits. Re-enabling motion does not replay the
+interrupted animation. Scroll panning still follows direct input; inertia stops
+at the current position and does not restart by itself. These rules also apply
+to a subtree's environment override.
+
+`TimelineView(.animation)` holds its displayed instant while motion is reduced.
+Periodic and custom schedules still receive `.lowFrequency` so clocks and useful
+status can update. Custom timers and animation styles must read
+`accessibilityReduceMotion` and provide a static, meaningful presentation;
+throttling decorative motion is not sufficient. Keyframes settle finite work at
+its endpoint, repeating phase/keyframe effects use their rest pose, and animated
+images show their first frame. Progress and activity retain their labels/values.
+Blink text emphasis is removed before raster output. Browser focus rings and
+carets are static; a terminal application's cursor setting remains host-owned.
+
+Visual motion policy is separate from announcements: do not mark every animation
+or timer tick as live content. Use deliberate status changes for useful feedback.
+Stable-output capture also suppresses built-in motion, while the public user
+preference remains unchanged.
+
+
 The `--reduce-motion` flag (or `SWIFTTUI_REDUCE_MOTION=1`) suppresses
 animations and spinners, and `--accessible` (`SWIFTTUI_ACCESSIBLE=1`) implies
 both `--reduce-motion` and `--cursor-follows-focus`. It does not imply
@@ -591,7 +614,6 @@ Canvas(trafficDrawing)
 
 The representation reserves no visual space, including when its semantic
 content is wider or taller than the graphic.
-
 
 ## User preferences
 

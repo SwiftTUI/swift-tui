@@ -2309,8 +2309,10 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
-  @Test("Reduced motion releases a pan at the drag position with no fling")
-  func scrollViewFlickSuppressedUnderReducedMotion() throws {
+  @Test(
+    "Every reduced-motion source releases a pan without a fling",
+    arguments: ["launch", "host", "view", "stable"])
+  func scrollViewFlickSuppressedUnderReducedMotion(policy: String) throws {
     final class Box { var position = ScrollCellOffset.zero }
     let terminalSize = CellSize(width: 20, height: 12)
     let rootIdentity = testIdentity("FlingReducedFixture")
@@ -2327,6 +2329,9 @@ struct InteractiveRuntimeTests {
           }
         }
       }
+      .transformEnvironment(\.accessibilityReduceMotion) { value in
+        if policy == "view" { value = true }
+      }
       .id(scrollID)
       .frame(width: 12, height: 6, alignment: .topLeading)
     }
@@ -2342,11 +2347,16 @@ struct InteractiveRuntimeTests {
 
     let t0 = MonotonicInstant.now()
     let clock = VirtualFrameClock(t0)
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { terminalSize }, pointerInputCapabilities: panningPointerCapabilities)
+    terminal.accessibilityPreferences.reduceMotion = policy == "host"
     let runLoop = try mountedMomentumRunLoop(
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
-      motion: .reduced,
+      motion: policy == "launch" ? .reduced : .normal,
+      stableOutput: policy == "stable",
       clock: clock,
+      terminal: terminal,
       viewBuilder: makeView
     )
 
@@ -2375,6 +2385,58 @@ struct InteractiveRuntimeTests {
       try runLoop.renderPendingFrames(renderedFrames: &frames)
     }
     #expect(box.position.y == offsetAtRelease)
+  }
+
+  @Test(
+    "Live host and subtree motion changes stop an active fling without replay",
+    arguments: [false, true])
+  func liveReducedMotionStopsMomentum(subtree: Bool) throws {
+    final class Box {
+      var position = ScrollCellOffset.zero
+      var reduced = false
+    }
+    let box = Box()
+    let size = CellSize(width: 20, height: 12)
+    let root = testIdentity("LiveMotion")
+    let clock = VirtualFrameClock(.now())
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { size }, pointerInputCapabilities: panningPointerCapabilities)
+    terminal.accessibilityPreferences.reduceMotion = false
+    let runLoop = try mountedMomentumRunLoop(
+      terminalSize: size, rootIdentity: root, clock: clock, terminal: terminal
+    ) {
+      ScrollView(.vertical, position: Binding(get: { box.position }, set: { box.position = $0 })) {
+        VStack(spacing: 0) { ForEach(0..<200) { Text("Row \($0)") } }
+      }
+      .transformEnvironment(\.accessibilityReduceMotion) { value in
+        if subtree { value = box.reduced }
+      }
+      .frame(width: 12, height: 6)
+    }
+    let route = try #require(runLoop.latestSemanticSnapshot.scrollRoutes.first)
+    #expect(
+      runLoop.scrollMomentum.begin(
+        identity: route.identity, offsetVelocity: .init(dx: 0, dy: 60),
+        canScrollX: false, canScrollY: true, now: clock.now))
+    runLoop.scheduler.requestDeadline(clock.now.advanced(by: .milliseconds(33)))
+    var frames = 0
+    clock.now = clock.now.advanced(by: .milliseconds(33))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(box.position.y > 0)
+    #expect(runLoop.scrollMomentum.hasActiveMomentum)
+    let stoppedPosition = box.position
+    if subtree { box.reduced = true } else { terminal.accessibilityPreferences.reduceMotion = true }
+    runLoop.scheduler.requestInvalidation(of: [root])
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(!runLoop.scrollMomentum.hasActiveMomentum)
+    #expect(box.position == stoppedPosition)
+    box.reduced = false
+    terminal.accessibilityPreferences.reduceMotion = false
+    runLoop.scheduler.requestInvalidation(of: [root])
+    clock.now = clock.now.advanced(by: .seconds(1))
+    try runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(box.position == stoppedPosition)
+    #expect(!runLoop.scrollMomentum.hasActiveMomentum)
   }
 
   @MainActor
@@ -4849,7 +4911,16 @@ private final class MockTerminalController: TerminalControlling {
   }
 }
 
-private final class RecordingTerminalHost: PresentationSurface {
+private final class RecordingTerminalHost: PresentationSurface, HostGeometryPresentationSurface {
+  var accessibilityPreferences = AccessibilityPreferences()
+
+  func captureHostLayoutConfiguration() -> HostLayoutConfiguration {
+    .init(
+      size: surfaceSize, appearance: appearance, theme: theme,
+      graphics: graphicsCapabilities, pointer: pointerInputCapabilities,
+      accessibilityPreferences: accessibilityPreferences)
+  }
+
   var surfaceSize: CellSize {
     surfaceSizeProvider()
   }
@@ -6135,6 +6206,7 @@ private func mountedMomentumRunLoop<V: View>(
   terminalSize: CellSize,
   rootIdentity: Identity,
   motion: RuntimeConfiguration.MotionMode = .normal,
+  stableOutput: Bool = false,
   pointerInputCapabilities: PointerInputCapabilities = panningPointerCapabilities,
   clock: VirtualFrameClock,
   terminal: RecordingTerminalHost? = nil,
@@ -6161,7 +6233,7 @@ private func mountedMomentumRunLoop<V: View>(
       invalidationIdentities: [rootIdentity]
     ),
     environmentValues: environmentValues,
-    runtimeConfiguration: RuntimeConfiguration(motion: motion),
+    runtimeConfiguration: RuntimeConfiguration(motion: motion, stableOutput: stableOutput),
     proposal: .init(width: terminalSize.width, height: terminalSize.height),
     viewBuilder: ScopedMapper { _ in
       viewBuilder()

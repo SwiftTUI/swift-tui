@@ -34,13 +34,7 @@ extension RunLoop {
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
     effectiveEnvironmentValues.accessibilityPreferences =
-      runtimeConfiguration.accessibilityPreferences.inheriting(
-        hostConfiguration.accessibilityPreferences.inheriting(
-          AccessibilityPreferences(reduceMotion: hostConfiguration.reduceMotion)
-            .inheriting(nativeAccessibilityPreferences(for: presentationSurface))))
-    if runtimeConfiguration.motion == .reduced {
-      effectiveEnvironmentValues.accessibilityReduceMotion = true
-    }
+      effectiveAccessibilityPreferences(hostConfiguration: hostConfiguration)
     effectiveEnvironmentValues.stableOutput = runtimeConfiguration.stableOutput
     effectiveEnvironmentValues.cursorFollowsFocus =
       runtimeConfiguration.cursorFollowsFocus
@@ -131,6 +125,22 @@ extension RunLoop {
       scheduler?.requestDeadline(instant)
     }
     return context
+  }
+
+  /// One live policy for rendering and input-driven motion. Explicit runtime
+  /// preferences take precedence over the host and native discovery.
+  func effectiveAccessibilityPreferences(
+    hostConfiguration: HostLayoutConfiguration? = nil
+  ) -> AccessibilityPreferences {
+    let host = hostConfiguration ?? presentationSurface.hostLayoutConfiguration()
+    var preferences = runtimeConfiguration.accessibilityPreferences.inheriting(
+      host.accessibilityPreferences.inheriting(
+        AccessibilityPreferences(reduceMotion: host.reduceMotion)
+          .inheriting(nativeAccessibilityPreferences(for: presentationSurface))))
+    if runtimeConfiguration.motion == .reduced {
+      preferences.reduceMotion = true
+    }
+    return preferences
   }
 
   package func proposal(hostConfiguration: HostLayoutConfiguration? = nil) -> ProposedSize {

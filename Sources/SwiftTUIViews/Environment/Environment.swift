@@ -257,6 +257,7 @@ public struct EnvironmentValues: Equatable, Sendable {
       )
     }
     style.accessibilityPreferences = accessibilityPreferences
+    style.stableOutput = stableOutput
     return EnvironmentSnapshot(
       debugSignature: snapshot.debugSignature,
       untypedValues: snapshot.untypedValues,

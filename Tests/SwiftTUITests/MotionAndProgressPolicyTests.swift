@@ -226,6 +226,22 @@ struct MotionAndProgressPolicyTests {
     #expect(reducedCount == 0)
   }
 
+  @Test(
+    "reduced motion and stable capture remove terminal blink while retaining other emphasis",
+    arguments: [false, true])
+  func blinkSuppressed(stable: Bool) {
+    let normal = renderArtifacts(
+      Text("Blink").blink().bold(), identity: testIdentity("blink-normal"))
+    let reduced = renderArtifacts(
+      Text("Blink").blink().bold(),
+      environmentValues: policyEnvironment(
+        accessibilityReduceMotion: !stable, stableOutput: stable),
+      identity: testIdentity("blink-reduced"))
+    #expect(normal.rasterSurface.cells[0][0].style?.emphasis.contains(.blink) == true)
+    #expect(reduced.rasterSurface.cells[0][0].style?.emphasis.contains(.blink) == false)
+    #expect(reduced.rasterSurface.cells[0][0].style?.emphasis.contains(.bold) == true)
+  }
+
   @Test("static controls render unchanged under motion policy")
   func staticControlsRenderUnchangedUnderPolicy() {
     let surface = renderedSurface(

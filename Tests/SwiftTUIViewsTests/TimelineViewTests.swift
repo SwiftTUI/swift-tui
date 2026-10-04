@@ -100,7 +100,7 @@ struct TimelineViewTests {
     #expect(instants[0].duration(to: instants[1]) == .milliseconds(200))
   }
 
-  @Test("AnimationTimelineSchedule throttles to ~4 fps under low-frequency")
+  @Test("AnimationTimelineSchedule stops under low-frequency")
   func animationLowFrequencyCadence() {
     let start = MonotonicInstant(offset: .zero)
     let schedule = AnimationTimelineSchedule()
@@ -110,10 +110,10 @@ struct TimelineViewTests {
         .prefix(2)
     )
 
-    #expect(instants[0].duration(to: instants[1]) == .milliseconds(250))
+    #expect(instants == [start])
   }
 
-  @Test("AnimationTimelineSchedule respects a coarser explicit minimum under low-frequency")
+  @Test("AnimationTimelineSchedule stops even with an explicit minimum under low-frequency")
   func animationLowFrequencyKeepsCoarserExplicit() {
     let start = MonotonicInstant(offset: .zero)
     let schedule = AnimationTimelineSchedule(minimumInterval: .milliseconds(500))
@@ -123,7 +123,7 @@ struct TimelineViewTests {
         .prefix(2)
     )
 
-    #expect(instants[0].duration(to: instants[1]) == .milliseconds(500))
+    #expect(instants == [start])
   }
 
   @Test("AnimationTimelineSchedule paused emits exactly one frame")

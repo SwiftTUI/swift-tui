@@ -41,7 +41,10 @@ extension RunLoop {
   ) {
     defer { scrollPanVelocitySampler.clear() }
 
-    guard runtimeConfiguration.motion == .normal,
+    guard !reducesScrollMotion,
+      !latestSemanticSnapshot.scrollRoutes.contains(where: {
+        $0.identity == routeIdentity && $0.reducesMotion
+      }),
       let context = scrollContext(for: routeIdentity)
     else {
       return
@@ -81,7 +84,18 @@ extension RunLoop {
     guard scrollMomentum.hasActiveMomentum else {
       return
     }
+    if reducesScrollMotion {
+      scrollMomentum.cancelAll()
+      return
+    }
     for identity in scrollMomentum.activeIdentities {
+      guard
+        let route = latestSemanticSnapshot.scrollRoutes.first(where: { $0.identity == identity }),
+        !route.reducesMotion
+      else {
+        scrollMomentum.cancel(identity)
+        continue
+      }
       scrollMomentum.retireIfBindingChanged(
         identity: identity,
         currentSourceID: localScrollPositionRegistry.bindingSourceID(for: identity)
@@ -120,6 +134,10 @@ extension RunLoop {
     guard scrollMomentum.hasActiveMomentum else {
       return
     }
+    // Read host changes before advancing physics: an already armed deadline
+    // must not move content after the user turns Reduce Motion on.
+    reconcileScrollMomentumBindings()
+    guard scrollMomentum.hasActiveMomentum else { return }
     guard scheduledFrame.causes.contains(.deadline) else {
       // Not our cadence tick — keep a deadline armed so the loop wakes to tick.
       rearmScrollMomentumDeadline(from: frameClock())
@@ -152,6 +170,10 @@ extension RunLoop {
       scheduler.requestInvalidation(of: [tick.identity])
     }
     rearmScrollMomentumDeadline(from: now)
+  }
+
+  private var reducesScrollMotion: Bool {
+    runtimeConfiguration.stableOutput || effectiveAccessibilityPreferences().reduceMotion == true
   }
 
   private func rearmScrollMomentumDeadline(from now: MonotonicInstant) {

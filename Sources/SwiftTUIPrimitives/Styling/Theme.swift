@@ -250,6 +250,11 @@ package final class StyleHeavyFieldsStorage: Sendable {
 public struct StyleEnvironmentSnapshot: Equatable, Sendable {
   /// Live choices available to every custom style.
   public var accessibilityPreferences = AccessibilityPreferences()
+  /// Capture policy stays separate from the preference exposed to app authors.
+  package var stableOutput = false
+  package var renderingReduceMotion: Bool {
+    stableOutput || accessibilityPreferences.reduceMotion == true
+  }
 
   /// Effective contrast, with an explicit preference taking precedence over appearance.
   public var colorSchemeContrast: ColorSchemeContrast {
@@ -383,5 +388,6 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
       && lhs.isEnabled == rhs.isEnabled
       && lhs.cellPixelMetrics == rhs.cellPixelMetrics
       && lhs.accessibilityPreferences == rhs.accessibilityPreferences
+      && lhs.stableOutput == rhs.stableOutput
   }
 }

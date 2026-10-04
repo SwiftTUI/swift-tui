@@ -223,6 +223,9 @@ package enum HostWireSchema {
     ],
     "ScrollRoute": [
       .init(
+        "reducesMotion",
+        wire: .notSerialized("runtime-owned momentum policy; hosts send scroll intent only")),
+      .init(
         "scrollAnchorCorrection",
         wire: .notSerialized("frame commit command applied to the owning scroll binding")),
       .init(

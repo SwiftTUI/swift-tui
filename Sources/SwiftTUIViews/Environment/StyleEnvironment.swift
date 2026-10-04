@@ -645,6 +645,7 @@ extension EnvironmentValues {
       cellPixelMetrics: cellPixelMetrics
     )
     snapshot.accessibilityPreferences = accessibilityPreferences
+    snapshot.stableOutput = stableOutput
     return snapshot
   }
 

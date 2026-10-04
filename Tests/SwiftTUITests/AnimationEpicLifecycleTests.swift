@@ -209,6 +209,110 @@ struct AnimationEpicLifecycleTests {
     try await harness.wait(until: { probe.values.dropFirst(count).contains(1) })
   }
 
+  @Test(
+    "a live reduced-motion toggle settles properties and exits with one completion",
+    arguments: ["property", "implicit", "content", "matched", "insertion", "removal"])
+  func liveMotionSettlesAnimation(family: String) throws {
+    let probe = Probe()
+    let harness = try AnimatorRuntimeHarness(size: .init(width: 50, height: 8)) {
+      LiveMotionFixture(probe: probe, family: family)
+    }
+    defer { harness.shutdown() }
+    let now = MonotonicInstant.now()
+    harness.runLoop.frameClock = { now }
+    let controller = harness.runLoop.renderer.internalAnimationController
+    try withAnimationSinks(controller) { _ = try harness.clickText("start") }
+    #expect(
+      controller.activeAnimationCount > 0
+        || !controller.debugStateSnapshot().removingIdentities.isEmpty)
+    #expect(probe.events.isEmpty)
+    try withAnimationSinks(controller) { _ = try harness.clickText("reduce") }
+    #expect(controller.debugStateSnapshot().activeAnimationKeys.isEmpty)
+    #expect(controller.debugStateSnapshot().removingIdentities.isEmpty)
+    #expect(probe.events == ["finished"])
+    #expect(harness.frame.contains("TARGET") == (family != "removal"))
+    try withAnimationSinks(controller) { _ = try harness.clickText("reduce") }
+    #expect(controller.debugStateSnapshot().activeAnimationKeys.isEmpty)
+    #expect(probe.events == ["finished"])
+  }
+
+  private struct LiveMotionFixture: View {
+    let probe: Probe
+    let family: String
+    @State private var moved = false
+    @State private var reduced = false
+    var body: some View {
+      VStack(alignment: .leading) {
+        HStack {
+          Button("start") {
+            withAnimation(.linear(duration: .seconds(30))) {
+              moved = true
+            } completion: {
+              probe.events.append("finished")
+            }
+          }
+          Button("reduce") { reduced.toggle() }
+        }
+        if family == "content" {
+          Text(moved ? "TARGET200" : "TARGET100").contentTransition(.numericText())
+        } else if family == "matched" {
+          if moved {
+            HStack {
+              Text("other")
+              Text("TARGET").matchedGeometryEffect(id: "hero")
+            }
+          } else {
+            HStack {
+              Text("TARGET").matchedGeometryEffect(id: "hero")
+              Text("other")
+            }
+          }
+        } else if family == "implicit" {
+          Text("TARGET").offset(x: moved ? 12 : 0)
+            .animation(.linear(duration: .seconds(30)), value: moved)
+        } else if (family != "removal" || !moved) && (family != "insertion" || moved) {
+          Text("TARGET").frame(width: moved ? 30 : 10, alignment: .leading)
+        }
+      }
+      .environment(\.accessibilityReduceMotion, reduced)
+    }
+  }
+
+  @Test("animation timelines stop live and resume without replaying missed ticks")
+  func liveTimelineMotion() async throws {
+    let probe = Probe()
+    let harness = try AnimatorRuntimeHarness { TimelineMotionFixture(probe: probe) }
+    defer { harness.shutdown() }
+    try await harness.wait { probe.values.count >= 3 }
+    try harness.clickText("reduce")
+    let count = probe.values.count
+    let pose = probe.values.last
+    try await harness.hold(for: .milliseconds(350))
+    #expect(probe.values.count == count)
+    #expect(probe.values.last == pose)
+    try harness.clickText("reduce")
+    try await harness.wait { probe.values.count > count }
+    #expect((probe.values.last ?? 0) > (pose ?? 0))
+  }
+
+  private struct TimelineMotionFixture: View {
+    let probe: Probe
+    @State private var reduced = false
+    var body: some View {
+      VStack {
+        Button("reduce") { reduced.toggle() }
+        TimelineView(.animation(minimumInterval: .milliseconds(20))) { context in
+          Text("timeline").onChange(of: context.instant) { _, instant in
+            probe.values.append(
+              Double(instant.offset.components.seconds)
+                + Double(instant.offset.components.attoseconds) / 1e18)
+          }
+        }
+      }
+      .environment(\.accessibilityReduceMotion, reduced)
+    }
+  }
+
   private struct KeyframeFixture: View {
     let probe: Probe
     @State private var trigger = 0
