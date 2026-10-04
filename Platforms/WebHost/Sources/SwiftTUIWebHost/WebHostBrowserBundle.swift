@@ -87,7 +87,9 @@ package enum WebHostBrowserBundle {
       guard values.isRegularFile == true else {
         continue
       }
-      paths.append(relativePath)
+      // FileManager emits native separators on Windows; this inventory is
+      // consumed as HTTP resource paths on every platform.
+      paths.append(relativePath.replacingOccurrences(of: "\\", with: "/"))
     }
     return paths.sorted()
   }
