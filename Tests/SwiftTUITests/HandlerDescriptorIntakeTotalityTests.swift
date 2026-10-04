@@ -73,6 +73,9 @@ struct HandlerDescriptorIntakeTotalityTests {
     "Gestures/GestureModifiers.swift",
     "State/FocusState.swift",
     "State/AccessibilityFocusState.swift",
+    // Framework-owned review binding and scroll preparation, with no authored
+    // callback. Collection operations themselves go through the intake.
+    "Collections/CollectionAccessibilityNavigation.swift",
     "State/FocusedValue.swift",
     "Focus/DefaultFocus.swift",
   ]

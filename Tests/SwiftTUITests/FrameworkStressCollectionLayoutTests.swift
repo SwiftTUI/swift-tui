@@ -1204,7 +1204,38 @@ extension FrameworkStressCollectionLayoutTests {
       )
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      // Membership changes retire ordinal action tokens. A fresh renderer has
+      // no membership history, so align only those generations before comparing
+      // the complete semantic snapshot (including review position and actions).
+      var normalized = retained.semanticSnapshot
+      let retainedNavigator = normalized.accessibilityNodes.first { $0.label == "Review items" }!
+      let freshNavigator = fresh.semanticSnapshot.accessibilityNodes.first {
+        $0.label == "Review items"
+      }!
+      var identities = [retainedNavigator.identity: freshNavigator.identity]
+      for node in normalized.accessibilityNodes where node.role == .custom("listitem") {
+        if let old = node.actionIdentity,
+          let new = fresh.semanticSnapshot.accessibilityNodes.first(where: {
+            $0.identity == node.identity
+          })?.actionIdentity
+        {
+          identities[old] = new
+        }
+      }
+      for index in normalized.accessibilityNodes.indices {
+        if normalized.accessibilityNodes[index].identity == retainedNavigator.identity {
+          normalized.accessibilityNodes[index].identity = freshNavigator.identity
+          normalized.accessibilityNodes[index].actionTarget = freshNavigator.actionTarget
+        }
+        if let identity = normalized.accessibilityNodes[index].actionIdentity {
+          normalized.accessibilityNodes[index].actionIdentity = identities[identity] ?? identity
+        }
+      }
+      for index in normalized.accessibilityActionRegions.indices {
+        let identity = normalized.accessibilityActionRegions[index].identity
+        normalized.accessibilityActionRegions[index].identity = identities[identity] ?? identity
+      }
+      #expect(normalized == fresh.semanticSnapshot)
       #expect(collectionLayoutText(retained).contains("020 B-\(generation)"))
     }
   }

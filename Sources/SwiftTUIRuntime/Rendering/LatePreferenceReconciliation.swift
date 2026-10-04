@@ -390,7 +390,13 @@ func layoutRuntimeIssues(
   input: FrameTailInput,
   resolved: ResolvedNode
 ) -> [RuntimeIssue] {
-  input.layoutPassContext.runtimeIssues + rootRuntimeIssues(in: resolved)
+  // Lazy rows may resolve styles during layout, after the frame-head drain.
+  // Consume their diagnostics into this pass so they neither disappear from
+  // this frame nor leak into an unrelated renderer's next frame.
+  for issue in ImperativeRuntimeIssueQueue.drain() {
+    input.layoutPassContext.recordRuntimeIssue(issue)
+  }
+  return input.layoutPassContext.runtimeIssues + rootRuntimeIssues(in: resolved)
 }
 
 @MainActor

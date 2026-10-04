@@ -89,7 +89,13 @@ extension FrameTailRenderer {
     _ input: FrameTailInput
   ) -> Bool {
     assertOffloadSummaryMatchesScans(input.resolved)
-    return input.resolved.customLayoutFallbackSummary.layoutRealizedContentCount > 0
+    let summary = input.resolved.customLayoutFallbackSummary
+    // A live indexed source also realizes graph nodes during layout. Large
+    // sources deliberately skip the worker snapshot; their viewport's node
+    // records must join the prepared checkpoint just like layout-realized
+    // content, or commit restores the pre-layout graph and drops their actions.
+    return summary.layoutRealizedContentCount > 0
+      || summary.mainActorOnlyIndexedChildSourceCount > 0
   }
 
   /// DEBUG drift oracle: the O(1) summary answers must agree with the

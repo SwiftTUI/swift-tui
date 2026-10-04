@@ -13,6 +13,79 @@ struct OffscreenAccessibilityTests {
   }
 
   @Test(
+    "unbounded outlines keep exact row allocations on cold and retained frames",
+    arguments: [1, 100])
+  func unboundedOutline(count: Int) {
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("UnboundedOutline")
+    for version in 0..<2 {
+      let result = renderer.render(
+        VStack {
+          OutlineGroup((0..<count).map { OutlineRecord(id: $0) }, children: \.children) { row in
+            Button("Record \(row.id) version \(version)") {}
+          }
+          Text("Footer \(version)")
+        },
+        context: .init(
+          identity: rootIdentity, invalidatedIdentities: version == 0 ? [] : [rootIdentity]))
+      let buttons = result.semanticSnapshot.accessibilityNodes.filter { $0.role == .button }
+      #expect(buttons.count == count)
+      #expect(buttons.last?.label == "Record \(count - 1) version \(version)")
+      #expect(result.rasterSurface.lines.joined().contains("Footer \(version)"))
+    }
+  }
+
+  @Test(
+    "a styled collection's far action survives assistive and keyboard focus commits",
+    arguments: [false, true])
+  func wrappedAction(asyncDriver: Bool) async throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("WrappedReview"), size: .init(width: 80, height: 40)
+    ) {
+      OffscreenWrappedActionFixture()
+    }
+    defer { harness.shutdown() }
+    var frames = 0
+    func render() async throws {
+      if asyncDriver {
+        try await harness.runLoop.renderPendingFramesAsync(renderedFrames: &frames)
+      } else {
+        try harness.runLoop.renderPendingFrames(renderedFrames: &frames)
+      }
+    }
+    func send(_ label: String, _ action: AccessibilityAction) throws {
+      let target = try #require(
+        harness.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.first {
+          $0.label == label
+        }?.actionTarget)
+      #expect(
+        harness.runLoop.handleAccessibilityAction(.init(target: target, action: action))
+          == .accepted)
+    }
+    try send("Review items in Records", .accessibilityFocus)
+    try send("Review items in Records", .setValue(.number(1000)))
+    try await render()
+    try send("Review items in Records", .accessibilityBlur)
+    try send("Review items in Records", .custom("Read item"))
+    try await render()
+    let reviewed = try #require(
+      harness.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.first {
+        $0.isAccessibilityFocused
+      }?.actionTarget)
+    #expect(
+      harness.runLoop.handleAccessibilityAction(.init(target: reviewed, action: .accessibilityBlur))
+        == .accepted)
+    try send("Inspect 999", .focus)
+    try await render()
+    try send("Inspect 999", .activate)
+    try await render()
+    #expect(
+      harness.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.contains {
+        $0.label == "Inspections 1"
+      })
+  }
+
+  @Test(
     "disabled collections remain readable offscreen without enabling row operations",
     arguments: [false, true])
   func disabledReview(table: Bool) throws {
@@ -385,6 +458,7 @@ struct OffscreenAccessibilityTests {
       table ? reviewed.properties?.rowIndex == 10_001 : reviewed.properties?.positionInSet == 10_000
     )
     #expect(harness.runLoop.focusTracker.currentFocusIdentity == keyboardFocus)
+    try send("Inspect 9999", .focus)
     try send("Inspect 9999", .activate)
     #expect(activations == [9999])
     let farTarget = try target("Inspect 9999")
@@ -459,6 +533,30 @@ private struct OffscreenFocusPriorityFixture: View {
         ids.reverse()
         heading = true
       }
+    }
+  }
+}
+
+private struct OffscreenWrappedActionFixture: View {
+  @State private var records = Array(0..<1000)
+  @State private var selected: Int? = nil
+  @State private var inspections = 0
+  @State private var mode = 0
+  private func record(_ id: Int) -> some View {
+    Button("Inspect \(id)") { inspections += 1 }
+  }
+  var body: some View {
+    VStack {
+      Text("Inspections \(inspections)")
+      Group {
+        if mode == 0 {
+          List(records, id: \.self, selection: $selected) { record($0) }
+        } else {
+          Text("Inactive")
+        }
+      }.listStyle(.automatic).tableStyle(.automatic).outlineStyle(.rounded)
+        .accessibilityLabel("Records").frame(height: 12)
+      Button("Other") {}
     }
   }
 }

@@ -370,7 +370,8 @@ extension LayoutEngine {
   ///
   /// Estimate products carry no child measurements and no allocation
   /// snapshot, and are never stored in the cross-frame measurement cache.
-  /// Ineligible: any in-scope measure-viewport hint (a claimed hint means
+  /// Ineligible: a commit-grade measurement (it must carry placement),
+  /// any in-scope measure-viewport hint (a claimed hint means
   /// this measure is part of a windowed band — exhaustive semantics stay),
   /// overlapping negative spacing. Empty and multi-fragment probes keep their
   /// logical cardinality and use an explicitly estimated nonempty extent.
@@ -379,6 +380,7 @@ extension LayoutEngine {
   /// through to the exhaustive arm.
   func scheduleLazyStackIdealEstimate(
     for node: ResolvedNode,
+    grade: MeasurementGrade,
     originalProposal: ProposedSize,
     effectiveProposal: ProposedSize,
     passContext: LayoutPassContext?,
@@ -386,7 +388,10 @@ extension LayoutEngine {
     work: inout [MeasurementWorkItem],
     results: inout [MeasuredNode]
   ) -> Bool {
-    guard LazyStackIdealEstimateGate.isEnabled,
+    // Only an allocator probe is guaranteed a later exact placement round.
+    // An unbounded final measurement (including a standalone outline) must
+    // retain real child allocations even when a previous extent is available.
+    guard grade == .probe, LazyStackIdealEstimateGate.isEnabled,
       case .lazyStack(let axis, let spacingOverride, _, _) = node.layoutBehavior,
       let source = node.indexedChildSource,
       case .unspecified = mainDimension(of: effectiveProposal, for: axis)

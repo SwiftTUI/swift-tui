@@ -12,9 +12,9 @@ import SwiftTUICore
 //
 // This is the channel only. Each family owns its validation predicate and its
 // automatic fallback. Every family records through
-// `ImperativeRuntimeIssueQueue`, which the frame head drains into that frame's
-// issue channel after the graph resolves, so a resolve-time report surfaces
-// on the same frame.
+// `ImperativeRuntimeIssueQueue`, which the frame head and late-layout stage
+// drain into that frame's issue channel, so eagerly resolved and lazy-row
+// reports both surface on the same frame.
 
 /// Constructs and routes the runtime issues shared by every style family's
 /// presentation validation.

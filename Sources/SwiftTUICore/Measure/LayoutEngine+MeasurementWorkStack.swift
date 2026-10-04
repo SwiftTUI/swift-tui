@@ -508,6 +508,7 @@ extension LayoutEngine {
       if case .lazyStack = node.layoutBehavior,
         scheduleLazyStackIdealEstimate(
           for: node,
+          grade: grade,
           originalProposal: proposal,
           effectiveProposal: effectiveProposal,
           passContext: passContext,
