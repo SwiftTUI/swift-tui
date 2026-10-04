@@ -1063,7 +1063,8 @@ extension FrameworkStressToastLifecycleTests {
       let frame = try harness.clickText("Activate Base Under Toast 021")
       #expect(frame.contains("base activation count \(count)"))
       #expect(frame.contains("nonmodal interaction toast"))
-      #expect(harness.actionRegistrationCount == 1)
+      // One base action and one semantic Dismiss for the live toast.
+      #expect(harness.actionRegistrationCount == 2)
       #expect(toastLifecycleEntryCount(in: harness) == 1)
     }
   }
@@ -1106,6 +1107,12 @@ extension FrameworkStressToastLifecycleTests {
       let frame = try harness.pressKey(KeyPress(.character("t"), modifiers: .ctrl))
       #expect(harness.runLoop.focusTracker.currentFocusIdentity == expectedFocus)
       #expect(harness.focusRegionCount == baselineRegions)
+      // Assistive Dismiss remains available without an ordinary Tab stop.
+      let status = harness.runLoop.latestSemanticSnapshot.accessibilityNodes.first {
+        $0.role == .status
+      }
+      #expect(
+        (status?.control?.customActions.contains("Dismiss") == true) == !cycle.isMultiple(of: 2))
       #expect(harness.focusModalRestorationStackCount == 0)
       #expect(toastLifecycleEntryCount(in: harness) == (cycle.isMultiple(of: 2) ? 0 : 1))
       #expect(frame.contains("focus neutral toast") == !cycle.isMultiple(of: 2))

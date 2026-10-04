@@ -267,7 +267,7 @@ struct StyledControlAccessibilityTests {
     )
     let names = snapshot.accessibilityNodes.filter {
       [
-        .toggle, .slider, .stepper, .picker, .textField, .secureField, .disclosureGroup,
+        .toggle, .slider, .stepper, .picker, .textField, .secureField, .button,
         .progressBar,
       ]
       .contains($0.role)
@@ -326,7 +326,7 @@ struct StyledControlAccessibilityTests {
     )
     #expect(named.accessibilityWarnings.isEmpty)
     #expect(named.accessibilityNodes.first { $0.role == .button }?.label == "Save")
-    #expect(named.accessibilityNodes.first { $0.role == .disclosureGroup }?.label == "Details")
+    #expect(named.accessibilityNodes.first { $0.properties?.expanded == true }?.label == "Details")
 
     // Without a usable name, or outside the label, the icon is a genuine omission.
     let unnamed = render(

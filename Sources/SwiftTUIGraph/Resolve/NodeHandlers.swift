@@ -69,6 +69,7 @@ package struct ActionNodeRecord: RuntimeNodeRecord {
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,
     accessibilityHandler: LocalActionRegistry.AccessibilityHandler? = nil,
+    hasActivationHandler: Bool = true,
     followUpInvalidationIdentity: Identity?,
     owner: RuntimeRegistrationOwnerKey
   ) {
@@ -76,6 +77,7 @@ package struct ActionNodeRecord: RuntimeNodeRecord {
     registrations[identity] = .init(
       handler: handler,
       accessibilityHandler: accessibilityHandler,
+      hasActivationHandler: hasActivationHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity
     )
   }
@@ -782,12 +784,14 @@ package struct NodeHandlers {
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,
     accessibilityHandler: LocalActionRegistry.AccessibilityHandler? = nil,
+    hasActivationHandler: Bool = true,
     followUpInvalidationIdentity: Identity?
   ) {
     recordAction(
       identity: identity,
       handler: handler,
       accessibilityHandler: accessibilityHandler,
+      hasActivationHandler: hasActivationHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity,
       owner: .current(identity: identity)
     )
@@ -797,6 +801,7 @@ package struct NodeHandlers {
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,
     accessibilityHandler: LocalActionRegistry.AccessibilityHandler? = nil,
+    hasActivationHandler: Bool = true,
     followUpInvalidationIdentity: Identity?,
     owner: RuntimeRegistrationOwnerKey
   ) {
@@ -804,6 +809,7 @@ package struct NodeHandlers {
       identity: identity,
       handler: handler,
       accessibilityHandler: accessibilityHandler,
+      hasActivationHandler: hasActivationHandler,
       followUpInvalidationIdentity: followUpInvalidationIdentity,
       owner: owner
     )

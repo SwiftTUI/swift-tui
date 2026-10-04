@@ -73,6 +73,16 @@ extension View {
   public func accessibilityRemoveTraits(_ traits: AccessibilityTraits) -> some View {
     modifier(AccessibilityTraitsModifier(traits: traits, removing: true))
   }
+
+  /// Presentation operations stay outside ordinary keyboard traversal.
+  package func accessibilityPresentationAction(
+    named name: String, _ action: @escaping @MainActor @Sendable () -> Void
+  ) -> some View {
+    modifier(
+      AccessibilityAuthoredActionModifier(
+        kinds: [.custom], name: name, scope: currentImperativeAuthoringContextSnapshot(),
+        action: { _ in action() }, includesKeyboardFocus: false))
+  }
 }
 
 private struct AccessibilityAuthoredActionModifier: IterativePrimitiveViewModifier {
@@ -80,6 +90,7 @@ private struct AccessibilityAuthoredActionModifier: IterativePrimitiveViewModifi
   let name: String?
   let scope: ImperativeAuthoringContextSnapshot?
   let action: @MainActor @Sendable (AccessibilityAction) -> Void
+  var includesKeyboardFocus = true
 
   func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>, in context: ResolveContext
@@ -89,7 +100,9 @@ private struct AccessibilityAuthoredActionModifier: IterativePrimitiveViewModifi
       if let name, name.allSatisfy(\.isWhitespace) { return [node] }
       let previous = node.semanticMetadata.accessibilityControl
       var actions = previous?.actions ?? []
-      for kind in [.focus] + kinds where !actions.contains(kind) { actions.append(kind) }
+      let focusActions: [AccessibilityActionKind] =
+        includesKeyboardFocus ? [.focus] : [.accessibilityFocus, .accessibilityBlur]
+      for kind in focusActions + kinds where !actions.contains(kind) { actions.append(kind) }
       var names = previous?.customActions ?? []
       if let name, !names.contains(name) { names.append(name) }
       node.semanticMetadata.accessibilityControl = .init(
@@ -97,7 +110,7 @@ private struct AccessibilityAuthoredActionModifier: IterativePrimitiveViewModifi
         maximum: previous?.maximum, step: previous?.step, selection: previous?.selection,
         customActions: names,
         opensLink: kinds.contains(.activate) ? false : previous?.opensLink ?? false)
-      node.semanticMetadata.isFocusable = true
+      if includesKeyboardFocus { node.semanticMetadata.isFocusable = true }
       if node.semanticMetadata.accessibilityRole == nil {
         node.semanticMetadata.accessibilityRole = kinds.contains(.increment) ? .stepper : .button
       }

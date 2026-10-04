@@ -77,6 +77,8 @@ struct DuplicateRegistrationProbeTests {
       #expect(
         registry.dispatchAccessibility(identity: identity, action: .custom("Reset")) == .changed)
       #expect(calls == 111)
+      #expect(registry.hasActivationHandler(identity: identity))
+      #expect(node.registeredHandlers.action.registrations[identity]?.hasActivationHandler == true)
       ViewNodeContext.withValue(node) {
         registry.composeAccessibility(
           identity: identity, preservingExisting: false, followUpInvalidationIdentity: nil
@@ -93,6 +95,13 @@ struct DuplicateRegistrationProbeTests {
       )
       #expect(registry.dispatchAccessibility(identity: identity, action: .decrement) == .changed)
       #expect(calls == 1111)
+      #expect(!registry.hasActivationHandler(identity: identity))
+      #expect(node.registeredHandlers.action.registrations[identity]?.hasActivationHandler == false)
+      let restored = LocalActionRegistry()
+      restored.restore(node.registeredHandlers.action.registrations)
+      #expect(!restored.hasActivationHandler(identity: identity))
+      #expect(restored.dispatchAccessibility(identity: identity, action: .decrement) == .changed)
+      #expect(calls == 2111)
       #expect(alarmCount == before)
     }
   }

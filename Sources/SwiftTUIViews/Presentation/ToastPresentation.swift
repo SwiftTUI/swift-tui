@@ -838,7 +838,7 @@ private struct ToastPresentationView: View {
     .accessibilityElement(children: .combine)
     .accessibilityRole(.status)
     .accessibilityLiveRegion(.polite)
-    .accessibilityAction(named: "Dismiss") { item.dismiss() }
+    .accessibilityPresentationAction(named: "Dismiss") { item.dismiss() }
     // Keyed on duration so replacing the active deadline (nil<->finite,
     // shorter/longer) cancels the running sleep and arms the current one.
     .task(id: item.duration) {

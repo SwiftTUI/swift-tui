@@ -6,15 +6,19 @@ package final class LocalActionRegistry: Equatable {
   package struct Registration {
     package var handler: Handler
     package var accessibilityHandler: AccessibilityHandler?
+    /// Semantic-only operations must not intercept keyboard/pointer activation.
+    package var hasActivationHandler: Bool
     package var followUpInvalidationIdentity: Identity?
 
     package init(
       handler: @escaping Handler,
       accessibilityHandler: AccessibilityHandler? = nil,
+      hasActivationHandler: Bool = true,
       followUpInvalidationIdentity: Identity? = nil
     ) {
       self.handler = handler
       self.accessibilityHandler = accessibilityHandler
+      self.hasActivationHandler = hasActivationHandler
       self.followUpInvalidationIdentity = followUpInvalidationIdentity
     }
   }
@@ -79,6 +83,10 @@ package final class LocalActionRegistry: Equatable {
     store[identity] != nil
   }
 
+  package func hasActivationHandler(identity: Identity) -> Bool {
+    store[identity]?.hasActivationHandler == true
+  }
+
   /// Intentionally decorates a control's one registration. Unlike registering
   /// another primitive at the same identity, this preserves its default action
   /// and delegates unhandled assistive operations to the preceding contribution.
@@ -98,6 +106,7 @@ package final class LocalActionRegistry: Equatable {
     }
     let registration = Registration(
       handler: handler, accessibilityHandler: accessibility,
+      hasActivationHandler: inherited?.hasActivationHandler ?? false,
       followUpInvalidationIdentity: followUpInvalidationIdentity)
     store.set(registration, for: identity, owner: .current(identity: identity))
     ViewNodeContext.current?.recordComposedActionRegistration(

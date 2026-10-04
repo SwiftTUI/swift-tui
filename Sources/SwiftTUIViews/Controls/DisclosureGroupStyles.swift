@@ -171,18 +171,7 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
 
     /// The captured authored content.
     public var body: some View {
-      CapturedSubviewView(payload: payload, isAccessibilityContent: true)
-        .semanticMetadata(contentSemantics)
-    }
-
-    private var contentSemantics: SemanticMetadata {
-      guard let controlIdentity else { return .init() }
-      var metadata = SemanticMetadata(accessibilityRole: .region)
-      metadata.isAccessibilityContent = true
-      metadata.accessibilityProperties = .init(
-        labelledBy: [controlIdentity],
-        identifier: controlIdentity.child(.named("AccessibilityDisclosureContent")))
-      return metadata
+      DisclosureAccessibilityContent(payload: payload, controlIdentity: controlIdentity)
     }
   }
 
@@ -278,6 +267,32 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
   package mutating func bindRoutes(to identity: Identity, expanded: Bool) {
     controlIdentity = identity
     content.controlIdentity = expanded ? identity : nil
+  }
+}
+
+/// Keep the labelled region separate from its payload: fusing a region role
+/// onto a single Text or Button replaces that child's own reading semantics.
+private struct DisclosureAccessibilityContent: PrimitiveView, IterativeResolvableView {
+  let payload: CapturedSubviewPayload
+  let controlIdentity: Identity?
+
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    payload.resolveElementsWork(in: context.child(component: .named("DisclosureContent"))).map {
+      completed in
+      let children = markingAccessibilityContent(completed)
+      guard let controlIdentity else { return children }
+      var metadata = SemanticMetadata(accessibilityRole: .region)
+      metadata.isAccessibilityContent = true
+      metadata.accessibilityProperties = .init(
+        labelledBy: [controlIdentity],
+        identifier: controlIdentity.child(.named("AccessibilityDisclosureContent")))
+      return [
+        ResolvedNode(
+          identity: context.identity, kind: .view("DisclosureContent"), children: children,
+          environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
+          semanticMetadata: metadata)
+      ]
+    }
   }
 }
 

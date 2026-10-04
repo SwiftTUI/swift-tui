@@ -1620,6 +1620,7 @@ package final class ViewNode {
     registeredHandlers.recordAction(
       identity: identity, handler: registration.handler,
       accessibilityHandler: registration.accessibilityHandler,
+      hasActivationHandler: registration.hasActivationHandler,
       followUpInvalidationIdentity: registration.followUpInvalidationIdentity)
     refreshCommittedHandlerInventoryOutsideCapture()
   }

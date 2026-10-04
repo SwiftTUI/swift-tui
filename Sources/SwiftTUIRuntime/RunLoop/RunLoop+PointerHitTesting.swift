@@ -269,6 +269,7 @@ extension RunLoop {
     return localActionRegistry.snapshot().keys
       .filter { candidate in
         candidate.isDescendant(of: identity)
+          && localActionRegistry.hasActivationHandler(identity: candidate)
       }
       .min { lhs, rhs in
         let lhsDepth = identityDepth(lhs)
@@ -300,7 +301,7 @@ extension RunLoop {
       if candidate != identity, mintsFocusRegion(candidate) {
         return nil
       }
-      if localActionRegistry.hasHandler(identity: candidate) {
+      if localActionRegistry.hasActivationHandler(identity: candidate) {
         return candidate
       }
       assertNoInfiniteIdentityLoop(candidate)
@@ -333,7 +334,7 @@ extension RunLoop {
   ) -> Identity? {
     var current: Identity? = identity
     while let candidate = current {
-      if localActionRegistry.hasHandler(identity: candidate),
+      if localActionRegistry.hasActivationHandler(identity: candidate),
         handlerRegionPermitsPointerActivation(candidate, at: location)
       {
         return candidate
@@ -368,6 +369,7 @@ extension RunLoop {
     return localActionRegistry.snapshot().keys
       .filter { candidate in
         candidate.isDescendant(of: identity)
+          && localActionRegistry.hasActivationHandler(identity: candidate)
           && handlerRegion(candidate, contains: location)
       }
       .min { lhs, rhs in

@@ -657,7 +657,8 @@ extension FrameworkStressPopoverTipLifecycleTests {
       #expect(frame.contains("First duplicate tip \(generation)"))
       #expect(frame.contains("Second duplicate tip \(generation)"))
       #expect(popoverTipStressEntryIDs(in: harness) == initialEntryIDs)
-      #expect(harness.actionRegistrationCount <= 2)
+      // Each live tip has its named action and one semantic Dismiss.
+      #expect(harness.actionRegistrationCount <= 4)
     }
   }
 }
@@ -995,7 +996,8 @@ extension FrameworkStressPopoverTipLifecycleTests {
         model.sourceVisible && model.hasTip && model.isEligible && model.primaryPresented
       #expect(popoverTipStressEntryCount(in: harness) == (expectsEntry ? 1 : 0))
       #expect(frame.contains(model.title) == expectsEntry)
-      #expect(harness.actionRegistrationCount <= 4)
+      // Base action, up to three tip actions, and one semantic Dismiss.
+      #expect(harness.actionRegistrationCount <= 5)
       #expect(harness.focusRegionCount <= 3)
     }
 
