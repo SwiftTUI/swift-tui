@@ -353,6 +353,7 @@ function isSupportedImageFormat(value) {
 // src/AccessibilityTree.ts
 class AccessibilityTreeMounter {
   sendAction;
+  openLink;
   element;
   announcerElement;
   domIdentity = Array.from(crypto.getRandomValues(new Uint32Array(4)), (part) => part.toString(16)).join("-");
@@ -388,8 +389,9 @@ class AccessibilityTreeMounter {
   isTabStop(node) {
     return !!this.sendAction && !!node.actionTarget && node.isEnabled !== false && !!node.actions?.includes("focus");
   }
-  constructor(sendAction) {
+  constructor(sendAction, openLink) {
     this.sendAction = sendAction;
+    this.openLink = openLink;
     this.element = document.createElement("div");
     this.element.className = "webhost-scene__accessibility-tree";
     this.element.style.position = "absolute";
@@ -613,9 +615,20 @@ class AccessibilityTreeMounter {
       return element;
     }
     element.addEventListener("click", (event) => {
-      if (tag === "a")
-        event.preventDefault();
       event.stopPropagation();
+      const model = current();
+      if (tag === "a") {
+        if (model?.opensLink && model.isEnabled !== false && model.properties?.readOnly !== true) {
+          if (this.openLink && model.value?.type === "text") {
+            event.preventDefault();
+            this.openLink(model.value.value);
+            return;
+          }
+          if (element.hasAttribute("href"))
+            return;
+        }
+        event.preventDefault();
+      }
       send({ action: "activate" });
     });
     if (tag === "a") {
@@ -630,7 +643,7 @@ class AccessibilityTreeMounter {
         event.stopPropagation();
         if (!element.hasAttribute("href")) {
           event.preventDefault();
-          send({ action: "activate" });
+          element.click();
         }
         return;
       }
@@ -712,6 +725,8 @@ class AccessibilityTreeMounter {
     element.dataset.accessibilityId = node.id;
     element.tabIndex = this.isTabStop(node) ? 0 : -1;
     if (element.tagName === "A") {
+      element.setAttribute("target", "_blank");
+      element.setAttribute("rel", "noopener noreferrer");
       const destination = node.value?.type === "text" ? node.value.value : undefined;
       setOrRemoveAttribute(element, "href", node.isEnabled !== false ? safeLinkDestination(destination) : undefined);
       element.style.pointerEvents = "auto";
@@ -741,10 +756,10 @@ class AccessibilityTreeMounter {
       text.remove();
       this.readingText.delete(element);
     }
-    setOrRemoveAttribute(element, "aria-description", properties?.description ?? ([
+    setOrRemoveAttribute(element, "aria-description", [
       !supportsValueText(node.role) && node.role !== "secureField" ? properties?.valueDescription : undefined,
-      node.hint
-    ].filter(Boolean).join("; ") || undefined));
+      properties?.description ?? node.hint
+    ].filter(Boolean).join("; ") || undefined);
     setOrRemoveAttribute(element, "lang", properties?.language);
     setOrRemoveAttribute(element, "aria-live", node.liveRegion || undefined);
     if (node.isFocused) {
@@ -2718,7 +2733,7 @@ function isWebHostAccessibilityNode(value) {
     return false;
   }
   const node = value;
-  return (node.customActions === undefined || Array.isArray(node.customActions) && node.customActions.length <= 65536 && node.customActions.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.customActions).size === node.customActions.length) && (node.selection === undefined || isAccessibilitySelection(node.selection)) && (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
+  return (node.opensLink === undefined || typeof node.opensLink === "boolean") && (node.customActions === undefined || Array.isArray(node.customActions) && node.customActions.length <= 65536 && node.customActions.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.customActions).size === node.customActions.length) && (node.selection === undefined || isAccessibilitySelection(node.selection)) && (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
 }
 function isAccessibilitySelection(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -5807,7 +5822,7 @@ class WebHostSceneRuntime {
     }
     this.accessibilityTree = new AccessibilityTreeMounter((target, request, requestID) => {
       this.onInput(encodeAccessibilityActionMessage(target, request, requestID));
-    });
+    }, this.onOpenHyperlink);
     this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
     if (this.domSurfaceRoot)
       this.domFocus = new DomFocusPresentation(this.terminalMount, () => this.nativePointerGesture || this.hasSurfaceSelection());
