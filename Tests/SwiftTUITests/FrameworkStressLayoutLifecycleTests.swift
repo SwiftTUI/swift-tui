@@ -596,7 +596,7 @@ extension FrameworkStressLayoutLifecycleTests {
       _ = try harness.clickText("Increment Destination Local")
       let frame = try harness.clickText("Refresh Item Payload")
       #expect(frame.contains("item version \(version) local \(version)"))
-      #expect(harness.actionRegistrationCount <= 3)
+      #expect(harness.actionRegistrationCount <= 4)  // Includes the live semantic Back operation.
     }
   }
 }
@@ -914,7 +914,7 @@ extension FrameworkStressLayoutLifecycleTests {
       _ = try harness.clickText("Increment Sheet Local", chooseLast: true)
       let frame = try harness.clickText("Refresh Sheet Payload", chooseLast: true)
       #expect(frame.contains("sheet version \(generation) local \(generation)"))
-      #expect(harness.actionRegistrationCount <= 4)
+      #expect(harness.actionRegistrationCount <= 5)  // Includes the live semantic Dismiss operation.
     }
   }
 }
@@ -1797,7 +1797,7 @@ extension FrameworkStressLayoutLifecycleTests {
     for generation in 1...8 {
       let frame = try harness.clickText("Advance Root Environment", chooseLast: true)
       #expect(frame.contains("sheet environment \(generation)"))
-      #expect(harness.actionRegistrationCount <= 3)
+      #expect(harness.actionRegistrationCount <= 4)  // Includes the live semantic Dismiss operation.
     }
   }
 }

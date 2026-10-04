@@ -28,6 +28,27 @@ public struct TabView<SelectionValue: Hashable, Content: View>: PrimitiveView,
 }
 
 extension TabView {
+  private struct AccessibilityTokens: Sendable {
+    var next: UInt64 = 0
+    var current: [TabDormantKey: UInt64] = [:]
+    mutating func assign(_ options: [TabOption]) -> [UInt64] {
+      var retained: [TabDormantKey: UInt64] = [:]
+      let values = options.map { option in
+        let value: UInt64
+        if let existing = current[option.dormantKey] {
+          value = existing
+        } else {
+          next += 1
+          value = next
+        }
+        retained[option.dormantKey] = value
+        return value
+      }
+      current = retained
+      return values
+    }
+  }
+
   private struct TabOption: Sendable {
     var tag: SelectionTag
     var label: TabItemLabel
@@ -63,9 +84,15 @@ extension TabView {
     // Input handlers capture tags only. Capturing the option array also owns
     // every deferred payload's authored State seeds through retained chrome.
     let orderedTags = options.map(\.tag)
+    // An authored Binding(get:set:) may read the enclosing view's State.
+    // Resolve that read in its authoring scope while retaining this tab's
+    // reader attribution; the tab node does not own the enclosing State.
+    let selectedValue = withAuthoringContext(authoringScope ?? currentAuthoringContext()) {
+      selection.wrappedValue
+    }
     let selectedIndex =
       options.firstIndex { option in
-        pickerSelectionMatches(option.tag, selection: selection.wrappedValue)
+        pickerSelectionMatches(option.tag, selection: selectedValue)
       }
       ?? options.indices.first
     let selectedDormantKey = selectedIndex.map { options[$0].dormantKey }
@@ -73,6 +100,19 @@ extension TabView {
       in: context, ownerNode: ownerNode,
       declaredDormantKeys: options.map(\.dormantKey), selectedDormantKey: selectedDormantKey,
       selectedTagComponent: selectedIndex.map { options[$0].tag.identityComponent })
+    var semanticTokens =
+      ownerNode?.stateSlot(
+        ordinal: StateSlotOrdinals.tabAccessibilityTokens, seed: AccessibilityTokens())
+      ?? AccessibilityTokens()
+    let tokens = semanticTokens.assign(options)
+    ownerNode?.setStateSlotSilently(
+      ordinal: StateSlotOrdinals.tabAccessibilityTokens, value: semanticTokens)
+    let semanticTabs = options.indices.map { index in
+      AccessibilityTabMetadata(
+        identity: context.identity.child("AccessibilityTab\(tokens[index])"),
+        visualIdentity: tabItemIdentity(for: context.identity, index: index),
+        label: options[index].label.displayText, selected: selectedIndex == index)
+    }
     let selectedContentEntityIdentity = dormantSelection.entityIdentity
     let selectedContentStructuralIdentity = dormantSelection.structuralIdentity
     let dormantArchiveRefreshRequest = dormantSelection.refreshRequest
@@ -175,6 +215,16 @@ extension TabView {
         context: context,
         fallbackAuthoringScope: authoringScope
       )
+      for index in orderedTags.indices {
+        let tag = orderedTags[index]
+        let target = semanticTabs[index].identity
+        intake.registerAction(identity: target) {
+          guard !pickerSelectionMatches(tag, selection: binding.wrappedValue) else { return false }
+          TabSelectionState.setStoredTabOverflowMenuExpanded(
+            false, in: ownerNode, invalidationIdentity: context.identity)
+          return setBoundSelection(binding, to: tag)
+        }
+      }
       intake.registerKeyPressHandler(
         identity: context.identity,
         handler: {
@@ -369,6 +419,7 @@ extension TabView {
         controlIdentity: context.identity,
         payloadEntityIdentity: selectedContentEntityIdentity,
         payloadStructuralIdentity: selectedContentStructuralIdentity,
+        restoreActiveContent: dormantSelection.restoreActiveContent,
         dormantArchiveLocatorSink: TabDormancy.makeLocatorSink(
           ownerNode: ownerNode,
           key: selectedDormantKey
@@ -376,8 +427,8 @@ extension TabView {
       )
     )
     var tabBodyContext = context.child(component: .named("TabBody"))
-    if optionsChurned {
-      // The options changed value across a re-resolve. Force the style body to
+    if optionsChurned || dormantSelection.restoreActiveContent != nil {
+      // Options or style changed across a re-resolve. Force the style body to
       // recompute even if the TabView node reused across an `.id`-island seam,
       // so the rendered chrome (route/label bindings) follows the new options
       // instead of being served stale by value-blind Layer-A reuse.
@@ -396,6 +447,9 @@ extension TabView {
         transactionSnapshot: context.transaction,
         semanticMetadata: tabViewSemanticMetadata()
       )
+      var structure = AccessibilityStructure()
+      structure.tabs = semanticTabs
+      node.semanticMetadata.accessibilityStructure = structure
       if let dormantArchiveRefreshRequest {
         node.preferenceValues[DormantTabArchiveRefreshPreferenceKey.self] = [
           dormantArchiveRefreshRequest

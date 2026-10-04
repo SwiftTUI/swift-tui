@@ -181,7 +181,13 @@ package struct PortalAttachmentSequenceView: PrimitiveView, IterativeResolvableV
       return payload.resolveElementsWork(in: childContext, placementRoot: context).map {
         result.nodes.append(contentsOf: $0)
       }
-    }.map { result.nodes }
+    }.map {
+      result.nodes.map { completed in
+        var node = completed
+        node.semanticMetadata.isAccessibilityContent = true
+        return node
+      }
+    }
   }
 
   package func appendDeclaredChildrenWork(
@@ -399,12 +405,14 @@ package struct PortalAttachmentGroupView: PrimitiveView, IterativeResolvableView
           result.nodes.append(contentsOf: $0)
         }
       }.map {
-        [
+        var metadata = SemanticMetadata()
+        metadata.isAccessibilityContent = true
+        return [
           ResolvedNode(
             identity: context.identity, kind: .view(kindName),
             typeDiscriminator: ObjectIdentifier(SynthesizedGroupWrapperMarker.self),
             children: result.nodes, environmentSnapshot: context.environment,
-            transactionSnapshot: context.transaction)
+            transactionSnapshot: context.transaction, semanticMetadata: metadata)
         ]
       }
     }

@@ -399,7 +399,7 @@ public struct TabViewStyleItemConfiguration: Sendable {
         StyleRouteTarget(
           identity: tabItemIdentity(for: controlIdentity, index: index),
           family: "TabViewStyle",
-          role: "item"
+          role: "item", accessibilityHidden: true
         )
       }, content: content())
   }
@@ -422,7 +422,7 @@ public struct TabViewStyleItemConfiguration: Sendable {
         StyleRouteTarget(
           identity: tabOverflowItemIdentity(for: controlIdentity, index: index),
           family: "TabViewStyle",
-          role: "overflow item"
+          role: "overflow item", accessibilityHidden: true
         )
       }, content: content())
   }
@@ -810,6 +810,7 @@ public struct TabViewStyleBodyConfiguration: Sendable {
   /// strip with nothing under it.
   public struct Content: PrimitiveView, IterativeResolvableView, Sendable {
     package var payload: LazySubviewPayload?
+    package var restoreActiveContent: (@MainActor @Sendable () -> Void)?
     /// The declaring `TabView`'s control identity — the identity focus rests
     /// on while the tab strip is focused. Recorded so the content slot can
     /// declare itself focus-presentation-inert for that control: the values
@@ -837,10 +838,12 @@ public struct TabViewStyleBodyConfiguration: Sendable {
       controlIdentity: Identity? = nil,
       payloadEntityIdentity: EntityIdentity? = nil,
       payloadStructuralIdentity: TabDormantPayloadStructuralIdentity? = nil,
+      restoreActiveContent: (@MainActor @Sendable () -> Void)? = nil,
       dormantArchiveLocatorSink:
         (@MainActor @Sendable (DormantStateArchiveLocator) -> Void)? = nil
     ) {
       self.payload = payload
+      self.restoreActiveContent = restoreActiveContent
       self.controlIdentity = controlIdentity
       self.payloadEntityIdentity = payloadEntityIdentity
       self.payloadStructuralIdentity = payloadStructuralIdentity
@@ -887,11 +890,18 @@ public struct TabViewStyleBodyConfiguration: Sendable {
         )
       }
 
-      // Keep the style-owned content slot transparent while preserving the
-      // lazy payload boundary that owns active-tab lifecycle and state.
-      let payloadContext = context.child(
-        component: .named("TabContentPayload")
-      )
+      // Keep logical content identity below the declaring tab, independent of
+      // the style layout. Its structural placement remains a distinct child of
+      // this slot, so the routed host cannot displace the slot's graph owner.
+      let placementContext = context.child(component: .named("TabContentPayload"))
+      var payloadContext =
+        controlIdentity.map {
+          placementContext.replacingIdentity(with: $0.child(.named("TabContentPayload")))
+        } ?? placementContext
+      if let restoreActiveContent {
+        restoreActiveContent()
+        payloadContext.withinChurnedSubtree = true
+      }
       let payloadRoute = payloadEntityIdentity.map {
         ResolveEntityRoute(
           identity: $0,
@@ -938,6 +948,14 @@ public struct TabViewStyleBodyConfiguration: Sendable {
           )
         }
 
+        // Stamp the payload itself: normalization may consume the transparent
+        // synthesized wrapper before semantic extraction.
+        child.semanticMetadata.isAccessibilityContent = true
+        if let controlIdentity {
+          var structure = child.semanticMetadata.accessibilityStructure ?? AccessibilityStructure()
+          structure.parent = controlIdentity.child(.named("AccessibilityTabPanel"))
+          child.semanticMetadata.accessibilityStructure = structure
+        }
         return [
           ResolvedNode(
             identity: context.identity,

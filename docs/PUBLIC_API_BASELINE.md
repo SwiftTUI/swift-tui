@@ -34,7 +34,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIAndroidHost` | 16 | 44 |
 | `SwiftTUICore` | 41 | 278 |
 | `SwiftTUIPrimitives` | 174 | 1542 |
-| `SwiftTUIGraph` | 75 | 492 |
+| `SwiftTUIGraph` | 76 | 501 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -895,12 +895,13 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (62)
+### Canonical surface (63)
 
 - `AccessibilityChildBehavior` — enum — 3 members
 - `AccessibilityNode` — struct — 17 members
 - `AccessibilityPoliteness` — enum — 4 members
-- `AccessibilityProperties` — class — 32 members
+- `AccessibilityPopup` — enum — 6 members
+- `AccessibilityProperties` — class — 34 members
 - `AccessibilityRole` — enum — 39 members
 - `AccessibilitySortDirection` — enum — 5 members
 - `AccessibilityTextInput` — class — 10 members

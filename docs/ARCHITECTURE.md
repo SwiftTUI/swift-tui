@@ -783,6 +783,14 @@ from keyboard/pointer regions, and their subtrees emit no draw commands.
 Combined operations preserve descendant ownership and invalidate their target
 when action membership or lifetime changes.
 
+Logical tabs and expansion triggers use sparse metadata in
+`ResolvedSemanticMetadata.swift`. Core's `SemanticTabAccessibility.swift` and
+`SemanticExpansionAccessibility.swift` create style-independent relationships
+while preserving primitive action owners and authored grouping. Portal and
+navigation containers retain their document content when they expose named
+Dismiss/Back operations. Browser-specific arrow navigation remains in the web
+package's `AccessibilityTree.ts`.
+
 Accessibility preferences use the inert `AccessibilityPreferences` and
 `AccessibilityColorProfile` vocabulary in `SwiftTUIPrimitives/Styling`.
 `RuntimePolicyEnvironment` exposes effective choices to views and style snapshots;

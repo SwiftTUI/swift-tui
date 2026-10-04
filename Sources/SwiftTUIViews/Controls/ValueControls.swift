@@ -298,7 +298,9 @@ extension DisclosureGroup {
       context.environmentValues.pressedIdentity(comparedAgainst: [context.identity])
       == context.identity
     let isEnabled = context.environmentValues.isEnabled
-    let expanded = isExpanded.wrappedValue
+    let expanded = withAuthoringContext(authoringScope ?? currentAuthoringContext()) {
+      isExpanded.wrappedValue
+    }
     let binding = isExpanded
 
     if isEnabled {
@@ -355,7 +357,7 @@ extension DisclosureGroup {
       isPressed: isPressed,
       styleEnvironment: styleEnvironment
     )
-    configuration.bindRoutes(to: context.identity)
+    configuration.bindRoutes(to: context.identity, expanded: expanded)
     return context.environmentValues.disclosureGroupStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("DisclosureBody"))
     ).flatMap { child in
@@ -368,6 +370,12 @@ extension DisclosureGroup {
         accessibilityRole: .disclosureGroup
       ).namingControl(with: label).accessibilityControl(
         .init(actions: [.focus, .activate, .setValue], value: .boolean(expanded)))
+      var structure = AccessibilityStructure()
+      structure.expansion = .init(
+        visualIdentity: disclosureGroupTriggerIdentity(for: context.identity),
+        contentIdentity: context.identity.child(.named("AccessibilityDisclosureContent")),
+        expanded: expanded)
+      metadata.accessibilityStructure = structure
       // Keep geometric evidence that the keyboard action has no pointer area of
       // its own. Merely omitting the region permits the runtime's
       // ancestor-action fallback, which collapsed the group from a press on its

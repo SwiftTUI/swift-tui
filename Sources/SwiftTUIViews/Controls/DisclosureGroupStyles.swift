@@ -151,6 +151,7 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
   /// the body keeps the authored content's state and authoring scope.
   public struct Content: View, Sendable {
     package let payload: CapturedSubviewPayload
+    package var controlIdentity: Identity? = nil
 
     package init<V: View>(
       authoringContext: AuthoringContext?,
@@ -171,6 +172,17 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
     /// The captured authored content.
     public var body: some View {
       CapturedSubviewView(payload: payload, isAccessibilityContent: true)
+        .semanticMetadata(contentSemantics)
+    }
+
+    private var contentSemantics: SemanticMetadata {
+      guard let controlIdentity else { return .init() }
+      var metadata = SemanticMetadata(accessibilityRole: .region)
+      metadata.isAccessibilityContent = true
+      metadata.accessibilityProperties = .init(
+        labelledBy: [controlIdentity],
+        identifier: controlIdentity.child(.named("AccessibilityDisclosureContent")))
+      return metadata
     }
   }
 
@@ -263,8 +275,9 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
       }, content: content())
   }
 
-  package mutating func bindRoutes(to identity: Identity) {
+  package mutating func bindRoutes(to identity: Identity, expanded: Bool) {
     controlIdentity = identity
+    content.controlIdentity = expanded ? identity : nil
   }
 }
 

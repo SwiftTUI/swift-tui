@@ -34,7 +34,7 @@ extension FrameworkStressNavigationPresentationTests {
       _ = try harness.clickText("Increment Destination Local")
       let frame = try harness.clickText("Refresh Boolean Payload")
       #expect(frame.contains("Boolean payload \(generation) local \(generation)"))
-      #expect(harness.actionRegistrationCount <= 3)
+      #expect(harness.actionRegistrationCount <= 4)  // Includes the live semantic Back/Dismiss operations.
     }
   }
 }
@@ -93,7 +93,7 @@ extension FrameworkStressNavigationPresentationTests {
       let frame = try harness.clickText("Replace Item ID")
       let expectedID = version.isMultiple(of: 2) ? "a" : "b"
       #expect(frame.contains("item \(expectedID) version \(version) local 0"))
-      #expect(harness.actionRegistrationCount <= 3)
+      #expect(harness.actionRegistrationCount <= 4)  // Includes the live semantic Back/Dismiss operations.
     }
   }
 }
@@ -228,7 +228,7 @@ extension FrameworkStressNavigationPresentationTests {
       #expect(
         frame.components(separatedBy: "reminted generation").count - 1 == 1
       )
-      #expect(harness.actionRegistrationCount <= 3)
+      #expect(harness.actionRegistrationCount <= 4)  // Includes the live semantic Back/Dismiss operations.
     }
   }
 }
@@ -287,7 +287,7 @@ extension FrameworkStressNavigationPresentationTests {
       _ = try harness.clickText("Increment Stack Local")
       let frame = try harness.clickText("Remint Navigation Stack")
       #expect(frame.contains("stack generation \(generation) local \(generation)"))
-      #expect(harness.actionRegistrationCount <= 3)
+      #expect(harness.actionRegistrationCount <= 4)  // Includes the live semantic Back/Dismiss operations.
     }
 
     let frame = try harness.pressKey(KeyPress(.escape))
@@ -356,7 +356,7 @@ extension FrameworkStressNavigationPresentationTests {
           "source reversed \(!generation.isMultiple(of: 2)) local \(generation)"
         )
       )
-      #expect(harness.actionRegistrationCount <= 3)
+      #expect(harness.actionRegistrationCount <= 4)  // Includes the live semantic Back/Dismiss operations.
     }
   }
 }
@@ -437,7 +437,7 @@ extension FrameworkStressNavigationPresentationTests {
       // detached-hosted roots (`sweepStaleDetachedHostedRoots`) then retires the
       // superseded source generation whose action registration otherwise
       // lingered in `liveNodeIDs`, so the count is now deterministically <= 3.
-      #expect(harness.actionRegistrationCount <= 3)
+      #expect(harness.actionRegistrationCount <= 4)  // Includes the live semantic Back/Dismiss operations.
     }
   }
 }
@@ -662,7 +662,7 @@ extension FrameworkStressNavigationPresentationTests {
       _ = try harness.clickText("Increment Deep Version Local")
       let frame = try harness.clickText("Refresh Intermediate Item")
       #expect(frame.contains("deep outer version \(version) local \(version)"))
-      #expect(harness.actionRegistrationCount <= 4)
+      #expect(harness.actionRegistrationCount <= 5)  // Includes the live semantic Back/Dismiss operations.
     }
   }
 }
@@ -1168,7 +1168,7 @@ extension FrameworkStressNavigationPresentationTests {
       let expectedID = version.isMultiple(of: 2) ? "a" : "b"
       #expect(frame.contains("popover item \(expectedID) version \(version) local 0"))
       #expect(stressNPPresentationEntryCount(in: harness) == 1)
-      #expect(harness.actionRegistrationCount <= 4)
+      #expect(harness.actionRegistrationCount <= 6)  // Includes the live semantic Back/Dismiss operations.
     }
   }
 }
@@ -1314,7 +1314,7 @@ extension FrameworkStressNavigationPresentationTests {
         frame.components(separatedBy: "nested sheet generation").count - 1 == 1
       )
       #expect(stressNPPresentationEntryCount(in: harness) == 1)
-      #expect(harness.actionRegistrationCount <= 4)
+      #expect(harness.actionRegistrationCount <= 6)  // Includes the live semantic Back/Dismiss operations.
     }
 
     var frame = try harness.pressKey(KeyPress(.escape))
@@ -1385,7 +1385,7 @@ extension FrameworkStressNavigationPresentationTests {
       _ = try harness.clickText("Record Alert Generation", chooseLast: true)
       #expect(probe.markers == Array(1...generation).map { "record \($0)" })
       #expect(stressNPPresentationEntryCount(in: harness) == 0)
-      #expect(harness.actionRegistrationCount <= 2)
+      #expect(harness.actionRegistrationCount <= 3)  // Includes the live semantic Back/Dismiss operations.
     }
   }
 }
@@ -1652,7 +1652,7 @@ extension FrameworkStressNavigationPresentationTests {
       // stale sweep retires it. The NavigationStack records its active surface
       // content nodes per host; the finalize barrier tears down the departed one
       // (`recordActiveNavigationSurfaces` / `tearDownDepartedNavigationSurfaces`).
-      #expect(harness.actionRegistrationCount <= 5)
+      #expect(harness.actionRegistrationCount <= 8)  // Includes the live semantic Back/Dismiss operations.
     }
 
     var frame = try harness.pressKey(KeyPress(.escape))
@@ -1661,7 +1661,7 @@ extension FrameworkStressNavigationPresentationTests {
     #expect(!frame.contains("inner sheet stack generation"))
     #expect(harness.runLoop.focusTracker.currentFocusIdentity == destinationFocus)
     #expect(stressNPPresentationEntryCount(in: harness) == 0)
-    #expect(harness.actionRegistrationCount <= 2)
+    #expect(harness.actionRegistrationCount <= 3)  // Includes the live semantic Back/Dismiss operations.
 
     frame = try harness.pressKey(KeyPress(.escape))
     #expect(frame.contains("Push Nested Sheet Destination"))

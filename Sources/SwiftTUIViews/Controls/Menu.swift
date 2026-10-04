@@ -60,8 +60,17 @@ public struct Menu<Label: View, Content: View>: PrimitiveView, IterativeResolvab
       .namingControl(with: label)
       // The open menu remains a keyboard dismissal target after disablement.
       // Its commands and pointer routes still obey the disabled environment.
-      metadata.allowsFocusWhenDisabled = menuIsExpanded(
+      let expanded = menuIsExpanded(
         in: context.viewGraph?.nodeForIdentity(context.identity.child(.named("MenuState"))))
+      metadata.allowsFocusWhenDisabled = expanded
+      var structure = AccessibilityStructure()
+      structure.expansion = .init(
+        visualIdentity: menuTriggerIdentity(for: context.identity),
+        contentIdentity: context.identity.child(.named("AccessibilityMenuContent")),
+        expanded: expanded, popup: .menu)
+      metadata.accessibilityStructure = structure
+      metadata.accessibilityControl = .init(
+        actions: [.focus, .activate, .setValue], value: .boolean(expanded))
       // Keep geometric evidence that the keyboard action has no pointer area.
       // Merely omitting its region permits the runtime's ancestor-action fallback.
       metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
@@ -135,7 +144,19 @@ extension Menu {
       fallbackAuthoringScope: authoringScope
     )
     if isEnabled {
-      intake.registerAction(identity: context.identity) {
+      intake.registerAction(
+        identity: context.identity,
+        accessibilityHandler: { action in
+          switch action {
+          case .activate: binding.wrappedValue.toggle()
+          case .setValue(.boolean(let next)):
+            guard binding.wrappedValue != next else { return .unchanged }
+            binding.wrappedValue = next
+          default: return .unsupported
+          }
+          return .changed
+        }
+      ) {
         binding.wrappedValue.toggle()
         return true
       }

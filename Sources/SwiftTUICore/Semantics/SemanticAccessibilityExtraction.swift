@@ -249,7 +249,9 @@ extension SemanticExtractor {
           textPresentations[traversalOrdinal] = textPresentation
         }
         let childPresentation: AccessibilityTextPresentation =
-          if metadata.hostedCollectionContainer != nil {
+          if metadata.hostedCollectionContainer != nil
+            || accessibilityRolePreservesContent(metadata.accessibilityRole)
+          {
             .independent
           } else if textPresentation == .primitiveOwned || ownsControl
             || metadata.usesAuthoredAccessibilityLabel
@@ -272,6 +274,7 @@ extension SemanticExtractor {
     }
 
     var nodes: [AccessibilityNode] = []
+    var expansionContentParents: [Identity: Identity] = [:]
     var nextEmitTraversalOrdinal = 0
     var emitStack:
       [(
@@ -287,7 +290,10 @@ extension SemanticExtractor {
       }
 
       let emits = emittedSubtrees.contains(node.identity)
-      var childParentIdentity = frame.emittedParentIdentity
+      // A structural wrapper can route content without emitting its own node.
+      var childParentIdentity =
+        node.semanticMetadata.accessibilityStructure?.parent
+        ?? frame.emittedParentIdentity
       var listCount = frame.listCount
       let collectionReadOnly =
         node.semanticMetadata.hostedCollectionContainer != nil
@@ -326,13 +332,23 @@ extension SemanticExtractor {
             for: node, parent: accessibilityNode, focusRegions: focusRegions,
             textPresentation: textPresentations[traversalOrdinal] ?? .independent)
           if !inlineNodes.isEmpty { accessibilityNode.label = nil }
-          nodes.append(accessibilityNode)
+          if node.semanticMetadata.accessibilityStructure?.tabs != nil,
+            accessibilityNode.role == .tabView
+          {
+            accessibilityNode.role = .group
+          }
+          let expansionNodes = expansionAccessibilityNodes(for: node, original: accessibilityNode)
+          nodes.append(contentsOf: expansionNodes ?? [accessibilityNode])
+          nodes.append(contentsOf: tabAccessibilityNodes(for: node, parent: accessibilityNode))
           nodes.append(contentsOf: inlineNodes)
           nodes.append(contentsOf: tableAccessibilityHeaders(for: node, parent: accessibilityNode))
           if case .tableRow = node.semanticMetadata.hostedCollectionItem?.role {
             nodes.append(
               contentsOf: collectionSelectionNodes(
                 for: node, parent: accessibilityNode.identity, readOnly: collectionReadOnly))
+          }
+          if let container = expansionNodes?.first {
+            expansionContentParents[accessibilityNode.identity] = container.identity
           }
           childParentIdentity = node.identity
         }
@@ -344,7 +360,29 @@ extension SemanticExtractor {
     }
 
     nodes = applyingAccessibilityStructure(to: nodes, structures: structures)
-    if var allowed = modalScopeIdentities {
+    // Apply authored child behavior to the whole primitive first. Afterwards
+    // its surviving content becomes the trigger's sibling for valid button ARIA.
+    for index in nodes.indices {
+      if let parent = nodes[index].parentIdentity, let container = expansionContentParents[parent] {
+        nodes[index].parentIdentity = container
+      }
+    }
+    // Command roles follow semantic menu ancestry, including portal-hosted
+    // commands and nested menus. Ordinary controls outside menus keep their role.
+    var menuMembership: [Identity: Bool] = [:]
+    for index in nodes.indices {
+      let insideMenu = nodes[index].parentIdentity.flatMap { menuMembership[$0] } ?? false
+      menuMembership[nodes[index].identity] = nodes[index].role == .menu || insideMenu
+      if insideMenu {
+        if nodes[index].role == .button {
+          nodes[index].role = .menuItem
+        } else if nodes[index].role == .toggle {
+          nodes[index].role = .custom("menuitemcheckbox")
+        }
+      }
+    }
+    if let modalScopeIdentities {
+      var allowed = Set(modalScopeIdentities.map(\.strippingEntityOccurrences))
       // The deepest presented modal owns semantic review, including static
       // content. Synthetic collection/text children inherit that membership.
       // Keep this before relationship resolution so background references drop.
@@ -355,6 +393,10 @@ extension SemanticExtractor {
           return true
         }
         return false
+      }
+      for index in nodes.indices
+      where [.sheet, .confirmationDialog, .alert, .popover].contains(nodes[index].role) {
+        nodes[index].properties = (nodes[index].properties ?? .init()).merging(.init(modal: true))
       }
       let retained = Set(nodes.map(\.identity))
       for index in nodes.indices {
@@ -796,6 +838,15 @@ extension SemanticExtractor {
       return false
     }
     return !hasNonEmptyAccessibilityLabel(node.semanticMetadata.accessibilityLabel)
+  }
+
+  /// Naming a container or giving it a Back/Dismiss operation does not
+  /// consume its document content as a control's decorative chrome.
+  private func accessibilityRolePreservesContent(_ role: AccessibilityRole?) -> Bool {
+    switch role {
+    case .sheet, .confirmationDialog, .alert, .popover, .region, .tabPanel, .status: true
+    default: false
+    }
   }
 
   private func accessibilityOwnsControlPresentation(_ node: PlacedNode) -> Bool {

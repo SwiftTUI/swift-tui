@@ -77,6 +77,12 @@ package struct PromptPresentationItem: PortalPresentationItem {
     onDismiss
   }
 
+  package var semanticMetadata: SemanticMetadata {
+    var metadata = surface.semanticMetadata
+    if !title.isEmpty { metadata.accessibilityLabel = title }
+    return metadata
+  }
+
   @MainActor
   package init(
     id: String,

@@ -66,7 +66,7 @@ package func menuPromptPresentationSpec(
     prepareSurface: { _ in
       PreparedPortalSurface { _, _ in
         anchoredSurfacePresentation(
-          presentation, accessibilityRole: .menu,
+          presentation, accessibilityRole: .group,
           hostInsets: .init(top: 0, leading: 1, bottom: 0, trailing: 0))
       }
     },

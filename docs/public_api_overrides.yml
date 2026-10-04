@@ -822,6 +822,7 @@ classifications:
     - SwiftTUIGraph.SectionRole
     - SwiftTUICore.SelectionRoute
     - SwiftTUIPrimitives.SelectionTag
+    - SwiftTUIGraph.AccessibilityPopup
     - SwiftTUIGraph.AccessibilityProperties
     - SwiftTUIGraph.AccessibilityTextKind
     - SwiftTUIGraph.AccessibilitySortDirection

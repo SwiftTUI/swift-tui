@@ -8,6 +8,20 @@ public enum AccessibilitySortDirection: String, Sendable, Hashable {
   case none, ascending, descending, other
 }
 
+/// The kind of popup opened by a control.
+public enum AccessibilityPopup: String, Sendable, Equatable {
+  /// A menu of commands.
+  case menu
+  /// A list of selectable options.
+  case listbox
+  /// A hierarchical tree.
+  case tree
+  /// An interactive grid.
+  case grid
+  /// A dialog or presentation.
+  case dialog
+}
+
 /// Optional widget semantics shared by every presenter.
 ///
 /// `nil` leaves a property unspecified during composition; explicit `false`,
@@ -22,6 +36,10 @@ public final class AccessibilityProperties: Equatable, Sendable {
   public let identifier: Identity?
   public let selected: Bool?
   public let expanded: Bool?
+  /// The kind of popup this control opens.
+  public let popup: AccessibilityPopup?
+  /// Whether the dialog excludes interaction with the background.
+  public let modal: Bool?
   public let required: Bool?
   public let invalid: Bool?
   public let busy: Bool?
@@ -52,6 +70,8 @@ public final class AccessibilityProperties: Equatable, Sendable {
   public init(
     selected: Bool? = nil,
     expanded: Bool? = nil,
+    popup: AccessibilityPopup? = nil,
+    modal: Bool? = nil,
     required: Bool? = nil,
     invalid: Bool? = nil,
     busy: Bool? = nil,
@@ -83,6 +103,8 @@ public final class AccessibilityProperties: Equatable, Sendable {
     self.identifier = identifier
     self.selected = selected
     self.expanded = expanded
+    self.popup = popup
+    self.modal = modal
     self.required = required
     self.invalid = invalid
     self.busy = busy
@@ -124,6 +146,8 @@ public final class AccessibilityProperties: Equatable, Sendable {
     guard lhs.identifier == rhs.identifier else { return false }
     guard lhs.selected == rhs.selected else { return false }
     guard lhs.expanded == rhs.expanded else { return false }
+    guard lhs.popup == rhs.popup else { return false }
+    guard lhs.modal == rhs.modal else { return false }
     guard lhs.required == rhs.required else { return false }
     guard lhs.invalid == rhs.invalid else { return false }
     guard lhs.busy == rhs.busy else { return false }
@@ -157,6 +181,8 @@ public final class AccessibilityProperties: Equatable, Sendable {
   public func merging(_ other: AccessibilityProperties) -> AccessibilityProperties {
     let selected = other.selected ?? self.selected
     let expanded = other.expanded ?? self.expanded
+    let popup = other.popup ?? self.popup
+    let modal = other.modal ?? self.modal
     let required = other.required ?? self.required
     let invalid = other.invalid ?? self.invalid
     let busy = other.busy ?? self.busy
@@ -186,6 +212,8 @@ public final class AccessibilityProperties: Equatable, Sendable {
     return .init(
       selected: selected,
       expanded: expanded,
+      popup: popup,
+      modal: modal,
       required: required,
       invalid: invalid,
       busy: busy,
@@ -233,6 +261,8 @@ public final class AccessibilityProperties: Equatable, Sendable {
     return .init(
       selected: selected,
       expanded: expanded,
+      popup: popup,
+      modal: modal,
       required: required,
       invalid: invalid,
       busy: busy,

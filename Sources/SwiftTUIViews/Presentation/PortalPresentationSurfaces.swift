@@ -33,7 +33,23 @@ package struct PortalSurfaceRoot: View, ActionScope {
 private struct PortalSurfaceContents: PrimitiveView, IterativeResolvableView {
   let item: PromptPresentationItem
   func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
-    item.surface.resolveWork(item, in: context).map { [$0] }
+    item.surface.resolveWork(item, in: context).map { completed in
+      var node = completed
+      if [.sheet, .confirmationDialog, .alert, .popover].contains(item.surface.accessibilityRole) {
+        installAccessibilityFocusActions(on: &node)
+        let previous = node.semanticMetadata.accessibilityControl
+        node.semanticMetadata.accessibilityControl = .init(
+          actions: (previous?.actions ?? []) + [.custom], customActions: ["Dismiss"])
+        let intake = HandlerDescriptorIntake(context: context)
+        intake.composeAccessibilityAction(identity: node.identity, preservingExisting: false) {
+          action in
+          guard action == .custom("Dismiss") else { return nil }
+          item.dismiss()
+          return .changed
+        }
+      }
+      return [node]
+    }
   }
 }
 
@@ -75,7 +91,7 @@ struct PromptActionPortalSurface: View {
       minimumWidth: presentation.minimumWidth,
       maximumWidth: presentation.maximumWidth
     )
-    .semanticMetadata(item.surface.semanticMetadata)
+    .semanticMetadata(item.semanticMetadata)
   }
 }
 
@@ -101,7 +117,7 @@ struct StandardContentPortalSurface: View {
       minimumWidth: presentation.minimumWidth,
       maximumWidth: presentation.maximumWidth
     )
-    .semanticMetadata(item.surface.semanticMetadata)
+    .semanticMetadata(item.semanticMetadata)
   }
 }
 
@@ -128,7 +144,7 @@ struct DropdownContentPortalSurface: View {
         .drawMetadata(.init(opacity: 0.6))
         .frame(maxWidth: .infinity, alignment: .bottom)
     }
-    .semanticMetadata(item.surface.semanticMetadata)
+    .semanticMetadata(item.semanticMetadata)
   }
 }
 
@@ -142,7 +158,7 @@ struct FullScreenContentPortalSurface: View {
       .padding(presentation.contentInsets)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .background { Rectangle().fill(presentation.backgroundStyle) }
-      .semanticMetadata(item.surface.semanticMetadata)
+      .semanticMetadata(item.semanticMetadata)
   }
 }
 
@@ -156,6 +172,7 @@ private struct PortalHeader: View {
       if !title.isEmpty { Text(title).bold() }
       Spacer(minLength: 0)
       Button("×", role: .close, action: dismiss).buttonStyle(.borderedProminent)
+        .accessibilityLabel(title.isEmpty ? "Close" : "Close \(title)")
     }
     .frame(height: 1, alignment: .leading)
     .padding(.init(horizontal: 1, vertical: 0))

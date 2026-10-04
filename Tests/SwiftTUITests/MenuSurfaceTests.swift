@@ -198,8 +198,8 @@ struct MenuSurfaceTests {
     // Menu items render as part of the portal overlay's focus scope, while
     // the base trigger remains focusable because menus are non-modal.
     let focusIdentities = expandedArtifacts.semanticSnapshot.focusRegions.map(\.identity)
-    let hasOverlayItem = focusIdentities.contains {
-      $0.path.contains("PortalHost/overlays")
+    let hasOverlayItem = expandedArtifacts.semanticSnapshot.focusRegions.contains { region in
+      region.scopePath.contains { $0.path.contains("PortalHost/overlays") }
     }
     #expect(!focusIdentities.isEmpty)
     #expect(focusIdentities.contains(testIdentity("Menu")))

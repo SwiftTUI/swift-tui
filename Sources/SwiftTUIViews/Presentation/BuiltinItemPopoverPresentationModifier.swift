@@ -177,7 +177,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
         }
       }
       let tipActions = tip.actions
-      let item = popoverPresentationItem(
+      var item = popoverPresentationItem(
         id: itemID,
         portalEntryID: portalEntryID,
         sourceIdentity: sourceIdentity,
@@ -200,6 +200,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
         dismiss: dismiss,
         onDismiss: onDismiss
       )
+      item.surfaceItem.title = tip.title.semanticMetadata.accessibilityLabel ?? tip.title.content
       return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)
     }
   }

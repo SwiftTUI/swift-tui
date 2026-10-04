@@ -203,11 +203,22 @@ public struct MenuStyleConfiguration: Sendable {
       }
     }
 
+    private var contentSemantics: SemanticMetadata {
+      guard let usageIdentity else { return .init() }
+      var metadata = SemanticMetadata(accessibilityRole: .menu)
+      metadata.isAccessibilityContent = true
+      metadata.accessibilityProperties = .init(
+        labelledBy: [usageIdentity],
+        identifier: usageIdentity.child(.named("AccessibilityMenuContent")))
+      return metadata
+    }
+
     private var contentBody: some View {
       VStack(alignment: .leading, spacing: 0) {
         CapturedSubviewSequenceView(
           payloads: payloads, retention: retention, isAccessibilityContent: true)
       }
+      .semanticMetadata(contentSemantics)
       .background { MenuStyleUsageMarker(identity: usageIdentity) }
     }
   }

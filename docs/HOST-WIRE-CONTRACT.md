@@ -752,3 +752,13 @@ painters, and
 `swift-tui-android/swift-tui-host/src/main/kotlin/sh/swifttui/android/host/`.
 Those repositories remain the source of truth for their own decoder and
 renderer behavior.
+
+### Composite presentation properties
+
+The optional accessibility `properties` object includes `popup` (`menu`,
+`listbox`, `tree`, `grid`, or `dialog`) and Boolean `modal`. Both are additive;
+missing values retain the previous protocol shape. Browser clients expose them
+as `aria-haspopup` and `aria-modal`. Modal alert surfaces use `alertdialog`.
+Expanded triggers remain buttons, with `expanded` and `controls`; their content
+is a sibling region/menu, so nested controls are not children of an ARIA button.
+Logical tabs expose `selected`, `controls` and panel `labelledBy` relationships.

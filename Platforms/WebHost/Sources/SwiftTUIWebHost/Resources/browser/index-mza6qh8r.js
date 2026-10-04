@@ -497,6 +497,8 @@ class AccessibilityTreeMounter {
   pendingValues = new Map;
   pendingFocus;
   runtimeFocusedElement;
+  pendingMenu;
+  pendingMenuReturn;
   appliedAssistiveFocusGeneration = -1n;
   compositionCommits = new WeakMap;
   get hasInteractiveControls() {
@@ -516,7 +518,39 @@ class AccessibilityTreeMounter {
     return true;
   }
   isTabStop(node) {
-    return !!this.sendAction && !!node.actionTarget && node.isEnabled !== false && !!node.actions?.includes("focus");
+    return !!this.sendAction && !!node.actionTarget && node.isEnabled !== false && (!!node.actions?.includes("focus") || node.role === "tab" && !!node.actions?.includes("accessibilityFocus"));
+  }
+  enclosingMenu(node, models = this.modelsById) {
+    const seen = new Set;
+    let parent = node.parentId;
+    while (parent && !seen.has(parent)) {
+      seen.add(parent);
+      const model = models.get(parent);
+      if (model?.role === "menu")
+        return model;
+      parent = model?.parentId;
+    }
+    return;
+  }
+  menuItems(menu) {
+    return [...this.modelsById.values()].filter((node) => this.enclosingMenu(node)?.id === menu.id && this.isTabStop(node));
+  }
+  focusControl(node) {
+    const element = this.nodesById.get(node.id);
+    if (!element || !node.actionTarget)
+      return;
+    element.focus({ preventScroll: true });
+    if (this.presenting && node.actions?.includes("focus")) {
+      const requestID = ++this.nextRequestID;
+      this.pendingFocus = { id: node.id, requestID };
+      this.sendAction?.(node.actionTarget, { action: "focus" }, String(requestID));
+    }
+  }
+  setMenuExpanded(trigger, expanded) {
+    if (!trigger?.actionTarget || trigger.isEnabled === false || !trigger.actions?.includes("setValue"))
+      return false;
+    this.sendAction?.(trigger.actionTarget, { action: "setValue", value: { type: "boolean", value: expanded } }, String(++this.nextRequestID));
+    return true;
   }
   constructor(sendAction, openLink) {
     this.sendAction = sendAction;
@@ -575,6 +609,10 @@ class AccessibilityTreeMounter {
   }
   presentFrame(nodes, metrics, announcements, options) {
     const activeBeforePresentation = document.activeElement;
+    const reviewedID = activeBeforePresentation?.dataset?.accessibilityId;
+    const reviewedModel = reviewedID ? this.modelsById.get(reviewedID) : undefined;
+    const reviewedMenu = reviewedModel ? this.enclosingMenu(reviewedModel) : undefined;
+    const menuReturn = this.pendingMenuReturn ?? reviewedMenu?.properties?.labelledBy?.[0];
     const visibleNodes = nodes.filter((node) => !node.hidden).map((node) => ({
       ...node,
       liveRegion: normalizeLiveRegion(node.liveRegion)
@@ -645,6 +683,57 @@ class AccessibilityTreeMounter {
       if (group && container.children[offset + 1] !== group)
         container.insertBefore(group, container.children[offset + 1] ?? null);
       childOffsets.set(container, offset + (group ? 2 : 1));
+    }
+    const tabGroups = new Map;
+    for (const node of visibleNodes)
+      if (node.role === "tab") {
+        const group = tabGroups.get(node.parentId) ?? [];
+        group.push(node);
+        tabGroups.set(node.parentId, group);
+      }
+    for (const group of tabGroups.values()) {
+      const enabled = group.filter((node) => this.isTabStop(node));
+      const chosen = enabled.find((node) => this.nodesById.get(node.id) === activeBeforePresentation) ?? enabled.find((node) => node.properties?.selected) ?? enabled[0];
+      for (const node of group) {
+        const element2 = this.nodesById.get(node.id);
+        if (element2)
+          element2.tabIndex = node === chosen ? 0 : -1;
+      }
+      if ((options.synchronizeFocus ?? true) && reviewedModel?.role === "tab" && reviewedModel.parentId === group[0]?.parentId && !enabled.some((node) => this.nodesById.get(node.id) === activeBeforePresentation) && chosen?.actionTarget && (!options.focusRequest || BigInt(options.focusRequest.generation) <= this.appliedAssistiveFocusGeneration)) {
+        this.nodesById.get(chosen.id)?.focus({ preventScroll: true });
+        this.sendAction?.(chosen.actionTarget, { action: "accessibilityFocus" }, String(++this.nextRequestID));
+      }
+    }
+    for (const menu of visibleNodes.filter((node) => node.role === "menu")) {
+      const items = this.menuItems(menu);
+      const selected = items.find((node) => this.nodesById.get(node.id) === activeBeforePresentation) ?? items[0];
+      for (const item of items) {
+        const element2 = this.nodesById.get(item.id);
+        if (element2)
+          element2.tabIndex = item === selected ? 0 : -1;
+      }
+    }
+    const newAppFocus = options.focusRequest && BigInt(options.focusRequest.generation) > this.appliedAssistiveFocusGeneration;
+    if ((options.synchronizeFocus ?? true) && !newAppFocus) {
+      if (this.pendingMenu) {
+        const trigger = this.modelsById.get(this.pendingMenu.trigger);
+        const menu = trigger?.properties?.controls?.map((id) => this.modelsById.get(id)).find((node) => node?.role === "menu");
+        if (menu) {
+          const items = this.menuItems(menu);
+          const destination = this.pendingMenu.last ? items.at(-1) : items[0];
+          if (destination)
+            this.focusControl(destination);
+          this.pendingMenu = undefined;
+        } else if (!trigger)
+          this.pendingMenu = undefined;
+      }
+      if (menuReturn && (!reviewedID || !this.modelsById.has(reviewedID) || this.pendingMenuReturn)) {
+        const trigger = this.modelsById.get(menuReturn);
+        if (trigger?.properties?.expanded === false && this.isTabStop(trigger)) {
+          this.focusControl(trigger);
+          this.pendingMenuReturn = undefined;
+        }
+      }
     }
     this.refreshNavigation(visibleNodes);
     this.announceLiveRegionChanges(visibleNodes, normalizedAnnouncements);
@@ -860,13 +949,76 @@ class AccessibilityTreeMounter {
     }
     element.addEventListener("keydown", (event) => {
       const model = current();
-      if (!model || event.key === "Tab" || event.key === "Escape")
+      if (!model || event.key === "Tab")
         return;
+      const menu = this.enclosingMenu(model);
+      if (menu && ["Escape", "ArrowLeft"].includes(event.key)) {
+        const triggerID = menu.properties?.labelledBy?.[0];
+        if (triggerID && this.setMenuExpanded(this.modelsById.get(triggerID), false)) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.pendingMenuReturn = triggerID;
+          return;
+        }
+      }
+      if (event.key === "Escape")
+        return;
+      if (model.properties?.popup === "menu" && ["ArrowDown", "ArrowUp", "ArrowRight"].includes(event.key)) {
+        const opened = model.properties.expanded === true;
+        if (opened || this.setMenuExpanded(model, true)) {
+          event.preventDefault();
+          event.stopPropagation();
+          const last = event.key === "ArrowUp";
+          const controlled = model.properties.controls?.map((id) => this.modelsById.get(id)).find((node2) => node2?.role === "menu");
+          if (opened && controlled) {
+            const items = this.menuItems(controlled);
+            const destination = last ? items.at(-1) : items[0];
+            if (destination)
+              this.focusControl(destination);
+          } else
+            this.pendingMenu = { trigger: model.id, last };
+          return;
+        }
+      }
+      if (menu && ["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const peers = this.menuItems(menu);
+        const index = peers.findIndex((node2) => node2.id === model.id);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? peers.length - 1 : (index + (event.key === "ArrowUp" ? -1 : 1) + peers.length) % peers.length;
+        const destination = peers[next];
+        if (destination) {
+          for (const peer of peers) {
+            const target = this.nodesById.get(peer.id);
+            if (target)
+              target.tabIndex = peer === destination ? 0 : -1;
+          }
+          this.focusControl(destination);
+        }
+        return;
+      }
       if (tag === "a" && event.key === "Enter") {
         event.stopPropagation();
         if (!element.hasAttribute("href")) {
           event.preventDefault();
           element.click();
+        }
+        return;
+      }
+      if (model.role === "tab" && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const peers = [...this.modelsById.values()].filter((node2) => node2.role === "tab" && node2.parentId === model.parentId && this.isTabStop(node2));
+        const index = peers.findIndex((node2) => node2.id === model.id);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? peers.length - 1 : (index + (event.key === "ArrowLeft" ? -1 : 1) + peers.length) % peers.length;
+        const destination = peers[next];
+        if (destination) {
+          for (const peer of peers) {
+            const target = this.nodesById.get(peer.id);
+            if (target)
+              target.tabIndex = peer === destination ? 0 : -1;
+          }
+          this.nodesById.get(destination.id)?.focus();
         }
         return;
       }
@@ -959,7 +1111,7 @@ class AccessibilityTreeMounter {
     else
       delete element.dataset.accessibilityFocused;
     const properties = node.properties;
-    const role = roleMapping(node.role);
+    const role = node.role === "alert" && properties?.modal ? { role: "alertdialog" } : roleMapping(node.role);
     if (properties?.headingLevel !== undefined) {
       role.role = "heading";
       role.level = properties.headingLevel;
@@ -988,6 +1140,8 @@ class AccessibilityTreeMounter {
       properties?.description ?? node.hint
     ].filter(Boolean).join("; ") || undefined);
     setOrRemoveAttribute(element, "lang", properties?.language);
+    setOrRemoveAttribute(element, "aria-haspopup", properties?.popup);
+    setOrRemoveAttribute(element, "aria-modal", properties?.modal?.toString());
     setOrRemoveAttribute(element, "aria-live", node.liveRegion || undefined);
     if (node.isFocused) {
       element.dataset.focused = "true";
@@ -995,8 +1149,8 @@ class AccessibilityTreeMounter {
       delete element.dataset.focused;
     }
     setOrRemoveAttribute(element, "aria-disabled", node.isEnabled === false ? "true" : undefined);
-    setOrRemoveAttribute(element, "aria-pressed", node.role === "button" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
-    setOrRemoveAttribute(element, "aria-checked", node.role === "toggle" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
+    setOrRemoveAttribute(element, "aria-pressed", node.role === "button" && properties?.expanded === undefined && node.value?.type === "boolean" ? String(node.value.value) : undefined);
+    setOrRemoveAttribute(element, "aria-checked", ["toggle", "custom(menuitemcheckbox)"].includes(node.role) && node.value?.type === "boolean" ? String(node.value.value) : undefined);
     setOrRemoveAttribute(element, "aria-expanded", properties?.expanded !== undefined ? String(properties.expanded) : node.role === "disclosureGroup" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
     setOrRemoveAttribute(element, "aria-valuenow", node.value?.type === "number" ? String(node.value.value) : undefined);
     setOrRemoveAttribute(element, "aria-valuemin", node.valueMin === undefined ? undefined : String(node.valueMin));
@@ -1184,6 +1338,7 @@ function roleMapping(role) {
     case "columnHeader":
       return { role: "columnheader" };
     case "confirmationDialog":
+    case "popover":
     case "sheet":
       return { role: "dialog" };
     case "disclosureGroup":
@@ -3013,7 +3168,7 @@ function isAccessibilityProperties(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
     return false;
   const properties = value;
-  return (properties.selected === undefined || typeof properties.selected === "boolean") && (properties.expanded === undefined || typeof properties.expanded === "boolean") && (properties.required === undefined || typeof properties.required === "boolean") && (properties.invalid === undefined || typeof properties.invalid === "boolean") && (properties.busy === undefined || typeof properties.busy === "boolean") && (properties.readOnly === undefined || typeof properties.readOnly === "boolean") && (properties.description === undefined || typeof properties.description === "string") && (properties.valueDescription === undefined || typeof properties.valueDescription === "string") && (properties.language === undefined || typeof properties.language === "string") && (properties.headingLevel === undefined || Number.isSafeInteger(properties.headingLevel) && properties.headingLevel > 0) && (properties.level === undefined || Number.isSafeInteger(properties.level) && properties.level > 0) && (properties.positionInSet === undefined || Number.isSafeInteger(properties.positionInSet) && properties.positionInSet > 0) && (properties.setSize === undefined || Number.isSafeInteger(properties.setSize) && (properties.setSize === -1 || properties.setSize >= 0)) && (properties.rowIndex === undefined || Number.isSafeInteger(properties.rowIndex) && properties.rowIndex > 0) && (properties.columnIndex === undefined || Number.isSafeInteger(properties.columnIndex) && properties.columnIndex > 0) && (properties.rowCount === undefined || Number.isSafeInteger(properties.rowCount) && (properties.rowCount === -1 || properties.rowCount >= 0)) && (properties.columnCount === undefined || Number.isSafeInteger(properties.columnCount) && (properties.columnCount === -1 || properties.columnCount >= 0)) && (properties.rowSpan === undefined || Number.isSafeInteger(properties.rowSpan) && properties.rowSpan > 0) && (properties.columnSpan === undefined || Number.isSafeInteger(properties.columnSpan) && properties.columnSpan > 0) && (properties.textKind === undefined || ["paragraph", "code", "quotation"].includes(properties.textKind)) && (properties.sort === undefined || ["none", "ascending", "descending", "other"].includes(properties.sort)) && (properties.labelledBy === undefined || Array.isArray(properties.labelledBy) && properties.labelledBy.every((id) => typeof id === "string")) && (properties.describedBy === undefined || Array.isArray(properties.describedBy) && properties.describedBy.every((id) => typeof id === "string")) && (properties.errorMessage === undefined || Array.isArray(properties.errorMessage) && properties.errorMessage.every((id) => typeof id === "string")) && (properties.controls === undefined || Array.isArray(properties.controls) && properties.controls.every((id) => typeof id === "string")) && (properties.owns === undefined || Array.isArray(properties.owns) && properties.owns.every((id) => typeof id === "string")) && (properties.flowTo === undefined || Array.isArray(properties.flowTo) && properties.flowTo.every((id) => typeof id === "string")) && (properties.activeDescendant === undefined || typeof properties.activeDescendant === "string");
+  return (properties.selected === undefined || typeof properties.selected === "boolean") && (properties.expanded === undefined || typeof properties.expanded === "boolean") && (properties.popup === undefined || ["menu", "listbox", "tree", "grid", "dialog"].includes(properties.popup)) && (properties.modal === undefined || typeof properties.modal === "boolean") && (properties.required === undefined || typeof properties.required === "boolean") && (properties.invalid === undefined || typeof properties.invalid === "boolean") && (properties.busy === undefined || typeof properties.busy === "boolean") && (properties.readOnly === undefined || typeof properties.readOnly === "boolean") && (properties.description === undefined || typeof properties.description === "string") && (properties.valueDescription === undefined || typeof properties.valueDescription === "string") && (properties.language === undefined || typeof properties.language === "string") && (properties.headingLevel === undefined || Number.isSafeInteger(properties.headingLevel) && properties.headingLevel > 0) && (properties.level === undefined || Number.isSafeInteger(properties.level) && properties.level > 0) && (properties.positionInSet === undefined || Number.isSafeInteger(properties.positionInSet) && properties.positionInSet > 0) && (properties.setSize === undefined || Number.isSafeInteger(properties.setSize) && (properties.setSize === -1 || properties.setSize >= 0)) && (properties.rowIndex === undefined || Number.isSafeInteger(properties.rowIndex) && properties.rowIndex > 0) && (properties.columnIndex === undefined || Number.isSafeInteger(properties.columnIndex) && properties.columnIndex > 0) && (properties.rowCount === undefined || Number.isSafeInteger(properties.rowCount) && (properties.rowCount === -1 || properties.rowCount >= 0)) && (properties.columnCount === undefined || Number.isSafeInteger(properties.columnCount) && (properties.columnCount === -1 || properties.columnCount >= 0)) && (properties.rowSpan === undefined || Number.isSafeInteger(properties.rowSpan) && properties.rowSpan > 0) && (properties.columnSpan === undefined || Number.isSafeInteger(properties.columnSpan) && properties.columnSpan > 0) && (properties.textKind === undefined || ["paragraph", "code", "quotation"].includes(properties.textKind)) && (properties.sort === undefined || ["none", "ascending", "descending", "other"].includes(properties.sort)) && (properties.labelledBy === undefined || Array.isArray(properties.labelledBy) && properties.labelledBy.every((id) => typeof id === "string")) && (properties.describedBy === undefined || Array.isArray(properties.describedBy) && properties.describedBy.every((id) => typeof id === "string")) && (properties.errorMessage === undefined || Array.isArray(properties.errorMessage) && properties.errorMessage.every((id) => typeof id === "string")) && (properties.controls === undefined || Array.isArray(properties.controls) && properties.controls.every((id) => typeof id === "string")) && (properties.owns === undefined || Array.isArray(properties.owns) && properties.owns.every((id) => typeof id === "string")) && (properties.flowTo === undefined || Array.isArray(properties.flowTo) && properties.flowTo.every((id) => typeof id === "string")) && (properties.activeDescendant === undefined || typeof properties.activeDescendant === "string");
 }
 function isAccessibilityActionResponse(value) {
   if (!value || typeof value !== "object")

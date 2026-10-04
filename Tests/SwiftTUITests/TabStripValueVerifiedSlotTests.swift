@@ -86,7 +86,10 @@ struct TabStripValueVerifiedSlotTests {
     #expect(topology.routedSlot.path.hasSuffix("/TabContentPayload"))
     #expect(topology.payloadRoot.path.contains("/TabContentValue[tag="))
     #expect(topology.payloadRoot.path.contains(";optional=true;occurrence=0;generation=0]"))
-    #expect(topology.routedSlot.isDescendant(of: topology.authoredSlot))
+    // Authored content belongs to the control, independent of the style's
+    // layout position; both slots still have the same reuse certificate.
+    #expect(topology.routedSlot == topology.control.child(.named("TabContentPayload")))
+    #expect(topology.authoredSlot.isDescendant(of: topology.control))
     #expect(topology.payloadRoot.isDescendant(of: topology.routedSlot))
 
     // Both the style-owned slot and the actual entity-routed payload root are
@@ -520,6 +523,7 @@ private final class ValueVerifiedSlotHarness<Root: View> {
       return nil
     }
     return TabContentProbeTopology(
+      control: control.committed.identity,
       authoredSlot: authoredSlot,
       routedSlot: routedSlot,
       payloadRoot: payloadRoot.committed.identity,
@@ -552,6 +556,7 @@ private final class ValueVerifiedSlotHarness<Root: View> {
 }
 
 private struct TabContentProbeTopology {
+  var control: Identity
   var authoredSlot: Identity
   var routedSlot: Identity
   var payloadRoot: Identity

@@ -186,6 +186,7 @@ private struct TabDormantRegistry: HotReloadArchiveProjecting {
 private struct TabDormantLocatorState {
   var activeKey: TabDormantKey?
   var activeLocator: DormantStateArchiveLocator?
+  var style: AnyTabViewStyle?
 }
 
 /// Reads detached archive snapshots for the tab owners that emitted a
@@ -259,10 +260,10 @@ private func makeDormantArchiveLocatorSink(
     guard registry.activeKey == key else {
       return
     }
-    storeTabDormantLocatorState(
-      TabDormantLocatorState(activeKey: key, activeLocator: locator),
-      in: ownerNode
-    )
+    var state = loadTabDormantLocatorState(from: ownerNode)
+    state.activeKey = key
+    state.activeLocator = locator
+    storeTabDormantLocatorState(state, in: ownerNode)
   }
 }
 
@@ -349,6 +350,7 @@ enum TabDormancy {
     var entityIdentity: EntityIdentity?
     var structuralIdentity: TabDormantPayloadStructuralIdentity?
     var refreshRequest: DormantTabArchiveRefreshRequest?
+    var restoreActiveContent: (@MainActor @Sendable () -> Void)?
   }
 
   static func prepare(
@@ -359,6 +361,7 @@ enum TabDormancy {
     var selectedContentEntityIdentity: EntityIdentity?
     var selectedContentStructuralIdentity: TabDormantPayloadStructuralIdentity?
     var dormantArchiveRefreshRequest: DormantTabArchiveRefreshRequest?
+    var restoreActiveContent: (@MainActor @Sendable () -> Void)?
 
     if let ownerNode {
       let enclosingEntity = ResolveEntityRouteStorage.current?.identity
@@ -391,6 +394,18 @@ enum TabDormancy {
         )
       }
 
+      let style = context.environmentValues.tabViewStyle
+      if dormantRegistry.activeKey == selectedDormantKey,
+        let previousStyle = locatorState.style, !style.isEqualForReuse(to: previousStyle),
+        let locator = locatorState.activeLocator, let graph = context.viewGraph
+      {
+        // The style may move the selected content through a different graph
+        // parent. Carry persistent authored state across that teardown only.
+        let handoff = TabStyleStateHandoff(graph.captureDormantStateArchive(using: locator))
+        restoreActiveContent = { [weak graph] in
+          if let state = handoff.take() { graph?.restoreDormantStateArchive(state) }
+        }
+      }
       if dormantRegistry.activeKey != selectedDormantKey {
         if let departingKey = dormantRegistry.activeKey,
           declaredDormantKeys.contains(departingKey),
@@ -423,18 +438,29 @@ enum TabDormancy {
         locatorState = TabDormantLocatorState()
       }
 
+      locatorState.style = style
       storeTabDormantRegistry(dormantRegistry, in: ownerNode)
       storeTabDormantLocatorState(locatorState, in: ownerNode)
     }
     return Selection(
       entityIdentity: selectedContentEntityIdentity,
       structuralIdentity: selectedContentStructuralIdentity,
-      refreshRequest: dormantArchiveRefreshRequest)
+      refreshRequest: dormantArchiveRefreshRequest, restoreActiveContent: restoreActiveContent)
   }
 
   static func makeLocatorSink(ownerNode: SwiftTUICore.ViewNode?, key: TabDormantKey?)
     -> (@MainActor @Sendable (DormantStateArchiveLocator) -> Void)?
   {
     makeDormantArchiveLocatorSink(ownerNode: ownerNode, key: key)
+  }
+}
+
+@MainActor
+private final class TabStyleStateHandoff {
+  private var state: DormantStateArchive?
+  init(_ state: DormantStateArchive) { self.state = state }
+  func take() -> DormantStateArchive? {
+    defer { state = nil }
+    return state
   }
 }

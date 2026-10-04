@@ -449,6 +449,8 @@ struct WebSurfaceWireTotalityTests {
     controlNode.properties = .init(
       selected: true,
       expanded: true,
+      popup: .dialog,
+      modal: true,
       required: true,
       invalid: true,
       busy: true,

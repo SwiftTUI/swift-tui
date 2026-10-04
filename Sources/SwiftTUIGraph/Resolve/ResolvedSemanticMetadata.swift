@@ -679,6 +679,8 @@ package struct AccessibilityStructure: Equatable, Sendable {
   package var parent: Identity? = nil
   package var keepsVirtualChildren = false
   package var navigationCategories: [String] = []
+  package var tabs: [AccessibilityTabMetadata]? = nil
+  package var expansion: AccessibilityExpansionMetadata? = nil
   package init() {}
 }
 
@@ -694,5 +696,36 @@ private final class HostedCollectionMetadata: Equatable, Sendable {
   }
   static func == (lhs: HostedCollectionMetadata, rhs: HostedCollectionMetadata) -> Bool {
     lhs === rhs || (lhs.container == rhs.container && lhs.item == rhs.item)
+  }
+}
+
+/// Logical tabs are independent of a style's visible strip and overflow chrome.
+package struct AccessibilityTabMetadata: Equatable, Sendable {
+  package var identity: Identity
+  package var visualIdentity: Identity
+  package var label: String
+  package var selected: Bool
+  package init(identity: Identity, visualIdentity: Identity, label: String, selected: Bool) {
+    self.identity = identity
+    self.visualIdentity = visualIdentity
+    self.label = label
+    self.selected = selected
+  }
+}
+
+/// The trigger's semantics stay independent of inline or portal content.
+package struct AccessibilityExpansionMetadata: Equatable, Sendable {
+  package var visualIdentity: Identity
+  package var contentIdentity: Identity
+  package var expanded: Bool
+  package var popup: AccessibilityPopup?
+  package init(
+    visualIdentity: Identity, contentIdentity: Identity, expanded: Bool,
+    popup: AccessibilityPopup? = nil
+  ) {
+    self.visualIdentity = visualIdentity
+    self.contentIdentity = contentIdentity
+    self.expanded = expanded
+    self.popup = popup
   }
 }

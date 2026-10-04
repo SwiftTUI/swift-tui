@@ -91,7 +91,6 @@ public final class FocusTracker {
       currentIndex = regions.isEmpty ? nil : 0
     }
     pruneModalRestorationStack(
-      previousFocusRegion: previousFocusRegion,
       nextRegions: regions,
       consumedIndex: modalRestoration?.stackIndex
     )
@@ -293,8 +292,10 @@ extension FocusTracker {
       return
     }
 
-    if modalRestorationStack.last?.modalScopePath == nextModalScopePath {
-      modalRestorationStack.removeLast()
+    // Returning to an existing modal must preserve its original invoker.
+    // The nested surface's record is consumed after choosing the return target.
+    if modalRestorationStack.contains(where: { $0.modalScopePath == nextModalScopePath }) {
+      return
     }
     modalRestorationStack.append(
       ModalRestoration(
@@ -331,22 +332,24 @@ extension FocusTracker {
   }
 
   private func pruneModalRestorationStack(
-    previousFocusRegion: FocusRegion?,
     nextRegions: [FocusRegion],
     consumedIndex: Int?
   ) {
     if let consumedIndex {
-      modalRestorationStack.remove(at: consumedIndex)
+      modalRestorationStack.removeSubrange(consumedIndex...)
     }
-
-    guard
-      let previousModalScopePath = previousFocusRegion?.modalFocusScopePath,
-      activeModalScopePath(in: nextRegions) != previousModalScopePath
-    else {
+    guard let nextModalScopePath = activeModalScopePath(in: nextRegions) else {
+      modalRestorationStack.removeAll()
       return
     }
-
-    modalRestorationStack.removeAll { $0.modalScopePath == previousModalScopePath }
+    // Keep suspended ancestors while a nested modal owns input. Once an
+    // ancestor returns, discard the closed descendants, even if their invoker
+    // was removed and no restoration candidate survived.
+    if let index = modalRestorationStack.firstIndex(where: {
+      $0.modalScopePath == nextModalScopePath
+    }) {
+      modalRestorationStack.removeSubrange((index + 1)...)
+    }
   }
 
   private func activeModalScopePath(

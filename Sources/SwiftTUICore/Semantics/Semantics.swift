@@ -93,6 +93,18 @@ package struct SemanticExtractor: Sendable {
               ownerNodeID: selection.ownerNodeID, ownerIdentity: selection.actionIdentity))
         }
 
+        if let tabs = node.semanticMetadata.accessibilityStructure?.tabs, !sealingParentOnChain {
+          for tab in tabs {
+            accessibilityActionRegions.append(
+              FocusRegion(
+                identity: tab.identity, rect: semanticBounds(for: node),
+                focusInteractions: .activate,
+                scopePath: scopePath, sectionIdentity: sectionIdentity,
+                modalFocusScopePath: modalFocusScopePath,
+                ownerNodeID: node.viewNodeID, ownerIdentity: node.identity))
+          }
+        }
+
         // Semantic review may visit disabled controls and static text without
         // turning either into a keyboard target. Modal pruning still applies.
         if node.semanticMetadata.accessibilityControl?.actions.contains(.accessibilityFocus)

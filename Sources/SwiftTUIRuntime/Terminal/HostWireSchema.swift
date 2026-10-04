@@ -319,6 +319,8 @@ package enum HostWireSchema {
     package static let accessibilityPropertyKeys: Set<String> = [
       "selected",
       "expanded",
+      "popup",
+      "modal",
       "required",
       "invalid",
       "busy",

@@ -573,6 +573,12 @@ package enum WebSurfaceFrameEncoder {
     if let value = properties.expanded {
       fields.append("\"expanded\":" + (value ? "true" : "false"))
     }
+    if let value = properties.popup {
+      fields.append("\"popup\":" + jsonString(value.rawValue))
+    }
+    if let value = properties.modal {
+      fields.append("\"modal\":" + (value ? "true" : "false"))
+    }
     if let value = properties.required {
       fields.append("\"required\":" + (value ? "true" : "false"))
     }

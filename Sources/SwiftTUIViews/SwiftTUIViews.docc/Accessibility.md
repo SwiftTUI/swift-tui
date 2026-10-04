@@ -127,6 +127,36 @@ position; connector glyphs are decorative. Authored row buttons retain their own
 actions. The outline does not claim the ARIA tree pattern's managed arrow-key
 model. Verify collection reading, context and operation with the intended reader.
 
+### Composite Controls And Presentations
+
+`TabView` publishes one logical tab list across all strip styles and overflow
+layouts. Each tab names the live panel and exposes selection. Browser Left/Right
+and Home/End move review among enabled tabs; Enter/Space selects the reviewed
+tab. Selection preserves retained child state. Removing a reviewed tab returns
+review to a surviving selected tab. Inactive panels are absent from reading.
+
+`Menu` and `DisclosureGroup` publish a trigger button separately from expanded
+content. Expansion and content relationships stay valid for inline and floating
+styles. Menus expose command roles, disabled state and nested menu scope.
+Browser arrows enter and traverse menu commands; Escape/Left closes the current
+menu and returns to its trigger. Closing one programmatically also restores the
+trigger when the reviewed command departs. These operations use typed runtime
+actions, with no duplicate terminal key activation.
+
+Named `NavigationStack` regions expose a **Back** operation while a destination
+is active. Sheets, alerts, confirmation dialogs, covers and popovers expose
+**Dismiss**. Modal surfaces publish their modal state, exclude background reading
+and preserve the full authored content. Standard close controls have a readable
+name. Read-only tips remain nonmodal; toasts expose their complete message as a
+polite status and have a dismiss operation. Browsers display named operations
+as associated buttons. Actual reader announcements and navigation still require
+qualification with the supported reader/browser combination.
+
+`AccessibilityProperties.popup` uses ``AccessibilityPopup`` to describe a
+control's popup kind; `modal` describes dialog modality. Built-in controls supply
+these fields automatically. Supplying either property to a custom element does
+not create an operation or a focus scope.
+
 ### Assistive Focus And Content Navigation
 
 `@AccessibilityFocusState` binds semantic focus independently of `@FocusState`

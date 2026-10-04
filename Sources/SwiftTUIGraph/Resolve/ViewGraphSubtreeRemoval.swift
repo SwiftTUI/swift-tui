@@ -384,7 +384,11 @@ extension ViewGraph {
         } ?? false
       removeSubtree(
         rootedAt: target,
-        policy: .ordinary.sparingVisitedDescendants(anchorSurvivesRemoval),
+        // The host may be dead while its visited descendants were adopted
+        // elsewhere. Do not discard the incoming reconciliation spare policy
+        // at a detached-host edge; the frame barrier judges those descendants.
+        policy: .ordinary.sparingVisitedDescendants(
+          policy.sparesVisitedDescendants || anchorSurvivesRemoval),
         isSubtreeDescent: true,
         walk: walk
       )

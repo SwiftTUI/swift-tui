@@ -50,17 +50,20 @@ package struct StyleRouteTarget: Sendable, Equatable {
   package var role: String
   /// Keeps a drag on this route even after the pointer leaves its bounds.
   package var captureOnPress: Bool
+  package var accessibilityHidden: Bool
 
   package init(
     identity: Identity,
     family: String,
     role: String,
-    captureOnPress: Bool = false
+    captureOnPress: Bool = false,
+    accessibilityHidden: Bool = false
   ) {
     self.identity = identity
     self.family = family
     self.role = role
     self.captureOnPress = captureOnPress
+    self.accessibilityHidden = accessibilityHidden
   }
 }
 
@@ -214,14 +217,25 @@ package struct StyleRouteView<Content: View>: PrimitiveView, IterativeResolvable
           identity: target.identity
         )
       )
-      return content.resolveWork(in: context.child(component: .named("content"))).map { [$0] }
+      return content.resolveWork(in: context.child(component: .named("content"))).map { completed in
+        var node = completed
+        if target.accessibilityHidden { node.semanticMetadata.accessibilityHidden = true }
+        return [node]
+      }
     }
     return PointerRouteView(
       identity: target.identity,
       content: content,
       captureOnPress: target.captureOnPress
     )
-    .makeResolveWork(in: context)
+    .makeResolveWork(in: context).map { completed in
+      guard target.accessibilityHidden else { return completed }
+      return completed.map { completed in
+        var node = completed
+        node.semanticMetadata.accessibilityHidden = true
+        return node
+      }
+    }
   }
 }
 

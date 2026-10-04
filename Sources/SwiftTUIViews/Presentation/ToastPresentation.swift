@@ -807,7 +807,7 @@ private struct ToastPresentationView: View {
     )
     let toastBody = HStack(alignment: .center, spacing: 1) {
       if let icon = presentation.icon {
-        Text(icon)
+        Text(icon).accessibilityHidden()
           .foregroundStyle(presentation.iconStyle)
       }
       VStack {
@@ -835,6 +835,10 @@ private struct ToastPresentationView: View {
       maxHeight: .finite(presentation.maxHeight),
       alignment: .leading
     )
+    .accessibilityElement(children: .combine)
+    .accessibilityRole(.status)
+    .accessibilityLiveRegion(.polite)
+    .accessibilityAction(named: "Dismiss") { item.dismiss() }
     // Keyed on duration so replacing the active deadline (nil<->finite,
     // shorter/longer) cancels the running sleep and arms the current one.
     .task(id: item.duration) {

@@ -96,10 +96,12 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Iterative
           var metadata = focusStructureMetadata(scopeBoundary: true)
           metadata.isCommandHost = true
 
+          var visibleContent = resolution.visibleNode
+          visibleContent.semanticMetadata.isAccessibilityContent = true
           var stackNode = ResolvedNode(
             identity: context.identity,
             kind: .view("NavigationStack"),
-            children: [resolution.visibleNode],
+            children: [visibleContent],
             environmentSnapshot: context.environment,
             transactionSnapshot: context.transaction,
             semanticMetadata: metadata
@@ -111,6 +113,20 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Iterative
           preferences[NavigationValueDestinationPreferenceKey.self] = .init()
 
           let navigationTitle = preferences[NavigationTitlePreferenceKey.self]
+          stackNode.semanticMetadata.accessibilityRole = .region
+          stackNode.semanticMetadata.accessibilityLabel = navigationTitle ?? "Navigation"
+          if let dismiss = resolution.popEntries.last?.dismiss {
+            installAccessibilityFocusActions(on: &stackNode)
+            stackNode.semanticMetadata.accessibilityControl = .init(
+              actions: [.accessibilityFocus, .accessibilityBlur, .custom], customActions: ["Back"])
+            HandlerDescriptorIntake(context: context).composeAccessibilityAction(
+              identity: context.identity, preservingExisting: false
+            ) { action in
+              guard action == .custom("Back") else { return nil }
+              dismiss()
+              return .changed
+            }
+          }
           preferences[NavigationTitlePreferenceKey.self] = nil
           if let navigationTitle {
             var toolbarItems = preferences[ToolbarItemsPreferenceKey.self]
@@ -164,7 +180,9 @@ private struct NavigationPathBinding {
     valueTypeID = ObjectIdentifier(Element.self)
     valueTypeName = String(reflecting: Element.self)
     values = {
-      binding.wrappedValue.map(AnyHashableSendable.init)
+      withAuthoringContext(authoringContext) {
+        binding.wrappedValue.map(AnyHashableSendable.init)
+      }
     }
     removeSuffix = { firstRemovedIndex in
       withAuthoringContext(authoringContext) {
