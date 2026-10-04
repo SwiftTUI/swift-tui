@@ -3996,8 +3996,19 @@ function readDomTextSpacing(mount) {
     return {};
   const text = mount.querySelector(".webhost-scene__surface-row [data-column]");
   const root = mount.querySelector(".webhost-scene__surface--dom") ?? (mount.matches?.(".webhost-scene__surface--dom") ? mount : null);
-  if (!text || !root)
-    return {};
+  if (!text || !root) {
+    const canvas = mount.querySelector("canvas.webhost-scene__surface");
+    if (!canvas)
+      return {};
+    const computed2 = view.getComputedStyle(canvas);
+    const spacing = {};
+    for (const key of ["letterSpacing", "wordSpacing", "lineHeight"]) {
+      const value = Number.parseFloat(computed2[key]);
+      if (Number.isFinite(value) && value > 0)
+        spacing[key] = value;
+    }
+    return spacing;
+  }
   const computed = view.getComputedStyle(text);
   const result = {};
   for (const key of ["letterSpacing", "wordSpacing", "lineHeight"]) {
@@ -4015,9 +4026,11 @@ class DomCellProbe {
   element;
   faces;
   styleKey;
+  canvas;
   constructor(mount) {
     this.mount = mount;
     const doc = mount.ownerDocument ?? document;
+    this.canvas = mount.querySelector?.("canvas.webhost-scene__surface") ?? undefined;
     this.element = doc.createElement("div");
     this.element.setAttribute("aria-hidden", "true");
     Object.assign(this.element.style, {
@@ -4068,13 +4081,13 @@ class DomCellProbe {
         margin: "0",
         border: "0",
         font: fontForStyle(style, { em }),
-        lineHeight: "1.5",
+        lineHeight: this.canvas ? "1.35" : "1.5",
         whiteSpace: "pre"
       });
       Object.assign(text.style, {
         display: "inline",
         font: "inherit",
-        lineHeight: "1.5",
+        lineHeight: this.canvas ? "1.35" : "1.5",
         padding: "0",
         margin: "0",
         border: "0",
@@ -4091,10 +4104,17 @@ class DomCellProbe {
     });
   }
   measure(style, scaleX = 1, scaleY = scaleX) {
+    const canvasCSS = this.canvas && this.mount.ownerDocument?.defaultView?.getComputedStyle(this.canvas);
+    if (canvasCSS)
+      style = {
+        ...style,
+        fontSize: Number.parseFloat(canvasCSS.fontSize) || style.fontSize,
+        fontFamily: canvasCSS.fontFamily || style.fontFamily
+      };
     this.configure(style);
     const spacing = readDomTextSpacing(this.mount);
     for (const { line, text } of this.faces) {
-      line.style.lineHeight = text.style.lineHeight = spacing.lineHeight === undefined ? "1.5" : `${spacing.lineHeight}px`;
+      line.style.lineHeight = text.style.lineHeight = spacing.lineHeight === undefined ? this.canvas ? "1.35" : "1.5" : `${spacing.lineHeight}px`;
       text.style.letterSpacing = `${spacing.letterSpacing ?? 0}px`;
       text.style.wordSpacing = `${spacing.wordSpacing ?? 0}px`;
     }
@@ -4132,6 +4152,7 @@ class DomCellProbe {
       advance: baseAdvance,
       baseline,
       fontSize: Number.parseFloat(computed?.fontSize ?? "") || style.fontSize,
+      fontFamily: computed?.fontFamily || style.fontFamily,
       spacingKey: JSON.stringify(spacing)
     };
   }
@@ -4279,17 +4300,24 @@ class DomGeometryController {
     if (!cells)
       return;
     const prior = this.typography;
-    if (prior?.identity === style.fontFamily && prior.cells.fontSize === cells.fontSize && prior.cells.spacingKey === cells.spacingKey && Math.abs(prior.cells.advance - cells.advance) <= 1 / 32 && prior.cells.height === cells.height) {
+    if (prior?.identity === (cells.fontFamily ?? style.fontFamily) && prior.cells.fontSize === cells.fontSize && prior.cells.spacingKey === cells.spacingKey && Math.abs(prior.cells.advance - cells.advance) <= 1 / 32 && prior.cells.height === cells.height) {
       cells = prior.cells;
     } else
-      this.typography = { identity: style.fontFamily, cells };
+      this.typography = {
+        identity: cells.fontFamily ?? style.fontFamily,
+        cells
+      };
     const previous = this.pending;
-    const measured = makeDomGeometry(previous?.revision ?? 1, style.fontFamily, cells, content);
+    const measured = makeDomGeometry(previous?.revision ?? 1, cells.fontFamily ?? style.fontFamily, cells, content);
     if (!measured)
       return;
     const next = {
       ...measured,
-      paragraphSpacing: this.paragraphSpacing(style, measured.cellHeight)
+      paragraphSpacing: this.paragraphSpacing({
+        ...style,
+        fontSize: cells.fontSize,
+        fontFamily: cells.fontFamily ?? style.fontFamily
+      }, measured.cellHeight)
     };
     const layoutChanged = previous && [
       "fontIdentity",
@@ -6334,7 +6362,7 @@ class WebHostSceneRuntime {
     this.chrome.append(this.accessibilityTree.navigationElement);
     this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
     this.domFocus = new DomFocusPresentation(this.terminalMount, () => this.nativePointerGesture || this.hasSurfaceSelection());
-    if (this.domSurfaceRoot) {
+    if (this.domSurfaceRoot || this.terminalMount.ownerDocument?.defaultView?.getComputedStyle) {
       this.domGeometry = new DomGeometryController(this.terminalMount);
       this.paintScheduler.setHeld(true);
     }
@@ -6363,7 +6391,7 @@ class WebHostSceneRuntime {
       writeError: (text) => this.writeOutput(text)
     });
     this.applyStyle(this.currentStyle);
-    if (this.domGeometry)
+    if (this.domSurfaceRoot)
       this.loadDomFont(this.currentStyle);
     else
       this.bridge?.updateRenderStyle(this.currentStyle);
@@ -6422,8 +6450,8 @@ class WebHostSceneRuntime {
   setStyle(style) {
     if (this.disposed)
       return;
-    const next = normalizeWebHostTerminalStyle(this.domGeometry && !style.fontFamily ? { ...style, fontFamily: DOM_FONT_FAMILY } : style);
-    if (this.domGeometry) {
+    const next = normalizeWebHostTerminalStyle(this.domSurfaceRoot && !style.fontFamily ? { ...style, fontFamily: DOM_FONT_FAMILY } : style);
+    if (this.domSurfaceRoot) {
       this.stagedFontChange = true;
       this.loadDomFont(next);
       return;
@@ -6540,6 +6568,8 @@ class WebHostSceneRuntime {
     if (this.domGeometry) {
       this.geometrySession.observe(frame);
       this.sendGeometryIfNeeded();
+      if (!this.geometrySession.negotiated && frame.viewportRevision === undefined)
+        this.currentFrame = frame;
     } else if (frame.viewportRevision === undefined) {
       this.currentFrame = frame;
       this.columns = Math.max(1, Math.round(frame.width));
@@ -6957,7 +6987,7 @@ class WebHostSceneRuntime {
       }
       this.geometryMeasurable = true;
       if (snapshot.bounded && this.geometryDiagnostic !== "bounded") {
-        this.writeOutput(`DOM viewport exceeds the supported grid; showing a bounded viewport.
+        this.writeOutput(`Viewport exceeds the supported grid; showing a bounded viewport.
 `);
         this.geometryDiagnostic = "bounded";
       } else if (!snapshot.bounded)
@@ -7082,7 +7112,7 @@ class WebHostSceneRuntime {
     return true;
   }
   measureCells() {
-    if (this.domSurfaceRoot) {
+    if (this.domGeometry) {
       return;
     }
     const canvas = this.canvas ?? document.createElement("canvas");
@@ -7130,8 +7160,8 @@ class WebHostSceneRuntime {
           inset: "auto",
           left: `${snapshot.content.offsetX}px`,
           top: `${snapshot.content.offsetY}px`,
-          width: `${this.columns * snapshot.cellWidth}px`,
-          height: `${this.rows * snapshot.cellHeight}px`
+          width: `${this.canvas ? snapshot.content.width : this.columns * snapshot.cellWidth}px`,
+          height: `${this.canvas ? snapshot.content.height : this.rows * snapshot.cellHeight}px`
         });
       }
     }
@@ -7177,7 +7207,11 @@ class WebHostSceneRuntime {
       cellWidth: this.cellWidth,
       cellHeight: this.cellHeight,
       pixelScale: this.canvasScale,
-      style: this.currentStyle
+      style: this.canvas && this.domGeometry?.presented ? {
+        ...this.currentStyle,
+        fontSize: this.domGeometry.presented.fontSize,
+        fontFamily: this.domGeometry.presented.fontIdentity
+      } : this.currentStyle
     };
   }
   pointerMetrics() {

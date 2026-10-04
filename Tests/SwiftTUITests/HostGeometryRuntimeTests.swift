@@ -363,6 +363,32 @@ private struct AccessibilityPreferenceStyleProbe: ButtonStyle {
 }
 
 extension HostGeometryRuntimeTests {
+  @Test func transparencyPreferenceRepaintsRetainedContentAndRestoresAuthoredFade() throws {
+    let host = GeometryTestSurface()
+    let root = testIdentity("LiveTransparencyPaint")
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in
+      Text("X").foregroundStyle(Color.red.opacity(0.3)).cellBackground(Color.blue).opacity(0.5)
+    }
+    var rendered = 0
+    var colors: [Color] = []
+    for reduced in [false, true, false] {
+      host.preferences.reduceTransparency = reduced
+      loop.scheduler.requestSignal(named: "SIGWINCH")
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+      let frame = try #require(host.frames.last)
+      let cell = try #require(frame.raster.cells.flatMap { $0 }.first { $0.character == "X" })
+      colors.append(try #require(cell.style?.foregroundColor))
+    }
+    #expect(colors[1] == .red)
+    #expect(colors[0] != colors[1])
+    #expect(colors[0] == colors[2])
+  }
+
   @Test func preferencesUpdateRetainedViewsAndCustomStylesLive() throws {
     let host = GeometryTestSurface()
     host.size = .init(width: 72, height: 8)

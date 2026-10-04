@@ -284,7 +284,9 @@ extension Rasterizer {
     // The per-cell path closes a gap where fading text rendered over
     // an opaque colored container silently blended toward the theme
     // background instead of the actual background beneath the cell.
-    let opacity = style.opacity
+    let opacity =
+      environment.accessibilityPreferences.reduceTransparency == true
+        && environment.isEnabled && style.opacity > 0 ? 1 : style.opacity
     let bakeOpacityIntoForeground = opacity < 1 && opacity >= 0
     if bakeOpacityIntoForeground, let fg = foregroundColor {
       let blendTarget =
@@ -326,7 +328,11 @@ extension Rasterizer {
       backgroundColor = background.converted(to: .sRGB, gamutMapping: .clip)
     }
     func decoration(_ line: TextLineStyle?) -> TextLineStyle? {
-      guard var line, let color = line.color,
+      guard var line else { return nil }
+      if preferences.reduceTransparency == true && environment.isEnabled && opacity > 0 {
+        line.color = removingTransparency(line.color)
+      }
+      guard let color = line.color,
         preferences.contrast == .increased || profile != .standard, opacity > 0
       else { return line }
       let background = backgroundColor ?? environment.theme.background
@@ -381,10 +387,13 @@ extension Rasterizer {
     }
 
     let profile = environment.accessibilityPreferences.colorProfile ?? .standard
-    if depth == 0, profile != .standard {
-      let authored = resolvedColorMode(
+    let opaque =
+      environment.accessibilityPreferences.reduceTransparency == true && environment.isEnabled
+    if depth == 0, profile != .standard || opaque {
+      var authored = resolvedColorMode(
         from: style, environment: environment, bounds: bounds, depth: 1)
-      return applyingColorProfile(profile, to: authored)
+      if opaque { authored = applyingReducedTransparency(to: authored) }
+      return profile == .standard ? authored : applyingColorProfile(profile, to: authored)
     }
 
     switch style {
@@ -497,6 +506,8 @@ extension Rasterizer {
         depth: depth + 1
       )
       switch innerMode {
+      case .opaque(let inner):
+        return .opaque(applyingOpacity(amount, to: inner))
       case .accessibility(let inner, let profile):
         return .accessibility(applyingOpacity(amount, to: inner), profile)
       case .constant(let color):
@@ -561,6 +572,9 @@ extension Rasterizer {
     sampleY: Int
   ) -> Color? {
     switch mode {
+    case .opaque(let inner):
+      return removingTransparency(
+        resolveColor(from: inner, bounds: bounds, sampleX: sampleX, sampleY: sampleY))
     case .accessibility(let inner, let profile):
       return resolveColor(from: inner, bounds: bounds, sampleX: sampleX, sampleY: sampleY)?
         .accessibilityMapped(profile)
@@ -664,6 +678,8 @@ extension Rasterizer {
     to mode: ResolvedShapeColorMode
   ) -> ResolvedShapeColorMode {
     switch mode {
+    case .opaque(let inner):
+      return .opaque(applyingOpacity(amount, to: inner))
     case .accessibility(let inner, let profile):
       return .accessibility(applyingOpacity(amount, to: inner), profile)
     case .constant(let color):
@@ -731,8 +747,29 @@ extension Rasterizer {
           pattern: tile.pattern,
           foreground: applyingColorProfile(profile, to: tile.foreground),
           background: tile.background.map { applyingColorProfile(profile, to: $0) }))
-    case .sampled, .sampledRadial, .sampledAngular, .sampledMesh, .accessibility:
+    case .sampled, .sampledRadial, .sampledAngular, .sampledMesh, .accessibility, .opaque:
       return .accessibility(mode, profile)
+    }
+  }
+
+  private func removingTransparency(_ color: Color?) -> Color? {
+    guard var color, color.alpha > 0 else { return color }
+    color.alpha = 1
+    return color
+  }
+
+  private func applyingReducedTransparency(to mode: ResolvedShapeColorMode)
+    -> ResolvedShapeColorMode
+  {
+    switch mode {
+    case .constant(let color): return .constant(removingTransparency(color))
+    case .tile(let tile):
+      return .tile(
+        .init(
+          pattern: tile.pattern,
+          foreground: applyingReducedTransparency(to: tile.foreground),
+          background: tile.background.map { applyingReducedTransparency(to: $0) }))
+    default: return .opaque(mode)
     }
   }
 
@@ -742,6 +779,11 @@ extension Rasterizer {
     _ style: ResolvedTextStyle, environment: StyleEnvironmentSnapshot,
     currentBackground: Color?, target: Double = 3
   ) -> ResolvedTextStyle {
+    var style = style
+    if environment.accessibilityPreferences.reduceTransparency == true && environment.isEnabled {
+      style.foregroundColor = removingTransparency(style.foregroundColor)
+      style.backgroundColor = removingTransparency(style.backgroundColor)
+    }
     let preferences = environment.accessibilityPreferences
     let profile = preferences.colorProfile ?? .standard
     guard preferences.contrast == .increased || profile != .standard,

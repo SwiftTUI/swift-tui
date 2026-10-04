@@ -206,7 +206,12 @@ extension DrawExtractor {
     // factor, so they take `effectiveOpacity` directly; shape styles carried
     // no factor at all (`.opacity` on a shape leaf was silently dropped) and
     // gain it through the multiplicative `AnyShapeStyle.opacity` wrap.
-    let effectiveOpacity = inheritedOpacity * (drawMetadata.explicitOpacity ?? 1)
+    let authoredOpacity = inheritedOpacity * (drawMetadata.explicitOpacity ?? 1)
+    // Preserve zero/hidden and disabled content. Children still inherit the
+    // authored cascade so a scoped preference override can restore its fade.
+    let effectiveOpacity =
+      environmentSnapshot.style.accessibilityPreferences.reduceTransparency == true
+        && environmentSnapshot.style.isEnabled && authoredOpacity > 0 ? 1 : authoredOpacity
     func faded(_ style: AnyShapeStyle) -> AnyShapeStyle {
       effectiveOpacity == 1 ? style : style.opacity(effectiveOpacity)
     }

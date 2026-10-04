@@ -81,6 +81,7 @@ package struct Rasterizer: Sendable {
     case sampledMesh(PreparedMeshGradient)
     case tile(ResolvedTileColorMode)
     case accessibility(ResolvedShapeColorMode, AccessibilityColorProfile)
+    case opaque(ResolvedShapeColorMode)
   }
 
   internal struct ResolvedTileColorMode {

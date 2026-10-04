@@ -632,6 +632,15 @@ user intent; labels, patterns and control behavior still need to honor that inte
 
 ### Color and contrast
 
+When reduced transparency is enabled, positive alpha in enabled text, shape,
+gradient, tile and direct Canvas-cell paints becomes opaque. Positive view
+opacity becomes one at the paint boundary. The authored ancestor cascade is
+retained so a subtree's explicit `false` can restore it; live preference changes
+repaint retained content. Zero opacity, transparent holes and disabled paints
+retain their authored behavior. Image pixel alpha and custom blend effects are
+not rewritten; provide an opaque alternative when their transparency obscures
+essential information.
+
 The standard profile preserves authored colors. Monochrome uses encoded relative
 luminance, including gradients and tile paints. Protanopia/deuteranopia profiles
 use a blue/orange semantic vocabulary; tritanopia uses red/cyan distinctions.
