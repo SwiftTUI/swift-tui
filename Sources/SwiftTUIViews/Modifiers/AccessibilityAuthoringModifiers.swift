@@ -26,9 +26,12 @@ extension View {
   /// Supplies an authoritative numeric value and range for a custom control.
   /// Pair this with an adjustable action to change application state.
   public func accessibilityValue(
-    _ value: Double, in bounds: ClosedRange<Double>, step: Double = 1
+    _ value: Double, in bounds: ClosedRange<Double>, step: Double = 1,
+    description: String? = nil
   ) -> some View {
-    modifier(AccessibilityNumericValueModifier(value: value, bounds: bounds, step: step))
+    modifier(
+      AccessibilityNumericValueModifier(
+        value: value, bounds: bounds, step: step, description: description))
   }
 
   /// Replaces the default assistive activation without synthesizing keyboard input.
@@ -123,6 +126,7 @@ private struct AccessibilityNumericValueModifier: IterativePrimitiveViewModifier
   let value: Double
   let bounds: ClosedRange<Double>
   let step: Double
+  let description: String?
 
   func makeResolveWork<Base: View>(
     content: ModifierContentInputs<Base>, in context: ResolveContext
@@ -137,6 +141,11 @@ private struct AccessibilityNumericValueModifier: IterativePrimitiveViewModifier
         actions: previous?.actions ?? [], value: .number(value),
         minimum: bounds.lowerBound, maximum: bounds.upperBound, step: step,
         selection: previous?.selection, customActions: previous?.customActions ?? [])
+      if let description {
+        let properties = AccessibilityProperties(valueDescription: description)
+        node.semanticMetadata.accessibilityProperties =
+          node.semanticMetadata.accessibilityProperties?.merging(properties) ?? properties
+      }
       return [node]
     }
   }
@@ -158,6 +167,10 @@ private struct AccessibilityTraitsModifier: IterativePrimitiveViewModifier {
       for (trait, role) in roles where traits.contains(trait) {
         if !removing {
           node.semanticMetadata.accessibilityRole = role
+        } else if trait == .isHeader,
+          case .heading = node.semanticMetadata.accessibilityRole
+        {
+          node.semanticMetadata.accessibilityRole = nil
         } else if node.semanticMetadata.accessibilityRole == role {
           node.semanticMetadata.accessibilityRole = nil
         }

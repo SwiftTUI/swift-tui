@@ -40,6 +40,10 @@ extension Link {
       in: context
     )
 
+    var semantics = focusableControlMetadata(
+      focusInteractions: .activate, accessibilityRole: .link)
+    semantics.accessibilityControl = .init(
+      actions: [.focus, .activate], value: .text(destination.rawValue))
     return ResolvedNode(
       identity: context.identity,
       kind: .view("Link"),
@@ -47,10 +51,7 @@ extension Link {
       transactionSnapshot: context.transaction,
       layoutMetadata: ambientTextLayoutMetadata(in: context),
       drawMetadata: .init(),
-      semanticMetadata: focusableControlMetadata(
-        focusInteractions: .activate,
-        accessibilityRole: .link
-      ),
+      semanticMetadata: semantics,
       drawPayload: .richText(
         resolvedRichTextPayload(
           for: self,

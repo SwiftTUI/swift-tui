@@ -168,8 +168,7 @@ struct RatingPicker: View {
     var body: some View {
         Text("Stars: \(rating)")
             .accessibilityLabel("Rating")
-            .accessibilityValue(Double(rating), in: 0...5)
-            .accessibilityValue("\(rating) of 5 stars")
+            .accessibilityValue(Double(rating), in: 0...5, description: "\(rating) of 5 stars")
             .accessibilityAdjustableAction { direction in
                 rating = min(5, max(0, rating + (direction == .increment ? 1 : -1)))
             }
@@ -180,8 +179,9 @@ struct RatingPicker: View {
 
 The adjustable callback owns the bounds and the one application mutation. Its
 published value is authoritative feedback, not a request to mutate the binding.
-The numeric overload supplies range information; the string overload supplies a
-spoken value description. The default `accessibilityAction(_:)` replaces only
+The numeric overload supplies range information and an optional spoken value
+description in one declaration; the string overload supplies a description alone.
+The default `accessibilityAction(_:)` replaces only
 assistive activation. Other existing primitive actions remain available.
 Named operations compose; an outer operation with the same name replaces the
 inner callback. Empty names are ignored. Disabled, read-only, modal-background
@@ -202,6 +202,17 @@ heading, image, link, then button have descending precedence. Selected state is
 independent. Use `accessibilityRole(_:)` and `accessibilityProperties(_:)` for an
 explicit role, heading level and additional widget state. Device-only SwiftUI
 traits have no implied implementation.
+
+`Link` publishes its destination separately from its name. The browser uses a
+native anchor for safe HTTP, HTTPS, mail and telephone destinations; activation
+still invokes the Swift `OpenLinkAction` once. Other schemes retain the typed
+application action without an executable browser URL.
+
+`LabeledContent` publishes a named group with its text value, excluding style
+chrome and repeated value slots. Interactive content remains independently
+readable and operable. Literal text survives an omitted style slot; generic
+content contributes its text when the style places it. Browser groups expose
+value descriptions as descriptions because ARIA groups have no range value.
 
 ### Reduced Motion
 

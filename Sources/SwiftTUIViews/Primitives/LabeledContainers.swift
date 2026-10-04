@@ -110,22 +110,74 @@ extension LabeledContent {
     in context: ResolveContext
   ) -> ResolveWork<ResolvedNode> {
     let configuration = LabeledContentStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label },
-      content: .init(authoringContext: authoringScope) { content },
+      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+      content: .init(authoringContext: authoringScope) {
+        LabeledAccessibilityContent(content: content)
+      },
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
     return context.environmentValues.labeledContentStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("LabeledContentBody"))
     ).map { child in
+      var semantics = SemanticMetadata(accessibilityRole: .group).namingControl(with: label)
+      let literal = content as? Text
+      semantics.accessibilityValueLabel = .owner(
+        fallback: literal?.semanticMetadata.accessibilityHidden == true
+          ? nil : literal?.semanticMetadata.accessibilityLabel ?? literal?.content)
       return ResolvedNode(
         identity: context.identity,
         kind: .view("LabeledContent"),
         children: [child],
         environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
+        transactionSnapshot: context.transaction,
+        semanticMetadata: semantics
       )
 
     }
+  }
+}
+
+/// Plain value content belongs to the labeled pair. Interactive content keeps
+/// its own reading order and actions; it must never be flattened into a value.
+private struct LabeledAccessibilityContent<Content: View>: PrimitiveView, IterativeResolvableView {
+  var content: Content
+
+  func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    resolveViewElementsWork(content, in: context).map { completed in
+      var stack = completed
+      var hasControl = false
+      while let node = stack.popLast() {
+        if node.semanticMetadata.accessibilityHidden { continue }
+        if node.semanticMetadata.accessibilityControl != nil {
+          hasControl = true
+          break
+        }
+        stack.append(contentsOf: node.children)
+      }
+      if hasControl { return markingAccessibilityContent(completed) }
+      var nodes = completed
+      var startsSlot = true
+      for index in nodes.indices where !nodes[index].semanticMetadata.accessibilityHidden {
+        nodes[index].semanticMetadata.accessibilityValueLabel = .source(
+          startsSlot ? .start : .continuation)
+        startsSlot = false
+      }
+      return nodes
+    }
+  }
+}
+
+extension LabeledAccessibilityContent: AdditionalDynamicPropertyUpdating {
+  func ownsDynamicPropertyTraversal(ofStoredFieldAt index: Int) -> Bool { index == 0 }
+
+  mutating func updateAdditionalDynamicProperties(
+    in context: AdditionalDynamicPropertyUpdateContext
+  ) -> DynamicPropertyUpdateResult {
+    runForwardedDynamicPropertyUpdates(on: &content, in: context)
+  }
+
+  func hasAdditionalDynamicPropertyUpdateSurface() -> Bool {
+    hasDynamicPropertyUpdateSurface(content)
   }
 }
 

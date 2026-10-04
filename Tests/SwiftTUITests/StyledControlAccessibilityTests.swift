@@ -8,6 +8,73 @@ import Testing
 @MainActor
 @Suite
 struct StyledControlAccessibilityTests {
+  @Test("labeled values own their names and values across styles without repeated chrome")
+  func labeledValues() {
+    for style in [AnyLabeledContentStyle.automatic, .stacked, .init(RepeatedPairStyle())] {
+      let snapshot = render(
+        LabeledContent {
+          HStack {
+            Text("Ada")
+            Text("Lovelace")
+          }
+        } label: {
+          HStack {
+            Text("Full")
+            Text("name")
+          }
+        }.labeledContentStyle(style))
+      #expect(snapshot.accessibilityNodes.compactMap(\.label) == ["Full name"])
+      #expect(
+        snapshot.accessibilityNodes.compactMap { $0.properties?.valueDescription }
+          == ["Ada Lovelace"])
+    }
+    let omitted = render(
+      LabeledContent("Full name", value: "Ada")
+        .labeledContentStyle(OmittedPairStyle()))
+    #expect(omitted.accessibilityNodes.compactMap(\.label) == ["Full name"])
+    #expect(omitted.accessibilityNodes.compactMap { $0.properties?.valueDescription } == ["Ada"])
+    let control = render(
+      LabeledContent("Preferences") {
+        VStack {
+          Text("Select an option")
+          Toggle("Enabled", isOn: .constant(true))
+        }
+      })
+    #expect(
+      control.accessibilityNodes.compactMap(\.label)
+        == ["Preferences", "Select an option", "Enabled"])
+    let controlDescriptions = control.accessibilityNodes.compactMap {
+      $0.properties?.valueDescription
+    }
+    #expect(controlDescriptions.isEmpty)
+    #expect(
+      control.accessibilityNodes.first { $0.role == .toggle }?.control?.value == .boolean(true))
+  }
+
+  @Test("standalone links expose their destination without replacing the authored name")
+  func linkDestination() {
+    let snapshot = render(
+      Link("Guide", destination: "https://example.com/guide")
+        .accessibilityHint("Opens documentation"))
+    let link = snapshot.accessibilityNodes.first { $0.role == .link }
+    #expect(link?.label == "Guide")
+    #expect(link?.hint == "Opens documentation")
+    #expect(link?.control?.value == .text("https://example.com/guide"))
+    #expect(link?.control?.actions == [.focus, .activate])
+    let plain = render(
+      Text("Title").accessibilityRole(.heading(level: 4))
+        .accessibilityRemoveTraits(.isHeader))
+    #expect(plain.accessibilityNodes.first { $0.label == "Title" }?.role == .group)
+    let described = render(
+      Text("Rating")
+        .accessibilityValue(2, in: 0...5, description: "Two stars"))
+    #expect(
+      described.accessibilityNodes.first { $0.label == "Rating" }?.control?.value == .number(2))
+    #expect(
+      described.accessibilityNodes.first { $0.label == "Rating" }?.properties?.valueDescription
+        == "Two stars")
+  }
+
   @Test("counter button title survives built-in styles and shortcut chrome")
   func counterButton() {
     for style in [AnyButtonStyle.automatic, .plain, .bordered, .borderedProminent] {
@@ -311,5 +378,23 @@ private struct LocalStateLabel: View {
   @State private var generation = 0
   var body: some View {
     Text("Local \(generation)").onTapGesture { generation += 1 }
+  }
+}
+
+private struct RepeatedPairStyle: LabeledContentStyle {
+  func makeBody(configuration: LabeledContentStyleConfiguration) -> some View {
+    VStack {
+      Text("Style chrome")
+      configuration.label
+      configuration.label
+      configuration.content
+      configuration.content
+    }
+  }
+}
+
+private struct OmittedPairStyle: LabeledContentStyle {
+  func makeBody(configuration: LabeledContentStyleConfiguration) -> some View {
+    Text("Visual abbreviation")
   }
 }

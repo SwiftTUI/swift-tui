@@ -8,9 +8,10 @@ public import SwiftTUICore
 /// style owns the arrangement, the spacing between the two slots, and any
 /// leader, rule, or tint it draws around them.
 ///
-/// A labeled content view is passive. Styling introduces no focus stop, action,
-/// or accessibility role of its own, and controls authored inside a slot keep
-/// their own behavior. A slot placed in the body keeps its authoring scope, so
+/// A labeled content view is passive. Its primitive supplies a named semantic
+/// group and a textual value independently of style chrome, without adding a
+/// focus stop or action. Controls authored inside a slot keep their own behavior.
+/// A slot placed in the body keeps its authoring scope, so
 /// state and tasks declared in it still belong to the declaration site. Unlike
 /// ``ControlGroupStyle``, this family does not retain a slot's child state when
 /// a style omits the slot or hosts it somewhere else, so keep a slot in the
