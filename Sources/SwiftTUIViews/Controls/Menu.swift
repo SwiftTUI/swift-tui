@@ -166,7 +166,9 @@ extension Menu {
     }
 
     var configuration = MenuStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+      label: .init(
+        authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+      ) { label.authoredAccessibilityLabel() },
       content: .init(authoringContext: authoringScope) { content },
       isPresented: enabledStyleBinding(expansionBinding, isEnabled: isEnabled),
       isEnabled: isEnabled, isFocused: isFocused, showsFocusEffect: showsFocusEffect,
@@ -187,7 +189,9 @@ extension Menu {
           family: "MenuStyle", role: "portal wrapper and inline content",
           styleLabel: style.snapshotLabel, identity: context.identity))
       return AnyMenuStyle.automatic.resolveBody(configuration: configuration, in: bodyContext)
-
+    }.flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.label, required: !(label is Text), context: context)
     }
   }
 }

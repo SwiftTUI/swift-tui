@@ -178,7 +178,9 @@ extension Slider {
 
     let formatted = formattedControlValue(currentValue, bounds: bounds, step: trackStep)
     var configuration = SliderStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+      label: .init(
+        authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+      ) { label.authoredAccessibilityLabel() },
       valueLabel: .init(authoringContext: authoringScope) { Text(formatted) },
       fractionCompleted: sliderFraction(value: currentValue, bounds: bounds),
       trackCellCount: 8,
@@ -192,7 +194,10 @@ extension Slider {
     configuration.bindRoutes(to: context.identity)
     return context.environmentValues.sliderStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("SliderBody"))
-    ).map { child in
+    ).flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.label, required: !(label is Text), context: context)
+    }.map { child in
 
       return ResolvedNode(
         identity: context.identity,

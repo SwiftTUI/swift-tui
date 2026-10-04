@@ -244,7 +244,9 @@ extension Picker {
 
       var configuration = PickerStyleConfiguration(
         controlIdentity: context.identity,
-        label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+        label: .init(
+          authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+        ) { label.authoredAccessibilityLabel() },
         options: options.map { .init(label: $0.label, isEnabled: $0.isEnabled) },
         selectedIndex: selectedIndex,
         isFocused: isFocused,
@@ -259,7 +261,10 @@ extension Picker {
       return pickerStyle.resolveBody(
         configuration: configuration,
         in: context.child(component: .named("PickerBody"))
-      ).map { child in
+      ).flatMap { child in
+        retainingAuthoredAccessibilitySlot(
+          in: child, slot: configuration.label, required: !(label is Text), context: context)
+      }.map { child in
 
         var node = ResolvedNode(
           identity: context.identity,

@@ -1604,3 +1604,261 @@ struct AccessibilityStructureRuntimeTests {
     #expect(first == 0 && second == 2)
   }
 }
+
+private struct OmittedButtonLabelStyle: ButtonStyle {
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View { Text("Button chrome") }
+}
+private struct OmittedToggleLabelStyle: ToggleStyle {
+  func makeBody(configuration: ToggleStyleConfiguration) -> some View { Text("Toggle chrome") }
+}
+private struct OmittedSliderLabelStyle: SliderStyle {
+  func makeBody(configuration: SliderStyleConfiguration) -> some View { Text("Slider chrome") }
+}
+private struct OmittedStepperLabelStyle: StepperStyle {
+  func makeBody(configuration: StepperStyleConfiguration) -> some View { Text("Stepper chrome") }
+}
+private struct OmittedFieldLabelStyle: TextFieldStyle {
+  func makeBody(configuration: TextFieldStyleConfiguration) -> some View {
+    configuration.fieldContent
+  }
+}
+private struct OmittedLabelTitleStyle: LabelStyle {
+  func makeBody(configuration: LabelStyleConfiguration) -> some View { configuration.icon }
+}
+private struct OmittedLabeledContentStyle: LabeledContentStyle {
+  func makeBody(configuration: LabeledContentStyleConfiguration) -> some View {
+    Text("Pair chrome")
+  }
+}
+private struct CompoundAccessibilityName: View {
+  let name: String
+  var body: some View {
+    HStack {
+      Text(name)
+      Text("name")
+    }
+  }
+}
+
+@MainActor
+@Suite
+struct OmittedAccessibilitySlotTests {
+  @Test("generic labels and values survive omitted style slots, update once and stay unpainted")
+  func omittedSlots() throws {
+    let size = CellSize(width: 60, height: 25)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("OmittedSlots")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var prefix = "First"
+    var writes = 0
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: focus
+    ) {
+      VStack {
+        Button(action: { writes += 1 }) { CompoundAccessibilityName(name: prefix) }
+          .buttonStyle(OmittedButtonLabelStyle())
+        Toggle(isOn: .constant(false)) { CompoundAccessibilityName(name: "Toggle") }
+          .toggleStyle(OmittedToggleLabelStyle())
+        Slider(value: .constant(2), in: 0...5) { CompoundAccessibilityName(name: "Slider") }
+          .sliderStyle(OmittedSliderLabelStyle())
+        Stepper(value: .constant(2), in: 0...5) { CompoundAccessibilityName(name: "Stepper") }
+          .stepperStyle(OmittedStepperLabelStyle())
+        TextField(text: .constant("Value")) { CompoundAccessibilityName(name: "Field") }
+          .textFieldStyle(OmittedFieldLabelStyle())
+        SecureField(text: .constant("private")) { CompoundAccessibilityName(name: "Password") }
+          .textFieldStyle(OmittedFieldLabelStyle())
+        Label {
+          CompoundAccessibilityName(name: "Status")
+        } icon: {
+          Text("*")
+        }
+        .labelStyle(OmittedLabelTitleStyle())
+        LabeledContent {
+          HStack {
+            Text("Ada")
+            Text("Lovelace")
+          }
+        } label: {
+          CompoundAccessibilityName(name: "Person")
+        }.labeledContentStyle(OmittedLabeledContentStyle())
+      }
+    }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    func render() throws {
+      loop.scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    try render()
+    let nodes = loop.latestSemanticSnapshot.accessibilityNodes
+    let labels = nodes.compactMap(\.label).filter { !$0.isEmpty }
+    #expect(
+      labels == [
+        "First name", "Toggle name", "Slider name", "Stepper name", "Field name", "Password name",
+        "Status name", "Person name",
+      ])
+    #expect(
+      nodes.first { $0.label == "Person name" }?.properties?.valueDescription == "Ada Lovelace")
+    #expect(!labels.contains("private"))
+    #expect(loop.latestSemanticSnapshot.accessibilityActionRegions.isEmpty)
+    let button = try #require(nodes.first { $0.label == "First name" })
+    #expect(
+      loop.handleAccessibilityAction(
+        .init(target: try #require(button.actionTarget), action: .activate)) == .accepted)
+    #expect(writes == 1)
+    prefix = "Updated"
+    try render()
+    #expect(
+      loop.latestSemanticSnapshot.accessibilityNodes.filter { $0.label == "Updated name" }.count
+        == 1)
+    let painted = terminal.latestSurface?.lines.joined(separator: "\n") ?? ""
+    #expect(!painted.contains("Updated") && !painted.contains("Ada"))
+    #expect(painted.contains("Button chrome") && painted.contains("Pair chrome"))
+  }
+}
+
+private struct StatefulOmittedAccessibilityName: View {
+  let pulse: Int
+  @State private var count = 0
+  var body: some View {
+    Text("Stateful name \(count)").onChange(of: pulse) { count += 1 }
+  }
+}
+
+extension OmittedAccessibilitySlotTests {
+  @Test("generic label state survives transitions between placed and omitted style slots")
+  func labelStateAcrossStyles() throws {
+    let size = CellSize(width: 50, height: 10)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("OmittedState")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var omitted = true
+    var pulse = 0
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: focus
+    ) {
+      Button(action: {}) { StatefulOmittedAccessibilityName(pulse: pulse) }
+        .buttonStyle(omitted ? AnyButtonStyle(OmittedButtonLabelStyle()) : .plain)
+    }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    func render() throws {
+      loop.scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    func name() -> String? {
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.role == .button }?.label
+    }
+    try render()
+    #expect(name() == "Stateful name 0")
+    pulse = 1
+    try render()
+    #expect(name() == "Stateful name 1")
+    omitted = false
+    try render()
+    #expect(name() == "Stateful name 1")
+    omitted = true
+    try render()
+    #expect(name() == "Stateful name 1")
+  }
+}
+
+private struct RepeatedStatefulLabelStyle: ButtonStyle {
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    VStack {
+      configuration.label
+      configuration.label
+    }
+  }
+}
+
+extension OmittedAccessibilitySlotTests {
+  @Test("repeated generic labels keep separate placements and one semantic name")
+  func repeatedLabelPlacements() throws {
+    let size = CellSize(width: 50, height: 10)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("RepeatedGenericName")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var omitted = false
+    var pulse = 0
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: focus
+    ) {
+      Button(action: {}) { StatefulOmittedAccessibilityName(pulse: pulse) }
+        .buttonStyle(
+          omitted
+            ? AnyButtonStyle(OmittedButtonLabelStyle())
+            : AnyButtonStyle(RepeatedStatefulLabelStyle()))
+    }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    func render() throws {
+      loop.scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    try render()
+    pulse = 1
+    try render()
+    let lines = terminal.latestSurface?.lines.filter { $0.contains("Stateful name 1") } ?? []
+    #expect(lines.count == 2)
+    #expect(
+      loop.latestSemanticSnapshot.accessibilityNodes.filter { $0.label == "Stateful name 1" }.count
+        == 1)
+    omitted = true
+    try render()
+    #expect(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.role == .button }?.label
+        == "Stateful name 1")
+    omitted = false
+    try render()
+    #expect(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.role == .button }?.label
+        == "Stateful name 1")
+    #expect(terminal.latestSurface?.lines.contains { $0.contains("Stateful name 0") } == true)
+  }
+
+  @Test("generic name and value retain separate state when both slots move")
+  func nameAndValueState() throws {
+    let size = CellSize(width: 60, height: 10)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("PairGenericState")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var omitted = true
+    var labelPulse = 0
+    var valuePulse = 0
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: focus
+    ) {
+      LabeledContent {
+        StatefulOmittedAccessibilityName(pulse: valuePulse)
+      } label: {
+        StatefulOmittedAccessibilityName(pulse: labelPulse)
+      }.labeledContentStyle(
+        omitted ? AnyLabeledContentStyle(OmittedLabeledContentStyle()) : .automatic)
+    }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    func render() throws {
+      loop.scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    try render()
+    labelPulse = 1
+    valuePulse = 1
+    try render()
+    labelPulse = 2
+    try render()
+    for placed in [true, false, true] {
+      omitted = !placed
+      try render()
+      let node = try #require(
+        loop.latestSemanticSnapshot.accessibilityNodes.first { $0.role == .group })
+      #expect(node.label == "Stateful name 2")
+      #expect(node.properties?.valueDescription == "Stateful name 1")
+    }
+  }
+}

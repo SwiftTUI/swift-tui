@@ -75,3 +75,35 @@ extension SemanticMetadata {
     return metadata
   }
 }
+
+/// Styles may omit a generic authored slot. Resolve that slot only when no placed
+/// source exists, retaining its captured authoring scope without painting it twice.
+@MainActor
+package func retainingAuthoredAccessibilitySlot<Slot: View>(
+  in styled: ResolvedNode, slot: Slot, required: Bool, isValue: Bool = false,
+  context: ResolveContext
+) -> ResolveWork<ResolvedNode> {
+  guard required else { return .value(styled) }
+  var stack = [styled]
+  while let node = stack.popLast() {
+    if isValue {
+      if case .source = node.semanticMetadata.accessibilityValueLabel { return .value(styled) }
+      if node.semanticMetadata.isAccessibilityContent { return .value(styled) }
+    } else if node.semanticMetadata.accessibilityLabelSource != nil {
+      return .value(styled)
+    }
+    if node.semanticMetadata.usesAuthoredAccessibilityLabel { continue }
+    stack.append(contentsOf: node.children)
+  }
+  let slotName: StaticString = isValue ? "SemanticValue" : "SemanticLabel"
+  let presentationName: StaticString =
+    isValue ? "SemanticValuePresentation" : "SemanticLabelPresentation"
+  return resolveViewWork(slot, in: context.child(component: .named(slotName))).map { source in
+    ResolvedNode(
+      identity: context.identity.child(.named(presentationName)),
+      kind: .view("AuthoredAccessibilitySlot"),
+      children: [styled, markingVirtualAccessibility(source, labelOnly: !isValue)],
+      environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
+      layoutBehavior: .decoration(primaryIndex: 0, alignment: .topLeading))
+  }
+}

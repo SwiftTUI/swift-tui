@@ -95,7 +95,9 @@ private struct AccessibilityRepresentationModifier<Representation: View>:
 }
 
 /// Mark every resolved node so retained children preserve the presentation boundary.
-private func markingVirtualAccessibility(_ root: ResolvedNode) -> ResolvedNode {
+package func markingVirtualAccessibility(_ root: ResolvedNode, labelOnly: Bool = false)
+  -> ResolvedNode
+{
   var steps: [(ResolvedNode, Bool)] = [(root, false)]
   var completed: [ResolvedNode] = []
   while let (source, assembling) = steps.popLast() {
@@ -107,6 +109,12 @@ private func markingVirtualAccessibility(_ root: ResolvedNode) -> ResolvedNode {
       var structure = node.semanticMetadata.accessibilityStructure ?? .init()
       structure.isVirtual = true
       node.semanticMetadata.accessibilityStructure = structure
+      if labelOnly {
+        node.semanticMetadata.accessibilityControl = nil
+        node.semanticMetadata.accessibilityRole = nil
+        node.semanticMetadata.isFocusable = false
+        node.semanticMetadata.isAccessibilityContent = false
+      }
       let count = source.children.count
       if count > 0 {
         node.children = Array(completed.suffix(count))

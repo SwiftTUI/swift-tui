@@ -110,9 +110,11 @@ public struct LabelStyleConfiguration: Sendable {
 
     package init<V: View>(
       authoringContext: AuthoringContext?,
+      accessibilityContext: ResolveContext? = nil,
       @ViewBuilder content: @escaping @MainActor () -> V
     ) {
       payload = CapturedSubviewPayload(authoringContext: authoringContext, content: content)
+        .anchored(in: accessibilityContext, slotName: "AuthoredLabel")
     }
 
     /// Captures content for a style test (see <doc:Testing-Styles>).

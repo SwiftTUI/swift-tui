@@ -107,9 +107,12 @@ public struct StepperStyleConfiguration: Sendable {
   public struct Label: View, Sendable {
     package let payload: CapturedSubviewPayload
     package init<V: View>(
-      authoringContext: AuthoringContext?, @ViewBuilder content: @escaping @MainActor () -> V
+      authoringContext: AuthoringContext?,
+      accessibilityContext: ResolveContext? = nil,
+      @ViewBuilder content: @escaping @MainActor () -> V
     ) {
       payload = CapturedSubviewPayload(authoringContext: authoringContext, content: content)
+        .anchored(in: accessibilityContext, slotName: "AuthoredLabel")
     }
     /// Captures `content` as the authored label of a fixture-constructed
     /// configuration for a style test (see <doc:Testing-Styles>).

@@ -110,7 +110,10 @@ extension Button {
     let resolvedHint = systemHintText
     let originalLabel = label
     let configuration = ButtonStyleConfiguration(
-      label: .init(authoringContext: authoringScope) {
+      label: .init(
+        authoringContext: authoringScope,
+        accessibilityContext: label is Text ? nil : context
+      ) {
         if let hint = resolvedHint {
           HStack(spacing: 0) {
             originalLabel.authoredAccessibilityLabel()
@@ -133,7 +136,10 @@ extension Button {
     return buttonStyle.resolveBody(
       configuration: configuration,
       in: context.child(component: .named("ButtonBody"))
-    ).map { child in
+    ).flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.label, required: !(label is Text), context: context)
+    }.map { child in
 
       return ResolvedNode(
         identity: context.identity,

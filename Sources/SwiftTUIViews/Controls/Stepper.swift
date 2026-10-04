@@ -190,7 +190,9 @@ extension Stepper {
 
     let formatted = formattedControlValue(currentValue, bounds: bounds, step: step)
     var configuration = StepperStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+      label: .init(
+        authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+      ) { label.authoredAccessibilityLabel() },
       valueLabel: .init(authoringContext: authoringScope) { Text(formatted) },
       canDecrement: canDecrement,
       canIncrement: canIncrement,
@@ -202,7 +204,10 @@ extension Stepper {
     configuration.bindRoutes(to: context.identity)
     return context.environmentValues.stepperStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("StepperBody"))
-    ).map { child in
+    ).flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.label, required: !(label is Text), context: context)
+    }.map { child in
 
       return ResolvedNode(
         identity: context.identity,

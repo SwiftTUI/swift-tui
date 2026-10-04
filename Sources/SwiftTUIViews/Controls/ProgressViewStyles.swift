@@ -108,9 +108,11 @@ public struct ProgressViewStyleConfiguration: Sendable {
 
     package init<V: View>(
       authoringContext: AuthoringContext?,
+      accessibilityContext: ResolveContext? = nil,
       @ViewBuilder content: @escaping @MainActor () -> V
     ) {
       payload = CapturedSubviewPayload(authoringContext: authoringContext, content: content)
+        .anchored(in: accessibilityContext, slotName: "AuthoredLabel")
     }
 
     /// Captures `content` as the authored label of a fixture-constructed
@@ -133,9 +135,11 @@ public struct ProgressViewStyleConfiguration: Sendable {
 
     package init<V: View>(
       authoringContext: AuthoringContext?,
+      accessibilityContext: ResolveContext? = nil,
       @ViewBuilder content: @escaping @MainActor () -> V
     ) {
       payload = CapturedSubviewPayload(authoringContext: authoringContext, content: content)
+        .anchored(in: accessibilityContext, slotName: "AuthoredValue")
     }
 
     /// Captures `content` as the authored current-value label of a

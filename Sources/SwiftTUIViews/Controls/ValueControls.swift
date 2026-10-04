@@ -71,7 +71,9 @@ extension Toggle {
     }
 
     let configuration = ToggleStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+      label: .init(
+        authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+      ) { label.authoredAccessibilityLabel() },
       isOn: enabledStyleBinding(binding, isEnabled: isEnabled),
       isMixed: false,
       isEnabled: isEnabled,
@@ -82,7 +84,10 @@ extension Toggle {
     )
     return context.environmentValues.toggleStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("ToggleBody"))
-    ).map { child in
+    ).flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.label, required: !(label is Text), context: context)
+    }.map { child in
 
       return ResolvedNode(
         identity: context.identity,
@@ -205,7 +210,9 @@ extension TextField {
           displayText: presentation.displayText)
       ),
       isShowingPrompt: presentation.isShowingPrompt,
-      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+      label: .init(
+        authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+      ) { label.authoredAccessibilityLabel() },
       showsLabel: showsLabel,
       chrome: chrome,
       placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
@@ -217,7 +224,11 @@ extension TextField {
     return textFieldStyle.resolveBody(
       configuration: configuration,
       in: context.child(component: .named("TextFieldBody"))
-    ).map { child in
+    ).flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.label, required: showsLabel && !(label is Text),
+        context: context)
+    }.map { child in
 
       return ResolvedNode(
         identity: context.identity,
@@ -331,7 +342,9 @@ extension DisclosureGroup {
     }
 
     var configuration = DisclosureGroupStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+      label: .init(
+        authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+      ) { label.authoredAccessibilityLabel() },
       content: .init(authoringContext: authoringScope) {
         if expanded { content }
       },
@@ -345,7 +358,10 @@ extension DisclosureGroup {
     configuration.bindRoutes(to: context.identity)
     return context.environmentValues.disclosureGroupStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("DisclosureBody"))
-    ).map { child in
+    ).flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.label, required: !(label is Text), context: context)
+    }.map { child in
 
       var metadata = focusableControlMetadata(
         focusInteractions: .activate,

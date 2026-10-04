@@ -139,10 +139,16 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     let configuration = ProgressViewStyleConfiguration(
       fractionCompleted: isIndeterminate ? nil : fraction,
       label: isEmptyView(label)
-        ? nil : .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+        ? nil
+        : .init(
+          authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+        ) { label.authoredAccessibilityLabel() },
       currentValueLabel: isEmptyView(currentValueLabel)
         ? nil
-        : .init(authoringContext: authoringScope) {
+        : .init(
+          authoringContext: authoringScope,
+          accessibilityContext: currentValueLabel is Text ? nil : context
+        ) {
           currentValueLabel.authoredAccessibilityValueLabel()
         },
       barWidth: max(1, barWidth),
@@ -162,7 +168,16 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
       })
     return context.environmentValues.progressViewStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("ProgressViewBody"))
-    ).map { child in
+    ).flatMap { child in
+      guard let slot = configuration.label else { return .value(child) }
+      return retainingAuthoredAccessibilitySlot(
+        in: child, slot: slot, required: !(label is Text), context: context)
+    }.flatMap { child in
+      guard let slot = configuration.currentValueLabel else { return .value(child) }
+      return retainingAuthoredAccessibilitySlot(
+        in: child, slot: slot, required: !(currentValueLabel is Text),
+        isValue: true, context: context)
+    }.map { child in
       return ResolvedNode(
         identity: context.identity,
         kind: .view("ProgressView"),

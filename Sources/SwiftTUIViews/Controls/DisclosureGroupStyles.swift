@@ -122,9 +122,11 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
 
     package init<V: View>(
       authoringContext: AuthoringContext?,
+      accessibilityContext: ResolveContext? = nil,
       @ViewBuilder content: @escaping @MainActor () -> V
     ) {
       payload = CapturedSubviewPayload(authoringContext: authoringContext, content: content)
+        .anchored(in: accessibilityContext, slotName: "AuthoredLabel")
     }
 
     /// Captures authored content for a style fixture (see <doc:Testing-Styles>).

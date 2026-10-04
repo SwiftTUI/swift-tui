@@ -197,6 +197,45 @@ package struct CapturedSubviewPayload: Sendable {
     )
   }
 
+  /// A primitive owns the first authored slot occurrence across style moves.
+  /// Extra visible copies keep distinct state; the semantic fallback is used
+  /// only when the style places none. Carry persistent state across the style
+  /// body's teardown without keeping its old nodes, actions or effects alive.
+  @MainActor
+  package func anchored(
+    in sourceContext: ResolveContext?, slotName: StaticString = "AuthoredLabel"
+  ) -> Self {
+    guard let sourceContext else { return self }
+    let identity = sourceContext.identity.child(.named(slotName))
+    let graph = sourceContext.viewGraph
+    let owner = graph?.nodeForIdentity(sourceContext.identity)?.stateOwnerHandle
+    let previous = graph?.nodeForIdentity(identity)
+    let restoration = previous.flatMap { node in
+      graph.map {
+        $0.captureRetainedSubviewState(
+          using: $0.dormantStateArchiveLocator(rootedAt: node.snapshot()))
+      }
+    }
+    let handoff = AuthoredSlotHandoff(restoration)
+    let original = self
+    return Self(
+      ScopedContentPayload(resolveElementsWork: { context, _ in
+        let occurrence =
+          owner.flatMap { context.viewGraph?.nodeForOwnerLifetimeID($0.ownerLifetime) }?
+          .claimExactIdentityOccurrence(for: identity, at: context.structuralPath) ?? 0
+        let routedIdentity =
+          occurrence == 0 ? identity : identity.child(.indexed("Copy", index: occurrence))
+        if occurrence == 0, let state = handoff.take(), let graph = context.viewGraph {
+          graph.restoreRetainedSubviewState(state)
+        }
+        return original.payload.resolveInEntityRoutedHostWork(
+          in: context.replacingIdentity(with: routedIdentity),
+          entityIdentity: EntityIdentity(routedIdentity),
+          structuralIdentity: nil
+        ).map { [$0] }
+      }))
+  }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     payload.resolveElements(in: context)
   }
@@ -485,5 +524,16 @@ extension LazySubviewPayload {
         in: context, entityIdentity: entityIdentity, structuralIdentity: structuralIdentity)
     case .portal(let payload): return payload.resolveWork(in: context, placementRoot: context)
     }
+  }
+}
+
+/// A one-resolution handoff carries persistent state, never a graph owner or an action.
+@MainActor
+private final class AuthoredSlotHandoff {
+  private var state: RetainedSubviewState?
+  init(_ state: RetainedSubviewState?) { self.state = state }
+  func take() -> RetainedSubviewState? {
+    defer { state = nil }
+    return state
   }
 }

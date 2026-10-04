@@ -45,13 +45,18 @@ extension Label {
     in context: ResolveContext
   ) -> ResolveWork<ResolvedNode> {
     let configuration = LabelStyleConfiguration(
-      title: .init(authoringContext: authoringScope) { title.authoredAccessibilityLabel() },
+      title: .init(
+        authoringContext: authoringScope, accessibilityContext: title is Text ? nil : context
+      ) { title.authoredAccessibilityLabel() },
       icon: .init(authoringContext: authoringScope) { icon },
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
     return context.environmentValues.labelStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("LabelBody"))
-    ).map { child in
+    ).flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.title, required: !(title is Text), context: context)
+    }.map { child in
       return ResolvedNode(
         identity: context.identity,
         kind: .view("Label"),
@@ -110,15 +115,26 @@ extension LabeledContent {
     in context: ResolveContext
   ) -> ResolveWork<ResolvedNode> {
     let configuration = LabeledContentStyleConfiguration(
-      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
-      content: .init(authoringContext: authoringScope) {
+      label: .init(
+        authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+      ) { label.authoredAccessibilityLabel() },
+      content: .init(
+        authoringContext: authoringScope, accessibilityContext: content is Text ? nil : context
+      ) {
         LabeledAccessibilityContent(content: content)
       },
       styleEnvironment: context.environmentValues.styleEnvironmentSnapshot
     )
     return context.environmentValues.labeledContentStyle.resolveBody(
       configuration: configuration, in: context.child(component: .named("LabeledContentBody"))
-    ).map { child in
+    ).flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.label, required: !(label is Text), context: context)
+    }.flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.content, required: !(content is Text),
+        isValue: true, context: context)
+    }.map { child in
       var semantics = SemanticMetadata(accessibilityRole: .group).namingControl(with: label)
       let literal = content as? Text
       semantics.accessibilityValueLabel = .owner(

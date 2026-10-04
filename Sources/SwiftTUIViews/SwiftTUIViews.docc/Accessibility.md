@@ -215,8 +215,13 @@ application action without an executable browser URL.
 
 `LabeledContent` publishes a named group with its text value, excluding style
 chrome and repeated value slots. Interactive content remains independently
-readable and operable. Literal text survives an omitted style slot; generic
-content contributes its text when the style places it. Browser groups expose
+readable and operable. Authored names and values survive omitted style slots,
+including generic view content. When a style omits a generic slot, the primitive
+resolves it once as unpainted semantic content. The first authored occurrence
+retains its persistent state when moved between visible and omitted placements;
+additional visible copies retain independent state. Names create no extra
+keyboard stops or assistive actions. Interactive value content stays operable
+through its virtual semantic controls. Browser groups expose
 value descriptions as descriptions because ARIA groups have no range value.
 
 ### Reduced Motion

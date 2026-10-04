@@ -11,8 +11,9 @@ public import SwiftTUICore
 ///
 /// The style owns appearance only. The focus stop, the action dispatch, key and
 /// pointer handling, and the accessibility semantics stay with the primitive
-/// whatever the style returns, so a body that drops
-/// ``ButtonStyleConfiguration/label`` loses the title and nothing else.
+/// whatever the style returns. Omitting
+/// ``ButtonStyleConfiguration/label`` hides its paint while preserving its
+/// authored accessible name and state.
 ///
 /// Apply a style with `buttonStyle(_:)`. The value is stored in the environment
 /// for the subtree, so the nearest modifier wins. The built-ins are
@@ -138,12 +139,13 @@ public struct ButtonStyleConfiguration: Sendable {
 
     package init<V: View>(
       authoringContext: AuthoringContext?,
+      accessibilityContext: ResolveContext? = nil,
       @ViewBuilder content: @escaping @MainActor () -> V
     ) {
       payload = CapturedSubviewPayload(
         authoringContext: authoringContext,
         content: content
-      )
+      ).anchored(in: accessibilityContext, slotName: "AuthoredLabel")
     }
 
     /// Captures `content` as the authored label of a fixture-constructed

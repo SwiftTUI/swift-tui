@@ -98,7 +98,9 @@ extension SecureField {
         caretAnchor: presentation.caretAnchor
       ),
       isShowingPrompt: presentation.isShowingPrompt,
-      label: .init(authoringContext: authoringScope) { label.authoredAccessibilityLabel() },
+      label: .init(
+        authoringContext: authoringScope, accessibilityContext: label is Text ? nil : context
+      ) { label.authoredAccessibilityLabel() },
       showsLabel: showsLabel,
       chrome: chrome,
       placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
@@ -110,7 +112,11 @@ extension SecureField {
     return textFieldStyle.resolveBody(
       configuration: configuration,
       in: context.child(component: .named("SecureFieldBody"))
-    ).map { child in
+    ).flatMap { child in
+      retainingAuthoredAccessibilitySlot(
+        in: child, slot: configuration.label, required: showsLabel && !(label is Text),
+        context: context)
+    }.map { child in
 
       return ResolvedNode(
         identity: context.identity,
