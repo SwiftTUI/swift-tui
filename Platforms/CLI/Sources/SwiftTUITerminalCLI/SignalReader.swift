@@ -17,7 +17,8 @@
       var defaults: [TerminalSignal] = [.sigint, .sigterm, .sigwinch]
       #if DEBUG && (os(macOS) || os(Linux))
         if let spool = FeatureFlags.environmentValue(named: "SWIFTTUI_HOT_RELOAD_SPOOL"),
-          !spool.isEmpty {
+          !spool.isEmpty
+        {
           defaults.append(.sigusr1)
         }
       #endif

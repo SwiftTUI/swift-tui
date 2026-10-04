@@ -16,7 +16,7 @@ name: Windows Build
 # with `/STACK:16777216` — the default 1 MiB runner stack kills the
 # deep-descent suites (the item-9 class, test-harness edition). The lane
 # list is the survey's final green set; POSIX-only test targets
-# (PTY/attach/WebHost/UnixSignals/EntryPointLaunch families) compile empty
+# (PTY/attach/UnixSignals/EntryPointLaunch families) compile empty
 # on Windows and are omitted rather than run vacuously.
 #
 # Deliberately NOT wired into the org-root gates: the operator keeps
@@ -129,7 +129,7 @@ jobs:
           $lanes = @(
             'SwiftTUICoreTests', 'SwiftTUIGraphTests', 'SwiftTUIViewsTests',
             'SwiftTUITests', 'SwiftTUIArgumentsTests', 'SwiftTUICLITests',
-            'SwiftTUIWASISurfaceBridgeTests', 'SwiftTUIWASITests',
+            'SwiftTUIWASISurfaceBridgeTests', 'SwiftTUIWASITests', 'SwiftTUIWebHostTests',
             'SwiftTUIAnimatedImageTests', 'SwiftTUIProfilingTests',
             'SwiftTUIVendorFigletTests', 'SwiftTUIVendorGIFTests',
             'SwiftTUIVendorJPEGTests', 'SwiftTUIVendorPNGTests'

@@ -1,7 +1,3 @@
-// Compiled out on Windows: the web host is deliberately absent from the
-// first Windows release (Stage 5.3 of the Windows plan, option (i)) —
-// its socket layer is POSIX-bound and the umbrella's dependency edge is
-// platform-conditional.
 #if !os(Windows)
   #if canImport(Darwin)
     import Darwin
@@ -13,6 +9,8 @@
     import Musl
   #endif
 
+  typealias WebHostSocketDescriptor = Int32
+
   /// Blocking POSIX socket primitives for the loopback WebHost server.
   ///
   /// Every function here is a thin, `unsafe`-annotated wrapper over one libc
@@ -20,7 +18,12 @@
   /// are made from dedicated `Thread`s only — never from a Swift concurrency
   /// executor, where a blocked worker can pin the whole cooperative pool on
   /// narrow machines.
-  enum WebHostPOSIXSocket {
+  enum WebHostSocket {
+    static let invalidDescriptor: WebHostSocketDescriptor = -1
+    static let readEvents = Int16(POLLIN)
+    static let writeEvents = Int16(POLLOUT)
+    static var lastError: Int32 { errno }
+    static func isValid(_ fd: WebHostSocketDescriptor) -> Bool { fd >= 0 }
     enum PollOutcome: Equatable {
       case ready
       case timedOut
@@ -96,6 +99,30 @@
         return (false, errno, false)
       }
       return (true, 0, false)
+    }
+
+    static func connect(_ fd: WebHostSocketDescriptor, host: String, port: UInt16) -> Bool {
+      var address = sockaddr_in()
+      #if canImport(Darwin)
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+      #endif
+      address.sin_family = sa_family_t(AF_INET)
+      address.sin_port = port.bigEndian
+      guard host.withCString({ unsafe inet_pton(AF_INET, $0, &address.sin_addr) }) == 1 else {
+        return false
+      }
+      return withUnsafePointer(to: &address) { pointer in
+        let address = unsafe UnsafeRawPointer(pointer).assumingMemoryBound(to: sockaddr.self)
+        #if canImport(Darwin)
+          return unsafe Darwin.connect(fd, address, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+        #elseif canImport(Glibc)
+          return unsafe Glibc.connect(fd, address, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+        #elseif canImport(Android)
+          return unsafe Android.connect(fd, address, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+        #elseif canImport(Musl)
+          return unsafe Musl.connect(fd, address, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+        #endif
+      }
     }
 
     static func boundPort(

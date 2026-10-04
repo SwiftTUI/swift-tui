@@ -75,8 +75,8 @@ ordinary public API (tracked separately in [.spi-api-baseline.txt](.spi-api-base
 |---|---|---|---|---|
 | `SwiftTUI` | `SwiftTUIAnimatedImage` | `always` | none | [source](../Sources/SwiftTUI/SwiftTUI.swift) |
 | `SwiftTUI` | `SwiftTUIArguments` | `always` | none | [source](../Sources/SwiftTUI/SwiftTUI.swift) |
-| `SwiftTUI` | `SwiftTUITerminalCLI` | `(!((os(macOS) \|\| os(iOS) \|\| os(Linux) \|\| os(Android))))` | none | [source](../Sources/SwiftTUI/SwiftTUI.swift) |
-| `SwiftTUI` | `SwiftTUIWebHostCLI` | `(os(macOS) \|\| os(iOS) \|\| os(Linux) \|\| os(Android))` | none | [source](../Sources/SwiftTUI/SwiftTUI.swift) |
+| `SwiftTUI` | `SwiftTUITerminalCLI` | `(!((os(macOS) \|\| os(iOS) \|\| os(Linux) \|\| os(Android) \|\| os(Windows))))` | none | [source](../Sources/SwiftTUI/SwiftTUI.swift) |
+| `SwiftTUI` | `SwiftTUIWebHostCLI` | `(os(macOS) \|\| os(iOS) \|\| os(Linux) \|\| os(Android) \|\| os(Windows))` | none | [source](../Sources/SwiftTUI/SwiftTUI.swift) |
 | `SwiftTUIAnimatedImage` | `SwiftTUICore` | `always` | none | [source](../Sources/SwiftTUIAnimatedImage/Exports.swift) |
 | `SwiftTUIAnimatedImage` | `SwiftTUIViews` | `always` | none | [source](../Sources/SwiftTUIAnimatedImage/Exports.swift) |
 | `SwiftTUIArguments` | `ArgumentParser` | `always` | none | [source](../Platforms/Arguments/Sources/SwiftTUIArguments/SwiftTUIArguments.swift) |
@@ -96,10 +96,10 @@ ordinary public API (tracked separately in [.spi-api-baseline.txt](.spi-api-base
 | `SwiftTUIViews` | `SwiftTUICore` | `always` | none | [source](../Sources/SwiftTUIViews/Exports.swift) |
 | `SwiftTUIViews` | `SwiftTUIVendorFigletEmbeddedFonts` | `always` | none | [source](../Sources/SwiftTUIViews/Primitives/TextFigure.swift) |
 | `SwiftTUIWASI` | `SwiftTUIRuntime` | `always` | none | [source](../Platforms/WASI/Sources/SwiftTUIWASI/SwiftTUIWASI.swift) |
-| `SwiftTUIWebHost` | `SwiftTUIRuntime` | `(!os(Windows))` | none | [source](../Platforms/WebHost/Sources/SwiftTUIWebHost/SwiftTUIWebHost.swift) |
-| `SwiftTUIWebHostCLI` | `SwiftTUIArguments` | `(!os(Windows))` | none | [source](../Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.swift) |
-| `SwiftTUIWebHostCLI` | `SwiftTUIRuntime` | `(!os(Windows))` | none | [source](../Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.swift) |
-| `SwiftTUIWebHostCLI` | `SwiftTUIWebHost` | `(!os(Windows))` | none | [source](../Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.swift) |
+| `SwiftTUIWebHost` | `SwiftTUIRuntime` | `always` | none | [source](../Platforms/WebHost/Sources/SwiftTUIWebHost/SwiftTUIWebHost.swift) |
+| `SwiftTUIWebHostCLI` | `SwiftTUIArguments` | `always` | none | [source](../Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.swift) |
+| `SwiftTUIWebHostCLI` | `SwiftTUIRuntime` | `always` | none | [source](../Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.swift) |
+| `SwiftTUIWebHostCLI` | `SwiftTUIWebHost` | `always` | none | [source](../Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.swift) |
 
 ## Reachability through re-exports
 

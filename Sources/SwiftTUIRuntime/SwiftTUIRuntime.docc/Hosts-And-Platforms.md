@@ -33,9 +33,8 @@ instances' URLs. Noninteractive and JSON output do not start it automatically.
 `WebHostCLIRunner` remains as a source-compatible facade over the
 same launcher. The `SwiftTUI` convenience product re-exports exactly one
 launch surface per platform: the combined terminal/WebHost launcher where the
-WebHost products build (macOS, Mac Catalyst, iOS, Linux, Android), and the
-portable terminal launcher on Windows, where `--web` fails with a clear
-web-runner-not-linked diagnostic and the WebHost types are absent.
+WebHost products build (macOS, Mac Catalyst, iOS, Linux, Android, Windows), and
+the portable terminal launcher on other compilation targets.
 
 Hosts in other package ecosystems keep their non-Swift half in dedicated
 sibling repositories: [`swift-tui-web`](https://github.com/SwiftTUI/swift-tui-web)
@@ -75,7 +74,7 @@ qualified independently.
 | Surface | 0.9 tier | Supported boundary |
 | --- | --- | --- |
 | Terminal runtime | Supported preview surface | Native macOS and Linux launch, input, raster presentation, and terminal graphics through the published SwiftPM products. |
-| Windows terminal runtime | Preview — first carried by 0.9.2 | Native Windows launch, input, and raster presentation on Windows 10 1809+ (build 17763) / Windows Server 2019+ — the ConPTY line — for `aarch64-` and `x86_64-unknown-windows-msvc`. Terminal surface only: WebHost, PTY embedding, and `--attach` are not part of the Windows claim. Full input fidelity (bracketed paste, focus events, mouse from conhost's own window) varies with the console host — current Windows Terminal, or Windows 11 24H2 conhost; the console-record input pump keeps older in-box conhost degrading gracefully rather than misbehaving. |
+| Windows terminal runtime | Preview — first carried by 0.9.2 | Native Windows launch, input, and raster presentation on Windows 10 1809+ (build 17763) / Windows Server 2019+ — the ConPTY line — for `aarch64-` and `x86_64-unknown-windows-msvc`. The loopback WebHost and shared browser companion are available; PTY embedding and `--attach` remain POSIX-only. Full input fidelity (bracketed paste, focus events, mouse from conhost's own window) varies with the console host — current Windows Terminal, or Windows 11 24H2 conhost; the console-record input pump keeps older in-box conhost degrading gracefully rather than misbehaving. |
 | WASI / browser and localhost WebHost | Supported preview surface | Published npm/browser packages, keyboard and pointer input, resize and scroll, canvas/DOM raster presentation, and the converged host wire. |
 | Native SwiftUI host | Supported preview surface | The lockstep external host on macOS 15+ and iOS 18+, including keyboard, pointer/touch, clipboard writes, native image placement, and semantic presentation. |
 | Android Compose host | Preview, arm64 | `arm64-v8a`, API 28+, NDK `27.3.13750724`, Swift 6.4.x, the Swift Android SDK, and the published AAR/Gradle-plugin packaging path. The core host can cross-compile x86_64, but x86_64 packaging and Android IME marked/pre-edit composition are outside the 0.9 support claim. |
@@ -256,7 +255,7 @@ resize) and a Win32 console controller on Windows.
 | --- | --- |
 | macOS package development | Primary supported Apple-host path (macOS 15+). |
 | Linux terminal builds and tests | Supported through `swiftly`. |
-| Windows terminal builds | Supported natively on Windows 10 1809+ (build 17763) / Windows Server 2019+ for `aarch64-` and `x86_64-unknown-windows-msvc`. The `SwiftTUI` umbrella serves the terminal launch surface only: the WebHost and PTY-embedding products do not build there, and `--web` fails with the web-runner-not-linked diagnostic. Link apps with `-Xlinker /STACK:16777216` — release builds included — or the runtime degrades to the stack-lean engine profile below the 8 MiB main-thread stack floor (see the per-host engine profiles). |
+| Windows terminal builds | Supported natively on Windows 10 1809+ (build 17763) / Windows Server 2019+ for `aarch64-` and `x86_64-unknown-windows-msvc`. The `SwiftTUI` umbrella includes terminal launch, the shared loopback browser companion, and `--web`. PTY embedding and `--attach` remain POSIX-only. Link apps with `-Xlinker /STACK:16777216` — release builds included — or the runtime degrades to the stack-lean engine profile below the 8 MiB main-thread stack floor (see the per-host engine profiles). |
 | iOS package builds | Supported for host-compatible products (iOS 18+). PTY/terminal-embedding products are excluded. |
 | WASI / browser | Supported through `SwiftTUIWASI` and the [`swift-tui-web`](https://github.com/SwiftTUI/swift-tui-web) browser packages. |
 | Android host / cross-compilation | `SwiftTUIAndroidHost` cross-compiles for `aarch64-unknown-linux-android28` and `x86_64-unknown-linux-android28`. The reusable Compose host + JNI shim ship as the published `sh.swifttui:android-host` AAR, with the `sh.swifttui.android` Gradle plugin, from [`swift-tui-android`](https://github.com/SwiftTUI/swift-tui-android). Consumer apps depend on the tagged `SwiftTUIAndroidHost` SwiftPM product over HTTPS and let the plugin cross-build their Swift host. |

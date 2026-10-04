@@ -47,6 +47,7 @@ final class SceneRuntime {
     selection: SelectedWindowScene,
     isPrimary: Bool,
     configuration: RuntimeConfiguration = .default,
+    browserOnlySecondary: Bool = false,
     resources: SceneSessionResources? = nil,
     sessionRunner: SessionRunner? = nil
   ) throws {
@@ -144,9 +145,18 @@ final class SceneRuntime {
         )
         resources.runtimeIssueSink = .standardError
         self.resources = resources
+      #elseif os(Windows)
+        guard browserOnlySecondary else {
+          throw SceneRuntimeError.secondaryScenesRequireAttachSubsystem
+        }
+        // The browser shares this graph even though Windows has no POSIX PTY
+        // attach endpoint. The primary scene still owns the real console.
+        let resources = SceneSessionResources(
+          presentationSurface: DetachedCompanionSurface(),
+          terminalInputReader: DetachedCompanionInput(), runtimeConfiguration: configuration)
+        resources.runtimeIssueSink = .standardError
+        self.resources = resources
       #else
-        // Secondary scenes are PTY-backed and only serve `--attach` clients;
-        // without the attach subsystem there is nothing they could render to.
         throw SceneRuntimeError.secondaryScenesRequireAttachSubsystem
       #endif
     }
@@ -406,3 +416,15 @@ enum SceneRuntimeError: Error, Equatable, Sendable, CustomStringConvertible {
     }
   }
 }
+
+#if os(Windows)
+  private final class DetachedCompanionSurface: PresentationSurfaceMetricsProvider {
+    let surfaceSize = CellSize(width: 80, height: 24)
+    let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+    let appearance: TerminalAppearance = .fallback
+    let supportsUserExit = false
+  }
+  private final class DetachedCompanionInput: TerminalInputReading {
+    func inputEvents() -> AsyncStream<InputEvent> { AsyncStream { $0.finish() } }
+  }
+#endif

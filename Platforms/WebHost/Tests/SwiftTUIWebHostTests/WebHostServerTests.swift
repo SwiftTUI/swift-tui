@@ -1,275 +1,267 @@
-// Excluded from Windows builds (Windows plan, Stage 6 item 3): exercises the
-// WebHost server stack, whose modules build empty on Windows
-// (whole-file-guarded).
-#if !os(Windows)
+import Foundation
+import Testing
 
-  import Foundation
-  import Testing
+@testable import SwiftTUIWebHost
 
-  @testable import SwiftTUIWebHost
+#if canImport(FoundationNetworking)
+  import FoundationNetworking
+#endif
 
-  #if canImport(FoundationNetworking)
-    import FoundationNetworking
-  #endif
+struct WebHostServerTests {
+  @Test("default port policy uses preferred range while explicit zero is kernel assigned")
+  func defaultPortPolicyUsesPreferredRangeWhileExplicitZeroIsKernelAssigned() {
+    #expect(WebHostConfig().candidatePorts == Array(9123...9132))
+    #expect(WebHostConfig(port: 0).candidatePorts == [0])
+    #expect(WebHostConfig().sceneID == nil)
+  }
 
-  struct WebHostServerTests {
-    @Test("default port policy uses preferred range while explicit zero is kernel assigned")
-    func defaultPortPolicyUsesPreferredRangeWhileExplicitZeroIsKernelAssigned() {
-      #expect(WebHostConfig().candidatePorts == Array(9123...9132))
-      #expect(WebHostConfig(port: 0).candidatePorts == [0])
-      #expect(WebHostConfig().sceneID == nil)
+  @Test("binding to port 0 produces a reachable loopback URL")
+  func bindingToPortZeroProducesReachableLoopbackURL() async throws {
+    try await withServer { session in
+      #expect(session.baseURL.host == "127.0.0.1")
+      #expect(session.baseURL.port != nil)
+
+      let (data, response) = try await serverData(from: session.url(path: "/"))
+      #expect(try statusCode(from: response) == 200)
+      let html = String(decoding: data, as: UTF8.self)
+      #expect(html.contains("<main id=\"webhost-root\"></main>"))
+      #expect(html.contains("?token=test-token"))
     }
+  }
 
-    @Test("binding to port 0 produces a reachable loopback URL")
-    func bindingToPortZeroProducesReachableLoopbackURL() async throws {
-      try await withServer { session in
-        #expect(session.baseURL.host == "127.0.0.1")
-        #expect(session.baseURL.port != nil)
-
-        let (data, response) = try await serverData(from: session.url(path: "/"))
-        #expect(try statusCode(from: response) == 200)
-        let html = String(decoding: data, as: UTF8.self)
-        #expect(html.contains("<main id=\"webhost-root\"></main>"))
-        #expect(html.contains("?token=test-token"))
-      }
-    }
-
-    @Test("static resource content types are stable")
-    func staticResourceContentTypesAreStable() async throws {
-      try await withServer { session in
-        let (_, htmlResponse) = try await serverData(from: session.url(path: "/"))
-        let (_, scriptResponse) = try await serverData(
-          from: session.url(path: "/static/webhost.js")
-        )
-        let (manifestData, manifestResponse) = try await serverData(
-          from: session.url(path: "/scene-manifest.json")
-        )
-
-        #expect(try contentType(from: htmlResponse)?.hasPrefix("text/html") == true)
-        #expect(try contentType(from: scriptResponse)?.hasPrefix("application/javascript") == true)
-        #expect(try contentType(from: manifestResponse)?.hasPrefix("application/json") == true)
-        #expect(String(decoding: manifestData, as: UTF8.self).contains("\"defaultSceneId\""))
-      }
-    }
-
-    @Test("WebSocket upgrade receives output and forwards input")
-    func webSocketUpgradeReceivesOutputAndForwardsInput() async throws {
-      try await withServer { session in
-        var events = session.channel.inboundEvents().makeAsyncIterator()
-        let webSocket = try WebSocketTestClient.connect(to: session.webSocketURL)
-
-        // A non-surface record reaches a pre-capabilities client immediately;
-        // surface records wait for its capability declaration.
-        try await session.channel.send(Array("clipboard-record".utf8))
-        let received = try webSocket.receiveMessage()
-        #expect(String(decoding: received, as: UTF8.self) == "clipboard-record")
-
-        guard case .connectionOpened(let openedToken) = try #require(await events.next()) else {
-          Issue.record("expected the attach to open a tagged connection")
-          return
-        }
-        #expect(openedToken == 1)
-
-        try webSocket.sendBinary(Data("input-record".utf8))
-        guard case .bytes(let token, let bytes) = try #require(await events.next()) else {
-          Issue.record("expected tagged inbound bytes")
-          return
-        }
-        #expect(token == openedToken)
-        #expect(String(decoding: bytes, as: UTF8.self) == "input-record")
-
-        webSocket.close()
-      }
-    }
-
-    @Test("all scene routes share authorization and keep separate channels")
-    func allSceneRoutesKeepSeparateChannels() async throws {
-      try await withServer(scenes: [
-        .init(id: "first", title: "First", isDefault: false),
-        .init(id: "second", title: "Second", isDefault: true),
-      ]) { session in
-        let (data, _) = try await serverData(from: session.url(path: "/scene-manifest.json"))
-        let manifest = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(manifest["defaultSceneId"] as? String == "second")
-        #expect((manifest["scenes"] as? [[String: Any]])?.count == 2)
-        var sockets: [WebSocketTestClient] = []
-        for id in ["first", "second"] {
-          var url = URLComponents(
-            url: session.url(path: "/ws/scene/\(id)"), resolvingAgainstBaseURL: false)!
-          url.scheme = "ws"
-          let socket = try WebSocketTestClient.connect(to: url.url!)
-          sockets.append(socket)
-          try await session.channels[id]!.send(Array("hello-\(id)".utf8))
-          #expect(String(decoding: try socket.receiveMessage(), as: UTF8.self) == "hello-\(id)")
-        }
-        #expect(await session.channels["first"]!.currentConnectionToken() == 1)
-        #expect(await session.channels["second"]!.currentConnectionToken() == 1)
-        for socket in sockets { socket.close() }
-      }
-    }
-
-    @Test("WebSocket close messages preserve close code and reason")
-    func webSocketCloseMessagesPreserveCloseCodeAndReason() async throws {
-      let channel = WebHostSceneChannel()
-      let output = await channel.attach(
-        client: AsyncStream { continuation in
-          continuation.yield(.close(code: 1009, reason: "too large"))
-          continuation.finish()
-        }
+  @Test("static resource content types are stable")
+  func staticResourceContentTypesAreStable() async throws {
+    try await withServer { session in
+      let (_, htmlResponse) = try await serverData(from: session.url(path: "/"))
+      let (_, scriptResponse) = try await serverData(
+        from: session.url(path: "/static/webhost.js")
       )
-      var iterator = output.makeAsyncIterator()
+      let (manifestData, manifestResponse) = try await serverData(
+        from: session.url(path: "/scene-manifest.json")
+      )
 
-      #expect(await iterator.next() == .close(code: 1009, reason: "too large"))
+      #expect(try contentType(from: htmlResponse)?.hasPrefix("text/html") == true)
+      #expect(try contentType(from: scriptResponse)?.hasPrefix("application/javascript") == true)
+      #expect(try contentType(from: manifestResponse)?.hasPrefix("application/json") == true)
+      #expect(String(decoding: manifestData, as: UTF8.self).contains("\"defaultSceneId\""))
     }
+  }
 
-    @Test("a detached channel drops surface records and bounds the rest")
-    func detachedChannelDropsSurfaceRecordsAndBoundsTheRest() async throws {
-      // The D11 regression pin, inverted. Before S3b this queued all 100 stale
-      // surface records unboundedly and flushed them into the next client ahead
-      // of its capability declaration — records naming an epoch that ended with
-      // the previous client.
-      let channel = WebHostSceneChannel()
-      for sequence in 0..<100 {
-        try await channel.send(Array("\u{001E}surface:{\"sequence\":\(sequence)}\n".utf8))
+  @Test("WebSocket upgrade receives output and forwards input")
+  func webSocketUpgradeReceivesOutputAndForwardsInput() async throws {
+    try await withServer { session in
+      var events = session.channel.inboundEvents().makeAsyncIterator()
+      let webSocket = try WebSocketTestClient.connect(to: session.webSocketURL)
+
+      // A non-surface record reaches a pre-capabilities client immediately;
+      // surface records wait for its capability declaration.
+      try await session.channel.send(Array("clipboard-record".utf8))
+      let received = try webSocket.receiveMessage()
+      #expect(String(decoding: received, as: UTF8.self) == "clipboard-record")
+
+      guard case .connectionOpened(let openedToken) = try #require(await events.next()) else {
+        Issue.record("expected the attach to open a tagged connection")
+        return
       }
-      let overflowingNonSurface = (0..<(WebHostSceneChannel.detachedNonSurfaceBacklogLimit + 8))
-        .map { index in
-          Array("\u{001E}runtimeIssue:{\"index\":\(index)}\n".utf8)
-        }
-      for record in overflowingNonSurface.prefix(WebHostSceneChannel.detachedNonSurfaceBacklogLimit)
-      {
+      #expect(openedToken == 1)
+
+      try webSocket.sendBinary(Data("input-record".utf8))
+      guard case .bytes(let token, let bytes) = try #require(await events.next()) else {
+        Issue.record("expected tagged inbound bytes")
+        return
+      }
+      #expect(token == openedToken)
+      #expect(String(decoding: bytes, as: UTF8.self) == "input-record")
+
+      webSocket.close()
+    }
+  }
+
+  @Test("all scene routes share authorization and keep separate channels")
+  func allSceneRoutesKeepSeparateChannels() async throws {
+    try await withServer(scenes: [
+      .init(id: "first", title: "First", isDefault: false),
+      .init(id: "second", title: "Second", isDefault: true),
+    ]) { session in
+      let (data, _) = try await serverData(from: session.url(path: "/scene-manifest.json"))
+      let manifest = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+      #expect(manifest["defaultSceneId"] as? String == "second")
+      #expect((manifest["scenes"] as? [[String: Any]])?.count == 2)
+      var sockets: [WebSocketTestClient] = []
+      for id in ["first", "second"] {
+        var url = URLComponents(
+          url: session.url(path: "/ws/scene/\(id)"), resolvingAgainstBaseURL: false)!
+        url.scheme = "ws"
+        let socket = try WebSocketTestClient.connect(to: url.url!)
+        sockets.append(socket)
+        try await session.channels[id]!.send(Array("hello-\(id)".utf8))
+        #expect(String(decoding: try socket.receiveMessage(), as: UTF8.self) == "hello-\(id)")
+      }
+      #expect(await session.channels["first"]!.currentConnectionToken() == 1)
+      #expect(await session.channels["second"]!.currentConnectionToken() == 1)
+      for socket in sockets { socket.close() }
+    }
+  }
+
+  @Test("WebSocket close messages preserve close code and reason")
+  func webSocketCloseMessagesPreserveCloseCodeAndReason() async throws {
+    let channel = WebHostSceneChannel()
+    let output = await channel.attach(
+      client: AsyncStream { continuation in
+        continuation.yield(.close(code: 1009, reason: "too large"))
+        continuation.finish()
+      }
+    )
+    var iterator = output.makeAsyncIterator()
+
+    #expect(await iterator.next() == .close(code: 1009, reason: "too large"))
+  }
+
+  @Test("a detached channel drops surface records and bounds the rest")
+  func detachedChannelDropsSurfaceRecordsAndBoundsTheRest() async throws {
+    // The D11 regression pin, inverted. Before S3b this queued all 100 stale
+    // surface records unboundedly and flushed them into the next client ahead
+    // of its capability declaration — records naming an epoch that ended with
+    // the previous client.
+    let channel = WebHostSceneChannel()
+    for sequence in 0..<100 {
+      try await channel.send(Array("\u{001E}surface:{\"sequence\":\(sequence)}\n".utf8))
+    }
+    let overflowingNonSurface = (0..<(WebHostSceneChannel.detachedNonSurfaceBacklogLimit + 8))
+      .map { index in
+        Array("\u{001E}runtimeIssue:{\"index\":\(index)}\n".utf8)
+      }
+    for record in overflowingNonSurface.prefix(WebHostSceneChannel.detachedNonSurfaceBacklogLimit) {
+      try await channel.send(record)
+    }
+    for record in overflowingNonSurface.dropFirst(
+      WebHostSceneChannel.detachedNonSurfaceBacklogLimit)
+    {
+      await #expect(throws: WebHostByteSinkError.outboundBacklogExceeded) {
         try await channel.send(record)
       }
-      for record in overflowingNonSurface.dropFirst(
-        WebHostSceneChannel.detachedNonSurfaceBacklogLimit)
-      {
-        await #expect(throws: WebHostByteSinkError.outboundBacklogExceeded) {
-          try await channel.send(record)
-        }
-      }
-
-      let detachedObservations = await channel.consumeObservations()
-      #expect(detachedObservations.phase == .detached)
-      #expect(detachedObservations.suppressedSurfaceRecords.isEmpty)
-      #expect(
-        detachedObservations.detachedNonSurfaceBacklogCount
-          == WebHostSceneChannel.detachedNonSurfaceBacklogLimit)
-
-      let client = AsyncStream<WebHostSocketMessage> { continuation in
-        continuation.yield(.data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)))
-      }
-      let output = await channel.attach(client: client)
-      var outputIterator = output.makeAsyncIterator()
-
-      // Admitted reliable records survive, in order, and not
-      // one surface record among them.
-      var flushed: [[UInt8]] = []
-      for _ in 0..<WebHostSceneChannel.detachedNonSurfaceBacklogLimit {
-        guard case .data(let bytes) = try #require(await outputIterator.next()) else {
-          Issue.record("expected a flushed non-surface record")
-          return
-        }
-        flushed.append(bytes)
-      }
-      #expect(flushed == Array(overflowingNonSurface.prefix(flushed.count)))
-
-      let attachedObservations = await channel.consumeObservations()
-      #expect(attachedObservations.phase == .preCapabilities)
-      #expect(attachedObservations.currentToken == 1)
-      #expect(attachedObservations.detachedNonSurfaceBacklogCount == 0)
-      #expect(attachedObservations.detachedNonSurfaceBacklogBytes == 0)
-      #expect(!attachedObservations.sceneInputFinished)
     }
-  }
 
-  func withServer(
-    scenes: [WebHostSceneDescriptor] = [.init(id: "main", title: "Main")],
-    _ body: (WebHostServerSession) async throws -> Void
-  ) async throws {
-    await webHostNetworkTestGate.enter()
-    do {
-      let server = WebHostLoopbackServer()
-      let session = try await server.start(
-        configuration: .init(bind: "127.0.0.1", port: 0),
-        token: WebHostToken(rawValue: "test-token"),
-        scenes: scenes
-      )
+    let detachedObservations = await channel.consumeObservations()
+    #expect(detachedObservations.phase == .detached)
+    #expect(detachedObservations.suppressedSurfaceRecords.isEmpty)
+    #expect(
+      detachedObservations.detachedNonSurfaceBacklogCount
+        == WebHostSceneChannel.detachedNonSurfaceBacklogLimit)
 
-      do {
-        try await body(session)
-        await session.stop()
-      } catch {
-        await session.stop()
-        throw error
+    let client = AsyncStream<WebHostSocketMessage> { continuation in
+      continuation.yield(.data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":true}\n".utf8)))
+    }
+    let output = await channel.attach(client: client)
+    var outputIterator = output.makeAsyncIterator()
+
+    // Admitted reliable records survive, in order, and not
+    // one surface record among them.
+    var flushed: [[UInt8]] = []
+    for _ in 0..<WebHostSceneChannel.detachedNonSurfaceBacklogLimit {
+      guard case .data(let bytes) = try #require(await outputIterator.next()) else {
+        Issue.record("expected a flushed non-surface record")
+        return
       }
-      await webHostNetworkTestGate.leave()
+      flushed.append(bytes)
+    }
+    #expect(flushed == Array(overflowingNonSurface.prefix(flushed.count)))
+
+    let attachedObservations = await channel.consumeObservations()
+    #expect(attachedObservations.phase == .preCapabilities)
+    #expect(attachedObservations.currentToken == 1)
+    #expect(attachedObservations.detachedNonSurfaceBacklogCount == 0)
+    #expect(attachedObservations.detachedNonSurfaceBacklogBytes == 0)
+    #expect(!attachedObservations.sceneInputFinished)
+  }
+}
+
+func withServer(
+  scenes: [WebHostSceneDescriptor] = [.init(id: "main", title: "Main")],
+  _ body: (WebHostServerSession) async throws -> Void
+) async throws {
+  await webHostNetworkTestGate.enter()
+  do {
+    let server = WebHostLoopbackServer()
+    let session = try await server.start(
+      configuration: .init(bind: "127.0.0.1", port: 0),
+      token: WebHostToken(rawValue: "test-token"),
+      scenes: scenes
+    )
+
+    do {
+      try await body(session)
+      await session.stop()
     } catch {
-      await webHostNetworkTestGate.leave()
+      await session.stop()
       throw error
     }
+    await webHostNetworkTestGate.leave()
+  } catch {
+    await webHostNetworkTestGate.leave()
+    throw error
   }
+}
 
-  private let webHostNetworkTestGate = WebHostNetworkTestGate()
+private let webHostNetworkTestGate = WebHostNetworkTestGate()
 
-  private actor WebHostNetworkTestGate {
-    private var isLocked = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+private actor WebHostNetworkTestGate {
+  private var isLocked = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
 
-    func enter() async {
-      guard isLocked else {
-        isLocked = true
-        return
-      }
-
-      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-        waiters.append(continuation)
-      }
+  func enter() async {
+    guard isLocked else {
+      isLocked = true
+      return
     }
 
-    func leave() {
-      guard !waiters.isEmpty else {
-        isLocked = false
-        return
-      }
-
-      waiters.removeFirst().resume()
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      waiters.append(continuation)
     }
   }
 
-  func serverData(
-    from url: URL
-  ) async throws -> (Data, URLResponse) {
-    let session = webHostTestURLSession()
-    defer { session.finishTasksAndInvalidate() }
-    return try await session.data(from: url)
-  }
+  func leave() {
+    guard !waiters.isEmpty else {
+      isLocked = false
+      return
+    }
 
-  func serverData(
-    for request: URLRequest
-  ) async throws -> (Data, URLResponse) {
-    let session = webHostTestURLSession()
-    defer { session.finishTasksAndInvalidate() }
-    return try await session.data(for: request)
+    waiters.removeFirst().resume()
   }
+}
 
-  private func webHostTestURLSession() -> URLSession {
-    let configuration = URLSessionConfiguration.ephemeral
-    configuration.timeoutIntervalForRequest = 5
-    configuration.timeoutIntervalForResource = 10
-    configuration.httpShouldSetCookies = false
-    return URLSession(configuration: configuration)
-  }
+func serverData(
+  from url: URL
+) async throws -> (Data, URLResponse) {
+  let session = webHostTestURLSession()
+  defer { session.finishTasksAndInvalidate() }
+  return try await session.data(from: url)
+}
 
-  func statusCode(
-    from response: URLResponse
-  ) throws -> Int {
-    try #require(response as? HTTPURLResponse).statusCode
-  }
+func serverData(
+  for request: URLRequest
+) async throws -> (Data, URLResponse) {
+  let session = webHostTestURLSession()
+  defer { session.finishTasksAndInvalidate() }
+  return try await session.data(for: request)
+}
 
-  func contentType(
-    from response: URLResponse
-  ) throws -> String? {
-    try #require(response as? HTTPURLResponse).value(forHTTPHeaderField: "Content-Type")
-  }
+private func webHostTestURLSession() -> URLSession {
+  let configuration = URLSessionConfiguration.ephemeral
+  configuration.timeoutIntervalForRequest = 5
+  configuration.timeoutIntervalForResource = 10
+  configuration.httpShouldSetCookies = false
+  return URLSession(configuration: configuration)
+}
 
-#endif
+func statusCode(
+  from response: URLResponse
+) throws -> Int {
+  try #require(response as? HTTPURLResponse).statusCode
+}
+
+func contentType(
+  from response: URLResponse
+) throws -> String? {
+  try #require(response as? HTTPURLResponse).value(forHTTPHeaderField: "Content-Type")
+}

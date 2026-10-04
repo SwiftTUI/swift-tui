@@ -116,19 +116,22 @@ public enum TerminalRunner {
     instanceName: String?,
     configuration: RuntimeConfiguration
   ) async throws {
+    let startsCompanion = shouldStartCompanion(
+      configuration: configuration, isInteractive: interactiveTerminal)
     // Create scene runtimes
     var sceneRuntimes: [SceneRuntime] = []
     for (index, selection) in selections.enumerated() {
       let runtime = try SceneRuntime(
         selection: selection,
         isPrimary: index == 0,
-        configuration: configuration
+        configuration: configuration,
+        browserOnlySecondary: startsCompanion
       )
       sceneRuntimes.append(runtime)
     }
 
     let companion: SharedSceneCompanionSession?
-    if shouldStartCompanion(configuration: configuration, isInteractive: interactiveTerminal) {
+    if startsCompanion {
       guard let start = SwiftTUILaunchRegistry.companionRunner else {
         throw TerminalRunnerError.webHostNotLinked
       }
@@ -150,6 +153,20 @@ public enum TerminalRunner {
     } else {
       companion = nil
     }
+
+    #if os(Windows)
+      let discovery: WindowsCompanionRegistration?
+      do {
+        discovery = try companion.map {
+          try WindowsCompanionRegistration(app: appName, url: $0.url)
+        }
+      } catch {
+        await companion?.stop()
+        for runtime in sceneRuntimes { runtime.shutdown() }
+        throw CompanionLaunchError(underlying: String(describing: error))
+      }
+      defer { discovery?.remove() }
+    #endif
 
     #if os(macOS) || os(iOS) || os(Linux) || os(Android)
       let registry = SceneInfoRegistry(
@@ -388,8 +405,15 @@ public enum TerminalRunner {
       try await AttachProxy.run(slavePath: ptyPath)
     }
   #else
+    @MainActor
     private static func printCompanionURLs(appName: String) throws {
-      throw SceneAttachUnavailableError()
+      #if os(Windows)
+        let urls = try WindowsCompanionRegistration.urls(app: appName)
+        guard !urls.isEmpty else { throw WindowsCompanionNotRunningError() }
+        for url in urls { print(url) }
+      #else
+        throw SceneAttachUnavailableError()
+      #endif
     }
 
     private static func listInstances(appName: String) {

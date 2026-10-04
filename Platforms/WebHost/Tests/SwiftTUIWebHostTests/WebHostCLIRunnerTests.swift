@@ -1,142 +1,135 @@
-// Excluded from Windows builds (Windows plan, Stage 6 item 3): exercises the
-// WebHost server stack, whose modules build empty on Windows
-// (whole-file-guarded).
-#if !os(Windows)
+import Foundation
+import SwiftTUICLI
+import SwiftTUIRuntime
+import Testing
 
-  import Foundation
-  import SwiftTUICLI
-  import SwiftTUIRuntime
-  import Testing
+@testable import SwiftTUIWebHost
+@testable import SwiftTUIWebHostCLI
 
-  @testable import SwiftTUIWebHost
-  @testable import SwiftTUIWebHostCLI
+@Suite
+@MainActor
+struct WebHostCLIRunnerTests {
+  @Test("combined runner parses standard SwiftTUI web arguments")
+  func combinedRunnerParsesStandardSwiftTUIWebArguments() throws {
+    let configuration = try WebHostCLIRunner.runtimeConfiguration(
+      arguments: [
+        "--web", "--port", "4567", "--bind", "127.0.0.1", "--open", "--scene", "details",
+      ],
+      environment: [:],
+      isStdoutTTY: true
+    )
 
-  @Suite
-  @MainActor
-  struct WebHostCLIRunnerTests {
-    @Test("combined runner parses standard SwiftTUI web arguments")
-    func combinedRunnerParsesStandardSwiftTUIWebArguments() throws {
-      let configuration = try WebHostCLIRunner.runtimeConfiguration(
-        arguments: [
-          "--web", "--port", "4567", "--bind", "127.0.0.1", "--open", "--scene", "details",
-        ],
-        environment: [:],
-        isStdoutTTY: true
-      )
+    #expect(configuration.web?.port == 4567)
+    #expect(configuration.web?.bind == "127.0.0.1")
+    #expect(configuration.web?.openBrowser == true)
+    #expect(configuration.web?.sceneID == WindowIdentifier("details"))
+  }
 
-      #expect(configuration.web?.port == 4567)
-      #expect(configuration.web?.bind == "127.0.0.1")
-      #expect(configuration.web?.openBrowser == true)
-      #expect(configuration.web?.sceneID == WindowIdentifier("details"))
-    }
+  @Test("combined runner routes web configuration to WebHost runner")
+  func combinedRunnerRoutesWebConfigurationToWebHostRunner() async throws {
+    var route: RunnerRoute?
 
-    @Test("combined runner routes web configuration to WebHost runner")
-    func combinedRunnerRoutesWebConfigurationToWebHostRunner() async throws {
-      var route: RunnerRoute?
-
-      try await WebHostCLIRunner.run(
-        SingleSceneApp(),
-        configuration: .init(web: .init()),
-        webRunner: { _, configuration in
-          route = .web(configuration)
-        },
-        terminalRunner: { _, configuration in
-          route = .terminal(configuration)
-        }
-      )
-
-      #expect(route?.isWeb == true)
-    }
-
-    @Test("combined runner routes terminal configuration to TerminalRunner")
-    func combinedRunnerRoutesTerminalConfigurationToTerminalRunner() async throws {
-      var route: RunnerRoute?
-
-      try await WebHostCLIRunner.run(
-        SingleSceneApp(),
-        configuration: .default,
-        webRunner: { _, configuration in
-          route = .web(configuration)
-        },
-        terminalRunner: { _, configuration in
-          route = .terminal(configuration)
-        }
-      )
-
-      #expect(route?.isTerminal == true)
-    }
-
-    @Test("terminal-only runner still rejects web configuration")
-    func terminalOnlyRunnerStillRejectsWebConfiguration() async throws {
-      do {
-        try await TerminalRunner.run(SingleSceneApp(), configuration: .init(web: .init()))
-        Issue.record("Expected terminal-only runner to reject web configuration.")
-      } catch let error as TerminalRunnerError {
-        #expect(error == .webHostNotLinked)
-      } catch {
-        Issue.record("Expected TerminalRunnerError.webHostNotLinked, got \(error).")
+    try await WebHostCLIRunner.run(
+      SingleSceneApp(),
+      configuration: .init(web: .init()),
+      webRunner: { _, configuration in
+        route = .web(configuration)
+      },
+      terminalRunner: { _, configuration in
+        route = .terminal(configuration)
       }
-    }
+    )
 
-    @Test("SwiftTUICLI target graph remains server-free")
-    func swiftTUICLITargetGraphRemainsServerFree() throws {
-      let packageURL = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .appendingPathComponent("Package.swift")
-      let manifest = try String(contentsOf: packageURL, encoding: .utf8)
-      let source = try #require(targetBlock(named: "SwiftTUICLI", in: manifest))
+    #expect(route?.isWeb == true)
+  }
 
-      #expect(!source.contains("SwiftTUIWebHost"))
-      #expect(!source.contains("Flying" + "Fox"))
-    }
+  @Test("combined runner routes terminal configuration to TerminalRunner")
+  func combinedRunnerRoutesTerminalConfigurationToTerminalRunner() async throws {
+    var route: RunnerRoute?
 
-    private func targetBlock(named targetName: String, in manifest: String) -> String? {
-      let marker = ".target(\n      name: \"\(targetName)\""
-      guard let markerRange = manifest.range(of: marker) else {
-        return nil
+    try await WebHostCLIRunner.run(
+      SingleSceneApp(),
+      configuration: .default,
+      webRunner: { _, configuration in
+        route = .web(configuration)
+      },
+      terminalRunner: { _, configuration in
+        route = .terminal(configuration)
       }
+    )
 
-      let suffix = manifest[markerRange.lowerBound...]
-      if let nextTarget = suffix.dropFirst(marker.count).range(of: "\n    .target(") {
-        return String(suffix[..<nextTarget.lowerBound])
-      }
-      if let nextTestTarget = suffix.dropFirst(marker.count).range(of: "\n    .testTarget(") {
-        return String(suffix[..<nextTestTarget.lowerBound])
-      }
-      return String(suffix)
+    #expect(route?.isTerminal == true)
+  }
+
+  @Test("terminal-only runner still rejects web configuration")
+  func terminalOnlyRunnerStillRejectsWebConfiguration() async throws {
+    do {
+      try await TerminalRunner.run(SingleSceneApp(), configuration: .init(web: .init()))
+      Issue.record("Expected terminal-only runner to reject web configuration.")
+    } catch let error as TerminalRunnerError {
+      #expect(error == .webHostNotLinked)
+    } catch {
+      Issue.record("Expected TerminalRunnerError.webHostNotLinked, got \(error).")
     }
   }
 
-  @MainActor
-  private struct SingleSceneApp: App {
-    var body: some Scene {
-      WindowGroup("Primary", id: WindowIdentifier("primary")) {
-        Text("Primary")
-      }
-    }
+  @Test("SwiftTUICLI target graph remains server-free")
+  func swiftTUICLITargetGraphRemainsServerFree() throws {
+    let packageURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Package.swift")
+    let manifest = try String(contentsOf: packageURL, encoding: .utf8)
+    let source = try #require(targetBlock(named: "SwiftTUICLI", in: manifest))
+
+    #expect(!source.contains("SwiftTUIWebHost"))
+    #expect(!source.contains("Flying" + "Fox"))
   }
 
-  private enum RunnerRoute: Equatable {
-    case web(RuntimeConfiguration)
-    case terminal(RuntimeConfiguration)
-
-    var isWeb: Bool {
-      if case .web = self {
-        return true
-      }
-      return false
+  private func targetBlock(named targetName: String, in manifest: String) -> String? {
+    let marker = ".target(\n      name: \"\(targetName)\""
+    guard let markerRange = manifest.range(of: marker) else {
+      return nil
     }
 
-    var isTerminal: Bool {
-      if case .terminal = self {
-        return true
-      }
-      return false
+    let suffix = manifest[markerRange.lowerBound...]
+    if let nextTarget = suffix.dropFirst(marker.count).range(of: "\n    .target(") {
+      return String(suffix[..<nextTarget.lowerBound])
+    }
+    if let nextTestTarget = suffix.dropFirst(marker.count).range(of: "\n    .testTarget(") {
+      return String(suffix[..<nextTestTarget.lowerBound])
+    }
+    return String(suffix)
+  }
+}
+
+@MainActor
+private struct SingleSceneApp: App {
+  var body: some Scene {
+    WindowGroup("Primary", id: WindowIdentifier("primary")) {
+      Text("Primary")
     }
   }
+}
 
-#endif
+private enum RunnerRoute: Equatable {
+  case web(RuntimeConfiguration)
+  case terminal(RuntimeConfiguration)
+
+  var isWeb: Bool {
+    if case .web = self {
+      return true
+    }
+    return false
+  }
+
+  var isTerminal: Bool {
+    if case .terminal = self {
+      return true
+    }
+    return false
+  }
+}
