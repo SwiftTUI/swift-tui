@@ -1610,6 +1610,20 @@ package final class ViewNode {
     )
   }
 
+  /// An explicitly composed action replaces the record with a closure that
+  /// retains and delegates to the prior contribution. Ordinary duplicate
+  /// primitive registrations still go through the F104 alarm below.
+  package func recordComposedActionRegistration(
+    identity: Identity, registration: LocalActionRegistry.Registration
+  ) {
+    recordRuntimeRegistrationMutation()
+    registeredHandlers.recordAction(
+      identity: identity, handler: registration.handler,
+      accessibilityHandler: registration.accessibilityHandler,
+      followUpInvalidationIdentity: registration.followUpInvalidationIdentity)
+    refreshCommittedHandlerInventoryOutsideCapture()
+  }
+
   package func recordActionRegistration(
     identity: Identity,
     handler: @escaping LocalActionRegistry.Handler,

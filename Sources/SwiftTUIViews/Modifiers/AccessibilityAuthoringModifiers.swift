@@ -97,30 +97,23 @@ private struct AccessibilityAuthoredActionModifier: IterativePrimitiveViewModifi
       if node.semanticMetadata.accessibilityRole == nil {
         node.semanticMetadata.accessibilityRole = kinds.contains(.increment) ? .stepper : .button
       }
-      let inherited = context.localActionRegistry?.registration(for: node.identity)
       let intake = HandlerDescriptorIntake(context: context, preferringSnapshot: scope)
-      intake.registerAction(
+      intake.composeAccessibilityAction(
         identity: node.identity,
-        accessibilityHandler: { request in
-          let matches: Bool
-          if case .custom(let requestedName) = request {
-            matches = name == requestedName
-          } else {
-            matches = kinds.contains(request.kind)
-          }
-          if matches {
-            action(request)
-            return .changed
-          }
-          if let inheritedAction = inherited?.accessibilityHandler {
-            return inheritedAction(request)
-          }
-          if request == .activate, let inherited {
-            return inherited.handler() ? .changed : .unchanged
-          }
-          return .unsupported
-        },
-        handler: { inherited?.handler() ?? false })
+        preservingExisting: previous?.actions.contains(where: { $0 != .focus }) == true
+      ) { request in
+        let matches: Bool
+        if case .custom(let requestedName) = request {
+          matches = name == requestedName
+        } else {
+          matches = kinds.contains(request.kind)
+        }
+        if matches {
+          action(request)
+          return .changed
+        }
+        return nil
+      }
       return [node]
     }
   }

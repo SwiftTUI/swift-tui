@@ -178,6 +178,19 @@ package struct HandlerDescriptorIntake {
 
   // MARK: Key-event family
 
+  package func composeAccessibilityAction(
+    identity: Identity, preservingExisting: Bool,
+    contribution: @escaping @MainActor (AccessibilityAction) -> AccessibilityActionOutcome?
+  ) {
+    let scope = dispatchScope
+    context.localActionRegistry?.composeAccessibility(
+      identity: identity, preservingExisting: preservingExisting,
+      followUpInvalidationIdentity: followUpInvalidationIdentity
+    ) { action in
+      withImperativeAuthoringContext(scope) { contribution(action) }
+    }
+  }
+
   package func registerKeyPressHandler(
     identity: Identity,
     phase: LocalKeyHandlerRegistry.KeyPressPhase = .control,

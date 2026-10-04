@@ -151,7 +151,8 @@ struct WebSurfaceWireTotalityTests {
     #expect(properties["language"] as? String == "Detail é\nquoted \"text\"")
     let control = try #require(nodes.first)
     #expect(control["actionTarget"] as? String == "fixture-token")
-    #expect(control["actions"] as? [String] == ["focus", "setValue"])
+    #expect(control["actions"] as? [String] == ["focus", "setValue", "custom"])
+    #expect(control["customActions"] as? [String] == ["Reset"])
     #expect(control["isEnabled"] as? Bool == false)
     let value = try #require(control["value"] as? [String: Any])
     #expect(value["type"] as? String == "text")
@@ -471,10 +472,11 @@ struct WebSurfaceWireTotalityTests {
     )
     controlNode.actionTarget = "fixture-token"
     controlNode.control = .init(
-      actions: [.focus, .setValue], value: .text("Current"),
+      actions: [.focus, .setValue, .custom], value: .text("Current"),
       minimum: 0, maximum: 10, step: 1,
       selection: .init(
-        presentation: .menu, options: [.init(id: "choice-1", label: "First", isEnabled: true)]))
+        presentation: .menu, options: [.init(id: "choice-1", label: "First", isEnabled: true)]),
+      customActions: ["Reset"])
     controlNode.isEnabled = false
     var frame = SemanticHostFrame(
       sequence: sequence,

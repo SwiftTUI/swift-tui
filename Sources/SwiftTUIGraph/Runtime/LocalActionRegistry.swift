@@ -79,8 +79,29 @@ package final class LocalActionRegistry: Equatable {
     store[identity] != nil
   }
 
-  package func registration(for identity: Identity) -> Registration? {
-    store[identity]
+  /// Intentionally decorates a control's one registration. Unlike registering
+  /// another primitive at the same identity, this preserves its default action
+  /// and delegates unhandled assistive operations to the preceding contribution.
+  package func composeAccessibility(
+    identity: Identity, preservingExisting: Bool, followUpInvalidationIdentity: Identity?,
+    contribution: @escaping @MainActor (AccessibilityAction) -> AccessibilityActionOutcome?
+  ) {
+    // The first authored operation starts a fresh chain on every resolve.
+    // Keeping the previous frame here would retain obsolete callbacks forever.
+    let inherited = preservingExisting ? store[identity] : nil
+    let handler: Handler = { inherited?.handler() ?? false }
+    let accessibility: AccessibilityHandler = { action in
+      if let result = contribution(action) { return result }
+      if let previous = inherited?.accessibilityHandler { return previous(action) }
+      guard action == .activate, let inherited else { return .unsupported }
+      return inherited.handler() ? .changed : .unchanged
+    }
+    let registration = Registration(
+      handler: handler, accessibilityHandler: accessibility,
+      followUpInvalidationIdentity: followUpInvalidationIdentity)
+    store.set(registration, for: identity, owner: .current(identity: identity))
+    ViewNodeContext.current?.recordComposedActionRegistration(
+      identity: identity, registration: registration)
   }
 
   package func reset() {

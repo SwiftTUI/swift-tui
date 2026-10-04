@@ -41,6 +41,62 @@ struct DuplicateRegistrationProbeTests {
     SoundnessProbeConfiguration.duplicateRegistrationOverwriteCount
   }
 
+  @Test("explicit assistive composition retains the primitive and preceding operations")
+  func composedActionsDoNotOverwriteContributions() {
+    let identity = testIdentity("Root", "Custom")
+    let node = RegistrationKindDriver.makeRecordingNode(identity: identity)
+    let registry = LocalActionRegistry()
+    var calls = 0
+    withArmedProbe {
+      let before = alarmCount
+      ViewNodeContext.withValue(node) {
+        registry.register(
+          identity: identity,
+          handler: {
+            calls += 1
+            return true
+          })
+        registry.composeAccessibility(
+          identity: identity, preservingExisting: true, followUpInvalidationIdentity: nil
+        ) {
+          guard $0 == .increment else { return nil }
+          calls += 10
+          return .changed
+        }
+        registry.composeAccessibility(
+          identity: identity, preservingExisting: true, followUpInvalidationIdentity: nil
+        ) {
+          guard $0 == .custom("Reset") else { return nil }
+          calls += 100
+          return .changed
+        }
+      }
+      #expect(alarmCount == before)
+      #expect(registry.dispatchAccessibility(identity: identity, action: .activate) == .changed)
+      #expect(registry.dispatchAccessibility(identity: identity, action: .increment) == .changed)
+      #expect(
+        registry.dispatchAccessibility(identity: identity, action: .custom("Reset")) == .changed)
+      #expect(calls == 111)
+      ViewNodeContext.withValue(node) {
+        registry.composeAccessibility(
+          identity: identity, preservingExisting: false, followUpInvalidationIdentity: nil
+        ) {
+          guard $0 == .decrement else { return nil }
+          calls += 1000
+          return .changed
+        }
+      }
+      #expect(
+        registry.dispatchAccessibility(identity: identity, action: .increment) == .unsupported)
+      #expect(
+        registry.dispatchAccessibility(identity: identity, action: .custom("Reset")) == .unsupported
+      )
+      #expect(registry.dispatchAccessibility(identity: identity, action: .decrement) == .changed)
+      #expect(calls == 1111)
+      #expect(alarmCount == before)
+    }
+  }
+
   @Test("a second same-identity action record within one capture session raises the alarm")
   func actionDoubleRecordRaisesAlarm() {
     let identity = testIdentity("Root", "Button")
