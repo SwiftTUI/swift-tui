@@ -10,7 +10,7 @@ extension RunLoop {
     _ request: AccessibilityActionRequest
   ) -> AccessibilityActionResult {
     guard
-      let node = latestSemanticSnapshot.accessibilityNodes.first(where: {
+      let node = publishedAccessibilitySnapshot.accessibilityNodes.first(where: {
         $0.actionTarget == request.target
       }), let control = node.control
     else {
@@ -28,7 +28,7 @@ extension RunLoop {
     if let combined, !combined.enabled { return .disabled }
     if combined?.readOnly == true { return .unsupported }
     let actionRegions =
-      focusTracker.focusRegions + latestSemanticSnapshot.accessibilityActionRegions
+      focusTracker.focusRegions + publishedAccessibilitySnapshot.accessibilityActionRegions
     guard !node.hidden,
       actionRegions.contains(where: {
         $0.identity == identity && $0.ownerNodeID == owner

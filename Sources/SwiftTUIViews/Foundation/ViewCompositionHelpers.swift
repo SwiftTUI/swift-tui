@@ -232,7 +232,15 @@ package struct CapturedSubviewPayload: Sendable {
           in: context.replacingIdentity(with: routedIdentity),
           entityIdentity: EntityIdentity(routedIdentity),
           structuralIdentity: nil
-        ).map { [$0] }
+        ).map { host in
+          // The graph host owns the slot lifetime, while its original layout
+          // elements remain direct children of the enclosing style stack.
+          guard let content = host.children.first,
+            content.typeDiscriminator == ObjectIdentifier(SynthesizedGroupWrapperMarker.self)
+          else { return [host] }
+          context.viewGraph?.reportDetachedResolvedLifetimeResult(host)
+          return content.children
+        }
       }))
   }
 

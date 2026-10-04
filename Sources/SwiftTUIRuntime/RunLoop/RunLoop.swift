@@ -81,6 +81,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   package var activeTerminalHandoffSessionGeneration: UInt64?
 
   package var latestSemanticSnapshot = SemanticSnapshot()
+  /// The last published action tokens. Focus-convergence candidates may replace
+  /// `latestSemanticSnapshot` while awaiting a rerender, but cannot issue tokens.
+  package var publishedAccessibilitySnapshot = SemanticSnapshot()
   package var accessibilityTargetLifetimes = AccessibilityTargetLifetimes()
   /// The most recent keyboard focus traversal, kept until the next input
   /// event. If the region the traversal landed on vanishes from the semantic

@@ -1820,8 +1820,9 @@ extension OmittedAccessibilitySlotTests {
     #expect(terminal.latestSurface?.lines.contains { $0.contains("Stateful name 0") } == true)
   }
 
-  @Test("generic name and value retain separate state when both slots move")
-  func nameAndValueState() throws {
+  @Test(
+    "generic name and value retain separate state when both slots move", arguments: [false, true])
+  func nameAndValueState(multiple: Bool) throws {
     let size = CellSize(width: 60, height: 10)
     let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
     let root = testIdentity("PairGenericState")
@@ -1835,8 +1836,10 @@ extension OmittedAccessibilitySlotTests {
     ) {
       LabeledContent {
         StatefulOmittedAccessibilityName(pulse: valuePulse)
+        if multiple { Text("tail") }
       } label: {
         StatefulOmittedAccessibilityName(pulse: labelPulse)
+        if multiple { Text("tail") }
       }.labeledContentStyle(
         omitted ? AnyLabeledContentStyle(OmittedLabeledContentStyle()) : .automatic)
     }
@@ -1857,8 +1860,10 @@ extension OmittedAccessibilitySlotTests {
       try render()
       let node = try #require(
         loop.latestSemanticSnapshot.accessibilityNodes.first { $0.role == .group })
-      #expect(node.label == "Stateful name 2")
-      #expect(node.properties?.valueDescription == "Stateful name 1")
+      #expect(node.label == "Stateful name 2" + (multiple ? " tail" : ""), "placed=\(placed)")
+      #expect(
+        node.properties?.valueDescription == "Stateful name 1" + (multiple ? " tail" : ""),
+        "placed=\(placed)")
     }
   }
 }
@@ -1905,5 +1910,45 @@ extension CustomAccessibilityActionTests {
     try render()
     #expect(try rating().control?.value == value)
     #expect(loop.handleAccessibilityAction(.init(target: second, action: .increment)) == .accepted)
+  }
+}
+
+extension CustomAccessibilityActionTests {
+  @Test("focus-convergence candidates cannot retire published assistive tokens")
+  func candidateDoesNotReplacePublishedTarget() throws {
+    let size = CellSize(width: 50, height: 8)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("PublishedActionTarget")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: focus
+    ) { CustomAccessibilityRating() }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    loop.scheduler.requestInvalidation(of: [root])
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let node = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == "Rating" })
+    let issued = try #require(node.actionTarget)
+    var candidate = DefaultRenderer().renderArtifacts(Text("Candidate"))
+    candidate.semanticSnapshot = loop.latestSemanticSnapshot
+    for index in candidate.semanticSnapshot.accessibilityNodes.indices {
+      if let target = candidate.semanticSnapshot.accessibilityNodes[index].actionTarget {
+        candidate.semanticSnapshot.accessibilityNodes[index].actionTarget = String(
+          target.split(separator: "#").dropLast().joined(separator: "#"))
+      }
+    }
+    var convergence = type(of: loop).FocusSyncConvergenceState()
+    _ = try loop.processFocusSyncIteration(candidate, convergence: &convergence)
+    #expect(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == "Rating" }?.actionTarget
+        != issued)
+    #expect(loop.handleAccessibilityAction(.init(target: issued, action: .increment)) == .accepted)
+    loop.scheduler.requestInvalidation(of: [root])
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    #expect(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == "Rating" }?.control?.value
+        == .number(3))
   }
 }

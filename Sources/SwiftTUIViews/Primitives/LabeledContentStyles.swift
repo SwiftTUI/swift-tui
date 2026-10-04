@@ -12,10 +12,10 @@ public import SwiftTUICore
 /// group and a textual value independently of style chrome, without adding a
 /// focus stop or action. Controls authored inside a slot keep their own behavior.
 /// A slot placed in the body keeps its authoring scope, so
-/// state and tasks declared in it still belong to the declaration site. Unlike
-/// ``ControlGroupStyle``, this family does not retain a slot's child state when
-/// a style omits the slot or hosts it somewhere else, so keep a slot in the
-/// body when its content owns state.
+/// state and tasks declared in it still belong to the declaration site. The
+/// first placement retains persistent authored state across style moves and
+/// omission; additional placements have independent state. Omitted slots remain
+/// available to accessibility without painting or adding keyboard focus stops.
 ///
 /// ``AnyLabeledContentStyle/automatic`` places the label and the content on one
 /// baseline with a flexible spacer between them;

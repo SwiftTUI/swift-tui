@@ -414,6 +414,7 @@ extension RunLoop {
       hasFrameSink: hasFrameSink,
       frameOrdinal: renderedFrames + 1
     )
+    publishedAccessibilitySnapshot = artifacts.semanticSnapshot
     recordPresentedRasterSurface(artifacts.rasterSurface)
     previousPresentedScrollLedger = scrollTranslation.ledger
     reportRuntimeIssues(

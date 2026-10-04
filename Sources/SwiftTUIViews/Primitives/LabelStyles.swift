@@ -11,10 +11,10 @@ public import SwiftTUICore
 /// A label is passive. Styling introduces no focus stop, action, or
 /// accessibility role of its own, and controls authored inside a slot keep
 /// their own behavior. A slot placed in the body keeps its authoring scope, so
-/// state and tasks declared in it still belong to the declaration site. Unlike
-/// ``ControlGroupStyle``, this family does not retain a slot's child state when
-/// a style omits the slot or hosts it somewhere else, so keep a slot in the
-/// body when its content owns state.
+/// state and tasks declared in it still belong to the declaration site. The
+/// first title placement retains persistent state across style moves and
+/// omission; additional title placements have independent state. An omitted
+/// title still names the label. Icon state follows its visible placement.
 ///
 /// The built-ins are ``AnyLabelStyle/titleAndIcon`` (the icon first, then one
 /// cell of spacing, then the title), ``AnyLabelStyle/titleOnly``, and
