@@ -1143,6 +1143,8 @@ class AccessibilityTreeMounter {
     const structuredText = properties?.textKind !== undefined || role.role === "heading";
     setOrRemoveAttribute(element, "aria-label", structuredText ? undefined : node.label || undefined);
     const text = this.readingText.get(element);
+    element.style.userSelect = structuredText ? "text" : "";
+    element.style.setProperty("-webkit-user-select", structuredText ? "text" : "");
     if (structuredText) {
       if (text) {
         if (text.data !== (node.label ?? ""))
