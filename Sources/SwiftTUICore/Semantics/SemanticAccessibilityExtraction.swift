@@ -282,7 +282,7 @@ extension SemanticExtractor {
           for: node,
           emittedSubtrees: emittedSubtrees
         )
-        if let accessibilityNode = accessibilityNode(
+        if var accessibilityNode = accessibilityNode(
           for: node,
           parentIdentity: frame.emittedParentIdentity,
           hasEmittedChild: hasEmittedChild,
@@ -294,7 +294,12 @@ extension SemanticExtractor {
           authoredValue: authoredValues[traversalOrdinal],
           textPresentation: textPresentations[traversalOrdinal] ?? .independent
         ) {
+          let inlineNodes = inlineAccessibilityNodes(
+            for: node, parent: accessibilityNode, focusRegions: focusRegions,
+            textPresentation: textPresentations[traversalOrdinal] ?? .independent)
+          if !inlineNodes.isEmpty { accessibilityNode.label = nil }
           nodes.append(accessibilityNode)
+          nodes.append(contentsOf: inlineNodes)
           childParentIdentity = node.identity
         }
       }
@@ -328,6 +333,53 @@ extension SemanticExtractor {
       }
     }
     return (nodes, visualLabelRoutes)
+  }
+
+  /// Rich text contributes prose and links once, in authored run order. Links
+  /// reuse the primitive's existing placed focus routes and open-link handlers.
+  private func inlineAccessibilityNodes(
+    for node: PlacedNode, parent: AccessibilityNode, focusRegions: [FocusRegion],
+    textPresentation: AccessibilityTextPresentation
+  ) -> [AccessibilityNode] {
+    guard textPresentation == .independent,
+      node.semanticMetadata.accessibilityLabel == nil,
+      node.semanticMetadata.accessibilityControl == nil,
+      case .richText(let payload) = node.drawPayload,
+      payload.runs.contains(where: { $0.linkIdentifier != nil })
+    else { return [] }
+    var segments: [(id: String?, destination: LinkDestination?, text: String)] = []
+    for run in payload.runs {
+      if let last = segments.indices.last, segments[last].id == run.linkIdentifier {
+        segments[last].text += run.text
+      } else {
+        segments.append((run.linkIdentifier, run.destination, run.text))
+      }
+    }
+    return segments.enumerated().compactMap { index, segment -> AccessibilityNode? in
+      guard !segment.text.allSatisfy(\.isWhitespace) else { return nil }
+      let identity =
+        segment.id.map { inlineLinkIdentity(parent: node.identity, identifier: $0) }
+        ?? node.identity.child(.indexed("AccessibilityText", index: index))
+      let route = focusRegions.first { $0.identity == identity }
+      var child = AccessibilityNode(
+        viewNodeID: segment.id == nil ? nil : node.viewNodeID,
+        identity: identity.strippingEntityOccurrences, parentIdentity: parent.identity,
+        rect: route?.rect ?? parent.rect, role: segment.id == nil ? .group : .link,
+        label: segment.text)
+      child.isEnabled = parent.isEnabled
+      if parent.properties?.readOnly != nil || parent.properties?.language != nil {
+        child.properties = AccessibilityProperties(
+          readOnly: parent.properties?.readOnly, language: parent.properties?.language)
+      }
+      if let destination = segment.destination, segment.id != nil {
+        child.control = .init(actions: [.focus, .activate], value: .text(destination.rawValue))
+        if let owner = node.viewNodeID {
+          child.actionTarget = "\(owner.rawValue):\(identity.path)"
+          child.actionIdentity = identity
+        }
+      }
+      return child
+    }
   }
 
   func accessibilityWarnings(

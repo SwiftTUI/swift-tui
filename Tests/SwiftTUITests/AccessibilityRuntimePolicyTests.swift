@@ -1114,6 +1114,33 @@ struct AccessibilityActionRuntimeTests {
 @MainActor
 @Suite("Public custom assistive actions")
 struct CustomAccessibilityActionTests {
+  @Test func inlineLinksUseTheirExistingTypedActionRoutes() throws {
+    let calls = AssistiveValueProbe(0)
+    let root = testIdentity("InlineLinks")
+    let size = CellSize(width: 60, height: 10)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: size, focusTracker: focus
+    ) {
+      Text("Read \(Link("Guide", destination: "https://example.com/guide")) now.")
+        .openLinkAction(
+          OpenLinkAction { _ in
+            calls.value += 1
+            return true
+          })
+    }
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let link = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.role == .link })
+    let target = try #require(link.actionTarget)
+    #expect(loop.handleAccessibilityAction(.init(target: target, action: .activate)) == .accepted)
+    #expect(calls.value == 1)
+  }
+
   @Test func primitiveAndAuthoredActivationRemainIndependent() throws {
     let calls = AssistiveValueProbe(0)
     let root = testIdentity("AuthoredButton")

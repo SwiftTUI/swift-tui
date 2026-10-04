@@ -75,6 +75,30 @@ struct StyledControlAccessibilityTests {
         == "Two stars")
   }
 
+  @Test("rich prose exposes inline links once in authored reading order")
+  func inlineLinks() {
+    let snapshot = render(
+      Text(
+        "Read \(Link("Guide", destination: "https://example.com/guide")) and \(Link("API", destination: "https://example.com/api")) next."
+      ).paragraph())
+    #expect(
+      snapshot.accessibilityNodes.compactMap(\.label) == [
+        "Read ", "Guide", " and ", "API", " next.",
+      ])
+    let links = snapshot.accessibilityNodes.filter { $0.role == .link }
+    #expect(
+      links.map { $0.control?.value } == [
+        .text("https://example.com/guide"), .text("https://example.com/api"),
+      ])
+    let owned = render(
+      Button {
+      } label: {
+        Text("Read \(Link("Guide", destination: "https://example.com/guide"))")
+      })
+    #expect(owned.accessibilityNodes.compactMap(\.label) == ["Read Guide"])
+    #expect(owned.accessibilityNodes.allSatisfy { $0.role != .link })
+  }
+
   @Test("counter button title survives built-in styles and shortcut chrome")
   func counterButton() {
     for style in [AnyButtonStyle.automatic, .plain, .bordered, .borderedProminent] {

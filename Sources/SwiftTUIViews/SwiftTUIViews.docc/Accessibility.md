@@ -203,7 +203,10 @@ independent. Use `accessibilityRole(_:)` and `accessibilityProperties(_:)` for a
 explicit role, heading level and additional widget state. Device-only SwiftUI
 traits have no implied implementation.
 
-`Link` publishes its destination separately from its name. The browser uses a
+`Link`, including a link interpolated into `Text`, publishes its destination
+separately from its name. Rich prose exposes text and links once in authored
+order; a link inside a control's label remains part of that control's name.
+The browser uses a
 native anchor for safe HTTP, HTTPS, mail and telephone destinations; activation
 still invokes the Swift `OpenLinkAction` once. Other schemes retain the typed
 application action without an executable browser URL.
