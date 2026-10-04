@@ -1064,7 +1064,12 @@ struct AccessibilityActionRuntimeTests {
     #expect(try node("Toggle").control?.value == .boolean(true))
     _ = try request("Modal", .activate)
     try loop.renderPendingFrames(renderedFrames: &frames)
-    #expect(try request("Toggle", .activate) == .outOfScope)
+    #expect(
+      !loop.latestSemanticSnapshot.accessibilityNodes.contains {
+        $0.identity == testIdentity("Toggle")
+      })
+    #expect(
+      loop.handleAccessibilityAction(.init(target: button, action: .activate)) == .staleTarget)
     #expect(try request("ModalChild", .focus) == .accepted)
   }
 

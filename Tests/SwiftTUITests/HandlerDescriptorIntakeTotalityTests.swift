@@ -72,6 +72,7 @@ struct HandlerDescriptorIntakeTotalityTests {
     "Gestures/GestureViewModifier.swift",
     "Gestures/GestureModifiers.swift",
     "State/FocusState.swift",
+    "State/AccessibilityFocusState.swift",
     "State/FocusedValue.swift",
     "Focus/DefaultFocus.swift",
   ]
