@@ -1,5 +1,5 @@
 public import ArgumentParser
-public import SwiftTUIRuntime
+import SwiftTUIRuntime
 
 /// The framework-owned option group flattened into every `SwiftTUICommand`.
 ///
