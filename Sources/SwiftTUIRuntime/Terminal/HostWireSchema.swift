@@ -187,6 +187,10 @@ package enum HostWireSchema {
         wire: .derived(
           "actions/value/valueMin/valueMax/valueStep/selection/customActions/opensLink")),
       .init("selectionOptionRects", wire: .derived("selection.options[].rect by opaque option ID")),
+      .init(
+        "combinedActions",
+        wire: .notSerialized(
+          "runtime-only child operation routes addressed by group customActions and actionTarget")),
       .init("isEnabled", wire: .key("isEnabled")),
       .init(
         "actionIdentity", wire: .notSerialized("runtime dispatch uses the opaque actionTarget")),
