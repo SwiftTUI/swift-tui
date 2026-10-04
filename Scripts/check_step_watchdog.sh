@@ -207,10 +207,17 @@ if [ "$case_exit" != "0" ]; then
   fail "a step ran with the watchdog disabled but still failed (exit=$case_exit)."
 fi
 
+# Busy-grace behavior needs a positive observed CPU rate, not a guarantee of
+# 25% of a core from the host scheduler. A loaded container measured 24% and
+# correctly classified this synthetic loop below the production floor. Use a
+# 1% floor only for these short branch tests; case 10 independently proves that
+# CPU below a configured floor is killed. Production remains at 25%.
 echo "6/11 a silent step that is still burning CPU survives the idle bound"
 case_busy_grace_seconds=6
+case_busy_min_cpu_percent=1
 run_case busy_silent_survives 2 0 busy_silent_step 5
 case_busy_grace_seconds=0
+case_busy_min_cpu_percent=25
 if [ "$case_wedged" = "1" ]; then
   fail "the busy-but-silent case never finished; the watchdog left it running."
 fi
@@ -223,8 +230,10 @@ fi
 
 echo "7/11 a silent, busy step still dies once its busy grace runs out"
 case_busy_grace_seconds=2
+case_busy_min_cpu_percent=1
 run_case busy_silent_exhausts 2 0 busy_silent_step 600
 case_busy_grace_seconds=0
+case_busy_min_cpu_percent=25
 if [ "$case_wedged" = "1" ]; then
   fail "a livelocking silent step outlived the watchdog's kill."
 fi
@@ -265,8 +274,10 @@ esac
 # the window COUNT it replaced.
 echo "9/11 a busy grace shorter than the idle bound still buys silence"
 case_busy_grace_seconds=2
+case_busy_min_cpu_percent=1
 run_case busy_partial_grace 4 0 busy_silent_step 5
 case_busy_grace_seconds=0
+case_busy_min_cpu_percent=25
 if [ "$case_wedged" = "1" ]; then
   fail "the partial-grace case never finished; the watchdog left it running."
 fi
