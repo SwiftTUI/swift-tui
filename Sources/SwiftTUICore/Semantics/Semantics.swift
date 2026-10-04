@@ -81,6 +81,21 @@ package struct SemanticExtractor: Sendable {
 
         let participatesInTopLevelFocus = node.participatesInTopLevelFocus
 
+        if !sealingParentOnChain {
+          let navigator = node.semanticMetadata.accessibilityStructure?.collectionNavigation
+          let review = node.semanticMetadata.hostedCollectionItem?.review
+          if let identity = navigator?.identity ?? review?.identity,
+            let rect = interactionRect(for: node, clippedTo: clipRect)
+          {
+            accessibilityActionRegions.append(
+              FocusRegion(
+                identity: identity, rect: rect, focusInteractions: .automatic,
+                scopePath: scopePath, sectionIdentity: sectionIdentity,
+                modalFocusScopePath: modalFocusScopePath,
+                ownerNodeID: review?.ownerNodeID ?? node.viewNodeID, ownerIdentity: node.identity))
+          }
+        }
+
         if let selection = node.semanticMetadata.hostedCollectionItem?.selection,
           interactionsEnabled, !sealingParentOnChain,
           let rect = interactionRect(for: node, clippedTo: clipRect)

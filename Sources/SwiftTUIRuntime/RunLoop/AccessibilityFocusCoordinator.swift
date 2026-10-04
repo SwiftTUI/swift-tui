@@ -15,6 +15,7 @@ package final class AccessibilityFocusCoordinator {
   private var focused: Target?
   private var requestGeneration: UInt64 = 0
   private var consumedRequests: [FocusBindingKey: UInt64] = [:]
+  private var preparedRequests: [FocusBindingKey: UInt64] = [:]
   private var previousBindings: [FocusBindingRegistrationSnapshot] = []
 
   package func accepts(_ node: AccessibilityNode, in snapshot: SemanticSnapshot) -> Bool {
@@ -39,6 +40,7 @@ package final class AccessibilityFocusCoordinator {
     let bindings = registry.snapshot().filter { $0.domain == .accessibility }
     let liveKeys = Set(bindings.map(\.bindingKey))
     consumedRequests = consumedRequests.filter { liveKeys.contains($0.key) }
+    preparedRequests = preparedRequests.filter { liveKeys.contains($0.key) }
     var changed = false
     // Retiring a target clears its still-live binding owner. Generation checks
     // in the binding protect a newer authored request and replacement owners.
@@ -54,15 +56,29 @@ package final class AccessibilityFocusCoordinator {
     where binding.hasPendingRequest
       && consumedRequests[binding.bindingKey] != binding.requestGeneration
     {
-      consumedRequests[binding.bindingKey] = binding.requestGeneration
-      guard !appliedRequest else { continue }
+      guard !appliedRequest else {
+        consumedRequests[binding.bindingKey] = binding.requestGeneration
+        continue
+      }
       let group = bindings.filter { $0.bindingKey == binding.bindingKey }
       if let selected = group.first(where: \.isSelected) {
         guard
           let node = allowed.first(where: {
             ($0.actionIdentity ?? $0.identity) == selected.identity
           })
-        else { continue }
+        else {
+          if preparedRequests[binding.bindingKey] != binding.requestGeneration,
+            let preparationIdentity = selected.preparationIdentity,
+            allowed.contains(where: { ($0.actionIdentity ?? $0.identity) == preparationIdentity }),
+            let prepare = selected.prepareFocus, prepare()
+          {
+            preparedRequests[binding.bindingKey] = binding.requestGeneration
+            changed = true
+          } else {
+            consumedRequests[binding.bindingKey] = binding.requestGeneration
+          }
+          continue
+        }
         focused = Target(node)
       } else {
         focused = nil
@@ -70,7 +86,15 @@ package final class AccessibilityFocusCoordinator {
       precondition(
         requestGeneration < UInt64.max, "Accessibility focus request generation exhausted")
       requestGeneration += 1
+      consumedRequests[binding.bindingKey] = binding.requestGeneration
       appliedRequest = true
+    }
+    if appliedRequest {
+      // A ready authored request wins over an earlier reveal preparation.
+      // Its delayed row must not steal focus on the following frame.
+      for binding in bindings where binding.hasPendingRequest {
+        consumedRequests[binding.bindingKey] = binding.requestGeneration
+      }
     }
     changed =
       registry.sync(actualFocusedIdentity: focused?.identity, domain: .accessibility) || changed

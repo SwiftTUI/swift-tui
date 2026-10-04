@@ -552,6 +552,7 @@ package struct HostedCollectionItemMetadata: Equatable, Sendable {
   package var isSelectable: Bool
   package var selection: HostedCollectionSelection? = nil
   package var section: HostedCollectionSection? = nil
+  package var review: HostedCollectionReview? = nil
 
   package init(
     role: HostedCollectionItemRole,
@@ -570,6 +571,17 @@ package struct HostedCollectionSection: Equatable, Sendable {
     self.title = title
     self.position = position
     self.count = count
+  }
+}
+
+/// One realized logical record can receive an explicit assistive review request
+/// without entering keyboard traversal or changing collection selection.
+package struct HostedCollectionReview: Equatable, Sendable {
+  package var identity: Identity
+  package var ownerNodeID: ViewNodeID?
+  package init(identity: Identity, ownerNodeID: ViewNodeID?) {
+    self.identity = identity
+    self.ownerNodeID = ownerNodeID
   }
 }
 
@@ -681,7 +693,23 @@ package struct AccessibilityStructure: Equatable, Sendable {
   package var navigationCategories: [String] = []
   package var tabs: [AccessibilityTabMetadata]? = nil
   package var expansion: AccessibilityExpansionMetadata? = nil
+  package var collectionNavigation: AccessibilityCollectionNavigation? = nil
   package init() {}
+}
+
+/// A bounded navigator for a collection's logical records, independent of its
+/// mounted viewport. Membership changes retire queued ordinal requests.
+package struct AccessibilityCollectionNavigation: Equatable, Sendable {
+  package var identity: Identity
+  package var position: Int
+  package var count: Int
+  package var canReturn: Bool
+  package init(identity: Identity, position: Int, count: Int, canReturn: Bool) {
+    self.identity = identity
+    self.position = position
+    self.count = count
+    self.canReturn = canReturn
+  }
 }
 
 /// Collection metadata is sparse and potentially large. One immutable box

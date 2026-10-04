@@ -74,11 +74,20 @@ extension RunLoop {
       if focusTracker.setFocus(to: identity) { scheduler.requestInput() }
       return .accepted
     }
-    guard localActionRegistry.hasHandler(identity: identity) else { return .unsupported }
     let before = schedulerInvalidationRequestGeneration()
-    switch localActionRegistry.dispatchAccessibility(
+    var outcome = localActionRegistry.dispatchAccessibility(
       identity: identity, action: combined?.action ?? request.action)
+    // Authored operations win. Default scroll commands use the existing scroll
+    // registration instead of adding an ordinary activation handler.
+    if outcome == .unsupported, combined == nil,
+      publishedAccessibilitySnapshot.scrollRoutes.contains(where: { $0.identity == identity }),
+      case .custom(let name) = request.action,
+      let command = ScrollAccessibilityCommand(rawValue: name)
     {
+      outcome =
+        command.perform(in: localScrollPositionRegistry, identity: identity) ? .changed : .unchanged
+    }
+    switch outcome {
     case .changed:
       scheduler.requestInput()
       recordFollowUpInvalidation(

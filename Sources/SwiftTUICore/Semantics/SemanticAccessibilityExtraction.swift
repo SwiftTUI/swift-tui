@@ -298,6 +298,7 @@ extension SemanticExtractor {
       let collectionReadOnly =
         node.semanticMetadata.hostedCollectionContainer != nil
         ? node.semanticMetadata.accessibilityProperties?.readOnly : frame.collectionReadOnly
+      var emittedHostedOutlineItem = false
       if case .list(let payload) = node.drawPayload {
         listCount = payload.virtualRowCount ?? payload.items.filter { $0.kind == .row }.count
       }
@@ -310,8 +311,12 @@ extension SemanticExtractor {
           contentsOf: collectionSelectionNodes(
             for: node, parent: item.identity, readOnly: collectionReadOnly))
         childParentIdentity = item.identity
+        // The collection already supplied this structural item and its level.
+        // Re-emitting the outline row's listitem role would duplicate the item
+        // and put a listitem directly inside another listitem without a list.
+        emittedHostedOutlineItem = node.semanticMetadata.accessibilityRole == .custom("listitem")
       }
-      if emits {
+      if emits && !emittedHostedOutlineItem {
         let hasEmittedChild = accessibilityHasEmittedChild(
           for: node,
           emittedSubtrees: emittedSubtrees
@@ -338,7 +343,11 @@ extension SemanticExtractor {
             accessibilityNode.role = .group
           }
           let expansionNodes = expansionAccessibilityNodes(for: node, original: accessibilityNode)
+          if case .tableRow = node.semanticMetadata.hostedCollectionItem?.role {
+            installCollectionReview(on: &accessibilityNode, for: node)
+          }
           nodes.append(contentsOf: expansionNodes ?? [accessibilityNode])
+          nodes.append(contentsOf: collectionNavigationNodes(for: node, parent: accessibilityNode))
           nodes.append(contentsOf: tabAccessibilityNodes(for: node, parent: accessibilityNode))
           nodes.append(contentsOf: inlineNodes)
           nodes.append(contentsOf: tableAccessibilityHeaders(for: node, parent: accessibilityNode))
@@ -844,7 +853,9 @@ extension SemanticExtractor {
   /// consume its document content as a control's decorative chrome.
   private func accessibilityRolePreservesContent(_ role: AccessibilityRole?) -> Bool {
     switch role {
-    case .sheet, .confirmationDialog, .alert, .popover, .region, .tabPanel, .status: true
+    case .sheet, .confirmationDialog, .alert, .popover, .region, .tabPanel, .status,
+      .scrollView, .scrollViewWithIndicators:
+      true
     default: false
     }
   }

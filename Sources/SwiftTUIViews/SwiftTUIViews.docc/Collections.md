@@ -148,6 +148,10 @@ every row and reports `collection.unboundedRealization` once. These callers
 request the true ideal size. An estimate can give the wrong size when row
 heights differ.
 
+A direct `OutlineGroup` in a List also provides an indexed source. It enumerates
+logical IDs and hierarchy without evaluating offscreen row views. Disclosure
+state belongs to the outline rather than its recycled rows.
+
 Arbitrary builder composition stays supported and keeps every authored node
 committed. It uses the eager path. SwiftTUI cannot prove a total indexed row
 source for heterogeneous content. Thus, it realizes and measures every row in

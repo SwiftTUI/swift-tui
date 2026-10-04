@@ -212,6 +212,15 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
           focusedForegroundStyle: presentation.focusedIndicatorStyle,
           reservesSpace: presentation.reservesIndicatorSpace)
 
+        var semantics = scrollViewMetadata(
+          accessibilityRole: indicatorAxes.isEmpty ? .scrollView : .scrollViewWithIndicators,
+          capturesPointerOnPress: allowsPanning)
+        // Protected editor surfaces own their text semantics and input paths.
+        if !fitsContent {
+          semantics.accessibilityControl = .init(
+            actions: [.focus, .custom, .accessibilityFocus, .accessibilityBlur],
+            customActions: ScrollAccessibilityCommand.names(for: axes))
+        }
         return [
           ResolvedNode(
             identity: context.identity,
@@ -231,11 +240,7 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
               )
             ).resolvedBehavior,
             drawMetadata: drawMetadata,
-            semanticMetadata: scrollViewMetadata(
-              accessibilityRole: indicatorAxes.isEmpty
-                ? .scrollView : .scrollViewWithIndicators,
-              capturesPointerOnPress: allowsPanning
-            )
+            semanticMetadata: semantics
           )
         ]
       }

@@ -25,6 +25,7 @@ extension EnvironmentValues {
 /// Presents hierarchical collection data as an outline.
 public struct OutlineGroup<Data, ID, RowContent>: View
 where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
+  @State private var collapsed: Set<[ID]> = []
   private let elements: [Data.Element]
   private let id: (Data.Element) -> ID
   private let children: (Data.Element) -> [Data.Element]
@@ -58,14 +59,117 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
   }
 
   public var body: some View {
-    OutlineTree(
-      elements: elements,
-      id: id,
-      children: children,
-      rowContent: rowContent,
-      authoringScope: authoringScope
-    )
+    LazyVStack(alignment: .leading, spacing: 0) {
+      rows(
+        outlineEntries(elements, id: id, children: children, collapsed: collapsed),
+        collapsed: $collapsed)
+    }.accessibilityRole(.list)
   }
+
+  private func rows(_ entries: [OutlineEntry<Data.Element, ID>], collapsed: Binding<Set<[ID]>>)
+    -> some View & IndexedChildSourceView
+  {
+    return ForEach(entries, id: \.path) { entry in
+      EnvironmentReader(\.outlineStyle) { style in
+        EnvironmentReader(\.styleEnvironmentSnapshot) { environment in
+          let presentation = style.presentation(for: .init(styleEnvironment: environment))
+          OutlineRow(
+            prefix: outlinePrefix(
+              ancestry: entry.ancestry, isLast: entry.isLast, style: presentation),
+            content: withAuthoringContext(authoringScope) { rowContent(entry.element) },
+            authoringScope: authoringScope,
+            expanded: entry.hasChildren
+              ? Binding(
+                get: { !collapsed.wrappedValue.contains(entry.path) },
+                set: { expanded in
+                  var next = collapsed.wrappedValue
+                  if expanded { next.remove(entry.path) } else { next.insert(entry.path) }
+                  // Removed data must not leave a growing history of disclosure state.
+                  let livePaths = Set(
+                    outlineEntries(elements, id: id, children: children, collapsed: []).map(\.path))
+                  collapsed.wrappedValue = next.intersection(livePaths)
+                }) : nil,
+            level: entry.ancestry.count + 1, position: entry.position, count: entry.count
+          )
+          .tag(entry.identifier)
+          .accessibilityRole(.custom("listitem"))
+          .accessibilityProperties(
+            .init(
+              level: entry.ancestry.count + 1,
+              positionInSet: entry.position, setSize: entry.count))
+        }
+      }
+    }
+  }
+}
+
+/// A direct OutlineGroup in List has a logical source without evaluating rows.
+@MainActor
+package protocol IndexedOutlineSourceView: IndexedChildSourceView {}
+
+extension OutlineGroup: IndexedOutlineSourceView {
+  package func indexedChildSource(in context: ResolveContext) -> (any IndexedChildSource)? {
+    withDynamicPropertyUpdateScope(self, for: context) {
+      let entries = outlineEntries(elements, id: id, children: children, collapsed: collapsed)
+      guard let source = rows(entries, collapsed: $collapsed).indexedChildSource(in: context) else {
+        return nil
+      }
+      return OutlineIndexedSource(
+        base: source,
+        tags: entries.map { SelectionTag(value: $0.identifier, includeOptional: true) })
+    }
+  }
+}
+
+private struct OutlineIndexedSource: IndexedChildSource {
+  let base: any IndexedChildSource
+  let tags: [SelectionTag]
+  var count: Int { base.count }
+  var identityRoot: Identity { base.identityRoot }
+  var measurementSignature: IndexedChildMeasurementSignature { base.measurementSignature }
+  func child(at index: Int) -> ResolvedNode { base.child(at: index) }
+  func elementIdentity(at index: Int) -> Identity { base.elementIdentity(at: index) }
+  func elementSelectionTag(at index: Int) -> SelectionTag? { tags[index] }
+}
+
+private struct OutlineEntry<Element, ID: Hashable & Sendable> {
+  let path: [ID]
+  let identifier: ID
+  let element: Element
+  let hasChildren: Bool
+  let ancestry: [Bool]
+  let position: Int
+  let count: Int
+  let isLast: Bool
+}
+
+/// Only logical data and IDs are enumerated. Row producers run in the viewport.
+@MainActor
+private func outlineEntries<Element, ID: Hashable & Sendable>(
+  _ elements: [Element], id: (Element) -> ID, children: (Element) -> [Element], collapsed: Set<[ID]>
+) -> [OutlineEntry<Element, ID>] {
+  var result: [OutlineEntry<Element, ID>] = []
+  var stack: [(elements: [Element], offset: Int, ancestry: [Bool], path: [ID])] = [
+    (elements, 0, [], [])
+  ]
+  while let frame = stack.popLast() {
+    guard frame.offset < frame.elements.count else { continue }
+    let element = frame.elements[frame.offset]
+    let identifier = id(element)
+    let path = frame.path + [identifier]
+    let descendants = children(element)
+    let isLast = frame.offset == frame.elements.count - 1
+    result.append(
+      .init(
+        path: path, identifier: identifier, element: element,
+        hasChildren: !descendants.isEmpty, ancestry: frame.ancestry, position: frame.offset + 1,
+        count: frame.elements.count, isLast: isLast))
+    stack.append((frame.elements, frame.offset + 1, frame.ancestry, frame.path))
+    if !collapsed.contains(path), !descendants.isEmpty {
+      stack.append((descendants, 0, frame.ancestry + [!isLast], path))
+    }
+  }
+  return result
 }
 
 extension List {
@@ -317,96 +421,6 @@ where Data.Element: Identifiable, Data.Element.ID: Sendable, ID == Data.Element.
   }
 }
 
-package struct OutlineTree<Element, ID, RowContent>: View
-where ID: Hashable & Sendable, RowContent: View {
-  package var elements: [Element]
-  package var id: (Element) -> ID
-  package var children: (Element) -> [Element]
-  package var rowContent: (Element) -> RowContent
-  package var authoringScope: AuthoringContext?
-  package var ancestry: [Bool] = []
-
-  public var body: some View {
-    EnvironmentReader(\.outlineStyle) { outlineStyle in
-      EnvironmentReader(\.styleEnvironmentSnapshot) { styleEnvironment in
-        outlineLevelBody(
-          presentation: outlineStyle.presentation(
-            for: OutlineStyleConfiguration(styleEnvironment: styleEnvironment)
-          )
-        )
-      }
-    }
-  }
-
-  @ViewBuilder @MainActor
-  private func outlineLevelBody(
-    presentation: OutlineStylePresentation
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
-      ForEach(entries) { entry in
-        OutlineBranch(entry: entry, tree: self, presentation: presentation)
-      }
-    }.accessibilityRole(.list)
-  }
-
-  fileprivate func rowView(for element: Element) -> RowContent {
-    withAuthoringContext(authoringScope) {
-      rowContent(element)
-    }
-  }
-
-  private var entries: [OutlineEntry<Element, ID>] {
-    elements.enumerated().map { offset, element in
-      OutlineEntry(
-        id: id(element),
-        element: element,
-        children: children(element),
-        position: offset + 1,
-        isLast: offset == elements.count - 1
-      )
-    }
-  }
-}
-
-private struct OutlineEntry<Element, ID: Hashable & Sendable>: Identifiable {
-  let id: ID
-  let element: Element
-  let children: [Element]
-  let position: Int
-  let isLast: Bool
-}
-
-/// An outline is a hierarchy of disclosure lists, with ordinary buttons and
-/// nested row controls. It does not claim an ARIA tree's managed arrow-key model.
-private struct OutlineBranch<Element, ID, RowContent>: View
-where ID: Hashable & Sendable, RowContent: View {
-  let entry: OutlineEntry<Element, ID>
-  let tree: OutlineTree<Element, ID, RowContent>
-  let presentation: OutlineStylePresentation
-  @State private var expanded = true
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      OutlineRow(
-        prefix: outlinePrefix(ancestry: tree.ancestry, isLast: entry.isLast, style: presentation),
-        content: tree.rowView(for: entry.element), authoringScope: tree.authoringScope,
-        expanded: entry.children.isEmpty ? nil : $expanded,
-        level: tree.ancestry.count + 1, position: entry.position, count: tree.elements.count)
-      if expanded && !entry.children.isEmpty {
-        OutlineTree(
-          elements: entry.children, id: tree.id, children: tree.children,
-          rowContent: tree.rowContent, authoringScope: tree.authoringScope,
-          ancestry: tree.ancestry + [!entry.isLast])
-      }
-    }
-    .accessibilityRole(.custom("listitem"))
-    .accessibilityProperties(
-      .init(
-        level: tree.ancestry.count + 1,
-        positionInSet: entry.position, setSize: tree.elements.count))
-  }
-}
-
 private struct OutlineRow<Content: View>: PrimitiveView, IterativeResolvableView {
   let prefix: String
   let content: Content
@@ -475,7 +489,7 @@ private struct ScopedOutlineRowContent<Content: View>: PrimitiveView, IterativeR
     // Mint a per-row owner for the row content by routing through
     // `resolveView`, so each outline row's row-local `@State` binds to its own
     // node keyed on `context.identity` — already the per-row explicit-ID
-    // identity carried down by `OutlineTree`'s `ForEach`. The generic
+    // identity carried down by the outline source's `ForEach`. The generic
     // `content.resolveElements(in:)` path this replaced never called
     // `beginEvaluation`/`makeAuthoringContext`, so it re-used the single
     // `authoringScope` owner captured once at `OutlineGroup.init` for every
@@ -485,7 +499,7 @@ private struct ScopedOutlineRowContent<Content: View>: PrimitiveView, IterativeR
     // this per-row owner: control handlers dispatch under their
     // construction-time scope (`HandlerDescriptorIntake.preferringAuthoringScope`),
     // and the row content is still built under `authoringScope` in
-    // `OutlineTree.rowView(for:)`, so a row button that mutates enclosing state
+    // `OutlineGroup`'s row producer, so a row button that mutates enclosing state
     // still routes to the enclosing owner.
     return withAuthoringContext(authoringScope) {
       resolveViewWork(content, in: context)

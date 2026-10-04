@@ -346,6 +346,11 @@ package enum FocusBindingDomain: Sendable {
 }
 
 package struct FocusBindingRegistrationSnapshot: Sendable {
+  /// An explicit assistive request may first reveal a lazy target. Called at
+  /// most once for that request, after commit, never during layout.
+  package var prepareFocus: (@MainActor @Sendable () -> Bool)?
+  /// A committed semantic owner that must be in the active scope before reveal.
+  package var preparationIdentity: Identity?
   package var domain: FocusBindingDomain
   package var requestGeneration: UInt64
   package var identity: Identity
@@ -366,9 +371,13 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     ownerIdentity: Identity? = nil,
     domain: FocusBindingDomain = .keyboard,
     requestGeneration: UInt64 = 0,
+    prepareFocus: (@MainActor @Sendable () -> Bool)? = nil,
+    preparationIdentity: Identity? = nil,
     applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
   ) {
     self.domain = domain
+    self.prepareFocus = prepareFocus
+    self.preparationIdentity = preparationIdentity
     self.requestGeneration = requestGeneration
     self.identity = identity
     self.bindingKey = bindingKey
@@ -428,6 +437,8 @@ package final class LocalFocusBindingRegistry: Equatable {
     isSelected: Bool,
     domain: FocusBindingDomain = .keyboard,
     requestGeneration: UInt64 = 0,
+    prepareFocus: (@MainActor @Sendable () -> Bool)? = nil,
+    preparationIdentity: Identity? = nil,
     applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
   ) {
     let registration = FocusBindingRegistrationSnapshot(
@@ -438,6 +449,8 @@ package final class LocalFocusBindingRegistry: Equatable {
       isSelected: isSelected,
       domain: domain,
       requestGeneration: requestGeneration,
+      prepareFocus: prepareFocus,
+      preparationIdentity: preparationIdentity,
       applyRuntimeFocus: applyRuntimeFocus
     )
     registrations.append(registration)

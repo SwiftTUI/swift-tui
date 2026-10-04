@@ -218,7 +218,7 @@ extension Table {
         }
       }
       var scrollCurrency: CollectionScrollCurrency?
-      if isEnabled, !resolvedRows.isEmpty {
+      if !resolvedRows.isEmpty {
         // A table body always alternates row/separator lines, so the row span is
         // 2 and no chrome precedes row 0 *within the body* — the header and
         // footer rules are fixed lines outside the scrolling window.
@@ -245,6 +245,24 @@ extension Table {
             return (offset, bodyCapacity)
           }
         )
+      }
+
+      let reviewSource =
+        resolvedContent.indexedSource.map(CollectionAccessibilitySource.init(indexed:))
+        ?? CollectionAccessibilitySource(identities: resolvedContent.children.map(\.identity))
+      let review = CollectionAccessibilityNavigation(
+        source: reviewSource, currency: scrollCurrency, owner: ownerNode, context: context)
+      if let review {
+        if let source = resolvedContent.indexedSource {
+          resolvedContent.indexedSource = HostedCollectionIndexedChildSource(base: source) {
+            review.decorate($0, index: $1)
+          }
+        } else {
+          for index in resolvedContent.children.indices {
+            resolvedContent.children[index] = review.decorate(
+              resolvedContent.children[index], index: index)
+          }
+        }
       }
 
       if isEnabled {
@@ -434,6 +452,11 @@ extension Table {
         accessibilityRole: .table
       )
       metadata.hostedCollectionContainer = .init(kind: .table)
+      if let review {
+        var structure = metadata.accessibilityStructure ?? .init()
+        structure.collectionNavigation = review.metadata
+        metadata.accessibilityStructure = structure
+      }
       metadata.hostedCollectionContainer?.hasSelection = isSelectable
       metadata.hostedCollectionContainer?.headerSorts = columns.map(\.sort)
       metadata.accessibilityProperties = .init(

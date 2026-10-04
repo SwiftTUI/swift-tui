@@ -89,7 +89,7 @@ extension List {
       context.environmentValues.scrollIndicatorVisibility.allowsVisibleIndicators
     let itemContext = context.child(component: .named("ListItems"))
     let resolvedContentWork: ResolveWork<ResolvedItems>
-    if usesIndexedDataSource,
+    if usesIndexedDataSource || content is any IndexedOutlineSourceView,
       let source = makeIndexedChildSource(
         from: content,
         in: itemContext.settingEnvironment(\.isResolvingHostedCollectionContent, to: true)
@@ -164,7 +164,7 @@ extension List {
           ownerNodeID: ownerNode?.viewNodeID)
       }
       var scrollCurrency: CollectionScrollCurrency?
-      if isEnabled, !rows.isEmpty {
+      if !rows.isEmpty {
         let showsIndicatorLines = showsIndicators
         let rowCount = rows.count
         scrollCurrency = CollectionScrollCurrency(
@@ -189,6 +189,28 @@ extension List {
             return (window.offset, window.visibleLineCount)
           }
         )
+      }
+
+      let reviewSource =
+        resolvedContent.indexedSource.map(CollectionAccessibilitySource.init(indexed:))
+        ?? CollectionAccessibilitySource(identities: rows.map(\.identity))
+      let review = CollectionAccessibilityNavigation(
+        source: reviewSource, currency: scrollCurrency, owner: ownerNode, context: context)
+      if let review {
+        if let source = resolvedContent.indexedSource {
+          resolvedContent.indexedSource = HostedCollectionIndexedChildSource(base: source) {
+            review.decorate($0, index: $1)
+          }
+        } else {
+          for index in resolvedContent.children.indices {
+            if case .listRow(let rowIndex) = resolvedContent.children[index].semanticMetadata
+              .hostedCollectionItem?.role
+            {
+              resolvedContent.children[index] = review.decorate(
+                resolvedContent.children[index], index: rowIndex)
+            }
+          }
+        }
       }
 
       if isEnabled {
@@ -423,6 +445,11 @@ extension List {
         accessibilityRole: .list
       )
       metadata.hostedCollectionContainer = .init(kind: .list)
+      if let review {
+        var structure = metadata.accessibilityStructure ?? .init()
+        structure.collectionNavigation = review.metadata
+        metadata.accessibilityStructure = structure
+      }
       var node = ResolvedNode(
         identity: context.identity,
         kind: .view("List"),

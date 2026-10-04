@@ -155,8 +155,16 @@ extension LayoutEngine {
     } else {
       childWidth = max(0, concreteSize.width)
     }
+    // An intrinsic-width request must discover the realized rows' widths.
+    // Constraining them to the empty payload's fallback width erases their
+    // text before it can contribute to the collection's ideal size.
+    let proposedChildWidth: ProposedDimension
+    switch effectiveProposal.width {
+    case .finite: proposedChildWidth = .finite(childWidth)
+    case .unspecified, .infinity: proposedChildWidth = effectiveProposal.width
+    }
     let childProposal = ProposedSize(
-      width: .finite(childWidth),
+      width: proposedChildWidth,
       height: .unspecified
     )
     for index in sourceIndices {
@@ -182,22 +190,22 @@ extension LayoutEngine {
         at: sourceIndices,
         into: &tallRowHeights
       )
-      listLayout = payload.style.visibleListLayout(
-        for: payload,
-        in: bounds,
-        rowHeights: tallRowHeights,
-        // Only set on the hint path, where `bounds` is the collection's own
-        // content height rather than a viewport. Without it the line model
-        // would build a display line per row of the whole dataset before
-        // anything windowed it — the interim O(dataset) cost S2 left behind.
-        rowWindow: measuredWindow
-      )
       measuredSize = measuredHostedListSize(
         for: payload,
         childMeasurements: measurements,
         sourceIndices: sourceIndices,
         retainedTallRowHeights: retainedTallRows,
         proposal: effectiveProposal
+      )
+      listLayout = payload.style.visibleListLayout(
+        for: payload,
+        in: .init(origin: .zero, size: measuredSize),
+        rowHeights: tallRowHeights,
+        // Only set on the hint path, where `bounds` is the collection's own
+        // content height rather than a viewport. Without it the line model
+        // would build a display line per row of the whole dataset before
+        // anything windowed it — the interim O(dataset) cost S2 left behind.
+        rowWindow: measuredWindow
       )
     case .table(let payload):
       var discovered = measureTableColumnWidths(
@@ -254,19 +262,19 @@ extension LayoutEngine {
         at: sourceIndices,
         into: &tallRowHeights
       )
-      tableLayout = DrawExtractor().visibleTableLayout(
-        for: payload,
-        in: bounds,
-        columnWidths: tableColumnWidths,
-        rowHeights: tallRowHeights,
-        rowWindow: measuredWindow
-      )
       measuredSize = measuredHostedTableSize(
         for: payload,
         childMeasurements: measurements,
         sourceIndices: sourceIndices,
         retainedTallRowHeights: retainedTallRows,
         proposal: effectiveProposal
+      )
+      tableLayout = DrawExtractor().visibleTableLayout(
+        for: payload,
+        in: .init(origin: .zero, size: measuredSize),
+        columnWidths: tableColumnWidths,
+        rowHeights: tallRowHeights,
+        rowWindow: measuredWindow
       )
     default:
       return nil

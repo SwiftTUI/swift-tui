@@ -120,12 +120,28 @@ the complete text and nested controls inside their rows. Eager and indexed
 collections use the same semantics for realized rows; indexed collections retain
 bounded materialization and do not expose unrealized rows as hidden controls.
 
-`OutlineGroup` uses nested disclosure lists. Branches begin expanded and offer a
+`OutlineGroup` exposes hierarchical list items. Branches begin expanded and offer a
 separate button to collapse or expand children; terminal keyboard, pointer and
 browser assistive input use the same state. Items expose level and sibling
 position; connector glyphs are decorative. Authored row buttons retain their own
 actions. The outline does not claim the ARIA tree pattern's managed arrow-key
-model. Verify collection reading, context and operation with the intended reader.
+model. Disclosure state survives row recycling, and only viewport rows evaluate
+their content in a bounded scroll region or a direct outline-backed List.
+
+Nonempty lists and tables expose a separate **Review items** position control.
+Set its logical position, step, choose first/last or page, then use **Read item**
+to move assistive focus to the realized row. **Return to previous item** restores
+the previous logical bookmark. Review does not change selection or ordinary
+keyboard focus. It remains available when row operations are disabled. Data
+changes follow the current ID; removing that ID moves the bookmark to the
+nearest surviving position. Old ordinal commands retire when membership changes.
+
+Ordinary `ScrollView` regions offer named page and edge operations for their
+axes, including lazy content and nested viewports. These use the viewport's
+existing scroll owner. Giving the viewport an accessibility label also names its
+operations through sizing wrappers. Text editors keep their own editing model.
+Physical scrolling and logical collection review are separate operations.
+Verify collection reading, context and operation with the intended reader.
 
 ### Composite Controls And Presentations
 

@@ -1,6 +1,47 @@
 @_spi(Testing) import SwiftTUIPrimitives
 
 extension SemanticExtractor {
+  func collectionNavigationNodes(for node: PlacedNode, parent: AccessibilityNode)
+    -> [AccessibilityNode]
+  {
+    guard let navigation = node.semanticMetadata.accessibilityStructure?.collectionNavigation else {
+      return []
+    }
+    let identity = navigation.identity.strippingEntityOccurrences
+    var item = AccessibilityNode(
+      viewNodeID: node.viewNodeID, identity: identity, parentIdentity: parent.parentIdentity,
+      rect: node.bounds, role: .stepper,
+      label: parent.label.map { "Review items in \($0)" } ?? "Review items")
+    var actions = ["Read item", "First item", "Last item", "Previous page", "Next page"]
+    if navigation.canReturn { actions.append("Return to previous item") }
+    item.control = .init(
+      actions: [
+        .increment, .decrement, .setValue, .custom, .accessibilityFocus, .accessibilityBlur,
+      ],
+      value: .number(Double(navigation.position)), minimum: 1, maximum: Double(navigation.count),
+      step: 1,
+      customActions: actions)
+    item.properties = .init(
+      valueDescription: "Item \(navigation.position) of \(navigation.count)",
+      controls: [parent.identity])
+    // Reviewing content is independent of whether its application operations
+    // are enabled. The realized row controls retain their disabled state.
+    item.isEnabled = true
+    item.actionIdentity = navigation.identity
+    if let owner = node.viewNodeID { item.actionTarget = "\(owner.rawValue):\(identity.path)" }
+    return [item]
+  }
+
+  func installCollectionReview(on item: inout AccessibilityNode, for node: PlacedNode) {
+    guard let review = node.semanticMetadata.hostedCollectionItem?.review else { return }
+    item.viewNodeID = review.ownerNodeID
+    item.actionIdentity = review.identity
+    item.control = .init(actions: [.accessibilityFocus, .accessibilityBlur])
+    if let owner = review.ownerNodeID {
+      item.actionTarget = "\(owner.rawValue):\(item.identity.path)"
+    }
+  }
+
   /// A row selector is an ordinary operation inside a structural list item or
   /// table cell. Nested authored controls retain their independent operations.
   func collectionSelectionNodes(for node: PlacedNode, parent: Identity, readOnly: Bool?)
@@ -62,8 +103,11 @@ extension SemanticExtractor {
     let section = node.semanticMetadata.hostedCollectionItem?.section
     item.properties = .init(
       description: section.map { "\($0.title ?? "Section"), item \($0.position) of \($0.count)" },
-      positionInSet: index + 1, setSize: count)
+      level: node.semanticMetadata.accessibilityProperties?.level,
+      positionInSet: node.semanticMetadata.accessibilityProperties?.positionInSet ?? index + 1,
+      setSize: node.semanticMetadata.accessibilityProperties?.setSize ?? count)
     item.isEnabled = node.environmentSnapshot.style.isEnabled
+    installCollectionReview(on: &item, for: node)
     return item
   }
 

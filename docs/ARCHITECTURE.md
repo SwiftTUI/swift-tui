@@ -804,4 +804,24 @@ Resolved hosted rows carry selection routes and section context; table headers
 are semantic siblings of body rows even when their raster chrome is hidden.
 Synthetic selectors use the collection action registry and the realized row's
 continuous semantic lifetime, preserving nested authored controls. Outline
-branches own disclosure state and compose ordinary buttons with nested lists.
+rows carry hierarchy level and sibling position. `OutlineViews.swift` enumerates
+logical entries without invoking row producers, and keeps disclosure state above
+the lazy recycling boundary. A direct `OutlineGroup` in a List supplies an indexed
+source; standalone outlines use a lazy stack. IDs include the ancestor path, so
+repeated IDs under different branches retain separate disclosure state.
+
+`Collections/CollectionAccessibilityNavigation.swift` stores two logical review
+bookmarks and exposes a position control plus first/last/page/read/return actions.
+It uses the existing collection scroll currency without changing selection or
+keyboard focus. Data changes reconcile bookmarks by identity and retire ordinal
+requests from the previous membership generation. Core adds review targets only
+to realized rows. The focus coordinator may prepare an explicit request by
+revealing its row after commit, once per request and only while its collection
+owner is in the active semantic scope. A ready authored request takes precedence
+without allowing the prepared request to replay later.
+
+`ScrollView/ScrollViewAccessibility.swift` provides named page/edge commands
+through the existing scroll registry, independently for nested viewports. Sizing
+wrappers forward a viewport's authored label to that owner. Protected text editor
+surfaces retain their own editing semantics. Authored operations take precedence
+over default scroll commands; no ordinary activation handlers are added.

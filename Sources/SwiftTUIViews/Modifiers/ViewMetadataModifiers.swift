@@ -498,6 +498,12 @@ public struct SemanticMetadataModifier: IterativePrimitiveViewModifier, Sendable
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
     return content.resolveWork(in: context).map { completed in
+      if let label = metadata.accessibilityLabel,
+        metadata == SemanticMetadata(accessibilityLabel: label),
+        let scroll = completed.applyingScrollAccessibilityLabel(label)
+      {
+        return [scroll]
+      }
       var node = completed
       node.semanticMetadata = node.semanticMetadata.merging(metadata)
       return [node]
