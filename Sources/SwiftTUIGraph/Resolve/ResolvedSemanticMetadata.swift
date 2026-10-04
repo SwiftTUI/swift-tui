@@ -64,7 +64,8 @@ public struct SemanticMetadata: Equatable, Sendable {
     get { authoredAccessibility?.control }
     set {
       authoredAccessibility = .init(
-        title: accessibilityTitle, control: newValue, valueLabel: accessibilityValueLabel)
+        title: accessibilityTitle, control: newValue, valueLabel: accessibilityValueLabel,
+        structure: accessibilityStructure)
     }
   }
   public var accessibilityLabel: String?
@@ -93,7 +94,8 @@ public struct SemanticMetadata: Equatable, Sendable {
     get { authoredAccessibility?.title }
     set {
       authoredAccessibility = .init(
-        title: newValue, control: accessibilityControl, valueLabel: accessibilityValueLabel)
+        title: newValue, control: accessibilityControl, valueLabel: accessibilityValueLabel,
+        structure: accessibilityStructure)
     }
   }
   /// Authored current-value content is separate from a control's name and style chrome.
@@ -101,7 +103,17 @@ public struct SemanticMetadata: Equatable, Sendable {
     get { authoredAccessibility?.valueLabel }
     set {
       authoredAccessibility = .init(
-        title: accessibilityTitle, control: accessibilityControl, valueLabel: newValue)
+        title: accessibilityTitle, control: accessibilityControl, valueLabel: newValue,
+        structure: accessibilityStructure)
+    }
+  }
+  /// Authoring structure shares the optional metadata allocation on ordinary nodes.
+  package var accessibilityStructure: AccessibilityStructure? {
+    get { authoredAccessibility?.structure }
+    set {
+      authoredAccessibility = .init(
+        title: accessibilityTitle, control: accessibilityControl,
+        valueLabel: accessibilityValueLabel, structure: newValue)
     }
   }
   public var accessibilityProperties: AccessibilityProperties? = nil
@@ -391,6 +403,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     merged.accessibilityTitle = other.accessibilityTitle ?? accessibilityTitle
     merged.accessibilityControl = other.accessibilityControl ?? accessibilityControl
     merged.accessibilityValueLabel = other.accessibilityValueLabel ?? accessibilityValueLabel
+    merged.accessibilityStructure = other.accessibilityStructure ?? accessibilityStructure
     merged.accessibilityProperties =
       if let base = accessibilityProperties,
         let override = other.accessibilityProperties
@@ -591,17 +604,25 @@ private final class AuthoredAccessibilityMetadata: Equatable, Sendable {
   let title: String?
   let control: AccessibilityControlState?
   let valueLabel: AccessibilityValueLabel?
+  let structure: AccessibilityStructure?
 
-  init?(title: String?, control: AccessibilityControlState?, valueLabel: AccessibilityValueLabel?) {
-    guard title != nil || control != nil || valueLabel != nil else { return nil }
+  init?(
+    title: String?, control: AccessibilityControlState?, valueLabel: AccessibilityValueLabel?,
+    structure: AccessibilityStructure?
+  ) {
+    guard title != nil || control != nil || valueLabel != nil || structure != nil else {
+      return nil
+    }
     self.title = title
     self.control = control
     self.valueLabel = valueLabel
+    self.structure = structure
   }
 
   static func == (lhs: AuthoredAccessibilityMetadata, rhs: AuthoredAccessibilityMetadata) -> Bool {
     lhs === rhs
-      || (lhs.title == rhs.title && lhs.control == rhs.control && lhs.valueLabel == rhs.valueLabel)
+      || (lhs.title == rhs.title && lhs.control == rhs.control && lhs.valueLabel == rhs.valueLabel
+        && lhs.structure == rhs.structure)
   }
 }
 
@@ -609,4 +630,18 @@ private final class AuthoredAccessibilityMetadata: Equatable, Sendable {
 package enum AccessibilityValueLabel: Equatable, Sendable {
   case owner(fallback: String?)
   case source(AccessibilityLabelSource)
+}
+
+/// How an authored accessibility element treats its descendants.
+public enum AccessibilityChildBehavior: Sendable, Equatable {
+  case contain, combine, ignore
+}
+
+package struct AccessibilityStructure: Equatable, Sendable {
+  package var children: AccessibilityChildBehavior? = nil
+  package var sortPriority: Double? = nil
+  package var isVirtual = false
+  package var parent: Identity? = nil
+  package var keepsVirtualChildren = false
+  package init() {}
 }

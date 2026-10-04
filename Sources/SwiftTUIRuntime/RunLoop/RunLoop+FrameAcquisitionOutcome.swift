@@ -137,6 +137,7 @@ extension RunLoop {
     let snapshot = artifacts.semanticSnapshot
     return snapshot.interactionRegions == latestSemanticSnapshot.interactionRegions
       && snapshot.focusRegions == latestSemanticSnapshot.focusRegions
+      && snapshot.accessibilityActionRegions == latestSemanticSnapshot.accessibilityActionRegions
       && snapshot.navigationRoutes == latestSemanticSnapshot.navigationRoutes
       && snapshot.scrollRoutes == latestSemanticSnapshot.scrollRoutes
       && snapshot.scrollTargets == latestSemanticSnapshot.scrollTargets

@@ -95,6 +95,7 @@ extension SemanticExtractor {
     var authoredLabels: [Int: String] = [:]
     var authoredValues: [Int: String] = [:]
     var emittedSubtrees: Set<Identity> = []
+    var structures: [Identity: AccessibilityStructure] = [:]
     var nextTraversalOrdinal = 0
     var stack:
       [(
@@ -221,6 +222,9 @@ extension SemanticExtractor {
         }
 
         let metadata = node.semanticMetadata
+        if let structure = metadata.accessibilityStructure {
+          structures[node.identity.strippingEntityOccurrences] = structure
+        }
         let isValueSource: Bool
         if case .source = metadata.accessibilityValueLabel {
           isValueSource = true
@@ -308,6 +312,8 @@ extension SemanticExtractor {
         emitStack.append((child, childParentIdentity))
       }
     }
+
+    nodes = applyingAccessibilityStructure(to: nodes, structures: structures)
 
     // Public `.id` values participate in graph scoping; they are not exported
     // semantic IDs. Explicit anchors let authors relate peers without knowing
@@ -452,6 +458,7 @@ extension SemanticExtractor {
     }
 
     return node.semanticMetadata.accessibilityRole != nil
+      || node.semanticMetadata.accessibilityStructure?.children != nil
       || node.semanticMetadata.accessibilityLabel != nil
       || node.semanticMetadata.usesAuthoredAccessibilityLabel
       || (textPresentation == .independent
@@ -509,7 +516,9 @@ extension SemanticExtractor {
       // Internal lookups (cursor anchors, focus relevance) stay on the raw
       // occurrence-qualified identity.
       identity: node.identity.strippingEntityOccurrences,
-      parentIdentity: parentIdentity?.strippingEntityOccurrences,
+      parentIdentity: node.semanticMetadata.accessibilityStructure?.parent?
+        .strippingEntityOccurrences
+        ?? parentIdentity?.strippingEntityOccurrences,
       rect: semanticBounds(for: node),
       role: role,
       label: suppressingPresentation

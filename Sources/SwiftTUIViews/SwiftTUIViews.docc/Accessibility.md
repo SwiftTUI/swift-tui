@@ -396,3 +396,32 @@ are not a 0.15.1 support claim or recorded Safari/VoiceOver task acceptance.
 - <doc:Focus>
 - <doc:Authoring-Views>
 - <doc:State-Environment-And-Focus>
+
+
+## Grouping and semantic representations
+
+Use `accessibilityElement(children: .contain)` to keep related descendants
+inside a named group. `.ignore` hides descendants and keeps the parent metadata;
+provide the parent's meaning explicitly. `.combine` joins readable labels and
+values, and promotes descendant activation/adjustment operations to named actions.
+Editing and selection widgets, and default-opening links, keep independent
+native surfaces inside the group. `accessibilitySortPriority(_:)` orders sibling
+subtrees with larger priorities first; equal values keep authored order.
+
+A representation supplies controls for custom paint without drawing those controls
+or adding them to terminal keyboard/pointer traversal:
+
+```swift
+Text(isSelected ? "Selected" : "Available")
+  .accessibilityRepresentation {
+    Toggle("Selected", isOn: $isSelected)
+  }
+```
+
+Use `accessibilityChildren` to keep the parent's meaning and replace its semantic
+children, for example chart data points. Representation closures are authored
+views, with normal bindings and retained graph ownership. They reserve no space
+in the visual parent's layout. Hidden, disabled, read-only, modal and retired
+control guards still apply to typed assistive actions. Browser semantic focus on
+a virtual control does not move terminal keyboard focus. This is not a binding
+to a screen reader's independent reading cursor.

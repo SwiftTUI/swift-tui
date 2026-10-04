@@ -1372,3 +1372,235 @@ private struct PickerConditionalFixture: View {
     }
   }
 }
+
+@MainActor
+@Suite
+struct AccessibilityStructureRuntimeTests {
+  @Test("unpainted representations act on shared state without keyboard or pointer targets")
+  func virtualControls() throws {
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: {
+      CellSize(width: 50, height: 10)
+    })
+    let root = testIdentity("VirtualRoot")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var writes = 0
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: CellSize(width: 50, height: 10),
+      focusTracker: focus
+    ) {
+      VStack {
+        Button("Painted") {}
+        Text("Visual rating").accessibilityRepresentation {
+          Button("Semantic rating") { writes += 1 }
+        }
+      }
+    }
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let nodes = loop.latestSemanticSnapshot.accessibilityNodes
+    let virtual = try #require(nodes.first { $0.label == "Semantic rating" })
+    #expect(!nodes.contains { $0.label == "Visual rating" })
+    #expect(!focus.focusRegions.contains { $0.identity == virtual.actionIdentity })
+    #expect(
+      !loop.latestSemanticSnapshot.interactionRegions.contains {
+        $0.identity == virtual.actionIdentity
+      })
+    #expect(
+      loop.handleAccessibilityAction(
+        .init(target: try #require(virtual.actionTarget), action: .activate)) == .accepted)
+    #expect(writes == 1)
+    let painted = terminal.latestSurface?.lines.joined(separator: "\n") ?? ""
+    #expect(painted.contains("Visual rating"))
+    #expect(!painted.contains("Semantic rating"))
+  }
+
+  @Test("combined text and button offer one named action with exactly one mutation")
+  func combinedActions() throws {
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: {
+      CellSize(width: 50, height: 10)
+    })
+    let root = testIdentity("CombinedRoot")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var writes = 0
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: CellSize(width: 50, height: 10),
+      focusTracker: focus
+    ) {
+      VStack {
+        Text("Ada")
+        Text("Available")
+        Button("Send challenge") { writes += 1 }
+      }.accessibilityElement(children: .combine)
+    }
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let node = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.control != nil })
+    #expect(node.label == "Ada, Available, Send challenge")
+    #expect(node.control?.customActions == ["Send challenge"])
+    #expect(
+      loop.handleAccessibilityAction(
+        .init(target: try #require(node.actionTarget), action: .custom("Send challenge")))
+        == .accepted)
+    #expect(writes == 1)
+  }
+
+  @Test("children replace painted descendants and sort as semantic subtrees")
+  func syntheticChildrenAndOrdering() throws {
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: {
+      CellSize(width: 50, height: 15)
+    })
+    let root = testIdentity("SyntheticRoot")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: CellSize(width: 50, height: 15),
+      focusTracker: focus
+    ) {
+      VStack {
+        VStack { Text("Painted detail") }.accessibilityLabel("Chart").accessibilityChildren {
+          VStack {
+            Text("Later").accessibilitySortPriority(-1)
+            Text("First").accessibilitySortPriority(1)
+          }
+        }
+        VStack { Text("Ignored detail") }.accessibilityElement(children: .ignore)
+          .accessibilityLabel("Summary")
+        VStack {
+          Text("A")
+          Text("B")
+        }.accessibilityElement(children: .contain)
+      }
+    }
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let labels = loop.latestSemanticSnapshot.accessibilityNodes.compactMap(\.label).filter {
+      !$0.isEmpty
+    }
+    #expect(labels == ["Chart", "First", "Later", "Summary", "A", "B"])
+    let painted = terminal.latestSurface?.lines.joined(separator: "\n") ?? ""
+    #expect(painted.contains("Painted detail") && painted.contains("Ignored detail"))
+    #expect(!painted.contains("Later") && !painted.contains("First"))
+  }
+
+  @Test("virtual controls reject disabled, read-only, modal and retired requests")
+  func virtualActionGuards() throws {
+    let size = CellSize(width: 60, height: 20)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("VirtualGuards")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var shown = true
+    var disabled = false
+    var readOnly = false
+    var modal = false
+    var writes = 0
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: focus
+    ) {
+      VStack {
+        Button("Ordinary") {}
+        if shown {
+          Text("Painted action").accessibilityRepresentation {
+            Button("Virtual action") { writes += 1 }
+              .accessibilityProperties(.init(readOnly: readOnly))
+          }.disabled(disabled)
+        }
+      }.sheet(isPresented: Binding(get: { modal }, set: { modal = $0 })) {
+        Button("Dismiss") { modal = false }
+      }
+    }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    func render() throws {
+      loop.scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    func target() throws -> String {
+      try #require(
+        loop.latestSemanticSnapshot.accessibilityNodes.first {
+          $0.label == "Virtual action"
+        }?.actionTarget)
+    }
+    try render()
+    let original = try target()
+    #expect(loop.handleAccessibilityAction(.init(target: original, action: .activate)) == .accepted)
+    disabled = true
+    try render()
+    #expect(
+      loop.handleAccessibilityAction(.init(target: try target(), action: .activate)) == .disabled)
+    disabled = false
+    readOnly = true
+    try render()
+    #expect(
+      loop.handleAccessibilityAction(.init(target: try target(), action: .activate)) == .unsupported
+    )
+    readOnly = false
+    modal = true
+    try render()
+    let modalResult = loop.handleAccessibilityAction(.init(target: original, action: .activate))
+    #expect(modalResult == .outOfScope || modalResult == .staleTarget)
+    modal = false
+    shown = false
+    try render()
+    #expect(
+      loop.handleAccessibilityAction(.init(target: original, action: .activate)) == .staleTarget)
+    shown = true
+    try render()
+    #expect(try target() != original)
+    #expect(
+      loop.handleAccessibilityAction(.init(target: original, action: .activate)) == .staleTarget)
+    #expect(writes == 1)
+  }
+
+  @Test("combined action membership changes invalidate duplicate-name requests")
+  func combinedMembership() throws {
+    let size = CellSize(width: 40, height: 12)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("CombinedMembership")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var firstShown = true
+    var first = 0
+    var second = 0
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: focus
+    ) {
+      VStack {
+        if firstShown { Button("Run") { first += 1 } }
+        Button("Run") { second += 1 }
+      }.accessibilityElement(children: .combine)
+    }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    func render() throws {
+      loop.scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    try render()
+    let group = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.control != nil })
+    #expect(group.control?.customActions == ["Run", "Run (2)"])
+    let target = try #require(group.actionTarget)
+    #expect(
+      loop.handleAccessibilityAction(.init(target: target, action: .custom("Run (2)"))) == .accepted
+    )
+    #expect(first == 0 && second == 1)
+    firstShown = false
+    try render()
+    #expect(
+      loop.handleAccessibilityAction(.init(target: target, action: .custom("Run"))) == .staleTarget)
+    let replacement = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.control != nil })
+    #expect(replacement.control?.customActions == ["Run"])
+    #expect(
+      loop.handleAccessibilityAction(
+        .init(target: try #require(replacement.actionTarget), action: .custom("Run"))) == .accepted)
+    #expect(first == 0 && second == 2)
+  }
+}

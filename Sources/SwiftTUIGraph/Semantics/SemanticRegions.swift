@@ -180,6 +180,8 @@ public struct AccessibilityNode: Equatable, Sendable {
   package var selectionOptionRects: [String: CellRect] = [:]
   public var isEnabled: Bool = true
   package var actionIdentity: Identity? = nil
+  /// Combined descendants retain their own committed routing and lifetime checks.
+  package var combinedActions: [String: AccessibilityCombinedAction] = [:]
   package var viewNodeID: ViewNodeID?
   public var identity: Identity
   public var parentIdentity: Identity?
@@ -238,5 +240,23 @@ public struct AccessibilityNode: Equatable, Sendable {
     self.hidden = hidden
     self.liveRegion = liveRegion
     self.cursorAnchor = cursorAnchor
+  }
+}
+
+package struct AccessibilityCombinedAction: Equatable, Sendable {
+  package let identity: Identity
+  package let owner: ViewNodeID
+  package let action: AccessibilityAction
+  package let enabled: Bool
+  package let readOnly: Bool
+  package init(
+    identity: Identity, owner: ViewNodeID, action: AccessibilityAction,
+    enabled: Bool, readOnly: Bool
+  ) {
+    self.identity = identity
+    self.owner = owner
+    self.action = action
+    self.enabled = enabled
+    self.readOnly = readOnly
   }
 }

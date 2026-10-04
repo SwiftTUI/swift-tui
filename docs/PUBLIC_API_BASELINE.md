@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 60 | 517 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 417 | 2557 |
+| `SwiftTUIViews` | 417 | 2561 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 47 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -34,7 +34,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIAndroidHost` | 16 | 44 |
 | `SwiftTUICore` | 40 | 273 |
 | `SwiftTUIPrimitives` | 172 | 1518 |
-| `SwiftTUIGraph` | 74 | 482 |
+| `SwiftTUIGraph` | 75 | 486 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -530,7 +530,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 218 members
+- `View` — protocol — 222 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member
@@ -891,8 +891,9 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (61)
+### Canonical surface (62)
 
+- `AccessibilityChildBehavior` — enum — 3 members
 - `AccessibilityNode` — struct — 15 members
 - `AccessibilityPoliteness` — enum — 4 members
 - `AccessibilityProperties` — class — 32 members

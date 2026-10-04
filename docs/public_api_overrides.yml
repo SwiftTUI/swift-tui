@@ -32,6 +32,7 @@ classifications:
   canonical:
     - SwiftTUIViews.AccessibilityTraits
     - SwiftTUIViews.AccessibilityAdjustmentDirection
+    - SwiftTUIGraph.AccessibilityChildBehavior
     # Debug native application reload export; absent from release/WASI builds.
     - SwiftTUIRuntime.HotReloadExport
     # ─── SwiftTUI umbrella ─────────────────────────────────────────────────

@@ -12,14 +12,26 @@ extension RunLoop {
     guard
       let node = latestSemanticSnapshot.accessibilityNodes.first(where: {
         $0.actionTarget == request.target
-      }), let identity = node.actionIdentity, let control = node.control
+      }), let control = node.control
     else {
       return .staleTarget
     }
     guard node.isEnabled else { return .disabled }
+    let combined: AccessibilityCombinedAction?
+    if case .custom(let name) = request.action {
+      combined = node.combinedActions[name]
+    } else {
+      combined = nil
+    }
+    guard let identity = combined?.identity ?? node.actionIdentity else { return .unsupported }
+    let owner = combined?.owner ?? node.viewNodeID
+    if let combined, !combined.enabled { return .disabled }
+    if combined?.readOnly == true { return .unsupported }
+    let actionRegions =
+      focusTracker.focusRegions + latestSemanticSnapshot.accessibilityActionRegions
     guard !node.hidden,
-      focusTracker.focusRegions.contains(where: {
-        $0.identity == identity && $0.ownerNodeID == node.viewNodeID
+      actionRegions.contains(where: {
+        $0.identity == identity && $0.ownerNodeID == owner
       })
     else { return .outOfScope }
     guard control.actions.contains(request.action.kind) else { return .unsupported }
@@ -53,7 +65,9 @@ extension RunLoop {
     }
     guard localActionRegistry.hasHandler(identity: identity) else { return .unsupported }
     let before = schedulerInvalidationRequestGeneration()
-    switch localActionRegistry.dispatchAccessibility(identity: identity, action: request.action) {
+    switch localActionRegistry.dispatchAccessibility(
+      identity: identity, action: combined?.action ?? request.action)
+    {
     case .changed:
       scheduler.requestInput()
       recordFollowUpInvalidation(

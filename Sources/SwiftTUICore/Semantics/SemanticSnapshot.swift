@@ -114,6 +114,8 @@ package struct AccessibilityWarning: Equatable, Sendable {
 public struct SemanticSnapshot: Equatable, Sendable {
   /// Visible authored text boundaries; hidden accessibility does not remove them.
   package var paragraphs: [ParagraphRegion] = []
+  /// Live virtual controls have committed action scope without keyboard participation.
+  package var accessibilityActionRegions: [FocusRegion] = []
   public var interactionRegions: [InteractionRegion]
   public var focusRegions: [FocusRegion]
   public var navigationRoutes: [NavigationRoute]

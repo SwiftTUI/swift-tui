@@ -88,6 +88,13 @@ extension DrawExtractor {
       case .descend(
         let node, let inheritedBorderMask, let isInBackgroundSubtree, let inheritedOpacity
       ):
+        if node.semanticMetadata.accessibilityStructure?.isVirtual == true {
+          builtNodes.append(
+            DrawNode(
+              viewNodeID: node.viewNodeID, identity: node.identity,
+              environmentSnapshot: node.environmentSnapshot, bounds: node.bounds))
+          continue
+        }
         // The reuse proof already verified the inherited opacity at this
         // subtree root matches the previous frame's, so reusing under a
         // steady ancestor fade is sound (see `collectReusablePhaseSubtrees`).

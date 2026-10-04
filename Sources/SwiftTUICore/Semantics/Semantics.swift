@@ -28,6 +28,7 @@ package struct SemanticExtractor: Sendable {
   package func extract(from placed: PlacedNode) -> SemanticSnapshot {
     var interactionRegions: [InteractionRegion] = []
     var focusRegions: [FocusRegion] = []
+    var accessibilityActionRegions: [FocusRegion] = []
     var paragraphs: [ParagraphRegion] = []
     // Scope chains of the command/chrome-hosting regions (Role A: `Panel`,
     // `NavigationStack`, …) visible this frame. A host is a focus *scope* but
@@ -71,6 +72,27 @@ package struct SemanticExtractor: Sendable {
         )
 
         let participatesInTopLevelFocus = node.participatesInTopLevelFocus
+
+        if node.semanticMetadata.accessibilityStructure?.isVirtual == true {
+          guard interactionsEnabled, !sealingParentOnChain else { return }
+          if participatesInTopLevelFocus {
+            accessibilityActionRegions.append(
+              FocusRegion(
+                identity: node.identity, rect: semanticBounds(for: node),
+                focusInteractions: node.semanticMetadata.focusInteractions,
+                scopePath: scopePath, sectionIdentity: sectionIdentity,
+                modalFocusScopePath: modalFocusScopePath,
+                ownerNodeID: node.viewNodeID, ownerIdentity: node.identity))
+          }
+          var ignoredPointerRegions: [InteractionRegion] = []
+          appendPayloadSemantics(
+            for: node, scopePath: scopePath, sectionIdentity: sectionIdentity,
+            modalFocusScopePath: modalFocusScopePath, clippedTo: clipRect,
+            sealingParentOnChain: false, allowsPointerHitTesting: false,
+            interactionRegions: &ignoredPointerRegions,
+            focusRegions: &accessibilityActionRegions, nextHitTestOrder: &nextHitTestOrder)
+          return
+        }
 
         if isEnabled, let space = node.semanticMetadata.namedCoordinateSpace {
           namedCoordinateSpaces[space] = node.bounds
@@ -169,6 +191,7 @@ package struct SemanticExtractor: Sendable {
         }
       },
       postVisit: { node, context, nextHitTestOrder in
+        guard node.semanticMetadata.accessibilityStructure?.isVirtual != true else { return }
         let scopePath = context.scopePath
         let sectionIdentity = context.sectionIdentity
         let modalFocusScopePath = context.modalFocusScopePath
@@ -206,7 +229,7 @@ package struct SemanticExtractor: Sendable {
     let scrollTargets = scrollTargets(from: placed)
     let accessibilityExtraction = accessibilityNodesAndVisualLabelRoutes(
       from: placed,
-      focusRegions: focusRegions
+      focusRegions: focusRegions + accessibilityActionRegions
     )
     let accessibilityWarnings =
       extractsAccessibilityWarnings
@@ -227,6 +250,7 @@ package struct SemanticExtractor: Sendable {
       activeCommandScopePath: activeCommandScopePath
     )
     snapshot.paragraphs = paragraphs
+    snapshot.accessibilityActionRegions = accessibilityActionRegions
     return snapshot
   }
 

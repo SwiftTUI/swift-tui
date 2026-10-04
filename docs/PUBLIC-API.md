@@ -72,6 +72,10 @@ The canonical public surface is the API ordinary app code uses first:
   result explicitly certifies or denies reuse. The complete authoring contract
   lives in the DocC article
   [Custom-Dynamic-Properties.md](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Custom-Dynamic-Properties.md).
+- Accessibility authoring includes `accessibilityElement(children:)` with
+  `AccessibilityChildBehavior`, `accessibilitySortPriority(_:)`,
+  `accessibilityRepresentation` and `accessibilityChildren`. These are canonical
+  `View` APIs; representation controls bind to ordinary application state.
 - The modifier algebra: `ViewModifier`, `View.modifier(_:)`, `ModifiedContent`,
   and the canonical identity/layout/styling/presentation modifiers.
 - Runtime integration in `SwiftTUIRuntime`: `DefaultRenderer`, `RunLoop`,

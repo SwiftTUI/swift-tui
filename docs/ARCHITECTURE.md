@@ -774,3 +774,11 @@ Public accessibility value/trait/action modifiers live in
 `Sources/SwiftTUIViews/Modifiers/AccessibilityAuthoringModifiers.swift`. They compose
 with primitive registrations through `HandlerDescriptorIntake` and the committed
 `LocalActionRegistry`; browser-specific action presentation stays in the web host.
+
+Accessibility grouping, ordering and unpainted representations originate in
+`Sources/SwiftTUIViews/Modifiers/AccessibilityStructureModifiers.swift`.
+`SemanticAccessibilityStructure.swift` curates the exported hierarchy after
+primitive naming. Virtual controls retain committed action routes separately
+from keyboard/pointer regions, and their subtrees emit no draw commands.
+Combined operations preserve descendant ownership and invalidate their target
+when action membership or lifetime changes.
