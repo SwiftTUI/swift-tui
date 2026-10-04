@@ -1862,3 +1862,48 @@ extension OmittedAccessibilitySlotTests {
     }
   }
 }
+
+extension CustomAccessibilityActionTests {
+  @Test("a removed root control never accepts a request from its earlier appearance")
+  func rootControlTargetLifetime() throws {
+    let size = CellSize(width: 50, height: 8)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("RootActionLifetime")
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var shown = true
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: focus
+    ) {
+      if shown { CustomAccessibilityRating() }
+    }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    func render() throws {
+      loop.scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    func rating() throws -> AccessibilityNode {
+      try #require(loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == "Rating" })
+    }
+    try render()
+    let first = try #require(rating().actionTarget)
+    #expect(loop.handleAccessibilityAction(.init(target: first, action: .increment)) == .accepted)
+    try render()
+    #expect(try rating().actionTarget == first)
+    shown = false
+    try render()
+    #expect(
+      loop.handleAccessibilityAction(.init(target: first, action: .increment)) == .staleTarget)
+    shown = true
+    try render()
+    let second = try #require(rating().actionTarget)
+    #expect(second != first)
+    let value = try rating().control?.value
+    #expect(
+      loop.handleAccessibilityAction(.init(target: first, action: .increment)) == .staleTarget)
+    try render()
+    #expect(try rating().control?.value == value)
+    #expect(loop.handleAccessibilityAction(.init(target: second, action: .increment)) == .accepted)
+  }
+}

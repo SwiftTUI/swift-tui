@@ -224,6 +224,11 @@ keyboard stops or assistive actions. Interactive value content stays operable
 through its virtual semantic controls. Browser groups expose
 value descriptions as descriptions because ARIA groups have no range value.
 
+Assistive action targets remain stable while the same control is continuously
+present in committed semantic frames. Removing and restoring a control issues a
+new target even if its root graph owner survives. Requests from the earlier
+appearance are rejected before mutation.
+
 ### Reduced Motion
 
 The `--reduce-motion` flag (or `SWIFTTUI_REDUCE_MOTION=1`) suppresses

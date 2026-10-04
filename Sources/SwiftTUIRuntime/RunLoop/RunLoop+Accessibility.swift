@@ -79,3 +79,34 @@ extension RunLoop {
     }
   }
 }
+
+/// A graph owner can survive while its root control disappears. Scope issued
+/// action targets to continuous committed semantic presence, not just that
+/// owner's lifetime. Candidate/focus-convergence frames never advance this map.
+package struct AccessibilityTargetLifetimes {
+  private struct Key: Hashable {
+    var target: String
+    var role: AccessibilityRole?
+  }
+  private var active: [Key: UInt64] = [:]
+  private var next: UInt64 = 0
+
+  package mutating func stamp(_ snapshot: inout SemanticSnapshot) {
+    var present: [Key: UInt64] = [:]
+    for index in snapshot.accessibilityNodes.indices {
+      guard let raw = snapshot.accessibilityNodes[index].actionTarget else { continue }
+      let key = Key(target: raw, role: snapshot.accessibilityNodes[index].role)
+      let lifetime: UInt64
+      if let existing = active[key] ?? present[key] {
+        lifetime = existing
+      } else {
+        precondition(next < UInt64.max, "Accessibility action lifetime exhausted")
+        next += 1
+        lifetime = next
+      }
+      present[key] = lifetime
+      snapshot.accessibilityNodes[index].actionTarget = "\(raw)#\(lifetime)"
+    }
+    active = present
+  }
+}
