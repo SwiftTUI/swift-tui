@@ -82,6 +82,32 @@
       }
     }
 
+    @Test("all scene routes share authorization and keep separate channels")
+    func allSceneRoutesKeepSeparateChannels() async throws {
+      try await withServer(scenes: [
+        .init(id: "first", title: "First", isDefault: false),
+        .init(id: "second", title: "Second", isDefault: true),
+      ]) { session in
+        let (data, _) = try await serverData(from: session.url(path: "/scene-manifest.json"))
+        let manifest = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(manifest["defaultSceneId"] as? String == "second")
+        #expect((manifest["scenes"] as? [[String: Any]])?.count == 2)
+        var sockets: [WebSocketTestClient] = []
+        for id in ["first", "second"] {
+          var url = URLComponents(
+            url: session.url(path: "/ws/scene/\(id)"), resolvingAgainstBaseURL: false)!
+          url.scheme = "ws"
+          let socket = try WebSocketTestClient.connect(to: url.url!)
+          sockets.append(socket)
+          try await session.channels[id]!.send(Array("hello-\(id)".utf8))
+          #expect(String(decoding: try socket.receiveMessage(), as: UTF8.self) == "hello-\(id)")
+        }
+        #expect(await session.channels["first"]!.currentConnectionToken() == 1)
+        #expect(await session.channels["second"]!.currentConnectionToken() == 1)
+        for socket in sockets { socket.close() }
+      }
+    }
+
     @Test("WebSocket close messages preserve close code and reason")
     func webSocketCloseMessagesPreserveCloseCodeAndReason() async throws {
       let channel = WebHostSceneChannel()
@@ -157,6 +183,7 @@
   }
 
   func withServer(
+    scenes: [WebHostSceneDescriptor] = [.init(id: "main", title: "Main")],
     _ body: (WebHostServerSession) async throws -> Void
   ) async throws {
     await webHostNetworkTestGate.enter()
@@ -165,7 +192,7 @@
       let session = try await server.start(
         configuration: .init(bind: "127.0.0.1", port: 0),
         token: WebHostToken(rawValue: "test-token"),
-        scene: .init(id: "main", title: "Main")
+        scenes: scenes
       )
 
       do {

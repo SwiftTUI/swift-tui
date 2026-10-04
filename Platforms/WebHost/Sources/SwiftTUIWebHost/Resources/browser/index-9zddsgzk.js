@@ -2979,6 +2979,7 @@ class WebHostOutputDecoder {
       gen: frame.gen,
       sequence: frame.sequence,
       geometryRevision: frame.geometryRevision,
+      viewportRevision: frame.viewportRevision,
       width: frame.width,
       height: frame.height,
       styles,
@@ -3078,7 +3079,7 @@ function encodeRenderStyleControlMessage(style) {
 `);
 }
 function encodeCapabilitiesControlMessage() {
-  return textEncoder.encode(`${recordPrefix}caps:{"acceptsDeltaFrames":true,"styleAppend":true,"geometryRevisions":true}
+  return textEncoder.encode(`${recordPrefix}caps:{"acceptsDeltaFrames":true,"styleAppend":true,"geometryRevisions":true,"sharedViewport":true}
 `);
 }
 function encodePointerCapabilitiesControlMessage(supportsScrollPanning) {
@@ -3106,11 +3107,13 @@ function encodePasteInputMessage(text) {
   return textEncoder.encode(`${recordPrefix}paste:${encodeURIComponent(text)}
 `);
 }
-function encodeMouseInputMessage(input, geometryRevision) {
-  if (geometryRevision !== undefined && !isGeometryRevision(geometryRevision))
+function encodeMouseInputMessage(input, geometryRevision, viewportRevision) {
+  if (viewportRevision !== undefined && (!isGeometryRevision(viewportRevision) || geometryRevision === undefined || !isGeometryRevision(geometryRevision, true)))
+    throw new RangeError("Invalid shared viewport pointer revision");
+  if (viewportRevision === undefined && geometryRevision !== undefined && !isGeometryRevision(geometryRevision))
     throw new RangeError("Invalid pointer geometry revision");
   return textEncoder.encode(recordPrefix + [
-    ...geometryRevision === undefined ? ["mouse"] : ["mouseGeometry", geometryRevision],
+    ...viewportRevision !== undefined ? ["mouseViewport", geometryRevision, viewportRevision] : geometryRevision === undefined ? ["mouse"] : ["mouseGeometry", geometryRevision],
     input.kind,
     formatCellCoordinate(input.x),
     formatCellCoordinate(input.y),
@@ -3142,7 +3145,7 @@ function isSurfaceGridDimension(value) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 2147483647;
 }
 function hasValidAdditiveFrameFields(frame) {
-  return (frame.accessibilityFocusRequest === undefined || isAccessibilityFocusPresentation(frame.accessibilityFocusRequest)) && isOptionalSafeInteger(frame.epoch) && isOptionalSafeInteger(frame.gen) && (frame.geometryRevision === undefined || isGeometryRevision(frame.geometryRevision, true)) && (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
+  return (frame.accessibilityFocusRequest === undefined || isAccessibilityFocusPresentation(frame.accessibilityFocusRequest)) && isOptionalSafeInteger(frame.epoch) && isOptionalSafeInteger(frame.gen) && (frame.geometryRevision === undefined || isGeometryRevision(frame.geometryRevision, true)) && (frame.viewportRevision === undefined || isGeometryRevision(frame.viewportRevision) && frame.geometryRevision !== undefined) && (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
 }
 function isAccessibilityFocusPresentation(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -5582,6 +5585,7 @@ class HostGeometrySession {
   sentRevision;
   latest;
   presentedRevision;
+  presentedViewportRevision;
   hasPresentedFrame = false;
   get negotiated() {
     return this.acknowledged;
@@ -5591,6 +5595,9 @@ class HostGeometrySession {
   }
   get pointerRevision() {
     return this.acknowledged ? this.presentedRevision : undefined;
+  }
+  get pointerViewportRevision() {
+    return this.presentedViewportRevision;
   }
   request(geometry) {
     if (!isHostGeometryRequest(geometry))
@@ -5614,12 +5621,13 @@ class HostGeometrySession {
   canPresent(frame) {
     if (!this.acknowledged)
       return frame?.geometryRevision === undefined;
-    return !!frame && !!this.latest && frame.geometryRevision === this.latest.revision && frame.width === this.latest.columns && frame.height === this.latest.rows;
+    return !!frame && !!this.latest && frame.geometryRevision === this.latest.revision && (frame.viewportRevision === undefined ? frame.width === this.latest.columns && frame.height === this.latest.rows : frame.width <= this.latest.columns && frame.height <= this.latest.rows);
   }
   didPresent(frame) {
     if (!this.canPresent(frame))
       throw new Error("Presentation does not match requested geometry");
     this.presentedRevision = frame?.geometryRevision;
+    this.presentedViewportRevision = frame?.viewportRevision;
     this.hasPresentedFrame = frame !== undefined;
   }
   resetConnection() {
@@ -5628,6 +5636,7 @@ class HostGeometrySession {
     this.acknowledged = false;
     this.sentRevision = undefined;
     this.presentedRevision = undefined;
+    this.presentedViewportRevision = undefined;
     this.hasPresentedFrame = false;
   }
 }
@@ -5647,37 +5656,37 @@ class InputEventEncoder {
   encodePaste(text) {
     return encodePasteInputMessage(text);
   }
-  encodePointerDown(location, button, event, geometryRevision) {
+  encodePointerDown(location, button, event, geometryRevision, viewportRevision) {
     return encodeMouseInputMessage({
       kind: "down",
       x: location.x,
       y: location.y,
       button,
       modifiers: modifierMask(event)
-    }, geometryRevision);
+    }, geometryRevision, viewportRevision);
   }
-  encodePointerUp(location, button, event, geometryRevision) {
+  encodePointerUp(location, button, event, geometryRevision, viewportRevision) {
     return encodeMouseInputMessage({
       kind: "up",
       x: location.x,
       y: location.y,
       button,
       modifiers: modifierMask(event)
-    }, geometryRevision);
+    }, geometryRevision, viewportRevision);
   }
-  encodePointerCancel(location, geometryRevision) {
-    return encodeMouseInputMessage({ kind: "cancelled", x: location.x, y: location.y }, geometryRevision);
+  encodePointerCancel(location, geometryRevision, viewportRevision) {
+    return encodeMouseInputMessage({ kind: "cancelled", x: location.x, y: location.y }, geometryRevision, viewportRevision);
   }
-  encodePointerMove(location, button, event, geometryRevision) {
+  encodePointerMove(location, button, event, geometryRevision, viewportRevision) {
     return encodeMouseInputMessage({
       kind: event.buttons ? "dragged" : "moved",
       x: location.x,
       y: location.y,
       button,
       modifiers: modifierMask(event)
-    }, geometryRevision);
+    }, geometryRevision, viewportRevision);
   }
-  encodeWheel(location, event, geometryRevision) {
+  encodeWheel(location, event, geometryRevision, viewportRevision) {
     return encodeMouseInputMessage({
       kind: "scrolled",
       x: location.x,
@@ -5685,7 +5694,7 @@ class InputEventEncoder {
       deltaX: normalizedWheelDelta(event.deltaX),
       deltaY: normalizedWheelDelta(event.deltaY),
       modifiers: modifierMask(event)
-    }, geometryRevision);
+    }, geometryRevision, viewportRevision);
   }
   pointerButton(button) {
     return pointerButton(button);
@@ -6166,6 +6175,7 @@ class WebHostSceneRuntime {
   painter;
   paintScheduler;
   inputEncoder = new InputEventEncoder;
+  awaitingConnectionFrame = false;
   currentStyle;
   canvas;
   canvasScale = 1;
@@ -6183,6 +6193,15 @@ class WebHostSceneRuntime {
   canceledPointerId;
   capturedPointerLocation;
   capturedPointerRevision;
+  capturedViewportRevision;
+  paintedGeometryRevision;
+  paintedViewportRevision;
+  get pointerRevision() {
+    return this.domGeometry ? this.geometrySession.pointerRevision : this.paintedViewportRevision !== undefined ? this.paintedGeometryRevision : undefined;
+  }
+  get pointerViewportRevision() {
+    return this.domGeometry ? this.geometrySession.pointerViewportRevision : this.paintedViewportRevision;
+  }
   disposed = false;
   stagedFontChange = false;
   reprojecting = false;
@@ -6224,7 +6243,10 @@ class WebHostSceneRuntime {
     this.currentStyle = normalizeWebHostTerminalStyle(options.renderer === "dom" && !options.style.fontFamily ? { ...options.style, fontFamily: DOM_FONT_FAMILY } : options.style);
     this.domFontOptions = options.domFont;
     this.bridge = options.bridge;
-    this.onInput = options.onInput;
+    this.onInput = (chunk) => {
+      if (!this.awaitingConnectionFrame)
+        options.onInput(chunk);
+    };
     this.onFrameDiagnostic = options.onFrameDiagnostic;
     this.onSurfacePainted = options.onSurfacePainted;
     this.synchronizeAccessibilityFocus = options.synchronizeAccessibilityFocus ?? true;
@@ -6299,6 +6321,10 @@ class WebHostSceneRuntime {
     this.installResizeObserver();
     this.bridge?.bindOutput({
       resetSurfaceSession: () => {
+        this.awaitingConnectionFrame = true;
+        this.currentFrame = undefined;
+        this.paintedGeometryRevision = undefined;
+        this.paintedViewportRevision = undefined;
         this.finishGeometryWait();
         this.domGeometry?.resetParagraphs();
         this.geometrySession.resetConnection();
@@ -6493,7 +6519,7 @@ class WebHostSceneRuntime {
     if (this.domGeometry) {
       this.geometrySession.observe(frame);
       this.sendGeometryIfNeeded();
-    } else {
+    } else if (frame.viewportRevision === undefined) {
       this.currentFrame = frame;
       this.columns = Math.max(1, Math.round(frame.width));
       this.rows = Math.max(1, Math.round(frame.height));
@@ -6726,7 +6752,8 @@ class WebHostSceneRuntime {
           location: location2,
           event,
           moved: false,
-          revision: this.geometrySession.pointerRevision
+          revision: this.pointerRevision,
+          viewportRevision: this.pointerViewportRevision
         } : undefined;
         if (this.allowsNativeTextSelection(event))
           this.terminalMount.focus?.({ preventScroll: true });
@@ -6747,11 +6774,12 @@ class WebHostSceneRuntime {
       this.hasCapturedPointer = true;
       this.capturedPointerId = event.pointerId;
       this.capturedPointerLocation = location;
-      this.capturedPointerRevision = this.geometrySession.pointerRevision;
+      this.capturedPointerRevision = this.pointerRevision;
+      this.capturedViewportRevision = this.pointerViewportRevision;
       this.pointerDownLinkTarget = button === "primary" ? this.linkTarget(location) : undefined;
       this.terminalMount.focus?.({ preventScroll: true });
       this.terminalMount.setPointerCapture?.(event.pointerId);
-      this.onInput(this.inputEncoder.encodePointerDown(location, button, event, this.geometrySession.pointerRevision));
+      this.onInput(this.inputEncoder.encodePointerDown(location, button, event, this.pointerRevision, this.pointerViewportRevision));
       event.preventDefault();
     };
     const handlePointerUp = (event) => {
@@ -6763,11 +6791,11 @@ class WebHostSceneRuntime {
         const press = this.textInputPress;
         this.textInputPress = undefined;
         this.nativePointerGesture = false;
-        if (press && !press.moved && press.revision === this.geometrySession.pointerRevision) {
+        if (press && !press.moved && press.revision === this.pointerRevision && press.viewportRevision === this.pointerViewportRevision) {
           if (this.hasSurfaceSelection())
             document.getSelection()?.removeAllRanges();
-          this.onInput(this.inputEncoder.encodePointerDown(press.location, "primary", press.event, this.geometrySession.pointerRevision));
-          this.onInput(this.inputEncoder.encodePointerUp(press.location, "primary", event, this.geometrySession.pointerRevision));
+          this.onInput(this.inputEncoder.encodePointerDown(press.location, "primary", press.event, this.pointerRevision, this.pointerViewportRevision));
+          this.onInput(this.inputEncoder.encodePointerUp(press.location, "primary", event, this.pointerRevision, this.pointerViewportRevision));
         }
         this.domFocus?.refresh();
         return;
@@ -6777,6 +6805,7 @@ class WebHostSceneRuntime {
       this.capturedPointerId = undefined;
       this.capturedPointerLocation = undefined;
       this.capturedPointerRevision = undefined;
+      this.capturedViewportRevision = undefined;
       this.terminalMount.releasePointerCapture?.(event.pointerId);
       const downLinkTarget = this.pointerDownLinkTarget;
       this.pointerDownLinkTarget = undefined;
@@ -6784,7 +6813,7 @@ class WebHostSceneRuntime {
         return;
       }
       const button = this.inputEncoder.pointerButton(event.button) ?? this.activePointerButton;
-      this.onInput(this.inputEncoder.encodePointerUp(location, button, event, this.geometrySession.pointerRevision));
+      this.onInput(this.inputEncoder.encodePointerUp(location, button, event, this.pointerRevision, this.pointerViewportRevision));
       if (downLinkTarget !== undefined && this.linkTarget(location) === downLinkTarget) {
         this.openHyperlink(downLinkTarget);
       }
@@ -6806,7 +6835,7 @@ class WebHostSceneRuntime {
       if (!this.hasCapturedPointer) {
         this.terminalMount.style.cursor = this.linkTarget(location) !== undefined ? "pointer" : "";
       }
-      this.onInput(this.inputEncoder.encodePointerMove(location, this.activePointerButton, event, this.geometrySession.pointerRevision));
+      this.onInput(this.inputEncoder.encodePointerMove(location, this.activePointerButton, event, this.pointerRevision, this.pointerViewportRevision));
     };
     const handleWheel = (event) => {
       if (this.wheelMode === "passive" || this.rendererKind === "dom" && (event.ctrlKey || event.metaKey)) {
@@ -6819,7 +6848,7 @@ class WebHostSceneRuntime {
       if (this.wheelMode === "chain" && !wheelTargetCanScroll(this.currentFrame?.scrollRegions, location, event.deltaX, event.deltaY)) {
         return;
       }
-      this.onInput(this.inputEncoder.encodeWheel(location, event, this.geometrySession.pointerRevision));
+      this.onInput(this.inputEncoder.encodeWheel(location, event, this.pointerRevision, this.pointerViewportRevision));
       event.preventDefault();
     };
     const cancelPointer = (event) => {
@@ -6959,15 +6988,17 @@ class WebHostSceneRuntime {
     const id = this.capturedPointerId;
     const location = this.capturedPointerLocation;
     const revision = this.capturedPointerRevision;
+    const viewportRevision = this.capturedViewportRevision;
     this.capturedPointerId = undefined;
     this.capturedPointerLocation = undefined;
     this.capturedPointerRevision = undefined;
+    this.capturedViewportRevision = undefined;
     this.hasCapturedPointer = false;
     this.pointerDownLinkTarget = undefined;
     if (id !== undefined) {
       this.canceledPointerId = id;
       if (location)
-        this.onInput(this.inputEncoder.encodePointerCancel(location, revision));
+        this.onInput(this.inputEncoder.encodePointerCancel(location, revision, viewportRevision));
       if (this.terminalMount.hasPointerCapture?.(id))
         this.terminalMount.releasePointerCapture?.(id);
     }
@@ -7045,6 +7076,17 @@ class WebHostSceneRuntime {
     this.cellHeight = Math.max(1, Math.ceil(this.currentStyle.fontSize * 1.35));
   }
   paint(request) {
+    if (request.frame)
+      this.awaitingConnectionFrame = false;
+    if (this.paintedViewportRevision !== request.frame?.viewportRevision)
+      this.cancelGeometryPointer();
+    this.paintedViewportRevision = request.frame?.viewportRevision;
+    this.paintedGeometryRevision = request.frame?.geometryRevision;
+    if (!this.domGeometry && request.frame) {
+      this.currentFrame = request.frame;
+      this.columns = Math.max(1, Math.round(request.frame.width));
+      this.rows = Math.max(1, Math.round(request.frame.height));
+    }
     if (this.domGeometry?.pending) {
       const pending = this.domGeometry.pending;
       if (!this.reprojecting)
@@ -7202,11 +7244,15 @@ class WebHostSceneRuntime {
     return !!location && this.painter.allowsTextSelection(location.x, location.y);
   }
   cellLocation(event) {
+    if (this.awaitingConnectionFrame)
+      return;
     if (this.domGeometry && (!this.geometryMeasurable || !this.geometrySession.allowsPointer))
       return;
     return cellLocationForEvent(event, this.pointerMetrics());
   }
   rawCellLocation(event) {
+    if (this.awaitingConnectionFrame)
+      return;
     if (this.domGeometry && (!this.geometryMeasurable || !this.geometrySession.allowsPointer))
       return;
     return rawCellLocationForEvent(event, this.pointerMetrics());
@@ -8007,6 +8053,7 @@ class InternalWebHostAppController {
   visibilityDocument;
   detachVisibilityListener;
   disposed = false;
+  sceneNavigation;
   accessibilitySettings;
   constructor(options) {
     this.mount = options.mount;
@@ -8044,8 +8091,7 @@ class InternalWebHostAppController {
       this.sceneRoot.style.display = "block";
     }
     const document2 = this.mount.ownerDocument;
-    if (settingsEnabled && document2) {
-      this.accessibilitySettings = createWebHostAccessibilitySettings(document2, this.style, (preferences) => this.setStyle(preferences));
+    if (document2 && (settingsEnabled || this.scenes.length > 1)) {
       const appRoot = document2.createElement("div");
       appRoot.className = "webhost-app";
       Object.assign(appRoot.style, {
@@ -8055,8 +8101,42 @@ class InternalWebHostAppController {
         height: "100%",
         minHeight: "0"
       });
+      if (this.scenes.length > 1) {
+        const label = document2.createElement("label");
+        label.textContent = "Scene ";
+        const select = document2.createElement("select");
+        select.setAttribute("aria-label", "Scene");
+        for (const scene of this.scenes) {
+          const option = document2.createElement("option");
+          option.value = scene.id;
+          option.textContent = scene.title ?? scene.id;
+          select.append(option);
+        }
+        select.value = this.selectedSceneId;
+        const status = document2.createElement("span");
+        status.setAttribute("role", "status");
+        select.addEventListener("change", async () => {
+          select.disabled = true;
+          status.textContent = "";
+          try {
+            await this.switchScene(select.value);
+          } catch {
+            status.textContent = "Unable to open this scene. Try selecting it again.";
+          } finally {
+            select.disabled = false;
+            select.focus({ preventScroll: true });
+          }
+        });
+        this.sceneNavigation = select;
+        label.append(select, status);
+        appRoot.append(label);
+      }
+      if (settingsEnabled) {
+        this.accessibilitySettings = createWebHostAccessibilitySettings(document2, this.style, (preferences) => this.setStyle(preferences));
+        appRoot.append(this.accessibilitySettings.element);
+      }
       this.sceneRoot.style.flex = "1 1 auto";
-      appRoot.append(this.accessibilitySettings.element, this.sceneRoot);
+      appRoot.append(this.sceneRoot);
       this.mount.replaceChildren(appRoot);
     } else {
       this.mount.replaceChildren(this.sceneRoot);
@@ -8083,6 +8163,8 @@ class InternalWebHostAppController {
       return;
     runtime.setVisible(true);
     this.selectedSceneId = id;
+    if (this.sceneNavigation)
+      this.sceneNavigation.value = id;
   }
   setStyle(style) {
     if (this.disposed)

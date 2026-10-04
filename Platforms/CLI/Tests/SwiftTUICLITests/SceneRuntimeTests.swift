@@ -21,6 +21,49 @@
   @Suite
   @MainActor
   struct SceneRuntimeTests {
+    @Test(
+      "companion secondary graph starts dormant and survives PTY reattachment",
+      .timeLimit(.minutes(1)))
+    func companionSecondaryRetainsItsRunLoop() async throws {
+      let selection = collectWindowSceneSelections(
+        from: WindowGroup("Secondary", id: "secondary") { Text("Retained") })[0]
+      let changed = MainActorConditionSignal()
+      var invocations = 0
+      let runtime = try SceneRuntime(
+        selection: selection, isPrimary: false,
+        sessionRunner: { _, _ in
+          invocations += 1
+          changed.notify()
+          await AsyncEvent().wait()
+          return .init(finalState: SceneSessionState(), renderedFrames: 1, exitReason: .inputEnded)
+        })
+      let endpoint = runtime.enableCompanion()
+      let task = Task {
+        try await runtime.run(
+          sessionName: "Retained",
+          onAttachmentChanged: { _ in
+            MainActor.assumeIsolated { changed.notify() }
+          })
+      }
+      defer {
+        task.cancel()
+        runtime.shutdown()
+      }
+      await changed.wait { invocations == 1 }
+      #expect(!endpoint.surface.terminalIsAttached)
+      let path = try #require(runtime.attachPtyPath)
+      for _ in 0..<2 {
+        let fd = sceneOpen(path, O_RDWR | O_NOCTTY)
+        #expect(fd >= 0)
+        await changed.wait { endpoint.surface.terminalIsAttached }
+        sceneClose(fd)
+        await changed.wait { !endpoint.surface.terminalIsAttached }
+      }
+      #expect(invocations == 1)
+      task.cancel()
+      _ = try await task.value
+    }
+
     @Test("RuntimeConfiguration.debug enables frame diagnostics")
     func debugConfigurationEnablesFrameDiagnostics() {
       #expect(

@@ -50,7 +50,18 @@ extension RunLoop {
     let stream = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
       deadlineState.setContinuation(continuation)
 
-      if let pullingReader {
+      if let scopedReader = terminalInputReader as? any ScopedInputReading {
+        let inputEvents = scopedReader.scopedInputEvents()
+        inputTask = Task {
+          for await event in inputEvents {
+            renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
+            if buffer.enqueue(.scopedInput(event)) { continuation.yield() }
+            ingressDiagnostics.recordPumpEnqueue(depth: buffer.pendingBatchCount())
+          }
+          if buffer.enqueue(.inputEnded) { continuation.yield() }
+          completion.streamFinished(continuation)
+        }
+      } else if let pullingReader {
         pullingReader.installPullDelivery(
           InputPullDeliverySink(
             deliver: { event in

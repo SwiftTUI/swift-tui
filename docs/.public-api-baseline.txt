@@ -120,6 +120,9 @@ SwiftTUIArguments.SwiftTUIOptions.accessible
 SwiftTUIArguments.SwiftTUIOptions.ascii
 SwiftTUIArguments.SwiftTUIOptions.bind
 SwiftTUIArguments.SwiftTUIOptions.colorProfile
+SwiftTUIArguments.SwiftTUIOptions.companion
+SwiftTUIArguments.SwiftTUIOptions.companionPort
+SwiftTUIArguments.SwiftTUIOptions.companionURL
 SwiftTUIArguments.SwiftTUIOptions.contrastPreference
 SwiftTUIArguments.SwiftTUIOptions.cursorFollowsFocus
 SwiftTUIArguments.SwiftTUIOptions.debug
@@ -2866,6 +2869,7 @@ SwiftTUIRuntime.RuntimeConfiguration.Builder
 SwiftTUIRuntime.RuntimeConfiguration.Builder.accessibilityPreferences(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.build()
 SwiftTUIRuntime.RuntimeConfiguration.Builder.color(_:)
+SwiftTUIRuntime.RuntimeConfiguration.Builder.companion(_:port:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.cursorFollowsFocus(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.debug(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.glyphs(_:)
@@ -2879,6 +2883,11 @@ SwiftTUIRuntime.RuntimeConfiguration.ColorMode.always
 SwiftTUIRuntime.RuntimeConfiguration.ColorMode.auto
 SwiftTUIRuntime.RuntimeConfiguration.ColorMode.init(rawValue:)
 SwiftTUIRuntime.RuntimeConfiguration.ColorMode.never
+SwiftTUIRuntime.RuntimeConfiguration.CompanionMode
+SwiftTUIRuntime.RuntimeConfiguration.CompanionMode.auto
+SwiftTUIRuntime.RuntimeConfiguration.CompanionMode.init(rawValue:)
+SwiftTUIRuntime.RuntimeConfiguration.CompanionMode.off
+SwiftTUIRuntime.RuntimeConfiguration.CompanionMode.on
 SwiftTUIRuntime.RuntimeConfiguration.GlyphMode
 SwiftTUIRuntime.RuntimeConfiguration.GlyphMode.ascii
 SwiftTUIRuntime.RuntimeConfiguration.GlyphMode.init(rawValue:)
@@ -2900,6 +2909,8 @@ SwiftTUIRuntime.RuntimeConfiguration.WebConfig.sceneID
 SwiftTUIRuntime.RuntimeConfiguration.accessibilityPreferences
 SwiftTUIRuntime.RuntimeConfiguration.builder()
 SwiftTUIRuntime.RuntimeConfiguration.color
+SwiftTUIRuntime.RuntimeConfiguration.companion
+SwiftTUIRuntime.RuntimeConfiguration.companionPort
 SwiftTUIRuntime.RuntimeConfiguration.cursorFollowsFocus
 SwiftTUIRuntime.RuntimeConfiguration.debug
 SwiftTUIRuntime.RuntimeConfiguration.default
@@ -2908,6 +2919,7 @@ SwiftTUIRuntime.RuntimeConfiguration.glyphs
 SwiftTUIRuntime.RuntimeConfiguration.init(color:glyphs:motion:stableOutput:output:web:debug:cursorFollowsFocus:)
 SwiftTUIRuntime.RuntimeConfiguration.motion
 SwiftTUIRuntime.RuntimeConfiguration.output
+SwiftTUIRuntime.RuntimeConfiguration.printCompanionURL
 SwiftTUIRuntime.RuntimeConfiguration.stableOutput
 SwiftTUIRuntime.RuntimeConfiguration.web
 SwiftTUIRuntime.RuntimeIssueSink.standardError

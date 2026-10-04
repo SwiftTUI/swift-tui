@@ -22,6 +22,9 @@
   /// module-load side effects, which Swift does not guarantee. Idempotent:
   /// installing again replaces the arm with an identical one.
   package func installWebHostRunner() {
+    SwiftTUILaunchRegistry.installCompanionRunner { endpoints, configuration in
+      try await WebHostCompanion.start(endpoints: endpoints, configuration: configuration)
+    }
     SwiftTUILaunchRegistry.installWebRunner { app, configuration in
       try await WebHostRunner.run(app, configuration: configuration)
     }

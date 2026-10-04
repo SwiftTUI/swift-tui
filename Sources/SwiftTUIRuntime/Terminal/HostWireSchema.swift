@@ -76,7 +76,9 @@ package enum HostWireSchema {
     "HostFrameProjection": [
       .init(
         "hostGeometryStamp",
-        wire: .derived("geometryRevision when negotiated; private session is not serialized")),
+        wire: .derived(
+          "geometryRevision and viewportRevision when negotiated; private session is not serialized"
+        )),
       .init("sequence", wire: .key("sequence")),
       .init(
         "raster",
@@ -275,7 +277,8 @@ package enum HostWireSchema {
       "version", "width", "height", "styles", "rows", "images",
     ]
     package static let fullFrameOptionalKeys: Set<String> = [
-      "geometryRevision", "epoch", "gen", "sequence", "damage", "accessibilityTree",
+      "geometryRevision", "viewportRevision", "epoch", "gen", "sequence", "damage",
+      "accessibilityTree",
       "accessibilityAnnouncements", "accessibilityActionResponse", "accessibilityFocusRequest",
       "scrollRegions", "paragraphs", "links", "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
@@ -285,7 +288,8 @@ package enum HostWireSchema {
       "damage",
     ]
     package static let deltaFrameOptionalKeys: Set<String> = [
-      "geometryRevision", "epoch", "gen", "baselineGen", "sequence", "accessibilityTree",
+      "geometryRevision", "viewportRevision", "epoch", "gen", "baselineGen", "sequence",
+      "accessibilityTree",
       "accessibilityAnnouncements", "accessibilityActionResponse", "accessibilityFocusRequest",
       "scrollRegions", "paragraphs",
       "links",
@@ -379,7 +383,7 @@ package enum HostWireSchema {
   package enum DeliveryUplink {
     package static let recordTypes: Set<String> = ["caps", "resync"]
     package static let capabilityKeys: Set<String> = [
-      "acceptsDeltaFrames", "styleAppend", "geometryRevisions",
+      "acceptsDeltaFrames", "styleAppend", "geometryRevisions", "sharedViewport",
     ]
     package static let resyncRequiredKeys: Set<String> = ["scope"]
     package static let resyncOptionalKeys: Set<String> = ["ids"]
@@ -452,6 +456,12 @@ package enum HostWireSchema {
   /// record-shape capability, so it is manifest-owned by ``DeliveryUplink``
   /// and does not add a capability bit.
   package static let capabilityMappings: [CapabilityMapping] = [
+    .init(
+      "sharedViewport", defaultValue: "false",
+      wasi: "not applied; WASI owns its requested grid",
+      webSocket: "caps record key sharedViewport",
+      android: "not applied; native host owns its requested grid"
+    ),
     .init(
       "geometryRevisions",
       defaultValue: "false",

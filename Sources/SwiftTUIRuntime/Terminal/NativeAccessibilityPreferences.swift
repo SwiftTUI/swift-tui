@@ -28,6 +28,9 @@ package func nativeAccessibilityPreferences(
 package func isLocalTerminalPreferenceSource(
   _ surface: any PresentationSurfaceMetricsProvider
 ) -> Bool {
+  if let shared = surface as? SharedSceneSurface {
+    return isLocalTerminalPreferenceSource(shared.terminal)
+  }
   #if !canImport(WASILibc)
     guard let terminal = surface as? TerminalHost, terminal.usesNativeAccessibilityPreferences
     else { return false }

@@ -12,6 +12,7 @@
     func inboundEvents() -> AsyncStream<WebHostInboundEvent>
     /// The connection whose bytes may still be parsed and applied.
     func currentConnectionToken() async -> UInt64?
+    func inputLease(for token: UInt64) async -> InputConnectionLease?
     func recordDiscardedInboundChunk(_ chunk: WebHostDiscardedInboundChunk) async
   }
 
@@ -42,6 +43,8 @@
 
   package struct WebSocketInputReaderLifecycle: Sendable {
     package var connectionOpened: @Sendable (UInt64) -> Void
+    package var connectionClosed: @Sendable (UInt64) -> Void = { _ in }
+    package var inputAllowed: @Sendable () -> Bool = { true }
   }
 
   /// Reads client bytes into scene input, owning parser state for exactly one
@@ -59,7 +62,7 @@
   /// - **Before applying.** The token is checked again immediately before a
   ///   parsed capability declaration is applied or a parsed input event is
   ///   yielded, because the connection can retire while a record is in hand.
-  package final class WebSocketInputReader: TerminalInputReading, Sendable {
+  package final class WebSocketInputReader: ScopedInputReading, Sendable {
     private struct ReaderState {
       var parser = WebSurfaceInputParser()
       /// The connection whose partial record the parser holds.
@@ -73,6 +76,8 @@
     private let source: any WebHostByteSource
     private let controlHandler: @Sendable (WebSurfaceInputControlMessage, UInt64) async -> Void
     private let connectionOpened: @Sendable (UInt64) -> Void
+    private let connectionClosed: @Sendable (UInt64) -> Void
+    private let inputAllowed: @Sendable () -> Bool
     private let hooks: WebSocketInputReaderTestHooks?
     private let state = Mutex(ReaderState())
 
@@ -89,8 +94,12 @@
     ) {
       self.source = source
       if let lifecycle {
+        self.inputAllowed = lifecycle.inputAllowed
+        self.connectionClosed = lifecycle.connectionClosed
         self.connectionOpened = lifecycle.connectionOpened
       } else {
+        self.inputAllowed = { true }
+        self.connectionClosed = { (_: UInt64) in }
         self.connectionOpened = { (_: UInt64) in }
       }
       self.hooks = hooks
@@ -105,11 +114,24 @@
       channel: WebHostSceneChannel,
       transport: WebSocketSurfaceTransport,
       signalReader: InProcessSignalReader? = nil,
-      hooks: WebSocketInputReaderTestHooks? = nil
+      hooks: WebSocketInputReaderTestHooks? = nil,
+      sharedViewportRequired: Bool = false
     ) {
       self.init(
         source: channel, hooks: hooks,
-        lifecycle: .init(connectionOpened: { transport.beginGeometrySession($0) })
+        lifecycle: .init(
+          connectionOpened: {
+            transport.beginGeometrySession($0)
+            if sharedViewportRequired { signalReader?.send("SIGWINCH") }
+          },
+          connectionClosed: {
+            transport.endGeometrySession($0)
+            if sharedViewportRequired { signalReader?.send("SIGWINCH") }
+          },
+          inputAllowed: {
+            !sharedViewportRequired
+              || (transport.isConnected && transport.wireCapabilities.sharedViewport)
+          })
       ) { message, token in
         switch message {
         case .geometry(let request):
@@ -128,10 +150,26 @@
           )
           signalReader?.send("SIGWINCH")
         case .capabilities(let capabilities):
+          guard
+            !sharedViewportRequired
+              || (capabilities.geometryRevisions && capabilities.sharedViewport)
+          else {
+            let issue = RuntimeIssue(
+              severity: .error, code: "companion-client-outdated",
+              message:
+                "This shared terminal session requires its matching browser assets. Reload the companion URL with the browser cache cleared."
+            )
+            try? await channel.send(
+              Array(WebSurfaceFrameEncoder.encodeRuntimeIssue(issue).utf8), connectionToken: token)
+            return
+          }
           await channel.applyCapabilities(
             token: token,
             reanchor: { transport.declareCapabilities(capabilities, connectionToken: token) },
-            requestRefresh: { transport.requestSurfaceRefresh() }
+            requestRefresh: {
+              transport.requestSurfaceRefresh()
+              if sharedViewportRequired { signalReader?.send("SIGWINCH") }
+            }
           )
         case .resync(let request):
           transport.requestResync(request)
@@ -155,24 +193,46 @@
       }
     }
 
+    package func scopedInputEvents() -> AsyncStream<ScopedInputEvent> {
+      AsyncStream { continuation in
+        let task = Task {
+          for await event in self.source.inboundEvents() {
+            await self.processScoped(
+              event, yielding: { continuation.yield($0) },
+              finish: { continuation.finish() })
+            await Task.yield()
+          }
+          continuation.finish()
+        }
+        continuation.onTermination = { _ in task.cancel() }
+      }
+    }
+
     /// One reader step. The production stream loop and every deterministic
     /// harness go through here, so no test exercises a private copy of it.
     package func process(
       _ event: WebHostInboundEvent,
       yielding continuation: AsyncStream<InputEvent>.Continuation
     ) async {
+      await processScoped(
+        event, yielding: { continuation.yield($0.event) },
+        finish: { continuation.finish() })
+    }
+
+    private func processScoped(
+      _ event: WebHostInboundEvent,
+      yielding yield: @escaping @Sendable (ScopedInputEvent) -> Void,
+      finish: @Sendable () -> Void
+    ) async {
       switch event {
       case .shutdown:
-        continuation.finish()
+        finish()
       case .connectionOpened(let token):
         await openConnection(token: token)
-      case .connectionClosed:
-        // Connection-local: parser ownership is retired at the next opened
-        // boundary, and a chunk queued before this close is classified by the
-        // live token when it is consumed.
-        break
+      case .connectionClosed(let token):
+        connectionClosed(token)
       case .bytes(let token, let bytes):
-        await processBytes(token: token, bytes: bytes, yielding: continuation)
+        await processBytes(token: token, bytes: bytes, yielding: yield)
       }
     }
 
@@ -201,7 +261,7 @@
     private func processBytes(
       token: UInt64,
       bytes: [UInt8],
-      yielding continuation: AsyncStream<InputEvent>.Continuation
+      yielding yield: @escaping @Sendable (ScopedInputEvent) -> Void
     ) async {
       guard await source.currentConnectionToken() == token else {
         let wasCurrentOnArrival = state.withLock(\.streamToken) == token
@@ -236,7 +296,8 @@
             request.hostSession = token
             scopedEvent = .accessibility(request)
           }
-          continuation.yield(scopedEvent)
+          guard inputAllowed(), let lease = await source.inputLease(for: token) else { continue }
+          yield(ScopedInputEvent(scopedEvent, origin: .browser, lease: lease))
         }
       }
     }

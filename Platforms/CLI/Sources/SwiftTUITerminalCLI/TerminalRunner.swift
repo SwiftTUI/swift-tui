@@ -53,6 +53,10 @@ public enum TerminalRunner {
     _ app: A,
     configuration: RuntimeConfiguration
   ) async throws {
+    if configuration.printCompanionURL {
+      try printCompanionURLs(appName: appNameFromType(A.self))
+      return
+    }
     if configuration.web != nil {
       throw TerminalRunnerError.webHostNotLinked
     }
@@ -123,6 +127,30 @@ public enum TerminalRunner {
       sceneRuntimes.append(runtime)
     }
 
+    let companion: SharedSceneCompanionSession?
+    if shouldStartCompanion(configuration: configuration, isInteractive: interactiveTerminal) {
+      guard let start = SwiftTUILaunchRegistry.companionRunner else {
+        throw TerminalRunnerError.webHostNotLinked
+      }
+      do {
+        companion = try await start(sceneRuntimes.map { $0.enableCompanion() }, configuration)
+      } catch {
+        for runtime in sceneRuntimes { runtime.shutdown() }
+        throw CompanionLaunchError(underlying: String(describing: error))
+      }
+      if let companion {
+        FileHandle.standardError.write(
+          Data(
+            ("Browser accessibility companion (same running app): \(companion.url)\n"
+              + "Open or reopen this URL in your browser. No browser opens automatically.\n"
+              + "From another terminal, run this executable with --companion-url to retrieve the URL.\n"
+              + "Use --companion off to disable, or --companion-port 0 for an available port.\n")
+              .utf8))
+      }
+    } else {
+      companion = nil
+    }
+
     #if os(macOS) || os(iOS) || os(Linux) || os(Android)
       let registry = SceneInfoRegistry(
         entries: sceneRuntimes.map { runtime in
@@ -143,6 +171,7 @@ public enum TerminalRunner {
         sceneProvider: {
           registry.scenes()
         },
+        companionURL: companion?.url,
         attachHandler: { sceneID in
           registry.attachResponse(for: sceneID)
         }
@@ -181,21 +210,32 @@ public enum TerminalRunner {
       }
     }
 
-    try await withThrowingTaskGroup(of: Void.self) { group in
-      #if os(macOS) || os(iOS) || os(Linux) || os(Android)
-        group.addTask {
-          try await server.run()
+    do {
+      try await withThrowingTaskGroup(of: Void.self) { group in
+        #if os(macOS) || os(iOS) || os(Linux) || os(Android)
+          group.addTask {
+            try await server.run()
+          }
+        #endif
+        for sceneTask in sceneTasks {
+          group.addTask {
+            _ = try await sceneTask.value
+          }
         }
-      #endif
-      for sceneTask in sceneTasks {
-        group.addTask {
-          _ = try await sceneTask.value
-        }
-      }
 
-      do {
-        _ = try await group.next()
-      } catch {
+        do {
+          _ = try await group.next()
+        } catch {
+          for task in sceneTasks {
+            task.cancel()
+          }
+          for runtime in sceneRuntimes {
+            runtime.shutdown()
+          }
+          group.cancelAll()
+          throw error
+        }
+
         for task in sceneTasks {
           task.cancel()
         }
@@ -203,20 +243,50 @@ public enum TerminalRunner {
           runtime.shutdown()
         }
         group.cancelAll()
-        throw error
       }
+    } catch {
+      await companion?.stop()
+      throw error
+    }
+    await companion?.stop()
+  }
 
-      for task in sceneTasks {
-        task.cancel()
-      }
-      for runtime in sceneRuntimes {
-        runtime.shutdown()
-      }
-      group.cancelAll()
+  package static func shouldStartCompanion(configuration: RuntimeConfiguration, isInteractive: Bool)
+    -> Bool
+  {
+    guard configuration.web == nil, configuration.output == .tui else { return false }
+    switch configuration.companion {
+    case .off: return false
+    case .on: return true
+    case .auto: return isInteractive && SwiftTUILaunchRegistry.companionRunner != nil
     }
   }
 
+  private static var interactiveTerminal: Bool {
+    #if os(Windows)
+      _isatty(STDIN_FILENO) != 0 && _isatty(STDOUT_FILENO) != 0
+    #else
+      isatty(STDIN_FILENO) != 0 && isatty(STDOUT_FILENO) != 0
+    #endif
+  }
+
   #if os(macOS) || os(iOS) || os(Linux) || os(Android)
+    private static func printCompanionURLs(appName: String) throws {
+      let instances = SocketClient.discoverInstances(appName: appName)
+      guard !instances.isEmpty else { throw SocketClientError.noRunningInstances }
+      for instance in instances {
+        let response = try SocketClient.sendRequest(
+          socketPath: instance.socketPath, request: "COMPANION\n")
+        if response.hasPrefix("OK ") {
+          print(
+            "Instance \(instance.identifier): \(response.dropFirst(3).trimmingCharacters(in: .newlines))"
+          )
+        } else {
+          print("Instance \(instance.identifier): \(response.trimmingCharacters(in: .newlines))")
+        }
+      }
+    }
+
     private static func listInstances(appName: String) {
       let instances = SocketClient.discoverInstances(appName: appName)
       if instances.isEmpty {
@@ -318,6 +388,10 @@ public enum TerminalRunner {
       try await AttachProxy.run(slavePath: ptyPath)
     }
   #else
+    private static func printCompanionURLs(appName: String) throws {
+      throw SceneAttachUnavailableError()
+    }
+
     private static func listInstances(appName: String) {
       print(SceneAttachUnavailableError().description)
     }
@@ -524,5 +598,13 @@ public enum TerminalRunnerError: Error, Equatable, Sendable, CustomStringConvert
         + "terminal-only SwiftTUICLI. Link the SwiftTUI" + "WebHostCLI product and call "
         + "WebHostCLIRunner.run(...), or remove --web."
     }
+  }
+}
+
+private struct CompanionLaunchError: Error, CustomStringConvertible {
+  var underlying: String
+  var description: String {
+    "Unable to start the loopback browser accessibility companion: \(underlying) "
+      + "Retry with --companion-port 0, or explicitly choose --companion off for terminal-only operation."
   }
 }

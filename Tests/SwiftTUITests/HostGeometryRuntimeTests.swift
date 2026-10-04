@@ -320,8 +320,13 @@ private struct GeometryEnvironmentText: View {
 }
 
 private final class GeometryTestSurface: HostGeometryPresentationSurface,
-  SemanticHostFramePresentationSurface
+  SemanticHostFramePresentationSurface, ClipboardWritingPresentationSurface
 {
+  var clipboardWrites: [String] = []
+  @MainActor func writeClipboard(_ text: String) throws -> Bool {
+    clipboardWrites.append(text)
+    return true
+  }
   var session: UInt64 = 7
   var revision: UInt64 = 1
   var reduceMotion: Bool?
@@ -423,5 +428,203 @@ extension HostGeometryRuntimeTests {
       #expect(text.contains("Motion normal") && text.contains("Contrast standard"))
       #expect(text.contains(opaque ? "Style opaque" : "Style clear"))
     }
+  }
+}
+
+extension HostGeometryRuntimeTests {
+  @Test func sharedClipboardUsesInputOriginAndNeverReadsServerForBrowser() throws {
+    let terminal = SharedTerminalTestSurface()
+    let browser = GeometryTestSurface()
+    let shared = SharedSceneSurface(terminal: terminal, terminalIsAttached: true)
+    shared.attachBrowser(browser, isConnected: { true })
+    try InputDispatchContext.$origin.withValue(.browser) { () throws -> Void in
+      #expect(try shared.readClipboard() == nil)
+      #expect(try shared.writeClipboard("browser copy"))
+    }
+    #expect(terminal.clipboardReads == 0)
+    #expect(terminal.clipboardWrites.isEmpty)
+    #expect(browser.clipboardWrites == ["browser copy"])
+    try InputDispatchContext.$origin.withValue(.terminal) { () throws -> Void in
+      #expect(try shared.readClipboard() == "server clipboard")
+      #expect(try shared.writeClipboard("terminal copy"))
+    }
+    #expect(terminal.clipboardReads == 1)
+    #expect(terminal.clipboardWrites == ["terminal copy"])
+    try shared.setTerminalAttached(false)
+    #expect(try shared.readClipboard() == nil)
+    #expect(terminal.clipboardReads == 1)
+  }
+
+  @Test func retiredIngressDropsQueuedKeysPasteAndActionsBeforeMutation() throws {
+    let host = GeometryTestSurface()
+    let root = testIdentity("RetiredIngress")
+    var text = ""
+    var writes = 0
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in
+      TextField(
+        "Name",
+        text: Binding(
+          get: { text },
+          set: {
+            text = $0
+            writes += 1
+          }))
+    }
+    loop.scheduler.requestSignal(named: "SIGWINCH")
+    var rendered = 0
+    try loop.renderPendingFrames(renderedFrames: &rendered)
+    let target = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first {
+        $0.label == "Name"
+      }?.actionTarget)
+    _ = loop.handle(.input(.accessibility(.init(target: target, action: .focus))))
+    let oldLease = InputConnectionLease()
+    let queued: [InputEvent] = [
+      .key(.init(.character("X"))), .paste(.init(content: "obsolete")),
+      .accessibility(.init(target: target, action: .setValue(.text("old")), requestID: 99)),
+    ]
+    let pump = EventPumpBuffer()
+    for event in queued {
+      _ = pump.enqueue(.scopedInput(.init(event, origin: .browser, lease: oldLease)))
+    }
+    oldLease.retire()
+    while pump.hasPendingEvents() {
+      for event in pump.drain() { _ = loop.handle(event.event, arrival: event.arrival) }
+    }
+    #expect(text.isEmpty && writes == 0)
+    #expect(loop.latestAccessibilityActionResponse == nil)
+    _ = loop.handle(.scopedInput(.init(.key(.init(.character("T"))), origin: .terminal)))
+    #expect(text == "T" && writes == 1)
+    let lease = InputConnectionLease()
+    _ = loop.handle(
+      .scopedInput(
+        .init(
+          .accessibility(.init(target: target, action: .setValue(.text("shared")), requestID: 1)),
+          origin: .browser, lease: lease)))
+    #expect(text == "shared" && writes == 2)
+    #expect(loop.latestAccessibilityActionResponse?.requestID == 1)
+    #expect(loop.currentInputOrigin == nil)
+  }
+
+  @Test func terminalPointerUsesItsGridAndCannotCompleteBrowserPress() throws {
+    let host = GeometryTestSurface()
+    let root = testIdentity("SharedPointerOrigins")
+    var activations = 0
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in Button("Activate") { activations += 1 } }
+    loop.scheduler.requestSignal(named: "SIGWINCH")
+    var rendered = 0
+    try loop.renderPendingFrames(renderedFrames: &rendered)
+    let region = try #require(loop.latestSemanticSnapshot.interactionRegions.first)
+    let point = Point(x: Double(region.rect.origin.x), y: Double(region.rect.origin.y))
+    func send(_ kind: MouseEvent.Kind, origin: InputOrigin) {
+      var event = MouseEvent(kind: kind, location: point)
+      if origin == .browser { event.hostGeometryStamp = .init(session: 7, revision: 1) }
+      _ = loop.handle(.scopedInput(.init(.mouse(event), origin: origin)))
+    }
+    send(.down(.primary), origin: .browser)
+    send(.up(.primary), origin: .terminal)
+    #expect(activations == 0)
+    send(.down(.primary), origin: .terminal)
+    send(.up(.primary), origin: .terminal)
+    #expect(activations == 1)
+    send(.down(.primary), origin: .browser)
+    send(.up(.primary), origin: .browser)
+    #expect(activations == 2)
+  }
+}
+
+extension HostGeometryRuntimeTests {
+  @Test func sharedGridFitsBothAndRejectsOldViewportPointersAfterTerminalResize() throws {
+    let terminal = SharedTerminalTestSurface()
+    let browser = GeometryTestSurface()
+    browser.size = .init(width: 120, height: 40)
+    var connected = true
+    let shared = SharedSceneSurface(terminal: terminal, terminalIsAttached: true)
+    shared.attachBrowser(browser, isConnected: { connected })
+    let root = testIdentity("CommonViewport")
+    var activations = 0
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: shared, terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in Button("Activate") { activations += 1 } }
+    var rendered = 0
+    func render() throws {
+      loop.scheduler.requestSignal(named: "SIGWINCH")
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+    }
+    try render()
+    let first = try #require(browser.frames.last)
+    #expect(first.raster.size == terminal.size)
+    #expect(terminal.frames.last == first.raster)
+    let region = try #require(first.semantics.interactionRegions.first)
+    let point = Point(x: Double(region.rect.origin.x), y: Double(region.rect.origin.y))
+    func browserEvent(_ kind: MouseEvent.Kind, stamp: HostGeometryStamp?) {
+      var event = MouseEvent(kind: kind, location: point)
+      event.hostGeometryStamp = stamp
+      _ = loop.handle(.scopedInput(.init(.mouse(event), origin: .browser)))
+    }
+    browserEvent(.down(.primary), stamp: first.hostGeometryStamp)
+    terminal.size = .init(width: 16, height: 5)
+    browserEvent(.up(.primary), stamp: first.hostGeometryStamp)
+    #expect(activations == 0)
+    try render()
+    let resized = try #require(browser.frames.last)
+    #expect(resized.raster.size == terminal.size)
+    #expect(
+      resized.hostGeometryStamp?.viewportRevision != first.hostGeometryStamp?.viewportRevision)
+    browserEvent(.down(.primary), stamp: first.hostGeometryStamp)
+    browserEvent(.up(.primary), stamp: first.hostGeometryStamp)
+    #expect(activations == 0)
+    browserEvent(.down(.primary), stamp: resized.hostGeometryStamp)
+    browserEvent(.up(.primary), stamp: resized.hostGeometryStamp)
+    #expect(activations == 1)
+    browser.size = .init(width: 12, height: 4)
+    browser.revision += 1
+    try render()
+    #expect(browser.frames.last?.raster.size == browser.size)
+    connected = false
+    try render()
+    #expect(browser.frames.last?.raster.size == terminal.size)
+    #expect(activations == 1)
+  }
+}
+
+private final class SharedTerminalTestSurface: PresentationSurface,
+  ClipboardWritingPresentationSurface, ClipboardReadingPresentationSurface
+{
+  var clipboardWrites: [String] = []
+  var clipboardReads = 0
+  @MainActor func writeClipboard(_ text: String) throws -> Bool {
+    clipboardWrites.append(text)
+    return true
+  }
+  @MainActor func readClipboard() throws -> String? {
+    clipboardReads += 1
+    return "server clipboard"
+  }
+  var size = CellSize(width: 24, height: 6)
+  var frames: [RasterSurface] = []
+  var surfaceSize: CellSize { size }
+  let appearance: TerminalAppearance = .fallback
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func write(_ output: String) throws {}
+  func clearScreen() throws {}
+  func moveCursor(to point: CellPoint) throws {}
+  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    frames.append(surface)
+    return .rasterHostMetrics(for: surface, damage: nil)
   }
 }

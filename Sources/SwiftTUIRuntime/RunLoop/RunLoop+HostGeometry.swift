@@ -51,7 +51,15 @@ extension RunLoop {
     let current = presentationSurface.hostLayoutConfiguration().geometry
     reconcileHostGeometry(current)
     let accepted: Bool
-    if let current {
+    if currentInputOrigin == .terminal {
+      // Terminal coordinates already name the authoritative terminal grid;
+      // they do not carry the companion page's geometry revision.
+      accepted =
+        event.hostGeometryStamp == nil
+        && (current?.viewportRevision == nil || appliedHostGeometry == current)
+    } else if let current, current.viewportRevision != nil {
+      accepted = event.hostGeometryStamp == current && appliedHostGeometry == current
+    } else if let current {
       accepted =
         current.revision == 0
         ? event.hostGeometryStamp == nil || event.hostGeometryStamp == current

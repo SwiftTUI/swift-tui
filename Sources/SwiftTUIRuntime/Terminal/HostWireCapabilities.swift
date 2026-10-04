@@ -34,15 +34,19 @@ package struct HostWireCapabilities: Equatable, Sendable {
 
   /// Host accepts captured geometry revisions and the revision-zero acknowledgement.
   package var geometryRevisions: Bool
+  /// Host accepts a producer-constrained grid and correlates pointer input with its revision.
+  package var sharedViewport: Bool
 
   package init(
     acceptsDeltaFrames: Bool = false,
     styleAppend: Bool = false,
-    geometryRevisions: Bool = false
+    geometryRevisions: Bool = false,
+    sharedViewport: Bool = false
   ) {
     self.acceptsDeltaFrames = acceptsDeltaFrames
     self.styleAppend = styleAppend
     self.geometryRevisions = geometryRevisions
+    self.sharedViewport = sharedViewport
   }
 
   /// The encoding state a host with these capabilities receives.
@@ -57,6 +61,7 @@ package struct HostWireCapabilities: Equatable, Sendable {
     HostWireEncodingState(
       deltaEnabled: acceptsDeltaFrames,
       geometryRevisionsEnabled: geometryRevisions,
+      sharedViewportEnabled: geometryRevisions && sharedViewport,
       styleAppendEnabled: styleAppend
     )
   }
@@ -75,6 +80,7 @@ package struct HostWireCapabilities: Equatable, Sendable {
     HostWireEncodingState(
       deltaEnabled: acceptsDeltaFrames,
       geometryRevisionsEnabled: geometryRevisions,
+      sharedViewportEnabled: geometryRevisions && sharedViewport,
       styleAppendEnabled: styleAppend,
       epochID: epochID
     )
@@ -129,6 +135,12 @@ package struct HostWireCapabilities: Equatable, Sendable {
           capabilities.acceptsDeltaFrames = value
         } else {
           guard scanner.skipValue() else { return nil }
+        }
+      case "sharedViewport":
+        if let value = scanner.consumeBool() {
+          capabilities.sharedViewport = value
+        } else if !scanner.skipValue() {
+          return nil
         }
       case "geometryRevisions":
         if let value = scanner.consumeBool() {

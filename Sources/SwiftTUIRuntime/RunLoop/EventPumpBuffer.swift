@@ -93,7 +93,13 @@ package final class EventPumpBuffer: Sendable {
         return nil
       }
       return .input(.mouse(mergedMouseEvent))
-    case (.input, _), (.inputEnded, _), (.signal, _):
+    case (.scopedInput(let current), .scopedInput(let next)):
+      guard current.origin == next.origin, current.lease === next.lease,
+        case .mouse(let first) = current.event, case .mouse(let second) = next.event,
+        let merged = first.merged(with: second)
+      else { return nil }
+      return .scopedInput(.init(.mouse(merged), origin: current.origin, lease: current.lease))
+    case (.input, _), (.scopedInput, _), (.inputEnded, _), (.signal, _):
       return nil
     }
   }
@@ -114,11 +120,6 @@ package final class EventPumpBuffer: Sendable {
   private func isCoalesciblePointerEvent(
     _ event: RuntimeEvent
   ) -> Bool {
-    switch event {
-    case .input(.mouse(let mouseEvent)):
-      return mouseEvent.isCoalescible
-    case .input, .inputEnded, .signal:
-      return false
-    }
+    event.coalescibleMouse != nil
   }
 }

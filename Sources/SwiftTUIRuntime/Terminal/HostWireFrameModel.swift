@@ -23,6 +23,7 @@ package struct HostWireFrameModel {
   // MARK: - Frame-level values
 
   package let geometryRevision: UInt64?
+  package let viewportRevision: UInt64?
   package let sequence: UInt64?
   package let gridSize: CellSize
   package let preferredLayoutSize: CellSize?
@@ -172,7 +173,8 @@ package struct HostWireFrameModel {
       damage: projection.rasterDamage,
       preferredLayoutSize: projection.preferredLayoutSize,
       terminalStyle: terminalStyle,
-      geometryRevision: projection.hostGeometryStamp?.revision
+      geometryRevision: projection.hostGeometryStamp?.revision,
+      viewportRevision: projection.hostGeometryStamp?.viewportRevision
     )
   }
 
@@ -184,9 +186,11 @@ package struct HostWireFrameModel {
     damage: PresentationDamage?,
     preferredLayoutSize: CellSize?,
     terminalStyle: TerminalRenderStyle? = nil,
-    geometryRevision: UInt64? = nil
+    geometryRevision: UInt64? = nil,
+    viewportRevision: UInt64? = nil
   ) {
     self.geometryRevision = geometryRevision
+    self.viewportRevision = viewportRevision
     self.sequence = sequence
     self.surface = surface
     gridSize = surface.size
@@ -331,6 +335,7 @@ package struct HostWireEncodingState: Sendable {
   package let epochID: UInt32
   package var recordsEncoded: UInt64
   package var geometryRevisionsEnabled: Bool
+  package var sharedViewportEnabled: Bool
   package var deltaEnabled: Bool
   /// Whether deltas may carry only the styles appended since their baseline,
   /// keyed by `stylesBase`. Negotiated, because the shape mis-indexes on a
@@ -344,6 +349,7 @@ package struct HostWireEncodingState: Sendable {
   package init(
     deltaEnabled: Bool,
     geometryRevisionsEnabled: Bool = false,
+    sharedViewportEnabled: Bool = false,
     styleAppendEnabled: Bool = false,
     knownImageIDs: Set<String> = [],
     hasBaseline: Bool = false,
@@ -354,6 +360,7 @@ package struct HostWireEncodingState: Sendable {
     recordsEncoded = 0
     self.deltaEnabled = deltaEnabled
     self.geometryRevisionsEnabled = geometryRevisionsEnabled
+    self.sharedViewportEnabled = sharedViewportEnabled
     self.styleAppendEnabled = styleAppendEnabled
     self.knownImageIDs = knownImageIDs
     persistentStyles = HostWireStyleTable(gridSize: baselineSize)

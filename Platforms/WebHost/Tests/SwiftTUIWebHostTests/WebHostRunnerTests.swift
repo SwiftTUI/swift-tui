@@ -50,6 +50,7 @@
       let scene = await server.startedScene()
       #expect(scene.id == "primary")
       #expect(scene.isDefault == true)
+      #expect(Set(await server.startedSession().channels.keys) == ["primary", "secondary"])
       await cancelAndDrain(task)
     }
 
@@ -70,8 +71,65 @@
       let scene = await server.startedScene()
       #expect(scene.id == "secondary")
       #expect(scene.title == "Secondary")
-      #expect(scene.isDefault == false)
+      #expect(scene.isDefault == true)
       await cancelAndDrain(task)
+    }
+
+    @Test(
+      "all scene graphs retain state across browser detach and reattach", .timeLimit(.minutes(1)))
+    func allScenesRetainStateAcrossReattach() async throws {
+      let server = FakeWebHostServer()
+      let task = Task { @MainActor in
+        try await WebHostRunner.run(
+          MultipleCounterApp(), configuration: .init(web: .init()), server: server,
+          token: WebHostToken(rawValue: "test-token"),
+          browserOpener: RecordingBrowserOpener(), bannerWriter: RecordingBannerWriter())
+      }
+      let session = await server.startedSession()
+      func attach(_ id: String) async -> (
+        AsyncStream<WebHostSocketMessage>.Continuation,
+        AsyncStream<WebHostSocketMessage>.Iterator
+      ) {
+        let (input, continuation) = AsyncStream<WebHostSocketMessage>.makeStream()
+        let output = await session.channels[id]!.attach(client: input)
+        continuation.yield(.data(Array("\u{001E}caps:{\"acceptsDeltaFrames\":false}\n".utf8)))
+        return (continuation, output.makeAsyncIterator())
+      }
+      func read(_ expected: String, from iterator: inout AsyncStream<WebHostSocketMessage>.Iterator)
+        async throws
+      {
+        while let message = await iterator.next(isolation: MainActor.shared) {
+          guard case .data(let bytes) = message else { continue }
+          let record = String(decoding: bytes, as: UTF8.self)
+          guard record.hasPrefix("\u{001E}surface:") else { continue }
+          let frame = try decodedSurfaceFrame(record)
+          let rows = frame["rows"] as? [[[Any]]] ?? []
+          let text = rows.map { row in
+            row.compactMap { $0.count > 1 ? $0[1] as? String : nil }.joined()
+          }.joined(separator: "\n")
+          if text.contains(expected) { return }
+        }
+        Issue.record("Scene stream ended before \(expected)")
+      }
+      var (primary, primaryOutput) = await attach("primary")
+      var (secondary, secondaryOutput) = await attach("secondary")
+      try await read("Primary count 0", from: &primaryOutput)
+      try await read("Secondary count 0", from: &secondaryOutput)
+      secondary.yield(.data(Array("\u{001E}key:tab:0\n\u{001E}key:return:0\n".utf8)))
+      try await read("Secondary count 1", from: &secondaryOutput)
+      secondary.finish()
+      var (reattached, reattachedOutput) = await attach("secondary")
+      try await read("Secondary count 1", from: &reattachedOutput)
+      primary.yield(.data(Array("\u{001E}key:tab:0\n\u{001E}key:return:0\n".utf8)))
+      try await read("Primary count 1", from: &primaryOutput)
+      reattached.yield(.data(Array("\u{001E}key:return:0\n".utf8)))
+      try await read("Secondary count 2", from: &reattachedOutput)
+      primary.finish()
+      reattached.finish()
+      await cancelAndDrain(task)
+      for channel in session.channels.values {
+        #expect(await channel.consumeObservations().sceneInputFinished)
+      }
     }
 
     @Test("runner reports missing requested scene")
@@ -256,6 +314,27 @@
   }
 
   @MainActor
+  private struct MultipleCounterApp: App {
+    var body: some Scene {
+      WindowGroup("Primary", id: WindowIdentifier("primary")) { RetainedCounter(name: "Primary") }
+      WindowGroup("Secondary", id: WindowIdentifier("secondary")) {
+        RetainedCounter(name: "Secondary")
+      }
+    }
+  }
+
+  private struct RetainedCounter: View {
+    let name: String
+    @State private var count = 0
+    var body: some View {
+      VStack {
+        Text("\(name) count \(count)")
+        Button("Increment") { count += 1 }
+      }
+    }
+  }
+
+  @MainActor
   private struct SingleSceneApp: App {
     var body: some Scene {
       WindowGroup("Primary", id: WindowIdentifier("primary")) {
@@ -313,9 +392,11 @@
     func start(
       configuration: WebHostConfig,
       token: WebHostToken,
-      scene: WebHostSceneDescriptor
+      scenes: [WebHostSceneDescriptor]
     ) async throws -> WebHostServerSession {
-      let channel = WebHostSceneChannel()
+      let scene = scenes.first(where: \.isDefault) ?? scenes[0]
+      let channels = Dictionary(uniqueKeysWithValues: scenes.map { ($0.id, WebHostSceneChannel()) })
+      let channel = channels[scene.id]!
       let session = WebHostServerSession(
         baseURL: URL(
           string: "http://127.0.0.1:\(configuration.port == 0 ? 9123 : configuration.port)/")!,
@@ -323,6 +404,7 @@
           string: "ws://127.0.0.1:9123/ws/scene/\(scene.id)?token=\(token.rawValue)")!,
         token: token,
         channel: channel,
+        channels: channels,
         stopHandler: {
           await self.recordStop()
         }

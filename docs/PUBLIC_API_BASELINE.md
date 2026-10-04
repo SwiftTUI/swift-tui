@@ -19,11 +19,11 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 60 | 519 |
+| `SwiftTUIRuntime` | 60 | 528 |
 | `SwiftTUIProfiling` | 9 | 52 |
 | `SwiftTUIViews` | 418 | 2580 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
-| `SwiftTUIArguments` | 5 | 57 |
+| `SwiftTUIArguments` | 5 | 60 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
 | `SwiftTUITerminalCLI` | 6 | 24 |
 | `SwiftTUICLIAttach` | 1 | 6 |
@@ -84,7 +84,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `RunLoop` — class — 11 members
 - `RunLoopExitReason` — enum — 4 members
 - `RunLoopResult` — struct — 4 members
-- `RuntimeConfiguration` — struct — 48 members
+- `RuntimeConfiguration` — struct — 57 members
 - `RuntimeIssueSink` — extension — 1 member
 - `RuntimeRenderMode` — enum — 9 members
 - `Scene` — protocol — 2 members
@@ -565,7 +565,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `standardOutputIsATTY()` — func
 - `SwiftTUIApp` — typealias
 - `SwiftTUICommand` — protocol — 12 members
-- `SwiftTUIOptions` — struct — 27 members
+- `SwiftTUIOptions` — struct — 30 members
 
 ## SwiftTUIPTYPrimitives
 

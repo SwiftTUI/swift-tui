@@ -10,6 +10,22 @@
   @testable import SwiftTUIWebHost
 
   struct WebSocketInputReaderTests {
+    @Test("a shared companion refuses input until matching viewport capabilities arrive")
+    func sharedCompanionRequiresMatchingCapabilities() async throws {
+      let transport = WebSocketSurfaceTransport(
+        surfaceSize: .init(width: 30, height: 8), sink: RecordingInputTestSink())
+      let client = await ChannelClient.attached(transport: transport, sharedViewportRequired: true)
+      await client.feed("\u{001E}key:character:A:0\n")
+      await client.feed("\u{001E}caps:{\"geometryRevisions\":true}\n\u{001E}key:character:B:0\n")
+      #expect(!transport.isConnected)
+      #expect(await client.channel.consumeObservations().phase == .preCapabilities)
+      await client.feed(
+        "\u{001E}caps:{\"geometryRevisions\":true,\"sharedViewport\":true}\n\u{001E}key:character:C:0\n"
+      )
+      #expect(transport.isConnected)
+      #expect(await client.yieldedEvents() == [.key(.init(.character("C"), modifiers: []))])
+    }
+
     @Test("resize wake survives a late signal-stream subscription")
     func resizeWakeSurvivesLateSignalSubscription() async throws {
       let transport = WebSocketSurfaceTransport(
@@ -301,7 +317,8 @@
 
     static func attached(
       transport: WebSocketSurfaceTransport? = nil,
-      signalReader: InProcessSignalReader? = nil
+      signalReader: InProcessSignalReader? = nil,
+      sharedViewportRequired: Bool = false
     ) async -> Self {
       let channel = WebHostSceneChannel()
       var clientContinuation: AsyncStream<WebHostSocketMessage>.Continuation?
@@ -313,7 +330,8 @@
           WebSocketInputReader(
             channel: channel,
             transport: transport,
-            signalReader: signalReader
+            signalReader: signalReader,
+            sharedViewportRequired: sharedViewportRequired
           )
         } else {
           WebSocketInputReader(source: channel)

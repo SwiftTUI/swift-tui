@@ -1,12 +1,13 @@
 # ``SwiftTUIWebHostCLI``
 
-Launch one SwiftTUI executable in either terminal or localhost-browser mode.
+Launch one SwiftTUI executable with a terminal and browser companion, or in browser-only mode.
 
 ## Overview
 
 `SwiftTUIWebHostCLI` composes the terminal runner with the WebHost runner. Use
-it when one binary must run in the terminal by default. It switches to browser
-hosting when the parsed application configuration requests web mode.
+it when one binary runs in the terminal with a default loopback browser companion.
+It switches to browser-only hosting when the configuration requests `--web`.
+See <doc:Browser-Companion> for discovery, opt-out, and SSH forwarding.
 
 Most apps get this through the `SwiftTUI` convenience product. Import
 `SwiftTUIWebHostCLI` directly when you want the combined launcher without

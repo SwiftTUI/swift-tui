@@ -281,3 +281,17 @@ extension SwiftTUIOptionsResolutionTests {
     #expect(throws: (any Error).self) { try SwiftTUIOptions.parse(["--color-profile", "unknown"]) }
   }
 }
+
+@Test("companion choices override environment including explicit ephemeral port")
+func companionChoiceResolution() throws {
+  let environment = ["SWIFTTUI_COMPANION": "off", "SWIFTTUI_COMPANION_PORT": "9321"]
+  let defaults = try SwiftTUIOptions.parse([]).runtimeConfiguration(
+    environment: environment, isStdoutTTY: true)
+  #expect(defaults.companion == .off && defaults.companionPort == 9321)
+  let explicit = try SwiftTUIOptions.parse([
+    "--companion", "auto", "--companion-port", "0", "--companion-url",
+  ])
+  .runtimeConfiguration(environment: environment, isStdoutTTY: true)
+  #expect(explicit.companion == .auto && explicit.companionPort == 0 && explicit.printCompanionURL)
+  #expect(throws: (any Error).self) { try SwiftTUIOptions.parse(["--companion-port", "65536"]) }
+}

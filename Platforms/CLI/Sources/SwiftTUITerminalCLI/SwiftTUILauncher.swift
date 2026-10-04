@@ -13,6 +13,15 @@ package enum SwiftTUILaunchRegistry {
   package typealias WebRunner =
     @MainActor @Sendable (any SwiftTUIRuntime.App, RuntimeConfiguration) async throws -> Void
 
+  package typealias CompanionRunner =
+    @MainActor @Sendable ([SharedSceneEndpoint], RuntimeConfiguration) async throws ->
+    SharedSceneCompanionSession
+  private static let companionStorage = Mutex<CompanionRunner?>(nil)
+  package static func installCompanionRunner(_ runner: @escaping CompanionRunner) {
+    companionStorage.withLock { $0 = runner }
+  }
+  package static var companionRunner: CompanionRunner? { companionStorage.withLock { $0 } }
+
   private static let storage = Mutex<WebRunner?>(nil)
 
   package static func installWebRunner(_ runner: @escaping WebRunner) {
@@ -27,6 +36,7 @@ package enum SwiftTUILaunchRegistry {
   /// process-global state behind.
   package static func resetWebRunnerForTesting() {
     storage.withLock { $0 = nil }
+    companionStorage.withLock { $0 = nil }
   }
 }
 

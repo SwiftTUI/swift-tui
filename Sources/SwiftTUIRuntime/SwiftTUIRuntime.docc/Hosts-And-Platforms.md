@@ -26,7 +26,11 @@ per-host engine profile below.
 A binary can support more than one mode. `SwiftTUILauncher` (shipped through
 the `SwiftTUICLI` product) routes launch: the terminal by default, the localhost
 WebHost when `--web` is present and `SwiftTUIWebHostCLI` installed its web arm
-at launch. `WebHostCLIRunner` remains as a source-compatible facade over the
+at launch. On macOS/Linux, the combined launcher's interactive terminal path
+also offers a loopback Canvas companion for the same app state, with all scenes
+retained. `--companion off` disables it; `--companion-url` retrieves running
+instances' URLs. Noninteractive and JSON output do not start it automatically.
+`WebHostCLIRunner` remains as a source-compatible facade over the
 same launcher. The `SwiftTUI` convenience product re-exports exactly one
 launch surface per platform: the combined terminal/WebHost launcher where the
 WebHost products build (macOS, Mac Catalyst, iOS, Linux, Android), and the

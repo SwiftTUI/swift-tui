@@ -99,6 +99,11 @@ extension SwiftTUIOptions {
       debug: debug,
       cursorFollowsFocus: cursorFollowsFocus
     )
+    configuration.companion =
+      companion.flatMap { RuntimeConfiguration.CompanionMode(rawValue: $0.rawValue) }
+      ?? baseline.companion
+    configuration.companionPort = companionPort ?? baseline.companionPort
+    configuration.printCompanionURL = companionURL
     configuration.accessibilityPreferences = preferences
     return configuration
   }

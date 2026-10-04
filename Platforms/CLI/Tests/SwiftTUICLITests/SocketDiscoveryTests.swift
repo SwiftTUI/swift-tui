@@ -18,6 +18,24 @@
 
   @Suite(.serialized)
   struct SocketDiscoveryTests {
+    @Test("companion discovery restricts bearer URLs to an owner-only socket")
+    func companionURLDiscovery() async throws {
+      let url = "http://127.0.0.1:9134/?token=fixture-token&renderer=canvas"
+      let server = SceneDiscoveryServer(
+        appName: uniqueAppName(), identifier: "companion",
+        sceneProvider: { [] }, companionURL: url, attachHandler: { _ in .error("unsupported") })
+      let task = await startServer(server)
+      defer { task.cancel() }
+      var status = stat()
+      #expect(server.socketPath.withCString { unsafe lstat($0, &status) } == 0)
+      #expect(status.st_mode & 0o777 == 0o600)
+      #expect(
+        try sendListRequest(socketPath: server.socketPath, request: "COMPANION\n") == "OK \(url)\n")
+      task.cancel()
+      _ = try? await task.value
+      #expect(!FileManager.default.fileExists(atPath: server.socketPath))
+    }
+
     @Test("STUI-512: discovery returns every scene in a response larger than 64 KiB")
     func largeSceneList() async throws {
       let scenes = (0..<1200).map {

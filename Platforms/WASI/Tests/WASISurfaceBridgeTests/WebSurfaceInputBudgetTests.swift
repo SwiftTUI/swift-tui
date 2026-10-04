@@ -100,3 +100,26 @@ import Testing
     #expect(parser.feed(Array("\u{1E}resize:256:256\n".utf8)).controlMessages.count == 1)
   }
 }
+
+extension WebSurfaceInputBudgetTests {
+  @Test func sharedViewportPointersPreserveBothRevisionsIncludingCanvasZero() {
+    for revision in [0, 9] {
+      var parser = WebSurfaceInputParser(session: 7)
+      let parsed = parser.feed(
+        Array("\u{001E}mouseViewport:\(revision):4:down:1.5:2:primary:0:0:0\n".utf8))
+      guard case .mouse(let event) = parsed.events.first else {
+        Issue.record("Expected a shared viewport pointer")
+        continue
+      }
+      #expect(
+        event.hostGeometryStamp
+          == .init(session: 7, revision: UInt64(revision), viewportRevision: 4))
+    }
+    for revision in ["0", "-1", "1.5", "9007199254740992"] {
+      var parser = WebSurfaceInputParser(session: 7)
+      #expect(
+        parser.feed(Array("\u{001E}mouseViewport:0:\(revision):down:1:2:primary:0:0:0\n".utf8))
+          .events.isEmpty)
+    }
+  }
+}

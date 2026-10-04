@@ -24,8 +24,11 @@
     package func start(
       configuration: WebHostConfig,
       token: WebHostToken,
-      scene: WebHostSceneDescriptor
+      scenes: [WebHostSceneDescriptor]
     ) async throws -> WebHostServerSession {
+      guard !scenes.isEmpty, Set(scenes.map(\.id)).count == scenes.count else {
+        throw WebHostServerError.invalidScenes
+      }
       var lastError: (any Error)?
       for port in configuration.candidatePorts {
         do {
@@ -33,7 +36,7 @@
             configuration: configuration,
             requestedPort: port,
             token: token,
-            scene: scene
+            scenes: scenes
           )
         } catch {
           lastError = error
@@ -49,7 +52,7 @@
       configuration: WebHostConfig,
       requestedPort: Int,
       token: WebHostToken,
-      scene: WebHostSceneDescriptor
+      scenes: [WebHostSceneDescriptor]
     ) throws -> WebHostServerSession {
       let requestedPort = try UInt16(webHostPort: requestedPort)
       let listenerFD = WebHostPOSIXSocket.createTCPSocket()
@@ -73,18 +76,20 @@
         throw WebHostServerError.unableToDetermineListeningPort
       }
 
-      let channel = WebHostSceneChannel()
+      let scene = scenes.first(where: \.isDefault) ?? scenes[0]
+      let channels = Dictionary(uniqueKeysWithValues: scenes.map { ($0.id, WebHostSceneChannel()) })
+      let channel = channels[scene.id]!
       let routes = WebHostRouteTable(
         bind: configuration.bind,
         token: token,
-        scene: scene,
+        scenes: scenes,
         port: port,
         maxMessageBytes: Self.maxMessageBytes
       )
       let coordinator = WebHostConnectionCoordinator(
         listenerFD: listenerFD,
         routes: routes,
-        channel: channel
+        channels: channels
       )
       coordinator.startAccepting()
 
@@ -99,6 +104,7 @@
         ),
         token: token,
         channel: channel,
+        channels: channels,
         stopHandler: {
           await coordinator.stop()
         }
@@ -112,22 +118,22 @@
       var running = true
       var connections: [ObjectIdentifier: WebHostLoopbackConnection] = [:]
       var acceptThreadExited = false
-      var acceptExitWaiter: CheckedContinuation<Void, Never>?
+      var acceptExitWaiters: [CheckedContinuation<Void, Never>] = []
     }
 
     private let listenerFD: Int32
     private let routes: WebHostRouteTable
-    private let channel: WebHostSceneChannel
+    private let channels: [String: WebHostSceneChannel]
     private let state = Mutex(State())
 
     init(
       listenerFD: Int32,
       routes: WebHostRouteTable,
-      channel: WebHostSceneChannel
+      channels: [String: WebHostSceneChannel]
     ) {
       self.listenerFD = listenerFD
       self.routes = routes
-      self.channel = channel
+      self.channels = channels
     }
 
     func startAccepting() {
@@ -155,7 +161,7 @@
           if state.acceptThreadExited {
             return true
           }
-          state.acceptExitWaiter = continuation
+          state.acceptExitWaiters.append(continuation)
           return false
         }
         if alreadyExited {
@@ -186,13 +192,13 @@
       }
 
       WebHostPOSIXSocket.close(listenerFD)
-      let waiter = state.withLock { state in
+      let waiters = state.withLock { state in
         state.acceptThreadExited = true
-        let waiter = state.acceptExitWaiter
-        state.acceptExitWaiter = nil
-        return waiter
+        let waiters = state.acceptExitWaiters
+        state.acceptExitWaiters.removeAll()
+        return waiters
       }
-      waiter?.resume()
+      for waiter in waiters { waiter.resume() }
     }
 
     private func register(
@@ -201,7 +207,7 @@
       let connection = WebHostLoopbackConnection(
         fd: connectionFD,
         routes: routes,
-        channel: channel,
+        channels: channels,
         onClose: { [weak self] connection in
           self?.state.withLock { state in
             state.connections[ObjectIdentifier(connection)] = nil
@@ -246,7 +252,7 @@
 
     private let fd: Int32
     private let routes: WebHostRouteTable
-    private let channel: WebHostSceneChannel
+    private let channels: [String: WebHostSceneChannel]
     private let onClose: @Sendable (WebHostLoopbackConnection) -> Void
     private let state = Mutex(State())
     private let outboxSignal = DispatchSemaphore(value: 0)
@@ -259,12 +265,12 @@
     init(
       fd: Int32,
       routes: WebHostRouteTable,
-      channel: WebHostSceneChannel,
+      channels: [String: WebHostSceneChannel],
       onClose: @escaping @Sendable (WebHostLoopbackConnection) -> Void
     ) {
       self.fd = fd
       self.routes = routes
-      self.channel = channel
+      self.channels = channels
       self.onClose = onClose
     }
 
@@ -401,9 +407,14 @@
         enqueue(response.serialized())
         finishWrites()
         drainIncoming()
-      case .webSocketUpgrade(let acceptResponse):
+      case .webSocketUpgrade(let acceptResponse, let sceneID):
+        guard let channel = channels[sceneID] else {
+          enqueue(WebHostHTTPResponse.notFound().serialized())
+          finishWrites()
+          return
+        }
         enqueue(acceptResponse.serialized())
-        runWebSocketSession()
+        runWebSocketSession(channel: channel)
         drainIncoming()
       }
     }
@@ -479,7 +490,7 @@
 
     // MARK: - WebSocket session
 
-    private func runWebSocketSession() {
+    private func runWebSocketSession(channel: WebHostSceneChannel) {
       let (clientStream, clientContinuation) = AsyncStream<WebHostSocketMessage>.makeStream()
 
       // The bridge task owns the channel conversation. It never blocks: writes
@@ -605,13 +616,13 @@
 
     var bind: String
     var token: WebHostToken
-    var scene: WebHostSceneDescriptor
+    var scenes: [WebHostSceneDescriptor]
     var port: Int
     var maxMessageBytes: Int
 
     enum RoutedRequest: Equatable, Sendable {
       case plain(WebHostHTTPResponse)
-      case webSocketUpgrade(WebHostHTTPResponse)
+      case webSocketUpgrade(WebHostHTTPResponse, sceneID: String)
     }
 
     func route(
@@ -621,8 +632,8 @@
         return .plain(.notFound())
       }
 
-      if head.path == "/ws/scene/\(scene.id)" {
-        return webSocketUpgrade(head)
+      if let scene = scenes.first(where: { head.path == "/ws/scene/\($0.id)" }) {
+        return webSocketUpgrade(head, sceneID: scene.id)
       }
 
       return .plain(
@@ -639,7 +650,7 @@
             }
           case "/scene-manifest.json":
             return .ok(
-              body: Array(Self.sceneManifest(scene).utf8),
+              body: Array(Self.sceneManifest(scenes).utf8),
               contentType: "application/json; charset=utf-8"
             )
           default:
@@ -655,7 +666,7 @@
     }
 
     private func webSocketUpgrade(
-      _ head: WebHostHTTPRequestHead
+      _ head: WebHostHTTPRequestHead, sceneID: String
     ) -> RoutedRequest {
       guard isAuthorized(head) else {
         return .plain(.forbidden())
@@ -684,7 +695,7 @@
             ("Connection", "Upgrade"),
             ("Sec-WebSocket-Accept", WebHostWebSocketWire.acceptKey(forClientKey: clientKey)),
           ]
-        )
+        ), sceneID: sceneID
       )
     }
 
@@ -732,14 +743,15 @@
       return nil
     }
 
-    static func sceneManifest(
-      _ scene: WebHostSceneDescriptor
-    ) -> String {
-      let title = scene.title.map { ",\"title\":\(jsonString($0))" } ?? ""
-      return """
-        {"defaultSceneId":\(jsonString(scene.id)),"scenes":[{"id":\(jsonString(scene.id))\(title),"isDefault":true}]}
-        """
+    static func sceneManifest(_ scenes: [WebHostSceneDescriptor]) -> String {
+      let primary = scenes.first(where: \.isDefault) ?? scenes[0]
+      let entries = scenes.map { scene in
+        let title = scene.title.map { ",\"title\":\(jsonString($0))" } ?? ""
+        return "{\"id\":\(jsonString(scene.id))\(title),\"isDefault\":\(scene.id == primary.id)}"
+      }.joined(separator: ",")
+      return "{\"defaultSceneId\":\(jsonString(primary.id)),\"scenes\":[\(entries)]}"
     }
+
   }
 
   private func constantTimeEquals(

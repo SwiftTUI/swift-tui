@@ -126,6 +126,20 @@
       #expect(current.action == .setValue(.text("new")))
     }
 
+    @Test("queued input lease retires before the replacement reader runs")
+    func queuedLeaseRetiresAtChannelBoundary() async throws {
+      let harness = await IsolationHarness.make()
+      let first = try #require(await harness.channel.inputLease(for: 1))
+      #expect(first.isCurrent)
+      let token = await harness.attach()
+      #expect(!first.isCurrent)
+      let second = try #require(await harness.channel.inputLease(for: token))
+      #expect(second.isCurrent)
+      #expect(await harness.channel.inputLease(for: 1) == nil)
+      await harness.channel.shutdown()
+      #expect(!second.isCurrent)
+    }
+
     /// A real channel, transport, and reader, stepped one tagged event at a time.
     private final class IsolationHarness: Sendable {
       let channel: WebHostSceneChannel

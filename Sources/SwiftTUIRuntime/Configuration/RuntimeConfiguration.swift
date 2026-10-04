@@ -8,6 +8,17 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   /// Explicit session choices take precedence over host detection.
   public var accessibilityPreferences = AccessibilityPreferences()
 
+  /// Whether an interactive terminal session offers a loopback browser companion.
+  public enum CompanionMode: String, Sendable, Equatable {
+    case auto, on, off
+  }
+
+  public var companion: CompanionMode = .auto
+  /// Companion listener port; zero asks the OS for an available loopback port.
+  public var companionPort: Int = 0
+  /// Prints companion URLs for running instances of this executable, then exits.
+  public var printCompanionURL = false
+
   public enum ColorMode: String, Sendable, Equatable {
     /// Auto-detect from TTY status and env vars (`NO_COLOR`, `FORCE_COLOR`, ...).
     case auto

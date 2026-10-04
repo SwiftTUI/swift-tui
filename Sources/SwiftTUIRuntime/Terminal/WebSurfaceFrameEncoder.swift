@@ -195,6 +195,7 @@ package enum WebSurfaceFrameEncoder {
         epochID: state.epochID,
         generation: generation,
         geometryRevisionsEnabled: state.geometryRevisionsEnabled,
+        sharedViewportEnabled: state.sharedViewportEnabled,
         knownImageIDs: &state.knownImageIDs
       ).output
     }
@@ -208,6 +209,7 @@ package enum WebSurfaceFrameEncoder {
         epochID: state.epochID,
         generation: generation,
         geometryRevisionsEnabled: state.geometryRevisionsEnabled,
+        sharedViewportEnabled: state.sharedViewportEnabled,
         knownImageIDs: &state.knownImageIDs
       )
       state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
@@ -229,6 +231,7 @@ package enum WebSurfaceFrameEncoder {
         epochID: state.epochID,
         generation: generation,
         geometryRevisionsEnabled: state.geometryRevisionsEnabled,
+        sharedViewportEnabled: state.sharedViewportEnabled,
         knownImageIDs: &state.knownImageIDs
       )
       state.rebaseline(onFrameStyles: full.styles, gridSize: model.gridSize)
@@ -242,6 +245,7 @@ package enum WebSurfaceFrameEncoder {
     epochID: UInt32,
     generation: UInt64,
     geometryRevisionsEnabled: Bool,
+    sharedViewportEnabled: Bool,
     knownImageIDs: inout Set<String>
   ) throws -> (output: String, styles: HostWireStyleTable) {
     var styles = HostWireStyleTable(gridSize: model.gridSize)
@@ -274,6 +278,9 @@ package enum WebSurfaceFrameEncoder {
     json += ",\"gen\":\(generation)"
     if geometryRevisionsEnabled {
       json += ",\"geometryRevision\":\(model.geometryRevision ?? 0)"
+    }
+    if sharedViewportEnabled, let revision = model.viewportRevision {
+      json += ",\"viewportRevision\":\(revision)"
     }
     if let sequence = model.sequence {
       json += ",\"sequence\":\(sequence)"
@@ -367,6 +374,9 @@ package enum WebSurfaceFrameEncoder {
     json += ",\"baselineGen\":\(baselineGeneration)"
     if candidate.geometryRevisionsEnabled {
       json += ",\"geometryRevision\":\(model.geometryRevision ?? 0)"
+    }
+    if candidate.sharedViewportEnabled, let revision = model.viewportRevision {
+      json += ",\"viewportRevision\":\(revision)"
     }
     if let sequence = model.sequence {
       json += ",\"sequence\":\(sequence)"

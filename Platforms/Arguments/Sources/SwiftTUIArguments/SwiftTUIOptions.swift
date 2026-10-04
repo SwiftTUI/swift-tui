@@ -118,6 +118,28 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   )
   public var json: Bool = false
 
+  @Option(
+    name: .customLong("companion"),
+    help:
+      "Browser accessibility companion: auto (interactive TTY), on, off. [env: SWIFTTUI_COMPANION]")
+  public var companion: AccessibilityChoice?
+
+  @Option(
+    name: .customLong("companion-port"),
+    help: "Loopback companion port. 0 = available port. [env: SWIFTTUI_COMPANION_PORT]",
+    transform: { value in
+      guard let port = Int(value), (0...65535).contains(port) else {
+        throw ValidationError("--companion-port must be between 0 and 65535")
+      }
+      return port
+    })
+  public var companionPort: Int?
+
+  @Flag(
+    name: .customLong("companion-url"),
+    help: "Print browser URLs for this app's running instances without starting another session.")
+  public var companionURL = false
+
   // ─── Web host ───────────────────────────────────────────────────
 
   @Flag(

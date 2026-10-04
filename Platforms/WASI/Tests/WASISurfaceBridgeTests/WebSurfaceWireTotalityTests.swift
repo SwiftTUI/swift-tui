@@ -106,7 +106,8 @@ struct WebSurfaceWireTotalityTests {
 
   @Test("a fully-populated full frame emits exactly the manifest key sets")
   func fullFrameEmitsExactlyTheManifestSurface() throws {
-    var state = HostWireCapabilities(geometryRevisions: true).negotiatedEncodingState(epochID: 1)
+    var state = HostWireCapabilities(geometryRevisions: true, sharedViewport: true)
+      .negotiatedEncodingState(epochID: 1)
     let record = try Self.decodedSurfaceFrame(
       WebSurfaceFrameEncoder.encode(
         HostWireFrameModel(
@@ -240,7 +241,7 @@ struct WebSurfaceWireTotalityTests {
     // be exact, and `stylesBase` appears only under a negotiated
     // `styleAppend` — so the fully-populated delta is a fully-negotiated one.
     var state = HostWireCapabilities(
-      acceptsDeltaFrames: true, styleAppend: true, geometryRevisions: true
+      acceptsDeltaFrames: true, styleAppend: true, geometryRevisions: true, sharedViewport: true
     )
     .negotiatedEncodingState(epochID: 2)
     _ = WebSurfaceFrameEncoder.encode(
@@ -537,6 +538,7 @@ struct WebSurfaceWireTotalityTests {
       generation: UInt64.max, target: "fixture-token")
     frame.semantics.accessibilityActionResponse = .init(
       requestID: 7, target: "fixture-token", result: .accepted)
+    frame.hostGeometryStamp = .init(session: 0, revision: 0, viewportRevision: 1)
     return frame
   }
 

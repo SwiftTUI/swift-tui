@@ -68,6 +68,13 @@ extension RuntimeConfiguration {
       return copy
     }
 
+    public func companion(_ mode: CompanionMode, port: Int = 0) -> Self {
+      var copy = self
+      copy.configuration.companion = mode
+      copy.configuration.companionPort = port
+      return copy
+    }
+
     public func web(
       port: Int = 0,
       bind: String = "127.0.0.1",

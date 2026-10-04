@@ -108,6 +108,9 @@ extension RuntimeConfiguration {
       reduceTransparency: preference("SWIFTTUI_REDUCE_TRANSPARENCY"),
       colorProfile: environment["SWIFTTUI_COLOR_PROFILE"].flatMap(
         AccessibilityColorProfile.init(rawValue:)))
+    configuration.companion =
+      environment["SWIFTTUI_COMPANION"].flatMap(CompanionMode.init(rawValue:)) ?? .auto
+    configuration.companionPort = environment["SWIFTTUI_COMPANION_PORT"].flatMap(Int.init) ?? 0
     return configuration
   }
 }

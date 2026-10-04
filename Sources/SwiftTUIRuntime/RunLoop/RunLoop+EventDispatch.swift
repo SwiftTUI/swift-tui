@@ -28,7 +28,12 @@ extension RunLoop {
     _ event: RuntimeEvent,
     arrival: InputArrival?
   ) -> RunLoopExitReason? {
-    guard case .input = event, let arrival, let tally = schedulerIntentTally else {
+    let isInput: Bool
+    switch event {
+    case .input, .scopedInput: isInput = true
+    case .inputEnded, .signal: isInput = false
+    }
+    guard isInput, let arrival, let tally = schedulerIntentTally else {
       return handle(event)
     }
     let requestsBeforeDispatch = tally.coalescedIntentRequestCount
@@ -42,6 +47,11 @@ extension RunLoop {
   package func handle(_ event: RuntimeEvent) -> RunLoopExitReason? {
     reconcileHostGeometry(presentationSurface.hostLayoutConfiguration().geometry)
     switch event {
+    case .scopedInput(let scoped):
+      guard scoped.isCurrent else { return nil }
+      return InputDispatchContext.$origin.withValue(scoped.origin) {
+        handle(.input(scoped.event))
+      }
     case .inputEnded:
       return .inputEnded
     case .signal(let name):
@@ -58,6 +68,10 @@ extension RunLoop {
         scheduler.requestInput()
         return handleKeyPress(keyPress)
       case .mouse(let mouseEvent):
+        if pointerInputOrigin != currentInputOrigin {
+          cancelPointerInteraction()
+          pointerInputOrigin = currentInputOrigin
+        }
         guard acceptsHostPointer(mouseEvent) else { return nil }
         let schedulesInput = shouldScheduleFrame(for: mouseEvent)
         let bypassPacing =

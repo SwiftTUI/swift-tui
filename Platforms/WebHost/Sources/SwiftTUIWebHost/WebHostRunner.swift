@@ -7,13 +7,16 @@
 
   /// Errors thrown while selecting or launching a WebHost scene.
   public enum WebHostRunnerError: Error, Equatable, Sendable, CustomStringConvertible {
+    @available(
+      *, deprecated, message: "WebHost now retains all app scenes; this error is no longer thrown."
+    )
     case multipleScenesUnsupported(count: Int)
     case sceneNotFound(WindowIdentifier, available: [WindowIdentifier])
 
     public var description: String {
       switch self {
       case .multipleScenesUnsupported(let count):
-        return "SwiftTUIWebHost V1 supports exactly one scene, but received \(count)."
+        return "Legacy single-scene WebHost could not launch \(count) scenes."
       case .sceneNotFound(let identifier, let available):
         let availableList = available.map(\.rawValue).joined(separator: ", ")
         if availableList.isEmpty {
@@ -84,62 +87,62 @@
         from: selections,
         requestedSceneID: webConfiguration.sceneID
       )
-      let scene = WebHostSceneDescriptor(
-        id: selection.identifier.rawValue,
-        title: selection.title,
-        isDefault: selection.isDefault
-      )
+      let scenes = selections.map { candidate in
+        WebHostSceneDescriptor(
+          id: candidate.identifier.rawValue, title: candidate.title,
+          isDefault: candidate.identifier == selection.identifier)
+      }
       let session = try await server.start(
-        configuration: webConfiguration,
-        token: token,
-        scene: scene
-      )
+        configuration: webConfiguration, token: token, scenes: scenes)
 
       bannerWriter.write(WebHostBanner.message(for: session, configuration: webConfiguration))
       if webConfiguration.openBrowser {
-        try browserOpener.open(session.url(path: "/"))
+        do { try browserOpener.open(session.url(path: "/")) } catch {
+          await session.stop()
+          throw error
+        }
       }
 
-      let transport = WebSocketSurfaceTransport(
-        surfaceSize: CellSize(width: 80, height: 24),
-        sink: session.channel
-      )
-      let signalReader = InProcessSignalReader()
-      let inputReader = WebSocketInputReader(
-        channel: session.channel,
-        transport: transport,
-        signalReader: signalReader
-      )
-      let sceneTask = Task { @MainActor in
-        let resources = SceneSessionResources(
-          presentationSurface: transport,
-          terminalInputReader: inputReader,
-          signalReader: signalReader,
-          surfaceName: "web",
-          runtimeConfiguration: configuration
-        )
-        resources.runtimeIssueSink = RuntimeIssueSink { issue in
-          try? transport.notifyRuntimeIssue(issue)
+      // Every scene keeps one graph owner for the app lifetime. Browser visibility
+      // and connection changes attach presentation/input to these existing owners.
+      let sceneTasks = selections.map { selection in
+        Task { @MainActor in
+          let channel = session.channels[selection.identifier.rawValue]!
+          let transport = WebSocketSurfaceTransport(
+            surfaceSize: CellSize(width: 80, height: 24), sink: channel)
+          let signalReader = InProcessSignalReader()
+          let inputReader = WebSocketInputReader(
+            channel: channel, transport: transport, signalReader: signalReader)
+          let resources = SceneSessionResources(
+            presentationSurface: transport, terminalInputReader: inputReader,
+            signalReader: signalReader, surfaceName: "web", runtimeConfiguration: configuration)
+          resources.runtimeIssueSink = RuntimeIssueSink { issue in
+            try? transport.notifyRuntimeIssue(issue)
+          }
+          _ = try await runSelectedScene(
+            selection: selection, sessionName: String(reflecting: A.self), resources: resources)
         }
-        _ = try await runSelectedScene(
-          selection: selection,
-          sessionName: String(reflecting: A.self),
-          resources: resources
-        )
       }
 
       do {
         try await withTaskCancellationHandler {
-          _ = try await sceneTask.value
+          try await withThrowingTaskGroup(of: Void.self) { group in
+            defer {
+              for task in sceneTasks { task.cancel() }
+              group.cancelAll()
+            }
+            for task in sceneTasks { group.addTask { try await task.value } }
+            _ = try await group.next()
+          }
         } onCancel: {
-          sceneTask.cancel()
+          for task in sceneTasks { task.cancel() }
           Task {
             await session.stop()
           }
         }
         await session.stop()
       } catch {
-        sceneTask.cancel()
+        for task in sceneTasks { task.cancel() }
         await session.stop()
         throw error
       }

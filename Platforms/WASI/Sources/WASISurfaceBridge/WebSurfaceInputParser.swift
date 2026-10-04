@@ -275,7 +275,17 @@ package struct WebSurfaceInputParser {
     var components = splitCommand(text)
     var stamp: HostGeometryStamp? =
       session == 0 ? nil : HostGeometryStamp(session: session, revision: 0)
-    if components.first == "mouseGeometry" {
+    if components.first == "mouseViewport" {
+      guard components.count == 10,
+        let revision = UInt64(components[1]),
+        revision <= HostGeometryRequest.maximumRevision,
+        let viewport = UInt64(components[2]), viewport > 0,
+        viewport <= HostGeometryRequest.maximumRevision
+      else { return nil }
+      stamp = HostGeometryStamp(session: session, revision: revision, viewportRevision: viewport)
+      components.removeSubrange(1...2)
+      components[0] = "mouse"
+    } else if components.first == "mouseGeometry" {
       guard components.count == 9, let revision = UInt64(components[1]),
         revision > 0, revision <= HostGeometryRequest.maximumRevision
       else { return nil }

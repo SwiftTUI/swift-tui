@@ -455,9 +455,15 @@ history as a semantic application. Provide a task-complete alternative and test
 it. Check reading, action, error recovery, focus, dynamic feedback, color and
 motion on each supported host; naming the container is insufficient.
 
-`--web` explicitly selects a browser session on platforms with the WebHost
-runner. Terminal and browser launch are mutually exclusive; terminal launch does
-not start a companion server, and Windows does not include WebHost. See
+Interactive terminal launches through `SwiftTUI` or `SwiftTUIWebHostCLI` offer a
+loopback Canvas browser companion before entering full screen. Open the printed
+URL to operate the same running scene, or use `--companion-url` from another
+terminal to retrieve it. The browser uses bundled assets and does not open
+unsolicited. Use `--companion off` to disable it. Redirected/noninteractive
+launches do not start it by default. `--web` selects browser-only hosting.
+The terminal-only `SwiftTUICLI` product and Windows do not include WebHost.
+See [Browser Companion](https://swifttui.sh/docs/documentation/swiftuiwebhostcli/browser-companion)
+and
 [Hosts And Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms).
 
 ## Authored paragraph spacing

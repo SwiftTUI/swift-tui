@@ -385,13 +385,14 @@ Its ratchet is therefore coupled to delivery. See
 ## Capability ingress
 
 `HostWireSchema.capabilityMappings` is the canonical mapping. There are
-currently three named bits:
+currently four named bits:
 
 | Capability | Default | Effect |
 | --- | --- | --- |
 | `acceptsDeltaFrames` | `false` | Permits v3 delta records after a full baseline. |
 | `styleAppend` | `false` | A delta carries `stylesBase` plus only the styles it added, instead of the whole accumulated table. |
 | `geometryRevisions` | `false` | Full and delta frames acknowledge geometry support with revision zero, then echo the positive revision captured before layout. |
+| `sharedViewport` | `false` | With `geometryRevisions`, permit a producer-bounded common grid and optional `viewportRevision`; used by terminal companions. |
 
 Absence begins with full-frame output. A rejected declaration leaves the
 existing state unchanged. Each accepted declaration constructs the whole
@@ -466,6 +467,19 @@ cell metrics, appearance, theme, pointer capabilities and revision before each
 layout acquisition. Full and delta frames echo that captured revision, including
 same-grid metric changes and empty damage. Revisions do not replace delivery
 `epoch`/`gen`, and every delivered delta must still be decoded.
+
+A shared terminal/browser scene also emits optional positive `viewportRevision`
+when `sharedViewport` and `geometryRevisions` were declared. It changes when the
+producer's common grid changes, including physical-terminal changes independent
+of a browser request. A browser may accept a bounded grid no larger than its
+requested dimensions, still with the matching browser geometry revision. It
+publishes pointer metadata only when that frame is painted. The corresponding
+record is `mouseViewport:<geometryRevision>:<viewportRevision>:<kind>:<x>:<y>:<button>:<deltaX>:<deltaY>:<modifiers>`.
+The Canvas legacy-resize path uses browser revision zero; DOM uses its positive
+request revision. Both values must match the current producer configuration and
+committed interaction map. The viewport revision is a positive JavaScript-safe
+integer; browser revision zero is allowed only in this shared-viewport record.
+WASI and Android own their requested grid and do not emit this extension.
 
 After the first positive request, a transport ignores legacy resizes. Pointer
 records retain their revision through parsing, coalescing and the async input

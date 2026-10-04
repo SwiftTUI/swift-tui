@@ -3,6 +3,7 @@
 // its socket layer is POSIX-bound and the umbrella's dependency edge is
 // platform-conditional.
 #if !os(Windows)
+  import SwiftTUIRuntime
   /// A tagged inbound event from the client side of a WebHost scene channel.
   ///
   /// A raw `[UInt8]` chunk stream lost the one fact the reader needs: *which
@@ -115,6 +116,7 @@
     private var detachedBudget = WebHostOutboundBudget()
     private var detachedNonSurfaceBacklog: [[UInt8]] = []
     private var phase: Phase = .detached
+    private var currentLease: InputConnectionLease?
     private var currentToken: UInt64?
     private var lastIssuedToken: UInt64 = 0
     private var sceneInputFinished = false
@@ -140,6 +142,10 @@
 
     package nonisolated func inboundEvents() -> AsyncStream<WebHostInboundEvent> {
       inboundStream
+    }
+
+    package func inputLease(for token: UInt64) -> InputConnectionLease? {
+      token == currentToken ? currentLease : nil
     }
 
     package func currentConnectionToken() -> UInt64? {
@@ -357,6 +363,8 @@
 
       lastIssuedToken += 1
       let token = lastIssuedToken
+      currentLease?.retire()
+      currentLease = InputConnectionLease()
       currentToken = token
       phase = .preCapabilities
 
@@ -444,6 +452,8 @@
         return
       }
       phase = .terminal
+      currentLease?.retire()
+      currentLease = nil
       currentToken = nil
       outputContinuation?.yield(.normalClose)
       outputContinuation?.finish()
@@ -538,6 +548,8 @@
     private func detachCurrentConnection(
       token: UInt64
     ) {
+      currentLease?.retire()
+      currentLease = nil
       currentToken = nil
       phase = .detached
       outputContinuation?.finish()

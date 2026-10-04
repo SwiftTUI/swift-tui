@@ -93,6 +93,11 @@ package enum HostWireBudget {
     if let revision = model.geometryRevision, revision > HostGeometryRequest.maximumRevision {
       throw Exceeded.limit
     }
+    if let revision = model.viewportRevision,
+      revision == 0 || revision > HostGeometryRequest.maximumRevision
+    {
+      throw Exceeded.limit
+    }
     if let preferred = model.preferredLayoutSize, !admits(preferred) {
       throw Exceeded.limit
     }

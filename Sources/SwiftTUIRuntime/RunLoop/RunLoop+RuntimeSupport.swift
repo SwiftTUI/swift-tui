@@ -2,7 +2,7 @@ import SwiftTUICore
 
 extension RunLoop {
   package func configuredUserExit(_ keyPress: KeyPress) -> RunLoopExitReason? {
-    guard presentationSurface.supportsUserExit else {
+    guard currentInputOrigin != .browser, presentationSurface.supportsUserExit else {
       reportRuntimeIssue(
         RuntimeIssue(
           severity: .error,

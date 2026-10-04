@@ -166,8 +166,9 @@ description.
 
 ## Beyond the terminal
 
-Terminal first, not terminal only. The same `App` also runs in a browser —
-launch it with `--web` to serve it over localhost, or compile it with the
+Interactive macOS/Linux launches offer a Canvas browser companion for the same
+running app; open the URL printed before full screen (`--companion off` disables
+it). The same `App` also runs browser-only — launch it with `--web` to serve it over localhost, or compile it with the
 `SwiftTUIWASI` product and ship it as a static bundle with
 [`@swifttui/web`](https://github.com/SwiftTUI/swift-tui-web), which is what the
 live demo is — and inside native apps through

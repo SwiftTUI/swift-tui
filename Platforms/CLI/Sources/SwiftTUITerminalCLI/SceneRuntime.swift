@@ -37,7 +37,8 @@ final class SceneRuntime {
   #if os(macOS) || os(iOS) || os(Linux) || os(Android)
     private let ptyPair: ScenePty?
   #endif
-  private let resources: SceneSessionResources
+  private var resources: SceneSessionResources
+  private var companionEndpoint: SharedSceneEndpoint?
   private let stateContainer: StateContainer<SceneSessionState>
   private let focusTracker: FocusTracker
   private let sessionRunner: SessionRunner
@@ -171,6 +172,15 @@ final class SceneRuntime {
     }
   #endif
 
+  func enableCompanion() -> SharedSceneEndpoint {
+    if let companionEndpoint { return companionEndpoint }
+    let endpoint = SharedSceneEndpoint(
+      descriptor: selection.descriptor, resources: resources, isPrimary: isPrimary)
+    resources = endpoint.resources
+    companionEndpoint = endpoint
+    return endpoint
+  }
+
   func run(
     sessionName: String,
     onAttachmentChanged: @escaping @Sendable (Bool) -> Void = { _ in }
@@ -189,6 +199,38 @@ final class SceneRuntime {
       if let armableSignalReader = resources.signalReader as? any SignalSourceArming {
         await armableSignalReader.armSignalSources()
       }
+      return try await sessionRunner(self, sessionName)
+    }
+
+    if let endpoint = companionEndpoint {
+      // Keep dormant secondary scenes alive. PTY attachment only changes their
+      // presentation/input, never the graph or its @State storage.
+      let monitor = Task { @MainActor in
+        #if os(macOS) || os(iOS) || os(Linux) || os(Android)
+          guard let ptyPair else { return }
+          while !Task.isCancelled {
+            let attached = await ptyPair.hasAttachedClient()
+            if attached != endpoint.surface.terminalIsAttached {
+              do { try endpoint.setTerminalAttached(attached) } catch {
+                try? endpoint.setTerminalAttached(false)
+              }
+              if endpoint.surface.terminalIsAttached {
+                _ = lifecycle.clientAttached()
+              } else {
+                _ = lifecycle.clientDetached()
+              }
+              onAttachmentChanged(endpoint.surface.terminalIsAttached)
+            }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+          }
+        #endif
+      }
+      endpoint.input.terminalEnded = { [weak self, weak endpoint] in
+        try? endpoint?.setTerminalAttached(false)
+        _ = self?.lifecycle.clientDetached()
+        onAttachmentChanged(false)
+      }
+      defer { monitor.cancel() }
       return try await sessionRunner(self, sessionName)
     }
 
@@ -220,6 +262,7 @@ final class SceneRuntime {
   }
 
   func shutdown() {
+    companionEndpoint?.stop()
     #if os(macOS) || os(iOS) || os(Linux) || os(Android)
       guard let ptyPair else { return }
       Task {

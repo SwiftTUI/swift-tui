@@ -87,10 +87,12 @@
 
   enum SocketRequest: Equatable, Sendable {
     case list
+    case companion
     case attach(sceneID: String)
 
     static func parse(_ raw: String) throws(SocketProtocolError) -> SocketRequest {
       let line = raw.hasSuffix("\n") ? String(raw.dropLast()) : raw
+      if line == "COMPANION" { return .companion }
       if line == "LIST" {
         return .list
       }
@@ -108,12 +110,15 @@
   // MARK: - SocketResponse
 
   package enum SocketResponse: Sendable {
+    case companionURL(String)
     case sceneList([SceneInfo])
     case attachOK(ptyPath: String)
     case error(String)
 
     package func encode() throws(SocketProtocolError) -> String {
       switch self {
+      case .companionURL(let url):
+        return "OK \(url)\n"
       case .sceneList(let scenes):
         let items = scenes.map { $0.jsonString() }.joined(separator: ",")
         let json = "[\(items)]"
@@ -156,16 +161,19 @@
     package let socketPath: String
 
     private let sceneProvider: @Sendable () -> [SceneInfo]
+    private let companionURL: String?
     private let attachHandler: @Sendable (String) -> SocketResponse
 
     package init(
       appName: String,
       identifier: String,
       sceneProvider: @escaping @Sendable () -> [SceneInfo],
+      companionURL: String? = nil,
       attachHandler: @escaping @Sendable (String) -> SocketResponse
     ) {
       let dir = "/tmp/swifttui/\(appName)"
       self.socketPath = "\(dir)/\(identifier).sock"
+      self.companionURL = companionURL
       self.sceneProvider = sceneProvider
       self.attachHandler = attachHandler
     }
@@ -182,6 +190,19 @@
       let parts = socketPath.split(separator: "/" as Character, omittingEmptySubsequences: true)
       let dirParts = parts.dropLast()
       mkdirRecursive(components: Array(dirParts).map(String.init))
+      if companionURL != nil {
+        // A companion URL contains a bearer token. Discovery may expose it only
+        // through a socket in directories owned by this user and not writable
+        // by other users. Reject symlinks as well as permissive directories.
+        for directory in ["/tmp/swifttui", "/" + dirParts.joined(separator: "/")] {
+          var status = stat()
+          let result = directory.withCString { unsafe lstat($0, &status) }
+          guard result == 0, status.st_uid == geteuid(),
+            status.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+            status.st_mode & 0o022 == 0
+          else { throw SceneDiscoveryServerError.failedToBind(path: directory, errno: EACCES) }
+        }
+      }
 
       if pathExists(socketPath) {
         if isSocketLive(socketPath) {
@@ -214,6 +235,12 @@
         throw SceneDiscoveryServerError.failedToBind(path: socketPath, errno: errno)
       }
       shouldCleanupSocketPath = true
+      if companionURL != nil {
+        let result = socketPath.withCString { unsafe chmod($0, 0o600) }
+        guard result == 0 else {
+          throw SceneDiscoveryServerError.failedToBind(path: socketPath, errno: errno)
+        }
+      }
 
       guard sceneListen(serverFD, 5) == 0 else {
         throw SceneDiscoveryServerError.failedToListen(errno: errno)
@@ -250,9 +277,10 @@
         }
         let provider = sceneProvider
         let handler = attachHandler
+        let companion = companionURL
         Task.detached {
           await SceneDiscoveryServer.handleClient(
-            fd: clientFD, sceneProvider: provider, attachHandler: handler)
+            fd: clientFD, sceneProvider: provider, companionURL: companion, attachHandler: handler)
         }
       }
     }
@@ -287,6 +315,7 @@
     private static func handleClient(
       fd: Int32,
       sceneProvider: @escaping @Sendable () -> [SceneInfo],
+      companionURL: String?,
       attachHandler: @escaping @Sendable (String) -> SocketResponse
     ) async {
       defer { sceneClose(fd) }
@@ -300,6 +329,10 @@
       do {
         let request = try SocketRequest.parse(raw)
         switch request {
+        case .companion:
+          response =
+            companionURL.map(SocketResponse.companionURL)
+            ?? .error("This instance has no browser companion.")
         case .list:
           response = .sceneList(sceneProvider())
         case .attach(let sceneID):

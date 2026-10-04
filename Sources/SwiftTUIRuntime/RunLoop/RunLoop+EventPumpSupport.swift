@@ -74,10 +74,7 @@ extension RunLoop {
   package func isCoalesciblePointerRuntimeEvent(
     _ event: RuntimeEvent
   ) -> Bool {
-    guard case .input(.mouse(let mouseEvent)) = event else {
-      return false
-    }
-    return mouseEvent.isCoalescible
+    event.coalescibleMouse != nil
   }
 
   package func isCoalesciblePointerPumpedEvent(

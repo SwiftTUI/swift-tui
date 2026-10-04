@@ -7,6 +7,20 @@
 /// direct-handler closures in `makeEventPump` (see `RunLoop+EventPump.swift`).
 package enum RuntimeEvent: Sendable {
   case input(InputEvent)
+  case scopedInput(ScopedInputEvent)
   case inputEnded
   case signal(String)
+}
+
+extension RuntimeEvent {
+  var coalescibleMouse: MouseEvent? {
+    let input: InputEvent
+    switch self {
+    case .input(let event): input = event
+    case .scopedInput(let scoped): input = scoped.event
+    case .inputEnded, .signal: return nil
+    }
+    guard case .mouse(let mouse) = input, mouse.isCoalescible else { return nil }
+    return mouse
+  }
 }

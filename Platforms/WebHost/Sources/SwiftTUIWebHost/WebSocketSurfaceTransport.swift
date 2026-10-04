@@ -47,6 +47,7 @@
     SemanticHostFramePresentationSurface, Sendable
   {
     private struct State: Sendable {
+      var isConnected = false
       var geometryRevision: UInt64 = 0
       var paragraphSpacing: Int = 0
       var geometrySessionToken: UInt64 = 0
@@ -133,6 +134,7 @@
       connectionToken: UInt64? = nil
     ) {
       state.withLock { state in
+        state.isConnected = true
         state.wireCapabilities = capabilities
         state.encodingState = capabilities.negotiatedEncodingState()
         state.connectionToken = connectionToken
@@ -147,12 +149,24 @@
     /// Retire queued pointer events as soon as a new socket opens, before its caps arrive.
     package func beginGeometrySession(_ token: UInt64) {
       state.withLock { state in
+        state.isConnected = false
         state.geometrySessionToken = token
         state.geometryRevision = 0
         state.paragraphSpacing = 0
         state.supportsScrollPanning = false
         state.pointerInputCapabilities = Self.pointerInputCapabilities(
           for: state.graphicsCapabilities.cellPixelSize, supportsScrollPanning: false)
+      }
+    }
+
+    package var isConnected: Bool { state.withLock(\.isConnected) }
+
+    package func endGeometrySession(_ token: UInt64) {
+      state.withLock { state in
+        guard state.geometrySessionToken == token else { return }
+        state.isConnected = false
+        state.geometrySessionToken = 0
+        state.geometryRevision = 0
       }
     }
 

@@ -719,6 +719,10 @@
         AsyncStream { $0.finish() }
       }
 
+      func inputLease(for token: UInt64) async -> InputConnectionLease? {
+        await channel.inputLease(for: token)
+      }
+
       func currentConnectionToken() async -> UInt64? {
         await channel.currentConnectionToken()
       }
