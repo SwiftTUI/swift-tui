@@ -514,6 +514,8 @@ class AccessibilityTreeMounter {
     this.compositionCommits.delete(element);
   }
   elementTag(node) {
+    if (node.role === "link")
+      return "a";
     if (node.selection && ["menu", "list"].includes(node.selection.presentation))
       return "select";
     if (!node.actionTarget || !this.sendAction)
@@ -611,13 +613,27 @@ class AccessibilityTreeMounter {
       return element;
     }
     element.addEventListener("click", (event) => {
+      if (tag === "a")
+        event.preventDefault();
       event.stopPropagation();
       send({ action: "activate" });
     });
+    if (tag === "a") {
+      for (const type of ["pointerdown", "pointerup", "pointermove"])
+        element.addEventListener(type, (event) => event.stopPropagation());
+    }
     element.addEventListener("keydown", (event) => {
       const model = current();
       if (!model || event.key === "Tab" || event.key === "Escape")
         return;
+      if (tag === "a" && event.key === "Enter") {
+        event.stopPropagation();
+        if (!element.hasAttribute("href")) {
+          event.preventDefault();
+          send({ action: "activate" });
+        }
+        return;
+      }
       if (model.properties?.readOnly === true && (event.key === "Backspace" || event.key === "Delete")) {
         event.preventDefault();
         event.stopPropagation();
@@ -695,6 +711,11 @@ class AccessibilityTreeMounter {
     element.id = `swifttui-a11y-${this.domIdentity}-${stableDOMId(node.id)}`;
     element.dataset.accessibilityId = node.id;
     element.tabIndex = this.isTabStop(node) ? 0 : -1;
+    if (element.tagName === "A") {
+      const destination = node.value?.type === "text" ? node.value.value : undefined;
+      setOrRemoveAttribute(element, "href", node.isEnabled !== false ? safeLinkDestination(destination) : undefined);
+      element.style.pointerEvents = "auto";
+    }
     const properties = node.properties;
     const role = roleMapping(node.role);
     if (properties?.headingLevel !== undefined) {
@@ -720,7 +741,10 @@ class AccessibilityTreeMounter {
       text.remove();
       this.readingText.delete(element);
     }
-    setOrRemoveAttribute(element, "aria-description", properties?.description ?? (node.hint || undefined));
+    setOrRemoveAttribute(element, "aria-description", properties?.description ?? ([
+      !supportsValueText(node.role) && node.role !== "secureField" ? properties?.valueDescription : undefined,
+      node.hint
+    ].filter(Boolean).join("; ") || undefined));
     setOrRemoveAttribute(element, "lang", properties?.language);
     setOrRemoveAttribute(element, "aria-live", node.liveRegion || undefined);
     if (node.isFocused) {
@@ -739,7 +763,7 @@ class AccessibilityTreeMounter {
     setOrRemoveAttribute(element, "aria-invalid", properties?.invalid?.toString());
     setOrRemoveAttribute(element, "aria-busy", properties?.busy?.toString());
     setOrRemoveAttribute(element, "aria-readonly", properties?.readOnly?.toString());
-    setOrRemoveAttribute(element, "aria-valuetext", node.role === "secureField" || node.selection ? undefined : properties?.valueDescription?.toString());
+    setOrRemoveAttribute(element, "aria-valuetext", !supportsValueText(node.role) || node.selection ? undefined : properties?.valueDescription?.toString());
     setOrRemoveAttribute(element, "aria-posinset", properties?.positionInSet?.toString());
     setOrRemoveAttribute(element, "aria-setsize", properties?.setSize?.toString());
     setOrRemoveAttribute(element, "aria-rowindex", properties?.rowIndex?.toString());
@@ -852,6 +876,19 @@ class AccessibilityTreeMounter {
     content.setAttribute("role", "img");
     content.setAttribute("aria-label", message);
     this.announcerElement.replaceChildren(content);
+  }
+}
+function supportsValueText(role) {
+  return ["slider", "stepper", "progressBar", "scrollBar", "meter"].includes(role);
+}
+function safeLinkDestination(destination) {
+  if (!destination)
+    return;
+  try {
+    const url = new URL(destination);
+    return ["http:", "https:", "mailto:", "tel:"].includes(url.protocol) ? url.href : undefined;
+  } catch {
+    return;
   }
 }
 function setOrRemoveAttribute(element, name, value) {
