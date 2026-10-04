@@ -478,10 +478,58 @@ extension SemanticExtractor {
       result.properties = result.properties.map { valueProperties.merging($0) } ?? valueProperties
     }
     result.control = node.semanticMetadata.accessibilityControl
+    if let selection = result.control?.selection,
+      selection.presentation == .radioGroup || selection.presentation == .segmented
+    {
+      result.selectionOptionRects = accessibilitySelectionOptionRects(
+        for: node, selection: selection)
+    }
     result.isEnabled = node.environmentSnapshot.style.isEnabled
     if let owner = node.viewNodeID, result.control != nil {
       result.actionTarget = "\(owner.rawValue):\(node.identity.path)"
       result.actionIdentity = node.identity
+    }
+    return result
+  }
+
+  private func accessibilitySelectionOptionRects(
+    for owner: PlacedNode, selection: AccessibilitySelection
+  ) -> [String: CellRect] {
+    let tokens = Dictionary(
+      uniqueKeysWithValues: selection.options.enumerated().map {
+        (pickerOptionIdentity(for: owner.identity, index: $0.offset), $0.element.id)
+      })
+    var result: [String: CellRect] = [:]
+    var stack: [(PlacedNode, CellRect?)] = [(owner, nil)]
+    while let (node, inheritedClip) = stack.popLast() {
+      if node.isTransient || node.semanticMetadata.accessibilityHidden { continue }
+      var clip = inheritedClip
+      if let next = node.clipBounds {
+        if let previous = clip {
+          guard let combined = previous.intersection(next) else { continue }
+          clip = combined
+        } else {
+          clip = next
+        }
+      }
+      if let token = tokens[node.semanticMetadata.explicitRouteIdentity ?? node.identity],
+        result[token] == nil
+      {
+        let bounds = semanticBounds(for: node)
+        let visibleBounds: CellRect? = if let clip { bounds.intersection(clip) } else { bounds }
+        if let bounds = visibleBounds, !bounds.isEmpty {
+          result[token] = bounds
+        }
+      }
+      if let viewport = node.scrollViewportRect {
+        if let previous = clip {
+          guard let combined = previous.intersection(viewport) else { continue }
+          clip = combined
+        } else {
+          clip = viewport
+        }
+      }
+      for child in node.children.reversed() { stack.append((child, clip)) }
     }
     return result
   }

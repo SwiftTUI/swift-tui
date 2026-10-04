@@ -899,6 +899,20 @@ struct AccessibilityActionRuntimeTests {
     }
     try render()
     let initial = try choices()
+    if styleIndex >= 2 {
+      let picker = try node()
+      #expect(picker.selectionOptionRects.count == initial.count)
+      for option in initial {
+        let bounds = try #require(picker.selectionOptionRects[option.id])
+        // The label and border are not options, including for disabled rows.
+        #expect(bounds.origin.y > picker.rect.origin.y)
+        #expect(bounds.size.height == 1)
+        #expect(bounds.origin.x > picker.rect.origin.x)
+      }
+      let firstBounds = try #require(picker.selectionOptionRects[initial[0].id])
+      let secondBounds = try #require(picker.selectionOptionRects[initial[1].id])
+      #expect(firstBounds.intersection(secondBounds) == nil)
+    }
     #expect(initial.map(\.label) == ["Choice 1", "Choice 2", "Choice 3"])
     #expect(initial.map(\.isEnabled) == [true, true, false])
     #expect(try node().control?.value == .text(initial[0].id))
@@ -924,6 +938,9 @@ struct AccessibilityActionRuntimeTests {
     #expect(try send(initial[1].id) == .invalidValue)
     disabled = true
     try render()
+    if styleIndex >= 2 {
+      #expect(try node().selectionOptionRects.count == options.count)
+    }
     #expect(try send(initial[0].id) == .disabled)
     #expect(writes == 1)
   }

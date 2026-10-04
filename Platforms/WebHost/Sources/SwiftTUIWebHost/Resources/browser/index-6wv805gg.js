@@ -263,6 +263,16 @@ function presentSelection(element, node, synchronizeValue, interactive) {
       radio.style.top = horizontal ? "0" : `${index * 100 / selection.options.length}%`;
       radio.style.width = horizontal ? `${100 / selection.options.length}%` : "100%";
       radio.style.height = horizontal ? "100%" : `${100 / selection.options.length}%`;
+      if (option.rect) {
+        const [x, y, width, height] = option.rect;
+        const [ownerX, ownerY, ownerWidth, ownerHeight] = node.rect;
+        radio.style.left = `${(x - ownerX) * 100 / Math.max(1, ownerWidth)}%`;
+        radio.style.top = `${(y - ownerY) * 100 / Math.max(1, ownerHeight)}%`;
+        radio.style.width = `${width * 100 / Math.max(1, ownerWidth)}%`;
+        radio.style.height = `${height * 100 / Math.max(1, ownerHeight)}%`;
+      }
+      radio.style.pointerEvents = option.rect ? "auto" : "none";
+      radio.style.boxSizing = "border-box";
       radio.style.margin = "0";
     }
     if (element.children[index] !== child)
@@ -384,6 +394,7 @@ class AccessibilityTreeMounter {
     this.element.style.inset = "0";
     this.element.style.opacity = "0";
     this.element.style.pointerEvents = "none";
+    this.element.style.zIndex = "3";
     this.announcerElement = document.createElement("div");
     this.announcerElement.className = "webhost-scene__accessibility-announcer";
     this.announcerElement.setAttribute("aria-atomic", "true");
@@ -523,6 +534,8 @@ class AccessibilityTreeMounter {
     };
     element.addEventListener(node.selection ? "focusin" : "focus", () => send({ action: "focus" }));
     if (node.selection) {
+      for (const type of ["pointerdown", "pointerup", "pointermove"])
+        element.addEventListener(type, (event) => event.stopPropagation());
       element.addEventListener("change", (event) => {
         event.stopPropagation();
         const input = event.target;
@@ -2620,7 +2633,7 @@ function isAccessibilitySelection(value) {
     return false;
   const ids = new Set;
   return selection.options.every((option) => {
-    if (!option || typeof option !== "object" || typeof option.id !== "string" || option.id === "" || ids.has(option.id) || typeof option.label !== "string" || typeof option.isEnabled !== "boolean")
+    if (!option || typeof option !== "object" || typeof option.id !== "string" || option.id === "" || ids.has(option.id) || typeof option.label !== "string" || typeof option.isEnabled !== "boolean" || option.rect !== undefined && (!isWebHostSurfaceRect(option.rect) || !option.rect.every(Number.isFinite) || option.rect[2] <= 0 || option.rect[3] <= 0))
       return false;
     ids.add(option.id);
     return true;

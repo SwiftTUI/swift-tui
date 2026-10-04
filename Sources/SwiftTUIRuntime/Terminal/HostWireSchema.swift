@@ -183,6 +183,7 @@ package enum HostWireSchema {
       .init("properties", wire: .key("properties")),
       .init("actionTarget", wire: .key("actionTarget")),
       .init("control", wire: .derived("actions/value/valueMin/valueMax/valueStep/selection")),
+      .init("selectionOptionRects", wire: .derived("selection.options[].rect by opaque option ID")),
       .init("isEnabled", wire: .key("isEnabled")),
       .init(
         "actionIdentity", wire: .notSerialized("runtime dispatch uses the opaque actionTarget")),

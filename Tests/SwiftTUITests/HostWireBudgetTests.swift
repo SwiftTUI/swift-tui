@@ -3,6 +3,42 @@ import Foundation
 import Testing
 
 @Suite struct HostWireBudgetTests {
+  @Test func pickerOptionGeometryIsKeyedByLiveTokenAtWireBoundary() throws {
+    var node = AccessibilityNode(
+      identity: Identity(components: ["picker"]),
+      rect: .init(origin: .zero, size: .init(width: 20, height: 8)), role: .picker)
+    node.actionTarget = "picker-token"
+    node.control = .init(
+      actions: [.focus, .setValue], value: .text("first"),
+      selection: .init(
+        presentation: .radioGroup,
+        options: [
+          .init(id: "first", label: "First", isEnabled: true),
+          .init(id: "other", label: "Other", isEnabled: false),
+        ]))
+    node.selectionOptionRects = [
+      "first": .init(origin: .init(x: 1, y: 3), size: .init(width: 17, height: 1)),
+      "retired": .init(origin: .zero, size: .init(width: 1, height: 1)),
+    ]
+    let frame = SemanticHostFrame(
+      sequence: 1,
+      raster: RasterSurface(size: .init(width: 1, height: 1), cells: [[.empty]]),
+      semantics: SemanticSnapshot(accessibilityNodes: [node]), focusedIdentity: nil)
+    let encoded = WebSurfaceFrameEncoder.encode(frame)
+    let json = String(encoded.dropFirst("\u{1E}surface:".count))
+    let object = try #require(
+      JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+    let tree = try #require(object["accessibilityTree"] as? [[String: Any]])
+    let selection = try #require(tree.first?["selection"] as? [String: Any])
+    let options = try #require(selection["options"] as? [[String: Any]])
+    #expect(options.count == 2)
+    #expect(options[0]["id"] as? String == "first")
+    #expect(options[0]["rect"] as? [Int] == [1, 3, 17, 1])
+    #expect(options[1]["rect"] == nil)
+    #expect(options[1]["isEnabled"] as? Bool == false)
+    #expect(!encoded.contains("retired"))
+  }
+
   @Test func secureControlValueIsRedactedAtWireBoundary() throws {
     var node = AccessibilityNode(
       identity: Identity(components: ["secret"]),

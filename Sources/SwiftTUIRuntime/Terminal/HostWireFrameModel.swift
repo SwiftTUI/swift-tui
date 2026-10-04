@@ -76,6 +76,7 @@ package struct HostWireFrameModel {
     package let actionTarget: String?
     package let properties: AccessibilityProperties?
     package let control: AccessibilityControlState?
+    package let selectionOptionRects: [String: CellRect]
     package let isEnabled: Bool
 
     package init(
@@ -95,6 +96,7 @@ package struct HostWireFrameModel {
       actionTarget = node.actionTarget
       properties = node.properties
       control = node.control
+      selectionOptionRects = node.selectionOptionRects
       isEnabled = node.isEnabled
     }
   }

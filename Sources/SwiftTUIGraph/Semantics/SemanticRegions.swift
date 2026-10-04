@@ -176,6 +176,8 @@ public struct AccessibilityNode: Equatable, Sendable {
   public var actionTarget: String? = nil
   public var properties: AccessibilityProperties? = nil
   public var control: AccessibilityControlState? = nil
+  /// Placed option routes, keyed by the control's opaque selection tokens.
+  package var selectionOptionRects: [String: CellRect] = [:]
   public var isEnabled: Bool = true
   package var actionIdentity: Identity? = nil
   package var viewNodeID: ViewNodeID?

@@ -706,8 +706,10 @@ package enum WebSurfaceFrameEncoder {
           fields.append("\"isEnabled\":\(node.isEnabled ? "true" : "false")")
           if let selection = control.selection {
             let options = selection.options.map { option in
-              "{\"id\":\(jsonString(option.id)),\"label\":\(jsonString(option.label)),"
-                + "\"isEnabled\":\(option.isEnabled ? "true" : "false")}"
+              let rect =
+                node.selectionOptionRects[option.id].map { ",\"rect\":\(encodeRect($0))" } ?? ""
+              return "{\"id\":\(jsonString(option.id)),\"label\":\(jsonString(option.label)),"
+                + "\"isEnabled\":\(option.isEnabled ? "true" : "false")\(rect)}"
             }.joined(separator: ",")
             fields.append(
               "\"selection\":{\"presentation\":\(jsonString(selection.presentation.rawValue)),"

@@ -319,6 +319,12 @@ not write the binding again. Whole-picker disabled, read-only, hidden and modal
 scope policies still apply. Custom styles keep these semantics even if they omit
 pointer route wrappers.
 
+Radio and segmented style options that use `option.route` publish the placed
+row or segment bounds to matching browser runtimes. These bounds align assistive
+outlines and native activation with the rendered choice, excluding the Picker's
+title and padding. Custom styles that omit the wrapper retain typed selection
+semantics but do not supply precise option geometry.
+
 These are current-source contracts requiring a matching browser runtime. They
 are not a 0.15.1 support claim or recorded Safari/VoiceOver task acceptance.
 

@@ -74,6 +74,16 @@ enabled. A host must require an action token and advertised action before
 sending a request; this also detects older runtimes without action support.
 Unknown optional fields remain ignorable by older hosts.
 
+Picker nodes can carry `selection`, with `presentation` (`menu`, `list`,
+`radioGroup`, or `segmented`) and ordered `options` containing opaque `id`,
+`label`, and `isEnabled`. Radio/segmented options with placed style routes also
+carry optional `rect: [x, y, width, height]` in scene cell coordinates. These
+bounds exclude the Picker's label, border and padding and remain available for
+disabled options. Missing or clipped-out routes omit `rect`; older producers
+also omit it. Hosts must not infer exact option geometry by dividing the whole
+Picker rectangle. Selection commands still echo the opaque option ID through
+text `setValue`; geometry is presentation metadata, never an action token.
+
 The shared WASI/WebSocket input parser accepts newline-terminated records
 introduced by RS (`0x1e`):
 
