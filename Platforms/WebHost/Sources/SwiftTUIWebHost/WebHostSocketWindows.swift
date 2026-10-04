@@ -22,7 +22,7 @@
     // Each owned socket retains one Winsock reference. Accepted sockets retain
     // their own reference, so stopping the listener cannot invalidate them.
     private static func retainWinsock() -> Bool {
-      var data = WSADATA()
+      var data = unsafe WSADATA()
       let result = unsafe WSAStartup(0x0202, &data)
       guard result == 0 else {
         WSASetLastError(result)
@@ -33,7 +33,7 @@
 
     static func createTCPSocket() -> SOCKET {
       guard retainWinsock() else { return invalidDescriptor }
-      let fd = WinSDK.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+      let fd = WinSDK.socket(AF_INET, SOCK_STREAM, Int32(IPPROTO_TCP.rawValue))
       guard isValid(fd) else {
         let code = lastError
         _ = WSACleanup()
@@ -45,7 +45,7 @@
       var enabled: Int32 = 1
       let result = withUnsafePointer(to: &enabled) { pointer in
         unsafe setsockopt(
-          fd, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+          fd, SOL_SOCKET, ~Int32(SO_REUSEADDR),
           UnsafeRawPointer(pointer).assumingMemoryBound(to: CChar.self),
           Int32(MemoryLayout<Int32>.size))
       }
@@ -116,7 +116,7 @@
     }
 
     static func accept(_ fd: SOCKET) -> SOCKET {
-      let client = unsafe WinSDK.accept(fd, nil, nil)
+      let client = WinSDK.accept(fd, nil, nil)
       guard isValid(client) else { return invalidDescriptor }
       guard retainWinsock() else {
         _ = closesocket(client)
