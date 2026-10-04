@@ -115,7 +115,7 @@ extension List {
       }
     }
     return resolvedContentWork.map { completed in
-      let resolvedContent = completed
+      var resolvedContent = completed
       let rows = resolvedContent.rows
       // Locate the selected row through the source's id index when there is
       // one: scanning every row and asking the policy about each tag is
@@ -152,6 +152,17 @@ extension List {
 
       let ownerNode =
         ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
+      for index in resolvedContent.children.indices {
+        guard
+          case .listRow(let rowIndex) = resolvedContent.children[index].semanticMetadata
+            .hostedCollectionItem?.role,
+          let tag = rows[rowIndex].tag
+        else { continue }
+        resolvedContent.children[index].semanticMetadata.hostedCollectionItem?.selection = .init(
+          isSelected: selectionPolicy.contains(tag),
+          actionIdentity: listRowIdentity(for: context.identity, rowIndex: rowIndex),
+          ownerNodeID: ownerNode?.viewNodeID)
+      }
       var scrollCurrency: CollectionScrollCurrency?
       if isEnabled, !rows.isEmpty {
         let showsIndicatorLines = showsIndicators
@@ -352,7 +363,15 @@ extension List {
               for: context.identity,
               rowIndex: rowIndex
             )
-            intake.registerAction(identity: rowIdentity) {
+            intake.registerAction(
+              identity: rowIdentity,
+              accessibilityHandler: { action in
+                guard action == .activate else { return .unsupported }
+                let previous = policy.contains(tag)
+                _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
+                return previous == policy.contains(tag) ? .unchanged : .changed
+              }
+            ) {
               policy.isMultiple ? policy.toggle(tag) : activate(tag)
             }
           }
@@ -494,6 +513,8 @@ extension List {
     }
 
     let policy = selectionPolicy
+    let selectionOwner =
+      (ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity))?.viewNodeID
     result.indexedSource = HostedCollectionIndexedChildSource(base: source) { rawNode, index in
       var node = rawNode
       let row = resolvedHostedListRow(from: node)
@@ -508,6 +529,12 @@ extension List {
         role: .listRow(rowIndex: index),
         isSelectable: compatibleTag != nil
       )
+      if let compatibleTag {
+        node.semanticMetadata.hostedCollectionItem?.selection = .init(
+          isSelected: policy.contains(compatibleTag),
+          actionIdentity: listRowIdentity(for: context.identity, rowIndex: index),
+          ownerNodeID: selectionOwner)
+      }
       return node
     }
     return result
@@ -561,6 +588,7 @@ extension List {
     _ node: ResolvedNode,
     into result: inout ResolvedItems
   ) {
+    let start = result.children.count
     for var child in node.children {
       switch child.semanticMetadata.sectionRole {
       case .header:
@@ -583,6 +611,22 @@ extension List {
         }
       default:
         collectItems(from: child.children, into: &result)
+      }
+    }
+    let sectionChildren = result.children[start...]
+    let header = sectionChildren.first {
+      $0.semanticMetadata.hostedCollectionItem?.role == .listHeader
+    }
+    let count = sectionChildren.filter {
+      if case .listRow = $0.semanticMetadata.hostedCollectionItem?.role { return true }
+      return false
+    }.count
+    var position = 0
+    for index in start..<result.children.count {
+      if case .listRow = result.children[index].semanticMetadata.hostedCollectionItem?.role {
+        position += 1
+        result.children[index].semanticMetadata.hostedCollectionItem?.section = .init(
+          title: header.map { resolvedNodeLabelText(from: $0) }, position: position, count: count)
       }
     }
   }

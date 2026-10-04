@@ -73,6 +73,18 @@ package struct SemanticExtractor: Sendable {
 
         let participatesInTopLevelFocus = node.participatesInTopLevelFocus
 
+        if let selection = node.semanticMetadata.hostedCollectionItem?.selection,
+          interactionsEnabled, !sealingParentOnChain,
+          let rect = interactionRect(for: node, clippedTo: clipRect)
+        {
+          accessibilityActionRegions.append(
+            FocusRegion(
+              identity: selection.actionIdentity, rect: rect, focusInteractions: .activate,
+              scopePath: scopePath, sectionIdentity: sectionIdentity,
+              modalFocusScopePath: modalFocusScopePath,
+              ownerNodeID: selection.ownerNodeID, ownerIdentity: selection.actionIdentity))
+        }
+
         if node.semanticMetadata.accessibilityStructure?.isVirtual == true {
           guard interactionsEnabled, !sealingParentOnChain else { return }
           if participatesInTopLevelFocus {

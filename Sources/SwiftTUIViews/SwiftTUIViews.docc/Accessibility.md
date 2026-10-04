@@ -41,8 +41,7 @@ label as their accessible name, excluding style chrome and displayed values.
 `ProgressView` and `Spinner` publish progress indicators as described below. Explicit
 `accessibilityLabel(_:)` overrides take precedence. See <doc:Style-System> for
 the naming contract when a custom style omits its label. Names and roles are
-only part of the contract: composite navigation and table relationships do not
-yet have complete assistive support. The following built-in
+only part of the contract: composite navigation remains host-dependent. The following built-in
 controls register their own supported actions without extra annotations:
 
 ```swift
@@ -68,8 +67,8 @@ indeterminate progress omits the numeric value. An unlabeled indicator is named
 “Progress”; supply a task-specific label when several tasks need distinguishing.
 The current-value label supplies value text separately from the name, including
 generic composed text. Repeated style placement does not repeat that text.
-Literal labels remain available when a custom style omits their slots; generic
-slots must be placed to contribute their content.
+Literal and generic labels remain available when a custom style omits their
+slots; authored generic slots retain their state through omission and placement.
 
 Every `Spinner` preset, including custom glyph styles, publishes a progress
 indicator with “Inactive”, “In progress”, or “Completed” value text. The active
@@ -89,6 +88,44 @@ pure decoration with `.accessibilityHidden()`.
 The existing Canvas and DOM browser adapters carry these semantics through WASI
 and native WebSocket. This describes source behavior; it does not claim a tagged
 release, actual screen-reader acceptance, or an interactive terminal reader.
+
+### Tables, Lists And Outlines
+
+`Table` publishes a static table, including a logical header row, body rows,
+column counts and cell positions. Header names remain available when visual
+headers are hidden or text is clipped. Set `TableColumn.isRowHeader` for a column
+that names its records, and `TableColumn.sort` to the current authored sort order:
+
+```swift
+let columns = [
+    TableColumn("Person", sort: .ascending, isRowHeader: true),
+    TableColumn("Score")
+]
+```
+
+The application sorts its data through an ordinary button or other authored
+operation and updates the column's sort value. A selectable table adds a semantic
+Selection column with one pressed-state button per realized row. Each button
+uses the table's existing selection binding. Multiple selection toggles that row;
+single selection chooses it without writing the same value again. Nested cell
+buttons and editors remain separate operations. Read-only and disabled table
+semantics prevent selection mutations. This is the static-table pattern with
+embedded controls; it does not claim an interactive grid's arrow-key behavior.
+
+`List` publishes structural list items around authored row content, including
+logical position and total count. Section rows describe their header
+and their position within the section together, while keeping their global list
+position. Named containers preserve
+the complete text and nested controls inside their rows. Eager and indexed
+collections use the same semantics for realized rows; indexed collections retain
+bounded materialization and do not expose unrealized rows as hidden controls.
+
+`OutlineGroup` uses nested disclosure lists. Branches begin expanded and offer a
+separate button to collapse or expand children; terminal keyboard, pointer and
+browser assistive input use the same state. Items expose level and sibling
+position; connector glyphs are decorative. Authored row buttons retain their own
+actions. The outline does not claim the ARIA tree pattern's managed arrow-key
+model. Verify collection reading, context and operation with the intended reader.
 
 ### Choosing An Operable Adjustable Control
 

@@ -4,7 +4,7 @@ public enum AccessibilityTextKind: String, Sendable, Equatable {
 }
 
 /// Sort direction of a table or grid header.
-public enum AccessibilitySortDirection: String, Sendable, Equatable {
+public enum AccessibilitySortDirection: String, Sendable, Hashable {
   case none, ascending, descending, other
 }
 

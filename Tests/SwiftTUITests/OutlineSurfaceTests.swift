@@ -102,7 +102,7 @@ struct OutlineSurfaceTests {
     )
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
-    #expect(surface.contains("▌ Sources"))
+    #expect(surface.contains("▌  ▾ Sources"))
     #expect(surface.contains("  │ ├─  App.swift"))
     #expect(surface.contains("  │ ╰─  Tests"))
     #expect(surface.contains("  Package.swift"))
@@ -146,7 +146,7 @@ struct OutlineSurfaceTests {
     )
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
-    #expect(surface.contains("  Root"))
+    #expect(surface.contains("   ▾ Root"))
     #expect(surface.contains("▌   ╰─  Leaf"))
   }
 }

@@ -521,6 +521,8 @@ package enum HostedCollectionContainerKind: Equatable, Sendable {
 package struct HostedCollectionContainerMetadata: Equatable, Sendable {
   package var kind: HostedCollectionContainerKind
   package var isSourceBacked: Bool
+  package var hasSelection: Bool = false
+  package var headerSorts: [AccessibilitySortDirection?] = []
 
   package init(
     kind: HostedCollectionContainerKind,
@@ -542,6 +544,8 @@ package enum HostedCollectionItemRole: Equatable, Sendable {
 package struct HostedCollectionItemMetadata: Equatable, Sendable {
   package var role: HostedCollectionItemRole
   package var isSelectable: Bool
+  package var selection: HostedCollectionSelection? = nil
+  package var section: HostedCollectionSection? = nil
 
   package init(
     role: HostedCollectionItemRole,
@@ -549,6 +553,31 @@ package struct HostedCollectionItemMetadata: Equatable, Sendable {
   ) {
     self.role = role
     self.isSelectable = isSelectable
+  }
+}
+
+package struct HostedCollectionSection: Equatable, Sendable {
+  package var title: String?
+  package var position: Int
+  package var count: Int
+  package init(title: String?, position: Int, count: Int) {
+    self.title = title
+    self.position = position
+    self.count = count
+  }
+}
+
+/// A realized row's selection route belongs to its collection owner. The row's
+/// own graph identity supplies the published lifetime, independent of its index.
+package struct HostedCollectionSelection: Equatable, Sendable {
+  package var isSelected: Bool
+  package var actionIdentity: Identity
+  package var ownerNodeID: ViewNodeID?
+
+  package init(isSelected: Bool, actionIdentity: Identity, ownerNodeID: ViewNodeID?) {
+    self.isSelected = isSelected
+    self.actionIdentity = actionIdentity
+    self.ownerNodeID = ownerNodeID
   }
 }
 

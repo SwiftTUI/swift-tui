@@ -2586,6 +2586,23 @@ package final class ViewGraph {
     )
   }
 
+  /// Installs parent-authored presentation layers around an already resolved
+  /// child. Keep the live child topology aligned with the returned value: a
+  /// later positional stamp/rebuild must not pair a new wrapper with the
+  /// original control's style-body node. Existing evaluated interiors retain
+  /// their nodes, registrations and declared-child replay boundaries.
+  package func installResolvedPresentation(_ resolved: ResolvedNode) -> ResolvedNode {
+    var resolved = resolved
+    resolved.children = resolved.children.map { child in
+      child.viewNodeID == nil ? installResolvedPresentation(child) : child
+    }
+    let node = nodeForResolvedNode(resolved)
+    let children = resolved.children.map(nodeForResolvedNode)
+    applyStructuralChildDiff(for: node, resolved: resolved)
+    applyResolvedNode(node, resolved: resolved, children: children)
+    return node.committed
+  }
+
   package func refreshResolvedMetadata(
     for resolved: ResolvedNode
   ) {

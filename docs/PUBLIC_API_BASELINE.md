@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 60 | 519 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 417 | 2565 |
+| `SwiftTUIViews` | 417 | 2568 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 57 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -471,7 +471,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `SurfaceSheetStyle` — struct — 3 members
 - `Tab` — struct — 2 members
 - `Table` — struct — 11 members
-- `TableColumn` — struct — 5 members
+- `TableColumn` — struct — 8 members
 - `TableRow` — struct — 1 member
 - `TableStyle` — protocol — 3 members
 - `TableStyleConfiguration` — struct — 7 members

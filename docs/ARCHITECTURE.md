@@ -790,3 +790,10 @@ the runtime captures host choices with geometry and applies explicit session
 overrides before resolution. `RuntimeRootEnvironmentSignature` includes all
 choices so preference-only changes invalidate retained views. The style codec
 carries additive optional string fields through WASI and WebSocket hosts.
+
+Collection structure is extracted by `SemanticCollectionAccessibility.swift`.
+Resolved hosted rows carry selection routes and section context; table headers
+are semantic siblings of body rows even when their raster chrome is hidden.
+Synthetic selectors use the collection action registry and the realized row's
+continuous semantic lifetime, preserving nested authored controls. Outline
+branches own disclosure state and compose ordinary buttons with nested lists.

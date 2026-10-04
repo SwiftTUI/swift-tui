@@ -907,7 +907,28 @@ extension FrameworkStressTableOutlineTests {
       let rendered = tableOutlineText(retained)
 
       #expect(retained.rasterSurface == fresh.rasterSurface)
-      #expect(retained.semanticSnapshot == fresh.semanticSnapshot)
+      // The disclosure button is now removed with the last child and gets a
+      // fresh graph owner when children return. Compare all semantics after
+      // normalizing graph-local lifetimes; runtime stale-target coverage lives
+      // in CollectionAccessibilityTests.outlineDisclosure.
+      func comparable(_ source: SemanticSnapshot) -> SemanticSnapshot {
+        var result = source
+        for index in result.accessibilityNodes.indices {
+          result.accessibilityNodes[index].viewNodeID = nil
+          if result.accessibilityNodes[index].actionTarget != nil {
+            result.accessibilityNodes[index].actionTarget =
+              result.accessibilityNodes[index].actionIdentity?.path
+          }
+        }
+        for index in result.focusRegions.indices {
+          result.focusRegions[index].ownerNodeID = nil
+        }
+        for index in result.interactionRegions.indices {
+          result.interactionRegions[index].routeID.ownerNodeID = nil
+        }
+        return result
+      }
+      #expect(comparable(retained.semanticSnapshot) == comparable(fresh.semanticSnapshot))
       #expect(rendered.contains("leaf-0-g\(generation)") == (count > 0))
       #expect(rendered.contains("leaf-6-g\(generation)") == (count > 0))
     }

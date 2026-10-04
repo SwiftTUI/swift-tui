@@ -21,6 +21,22 @@ public struct TableColumn: Hashable, Sendable {
   /// one explicitly.
   public var titleAlignment: TableColumnAlignment
 
+  /// The current authored sort order, announced with this column's header.
+  /// The application owns sorting its records and updating this value.
+  public var sort: AccessibilitySortDirection?
+  /// Whether body cells in this column name their rows.
+  public var isRowHeader: Bool
+
+  /// Creates a column with unspecified sort order and ordinary body cells.
+  public init<S: StringProtocol>(
+    _ title: S, width: Int? = nil, alignment: TableColumnAlignment = .leading,
+    titleAlignment: TableColumnAlignment? = nil
+  ) {
+    self.init(
+      title, width: width, alignment: alignment, titleAlignment: titleAlignment,
+      sort: nil, isRowHeader: false)
+  }
+
   /// Creates a table column.
   ///
   /// - Parameters:
@@ -31,16 +47,24 @@ public struct TableColumn: Hashable, Sendable {
   ///     `.leading`.
   ///   - titleAlignment: How the header title aligns. Defaults to `nil`,
   ///     meaning it follows `alignment`.
+  ///   - sort: The current sort order for assistive readers. Sorting remains
+  ///     application-owned. Defaults to unspecified.
+  ///   - isRowHeader: Whether this column names each row. Defaults to `false`.
+  @_disfavoredOverload
   public init<S: StringProtocol>(
     _ title: S,
     width: Int? = nil,
     alignment: TableColumnAlignment = .leading,
-    titleAlignment: TableColumnAlignment? = nil
+    titleAlignment: TableColumnAlignment? = nil,
+    sort: AccessibilitySortDirection? = nil,
+    isRowHeader: Bool = false
   ) {
     self.title = String(title)
     self.width = width
     self.alignment = alignment
     self.titleAlignment = titleAlignment ?? alignment
+    self.sort = sort
+    self.isRowHeader = isRowHeader
   }
 }
 

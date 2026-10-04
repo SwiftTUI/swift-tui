@@ -344,31 +344,12 @@ where ID: Hashable & Sendable, RowContent: View {
   ) -> some View {
     VStack(alignment: .leading, spacing: 0) {
       ForEach(entries) { entry in
-        OutlineRow(
-          prefix: outlinePrefix(
-            ancestry: ancestry,
-            isLast: entry.isLast,
-            style: presentation
-          ),
-          content: rowView(for: entry.element),
-          authoringScope: authoringScope
-        )
-
-        if !entry.children.isEmpty {
-          OutlineTree(
-            elements: entry.children,
-            id: id,
-            children: children,
-            rowContent: rowContent,
-            authoringScope: authoringScope,
-            ancestry: ancestry + [!entry.isLast]
-          )
-        }
+        OutlineBranch(entry: entry, tree: self, presentation: presentation)
       }
-    }
+    }.accessibilityRole(.list)
   }
 
-  private func rowView(for element: Element) -> RowContent {
+  fileprivate func rowView(for element: Element) -> RowContent {
     withAuthoringContext(authoringScope) {
       rowContent(element)
     }
@@ -380,6 +361,7 @@ where ID: Hashable & Sendable, RowContent: View {
         id: id(element),
         element: element,
         children: children(element),
+        position: offset + 1,
         isLast: offset == elements.count - 1
       )
     }
@@ -390,35 +372,72 @@ private struct OutlineEntry<Element, ID: Hashable & Sendable>: Identifiable {
   let id: ID
   let element: Element
   let children: [Element]
+  let position: Int
   let isLast: Bool
+}
+
+/// An outline is a hierarchy of disclosure lists, with ordinary buttons and
+/// nested row controls. It does not claim an ARIA tree's managed arrow-key model.
+private struct OutlineBranch<Element, ID, RowContent>: View
+where ID: Hashable & Sendable, RowContent: View {
+  let entry: OutlineEntry<Element, ID>
+  let tree: OutlineTree<Element, ID, RowContent>
+  let presentation: OutlineStylePresentation
+  @State private var expanded = true
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      OutlineRow(
+        prefix: outlinePrefix(ancestry: tree.ancestry, isLast: entry.isLast, style: presentation),
+        content: tree.rowView(for: entry.element), authoringScope: tree.authoringScope,
+        expanded: entry.children.isEmpty ? nil : $expanded,
+        level: tree.ancestry.count + 1, position: entry.position, count: tree.elements.count)
+      if expanded && !entry.children.isEmpty {
+        OutlineTree(
+          elements: entry.children, id: tree.id, children: tree.children,
+          rowContent: tree.rowContent, authoringScope: tree.authoringScope,
+          ancestry: tree.ancestry + [!entry.isLast])
+      }
+    }
+    .accessibilityRole(.custom("listitem"))
+    .accessibilityProperties(
+      .init(
+        level: tree.ancestry.count + 1,
+        positionInSet: entry.position, setSize: tree.elements.count))
+  }
 }
 
 private struct OutlineRow<Content: View>: PrimitiveView, IterativeResolvableView {
   let prefix: String
   let content: Content
   let authoringScope: AuthoringContext?
+  let expanded: Binding<Bool>?
+  let level: Int
+  let position: Int
+  let count: Int
 
   @ViewBuilder
   private func rowBody(
     prefix renderedPrefix: String,
     spacing: Int
   ) -> some View {
-    if renderedPrefix.isEmpty {
-      ScopedOutlineRowContent(
-        authoringScope: authoringScope,
-        content: content
-      )
-    } else {
-      HStack(alignment: .firstTextBaseline, spacing: spacing) {
+    HStack(alignment: .firstTextBaseline, spacing: spacing) {
+      if !renderedPrefix.isEmpty {
         Text(renderedPrefix)
           .lineLimit(1)
           .fixedSize(horizontal: true, vertical: false)
           .foregroundStyle(.terminalBorder(.neutral))
-        ScopedOutlineRowContent(
-          authoringScope: authoringScope,
-          content: content
-        )
+          .accessibilityHidden(true)
       }
+      if let expanded {
+        Button(expanded.wrappedValue ? "▾" : "▸") { expanded.wrappedValue.toggle() }
+          .buttonStyle(.plain)
+          .accessibilityLabel(
+            "\(expanded.wrappedValue ? "Collapse" : "Expand") item \(position) at level \(level)"
+          )
+          .accessibilityProperties(.init(expanded: expanded.wrappedValue))
+      }
+      ScopedOutlineRowContent(authoringScope: authoringScope, content: content)
     }
   }
 
@@ -429,6 +448,9 @@ private struct OutlineRow<Content: View>: PrimitiveView, IterativeResolvableView
       in: context.child(component: .named("Content")),
       kindName: "OutlineRow"
     ).map { children in
+      var metadata = SemanticMetadata(isHostedCollectionRowBoundary: true)
+      metadata.accessibilityProperties = .init(
+        description: "Level \(level), item \(position) of \(count)")
       return [
         ResolvedNode(
           identity: context.identity,
@@ -436,7 +458,7 @@ private struct OutlineRow<Content: View>: PrimitiveView, IterativeResolvableView
           children: children,
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
-          semanticMetadata: .init(isHostedCollectionRowBoundary: true)
+          semanticMetadata: metadata
         )
       ]
     }

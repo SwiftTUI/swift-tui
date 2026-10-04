@@ -5090,6 +5090,9 @@ SwiftTUIViews.Table.init(selection:columns:rows:)
 SwiftTUIViews.TableColumn
 SwiftTUIViews.TableColumn.alignment
 SwiftTUIViews.TableColumn.init(_:width:alignment:titleAlignment:)
+SwiftTUIViews.TableColumn.init(_:width:alignment:titleAlignment:sort:isRowHeader:)
+SwiftTUIViews.TableColumn.isRowHeader
+SwiftTUIViews.TableColumn.sort
 SwiftTUIViews.TableColumn.title
 SwiftTUIViews.TableColumn.titleAlignment
 SwiftTUIViews.TableColumn.width

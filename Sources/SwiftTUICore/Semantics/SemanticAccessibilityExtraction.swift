@@ -248,7 +248,9 @@ extension SemanticExtractor {
           textPresentations[traversalOrdinal] = textPresentation
         }
         let childPresentation: AccessibilityTextPresentation =
-          if textPresentation == .primitiveOwned || ownsControl
+          if metadata.hostedCollectionContainer != nil {
+            .independent
+          } else if textPresentation == .primitiveOwned || ownsControl
             || metadata.usesAuthoredAccessibilityLabel
           {
             .primitiveOwned
@@ -270,7 +272,11 @@ extension SemanticExtractor {
 
     var nodes: [AccessibilityNode] = []
     var nextEmitTraversalOrdinal = 0
-    var emitStack: [(node: PlacedNode, emittedParentIdentity: Identity?)] = [(root, nil)]
+    var emitStack:
+      [(
+        node: PlacedNode, emittedParentIdentity: Identity?, listCount: Int?,
+        collectionReadOnly: Bool?
+      )] = [(root, nil, nil, nil)]
     while let frame = emitStack.popLast() {
       let node = frame.node
       let traversalOrdinal = nextEmitTraversalOrdinal
@@ -281,6 +287,23 @@ extension SemanticExtractor {
 
       let emits = emittedSubtrees.contains(node.identity)
       var childParentIdentity = frame.emittedParentIdentity
+      var listCount = frame.listCount
+      let collectionReadOnly =
+        node.semanticMetadata.hostedCollectionContainer != nil
+        ? node.semanticMetadata.accessibilityProperties?.readOnly : frame.collectionReadOnly
+      if case .list(let payload) = node.drawPayload {
+        listCount = payload.virtualRowCount ?? payload.items.filter { $0.kind == .row }.count
+      }
+      if emits,
+        let item = listAccessibilityItem(
+          for: node, parent: frame.emittedParentIdentity, count: listCount)
+      {
+        nodes.append(item)
+        nodes.append(
+          contentsOf: collectionSelectionNodes(
+            for: node, parent: item.identity, readOnly: collectionReadOnly))
+        childParentIdentity = item.identity
+      }
       if emits {
         let hasEmittedChild = accessibilityHasEmittedChild(
           for: node,
@@ -288,7 +311,7 @@ extension SemanticExtractor {
         )
         if var accessibilityNode = accessibilityNode(
           for: node,
-          parentIdentity: frame.emittedParentIdentity,
+          parentIdentity: childParentIdentity,
           hasEmittedChild: hasEmittedChild,
           focusIdentities: focusIdentities,
           textInputPresentations: textInputPresentations,
@@ -304,12 +327,18 @@ extension SemanticExtractor {
           if !inlineNodes.isEmpty { accessibilityNode.label = nil }
           nodes.append(accessibilityNode)
           nodes.append(contentsOf: inlineNodes)
+          nodes.append(contentsOf: tableAccessibilityHeaders(for: node, parent: accessibilityNode))
+          if case .tableRow = node.semanticMetadata.hostedCollectionItem?.role {
+            nodes.append(
+              contentsOf: collectionSelectionNodes(
+                for: node, parent: accessibilityNode.identity, readOnly: collectionReadOnly))
+          }
           childParentIdentity = node.identity
         }
       }
 
       for child in node.children.reversed() {
-        emitStack.append((child, childParentIdentity))
+        emitStack.append((child, childParentIdentity, listCount, collectionReadOnly))
       }
     }
 
@@ -748,6 +777,9 @@ extension SemanticExtractor {
   }
 
   private func accessibilityOwnsControlPresentation(_ node: PlacedNode) -> Bool {
+    // A collection's focus route supports scrolling/selection; it does not own
+    // the authored content of its rows as control chrome.
+    if node.semanticMetadata.hostedCollectionContainer != nil { return false }
     if node.semanticMetadata.accessibilityControl != nil { return true }
     switch node.semanticMetadata.accessibilityRole {
     case .button, .checkbox, .disclosureGroup, .link, .menuItem, .picker,

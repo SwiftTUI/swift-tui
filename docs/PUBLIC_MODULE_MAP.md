@@ -44,7 +44,7 @@ implementation/vendor targets are named below; they have no symbol count here.
 | [`SwiftTUI`](PUBLIC_API_BASELINE.md#swifttui) | `SwiftTUI` | 1 | 4 |
 | [`SwiftTUIRuntime`](PUBLIC_API_BASELINE.md#swifttuiruntime) | `SwiftTUIRuntime` | 60 | 519 |
 | [`SwiftTUIProfiling`](PUBLIC_API_BASELINE.md#swifttuiprofiling) | `SwiftTUIProfiling` | 9 | 52 |
-| [`SwiftTUIViews`](PUBLIC_API_BASELINE.md#swifttuiviews) | `SwiftTUIViews` | 417 | 2565 |
+| [`SwiftTUIViews`](PUBLIC_API_BASELINE.md#swifttuiviews) | `SwiftTUIViews` | 417 | 2568 |
 | [`SwiftTUIAnimatedImage`](PUBLIC_API_BASELINE.md#swifttuianimatedimage) | `SwiftTUIAnimatedImage` | 5 | 36 |
 | [`SwiftTUIArguments`](PUBLIC_API_BASELINE.md#swifttuiarguments) | `SwiftTUIArguments` | 5 | 57 |
 | [`SwiftTUIPTYPrimitives`](PUBLIC_API_BASELINE.md#swifttuiptyprimitives) | `SwiftTUIPTYPrimitives` | 7 | 40 |

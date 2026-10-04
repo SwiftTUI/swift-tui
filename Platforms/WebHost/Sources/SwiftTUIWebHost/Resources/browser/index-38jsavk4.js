@@ -891,6 +891,7 @@ class AccessibilityTreeMounter {
       delete element.dataset.focused;
     }
     setOrRemoveAttribute(element, "aria-disabled", node.isEnabled === false ? "true" : undefined);
+    setOrRemoveAttribute(element, "aria-pressed", node.role === "button" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
     setOrRemoveAttribute(element, "aria-checked", node.role === "toggle" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
     setOrRemoveAttribute(element, "aria-expanded", properties?.expanded !== undefined ? String(properties.expanded) : node.role === "disclosureGroup" && node.value?.type === "boolean" ? String(node.value.value) : undefined);
     setOrRemoveAttribute(element, "aria-valuenow", node.value?.type === "number" ? String(node.value.value) : undefined);

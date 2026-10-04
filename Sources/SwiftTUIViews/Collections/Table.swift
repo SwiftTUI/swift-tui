@@ -153,6 +153,9 @@ extension Table {
           rows: resolvedRows,
           joinGlyph: tableStyle.borderGlyphs.columnJoin
         )
+        if let graph = context.viewGraph {
+          resolvedContent.children = resolvedContent.children.map(graph.installResolvedPresentation)
+        }
       }
       let selectableRowIndices = resolvedRows.indices.filter { index in
         guard let tag = resolvedRows[index].tag else {
@@ -181,6 +184,13 @@ extension Table {
 
       let ownerNode =
         ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
+      for index in resolvedContent.children.indices {
+        guard let tag = resolvedRows[index].tag else { continue }
+        resolvedContent.children[index].semanticMetadata.hostedCollectionItem?.selection = .init(
+          isSelected: selectionPolicy.contains(tag),
+          actionIdentity: tableRowIdentity(for: context.identity, rowIndex: index),
+          ownerNodeID: ownerNode?.viewNodeID)
+      }
       let keyboardValue: SelectionValue? = withPersistentDormantStateSlot {
         ownerNode?.stateSlot(
           ordinal: StateSlotOrdinals.tableKeyboardSelection,
@@ -361,6 +371,17 @@ extension Table {
               continue
             }
 
+            let identity = tableRowIdentity(for: context.identity, rowIndex: rowIndex)
+            intake.registerAction(
+              identity: identity,
+              accessibilityHandler: { action in
+                guard action == .activate else { return .unsupported }
+                let previous = policy.contains(tag)
+                _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
+                return previous == policy.contains(tag) ? .unchanged : .changed
+              }
+            ) { policy.isMultiple ? policy.toggle(tag) : policy.select(tag) }
+
             let routeID = runtimePrimaryRouteID(
               for: tableRowIdentity(
                 for: context.identity,
@@ -413,6 +434,11 @@ extension Table {
         accessibilityRole: .table
       )
       metadata.hostedCollectionContainer = .init(kind: .table)
+      metadata.hostedCollectionContainer?.hasSelection = isSelectable
+      metadata.hostedCollectionContainer?.headerSorts = columns.map(\.sort)
+      metadata.accessibilityProperties = .init(
+        rowCount: resolvedRows.count + 1,
+        columnCount: resolvedColumns.count + (isSelectable ? 1 : 0))
       var node = ResolvedNode(
         identity: context.identity,
         kind: .view("Table"),
@@ -463,8 +489,14 @@ extension Table {
           environmentSnapshot: cell.environmentSnapshot,
           transactionSnapshot: cell.transactionSnapshot,
           layoutBehavior: .frame(width: width, height: nil, alignment: alignment),
-          semanticMetadata: .init(isFocusable: false)
+          semanticMetadata: .init(
+            isFocusable: false,
+            accessibilityRole: self.columns.indices.contains(index)
+              && self.columns[index].isRowHeader ? .rowHeader : .cell)
         )
+        hostedCell.semanticMetadata.accessibilityProperties = .init(
+          rowIndex: row.semanticMetadata.accessibilityProperties?.rowIndex,
+          columnIndex: index + 1 + (selectionPolicy.isSelectable ? 1 : 0))
         hostedCell.drawMetadata.clipsToBounds = true
         return hostedCell
       }
@@ -537,10 +569,15 @@ extension Table {
     }
 
     let policy = selectionPolicy
+    let selectionOwner =
+      (ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity))?.viewNodeID
     result.indexedSource = HostedCollectionIndexedChildSource(base: source) { rawNode, index in
       var node = rawNode
       mergeCellRowPresentation(into: &node)
-      node.semanticMetadata.accessibilityRole = nil
+      node.semanticMetadata.accessibilityRole = .tableRow
+      let properties = AccessibilityProperties(rowIndex: index + 2)
+      node.semanticMetadata.accessibilityProperties =
+        node.semanticMetadata.accessibilityProperties.map { properties.merging($0) } ?? properties
       let tag = node.semanticMetadata.selectionTag
       let compatibleTag = tag.flatMap { tag in
         policy.isSelectable && policy.value(from: tag) != nil ? tag : nil
@@ -564,6 +601,12 @@ extension Table {
         role: .tableRow(rowIndex: index),
         isSelectable: compatibleTag != nil
       )
+      if let compatibleTag {
+        node.semanticMetadata.hostedCollectionItem?.selection = .init(
+          isSelected: policy.contains(compatibleTag),
+          actionIdentity: tableRowIdentity(for: context.identity, rowIndex: index),
+          ownerNodeID: selectionOwner)
+      }
       node =
         hostedTableRowNodes(
           [node],
@@ -592,11 +635,10 @@ extension Table {
     while var node = work.popLast() {
       if node.semanticMetadata.accessibilityRole == .tableRow {
         mergeCellRowPresentation(into: &node)
-        // TableRow is a structural host. Nested cell content contributes its
-        // own accessibility normally; the table container owns the table role
-        // and row-background selection remains a separate fallback route.
-        node.semanticMetadata.accessibilityRole = nil
         let rowIndex = result.payloads.count
+        let properties = AccessibilityProperties(rowIndex: rowIndex + 2)
+        node.semanticMetadata.accessibilityProperties =
+          node.semanticMetadata.accessibilityProperties.map { properties.merging($0) } ?? properties
         let tag = node.semanticMetadata.selectionTag
         let compatibleTag = tag.flatMap { tag in
           selectionPolicy.value(from: tag) == nil ? nil : tag
