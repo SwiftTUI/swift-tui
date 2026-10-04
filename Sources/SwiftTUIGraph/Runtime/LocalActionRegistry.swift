@@ -79,6 +79,10 @@ package final class LocalActionRegistry: Equatable {
     store[identity] != nil
   }
 
+  package func registration(for identity: Identity) -> Registration? {
+    store[identity]
+  }
+
   package func reset() {
     store.reset()
   }

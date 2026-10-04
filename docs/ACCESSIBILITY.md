@@ -182,3 +182,14 @@ These are shared contracts and authoring primitives, not completion of default
 semantics for every built-in widget, general custom action APIs, native host
 support, terminal semantic reading or new screen-reader task qualification.
 The browser mappings follow [WAI-ARIA 1.2](https://www.w3.org/TR/wai-aria-1.2/).
+
+### Public custom actions
+
+An optional `customActions` array lists nonempty operation names on an actionable
+node. Its `actions` array includes `custom`. Hosts submit
+`accessibility:<requestID>:<target>:custom:name:<percent-encoded-name>` using the
+existing record framing. Names are exact per-control identifiers; the committed
+list must contain the requested name. Unicode, delimiters and newlines use the
+same UTF-8 percent encoding as text values. Unsupported names have no effect.
+Older hosts can ignore the additive field; they cannot operate those actions.
+The browser adapter presents named operations as associated native buttons.

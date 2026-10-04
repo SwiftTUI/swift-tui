@@ -1,6 +1,6 @@
 /// The operations a published semantic control accepts.
 public enum AccessibilityActionKind: String, CaseIterable, Sendable, Hashable {
-  case focus, activate, increment, decrement, setValue
+  case focus, activate, increment, decrement, setValue, custom
 }
 
 /// A control value, independent of its localized display label.
@@ -46,6 +46,7 @@ public struct AccessibilitySelection: Equatable, Sendable {
 public enum AccessibilityAction: Equatable, Sendable {
   case focus, activate, increment, decrement
   case setValue(AccessibilityValue)
+  case custom(String)
 
   public var kind: AccessibilityActionKind {
     switch self {
@@ -54,6 +55,7 @@ public enum AccessibilityAction: Equatable, Sendable {
     case .increment: .increment
     case .decrement: .decrement
     case .setValue: .setValue
+    case .custom: .custom
     }
   }
 }
@@ -84,18 +86,19 @@ public final class AccessibilityControlState: Equatable, Sendable {
   public let maximum: Double?
   public let step: Double?
   public let selection: AccessibilitySelection?
+  public let customActions: [String]
 
   public static func == (lhs: AccessibilityControlState, rhs: AccessibilityControlState) -> Bool {
     lhs === rhs
       || (lhs.actions == rhs.actions && lhs.value == rhs.value
         && lhs.minimum == rhs.minimum && lhs.maximum == rhs.maximum && lhs.step == rhs.step
-        && lhs.selection == rhs.selection)
+        && lhs.selection == rhs.selection && lhs.customActions == rhs.customActions)
   }
 
   public init(
     actions: [AccessibilityActionKind], value: AccessibilityValue? = nil,
     minimum: Double? = nil, maximum: Double? = nil, step: Double? = nil,
-    selection: AccessibilitySelection? = nil
+    selection: AccessibilitySelection? = nil, customActions: [String] = []
   ) {
     self.actions = actions
     self.value = value
@@ -103,6 +106,7 @@ public final class AccessibilityControlState: Equatable, Sendable {
     self.maximum = maximum
     self.step = step
     self.selection = selection
+    self.customActions = customActions
   }
 }
 

@@ -24,6 +24,11 @@ package enum AccessibilityActionWire {
       case .increment: action = .increment
       default: action = .decrement
       }
+    case .custom:
+      guard parts.count == 5, parts[3] == "name",
+        let name = percentDecodedString(parts[4]), !name.isEmpty
+      else { return nil }
+      action = .custom(name)
     case .setValue:
       guard parts.count == 5, let rawValue = percentDecodedString(parts[4]) else { return nil }
       switch parts[3] {

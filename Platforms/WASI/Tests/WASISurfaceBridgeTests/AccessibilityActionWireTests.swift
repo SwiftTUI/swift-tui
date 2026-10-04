@@ -37,12 +37,23 @@ import Testing
       ])
   }
 
+  @Test func namedActionsPreserveUnicodeAndCorrelation() {
+    var parser = WebSurfaceInputParser()
+    #expect(
+      parser.feed(Array("\u{1E}accessibility:19:t:custom:name:Reset%3A%20%E2%98%85\n".utf8)).events
+        == [
+          .accessibility(.init(target: "t", action: .custom("Reset: ★"), requestID: 19))
+        ])
+  }
+
   @Test func malformedRequestsDoNotBecomeKeyboardInput() {
     for command in [
       "accessibility::activate", "accessibility:t:unknown", "accessibility:t:focus:extra",
       "accessibility:t:setValue", "accessibility:t:setValue:number:nan",
       "accessibility:t:setValue:number:inf", "accessibility:t:setValue:boolean:yes",
-      "accessibility:%ZZ:activate", "accessibility:t:setValue:text:%ZZ",
+      "accessibility:t:custom:name:", "accessibility:t:custom:name:%ZZ",
+      "accessibility:t:custom:text:Reset", "accessibility:%ZZ:activate",
+      "accessibility:t:setValue:text:%ZZ",
     ] {
       var parser = WebSurfaceInputParser()
       #expect(parser.feed(Array("\u{1E}\(command)\n".utf8)).events.isEmpty)

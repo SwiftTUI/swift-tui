@@ -478,6 +478,15 @@ extension SemanticExtractor {
       result.properties = result.properties.map { valueProperties.merging($0) } ?? valueProperties
     }
     result.control = node.semanticMetadata.accessibilityControl
+    if result.control?.selection?.presentation == .menu,
+      let trigger = accessibilityRouteRects(
+        for: node, tokens: [pickerTriggerIdentity(for: node.identity): "trigger"])["trigger"]
+    {
+      // The native popup owns its option geometry. Its closed control must
+      // stay on the placed trigger even when terminal focus expands the
+      // painted menu beneath it; the whole container includes unrelated rows.
+      result.rect = trigger
+    }
     if let selection = result.control?.selection,
       selection.presentation == .radioGroup || selection.presentation == .segmented
     {
@@ -499,6 +508,12 @@ extension SemanticExtractor {
       uniqueKeysWithValues: selection.options.enumerated().map {
         (pickerOptionIdentity(for: owner.identity, index: $0.offset), $0.element.id)
       })
+    return accessibilityRouteRects(for: owner, tokens: tokens)
+  }
+
+  private func accessibilityRouteRects(
+    for owner: PlacedNode, tokens: [Identity: String]
+  ) -> [String: CellRect] {
     var result: [String: CellRect] = [:]
     var stack: [(PlacedNode, CellRect?)] = [(owner, nil)]
     while let (node, inheritedClip) = stack.popLast() {

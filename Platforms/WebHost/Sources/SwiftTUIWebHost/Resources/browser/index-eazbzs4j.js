@@ -230,6 +230,7 @@ function presentSelection(element, node, synchronizeValue, interactive) {
     element.disabled = !enabled;
     element.tabIndex = enabled ? 0 : -1;
     element.required = node.properties?.required === true;
+    element.style.pointerEvents = "auto";
     element.removeAttribute("role");
   } else {
     element.setAttribute("role", "radiogroup");
@@ -356,6 +357,7 @@ class AccessibilityTreeMounter {
   announcerElement;
   domIdentity = Array.from(crypto.getRandomValues(new Uint32Array(4)), (part) => part.toString(16)).join("-");
   nodesById = new Map;
+  actionGroupsById = new Map;
   previousLabelsById = new Map;
   hasLiveRegionBaseline = false;
   readingText = new WeakMap;
@@ -445,6 +447,8 @@ class AccessibilityTreeMounter {
           removed.remove();
         }
         this.pendingValues.delete(id);
+        this.actionGroupsById.get(id)?.remove();
+        this.actionGroupsById.delete(id);
         if (this.pendingFocus?.id === id)
           this.pendingFocus = undefined;
       }
@@ -468,7 +472,10 @@ class AccessibilityTreeMounter {
       if (container.children[offset] !== element2) {
         container.insertBefore(element2, container.children[offset] ?? null);
       }
-      childOffsets.set(container, offset + 1);
+      const group = this.presentCustomActions(node, element2);
+      if (group && container.children[offset + 1] !== group)
+        container.insertBefore(group, container.children[offset + 1] ?? null);
+      childOffsets.set(container, offset + (group ? 2 : 1));
     }
     this.announceLiveRegionChanges(visibleNodes, normalizedAnnouncements);
     const focused = visibleNodes.find((node) => node.isFocused);
@@ -492,6 +499,7 @@ class AccessibilityTreeMounter {
       this.clearEditable(element);
     }
     this.nodesById.clear();
+    this.actionGroupsById.clear();
     this.modelsById.clear();
     this.previousLabelsById.clear();
     this.pendingValues.clear();
@@ -510,11 +518,61 @@ class AccessibilityTreeMounter {
       return "select";
     if (!node.actionTarget || !this.sendAction)
       return "div";
+    if (node.role === "stepper" && !node.actions?.includes("setValue"))
+      return "div";
     if (node.role === "textEditor")
       return "textarea";
     if (["textField", "secureField", "slider", "stepper"].includes(node.role))
       return "input";
     return "div";
+  }
+  presentCustomActions(node, owner) {
+    const names = node.actionTarget && this.sendAction && node.actions?.includes("custom") ? node.customActions ?? [] : [];
+    let group = this.actionGroupsById.get(node.id);
+    if (!names.length) {
+      group?.remove();
+      this.actionGroupsById.delete(node.id);
+      return;
+    }
+    if (!group) {
+      group = document.createElement("div");
+      group.setAttribute("role", "group");
+      this.actionGroupsById.set(node.id, group);
+      for (const type of ["click", "pointerdown", "pointerup", "pointermove"])
+        group.addEventListener(type, (event) => event.stopPropagation());
+      group.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab" && event.key !== "Escape")
+          event.stopPropagation();
+      });
+    }
+    group.setAttribute("aria-label", `${node.label ?? "Control"} actions`);
+    group.style.cssText = owner.style.cssText;
+    const previous = new Map(Array.from(group.children, (child) => [
+      child.textContent,
+      child
+    ]));
+    for (const [index, name] of names.entries()) {
+      let button = previous.get(name);
+      if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.textContent = name;
+        button.addEventListener("click", () => {
+          const current = this.modelsById.get(node.id);
+          if (this.actionGroupsById.get(node.id) !== group || !current?.actionTarget || current.isEnabled === false || current.properties?.readOnly === true || !current.customActions?.includes(name))
+            return;
+          this.sendAction?.(current.actionTarget, { action: "custom", name }, String(++this.nextRequestID));
+        });
+      }
+      previous.delete(name);
+      button.disabled = node.isEnabled === false || node.properties?.readOnly === true;
+      button.tabIndex = button.disabled ? -1 : 0;
+      if (group.children[index] !== button)
+        group.insertBefore(button, group.children[index] ?? null);
+    }
+    for (const button of previous.values())
+      button.remove();
+    return group;
   }
   createElement(node, tag) {
     const element = document.createElement(tag);
@@ -2111,7 +2169,7 @@ function encodeBase64(value) {
 
 // src/WebHostSurfaceTransport.ts
 function encodeAccessibilityActionMessage(target, request, requestID) {
-  const value = request.action === "setValue" ? `:${request.value.type}:${encodeURIComponent(String(request.value.value))}` : "";
+  const value = request.action === "setValue" ? `:${request.value.type}:${encodeURIComponent(String(request.value.value))}` : request.action === "custom" ? `:name:${encodeURIComponent(request.name)}` : "";
   return new TextEncoder().encode(`\x1Eaccessibility:${requestID === undefined ? "" : `${requestID}:`}${encodeURIComponent(target)}:${request.action}${value}
 `);
 }
@@ -2623,7 +2681,7 @@ function isWebHostAccessibilityNode(value) {
     return false;
   }
   const node = value;
-  return (node.selection === undefined || isAccessibilitySelection(node.selection)) && (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
+  return (node.customActions === undefined || Array.isArray(node.customActions) && node.customActions.length <= 65536 && node.customActions.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.customActions).size === node.customActions.length) && (node.selection === undefined || isAccessibilitySelection(node.selection)) && (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
 }
 function isAccessibilitySelection(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))

@@ -120,6 +120,10 @@ package enum HostWireBudget {
       try charge(node.label)
       try charge(node.hint)
       try charge(node.liveRegionToken)
+      if let names = node.control?.customActions {
+        guard names.count <= metadataEntries else { throw Exceeded.limit }
+        for name in names { try charge(name) }
+      }
       if let selection = node.control?.selection {
         guard selection.options.count <= metadataEntries else { throw Exceeded.limit }
         for option in selection.options {

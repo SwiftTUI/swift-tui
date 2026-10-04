@@ -899,6 +899,15 @@ struct AccessibilityActionRuntimeTests {
     }
     try render()
     let initial = try choices()
+    if styleIndex == 1 {
+      let collapsed = try node().rect
+      #expect(collapsed.size.height == 1)
+      let target = try #require(node().actionTarget)
+      #expect(loop.handleAccessibilityAction(.init(target: target, action: .focus)) == .accepted)
+      try render()
+      #expect(try node().rect == collapsed)
+      #expect(writes == 0)
+    }
     if styleIndex >= 2 {
       let picker = try node()
       #expect(picker.selectionOptionRects.count == initial.count)
@@ -1099,6 +1108,138 @@ struct AccessibilityActionRuntimeTests {
     #expect(floating.value == Double(raw))
     #expect(integer.writes.isEmpty)
     #expect(floating.writes.isEmpty)
+  }
+}
+
+@MainActor
+@Suite("Public custom assistive actions")
+struct CustomAccessibilityActionTests {
+  @Test func primitiveAndAuthoredActivationRemainIndependent() throws {
+    let calls = AssistiveValueProbe(0)
+    let root = testIdentity("AuthoredButton")
+    let size = CellSize(width: 40, height: 10)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let focus = FocusTracker(invalidationIdentities: [root])
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: size, focusTracker: focus
+    ) {
+      VStack {
+        Button("Original") { calls.value += 1 }
+          .accessibilityAction(named: "Extra") { calls.value += 10 }
+        Button("Override") { calls.value += 100 }
+          .accessibilityAction { calls.value += 1000 }
+          .accessibilityAddTraits(.isSelected)
+          .accessibilityRemoveTraits(.isSelected)
+      }
+    }
+    focus.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let original = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == "Original" })
+    let override = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == "Override" })
+    #expect(override.properties?.selected == false)
+    #expect(
+      loop.handleAccessibilityAction(
+        .init(target: try #require(original.actionTarget), action: .activate)) == .accepted)
+    #expect(calls.value == 1)
+    #expect(
+      loop.handleAccessibilityAction(
+        .init(target: try #require(original.actionTarget), action: .custom("Extra"))) == .accepted)
+    #expect(calls.value == 11)
+    #expect(
+      loop.handleAccessibilityAction(
+        .init(target: try #require(override.actionTarget), action: .activate)) == .accepted)
+    #expect(calls.value == 1011)
+  }
+
+  @Test func actionsComposeAndRespectCommittedState() throws {
+    let root = testIdentity("CustomActions")
+    let size = CellSize(width: 40, height: 10)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let focus = FocusTracker(invalidationIdentities: [root])
+    var disabled = false
+    var shown = true
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal, terminalSize: size, focusTracker: focus
+    ) {
+      VStack {
+        Text("Custom controls")
+        if shown { CustomAccessibilityRating().disabled(disabled) }
+      }
+    }
+    focus.invalidator = loop.scheduler
+    var frames = 0
+    func render() throws {
+      loop.scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+    }
+    func rating() throws -> AccessibilityNode {
+      try #require(loop.latestSemanticSnapshot.accessibilityNodes.first { $0.label == "Rating" })
+    }
+    try render()
+    let target = try #require(rating().actionTarget)
+    func send(_ action: AccessibilityAction) -> AccessibilityActionResult {
+      loop.handleAccessibilityAction(.init(target: target, action: action))
+    }
+    #expect(try rating().control?.customActions == ["Reset", "Maximum"])
+    #expect(try rating().control?.value == .number(2))
+    #expect(send(.increment) == .accepted)
+    try render()
+    #expect(try rating().control?.value == .number(3))
+    #expect(try rating().properties?.valueDescription == "3 stars; 1 writes")
+    #expect(send(.custom("Reset")) == .accepted)
+    try render()
+    #expect(try rating().control?.value == .number(0))
+    #expect(try rating().properties?.valueDescription == "0 stars; 2 writes")
+    #expect(send(.custom("Maximum")) == .accepted)
+    try render()
+    #expect(try rating().control?.value == .number(5))
+    #expect(send(.decrement) == .accepted)
+    try render()
+    #expect(try rating().control?.value == .number(4))
+    #expect(send(.custom("Forged")) == .unsupported)
+    #expect(send(.setValue(.number(1))) == .unsupported)
+    disabled = true
+    try render()
+    #expect(send(.increment) == .disabled)
+    #expect(send(.custom("Reset")) == .disabled)
+    shown = false
+    try render()
+    #expect(send(.increment) == .staleTarget)
+    shown = true
+    try render()
+    #expect(try rating().actionTarget != target)
+    #expect(send(.custom("Reset")) == .staleTarget)
+  }
+}
+
+private struct CustomAccessibilityRating: View {
+  @State private var value = 2
+  @State private var writes = 0
+  var body: some View {
+    Text("Stars: \(value)")
+      .accessibilityLabel("Rating")
+      .accessibilityValue(Double(value), in: 0...5)
+      .accessibilityValue("\(value) stars; \(writes) writes")
+      .accessibilityAdjustableAction { direction in
+        value = min(5, max(0, value + (direction == .increment ? 1 : -1)))
+        writes += 1
+      }
+      .accessibilityAction(named: "Reset") {
+        value = 1
+        writes += 100
+      }
+      .accessibilityAction(named: "Reset") {
+        value = 0
+        writes += 1
+      }
+      .accessibilityAction(named: "Maximum") {
+        value = 5
+        writes += 1
+      }
   }
 }
 

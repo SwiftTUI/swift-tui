@@ -107,10 +107,10 @@ struct RatingControl: View {
 ```
 
 Adding `.accessibilityRole(.slider)` and arrow-key handlers to a custom drawing
-does not register assistive adjustment. Public custom action registration and a
-separate authored value modifier are absent. A changing label describes state;
-it cannot substitute for an action route. Prefer a styled built-in control when
-its behavior fits the task.
+does not register assistive adjustment. Pair `accessibilityAdjustableAction(_:)`
+with `accessibilityValue` for a custom control (see below), or use a styled
+built-in control when its behavior fits the task. A changing label alone
+cannot substitute for an action route.
 
 In cursor-follows-focus terminal mode, the hardware cursor parks on the
 focused view's origin by default; `.accessibilityCursorAnchor(_:)` moves that
@@ -155,6 +155,53 @@ Text("~~~~~~~~~~")  // decorative divider
 
 `.accessibilityHidden(_:)` defaults to `true`; pass `false` to re-expose a
 subtree conditionally.
+
+### Custom controls and actions
+
+Custom controls can register public assistive operations without SPI or fabricated
+key events. Keep the accessible name separate from its current value:
+
+```swift
+struct RatingPicker: View {
+    @Binding var rating: Int
+
+    var body: some View {
+        Text("Stars: \(rating)")
+            .accessibilityLabel("Rating")
+            .accessibilityValue(Double(rating), in: 0...5)
+            .accessibilityValue("\(rating) of 5 stars")
+            .accessibilityAdjustableAction { direction in
+                rating = min(5, max(0, rating + (direction == .increment ? 1 : -1)))
+            }
+            .accessibilityAction(named: "Reset rating") { rating = 0 }
+    }
+}
+```
+
+The adjustable callback owns the bounds and the one application mutation. Its
+published value is authoritative feedback, not a request to mutate the binding.
+The numeric overload supplies range information; the string overload supplies a
+spoken value description. The default `accessibilityAction(_:)` replaces only
+assistive activation. Other existing primitive actions remain available.
+Named operations compose; an outer operation with the same name replaces the
+inner callback. Empty names are ignored. Disabled, read-only, modal-background
+and removed controls retain the runtime's committed dispatch guards.
+
+Browsers present an adjustable control as a spinbutton and named operations as
+adjacent buttons in a group named after the control. This is a browser-native
+operation list, not a VoiceOver custom-actions rotor implementation. Named actions
+and adjustment have automated retained-state and browser coverage; actual reader
+usability requires qualification for the deployed host and version. Terminal
+cursor-following mode does not expose these operations as a semantic reader.
+
+`accessibilityAddTraits(_:)` and `accessibilityRemoveTraits(_:)` support button,
+link, image, heading, static-text and selected semantics. Traits describe meaning;
+adding a button or link trait alone does not register activation. Browser roles
+are mutually exclusive: when several role traits are supplied, static text,
+heading, image, link, then button have descending precedence. Selected state is
+independent. Use `accessibilityRole(_:)` and `accessibilityProperties(_:)` for an
+explicit role, heading level and additional widget state. Device-only SwiftUI
+traits have no implied implementation.
 
 ### Reduced Motion
 

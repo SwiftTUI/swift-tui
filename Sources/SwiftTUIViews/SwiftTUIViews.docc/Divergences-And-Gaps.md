@@ -28,6 +28,19 @@ not a divergence: absent APIs appear here only when the absence has a recorded
 stance or breaks an idiom. And items the vision document declares out of scope
 are omitted even when SwiftUI exposes a corresponding API.
 
+## Accessibility authoring
+
+- **Named actions use an associated browser action group.** *Provisional.*
+  `accessibilityAction(named:_:)` adds native buttons rather than a
+  platform-specific custom-action rotor. `accessibilityAdjustableAction(_:)`
+  supplies typed increment/decrement operations; application callbacks own
+  bounds and the mutation. These operations do not yet have a production
+  terminal semantic reader. See <doc:Accessibility> for the current host boundary.
+- **`AccessibilityTraits` is a portable subset.** *Provisional.* Button, link,
+  image, heading, static text and selected traits have supported mappings.
+  Browser roles are exclusive; selected state composes independently.
+  Device-only traits are not accepted as no-op declarations.
+
 ## Omissions
 
 - **No value-based `NavigationLink` yet.** *Provisional.* A push currently

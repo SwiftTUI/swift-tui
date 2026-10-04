@@ -30,6 +30,8 @@
 classifications:
 
   canonical:
+    - SwiftTUIViews.AccessibilityTraits
+    - SwiftTUIViews.AccessibilityAdjustmentDirection
     # Debug native application reload export; absent from release/WASI builds.
     - SwiftTUIRuntime.HotReloadExport
     # ─── SwiftTUI umbrella ─────────────────────────────────────────────────
@@ -1032,6 +1034,7 @@ notes: {}
 # rot. Add a symbol here whenever a SwiftUI-named API's behavior or signature
 # departs from SwiftUI's; write the register entry in the same change.
 swiftui_divergent:
+  - SwiftTUIViews.AccessibilityTraits
   - SwiftTUIViews.Binding
   - SwiftTUIViews.Canvas
   - SwiftTUIViews.DragGesture

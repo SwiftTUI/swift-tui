@@ -769,3 +769,8 @@ Authored paragraph boundaries originate in `SwiftTUIViews/Primitives/TextParagra
 the Core semantic extractor keeps them independent of accessibility visibility.
 The runtime captures host-requested paragraph spacing with geometry, and the
 shared wire encoder publishes clipped, unambiguous bounds without copying text.
+
+Public accessibility value/trait/action modifiers live in
+`Sources/SwiftTUIViews/Modifiers/AccessibilityAuthoringModifiers.swift`. They compose
+with primitive registrations through `HandlerDescriptorIntake` and the committed
+`LocalActionRegistry`; browser-specific action presentation stays in the web host.
