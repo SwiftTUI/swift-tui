@@ -313,14 +313,13 @@ extension EnvironmentValues {
 
   /// The contrast level of the detected terminal appearance.
   ///
-  /// Derived from ``EnvironmentValues/terminalAppearance`` rather than stored,
-  /// so it cannot be written on its own. `ColorSchemeContrast.increased`
-  /// means the terminal's foreground and background are far enough apart that
-  /// styles should prefer stronger separation over subtle tinting.
+  /// An explicit ``EnvironmentValues/accessibilityPreferences`` contrast choice
+  /// takes precedence over the detected terminal appearance. Styles can use
+  /// `.increased` to prefer stronger separation over subtle tinting.
   ///
   /// See <doc:Styling-And-Theming>.
   public var colorSchemeContrast: ColorSchemeContrast {
-    terminalAppearance.colorSchemeContrast
+    accessibilityPreferences.contrast ?? terminalAppearance.colorSchemeContrast
   }
 
   /// The emphasis level controls in this subtree render with.
@@ -637,7 +636,7 @@ extension EnvironmentValues {
   }
 
   package var styleEnvironmentSnapshot: StyleEnvironmentSnapshot {
-    .init(
+    var snapshot = StyleEnvironmentSnapshot(
       appearance: terminalAppearance,
       theme: theme,
       foregroundStyle: foregroundStyle,
@@ -645,6 +644,8 @@ extension EnvironmentValues {
       isEnabled: isEnabled,
       cellPixelMetrics: cellPixelMetrics
     )
+    snapshot.accessibilityPreferences = accessibilityPreferences
+    return snapshot
   }
 
 }

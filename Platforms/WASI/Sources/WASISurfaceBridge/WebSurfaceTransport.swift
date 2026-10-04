@@ -98,6 +98,7 @@ package final class WebSurfaceTransport: HostGeometryPresentationSurface,
         pointer: state.pointerInputCapabilities,
         geometry: HostGeometryStamp(session: 0, revision: state.geometryRevision),
         reduceMotion: state.renderStyle.reduceMotion,
+        accessibilityPreferences: state.renderStyle.accessibilityPreferences,
         paragraphSpacing: state.paragraphSpacing
       )
     }

@@ -164,6 +164,40 @@ public struct TerminalRenderStyle: Equatable, Sendable, Codable {
   public var theme: Theme?
   /// Host motion preference. Absence preserves the runtime configuration.
   public var reduceMotion: Bool?
+  /// Host contrast preference. Absence inherits the runtime policy.
+  public var contrast: ColorSchemeContrast? = nil
+  /// Request redundant information cues beyond hue.
+  public var differentiateWithoutColor: Bool? = nil
+  /// Request opaque presentation surfaces.
+  public var reduceTransparency: Bool? = nil
+  /// Host palette profile preference.
+  public var colorProfile: AccessibilityColorProfile? = nil
+
+  /// The complete set of host accessibility choices.
+  public var accessibilityPreferences: AccessibilityPreferences {
+    get {
+      .init(
+        reduceMotion: reduceMotion, contrast: contrast,
+        differentiateWithoutColor: differentiateWithoutColor,
+        reduceTransparency: reduceTransparency, colorProfile: colorProfile)
+    }
+    set {
+      reduceMotion = newValue.reduceMotion
+      contrast = newValue.contrast
+      differentiateWithoutColor = newValue.differentiateWithoutColor
+      reduceTransparency = newValue.reduceTransparency
+      colorProfile = newValue.colorProfile
+    }
+  }
+
+  /// Creates a host style with optional accessibility choices.
+  public init(
+    appearance: TerminalAppearance, theme: Theme? = nil,
+    accessibilityPreferences: AccessibilityPreferences
+  ) {
+    self.init(appearance: appearance, theme: theme, reduceMotion: nil)
+    self.accessibilityPreferences = accessibilityPreferences
+  }
 
   public init(
     appearance: TerminalAppearance,
@@ -214,6 +248,14 @@ package final class StyleHeavyFieldsStorage: Sendable {
 /// memberwise initializer's defaults stand in for a live host; see the
 /// Testing Styles guide.
 public struct StyleEnvironmentSnapshot: Equatable, Sendable {
+  /// Live choices available to every custom style.
+  public var accessibilityPreferences = AccessibilityPreferences()
+
+  /// Effective contrast, with an explicit preference taking precedence over appearance.
+  public var colorSchemeContrast: ColorSchemeContrast {
+    accessibilityPreferences.contrast ?? appearance.colorSchemeContrast
+  }
+
   /// Boxed storage for the heavy value-type fields (~5 KB to 8 bytes).
   package var heavyFields: StyleHeavyFieldsStorage
 
@@ -340,5 +382,6 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
       && lhs.tintStyle == rhs.tintStyle
       && lhs.isEnabled == rhs.isEnabled
       && lhs.cellPixelMetrics == rhs.cellPixelMetrics
+      && lhs.accessibilityPreferences == rhs.accessibilityPreferences
   }
 }

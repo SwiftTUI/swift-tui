@@ -325,6 +325,7 @@ private final class GeometryTestSurface: HostGeometryPresentationSurface,
   var session: UInt64 = 7
   var revision: UInt64 = 1
   var reduceMotion: Bool?
+  var preferences = AccessibilityPreferences()
   var paragraphSpacing = 0
   var size = CellSize(width: 24, height: 6)
   var pitch = PixelSize(width: 9, height: 21)
@@ -337,7 +338,7 @@ private final class GeometryTestSurface: HostGeometryPresentationSurface,
       size: size, appearance: appearance, theme: nil,
       graphics: .init(cellPixelSize: pitch), pointer: .cellOnly,
       geometry: .init(session: session, revision: revision), reduceMotion: reduceMotion,
-      paragraphSpacing: paragraphSpacing)
+      accessibilityPreferences: preferences, paragraphSpacing: paragraphSpacing)
   }
   func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
     frames.append(frame)
@@ -347,4 +348,80 @@ private final class GeometryTestSurface: HostGeometryPresentationSurface,
 
 private final class GeometryTestInput: TerminalInputReading {
   func inputEvents() -> AsyncStream<InputEvent> { AsyncStream { $0.finish() } }
+}
+
+private struct AccessibilityPreferenceStyleProbe: ButtonStyle {
+  func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+    let preferences = configuration.styleEnvironment.accessibilityPreferences
+    Text("Style \(preferences.reduceTransparency == true ? "opaque" : "clear")")
+  }
+}
+
+extension HostGeometryRuntimeTests {
+  @Test func preferencesUpdateRetainedViewsAndCustomStylesLive() throws {
+    let host = GeometryTestSurface()
+    host.size = .init(width: 72, height: 8)
+    let root = testIdentity("LivePreferences")
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in
+      VStack {
+        EnvironmentReader(\.accessibilityPreferences) { preferences in
+          Text("Motion \(preferences.reduceMotion == true ? "reduced" : "normal")")
+          Text("Profile \(preferences.colorProfile?.rawValue ?? "auto")")
+        }
+        Button("Probe") {}.buttonStyle(AccessibilityPreferenceStyleProbe())
+      }
+    }
+    var rendered = 0
+    for enabled in [false, true, false] {
+      host.preferences = .init(
+        reduceMotion: false, contrast: enabled ? .increased : .standard,
+        differentiateWithoutColor: enabled, reduceTransparency: enabled,
+        colorProfile: enabled ? .monochrome : .standard)
+      loop.scheduler.requestSignal(named: "SIGWINCH")
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+      let painted = try #require(host.frames.last).raster.lines.joined(separator: "\n")
+      #expect(painted.contains("Motion normal"))
+      #expect(painted.contains(enabled ? "Profile monochrome" : "Profile standard"))
+      #expect(painted.contains(enabled ? "Style opaque" : "Style clear"))
+    }
+  }
+}
+
+extension HostGeometryRuntimeTests {
+  @Test func explicitRuntimePreferencesWinOverLiveHostDetection() throws {
+    let host = GeometryTestSurface()
+    host.size = .init(width: 60, height: 8)
+    host.preferences = .init(reduceMotion: true, contrast: .increased, reduceTransparency: true)
+    var configuration = RuntimeConfiguration()
+    configuration.accessibilityPreferences = .init(reduceMotion: false, contrast: .standard)
+    let root = testIdentity("ExplicitPreferences")
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host, terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      runtimeConfiguration: configuration,
+      viewBuilder: ScopedMapper { _ in
+        VStack {
+          EnvironmentReader(\.accessibilityPreferences) { preferences in
+            Text("Motion \(preferences.reduceMotion == true ? "reduced" : "normal")")
+            Text("Contrast \(preferences.contrast == .increased ? "increased" : "standard")")
+          }
+          Button("Probe") {}.buttonStyle(AccessibilityPreferenceStyleProbe())
+        }
+      })
+    var frames = 0
+    for opaque in [true, false] {
+      host.preferences.reduceTransparency = opaque
+      loop.scheduler.requestSignal(named: "SIGWINCH")
+      try loop.renderPendingFrames(renderedFrames: &frames)
+      let text = try #require(host.frames.last).raster.lines.joined(separator: "\n")
+      #expect(text.contains("Motion normal") && text.contains("Contrast standard"))
+      #expect(text.contains(opaque ? "Style opaque" : "Style clear"))
+    }
+  }
 }

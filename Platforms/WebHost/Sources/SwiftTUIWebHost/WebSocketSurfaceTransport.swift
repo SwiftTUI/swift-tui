@@ -231,6 +231,7 @@
           geometry: HostGeometryStamp(
             session: state.geometrySessionToken, revision: state.geometryRevision),
           reduceMotion: state.renderStyle.reduceMotion,
+          accessibilityPreferences: state.renderStyle.accessibilityPreferences,
           paragraphSpacing: state.paragraphSpacing
         )
       }

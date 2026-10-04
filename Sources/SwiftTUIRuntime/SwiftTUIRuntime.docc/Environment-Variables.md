@@ -48,10 +48,30 @@ start.
 | `SWIFTTUI_ACCESSIBLE` | boolean | Shorthand for `SWIFTTUI_REDUCE_MOTION=1` plus `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`. Wins over explicit `0` values on those two variables. |
 | `SWIFTTUI_JSON` | boolean | Selects JSON output. |
 | `SWIFTTUI_ASCII` | boolean | Forces ASCII glyphs in place of Unicode box drawing and symbols. |
-| `SWIFTTUI_REDUCE_MOTION` | `0` / truthy | Truthy sets the app-visible accessibility reduce-motion preference and renders built-in animation in its static form. |
+| `SWIFTTUI_REDUCE_MOTION` | boolean | Sets the app-visible reduce-motion choice; `0`, `false`, `no` and `off` explicitly disable it. |
+| `SWIFTTUI_INCREASE_CONTRAST` | boolean | Chooses increased or standard contrast; absence inherits the host preference. |
+| `SWIFTTUI_DIFFERENTIATE_WITHOUT_COLOR` | boolean | Requests redundant meaning beyond hue. |
+| `SWIFTTUI_REDUCE_TRANSPARENCY` | boolean | Requests opaque surfaces. |
+| `SWIFTTUI_COLOR_PROFILE` | `standard`, `monochrome`, `protanopia`, `deuteranopia`, `tritanopia` | Selects the app-visible color profile. |
 | `SWIFTTUI_STABLE_OUTPUT` | `0` / truthy | Explicitly disables built-in animation for deterministic capture without changing the accessibility preference. When unset, `CI=true` or a non-TTY stdout enables stable output automatically. |
 | `SWIFTTUI_DEBUG` | boolean | Debug mode: arms the session debug bundle (see *Debug bundles and trace selection*), including the diagnostics TSV and the frame trace. |
 | `SWIFTTUI_CURSOR_FOLLOWS_FOCUS` | boolean | Moves the hardware terminal cursor to the focused control so screen readers can track focus. |
+
+Accessibility booleans accept `1/true/yes/on` and `0/false/no/off`, without case
+sensitivity. These startup choices override browser/host preferences. The
+`SwiftTUIArguments` options `--motion-preference`, `--contrast-preference`,
+`--differentiate-without-color` and `--reduce-transparency` accept `auto/on/off`;
+`--color-profile` accepts the profile names above or `auto`. Explicit options
+override environment choices, and `auto` returns to host detection. Existing
+`--accessible` and `--reduce-motion` remain authoritative motion opt-ins.
+Per-view environment overrides apply locally. No screen-reader detection is used.
+
+Local macOS terminal sessions inherit motion, contrast, differentiation and
+transparency choices from `NSWorkspace` and refresh when its accessibility display
+notification arrives, including while idle. SSH sessions do not inherit the
+server desktop's choices. Other terminal platforms leave unavailable detection
+unspecified and use the explicit options above. Browser detection remains local
+to the browser. See [Apple's display-change notification](https://developer.apple.com/documentation/appkit/nsworkspace/accessibilitydisplayoptionsdidchangenotification).
 
 ### Web host session
 

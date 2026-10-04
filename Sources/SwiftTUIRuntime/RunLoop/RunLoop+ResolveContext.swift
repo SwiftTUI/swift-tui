@@ -33,8 +33,14 @@ extension RunLoop {
     effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
-    effectiveEnvironmentValues.accessibilityReduceMotion =
-      runtimeConfiguration.motion == .reduced || hostConfiguration.reduceMotion == true
+    effectiveEnvironmentValues.accessibilityPreferences =
+      runtimeConfiguration.accessibilityPreferences.inheriting(
+        hostConfiguration.accessibilityPreferences.inheriting(
+          AccessibilityPreferences(reduceMotion: hostConfiguration.reduceMotion)
+            .inheriting(nativeAccessibilityPreferences(for: presentationSurface))))
+    if runtimeConfiguration.motion == .reduced {
+      effectiveEnvironmentValues.accessibilityReduceMotion = true
+    }
     effectiveEnvironmentValues.stableOutput = runtimeConfiguration.stableOutput
     effectiveEnvironmentValues.cursorFollowsFocus =
       runtimeConfiguration.cursorFollowsFocus
@@ -69,7 +75,7 @@ extension RunLoop {
     }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
     var animationSegments = scheduledFrame.animationSegments
-    if runtimeConfiguration.motion == .reduced || runtimeConfiguration.stableOutput {
+    if effectiveEnvironmentValues.renderingReduceMotion {
       // SwiftUI's reduced-motion contract: the state change applies
       // instantly AND the `withAnimation(_:completion:)` closure still
       // fires. Nil-ing the batch ID below means no animation will ever

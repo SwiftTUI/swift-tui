@@ -236,7 +236,7 @@ public struct EnvironmentValues: Equatable, Sendable {
         reuseValue: box.reuseValue
       )
     }
-    let style: StyleEnvironmentSnapshot
+    var style: StyleEnvironmentSnapshot
     if reuseStyle {
       // Non-style keypath changed: reuse heavy fields, update lightweight ones.
       style = StyleEnvironmentSnapshot(
@@ -256,6 +256,7 @@ public struct EnvironmentValues: Equatable, Sendable {
         cellPixelMetrics: cellPixelMetrics
       )
     }
+    style.accessibilityPreferences = accessibilityPreferences
     return EnvironmentSnapshot(
       debugSignature: snapshot.debugSignature,
       untypedValues: snapshot.untypedValues,

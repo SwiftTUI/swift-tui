@@ -214,3 +214,26 @@ private func base64EncodedJSON(
 ) -> String {
   Data(json.utf8).base64EncodedString()
 }
+
+extension TerminalRenderStyleCodecTests {
+  @Test("all preference choices round-trip without losing explicit false")
+  func accessibilityPreferencesRoundTrip() throws {
+    for enabled in [false, true] {
+      for profile in AccessibilityColorProfile.allCases {
+        let preferences = AccessibilityPreferences(
+          reduceMotion: enabled, contrast: enabled ? .increased : .standard,
+          differentiateWithoutColor: enabled, reduceTransparency: enabled,
+          colorProfile: profile)
+        let style = TerminalRenderStyle(
+          appearance: .fallback, accessibilityPreferences: preferences)
+        let encoded = try #require(TerminalRenderStyleCodec.encodeBase64(style))
+        #expect(
+          TerminalRenderStyleCodec.decodeBase64(encoded)?.accessibilityPreferences == preferences)
+        let data = try JSONEncoder().encode(style)
+        #expect(
+          try JSONDecoder().decode(TerminalRenderStyle.self, from: data).accessibilityPreferences
+            == preferences)
+      }
+    }
+  }
+}

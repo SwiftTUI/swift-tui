@@ -50,6 +50,7 @@ package struct HostLayoutConfiguration: Sendable {
   package let pointer: PointerInputCapabilities
   package let geometry: HostGeometryStamp?
   package let reduceMotion: Bool?
+  package let accessibilityPreferences: AccessibilityPreferences
   package let paragraphSpacing: Int
 
   package init(
@@ -60,6 +61,7 @@ package struct HostLayoutConfiguration: Sendable {
     pointer: PointerInputCapabilities,
     geometry: HostGeometryStamp? = nil,
     reduceMotion: Bool? = nil,
+    accessibilityPreferences: AccessibilityPreferences = .init(),
     paragraphSpacing: Int = 0
   ) {
     self.size = size
@@ -69,6 +71,7 @@ package struct HostLayoutConfiguration: Sendable {
     self.pointer = pointer
     self.geometry = geometry
     self.reduceMotion = reduceMotion
+    self.accessibilityPreferences = accessibilityPreferences
     self.paragraphSpacing = paragraphSpacing
   }
 }

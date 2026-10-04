@@ -74,6 +74,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
     private let fallbackSize: CellSize
     let controller: any TerminalControlling
     let environment: [String: String]
+    package let usesNativeAccessibilityPreferences: Bool
     let mouseInputResolution: TerminalMouseInputResolution
     private let usesTerminalEditOperations: Bool
     private let imageRenderer: TerminalImageRenderer
@@ -112,6 +113,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         outputFileDescriptor: outputFileDescriptor,
         fallbackSize: fallbackSize,
         controller: PlatformTerminalController.make(),
+        usesNativeAccessibilityPreferences: true,
         capabilityProfile: capabilityProfile,
         environment: environment ?? currentProcessEnvironment(),
         usesTerminalEditOperations: usesTerminalEditOperations,
@@ -124,6 +126,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       outputFileDescriptor: Int32,
       fallbackSize: CellSize,
       controller: any TerminalControlling,
+      usesNativeAccessibilityPreferences: Bool = false,
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil,
       usesTerminalEditOperations: Bool? = nil,
@@ -134,6 +137,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       self.outputFileDescriptor = outputFileDescriptor
       self.fallbackSize = fallbackSize
       self.controller = controller
+      self.usesNativeAccessibilityPreferences = usesNativeAccessibilityPreferences
       self.environment = environment
       self.mouseInputResolution = mouseInputResolution
       self.usesTerminalEditOperations =

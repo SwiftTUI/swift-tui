@@ -1,3 +1,5 @@
+import SwiftTUICore
+
 extension RuntimeConfiguration {
   /// Builds a `RuntimeConfiguration` from environment variables and TTY status.
   ///
@@ -46,7 +48,7 @@ extension RuntimeConfiguration {
       glyphsResolved = .ascii
     }
     if let v = environment["SWIFTTUI_REDUCE_MOTION"], !v.isEmpty {
-      motion = (v != "0") ? .reduced : .normal
+      motion = ["0", "false", "no", "off"].contains(v.lowercased()) ? .normal : .reduced
     }
     if let v = environment["SWIFTTUI_STABLE_OUTPUT"], !v.isEmpty {
       stableOutput = v != "0"
@@ -81,7 +83,7 @@ extension RuntimeConfiguration {
 
     let debug = (environment["SWIFTTUI_DEBUG"].map { !$0.isEmpty && $0 != "0" }) ?? false
 
-    return RuntimeConfiguration(
+    var configuration = RuntimeConfiguration(
       color: color,
       glyphs: glyphsResolved,
       motion: motion,
@@ -91,5 +93,21 @@ extension RuntimeConfiguration {
       debug: debug,
       cursorFollowsFocus: cursorFollowsFocus
     )
+    func preference(_ key: String) -> Bool? {
+      guard let value = environment[key]?.lowercased() else { return nil }
+      switch value {
+      case "1", "true", "yes", "on": return true
+      case "0", "false", "no", "off": return false
+      default: return nil
+      }
+    }
+    configuration.accessibilityPreferences = .init(
+      reduceMotion: preference("SWIFTTUI_REDUCE_MOTION"),
+      contrast: preference("SWIFTTUI_INCREASE_CONTRAST").map { $0 ? .increased : .standard },
+      differentiateWithoutColor: preference("SWIFTTUI_DIFFERENTIATE_WITHOUT_COLOR"),
+      reduceTransparency: preference("SWIFTTUI_REDUCE_TRANSPARENCY"),
+      colorProfile: environment["SWIFTTUI_COLOR_PROFILE"].flatMap(
+        AccessibilityColorProfile.init(rawValue:)))
+    return configuration
   }
 }

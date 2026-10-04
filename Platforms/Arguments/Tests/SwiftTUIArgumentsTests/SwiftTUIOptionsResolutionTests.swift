@@ -248,3 +248,36 @@ struct SwiftTUIOptionsResolutionTests {
   }
 
 }
+
+extension SwiftTUIOptionsResolutionTests {
+  @Test("explicit accessibility choices override environment and auto returns to host detection")
+  func explicitAccessibilityPreferences() throws {
+    let environment = [
+      "SWIFTTUI_REDUCE_MOTION": "1", "SWIFTTUI_INCREASE_CONTRAST": "1",
+      "SWIFTTUI_DIFFERENTIATE_WITHOUT_COLOR": "1", "SWIFTTUI_REDUCE_TRANSPARENCY": "1",
+      "SWIFTTUI_COLOR_PROFILE": "monochrome",
+    ]
+    let off = try SwiftTUIOptions.parse([
+      "--motion-preference", "off", "--contrast-preference", "off",
+      "--differentiate-without-color", "off", "--reduce-transparency", "off",
+      "--color-profile", "standard",
+    ]).runtimeConfiguration(environment: environment, isStdoutTTY: true)
+    #expect(off.motion == .normal)
+    #expect(
+      off.accessibilityPreferences
+        == .init(
+          reduceMotion: false, contrast: .standard,
+          differentiateWithoutColor: false, reduceTransparency: false, colorProfile: .standard))
+    let automatic = try SwiftTUIOptions.parse([
+      "--motion-preference", "auto", "--contrast-preference", "auto",
+      "--differentiate-without-color", "auto", "--reduce-transparency", "auto",
+      "--color-profile", "auto",
+    ]).runtimeConfiguration(environment: environment, isStdoutTTY: true)
+    #expect(automatic.motion == .normal)
+    #expect(automatic.accessibilityPreferences == .init())
+    let accessible = try SwiftTUIOptions.parse(["--motion-preference", "off", "--accessible"])
+      .runtimeConfiguration(environment: [:], isStdoutTTY: true)
+    #expect(accessible.motion == .reduced)
+    #expect(throws: (any Error).self) { try SwiftTUIOptions.parse(["--color-profile", "unknown"]) }
+  }
+}

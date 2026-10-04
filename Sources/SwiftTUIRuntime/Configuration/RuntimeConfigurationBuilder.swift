@@ -1,3 +1,5 @@
+public import SwiftTUICore
+
 extension RuntimeConfiguration {
   /// Returns a new fluent builder initialized with `RuntimeConfiguration.default`.
   ///
@@ -25,6 +27,12 @@ extension RuntimeConfiguration {
     public func glyphs(_ value: GlyphMode) -> Self {
       var copy = self
       copy.configuration.glyphs = value
+      return copy
+    }
+
+    public func accessibilityPreferences(_ value: AccessibilityPreferences) -> Self {
+      var copy = self
+      copy.configuration.accessibilityPreferences = value
       return copy
     }
 

@@ -23,6 +23,21 @@ extension SwiftTUIOptions {
     var stableOutput = baseline.stableOutput
     var output = baseline.output
     var cursorFollowsFocus = baseline.cursorFollowsFocus
+    var preferences = baseline.accessibilityPreferences
+    if let motionPreference {
+      preferences.reduceMotion = motionPreference.boolValue
+      motion = motionPreference == .on ? .reduced : .normal
+    }
+    if let contrastPreference {
+      preferences.contrast = contrastPreference.boolValue.map { $0 ? .increased : .standard }
+    }
+    if let differentiateWithoutColor {
+      preferences.differentiateWithoutColor = differentiateWithoutColor.boolValue
+    }
+    if let reduceTransparency { preferences.reduceTransparency = reduceTransparency.boolValue }
+    if let colorProfile {
+      preferences.colorProfile = AccessibilityColorProfile(rawValue: colorProfile)
+    }
 
     // --accessible expands to --reduce-motion --cursor-follows-focus.
     let effectiveReduceMotion = reduceMotion || accessible
@@ -74,7 +89,7 @@ extension SwiftTUIOptions {
     // Debug: --debug overrides baseline.
     let debug = self.debug || baseline.debug
 
-    return RuntimeConfiguration(
+    var configuration = RuntimeConfiguration(
       color: color,
       glyphs: glyphs,
       motion: motion,
@@ -84,5 +99,7 @@ extension SwiftTUIOptions {
       debug: debug,
       cursorFollowsFocus: cursorFollowsFocus
     )
+    configuration.accessibilityPreferences = preferences
+    return configuration
   }
 }

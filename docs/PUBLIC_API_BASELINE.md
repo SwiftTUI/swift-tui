@@ -19,11 +19,11 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | Module | Top-level | All public |
 |---|---:|---:|
 | `SwiftTUI` | 1 | 4 |
-| `SwiftTUIRuntime` | 60 | 517 |
+| `SwiftTUIRuntime` | 60 | 519 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 417 | 2561 |
+| `SwiftTUIViews` | 417 | 2565 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
-| `SwiftTUIArguments` | 5 | 47 |
+| `SwiftTUIArguments` | 5 | 57 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
 | `SwiftTUITerminalCLI` | 6 | 24 |
 | `SwiftTUICLIAttach` | 1 | 6 |
@@ -33,7 +33,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 16 | 44 |
 | `SwiftTUICore` | 40 | 273 |
-| `SwiftTUIPrimitives` | 172 | 1518 |
+| `SwiftTUIPrimitives` | 174 | 1542 |
 | `SwiftTUIGraph` | 75 | 486 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
@@ -84,7 +84,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `RunLoop` — class — 11 members
 - `RunLoopExitReason` — enum — 4 members
 - `RunLoopResult` — struct — 4 members
-- `RuntimeConfiguration` — struct — 46 members
+- `RuntimeConfiguration` — struct — 48 members
 - `RuntimeIssueSink` — extension — 1 member
 - `RuntimeRenderMode` — enum — 9 members
 - `Scene` — protocol — 2 members
@@ -256,7 +256,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `EnvironmentKey` — protocol — 2 members
 - `EnvironmentReader` — struct — 1 member
 - `EnvironmentTransformModifier` — struct
-- `EnvironmentValues` — struct — 31 members
+- `EnvironmentValues` — struct — 35 members
 - `EnvironmentWritingModifier` — struct
 - `EquatableView` — struct — 2 members
 - `ExclusiveGesture` — struct — 6 members
@@ -564,7 +564,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `standardOutputIsATTY()` — func
 - `SwiftTUIApp` — typealias
 - `SwiftTUICommand` — protocol — 12 members
-- `SwiftTUIOptions` — struct — 17 members
+- `SwiftTUIOptions` — struct — 27 members
 
 ## SwiftTUIPTYPrimitives
 
@@ -707,8 +707,10 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (170)
+### Canonical surface (172)
 
+- `AccessibilityColorProfile` — enum — 6 members
+- `AccessibilityPreferences` — struct — 8 members
 - `adapt(_:to:method:)` — func
 - `Alignment` — struct — 16 members
 - `AlignmentID` — protocol — 1 member
@@ -836,7 +838,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `Size` — struct — 4 members
 - `Spacing` — struct — 4 members
 - `StrokeStyle` — struct — 28 members
-- `StyleEnvironmentSnapshot` — struct — 12 members
+- `StyleEnvironmentSnapshot` — struct — 14 members
 - `TableBorderGlyphs` — struct — 18 members
 - `TableCellAlignment` — enum — 4 members
 - `TableCellPayload` — struct — 5 members
@@ -856,7 +858,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `TerminalMouseInputResolution` — enum — 3 members
 - `TerminalMouseInputTrustPolicy` — enum — 5 members
 - `TerminalPalette` — struct — 24 members
-- `TerminalRenderStyle` — struct — 7 members
+- `TerminalRenderStyle` — struct — 13 members
 - `TerminalTone` — enum — 7 members
 - `TextFigureColorMode` — struct — 8 members
 - `TextFigureFont` — typealias

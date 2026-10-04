@@ -51,6 +51,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   // `RunLoop+Rendering.swift` can read pending move endpoints and clear them
   // at the committed-frame boundary.
   var focusTrackerInvalidationFilter: FocusPresentationInvalidationFilter?
+  private var nativePreferenceObserver: NativeAccessibilityPreferenceObserver?
   package var pendingAccessibilityAnnouncements: [AccessibilityAnnouncement] = []
   package let observationBridge = ObservationBridge()
   package let renderSuspensionDiagnostics = RenderSuspensionDiagnostics()
@@ -305,6 +306,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
       )
     )
     registerMemoryMetricProviders()
+    nativePreferenceObserver = NativeAccessibilityPreferenceObserver(surface: presentationSurface) {
+      [weak self] in
+      self?.scheduler.requestSignal(named: "accessibilityPreferences")
+    }
   }
 
   private func registerMemoryMetricProviders() {

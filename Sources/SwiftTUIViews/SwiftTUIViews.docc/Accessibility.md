@@ -435,3 +435,19 @@ in the visual parent's layout. Hidden, disabled, read-only, modal and retired
 control guards still apply to typed assistive actions. Browser semantic focus on
 a virtual control does not move terminal keyboard focus. This is not a binding
 to a screen reader's independent reading cursor.
+
+
+## User preferences
+
+Read `EnvironmentValues.accessibilityPreferences` for the effective optional
+choices, or the convenience values `accessibilityReduceMotion`,
+`accessibilityDifferentiateWithoutColor`, `accessibilityReduceTransparency` and
+`accessibilityColorProfile`. `colorSchemeContrast` honors an explicit contrast
+choice before the terminal appearance heuristic. Custom styles receive the same
+preferences through `configuration.styleEnvironment.accessibilityPreferences`.
+
+Precedence is authored subtree override, explicit runtime/CLI/environment choice,
+then host detection. An explicit `false` or standard profile remains an override;
+`nil` inherits. Browser preferences can change live, including while a scene is
+retained. Terminal environment variables are startup choices. Preferences express
+user intent; labels, patterns and control behavior still need to honor that intent.

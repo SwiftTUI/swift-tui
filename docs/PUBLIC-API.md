@@ -346,3 +346,14 @@ Before making a symbol public, ask:
 If the answer points toward internal compatibility rather than product
 direction, keep the symbol non-public. When a new public symbol does
 land, classify it here before it becomes a default example elsewhere.
+
+## Accessibility preferences
+
+`AccessibilityPreferences` is the shared optional-override value; absence
+inherits host detection, while explicit false and standard remain choices.
+`RuntimeConfiguration.accessibilityPreferences` and its builder method set
+session overrides. The environment exposes the aggregate and individual
+motion, color-differentiation, transparency and palette choices. Custom styles
+receive the aggregate through `StyleEnvironmentSnapshot.accessibilityPreferences`.
+`TerminalRenderStyle.accessibilityPreferences` combines the host's legacy
+motion field and additive preference fields; old initializers remain available.

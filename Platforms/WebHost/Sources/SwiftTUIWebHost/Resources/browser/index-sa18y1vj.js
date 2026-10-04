@@ -135,6 +135,129 @@ class DomFontResources {
   }
 }
 
+// src/WebHostAccessibilitySettings.ts
+var storageKey = "swifttui.accessibility.preferences.v1";
+var profiles = [
+  "standard",
+  "monochrome",
+  "protanopia",
+  "deuteranopia",
+  "tritanopia"
+];
+var booleanKeys = [
+  "reduceMotion",
+  "differentiateWithoutColor",
+  "reduceTransparency"
+];
+function readWebHostAccessibilityPreferences() {
+  try {
+    const value = JSON.parse(globalThis.sessionStorage?.getItem(storageKey) ?? "{}");
+    if (!value || typeof value !== "object")
+      return {};
+    const result = {};
+    for (const key of booleanKeys) {
+      const candidate = value[key];
+      if (typeof candidate === "boolean")
+        result[key] = candidate;
+    }
+    const contrast = value.contrast;
+    if (contrast === "standard" || contrast === "increased")
+      result.contrast = contrast;
+    const profile = value.colorProfile;
+    if (profiles.some((candidate) => candidate === profile))
+      result.colorProfile = profile;
+    return result;
+  } catch {
+    return {};
+  }
+}
+function createWebHostAccessibilitySettings(document2, initial, changed) {
+  const details = document2.createElement("details");
+  details.className = "webhost-accessibility-settings";
+  Object.assign(details.style, {
+    flex: "0 0 auto",
+    color: "CanvasText",
+    background: "Canvas",
+    font: "14px system-ui",
+    padding: "4px 8px",
+    boxSizing: "border-box"
+  });
+  const summary = document2.createElement("summary");
+  summary.textContent = "Accessibility settings";
+  details.append(summary);
+  const fields = document2.createElement("div");
+  Object.assign(fields.style, {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    padding: "8px 0"
+  });
+  details.append(fields);
+  const selectors = new Map;
+  const definitions = [
+    ["reduceMotion", "Reduce motion", ["auto", "on", "off"]],
+    ["contrast", "Contrast", ["auto", "increased", "standard"]],
+    [
+      "differentiateWithoutColor",
+      "Differentiate without color",
+      ["auto", "on", "off"]
+    ],
+    ["reduceTransparency", "Reduce transparency", ["auto", "on", "off"]],
+    ["colorProfile", "Color profile", ["auto", ...profiles]]
+  ];
+  const read = () => {
+    const result = {};
+    for (const key of booleanKeys) {
+      const value = selectors.get(key)?.value ?? "auto";
+      result[key] = value === "auto" ? undefined : value === "on";
+    }
+    const contrast = selectors.get("contrast")?.value ?? "auto";
+    result.contrast = contrast === "auto" ? undefined : contrast;
+    const profile = selectors.get("colorProfile")?.value ?? "auto";
+    result.colorProfile = profile === "auto" ? undefined : profile;
+    return result;
+  };
+  const commit = () => {
+    const preferences = read();
+    try {
+      globalThis.sessionStorage?.setItem(storageKey, JSON.stringify(preferences));
+    } catch {}
+    changed(preferences);
+  };
+  for (const [key, title, values] of definitions) {
+    const label = document2.createElement("label");
+    label.append(document2.createTextNode(`${title} `));
+    const select = document2.createElement("select");
+    for (const value of values) {
+      const option = document2.createElement("option");
+      option.value = value;
+      option.textContent = value === "auto" ? "Use system setting" : value.charAt(0).toUpperCase() + value.slice(1);
+      select.append(option);
+    }
+    select.addEventListener("change", commit);
+    selectors.set(key, select);
+    label.append(select);
+    fields.append(label);
+  }
+  const reset = document2.createElement("button");
+  reset.type = "button";
+  reset.textContent = "Use system settings";
+  reset.addEventListener("click", () => {
+    for (const select of selectors.values())
+      select.value = "auto";
+    commit();
+  });
+  fields.append(reset);
+  const update = (preferences) => {
+    for (const [key, select] of selectors) {
+      const value = preferences[key];
+      select.value = value === undefined ? "auto" : typeof value === "boolean" ? value ? "on" : "off" : value;
+    }
+  };
+  update(initial);
+  return { element: details, update };
+}
+
 // src/WebHostSceneManifest.ts
 function normalizeWebHostSceneManifest(source) {
   const scenes = normalizeSceneDescriptors(source);
@@ -2008,6 +2131,10 @@ function normalizeWebHostTerminalStyle(style = {}) {
     cursorBlink: style.cursorBlink ?? false,
     backgroundOpacity: normalizeOpacity(style.backgroundOpacity ?? 1),
     ...style.reduceMotion === undefined ? {} : { reduceMotion: style.reduceMotion },
+    ...style.contrast === undefined ? {} : { contrast: style.contrast },
+    ...style.differentiateWithoutColor === undefined ? {} : { differentiateWithoutColor: style.differentiateWithoutColor },
+    ...style.reduceTransparency === undefined ? {} : { reduceTransparency: style.reduceTransparency },
+    ...style.colorProfile === undefined ? {} : { colorProfile: style.colorProfile },
     palette,
     theme
   };
@@ -2021,19 +2148,40 @@ function mergeWebHostTerminalStyle(base, patch) {
     theme: patch.theme ? { ...resolvedBase.theme, ...patch.theme } : resolvedBase.theme
   });
 }
+function resolveWebHostAccessibilityPreferences(style) {
+  const media = (query) => globalThis.matchMedia?.(query).matches;
+  const forced = media("(forced-colors: active)");
+  const contrast = media("(prefers-contrast: more)") || forced ? "increased" : media("(prefers-contrast: less)") ? "standard" : undefined;
+  return {
+    reduceMotion: style.reduceMotion ?? media("(prefers-reduced-motion: reduce)"),
+    contrast: style.contrast ?? contrast,
+    differentiateWithoutColor: style.differentiateWithoutColor ?? (forced ? true : undefined),
+    reduceTransparency: style.reduceTransparency ?? media("(prefers-reduced-transparency: reduce)"),
+    colorProfile: style.colorProfile
+  };
+}
 function resolveWebHostTerminalRenderStyle(style) {
   const normalized = normalizeWebHostTerminalStyle(style);
-  const reduceMotion = normalized.reduceMotion ?? globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const preferences = resolveWebHostAccessibilityPreferences(normalized);
+  const reduceMotion = preferences.reduceMotion;
   return {
     ...reduceMotion === undefined ? {} : {
       reduceMotion: reduceMotion ? "true" : "false"
     },
+    ...preferences.contrast === undefined ? {} : { contrast: preferences.contrast },
+    ...preferences.differentiateWithoutColor === undefined ? {} : {
+      differentiateWithoutColor: preferences.differentiateWithoutColor ? "true" : "false"
+    },
+    ...preferences.reduceTransparency === undefined ? {} : {
+      reduceTransparency: preferences.reduceTransparency ? "true" : "false"
+    },
+    ...preferences.colorProfile === undefined ? {} : { colorProfile: preferences.colorProfile },
     appearance: {
       foregroundColor: normalized.theme.foreground,
       backgroundColor: normalized.theme.background,
       tintColor: normalized.theme.tint,
       palette: paletteToIndexedMap(normalized.palette.ansi),
-      colorSchemeContrast: contrastRatio(normalized.theme.foreground, normalized.theme.background) >= 7 ? "increased" : "standard",
+      colorSchemeContrast: preferences.contrast ?? (contrastRatio(normalized.theme.foreground, normalized.theme.background) >= 7 ? "increased" : "standard"),
       source: "override"
     },
     theme: { ...normalized.theme }
@@ -2044,13 +2192,13 @@ function encodeWebHostTerminalRenderStyleBase64(style) {
 }
 function webTUITerminalBackgroundColor(style) {
   const normalized = normalizeWebHostTerminalStyle(style);
-  return hexToRgba(normalized.theme.background, normalized.backgroundOpacity);
+  return hexToRgba(normalized.theme.background, resolveWebHostAccessibilityPreferences(normalized).reduceTransparency ? 1 : normalized.backgroundOpacity);
 }
 function applyWebHostTerminalStyle(element, style) {
   const normalized = normalizeWebHostTerminalStyle(style);
   element.style.fontFamily = normalized.fontFamily;
   element.style.fontSize = `${normalized.fontSize}px`;
-  element.style.background = hexToRgba(normalized.theme.background, normalized.backgroundOpacity);
+  element.style.background = webTUITerminalBackgroundColor(normalized);
   element.style.color = normalized.theme.foreground;
 }
 function normalizePalette(input, defaults) {
@@ -5853,6 +6001,8 @@ class WebHostSceneRuntime {
     this.applyStyle(this.currentStyle);
     if (this.domGeometry)
       this.loadDomFont(this.currentStyle);
+    else
+      this.bridge?.updateRenderStyle(this.currentStyle);
     this.installPointerParadigmObserver();
     this.sendPointerCapabilitiesIfChanged(coarsePrimaryPointer());
     this.measureCells();
@@ -6181,9 +6331,13 @@ class WebHostSceneRuntime {
     const preferences = [
       "(forced-colors: active)",
       "(prefers-color-scheme: dark)",
-      "(prefers-reduced-motion: reduce)"
+      "(prefers-reduced-motion: reduce)",
+      "(prefers-reduced-transparency: reduce)",
+      "(prefers-contrast: more)",
+      "(prefers-contrast: less)"
     ].map((query) => globalThis.matchMedia?.(query)).filter((query) => query !== undefined);
     const preferenceChanged = () => {
+      this.applyStyle(this.currentStyle);
       this.bridge?.updateRenderStyle?.(this.currentStyle);
       refresh();
       this.paintScheduler.requestRepaint();
@@ -7508,7 +7662,8 @@ async function createWebHostApp(options) {
     renderer: options.renderer,
     domFont: options.domFont,
     sceneFrame: options.sceneFrame,
-    paintScheduling: options.paintScheduling
+    paintScheduling: options.paintScheduling,
+    accessibilitySettings: options.accessibilitySettings
   });
   await controller.initialize();
   return controller;
@@ -7534,9 +7689,15 @@ class InternalWebHostAppController {
   visibilityDocument;
   detachVisibilityListener;
   disposed = false;
+  accessibilitySettings;
   constructor(options) {
     this.mount = options.mount;
-    this.style = normalizeWebHostTerminalStyle(options.renderer === "dom" && !options.style?.fontFamily ? { ...options.style, fontFamily: DOM_FONT_FAMILY } : options.style ?? {});
+    const settingsEnabled = options.accessibilitySettings ?? true;
+    const initialStyle = {
+      ...options.style,
+      ...settingsEnabled ? readWebHostAccessibilityPreferences() : {}
+    };
+    this.style = normalizeWebHostTerminalStyle(options.renderer === "dom" && !initialStyle.fontFamily ? { ...initialStyle, fontFamily: DOM_FONT_FAMILY } : initialStyle);
     this.domFont = options.domFont;
     this.environment = options.environment;
     this.embeddedHost = options.embeddedHost;
@@ -7564,7 +7725,24 @@ class InternalWebHostAppController {
     } else {
       this.sceneRoot.style.display = "block";
     }
-    this.mount.replaceChildren(this.sceneRoot);
+    const document2 = this.mount.ownerDocument;
+    if (settingsEnabled && document2) {
+      this.accessibilitySettings = createWebHostAccessibilitySettings(document2, this.style, (preferences) => this.setStyle(preferences));
+      const appRoot = document2.createElement("div");
+      appRoot.className = "webhost-app";
+      Object.assign(appRoot.style, {
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+        height: "100%",
+        minHeight: "0"
+      });
+      this.sceneRoot.style.flex = "1 1 auto";
+      appRoot.append(this.accessibilitySettings.element, this.sceneRoot);
+      this.mount.replaceChildren(appRoot);
+    } else {
+      this.mount.replaceChildren(this.sceneRoot);
+    }
     this.applyHostFrameStyle();
   }
   async initialize() {
@@ -7593,6 +7771,7 @@ class InternalWebHostAppController {
       return;
     const merged = mergeWebHostTerminalStyle(this.style, style);
     this.style = merged;
+    this.accessibilitySettings?.update(this.style);
     for (const runtime of this.runtimes.values()) {
       runtime.setStyle(this.style);
     }

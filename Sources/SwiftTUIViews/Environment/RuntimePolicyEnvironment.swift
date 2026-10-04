@@ -1,5 +1,7 @@
-private enum AccessibilityReduceMotionKey: EnvironmentKey, FrameworkEnvironmentKey {
-  static let defaultValue = false
+public import SwiftTUICore
+
+private enum AccessibilityPreferencesKey: EnvironmentKey, FrameworkEnvironmentKey {
+  static let defaultValue = AccessibilityPreferences()
 }
 
 private enum StableOutputKey: EnvironmentKey, FrameworkEnvironmentKey {
@@ -11,9 +13,34 @@ private enum CursorFollowsFocusKey: EnvironmentKey, FrameworkEnvironmentKey {
 }
 
 extension EnvironmentValues {
+  /// The effective host preferences; a subtree can override individual choices.
+  public var accessibilityPreferences: AccessibilityPreferences {
+    get { self[AccessibilityPreferencesKey.self] }
+    set { self[AccessibilityPreferencesKey.self] = newValue }
+  }
+
+  /// Whether content should avoid nonessential motion.
   public var accessibilityReduceMotion: Bool {
-    get { self[AccessibilityReduceMotionKey.self] }
-    set { self[AccessibilityReduceMotionKey.self] = newValue }
+    get { accessibilityPreferences.reduceMotion ?? false }
+    set { accessibilityPreferences.reduceMotion = newValue }
+  }
+
+  /// Whether content should distinguish meaning with labels, shapes or patterns.
+  public var accessibilityDifferentiateWithoutColor: Bool {
+    get { accessibilityPreferences.differentiateWithoutColor ?? false }
+    set { accessibilityPreferences.differentiateWithoutColor = newValue }
+  }
+
+  /// Whether content should prefer opaque surfaces.
+  public var accessibilityReduceTransparency: Bool {
+    get { accessibilityPreferences.reduceTransparency ?? false }
+    set { accessibilityPreferences.reduceTransparency = newValue }
+  }
+
+  /// The user-selected color profile; unspecified hosts use the standard palette.
+  public var accessibilityColorProfile: AccessibilityColorProfile {
+    get { accessibilityPreferences.colorProfile ?? .standard }
+    set { accessibilityPreferences.colorProfile = newValue }
   }
 
   /// Framework rendering policy that produces deterministic captured output

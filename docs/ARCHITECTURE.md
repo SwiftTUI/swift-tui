@@ -782,3 +782,11 @@ primitive naming. Virtual controls retain committed action routes separately
 from keyboard/pointer regions, and their subtrees emit no draw commands.
 Combined operations preserve descendant ownership and invalidate their target
 when action membership or lifetime changes.
+
+Accessibility preferences use the inert `AccessibilityPreferences` and
+`AccessibilityColorProfile` vocabulary in `SwiftTUIPrimitives/Styling`.
+`RuntimePolicyEnvironment` exposes effective choices to views and style snapshots;
+the runtime captures host choices with geometry and applies explicit session
+overrides before resolution. `RuntimeRootEnvironmentSignature` includes all
+choices so preference-only changes invalidate retained views. The style codec
+carries additive optional string fields through WASI and WebSocket hosts.

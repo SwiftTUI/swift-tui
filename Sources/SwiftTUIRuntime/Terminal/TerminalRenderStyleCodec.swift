@@ -58,11 +58,42 @@
     case .some(.string("false")): reduceMotion = false
     default: return nil
     }
+    let differentiateWithoutColor: Bool?
+    switch object["differentiateWithoutColor"] {
+    case nil, .some(.null): differentiateWithoutColor = nil
+    case .some(.string("true")): differentiateWithoutColor = true
+    case .some(.string("false")): differentiateWithoutColor = false
+    default: return nil
+    }
+    let reduceTransparency: Bool?
+    switch object["reduceTransparency"] {
+    case nil, .some(.null): reduceTransparency = nil
+    case .some(.string("true")): reduceTransparency = true
+    case .some(.string("false")): reduceTransparency = false
+    default: return nil
+    }
+    let contrast: ColorSchemeContrast?
+    switch object["contrast"] {
+    case nil, .some(.null): contrast = nil
+    case .some(.string(let raw)):
+      guard let parsed = ColorSchemeContrast(rawValue: raw) else { return nil }
+      contrast = parsed
+    default: return nil
+    }
+    let colorProfile: AccessibilityColorProfile?
+    switch object["colorProfile"] {
+    case nil, .some(.null): colorProfile = nil
+    case .some(.string(let raw)):
+      guard let parsed = AccessibilityColorProfile(rawValue: raw) else { return nil }
+      colorProfile = parsed
+    default: return nil
+    }
     return .init(
-      appearance: appearance,
-      theme: theme,
-      reduceMotion: reduceMotion
-    )
+      appearance: appearance, theme: theme,
+      accessibilityPreferences: .init(
+        reduceMotion: reduceMotion, contrast: contrast,
+        differentiateWithoutColor: differentiateWithoutColor,
+        reduceTransparency: reduceTransparency, colorProfile: colorProfile))
   }
 
   private static func decodeAppearance(
@@ -191,6 +222,18 @@
       // String tokens keep older style parsers usable: they understand only
       // objects, strings and null, and ignore unknown string-valued fields.
       fields.append("\"reduceMotion\":\"\(reduceMotion ? "true" : "false")\"")
+    }
+    let preferences: [(String, String?)] = [
+      ("contrast", style.contrast?.rawValue),
+      ("differentiateWithoutColor", style.differentiateWithoutColor.map { $0 ? "true" : "false" }),
+      ("reduceTransparency", style.reduceTransparency.map { $0 ? "true" : "false" }),
+      ("colorProfile", style.colorProfile?.rawValue),
+    ]
+    for (key, value) in preferences {
+      if let value {
+        fields.append(
+          "\(styleTransportJSONStringLiteral(key)):\(styleTransportJSONStringLiteral(value))")
+      }
     }
     return "{\(fields.joined(separator: ","))}"
   }

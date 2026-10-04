@@ -1,8 +1,13 @@
+public import SwiftTUICore
+
 /// The resolved runtime configuration for a SwiftTUI runner.
 /// Argument parsers and environment-variable resolvers produce this value.
 /// `TerminalRunner.run(_:configuration:)` and peer runners consume it.
 /// This value is Foundation-free, `Sendable`, and value-typed.
 public struct RuntimeConfiguration: Sendable, Equatable {
+  /// Explicit session choices take precedence over host detection.
+  public var accessibilityPreferences = AccessibilityPreferences()
+
   public enum ColorMode: String, Sendable, Equatable {
     /// Auto-detect from TTY status and env vars (`NO_COLOR`, `FORCE_COLOR`, ...).
     case auto

@@ -1,4 +1,5 @@
 public import ArgumentParser
+public import SwiftTUIRuntime
 
 /// The framework-owned option group flattened into every `SwiftTUICommand`.
 ///
@@ -61,6 +62,53 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
     help: "Move the terminal cursor to focus in TUI output. [env: SWIFTTUI_CURSOR_FOLLOWS_FOCUS]"
   )
   public var cursorFollowsFocus: Bool = false
+
+  /// `auto` inherits host detection; `on` and `off` are explicit choices.
+  public enum AccessibilityChoice: String, CaseIterable, ExpressibleByArgument, Sendable {
+    case auto, on, off
+
+    package var boolValue: Bool? {
+      switch self {
+      case .auto: nil
+      case .on: true
+      case .off: false
+      }
+    }
+  }
+
+  @Option(
+    name: .customLong("motion-preference"),
+    help:
+      "Reduced motion: auto, on, off. Overrides the environment; --accessible/--reduce-motion still enable it."
+  )
+  public var motionPreference: AccessibilityChoice?
+
+  @Option(
+    name: .customLong("contrast-preference"),
+    help: "Increased contrast: auto, on, off. [env: SWIFTTUI_INCREASE_CONTRAST]")
+  public var contrastPreference: AccessibilityChoice?
+
+  @Option(
+    name: .customLong("differentiate-without-color"),
+    help: "Use cues beyond color: auto, on, off. [env: SWIFTTUI_DIFFERENTIATE_WITHOUT_COLOR]")
+  public var differentiateWithoutColor: AccessibilityChoice?
+
+  @Option(
+    name: .customLong("reduce-transparency"),
+    help: "Reduce transparency: auto, on, off. [env: SWIFTTUI_REDUCE_TRANSPARENCY]")
+  public var reduceTransparency: AccessibilityChoice?
+
+  @Option(
+    name: .customLong("color-profile"),
+    help:
+      "Palette: auto, standard, monochrome, protanopia, deuteranopia, tritanopia. [env: SWIFTTUI_COLOR_PROFILE]",
+    transform: { value in
+      guard value == "auto" || AccessibilityColorProfile(rawValue: value) != nil else {
+        throw ValidationError("Unknown accessibility color profile: \(value)")
+      }
+      return value
+    })
+  public var colorProfile: String?
 
   // ─── Output mode ────────────────────────────────────────────────
 

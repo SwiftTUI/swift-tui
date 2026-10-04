@@ -42,11 +42,11 @@ implementation/vendor targets are named below; they have no symbol count here.
 | Owning module | Direct product roots | Top-level | All public |
 |---|---|---:|---:|
 | [`SwiftTUI`](PUBLIC_API_BASELINE.md#swifttui) | `SwiftTUI` | 1 | 4 |
-| [`SwiftTUIRuntime`](PUBLIC_API_BASELINE.md#swifttuiruntime) | `SwiftTUIRuntime` | 60 | 517 |
+| [`SwiftTUIRuntime`](PUBLIC_API_BASELINE.md#swifttuiruntime) | `SwiftTUIRuntime` | 60 | 519 |
 | [`SwiftTUIProfiling`](PUBLIC_API_BASELINE.md#swifttuiprofiling) | `SwiftTUIProfiling` | 9 | 52 |
-| [`SwiftTUIViews`](PUBLIC_API_BASELINE.md#swifttuiviews) | `SwiftTUIViews` | 417 | 2561 |
+| [`SwiftTUIViews`](PUBLIC_API_BASELINE.md#swifttuiviews) | `SwiftTUIViews` | 417 | 2565 |
 | [`SwiftTUIAnimatedImage`](PUBLIC_API_BASELINE.md#swifttuianimatedimage) | `SwiftTUIAnimatedImage` | 5 | 36 |
-| [`SwiftTUIArguments`](PUBLIC_API_BASELINE.md#swifttuiarguments) | `SwiftTUIArguments` | 5 | 47 |
+| [`SwiftTUIArguments`](PUBLIC_API_BASELINE.md#swifttuiarguments) | `SwiftTUIArguments` | 5 | 57 |
 | [`SwiftTUIPTYPrimitives`](PUBLIC_API_BASELINE.md#swifttuiptyprimitives) | `SwiftTUIPTYPrimitives` | 7 | 40 |
 | [`SwiftTUITerminalCLI`](PUBLIC_API_BASELINE.md#swifttuiterminalcli) | None (non-product support target) | 6 | 24 |
 | [`SwiftTUICLIAttach`](PUBLIC_API_BASELINE.md#swifttuicliattach) | None (non-product support target) | 1 | 6 |
@@ -56,7 +56,7 @@ implementation/vendor targets are named below; they have no symbol count here.
 | [`SwiftTUIWebHostCLI`](PUBLIC_API_BASELINE.md#swifttuiwebhostcli) | `SwiftTUIWebHostCLI` | 2 | 8 |
 | [`SwiftTUIAndroidHost`](PUBLIC_API_BASELINE.md#swifttuiandroidhost) | `SwiftTUIAndroidHost` | 16 | 44 |
 | [`SwiftTUICore`](PUBLIC_API_BASELINE.md#swifttuicore) | None (non-product support target) | 40 | 273 |
-| [`SwiftTUIPrimitives`](PUBLIC_API_BASELINE.md#swifttuiprimitives) | None (non-product support target) | 172 | 1518 |
+| [`SwiftTUIPrimitives`](PUBLIC_API_BASELINE.md#swifttuiprimitives) | None (non-product support target) | 174 | 1542 |
 | [`SwiftTUIGraph`](PUBLIC_API_BASELINE.md#swifttuigraph) | None (non-product support target) | 75 | 486 |
 | [`SwiftTUIPTYCPrimitives`](PUBLIC_API_BASELINE.md#swifttuiptycprimitives) | None (non-product support target) | 0 | 0 |
 | [`SwiftTUIPlatformIO`](PUBLIC_API_BASELINE.md#swifttuiplatformio) | None (non-product support target) | 1 | 19 |
