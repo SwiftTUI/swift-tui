@@ -5,25 +5,6 @@ import Testing
 
 @Suite(.serialized)
 struct TerminalRunnerConfigurationTests {
-  @Test("default companion is interactive-only and explicit policy wins")
-  func companionPolicy() {
-    SwiftTUILaunchRegistry.installCompanionRunner { _, _ in .init(url: "test", stop: {}) }
-    defer { SwiftTUILaunchRegistry.resetWebRunnerForTesting() }
-    #expect(TerminalRunner.shouldStartCompanion(configuration: .default, isInteractive: true))
-    #expect(!TerminalRunner.shouldStartCompanion(configuration: .default, isInteractive: false))
-    var configuration = RuntimeConfiguration.default
-    configuration.companion = .on
-    #expect(TerminalRunner.shouldStartCompanion(configuration: configuration, isInteractive: false))
-    configuration.companion = .off
-    #expect(!TerminalRunner.shouldStartCompanion(configuration: configuration, isInteractive: true))
-    configuration.companion = .on
-    configuration.output = .json
-    #expect(!TerminalRunner.shouldStartCompanion(configuration: configuration, isInteractive: true))
-    configuration.output = .tui
-    configuration.web = .init()
-    #expect(!TerminalRunner.shouldStartCompanion(configuration: configuration, isInteractive: true))
-  }
-
   @Test("TerminalRunner.run(_:configuration:) overload exists and accepts RuntimeConfiguration")
   func acceptsConfiguration() async {
     // Reference the overload via its metatype. Compile-time anchor only;

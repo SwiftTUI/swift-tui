@@ -40,23 +40,25 @@
       }
       guard converted else { throw DiscoveryError(code: GetLastError()) }
       defer { _ = unsafe LocalFree(descriptor) }
-      var attributes = SECURITY_ATTRIBUTES(
+      var attributes = unsafe SECURITY_ATTRIBUTES(
         nLength: DWORD(MemoryLayout<SECURITY_ATTRIBUTES>.size),
         lpSecurityDescriptor: descriptor, bInheritHandle: false)
       var key: HKEY?
       var disposition: DWORD = 0
-      let status = Self.wide(path) { name in
+      let status = unsafe Self.wide(path) { name in
         unsafe RegCreateKeyExW(
           HKEY_CURRENT_USER, name, 0, nil, DWORD(REG_OPTION_VOLATILE),
-          REGSAM(KEY_ALL_ACCESS), &attributes, &key, &disposition)
+          REGSAM(KEY_SET_VALUE), &attributes, &key, &disposition)
       }
-      guard status == 0, let key else { throw DiscoveryError(code: UInt32(bitPattern: status)) }
+      guard status == 0, let key = unsafe key else {
+        throw DiscoveryError(code: UInt32(bitPattern: status))
+      }
       defer { _ = unsafe RegCloseKey(key) }
       guard disposition == REG_CREATED_NEW_KEY else { throw DiscoveryError(code: 183) }
       do {
         let record = Record(app: app, url: url, pid: GetCurrentProcessId(), created: created)
         let data = try JSONEncoder().encode(record)
-        let result = data.withUnsafeBytes { bytes in
+        let result = unsafe data.withUnsafeBytes { bytes in
           unsafe RegSetValueExW(
             key, nil, 0, DWORD(REG_BINARY),
             bytes.baseAddress?.assumingMemoryBound(to: BYTE.self), DWORD(bytes.count))
@@ -71,16 +73,18 @@
     func remove() {
       guard !removed else { return }
       removed = true
-      _ = Self.wide(path) { unsafe RegDeleteTreeW(HKEY_CURRENT_USER, $0) }
+      _ = unsafe Self.wide(path) { unsafe RegDeleteTreeW(HKEY_CURRENT_USER, $0) }
     }
 
     static func urls(app: String) throws -> [String] {
       var parent: HKEY?
-      let status = wide(root) {
-        unsafe RegOpenKeyExW(HKEY_CURRENT_USER, $0, 0, REGSAM(KEY_READ), &parent)
+      let status = unsafe wide(root) {
+        unsafe RegOpenKeyExW(HKEY_CURRENT_USER, $0, 0, REGSAM(KEY_ENUMERATE_SUB_KEYS), &parent)
       }
       if status == 2 { return [] }
-      guard status == 0, let parent else { throw DiscoveryError(code: UInt32(bitPattern: status)) }
+      guard status == 0, let parent = unsafe parent else {
+        throw DiscoveryError(code: UInt32(bitPattern: status))
+      }
       defer { _ = unsafe RegCloseKey(parent) }
       var index: DWORD = 0
       var results: [String] = []
@@ -95,9 +99,11 @@
         index += 1
         let child = String(decoding: name.prefix(Int(count)), as: UTF16.self)
         var key: HKEY?
-        let opened = wide(child) { unsafe RegOpenKeyExW(parent, $0, 0, REGSAM(KEY_READ), &key) }
-        guard opened == 0, let key else { continue }
-        let record = readRecord(key)
+        let opened = unsafe wide(child) {
+          unsafe RegOpenKeyExW(parent, $0, 0, REGSAM(KEY_QUERY_VALUE), &key)
+        }
+        guard opened == 0, let key = unsafe key else { continue }
+        let record = unsafe readRecord(key)
         _ = unsafe RegCloseKey(key)
         guard let record, record.app == app, isCompanionURL(record.url),
           creationTime(processID: record.pid) == record.created
@@ -114,7 +120,7 @@
         type == REG_BINARY, size > 0, size <= 16_384
       else { return nil }
       var data = Data(count: Int(size))
-      let result = data.withUnsafeMutableBytes { bytes in
+      let result = unsafe data.withUnsafeMutableBytes { bytes in
         unsafe RegQueryValueExW(
           key, nil, nil, &type,
           bytes.baseAddress?.assumingMemoryBound(to: BYTE.self), &size)
@@ -150,7 +156,8 @@
 
     private static func currentUserSID() throws -> String {
       var token: HANDLE?
-      guard unsafe OpenProcessToken(GetCurrentProcess(), DWORD(TOKEN_QUERY), &token), let token
+      guard unsafe OpenProcessToken(GetCurrentProcess(), DWORD(TOKEN_QUERY), &token),
+        let token = unsafe token
       else {
         throw DiscoveryError(code: GetLastError())
       }
@@ -159,13 +166,14 @@
       _ = unsafe GetTokenInformation(token, TokenUser, nil, 0, &size)
       guard size > 0 else { throw DiscoveryError(code: GetLastError()) }
       var data = Data(count: Int(size))
-      return try data.withUnsafeMutableBytes { bytes in
+      return unsafe try data.withUnsafeMutableBytes { bytes in
         guard unsafe GetTokenInformation(token, TokenUser, bytes.baseAddress, size, &size) else {
           throw DiscoveryError(code: GetLastError())
         }
         let user = unsafe bytes.loadUnaligned(as: TOKEN_USER.self)
         var string: LPWSTR?
-        guard unsafe ConvertSidToStringSidW(user.User.Sid, &string), let string else {
+        guard unsafe ConvertSidToStringSidW(user.User.Sid, &string), let string = unsafe string
+        else {
           throw DiscoveryError(code: GetLastError())
         }
         defer { _ = unsafe LocalFree(string) }
@@ -177,7 +185,7 @@
       rethrows -> T
     {
       let characters = Array(string.utf16) + [0]
-      return try characters.withUnsafeBufferPointer { buffer in try body(unsafe buffer.baseAddress!)
+      return try characters.withUnsafeBufferPointer { buffer in unsafe try body(buffer.baseAddress!)
       }
     }
 
