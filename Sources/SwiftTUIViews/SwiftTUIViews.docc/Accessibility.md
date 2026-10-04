@@ -127,6 +127,38 @@ position; connector glyphs are decorative. Authored row buttons retain their own
 actions. The outline does not claim the ARIA tree pattern's managed arrow-key
 model. Verify collection reading, context and operation with the intended reader.
 
+### Assistive Focus And Content Navigation
+
+`@AccessibilityFocusState` binds semantic focus independently of `@FocusState`
+and terminal keyboard focus. Use a Boolean for one destination or an optional
+hashable value for several destinations:
+
+```swift
+@AccessibilityFocusState private var review: String?
+
+Text("Quarterly results")
+    .accessibilityRole(.heading(level: 2))
+    .accessibilityFocused($review, equals: "summary")
+    .accessibilityNavigationCategory("Report sections")
+```
+
+Assign `review = "summary"` to request native browser focus on that committed
+semantic element; assign `nil` to clear it. Static text does not become a
+terminal keyboard stop. Disabled controls remain reviewable but cannot mutate
+state. Removed or out-of-modal-scope targets clear their binding; delayed events
+from a removed target cannot focus a replacement. Repainting does not repeat an
+already-applied focus request. Browser focus changes update the binding only
+where the host can observe native semantic focus. A screen reader's independent
+virtual review cursor is not exposed by browser DOM focus events.
+
+Repeat `accessibilityNavigationCategory(_:)` to include a destination in several
+named groups. Canvas and DOM hosts expose these groups through native controls
+in the scene's **Navigate content** panel. Choosing a destination moves semantic
+review without sending a keyboard-focus request to the application. Blank names
+are ignored and repeated category names are deduplicated. Native heading and
+landmark navigation still uses the authored roles. Named groups include committed,
+visible destinations; they do not materialize offscreen virtual rows.
+
 ### Choosing An Operable Adjustable Control
 
 Use a built-in `Stepper` or `Slider` for adjustment. These controls register

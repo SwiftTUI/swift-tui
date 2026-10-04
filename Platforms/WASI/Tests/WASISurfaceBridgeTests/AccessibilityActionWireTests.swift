@@ -46,6 +46,20 @@ import Testing
         ])
   }
 
+  @Test func assistiveFocusRemainsDistinctFromKeyboardFocus() {
+    var parser = WebSurfaceInputParser()
+    let events = parser.feed(
+      Array(
+        "\u{1E}accessibility:20:t:accessibilityFocus\n\u{1E}accessibility:21:t:accessibilityBlur\n"
+          .utf8)
+    ).events
+    #expect(
+      events == [
+        .accessibility(.init(target: "t", action: .accessibilityFocus, requestID: 20)),
+        .accessibility(.init(target: "t", action: .accessibilityBlur, requestID: 21)),
+      ])
+  }
+
   @Test func malformedRequestsDoNotBecomeKeyboardInput() {
     for command in [
       "accessibility::activate", "accessibility:t:unknown", "accessibility:t:focus:extra",
@@ -54,6 +68,7 @@ import Testing
       "accessibility:t:custom:name:", "accessibility:t:custom:name:%ZZ",
       "accessibility:t:custom:text:Reset", "accessibility:%ZZ:activate",
       "accessibility:t:setValue:text:%ZZ",
+      "accessibility:t:accessibilityFocus:extra", "accessibility:t:accessibilityBlur:extra",
     ] {
       var parser = WebSurfaceInputParser()
       #expect(parser.feed(Array("\u{1E}\(command)\n".utf8)).events.isEmpty)

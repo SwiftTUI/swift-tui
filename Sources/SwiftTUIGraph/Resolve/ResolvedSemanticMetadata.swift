@@ -678,6 +678,7 @@ package struct AccessibilityStructure: Equatable, Sendable {
   package var isVirtual = false
   package var parent: Identity? = nil
   package var keepsVirtualChildren = false
+  package var navigationCategories: [String] = []
   package init() {}
 }
 

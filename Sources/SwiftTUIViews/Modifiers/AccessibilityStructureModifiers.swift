@@ -125,3 +125,31 @@ package func markingVirtualAccessibility(_ root: ResolvedNode, labelOnly: Bool =
   }
   return completed.removeLast()
 }
+
+extension View {
+  /// Adds this semantic element to a named navigation group. Browser hosts
+  /// expose groups through native controls alongside their role-based reading
+  /// navigation. This does not create a keyboard focus stop in the application.
+  public func accessibilityNavigationCategory(_ name: String) -> some View {
+    modifier(AccessibilityNavigationCategoryModifier(name: name))
+  }
+}
+
+private struct AccessibilityNavigationCategoryModifier: IterativePrimitiveViewModifier {
+  let name: String
+  func makeResolveWork<Base: View>(
+    content: ModifierContentInputs<Base>, in context: ResolveContext
+  ) -> ResolveWork<[ResolvedNode]> {
+    content.resolveWork(in: context).map { completed in
+      guard name.contains(where: { !$0.isWhitespace }) else { return [completed] }
+      var node = completed
+      var structure = node.semanticMetadata.accessibilityStructure ?? .init()
+      if !structure.navigationCategories.contains(name) {
+        structure.navigationCategories.append(name)
+      }
+      node.semanticMetadata.accessibilityStructure = structure
+      installAccessibilityFocusActions(on: &node)
+      return [node]
+    }
+  }
+}

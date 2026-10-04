@@ -479,6 +479,11 @@ class AccessibilityTreeMounter {
   openLink;
   element;
   announcerElement;
+  navigationElement;
+  categorySelect;
+  targetSelect;
+  navigationGo;
+  navigationGroups = new Map;
   domIdentity = Array.from(crypto.getRandomValues(new Uint32Array(4)), (part) => part.toString(16)).join("-");
   nodesById = new Map;
   actionGroupsById = new Map;
@@ -492,6 +497,7 @@ class AccessibilityTreeMounter {
   pendingValues = new Map;
   pendingFocus;
   runtimeFocusedElement;
+  appliedAssistiveFocusGeneration = -1n;
   compositionCommits = new WeakMap;
   get hasInteractiveControls() {
     return [...this.modelsById.values()].some((node) => this.isTabStop(node));
@@ -515,6 +521,37 @@ class AccessibilityTreeMounter {
   constructor(sendAction, openLink) {
     this.sendAction = sendAction;
     this.openLink = openLink;
+    this.navigationElement = document.createElement("details");
+    this.navigationElement.hidden = true;
+    this.navigationElement.className = "webhost-scene__content-navigation";
+    const summary = document.createElement("summary");
+    summary.textContent = "Navigate content";
+    const categoryLabel = document.createElement("label");
+    categoryLabel.textContent = "Content group ";
+    this.categorySelect = document.createElement("select");
+    categoryLabel.append(this.categorySelect);
+    const targetLabel = document.createElement("label");
+    targetLabel.textContent = "Destination ";
+    this.targetSelect = document.createElement("select");
+    targetLabel.append(this.targetSelect);
+    this.navigationGo = document.createElement("button");
+    this.navigationGo.type = "button";
+    this.navigationGo.textContent = "Go to content";
+    this.navigationElement.append(summary, categoryLabel, targetLabel, this.navigationGo);
+    this.categorySelect.addEventListener("change", () => this.refreshNavigationTargets());
+    this.navigationGo.addEventListener("click", () => {
+      const node = this.modelsById.get(this.targetSelect.value);
+      const target = node ? this.nodesById.get(node.id) : undefined;
+      if (!node?.actionTarget || !target || !node.actions?.includes("accessibilityFocus"))
+        return;
+      this.presenting = true;
+      try {
+        target.focus();
+      } finally {
+        this.presenting = false;
+      }
+      this.sendAction?.(node.actionTarget, { action: "accessibilityFocus" }, String(++this.nextRequestID));
+    });
     this.element = document.createElement("div");
     this.element.className = "webhost-scene__accessibility-tree";
     this.element.style.position = "absolute";
@@ -609,7 +646,20 @@ class AccessibilityTreeMounter {
         container.insertBefore(group, container.children[offset + 1] ?? null);
       childOffsets.set(container, offset + (group ? 2 : 1));
     }
+    this.refreshNavigation(visibleNodes);
     this.announceLiveRegionChanges(visibleNodes, normalizedAnnouncements);
+    const assistiveRequest = options.focusRequest;
+    const requestGeneration = assistiveRequest ? BigInt(assistiveRequest.generation) : undefined;
+    const applyAssistiveRequest = (options.synchronizeFocus ?? true) && requestGeneration !== undefined && requestGeneration > this.appliedAssistiveFocusGeneration;
+    if (applyAssistiveRequest && assistiveRequest) {
+      this.appliedAssistiveFocusGeneration = requestGeneration;
+      const target = visibleNodes.find((node) => node.actionTarget === assistiveRequest.target);
+      if (assistiveRequest.target !== undefined && target) {
+        this.nodesById.get(target.id)?.focus({ preventScroll: true });
+      } else if (assistiveRequest.target === undefined && this.element.contains(document.activeElement)) {
+        document.activeElement?.blur();
+      }
+    }
     const focused = visibleNodes.find((node) => node.isFocused);
     const element = focused ? this.nodesById.get(focused.id) : undefined;
     const pending = this.pendingFocus;
@@ -619,7 +669,7 @@ class AccessibilityTreeMounter {
     if (focusAcknowledged) {
       this.pendingFocus = undefined;
     }
-    if ((options.synchronizeFocus ?? true) && synchronize && element && this.pendingFocus === undefined) {
+    if ((options.synchronizeFocus ?? true) && !applyAssistiveRequest && synchronize && element && this.pendingFocus === undefined) {
       const focusElement = selectionFocusElement(element);
       if (document.activeElement !== focusElement)
         focusElement.focus?.({ preventScroll: true });
@@ -636,8 +686,43 @@ class AccessibilityTreeMounter {
     this.pendingValues.clear();
     this.pendingFocus = undefined;
     this.runtimeFocusedElement = undefined;
+    this.appliedAssistiveFocusGeneration = -1n;
     this.element.replaceChildren();
     this.announcerElement.replaceChildren();
+    this.navigationElement.remove();
+  }
+  refreshNavigation(nodes) {
+    this.navigationGroups = new Map;
+    for (const node of nodes) {
+      if (!node.label?.trim() || !node.actionTarget || !node.actions?.includes("accessibilityFocus"))
+        continue;
+      for (const category of node.navigationCategories ?? []) {
+        const entries = this.navigationGroups.get(category) ?? [];
+        entries.push(node);
+        this.navigationGroups.set(category, entries);
+      }
+    }
+    this.navigationElement.hidden = this.navigationGroups.size === 0;
+    this.setNavigationOptions(this.categorySelect, [...this.navigationGroups.keys()].map((name) => [name, name]));
+    this.refreshNavigationTargets();
+  }
+  refreshNavigationTargets() {
+    const entries = this.navigationGroups.get(this.categorySelect.value) ?? [];
+    this.setNavigationOptions(this.targetSelect, entries.map((node) => [node.id, node.label ?? ""]));
+    this.navigationGo.disabled = entries.length === 0;
+  }
+  setNavigationOptions(select, entries) {
+    if (select.options.length === entries.length && entries.every(([value, label], index) => select.options[index]?.value === value && select.options[index]?.textContent === label))
+      return;
+    const selected = select.value;
+    select.replaceChildren(...entries.map(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      return option;
+    }));
+    if (entries.some(([value]) => value === selected))
+      select.value = selected;
   }
   clearEditable(element) {
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA")
@@ -714,7 +799,8 @@ class AccessibilityTreeMounter {
     const current = () => this.nodesById.get(node.id) === element ? this.modelsById.get(node.id) : undefined;
     const send = (request) => {
       const model = current();
-      if (this.presenting || !model?.actionTarget || model.isEnabled === false || model.properties?.readOnly === true && request.action !== "focus" || !model.actions?.includes(request.action))
+      const semanticFocus = request.action === "accessibilityFocus" || request.action === "accessibilityBlur";
+      if (this.presenting || !model?.actionTarget || model.isEnabled === false && !semanticFocus || model.properties?.readOnly === true && request.action !== "focus" && !semanticFocus || !model.actions?.includes(request.action))
         return;
       const requestID = ++this.nextRequestID;
       if (request.action === "setValue")
@@ -723,7 +809,15 @@ class AccessibilityTreeMounter {
         this.pendingFocus = { id: node.id, requestID };
       this.sendAction?.(model.actionTarget, request, String(requestID));
     };
-    element.addEventListener(node.selection ? "focusin" : "focus", () => send({ action: "focus" }));
+    element.addEventListener(node.selection ? "focusin" : "focus", () => {
+      send({ action: "focus" });
+      send({ action: "accessibilityFocus" });
+    });
+    element.addEventListener(node.selection ? "focusout" : "blur", (event) => {
+      if (node.selection && element.contains(event.relatedTarget))
+        return;
+      send({ action: "accessibilityBlur" });
+    });
     if (node.selection) {
       for (const type of ["pointerdown", "pointerup", "pointermove"])
         element.addEventListener(type, (event) => event.stopPropagation());
@@ -860,6 +954,10 @@ class AccessibilityTreeMounter {
       setOrRemoveAttribute(element, "href", node.isEnabled !== false ? safeLinkDestination(destination) : undefined);
       element.style.pointerEvents = "auto";
     }
+    if (node.isAccessibilityFocused)
+      element.dataset.accessibilityFocused = "true";
+    else
+      delete element.dataset.accessibilityFocused;
     const properties = node.properties;
     const role = roleMapping(node.role);
     if (properties?.headingLevel !== undefined) {
@@ -2689,6 +2787,7 @@ class WebHostOutputDecoder {
       damage: frame.damage,
       accessibilityTree: frame.accessibilityTree,
       accessibilityActionResponse: frame.accessibilityActionResponse,
+      accessibilityFocusRequest: frame.accessibilityFocusRequest,
       accessibilityAnnouncements: frame.accessibilityAnnouncements,
       scrollRegions: frame.scrollRegions,
       paragraphs: frame.paragraphs,
@@ -2843,7 +2942,13 @@ function isSurfaceGridDimension(value) {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 2147483647;
 }
 function hasValidAdditiveFrameFields(frame) {
-  return isOptionalSafeInteger(frame.epoch) && isOptionalSafeInteger(frame.gen) && (frame.geometryRevision === undefined || isGeometryRevision(frame.geometryRevision, true)) && (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
+  return (frame.accessibilityFocusRequest === undefined || isAccessibilityFocusPresentation(frame.accessibilityFocusRequest)) && isOptionalSafeInteger(frame.epoch) && isOptionalSafeInteger(frame.gen) && (frame.geometryRevision === undefined || isGeometryRevision(frame.geometryRevision, true)) && (frame.links === undefined || isWebHostSurfaceLinks(frame.links)) && (frame.linkTargets === undefined || isWebHostSurfaceLinkTargets(frame.linkTargets)) && (frame.focusPresentation === undefined || isWebHostFocusPresentation(frame.focusPresentation)) && (frame.preferredGridWidth === undefined || Number.isSafeInteger(frame.preferredGridWidth) && frame.preferredGridWidth >= 0) && (frame.preferredGridHeight === undefined || Number.isSafeInteger(frame.preferredGridHeight) && frame.preferredGridHeight >= 0);
+}
+function isAccessibilityFocusPresentation(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const request = value;
+  return typeof request.generation === "string" && /^(0|[1-9][0-9]{0,19})$/.test(request.generation) && BigInt(request.generation) <= 18446744073709551615n && (request.target === undefined || typeof request.target === "string");
 }
 function isOptionalSafeInteger(value) {
   return value === undefined || Number.isSafeInteger(value);
@@ -2888,7 +2993,7 @@ function isWebHostAccessibilityNode(value) {
     return false;
   }
   const node = value;
-  return (node.opensLink === undefined || typeof node.opensLink === "boolean") && (node.customActions === undefined || Array.isArray(node.customActions) && node.customActions.length <= 65536 && node.customActions.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.customActions).size === node.customActions.length) && (node.selection === undefined || isAccessibilitySelection(node.selection)) && (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
+  return (node.opensLink === undefined || typeof node.opensLink === "boolean") && (node.customActions === undefined || Array.isArray(node.customActions) && node.customActions.length <= 65536 && node.customActions.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.customActions).size === node.customActions.length) && (node.selection === undefined || isAccessibilitySelection(node.selection)) && (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.isAccessibilityFocused === undefined || typeof node.isAccessibilityFocused === "boolean") && (node.navigationCategories === undefined || Array.isArray(node.navigationCategories) && node.navigationCategories.length <= 65536 && node.navigationCategories.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.navigationCategories).size === node.navigationCategories.length) && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
 }
 function isAccessibilitySelection(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -5889,6 +5994,7 @@ class WebHostSceneRuntime {
   fontResult;
   loadingFont;
   accessibilityTree;
+  chrome;
   diagnosticText;
   resizeObserver;
   detachMetricObservers;
@@ -5947,12 +6053,15 @@ class WebHostSceneRuntime {
     this.element.dataset.sceneId = options.descriptor.id;
     this.element.hidden = true;
     const header = document.createElement("div");
+    this.chrome = document.createElement("div");
+    this.chrome.className = "webhost-scene__chrome";
+    this.chrome.append(header);
     header.className = "webhost-scene__header";
     header.textContent = options.descriptor.title ?? options.descriptor.id;
     this.terminalMount = document.createElement("div");
     this.terminalMount.className = "webhost-scene__terminal";
     this.terminalMount.tabIndex = 0;
-    this.element.append(header, this.terminalMount);
+    this.element.append(this.chrome, this.terminalMount);
     options.mount.appendChild(this.element);
     this.applyVisibility();
   }
@@ -5978,6 +6087,7 @@ class WebHostSceneRuntime {
     this.accessibilityTree = new AccessibilityTreeMounter((target, request, requestID) => {
       this.onInput(encodeAccessibilityActionMessage(target, request, requestID));
     }, this.onOpenHyperlink);
+    this.chrome.append(this.accessibilityTree.navigationElement);
     this.terminalMount.replaceChildren(this.surfaceElement, this.accessibilityTree.element, this.accessibilityTree.announcerElement);
     if (this.domSurfaceRoot)
       this.domFocus = new DomFocusPresentation(this.terminalMount, () => this.nativePointerGesture || this.hasSurfaceSelection());
@@ -6793,7 +6903,8 @@ class WebHostSceneRuntime {
       cellHeight: this.cellHeight
     }, [...announcements], {
       synchronizeFocus: this.synchronizeAccessibilityFocus && !this.nativePointerGesture && !this.hasSurfaceSelection(),
-      actionResponse: frame.accessibilityActionResponse
+      actionResponse: frame.accessibilityActionResponse,
+      focusRequest: frame.accessibilityFocusRequest
     });
   }
   surfaceMetrics() {

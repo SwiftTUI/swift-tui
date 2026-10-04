@@ -44,7 +44,7 @@ implementation/vendor targets are named below; they have no symbol count here.
 | [`SwiftTUI`](PUBLIC_API_BASELINE.md#swifttui) | `SwiftTUI` | 1 | 4 |
 | [`SwiftTUIRuntime`](PUBLIC_API_BASELINE.md#swifttuiruntime) | `SwiftTUIRuntime` | 60 | 519 |
 | [`SwiftTUIProfiling`](PUBLIC_API_BASELINE.md#swifttuiprofiling) | `SwiftTUIProfiling` | 9 | 52 |
-| [`SwiftTUIViews`](PUBLIC_API_BASELINE.md#swifttuiviews) | `SwiftTUIViews` | 417 | 2568 |
+| [`SwiftTUIViews`](PUBLIC_API_BASELINE.md#swifttuiviews) | `SwiftTUIViews` | 418 | 2580 |
 | [`SwiftTUIAnimatedImage`](PUBLIC_API_BASELINE.md#swifttuianimatedimage) | `SwiftTUIAnimatedImage` | 5 | 36 |
 | [`SwiftTUIArguments`](PUBLIC_API_BASELINE.md#swifttuiarguments) | `SwiftTUIArguments` | 5 | 57 |
 | [`SwiftTUIPTYPrimitives`](PUBLIC_API_BASELINE.md#swifttuiptyprimitives) | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -55,9 +55,9 @@ implementation/vendor targets are named below; they have no symbol count here.
 | [`SwiftTUIWebHost`](PUBLIC_API_BASELINE.md#swifttuiwebhost) | `SwiftTUIWebHost` | 3 | 16 |
 | [`SwiftTUIWebHostCLI`](PUBLIC_API_BASELINE.md#swifttuiwebhostcli) | `SwiftTUIWebHostCLI` | 2 | 8 |
 | [`SwiftTUIAndroidHost`](PUBLIC_API_BASELINE.md#swifttuiandroidhost) | `SwiftTUIAndroidHost` | 16 | 44 |
-| [`SwiftTUICore`](PUBLIC_API_BASELINE.md#swifttuicore) | None (non-product support target) | 40 | 273 |
+| [`SwiftTUICore`](PUBLIC_API_BASELINE.md#swifttuicore) | None (non-product support target) | 41 | 278 |
 | [`SwiftTUIPrimitives`](PUBLIC_API_BASELINE.md#swifttuiprimitives) | None (non-product support target) | 174 | 1542 |
-| [`SwiftTUIGraph`](PUBLIC_API_BASELINE.md#swifttuigraph) | None (non-product support target) | 75 | 486 |
+| [`SwiftTUIGraph`](PUBLIC_API_BASELINE.md#swifttuigraph) | None (non-product support target) | 75 | 492 |
 | [`SwiftTUIPTYCPrimitives`](PUBLIC_API_BASELINE.md#swifttuiptycprimitives) | None (non-product support target) | 0 | 0 |
 | [`SwiftTUIPlatformIO`](PUBLIC_API_BASELINE.md#swifttuiplatformio) | None (non-product support target) | 1 | 19 |
 | [`SwiftTUITestSupport`](PUBLIC_API_BASELINE.md#swifttuitestsupport) | `SwiftTUITestSupport` | 0 | 0 |

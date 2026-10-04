@@ -326,6 +326,8 @@ extension RunLoop {
       localFocusBindingRegistry.discardArrivalDefaults()
       armedArrivalDefault = false
     }
+    let accessibilityFocusChanged = accessibilityFocusCoordinator.synchronize(
+      snapshot: renderedArtifacts.semanticSnapshot, registry: localFocusBindingRegistry)
     let focusStateChanged = localFocusBindingRegistry.sync(
       actualFocusedIdentity: focusTracker.currentFocusIdentity
     )
@@ -353,14 +355,15 @@ extension RunLoop {
     convergence.focusGraphChanged = convergence.focusGraphChanged || focusChanged
     convergence.focusBindingChanged =
       convergence.focusBindingChanged || appliedFocusRequest || appliedDefaultFocusRequest
-      || armedArrivalDefault || focusStateChanged
+      || armedArrivalDefault || focusStateChanged || accessibilityFocusChanged
     convergence.focusedValuesChanged =
       convergence.focusedValuesChanged || focusedValuesChanged
     convergence.scrollPositionChanged =
       convergence.scrollPositionChanged || scrollPositionChanged
 
     if focusChanged || appliedFocusRequest || appliedDefaultFocusRequest || armedArrivalDefault
-      || focusStateChanged || focusedValuesChanged || scrollPositionChanged
+      || focusStateChanged || accessibilityFocusChanged || focusedValuesChanged
+      || scrollPositionChanged
     {
       appendLifecycleCarryForward(
         renderedArtifacts.commitPlan.lifecycle,

@@ -16,9 +16,11 @@ package enum AccessibilityActionWire {
     else { return nil }
     let action: AccessibilityAction
     switch kind {
-    case .focus, .activate, .increment, .decrement:
+    case .focus, .activate, .increment, .decrement, .accessibilityFocus, .accessibilityBlur:
       guard parts.count == 3 else { return nil }
       switch kind {
+      case .accessibilityFocus: action = .accessibilityFocus
+      case .accessibilityBlur: action = .accessibilityBlur
       case .focus: action = .focus
       case .activate: action = .activate
       case .increment: action = .increment

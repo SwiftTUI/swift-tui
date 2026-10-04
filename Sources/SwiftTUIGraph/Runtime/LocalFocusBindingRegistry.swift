@@ -341,7 +341,13 @@ package struct DefaultFocusArrivalSnapshot: Sendable {
   }
 }
 
+package enum FocusBindingDomain: Sendable {
+  case keyboard, accessibility
+}
+
 package struct FocusBindingRegistrationSnapshot: Sendable {
+  package var domain: FocusBindingDomain
+  package var requestGeneration: UInt64
   package var identity: Identity
   package var bindingKey: FocusBindingKey
   package var bindingID: String
@@ -358,8 +364,12 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     hasPendingRequest: Bool,
     isSelected: Bool,
     ownerIdentity: Identity? = nil,
+    domain: FocusBindingDomain = .keyboard,
+    requestGeneration: UInt64 = 0,
     applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
   ) {
+    self.domain = domain
+    self.requestGeneration = requestGeneration
     self.identity = identity
     self.bindingKey = bindingKey
     self.bindingID = bindingID
@@ -416,6 +426,8 @@ package final class LocalFocusBindingRegistry: Equatable {
     bindingID: String,
     hasPendingRequest: Bool,
     isSelected: Bool,
+    domain: FocusBindingDomain = .keyboard,
+    requestGeneration: UInt64 = 0,
     applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
   ) {
     let registration = FocusBindingRegistrationSnapshot(
@@ -424,6 +436,8 @@ package final class LocalFocusBindingRegistry: Equatable {
       bindingID: bindingID,
       hasPendingRequest: hasPendingRequest,
       isSelected: isSelected,
+      domain: domain,
+      requestGeneration: requestGeneration,
       applyRuntimeFocus: applyRuntimeFocus
     )
     registrations.append(registration)
@@ -451,9 +465,10 @@ package final class LocalFocusBindingRegistry: Equatable {
   }
 
   package func desiredFocusRequest(
-    allowedIdentities: Set<Identity>
+    allowedIdentities: Set<Identity>,
+    domain: FocusBindingDomain = .keyboard
   ) -> FocusBindingRequest {
-    let snapshot = self.snapshot()
+    let snapshot = self.snapshot().filter { $0.domain == domain }
     var seenBindingKeys: Set<FocusBindingKey> = []
 
     for registration in snapshot {
@@ -519,9 +534,10 @@ package final class LocalFocusBindingRegistry: Equatable {
   }
 
   package func sync(
-    actualFocusedIdentity: Identity?
+    actualFocusedIdentity: Identity?,
+    domain: FocusBindingDomain = .keyboard
   ) -> Bool {
-    let snapshot = self.snapshot()
+    let snapshot = self.snapshot().filter { $0.domain == domain }
     let grouped = orderedGroups(from: snapshot)
     var changed = false
 

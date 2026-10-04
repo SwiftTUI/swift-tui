@@ -392,6 +392,7 @@ extension RunLoop {
     )
     appendPendingAccessibilityAnnouncements(to: &artifacts)
     accessibilityTargetLifetimes.stamp(&artifacts.semanticSnapshot)
+    accessibilityFocusCoordinator.present(in: &artifacts.semanticSnapshot)
     latestSemanticSnapshot = artifacts.semanticSnapshot
 
     let focusPresentation = artifacts.semanticSnapshot.focusPresentation(

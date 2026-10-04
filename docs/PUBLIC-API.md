@@ -64,7 +64,7 @@ The canonical public surface is the API ordinary app code uses first:
   `NavigationStack`, `TabView`, and `Button`. They also include `Toggle`,
   `Slider`, `TextField`, `TextEditor`, `Picker`, `Text`, `Image`, and the rest.
 - Property wrappers and environment plumbing: `@State`, `@Binding`,
-  `@Environment`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and the
+  `@Environment`, `@FocusState`, `@AccessibilityFocusState`, `@FocusedValue`, `@FocusedBinding`, and the
   repo-owned `@Bindable`. Custom wrappers conform to `DynamicProperty`
   through its
   `update(in:) -> DynamicPropertyUpdateResult` contract. The context carries
@@ -74,7 +74,8 @@ The canonical public surface is the API ordinary app code uses first:
   [Custom-Dynamic-Properties.md](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Custom-Dynamic-Properties.md).
 - Accessibility authoring includes `accessibilityElement(children:)` with
   `AccessibilityChildBehavior`, `accessibilitySortPriority(_:)`,
-  `accessibilityRepresentation` and `accessibilityChildren`. These are canonical
+  `accessibilityRepresentation`, `accessibilityChildren`, independent
+  `accessibilityFocused` bindings and `accessibilityNavigationCategory(_:)`. These are canonical
   `View` APIs; representation controls bind to ordinary application state.
 - The modifier algebra: `ViewModifier`, `View.modifier(_:)`, `ModifiedContent`,
   and the canonical identity/layout/styling/presentation modifiers.

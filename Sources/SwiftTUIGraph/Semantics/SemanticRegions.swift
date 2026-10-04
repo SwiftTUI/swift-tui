@@ -179,6 +179,10 @@ public struct AccessibilityNode: Equatable, Sendable {
   /// Placed option routes, keyed by the control's opaque selection tokens.
   package var selectionOptionRects: [String: CellRect] = [:]
   public var isEnabled: Bool = true
+  /// Assistive semantic focus, independent of keyboard focus.
+  public var isAccessibilityFocused: Bool = false
+  /// Authored named navigation groups, in addition to native role navigation.
+  public var navigationCategories: [String] = []
   package var actionIdentity: Identity? = nil
   /// Combined descendants retain their own committed routing and lifetime checks.
   package var combinedActions: [String: AccessibilityCombinedAction] = [:]

@@ -32,6 +32,8 @@ classifications:
   canonical:
     - SwiftTUIPrimitives.AccessibilityPreferences
     - SwiftTUIPrimitives.AccessibilityColorProfile
+    - SwiftTUIViews.AccessibilityFocusState
+    - SwiftTUICore.AccessibilityFocusPresentation
     - SwiftTUIViews.AccessibilityTraits
     - SwiftTUIViews.AccessibilityAdjustmentDirection
     - SwiftTUIGraph.AccessibilityChildBehavior

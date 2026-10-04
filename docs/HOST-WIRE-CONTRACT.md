@@ -81,6 +81,22 @@ terminal style can appear without changing that choice. The encoder emits a
 v3 record only after a consumer declares `acceptsDeltaFrames` and establishes
 a compatible baseline. The record also carries `baselineGen`.
 
+## Assistive focus and named navigation
+
+Full and delta frames may carry `accessibilityFocusRequest` with a decimal-string
+UInt64 `generation` and an optional opaque `target`. An absent target requests
+clearing semantic focus. Hosts apply each increasing generation once; a repeat
+frame must not take focus back after the user reviews elsewhere. This serial is
+independent of keyboard focus and frame sequence. Accessibility nodes may carry
+`isAccessibilityFocused` and a unique array of nonblank `navigationCategories`.
+Older consumers ignore these additive fields.
+
+The parameterless `accessibilityFocus` and `accessibilityBlur` input actions report
+observable semantic DOM focus. They use the ordinary correlated action envelope,
+opaque target lifetime and published modal-scope guards. They can review disabled
+controls but never activate them, and do not change terminal keyboard focus.
+They do not report a reader's unobservable virtual cursor.
+
 ## Evolution rules
 
 The following rules are load-bearing:

@@ -328,7 +328,7 @@ extension LocalFocusBindingRegistry: RuntimeRegistry {
     for registration in snapshot() {
       builder.add(
         "focusBinding",
-        "\(registration.identity.path)#\(registration.bindingID)"
+        "\(registration.domain):\(registration.identity.path)#\(registration.bindingID)"
       )
     }
   }

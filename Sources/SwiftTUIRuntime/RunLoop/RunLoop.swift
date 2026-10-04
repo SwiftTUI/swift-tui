@@ -86,6 +86,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// `latestSemanticSnapshot` while awaiting a rerender, but cannot issue tokens.
   package var publishedAccessibilitySnapshot = SemanticSnapshot()
   package var accessibilityTargetLifetimes = AccessibilityTargetLifetimes()
+  package let accessibilityFocusCoordinator = AccessibilityFocusCoordinator()
   /// The most recent keyboard focus traversal, kept until the next input
   /// event. If the region the traversal landed on vanishes from the semantic
   /// snapshot before any further input — a control that disables itself as a

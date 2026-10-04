@@ -16,6 +16,17 @@ extension RunLoop {
     else {
       return .staleTarget
     }
+    if request.action == .accessibilityFocus || request.action == .accessibilityBlur {
+      guard control.actions.contains(request.action.kind) else { return .unsupported }
+      guard accessibilityFocusCoordinator.accepts(node, in: publishedAccessibilitySnapshot) else {
+        return .outOfScope
+      }
+      if accessibilityFocusCoordinator.receive(node, focused: request.action == .accessibilityFocus)
+      {
+        scheduler.requestInput()
+      }
+      return .accepted
+    }
     guard node.isEnabled else { return .disabled }
     let combined: AccessibilityCombinedAction?
     if case .custom(let name) = request.action {

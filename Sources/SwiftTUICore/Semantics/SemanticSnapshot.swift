@@ -127,6 +127,8 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var accessibilityAnnouncements: [AccessibilityAnnouncement]
   /// Presentation-only acknowledgement; the runtime fills this after commit.
   public var accessibilityActionResponse: AccessibilityActionResponse? = nil
+  /// A generation-scoped app request; hosts apply it once, not on every repaint.
+  public var accessibilityFocusRequest: AccessibilityFocusPresentation? = nil
   package var accessibilityWarnings: [AccessibilityWarning]
   /// Scope chain of the **active/visible context** — the unambiguous chain of
   /// command/chrome-hosting regions (`Panel`, `NavigationStack`, …) visible this
@@ -190,5 +192,16 @@ public struct SemanticSnapshot: Equatable, Sendable {
     self.accessibilityAnnouncements = accessibilityAnnouncements
     self.accessibilityWarnings = accessibilityWarnings
     self.activeCommandScopePath = activeCommandScopePath
+  }
+}
+
+/// A programmatic assistive-focus request. A nil target clears assistive focus.
+/// Generation is scoped to one live app session and serialized losslessly.
+public struct AccessibilityFocusPresentation: Equatable, Sendable {
+  public let generation: UInt64
+  public let target: String?
+  public init(generation: UInt64, target: String?) {
+    self.generation = generation
+    self.target = target
   }
 }

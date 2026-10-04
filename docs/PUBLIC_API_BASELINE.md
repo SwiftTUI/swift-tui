@@ -21,7 +21,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUI` | 1 | 4 |
 | `SwiftTUIRuntime` | 60 | 519 |
 | `SwiftTUIProfiling` | 9 | 52 |
-| `SwiftTUIViews` | 417 | 2568 |
+| `SwiftTUIViews` | 418 | 2580 |
 | `SwiftTUIAnimatedImage` | 5 | 36 |
 | `SwiftTUIArguments` | 5 | 57 |
 | `SwiftTUIPTYPrimitives` | 7 | 40 |
@@ -32,9 +32,9 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIWebHost` | 3 | 16 |
 | `SwiftTUIWebHostCLI` | 2 | 8 |
 | `SwiftTUIAndroidHost` | 16 | 44 |
-| `SwiftTUICore` | 40 | 273 |
+| `SwiftTUICore` | 41 | 278 |
 | `SwiftTUIPrimitives` | 174 | 1542 |
-| `SwiftTUIGraph` | 75 | 486 |
+| `SwiftTUIGraph` | 75 | 492 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -126,10 +126,11 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 ## SwiftTUIViews
 
-### Canonical surface (417)
+### Canonical surface (418)
 
 - `AccessibilityAdjustmentDirection` — enum — 2 members
 - `AccessibilityAnnouncer` — enum — 1 member
+- `AccessibilityFocusState` — struct — 8 members
 - `AccessibilityTraits` — struct — 8 members
 - `ActionScope` — extension — 7 members
 - `AnchoredSurfaceStylePresentation` — struct — 8 members
@@ -530,7 +531,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `VerticalAlignmentGuideModifier` — struct
 - `VerticalControlGroupStyle` — struct — 3 members
 - `VerticalEdge` — enum — 1 member
-- `View` — protocol — 222 members
+- `View` — protocol — 225 members
 - `ViewBuilder` — enum — 10 members
 - `ViewModifier` — protocol — 5 members
 - `ViewModifierContent` — struct — 1 member
@@ -655,9 +656,10 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (39)
+### Canonical surface (40)
 
 - `AccessibilityAnnouncement` — struct — 3 members
+- `AccessibilityFocusPresentation` — struct — 3 members
 - `CanvasPixelGridDrawing` — struct — 6 members
 - `CanvasPixelGridMode` — enum — 3 members
 - `DrawCommand` — enum — 14 members
@@ -691,7 +693,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `RenderGeneration` — struct — 4 members
 - `ResolvedTextStyle` — extension — 3 members
 - `SelectionRoute` — struct — 3 members
-- `SemanticSnapshot` — struct — 11 members
+- `SemanticSnapshot` — struct — 12 members
 - `TextCluster` — struct — 3 members
 - `TextLayoutLine` — struct — 4 members
 - `TextLayoutOptions` — struct — 5 members
@@ -896,7 +898,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 ### Canonical surface (62)
 
 - `AccessibilityChildBehavior` — enum — 3 members
-- `AccessibilityNode` — struct — 15 members
+- `AccessibilityNode` — struct — 17 members
 - `AccessibilityPoliteness` — enum — 4 members
 - `AccessibilityProperties` — class — 32 members
 - `AccessibilityRole` — enum — 39 members
@@ -960,8 +962,8 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 ### Package-only seams (13)
 
-- `AccessibilityAction` — enum — 7 members
-- `AccessibilityActionKind` — enum — 7 members
+- `AccessibilityAction` — enum — 9 members
+- `AccessibilityActionKind` — enum — 9 members
 - `AccessibilityActionRequest` — struct — 4 members
 - `AccessibilityActionResponse` — struct — 4 members
 - `AccessibilityActionResult` — enum — 7 members

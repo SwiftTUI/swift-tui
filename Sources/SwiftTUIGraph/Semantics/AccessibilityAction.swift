@@ -1,6 +1,7 @@
 /// The operations a published semantic control accepts.
 public enum AccessibilityActionKind: String, CaseIterable, Sendable, Hashable {
   case focus, activate, increment, decrement, setValue, custom
+  case accessibilityFocus, accessibilityBlur
 }
 
 /// A control value, independent of its localized display label.
@@ -45,11 +46,14 @@ public struct AccessibilitySelection: Equatable, Sendable {
 /// An assistive operation. Values are delivered to the owning control directly.
 public enum AccessibilityAction: Equatable, Sendable {
   case focus, activate, increment, decrement
+  case accessibilityFocus, accessibilityBlur
   case setValue(AccessibilityValue)
   case custom(String)
 
   public var kind: AccessibilityActionKind {
     switch self {
+    case .accessibilityFocus: .accessibilityFocus
+    case .accessibilityBlur: .accessibilityBlur
     case .focus: .focus
     case .activate: .activate
     case .increment: .increment

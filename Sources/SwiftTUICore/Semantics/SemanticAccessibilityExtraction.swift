@@ -83,7 +83,8 @@ private struct TextInputAccessibilityPresentation {
 extension SemanticExtractor {
   func accessibilityNodesAndVisualLabelRoutes(
     from root: PlacedNode,
-    focusRegions: [FocusRegion]
+    focusRegions: [FocusRegion],
+    modalScopeIdentities: Set<Identity>? = nil
   ) -> (nodes: [AccessibilityNode], visualLabelRoutes: AccessibilityVisualLabelRoutes) {
     let focusIdentities = accessibilityFocusIdentities(from: focusRegions)
     let textInputPresentations = textInputAccessibilityPresentations(from: root)
@@ -343,6 +344,25 @@ extension SemanticExtractor {
     }
 
     nodes = applyingAccessibilityStructure(to: nodes, structures: structures)
+    if var allowed = modalScopeIdentities {
+      // The deepest presented modal owns semantic review, including static
+      // content. Synthetic collection/text children inherit that membership.
+      // Keep this before relationship resolution so background references drop.
+      nodes = nodes.filter { node in
+        if allowed.contains(node.identity) { return true }
+        if let parent = node.parentIdentity, allowed.contains(parent) {
+          allowed.insert(node.identity)
+          return true
+        }
+        return false
+      }
+      let retained = Set(nodes.map(\.identity))
+      for index in nodes.indices {
+        if let parent = nodes[index].parentIdentity, !retained.contains(parent) {
+          nodes[index].parentIdentity = nil
+        }
+      }
+    }
 
     // Public `.id` values participate in graph scoping; they are not exported
     // semantic IDs. Explicit anchors let authors relate peers without knowing
@@ -569,6 +589,8 @@ extension SemanticExtractor {
       let valueProperties = AccessibilityProperties(valueDescription: authoredValue)
       result.properties = result.properties.map { valueProperties.merging($0) } ?? valueProperties
     }
+    result.navigationCategories =
+      node.semanticMetadata.accessibilityStructure?.navigationCategories ?? []
     result.control = node.semanticMetadata.accessibilityControl
     if result.control?.selection?.presentation == .menu,
       let trigger = accessibilityRouteRects(

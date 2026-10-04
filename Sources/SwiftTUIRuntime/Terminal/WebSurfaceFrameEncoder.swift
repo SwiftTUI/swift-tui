@@ -437,6 +437,12 @@ package enum WebSurfaceFrameEncoder {
     for model: HostWireFrameModel
   ) throws -> String {
     var json = HostWireRecord("")
+    if let request = model.accessibilityFocusRequest {
+      json +=
+        ",\"accessibilityFocusRequest\":{\"generation\":\(jsonString(String(request.generation)))"
+      if let target = request.target { json += ",\"target\":\(jsonString(target))" }
+      json += "}"
+    }
     if let response = model.accessibilityActionResponse {
       json +=
         ",\"accessibilityActionResponse\":{\"requestID\":\(jsonString(String(response.requestID))),\"target\":\(jsonString(response.target)),\"result\":\(jsonString(response.result.rawValue))}"
@@ -677,6 +683,14 @@ package enum WebSurfaceFrameEncoder {
           "\"role\":\(jsonString(node.roleToken))",
           "\"isFocused\":\(node.isFocused ? "true" : "false")",
         ]
+        if !node.navigationCategories.isEmpty {
+          fields.append(
+            "\"navigationCategories\":[\(node.navigationCategories.map(jsonString).joined(separator: ","))]"
+          )
+        }
+        if node.isAccessibilityFocused {
+          fields.append("\"isAccessibilityFocused\":true")
+        }
         if let parentIDPath = node.parentIDPath {
           fields.append("\"parentId\":\(jsonString(parentIDPath))")
         }

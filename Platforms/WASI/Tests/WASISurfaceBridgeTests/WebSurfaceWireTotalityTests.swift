@@ -154,6 +154,12 @@ struct WebSurfaceWireTotalityTests {
     #expect(control["actions"] as? [String] == ["focus", "setValue", "custom"])
     #expect(control["customActions"] as? [String] == ["Reset"])
     #expect(control["isEnabled"] as? Bool == false)
+    #expect(control["isAccessibilityFocused"] as? Bool == true)
+    #expect(control["navigationCategories"] as? [String] == ["Comparisons"])
+    let assistiveFocus = try #require(record["accessibilityFocusRequest"] as? [String: Any])
+    #expect(Set(assistiveFocus.keys) == ["generation", "target"])
+    #expect(assistiveFocus["generation"] as? String == String(UInt64.max))
+    #expect(assistiveFocus["target"] as? String == "fixture-token")
     let value = try #require(control["value"] as? [String: Any])
     #expect(value["type"] as? String == "text")
     #expect(value["value"] as? String == "Current")
@@ -478,6 +484,8 @@ struct WebSurfaceWireTotalityTests {
         presentation: .menu, options: [.init(id: "choice-1", label: "First", isEnabled: true)]),
       customActions: ["Reset"], opensLink: true)
     controlNode.isEnabled = false
+    controlNode.isAccessibilityFocused = true
+    controlNode.navigationCategories = ["Comparisons"]
     var frame = SemanticHostFrame(
       sequence: sequence,
       raster: Self.linkedRasterSurface(),
@@ -511,6 +519,8 @@ struct WebSurfaceWireTotalityTests {
         identity: Identity(components: ["root", "paragraph"]),
         rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 2)))
     ]
+    frame.semantics.accessibilityFocusRequest = .init(
+      generation: UInt64.max, target: "fixture-token")
     frame.semantics.accessibilityActionResponse = .init(
       requestID: 7, target: "fixture-token", result: .accepted)
     return frame

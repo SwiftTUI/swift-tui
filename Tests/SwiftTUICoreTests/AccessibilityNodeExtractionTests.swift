@@ -5,6 +5,48 @@ import Testing
 
 @Suite
 struct AccessibilityNodeExtractionTests {
+  @Test("modal reading excludes background and outer dialogs, including static-only scopes")
+  func modalReadingScope() throws {
+    let backgroundID = testIdentity("Background")
+    let background = placedNode(
+      identity: backgroundID,
+      semanticMetadata: .init(accessibilityLabel: "Background"))
+    var modalMetadata = SemanticMetadata(accessibilityRole: .sheet)
+    modalMetadata.focusScopeBoundary = true
+    var leafMetadata = SemanticMetadata(accessibilityLabel: "Inner prose")
+    leafMetadata.accessibilityProperties = .init(describedBy: [backgroundID])
+    let leaf = placedNode(identity: testIdentity("Leaf"), semanticMetadata: leafMetadata)
+    let innerID = testIdentity("Inner")
+    let inner = placedNode(identity: innerID, semanticMetadata: modalMetadata, children: [leaf])
+    let outer = placedNode(
+      identity: testIdentity("Outer"), semanticMetadata: modalMetadata,
+      children: [
+        placedNode(
+          identity: testIdentity("OuterProse"),
+          semanticMetadata: .init(accessibilityLabel: "Outer prose")), inner,
+      ])
+    let root = placedNode(identity: testIdentity("Root"), children: [background, outer])
+    let nodes = SemanticExtractor().extract(from: root).accessibilityNodes
+    #expect(Set(nodes.map(\.identity)) == [innerID, leaf.identity])
+    #expect(nodes.first { $0.identity == innerID }?.parentIdentity == nil)
+    #expect(nodes.first { $0.identity == leaf.identity }?.properties?.describedBy == [])
+
+    let emptyID = testIdentity("EmptyTopmost")
+    let empty = placedNode(identity: emptyID, semanticMetadata: modalMetadata)
+    let siblings = placedNode(
+      identity: testIdentity("Siblings"), children: [background, inner, empty])
+    #expect(
+      SemanticExtractor().extract(from: siblings).accessibilityNodes.map(\.identity) == [emptyID])
+    var tipMetadata = SemanticMetadata(accessibilityRole: .popover)
+    tipMetadata.focusScopeBoundary = false
+    let tip = placedNode(identity: testIdentity("Tip"), semanticMetadata: tipMetadata)
+    let withTip = placedNode(identity: testIdentity("Nonmodal"), children: [background, tip])
+    #expect(
+      SemanticExtractor().extract(from: withTip).accessibilityNodes.contains {
+        $0.identity == backgroundID
+      })
+  }
+
   @Test("authored relationship anchors resolve only unique visible current targets")
   func relationshipAnchors() throws {
     let sourceID = testIdentity("Source")

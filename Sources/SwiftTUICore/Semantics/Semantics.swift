@@ -41,6 +41,8 @@ package struct SemanticExtractor: Sendable {
     var selectionRoutes: [SelectionRoute] = []
     var namedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:]
     var hitTestOrder = 0
+    var modalNodes: [(identity: Identity, scope: [Identity])] = []
+    var activeAccessibilityModal: [Identity]?
 
     walk(
       placed,
@@ -49,6 +51,12 @@ package struct SemanticExtractor: Sendable {
         let scopePath = context.scopePath
         let sectionIdentity = context.sectionIdentity
         let modalFocusScopePath = context.modalFocusScopePath
+        if let path = modalFocusScopePath {
+          modalNodes.append((node.identity, path))
+          if path.count >= (activeAccessibilityModal?.count ?? 0) {
+            activeAccessibilityModal = path
+          }
+        }
         let clipRect = context.clipRect
         if node.semanticMetadata.isParagraph,
           let rect = interactionRect(for: node, clippedTo: clipRect)
@@ -83,6 +91,20 @@ package struct SemanticExtractor: Sendable {
               scopePath: scopePath, sectionIdentity: sectionIdentity,
               modalFocusScopePath: modalFocusScopePath,
               ownerNodeID: selection.ownerNodeID, ownerIdentity: selection.actionIdentity))
+        }
+
+        // Semantic review may visit disabled controls and static text without
+        // turning either into a keyboard target. Modal pruning still applies.
+        if node.semanticMetadata.accessibilityControl?.actions.contains(.accessibilityFocus)
+          == true,
+          !sealingParentOnChain
+        {
+          accessibilityActionRegions.append(
+            FocusRegion(
+              identity: node.identity, rect: semanticBounds(for: node),
+              focusInteractions: .automatic, scopePath: scopePath, sectionIdentity: sectionIdentity,
+              modalFocusScopePath: modalFocusScopePath,
+              ownerNodeID: node.viewNodeID, ownerIdentity: node.identity))
         }
 
         if node.semanticMetadata.accessibilityStructure?.isVirtual == true {
@@ -241,7 +263,10 @@ package struct SemanticExtractor: Sendable {
     let scrollTargets = scrollTargets(from: placed)
     let accessibilityExtraction = accessibilityNodesAndVisualLabelRoutes(
       from: placed,
-      focusRegions: focusRegions + accessibilityActionRegions
+      focusRegions: focusRegions + accessibilityActionRegions,
+      modalScopeIdentities: activeAccessibilityModal.map { active in
+        Set(modalNodes.filter { $0.scope == active }.map(\.identity))
+      }
     )
     let accessibilityWarnings =
       extractsAccessibilityWarnings

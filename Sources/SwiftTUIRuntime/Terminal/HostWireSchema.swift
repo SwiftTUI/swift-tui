@@ -192,6 +192,8 @@ package enum HostWireSchema {
         wire: .notSerialized(
           "runtime-only child operation routes addressed by group customActions and actionTarget")),
       .init("isEnabled", wire: .key("isEnabled")),
+      .init("isAccessibilityFocused", wire: .key("isAccessibilityFocused")),
+      .init("navigationCategories", wire: .key("navigationCategories")),
       .init(
         "actionIdentity", wire: .notSerialized("runtime dispatch uses the opaque actionTarget")),
       .init(
@@ -275,7 +277,7 @@ package enum HostWireSchema {
     ]
     package static let fullFrameOptionalKeys: Set<String> = [
       "geometryRevision", "epoch", "gen", "sequence", "damage", "accessibilityTree",
-      "accessibilityAnnouncements", "accessibilityActionResponse",
+      "accessibilityAnnouncements", "accessibilityActionResponse", "accessibilityFocusRequest",
       "scrollRegions", "paragraphs", "links", "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
     ]
@@ -285,7 +287,8 @@ package enum HostWireSchema {
     ]
     package static let deltaFrameOptionalKeys: Set<String> = [
       "geometryRevision", "epoch", "gen", "baselineGen", "sequence", "accessibilityTree",
-      "accessibilityAnnouncements", "accessibilityActionResponse", "scrollRegions", "paragraphs",
+      "accessibilityAnnouncements", "accessibilityActionResponse", "accessibilityFocusRequest",
+      "scrollRegions", "paragraphs",
       "links",
       "linkTargets", "focusPresentation",
       "preferredGridWidth", "preferredGridHeight", "terminalStyle",
@@ -308,7 +311,8 @@ package enum HostWireSchema {
       "textRows", "requiresFullTextRepaint", "requiresFullGraphicsReplay",
     ]
     package static let accessibilityNodeKeys: Set<String> = [
-      "id", "rect", "role", "isFocused", "parentId", "label", "hint", "hidden",
+      "id", "rect", "role", "isFocused", "isAccessibilityFocused", "navigationCategories",
+      "parentId", "label", "hint", "hidden",
       "liveRegion", "cursorAnchor", "actionTarget", "actions", "isEnabled", "value",
       "valueMin", "valueMax", "valueStep", "properties", "selection", "customActions", "opensLink",
     ]
