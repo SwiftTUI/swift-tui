@@ -77,8 +77,18 @@ to the browser. See [Apple's display-change notification](https://developer.appl
 
 Also read by `RuntimeConfiguration.detect`. The group is consulted only when
 `SWIFTTUI_WEB` is truthy; it makes the batteries-included runner serve the app
-to a browser instead of the terminal. Terminal launch does not start a companion
-server. WebHost is not included on Windows.
+to a browser instead of the terminal. On macOS/Linux, ordinary interactive
+terminal launch also starts the shared browser companion by default; this uses
+the separate settings below. WebHost is not included on Windows in this revision.
+
+| Companion variable | Values | Effect |
+| --- | --- | --- |
+| `SWIFTTUI_COMPANION` | `auto` (default), `on`, `off` | Automatic interactive launch, explicit request, or opt-out. |
+| `SWIFTTUI_COMPANION_PORT` | integer, default `0` | Companion port; `0` selects an available port. |
+
+CLI choices override these defaults. JSON output does not start a companion;
+redirected terminal launch still requires a TTY. See <doc:Browser-Companion> in
+the WebHost CLI catalog for discovery and SSH forwarding.
 
 | Variable | Values | Effect |
 | --- | --- | --- |
