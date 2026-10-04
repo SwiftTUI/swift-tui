@@ -404,7 +404,7 @@ struct AccessibilityNodeExtractionTests {
           identity: imageID,
           kind: "Image",
           message:
-            "Image omitted from accessibility output; add accessibilityLabel(...) or accessibilityHidden(true)."
+            "Image omitted from accessibility output; add accessibilityLabel(...) for a simple description, accessibilityRepresentation { ... } for data and operations, or accessibilityHidden(true) for decoration."
         )
       ])
   }

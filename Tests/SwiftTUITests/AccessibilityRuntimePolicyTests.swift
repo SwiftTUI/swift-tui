@@ -1381,6 +1381,30 @@ private struct PickerConditionalFixture: View {
 @MainActor
 @Suite
 struct AccessibilityStructureRuntimeTests {
+  @Test("large semantic representations do not enlarge the painted surface")
+  func virtualSurfaceExtent() {
+    let renderer = DefaultRenderer()
+    let identity = testIdentity("VirtualSurfaceExtent")
+    for count in [2, 50, 3] {
+      let result = renderer.render(
+        Text("Plot").accessibilityRepresentation {
+          VStack(spacing: 0) {
+            ForEach(0..<count, id: \.self) { index in
+              Text("Source record \(index)")
+            }
+          }
+        }.frame(width: 4, height: 1),
+        context: .init(identity: identity, invalidatedIdentities: [identity]),
+        proposal: .init(width: 4, height: 1))
+      #expect(result.rasterSurface.size == CellSize(width: 4, height: 1))
+      #expect(result.rasterSurface.lines == ["Plot"])
+      #expect(
+        result.semanticSnapshot.accessibilityNodes.filter {
+          $0.label?.hasPrefix("Source record ") == true
+        }.count == count)
+    }
+  }
+
   @Test("unpainted representations act on shared state without keyboard or pointer targets")
   func virtualControls() throws {
     let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: {

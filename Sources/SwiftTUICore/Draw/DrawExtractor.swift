@@ -92,7 +92,9 @@ extension DrawExtractor {
           builtNodes.append(
             DrawNode(
               viewNodeID: node.viewNodeID, identity: node.identity,
-              environmentSnapshot: node.environmentSnapshot, bounds: node.bounds))
+              // Semantic geometry can exceed the visual primary. It must not
+              // contribute an extent to the raster surface, even without paint.
+              environmentSnapshot: node.environmentSnapshot, bounds: .zero))
           continue
         }
         // The reuse proof already verified the inherited opacity at this

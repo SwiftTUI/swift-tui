@@ -156,7 +156,7 @@ struct LinearAccessibilityRendererTests {
           identity: testIdentity("Canvas"),
           kind: "Canvas",
           message:
-            "Canvas omitted from accessibility output; add accessibilityLabel(...) or accessibilityHidden(true)."
+            "Canvas omitted from accessibility output; add accessibilityLabel(...) for a simple description, accessibilityRepresentation { ... } for data and operations, or accessibilityHidden(true) for decoration."
         )
       ]
     )
@@ -165,7 +165,7 @@ struct LinearAccessibilityRendererTests {
 
     #expect(
       output
-        == "warning: Canvas omitted from accessibility output; add accessibilityLabel(...) or accessibilityHidden(true).\n"
+        == "warning: Canvas omitted from accessibility output; add accessibilityLabel(...) for a simple description, accessibilityRepresentation { ... } for data and operations, or accessibilityHidden(true) for decoration.\n"
     )
   }
 

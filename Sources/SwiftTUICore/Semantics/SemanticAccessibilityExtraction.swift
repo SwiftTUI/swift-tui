@@ -530,7 +530,7 @@ extension SemanticExtractor {
             identity: node.identity,
             kind: visualContent.kind,
             message:
-              "\(visualContent.kind) omitted from accessibility output; add accessibilityLabel(...) or accessibilityHidden(true)."
+              "\(visualContent.kind) omitted from accessibility output; add accessibilityLabel(...) for a simple description, accessibilityRepresentation { ... } for data and operations, or accessibilityHidden(true) for decoration."
           )
         )
       }

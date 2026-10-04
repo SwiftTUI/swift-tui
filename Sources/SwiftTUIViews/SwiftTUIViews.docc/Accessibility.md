@@ -564,6 +564,28 @@ control guards still apply to typed assistive actions. Browser semantic focus on
 a virtual control does not move terminal keyboard focus. This is not a binding
 to a screen reader's independent reading cursor.
 
+For a chart, diagram or image that carries data, a short label alone cannot
+provide arbitrary values or operations. Use a representation with named source
+values, units and relationships, and bind its controls to the same state as the
+graphic. Large datasets need bounded review controls or a lazy collection with
+logical navigation; do not create a semantic control for every pixel or cell.
+Keep decorative graphics hidden. The unlabeled-graphic diagnostic distinguishes
+simple descriptions, data/operation representations and decoration; it cannot
+infer the meaning of arbitrary drawing commands or image bytes.
+
+```swift
+Canvas(trafficDrawing)
+  .accessibilityRepresentation {
+    VStack {
+      Text("Monday: 125 requests; Friday: 180 requests")
+      Button("Inspect Friday") { selectedDay = .friday }
+    }
+  }
+```
+
+The representation reserves no visual space, including when its semantic
+content is wider or taller than the graphic.
+
 
 ## User preferences
 
