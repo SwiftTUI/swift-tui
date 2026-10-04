@@ -87,8 +87,9 @@ the separate settings below. WebHost is not included on Windows in this revision
 | `SWIFTTUI_COMPANION_PORT` | integer, default `0` | Companion port; `0` selects an available port. |
 
 CLI choices override these defaults. JSON output does not start a companion;
-redirected terminal launch still requires a TTY. See <doc:Browser-Companion> in
-the WebHost CLI catalog for discovery and SSH forwarding.
+redirected terminal launch still requires a TTY. See the
+[Browser Companion guide](https://github.com/SwiftTUI/swift-tui/blob/main/Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.docc/Browser-Companion.md)
+for discovery and SSH forwarding.
 
 | Variable | Values | Effect |
 | --- | --- | --- |
