@@ -114,7 +114,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     let rawFraction = progressFraction(value: value, total: total)
     let fraction = rawFraction.isFinite ? rawFraction : 0
     let animates = isIndeterminate && !context.environmentValues.renderingReduceMotion
-    var tasks: [TaskDescriptor] = []
+    let tasks: [TaskDescriptor]
     if animates {
       // Cadence belongs to the primitive so every style receives a live
       // phase, while standalone style fixtures remain inert.
@@ -132,7 +132,9 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
           phase.wrappedValue &+= 1
         }
       }
-      tasks.append(descriptor)
+      tasks = [descriptor]
+    } else {
+      tasks = []
     }
     let configuration = ProgressViewStyleConfiguration(
       fractionCompleted: isIndeterminate ? nil : fraction,
