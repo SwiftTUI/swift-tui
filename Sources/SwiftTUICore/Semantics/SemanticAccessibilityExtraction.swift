@@ -279,8 +279,8 @@ extension SemanticExtractor {
     var emitStack:
       [(
         node: PlacedNode, emittedParentIdentity: Identity?, listCount: Int?,
-        collectionReadOnly: Bool?
-      )] = [(root, nil, nil, nil)]
+        collectionReadOnly: Bool?, language: String?
+      )] = [(root, nil, nil, nil, nil)]
     while let frame = emitStack.popLast() {
       let node = frame.node
       let traversalOrdinal = nextEmitTraversalOrdinal
@@ -294,6 +294,7 @@ extension SemanticExtractor {
       var childParentIdentity =
         node.semanticMetadata.accessibilityStructure?.parent
         ?? frame.emittedParentIdentity
+      let language = node.semanticMetadata.accessibilityProperties?.language ?? frame.language
       var listCount = frame.listCount
       let collectionReadOnly =
         node.semanticMetadata.hostedCollectionContainer != nil
@@ -333,6 +334,22 @@ extension SemanticExtractor {
           authoredValue: authoredValues[traversalOrdinal],
           textPresentation: textPresentations[traversalOrdinal] ?? .independent
         ) {
+          if let language, accessibilityNode.properties?.language == nil {
+            accessibilityNode.properties = (accessibilityNode.properties ?? .init()).merging(
+              .init(language: language))
+          }
+          // Independent source text has real text content in semantic hosts.
+          // Authored group names and primitive labels remain names; ordinary
+          // Text does not acquire an inferred paragraph boundary.
+          if (textPresentations[traversalOrdinal] ?? .independent) == .independent,
+            node.semanticMetadata.accessibilityRole == nil,
+            node.semanticMetadata.accessibilityLabel == nil,
+            accessibilityTextLabel(from: node.drawPayload) != nil,
+            accessibilityNode.properties?.textKind == nil
+          {
+            accessibilityNode.properties = (accessibilityNode.properties ?? .init()).merging(
+              .init(textKind: node.semanticMetadata.isParagraph ? .paragraph : .plain))
+          }
           let inlineNodes = inlineAccessibilityNodes(
             for: node, parent: accessibilityNode, focusRegions: focusRegions,
             textPresentation: textPresentations[traversalOrdinal] ?? .independent)
@@ -364,7 +381,7 @@ extension SemanticExtractor {
       }
 
       for child in node.children.reversed() {
-        emitStack.append((child, childParentIdentity, listCount, collectionReadOnly))
+        emitStack.append((child, childParentIdentity, listCount, collectionReadOnly, language))
       }
     }
 
@@ -473,10 +490,9 @@ extension SemanticExtractor {
         rect: route?.rect ?? parent.rect, role: segment.id == nil ? .group : .link,
         label: segment.text)
       child.isEnabled = parent.isEnabled
-      if parent.properties?.readOnly != nil || parent.properties?.language != nil {
-        child.properties = AccessibilityProperties(
-          readOnly: parent.properties?.readOnly, language: parent.properties?.language)
-      }
+      child.properties = AccessibilityProperties(
+        readOnly: parent.properties?.readOnly, language: parent.properties?.language,
+        textKind: segment.id == nil ? .plain : nil)
       if let destination = segment.destination, segment.id != nil {
         child.control = .init(
           actions: [.focus, .activate], value: .text(destination.rawValue),

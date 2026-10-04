@@ -740,6 +740,9 @@ package enum WebSurfaceFrameEncoder {
               "\"selection\":{\"presentation\":\(jsonString(selection.presentation.rawValue)),"
                 + "\"options\":[\(options)]}")
           }
+          if let selection = node.textSelection, node.roleToken != "secureField" {
+            fields.append("\"textSelection\":[\(selection[0]),\(selection[1])]")
+          }
           if let value = control.value, node.roleToken != "secureField" {
             let kind: String
             let encoded: String

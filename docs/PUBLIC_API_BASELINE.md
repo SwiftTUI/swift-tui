@@ -34,7 +34,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 | `SwiftTUIAndroidHost` | 16 | 44 |
 | `SwiftTUICore` | 41 | 278 |
 | `SwiftTUIPrimitives` | 174 | 1542 |
-| `SwiftTUIGraph` | 76 | 501 |
+| `SwiftTUIGraph` | 77 | 511 |
 | `SwiftTUIPTYCPrimitives` | 0 | 0 |
 | `SwiftTUIPlatformIO` | 1 | 19 |
 | `SwiftTUITestSupport` | 0 | 0 |
@@ -895,7 +895,7 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 > carry `public` access but do not establish a supported direct import.
 > See the module map for re-export paths and symbol classifications below.
 
-### Canonical surface (63)
+### Canonical surface (64)
 
 - `AccessibilityChildBehavior` — enum — 3 members
 - `AccessibilityNode` — struct — 17 members
@@ -904,8 +904,9 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 - `AccessibilityProperties` — class — 34 members
 - `AccessibilityRole` — enum — 39 members
 - `AccessibilitySortDirection` — enum — 5 members
+- `AccessibilityTextEdit` — struct — 4 members
 - `AccessibilityTextInput` — class — 10 members
-- `AccessibilityTextKind` — enum — 4 members
+- `AccessibilityTextKind` — enum — 5 members
 - `AccessibilityVisualContent` — struct — 2 members
 - `ActionScope` — protocol
 - `Anchor` — struct
@@ -963,8 +964,8 @@ For products, supported imports, and re-export reachability, see [PUBLIC_MODULE_
 
 ### Package-only seams (13)
 
-- `AccessibilityAction` — enum — 9 members
-- `AccessibilityActionKind` — enum — 9 members
+- `AccessibilityAction` — enum — 11 members
+- `AccessibilityActionKind` — enum — 11 members
 - `AccessibilityActionRequest` — struct — 4 members
 - `AccessibilityActionResponse` — struct — 4 members
 - `AccessibilityActionResult` — enum — 7 members

@@ -5,7 +5,7 @@ package enum AccessibilityActionWire {
     guard text.utf8.count <= HostWireBudget.recordBytes else { return nil }
     var parts = text.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
     var requestID: UInt64?
-    if parts.count == 4 || parts.count == 6 {
+    if parts.count == 4 || parts.count == 6 || parts.count == 8 {
       guard let parsedID = UInt64(parts[1]) else { return nil }
       requestID = parsedID
       parts.remove(at: 1)
@@ -31,6 +31,14 @@ package enum AccessibilityActionWire {
         let name = percentDecodedString(parts[4]), !name.isEmpty
       else { return nil }
       action = .custom(name)
+    case .editText, .selectText:
+      guard parts.count == 7, parts[3] == "text",
+        let text = percentDecodedString(parts[4]),
+        let anchor = Int(parts[5]), anchor >= 0,
+        let head = Int(parts[6]), head >= 0
+      else { return nil }
+      let edit = AccessibilityTextEdit(text: text, anchor: anchor, head: head)
+      action = kind == .editText ? .editText(edit) : .selectText(edit)
     case .setValue:
       guard parts.count == 5, let rawValue = percentDecodedString(parts[4]) else { return nil }
       switch parts[3] {

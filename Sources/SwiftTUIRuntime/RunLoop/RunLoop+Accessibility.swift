@@ -52,7 +52,10 @@ extension RunLoop {
       return .unsupported
     }
     // Read-only controls remain focusable, but cannot be mutated by a host.
-    guard node.properties?.readOnly != true || request.action == .focus else {
+    guard
+      node.properties?.readOnly != true || request.action == .focus
+        || request.action.kind == .selectText
+    else {
       return .unsupported
     }
     if case .setValue(let value) = request.action {

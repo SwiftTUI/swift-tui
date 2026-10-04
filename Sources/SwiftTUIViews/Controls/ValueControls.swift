@@ -242,7 +242,9 @@ extension TextField {
         ).namingControl(with: label).merging(
           SemanticMetadata(accessibilityLabel: titleAccessibilityLabel)
         ).accessibilityControl(
-          .init(actions: [.focus, .setValue], value: .text(synchronizedValue.text)))
+          .init(
+            actions: [.focus, .setValue, .editText, .selectText],
+            value: .text(synchronizedValue.text)))
       )
 
     }

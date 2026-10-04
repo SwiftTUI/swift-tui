@@ -57,6 +57,15 @@ struct WebSurfaceWireTotalityTests {
     #expect(try Data(contentsOf: url) == bytes)
   }
 
+  @Test("secure wire snapshots omit selection even if a producer supplies native metadata")
+  func secureSelectionIsOmitted() throws {
+    var frame = Self.fullyPopulatedFrame()
+    frame.semantics.accessibilityNodes[0].role = .secureField
+    let record = try Self.decodedSurfaceFrame(WebSurfaceFrameEncoder.encode(frame))
+    let nodes = try #require(record["accessibilityTree"] as? [[String: Any]])
+    #expect(nodes.first?["textSelection"] == nil)
+  }
+
   @Test("emitted wire vocabularies equal the frozen manifest sets")
   func emittedWireVocabulariesEqualTheFrozenManifestSets() {
     #expect(
@@ -164,6 +173,7 @@ struct WebSurfaceWireTotalityTests {
     #expect(value["type"] as? String == "text")
     #expect(value["value"] as? String == "Current")
     #expect(control["valueMax"] as? Double == 10)
+    #expect(control["textSelection"] as? [Int] == [4, 1])
 
     let announcements = try #require(record["accessibilityAnnouncements"] as? [[String: Any]])
     #expect(
@@ -478,6 +488,8 @@ struct WebSurfaceWireTotalityTests {
       flowTo: [Identity(components: ["root", "related"])],
       activeDescendant: Identity(components: ["root", "related"])
     )
+    controlNode.textInput = .init(
+      selection: 1..<4, insertionOffset: 1, clusters: [], endAnchor: .zero)
     controlNode.actionTarget = "fixture-token"
     controlNode.control = .init(
       actions: [.focus, .setValue, .custom], value: .text("Current"),

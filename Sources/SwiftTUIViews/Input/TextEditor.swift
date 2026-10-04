@@ -142,7 +142,7 @@ extension TextEditor {
       // scroll-position binding, none of which need descendant focus regions.
       metadata.sealsFocusDescendants = true
       metadata.accessibilityControl = .init(
-        actions: [.focus, .setValue], value: .text(text.wrappedValue))
+        actions: [.focus, .setValue, .editText, .selectText], value: .text(text.wrappedValue))
       return ResolvedNode(
         identity: context.identity,
         kind: .view("TextEditor"),

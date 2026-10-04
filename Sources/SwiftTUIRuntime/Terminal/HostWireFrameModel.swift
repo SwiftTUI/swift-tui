@@ -79,6 +79,7 @@ package struct HostWireFrameModel {
     package let properties: AccessibilityProperties?
     package let control: AccessibilityControlState?
     package let selectionOptionRects: [String: CellRect]
+    package let textSelection: [Int]?
     package let isEnabled: Bool
 
     package init(
@@ -101,6 +102,16 @@ package struct HostWireFrameModel {
       properties = node.properties
       control = node.control
       selectionOptionRects = node.selectionOptionRects
+      textSelection =
+        node.role == .secureField
+        ? nil
+        : node.textInput.map { input in
+          let head = input.insertionOffset
+          let anchor =
+            head == input.selection.lowerBound
+            ? input.selection.upperBound : input.selection.lowerBound
+          return [anchor, head]
+        }
       isEnabled = node.isEnabled
     }
   }

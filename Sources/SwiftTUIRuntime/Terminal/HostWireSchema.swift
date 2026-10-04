@@ -212,9 +212,8 @@ package enum HostWireSchema {
       .init("cursorAnchor", wire: .key("cursorAnchor")),
       .init(
         "textInput",
-        wire: .notSerialized(
-          "native text-range queries use placed grapheme geometry; wire hosts retain value/cursorAnchor"
-        )),
+        wire: .derived(
+          "textSelection UTF-16 anchor/head; secure values and cluster geometry omitted")),
     ],
     "AccessibilityAnnouncement": [
       .init("message", wire: .key("message")),
@@ -313,7 +312,8 @@ package enum HostWireSchema {
     package static let accessibilityNodeKeys: Set<String> = [
       "id", "rect", "role", "isFocused", "isAccessibilityFocused", "navigationCategories",
       "parentId", "label", "hint", "hidden",
-      "liveRegion", "cursorAnchor", "actionTarget", "actions", "isEnabled", "value",
+      "liveRegion", "cursorAnchor", "textSelection", "actionTarget", "actions", "isEnabled",
+      "value",
       "valueMin", "valueMax", "valueStep", "properties", "selection", "customActions", "opensLink",
     ]
     package static let accessibilityPropertyKeys: Set<String> = [

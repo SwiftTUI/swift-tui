@@ -428,9 +428,11 @@ SwiftTUIGraph.AccessibilityAction.accessibilityFocus
 SwiftTUIGraph.AccessibilityAction.activate
 SwiftTUIGraph.AccessibilityAction.custom(_:)
 SwiftTUIGraph.AccessibilityAction.decrement
+SwiftTUIGraph.AccessibilityAction.editText(_:)
 SwiftTUIGraph.AccessibilityAction.focus
 SwiftTUIGraph.AccessibilityAction.increment
 SwiftTUIGraph.AccessibilityAction.kind
+SwiftTUIGraph.AccessibilityAction.selectText(_:)
 SwiftTUIGraph.AccessibilityAction.setValue(_:)
 SwiftTUIGraph.AccessibilityActionKind
 SwiftTUIGraph.AccessibilityActionKind.accessibilityBlur
@@ -438,9 +440,11 @@ SwiftTUIGraph.AccessibilityActionKind.accessibilityFocus
 SwiftTUIGraph.AccessibilityActionKind.activate
 SwiftTUIGraph.AccessibilityActionKind.custom
 SwiftTUIGraph.AccessibilityActionKind.decrement
+SwiftTUIGraph.AccessibilityActionKind.editText
 SwiftTUIGraph.AccessibilityActionKind.focus
 SwiftTUIGraph.AccessibilityActionKind.increment
 SwiftTUIGraph.AccessibilityActionKind.init(rawValue:)
+SwiftTUIGraph.AccessibilityActionKind.selectText
 SwiftTUIGraph.AccessibilityActionKind.setValue
 SwiftTUIGraph.AccessibilityActionRequest
 SwiftTUIGraph.AccessibilityActionRequest.action
@@ -601,6 +605,11 @@ SwiftTUIGraph.AccessibilitySortDirection.descending
 SwiftTUIGraph.AccessibilitySortDirection.init(rawValue:)
 SwiftTUIGraph.AccessibilitySortDirection.none
 SwiftTUIGraph.AccessibilitySortDirection.other
+SwiftTUIGraph.AccessibilityTextEdit
+SwiftTUIGraph.AccessibilityTextEdit.anchor
+SwiftTUIGraph.AccessibilityTextEdit.head
+SwiftTUIGraph.AccessibilityTextEdit.init(text:anchor:head:)
+SwiftTUIGraph.AccessibilityTextEdit.text
 SwiftTUIGraph.AccessibilityTextInput
 SwiftTUIGraph.AccessibilityTextInput.==(_:_:)
 SwiftTUIGraph.AccessibilityTextInput.Cluster
@@ -616,6 +625,7 @@ SwiftTUIGraph.AccessibilityTextKind
 SwiftTUIGraph.AccessibilityTextKind.code
 SwiftTUIGraph.AccessibilityTextKind.init(rawValue:)
 SwiftTUIGraph.AccessibilityTextKind.paragraph
+SwiftTUIGraph.AccessibilityTextKind.plain
 SwiftTUIGraph.AccessibilityTextKind.quotation
 SwiftTUIGraph.AccessibilityValue
 SwiftTUIGraph.AccessibilityValue.boolean(_:)

@@ -21,6 +21,40 @@ package func registerTextInputBinding(
   intake.registerAction(
     identity: context.identity,
     accessibilityHandler: { action in
+      switch action {
+      case .editText(let edit), .selectText(let edit):
+        guard let selection = textSelection(for: edit),
+          traits.isMultiline
+            || !edit.text.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\n" })
+        else { return .invalidValue }
+        let current = value.wrappedValue.synchronized(with: binding.wrappedValue)
+        if action.kind == .selectText {
+          guard current.text == edit.text else { return .invalidValue }
+          guard current.selection != selection else { return .unchanged }
+          return applyTextInputCommand(
+            .setSelection(selection), binding: binding, value: value, traits: traits,
+            layout: layout,
+            clipboardWriteAction: context.environmentValues.clipboardWriteAction,
+            clipboardReadAction: context.environmentValues.clipboardReadAction)
+            ? .changed : .unchanged
+        }
+        guard current.text != edit.text || current.selection != selection else { return .unchanged }
+        if current.text != edit.text {
+          var replacing = current
+          replacing.selection = .init(anchor: .init(0), head: .init(current.text.count))
+          value.wrappedValue = replacing
+          _ = applyTextInputCommand(
+            .insertText(edit.text), binding: binding, value: value, traits: traits, layout: layout,
+            clipboardWriteAction: context.environmentValues.clipboardWriteAction,
+            clipboardReadAction: context.environmentValues.clipboardReadAction)
+        }
+        _ = applyTextInputCommand(
+          .setSelection(selection), binding: binding, value: value, traits: traits, layout: layout,
+          clipboardWriteAction: context.environmentValues.clipboardWriteAction,
+          clipboardReadAction: context.environmentValues.clipboardReadAction)
+        return .changed
+      default: break
+      }
       guard case .setValue(.text(let next)) = action else { return .unsupported }
       guard binding.wrappedValue != next else { return .unchanged }
       var selected = value.wrappedValue.synchronized(with: binding.wrappedValue)
@@ -266,4 +300,19 @@ private func ctrlTextInputCommand(
   default:
     return nil
   }
+}
+
+/// Browser offsets must name complete grapheme boundaries in the shared editor.
+private func textSelection(for edit: AccessibilityTextEdit) -> TextSelection? {
+  guard edit.anchor >= 0, edit.head >= 0 else { return nil }
+  var anchor: Int? = edit.anchor == 0 ? 0 : nil
+  var head: Int? = edit.head == 0 ? 0 : nil
+  var utf16 = 0
+  for (index, character) in edit.text.enumerated() {
+    utf16 += character.utf16.count
+    if utf16 == edit.anchor { anchor = index + 1 }
+    if utf16 == edit.head { head = index + 1 }
+  }
+  guard let anchor, let head else { return nil }
+  return .init(anchor: .init(anchor), head: .init(head))
 }

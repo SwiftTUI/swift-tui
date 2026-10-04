@@ -1,6 +1,6 @@
 /// The operations a published semantic control accepts.
 public enum AccessibilityActionKind: String, CaseIterable, Sendable, Hashable {
-  case focus, activate, increment, decrement, setValue, custom
+  case focus, activate, increment, decrement, setValue, custom, editText, selectText
   case accessibilityFocus, accessibilityBlur
 }
 
@@ -43,11 +43,34 @@ public struct AccessibilitySelection: Equatable, Sendable {
   }
 }
 
+/// A native editor's text and directed selection, measured in UTF-16 code units.
+/// Selection-only requests include the expected text so an obsolete range cannot
+/// select unrelated content after an application update.
+public struct AccessibilityTextEdit: Equatable, Sendable {
+  /// The replacement text, or expected current text for a selection-only request.
+  public let text: String
+  /// The fixed end of the selection in UTF-16 code units.
+  public let anchor: Int
+  /// The moving end of the selection in UTF-16 code units.
+  public let head: Int
+
+  /// Creates an edit. Controls reject out-of-range and split-grapheme offsets.
+  public init(text: String, anchor: Int, head: Int) {
+    self.text = text
+    self.anchor = anchor
+    self.head = head
+  }
+}
+
 /// An assistive operation. Values are delivered to the owning control directly.
 public enum AccessibilityAction: Equatable, Sendable {
   case focus, activate, increment, decrement
   case accessibilityFocus, accessibilityBlur
   case setValue(AccessibilityValue)
+  /// Replaces text and updates its directed selection as one operation.
+  case editText(AccessibilityTextEdit)
+  /// Reviews a range without writing the application's text binding.
+  case selectText(AccessibilityTextEdit)
   case custom(String)
 
   public var kind: AccessibilityActionKind {
@@ -59,6 +82,8 @@ public enum AccessibilityAction: Equatable, Sendable {
     case .increment: .increment
     case .decrement: .decrement
     case .setValue: .setValue
+    case .editText: .editText
+    case .selectText: .selectText
     case .custom: .custom
     }
   }

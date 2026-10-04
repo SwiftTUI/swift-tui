@@ -89,11 +89,22 @@ struct StyledControlAccessibilityTests {
     let snapshot = render(
       Text(
         "Read \(Link("Guide", destination: "https://example.com/guide")) and \(Link("API", destination: "https://example.com/api")) next."
-      ).paragraph())
+      ).paragraph().accessibilityProperties(.init(language: "en-GB")))
     #expect(
       snapshot.accessibilityNodes.compactMap(\.label) == [
         "Read ", "Guide", " and ", "API", " next.",
       ])
+    let prose = snapshot.accessibilityNodes.filter { $0.label != nil && $0.role != .link }
+    for node in prose {
+      #expect(node.properties?.textKind == .plain, "\(node.label ?? "nil")")
+      #expect(
+        node.properties?.language == "en-GB",
+        "\(node.label ?? "nil") parent=\(node.parentIdentity?.path ?? "nil")")
+    }
+    #expect(
+      snapshot.accessibilityNodes.contains {
+        $0.properties?.textKind == .paragraph && $0.label == nil
+      })
     let links = snapshot.accessibilityNodes.filter { $0.role == .link }
     #expect(links.allSatisfy { $0.control?.opensLink == true })
     #expect(

@@ -16,9 +16,11 @@ does not establish native-host support.
 
 ### When Built-Ins Are Enough
 
-Ordinary `Text` publishes its full source string as a named semantic group in
-layout reading order, including styled/rich text and `Text.paragraph()`.
-Wrapping and truncation do not shorten that accessible name. An explicit role
+Ordinary `Text` publishes its full source string as semantic text in layout
+reading order, including styled/rich text. Supporting browser hosts expose real
+text nodes for native selection and text-unit review. `Text.paragraph()` adds an
+explicit paragraph boundary; ordinary newlines do not infer one. Wrapping and
+truncation do not shorten the source. An explicit role
 (such as a heading or status) and `accessibilityLabel(_:)` still take precedence;
 an empty label stays empty. Empty or whitespace-only unannotated text is omitted.
 Use `accessibilityHidden()` for decorative text.
@@ -392,8 +394,14 @@ controls, unsupported actions, and invalid value types are rejected.
 Buttons support focus and activation. Toggle and DisclosureGroup also accept
 boolean values. Slider and Stepper accept increment, decrement, and numeric
 values within their bounds. TextField and TextEditor accept replacement text;
-SecureField accepts replacement text but never publishes its contents. Input
-normalization remains owned by the control (including single-line editing).
+SecureField accepts replacement text but never publishes its contents. The
+`editText` and `selectText` actions carry directed UTF-16 selection with the
+expected text. Selection-only review never writes the application binding;
+obsolete text, split graphemes and invalid offsets are rejected. Read-only
+controls permit selection review but reject edits. Nonsecure editors publish
+selection/caret for browser and ordinary keyboard handoff. Secure controls omit
+that state and their value from host snapshots. Input normalization remains
+owned by the control (including single-line editing).
 Repeated focus and value echoes do not write the binding or schedule new work.
 
 See `docs/ACCESSIBILITY.md` in the source repository for the additive host-wire
@@ -416,8 +424,13 @@ Swift grid, and live announcements no longer add native Find matches.
 request uniform paragraph spacing through captured geometry; Swift reserves the
 additional whole rows. Ordinary text and newlines do not infer boundaries.
 There is no full WCAG conformance claim.
-Shared host-native IME/pre-edit presentation is excluded. Committed Unicode,
-paste and final composition values are delivered exactly once. Shared runtime
+Browser native editors retain their local composition while Swift frames arrive,
+then send the committed value and caret once. Unchanged acknowledgements preserve
+the native value and undo history. Nonsecure server selection updates preserve
+direction; secure local values are cleared on blur and removal. Native browser
+selection, paste and undo remain subject to browser support. Shared host-native
+IME/pre-edit presentation is excluded. Committed Unicode, paste and final
+composition values are delivered exactly once. Shared runtime
 tests and browser automation do not establish VoiceOver, TalkBack, or WCAG
 conformance. The browser package's
 [DOM support statement](https://github.com/SwiftTUI/swift-tui-web/tree/main/packages/web#experimental-support-boundary)

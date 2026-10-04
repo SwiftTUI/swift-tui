@@ -1,7 +1,7 @@
 /// Native text-query metadata derived from the placed text input content.
 /// Offsets use UTF-16 code units, as required by native accessibility APIs.
-/// Secure inputs never publish this payload. The host wire continues to carry
-/// its existing value and cursor anchor; this layout is for native snapshots.
+/// Secure inputs never publish this payload. The web host wire carries the
+/// directed selection; placed cluster geometry remains in native snapshots.
 public final class AccessibilityTextInput: Equatable, Sendable {
   /// A source grapheme and its bounds in the host's cell coordinate space.
   public struct Cluster: Equatable, Sendable {

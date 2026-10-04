@@ -1,5 +1,7 @@
 /// Authored reading structure, independent of raster line wrapping.
 public enum AccessibilityTextKind: String, Sendable, Equatable {
+  /// Selectable source text without an inferred paragraph boundary.
+  case plain
   case paragraph, code, quotation
 }
 

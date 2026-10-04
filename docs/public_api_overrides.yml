@@ -825,6 +825,7 @@ classifications:
     - SwiftTUIGraph.AccessibilityPopup
     - SwiftTUIGraph.AccessibilityProperties
     - SwiftTUIGraph.AccessibilityTextKind
+    - SwiftTUIGraph.AccessibilityTextEdit
     - SwiftTUIGraph.AccessibilitySortDirection
     - SwiftTUIGraph.SemanticMetadata
     - SwiftTUIPrimitives.SemanticShapeStyle

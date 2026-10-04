@@ -46,7 +46,7 @@ provenance is package-only and does not change the wire format. Untagged request
 from other host adapters retain their existing behavior.
 
 `control.actions` advertises focus, activate, increment, decrement, and/or
-setValue. `control.value` is boolean, number, or text. Numeric controls publish
+setValue, editText and selectText. `control.value` is boolean, number, or text. Numeric controls publish
 optional minimum, maximum and step. SecureField omits its value entirely.
 The runtime rejects stale, disabled, hidden/out-of-scope and unsupported targets,
 wrong value types, nonfinite numbers and numbers outside published bounds.
@@ -60,14 +60,23 @@ Supported primitive routes:
 | Button and activating controls | activate | none |
 | Toggle, DisclosureGroup | activate, setValue | boolean |
 | Slider, Stepper | increment, decrement, setValue | number |
-| TextField, TextEditor | setValue | text |
-| SecureField | setValue | omitted |
+| TextField, TextEditor | setValue, editText, selectText | text |
+| SecureField | setValue, editText, selectText | omitted |
+
+Text edits carry a replacement string and directed UTF-16 anchor/head offsets.
+Selection-only requests carry the expected current string and never write the
+application binding. Both endpoints must be valid grapheme boundaries. The
+runtime rejects stale expected text and out-of-range/split-grapheme selections.
+Read-only editors permit selection review while rejecting value mutations.
+Ordinary keyboard commands reuse the resulting caret. Secure fields do not
+publish their value, selection or native text-query geometry.
 
 ### Wire compatibility
 
 Full and delta records add optional node fields `actionTarget`, `actions`,
 `isEnabled`, `value` (`{type: "boolean"|"number"|"text", value: ...}`),
-`valueMin`, `valueMax`, and `valueStep`. Presentation-only nodes omit these
+`valueMin`, `valueMax`, `valueStep`, and nonsecure editor `textSelection`
+(`[anchor, head]` in UTF-16 code units). Presentation-only nodes omit these
 fields, except that any node under a disabled environment carries
 `isEnabled: false`, control or not; hosts read an absent `isEnabled` as
 enabled. A host must require an action token and advertised action before
@@ -93,6 +102,8 @@ accessibility:<percent-encoded-target>:activate
 accessibility:<percent-encoded-target>:increment
 accessibility:<percent-encoded-target>:decrement
 accessibility:<percent-encoded-target>:setValue:<boolean|number|text>:<percent-encoded-value>
+accessibility:<percent-encoded-target>:editText:text:<percent-encoded-text>:<anchor>:<head>
+accessibility:<percent-encoded-target>:selectText:text:<percent-encoded-expected-text>:<anchor>:<head>
 ```
 
 Encode UTF-8 bytes using URI-component escaping, including colons, newlines,
@@ -200,3 +211,20 @@ list must contain the requested name. Unicode, delimiters and newlines use the
 same UTF-8 percent encoding as text values. Unsupported names have no effect.
 Older hosts can ignore the additive field; they cannot operate those actions.
 The browser adapter presents named operations as associated native buttons.
+
+
+### Browser prose and native editing
+
+Independent ordinary `Text` carries `textKind: plain`; authored paragraphs use
+`paragraph`, and heading roles retain their level. Supporting browser adapters
+render semantic source strings as real text, preserving the text node on an
+unchanged frame. Inline links and surrounding text remain in authored order
+without repeating the parent string. Language inherits through structural
+wrappers and explicit child language takes precedence. Primitive label chrome
+and authored aggregate names retain their existing ownership rules.
+
+Native editors retain composition while frames arrive and commit the final text
+and directed caret once. An unchanged acknowledged value does not reset the
+native editor or undo history. Late events from a removed/replaced editor cannot
+mutate its replacement. These source contracts do not establish actual reader
+text-unit navigation or universal browser undo support.

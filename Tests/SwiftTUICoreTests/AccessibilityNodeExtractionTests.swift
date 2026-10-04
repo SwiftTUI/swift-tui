@@ -120,6 +120,26 @@ struct AccessibilityNodeExtractionTests {
         "Read this.", "Full paragraph source, even when its bounds are narrow.",
       ])
     #expect(nodes.dropFirst().allSatisfy { $0.role == .group && $0.parentIdentity == rootID })
+    #expect(nodes.filter { $0.label != nil }.allSatisfy { $0.properties?.textKind == .plain })
+  }
+
+  @Test("language inherits through structural wrappers and local prose overrides it")
+  func inheritedProseLanguage() {
+    var outer = SemanticMetadata()
+    outer.accessibilityProperties = .init(language: "fr")
+    var inner = SemanticMetadata()
+    inner.accessibilityProperties = .init(language: "de")
+    let root = placedNode(
+      identity: testIdentity("Languages"), semanticMetadata: outer,
+      children: [
+        placedNode(identity: testIdentity("French"), drawPayload: .text("Bonjour")),
+        placedNode(
+          identity: testIdentity("German"), semanticMetadata: inner, drawPayload: .text("Hallo")),
+      ])
+    let nodes = SemanticExtractor().extract(from: root).accessibilityNodes
+    #expect(nodes.first { $0.label == "Bonjour" }?.properties?.language == "fr")
+    #expect(nodes.first { $0.label == "Hallo" }?.properties?.language == "de")
+    #expect(nodes.filter { $0.label != nil }.allSatisfy { $0.properties?.textKind == .plain })
   }
 
   @Test("an aggregate name replaces descendant prose while nested controls keep their names")

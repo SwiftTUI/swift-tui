@@ -500,6 +500,8 @@ class AccessibilityTreeMounter {
   pendingMenu;
   pendingMenuReturn;
   appliedAssistiveFocusGeneration = -1n;
+  composing = new WeakSet;
+  textSelections = new WeakMap;
   compositionCommits = new WeakMap;
   get hasInteractiveControls() {
     return [...this.modelsById.values()].some((node) => this.isTabStop(node));
@@ -817,6 +819,8 @@ class AccessibilityTreeMounter {
     if (element.tagName === "INPUT" || element.tagName === "TEXTAREA")
       element.value = "";
     this.compositionCommits.delete(element);
+    this.composing.delete(element);
+    this.textSelections.delete(element);
   }
   elementTag(node) {
     if (node.role === "link")
@@ -889,10 +893,10 @@ class AccessibilityTreeMounter {
     const send = (request) => {
       const model = current();
       const semanticFocus = request.action === "accessibilityFocus" || request.action === "accessibilityBlur";
-      if (this.presenting || !model?.actionTarget || model.isEnabled === false && !semanticFocus || model.properties?.readOnly === true && request.action !== "focus" && !semanticFocus || !model.actions?.includes(request.action))
+      if (this.presenting || !model?.actionTarget || model.isEnabled === false && !semanticFocus || model.properties?.readOnly === true && request.action !== "focus" && request.action !== "selectText" && !semanticFocus || !model.actions?.includes(request.action))
         return;
       const requestID = ++this.nextRequestID;
-      if (request.action === "setValue")
+      if (["setValue", "editText", "selectText"].includes(request.action))
         this.pendingValues.set(node.id, requestID);
       if (request.action === "focus")
         this.pendingFocus = { id: node.id, requestID };
@@ -1048,9 +1052,9 @@ class AccessibilityTreeMounter {
       }
     });
     if (tag !== "div") {
-      let composing = false;
       element.addEventListener("blur", () => {
-        composing = false;
+        this.composing.delete(element);
+        this.textSelections.delete(element);
         this.compositionCommits.delete(element);
         if (current()?.role === "secureField")
           element.value = "";
@@ -1068,23 +1072,39 @@ class AccessibilityTreeMounter {
               action: "setValue",
               value: { type: "number", value: number }
             });
+        } else if (model.actions?.includes("editText")) {
+          const selection = nativeTextSelection(element);
+          this.textSelections.set(element, selection);
+          send({ action: "editText", ...selection });
         } else {
           send({ action: "setValue", value: { type: "text", value } });
         }
       };
+      element.addEventListener("selectionchange", () => {
+        const model = current();
+        if (this.presenting || this.composing.has(element) || document.activeElement !== element || !model?.actions?.includes("selectText"))
+          return;
+        const selection = nativeTextSelection(element);
+        const previous = this.textSelections.get(element);
+        if (previous?.text === selection.text && previous.anchor === selection.anchor && previous.head === selection.head)
+          return;
+        this.textSelections.set(element, selection);
+        send({ action: "selectText", ...selection });
+      });
       element.addEventListener("compositionstart", () => {
-        composing = true;
+        this.composing.add(element);
         this.compositionCommits.delete(element);
       });
       element.addEventListener("compositionend", () => {
-        composing = false;
+        if (!this.composing.delete(element))
+          return;
         if (!current())
           return;
         commit();
         this.compositionCommits.set(element, element.value);
       });
       element.addEventListener("input", (event) => {
-        if (composing || event.isComposing)
+        if (this.composing.has(element) || event.isComposing)
           return;
         const previous = this.compositionCommits.get(element);
         this.compositionCommits.delete(element);
@@ -1115,18 +1135,19 @@ class AccessibilityTreeMounter {
     if (properties?.headingLevel !== undefined) {
       role.role = "heading";
       role.level = properties.headingLevel;
-    } else if (properties?.textKind !== undefined) {
-      role.role = properties.textKind === "quotation" ? "blockquote" : properties.textKind;
+    } else if (role.role !== "heading" && properties?.textKind !== undefined) {
+      role.role = properties.textKind === "plain" ? "generic" : properties.textKind === "quotation" ? "blockquote" : properties.textKind;
     }
     setOrRemoveAttribute(element, "role", node.role === "secureField" && element.tagName === "INPUT" ? undefined : role.role);
     setOrRemoveAttribute(element, "aria-level", role.level !== undefined ? String(role.level) : properties?.level?.toString());
-    const structuredText = properties?.textKind !== undefined;
+    const structuredText = properties?.textKind !== undefined || role.role === "heading";
     setOrRemoveAttribute(element, "aria-label", structuredText ? undefined : node.label || undefined);
     const text = this.readingText.get(element);
     if (structuredText) {
-      if (text)
-        text.textContent = node.label ?? "";
-      else {
+      if (text) {
+        if (text.data !== (node.label ?? ""))
+          text.data = node.label ?? "";
+      } else {
         const content = document.createTextNode(node.label ?? "");
         this.readingText.set(element, content);
         element.prepend(content);
@@ -1183,11 +1204,24 @@ class AccessibilityTreeMounter {
       setOrRemoveAttribute(element, "step", node.valueStep === undefined ? undefined : String(node.valueStep));
       const value = node.value ? String(node.value.value) : "";
       const pending = this.pendingValues.get(node.id);
-      if (pending === undefined || pending <= this.acknowledgedRequestID) {
+      if (!this.composing.has(element) && (pending === undefined || pending <= this.acknowledgedRequestID)) {
         this.pendingValues.delete(node.id);
+        const previous = nativeTextSelection(input);
         if (node.role !== "secureField" && input.value !== value) {
           this.compositionCommits.delete(element);
           input.value = value;
+        }
+        if (input.selectionStart !== null) {
+          const [anchor, head] = node.textSelection ?? [
+            previous.anchor,
+            previous.head
+          ];
+          const boundedAnchor = Math.min(anchor, input.value.length);
+          const boundedHead = Math.min(head, input.value.length);
+          if (input.selectionStart !== Math.min(boundedAnchor, boundedHead) || input.selectionEnd !== Math.max(boundedAnchor, boundedHead) || boundedAnchor !== boundedHead && input.selectionDirection !== (boundedHead < boundedAnchor ? "backward" : "forward")) {
+            input.setSelectionRange(Math.min(boundedAnchor, boundedHead), Math.max(boundedAnchor, boundedHead), boundedHead < boundedAnchor ? "backward" : "forward");
+          }
+          this.textSelections.set(element, nativeTextSelection(input));
         }
       }
     }
@@ -1376,6 +1410,15 @@ function roleMapping(role) {
 }
 function stableDOMId(id) {
   return Array.from(id, (character) => character.codePointAt(0).toString(16)).join("-");
+}
+function nativeTextSelection(input) {
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  return {
+    text: input.value,
+    anchor: input.selectionDirection === "backward" ? end : start,
+    head: input.selectionDirection === "backward" ? start : end
+  };
 }
 
 // src/StaticGif.ts
@@ -2629,7 +2672,7 @@ function encodeBase64(value) {
 
 // src/WebHostSurfaceTransport.ts
 function encodeAccessibilityActionMessage(target, request, requestID) {
-  const value = request.action === "setValue" ? `:${request.value.type}:${encodeURIComponent(String(request.value.value))}` : request.action === "custom" ? `:name:${encodeURIComponent(request.name)}` : "";
+  const value = request.action === "editText" || request.action === "selectText" ? `:text:${encodeURIComponent(request.text)}:${request.anchor}:${request.head}` : request.action === "setValue" ? `:${request.value.type}:${encodeURIComponent(String(request.value.value))}` : request.action === "custom" ? `:name:${encodeURIComponent(request.name)}` : "";
   return new TextEncoder().encode(`\x1Eaccessibility:${requestID === undefined ? "" : `${requestID}:`}${encodeURIComponent(target)}:${request.action}${value}
 `);
 }
@@ -3148,7 +3191,7 @@ function isWebHostAccessibilityNode(value) {
     return false;
   }
   const node = value;
-  return (node.opensLink === undefined || typeof node.opensLink === "boolean") && (node.customActions === undefined || Array.isArray(node.customActions) && node.customActions.length <= 65536 && node.customActions.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.customActions).size === node.customActions.length) && (node.selection === undefined || isAccessibilitySelection(node.selection)) && (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.isAccessibilityFocused === undefined || typeof node.isAccessibilityFocused === "boolean") && (node.navigationCategories === undefined || Array.isArray(node.navigationCategories) && node.navigationCategories.length <= 65536 && node.navigationCategories.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.navigationCategories).size === node.navigationCategories.length) && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
+  return (node.opensLink === undefined || typeof node.opensLink === "boolean") && (node.customActions === undefined || Array.isArray(node.customActions) && node.customActions.length <= 65536 && node.customActions.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.customActions).size === node.customActions.length) && (node.selection === undefined || isAccessibilitySelection(node.selection)) && (node.textSelection === undefined || Array.isArray(node.textSelection) && node.textSelection.length === 2 && node.textSelection.every((offset) => Number.isSafeInteger(offset) && offset >= 0)) && (node.properties === undefined || isAccessibilityProperties(node.properties)) && typeof node.id === "string" && (node.parentId === undefined || typeof node.parentId === "string") && isWebHostSurfaceRect(node.rect) && typeof node.role === "string" && (node.label === undefined || typeof node.label === "string") && (node.hint === undefined || typeof node.hint === "string") && (node.hidden === undefined || typeof node.hidden === "boolean") && (node.liveRegion === undefined || typeof node.liveRegion === "string") && (node.cursorAnchor === undefined || isWebHostAccessibilityPoint(node.cursorAnchor)) && (node.isFocused === undefined || typeof node.isFocused === "boolean") && (node.isAccessibilityFocused === undefined || typeof node.isAccessibilityFocused === "boolean") && (node.navigationCategories === undefined || Array.isArray(node.navigationCategories) && node.navigationCategories.length <= 65536 && node.navigationCategories.every((name) => typeof name === "string" && name.trim().length > 0) && new Set(node.navigationCategories).size === node.navigationCategories.length) && (node.actionTarget === undefined || typeof node.actionTarget === "string") && (node.actions === undefined || Array.isArray(node.actions) && node.actions.every((action) => typeof action === "string")) && (node.isEnabled === undefined || typeof node.isEnabled === "boolean") && (node.value === undefined || isAccessibilityValue(node.value)) && [node.valueMin, node.valueMax, node.valueStep].every((value2) => value2 === undefined || typeof value2 === "number" && Number.isFinite(value2));
 }
 function isAccessibilitySelection(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -3168,7 +3211,7 @@ function isAccessibilityProperties(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
     return false;
   const properties = value;
-  return (properties.selected === undefined || typeof properties.selected === "boolean") && (properties.expanded === undefined || typeof properties.expanded === "boolean") && (properties.popup === undefined || ["menu", "listbox", "tree", "grid", "dialog"].includes(properties.popup)) && (properties.modal === undefined || typeof properties.modal === "boolean") && (properties.required === undefined || typeof properties.required === "boolean") && (properties.invalid === undefined || typeof properties.invalid === "boolean") && (properties.busy === undefined || typeof properties.busy === "boolean") && (properties.readOnly === undefined || typeof properties.readOnly === "boolean") && (properties.description === undefined || typeof properties.description === "string") && (properties.valueDescription === undefined || typeof properties.valueDescription === "string") && (properties.language === undefined || typeof properties.language === "string") && (properties.headingLevel === undefined || Number.isSafeInteger(properties.headingLevel) && properties.headingLevel > 0) && (properties.level === undefined || Number.isSafeInteger(properties.level) && properties.level > 0) && (properties.positionInSet === undefined || Number.isSafeInteger(properties.positionInSet) && properties.positionInSet > 0) && (properties.setSize === undefined || Number.isSafeInteger(properties.setSize) && (properties.setSize === -1 || properties.setSize >= 0)) && (properties.rowIndex === undefined || Number.isSafeInteger(properties.rowIndex) && properties.rowIndex > 0) && (properties.columnIndex === undefined || Number.isSafeInteger(properties.columnIndex) && properties.columnIndex > 0) && (properties.rowCount === undefined || Number.isSafeInteger(properties.rowCount) && (properties.rowCount === -1 || properties.rowCount >= 0)) && (properties.columnCount === undefined || Number.isSafeInteger(properties.columnCount) && (properties.columnCount === -1 || properties.columnCount >= 0)) && (properties.rowSpan === undefined || Number.isSafeInteger(properties.rowSpan) && properties.rowSpan > 0) && (properties.columnSpan === undefined || Number.isSafeInteger(properties.columnSpan) && properties.columnSpan > 0) && (properties.textKind === undefined || ["paragraph", "code", "quotation"].includes(properties.textKind)) && (properties.sort === undefined || ["none", "ascending", "descending", "other"].includes(properties.sort)) && (properties.labelledBy === undefined || Array.isArray(properties.labelledBy) && properties.labelledBy.every((id) => typeof id === "string")) && (properties.describedBy === undefined || Array.isArray(properties.describedBy) && properties.describedBy.every((id) => typeof id === "string")) && (properties.errorMessage === undefined || Array.isArray(properties.errorMessage) && properties.errorMessage.every((id) => typeof id === "string")) && (properties.controls === undefined || Array.isArray(properties.controls) && properties.controls.every((id) => typeof id === "string")) && (properties.owns === undefined || Array.isArray(properties.owns) && properties.owns.every((id) => typeof id === "string")) && (properties.flowTo === undefined || Array.isArray(properties.flowTo) && properties.flowTo.every((id) => typeof id === "string")) && (properties.activeDescendant === undefined || typeof properties.activeDescendant === "string");
+  return (properties.selected === undefined || typeof properties.selected === "boolean") && (properties.expanded === undefined || typeof properties.expanded === "boolean") && (properties.popup === undefined || ["menu", "listbox", "tree", "grid", "dialog"].includes(properties.popup)) && (properties.modal === undefined || typeof properties.modal === "boolean") && (properties.required === undefined || typeof properties.required === "boolean") && (properties.invalid === undefined || typeof properties.invalid === "boolean") && (properties.busy === undefined || typeof properties.busy === "boolean") && (properties.readOnly === undefined || typeof properties.readOnly === "boolean") && (properties.description === undefined || typeof properties.description === "string") && (properties.valueDescription === undefined || typeof properties.valueDescription === "string") && (properties.language === undefined || typeof properties.language === "string") && (properties.headingLevel === undefined || Number.isSafeInteger(properties.headingLevel) && properties.headingLevel > 0) && (properties.level === undefined || Number.isSafeInteger(properties.level) && properties.level > 0) && (properties.positionInSet === undefined || Number.isSafeInteger(properties.positionInSet) && properties.positionInSet > 0) && (properties.setSize === undefined || Number.isSafeInteger(properties.setSize) && (properties.setSize === -1 || properties.setSize >= 0)) && (properties.rowIndex === undefined || Number.isSafeInteger(properties.rowIndex) && properties.rowIndex > 0) && (properties.columnIndex === undefined || Number.isSafeInteger(properties.columnIndex) && properties.columnIndex > 0) && (properties.rowCount === undefined || Number.isSafeInteger(properties.rowCount) && (properties.rowCount === -1 || properties.rowCount >= 0)) && (properties.columnCount === undefined || Number.isSafeInteger(properties.columnCount) && (properties.columnCount === -1 || properties.columnCount >= 0)) && (properties.rowSpan === undefined || Number.isSafeInteger(properties.rowSpan) && properties.rowSpan > 0) && (properties.columnSpan === undefined || Number.isSafeInteger(properties.columnSpan) && properties.columnSpan > 0) && (properties.textKind === undefined || ["plain", "paragraph", "code", "quotation"].includes(properties.textKind)) && (properties.sort === undefined || ["none", "ascending", "descending", "other"].includes(properties.sort)) && (properties.labelledBy === undefined || Array.isArray(properties.labelledBy) && properties.labelledBy.every((id) => typeof id === "string")) && (properties.describedBy === undefined || Array.isArray(properties.describedBy) && properties.describedBy.every((id) => typeof id === "string")) && (properties.errorMessage === undefined || Array.isArray(properties.errorMessage) && properties.errorMessage.every((id) => typeof id === "string")) && (properties.controls === undefined || Array.isArray(properties.controls) && properties.controls.every((id) => typeof id === "string")) && (properties.owns === undefined || Array.isArray(properties.owns) && properties.owns.every((id) => typeof id === "string")) && (properties.flowTo === undefined || Array.isArray(properties.flowTo) && properties.flowTo.every((id) => typeof id === "string")) && (properties.activeDescendant === undefined || typeof properties.activeDescendant === "string");
 }
 function isAccessibilityActionResponse(value) {
   if (!value || typeof value !== "object")
