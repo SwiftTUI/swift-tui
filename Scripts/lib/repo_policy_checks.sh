@@ -183,6 +183,20 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
+    "Check third-party action pins" \
+    "bun Scripts/check_action_pins.ts" \
+    bun Scripts/check_action_pins.ts
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Test third-party action pin policy" \
+    "bun test Scripts/check_action_pins.test.ts" \
+    bun test Scripts/check_action_pins.test.ts
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
     "Check Linux image publication contract" \
     "bun Scripts/check_linux_image_workflow.ts" \
     bun Scripts/check_linux_image_workflow.ts
