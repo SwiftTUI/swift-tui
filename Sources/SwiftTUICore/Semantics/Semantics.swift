@@ -245,6 +245,9 @@ package struct SemanticExtractor: Sendable {
           scrollRoutes[scrollRoutes.count - 1].reducesMotion =
             node.environmentSnapshot.style.renderingReduceMotion
           scrollRoutes[scrollRoutes.count - 1].scrollAnchorCorrection = anchorOffset
+          scrollRoutes[scrollRoutes.count - 1].collectionScrollPosition =
+            node.hostedTableVisibleLayout?.scrollPosition
+            ?? node.hostedListVisibleLayout?.scrollPosition
           scrollRoutes[scrollRoutes.count - 1].collectionMaximumAnchorRow =
             node.hostedTableVisibleLayout?.maximumAnchorRow
             ?? node.hostedListVisibleLayout?.maximumAnchorRow

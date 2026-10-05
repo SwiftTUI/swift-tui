@@ -41,7 +41,10 @@ package struct TableVisibleLayout: Equatable, Sendable {
   /// when rows taller than one cell make it differ from the one-line
   /// arithmetic the scroll currency uses; `nil` otherwise. Scroll routing
   /// publishes it so the currency clamps against the rows actually drawn.
-  package var maximumAnchorRow: Int?
+  package var maximumAnchorRow: Int? { scrollMetadata?.maximumAnchorRow }
+  /// Cell-based position and measured endpoints for browser scroll chaining.
+  package var scrollPosition: CollectionScrollPosition? { scrollMetadata?.position }
+  package var scrollMetadata: CollectionScrollLayoutMetadata?
 
   package init(
     contentBounds: CellRect,
@@ -329,7 +332,8 @@ extension DrawExtractor {
       widths: widths,
       totalContentHeight: generated.totalLineCount + extraCells + extraAfter
     )
-    layout.maximumAnchorRow = generated.maximumAnchorRow
+    layout.scrollMetadata = .init(
+      maximumAnchorRow: generated.maximumAnchorRow, position: generated.scrollPosition)
     return layout
   }
 
@@ -340,7 +344,8 @@ extension DrawExtractor {
     lines: [TableDisplayLine],
     linePositions: [Int]?,
     totalLineCount: Int,
-    maximumAnchorRow: Int?
+    maximumAnchorRow: Int?,
+    scrollPosition: CollectionScrollPosition?
   )
 
   private func visibleTableLines(
@@ -369,17 +374,17 @@ extension DrawExtractor {
     )
 
     guard viewportLineCount > 0 else {
-      return ([], nil, 0, nil)
+      return ([], nil, 0, nil, nil)
     }
     guard displayLines.count > viewportLineCount else {
-      return (displayLines, nil, displayLines.count, nil)
+      return (displayLines, nil, displayLines.count, nil, nil)
     }
 
     let fixedTopCount = min(displayLines.count, payload.showsHeaders ? 3 : 1)
     let fixedBottomCount = displayLines.isEmpty ? 0 : 1
     guard viewportLineCount > fixedTopCount + fixedBottomCount else {
       let clamped = Array(displayLines.prefix(viewportLineCount))
-      return (clamped, nil, clamped.count, nil)
+      return (clamped, nil, clamped.count, nil, nil)
     }
 
     let bodyStart = fixedTopCount
@@ -396,7 +401,7 @@ extension DrawExtractor {
         Array(displayLines.prefix(fixedTopCount))
         + bodyLines
         + Array(displayLines.suffix(fixedBottomCount))
-      return (all, nil, all.count, nil)
+      return (all, nil, all.count, nil, nil)
     }
 
     if !showsIndicators {
@@ -409,7 +414,7 @@ extension DrawExtractor {
         Array(displayLines.prefix(fixedTopCount))
         + window.lines
         + Array(displayLines.suffix(fixedBottomCount))
-      return (visible, nil, visible.count, nil)
+      return (visible, nil, visible.count, nil, nil)
     }
 
     let anchoredOffset = visibleTableBodyWindow(
@@ -456,7 +461,7 @@ extension DrawExtractor {
       Array(displayLines.prefix(fixedTopCount))
       + Array(visibleBody.prefix(bodyCapacity))
       + Array(displayLines.suffix(fixedBottomCount))
-    return (visible, nil, visible.count, nil)
+    return (visible, nil, visible.count, nil, nil)
   }
 
   private func viewportBackedVisibleTableLines(
@@ -468,7 +473,7 @@ extension DrawExtractor {
     rowWindow: Range<Int>?
   ) -> GeneratedTableLines {
     guard viewportLineCount > 0 else {
-      return ([], nil, 0, nil)
+      return ([], nil, 0, nil, nil)
     }
 
     var chromePayload = payload
@@ -480,7 +485,7 @@ extension DrawExtractor {
     let bottom = chrome.last.map { [$0] } ?? []
     guard viewportLineCount > top.count + bottom.count else {
       let clamped = Array(top.prefix(viewportLineCount))
-      return (clamped, nil, clamped.count, nil)
+      return (clamped, nil, clamped.count, nil, nil)
     }
 
     let bodyLineCount = payload.rows.isEmpty ? 0 : payload.rows.count * 2 - 1
@@ -509,7 +514,7 @@ extension DrawExtractor {
             widths: widths
           )
           + bottom
-        return (all, nil, totalLineCount, nil)
+        return (all, nil, totalLineCount, nil, nil)
       }
 
       let windowStart = max(0, rowWindow.lowerBound * 2)
@@ -523,7 +528,7 @@ extension DrawExtractor {
             widths: widths
           )
           + bottom
-        return (all, nil, totalLineCount, nil)
+        return (all, nil, totalLineCount, nil, nil)
       }
 
       let body = viewportBackedTableBodyLines(
@@ -535,7 +540,7 @@ extension DrawExtractor {
         Array(0..<top.count)
         + (windowStart..<windowEnd).map { top.count + $0 }
         + (bottom.isEmpty ? [] : [top.count + bodyLineCount])
-      return (top + body + bottom, positions, totalLineCount, nil)
+      return (top + body + bottom, positions, totalLineCount, nil, nil)
     }
 
     let selectedLine = min(
@@ -579,6 +584,14 @@ extension DrawExtractor {
     func maximumAnchorRow(_ range: (offset: Int, end: Int, maxOffset: Int)) -> Int? {
       bodyCellCount > bodyLineCount ? (range.maxOffset + 1) / 2 : nil
     }
+    func scrollPosition(_ range: (offset: Int, end: Int, maxOffset: Int))
+      -> CollectionScrollPosition
+    {
+      CollectionScrollPosition(
+        cellOffset: range.offset
+          + tallRowExtraCells(in: rowHeights ?? [:]) { $0 * 2 < range.offset },
+        isAtStart: range.offset == 0, isAtEnd: range.offset == range.maxOffset)
+    }
     // A window whose next row does not fit leaves cells unused. Blank body
     // lines fill them, so the overflow indicator and the closing border stay
     // on the table's last lines instead of floating up under the rows.
@@ -606,7 +619,7 @@ extension DrawExtractor {
           capacity: bodyCapacity
         )
         + bottom
-      return (visible, nil, visible.count, maximumAnchorRow(range))
+      return (visible, nil, visible.count, maximumAnchorRow(range), scrollPosition(range))
     }
 
     let initial = window(capacity: bodyCapacity)
@@ -637,7 +650,7 @@ extension DrawExtractor {
       )
     }
     let visible = top + Array(visibleBody.prefix(bodyCapacity)) + bottom
-    return (visible, nil, visible.count, maximumAnchorRow(range))
+    return (visible, nil, visible.count, maximumAnchorRow(range), scrollPosition(range))
   }
 
   private func viewportBackedTableBodyLines(

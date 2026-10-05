@@ -370,6 +370,14 @@ struct CollectionScrollCurrencyTests {
     }
     defer { harness.shutdown() }
 
+    func publishedRoute() throws -> ScrollRoute {
+      try #require(
+        harness.runLoop.localScrollPositionRegistry.routesWithCurrentOffsets(
+          harness.runLoop.latestSemanticSnapshot.scrollRoutes
+        ).first)
+    }
+    #expect(try publishedRoute().contentOffset.y == 0, "the top must chain wheel-up")
+
     switch move {
     case .scrollToEdge:
       _ = try harness.clickText("Bottom")
@@ -389,11 +397,26 @@ struct CollectionScrollCurrencyTests {
       #expect(harness.frame.contains("╰"), "the closing border is visible:\n\(harness.frame)")
     }
 
+    let bottomRoute = try publishedRoute()
+    #expect(
+      bottomRoute.contentOffset.y
+        == max(
+          0,
+          bottomRoute.contentBounds.size.height - bottomRoute.viewportRect.size.height),
+      "the browser must chain wheel-down at the last row")
+
     // Reversing moves one row at once: no spinning in place at the bottom, and
     // no jump past the rows the layout actually drew there.
     if move == .wheel {
       let point = try #require(harness.point(forText: "«49»a"))
       _ = try harness.scrollPointer(at: point, deltaY: -1)
+      let reversedRoute = try publishedRoute()
+      #expect(reversedRoute.contentOffset.y > 0)
+      #expect(
+        reversedRoute.contentOffset.y
+          < max(
+            0,
+            reversedRoute.contentBounds.size.height - reversedRoute.viewportRect.size.height))
       #expect(!harness.frame.contains("«49»b"), "one notch up moves the window:\n\(harness.frame)")
       #expect(harness.frame.contains("«48»b"), "by one row:\n\(harness.frame)")
     }

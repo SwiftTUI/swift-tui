@@ -71,7 +71,24 @@ package struct LazyScrollAnchorCorrection: Equatable, Sendable {
   }
 }
 
+/// The measured collection window in cell units, separate from its row-based
+/// navigation currency. Fixed chrome and overflow indicators make the last
+/// legal row anchor differ from a plain `contentHeight - viewportHeight` clamp.
+package struct CollectionScrollPosition: Equatable, Sendable {
+  package var cellOffset: Int
+  package var isAtStart: Bool
+  package var isAtEnd: Bool
+
+  package init(cellOffset: Int, isAtStart: Bool, isAtEnd: Bool) {
+    self.cellOffset = cellOffset
+    self.isAtStart = isAtStart
+    self.isAtEnd = isAtEnd
+  }
+}
+
 public struct ScrollRoute: Equatable, Sendable {
+  package var collectionScrollPosition: CollectionScrollPosition? = nil
+
   /// Authored motion policy at this route, refreshed with each semantic frame.
   package var reducesMotion = false
   package var scrollAnchorCorrection: LazyScrollAnchorCorrection? = nil

@@ -173,6 +173,15 @@ package final class LocalScrollPositionRegistry: Equatable {
       let offset = registration.currentOffset()
       var enriched = route
       enriched.contentOffset = CellPoint(x: offset.x, y: offset.y)
+      if let position = route.collectionScrollPosition {
+        let maximum = max(0, route.contentBounds.size.height - route.viewportRect.size.height)
+        // Chaining follows the measured window's endpoints. The body scrolls
+        // by whole rows, while chrome and indicators stay fixed in the viewport.
+        enriched.contentOffset.y =
+          position.isAtStart
+          ? 0
+          : position.isAtEnd ? maximum : min(maximum, max(0, position.cellOffset))
+      }
       return enriched
     }
   }

@@ -53,6 +53,25 @@ package struct ListDisplayLine: Equatable, Sendable {
   }
 }
 
+/// Immutable optional storage keeps collection bookkeeping out of every
+/// MeasuredNode's recursive inline footprint, including non-collection nodes.
+package final class CollectionScrollLayoutMetadata: Equatable, Sendable {
+  package let maximumAnchorRow: Int?
+  package let position: CollectionScrollPosition?
+
+  package init?(maximumAnchorRow: Int?, position: CollectionScrollPosition?) {
+    guard maximumAnchorRow != nil || position != nil else { return nil }
+    self.maximumAnchorRow = maximumAnchorRow
+    self.position = position
+  }
+
+  package static func == (lhs: CollectionScrollLayoutMetadata, rhs: CollectionScrollLayoutMetadata)
+    -> Bool
+  {
+    lhs === rhs || (lhs.maximumAnchorRow == rhs.maximumAnchorRow && lhs.position == rhs.position)
+  }
+}
+
 package struct ListVisibleLayout: Equatable, Sendable {
   package var contentBounds: CellRect
   package var lines: [ListDisplayLine]
@@ -63,7 +82,10 @@ package struct ListVisibleLayout: Equatable, Sendable {
   /// The table twin's ``TableVisibleLayout/maximumAnchorRow``: the largest
   /// scroll anchor row whose window still ends at the last row, when taller
   /// rows make it differ from the currency's one-line arithmetic.
-  package var maximumAnchorRow: Int?
+  package var maximumAnchorRow: Int? { scrollMetadata?.maximumAnchorRow }
+  /// Cell-based position and measured endpoints for browser scroll chaining.
+  package var scrollPosition: CollectionScrollPosition? { scrollMetadata?.position }
+  package var scrollMetadata: CollectionScrollLayoutMetadata?
 
   package init(
     contentBounds: CellRect,

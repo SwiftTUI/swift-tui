@@ -231,6 +231,10 @@ package enum HostWireSchema {
       .init(
         "collectionMaximumAnchorRow",
         wire: .notSerialized("collection scroll-currency clamp consumed by the owning view")),
+      .init(
+        "collectionScrollPosition",
+        wire: .notSerialized(
+          "measured layout position applied to contentOffset before host projection")),
       .init("identity", wire: .key("id")),
       .init(
         "viewNodeID",
