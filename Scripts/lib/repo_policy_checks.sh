@@ -66,24 +66,10 @@ run_repo_policy_phase() {
   repo_root=$1
   mode=$2
 
-  # Run prek hooks first.  prek owns hooks that have no standalone
-  # script (notably swift-format and `no-foundation-in-library-products`)
-  # and also re-invokes the script-based hooks below.  Putting it at
-  # the top of the phase lets the gate fail fast on policy violations
-  # that would otherwise only surface at `git commit` time.
-  #
-  # Scope is prek's default — the staged change being committed — not a
-  # branch diff against `origin/main`.  This makes the gate match the
-  # commit-time pre-commit hook exactly: it checks the change you are
-  # committing, so `swift-format`'s in-place rewrites never touch files
-  # outside that change.  (Stage your work before running the gate to
-  # exercise the prek step; with a clean tree it is a no-op and the
-  # script-based policy steps below still run.)
-  #
-  # If `prek` is not installed locally the step is skipped — the
-  # commit-time hooks still catch the same issues, and CI installs
-  # prek explicitly.  This keeps the gate runnable on machines that
-  # have not finished onboarding.
+  # The optional staged hook pass formats only the change being committed.
+  # A clean index never enters prek's stash/restore path. CI does not install
+  # prek: all source-policy hooks run independently below. Formatting remains
+  # commit-time only because it rewrites files and requires a Swift toolchain.
   if command -v prek >/dev/null 2>&1; then
     run_repo_policy_check \
       "$mode" \
@@ -93,9 +79,36 @@ run_repo_policy_phase() {
       run_staged_prek_hooks "$repo_root"
   else
     echo "[check_repo_policy_phase] prek not on PATH — skipping prek run"
-    echo "  install it from https://prek.j178.dev to catch policy"
-    echo "  violations during the gate rather than at commit time."
+    echo "  standalone source-policy checks still run below"
   fi
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Check main-thread usage" \
+    "./Scripts/check_main_thread_usage.sh" \
+    ./Scripts/check_main_thread_usage.sh
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Check Foundation source imports" \
+    "./Scripts/check_foundation_imports.sh" \
+    ./Scripts/check_foundation_imports.sh
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Check standalone policy hook coverage" \
+    "bun Scripts/check_policy_hook_coverage.ts" \
+    bun Scripts/check_policy_hook_coverage.ts
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Test standalone policy hook coverage" \
+    "bun test Scripts/check_policy_hook_coverage.test.ts Scripts/check_foundation_imports.test.ts" \
+    bun test Scripts/check_policy_hook_coverage.test.ts Scripts/check_foundation_imports.test.ts
 
   run_repo_policy_check \
     "$mode" \
