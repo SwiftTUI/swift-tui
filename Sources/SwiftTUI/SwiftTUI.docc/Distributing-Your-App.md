@@ -101,9 +101,7 @@ available on every command as the lower-level spelling.
   ```
 
   A debug build that degrades emits a `windows.stack-floor-lean-profile`
-  runtime issue naming the remedy. On Windows the `SwiftTUI` umbrella serves
-  the terminal launch surface only: the WebHost products do not build there,
-  and `--web` fails with the web-runner-not-linked diagnostic.
+  runtime issue naming the remedy.
 
 The full host and distribution matrix lives in
 [Hosts and Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms).
