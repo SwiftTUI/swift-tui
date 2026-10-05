@@ -68,8 +68,8 @@ enum TerminalHostEscapeSequences {
   static func cursor(
     to point: CellPoint
   ) -> String {
-    let row = max(1, point.y + 1)
-    let column = max(1, point.x + 1)
+    let row = min(max(0, point.y), Int.max - 1) + 1
+    let column = min(max(0, point.x), Int.max - 1) + 1
     return "\u{001B}[\(row);\(column)H"
   }
 

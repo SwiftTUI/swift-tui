@@ -1610,6 +1610,11 @@ package final class ViewNode {
     )
   }
 
+  /// A registration captured during this resolve, never a previous-frame chain.
+  package func hasCurrentActionRegistration(identity: Identity) -> Bool {
+    registrationCaptureDepth > 0 && registeredHandlers.action.registrations[identity] != nil
+  }
+
   /// An explicitly composed action replaces the record with a closure that
   /// retains and delegates to the prior contribution. Ordinary duplicate
   /// primitive registrations still go through the F104 alarm below.

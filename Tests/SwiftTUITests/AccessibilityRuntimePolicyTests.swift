@@ -375,6 +375,87 @@ struct AccessibilityRuntimePolicyTests {
     #expect(terminal.writes.contains("\u{001B}[?25l"))
   }
 
+  @Test(
+    "Duplicate row identities retain their own caret and focus cursor", arguments: [false, true])
+  func duplicateRowCursor(cursorFollowsFocus: Bool) throws {
+    let size = CellSize(width: 32, height: 8)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("DuplicateRowCursor")
+    let tracker = FocusTracker(invalidationIdentities: [root])
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: tracker,
+      runtimeConfiguration: .init(cursorFollowsFocus: cursorFollowsFocus)
+    ) {
+      VStack {
+        ForEach(["same", "same"], id: \.self) { _ in
+          TextField("Name", text: .constant("abc")).frame(width: 14)
+        }
+      }
+    }
+    tracker.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    _ = loop.handle(.input(.key(.init(.tab))))
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let nodes = loop.latestSemanticSnapshot.accessibilityNodes.filter { $0.role == .textField }
+    #expect(nodes.count == 2)
+    let second = try #require(nodes.last)
+    #expect(nodes.first?.identity == second.identity)
+    #expect(nodes.first?.actionIdentity != second.actionIdentity)
+    #expect(tracker.currentFocusIdentity == second.actionIdentity)
+    let anchor = try #require(second.cursorAnchor)
+    #expect(terminal.movedCursorPoints.last == anchor)
+    #expect(
+      AccessibilityRuntimePolicy().focusedCursorPoint(
+        in: loop.latestSemanticSnapshot, focusedIdentity: tracker.currentFocusIdentity) == anchor)
+    #expect(
+      HostWireFrameModel.WireAccessibilityNode(
+        second,
+        focusedIdentity: tracker.currentFocusIdentity
+      ).isFocused)
+  }
+
+  @Test(
+    "Extreme anchors inside scrolling content cannot overflow cursor emission",
+    arguments: [Int.min, Int.max], [0, 3])
+  func extremeScrollingAnchor(offset: Int, padding: Int) throws {
+    let size = CellSize(width: 32, height: 8)
+    let terminal = CursorFocusTestTerminalHost(surfaceSizeProvider: { size })
+    let root = testIdentity("ExtremeScrollingCursor")
+    let tracker = FocusTracker(invalidationIdentities: [root])
+    let loop = cursorFocusRunLoop(
+      rootIdentity: root, terminal: terminal,
+      terminalSize: size, focusTracker: tracker,
+      runtimeConfiguration: .init(cursorFollowsFocus: true)
+    ) {
+      ScrollView {
+        Button("Bounded") {}.accessibilityCursorAnchor(.init(x: offset, y: offset))
+          .padding(padding)
+      }.frame(width: 20, height: 5)
+    }
+    tracker.invalidator = loop.scheduler
+    loop.scheduler.requestInvalidation(of: [root])
+    var frames = 0
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let initialNode = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.role == .button })
+    let target = try #require(initialNode.actionTarget)
+    #expect(loop.handleAccessibilityAction(.init(target: target, action: .focus)) == .accepted)
+    try loop.renderPendingFrames(renderedFrames: &frames)
+    let node = try #require(
+      loop.latestSemanticSnapshot.accessibilityNodes.first { $0.role == .button })
+    #expect(tracker.currentFocusIdentity == node.actionIdentity)
+    let anchor = try #require(node.cursorAnchor)
+    #expect(anchor.x >= node.rect.origin.x && anchor.x < node.rect.maxX)
+    #expect(anchor.y >= node.rect.origin.y && anchor.y < node.rect.maxY)
+    #expect(terminal.movedCursorPoints.last == anchor)
+    #expect(
+      TerminalHostEscapeSequences.cursor(to: .init(x: offset, y: offset))
+        == "\u{1B}[\(offset == Int.max ? Int.max : 1);\(offset == Int.max ? Int.max : 1)H")
+  }
+
   @Test("run loop anchors cursor-following to a TextField caret")
   func runLoopAnchorsCursorFollowingToTextFieldCaret() throws {
     let terminalSize = CellSize(width: 32, height: 6)

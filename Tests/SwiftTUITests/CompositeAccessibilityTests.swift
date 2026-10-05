@@ -8,6 +8,46 @@ import Testing
 @Suite(.serialized)
 struct CompositeAccessibilityTests {
   @Test(
+    "Authored actions preserve tab-strip keyboard activation", arguments: [false, true],
+    [false, true])
+  func authoredTabKeyboard(overflow: Bool, useSpace: Bool) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AuthoredTabKeyboard"),
+      size: .init(width: overflow ? 24 : 60, height: 12)
+    ) { AuthoredTabKeyboardFixture(overflow: overflow) }
+    defer { harness.shutdown() }
+    var frames = 0
+    func key(_ key: KeyEvent) throws {
+      _ = harness.runLoop.handle(.input(.key(.init(key))))
+      try harness.runLoop.renderPendingFrames(renderedFrames: &frames)
+    }
+    #expect(
+      harness.runLoop.localActionRegistry.hasActivationHandler(
+        identity: testIdentity("AuthoredTabs")))
+    try key(.arrowRight)
+    if overflow { try key(.arrowRight) }
+    try key(useSpace ? .space : .return)
+    if overflow {
+      #expect(harness.frame.contains("Three"))
+      #expect(harness.frame.contains("Four"))
+    } else {
+      #expect(harness.frame.contains("Selected two"))
+    }
+    #expect(harness.frame.contains("Authored 0"))
+    // A fresh resolve must replace callbacks rather than retain old chains.
+    let node = try #require(
+      harness.runLoop.latestSemanticSnapshot.accessibilityNodes.first {
+        $0.identity == testIdentity("AuthoredTabs")
+      })
+    let target = try #require(node.actionTarget)
+    #expect(
+      harness.runLoop.handleAccessibilityAction(.init(target: target, action: .custom("Inspect")))
+        == .accepted)
+    try harness.runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(harness.frame.contains("Authored 1"))
+  }
+
+  @Test(
     "logical tabs preserve selection, retained state, relationships and target lifetimes",
     arguments: [0, 1, 2, 3])
   func tabs(style: Int) throws {
@@ -447,6 +487,30 @@ private struct ChangingAccessibleTabStyleFixture: View {
     VStack {
       Button("Next style") { style = (style + 1) % 4 }
       AccessibleTabsFixture(style: style)
+    }
+  }
+}
+
+private struct AuthoredTabKeyboardFixture: View {
+  let overflow: Bool
+  @State private var selection = "one"
+  @State private var authored = 0
+  var body: some View {
+    VStack {
+      Text("Selected \(selection)")
+      Text("Authored \(authored)")
+      TabView(selection: $selection) {
+        Tab("One", value: "one") { Text("One content") }
+        Tab("Two", value: "two") { Text("Two content") }
+        Tab("Three", value: "three") { Text("Three content") }
+        Tab("Four", value: "four") { Text("Four content") }
+      }
+      .tabViewStyle(.literalTabs)
+      .id(testIdentity("AuthoredTabs"))
+      .accessibilityAction { authored += 1 }
+      .accessibilityAction(named: "Inspect") { authored += 1 }
+      .accessibilityAdjustableAction { _ in authored += 1 }
+      .frame(width: overflow ? 24 : 60, height: 8)
     }
   }
 }

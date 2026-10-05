@@ -49,6 +49,38 @@ struct JSONFrameRendererTests {
     #expect(announcements.first?["politeness"] as? String == "polite")
   }
 
+  @Test("JSON escapes terminal control scalars without changing decoded strings")
+  func terminalControlsRoundTrip() throws {
+    let text = "before\u{7F}\u{85}\u{9B}\u{9C}\u{9D}after界"
+    let identity = testIdentity("Controls")
+    let output = JSONFrameRenderer().render(
+      surface: RasterSurface(size: .init(width: 80, height: 1), lines: [text]),
+      semanticSnapshot: SemanticSnapshot(
+        accessibilityNodes: [
+          AccessibilityNode(
+            identity: identity, rect: rect(x: 0, y: 0, width: 10, height: 1),
+            role: .group, label: text, hint: text)
+        ],
+        accessibilityAnnouncements: [.init(message: text, politeness: .polite)],
+        accessibilityWarnings: [.init(identity: identity, kind: text, message: text)]),
+      focusedIdentity: nil)
+    #expect(!output.unicodeScalars.contains { (0x7F...0x9F).contains($0.value) })
+    for escape in ["\\u007F", "\\u0085", "\\u009B", "\\u009C", "\\u009D"] {
+      #expect(output.contains(escape))
+    }
+    let object = try decodeJSONObject(output)
+    #expect(object["rows"] as? [String] == [text])
+    let node = try #require((object["accessibilityNodes"] as? [[String: Any]])?.first)
+    #expect(node["label"] as? String == text)
+    #expect(node["hint"] as? String == text)
+    let announcement = try #require(
+      (object["accessibilityAnnouncements"] as? [[String: Any]])?.first)
+    #expect(announcement["message"] as? String == text)
+    let warning = try #require((object["accessibilityWarnings"] as? [[String: Any]])?.first)
+    #expect(warning["kind"] as? String == text)
+    #expect(warning["message"] as? String == text)
+  }
+
   @Test("JSON runtime writes JSON output instead of presenting raster frames")
   func jsonRuntimeWritesJSONOutputInsteadOfRasterFrames() async throws {
     let terminalSize = CellSize(width: 30, height: 8)

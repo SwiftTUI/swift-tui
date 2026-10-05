@@ -96,7 +96,9 @@ package final class LocalActionRegistry: Equatable {
   ) {
     // The first authored operation starts a fresh chain on every resolve.
     // Keeping the previous frame here would retain obsolete callbacks forever.
-    let inherited = preservingExisting ? store[identity] : nil
+    let preservesCurrent =
+      ViewNodeContext.current?.hasCurrentActionRegistration(identity: identity) == true
+    let inherited = preservingExisting || preservesCurrent ? store[identity] : nil
     let handler: Handler = { inherited?.handler() ?? false }
     let accessibility: AccessibilityHandler = { action in
       if let result = contribution(action) { return result }

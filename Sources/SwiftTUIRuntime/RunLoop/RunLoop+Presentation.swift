@@ -118,7 +118,7 @@ extension RunLoop {
   ) -> CellPoint? {
     guard let focusedIdentity = focusTracker.currentFocusIdentity,
       let node = semanticSnapshot.accessibilityNodes.first(where: {
-        $0.identity == focusedIdentity
+        ($0.actionIdentity ?? $0.identity) == focusedIdentity
       }),
       node.textInput != nil || node.role == .secureField
     else {

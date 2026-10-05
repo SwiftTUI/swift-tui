@@ -366,6 +366,23 @@ struct AccessibilityNodeExtractionTests {
     #expect(!nodes.contains { $0.identity == contentID })
   }
 
+  @Test(
+    "Extreme authored cursor offsets clamp inside semantic bounds", arguments: [Int.min, Int.max],
+    [0, 3])
+  func extremeCursorAnchors(offset: Int, origin: Int) throws {
+    let identity = testIdentity("ExtremeAnchor")
+    let placed = placedNode(
+      identity: identity, bounds: rect(x: origin, y: origin, width: 8, height: 3),
+      semanticMetadata: .init(
+        accessibilityRole: .button,
+        accessibilityCursorAnchor: .init(x: offset, y: offset)))
+    let node = try #require(SemanticExtractor().extract(from: placed).accessibilityNodes.first)
+    #expect(
+      node.cursorAnchor
+        == CellPoint(
+          x: origin + (offset == Int.max ? 7 : 0), y: origin + (offset == Int.max ? 2 : 0)))
+  }
+
   @Test("Explicit accessibility cursor anchors still apply to their own node")
   func explicitCursorAnchorStillAppliesToOwnNode() throws {
     let identity = testIdentity("Custom")

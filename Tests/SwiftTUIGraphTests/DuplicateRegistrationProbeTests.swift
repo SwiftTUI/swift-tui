@@ -57,14 +57,14 @@ struct DuplicateRegistrationProbeTests {
             return true
           })
         registry.composeAccessibility(
-          identity: identity, preservingExisting: true, followUpInvalidationIdentity: nil
+          identity: identity, preservingExisting: false, followUpInvalidationIdentity: nil
         ) {
           guard $0 == .increment else { return nil }
           calls += 10
           return .changed
         }
         registry.composeAccessibility(
-          identity: identity, preservingExisting: true, followUpInvalidationIdentity: nil
+          identity: identity, preservingExisting: false, followUpInvalidationIdentity: nil
         ) {
           guard $0 == .custom("Reset") else { return nil }
           calls += 100

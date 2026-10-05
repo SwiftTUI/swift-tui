@@ -96,7 +96,7 @@ package struct HostWireFrameModel {
       hidden = node.hidden
       liveRegionToken = node.liveRegion?.description
       cursorAnchor = node.cursorAnchor
-      isFocused = node.identity == focusedIdentity
+      isFocused = (node.actionIdentity ?? node.identity) == focusedIdentity
       isAccessibilityFocused = node.isAccessibilityFocused
       navigationCategories = node.navigationCategories
       actionTarget = node.actionTarget

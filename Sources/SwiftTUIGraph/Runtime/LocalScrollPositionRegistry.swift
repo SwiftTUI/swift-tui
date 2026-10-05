@@ -396,7 +396,7 @@ package final class LocalScrollPositionRegistry: Equatable {
 
     let focusedCursorAnchor =
       accessibilityNodes
-      .first(where: { $0.identity == focusedIdentity })?
+      .first(where: { ($0.actionIdentity ?? $0.identity) == focusedIdentity })?
       .cursorAnchor
     let focusedCursorRect = focusedCursorAnchor.map {
       CellRect(

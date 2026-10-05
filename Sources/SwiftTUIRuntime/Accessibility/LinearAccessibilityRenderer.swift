@@ -139,7 +139,7 @@ package struct JSONFrameRenderer: Equatable, Sendable {
       ("hint", optionalString(node.hint)),
       ("rect", rect(node.rect)),
       ("hidden", bool(node.hidden)),
-      ("focused", bool(node.identity == focusedIdentity)),
+      ("focused", bool((node.actionIdentity ?? node.identity) == focusedIdentity)),
       ("liveRegion", optionalString(node.liveRegion?.description)),
       ("cursorAnchor", optionalPoint(node.cursorAnchor)),
     ])
@@ -237,7 +237,7 @@ package struct JSONFrameRenderer: Equatable, Sendable {
         output += "\\f"
       case 0x0D:
         output += "\\r"
-      case 0x00...0x1F:
+      case 0x00...0x1F, 0x7F...0x9F:
         output += "\\u00" + twoDigitHex(Int(scalar.value))
       default:
         output.unicodeScalars.append(scalar)

@@ -7,23 +7,34 @@ extension SemanticExtractor {
   ) -> [AccessibilityNode] {
     guard !structures.isEmpty else { return original }
     var nodes = orderingAccessibilityNodes(original, structures: structures)
-    // Parents precede descendants. Inner grouping must settle before an outer merge.
+    var indexByIdentity: [Identity: Int] = [:]
+    var childrenByIdentity: [Identity: [Int]] = [:]
+    for index in nodes.indices {
+      if indexByIdentity[nodes[index].identity] == nil {
+        indexByIdentity[nodes[index].identity] = index
+      }
+      if let parent = nodes[index].parentIdentity {
+        childrenByIdentity[parent, default: []].append(index)
+      }
+    }
+    var removed: Set<Int> = []
+    // Parents precede descendants. Inner grouping must settle before an outer
+    // merge. Tombstones avoid shifting the whole array for every child removal.
     for source in original.reversed() {
       guard let structure = structures[source.identity], let behavior = structure.children,
-        behavior != .contain,
-        let index = nodes.firstIndex(where: { $0.identity == source.identity })
+        behavior != .contain, let index = indexByIdentity[source.identity],
+        !removed.contains(index)
       else { continue }
-      var descendants: Set<Identity> = [source.identity]
+      var visited: Set<Int> = [index]
       var childIndices: [Int] = []
-      for child in nodes.indices where child != index {
-        guard let parent = nodes[child].parentIdentity, descendants.contains(parent) else {
-          continue
-        }
+      var stack = (childrenByIdentity[source.identity] ?? []).reversed().map { $0 }
+      while let child = stack.popLast() {
+        guard !removed.contains(child), visited.insert(child).inserted else { continue }
         if structure.keepsVirtualChildren, structures[nodes[child].identity]?.isVirtual == true {
           continue
         }
-        descendants.insert(nodes[child].identity)
         childIndices.append(child)
+        stack.append(contentsOf: (childrenByIdentity[nodes[child].identity] ?? []).reversed())
       }
       if behavior == .combine {
         let children = childIndices.map { nodes[$0] }
@@ -35,6 +46,8 @@ extension SemanticExtractor {
         var labels: [String] = []
         var values: [String] = []
         var names = nodes[index].control?.customActions ?? []
+        var usedNames = Set(names)
+        var nextSuffix: [String: Int] = [:]
         var routes = nodes[index].combinedActions
         for child in children where !retained.contains(child.identity) {
           if let label = child.label, !label.isEmpty { labels.append(label) }
@@ -55,11 +68,12 @@ extension SemanticExtractor {
           operations += control.customActions.map { ($0, .custom($0)) }
           for (title, action) in operations {
             var name = title
-            var duplicate = 2
-            while names.contains(name) {
+            var duplicate = nextSuffix[title] ?? 2
+            while !usedNames.insert(name).inserted {
               name = "\(title) (\(duplicate))"
               duplicate += 1
             }
+            nextSuffix[title] = duplicate
             names.append(name)
             if case .custom(let nested) = action, let route = child.combinedActions[nested] {
               routes[name] = route
@@ -94,12 +108,21 @@ extension SemanticExtractor {
         }
         for child in childIndices where retained.contains(nodes[child].identity) {
           nodes[child].parentIdentity = source.identity
+          childrenByIdentity[source.identity, default: []].append(child)
         }
         childIndices.removeAll { retained.contains(nodes[$0].identity) }
       }
-      for child in childIndices.reversed() { nodes.remove(at: child) }
+      for child in childIndices {
+        removed.insert(child)
+        childrenByIdentity[nodes[child].identity] = nil
+      }
+      // Retained editors/links now belong directly to this container; virtual
+      // subtrees excluded above remain intact. Preserve the existing read order.
+      childrenByIdentity[source.identity] = Set(childrenByIdentity[source.identity] ?? [])
+        .filter { !removed.contains($0) }.sorted()
     }
-    return orderingAccessibilityNodes(nodes, structures: structures)
+    return orderingAccessibilityNodes(
+      nodes.indices.filter { !removed.contains($0) }.map { nodes[$0] }, structures: structures)
   }
 
   private func orderingAccessibilityNodes(

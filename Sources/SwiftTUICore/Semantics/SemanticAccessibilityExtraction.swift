@@ -87,6 +87,12 @@ extension SemanticExtractor {
     modalScopeIdentities: Set<Identity>? = nil
   ) -> (nodes: [AccessibilityNode], visualLabelRoutes: AccessibilityVisualLabelRoutes) {
     let focusIdentities = accessibilityFocusIdentities(from: focusRegions)
+    // Keep the first route, matching focus traversal, and index once for all
+    // rich-text segments rather than scanning every focus region per link.
+    var focusRoutes: [Identity: FocusRegion] = [:]
+    for region in focusRegions where focusRoutes[region.identity] == nil {
+      focusRoutes[region.identity] = region
+    }
     let textInputPresentations = textInputAccessibilityPresentations(from: root)
     var visualLabelRoutes = AccessibilityVisualLabelRoutes()
     var visualCandidateSummaries: [Int: AccessibilityVisualCandidateSummary] = [:]
@@ -352,7 +358,7 @@ extension SemanticExtractor {
               .init(textKind: node.semanticMetadata.isParagraph ? .paragraph : .plain))
           }
           let inlineNodes = inlineAccessibilityNodes(
-            for: node, parent: accessibilityNode, focusRegions: focusRegions,
+            for: node, parent: accessibilityNode, focusRoutes: focusRoutes,
             textPresentation: textPresentations[traversalOrdinal] ?? .independent)
           if !inlineNodes.isEmpty { accessibilityNode.label = nil }
           if node.semanticMetadata.accessibilityStructure?.tabs != nil,
@@ -462,7 +468,7 @@ extension SemanticExtractor {
   /// Rich text contributes prose and links once, in authored run order. Links
   /// reuse the primitive's existing placed focus routes and open-link handlers.
   private func inlineAccessibilityNodes(
-    for node: PlacedNode, parent: AccessibilityNode, focusRegions: [FocusRegion],
+    for node: PlacedNode, parent: AccessibilityNode, focusRoutes: [Identity: FocusRegion],
     textPresentation: AccessibilityTextPresentation
   ) -> [AccessibilityNode] {
     guard textPresentation == .independent,
@@ -484,7 +490,7 @@ extension SemanticExtractor {
       let identity =
         segment.id.map { inlineLinkIdentity(parent: node.identity, identifier: $0) }
         ?? node.identity.child(.indexed("AccessibilityText", index: index))
-      let route = focusRegions.first { $0.identity == identity }
+      let route = segment.id == nil ? nil : focusRoutes[identity]
       var child = AccessibilityNode(
         viewNodeID: segment.id == nil ? nil : node.viewNodeID,
         identity: identity.strippingEntityOccurrences, parentIdentity: parent.identity,
@@ -851,9 +857,18 @@ extension SemanticExtractor {
       return nil
     }
     let bounds = semanticBounds(for: node)
+    // Authored offsets can be arbitrary Int values. Keep the anchor in the
+    // semantic cell bounds and reserve one coordinate for 1×1 reveal rectangles
+    // and the terminal's one-based cursor encoding.
+    func coordinate(origin: Int, offset: Int, extent: Int) -> Int {
+      let upper = max(1, extent) - 1
+      let local = min(max(0, offset), upper)
+      let (absolute, overflow) = origin.addingReportingOverflow(local)
+      return min(overflow ? Int.max - 1 : absolute, Int.max - 1)
+    }
     return CellPoint(
-      x: bounds.origin.x + anchor.x,
-      y: bounds.origin.y + anchor.y
+      x: coordinate(origin: bounds.origin.x, offset: anchor.x, extent: bounds.size.width),
+      y: coordinate(origin: bounds.origin.y, offset: anchor.y, extent: bounds.size.height)
     )
   }
 

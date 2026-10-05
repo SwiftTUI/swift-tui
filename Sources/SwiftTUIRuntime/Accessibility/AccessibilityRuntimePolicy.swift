@@ -11,7 +11,9 @@ package struct AccessibilityRuntimePolicy: Equatable, Sendable {
       return nil
     }
     guard
-      let node = snapshot.accessibilityNodes.first(where: { $0.identity == focusedIdentity })
+      let node = snapshot.accessibilityNodes.first(where: {
+        ($0.actionIdentity ?? $0.identity) == focusedIdentity
+      })
     else {
       return nil
     }
