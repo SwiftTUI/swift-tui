@@ -1,7 +1,7 @@
 name: Repo Gate
 
 # The push/PR verdict for swift-tui: Linux only, one hot-path verdict per
-# push, ≤ 20 minutes wall-clock (swift-tui-org plan 2026-08-25-001, Stage 1).
+# push, with bounded build and execution steps.
 #
 # The single 30-minute job this replaced compiled the package once (≈ 9.6
 # min), launched `swift test` 27 more times (≈ 8 s of fixed cost each),
@@ -20,8 +20,8 @@ name: Repo Gate
 #                        SwiftTUITests suites; entry-point fixtures;
 #                        Foundation audit from the build's own
 #                        module traces                               ~15 min
-#   runtime (A, B, C)    image: one serialized SwiftTUITests shard
-#                        each, plus the serialized-execution check   ~16 min
+#   runtime (A, B, C)    image: bounded cold build, then one serialized
+#                        SwiftTUITests shard and execution check
 #   wasi-cross-compile   image (it ships the wasm SDK)                ~2 min
 #   Linux repo gate      aggregator: the branch-protection target;
 #                        scans the merged soundness traces of every
@@ -52,20 +52,20 @@ permissions:
   contents: read
 
 # The event name keeps each trigger in its own group, so a push to main cannot
-# cancel an in-flight workflow_dispatch run. cancel-in-progress stays because
-# every job here is ≤ 20 minutes (plan principle P5).
+# cancel an in-flight workflow_dispatch run. A newer push supersedes only the
+# older push verdict for the same ref.
 concurrency:
   group: repo-gate-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   BUN_VERSION: "1.3.14"
-  # Per-step silence bound for the gate's watchdog. Every step is now ≤ ~10
-  # minutes and prints continuously (per-file compile lines, per-test lines),
-  # so 600 s of silence is a wedge, not a slow runner.
+  # Per-step silence bound for the gate's watchdog. Busy steps emit per-file
+  # compile lines or per-test lines; the CPU-aware grace below distinguishes
+  # slow active work from a parked process.
   #
-  # These four are sized together against the 30-minute cap the core and
-  # runtime jobs carry; the policy job has a tighter cap and overrides them.
+  # These four fit the core job's 30-minute cap. Runtime jobs allow a separate
+  # cold build before execution; the policy job has a tighter cap and overrides them.
   # Worst-case kill = 600 idle + 300 grace + 10 kill grace = 910 s. It was
   # 2410 s until 2026-08-29 — the grace was a COUNT of three forgiven windows,
   # each costing another whole idle bound — so the watchdog could not fire
@@ -300,7 +300,12 @@ jobs:
     container:
       image: ghcr.io/swifttui/swift-tui-linux:swift-6.4.0
       options: --cap-add=SYS_PTRACE
-    timeout-minutes: 30
+    # A cold test build took 750 s on amd64 before the serialized C shard
+    # started. Give compilation its own bounded step instead of consuming the
+    # runtime watchdog's unchanged 1500 s absolute limit.
+    timeout-minutes: 45
+    env:
+      SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "2700"
     strategy:
       fail-fast: false
       # `arch` must be an original matrix key: an `include` row whose arch is
@@ -347,6 +352,16 @@ jobs:
             Scripts/apt_get_retry.sh update
             Scripts/apt_get_retry.sh install -y --no-install-recommends gdb
           fi
+
+      - name: Build runtime test bundle
+        timeout-minutes: 20
+        shell: bash
+        env:
+          DISABLE_EXPLICIT_PLATFORMS: "1"
+          SWIFTTUI_WARNINGS_AS_ERRORS: "1"
+        run: |
+          set -euo pipefail
+          swiftly run swift build --build-system native --build-tests -Xswiftc -emit-loaded-module-trace
 
       - name: Run runtime shard
         shell: bash
