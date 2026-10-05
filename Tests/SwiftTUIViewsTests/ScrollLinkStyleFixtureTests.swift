@@ -31,7 +31,7 @@ struct ScrollLinkStyleFixtureTests {
     let plain = PlainLinkStyle().resolvePresentation(for: configuration)
     #expect(configuration.focusActive)
     #expect(automatic.underline == .visible(.init(pattern: .solid)))
-    #expect(underlined.foregroundStyle == configuration.styleEnvironment.themeStyle(for: .link))
+    #expect(underlined.foregroundStyle == .semantic(.link))
     #expect(underlined.underline == .visible(.init(pattern: .solid)))
     #expect(plain.foregroundStyle == nil)
     #expect(plain.underline == .hidden)

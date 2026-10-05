@@ -501,12 +501,16 @@ struct ButtonFocusStabilityTests {
     for (style, role, tone) in cases {
       let rail = try Self.focusedRailCell(
         Button("File", role: role) {}.buttonStyle(style), identity: testIdentity("RailTone"))
-      let expected = try Self.foregroundColor(painting: .terminalBorder(tone))
-      #expect(
-        rail.style?.foregroundColor == expected,
-        "\(style.snapshotLabel) \(String(describing: role)) rail must paint the \(tone) border tone"
-      )
-      #expect(rail.style?.foregroundColor != rail.style?.backgroundColor)
+      let expected = try #require(try Self.foregroundColor(painting: .terminalBorder(tone)))
+      let foreground = try #require(rail.style?.foregroundColor)
+      let background = rail.style?.backgroundColor ?? TerminalAppearance.fallback.backgroundColor
+      if expected.contrastRatio(to: background) >= 4.5 {
+        #expect(
+          foreground == expected,
+          "\(style.snapshotLabel) \(String(describing: role)) keeps a readable \(tone) border tone")
+      }
+      // The rail is a non-text focus indicator; its applicable target is 3:1.
+      #expect(foreground.contrastRatio(to: background) >= 3)
     }
   }
 

@@ -702,7 +702,7 @@ private func powerlineTabItem(
   let selectedBackgroundColor = powerlineSelectedBackgroundColor(
     tone: tone,
     styleEnvironment: styleEnvironment
-  )
+  ).accessibilityContrasting(with: styleEnvironment.theme.background, target: 4.5)
   let selectedBackgroundStyle = AnyShapeStyle(selectedBackgroundColor)
   let selectedForegroundStyle = AnyShapeStyle(
     contrastingForegroundColor(on: selectedBackgroundColor)

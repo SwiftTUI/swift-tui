@@ -1080,7 +1080,7 @@ struct TabViewSurfaceTests {
     #expect(firstLine.contains("Logs"))
   }
 
-  @Test("selected powerline tabs fill the full segment with the accent color")
+  @Test("selected powerline tabs fill the full segment with a contrasting accent color")
   func selectedPowerlineTabsUseFullAccentFill() throws {
     let artifacts = renderTabArtifacts(
       style: .powerline,
@@ -1088,7 +1088,10 @@ struct TabViewSurfaceTests {
       selection: "settings"
     )
     let firstRow = try #require(artifacts.rasterSurface.cells.first)
-    let expectedBackground = TerminalAppearance.fallback.tintColor
+    let expectedBackground = try #require(
+      firstRow.first { $0.character == "S" }?.style?.backgroundColor)
+    #expect(
+      expectedBackground.contrastRatio(to: TerminalAppearance.fallback.backgroundColor) >= 4.5)
     let wedgeIndices = firstRow.enumerated().compactMap { index, cell in
       switch cell.character {
       case "◢", "◤":

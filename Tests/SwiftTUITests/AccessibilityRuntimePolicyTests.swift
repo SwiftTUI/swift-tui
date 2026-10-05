@@ -1381,6 +1381,28 @@ private struct PickerConditionalFixture: View {
 @MainActor
 @Suite
 struct AccessibilityStructureRuntimeTests {
+  @Test("named containing groups preserve static reading content in representations")
+  func namedContainerReading() {
+    let result = DefaultRenderer().render(
+      Text("Terminal pixels").accessibilityRepresentation {
+        VStack {
+          Text("Child caret: row 41, column 8")
+          Text("Earlier output 界").accessibilityLabel("Earlier output 界")
+          Button("Copy output") {}
+        }.accessibilityElement(children: .contain).accessibilityLabel("Terminal pane")
+      }.frame(width: 4, height: 1),
+      context: .init(identity: testIdentity("NamedVirtualContainer")),
+      proposal: .init(width: 4, height: 1))
+    let nodes = result.semanticSnapshot.accessibilityNodes
+    for label in [
+      "Terminal pane", "Child caret: row 41, column 8", "Earlier output 界", "Copy output",
+    ] {
+      #expect(nodes.contains { $0.label == label })
+    }
+    #expect(result.rasterSurface.size == CellSize(width: 4, height: 1))
+    #expect(result.semanticSnapshot.focusRegions.isEmpty)
+  }
+
   @Test("large semantic representations do not enlarge the painted surface")
   func virtualSurfaceExtent() {
     let renderer = DefaultRenderer()

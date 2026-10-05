@@ -300,7 +300,24 @@ extension Rasterizer {
     if environment.renderingReduceMotion { emphasis.remove(.blink) }
     let preferences = environment.accessibilityPreferences
     let profile = preferences.colorProfile ?? .standard
-    if preferences.contrast == .increased || profile != .standard, opacity > 0 {
+    // Semantic ink is readable by default even when it is used over a
+    // selected row or a tinted control surface. Preserve authored paints,
+    // fades and disabled treatments unless the user requests an override.
+    let semanticInk: Bool =
+      switch style.foregroundStyle ?? environment.foregroundStyle ?? .semantic(.foreground) {
+      case .semantic(let role):
+        !((role == .foreground && environment.foregroundStyle != nil)
+          || (role == .tint && environment.tintStyle != nil))
+      case .terminalChrome: true
+      default: false
+      }
+    let defaultBackground = backgroundColor ?? currentCellBackground ?? environment.theme.background
+    let defaultContrast =
+      semanticInk && environment.isEnabled && opacity == 1
+      && (foregroundColor?.alpha ?? 1) == 1
+      && (foregroundColor ?? environment.theme.foreground).accessibilityDisplayColor
+        .contrastRatio(to: defaultBackground.accessibilityDisplayColor) < 4.5
+    if preferences.contrast == .increased || profile != .standard || defaultContrast, opacity > 0 {
       // The user-selected policy applies to explicit paints and gradients too.
       // Inspect the composed pair, not the unblended authored color token.
       let under = (currentCellBackground ?? environment.theme.background)
@@ -325,7 +342,9 @@ extension Rasterizer {
         emphasis.remove(.faint)
       }
       foregroundColor = foreground.converted(to: .sRGB, gamutMapping: .clip)
-      backgroundColor = background.converted(to: .sRGB, gamutMapping: .clip)
+      if preferences.contrast == .increased || profile != .standard {
+        backgroundColor = background.converted(to: .sRGB, gamutMapping: .clip)
+      }
     }
     func decoration(_ line: TextLineStyle?) -> TextLineStyle? {
       guard var line else { return nil }

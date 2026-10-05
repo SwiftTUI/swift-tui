@@ -411,6 +411,19 @@ private struct CompactStepperStyleBody: View {
 private struct StepperStyleRow: View {
   let configuration: StepperStyleConfiguration
   let compact: Bool
+  @Environment(\.pointerInputCapabilities) private var pointer
+
+  private var actionTarget: CellSize {
+    guard case .subCell(source: .webPixels, metrics: let metrics) = pointer.precision else {
+      return .init(width: 1, height: 1)
+    }
+    // Browser metrics are CSS pixels, independent of the backing-store scale.
+    // Size the routed area itself, rather than only its accessible parent.
+    return .init(
+      width: max(1, Int((24 / Double(max(1, metrics.width))).rounded(.up))),
+      height: max(1, Int((24 / Double(max(1, metrics.height))).rounded(.up))))
+  }
+
   var body: some View {
     let active = configuration.focusActive || configuration.isPressed
     let chrome = configuration.styleEnvironment.rowChrome(
@@ -429,12 +442,14 @@ private struct StepperStyleRow: View {
         configuration.decrement {
           Text(compact ? "−" : configuration.canDecrement ? "◀" : "◁")
             .foregroundStyle(configuration.canDecrement ? accent : AnyShapeStyle(.placeholder))
+            .frame(width: actionTarget.width, height: actionTarget.height)
         }
         configuration.valueLabel.foregroundStyle(
           active ? contentChrome.foregroundStyle : chrome.foregroundStyle)
         configuration.increment {
           Text(compact ? "+" : configuration.canIncrement ? "▶" : "▷")
             .foregroundStyle(configuration.canIncrement ? accent : AnyShapeStyle(.placeholder))
+            .frame(width: actionTarget.width, height: actionTarget.height)
         }
       }
       .opacity(contentChrome.opacity)

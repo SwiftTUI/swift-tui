@@ -3339,6 +3339,7 @@ class CanvasSurfacePainter {
   canvas;
   requestRedraw = () => {};
   lastEpoch;
+  forcedColors = false;
   pendingImagePayloadMissIds = new Set;
   imagePayloadMissScheduled = false;
   constructor(options = {}) {
@@ -3390,7 +3391,10 @@ class CanvasSurfacePainter {
       }
     }
     this.trimDecodedImages();
-    const dirtyRegion = frame ? this.dirtyRegionForDamage(damage, frame, metrics) : undefined;
+    const forcedColors = globalThis.matchMedia?.("(forced-colors: active)").matches ?? false;
+    const colorsChanged = forcedColors !== this.forcedColors;
+    this.forcedColors = forcedColors;
+    const dirtyRegion = frame && !colorsChanged ? this.dirtyRegionForDamage(damage, frame, metrics) : undefined;
     const recoveredPayloadIds = new Set(recoveredImagePayloadIds);
     if (dirtyRegion?.rects.length === 0) {
       this.prepareImages(frame?.images ?? [], recoveredPayloadIds);
@@ -3399,7 +3403,7 @@ class CanvasSurfacePainter {
     const scale = metrics.pixelScale ?? (globalThis.window?.devicePixelRatio || 1);
     context.setTransform(scale, 0, 0, scale, 0, 0);
     context.textBaseline = "alphabetic";
-    context.fillStyle = webTUITerminalBackgroundColor(metrics.style);
+    context.fillStyle = forcedColors ? "Canvas" : webTUITerminalBackgroundColor(metrics.style);
     if (dirtyRegion) {
       for (const rect of dirtyRegion.rects) {
         context.clearRect(rect.x, rect.y, rect.width, rect.height);
@@ -3689,8 +3693,9 @@ class CanvasSurfacePainter {
     const rectX = x * metrics.cellWidth;
     const rectY = y * metrics.cellHeight;
     const width = Math.max(1, span) * metrics.cellWidth;
-    const background = resolvedSurfaceBackground(style, metrics.style);
-    const foreground = resolvedSurfaceForeground(style, metrics.style);
+    const reversed = !!((style?.em ?? 0) & 16);
+    const background = this.forcedColors ? reversed ? "CanvasText" : "Canvas" : resolvedSurfaceBackground(style, metrics.style);
+    const foreground = this.forcedColors ? reversed ? "Canvas" : "CanvasText" : resolvedSurfaceForeground(style, metrics.style);
     const opacity = style?.opacity ?? 1;
     if (background) {
       context.globalAlpha = opacity;
@@ -3760,8 +3765,8 @@ class CanvasSurfacePainter {
     if (!line) {
       return;
     }
-    context.strokeStyle = line.color ?? fallbackColor;
-    context.fillStyle = line.color ?? fallbackColor;
+    context.strokeStyle = this.forcedColors ? fallbackColor : line.color ?? fallbackColor;
+    context.fillStyle = this.forcedColors ? fallbackColor : line.color ?? fallbackColor;
     const lineY = placement === "underline" ? y + metrics.cellHeight - 2 : y + Math.floor(metrics.cellHeight / 2);
     emitTextDecoration(context, line.pattern, x, lineY, width);
   }

@@ -164,9 +164,9 @@ private func plainForegroundStyle(
 ) -> AnyShapeStyle {
   switch role {
   case .destructive:
-    styleEnvironment.themeStyle(for: .danger)
+    .semantic(.danger)
   case .cancel, .close:
-    styleEnvironment.themeStyle(for: .muted)
+    .semantic(.muted)
   case .confirm:
     styleEnvironment.resolvedStyle(for: .tint)
   case nil:
@@ -181,13 +181,13 @@ private func linkForegroundStyle(
 ) -> AnyShapeStyle {
   switch role {
   case .destructive:
-    styleEnvironment.themeStyle(for: .danger)
+    .semantic(.danger)
   case .cancel, .close:
-    styleEnvironment.themeStyle(for: .muted)
+    .semantic(.muted)
   case .confirm:
     styleEnvironment.resolvedStyle(for: .tint)
   case nil:
-    styleEnvironment.themeStyle(for: .link)
+    .semantic(.link)
   }
 }
 

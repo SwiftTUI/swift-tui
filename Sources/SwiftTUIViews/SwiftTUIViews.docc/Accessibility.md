@@ -632,6 +632,13 @@ user intent; labels, patterns and control behavior still need to honor that inte
 
 ### Color and contrast
 
+Enabled, opaque semantic text resolves to at least 4.5:1 against its painted
+background in standard mode, including selected rows and tinted surfaces.
+The default separator, muted and border palettes retain readable contrast.
+Explicit foreground paints, authored fades and disabled treatments keep their
+standard-mode appearance; user-selected color profiles and increased contrast
+apply the broader policy below.
+
 When reduced transparency is enabled, positive alpha in enabled text, shape,
 gradient, tile and direct Canvas-cell paints becomes opaque. Positive view
 opacity becomes one at the paint boundary. The authored ancestor cascade is
@@ -662,6 +669,13 @@ not recolored; provide a description or structured data alternative for an image
 that carries information. Applications must audit neighboring graphic colors,
 custom blend effects, image content and external CSS separately. Numerical pair
 targets are not whole-application WCAG conformance.
+
+The automatic and compact Stepper styles reserve at least 24 by 24 CSS pixels
+for each browser increment/decrement route, using the reported web cell metrics.
+The two action regions remain separate when text size changes. Terminal cell
+layouts retain their cell-sized affordances. Custom styles own the size and
+spacing of their routed content, and application layouts must still provide
+usable target spacing and avoid clipping controls.
 
 Terminal `capabilityProfile.colorLevel` exposes the detected color repertoire.
 With an explicit runtime color-profile/increased-contrast request, automatic

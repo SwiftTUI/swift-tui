@@ -404,6 +404,7 @@ public struct TerminalAppearance: Equatable, Sendable, Codable {
 
   private func deriveSynthesizedTheme() -> Theme {
     let separator = backgroundColor.mixed(with: foregroundColor, amount: separatorMixAmount)
+      .accessibilityContrasting(with: backgroundColor, target: 4.5)
     let fill = elevatedSurface(
       from: backgroundColor,
       amount: 0.08
@@ -414,6 +415,7 @@ public struct TerminalAppearance: Equatable, Sendable, Codable {
       invert: true
     )
     let muted = backgroundColor.mixed(with: foregroundColor, amount: mutedMixAmount)
+      .accessibilityContrasting(with: backgroundColor, target: 4.5)
     let placeholder = contrastSafe(
       backgroundColor.mixed(with: foregroundColor, amount: placeholderMixAmount),
       against: backgroundColor,

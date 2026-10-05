@@ -3,7 +3,7 @@ import SwiftTUIPlatformIO
 public import SwiftTUIRuntime
 import SwiftTUITerminalCLI
 
-#if os(macOS) || os(iOS) || os(Linux) || os(Android)
+#if os(macOS) || os(iOS) || os(Linux) || os(Android) || os(Windows)
   import SwiftTUIWebHostCLI
 #endif
 
@@ -29,7 +29,7 @@ extension App {
     // launch: explicit and testable, never a module-load side effect. On
     // platforms without the web host the launcher simply has no web arm and
     // `--web` fails with the clear not-linked diagnostic.
-    #if os(macOS) || os(iOS) || os(Linux) || os(Android)
+    #if os(macOS) || os(iOS) || os(Linux) || os(Android) || os(Windows)
       installWebHostRunner()
     #endif
     var dispatchedCommandType: (any ParsableCommand.Type)?

@@ -88,10 +88,10 @@ changes); `stdin` EOF is not cancellable.
 ### Executable runners
 
 For ordinary apps, import `SwiftTUI` and mark your app type with `@main` to use
-the default launcher. It runs in the terminal by default and switches to the
-localhost WebHost when `--web` is present. On Windows the umbrella carries the
-terminal launch surface only, so `--web` fails there with a clear
-web-runner-not-linked diagnostic.
+the default launcher. Interactive terminal launch offers a browser companion
+sharing the same retained scenes and state on macOS, Linux and Windows.
+`--companion off` opts out; `--companion-url` retrieves a running instance's URL.
+`--web` runs the localhost WebHost without a terminal.
 
 `@main` is the supported launch form. Because `App` refines an
 `AsyncParsableCommand`, `App.main()` is `async` and only `@main` binds it

@@ -281,7 +281,7 @@ public struct UnderlinedLinkStyle: LinkStyle {
     -> LinkStylePresentation
   {
     var presentation = AutomaticLinkStyle().resolvePresentation(for: configuration)
-    presentation.foregroundStyle = configuration.styleEnvironment.themeStyle(for: .link)
+    presentation.foregroundStyle = .semantic(.link)
     return presentation
   }
 }

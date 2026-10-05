@@ -1926,8 +1926,8 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(
-      artifacts.rasterSurface.cells[0][0].style?.foregroundColor?.hexString()
-        == Color.blue.hexString()
+      (artifacts.rasterSurface.cells[0][0].style?.foregroundColor?.contrastRatio(to: .white) ?? 0)
+        >= 4.5
     )
     #expect(
       artifacts.rasterSurface.cells[1][0].style?.foregroundColor?.hexString()
@@ -5007,8 +5007,6 @@ struct SwiftUISurfaceTests {
     )
     environmentValues.terminalAppearance = appearance
 
-    let theme = appearance.synthesizedTheme()
-    let expectedLinkColor = theme.link
     final class TapBox {
       var didTap = false
     }
@@ -5037,27 +5035,14 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.lines == [" Docs"])
     #expect(actionRegistry.dispatch(identity: testIdentity("DocsButton")))
     #expect(tapBox.didTap)
-    let gutterStyle = ResolvedTextStyle(
-      foregroundColor: .white,
-      backgroundColor: .white,
-      emphasis: [],
-      underlineStyle: nil,
-      strikethroughStyle: nil,
-      opacity: 1
-    )
-    let linkStyle = ResolvedTextStyle(
-      foregroundColor: expectedLinkColor,
-      backgroundColor: .white,
-      emphasis: [],
-      underlineStyle: .init(pattern: .solid),
-      strikethroughStyle: nil,
-      opacity: 1
-    )
-    #expect(
-      artifacts.rasterSurface.styleRuns == [
-        RasterStyleRun(x: 0, y: 0, length: 1, style: gutterStyle),
-        RasterStyleRun(x: 1, y: 0, length: 4, style: linkStyle),
-      ])
+    let runs = artifacts.rasterSurface.styleRuns
+    #expect(runs.count == 2)
+    #expect(runs.first?.x == 0 && runs.first?.length == 1)
+    #expect(runs.first?.style.underlineStyle == nil)
+    #expect(runs.last?.x == 1 && runs.last?.length == 4)
+    #expect(runs.last?.style.underlineStyle == .init(pattern: .solid))
+    #expect(runs.allSatisfy { $0.style.backgroundColor == .white && $0.style.opacity == 1 })
+    #expect((runs.last?.style.foregroundColor?.contrastRatio(to: .white) ?? 0) >= 4.5)
   }
 
   @Test("Link resolves as focusable rich text and dispatches open-link actions")

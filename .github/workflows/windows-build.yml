@@ -16,7 +16,7 @@ name: Windows Build
 # with `/STACK:16777216` — the default 1 MiB runner stack kills the
 # deep-descent suites (the item-9 class, test-harness edition). The lane
 # list is the survey's final green set; POSIX-only test targets
-# (PTY/attach/WebHost/UnixSignals/EntryPointLaunch families) compile empty
+# (PTY/attach/UnixSignals/EntryPointLaunch families) compile empty
 # on Windows and are omitted rather than run vacuously.
 #
 # Deliberately NOT wired into the org-root gates: the operator keeps
@@ -66,9 +66,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     needs: changes
     if: needs.changes.outputs.changed == 'true'
-    # Green runs peak at 42.6 minutes; the former 120-minute cap only ever
-    # bounded hangs.
-    timeout-minutes: 60
+    # The expanded x64 suite needs ~32 minutes after a ~21-minute cold build.
+    # Leave room for the remaining lanes and cache upload; suite time limits
+    # still bound individual tests.
+    timeout-minutes: 90
     env:
       # Same policy as the POSIX repo gate: the gate builds with
       # warnings-as-errors so new Windows-only warnings fail here instead of
@@ -129,7 +130,7 @@ jobs:
           $lanes = @(
             'SwiftTUICoreTests', 'SwiftTUIGraphTests', 'SwiftTUIViewsTests',
             'SwiftTUITests', 'SwiftTUIArgumentsTests', 'SwiftTUICLITests',
-            'SwiftTUIWASISurfaceBridgeTests', 'SwiftTUIWASITests',
+            'SwiftTUIWASISurfaceBridgeTests', 'SwiftTUIWASITests', 'SwiftTUIWebHostTests',
             'SwiftTUIAnimatedImageTests', 'SwiftTUIProfilingTests',
             'SwiftTUIVendorFigletTests', 'SwiftTUIVendorGIFTests',
             'SwiftTUIVendorJPEGTests', 'SwiftTUIVendorPNGTests'
@@ -137,7 +138,7 @@ jobs:
           $failed = @()
           foreach ($lane in $lanes) {
             Write-Host "=== lane $lane ==="
-            swift test --no-parallel --filter $lane -Xlinker /STACK:16777216
+            swift test --skip-build --no-parallel --filter $lane -Xlinker /STACK:16777216
             if ($LASTEXITCODE -ne 0) { $failed += $lane }
           }
           if ($failed.Count -gt 0) {

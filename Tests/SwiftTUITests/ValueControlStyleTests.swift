@@ -6,6 +6,39 @@ import Testing
 
 @MainActor
 struct ValueControlStyleTests {
+  @Test(
+    "browser stepper halves have independent 24 CSS pixel hit targets",
+    arguments: [false, true],
+    [
+      CellPixelMetrics(width: 9, height: 19, source: .reported),
+      CellPixelMetrics(width: 12, height: 24, source: .reported),
+      CellPixelMetrics(width: 24, height: 48, source: .reported),
+    ])
+  func browserStepperTargets(compact: Bool, metrics: CellPixelMetrics) throws {
+    let identity = testIdentity("WebStepper")
+    var environment = EnvironmentValues()
+    environment.pointerInputCapabilities = .init(
+      precision: .subCell(source: .webPixels, metrics: metrics))
+    let frame = DefaultRenderer().render(
+      Stepper("Count", value: .constant(1), in: 0...2)
+        .stepperStyle(compact ? .compact : .automatic),
+      context: .init(identity: identity, environmentValues: environment),
+      proposal: .init(width: 40, height: 8))
+    let decrement = try #require(
+      frame.semanticSnapshot.interactionRegions.first {
+        $0.identity == stepperDecrementIdentity(for: identity)
+      })
+    let increment = try #require(
+      frame.semanticSnapshot.interactionRegions.first {
+        $0.identity == stepperIncrementIdentity(for: identity)
+      })
+    for target in [decrement, increment] {
+      #expect(target.rect.size.width * metrics.width >= 24)
+      #expect(target.rect.size.height * metrics.height >= 24)
+    }
+    #expect(decrement.rect.origin.x + decrement.rect.size.width <= increment.rect.origin.x)
+  }
+
   @Test("slider no-op press, held drag, and release do not call a custom setter")
   func sliderNoOpPointerDoesNotWrite() throws {
     final class Box {

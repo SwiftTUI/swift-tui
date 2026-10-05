@@ -166,7 +166,7 @@ description.
 
 ## Beyond the terminal
 
-Interactive macOS/Linux launches offer a Canvas browser companion for the same
+Interactive macOS/Linux/Windows launches offer a Canvas browser companion for the same
 running app; open the URL printed before full screen (`--companion off` disables
 it). The same `App` also runs browser-only — launch it with `--web` to serve it over localhost, or compile it with the
 `SwiftTUIWASI` product and ship it as a static bundle with

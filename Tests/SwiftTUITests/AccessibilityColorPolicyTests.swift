@@ -123,12 +123,22 @@ struct AccessibilityColorPolicyTests {
     "increased-contrast semantic chrome works on light and dark hosts",
     arguments: [false, true], [false, true])
   func controls(light: Bool, focused: Bool) throws {
+    try verifyControls(light: light, focused: focused, enhanced: true)
+  }
+
+  @Test(
+    "standard semantic chrome retains minimum contrast", arguments: [false, true], [false, true])
+  func standardControls(light: Bool, focused: Bool) throws {
+    try verifyControls(light: light, focused: focused, enhanced: false)
+  }
+
+  private func verifyControls(light: Bool, focused: Bool, enhanced: Bool) throws {
     let appearance: TerminalAppearance =
       light
       ? .init(foregroundColor: .black, backgroundColor: .white, tintColor: .blue) : .fallback
     var environment = EnvironmentValues()
     environment.terminalAppearance = appearance
-    environment.accessibilityPreferences.contrast = .increased
+    environment.accessibilityPreferences.contrast = enhanced ? .increased : .standard
     let id = testIdentity("control")
     if focused { environment.focusedIdentity = id }
     func verify<V: View>(_ view: V) throws {
@@ -142,7 +152,8 @@ struct AccessibilityColorPolicyTests {
       for cell in cells {
         let fg = cell.style?.foregroundColor ?? appearance.foregroundColor
         let bg = cell.style?.backgroundColor ?? appearance.backgroundColor
-        let threshold = cell.character.isLetter || cell.character.isNumber ? 7.0 : 3.0
+        let threshold =
+          cell.character.isLetter || cell.character.isNumber ? (enhanced ? 7.0 : 4.5) : 3.0
         #expect(
           fg.contrastRatio(to: bg) >= threshold,
           "\(String(reflecting: V.self)) profile \(environment.accessibilityPreferences.colorProfile?.rawValue ?? "nil") glyph \(cell.character) pair \(fg.hexString()) / \(bg.hexString())"

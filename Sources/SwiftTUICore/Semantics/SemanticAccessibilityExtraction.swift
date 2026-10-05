@@ -251,6 +251,7 @@ extension SemanticExtractor {
         let childPresentation: AccessibilityTextPresentation =
           if metadata.hostedCollectionContainer != nil
             || accessibilityRolePreservesContent(metadata.accessibilityRole)
+            || metadata.accessibilityStructure?.children == .contain
           {
             .independent
           } else if textPresentation == .primitiveOwned || ownsControl

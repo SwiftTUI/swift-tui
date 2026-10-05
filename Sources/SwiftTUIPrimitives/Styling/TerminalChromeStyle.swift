@@ -215,7 +215,7 @@ extension Theme {
           tone == .neutral
           ? interpolatedAmount(dark: 0.24, light: 0.18, appearance: appearance)
           : interpolatedAmount(dark: 0.52, light: 0.36, appearance: appearance)
-      )
+      ).accessibilityContrasting(with: appearance.backgroundColor, target: 4.5)
     )
   }
 

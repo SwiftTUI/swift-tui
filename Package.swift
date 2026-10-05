@@ -204,12 +204,10 @@ let package = Package(
         "SwiftTUIPlatformIO",
         "SwiftTUIRuntime",
         "SwiftTUITerminalCLI",
-        // Stage 5.3 of the Windows plan, option (i): the first Windows
-        // release ships without the web host; the ratified allowlist from
-        // Stage 1 names everything the edge serves today.
+        // Native app launch includes the bundled loopback browser companion.
         .target(
           name: "SwiftTUIWebHostCLI",
-          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
+          condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android, .windows])
         ),
       ],
       path: "Sources/SwiftTUI",
@@ -308,7 +306,8 @@ let package = Package(
         ),
       ],
       path: "Platforms/CLI/Sources/SwiftTUITerminalCLI",
-      swiftSettings: swiftSettings()
+      swiftSettings: swiftSettings(),
+      linkerSettings: [.linkedLibrary("Advapi32", .when(platforms: [.windows]))]
     ),
     // Compatibility facade (Stage 2.5): existing `import SwiftTUICLI`
     // consumers keep the combined launch + attach surface.
@@ -351,7 +350,11 @@ let package = Package(
       resources: [
         .copy("Resources/browser")
       ],
-      swiftSettings: swiftSettings()
+      swiftSettings: swiftSettings(),
+      linkerSettings: [
+        .linkedLibrary("Ws2_32", .when(platforms: [.windows])),
+        .linkedLibrary("Shell32", .when(platforms: [.windows])),
+      ]
     ),
     .target(
       name: "SwiftTUIWebHostCLI",

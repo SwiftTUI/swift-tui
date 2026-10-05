@@ -77,9 +77,9 @@ to the browser. See [Apple's display-change notification](https://developer.appl
 
 Also read by `RuntimeConfiguration.detect`. The group is consulted only when
 `SWIFTTUI_WEB` is truthy; it makes the batteries-included runner serve the app
-to a browser instead of the terminal. On macOS/Linux, ordinary interactive
+to a browser instead of the terminal. On macOS/Linux/Windows, ordinary interactive
 terminal launch also starts the shared browser companion by default; this uses
-the separate settings below. WebHost is not included on Windows in this revision.
+the separate settings below.
 
 | Companion variable | Values | Effect |
 | --- | --- | --- |
