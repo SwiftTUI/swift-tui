@@ -49,9 +49,10 @@ public enum TerminalRunner {
   }
 
   @MainActor
-  private static func launch<A: App>(
+  static func launch<A: App>(
     _ app: A,
-    configuration: RuntimeConfiguration
+    configuration: RuntimeConfiguration,
+    arguments: [String] = CommandLine.arguments
   ) async throws {
     if configuration.printCompanionURL {
       try printCompanionURLs(appName: appNameFromType(A.self))
@@ -61,18 +62,18 @@ public enum TerminalRunner {
       throw TerminalRunnerError.webHostNotLinked
     }
 
-    let selections = collectWindowSceneSelections(from: app.body)
-    try validateWindowSceneIdentifiers(selections.map(\.descriptor))
-    guard !selections.isEmpty else {
-      throw AppLaunchError.noScenes
-    }
-
     let sessionName = String(reflecting: A.self)
     let appName = appNameFromType(A.self)
-    let mode = CLIMode.parse(CommandLine.arguments)
+    let mode = CLIMode.parse(arguments)
 
     switch mode {
     case .app(let instanceName):
+      let selections = collectWindowSceneSelections(from: app.body)
+      try validateWindowSceneIdentifiers(selections.map(\.descriptor))
+      guard !selections.isEmpty else {
+        throw AppLaunchError.noScenes
+      }
+
       // Announce the debug bundle after the session ends (and after teardown
       // restored the primary screen), succeed or throw — a crashed session is
       // exactly when the bundle matters. Screen-deferred runtime issues flush
