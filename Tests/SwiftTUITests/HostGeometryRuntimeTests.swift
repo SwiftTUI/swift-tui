@@ -35,6 +35,37 @@ import Testing
     }
   }
 
+  @Test func cancellationPreservesPendingKeyboardTraversalAndItsContinuation() throws {
+    let host = GeometryTestSurface()
+    let root = testIdentity("CancelFocusContinuation")
+    let state = StateContainer(initialState: true, invalidationIdentities: [root])
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: host,
+      terminalInputReader: GeometryTestInput(), stateContainer: state,
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { showSecond, _ in
+      VStack(spacing: 0) {
+        Button("First") {}
+        if showSecond { Button("Second") {} }
+        Button("Third") {}
+      }
+    }
+    loop.scheduler.requestSignal(named: "SIGWINCH")
+    var rendered = 0
+    try loop.renderPendingFrames(renderedFrames: &rendered)
+    let regions = loop.latestSemanticSnapshot.focusRegions
+    try #require(regions.count == 3)
+    _ = loop.handle(.input(.key(KeyPress(.tab, modifiers: []))))
+    #expect(loop.pendingFocusTraversal?.landedIdentity == regions[1].identity)
+    state.replace(with: false)
+    var cancel = MouseEvent(kind: .cancelled, location: Point(x: 1, y: 1))
+    cancel.hostGeometryStamp = .init(session: 7, revision: 1)
+    _ = loop.handle(.input(.mouse(cancel)))
+    #expect(loop.pendingFocusTraversal?.landedIdentity == regions[1].identity)
+    try loop.renderPendingFrames(renderedFrames: &rendered)
+    #expect(loop.focusTracker.currentFocusIdentity == regions[2].identity)
+  }
+
   @Test func explicitCancellationClearsGestureWithoutReleaseAndAllowsNextPress() throws {
     let host = GeometryTestSurface()
     let root = testIdentity("CancelledPointer")

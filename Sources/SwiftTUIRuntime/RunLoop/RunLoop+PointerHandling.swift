@@ -7,13 +7,13 @@ extension RunLoop {
   ) {
     lastPointerLocation = mouseEvent.location
     // Deliberate pointer actions supersede the pending keyboard traversal
-    // record (passive hover moves do not — they can race the frame that
-    // resolves the traversal's landing).
+    // record. Passive hover and host cancellation can race the frame that
+    // resolves the traversal's landing, so preserve keyboard intent for both.
     switch mouseEvent.kind {
-    case .down, .up, .dragged, .scrolled, .cancelled:
+    case .down, .up, .dragged, .scrolled:
       pendingFocusTraversal = nil
       pendingKeyFocus = nil
-    case .moved:
+    case .moved, .cancelled:
       break
     }
     // A fresh press or a deliberate pan supersedes any click-restore record
