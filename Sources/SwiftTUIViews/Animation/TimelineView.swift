@@ -207,7 +207,7 @@ extension TimelineSchedule where Self == PeriodicTimelineSchedule {
 extension TimelineSchedule where Self == AnimationTimelineSchedule {
   /// A schedule for smooth animation.
   /// The default rate is ~20 fps.
-  /// Under reduce-motion, the rate decreases to ~4 fps.
+  /// Under reduce-motion, emits only the starting instant.
   public static var animation: AnimationTimelineSchedule {
     AnimationTimelineSchedule()
   }

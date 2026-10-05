@@ -644,8 +644,8 @@ reference. Every built-in animation then renders in static form:
   does not reveal a stale intermediate sample. A triggered phase animator
   similarly settles at its first phase.
 - ``TimelineView`` schedules run at a low cadence — the `.animation`
-  schedule drops to about four updates per second, and periodic schedules
-  fire at most once per second.
+  schedule holds its displayed instant while motion is reduced, and
+  periodic schedules fire at most once per second.
 
 The same settled rendering applies when output is not an interactive
 terminal (piped output, CI), keeping captured output deterministic. Read
