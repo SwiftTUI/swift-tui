@@ -6876,8 +6876,11 @@ class WebHostSceneRuntime {
       event.preventDefault();
     };
     const handlePointerMove = (event) => {
-      if (event.pointerId === this.canceledPointerId)
-        return;
+      if (event.pointerId === this.canceledPointerId) {
+        if (event.buttons)
+          return;
+        this.canceledPointerId = undefined;
+      }
       const press = this.textInputPress;
       if (press && Math.hypot(event.clientX - press.event.clientX, event.clientY - press.event.clientY) > 3)
         press.moved = true;
