@@ -163,7 +163,7 @@ Full policy in [docs/PUBLIC-API.md](docs/PUBLIC-API.md#anyview-policy).
 - **main-thread-usage** — forbids bare `Thread.isMainThread` without
   justification.
 - **no-ai-coauthors** — uses
-  `https://github.com/GoodHatsLLC/no-ai-coauthors` to reject commit messages
+  `https://github.com/optional-dev/no-ai-coauthors` to reject commit messages
   with AI attribution trailers.
 
 ## Tests
