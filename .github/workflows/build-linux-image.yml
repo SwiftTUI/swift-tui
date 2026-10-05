@@ -6,7 +6,8 @@ name: Build Linux dev image
 #
 # Triggers: this image rebuilds when its inputs change (the Dockerfile,
 # the Swift toolchain pin, or this workflow), and on demand via
-# `workflow_dispatch`.
+# `workflow_dispatch`. A weekly Monday 07:23 UTC build on main refreshes
+# the Ubuntu base and installed packages, bypassing cached build layers.
 #
 # Security note: every user-controllable input ($SWIFT_VERSION, $REF_NAME,
 # $EVENT_NAME, $OVERRIDE) is funneled through `env:` and shell-quoted, never
@@ -14,6 +15,8 @@ name: Build Linux dev image
 # injection prevention.
 
 on:
+  schedule:
+    - cron: "23 7 * * 1"
   push:
     branches: [main]
     paths:
@@ -103,7 +106,7 @@ jobs:
           # build for validation, even when the push input is true.
           push=false
           if [ "$REF" = "refs/heads/main" ]; then
-            if [ "$EVENT_NAME" = "push" ]; then
+            if [ "$EVENT_NAME" = "push" ] || [ "$EVENT_NAME" = "schedule" ]; then
               push=true
             elif [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$OVERRIDE" = "true" ]; then
               push=true
@@ -128,6 +131,8 @@ jobs:
           context: Scripts/linux
           file: Scripts/linux/Dockerfile
           platforms: ${{ matrix.platform }}
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           push: false
           tags: ${{ env.IMAGE_NAME }}:build-${{ matrix.arch }}
           cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache-${{ matrix.arch }}
@@ -146,6 +151,8 @@ jobs:
           context: Scripts/linux
           file: Scripts/linux/Dockerfile
           platforms: ${{ matrix.platform }}
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
           tags: ${{ env.IMAGE_NAME }}
           # Registry-backed BuildKit cache. Stored per architecture so native

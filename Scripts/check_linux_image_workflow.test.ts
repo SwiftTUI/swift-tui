@@ -19,3 +19,12 @@ test("rejects unguarded stable manifest and registry cache writes", () => {
   doc.jobs.build.steps.find((s: any) => s.with?.["cache-to"]).if = "always()";
   expect(validateLinuxImageWorkflow(doc)).toHaveLength(2);
 });
+
+test("rejects loss of weekly rebuilding or base/package refresh", () => {
+  const doc = workflow();
+  delete doc.on.schedule;
+  const steps = doc.jobs.build.steps.filter((s: any) => s.uses?.startsWith("docker/build-push-action@"));
+  delete steps[0].with.pull;
+  steps[1].with["no-cache"] = false;
+  expect(validateLinuxImageWorkflow(doc)).toHaveLength(3);
+});

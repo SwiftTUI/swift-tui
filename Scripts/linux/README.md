@@ -181,9 +181,14 @@ separate CI workflows.
 - `.swift-version`
 - the workflow file itself
 
+A scheduled build also runs every Monday at 07:23 UTC on `main`. It pulls
+the current Ubuntu base and bypasses BuildKit layer caches so apt packages
+refresh even when the base digest is unchanged. Ordinary builds retain the
+registry cache and still check for a newer base.
+
 Other commits do not rebuild the image. The image is a build *input*, not an
 output of each commit. Pull requests that modify these paths build both native
-architectures. They do not push the image. Only pushes to `main` and manual
+architectures. They do not push the image. Only pushes to `main`, scheduled builds on `main`, and manual
 `workflow_dispatch` runs on the `main` branch with `push: true` publish the
 multi-arch manifest and update the shared build caches. Dispatches on other
 branches or tags build without publishing, regardless of the input.
