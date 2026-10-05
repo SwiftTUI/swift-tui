@@ -170,6 +170,20 @@ run_repo_policy_phase() {
   run_repo_policy_check \
     "$mode" \
     "$repo_root" \
+    "Check Linux image publication contract" \
+    "bun Scripts/check_linux_image_workflow.ts" \
+    bun Scripts/check_linux_image_workflow.ts
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
+    "Test Linux image publication contract" \
+    "bun test Scripts/check_linux_image_workflow.test.ts" \
+    bun test Scripts/check_linux_image_workflow.test.ts
+
+  run_repo_policy_check \
+    "$mode" \
+    "$repo_root" \
     "Test performance smoke failure propagation" \
     "sh Scripts/check_perf_smoke.sh" \
     sh Scripts/check_perf_smoke.sh

@@ -28,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       push:
-        description: "Push the built image to GHCR"
+        description: "Push the built image to GHCR (main branch only)"
         type: boolean
         required: false
         # default: true so an un-set boolean input resolves to "true"
@@ -57,6 +57,8 @@ jobs:
     name: Build ${{ matrix.arch }} image
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
+    outputs:
+      push: ${{ steps.push_decision.outputs.push }}
     strategy:
       fail-fast: false
       matrix:
@@ -92,25 +94,20 @@ jobs:
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
+          REF: ${{ github.ref }}
           OVERRIDE: ${{ inputs.push }}
         run: |
           set -euo pipefail
-          # Push on main pushes and manual dispatches; build-only on PRs.
-          # For workflow_dispatch the `push`
-          # input decides — it carries `default: true`, so OVERRIDE is always
-          # a concrete "true"/"false" and the dispatch default is honored.
-          # (A prior `[ -n "$OVERRIDE" ]` guard was wrong: an un-set boolean
-          # input resolves to the string "false", not "", so a plain dispatch
-          # silently built without pushing.) All inputs are read from env:
-          # vars, never inlined as Actions expressions, so a malicious branch
-          # name can't break out.
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            push="$OVERRIDE"
-          elif [ "$EVENT_NAME" = "push" ] && [ "$REF_NAME" = "main" ]; then
-            push=true
-          else
-            push=false
+          # Only the main branch may publish images or the shared build cache.
+          # A tag named main is not the main branch. Dispatches elsewhere still
+          # build for validation, even when the push input is true.
+          push=false
+          if [ "$REF" = "refs/heads/main" ]; then
+            if [ "$EVENT_NAME" = "push" ]; then
+              push=true
+            elif [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$OVERRIDE" = "true" ]; then
+              push=true
+            fi
           fi
           printf 'push=%s\n' "$push" >> "$GITHUB_OUTPUT"
 
@@ -189,10 +186,8 @@ jobs:
     timeout-minutes: 10
     if: >-
       needs.build.result == 'success' &&
-      (
-        (github.event_name == 'workflow_dispatch' && inputs.push) ||
-        (github.event_name == 'push' && github.ref_name == 'main')
-      )
+      needs.build.outputs.push == 'true' &&
+      github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout

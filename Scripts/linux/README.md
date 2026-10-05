@@ -183,8 +183,10 @@ separate CI workflows.
 
 Other commits do not rebuild the image. The image is a build *input*, not an
 output of each commit. Pull requests that modify these paths build both native
-architectures. They do not push the image. Only `main` and manual
-`workflow_dispatch` runs publish the multi-arch manifest to GHCR.
+architectures. They do not push the image. Only pushes to `main` and manual
+`workflow_dispatch` runs on the `main` branch with `push: true` publish the
+multi-arch manifest and update the shared build caches. Dispatches on other
+branches or tags build without publishing, regardless of the input.
 
 ### Tags published to GHCR
 
@@ -194,8 +196,8 @@ Each successful publish emits a manifest containing both `linux/amd64` and
 | Tag                | When                              | Purpose                       |
 |--------------------|-----------------------------------|-------------------------------|
 | `:latest`          | `main` only                       | What `linux.sh` defaults to   |
-| `:swift-6.4.0`     | every successful build            | Pin to a Swift toolchain      |
-| `:sha-<7-char-sha> | every successful build            | Pin to an exact image build   |
+| `:swift-6.4.0`     | successful publish from `main`            | Pin to a Swift toolchain      |
+| `:sha-<7-char-sha>` | successful publish from `main`            | Pin to an exact image build   |
 
 Pin to `:sha-…` from `linux.sh`:
 
