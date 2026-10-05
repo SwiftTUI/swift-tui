@@ -111,6 +111,57 @@ struct GestureCompositionTests {
     #expect(ended.first?.second?.translation.dx == 2)
   }
 
+  @Test("SimultaneousGesture stops composite changes at the first end and rearms")
+  func simultaneousChangesStopAfterEnd() throws {
+    var changes: [Double] = []
+    var endings: [Double] = []
+    var childEndings: [Double] = []
+    var deadlines: [MonotonicInstant] = []
+    let context = GestureRecognizerBuildContext(
+      attachingIdentity: identity("terminal-value"), gestureStateRegistry: nil,
+      requestDeadline: { deadlines.append($0) })
+    let rec = LongPressGesture(minimumDuration: .milliseconds(50), maximumDistance: 10)
+      .simultaneously(with: DragGesture().onEnded { childEndings.append($0.translation.dx) })
+      .map { $0.second?.translation.dx ?? -1 }
+      .onChanged { changes.append($0) }
+      .onEnded { endings.append($0) }
+      ._makeRecognizer(context: context)
+
+    for _ in 0..<2 {
+      rec.reArm()
+      _ = rec.handle(event: event(.down(.primary)))
+      _ = rec.handle(event: event(.dragged(.primary), at: Point(x: 2, y: 0)))
+      #expect(rec.handleDeadline(at: try #require(deadlines.last)))
+      #expect(rec.phase == .ended)
+      #expect(rec.isActive)
+      _ = rec.handle(event: event(.dragged(.primary), at: Point(x: 5, y: 0)))
+      _ = rec.handle(event: event(.up(.primary), at: Point(x: 7, y: 0)))
+      #expect(!rec.isActive)
+      #expect(rec.currentValue(as: Double.self) == 2)
+    }
+    #expect(changes == [0, 2, 0, 2])
+    #expect(endings == [2, 2])
+    #expect(childEndings == [7, 7], "the surviving child must still finish its own gesture")
+  }
+
+  @Test("SimultaneousGesture captures its terminal value even without a reader at the end tick")
+  func simultaneousTerminalSnapshotIsEager() throws {
+    var deadlines: [MonotonicInstant] = []
+    let context = GestureRecognizerBuildContext(
+      attachingIdentity: identity("unread-terminal-value"), gestureStateRegistry: nil,
+      requestDeadline: { deadlines.append($0) })
+    let rec = LongPressGesture(minimumDuration: .milliseconds(50), maximumDistance: 10)
+      .simultaneously(with: DragGesture())
+      .map { $0.second?.translation.dx ?? -1 }
+      ._makeRecognizer(context: context)
+    _ = rec.handle(event: event(.down(.primary)))
+    _ = rec.handle(event: event(.dragged(.primary), at: Point(x: 2, y: 0)))
+    _ = rec.handleDeadline(at: try #require(deadlines.first))
+    _ = rec.handle(event: event(.dragged(.primary), at: Point(x: 5, y: 0)))
+    #expect(rec.currentValue(as: Double.self) == 2)
+    rec.tearDown()
+  }
+
   @Test("ExclusiveGesture surfaces the active child's value mid-gesture")
   func exclusiveSurfacesMidGestureValues() {
     let box = GestureStateBox<String>(seed: "idle", slotOrdinal: 0)

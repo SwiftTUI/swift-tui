@@ -3,7 +3,8 @@ public import SwiftTUICore
 /// A gesture combining two gestures that can recognize at the same time
 /// (SwiftUI's `SimultaneousGesture`). Every event is delivered to both
 /// children. The composite ends when either child ends. It fails only when
-/// both children have given up.
+/// both children have given up. Its value freezes when the composite ends,
+/// while any still-active child continues receiving events until it finishes.
 public struct SimultaneousGesture<First: Gesture, Second: Gesture>: Gesture {
   /// The value of a simultaneous gesture.
   /// A child that is recognizing or has recognized its gesture contains its current value.
@@ -62,6 +63,7 @@ final class SimultaneousGestureRecognizer<First: Gesture, Second: Gesture>: Gest
 
   let first: AnyGestureRecognizer
   let second: AnyGestureRecognizer
+  private var terminalValue: Value?
 
   init(first: AnyGestureRecognizer, second: AnyGestureRecognizer) {
     self.first = first
@@ -71,6 +73,7 @@ final class SimultaneousGestureRecognizer<First: Gesture, Second: Gesture>: Gest
   func reArm() {
     first.reArm()
     second.reArm()
+    terminalValue = nil
   }
 
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
@@ -114,6 +117,7 @@ final class SimultaneousGestureRecognizer<First: Gesture, Second: Gesture>: Gest
     if !second.phase.isTerminal {
       dispositions.append(second.handle(event: event))
     }
+    captureTerminalValue()
     if dispositions.contains(.handled) { return .handled }
     if !dispositions.isEmpty && dispositions.allSatisfy({ $0 == .failed }) {
       return .failed
@@ -125,14 +129,22 @@ final class SimultaneousGestureRecognizer<First: Gesture, Second: Gesture>: Gest
     let alreadyTerminal = phase.isTerminal
     let a = first.handleDeadline(at: instant)
     let b = second.handleDeadline(at: instant)
+    captureTerminalValue()
     return !alreadyTerminal && (a || b)
   }
 
   func currentValue() -> Value? {
+    if let terminalValue { return terminalValue }
     let firstValue = first.recognizingValue(as: First.Value.self)
     let secondValue = second.recognizingValue(as: Second.Value.self)
     guard firstValue != nil || secondValue != nil else { return nil }
     return Value(first: firstValue, second: secondValue)
+  }
+
+  private func captureTerminalValue() {
+    if terminalValue == nil, phase.isTerminal {
+      terminalValue = currentValue()
+    }
   }
 
   func tearDown() {
