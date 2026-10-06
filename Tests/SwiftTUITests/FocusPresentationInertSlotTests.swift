@@ -37,11 +37,14 @@ struct FocusPresentationInertSlotScopeTests {
   func focusMemberConservativeMatching() {
     var scope = RetainedReuseSuppressionScope()
     scope.insertFocusPresentationMember(member)
-    #expect(scope.suppresses(identity: member))
-    #expect(scope.suppresses(identity: ancestor))
-    #expect(scope.suppresses(identity: chromeChild))
-    #expect(scope.suppresses(identity: contentChild))
-    #expect(!scope.suppresses(identity: testIdentity("Elsewhere")))
+    let noExempt: (Identity, Identity) -> Bool = { _, _ in false }
+    #expect(scope.suppresses(identity: member, isFocusPresentationDescendantExempt: noExempt))
+    #expect(scope.suppresses(identity: ancestor, isFocusPresentationDescendantExempt: noExempt))
+    #expect(scope.suppresses(identity: chromeChild, isFocusPresentationDescendantExempt: noExempt))
+    #expect(scope.suppresses(identity: contentChild, isFocusPresentationDescendantExempt: noExempt))
+    #expect(
+      !scope.suppresses(
+        identity: testIdentity("Elsewhere"), isFocusPresentationDescendantExempt: noExempt))
   }
 
   @Test("a declared inert slot exempts descendant-only matches of the declaring member")
@@ -76,8 +79,7 @@ struct FocusPresentationInertSlotScopeTests {
 
   @Test("cone members (animation legs) never consult the exemption")
   func coneMembersIgnoreExemption() {
-    var scope = RetainedReuseSuppressionScope()
-    scope.insert(member)
+    var scope = RetainedReuseSuppressionScope(identities: [member])
     #expect(
       scope.suppresses(
         identity: contentChild, isFocusPresentationDescendantExempt: { _, _ in true }))
