@@ -1,4 +1,5 @@
 import SwiftTUICore
+import Synchronization
 
 // Plain (internal) imports on purpose: after the Stage 3 reshape no libc
 // type appears in the seam's package-visible surface — that is the point of
@@ -16,6 +17,21 @@ import SwiftTUICore
 // Positive host test, not "not WASI": the terminal-control seam compiles
 // exactly where a real terminal host exists (Stage 3.5 of the Windows plan).
 #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(ucrt)
+  /// A shared deadline can be installed while a presentation write is waiting.
+  package final class TerminalWriteBudget: Sendable {
+    private let deadline: Mutex<ContinuousClock.Instant?>
+    package init(deadline: ContinuousClock.Instant? = nil) {
+      self.deadline = Mutex(deadline)
+    }
+    func finishWithin(_ duration: Duration) {
+      deadline.withLock { $0 = min($0 ?? .now + duration, .now + duration) }
+    }
+    package var expired: Bool { deadline.withLock { $0.map { .now >= $0 } ?? false } }
+    package func check() throws {
+      if expired { throw TerminalHostError.failedToWrite(errno: ETIMEDOUT) }
+    }
+  }
+
   package protocol TerminalControlling: Sendable {
     func isATTY(_ fileDescriptor: Int32) -> Bool
     func windowSize(of fileDescriptor: Int32) throws -> CellSize
@@ -30,6 +46,8 @@ import SwiftTUICore
     func restore(_ snapshot: TerminalModeSnapshot, input: Int32, output: Int32) throws
 
     func write(_ output: String, to fileDescriptor: Int32) throws
+    /// Implementations that can block must honor the shared shutdown deadline.
+    func write(_ output: String, to fileDescriptor: Int32, budget: TerminalWriteBudget) throws
     func read(
       from fileDescriptor: Int32,
       maxBytes: Int,
@@ -38,6 +56,11 @@ import SwiftTUICore
   }
 
   extension TerminalControlling {
+    func write(_ output: String, to fileDescriptor: Int32, budget: TerminalWriteBudget) throws {
+      try budget.check()
+      try write(output, to: fileDescriptor)
+    }
+
     func cellPixelSize(of _: Int32) throws -> PixelSize? {
       nil
     }
@@ -85,12 +108,12 @@ import SwiftTUICore
       let currentFileStatusFlags = fcntl(input, F_GETFL)
       guard currentFileStatusFlags >= 0 else {
         let flagsErrno = errno
-        _ = unsafe tcsetattr(input, TCSAFLUSH, &currentAttributes)
+        _ = unsafe tcsetattr(input, TCSANOW, &currentAttributes)
         throw TerminalHostError.failedToReadFileStatusFlags(errno: flagsErrno)
       }
       guard fcntl(input, F_SETFL, currentFileStatusFlags | Int32(O_NONBLOCK)) >= 0 else {
         let flagsErrno = errno
-        _ = unsafe tcsetattr(input, TCSAFLUSH, &currentAttributes)
+        _ = unsafe tcsetattr(input, TCSANOW, &currentAttributes)
         throw TerminalHostError.failedToSetFileStatusFlags(errno: flagsErrno)
       }
 
@@ -105,7 +128,8 @@ import SwiftTUICore
         throw TerminalHostError.failedToSetFileStatusFlags(errno: errno)
       }
       var attributes = snapshot.attributes
-      guard unsafe tcsetattr(input, TCSAFLUSH, &attributes) == 0 else {
+      // TCSAFLUSH waits for output drain and can hang forever on a stalled PTY.
+      guard unsafe tcsetattr(input, TCSANOW, &attributes) == 0 else {
         throw TerminalHostError.failedToSetAttributes(errno: errno)
       }
     }
@@ -143,6 +167,19 @@ import SwiftTUICore
     }
 
     func write(_ output: String, to fileDescriptor: Int32) throws {
+      try write(
+        output, to: fileDescriptor,
+        budget: TerminalWriteBudget(deadline: .now + .seconds(1)))
+    }
+
+    func write(_ output: String, to fileDescriptor: Int32, budget: TerminalWriteBudget) throws {
+      // poll alone cannot bound a blocking write, even after POLLOUT. Restore
+      // the original flags before the caller restores its raw-mode snapshot.
+      let flags = fcntl(fileDescriptor, F_GETFL)
+      guard flags >= 0, fcntl(fileDescriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+        throw TerminalHostError.failedToWrite(errno: errno)
+      }
+      defer { _ = fcntl(fileDescriptor, F_SETFL, flags) }
       let bytes = Array(output.utf8)
       let totalBytes = bytes.count
 
@@ -153,11 +190,12 @@ import SwiftTUICore
 
         var bytesWritten = 0
         while bytesWritten < totalBytes {
+          try budget.check()
           let pointer = unsafe baseAddress.advanced(by: bytesWritten)
           let result = unsafe terminalPlatformWrite(
             fileDescriptor,
             pointer,
-            totalBytes - bytesWritten
+            min(16_384, totalBytes - bytesWritten)
           )
 
           if result > 0 {
@@ -166,14 +204,14 @@ import SwiftTUICore
           }
 
           if result == 0 {
-            continue
+            throw TerminalHostError.failedToWrite(errno: EIO)
           }
 
           switch errno {
           case EINTR:
             continue
           case EAGAIN, EWOULDBLOCK:
-            try waitUntilWritable(fileDescriptor)
+            try waitUntilWritable(fileDescriptor, budget: budget)
           case EIO, EPIPE:
             // The far end of the terminal has closed: EIO when a PTY master
             // is gone, EPIPE for a socket-backed terminal. That is a clean
@@ -223,7 +261,8 @@ import SwiftTUICore
 
   extension POSIXTerminalController {
     private func waitUntilWritable(
-      _ fileDescriptor: Int32
+      _ fileDescriptor: Int32,
+      budget: TerminalWriteBudget
     ) throws {
       var descriptor = pollfd(
         fd: fileDescriptor,
@@ -232,7 +271,8 @@ import SwiftTUICore
       )
 
       while true {
-        let ready = unsafe terminalPlatformPoll(&descriptor, 1, -1)
+        try budget.check()
+        let ready = unsafe terminalPlatformPoll(&descriptor, 1, 20)
         if ready > 0 {
           return
         }

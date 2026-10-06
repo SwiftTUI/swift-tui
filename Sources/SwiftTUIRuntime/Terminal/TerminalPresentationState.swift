@@ -101,6 +101,7 @@ import Synchronization
       var pendingError: TerminalHostError?
     }
 
+    private let writeBudget = TerminalWriteBudget()
     private let controller: any TerminalControlling
     private let outputFileDescriptor: Int32
     private let queue = DispatchQueue(label: "swift-tui.presentation-writer")
@@ -199,6 +200,11 @@ import Synchronization
       queue.sync {}
     }
 
+    func finishWithin(_ duration: Duration) {
+      writeBudget.finishWithin(duration)
+      drain()
+    }
+
     private func startWriterIfNeeded(
       updatePendingFrame: (inout State) -> Void
     ) {
@@ -246,7 +252,7 @@ import Synchronization
         }
 
         do {
-          try controller.write(frame.output, to: outputFileDescriptor)
+          try controller.write(frame.output, to: outputFileDescriptor, budget: writeBudget)
           recordWriteCompletion(of: frame)
         } catch let error as TerminalHostError {
           recordWriteFailure(error)

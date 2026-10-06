@@ -21,7 +21,18 @@ import Synchronization
     package let resetBytes: [UInt8]
 
     package func perform() {
-      if !resetBytes.isEmpty {
+      // Exit cleanup must not wait on an output peer that stopped reading.
+      // If nonblocking mode cannot be installed, skip reset bytes and still
+      // restore input attributes. No asynchronous writer survives this action.
+      #if canImport(ucrt)
+        let canWriteReset = true
+      #else
+        let outputFlags = fcntl(outputFileDescriptor, F_GETFL)
+        let canWriteReset =
+          outputFlags >= 0
+          && fcntl(outputFileDescriptor, F_SETFL, outputFlags | O_NONBLOCK) >= 0
+      #endif
+      if canWriteReset, !resetBytes.isEmpty {
         resetBytes.withUnsafeBytes { bytes in
           guard let baseAddress = bytes.baseAddress else {
             return
@@ -42,6 +53,10 @@ import Synchronization
         }
       }
 
+      #if !canImport(ucrt)
+        if canWriteReset { _ = fcntl(outputFileDescriptor, F_SETFL, outputFlags) }
+      #endif
+
       // Restores inline rather than through a controller: this runs from an
       // atexit handler, where allocation and actor hops are off-limits.
       #if canImport(ucrt)
@@ -50,7 +65,7 @@ import Synchronization
       #else
         _ = fcntl(inputFileDescriptor, F_SETFL, savedSnapshot.inputFileStatusFlags)
         var attributes = savedSnapshot.attributes
-        _ = unsafe tcsetattr(inputFileDescriptor, TCSAFLUSH, &attributes)
+        _ = unsafe tcsetattr(inputFileDescriptor, TCSANOW, &attributes)
       #endif
     }
   }

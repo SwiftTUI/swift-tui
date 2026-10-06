@@ -23,6 +23,7 @@ import SwiftTUICore
     private var savedSnapshot: TerminalModeSnapshot?
     private var processExitCleanupToken: UInt64?
 
+    var ownsScreen = false
     var isEnabled = false
     var mouseCoordinateMode = MouseCoordinateMode.cells
     var pointerHoverEnabled = false
@@ -45,14 +46,18 @@ import SwiftTUICore
 
     mutating func deactivate() -> TerminalRawModeRestorePlan {
       unregisterProcessExitCleanup()
-      let restorePlan = TerminalRawModeRestorePlan(
+      let plan = restorePlan
+      reset()
+      return plan
+    }
+
+    var restorePlan: TerminalRawModeRestorePlan {
+      TerminalRawModeRestorePlan(
         savedSnapshot: savedSnapshot,
         mouseCoordinateMode: mouseCoordinateMode,
         pointerHoverEnabled: pointerHoverEnabled,
         kittyKeyboardPushed: kittyKeyboardPushed
       )
-      reset()
-      return restorePlan
     }
 
     mutating func refreshProcessExitCleanupRegistration(
@@ -84,6 +89,7 @@ import SwiftTUICore
     private mutating func reset() {
       savedSnapshot = nil
       isEnabled = false
+      ownsScreen = false
       mouseCoordinateMode = .cells
       pointerHoverEnabled = false
       kittyKeyboardPushed = false

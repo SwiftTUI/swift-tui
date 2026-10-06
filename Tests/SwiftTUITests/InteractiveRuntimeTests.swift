@@ -582,30 +582,31 @@ struct InteractiveRuntimeTests {
     #expect(controller.enterRawModeCalls == 1)
     #expect(controller.restoreCalls == 1)
     #expect(
-      controller.writes == [
-        "\u{001B}]10;?\u{0007}",
-        "\u{001B}]11;?\u{0007}",
-        "\u{001B}]4;1;?\u{0007}",
-        "\u{001B}]4;2;?\u{0007}",
-        "\u{001B}]4;3;?\u{0007}",
-        "\u{001B}]4;4;?\u{0007}",
-        "\u{001B}]4;6;?\u{0007}",
-        "\u{001B}]4;8;?\u{0007}",
-        "\u{001B}[?1049h",
-        "\u{001B}[2J",
-        "\u{001B}[1;1H",
-        "\u{001B}[?25l",
-        "\u{001B}[?2004h",
-        // Kitty keyboard flags probe (piggybacking DA1). The mock answers
-        // nothing, so no enhancement push follows.
-        "\u{001B}[?u\u{001B}[c",
-        "\u{001B}[2J",
-        "\u{001B}[1;1H",
-        "\u{001B}[?2004l",
-        "\u{001B}[0m",
-        "\u{001B}[?25h",
-        "\u{001B}[?1049l",
-      ])
+      controller.writes.joined()
+        == [
+          "\u{001B}]10;?\u{0007}",
+          "\u{001B}]11;?\u{0007}",
+          "\u{001B}]4;1;?\u{0007}",
+          "\u{001B}]4;2;?\u{0007}",
+          "\u{001B}]4;3;?\u{0007}",
+          "\u{001B}]4;4;?\u{0007}",
+          "\u{001B}]4;6;?\u{0007}",
+          "\u{001B}]4;8;?\u{0007}",
+          "\u{001B}[?1049h",
+          "\u{001B}[2J",
+          "\u{001B}[1;1H",
+          "\u{001B}[?25l",
+          "\u{001B}[?2004h",
+          // Kitty keyboard flags probe (piggybacking DA1). The mock answers
+          // nothing, so no enhancement push follows.
+          "\u{001B}[?u\u{001B}[c",
+          "\u{001B}[2J",
+          "\u{001B}[1;1H",
+          "\u{001B}[?2004l",
+          "\u{001B}[?25h",
+          "\u{001B}[0m",
+          "\u{001B}[?1049l",
+        ].joined())
   }
 
   @Test("terminal host enables and disables mouse reporting for capable terminals")
@@ -623,7 +624,7 @@ struct InteractiveRuntimeTests {
     try host.disableRawMode()
 
     #expect(controller.writes.contains("\u{001B}[?1006h\u{001B}[?1002h"))
-    #expect(controller.writes.contains("\u{001B}[?1002l\u{001B}[?1006l"))
+    #expect(controller.writes.joined().contains("\u{001B}[?1002l\u{001B}[?1006l"))
   }
 
   @Test("terminal host resets retained presentation state across raw-mode sessions")

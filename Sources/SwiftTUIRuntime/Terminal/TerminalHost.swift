@@ -221,20 +221,23 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       presentationSession.reset()
 
       var shouldRestoreOnFailure = true
-      var screenOwnershipAcquired = false
       defer {
         if shouldRestoreOnFailure {
-          if screenOwnershipAcquired {
+          if rawModeSession.ownsScreen {
             TerminalScreenOwnership.release()
+            rawModeSession.ownsScreen = false
           }
-          let restorePlan = rawModeSession.deactivate()
+          let restorePlan = rawModeSession.restorePlan
           presentationSession.reset()
           if let savedSnapshot = restorePlan.savedSnapshot {
-            try? controller.restore(
-              savedSnapshot,
-              input: inputFileDescriptor,
-              output: outputFileDescriptor
-            )
+            do {
+              try controller.restore(
+                savedSnapshot,
+                input: inputFileDescriptor, output: outputFileDescriptor)
+              _ = rawModeSession.deactivate()
+            } catch {
+              // The process-exit fallback retains the snapshot.
+            }
           }
         }
       }
@@ -242,7 +245,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       refreshAppearanceIfNeeded()
       try write(TerminalHostEscapeSequences.enterAlternateScreen)
       TerminalScreenOwnership.acquire()
-      screenOwnershipAcquired = true
+      rawModeSession.ownsScreen = true
       try write(TerminalHostEscapeSequences.clearScreen)
       try write(TerminalHostEscapeSequences.cursor(to: .zero))
       try write(TerminalHostEscapeSequences.hideCursor)
@@ -274,61 +277,40 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       guard rawModeSession.isEnabled else {
         return
       }
-      // Balanced against enableRawMode's post-enter acquire. Released via
-      // defer (not after the exit write) so a throw partway through teardown
-      // cannot leak the latch — after this call the session is over either
-      // way, and deferred issues flush at runner teardown.
-      defer {
-        TerminalScreenOwnership.release()
-      }
-
       let presentationWriter = presentationSession.writer
-      let restorePlan = rawModeSession.deactivate()
+      let restorePlan = rawModeSession.restorePlan
       presentationSession.reset()
-
-      var snapshotToRestore = restorePlan.savedSnapshot
-      defer {
-        if let snapshotToRestore {
-          try? controller.restore(
-            snapshotToRestore,
-            input: inputFileDescriptor,
-            output: outputFileDescriptor
-          )
-        }
-      }
-
-      presentationWriter?.drain()
-      try presentationWriter?.consumePendingError()
-
-      try writeSynchronously(TerminalHostEscapeSequences.clearScreen)
-      try writeSynchronously(TerminalHostEscapeSequences.cursor(to: .zero))
-      if restorePlan.mouseCoordinateMode.reportsMouseInput {
-        try writeSynchronously(
-          TerminalHostEscapeSequences.disableMouseReporting(
+      // A single deadline covers the active frame, pending frame, and reset
+      // bytes. No writer survives this call to emit into the restored shell.
+      let deadline = ContinuousClock.now + .milliseconds(250)
+      presentationWriter?.finishWithin(.milliseconds(250))
+      var outputError: (any Error)?
+      do {
+        try presentationWriter?.consumePendingError()
+      } catch { outputError = error }
+      do {
+        let reset =
+          TerminalHostEscapeSequences.clearScreen
+          + TerminalHostEscapeSequences.cursor(to: .zero)
+          + TerminalHostEscapeSequences.processExitReset(
             mouseCoordinateMode: restorePlan.mouseCoordinateMode,
-            hoverEnabled: restorePlan.pointerHoverEnabled
-          )
-        )
-      }
-      if restorePlan.kittyKeyboardPushed {
-        // Must precede exitAlternateScreen: the enhancement stack is
-        // per-screen, so the pop only reaches our pushed entry while the
-        // alternate screen is still active.
-        try writeSynchronously(TerminalHostEscapeSequences.popKittyKeyboardEnhancements)
-      }
-      try writeSynchronously(TerminalHostEscapeSequences.disableBracketedPaste)
-      try writeSynchronously(TerminalHostEscapeSequences.resetStyle)
-      try writeSynchronously(TerminalHostEscapeSequences.showCursor)
-      try writeSynchronously(TerminalHostEscapeSequences.exitAlternateScreen)
+            hoverEnabled: restorePlan.pointerHoverEnabled,
+            kittyKeyboardPushed: restorePlan.kittyKeyboardPushed)
+        try controller.write(
+          reset, to: outputFileDescriptor,
+          budget: TerminalWriteBudget(deadline: deadline))
+      } catch { if outputError == nil { outputError = error } }
 
       if let savedSnapshot = restorePlan.savedSnapshot {
+        // Keep the fallback registered if restore fails. A caller can retry;
+        // process exit still has the original snapshot in the meantime.
         try controller.restore(
           savedSnapshot,
-          input: inputFileDescriptor,
-          output: outputFileDescriptor
-        )
-        snapshotToRestore = nil
+          input: inputFileDescriptor, output: outputFileDescriptor)
       }
+      if rawModeSession.ownsScreen { TerminalScreenOwnership.release() }
+      _ = rawModeSession.deactivate()
+      if let outputError { throw outputError }
     }
 
     public func write(_ output: String) throws {
