@@ -19,6 +19,24 @@
     private let readStream: AsyncStream<[UInt8]>
     private var readContinuation: AsyncStream<[UInt8]>.Continuation?
     private var didStartReading = false
+    private struct PendingWrite {
+      let id: UInt64
+      let bytes: [UInt8]
+      var offset = 0
+      let continuation: CheckedContinuation<Result<Void, PTYError>, Never>
+    }
+    private var pendingWrites: [PendingWrite] = []
+    private var nextWriteID: UInt64 = 0
+    private var writeSource: (any DispatchSourceWrite)?
+    private var writeGeneration: UInt64 = 0
+
+    deinit {
+      readSource?.cancel()
+      writeSource?.cancel()
+      readContinuation?.finish()
+      closeFD(masterFD)
+      closeFD(retainedSlaveFD)
+    }
 
     public init(handles: PTYHandles, retainSlaveFD: Bool) {
       let (stream, continuation) = AsyncStream<[UInt8]>.makeStream()
@@ -58,40 +76,123 @@
       try ptyResize(masterFD: masterFD, cols: size.width, rows: size.height)
     }
 
-    public func write(_ bytes: [UInt8]) throws(PTYError) {
-      guard masterFD >= 0 else {
-        throw .notStarted
-      }
-
-      var offset = 0
-      while offset < bytes.count {
-        let written = bytes.withUnsafeBufferPointer { buffer -> Int in
-          guard let baseAddress = buffer.baseAddress else {
-            return 0
+    /// Writes are serialized in admission order. Cancellation returns ECANCELED;
+    /// bytes already accepted by the kernel remain delivered, and the unwritten
+    /// suffix is discarded. Closing fails all pending writes with notStarted.
+    public func write(_ bytes: [UInt8]) async throws(PTYError) {
+      let id = nextWriteID
+      nextWriteID &+= 1
+      let result: Result<Void, PTYError> = await withTaskCancellationHandler {
+        await withCheckedContinuation { continuation in
+          guard !Task.isCancelled else {
+            continuation.resume(returning: .failure(.writeFailed(errno: ECANCELED)))
+            return
           }
-
-          return unsafe ptyWriteOnce(masterFD, baseAddress + offset, bytes.count - offset)
+          guard masterFD >= 0 else {
+            continuation.resume(returning: .failure(.notStarted))
+            return
+          }
+          pendingWrites.append(PendingWrite(id: id, bytes: bytes, continuation: continuation))
+          pendingWriteObserver?(pendingWrites.count)
+          if pendingWrites.count == 1 { drainWrites() }
         }
+      } onCancel: {
+        Task { await self.cancelWrite(id) }
+      }
+      try result.get()
+    }
 
+    var pendingWriteCount: Int { pendingWrites.count }
+    private var pendingWriteObserver: (@Sendable (Int) -> Void)?
+    func observePendingWrites(_ observer: @escaping @Sendable (Int) -> Void) {
+      pendingWriteObserver = observer
+      observer(pendingWrites.count)
+    }
+
+    private func cancelWrite(_ id: UInt64) {
+      guard let index = pendingWrites.firstIndex(where: { $0.id == id }) else { return }
+      pendingWrites.remove(at: index).continuation.resume(
+        returning: .failure(.writeFailed(errno: ECANCELED)))
+      if index == 0 {
+        cancelWriteSource()
+        drainWrites()
+      }
+    }
+
+    private func cancelWriteSource() {
+      writeGeneration &+= 1
+      writeSource?.cancel()
+      writeSource = nil
+    }
+
+    private func drainWrites() {
+      guard masterFD >= 0, writeSource == nil else { return }
+      var turnBytes = 0
+      while !pendingWrites.isEmpty {
+        let request = pendingWrites[0]
+        if request.offset == request.bytes.count {
+          pendingWrites.removeFirst().continuation.resume(returning: .success(()))
+          continue
+        }
+        // Bound one actor turn even when a peer drains continuously.
+        if turnBytes >= 65_536 {
+          Task {
+            await Task.yield()
+            self.drainWrites()
+          }
+          return
+        }
+        let written = request.bytes.withUnsafeBufferPointer { buffer in
+          unsafe ptyWriteOnce(
+            masterFD, buffer.baseAddress! + request.offset,
+            min(65_536 - turnBytes, request.bytes.count - request.offset))
+        }
         if written > 0 {
-          offset += written
+          pendingWrites[0].offset += written
+          turnBytes += written
           continue
         }
-
-        let failureErrno = errno
-        if failureErrno == EINTR {
-          continue
+        let failure = errno
+        if written < 0 && failure == EINTR { continue }
+        if written < 0 && (failure == EAGAIN || failure == EWOULDBLOCK) {
+          waitForWritable()
+          return
         }
-
-        if failureErrno == EAGAIN || failureErrno == EWOULDBLOCK {
-          guard Self.waitUntilWritable(masterFD) else {
-            throw .writeFailed(errno: errno)
-          }
-          continue
-        }
-
-        throw .writeFailed(errno: failureErrno)
+        pendingWrites.removeFirst().continuation.resume(
+          returning: .failure(.writeFailed(errno: written == 0 ? EIO : failure)))
       }
+    }
+
+    private func waitForWritable() {
+      // The source owns a duplicate until its cancel handler runs. Closing the
+      // actor's descriptor cannot make a delayed dispatch callback watch a
+      // recycled descriptor. Callbacks only notify the actor; they never write.
+      let fd = fcntl(masterFD, F_DUPFD_CLOEXEC, 0)
+      guard fd >= 0 else {
+        let failure = PTYError.writeFailed(errno: errno)
+        let writes = pendingWrites
+        pendingWrites.removeAll()
+        for request in writes { request.continuation.resume(returning: .failure(failure)) }
+        return
+      }
+      writeGeneration &+= 1
+      let generation = writeGeneration
+      let source = DispatchSource.makeWriteSource(
+        fileDescriptor: fd,
+        queue: DispatchQueue.global(qos: .userInitiated))
+      source.setEventHandler { [weak self] in
+        source.cancel()
+        Task { await self?.becameWritable(generation) }
+      }
+      source.setCancelHandler { closeFD(fd) }
+      writeSource = source
+      source.resume()
+    }
+
+    private func becameWritable(_ generation: UInt64) {
+      guard generation == writeGeneration else { return }
+      cancelWriteSource()
+      drainWrites()
     }
 
     public func read() -> AsyncStream<[UInt8]> {
@@ -116,6 +217,10 @@
 
     public func close() {
       finishReading()
+      cancelWriteSource()
+      let writes = pendingWrites
+      pendingWrites.removeAll()
+      for request in writes { request.continuation.resume(returning: .failure(.notStarted)) }
 
       if masterFD >= 0 {
         closeFD(masterFD)
@@ -133,8 +238,13 @@
         return
       }
 
+      let fd = fcntl(masterFD, F_DUPFD_CLOEXEC, 0)
+      guard fd >= 0 else {
+        close()
+        return
+      }
       let source = DispatchSource.makeReadSource(
-        fileDescriptor: masterFD,
+        fileDescriptor: fd,
         queue: DispatchQueue.global(qos: .userInitiated)
       )
       source.setEventHandler { [weak self] in
@@ -146,7 +256,7 @@
           await self.drainAvailable()
         }
       }
-      source.setCancelHandler {}
+      source.setCancelHandler { closeFD(fd) }
       readContinuation?.onTermination = { @Sendable [weak self] _ in
         guard let self else {
           return
@@ -224,23 +334,6 @@
       _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
     }
 
-    private static func waitUntilWritable(_ fd: Int32) -> Bool {
-      var descriptor = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
-      while true {
-        let result = unsafe poll(&descriptor, 1, 100)
-        if result > 0 {
-          return (descriptor.revents & Int16(POLLOUT)) != 0
-        }
-
-        if result == 0 {
-          return true
-        }
-
-        if errno != EINTR {
-          return false
-        }
-      }
-    }
   }
 
   private func ptyWriteOnce(

@@ -628,6 +628,7 @@ let package = Package(
       name: "SwiftTUIPTYPrimitivesTests",
       dependencies: [
         "SwiftTUI",
+        "SwiftTUITestSupport",
         .target(
           name: "SwiftTUIPTYPrimitives",
           condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])
