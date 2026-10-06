@@ -265,6 +265,11 @@ Use `SwiftTUICLI` directly for a terminal-only graph.
 and socket outbox. Socket completion propagates back to the pump, so a slow
 reader cannot move its backlog into a downstream unbounded stream. See the
 [outbound delivery policy](HOST-WIRE-CONTRACT.md#webhost-outbound-delivery-budget).
+`WebHostIngressQueue` bounds socket, scene, and decoded input by records and
+bytes. Decoded `InputAdmission` reservations remain attached to scoped events
+through the runtime pump; coalescing retains one reservation for the surviving
+event. Completed receive tasks retire by connection token. See the
+[inbound delivery policy](HOST-WIRE-CONTRACT.md#webhost-inbound-delivery-budget).
 
 ## Source layout
 

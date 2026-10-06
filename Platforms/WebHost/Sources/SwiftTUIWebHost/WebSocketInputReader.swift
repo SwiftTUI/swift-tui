@@ -9,6 +9,7 @@ package protocol WebHostByteSource: Sendable {
   func currentConnectionToken() async -> UInt64?
   func inputLease(for token: UInt64) async -> InputConnectionLease?
   func recordDiscardedInboundChunk(_ chunk: WebHostDiscardedInboundChunk) async
+  func inputOverloaded(token: UInt64) async
 }
 
 /// Deterministic observation and barrier points for the reader's connection
@@ -75,6 +76,15 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
   private let inputAllowed: @Sendable () -> Bool
   private let hooks: WebSocketInputReaderTestHooks?
   private let state = Mutex(ReaderState())
+  private let admissionBudget = WebHostInputAdmissionBudget()
+  package var admittedInputSnapshot: WebHostInputAdmissionBudget.Snapshot {
+    admissionBudget.snapshot
+  }
+  private let scopedQueue = WebHostIngressQueue<ScopedInputEvent>()
+  private let inputQueue = WebHostIngressQueue<InputEvent>()
+  package var ingressSnapshot: WebHostIngressQueue<ScopedInputEvent>.Snapshot {
+    scopedQueue.snapshot
+  }
 
   /// Internal because `WebSurfaceInputControlMessage` reaches this module
   /// through an internal import; the package-visible entry point is the
@@ -173,33 +183,62 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
   }
 
   package func inputEvents() -> AsyncStream<InputEvent> {
-    AsyncStream { continuation in
-      let task = Task {
-        for await event in self.source.inboundEvents() {
-          await self.process(event, yielding: continuation)
-          await Task.yield()
-        }
-        continuation.finish()
+    let task = Task {
+      for await event in self.source.inboundEvents() {
+        await self.processScoped(
+          event,
+          yielding: { scoped in
+            if self.inputQueue.offer(scoped.event, bytes: Self.inputByteCost(scoped.event)) {
+              return true
+            }
+            self.inputQueue.discardBuffered()
+            return false
+          }, finish: { self.inputQueue.finish() })
+        await Task.yield()
       }
-
-      continuation.onTermination = { _ in
-        task.cancel()
-      }
+      self.inputQueue.finish()
     }
+    return inputQueue.stream(onCancel: { task.cancel() })
   }
 
   package func scopedInputEvents() -> AsyncStream<ScopedInputEvent> {
-    AsyncStream { continuation in
-      let task = Task {
-        for await event in self.source.inboundEvents() {
-          await self.processScoped(
-            event, yielding: { continuation.yield($0) },
-            finish: { continuation.finish() })
-          await Task.yield()
-        }
-        continuation.finish()
+    let task = Task {
+      for await event in self.source.inboundEvents() {
+        await self.processScoped(
+          event,
+          yielding: { scoped in
+            if self.scopedQueue.offer(scoped, bytes: Self.inputByteCost(scoped.event)) {
+              return true
+            }
+            self.scopedQueue.discardBuffered()
+            return false
+          }, finish: { self.scopedQueue.finish() })
+        await Task.yield()
       }
-      continuation.onTermination = { _ in task.cancel() }
+      self.scopedQueue.finish()
+    }
+    return scopedQueue.stream(onCancel: { task.cancel() })
+  }
+
+  private static func inputByteCost(_ event: InputEvent) -> Int {
+    let base = MemoryLayout<ScopedInputEvent>.stride
+    switch event {
+    case .key(let key):
+      if case .character(let value) = key.key { return base + String(value).utf8.count }
+      return base
+    case .mouse: return base
+    case .paste(let paste): return base + paste.content.utf8.count
+    case .drop(let paths, _):
+      return base
+        + paths.reduce(0) { $0 + MemoryLayout<DroppedPath>.stride + $1.rawValue.utf8.count }
+    case .accessibility(let request):
+      var bytes = base + request.target.utf8.count
+      switch request.action {
+      case .custom(let text), .setValue(.text(let text)): bytes += text.utf8.count
+      case .editText(let edit), .selectText(let edit): bytes += edit.text.utf8.count
+      default: break
+      }
+      return bytes
     }
   }
 
@@ -210,13 +249,17 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
     yielding continuation: AsyncStream<InputEvent>.Continuation
   ) async {
     await processScoped(
-      event, yielding: { continuation.yield($0.event) },
+      event,
+      yielding: {
+        if case .enqueued = continuation.yield($0.event) { return true }
+        return false
+      },
       finish: { continuation.finish() })
   }
 
   private func processScoped(
     _ event: WebHostInboundEvent,
-    yielding yield: @escaping @Sendable (ScopedInputEvent) -> Void,
+    yielding yield: @escaping @Sendable (ScopedInputEvent) -> Bool,
     finish: @Sendable () -> Void
   ) async {
     switch event {
@@ -256,7 +299,7 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
   private func processBytes(
     token: UInt64,
     bytes: [UInt8],
-    yielding yield: @escaping @Sendable (ScopedInputEvent) -> Void
+    yielding yield: @escaping @Sendable (ScopedInputEvent) -> Bool
   ) async {
     guard await source.currentConnectionToken() == token else {
       let wasCurrentOnArrival = state.withLock(\.streamToken) == token
@@ -269,30 +312,81 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
       return
     }
 
-    let parsed = state.withLock { state in
-      state.parserToken = token
-      return state.parser.feedRecords(bytes)
-    }
-    hooks?.parserStateDidChange?(token, state.withLock(\.parser.bufferedCommandBytes).count)
+    for offset in stride(from: 0, to: bytes.count, by: 4096) {
+      guard !Task.isCancelled else { return }
+      let parsed = state.withLock { state in
+        state.parserToken = token
+        return state.parser.feedRecords(Array(bytes[offset..<min(offset + 4096, bytes.count)]))
+      }
+      hooks?.parserStateDidChange?(token, state.withLock(\.parser.bufferedCommandBytes).count)
 
-    for record in parsed {
-      switch record {
-      case .control(let message):
-        if case .capabilities = message {
-          await hooks?.beforeApplyParsedRecord?(token, .caps)
+      for record in parsed {
+        switch record {
+        case .control(let message):
+          if case .capabilities = message {
+            await hooks?.beforeApplyParsedRecord?(token, .caps)
+          }
+          guard await source.currentConnectionToken() == token else { continue }
+          await controlHandler(message, token)
+        case .input(let event):
+          await hooks?.beforeApplyParsedRecord?(token, .terminalInput)
+          guard await source.currentConnectionToken() == token else { continue }
+          var scopedEvent = event
+          if case .accessibility(var request) = scopedEvent {
+            request.hostSession = token
+            scopedEvent = .accessibility(request)
+          }
+          guard inputAllowed(), let lease = await source.inputLease(for: token) else { continue }
+          guard let admission = admissionBudget.reserve(Self.inputByteCost(scopedEvent)) else {
+            await source.inputOverloaded(token: token)
+            return
+          }
+          guard
+            yield(
+              ScopedInputEvent(
+                scopedEvent, origin: .browser, lease: lease,
+                admission: admission))
+          else {
+            await source.inputOverloaded(token: token)
+            return
+          }
         }
-        guard await source.currentConnectionToken() == token else { continue }
-        await controlHandler(message, token)
-      case .input(let event):
-        await hooks?.beforeApplyParsedRecord?(token, .terminalInput)
-        guard await source.currentConnectionToken() == token else { continue }
-        var scopedEvent = event
-        if case .accessibility(var request) = scopedEvent {
-          request.hostSession = token
-          scopedEvent = .accessibility(request)
-        }
-        guard inputAllowed(), let lease = await source.inputLease(for: token) else { continue }
-        yield(ScopedInputEvent(scopedEvent, origin: .browser, lease: lease))
+      }
+    }
+  }
+}
+
+/// Unlike the stream queue budget, this reservation survives dequeue and follows
+/// the scoped event through the runtime pump and dispatch.
+package final class WebHostInputAdmissionBudget: Sendable {
+  package struct Snapshot: Sendable {
+    package var records = 0
+    package var bytes = 0
+    package var highWaterRecords = 0
+    package var highWaterBytes = 0
+    package var refused = 0
+  }
+  private let state = Mutex(Snapshot())
+  package var snapshot: Snapshot { state.withLock { $0 } }
+  func reserve(_ bytes: Int) -> InputAdmission? {
+    let admitted = state.withLock { state in
+      guard state.records < WebHostIngressQueue<ScopedInputEvent>.recordLimit,
+        bytes <= WebHostIngressQueue<ScopedInputEvent>.byteLimit - state.bytes
+      else {
+        state.refused += 1
+        return false
+      }
+      state.records += 1
+      state.bytes += bytes
+      state.highWaterRecords = max(state.highWaterRecords, state.records)
+      state.highWaterBytes = max(state.highWaterBytes, state.bytes)
+      return true
+    }
+    guard admitted else { return nil }
+    return InputAdmission { [self] in
+      state.withLock {
+        $0.records -= 1
+        $0.bytes -= bytes
       }
     }
   }

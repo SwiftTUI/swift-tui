@@ -101,8 +101,33 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
 
   private static let surfaceRecordPrefix = Array("\u{001E}surface:".utf8)
 
-  nonisolated let inboundStream: AsyncStream<WebHostInboundEvent>
-  private nonisolated let inboundContinuation: AsyncStream<WebHostInboundEvent>.Continuation
+  private nonisolated let inboundQueue = WebHostIngressQueue<WebHostInboundEvent>()
+  package nonisolated var ingressSnapshot: WebHostIngressQueue<WebHostInboundEvent>.Snapshot {
+    inboundQueue.snapshot
+  }
+  package private(set) var socketIngressSnapshot:
+    WebHostIngressQueue<WebHostSocketMessage>.Snapshot?
+  package struct IngressObservation: Sendable {
+    package var currentToken: UInt64?
+    package var activeReceiveTasks: Int
+    package var socket: WebHostIngressQueue<WebHostSocketMessage>.Snapshot?
+  }
+  private var ingressObserver: (@Sendable (IngressObservation) -> Void)?
+  package func observeIngress(_ observer: (@Sendable (IngressObservation) -> Void)?) {
+    ingressObserver = observer
+    publishIngressObservation()
+  }
+  private func publishIngressObservation() {
+    ingressObserver?(
+      .init(
+        currentToken: currentToken, activeReceiveTasks: receiveTasks.count,
+        socket: socketIngressSnapshot))
+  }
+
+  package func recordSocketIngress(_ snapshot: WebHostIngressQueue<WebHostSocketMessage>.Snapshot) {
+    socketIngressSnapshot = snapshot
+    publishIngressObservation()
+  }
 
   private var outputContinuation: AsyncStream<WebHostSocketMessage>.Continuation?
   private var waitsForSocketWrites = false
@@ -116,7 +141,8 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
   private var currentToken: UInt64?
   private var lastIssuedToken: UInt64 = 0
   private var sceneInputFinished = false
-  private var receiveTasks: [Task<Void, Never>] = []
+  private var receiveTasks: [UInt64: Task<Void, Never>] = [:]
+  package var activeReceiveTaskCount: Int { receiveTasks.count }
   private var processedInboundCallbacks: UInt64 = 0
   private var yieldedInboundEvents: UInt64 = 0
   private var yieldedOutputRecords: UInt64 = 0
@@ -126,18 +152,15 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
   private var suppressedSurfaceRecords: [[UInt8]] = []
   private var suppressionBudget = WebHostOutboundBudget()
   private var discardedInboundChunks: [WebHostDiscardedInboundChunk] = []
+  private var discardedInboundBudget = WebHostOutboundBudget()
   private var refreshRequestCount = 0
   private var capsProcessedCount = 0
   private var ignoredStaleCallbackCount = 0
 
-  package init() {
-    var continuation: AsyncStream<WebHostInboundEvent>.Continuation?
-    inboundStream = AsyncStream { continuation = $0 }
-    inboundContinuation = continuation!
-  }
+  package init() {}
 
   package nonisolated func inboundEvents() -> AsyncStream<WebHostInboundEvent> {
-    inboundStream
+    inboundQueue.stream()
   }
 
   package func inputLease(for token: UInt64) -> InputConnectionLease? {
@@ -224,7 +247,7 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
   package func recordDiscardedInboundChunk(
     _ chunk: WebHostDiscardedInboundChunk
   ) {
-    discardedInboundChunks.append(chunk)
+    if discardedInboundBudget.admit(chunk.bytes.count) { discardedInboundChunks.append(chunk) }
   }
 
   package func send(
@@ -300,9 +323,15 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     disconnectCurrentConnection(token: connectionToken)
   }
 
+  package func inputOverloaded(token: UInt64) {
+    guard token == currentToken else { return }
+    inboundQueue.discardBuffered()
+    disconnectCurrentConnection(token: token)
+  }
+
   private func disconnectCurrentConnection(token: UInt64?) {
     guard let token, token == currentToken else { return }
-    outputContinuation?.yield(.close(code: 1013, reason: "Outbound backlog or write failure."))
+    outputContinuation?.yield(.close(code: 1013, reason: "Connection backlog or write failure."))
     // A write may already be partial. Abort the descriptor before any new
     // record can be written; finishing only the AsyncStream cannot wake it.
     closeSocket?()
@@ -354,6 +383,9 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
       outputContinuation = nil
     }
     failOutputWaiters()
+    // Stop a replaced socket's reader too; already queued callbacks retain
+    // their old token and are still refused by the reader.
+    closeSocket?()
     closeSocket = nil
     self.waitsForSocketWrites = waitsForSocketWrites
 
@@ -388,8 +420,11 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
           self.receive(message, token: token)
         }
         self.connectionDidEnd(token: token)
+        self.receiveTasks.removeValue(forKey: token)
+        self.publishIngressObservation()
       }
-      receiveTasks.append(task)
+      receiveTasks[token] = task
+      publishIngressObservation()
 
       continuation.onTermination = { _ in
         Task {
@@ -404,7 +439,12 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     onDisconnect: @escaping @Sendable () -> Void
   ) -> (output: AsyncStream<WebHostSocketMessage>, token: UInt64?) {
     let output = attach(client: client, waitsForSocketWrites: true)
-    if currentToken != nil { closeSocket = onDisconnect }
+    if currentToken != nil {
+      closeSocket = onDisconnect
+    } else {
+      // Admission can fail during attach itself, before the callback exists.
+      onDisconnect()
+    }
     return (output, currentToken)
   }
 
@@ -455,15 +495,17 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     outputContinuation?.finish()
     outputContinuation = nil
     failOutputWaiters()
+    closeSocket?()
     closeSocket = nil
     detachedNonSurfaceBacklog.removeAll(keepingCapacity: true)
     detachedBudget = WebHostOutboundBudget()
-    for task in receiveTasks {
+    for task in receiveTasks.values {
       task.cancel()
     }
     receiveTasks.removeAll(keepingCapacity: true)
+    publishIngressObservation()
     yieldInbound(.shutdown)
-    inboundContinuation.finish()
+    inboundQueue.finish()
     sceneInputFinished = true
     let stranded = inboundCallbackWaiters
     inboundCallbackWaiters.removeAll()
@@ -489,6 +531,7 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     suppressedSurfaceRecords.removeAll(keepingCapacity: true)
     suppressionBudget = WebHostOutboundBudget()
     discardedInboundChunks.removeAll(keepingCapacity: true)
+    discardedInboundBudget = WebHostOutboundBudget()
     refreshRequestCount = 0
     capsProcessedCount = 0
     ignoredStaleCallbackCount = 0
@@ -503,8 +546,7 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     defer { resumeMaturedInboundCallbackWaiters() }
     guard phase != .terminal else {
       if case .data(let bytes) = message {
-        discardedInboundChunks.append(
-          .init(token: token, bytes: bytes, reason: .terminal))
+        recordDiscardedInboundChunk(.init(token: token, bytes: bytes, reason: .terminal))
       }
       return
     }
@@ -548,6 +590,7 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     currentLease = nil
     currentToken = nil
     phase = .detached
+    publishIngressObservation()
     outputContinuation?.finish()
     outputContinuation = nil
     failOutputWaiters()
@@ -567,7 +610,15 @@ package actor WebHostSceneChannel: WebHostByteSink, WebHostByteSource {
     _ event: WebHostInboundEvent
   ) {
     yieldedInboundEvents += 1
-    inboundContinuation.yield(event)
+    let bytes: Int
+    if case .bytes(_, let payload) = event { bytes = payload.count } else { bytes = 0 }
+    guard inboundQueue.offer(event, bytes: bytes) else {
+      // Overload retires the lease before clearing queued input. Nothing from
+      // this connection can reach the runtime after reconnect.
+      inboundQueue.discardBuffered()
+      disconnectCurrentConnection(token: currentToken)
+      return
+    }
   }
 
   private static func isSurfaceRecord(

@@ -776,3 +776,32 @@ as `aria-haspopup` and `aria-modal`. Modal alert surfaces use `alertdialog`.
 Expanded triggers remain buttons, with `expanded` and `controls`; their content
 is a sibling region/menu, so nested controls are not children of an ARIA button.
 Logical tabs expose `selected`, `controls` and panel `labelledBy` relationships.
+
+
+## WebHost inbound delivery budget
+
+Socket messages, tagged scene events, and decoded event queues each admit at
+most 256 records and 4 MiB of logical payload. They are single-consumer FIFOs;
+their AsyncStream adapters do not add another buffer. Capacity exhaustion
+explicitly disconnects the client and retires its input lease, rather than
+selectively dropping a key, button release, or control record and accepting
+later input from that connection. Reconnection creates a fresh token and parser
+session. Shutdown finishes queues and wakes waiting consumers.
+
+Decoded scoped events carry a count/byte reservation until their final copy is
+released, including time spent in the runtime event pump. Thus an eager pump
+cannot move the browser backlog outside the budget. Mouse coalescing retains
+one reservation for the surviving event. Strings in paste, key, accessibility,
+and drop events contribute to the decoded byte charge, along with fixed event
+storage. Parsing feeds at most 4 KiB at a time to bound temporary arrays of
+expanded input events; the existing wire-record limit separately bounds partial
+commands. Socket framing/assembly and one in-flight item per boundary are
+additional bounded storage. These limits describe logical retained payload,
+not process RSS or allocator overhead, and apply per scene/connection.
+
+Queue observations expose record/byte high-water marks, refusal counts, oldest
+queued age, and maximum consumed age. Diagnostic samples of discarded inbound
+chunks are separately capped at 32 records and 4 MiB; reading observations resets
+that sample budget. Stale samples preserve the same reason and bytes while they
+fit. Completed receive-task handles are removed when their tagged loop ends;
+shutdown cancels the remaining active loops.

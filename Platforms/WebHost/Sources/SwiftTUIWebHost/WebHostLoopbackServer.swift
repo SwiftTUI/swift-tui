@@ -486,7 +486,8 @@ final class WebHostLoopbackConnection: Sendable {
   // MARK: - WebSocket session
 
   private func runWebSocketSession(channel: WebHostSceneChannel) {
-    let (clientStream, clientContinuation) = AsyncStream<WebHostSocketMessage>.makeStream()
+    let clientQueue = WebHostIngressQueue<WebHostSocketMessage>()
+    let clientStream = clientQueue.stream()
 
     // The bridge task owns the channel conversation. It never blocks: writes
     // go through the outbox, and the writer thread does the blocking. It must
@@ -525,7 +526,11 @@ final class WebHostLoopbackConnection: Sendable {
       maxMessageBytes: routes.maxMessageBytes)
     var buffer = [UInt8](repeating: 0, count: 64 * 1024)
 
-    defer { clientContinuation.finish() }
+    defer {
+      clientQueue.finish()
+      let snapshot = clientQueue.snapshot
+      Task { await channel.recordSocketIngress(snapshot) }
+    }
 
     while true {
       let count = WebHostSocket.receive(fd, into: &buffer)
@@ -539,7 +544,7 @@ final class WebHostLoopbackConnection: Sendable {
         do {
           frame = try decoder.nextFrame()
         } catch {
-          handleWireFailure(decodeError: error, clientContinuation: clientContinuation)
+          handleWireFailure(decodeError: error, clientQueue: clientQueue)
           return
         }
         guard let frame else {
@@ -550,7 +555,7 @@ final class WebHostLoopbackConnection: Sendable {
         do {
           event = try assembler.assemble(frame)
         } catch {
-          handleWireFailure(assemblyError: error, clientContinuation: clientContinuation)
+          handleWireFailure(assemblyError: error, clientQueue: clientQueue)
           return
         }
 
@@ -564,10 +569,22 @@ final class WebHostLoopbackConnection: Sendable {
         case .closeReceived:
           // The channel echoes the close back out, which is what makes the
           // writer send the closing frame; see `WebHostSceneChannel.receive`.
-          clientContinuation.yield(.normalClose)
+          clientQueue.offer(.normalClose, bytes: 0)
           return
         case .message(let message):
-          clientContinuation.yield(message)
+          let byteCount: Int
+          switch message {
+          case .data(let bytes): byteCount = bytes.count
+          case .text(let text): byteCount = text.utf8.count
+          case .close: byteCount = 0
+          }
+          guard clientQueue.offer(message, bytes: byteCount) else {
+            // Abort explicitly; never drop a release/control and keep accepting
+            // later events on the same connection.
+            clientQueue.discardBuffered()
+            terminate()
+            return
+          }
         }
       }
     }
@@ -580,7 +597,7 @@ final class WebHostLoopbackConnection: Sendable {
   private func handleWireFailure(
     decodeError: WebHostWebSocketWire.DecodeError? = nil,
     assemblyError: WebHostWebSocketWire.AssemblyError? = nil,
-    clientContinuation: AsyncStream<WebHostSocketMessage>.Continuation
+    clientQueue: WebHostIngressQueue<WebHostSocketMessage>
   ) {
     let isTooLarge: Bool
     switch (decodeError, assemblyError) {
@@ -591,11 +608,11 @@ final class WebHostLoopbackConnection: Sendable {
     }
 
     if isTooLarge {
-      clientContinuation.yield(
+      clientQueue.offer(
         .close(
           code: 1009,
           reason: "WebHost WebSocket message exceeded \(routes.maxMessageBytes) bytes."
-        )
+        ), bytes: 0
       )
     } else {
       enqueue(WebHostWebSocketWire.encodeClose(code: 1002, reason: "WebSocket protocol error."))

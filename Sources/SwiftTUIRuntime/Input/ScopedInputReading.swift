@@ -15,15 +15,28 @@ package enum InputOrigin: Sendable {
   case browser
 }
 
+/// An ingress reservation follows an event through the pump, releasing capacity
+/// only when the final queued/dispatched copy is gone.
+package final class InputAdmission: Sendable {
+  private let release: @Sendable () -> Void
+  package init(release: @escaping @Sendable () -> Void) { self.release = release }
+  deinit { release() }
+}
+
 package struct ScopedInputEvent: Sendable {
   package var event: InputEvent
   package let origin: InputOrigin
   package let lease: InputConnectionLease?
+  package let admission: InputAdmission?
 
-  package init(_ event: InputEvent, origin: InputOrigin, lease: InputConnectionLease? = nil) {
+  package init(
+    _ event: InputEvent, origin: InputOrigin, lease: InputConnectionLease? = nil,
+    admission: InputAdmission? = nil
+  ) {
     self.event = event
     self.origin = origin
     self.lease = lease
+    self.admission = admission
   }
 
   package var isCurrent: Bool { lease?.isCurrent ?? true }

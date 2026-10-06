@@ -98,7 +98,10 @@ package final class EventPumpBuffer: Sendable {
         case .mouse(let first) = current.event, case .mouse(let second) = next.event,
         let merged = first.merged(with: second)
       else { return nil }
-      return .scopedInput(.init(.mouse(merged), origin: current.origin, lease: current.lease))
+      return .scopedInput(
+        .init(
+          .mouse(merged), origin: current.origin, lease: current.lease,
+          admission: current.admission))
     case (.input, _), (.scopedInput, _), (.inputEnded, _), (.signal, _):
       return nil
     }

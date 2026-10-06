@@ -727,6 +727,10 @@
         await channel.currentConnectionToken()
       }
 
+      func inputOverloaded(token: UInt64) async {
+        await channel.inputOverloaded(token: token)
+      }
+
       func recordDiscardedInboundChunk(
         _ chunk: WebHostDiscardedInboundChunk
       ) async {
