@@ -37,8 +37,12 @@ public struct TerminalInputParser: Sendable {
     bufferedBytes.append(contentsOf: bytes)
 
     var events: [InputEvent] = []
-    while let event = parseNextEvent() {
-      events.append(event)
+    while !bufferedBytes.isEmpty {
+      let countBefore = bufferedBytes.count
+      if let event = parseNextEvent() { events.append(event) }
+      // nil can mean either a consumed, ignored envelope or an incomplete
+      // prefix. Only the latter waits for another read; draining never recurses.
+      if bufferedBytes.count == countBefore { break }
     }
     return events
   }
@@ -57,12 +61,17 @@ public struct TerminalInputParser: Sendable {
     // prefix may be a control string whose writer died before the ST
     // terminator (F139). The idle flush resolves both; without it the
     // parser would buffer — and eat — all input forever.
-    return unterminatedControlStringIntroducer != nil
+    return isIncompleteSS3 || unterminatedControlStringIntroducer != nil
   }
+
+  private var isIncompleteSS3: Bool { bufferedBytes == [0x1B, 0x4F] }
 
   /// The control-string introducer byte when the buffer holds an
   /// unterminated OSC/DCS/PM/APC prefix, else `nil`.
   private var unterminatedControlStringIntroducer: UInt8? {
+    if bufferedBytes.first == 0x9D {
+      return controlStringEnd(prefixLength: 1, terminatesWithBEL: true) == nil ? 0x9D : nil
+    }
     guard bufferedBytes.count >= 2, bufferedBytes[0] == 0x1B else {
       return nil
     }
@@ -86,18 +95,22 @@ public struct TerminalInputParser: Sendable {
   /// escape sequence. The run loop calls this on a short idle timeout (the vim
   /// `ttimeoutlen` model) to commit a bare Escape once no continuation byte has
   /// followed. If a lone ESC was pending, this function returns `[.key(.escape)]`.
-  /// Otherwise, it returns an empty array.
-  /// A continuation byte already completed or advanced the buffer, so there is nothing to flush.
+  /// Incomplete SS3 and bare seven-bit control introducers resolve to Alt
+  /// chords; incomplete control payloads (including C1 OSC) are discarded.
   public mutating func flush() -> [InputEvent] {
     guard isAwaitingEscapeDisambiguation else {
       return []
     }
+    if isIncompleteSS3 {
+      bufferedBytes.removeAll(keepingCapacity: true)
+      return [.key(KeyPress(.character("O"), modifiers: .alt))]
+    }
     if let introducer = unterminatedControlStringIntroducer {
-      // Exactly ESC + introducer is a typed Alt+letter chord — a real
-      // control string's payload follows in the same read. Anything longer
+      // At an explicit timeout/EOF, ESC + introducer resolves to Alt+letter.
+      // C1 introducers never represent an Alt chord. Anything longer
       // is a control string whose terminator never arrived: discard it
       // whole rather than typing the payload as literal text (F139).
-      let isBareChord = bufferedBytes.count == 2
+      let isBareChord = bufferedBytes.count == 2 && bufferedBytes[0] == 0x1B
       bufferedBytes.removeAll(keepingCapacity: true)
       guard isBareChord else {
         return []
@@ -190,7 +203,7 @@ extension TerminalInputParser {
     default:
       // Stray continuation byte or invalid lead — drop it, keep draining.
       bufferedBytes.removeFirst()
-      return parseNextEvent()
+      return nil
     }
     let sequenceLength = 1 + continuationCount
     guard bufferedBytes.count >= sequenceLength else {
@@ -199,14 +212,14 @@ extension TerminalInputParser {
     let sequence = Array(bufferedBytes[0..<sequenceLength])
     guard sequence.dropFirst().allSatisfy({ (0x80...0xBF).contains($0) }) else {
       bufferedBytes.removeFirst()
-      return parseNextEvent()
+      return nil
     }
     bufferedBytes.removeFirst(sequenceLength)
     let decoded = String(decoding: sequence, as: UTF8.self)
     // Overlong/surrogate encodings decode to U+FFFD replacement characters;
     // consume them silently rather than emitting synthetic text.
     guard decoded.unicodeScalars.count == 1, decoded != "\u{FFFD}" else {
-      return parseNextEvent()
+      return nil
     }
     return .key(KeyPress(.character(Character(decoded))))
   }
@@ -249,20 +262,16 @@ extension TerminalInputParser {
     // fields on every F1–F4 press.
     if bufferedBytes[1] == 0x4F {
       guard bufferedBytes.count > 2 else {
-        // The chunk ends at ESC O: treat it as Alt+O, mirroring the lone-ESC
-        // convention (a chunk boundary is the implicit ESC timeout — real SS3
-        // sequences arrive atomically in one terminal read, while a typed
-        // Alt+O ends its read here). Waiting instead would stall Alt+O until
-        // the NEXT keystroke and then swallow that key as an SS3 final.
-        bufferedBytes.removeFirst(2)
-        return .key(KeyPress(.character("O"), modifiers: .alt))
+        // Read boundaries do not disambiguate Alt+O from SS3. An explicit
+        // idle timeout or EOF commits the chord through flush().
+        return nil
       }
       let finalByte = bufferedBytes[2]
       bufferedBytes.removeFirst(3)
       guard let key = ss3Key(from: finalByte) else {
         // Unknown SS3 final: the envelope is consumed whole so the final
         // byte is never inserted as literal text. Keep draining the buffer.
-        return parseNextEvent()
+        return nil
       }
       return .key(KeyPress(key))
     }
@@ -354,7 +363,7 @@ extension TerminalInputParser {
         }
         if bufferedBytes[index + 1] == 0x75 {
           bufferedBytes.removeFirst(index + 2)
-          return parseNextEvent()
+          return nil
         }
       }
       if bufferedBytes[index] == 0x7E {
@@ -365,7 +374,7 @@ extension TerminalInputParser {
         // The envelope was consumed but maps to no KeyEvent (e.g. Delete).
         // Keep draining the buffer instead of reporting end-of-input, so a
         // following keystroke in the same chunk is not stranded.
-        return parseNextEvent()
+        return nil
       }
       // Kitty keyboard protocol key: ESC [ <params> u. Parsed whether or not
       // this host pushed the enhancement flags: terminals never emit CSI u
@@ -379,11 +388,11 @@ extension TerminalInputParser {
         // Consumed whole with no deliverable event (key release, modifier
         // set the framework cannot represent, or an unmapped functional
         // code). Keep draining the buffer.
-        return parseNextEvent()
+        return nil
       }
       if bufferedBytes[index] == 0x74 {
         bufferedBytes.removeFirst(index + 1)
-        return parseNextEvent()
+        return nil
       }
       // Letter-terminated parameterized sequence (e.g. ESC[1;5A): fall through
       // to the existing modifier handling below.
@@ -427,7 +436,7 @@ extension TerminalInputParser {
     }
     guard bufferedBytes[1] == 0x3F else {
       bufferedBytes.removeFirst()
-      return parseNextEvent()
+      return nil
     }
     return discardCSI(prefixLength: 1)
   }
@@ -445,10 +454,10 @@ extension TerminalInputParser {
     }
     guard (0x40...0x7E).contains(bufferedBytes[index]) else {
       bufferedBytes.removeFirst()
-      return parseNextEvent()
+      return nil
     }
     bufferedBytes.removeFirst(index + 1)
-    return parseNextEvent()
+    return nil
   }
 
   private mutating func discardControlString(
@@ -464,7 +473,7 @@ extension TerminalInputParser {
       return nil
     }
     bufferedBytes.removeFirst(end)
-    return parseNextEvent()
+    return nil
   }
 
   private func controlStringEnd(
@@ -527,7 +536,7 @@ extension TerminalInputParser {
     let modifiers = csiModifiers(from: modifierBytes)
 
     guard let key = csiTerminalKey(from: terminalByte) else {
-      return parseNextEvent()
+      return nil
     }
 
     return .key(KeyPress(key, modifiers: modifiers))
@@ -804,7 +813,7 @@ extension TerminalInputParser {
       let byte = bufferedBytes[index]
       guard (0x30...0x39).contains(byte) || byte == 0x2D || byte == 0x3B else {
         bufferedBytes.removeFirst(index + 1)
-        return parseNextEvent()
+        return nil
       }
       index += 1
     }
@@ -826,7 +835,7 @@ extension TerminalInputParser {
       let encodedX = asciiSignedInteger(from: parameters[1]),
       let encodedY = asciiSignedInteger(from: parameters[2])
     else {
-      return parseNextEvent()
+      return nil
     }
 
     // SGR extended buttons 8-11 (back/forward and beyond) set bit 128. The
@@ -836,7 +845,7 @@ extension TerminalInputParser {
     // (F78). Reject the whole family explicitly; the envelope is already
     // consumed, so nothing leaks as text.
     guard encodedButton & 128 == 0 else {
-      return parseNextEvent()
+      return nil
     }
 
     let location = pointerLocation(encodedX: encodedX, encodedY: encodedY)
@@ -861,7 +870,7 @@ extension TerminalInputParser {
       }
 
       guard let delta else {
-        return parseNextEvent()
+        return nil
       }
 
       return .mouse(
@@ -898,7 +907,7 @@ extension TerminalInputParser {
     }
 
     guard let button = mouseButton(from: baseCode) else {
-      return parseNextEvent()
+      return nil
     }
 
     let kind: MouseEvent.Kind =

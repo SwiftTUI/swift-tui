@@ -20,7 +20,7 @@
   struct InputReaderControlMessageTests {
     @Test(
       "STUI-510: EOF resolves pending escape prefixes on both streams",
-      arguments: [false, true], ["\u{1B}", "\u{1B}]", "\u{1B}P", "\u{1B}]unfinished"])
+      arguments: [false, true], ["\u{1B}", "\u{1B}O", "\u{1B}]", "\u{1B}P", "\u{1B}]unfinished"])
     func escapeAtEOF(terminalEvents: Bool, suffix: String) async throws {
       var descriptors: [Int32] = [-1, -1]
       try #require(unsafe pipe(&descriptors) == 0)
@@ -40,6 +40,7 @@
       var expected: [InputEvent] = [.key(.character("q"))]
       switch suffix {
       case "\u{1B}": expected.append(.key(.escape))
+      case "\u{1B}O": expected.append(.key(KeyPress(.character("O"), modifiers: .alt)))
       case "\u{1B}]": expected.append(.key(KeyPress(.character("]"), modifiers: .alt)))
       case "\u{1B}P": expected.append(.key(KeyPress(.character("P"), modifiers: .alt)))
       default: break

@@ -122,11 +122,11 @@ struct VT220FunctionKeyParserTests {
     #expect(events == [.key(KeyPress(.character("a")))])
   }
 
-  @Test("A chunk ending at ESC O is Alt+O (chunk boundary as ESC timeout)")
-  func chunkEndingAtEscOIsAltO() {
+  @Test("ESC O waits until an explicit timeout to resolve Alt+O")
+  func idleEscOIsAltO() {
     var parser = TerminalInputParser()
-    let events = parser.feed(Array("\u{1B}O".utf8))
-    #expect(events == [.key(KeyPress(.character("O"), modifiers: .alt))])
+    #expect(parser.feed(Array("\u{1B}O".utf8)).isEmpty)
+    #expect(parser.flush() == [.key(KeyPress(.character("O"), modifiers: .alt))])
   }
 
   // MARK: - Modified CSI forms
