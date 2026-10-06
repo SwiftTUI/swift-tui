@@ -1,8 +1,9 @@
 import Foundation
 import SwiftTUI
-import SwiftTUIAnimatedImage
 @_spi(Testing) import SwiftTUITestSupport
 import Testing
+
+@testable import SwiftTUIAnimatedImage
 
 @MainActor
 @Suite
@@ -23,6 +24,36 @@ struct AnimatedImageTests {
     #expect(decoded.frames.count == 2)
     #expect(decoded.frameDelays == [.milliseconds(50), .milliseconds(120)])
     #expect(decoded.frames.map(\.pixels) == sequence.frames.map(\.pixels))
+  }
+
+  @Test("GIF export saturates enormous frame delays without overflow")
+  func saturatedGIFDelays() throws {
+    let frame = Self.frame(red: 255, green: 0, blue: 0)
+    let sequences = [
+      AnimatedImageSequence(frames: [frame], framesPerSecond: Double.leastNonzeroMagnitude),
+      AnimatedImageSequence(frames: [frame], framesPerSecond: 1e-11),
+      AnimatedImageSequence(frames: [frame], frameDelays: [.seconds(Int64.max)]),
+    ]
+    for sequence in sequences {
+      let decoded = try AnimatedGIF.decode(data: AnimatedGIF.encode(sequence))
+      #expect(decoded.frameDelays == [.milliseconds(655_350)])
+    }
+  }
+
+  @Test("GIF export rounds up then clamps to the format's delay range")
+  func gifDelayBoundaries() throws {
+    let frame = Self.frame(red: 255, green: 0, blue: 0)
+    #expect(delayCentiseconds(forNanoseconds: 0) == 1)
+    #expect(delayCentiseconds(forNanoseconds: UInt64.max) == Int(UInt16.max))
+    for (nanos, milliseconds): (Int64, Int) in [
+      (1, 20), (10_000_000, 20), (20_000_000, 20),
+      (20_000_001, 30), (655_340_000_001, 655_350),
+      (655_350_000_000, 655_350), (655_350_000_001, 655_350),
+    ] {
+      let sequence = AnimatedImageSequence(frames: [frame], frameDelays: [.nanoseconds(nanos)])
+      let decoded = try AnimatedGIF.decode(data: AnimatedGIF.encode(sequence))
+      #expect(decoded.frameDelays == [.milliseconds(milliseconds)])
+    }
   }
 
   @Test("Repo Nyan GIF decodes every source frame as a distinct composed frame")

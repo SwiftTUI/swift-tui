@@ -197,9 +197,10 @@ private func normalizedGIFDelayMilliseconds(
   return max(20, centiseconds * 10)
 }
 
-private func delayCentiseconds(
+func delayCentiseconds(
   forNanoseconds nanoseconds: UInt64
 ) -> Int {
-  let centiseconds = (nanoseconds + 9_999_999) / 10_000_000
+  // Divide before rounding: even UInt64.max is an admitted saturated delay.
+  let centiseconds = nanoseconds / 10_000_000 + (nanoseconds % 10_000_000 == 0 ? 0 : 1)
   return Int(min(UInt64(UInt16.max), max(1, centiseconds)))
 }
