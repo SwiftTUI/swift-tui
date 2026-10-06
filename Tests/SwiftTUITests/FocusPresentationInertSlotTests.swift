@@ -79,7 +79,7 @@ struct FocusPresentationInertSlotScopeTests {
 
   @Test("cone members (animation legs) never consult the exemption")
   func coneMembersIgnoreExemption() {
-    var scope = RetainedReuseSuppressionScope(identities: [member])
+    let scope = RetainedReuseSuppressionScope(identities: [member])
     #expect(
       scope.suppresses(
         identity: contentChild, isFocusPresentationDescendantExempt: { _, _ in true }))
