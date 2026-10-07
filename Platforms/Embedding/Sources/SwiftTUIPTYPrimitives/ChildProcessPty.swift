@@ -98,7 +98,7 @@
         self.pendingSignal = nil
         try? sendSignalToStartedProcess(pendingSignal)
       }
-      // Retain the slave until the exit watcher drains the child's final bytes.
+      // The pair retains the slave until consumption drains the child's final bytes.
     }
 
     public func waitForExit() async -> ExitStatus {
