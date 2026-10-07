@@ -47,6 +47,7 @@
     private var nextWriteID: UInt64 = 0
     private var writeSource: (any DispatchSourceWrite)?
     private var writeGeneration: UInt64 = 0
+    private var writingFinished = false
 
     deinit {
       readSource?.cancel()
@@ -104,7 +105,7 @@
             continuation.resume(returning: .failure(.writeFailed(errno: ECANCELED)))
             return
           }
-          guard masterFD >= 0 else {
+          guard masterFD >= 0, !writingFinished else {
             continuation.resume(returning: .failure(.notStarted))
             return
           }
@@ -143,7 +144,7 @@
     }
 
     private func drainWrites() {
-      guard masterFD >= 0, writeSource == nil else { return }
+      guard masterFD >= 0, !writingFinished, writeSource == nil else { return }
       var turnBytes = 0
       while !pendingWrites.isEmpty {
         let request = pendingWrites[0]
@@ -255,6 +256,10 @@
     /// Process exit notification itself must never wait for a consumer.
     func finishChildOutput() {
       childExited = true
+      // The retained slave now exists only to protect the output tail. A pump
+      // awaiting a backpressured reply must be released so it can consume that
+      // tail. There is no longer a primary child to accept further input.
+      finishWrites()
       if readingFinished {
         releaseAndCloseSlaveFD()
       } else {
@@ -265,10 +270,7 @@
 
     public func close() {
       finishReading()
-      cancelWriteSource()
-      let writes = pendingWrites
-      pendingWrites.removeAll()
-      for request in writes { request.continuation.resume(returning: .failure(.notStarted)) }
+      finishWrites()
 
       if masterFD >= 0 {
         closeFD(masterFD)
@@ -279,6 +281,14 @@
         closeFD(retainedSlaveFD)
         retainedSlaveFD = -1
       }
+    }
+
+    private func finishWrites() {
+      writingFinished = true
+      cancelWriteSource()
+      let writes = pendingWrites
+      pendingWrites.removeAll()
+      for request in writes { request.continuation.resume(returning: .failure(.notStarted)) }
     }
 
     func startReading() {

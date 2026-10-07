@@ -19,7 +19,10 @@ buffers and bytes retained by callers are separate. A stalled consumer stops
 master reads so the child receives kernel backpressure. No timer polls an idle
 or full PTY. Cancellation abandons queued output; `close()` releases the pair.
 Normal EOF preserves queued bytes for the reader. Process exit defers closing
-the retained slave until the kernel output tail has been read.
+the retained slave until the kernel output tail has been read. Once the primary
+child exits, pending and subsequent input writes fail with `notStarted`; this
+lets a pump waiting on a saturated reply resume output draining. Descendant
+output can still drain to EOF, but input ownership ends with the primary child.
 
 For opt-in diagnostics, set `SWIFTTUI_PTY_DIAGNOSTICS` to an existing writable
 directory before constructing a pair. Each pair writes a `pty-<UUID>.tsv` file

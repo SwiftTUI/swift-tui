@@ -179,6 +179,56 @@
       }
     }
 
+    @Test(
+      "child exit releases blocked input before a full output tail drains", .timeLimit(.minutes(1)))
+    func exitWithBothDirectionsFull() async throws {
+      try await withPTYPair(retainSlaveFD: true) { handles, pair in
+        try makeRaw(handles.slaveFD)
+        _ = fcntl(handles.slaveFD, F_SETFL, O_NONBLOCK)
+        let signal = ConditionSignal()
+        let full = Mutex(false)
+        await pair.observeReadQueue { count in
+          full.withLock { $0 = count == PTYPair.readBufferLimit }
+          signal.notify()
+        }
+        await pair.startReading()
+        let output = [UInt8](repeating: 0x62, count: PTYPair.readBufferLimit)
+        var offset = 0
+        while offset < output.count {
+          let n = output.withUnsafeBufferPointer {
+            unsafe write(handles.slaveFD, $0.baseAddress! + offset, output.count - offset)
+          }
+          if n > 0 {
+            offset += n
+          } else if errno == EINTR {
+            continue
+          } else {
+            await writable(handles.slaveFD)
+          }
+        }
+        await signal.wait(until: { full.withLock { $0 } })
+        let tail = Array("EXIT-TAIL".utf8)
+        let tailWritten = tail.withUnsafeBufferPointer {
+          unsafe write(handles.slaveFD, $0.baseAddress!, $0.count)
+        }
+        #expect(tailWritten == tail.count)
+        let input = Task { try await pair.write([UInt8](repeating: 0x61, count: 128 * 1024)) }
+        await pendingWrites(pair, atLeast: 1)
+        await pair.finishChildOutput()
+        // Must complete before any output is consumed; otherwise a pump waiting
+        // on a terminal reply can never free the queue or observe EOF.
+        if case .failure(let error) = await input.result {
+          #expect((error as? PTYError) == .notStarted)
+        } else {
+          Issue.record("backpressured input unexpectedly completed")
+        }
+        var received: [UInt8] = []
+        for await chunk in await pair.read() { received += chunk }
+        #expect(received == output + tail)
+        #expect(await pair.rawMasterFD == -1)
+      }
+    }
+
     @Test("read cancellation races close without stranding a continuation", .timeLimit(.minutes(1)))
     func readCancellation() async throws {
       for closeFirst in [false, true] {
