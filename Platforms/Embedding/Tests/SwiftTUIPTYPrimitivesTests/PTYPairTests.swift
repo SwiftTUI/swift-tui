@@ -124,6 +124,79 @@
       }
     }
 
+    @Test(
+      "a stalled reader bounds memory and resumes every byte through EOF", .timeLimit(.minutes(1)))
+    func boundedLosslessRead() async throws {
+      try await withPTYPair(retainSlaveFD: true) { handles, pair in
+        try makeRaw(handles.slaveFD)
+        _ = fcntl(handles.slaveFD, F_SETFL, O_NONBLOCK)
+        let signal = ConditionSignal()
+        let progress = Mutex((full: false, blocked: false, maximum: 0))
+        await pair.observeReadQueue { count in
+          progress.withLock {
+            $0.maximum = max($0.maximum, count)
+            if count == PTYPair.readBufferLimit { $0.full = true }
+          }
+          signal.notify()
+        }
+        let bytes = (0..<(1024 * 1024 + 137)).map { UInt8(truncatingIfNeeded: $0) }
+        // startReading models the pre-fork eager reader. No stream consumer yet.
+        await pair.startReading()
+        let writer = Task {
+          var offset = 0
+          while offset < bytes.count {
+            let n = bytes.withUnsafeBufferPointer {
+              unsafe write(
+                handles.slaveFD, $0.baseAddress! + offset, min(8192, bytes.count - offset))
+            }
+            if n > 0 {
+              offset += n
+            } else if errno == EINTR {
+              continue
+            } else if errno == EAGAIN || errno == EWOULDBLOCK {
+              progress.withLock { $0.blocked = true }
+              signal.notify()
+              await writable(handles.slaveFD)
+            } else {
+              Issue.record("slave write failed: \(errno)")
+              break
+            }
+          }
+          await pair.finishChildOutput()
+        }
+        await signal.wait(until: { progress.withLock { $0.full && $0.blocked } })
+        #expect(await pair.queuedReadBytes == PTYPair.readBufferLimit)
+        var received: [UInt8] = []
+        for await chunk in await pair.read() {
+          #expect(chunk.count <= 4096)
+          received.append(contentsOf: chunk)
+        }
+        await writer.value
+        #expect(received == bytes)
+        #expect(progress.withLock { $0.maximum } == PTYPair.readBufferLimit)
+        #expect(await pair.queuedReadBytes == 0)
+        #expect(await pair.rawMasterFD == -1)
+      }
+    }
+
+    @Test("read cancellation races close without stranding a continuation", .timeLimit(.minutes(1)))
+    func readCancellation() async throws {
+      for closeFirst in [false, true] {
+        for _ in 0..<32 {
+          try await withPTYPair(retainSlaveFD: true) { _, pair in
+            let stream = await pair.read()
+            let reader = Task { for await _ in stream {} }
+            if closeFirst { await pair.close() }
+            reader.cancel()
+            await reader.value
+            await pair.close()
+            #expect(await pair.rawMasterFD == -1)
+            #expect(await pair.queuedReadBytes == 0)
+          }
+        }
+      }
+    }
+
     @Test("a child whose exec fails releases its PTY")
     func failedChildExec() async throws {
       let child = ChildProcessPty(
@@ -202,6 +275,16 @@
       signal.notify()
     }
     await signal.wait(until: { count.withLock { $0 >= target } })
+  }
+
+  private func writable(_ fd: Int32) async {
+    await withCheckedContinuation { continuation in
+      let source = DispatchSource.makeWriteSource(
+        fileDescriptor: fd, queue: DispatchQueue.global())
+      source.setEventHandler { source.cancel() }
+      source.setCancelHandler { continuation.resume() }
+      source.resume()
+    }
   }
 
   private func readable(_ fd: Int32) async {

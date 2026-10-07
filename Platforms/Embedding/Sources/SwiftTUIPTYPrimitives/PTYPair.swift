@@ -16,8 +16,26 @@
     private var masterFD: Int32
     private var retainedSlaveFD: Int32
     private var readSource: (any DispatchSourceRead)?
-    private let readStream: AsyncStream<[UInt8]>
-    private var readContinuation: AsyncStream<[UInt8]>.Continuation?
+    // The unfolding stream has no implicit buffer. At most 64 KiB waits here,
+    // plus one <=4 KiB chunk owned by the consumer. Kernel buffers are separate.
+    static let readBufferLimit = 65_536
+    private struct ReadChunk {
+      let bytes: [UInt8]
+      let readTime: UInt64
+    }
+    private var readQueue: [ReadChunk] = []
+    private(set) var queuedReadBytes = 0
+    private var readWaiter: CheckedContinuation<[UInt8]?, Never>?
+    private var readingFinished = false
+    private var childExited = false
+    private var readGeneration: UInt64 = 0
+    private let trace = PTYReadTrace()
+    private var readQueueObserver: (@Sendable (Int) -> Void)?
+
+    func observeReadQueue(_ observer: @escaping @Sendable (Int) -> Void) {
+      readQueueObserver = observer
+      observer(queuedReadBytes)
+    }
     private var didStartReading = false
     private struct PendingWrite {
       let id: UInt64
@@ -33,15 +51,12 @@
     deinit {
       readSource?.cancel()
       writeSource?.cancel()
-      readContinuation?.finish()
+      readWaiter?.resume(returning: nil)
       closeFD(masterFD)
       closeFD(retainedSlaveFD)
     }
 
     public init(handles: PTYHandles, retainSlaveFD: Bool) {
-      let (stream, continuation) = AsyncStream<[UInt8]>.makeStream()
-      readStream = stream
-      readContinuation = continuation
       masterFD = handles.masterFD
       slavePath = handles.slavePath
       retainedSlaveFD = retainSlaveFD ? handles.slaveFD : -1
@@ -80,6 +95,7 @@
     /// bytes already accepted by the kernel remain delivered, and the unwritten
     /// suffix is discarded. Closing fails all pending writes with notStarted.
     public func write(_ bytes: [UInt8]) async throws(PTYError) {
+      trace?.record("writeStart", slave: slavePath, bytes: bytes.count)
       let id = nextWriteID
       nextWriteID &+= 1
       let result: Result<Void, PTYError> = await withTaskCancellationHandler {
@@ -99,6 +115,7 @@
       } onCancel: {
         Task { await self.cancelWrite(id) }
       }
+      trace?.record("writeEnd", slave: slavePath, bytes: bytes.count)
       try result.get()
     }
 
@@ -195,24 +212,55 @@
       drainWrites()
     }
 
+    /// A single-consumer, lossless stream. Stop requesting chunks to apply
+    /// backpressure to the child. Cancellation ends reading; call close() to
+    /// release descriptors when abandoning a pair.
     public func read() -> AsyncStream<[UInt8]> {
       guard !didStartReading else {
         return AsyncStream { $0.finish() }
       }
       didStartReading = true
       startReading()
-      return readStream
+      return AsyncStream(unfolding: { await self.nextChunk() })
     }
 
-    /// The child has exited, so all of its writes are available. Drain before
-    /// closing our retained slave: Darwin discards unread terminal output when
-    /// the last slave closes. The stream buffers it even if read() starts later.
+    private func nextChunk() async -> [UInt8]? {
+      await withTaskCancellationHandler {
+        guard !Task.isCancelled else {
+          cancelReading()
+          return nil
+        }
+        if !readQueue.isEmpty {
+          let chunk = readQueue.removeFirst()
+          queuedReadBytes -= chunk.bytes.count
+          recordRead("dequeue", count: chunk.bytes.count, readTime: chunk.readTime)
+          readQueueObserver?(queuedReadBytes)
+          // A full queue has no armed source. Consumption restarts the reader.
+          startReading()
+          return chunk.bytes
+        }
+        guard !readingFinished else { return nil }
+        return await withCheckedContinuation { continuation in
+          precondition(readWaiter == nil, "PTYPair.read() supports one consumer")
+          readWaiter = continuation
+          startReading()
+        }
+      } onCancel: {
+        Task { await self.cancelReading() }
+      }
+    }
+
+    /// Darwin can discard unread output when the last slave closes. A full
+    /// queue therefore defers that close until consumption reaches EAGAIN.
+    /// Process exit notification itself must never wait for a consumer.
     func finishChildOutput() {
-      drainAvailable()
-      releaseAndCloseSlaveFD()
-      // Descendants may still own the slave. In that case the normal reader
-      // keeps running until their output reaches EOF as well.
-      drainAvailable()
+      childExited = true
+      if readingFinished {
+        releaseAndCloseSlaveFD()
+      } else {
+        cancelReadSource()
+        drainAvailable()
+      }
     }
 
     public func close() {
@@ -234,95 +282,121 @@
     }
 
     func startReading() {
-      guard masterFD >= 0, readSource == nil, readContinuation != nil else {
+      guard !readingFinished, readSource == nil, queuedReadBytes < Self.readBufferLimit else {
         return
       }
+      drainAvailable()
+    }
 
+    private func waitForReadable() {
+      guard readSource == nil, !readingFinished else { return }
       let fd = fcntl(masterFD, F_DUPFD_CLOEXEC, 0)
       guard fd >= 0 else {
         close()
         return
       }
+      readGeneration &+= 1
+      let generation = readGeneration
       let source = DispatchSource.makeReadSource(
-        fileDescriptor: fd,
-        queue: DispatchQueue.global(qos: .userInitiated)
-      )
+        fileDescriptor: fd, queue: DispatchQueue.global(qos: .userInitiated))
+      // One callback per arm: a readable full PTY cannot enqueue unbounded
+      // actor tasks while the consumer is stalled.
       source.setEventHandler { [weak self] in
-        guard let self else {
-          return
-        }
-
-        Task {
-          await self.drainAvailable()
-        }
+        source.cancel()
+        Task { await self?.becameReadable(generation) }
       }
       source.setCancelHandler { closeFD(fd) }
-      readContinuation?.onTermination = { @Sendable [weak self] _ in
-        guard let self else {
-          return
-        }
-
-        Task {
-          await self.stopReading()
-        }
-      }
-
       readSource = source
       source.resume()
+    }
+
+    private func becameReadable(_ generation: UInt64) {
+      guard generation == readGeneration else { return }
+      cancelReadSource()
       drainAvailable()
     }
 
-    private func stopReading() {
+    private func cancelReadSource() {
+      readGeneration &+= 1
       readSource?.cancel()
       readSource = nil
-      readContinuation = nil
+    }
+
+    private func cancelReading() {
+      finishReading()
+      readQueue.removeAll()
+      queuedReadBytes = 0
+      readQueueObserver?(0)
+      if childExited { releaseAndCloseSlaveFD() }
     }
 
     private func finishReading() {
-      readSource?.cancel()
-      readSource = nil
-      readContinuation?.finish()
-      readContinuation = nil
+      readingFinished = true
+      cancelReadSource()
+      let waiter = readWaiter
+      readWaiter = nil
+      waiter?.resume(returning: nil)
+    }
+
+    private func recordRead(_ event: String, count: Int, readTime: UInt64 = 0) {
+      guard let trace else { return }
+      let now = DispatchTime.now().uptimeNanoseconds
+      trace.record(
+        event, time: now, slave: slavePath, bytes: count, queued: queuedReadBytes,
+        oldest: readQueue.first.map { now - $0.readTime } ?? 0,
+        residence: readTime == 0 ? 0 : now - readTime)
     }
 
     private func drainAvailable() {
+      guard !readingFinished else { return }
       guard masterFD >= 0 else {
         finishReading()
         return
       }
-
       var buffer = [UInt8](repeating: 0, count: 4096)
-      while true {
-        let readCount = buffer.withUnsafeMutableBufferPointer { storage -> Int in
-          guard let baseAddress = storage.baseAddress else {
-            return 0
-          }
-
-          return unsafe ptyReadOnce(masterFD, baseAddress, storage.count)
+      // Strict byte budget, including a short read at the remaining boundary.
+      while queuedReadBytes < Self.readBufferLimit {
+        let budget = min(buffer.count, Self.readBufferLimit - queuedReadBytes)
+        let readCount = buffer.withUnsafeMutableBufferPointer { storage in
+          unsafe ptyReadOnce(masterFD, storage.baseAddress!, budget)
         }
-
         if readCount > 0 {
-          readContinuation?.yield(Array(buffer.prefix(Int(readCount))))
+          let chunk = ReadChunk(
+            bytes: Array(buffer.prefix(readCount)),
+            readTime: trace == nil ? 0 : DispatchTime.now().uptimeNanoseconds)
+          recordRead("read", count: readCount)
+          if let waiter = readWaiter {
+            readWaiter = nil
+            recordRead("dequeue", count: readCount, readTime: chunk.readTime)
+            waiter.resume(returning: chunk.bytes)
+          } else {
+            readQueue.append(chunk)
+            queuedReadBytes += readCount
+            recordRead("enqueue", count: readCount)
+            readQueueObserver?(queuedReadBytes)
+          }
           continue
         }
-
         if readCount == 0 {
           close()
           return
         }
-
         let failureErrno = errno
-        if failureErrno == EINTR {
-          continue
-        }
-
+        if failureErrno == EINTR { continue }
         if failureErrno == EAGAIN || failureErrno == EWOULDBLOCK {
+          if childExited && retainedSlaveFD >= 0 {
+            releaseAndCloseSlaveFD()
+            // Recheck EOF (or a descendant's output) after the retained close.
+            continue
+          }
+          waitForReadable()
           return
         }
-
+        // Linux reports EIO when the last slave closes.
         close()
         return
       }
+      recordRead("full", count: 0)
     }
 
     private static func setNonblocking(_ fd: Int32) {

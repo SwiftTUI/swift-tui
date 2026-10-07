@@ -68,7 +68,7 @@
       pair = childPair
       try? await childPair.resize(initialSize)
       // Start draining before the child can fill or close its terminal. The
-      // pair buffers output until the caller begins consuming read().
+      // pair buffers at most 64 KiB until the caller begins consuming read().
       await childPair.startReading()
 
       let forkedPID = unsafe argv.withUnsafeMutablePointer { argvPointer in
