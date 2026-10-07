@@ -131,8 +131,7 @@ consumes the same authored scene model on top of a `SwiftTUIWASI` build.
 installs the `--web` arm of the shared `SwiftTUILauncher` for binaries that
 support both terminal-native and `--web` launch (its `WebHostCLIRunner` entry
 remains as a source-compatible facade). `SwiftTUI` includes that combined
-launch surface by default on platforms where the WebHost products build; on
-Windows it re-exports the portable terminal launcher instead. Import
+launch surface by default on platforms where the WebHost products build. Import
 `SwiftTUIWebHostCLI` directly only for a narrower graph.
 
 ## See Also

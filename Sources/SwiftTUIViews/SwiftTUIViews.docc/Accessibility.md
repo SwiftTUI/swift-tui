@@ -484,7 +484,7 @@ URL to operate the same running scene, or use `--companion-url` from another
 terminal to retrieve it. The browser uses bundled assets and does not open
 unsolicited. Use `--companion off` to disable it. Redirected/noninteractive
 launches do not start it by default. `--web` selects browser-only hosting.
-The terminal-only `SwiftTUICLI` product and Windows do not include WebHost.
+The terminal-only `SwiftTUICLI` product does not include WebHost.
 See [Browser Companion](https://swifttui.sh/docs/documentation/swiftuiwebhostcli/browser-companion)
 and
 [Hosts And Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms).
