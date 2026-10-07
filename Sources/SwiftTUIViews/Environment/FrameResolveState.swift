@@ -36,20 +36,6 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
       && chromeOnlyFocusMembers.isEmpty
   }
 
-  package mutating func formUnion(_ newIdentities: Set<Identity>) {
-    guard !suppressesAll else {
-      return
-    }
-    identities.formUnion(newIdentities)
-  }
-
-  package mutating func insert(_ identity: Identity) {
-    guard !suppressesAll else {
-      return
-    }
-    identities.insert(identity)
-  }
-
   package mutating func formUnionFocusPresentationMembers(
     _ newIdentities: Set<Identity>
   ) {
@@ -71,13 +57,6 @@ package struct RetainedReuseSuppressionScope: Equatable, Sendable {
       return
     }
     chromeOnlyFocusMembers.insert(identity)
-  }
-
-  /// Conservative matching: focus-presentation members behave exactly like
-  /// cone members. Callers with graph access should prefer
-  /// ``suppresses(identity:isFocusPresentationDescendantExempt:)``.
-  package func suppresses(identity: Identity) -> Bool {
-    suppresses(identity: identity) { _, _ in false }
   }
 
   /// Whether retained reuse is suppressed for `identity`.
@@ -286,10 +265,6 @@ package final class FrameResolveInputBox {
 
   package func store(_ inputs: FrameResolveInputs) {
     self.inputs = inputs
-  }
-
-  package func clear() {
-    inputs = nil
   }
 }
 
