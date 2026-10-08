@@ -185,8 +185,8 @@ kinds and opaque committed target tokens are unchanged. Existing v2/v3 adapters
 (including 0.15.1) ignore the unknown object and keep their earlier behavior;
 updated adapters accept its absence and ignore unknown optional object keys.
 Malformed known fields reject the frame. Both producer and adapter source must
-include this extension for the richer behavior; it is not part of the 0.15.1
-support claim. Raster-only v1 frames are unchanged. Secure-field control values
+include this extension for the richer behavior, as paired framework and browser
+release 0.16.0 do. Raster-only v1 frames are unchanged. Secure-field control values
 are omitted at the wire boundary even if an integration supplies one.
 
 These are shared contracts and authoring primitives, not completion of default

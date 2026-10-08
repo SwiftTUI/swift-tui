@@ -461,11 +461,10 @@ documents the tested profile, selection/find limits, and other known exclusions.
 
 ## Version and application responsibilities
 
-The default public dependency is release `0.15.1`. Ordinary static-text extraction
-was added after that release in framework commit
+Release `0.16.0` includes ordinary static-text extraction, introduced in framework commit
 [`5519ebb2`](https://github.com/SwiftTUI/swift-tui/commit/5519ebb246f556df217389c599617e17bfb5f2d4).
 Its recorded Safari/VoiceOver reading journey used the DOM presenter and a
-coordination candidate, not a fresh `0.15.1` consumer. It covers reading order,
+coordination candidate preceding the release. It covers reading order,
 full paragraphs, names and a button-driven count update; it does not prove
 character navigation, text selection, every control, or the Canvas listening
 journey. Pair producer and browser versions when evaluating a capability.
@@ -555,8 +554,9 @@ outlines and native activation with the rendered choice, excluding the Picker's
 title and padding. Custom styles that omit the wrapper retain typed selection
 semantics but do not supply precise option geometry.
 
-These are current-source contracts requiring a matching browser runtime. They
-are not a 0.15.1 support claim or recorded Safari/VoiceOver task acceptance.
+These capabilities ship in framework and browser release `0.16.0` and require
+matching versions. Their automated coverage does not establish additional
+Safari/VoiceOver task acceptance.
 
 ## See Also
 

@@ -8,12 +8,87 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-08
+
+More content and controls participate in accessibility, interactive terminal
+sessions gain a shared browser companion, and terminal input, PTY output and
+shutdown paths have bounded ownership. This release also fixes layout,
+animation, drawing and navigation regressions accumulated since 0.15.1.
+
+### Added
+
+- Ordinary static text and explicit `Text.paragraph()` semantics, semantic
+  grouping and unpainted accessibility representations, custom assistive
+  actions, independent accessibility focus bindings, and named navigation
+  regions (STUI-579, STUI-652, STUI-655, STUI-656).
+- Shared widget properties and relationships; stable Picker choices and
+  option geometry; progress and spinner meaning; collection structure,
+  selection and outline disclosure; and composite navigation and presentation
+  semantics. Offscreen collection content can be revealed for review without
+  selecting it (STUI-654, STUI-657 to STUI-661).
+- Directed browser text edits and selection ranges, with structured source
+  prose and secure-text boundaries (STUI-662).
+- A shared browser companion for retained interactive terminal scenes on
+  macOS, Linux and Windows. Interactive launches start it by default;
+  `SWIFTTUI_COMPANION=off` opts out. Scene selection and pointer input follow
+  the presented viewport (STUI-665, STUI-666, STUI-667).
+- Live accessibility preferences across hosts and styles, including reduced
+  motion, reduced transparency, composited contrast and color adaptation
+  (STUI-668 to STUI-671).
+
 ### Changed
 
 - Require `swift-collections` 1.7.2 or later within 1.x. This lifts the
   temporary 1.7.0 cap after upstream fixed the Swift 6.4 borrow-runtime
   references that prevented deployment to macOS/iOS versions before 27
   (STUI-907; apple/swift-collections#733).
+- Publish measured collection offsets for wheel chaining and share immutable
+  resolve continuation scopes and live registration paths to reduce repeated
+  work (STUI-650, STUI-711).
+- Missing-label diagnostics describe both simple accessibility labels and
+  richer accessibility representations. Accessibility extraction, composed
+  actions and review-cursor bounds handle large or unusual inputs without
+  broadening their claims beyond the documented host support.
+
+### Fixed
+
+- Bound WebHost ingress and receive-task lifetimes, make PTY writes
+  cancellable, close owned descriptors, retain lossless PTY output under
+  backpressure, and bound terminal teardown before restoring terminal modes.
+  Blocked input is released before draining the PTY exit tail (STUI-645,
+  STUI-884, STUI-894 to STUI-898).
+- Recover terminal input across chunks without recursive parsing, clamp
+  animated-image timing without overflow, and reap spawned link helpers
+  without blocking the caller (STUI-826, STUI-891 to STUI-893, STUI-899).
+- Scroll momentum keeps one deadline chain instead of scheduling redundant
+  follow-up deadlines. Empty `NO_COLOR` values no longer disable color, and
+  unpresented diagnostic frames no longer count as full repaints
+  (STUI-900, STUI-901, STUI-902).
+- Default progress text matches its clamped numeric value; menu Pickers close
+  after a changed pointer selection; different navigation presentation
+  bindings cannot reuse each other's destination state; and leading path
+  lines retain their implicit origin (STUI-903 to STUI-906).
+- Correct oversized alignment, rigid `fixedSize` spacers, foreign-surface
+  sizing and damage, retained tall collection rows, final-row scrolling, and
+  wheel chaining through non-overflowing or single-axis views (STUI-590,
+  STUI-591, STUI-594, STUI-598, STUI-611, STUI-613, STUI-616, STUI-626).
+- Correct zero-opacity drawing, open-path containment, stroke-trim animation,
+  matched-geometry destinations, keyframe retrigger values and inherited
+  velocities, and one-shot reduced-motion end values (STUI-592, STUI-603,
+  STUI-605, STUI-609, STUI-610, STUI-612, STUI-627).
+- Preserve composite gesture values and keyboard traversal across pointer
+  cancellation; keep hosted sessions alive after exit keys; and terminate
+  Android run loops when their host stops its readers (STUI-582, STUI-587,
+  STUI-588, STUI-614, STUI-709, STUI-712).
+
+### Integration notes
+
+- Host integrations switching exhaustively over `AccessibilityAction` or
+  `AccessibilityActionKind` must handle the new custom-action, text-edit,
+  text-selection, accessibility-focus and accessibility-blur cases.
+- Pair framework and browser 0.16.0 for the new semantic and preference
+  transport. Automated transport and geometry coverage does not expand the
+  recorded assistive-technology acceptance beyond the documented journeys.
 
 ## [0.15.1] - 2026-09-25
 
@@ -2166,7 +2241,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.15.1...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.16.0...HEAD
+[0.16.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.16.0
 [0.15.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.15.1
 [0.15.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.15.0
 [0.14.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.14.0
