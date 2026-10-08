@@ -26,7 +26,8 @@ flag wins over an inherited variable.
 SwiftTUI also honors the standard terminal conventions (`NO_COLOR`,
 `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`, `TERM`, `COLORTERM`, and
 `LANG`/`LC_*`) through ``TerminalCapabilityProfile`` and the runtime
-configuration resolver. `NO_COLOR` always wins over `FORCE_COLOR`.
+configuration resolver. Nonempty `NO_COLOR` always wins over `FORCE_COLOR`;
+an empty `NO_COLOR` value is ignored.
 
 Beyond that family, the framework consults these standard variables:
 

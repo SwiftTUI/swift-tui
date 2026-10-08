@@ -144,7 +144,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     }
 
     let colorLevel: ColorLevel
-    if environment["NO_COLOR"] != nil {
+    if let noColor = environment["NO_COLOR"], !noColor.isEmpty {
       colorLevel = .none
     } else if colorTerm.contains("truecolor") || colorTerm.contains("24bit") {
       colorLevel = .trueColor
@@ -208,7 +208,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     }
 
     let colorLevel: ColorLevel
-    if environment["NO_COLOR"] != nil {
+    if let noColor = environment["NO_COLOR"], !noColor.isEmpty {
       colorLevel = .none
     } else if colorTerm.contains("truecolor") || colorTerm.contains("24bit") {
       colorLevel = .trueColor

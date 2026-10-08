@@ -8,7 +8,7 @@ extension RuntimeConfiguration {
   /// This resolver owns `SWIFTTUI_*`, `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, and `CI`.
   ///
   /// Precedence within env-var resolution:
-  /// 1. `NO_COLOR` always wins over `FORCE_COLOR`
+  /// 1. Nonempty `NO_COLOR` always wins over `FORCE_COLOR`; an empty value is ignored
   /// 2. `CLICOLOR=0` disables color. `CLICOLOR_FORCE` forces it.
   /// 3. `SWIFTTUI_ACCESSIBLE=1` is shorthand for `SWIFTTUI_REDUCE_MOTION=1`
   ///    plus `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`, and wins over explicit `0`

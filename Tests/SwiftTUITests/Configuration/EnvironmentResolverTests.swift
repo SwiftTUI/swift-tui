@@ -42,6 +42,35 @@ struct EnvironmentResolverTests {
     #expect(configuration.color == .always)
   }
 
+  @Test("Empty NO_COLOR preserves automatic and forced color")
+  func emptyNoColorEnvVar() {
+    #expect(
+      RuntimeConfiguration.detect(environment: ["NO_COLOR": ""], isStdoutTTY: true).color
+        == .auto)
+    #expect(
+      RuntimeConfiguration.detect(environment: ["NO_COLOR": ""], isStdoutTTY: false).color
+        == .never)
+    for forceVariable in ["FORCE_COLOR", "CLICOLOR_FORCE"] {
+      #expect(
+        RuntimeConfiguration.detect(
+          environment: ["NO_COLOR": "", forceVariable: "1"], isStdoutTTY: true
+        ).color == .always)
+    }
+  }
+
+  @Test("Only nonempty NO_COLOR disables POSIX and Windows color", arguments: ["", "0", "1"])
+  func noColorCapabilityProfiles(value: String) {
+    let environment = ["NO_COLOR": value, "TERM": "xterm-256color", "COLORTERM": "truecolor"]
+    let profiles = [
+      TerminalCapabilityProfile.detectPOSIXTerminal(environment: environment, isTTY: true),
+      TerminalCapabilityProfile.detectWindowsConsole(environment: environment, isTTY: true),
+    ]
+    for profile in profiles {
+      #expect(profile.colorLevel == (value.isEmpty ? .trueColor : .none))
+      #expect(profile.emitsStyleEscapeSequences == value.isEmpty)
+    }
+  }
+
   @Test("NO_COLOR wins over FORCE_COLOR")
   func noColorWinsOverForceColor() {
     let configuration = RuntimeConfiguration.detect(
