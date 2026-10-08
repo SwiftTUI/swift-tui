@@ -8,6 +8,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- Require `swift-collections` 1.7.2 or later within 1.x. This lifts the
+  temporary 1.7.0 cap after upstream fixed the Swift 6.4 borrow-runtime
+  references that prevented deployment to macOS/iOS versions before 27
+  (STUI-907; apple/swift-collections#733).
+
 ## [0.15.1] - 2026-09-25
 
 A dependency-only patch. No framework source changes.
