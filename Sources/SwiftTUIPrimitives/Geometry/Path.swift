@@ -209,6 +209,7 @@ public struct Path: Equatable, Sendable {
         current = value
         subpathStart = value
       case .line(let value):
+        extend(current)
         extend(value)
         current = value
       case .quadCurve(let to, let control):
@@ -313,8 +314,8 @@ public struct Path: Equatable, Sendable {
     var pen: Point?
 
     func ensurePen() -> Point {
-      if current.isEmpty, let pen {
-        current.append(pen)
+      if current.isEmpty {
+        current.append(pen ?? .zero)
       }
       return current.last ?? pen ?? Point(x: 0, y: 0)
     }
