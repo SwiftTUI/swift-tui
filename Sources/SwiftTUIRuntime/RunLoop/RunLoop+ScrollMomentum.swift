@@ -139,8 +139,9 @@ extension RunLoop {
     reconcileScrollMomentumBindings()
     guard scrollMomentum.hasActiveMomentum else { return }
     guard scheduledFrame.causes.contains(.deadline) else {
-      // Not our cadence tick — keep a deadline armed so the loop wakes to tick.
-      rearmScrollMomentumDeadline(from: frameClock())
+      // Release and each deadline tick already arm the next cadence deadline.
+      // Re-arming from an invalidation frame's later clock reading creates a
+      // second deadline chain, since the scheduler coalesces exact instants.
       return
     }
 

@@ -2186,6 +2186,14 @@ struct InteractiveRuntimeTests {
       .input(.mouse(.init(kind: .dragged(.primary), location: top, timestamp: tDrag))))
     try runLoop.renderPendingFrames(renderedFrames: &frames)
     let tUp = t0.advanced(by: .milliseconds(24))
+    clock.now = tUp
+    // Time advances within a drain pass in production. An invalidation echo
+    // must not create a second, slightly later momentum deadline chain.
+    runLoop.frameClock = { [clock] in
+      let now = clock.now
+      clock.now = now.advanced(by: .microseconds(1))
+      return now
+    }
     _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: top, timestamp: tUp))))
     try runLoop.renderPendingFrames(renderedFrames: &frames)
 
@@ -2195,11 +2203,13 @@ struct InteractiveRuntimeTests {
 
     // Drive the decay deterministically by stepping the frame-readiness clock at
     // the 33 ms tick cadence — no sleeps, no async loop.
-    clock.now = tUp
+    var nextTick = tUp.advanced(by: .milliseconds(33))
     var step = 0
     while runLoop.scrollMomentum.hasActiveMomentum, step < 600 {
-      clock.now = clock.now.advanced(by: .milliseconds(33))
+      #expect(runLoop.scheduler.nextWakeInstant(after: clock.now) == nextTick)
+      clock.now = nextTick
       try runLoop.renderPendingFrames(renderedFrames: &frames)
+      nextTick = nextTick.advanced(by: .milliseconds(33))
       step += 1
     }
 
