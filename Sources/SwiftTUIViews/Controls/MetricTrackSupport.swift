@@ -35,7 +35,12 @@ package func progressSummaryText(
   value: Double,
   total: Double
 ) -> String {
-  "\(metricValueString(value))/\(metricValueString(total))"
+  let rawFraction = progressFraction(value: value, total: total)
+  let fraction = rawFraction.isFinite ? rawFraction : 0
+  guard total.isFinite, total > 0 else {
+    return "\(Int((fraction * 100).rounded()))%"
+  }
+  return "\(metricValueString(fraction * total))/\(metricValueString(total))"
 }
 
 package func meterSummaryText(

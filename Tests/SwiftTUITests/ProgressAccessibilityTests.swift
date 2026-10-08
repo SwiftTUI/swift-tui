@@ -84,13 +84,16 @@ struct ProgressAccessibilityTests {
 
   @Test("numeric progress follows visual clamping and never exports nonfinite numbers")
   func numericEdges() throws {
-    for (value, total, expected) in [
-      (-2.0, 4.0, 0.0), (8, 4, 1), (1, 0, 1), (0, 0, 0), (.nan, 4, 0), (.infinity, 4, 1),
-      (1, .infinity, 0),
+    for (value, total, expected, description) in [
+      (-2.0, 4.0, 0.0, "0/4"), (8, 4, 1, "4/4"), (1, 0, 1, "100%"),
+      (0, 0, 0, "0%"), (.nan, 4, 0, "0/4"), (.infinity, 4, 1, "4/4"),
+      (-.infinity, 4, 0, "0/4"), (1, .infinity, 0, "0%"),
+      (.infinity, .infinity, 0, "0%"), (1, -4, 1, "100%"),
     ] {
       let snapshot = render(ProgressView(value: value, total: total))
       let node = try #require(snapshot.accessibilityNodes.first { $0.role == .progressBar })
       #expect(node.control?.value == .number(expected))
+      #expect(node.properties?.valueDescription == description)
       #expect(node.label == "Progress")
     }
   }
