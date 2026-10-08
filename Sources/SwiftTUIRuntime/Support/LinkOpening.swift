@@ -1,11 +1,17 @@
 import SwiftTUIViews
 
+#if os(macOS) || os(Linux)
+  import Dispatch
+#endif
+
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(Musl)
+  import Musl
 #elseif canImport(ucrt)
   import CRT
 #endif
@@ -43,11 +49,13 @@ package func openLinkInSystem(
   #endif
 }
 
-#if canImport(Darwin) || canImport(Glibc)
-  private func spawnDetachedProcess(
+#if os(macOS) || os(Linux)
+  // Internal completion hook lets tests observe reaping without polling process state.
+  func spawnDetachedProcess(
     command: String,
     arguments: [String],
-    searchPath: Bool
+    searchPath: Bool,
+    onExit: (@Sendable (pid_t) -> Void)? = nil
   ) -> Bool {
     var pid = pid_t()
     var cArguments: [UnsafeMutablePointer<CChar>?] = unsafe arguments.map { argument in
@@ -99,6 +107,17 @@ package func openLinkInSystem(
       }
     }
 
-    return spawnResult == 0
+    guard spawnResult == 0 else { return false }
+    let childPID = pid
+    // waitpid blocks until the helper exits. Keep it off the caller and the
+    // cooperative executor, and reap only this child without changing SIGCHLD.
+    DispatchQueue.global(qos: .background).async {
+      var status: Int32 = 0
+      while unsafe waitpid(childPID, &status, 0) == -1 {
+        guard errno == EINTR else { break }
+      }
+      onExit?(childPID)
+    }
+    return true
   }
 #endif
