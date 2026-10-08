@@ -264,11 +264,13 @@ public struct BooleanNavigationDestinationModifier<Destination: View>:
         sourceIdentity: sourceIdentity,
         sourceEntity: node.entityIdentity,
         modifierOrdinal: modifierOrdinal,
-        scope: context.environmentValues.navigationDestinationDeclarationScope
+        scope: context.environmentValues.navigationDestinationDeclarationScope,
+        bindingSourceID: isPresented.bindingSourceID
       )
       let activationOrdinal = updateNavigationDestinationActivation(
         sourceIdentity: sourceIdentity,
         modifierOrdinal: modifierOrdinal,
+        bindingSourceID: isPresented.bindingSourceID,
         activeKey: isPresented.wrappedValue ? .boolean : nil,
         in: context
       )
@@ -330,13 +332,15 @@ where Item.ID: Sendable {
         sourceIdentity: sourceIdentity,
         sourceEntity: node.entityIdentity,
         modifierOrdinal: modifierOrdinal,
-        scope: context.environmentValues.navigationDestinationDeclarationScope
+        scope: context.environmentValues.navigationDestinationDeclarationScope,
+        bindingSourceID: item.bindingSourceID
       )
       let currentItem = item.wrappedValue
       let activeKey = currentItem.map { NavigationDestinationActivationKey($0.id) }
       let activationOrdinal = updateNavigationDestinationActivation(
         sourceIdentity: sourceIdentity,
         modifierOrdinal: modifierOrdinal,
+        bindingSourceID: item.bindingSourceID,
         activeKey: activeKey,
         in: context
       )
@@ -754,11 +758,13 @@ private enum NavigationDestinationActivationKey: Equatable, Hashable, Sendable {
 }
 
 private struct NavigationDestinationActivationState: Equatable, Sendable {
+  var bindingSourceID: AnyID?
   var activeKey: NavigationDestinationActivationKey?
   var activeOrdinal: Int
   var nextOrdinal: Int
 
   static let inactive = Self(
+    bindingSourceID: nil,
     activeKey: nil,
     activeOrdinal: -1,
     nextOrdinal: 0
@@ -779,14 +785,20 @@ private func navigationDestinationDeclarationIdentity(
   sourceIdentity: Identity,
   sourceEntity: EntityIdentity?,
   modifierOrdinal: Int,
-  scope: Identity?
+  scope: Identity?,
+  bindingSourceID: AnyID? = nil
 ) -> Identity {
-  navigationDestinationDeclarationRoot(
+  let identity = navigationDestinationDeclarationRoot(
     sourceIdentity: sourceIdentity,
     sourceEntity: sourceEntity,
     scope: scope
   )
   .child("NavigationDestination[\(modifierOrdinal)]")
+  // A conditional can replace one declaration with another at the same
+  // stable source and modifier ordinal without an intervening inactive frame.
+  // Keep their destination storage separate while preserving same-binding
+  // source reorders and cardinality changes.
+  return bindingSourceID.map { identity.explicitID($0) } ?? identity
 }
 
 /// The branch-independent root the pushed destination surface's identity is
@@ -842,6 +854,7 @@ extension EnvironmentValues {
 private func updateNavigationDestinationActivation(
   sourceIdentity: Identity,
   modifierOrdinal: Int,
+  bindingSourceID: AnyID?,
   activeKey: NavigationDestinationActivationKey?,
   in context: ResolveContext
 ) -> Int? {
@@ -869,11 +882,12 @@ private func updateNavigationDestinationActivation(
     return nil
   }
 
-  if state.activeKey == activeKey {
+  if state.activeKey == activeKey, state.bindingSourceID == bindingSourceID {
     return state.activeOrdinal
   }
 
   state.activeKey = activeKey
+  state.bindingSourceID = bindingSourceID
   state.activeOrdinal = state.nextOrdinal
   state.nextOrdinal += 1
   withPersistentDormantStateSlot {

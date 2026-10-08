@@ -96,6 +96,7 @@ package enum StateSlotOrdinals {
 
 @MainActor
 private struct DynamicStateLocation<Value> {
+  var bindingSourceID: AnyID
   var getValue: @MainActor () -> Value
   var setValue: @MainActor (Value) -> Void
   var valueIdentity: @MainActor @Sendable () -> StateValueIdentity?
@@ -106,8 +107,16 @@ private struct DynamicStateLocation<Value> {
       set: setValue
     )
     binding.valueIdentity = valueIdentity
+    binding.bindingSourceID = bindingSourceID
     return binding
   }
+}
+
+/// Backing-storage identity survives re-projection while distinguishing
+/// declarations, composed-property paths, and independently mounted owners.
+private struct StateBindingSource: Hashable, Sendable {
+  var owner: StateStorageOwner
+  var slot: StateSlotIdentifier
 }
 
 @MainActor
@@ -340,7 +349,7 @@ public struct State<Value> {
     var binding = Binding(
       mainActorGet: { wrappedValue },
       set: { wrappedValue = $0 }
-    )
+    ).withBindingSource(ObjectIdentifier(box))
     binding.valueIdentity = {
       if let location = activeLocation() {
         return location.valueIdentity()
@@ -531,6 +540,7 @@ public struct State<Value> {
     let declarationFileID = box.declarationFileID
     let dormantPolicy = box.dormantPolicy
     return DynamicStateLocation(
+      bindingSourceID: AnyID(StateBindingSource(owner: storageOwner, slot: slotIdentifier)),
       getValue: { [weak box] in
         guard let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) else {
           if let retainedValue = box?.retainedValue(for: storageOwner) {

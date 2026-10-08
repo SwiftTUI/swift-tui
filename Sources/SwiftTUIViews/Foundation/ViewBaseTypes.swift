@@ -20,7 +20,8 @@ public struct Binding<Value> {
   /// supplies one. `Binding` itself is a pair of closures with no identity
   /// across renders; consumers that must distinguish "same authored binding
   /// re-created by a re-resolve" from "a different binding swapped in"
-  /// (scroll-momentum retirement) read this. Nil — the default — leaves
+  /// (scroll-momentum retirement and navigation destinations) read this.
+  /// `State` supplies its owner and slot identity. Nil — the default — leaves
   /// those consumers with no distinction, preserving prior behavior.
   package var bindingSourceID: AnyID?
 
