@@ -1009,6 +1009,14 @@ if lane_runs_core; then
     "Run SwiftTUI presentation overlay coexistence tests" \
     "$(swift_command_text test --filter SwiftTUITests.PresentationOverlayCoexistenceTests)" \
     run_swift test --filter SwiftTUITests.PresentationOverlayCoexistenceTests
+
+  # Each case traverses all collection styles and eager/indexed interactions
+  # in one retained scene. These are distinct coverage states, so keep the
+  # complete journey in the core lane instead of reducing a churn count.
+  run_function_step \
+    "Run SwiftTUI collection accessibility transport journeys" \
+    "$(swift_command_text test --filter SwiftTUITests.CollectionAccessibilityTransportRegressionTests)" \
+    run_swift test --filter SwiftTUITests.CollectionAccessibilityTransportRegressionTests
 fi
 
 # --- Runtime lane: the serialized SwiftTUITests surface --------------------
