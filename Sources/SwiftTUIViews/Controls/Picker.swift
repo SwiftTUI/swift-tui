@@ -194,7 +194,11 @@ extension Picker {
           intake.registerPointerHandler(routeID: routeID) { event in
             switch event.kind {
             case .down(.primary):
+              let before = binding.wrappedValue
               _ = setBoundSelection(binding, to: option.tag)
+              if wantsTrigger, before != binding.wrappedValue {
+                setPickerMenuExpanded(false, in: ownerNode, identity: context.identity)
+              }
               return .claimed
             case .up(.primary):
               return .claimed

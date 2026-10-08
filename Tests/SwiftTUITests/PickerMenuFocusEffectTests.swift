@@ -1,4 +1,5 @@
 import SwiftTUIRuntime
+import SwiftTUITestSupport
 import Testing
 
 @_spi(StyleFixtures) @testable import SwiftTUIViews
@@ -11,6 +12,34 @@ import Testing
 @MainActor
 @Suite
 struct PickerMenuFocusEffectTests {
+  @Test("pointer selection closes a menu picker after the selection changes")
+  func pointerSelectionClosesMenu() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("MenuPickerSelection"), size: .init(width: 40, height: 10)
+    ) {
+      MenuPickerSelectionFixture()
+    }
+    defer { harness.shutdown() }
+
+    var frame = try harness.clickText("Alpha")
+    #expect(frame.contains("▴"))
+    #expect(frame.contains("Beta"))
+    frame = try harness.clickText("Beta")
+    #expect(frame.contains("selected 1"))
+    #expect(frame.contains("▾"))
+    #expect(!frame.contains("▴"))
+    #expect(!frame.contains("Alpha"))
+    frame = try harness.clickText("Beta")
+    #expect(frame.contains("▴"))
+    frame = try harness.clickText("Beta", chooseLast: true)
+    #expect(frame.contains("selected 1"))
+    #expect(frame.contains("▴"))
+    frame = try harness.clickText("Alpha")
+    #expect(frame.contains("selected 0"))
+    #expect(!frame.contains("Beta"))
+    #expect(frame.contains("▾"))
+  }
+
   @Test("a focused menu picker under focusEffectDisabled expands without a focus rail")
   func focusedMenuPickerHonorsTheFocusEffect() throws {
     let (effectSurface, _) = Self.render(focusEffectDisabled: false)
@@ -134,5 +163,20 @@ struct PickerMenuFocusEffectTests {
       viewportLineCount: nil,
       lineWidth: nil
     )
+  }
+}
+
+@MainActor
+private struct MenuPickerSelectionFixture: View {
+  @State private var selection = 0
+
+  var body: some View {
+    VStack {
+      Text("selected \(selection)")
+      Picker("Mode", selection: $selection) {
+        Text("Alpha").tag(0)
+        Text("Beta").tag(1)
+      }.pickerStyle(.menu)
+    }
   }
 }
