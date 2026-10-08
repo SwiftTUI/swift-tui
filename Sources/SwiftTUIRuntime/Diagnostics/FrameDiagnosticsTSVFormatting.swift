@@ -325,7 +325,9 @@ package enum FrameDiagnosticsTSVFormatting {
         let pct = Int(rate * 1000)
         return "\(pct / 10).\(pct % 10)%"
       } ?? "-"
-    let damageRows = record.damageRowCount.map(String.init) ?? "full"
+    // Nil means unbounded damage only when the frame actually presented.
+    let damageRows =
+      record.damageRowCount.map(String.init) ?? (record.presentationStrategy == "-" ? "-" : "full")
     let damageRangeAwareRows = record.damageRangeAwareRowCount.map(String.init) ?? "-"
     let damageSpans = record.damageTextSpanCount.map(String.init) ?? "-"
     let damageCells = record.damageTextCellCount.map(String.init) ?? "-"

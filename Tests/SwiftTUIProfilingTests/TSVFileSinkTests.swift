@@ -111,6 +111,62 @@ struct TSVFileSinkTests {
     #expect(TSVFileSink(path: "/this/path/does/not/exist/run.tsv") == nil)
   }
 
+  @Test("Frames without a presentation leave damage unknown instead of reporting full repaint")
+  func noPresentationDamageIsUnknown() throws {
+    guard case .zeroArtifact(var cancelled) = makeZeroArtifactSample() else {
+      Issue.record("Expected a zero-artifact sample")
+      return
+    }
+    cancelled.tailJobState = "cancelled_before_start"
+    cancelled.tailCancelReason = "superseded"
+    cancelled.dropDecision = "-"
+    let elided = ElidedFrameSample(
+      frameNumber: 9,
+      scheduledFrame: makeScheduledFrame(),
+      desiredGeneration: 4,
+      coalescedEventBatches: 0,
+      coalescedWakeCauses: [],
+      intentRequestCount: 1,
+      animationControllerActiveAnimationCount: 0,
+      animationControllerHasPendingWork: false,
+      cancelledRenderCount: 1
+    )
+    let samples: [RuntimeFrameSample] = [
+      makeCommittedSample(), makeZeroArtifactSample(), .zeroArtifact(cancelled), .elided(elided),
+    ]
+    let path = Self.temporaryPath()
+    defer { try? FileManager.default.removeItem(atPath: path) }
+    let sink = try #require(TSVFileSink(path: path))
+    for sample in samples { sink.record(sample) }
+
+    let text = try String(contentsOfFile: path, encoding: .utf8)
+    let rows = text.split(separator: "\n").dropFirst().map {
+      $0.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+    }
+    let header = FrameDiagnosticsTSVFormatting.headerFields
+    let damageIndex = try #require(header.firstIndex(of: "damage_rows"))
+    #expect(rows.map { $0[damageIndex] } == ["full", "-", "-", "-"])
+    for name in ["damage_range_rows", "damage_spans", "damage_cells", "damage_graphics"] {
+      let index = try #require(header.firstIndex(of: name))
+      #expect(rows.dropFirst().allSatisfy { $0[index] == "-" })
+    }
+  }
+
+  @Test("Presented frames preserve bounded damage and the unbounded full sentinel")
+  func presentedDamageRows() throws {
+    let index = try #require(
+      FrameDiagnosticsTSVFormatting.headerFields.firstIndex(of: "damage_rows"))
+    for strategy in ["full", "incremental"] {
+      var record = FrameDiagnosticRecord(
+        frameNumber: 1, causeSummary: "test", presentationStrategy: strategy)
+      #expect(FrameDiagnosticsTSVFormatting.fields(for: record)[index] == "full")
+      record.damageRowCount = 0
+      #expect(FrameDiagnosticsTSVFormatting.fields(for: record)[index] == "0")
+      record.damageRowCount = 3
+      #expect(FrameDiagnosticsTSVFormatting.fields(for: record)[index] == "3")
+    }
+  }
+
   private static func temporaryPath() -> String {
     FileManager.default.temporaryDirectory
       .appendingPathComponent("tsv-sink-\(UUID().uuidString).tsv")

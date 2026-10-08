@@ -6,6 +6,25 @@ import Testing
 /// Plan 2026-08-11-005 Stage 0: deterministic work counters surfaced from
 /// `frames.tsv` into the summary/aggregate/compare vocabulary.
 struct DeterministicCounterTests {
+  @Test("Unknown damage on unpresented frames does not inflate full repaint totals")
+  func unpresentedFramesDoNotCountAsFullRepaints() throws {
+    let frames = try PerfFrameDiagnosticsTSVReader.parse(
+      """
+      frame\ttail_job_state\telided\tdamage_rows
+      1\tcompleted\t0\tfull
+      2\tcancelled_before_start\t0\t-
+      2\tdropped_completed\t0\t-
+      2\t-\t1\t-
+      2\tcompleted\t0\t0
+      3\tcompleted\t0\t3
+      """
+    )
+    #expect(frames[1...3].allSatisfy { $0.emission.damageRows == .unknown })
+    let counters = PerfDeterministicCounters.reduce(frames: frames, committedFrameCount: 3)
+    #expect(counters.fullRepaintFrames == 1)
+    #expect(counters.boundedDamageRows == 3)
+  }
+
   @Test("reader parses fraction numerators and branching counter columns")
   func readerParsesCounterColumns() throws {
     let records = try PerfFrameDiagnosticsTSVReader.parse(
@@ -162,8 +181,9 @@ struct DeterministicCounterTests {
       metadata: metadata, events: [], cpuSamples: [], frames: [])
     #expect(summary.deterministicCounters != nil)
 
-    var json = try JSONSerialization.jsonObject(
-      with: JSONEncoder().encode(summary)) as! [String: Any]
+    var json =
+      try JSONSerialization.jsonObject(
+        with: JSONEncoder().encode(summary)) as! [String: Any]
     json.removeValue(forKey: "deterministic_counters")
     let stripped = try JSONSerialization.data(withJSONObject: json)
     let decoded = try JSONDecoder().decode(PerfSummary.self, from: stripped)
