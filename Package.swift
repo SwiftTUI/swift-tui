@@ -133,14 +133,6 @@ let package = Package(
   products: packageProducts,
   dependencies: packageDependencies,
   targets: [
-    // Package access keeps the benchmark focused on rasterization without exposing new library APIs.
-    .executableTarget(
-      name: "TextClippingBenchmark",
-      dependencies: ["SwiftTUICore"],
-      path: "Tools/TextClippingBenchmark",
-      exclude: ["README.md"],
-      swiftSettings: swiftSettings()
-    ),
     .executableTarget(
       name: "SwiftTUIDev",
       dependencies: ["SwiftTUIRuntime"],
