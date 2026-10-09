@@ -153,7 +153,7 @@ journey drivers are for.
 
 Two conventions keep frames byte-stable on CI runners. First, `NO_COLOR`
 (and the wider `CLICOLOR`/`FORCE_COLOR`/`TERM` family) controls escape
-sequences, and `NO_COLOR` always wins over `FORCE_COLOR`. Second,
+sequences, and a nonempty `NO_COLOR` wins over `FORCE_COLOR`. Second,
 `SWIFTTUI_STABLE_OUTPUT`
 disables built-in animation so captured frames show its static form:
 
