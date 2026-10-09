@@ -126,12 +126,21 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUITestSupport", targets: ["SwiftTUITestSupport"]),
   ]
 
+/// Defines the libraries, platform hosts, and package-scoped developer tools.
 let package = Package(
   name: "swift-tui",
   platforms: packagePlatforms,
   products: packageProducts,
   dependencies: packageDependencies,
   targets: [
+    // Package access keeps the benchmark focused on rasterization without exposing new library APIs.
+    .executableTarget(
+      name: "TextClippingBenchmark",
+      dependencies: ["SwiftTUICore"],
+      path: "Tools/TextClippingBenchmark",
+      exclude: ["README.md"],
+      swiftSettings: swiftSettings()
+    ),
     .executableTarget(
       name: "SwiftTUIDev",
       dependencies: ["SwiftTUIRuntime"],
