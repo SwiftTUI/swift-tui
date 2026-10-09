@@ -67,21 +67,6 @@ extension Rasterizer {
     return (x: maxX, y: maxY)
   }
 
-  /// Paints a draw subtree in order while preserving clipping and post-child commands.
-  ///
-  /// Subtrees that miss the damaged rows can be skipped. Accepted commands still
-  /// check the exact dirty rows before writing. Visibility tracking follows the
-  /// existing geometry rules independently of the text clipping optimization.
-  /// - Parameters:
-  ///   - node: Root of the draw subtree, with bounds in absolute terminal cells.
-  ///   - cells: Destination text cells, updated in paint order.
-  ///   - imageAttachments: Destination graphics attachments, appended for visible images.
-  ///   - clip: Inherited clip, refined by each node's own clipping rules.
-  ///   - dirtyRows: Exact repaint rows, or `nil` to repaint all rows.
-  ///   - dirtySpans: Row-span lookup for the same repaint coverage.
-  ///   - visibleIdentities: Accumulator for identities visible on this surface.
-  ///   - presentationRecorder: Optional sink for ordered cell and effect layers.
-  ///   - lineArms: Shared border-intersection state for this paint walk.
   internal func paint(
     node: DrawNode,
     cells: inout [[RasterCell]],
