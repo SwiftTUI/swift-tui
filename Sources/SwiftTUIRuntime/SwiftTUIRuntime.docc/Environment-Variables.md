@@ -57,6 +57,7 @@ start.
 | `SWIFTTUI_STABLE_OUTPUT` | `0` / truthy | Explicitly disables built-in animation for deterministic capture without changing the accessibility preference. When unset, `CI=true` or a non-TTY stdout enables stable output automatically. |
 | `SWIFTTUI_DEBUG` | boolean | Debug mode: arms the session debug bundle (see *Debug bundles and trace selection*), including the diagnostics TSV and the frame trace. |
 | `SWIFTTUI_CURSOR_FOLLOWS_FOCUS` | boolean | Moves the hardware terminal cursor to the focused control so screen readers can track focus. |
+| `SWIFTTUI_READER` | boolean | Starts the sequential terminal reader. `--reader` / `--no-reader` override this preference; F12 switches during a session. |
 
 Accessibility booleans accept `1/true/yes/on` and `0/false/no/off`, without case
 sensitivity. These startup choices override browser/host preferences. The

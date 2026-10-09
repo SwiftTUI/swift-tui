@@ -111,6 +111,7 @@ extension RuntimeConfiguration {
     configuration.companion =
       environment["SWIFTTUI_COMPANION"].flatMap(CompanionMode.init(rawValue:)) ?? .auto
     configuration.companionPort = environment["SWIFTTUI_COMPANION_PORT"].flatMap(Int.init) ?? 0
+    configuration.terminalReader = preference("SWIFTTUI_READER") == true
     return configuration
   }
 }

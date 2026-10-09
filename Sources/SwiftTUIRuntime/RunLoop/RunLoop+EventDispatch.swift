@@ -99,8 +99,15 @@ extension RunLoop {
         }
         let result = handleAccessibilityAction(request)
         if let requestID = request.requestID {
-          latestAccessibilityActionResponse = .init(
+          let response = AccessibilityActionResponse(
             requestID: requestID, target: request.target, result: result)
+          let consumedByReader =
+            InputDispatchContext.origin != .browser
+            && (presentationSurface as? any TerminalReaderResponseReceiving)?.receiveReaderResponse(
+              response) == true
+          if !consumedByReader {
+            latestAccessibilityActionResponse = response
+          }
           // Even a rejected/no-op request needs an authoritative acknowledgement.
           scheduler.requestInput()
         } else if result != .accepted {

@@ -30,6 +30,16 @@ or terminal bytes.
 
 ## Modules and the dependency graph
 
+`SwiftTUIRuntime/Accessibility/TerminalReader*` owns terminal semantic review,
+bounded immutable history, line commands and grapheme-based editing. The CLI
+wraps each scene's terminal resources in this presenter; its scene hub routes
+review commands into the existing scene input stream. `SharedSceneSurface`
+delivers committed semantic frames to both reader and browser. The run loop
+correlates terminal action responses independently from browser responses.
+`TerminalHost` retains normal scrollback in reader mode and restores its saved
+terminal settings on mode changes and exit. See the
+[terminal reader guide](../Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Terminal-Reader.md).
+
 Widget metadata uses the immutable `AccessibilityProperties` payload in
 `SwiftTUIGraph/Semantics/`. Metadata merging preserves unspecified fields; Core
 extracts it into the committed `AccessibilityNode`, and Runtime carries it in

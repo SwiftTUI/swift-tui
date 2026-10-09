@@ -40,6 +40,11 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
   public var accessible: Bool = false
 
   @Flag(
+    name: .customLong("reader"), inversion: .prefixedNo,
+    help: "Start the sequential terminal reader. F12 switches modes. [env: SWIFTTUI_READER]")
+  public var reader: Bool?
+
+  @Flag(
     name: .customLong("ascii"),
     help: "ASCII-only mode: no Unicode glyphs, box drawing, or emoji. [env: SWIFTTUI_ASCII]"
   )

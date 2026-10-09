@@ -22,6 +22,7 @@ presentation. Thus, one snapshot stays valid when focus moves.
 | Consumer | Current behavior | Evidence boundary |
 | --- | --- | --- |
 | Terminal cursor mode | Uses focus and cursor anchors to position the hardware cursor. Off by default; text input retains its caret. | Emits terminal bytes, not a semantic tree or spoken announcement. Reader compatibility requires testing. |
+| Terminal reader | Sequential committed semantic chunks, independent review/history, bounded updates, text editing and typed actions in the existing scene owners. `--reader`, `SWIFTTUI_READER=1`, or F12 activates it. | PTY and runtime tests establish state/routing; actual terminal, screen-reader and remote profiles require separate qualification. |
 | Canvas and DOM browsers | A shared ARIA sidecar receives semantic nodes; supported controls route typed actions back to Swift. | Names, roles and unit assertions do not prove complete assistive task access. |
 | Public SwiftUI host | Presents native semantic elements and runtime-origin focus. | Presentation does not establish assistive action support; macOS and iOS require independent qualification. |
 | Android host | Serializes semantic nodes and exposes native accessibility-provider actions. | Provider tests do not establish TalkBack discovery or operation. |
@@ -30,6 +31,11 @@ presentation. Thus, one snapshot stays valid when focus moves.
 The [consumer article](../Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md)
 records the current control, release and authoring boundaries. Native host
 packages own their adapter implementations; no browser acceptance transfers to them.
+
+The reader's implementation is in `SwiftTUIRuntime/Accessibility/TerminalReader*`.
+Its in-process action acknowledgements are correlated separately from the
+browser wire acknowledgement, so either input can follow the other before a
+frame commits. It does not reuse the test-support linear snapshot renderer.
 
 ## Assistive action contract
 

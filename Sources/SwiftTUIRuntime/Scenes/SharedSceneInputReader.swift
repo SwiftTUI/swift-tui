@@ -34,6 +34,16 @@ package final class SharedSceneInputReader: @preconcurrency ScopedInputReading,
     if started { startBrowserInput() }
   }
 
+  /// A reader on the primary terminal can operate a dormant scene's existing graph.
+  package func sendReaderEvent(_ event: InputEvent) {
+    guard !finished else { return }
+    continuation.yield(.init(event, origin: .terminal))
+  }
+
+  package func connectTerminalReader(to hub: TerminalReaderSceneHub) {
+    (terminal as? TerminalReaderInput)?.sceneHub = hub
+  }
+
   package func scopedInputEvents() -> AsyncStream<ScopedInputEvent> {
     if !started {
       started = true

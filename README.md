@@ -112,7 +112,10 @@ swift run --package-path counter counter
   gracefully: one binary is correct in kitty, a bare SSH session, or CI. Every
   app also ships `--accessible`, `--cursor-follows-focus`, `--reduce-motion`,
   `--no-color`, and `--ascii`. `--accessible` enables reduced motion and cursor
-  following; it does not provide a semantic terminal reader or start a browser.
+  following. `--reader` starts sequential semantic reading and typed control
+  actions; F12 switches modes without restarting. Persist that choice with
+  `SWIFTTUI_READER=1`. See the
+  [terminal reader guide](Sources/SwiftTUIRuntime/SwiftTUIRuntime.docc/Terminal-Reader.md).
   See [Accessibility](Sources/SwiftTUIViews/SwiftTUIViews.docc/Accessibility.md)
   for supported browser actions, version boundaries, and author responsibilities.
 - **One compiled binary, testable without a TTY.** Swift 6 compiles your

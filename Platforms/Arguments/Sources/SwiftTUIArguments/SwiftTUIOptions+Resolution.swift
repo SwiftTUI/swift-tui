@@ -104,6 +104,7 @@ extension SwiftTUIOptions {
       ?? baseline.companion
     configuration.companionPort = companionPort ?? baseline.companionPort
     configuration.printCompanionURL = companionURL
+    configuration.terminalReader = reader ?? baseline.terminalReader
     configuration.accessibilityPreferences = preferences
     return configuration
   }

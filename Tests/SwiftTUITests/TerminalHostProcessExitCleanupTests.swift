@@ -17,6 +17,25 @@
   @MainActor
   @Suite
   struct TerminalHostProcessExitCleanupTests {
+    @Test("reader process-exit cleanup retains scrollback and resets raw input protocols")
+    func readerProcessExitCleanup() throws {
+      var inputPipe = try makePipe()
+      var outputPipe = try makePipe()
+      defer {
+        closePipe(&inputPipe)
+        closePipe(&outputPipe)
+        TerminalProcessExitCleanupRegistry.runForTesting()
+      }
+      let host = TerminalHost(
+        inputFileDescriptor: inputPipe.readEnd,
+        outputFileDescriptor: outputPipe.writeEnd, fallbackSize: .init(width: 80, height: 24),
+        controller: ProcessExitCleanupController(), capabilityProfile: .trueColor)
+      host.readerMode = true
+      try host.enableRawMode()
+      TerminalProcessExitCleanupRegistry.runForTesting()
+      closeFileDescriptor(&outputPipe.writeEnd)
+      #expect(try readUTF8(from: outputPipe.readEnd) == "\u{001B}[?2004l\u{001B}[?25h\u{001B}[0m")
+    }
     @Test("process-exit cleanup restores the terminal for an active raw-mode host")
     func processExitCleanupRestoresActiveHost() throws {
       let controller = ProcessExitCleanupController()

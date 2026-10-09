@@ -5,7 +5,8 @@ import SwiftTUICore
 package final class SharedSceneSurface: HostGeometryPresentationSurface,
   SemanticHostFramePresentationSurface, TerminalCommandPresentationSurface,
   TerminalCursorFocusPresentationSurface, TerminalInputCapabilityProviding,
-  ClipboardWritingPresentationSurface, ClipboardReadingPresentationSurface
+  ClipboardWritingPresentationSurface, ClipboardReadingPresentationSurface,
+  TerminalReaderResponseReceiving
 {
   package let terminal: any PresentationSurfaceMetricsProvider
   package private(set) var terminalIsAttached: Bool
@@ -125,9 +126,18 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
     var metrics =
       try browser?.present(frame)
       ?? .rasterHostMetrics(for: frame.raster, damage: frame.rasterDamage)
-    guard terminalIsAttached else { return metrics }
+    guard terminalIsAttached else {
+      if let reader = terminal as? TerminalReaderSurface {
+        _ = try reader.present(frame, terminalAttached: false)
+      }
+      return metrics
+    }
     do {
-      if let target = terminal as? any DamageAwarePresentationSurface {
+      if let target = terminal as? any SemanticHostFramePresentationSurface {
+        var terminalFrame = frame
+        if repaintTerminal { terminalFrame.rasterDamage = nil }
+        metrics = try target.present(terminalFrame)
+      } else if let target = terminal as? any DamageAwarePresentationSurface {
         metrics = try target.present(
           frame.raster, damage: repaintTerminal ? nil : frame.rasterDamage)
       } else if let target = terminal as? any RasterPresentationSurface {
@@ -141,8 +151,18 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
     return metrics
   }
 
+  @discardableResult
+  package func receiveReaderResponse(_ response: AccessibilityActionResponse) -> Bool {
+    (terminal as? any TerminalReaderResponseReceiving)?.receiveReaderResponse(response) ?? false
+  }
+
   @MainActor @discardableResult
   package func writeClipboard(_ text: String) throws -> Bool {
+    if InputDispatchContext.origin == .terminal,
+      let reader = terminal as? TerminalReaderSurface, reader.externalReaderOutput != nil
+    {
+      return try reader.writeClipboard(text)
+    }
     if InputDispatchContext.origin == .browser || !terminalIsAttached {
       return try (browser as? any ClipboardWritingPresentationSurface)?.writeClipboard(text)
         ?? false
@@ -154,7 +174,11 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
   package func readClipboard() throws -> String? {
     // Browser paste arrives from that browser. Never read the server's clipboard
     // on behalf of an attached browser or a task launched by its input.
-    guard InputDispatchContext.origin != .browser, terminalIsAttached else { return nil }
+    guard InputDispatchContext.origin != .browser else { return nil }
+    if let reader = terminal as? TerminalReaderSurface, reader.externalReaderOutput != nil {
+      return try reader.readClipboard()
+    }
+    guard terminalIsAttached else { return nil }
     return try (terminal as? any ClipboardReadingPresentationSurface)?.readClipboard()
   }
 }

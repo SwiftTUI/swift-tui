@@ -7,9 +7,12 @@ application task; a label or role alone does not make a custom control operable.
 ## Overview
 
 Canvas and DOM browser hosts mount a semantic sidecar and route supported
-assistive actions back to Swift. Terminal cursor-following moves the hardware
-cursor; it does not publish that semantic tree, speak announcements, or provide
-an interactive linear reader. The public native SwiftUI host's semantic
+assistive actions back to Swift. Default terminal apps also include a sequential
+semantic reader: start with `--reader`, set `SWIFTTUI_READER=1`, or press F12.
+It reads the same committed content and dispatches the same typed actions while
+retaining application state. Use `help` for navigation, editing, scene selection,
+and update commands. Terminal cursor-following separately moves the hardware
+cursor. The public native SwiftUI host's semantic
 presentation does not provide the browser action adapter. iOS and Android
 assistive operation require their own qualification; browser VoiceOver evidence
 does not establish native-host support.
@@ -89,7 +92,8 @@ pure decoration with `.accessibilityHidden()`.
 
 The existing Canvas and DOM browser adapters carry these semantics through WASI
 and native WebSocket. This describes source behavior; it does not claim a tagged
-release, actual screen-reader acceptance, or an interactive terminal reader.
+release or actual screen-reader acceptance. The terminal reader consumes the
+same stable progress semantics and queues intermediate progress for review.
 
 ### Tables, Lists And Outlines
 

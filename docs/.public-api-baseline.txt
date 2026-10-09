@@ -135,6 +135,7 @@ SwiftTUIArguments.SwiftTUIOptions.motionPreference
 SwiftTUIArguments.SwiftTUIOptions.noColor
 SwiftTUIArguments.SwiftTUIOptions.open
 SwiftTUIArguments.SwiftTUIOptions.port
+SwiftTUIArguments.SwiftTUIOptions.reader
 SwiftTUIArguments.SwiftTUIOptions.reduceMotion
 SwiftTUIArguments.SwiftTUIOptions.reduceTransparency
 SwiftTUIArguments.SwiftTUIOptions.runtimeConfiguration(environment:isStdoutTTY:)
@@ -2921,6 +2922,7 @@ SwiftTUIRuntime.RuntimeConfiguration.motion
 SwiftTUIRuntime.RuntimeConfiguration.output
 SwiftTUIRuntime.RuntimeConfiguration.printCompanionURL
 SwiftTUIRuntime.RuntimeConfiguration.stableOutput
+SwiftTUIRuntime.RuntimeConfiguration.terminalReader
 SwiftTUIRuntime.RuntimeConfiguration.web
 SwiftTUIRuntime.RuntimeIssueSink.standardError
 SwiftTUIRuntime.RuntimeRenderMode

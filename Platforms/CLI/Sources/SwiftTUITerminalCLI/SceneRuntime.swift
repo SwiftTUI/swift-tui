@@ -161,6 +161,10 @@ final class SceneRuntime {
       #endif
     }
 
+    if configuration.output == .tui {
+      self.resources = self.resources.withTerminalReader()
+    }
+
     stateContainer = StateContainer(
       initialState: SceneSessionState(),
       invalidationIdentities: [selection.rootIdentity]
@@ -189,6 +193,10 @@ final class SceneRuntime {
     resources = endpoint.resources
     companionEndpoint = endpoint
     return endpoint
+  }
+
+  func connectReader(to hub: TerminalReaderSceneHub) {
+    companionEndpoint?.input.connectTerminalReader(to: hub)
   }
 
   func run(

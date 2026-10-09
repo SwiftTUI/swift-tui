@@ -80,6 +80,15 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
     private let imageRenderer: TerminalImageRenderer
 
     private var rawModeSession = TerminalRawModeSession()
+    package var readerMode = false
+
+    package func setReaderMode(_ enabled: Bool) throws {
+      guard readerMode != enabled else { return }
+      let active = rawModeSession.isEnabled
+      if active { try disableRawMode() }
+      readerMode = enabled
+      if active { try enableRawMode() }
+    }
     var activeMouseCoordinateMode: MouseCoordinateMode {
       rawModeSession.mouseCoordinateMode
     }
@@ -212,9 +221,10 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         input: inputFileDescriptor,
         output: outputFileDescriptor
       )
+      rawModeSession.readerMode = readerMode
       rawModeSession.activate(
         snapshot: snapshot,
-        mouseCoordinateMode: resolvedMouseCoordinateMode(),
+        mouseCoordinateMode: readerMode ? .disabled : resolvedMouseCoordinateMode(),
         inputFileDescriptor: inputFileDescriptor,
         outputFileDescriptor: outputFileDescriptor
       )
@@ -242,6 +252,12 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         }
       }
 
+      if readerMode {
+        try write(TerminalHostEscapeSequences.showCursor)
+        try write(TerminalHostEscapeSequences.enableBracketedPaste)
+        shouldRestoreOnFailure = false
+        return
+      }
       refreshAppearanceIfNeeded()
       try write(TerminalHostEscapeSequences.enterAlternateScreen)
       TerminalScreenOwnership.acquire()
@@ -290,12 +306,15 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       } catch { outputError = error }
       do {
         let reset =
-          TerminalHostEscapeSequences.clearScreen
-          + TerminalHostEscapeSequences.cursor(to: .zero)
-          + TerminalHostEscapeSequences.processExitReset(
-            mouseCoordinateMode: restorePlan.mouseCoordinateMode,
-            hoverEnabled: restorePlan.pointerHoverEnabled,
-            kittyKeyboardPushed: restorePlan.kittyKeyboardPushed)
+          restorePlan.readerMode
+          ? TerminalHostEscapeSequences.disableBracketedPaste
+            + TerminalHostEscapeSequences.showCursor + TerminalHostEscapeSequences.resetStyle
+          : TerminalHostEscapeSequences.clearScreen
+            + TerminalHostEscapeSequences.cursor(to: .zero)
+            + TerminalHostEscapeSequences.processExitReset(
+              mouseCoordinateMode: restorePlan.mouseCoordinateMode,
+              hoverEnabled: restorePlan.pointerHoverEnabled,
+              kittyKeyboardPushed: restorePlan.kittyKeyboardPushed)
         try controller.write(
           reset, to: outputFileDescriptor,
           budget: TerminalWriteBudget(deadline: deadline))

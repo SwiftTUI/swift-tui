@@ -126,10 +126,17 @@ public enum TerminalRunner {
         selection: selection,
         isPrimary: index == 0,
         configuration: configuration,
-        browserOnlySecondary: startsCompanion
+        browserOnlySecondary: startsCompanion || configuration.output == .tui
       )
       sceneRuntimes.append(runtime)
     }
+
+    // The local reader must reach every scene even with the browser companion disabled.
+    let readerEndpoints =
+      configuration.output == .tui ? sceneRuntimes.map { $0.enableCompanion() } : []
+    let readerHub = TerminalReaderSceneHub(endpoints: readerEndpoints)
+    sceneRuntimes.first?.connectReader(to: readerHub)
+    defer { readerHub.reset() }
 
     let companion: SharedSceneCompanionSession?
     if startsCompanion {

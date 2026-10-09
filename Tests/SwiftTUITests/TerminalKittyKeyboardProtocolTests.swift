@@ -15,6 +15,19 @@ import Testing
 @MainActor
 @Suite
 struct TerminalKittyKeyboardProtocolTests {
+  @Test("reader mode retains terminal history, suppresses probes and restores normal input on exit")
+  func readerMode() throws {
+    let controller = KittyKeyboardMockTerminalController(readResponses: [])
+    let host = makeHost(controller: controller)
+    host.readerMode = true
+    try host.enableRawMode()
+    try host.disableRawMode()
+    let output = controller.writes.joined()
+    #expect(output.contains("\u{001B}[?2004h"))
+    #expect(output.contains("\u{001B}[?2004l"))
+    #expect(!output.contains("1049") && !output.contains("1002") && !output.contains("[2J"))
+    #expect(!output.contains("[?u"))
+  }
   private static let flagsReportWithDeviceAttributes = Array(
     "\u{001B}[?1u\u{001B}[?62;4c".utf8
   )
@@ -191,8 +204,6 @@ private final class KittyKeyboardMockTerminalController: TerminalControlling {
   func cellPixelSize(of _: Int32) throws -> PixelSize? {
     nil
   }
-
-
 
   func write(_ output: String, to _: Int32) throws {
     writesStorage.withLock { $0.append(output) }

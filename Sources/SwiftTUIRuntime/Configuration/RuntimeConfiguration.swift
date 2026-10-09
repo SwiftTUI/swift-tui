@@ -18,6 +18,8 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public var companionPort: Int = 0
   /// Prints companion URLs for running instances of this executable, then exits.
   public var printCompanionURL = false
+  /// Starts the sequential terminal reader. F12 also switches modes in a running app.
+  public var terminalReader = false
 
   public enum ColorMode: String, Sendable, Equatable {
     /// Auto-detect from TTY status and env vars (`NO_COLOR`, `FORCE_COLOR`, ...).

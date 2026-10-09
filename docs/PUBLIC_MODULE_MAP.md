@@ -42,11 +42,11 @@ implementation/vendor targets are named below; they have no symbol count here.
 | Owning module | Direct product roots | Top-level | All public |
 |---|---|---:|---:|
 | [`SwiftTUI`](PUBLIC_API_BASELINE.md#swifttui) | `SwiftTUI` | 1 | 4 |
-| [`SwiftTUIRuntime`](PUBLIC_API_BASELINE.md#swifttuiruntime) | `SwiftTUIRuntime` | 60 | 528 |
+| [`SwiftTUIRuntime`](PUBLIC_API_BASELINE.md#swifttuiruntime) | `SwiftTUIRuntime` | 60 | 529 |
 | [`SwiftTUIProfiling`](PUBLIC_API_BASELINE.md#swifttuiprofiling) | `SwiftTUIProfiling` | 9 | 52 |
 | [`SwiftTUIViews`](PUBLIC_API_BASELINE.md#swifttuiviews) | `SwiftTUIViews` | 418 | 2580 |
 | [`SwiftTUIAnimatedImage`](PUBLIC_API_BASELINE.md#swifttuianimatedimage) | `SwiftTUIAnimatedImage` | 5 | 36 |
-| [`SwiftTUIArguments`](PUBLIC_API_BASELINE.md#swifttuiarguments) | `SwiftTUIArguments` | 5 | 60 |
+| [`SwiftTUIArguments`](PUBLIC_API_BASELINE.md#swifttuiarguments) | `SwiftTUIArguments` | 5 | 61 |
 | [`SwiftTUIPTYPrimitives`](PUBLIC_API_BASELINE.md#swifttuiptyprimitives) | `SwiftTUIPTYPrimitives` | 7 | 40 |
 | [`SwiftTUITerminalCLI`](PUBLIC_API_BASELINE.md#swifttuiterminalcli) | None (non-product support target) | 6 | 24 |
 | [`SwiftTUICLIAttach`](PUBLIC_API_BASELINE.md#swifttuicliattach) | None (non-product support target) | 1 | 6 |

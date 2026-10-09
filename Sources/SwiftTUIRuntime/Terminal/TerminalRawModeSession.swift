@@ -13,6 +13,7 @@ import SwiftTUICore
 // Positive host test, not "not WASI" (Stage 3.5 of the Windows plan).
 #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(ucrt)
   struct TerminalRawModeRestorePlan {
+    var readerMode = false
     var savedSnapshot: TerminalModeSnapshot?
     var mouseCoordinateMode: MouseCoordinateMode
     var pointerHoverEnabled: Bool
@@ -20,6 +21,7 @@ import SwiftTUICore
   }
 
   struct TerminalRawModeSession {
+    var readerMode = false
     private var savedSnapshot: TerminalModeSnapshot?
     private var processExitCleanupToken: UInt64?
 
@@ -53,6 +55,7 @@ import SwiftTUICore
 
     var restorePlan: TerminalRawModeRestorePlan {
       TerminalRawModeRestorePlan(
+        readerMode: readerMode,
         savedSnapshot: savedSnapshot,
         mouseCoordinateMode: mouseCoordinateMode,
         pointerHoverEnabled: pointerHoverEnabled,
@@ -96,7 +99,12 @@ import SwiftTUICore
     }
 
     private func processExitResetBytes() -> [UInt8] {
-      Array(
+      if readerMode {
+        return Array(
+          (TerminalHostEscapeSequences.disableBracketedPaste
+            + TerminalHostEscapeSequences.showCursor + TerminalHostEscapeSequences.resetStyle).utf8)
+      }
+      return Array(
         TerminalHostEscapeSequences.processExitReset(
           mouseCoordinateMode: mouseCoordinateMode,
           hoverEnabled: pointerHoverEnabled,

@@ -4,6 +4,22 @@ import Testing
 @testable import SwiftTUIArguments
 
 struct SwiftTUIOptionsResolutionTests {
+  @Test("reader launch choice is inherited from the environment and explicitly overridable")
+  func readerChoice() throws {
+    let defaults = try SwiftTUIOptions.parse([])
+    #expect(!defaults.runtimeConfiguration(environment: [:], isStdoutTTY: true).terminalReader)
+    #expect(
+      defaults.runtimeConfiguration(environment: ["SWIFTTUI_READER": "1"], isStdoutTTY: true)
+        .terminalReader)
+    let enabled = try SwiftTUIOptions.parse(["--reader"])
+    #expect(
+      enabled.runtimeConfiguration(environment: ["SWIFTTUI_READER": "0"], isStdoutTTY: true)
+        .terminalReader)
+    let disabled = try SwiftTUIOptions.parse(["--no-reader"])
+    #expect(
+      !disabled.runtimeConfiguration(environment: ["SWIFTTUI_READER": "1"], isStdoutTTY: true)
+        .terminalReader)
+  }
   @Test("All defaults, empty env, TTY → auto color, unicode, normal motion")
   func defaultsTTY() throws {
     let options = try SwiftTUIOptions.parse([])

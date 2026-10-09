@@ -31,6 +31,9 @@ package func isLocalTerminalPreferenceSource(
   if let shared = surface as? SharedSceneSurface {
     return isLocalTerminalPreferenceSource(shared.terminal)
   }
+  if let reader = surface as? TerminalReaderSurface {
+    return isLocalTerminalPreferenceSource(reader.terminal)
+  }
   #if !canImport(WASILibc)
     guard let terminal = surface as? TerminalHost, terminal.usesNativeAccessibilityPreferences
     else { return false }
