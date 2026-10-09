@@ -126,7 +126,6 @@ let packageProducts: [Product] =
     .library(name: "SwiftTUITestSupport", targets: ["SwiftTUITestSupport"]),
   ]
 
-/// Defines the libraries, platform hosts, and package-scoped developer tools.
 let package = Package(
   name: "swift-tui",
   platforms: packagePlatforms,
