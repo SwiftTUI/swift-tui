@@ -3,6 +3,29 @@ import Testing
 @testable import SwiftTUIRuntime
 
 struct EnvironmentResolverTests {
+  @Test(
+    "Invalid environment ports fall back to automatic allocation",
+    arguments: ["", "invalid", "-1", "65536", "70000", "99999", "999999999999999999999999"])
+  func invalidEnvironmentPorts(value: String) {
+    let configuration = RuntimeConfiguration.detect(
+      environment: [
+        "SWIFTTUI_COMPANION_PORT": value, "SWIFTTUI_WEB": "1", "SWIFTTUI_PORT": value,
+      ], isStdoutTTY: true)
+    #expect(configuration.companionPort == 0)
+    #expect(configuration.web?.port == 0)
+  }
+
+  @Test("Valid environment ports retain their value", arguments: [0, 1, 9321, 65535])
+  func validEnvironmentPorts(port: Int) {
+    let configuration = RuntimeConfiguration.detect(
+      environment: [
+        "SWIFTTUI_COMPANION_PORT": String(port), "SWIFTTUI_WEB": "1",
+        "SWIFTTUI_PORT": String(port),
+      ], isStdoutTTY: true)
+    #expect(configuration.companionPort == port)
+    #expect(configuration.web?.port == port)
+  }
+
   @Test("Empty environment + TTY produces default-ish configuration")
   func emptyEnvironmentTTY() {
     let configuration = RuntimeConfiguration.detect(environment: [:], isStdoutTTY: true)

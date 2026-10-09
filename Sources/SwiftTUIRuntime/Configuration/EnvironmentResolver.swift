@@ -68,9 +68,15 @@ extension RuntimeConfiguration {
     }
 
     // Web config.
+    func port(_ key: String) -> Int {
+      guard let value = environment[key].flatMap(Int.init), (0...65535).contains(value) else {
+        return 0
+      }
+      return value
+    }
     let web: WebConfig? = {
       guard let v = environment["SWIFTTUI_WEB"], !v.isEmpty, v != "0" else { return nil }
-      let port = environment["SWIFTTUI_PORT"].flatMap(Int.init) ?? 0
+      let port = port("SWIFTTUI_PORT")
       let bind = environment["SWIFTTUI_BIND"] ?? "127.0.0.1"
       let requestedOpen = environment["SWIFTTUI_OPEN"].map { !$0.isEmpty && $0 != "0" } ?? false
       let disabledOpen = environment["SWIFTTUI_NO_OPEN"].map { !$0.isEmpty && $0 != "0" } ?? false
@@ -110,7 +116,7 @@ extension RuntimeConfiguration {
         AccessibilityColorProfile.init(rawValue:)))
     configuration.companion =
       environment["SWIFTTUI_COMPANION"].flatMap(CompanionMode.init(rawValue:)) ?? .auto
-    configuration.companionPort = environment["SWIFTTUI_COMPANION_PORT"].flatMap(Int.init) ?? 0
+    configuration.companionPort = port("SWIFTTUI_COMPANION_PORT")
     configuration.terminalReader = preference("SWIFTTUI_READER") == true
     return configuration
   }
