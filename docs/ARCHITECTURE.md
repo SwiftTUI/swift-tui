@@ -501,6 +501,7 @@ Platforms/             Arguments, CLI, WASI, WebHost,
                        Android, Embedding  (sources for the product targets)
 Vendor/                swift-figlet, swift-gif, swift-jpeg, swift-png,
                        UnixSignals  (third-party code, own licenses)
+Tools/TextClippingBenchmark/  Standalone fresh-text raster benchmark (release CSV)
 Tools/TermUIPerf/      Performance scenario harness + committed benchmark
                        (`bench`: BenchSuite, cold one-shot lane, counter
                        ratchet vs Baselines/bench-counters.json)
