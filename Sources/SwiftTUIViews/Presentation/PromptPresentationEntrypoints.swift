@@ -166,7 +166,7 @@ package func anchoredSurfacePresentation(
     AnchoredContentPortalSurface(
       content: VStack(alignment: .leading, spacing: 0) {
         PortalAttachmentSequenceView(payloads: item.contentPayloads)
-      }, presentation: presentation, semanticMetadata: item.surface.semanticMetadata)
+      }, presentation: presentation, semanticMetadata: item.semanticMetadata)
   }
 }
 

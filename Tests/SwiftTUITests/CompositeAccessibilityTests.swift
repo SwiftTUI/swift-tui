@@ -402,6 +402,10 @@ extension CompositeAccessibilityTests {
       #expect(surface.properties?.modal != true)
       #expect(nodes().contains { $0.label == "Open presentation" })
     }
+    if variant == 6 {
+      #expect(surface.role == .popover)
+      #expect(surface.label == "Helpful information")
+    }
     if variant >= 7 {
       #expect(surface.role == .status)
       #expect(surface.label == "Saved changes")
