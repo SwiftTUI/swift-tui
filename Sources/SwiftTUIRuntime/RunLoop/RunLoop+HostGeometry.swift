@@ -53,10 +53,13 @@ extension RunLoop {
     let accepted: Bool
     if currentInputOrigin == .terminal {
       // Terminal coordinates already name the authoritative terminal grid;
-      // they do not carry the companion page's geometry revision.
+      // only the session and shared cell layout must have been committed.
+      // A browser-only pixel pitch change does not move terminal hit regions.
       accepted =
         event.hostGeometryStamp == nil
-        && (current?.viewportRevision == nil || appliedHostGeometry == current)
+        && (current?.viewportRevision == nil
+          || (appliedHostGeometry?.session == current?.session
+            && appliedHostGeometry?.viewportRevision == current?.viewportRevision))
     } else if let current, current.viewportRevision != nil {
       accepted = event.hostGeometryStamp == current && appliedHostGeometry == current
     } else if let current {

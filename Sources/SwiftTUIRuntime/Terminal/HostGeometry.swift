@@ -33,7 +33,7 @@ package struct HostGeometryRequest: Equatable, Sendable {
 package struct HostGeometryStamp: Equatable, Sendable {
   package let session: UInt64
   package let revision: UInt64
-  /// Producer-owned grid changes, such as a companion's physical terminal resize.
+  /// Producer-owned cell layout changes, including common grid and paragraph spacing.
   package let viewportRevision: UInt64?
 
   package init(session: UInt64, revision: UInt64, viewportRevision: UInt64? = nil) {
