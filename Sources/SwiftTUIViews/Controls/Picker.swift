@@ -218,7 +218,7 @@ extension Picker {
             else { return .invalidValue }
             let before = binding.wrappedValue
             guard setBoundSelection(binding, to: option.tag) else { return .invalidValue }
-            if wantsTrigger {
+            if wantsTrigger, before != binding.wrappedValue {
               setPickerMenuExpanded(false, in: ownerNode, identity: context.identity)
             }
             return before == binding.wrappedValue ? .unchanged : .changed
