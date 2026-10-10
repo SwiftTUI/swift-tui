@@ -134,6 +134,42 @@ struct TextRasterClippingTests {
     #expect(surface.presentationLayers.map(\.bounds) == [clip])
   }
 
+  /// A clipped final glyph must not let trailing zero-width text overwrite neighboring cells.
+  /// - Parameters:
+  ///   - family: Wrapped text painter whose right boundary must be preserved.
+  ///   - explicitClip: Whether the glyph is rejected by a clip or the surface's left edge.
+  @Test(
+    "clipped wrapped text does not paint zero-width characters past its right edge",
+    arguments: [TextPaintFamily.plain, .rich], [false, true])
+  func clippedFinalGlyphPreservesNeighboringCells(family: TextPaintFamily, explicitClip: Bool) {
+    let size = CellSize(width: 5, height: 1)
+    let surfaceBounds = CellRect(origin: .zero, size: size)
+    var node = DrawNode(
+      identity: testIdentity("clipped-final-glyph-underlay"), bounds: surfaceBounds,
+      commands: [
+        .preformattedText(
+          bounds: surfaceBounds, lines: ["ABCDE"],
+          style: .init(foregroundStyle: .color(.yellow), backgroundStyle: .color(.blue)))
+      ])
+    let rasterizer = Rasterizer()
+    let underlay = rasterizer.rasterize(node, minimumSize: size)
+    let bounds = CellRect(
+      origin: .init(x: explicitClip ? 0 : -2, y: 0), size: .init(width: 3, height: 1))
+    let clip: CellRect? =
+      explicitClip ? .init(origin: .init(x: 2, y: 0), size: .init(width: 3, height: 1)) : nil
+    node.children = [
+      .init(
+        identity: testIdentity("clipped-final-glyph"), bounds: bounds, clipBounds: clip,
+        commands: [family.command(bounds: bounds, lines: ["a界\u{200B}"])])
+    ]
+
+    // Neither visible-width glyph can be written. The trailing zero-width
+    // space must not escape the text bounds and replace an underlay cell.
+    let surface = rasterizer.rasterize(node, minimumSize: size)
+    #expect(surface == underlay)
+    #expect(surface.presentationLayers == underlay.presentationLayers)
+  }
+
   /// A preformatted trailing zero-width character still occupies its right-edge cell.
   @Test("zero-width text at a preformatted boundary survives early rejection")
   func zeroWidthAtRightEdge() {
