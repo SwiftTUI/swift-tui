@@ -622,6 +622,9 @@ extension Rasterizer {
               clip: frame.clip, surfaceSize: surfaceSize)
             {
               x += cluster.cellWidth
+              if x >= bounds.origin.x + bounds.size.width {
+                break
+              }
               continue
             }
 
@@ -897,6 +900,9 @@ extension Rasterizer {
               clip: frame.clip, surfaceSize: surfaceSize)
             {
               x += cluster.cellWidth
+              if x >= bounds.origin.x + bounds.size.width {
+                break
+              }
               continue
             }
 
