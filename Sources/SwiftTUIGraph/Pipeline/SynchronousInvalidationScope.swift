@@ -6,13 +6,14 @@ import Synchronization
 package final class SynchronousInvalidationScope {
   @TaskLocal private static var current: SynchronousInvalidationScope?
 
-  private struct State {
-    var isOpen = true
-    var didRequestInvalidation = false
+  private enum State {
+    case tracking
+    case invalidated
+    case closed(didRequestInvalidation: Bool)
   }
 
   private let scheduler: ObjectIdentifier
-  private let state = Mutex(State())
+  private let state = Mutex(State.tracking)
 
   private init(scheduler: FrameScheduler) {
     self.scheduler = ObjectIdentifier(scheduler)
@@ -32,8 +33,11 @@ package final class SynchronousInvalidationScope {
   package static func record(scheduler: FrameScheduler) {
     guard let scope = current, scope.scheduler == ObjectIdentifier(scheduler) else { return }
     scope.state.withLock { state in
-      if state.isOpen {
-        state.didRequestInvalidation = true
+      switch state {
+      case .tracking:
+        state = .invalidated
+      case .invalidated, .closed:
+        break
       }
     }
   }
@@ -41,8 +45,16 @@ package final class SynchronousInvalidationScope {
   @discardableResult
   private func close() -> Bool {
     state.withLock { state in
-      state.isOpen = false
-      return state.didRequestInvalidation
+      switch state {
+      case .tracking:
+        state = .closed(didRequestInvalidation: false)
+        return false
+      case .invalidated:
+        state = .closed(didRequestInvalidation: true)
+        return true
+      case .closed(let didRequestInvalidation):
+        return didRequestInvalidation
+      }
     }
   }
 }

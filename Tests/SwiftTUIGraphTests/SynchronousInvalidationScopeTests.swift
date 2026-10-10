@@ -9,21 +9,27 @@ import Testing
 struct SynchronousInvalidationScopeTests {
   @Test(
     "synchronous invalidations are attributed without changing scheduler intent",
-    arguments: [false, true])
-  func synchronousInvalidationsAreAttributed(animated: Bool) throws {
+    arguments: [false, true], [0, 1, 3])
+  func synchronousInvalidationsAreAttributed(animated: Bool, requestCount: Int) throws {
     let scheduler = FrameScheduler()
     let identity = testIdentity("Scope", "Synchronous")
 
     let tracked = SynchronousInvalidationScope.track(scheduler: scheduler) {
-      requestInvalidation(scheduler: scheduler, identity: identity, animated: animated)
+      for _ in 0..<requestCount {
+        requestInvalidation(scheduler: scheduler, identity: identity, animated: animated)
+      }
       return 42
     }
 
     #expect(tracked.value == 42)
-    #expect(tracked.didRequestInvalidation)
+    #expect(tracked.didRequestInvalidation == (requestCount > 0))
+    guard requestCount > 0 else {
+      #expect(scheduler.consumeReadyFrame() == nil)
+      return
+    }
     let frame = try #require(scheduler.consumeReadyFrame())
     #expect(frame.invalidatedIdentities == [identity])
-    #expect(frame.intentRequestCount == 1)
+    #expect(frame.intentRequestCount == requestCount)
     #expect(frame.hasExplicitAnimationTransactions == animated)
   }
 
