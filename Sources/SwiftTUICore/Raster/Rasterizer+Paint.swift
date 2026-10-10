@@ -1,3 +1,4 @@
+/// Paints draw commands into terminal cells while preserving clipping and presentation effects.
 extension Rasterizer {
   private struct PaintContext {
     var clip: CellRect?
@@ -197,7 +198,10 @@ extension Rasterizer {
           // screen's content through style resolution and text layout every
           // incremental frame.
           let subtreeTop = max(0, node.subtreeBounds.origin.y)
-          let subtreeBottom = subtreeTop + max(0, node.subtreeBounds.size.height)
+          // Compute the bottom from the original position before clamping it.
+          // Moving a negative top to zero must not make the subtree taller.
+          let subtreeBottom = max(
+            0, node.subtreeBounds.origin.y + max(0, node.subtreeBounds.size.height))
           if subtreeBottom > subtreeTop,
             !dirtySpans.intersects(rows: subtreeTop..<subtreeBottom)
           {
@@ -524,6 +528,7 @@ extension Rasterizer {
       let clip: CellRect?
     }
 
+    let surfaceSize = CellSize(width: cells.first?.count ?? 0, height: cells.count)
     var stack: [Frame] = []
     stack.reserveCapacity(commands.count)
     for command in commands.reversed() {
@@ -568,12 +573,19 @@ extension Rasterizer {
         guard bounds.size.height > 0, bounds.size.width > 0 else {
           continue
         }
+        // Skip this text block if it cannot reach the screen, the clip,
+        // or any row being repainted. This avoids layout and color work.
+        guard let visible = textPaintBounds(bounds, clip: frame.clip, surfaceSize: surfaceSize),
+          dirtySpans.map({ $0.intersects(rows: visible) }) ?? true
+        else { continue }
         let colorModes = resolvedTextColorModes(
           for: style,
           environment: environment,
           bounds: bounds
         )
 
+        // Keep the original width for wrapping. Clipping decides what to
+        // paint; it must not change where the text wraps.
         let layout = layoutText(
           for: content,
           width: bounds.size.width,
@@ -582,7 +594,13 @@ extension Rasterizer {
           wrappingStrategy: wrappingStrategy
         )
 
-        for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
+        // Visit visible lines using their original indices, so scrolling
+        // does not shift their positions or the colors sampled for them.
+        let lineRange = textPaintLineRange(
+          bounds: bounds, lineCount: layout.lines.count, clip: frame.clip,
+          surfaceSize: surfaceSize)
+        for lineIndex in lineRange {
+          let line = layout.lines[lineIndex]
           // Per-line cull (D70): hoists the exact-set clamp from cell to line
           // granularity, so a command that STRADDLES two damage bands resolves
           // styles only for the lines it will actually write. The whole-command
@@ -595,6 +613,19 @@ extension Rasterizer {
           for cluster in line.clusters {
             guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
               break
+            }
+
+            // Skip color and style work for a character the writer would discard.
+            // Still advance x so later characters keep their original positions.
+            if !textGlyphCanWrite(
+              atX: x, y: bounds.origin.y + lineIndex, width: cluster.cellWidth,
+              clip: frame.clip, surfaceSize: surfaceSize)
+            {
+              x += cluster.cellWidth
+              if x >= bounds.origin.x + bounds.size.width {
+                break
+              }
+              continue
             }
 
             let resolvedStyle = resolveTextStyle(
@@ -640,13 +671,23 @@ extension Rasterizer {
         guard bounds.size.height > 0, bounds.size.width > 0 else {
           continue
         }
+        // Skip this text block if it cannot reach the screen, the clip,
+        // or any row being repainted. This avoids layout and color work.
+        guard let visible = textPaintBounds(bounds, clip: frame.clip, surfaceSize: surfaceSize),
+          dirtySpans.map({ $0.intersects(rows: visible) }) ?? true
+        else { continue }
         let colorModes = resolvedTextColorModes(
           for: style,
           environment: environment,
           bounds: bounds
         )
 
-        for (lineIndex, line) in lines.prefix(bounds.size.height).enumerated() {
+        // Visit visible lines using their original indices, so scrolling
+        // does not shift their positions or the colors sampled for them.
+        let lineRange = textPaintLineRange(
+          bounds: bounds, lineCount: lines.count, clip: frame.clip, surfaceSize: surfaceSize)
+        for lineIndex in lineRange {
+          let line = lines[lineIndex]
           // Per-line cull (D70) — also skips `clusterize` for clean lines.
           if let dirtyRows, !dirtyRows.contains(bounds.origin.y + lineIndex) {
             continue
@@ -656,6 +697,16 @@ extension Rasterizer {
           for cluster in clusters {
             guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
               break
+            }
+
+            // Skip color and style work for a character the writer would discard.
+            // Still advance x so later characters keep their original positions.
+            if !textGlyphCanWrite(
+              atX: x, y: bounds.origin.y + lineIndex, width: cluster.cellWidth,
+              clip: frame.clip, surfaceSize: surfaceSize)
+            {
+              x += cluster.cellWidth
+              continue
             }
 
             let resolvedStyle = resolveTextStyle(
@@ -698,8 +749,18 @@ extension Rasterizer {
         guard bounds.size.height > 0, bounds.size.width > 0 else {
           continue
         }
+        // Skip this text block if it cannot reach the screen, the clip,
+        // or any row being repainted to avoid layout and color work.
+        guard let visible = textPaintBounds(bounds, clip: frame.clip, surfaceSize: surfaceSize),
+          dirtySpans.map({ $0.intersects(rows: visible) }) ?? true
+        else { continue }
 
-        for (lineIndex, line) in lines.prefix(bounds.size.height).enumerated() {
+        // Visit visible lines using their original indices, so scrolling
+        // does not shift their positions or the colors sampled for them.
+        let lineRange = textPaintLineRange(
+          bounds: bounds, lineCount: lines.count, clip: frame.clip, surfaceSize: surfaceSize)
+        for lineIndex in lineRange {
+          let line = lines[lineIndex]
           // Per-line cull (D70) — also skips the per-run style merge and
           // `clusterize` for clean lines.
           if let dirtyRows, !dirtyRows.contains(bounds.origin.y + lineIndex) {
@@ -719,6 +780,16 @@ extension Rasterizer {
             for cluster in clusters {
               guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
                 break
+              }
+
+              // Skip color and style work for a character the writer would discard.
+              // Still advance x so later characters keep their original positions.
+              if !textGlyphCanWrite(
+                atX: x, y: bounds.origin.y + lineIndex, width: cluster.cellWidth,
+                clip: frame.clip, surfaceSize: surfaceSize)
+              {
+                x += cluster.cellWidth
+                continue
               }
 
               let resolvedStyle = resolveTextStyle(
@@ -768,7 +839,14 @@ extension Rasterizer {
         guard bounds.size.height > 0, bounds.size.width > 0 else {
           continue
         }
+        // Skip this text block if it cannot reach the screen, the clip,
+        // or any row being repainted. This avoids layout and color work.
+        guard let visible = textPaintBounds(bounds, clip: frame.clip, surfaceSize: surfaceSize),
+          dirtySpans.map({ $0.intersects(rows: visible) }) ?? true
+        else { continue }
 
+        // Rich text still wraps at its original width, even when only
+        // a small part of the laid-out block is visible.
         let layout = layoutRichText(
           for: payload,
           options: .init(
@@ -791,7 +869,13 @@ extension Rasterizer {
           bounds: bounds
         )
 
-        for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
+        // Visit visible lines using their original indices, so scrolling
+        // does not shift their positions or the colors sampled for them.
+        let lineRange = textPaintLineRange(
+          bounds: bounds, lineCount: layout.lines.count, clip: frame.clip,
+          surfaceSize: surfaceSize)
+        for lineIndex in lineRange {
+          let line = layout.lines[lineIndex]
           // Per-line cull (D70).
           if let dirtyRows, !dirtyRows.contains(bounds.origin.y + lineIndex) {
             continue
@@ -809,6 +893,19 @@ extension Rasterizer {
               cluster.runIndex.flatMap { runIndex in
                 runColorModes.indices.contains(runIndex) ? runColorModes[runIndex] : nil
               } ?? defaultColorModes
+            // Skip color and style work for a character the writer would discard.
+            // Still advance x so later characters keep their original positions.
+            if !textGlyphCanWrite(
+              atX: x, y: bounds.origin.y + lineIndex, width: cluster.cellWidth,
+              clip: frame.clip, surfaceSize: surfaceSize)
+            {
+              x += cluster.cellWidth
+              if x >= bounds.origin.x + bounds.size.width {
+                break
+              }
+              continue
+            }
+
             let resolvedStyle = resolveTextStyle(
               run?.style ?? .init(),
               foregroundMode: colorModes.foreground,
