@@ -22,8 +22,7 @@ struct RunLoopDrainFairnessTests {
       try await harness.runLoop.renderPendingFramesAsync(renderedFrames: &frames)
     }
 
-    #expect(frames > 0)
-    #expect(frames < PeriodicInvalidationSink.safetyLimit)
+    #expect(frames == RunLoop<Int, Text>.maxFramesPerDrainPass)
     #expect(harness.scheduler.hasPendingFrame(at: harness.clock.now))
 
     // Yielding must preserve the pending write for the next pass.
@@ -66,6 +65,50 @@ struct RunLoopDrainFairnessTests {
     var syncFrames = 0
     try harness.runLoop.renderPendingFrames(renderedFrames: &syncFrames, eventPump: pump)
     #expect(syncFrames == framesPerPass, "sync frames: \(syncFrames)")
+  }
+
+  @Test(
+    "custom schedulers preserve cooperative and signal acquisition bounds",
+    arguments: [false, true], [RunLoopExitReason.inputEnded, .signal("SIGTERM")])
+  func customSchedulerExitRetainsDrainBounds(
+    synchronous: Bool, exitReason: RunLoopExitReason
+  ) async throws {
+    let harness = CooperativeExitHarness(scheduler: ForwardingFrameScheduler())
+    harness.runLoop.isSessionActive = true
+    harness.runLoop.stateContainer.invalidator = harness.scheduler
+    harness.runLoop.focusTracker.invalidator = harness.scheduler
+    defer {
+      harness.runLoop.isSessionActive = false
+      harness.runLoop.lifecycleCoordinator.shutdown()
+      harness.input.finish()
+    }
+    #expect(harness.runLoop.handleKeyPress(KeyPress(.return)) == nil)
+    harness.scheduler.requestInvalidation(of: [harness.root])
+    let policy = RunLoop<CooperativeExitState, CooperativeExitFixture>.FrameDrainPolicy(
+      exitReason: exitReason)
+    var frames = 0
+
+    if synchronous {
+      try harness.runLoop.renderPendingFrames(renderedFrames: &frames, drainPolicy: policy)
+    } else {
+      _ = try await harness.runLoop.renderPendingFramesAsync(
+        renderedFrames: &frames, eventPump: nil, drainPolicy: policy)
+    }
+
+    let expectedAcquisitions: Int
+    switch exitReason {
+    case .programmatic, .userExit, .inputEnded:
+      expectedAcquisitions =
+        RunLoop<CooperativeExitState, CooperativeExitFixture>.maxFramesPerDrainPass
+    case .signal:
+      expectedAcquisitions = 1
+    }
+    #expect(frames == expectedAcquisitions)
+    #expect(harness.producer.acquiredFrames == expectedAcquisitions)
+    #expect(harness.producer.committedFrames == expectedAcquisitions)
+    #expect(
+      harness.surface.lastFrameContainsLine("input 1 tick \(expectedAcquisitions - 1)"))
+    #expect(harness.scheduler.hasPendingFrame(at: .now()))
   }
 
   @Test("end of input flushes the input change without draining a periodic producer forever")
@@ -581,17 +624,51 @@ private final class CooperativeExitInputReader: SynchronousInputPulling {
   }
 }
 
+/// Keeps native scheduling semantics while exercising a scheduler whose
+/// callback-attribution mechanism is unavailable to the run loop.
+private final class ForwardingFrameScheduler: FrameScheduling {
+  private let inner = FrameScheduler()
+
+  func requestInvalidation(of identities: Set<Identity>) {
+    inner.requestInvalidation(of: identities)
+  }
+
+  func requestInput() { inner.requestInput() }
+  func requestSignal(named name: String) { inner.requestSignal(named: name) }
+  func requestExternalWake(reason: String) { inner.requestExternalWake(reason: reason) }
+  func requestDeadline(_ deadline: MonotonicInstant) { inner.requestDeadline(deadline) }
+  func hasPendingFrame(at now: MonotonicInstant) -> Bool { inner.hasPendingFrame(at: now) }
+  func nextWakeInstant(after now: MonotonicInstant) -> MonotonicInstant? {
+    inner.nextWakeInstant(after: now)
+  }
+
+  func consumeReadyFrame(at now: MonotonicInstant) -> ScheduledFrame? {
+    inner.consumeReadyFrame(at: now)
+  }
+
+  var deadlineArmCut: DeadlineArmCut { inner.deadlineArmCut }
+
+  func consumeReadyFrame(
+    at now: MonotonicInstant, armedBefore cut: DeadlineArmCut
+  ) -> ScheduledFrame? {
+    inner.consumeReadyFrame(at: now, armedBefore: cut)
+  }
+
+  func reset() { inner.reset() }
+}
+
 @MainActor
 private final class CooperativeExitHarness {
   let root = testIdentity("CooperativeExitProducer")
-  let scheduler = FrameScheduler()
+  let scheduler: any FrameScheduling
   let input = CooperativeExitInputReader()
   let surface = CooperativeExitSurface()
   let lifetime = CooperativeExitLifetime()
   let producer: CooperativeExitProducer
   let runLoop: RunLoop<CooperativeExitState, CooperativeExitFixture>
 
-  init() {
+  init(scheduler: any FrameScheduling = FrameScheduler()) {
+    self.scheduler = scheduler
     let state = StateContainer(
       initialState: CooperativeExitState(), invalidationIdentities: [root])
     let producer = CooperativeExitProducer(state: state)

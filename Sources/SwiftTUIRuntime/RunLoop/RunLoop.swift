@@ -691,18 +691,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
             // UI follow-ups, without draining unrelated producer writes.
             // Skipped acquisitions still retry within the normal count cap.
             // Signals retain the stricter single-acquisition flush.
-            let signalExit: Bool = {
-              if case .signal = exitReason {
-                return true
-              }
-              return false
-            }()
             if let flushedExitReason = try await renderPendingFramesAsync(
               renderedFrames: &renderedFrames,
               eventPump: eventPump,
-              frameBudget: signalExit ? 1 : nil,
-              appliesWorkBudget: false,
-              isCooperativeExitFlush: !signalExit
+              drainPolicy: FrameDrainPolicy(exitReason: exitReason)
             ) {
               return RunLoopResult(
                 finalState: stateContainer.state,

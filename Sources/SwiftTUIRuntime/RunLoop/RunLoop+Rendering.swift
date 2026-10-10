@@ -11,17 +11,15 @@ extension RunLoop {
   /// so cancellation cannot evade the bound either (STUI-529).
   /// Sixteen acquisitions leave room for the existing two-cancel/two-drop
   /// progress bounds (at most nine acquisitions to a forced commit).
-  package static var maxFramesPerDrainPass: Int { 16 }
+  nonisolated package static var maxFramesPerDrainPass: Int { 16 }
 
   /// Synchronous frame driver for direct event-pump re-entry and test helpers.
   /// Signal termination limits this drain to one acquisition, just as the
   /// async driver does. This path does not perform off-screen frame elision.
   package func renderPendingFrames(
     renderedFrames: inout Int,
-    frameBudget: Int? = nil,
     eventPump: EventPump? = nil,
-    appliesWorkBudget: Bool = true,
-    isCooperativeExitFlush: Bool = false
+    drainPolicy: FrameDrainPolicy = .normal
   ) throws {
     guard beginTerminalRenderPassIfAvailable() else {
       return
@@ -52,10 +50,11 @@ extension RunLoop {
     let drainPass = beginDeadlineDrainPass()
     var consumedScheduledFrames = 0
     var passStartedAt: MonotonicInstant?
-    while consumedScheduledFrames < (frameBudget ?? Self.maxFramesPerDrainPass) {
+    while consumedScheduledFrames < drainPolicy.acquisitionLimit {
       if consumedScheduledFrames > 0,
         shouldYieldDrainPass(
-          to: eventPump, passStartedAt: passStartedAt, appliesWorkBudget: appliesWorkBudget)
+          to: eventPump, passStartedAt: passStartedAt,
+          appliesWorkBudget: drainPolicy.appliesWorkBudget)
       {
         break
       }
@@ -100,7 +99,7 @@ extension RunLoop {
 
       var geometry: HostGeometryStamp?
       var artifacts: FrameArtifacts?
-      var requiresFollowUp = false
+      var callbackInvalidations = FrameCallbackInvalidations.none
       while true {
         applyRenderPassEvaluationPolicy(convergence: convergence)
         let passScheduledFrame =
@@ -144,10 +143,10 @@ extension RunLoop {
         lifecycleCoordinator.absorbPublishedRegistrations(
           localLifecycleRegistry.snapshot()
         )
-        let focusSync = try trackExitFollowUp(enabled: isCooperativeExitFlush) {
+        let focusSync = try observeFrameCallback {
           try processFocusSyncIteration(renderedArtifacts, convergence: &convergence)
         }
-        requiresFollowUp = requiresFollowUp || focusSync.didRequestInvalidation
+        callbackInvalidations = callbackInvalidations.merging(focusSync.invalidations)
         switch focusSync.value {
         case .rerender:
           // The single eager focus-location re-render (capped by
@@ -162,7 +161,7 @@ extension RunLoop {
       guard let artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
-      let appliedFrameRequiresFollowUp = try applyAcquiredFrame(
+      let appliedFrameInvalidations = try applyAcquiredFrame(
         artifacts,
         scheduledFrame: scheduledFrame,
         consumedAt: consumedAt,
@@ -174,12 +173,11 @@ extension RunLoop {
         ingressAcquisition: ingressAcquisition,
         answeredInputs: answeredInputs,
         hasFrameSink: hasFrameSink,
-        tracksFollowUpInvalidations: isCooperativeExitFlush,
         renderedFrames: &renderedFrames
       )
       previousRenderedState = currentState
-      let hasRequiredFollowUp = requiresFollowUp || appliedFrameRequiresFollowUp
-      if isCooperativeExitFlush && !hasRequiredFollowUp {
+      callbackInvalidations = callbackInvalidations.merging(appliedFrameInvalidations)
+      if !drainPolicy.shouldContinue(after: callbackInvalidations) {
         break
       }
       if terminalHandoffInProgress {
@@ -388,9 +386,8 @@ extension RunLoop {
     ingressAcquisition: IngressAcquisitionSnapshot,
     answeredInputs: AnsweredInputs?,
     hasFrameSink: Bool,
-    tracksFollowUpInvalidations: Bool,
     renderedFrames: inout Int
-  ) throws -> Bool {
+  ) throws -> FrameCallbackInvalidations {
     var artifacts = acquiredArtifacts
     reportRuntimeIssues(artifacts.diagnostics.runtime.issues)
     reportNewSoundnessProbeViolations()
@@ -426,15 +423,15 @@ extension RunLoop {
     publishedAccessibilitySnapshot = artifacts.semanticSnapshot
     recordPresentedRasterSurface(artifacts.rasterSurface)
     previousPresentedScrollLedger = scrollTranslation.ledger
-    let lifecycleFollowUp = trackExitFollowUp(enabled: tracksFollowUpInvalidations) {
+    let lifecycle = observeFrameCallback {
       lifecycleCoordinator.applyCommittedFrame(
         plan: artifacts.commitPlan,
         currentLifecycleRegistry: localLifecycleRegistry,
         currentTaskRegistry: localTaskRegistry
       )
     }
-    reportRuntimeIssues(lifecycleFollowUp.value)
-    let followUp = trackExitFollowUp(enabled: tracksFollowUpInvalidations) {
+    reportRuntimeIssues(lifecycle.value)
+    let callbacks = observeFrameCallback {
       // AFTER the lifecycle dispatch, so a completion's state writes get their
       // own resolve before any same-frame `onChange` can read them (the stuck-
       // ripple absorbing state), and BEFORE `flushPostActionInvalidations` so
@@ -461,7 +458,7 @@ extension RunLoop {
       flushPostActionInvalidations()
       return preferenceObservationChanged
     }
-    let preferenceObservationChanged = followUp.value
+    let preferenceObservationChanged = callbacks.value
     // After rendering, request the next animation frame deadline
     // whenever the tick reported pending work.  Phase 4 split the
     // tick result so ``hasPendingWork`` is the unambiguous "schedule
@@ -525,7 +522,7 @@ extension RunLoop {
       renderedFrames: renderedFrames
     )
 
-    let pressedFollowUp = trackExitFollowUp(enabled: tracksFollowUpInvalidations) {
+    let pressedCleanup = observeFrameCallback {
       if let transientPressedIdentity,
         transientPressedIdentity == pressedIdentity
       {
@@ -533,22 +530,25 @@ extension RunLoop {
         setPressedIdentity(nil, transient: false)
       }
     }
-    return lifecycleFollowUp.didRequestInvalidation || followUp.didRequestInvalidation
-      || pressedFollowUp.didRequestInvalidation
+    return lifecycle.invalidations
+      .merging(callbacks.invalidations)
+      .merging(pressedCleanup.invalidations)
   }
 
-  /// Only frame-owned synchronous callbacks can require another exit-flush
-  /// presentation. Independent producers, frame presentation and diagnostics do
-  /// not extend the flush. Unknown schedulers keep the original bounded drain.
-  private func trackExitFollowUp<Value>(
-    enabled: Bool,
+  /// Observe only synchronous frame callbacks. Presentation, diagnostics and
+  /// independent producers remain outside these scopes.
+  private func observeFrameCallback<Value>(
     _ operation: () throws -> Value
-  ) rethrows -> (value: Value, didRequestInvalidation: Bool) {
-    guard enabled else { return (try operation(), false) }
+  ) rethrows -> (value: Value, invalidations: FrameCallbackInvalidations) {
     guard let frameScheduler = scheduler as? FrameScheduler else {
-      return (try operation(), true)
+      return (try operation(), .unavailable)
     }
-    return try SynchronousInvalidationScope.track(scheduler: frameScheduler, operation)
+    let observation = try SynchronousInvalidationScope.track(
+      scheduler: frameScheduler, operation)
+    if observation.didRequestInvalidation {
+      return (observation.value, .observed)
+    }
+    return (observation.value, .none)
   }
 
   package func updateTerminalPointerHoverModeIfNeeded() throws {
@@ -571,23 +571,13 @@ extension RunLoop {
     )
   }
 
-  /// - Parameters:
-  ///   - frameBudget: the acquisition cap for this pass; defaults to
-  ///     `maxFramesPerDrainPass`.
-  ///   - appliesWorkBudget: whether `drainPassWorkBudget` (when set) bounds
-  ///     this pass. The cooperative exit flush passes `false` so a short
-  ///     follow-up chain still presents the input handled in its batch before
-  ///     exit. Cooperative flushes instead stop once a presentation and its
-  ///     synchronous UI follow-ups have completed, still within the count cap.
-  ///   - isCooperativeExitFlush: stop after a real presentation unless its
-  ///     synchronous focus/lifecycle callbacks requested a follow-up. Skipped
-  ///     and elided acquisitions cannot satisfy the presentation requirement.
+  /// The drain policy owns acquisition limits, elapsed-work budgeting and
+  /// whether a presented frame's callback invalidations require another frame.
+  /// Skipped and elided acquisitions never satisfy an exit presentation.
   package func renderPendingFramesAsync(
     renderedFrames: inout Int,
     eventPump: EventPump?,
-    frameBudget: Int? = nil,
-    appliesWorkBudget: Bool = true,
-    isCooperativeExitFlush: Bool = false
+    drainPolicy: FrameDrainPolicy = .normal
   ) async throws -> RunLoopExitReason? {
     guard beginTerminalRenderPassIfAvailable() else {
       return nil
@@ -617,7 +607,6 @@ extension RunLoop {
       hasFrameSink || runtimeConfiguration.debug
     )
     let drainPass = beginDeadlineDrainPass()
-    let frameBudget = frameBudget ?? Self.maxFramesPerDrainPass
     var consumedScheduledFrames = 0
     var passStartedAt: MonotonicInstant?
     frameLoop: while true {
@@ -627,7 +616,7 @@ extension RunLoop {
       // Leave unconsumed work in the scheduler for the next pass. Even a
       // cooperative exit flush must return when a periodic producer keeps
       // invalidating during every frame on a slow machine.
-      if consumedScheduledFrames >= frameBudget {
+      if consumedScheduledFrames >= drainPolicy.acquisitionLimit {
         break frameLoop
       }
       // Input service between acquisitions: runs after committed, skipped,
@@ -636,7 +625,8 @@ extension RunLoop {
       // elapsed-work budget.
       if consumedScheduledFrames > 0,
         shouldYieldDrainPass(
-          to: eventPump, passStartedAt: passStartedAt, appliesWorkBudget: appliesWorkBudget)
+          to: eventPump, passStartedAt: passStartedAt,
+          appliesWorkBudget: drainPolicy.appliesWorkBudget)
       {
         break frameLoop
       }
@@ -680,7 +670,7 @@ extension RunLoop {
 
       var acquisition = FrameAcquisitionState()
       var artifacts: FrameArtifacts?
-      var requiresFollowUp = false
+      var callbackInvalidations = FrameCallbackInvalidations.none
       // The focus-sync convergence loop is the one place the runtime must
       // suspend (the async render). Acquisition is the only strategy
       // difference (ADR-0021); the per-iteration side effects
@@ -774,10 +764,10 @@ extension RunLoop {
             tailJobState: tailJobState
           )
           artifacts = renderedArtifacts
-          let focusSync = try trackExitFollowUp(enabled: isCooperativeExitFlush) {
+          let focusSync = try observeFrameCallback {
             try processFocusSyncIteration(renderedArtifacts, convergence: &convergence)
           }
-          requiresFollowUp = requiresFollowUp || focusSync.didRequestInvalidation
+          callbackInvalidations = callbackInvalidations.merging(focusSync.invalidations)
           switch focusSync.value {
           case .rerender:
             // The single eager focus-location re-render (capped by
@@ -792,7 +782,7 @@ extension RunLoop {
       guard let artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
-      let appliedFrameRequiresFollowUp = try applyAcquiredFrame(
+      let appliedFrameInvalidations = try applyAcquiredFrame(
         artifacts,
         scheduledFrame: scheduledFrame,
         consumedAt: consumedAt,
@@ -804,12 +794,11 @@ extension RunLoop {
         ingressAcquisition: ingressAcquisition,
         answeredInputs: answeredInputs,
         hasFrameSink: hasFrameSink,
-        tracksFollowUpInvalidations: isCooperativeExitFlush,
         renderedFrames: &renderedFrames
       )
       previousRenderedState = currentState
-      let hasRequiredFollowUp = requiresFollowUp || appliedFrameRequiresFollowUp
-      if isCooperativeExitFlush && !hasRequiredFollowUp {
+      callbackInvalidations = callbackInvalidations.merging(appliedFrameInvalidations)
+      if !drainPolicy.shouldContinue(after: callbackInvalidations) {
         break frameLoop
       }
       // The pending-input yield that used to sit here runs at the top of the

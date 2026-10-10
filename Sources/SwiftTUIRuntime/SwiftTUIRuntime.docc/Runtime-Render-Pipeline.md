@@ -469,6 +469,13 @@ independent background producers, frame presentation and diagnostic sinks do not
 extend the flush. The same 16-acquisition cap still bounds retries and callback
 chains. Signal exits retain their stricter one-acquisition flush.
 
+The drain owns one policy for normal rendering, cooperative exit or signal exit.
+Frame application reports synchronous callback invalidations without selecting
+shutdown behavior. An unavailable observation is distinct from an observed
+invalidation: cooperative drains retain the acquisition cap for custom schedulers
+that cannot attribute callback activity. Normal drains continue pending work
+within their elapsed-work and acquisition bounds.
+
 The native `FrameScheduler` attributes callback invalidations using a
 scheduler-specific task-local scope that closes when each synchronous callback
 phase returns. Authored main-actor tasks run after that phase and cannot keep its

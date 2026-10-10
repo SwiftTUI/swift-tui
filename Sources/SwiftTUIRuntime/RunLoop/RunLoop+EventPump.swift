@@ -331,16 +331,10 @@ extension RunLoop {
               return false
             }())
         if shouldFlushBeforeExit {
-          let signalExit: Bool = {
-            if case .signal = exitReason { return true }
-            return false
-          }()
           try renderPendingFrames(
             renderedFrames: &renderedFrames,
-            frameBudget: signalExit ? 1 : nil,
             eventPump: eventPump,
-            appliesWorkBudget: false,
-            isCooperativeExitFlush: !signalExit)
+            drainPolicy: FrameDrainPolicy(exitReason: exitReason))
         }
         if let programmatic = consumeProgrammaticTerminationRequest() {
           return programmatic

@@ -1,6 +1,80 @@
 import SwiftTUICore
 
 extension RunLoop {
+  /// Owns acquisition bounds and continuation decisions for one drain pass.
+  package enum FrameDrainPolicy {
+    case normal
+    case cooperativeExit
+    case signalExit
+
+    init(exitReason: RunLoopExitReason) {
+      switch exitReason {
+      case .programmatic, .userExit, .inputEnded:
+        self = .cooperativeExit
+      case .signal:
+        self = .signalExit
+      }
+    }
+
+    var acquisitionLimit: Int {
+      switch self {
+      case .normal, .cooperativeExit:
+        return RunLoop.maxFramesPerDrainPass
+      case .signalExit:
+        return 1
+      }
+    }
+
+    var appliesWorkBudget: Bool {
+      switch self {
+      case .normal:
+        return true
+      case .cooperativeExit, .signalExit:
+        return false
+      }
+    }
+
+    func shouldContinue(after invalidations: FrameCallbackInvalidations) -> Bool {
+      switch self {
+      case .normal:
+        return true
+      case .signalExit:
+        return false
+      case .cooperativeExit:
+        switch invalidations {
+        case .none:
+          return false
+        case .observed, .unavailable:
+          return true
+        }
+      }
+    }
+  }
+
+  /// Observed callback activity, independent of the drain's reason for running.
+  /// Custom schedulers cannot attribute invalidations to a callback scope.
+  enum FrameCallbackInvalidations {
+    case none
+    case observed
+    case unavailable
+
+    func merging(_ other: FrameCallbackInvalidations) -> FrameCallbackInvalidations {
+      switch self {
+      case .none:
+        return other
+      case .observed:
+        return .observed
+      case .unavailable:
+        switch other {
+        case .none, .unavailable:
+          return .unavailable
+        case .observed:
+          return .observed
+        }
+      }
+    }
+  }
+
   package struct RenderIntentCoalescingDiagnostics: Equatable, Sendable {
     package var desiredGeneration: UInt64
     package var coalescedEventBatches: Int
