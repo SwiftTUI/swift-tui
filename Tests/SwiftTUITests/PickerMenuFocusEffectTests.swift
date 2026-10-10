@@ -12,6 +12,38 @@ import Testing
 @MainActor
 @Suite
 struct PickerMenuFocusEffectTests {
+  @Test("accessibility selection closes a menu picker only when the selection changes")
+  func accessibilitySelectionClosesMenu() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("AccessibleMenuPickerSelection"),
+      size: .init(width: 40, height: 10)
+    ) { MenuPickerSelectionFixture() }
+    defer { harness.shutdown() }
+    #expect(try harness.clickText("Alpha").contains("▴"))
+
+    func select(_ label: String) throws {
+      let picker = try #require(
+        harness.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.first {
+          $0.control?.selection != nil
+        })
+      let option = try #require(picker.control?.selection?.options.first { $0.label == label })
+      #expect(
+        harness.runLoop.handleAccessibilityAction(
+          .init(target: try #require(picker.actionTarget), action: .setValue(.text(option.id))))
+          == .accepted)
+      var frames = 0
+      try harness.runLoop.renderPendingFrames(renderedFrames: &frames)
+    }
+    try select("Alpha")
+    #expect(harness.frame.contains("selected 0"))
+    #expect(harness.frame.contains("▴"))
+    #expect(harness.frame.contains("Beta"))
+    try select("Beta")
+    #expect(harness.frame.contains("selected 1"))
+    #expect(harness.frame.contains("▾"))
+    #expect(!harness.frame.contains("Alpha"))
+  }
+
   @Test("pointer selection closes a menu picker after the selection changes")
   func pointerSelectionClosesMenu() throws {
     let harness = try StressRuntimeHarness(

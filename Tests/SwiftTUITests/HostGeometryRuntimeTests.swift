@@ -394,6 +394,59 @@ private struct AccessibilityPreferenceStyleProbe: ButtonStyle {
 }
 
 extension HostGeometryRuntimeTests {
+  @Test(arguments: ["zoom", "spacing", "terminalResize", "browserResize", "session"])
+  func terminalClicksWaitOnlyForSharedLayoutChanges(change: String) throws {
+    let terminal = SharedTerminalTestSurface()
+    let browser = GeometryTestSurface()
+    browser.size = .init(width: 120, height: 40)
+    let shared = SharedSceneSurface(terminal: terminal, terminalIsAttached: true)
+    shared.attachBrowser(browser, isConnected: { true })
+    let root = testIdentity("TerminalGeometryAcceptance")
+    var activations = 0
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: shared, terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in Button("Activate") { activations += 1 } }
+    var rendered = 0
+    func render() throws {
+      loop.scheduler.requestSignal(named: "SIGWINCH")
+      try loop.renderPendingFrames(renderedFrames: &rendered)
+    }
+    func click(origin: InputOrigin, stamp: HostGeometryStamp? = nil) throws {
+      let region = try #require(loop.latestSemanticSnapshot.interactionRegions.first)
+      let point = Point(x: Double(region.rect.origin.x), y: Double(region.rect.origin.y))
+      for kind in [MouseEvent.Kind.down(.primary), .up(.primary)] {
+        var event = MouseEvent(kind: kind, location: point)
+        event.hostGeometryStamp = stamp
+        _ = loop.handle(.scopedInput(.init(.mouse(event), origin: origin)))
+      }
+    }
+    try render()
+    let firstStamp = try #require(browser.frames.last?.hostGeometryStamp)
+    try click(origin: .terminal)
+    #expect(activations == 1)
+    switch change {
+    case "zoom": browser.pitch = .init(width: 12, height: 28)
+    case "spacing": browser.paragraphSpacing = 2
+    case "terminalResize": terminal.size = .init(width: 20, height: 5)
+    case "browserResize": browser.size = .init(width: 18, height: 4)
+    default: browser.session += 1
+    }
+    browser.revision += 1
+    try click(origin: .browser, stamp: firstStamp)
+    try click(origin: .browser, stamp: shared.captureHostLayoutConfiguration().geometry)
+    #expect(activations == 1)
+    try click(origin: .terminal)
+    let expected = change == "zoom" ? 2 : 1
+    #expect(activations == expected)
+    try render()
+    try click(origin: .terminal)
+    #expect(activations == expected + 1)
+    try click(origin: .browser, stamp: browser.frames.last?.hostGeometryStamp)
+    #expect(activations == expected + 2)
+  }
+
   @Test func transparencyPreferenceRepaintsRetainedContentAndRestoresAuthoredFade() throws {
     let host = GeometryTestSurface()
     let root = testIdentity("LiveTransparencyPaint")

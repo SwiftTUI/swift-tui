@@ -15,6 +15,7 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
   private var browser: (any SemanticHostFramePresentationSurface)?
   private var browserIsConnected: () -> Bool = { false }
   private var lastGrid: CellSize?
+  private var lastParagraphSpacing: Int?
   private var viewportRevision: UInt64 = 1
   private var repaintTerminal = true
 
@@ -82,11 +83,13 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
       size = .init(
         width: min(size.width, remote.size.width), height: min(size.height, remote.size.height))
     }
-    if let lastGrid, lastGrid != size {
+    let paragraphSpacing = connected ? presentation.paragraphSpacing : local.paragraphSpacing
+    if let lastGrid, lastGrid != size || lastParagraphSpacing != paragraphSpacing {
       viewportRevision += 1
       repaintTerminal = true
     }
     lastGrid = size
+    lastParagraphSpacing = paragraphSpacing
     let geometry = remote?.geometry.map {
       HostGeometryStamp(
         session: $0.session, revision: $0.revision, viewportRevision: viewportRevision)
@@ -97,7 +100,7 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
       pointer: presentation.pointer, geometry: geometry,
       reduceMotion: presentation.reduceMotion,
       accessibilityPreferences: presentation.accessibilityPreferences,
-      paragraphSpacing: connected ? presentation.paragraphSpacing : local.paragraphSpacing)
+      paragraphSpacing: paragraphSpacing)
   }
 
   package func enableRawMode() throws {

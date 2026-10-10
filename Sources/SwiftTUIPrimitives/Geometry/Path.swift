@@ -24,6 +24,7 @@ public struct Path: Equatable, Sendable {
     case close
   }
 
+  /// Authored elements, including an explicit origin move for a leading segment.
   public private(set) var elements: [Element]
 
   public init() {
@@ -32,6 +33,15 @@ public struct Path: Equatable, Sendable {
 
   public init(_ elements: [Element]) {
     self.elements = elements
+    for (index, element) in elements.enumerated() {
+      switch element {
+      case .close: continue
+      case .move: return
+      case .line, .quadCurve, .curve:
+        self.elements.insert(.move(to: .zero), at: index)
+        return
+      }
+    }
   }
 
   /// Builds a path imperatively, SwiftUI-style.
@@ -65,15 +75,28 @@ public struct Path: Equatable, Sendable {
   }
 
   public mutating func addLine(to point: Point) {
+    ensureInitialMove()
     elements.append(.line(to: point))
   }
 
   public mutating func addQuadCurve(to point: Point, control: Point) {
+    ensureInitialMove()
     elements.append(.quadCurve(to: point, control: control))
   }
 
   public mutating func addCurve(to point: Point, control1: Point, control2: Point) {
+    ensureInitialMove()
     elements.append(.curve(to: point, control1: control1, control2: control2))
+  }
+
+  private mutating func ensureInitialMove() {
+    // Leading closes do not establish a pen. Materialize its implicit origin
+    // so translation and animation transform every point in the path.
+    for element in elements {
+      if case .close = element { continue }
+      return
+    }
+    move(to: .zero)
   }
 
   public mutating func close() {

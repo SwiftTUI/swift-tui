@@ -470,8 +470,10 @@ same-grid metric changes and empty damage. Revisions do not replace delivery
 
 A shared terminal/browser scene also emits optional positive `viewportRevision`
 when `sharedViewport` and `geometryRevisions` were declared. It changes when the
-producer's common grid changes, including physical-terminal changes independent
-of a browser request. A browser may accept a bounded grid no larger than its
+producer's common grid or paragraph spacing changes, including physical-terminal
+changes independent of a browser request. Terminal-origin pointers require the
+committed session and viewport revision, so browser-only pixel pitch changes do
+not block fresh terminal clicks. A browser may accept a bounded grid no larger than its
 requested dimensions, still with the matching browser geometry revision. It
 publishes pointer metadata only when that frame is painted. The corresponding
 record is `mouseViewport:<geometryRevision>:<viewportRevision>:<kind>:<x>:<y>:<button>:<deltaX>:<deltaY>:<modifiers>`.

@@ -86,7 +86,7 @@ the separate settings below.
 | Companion variable | Values | Effect |
 | --- | --- | --- |
 | `SWIFTTUI_COMPANION` | `auto` (default), `on`, `off` | Automatic interactive launch, explicit request, or opt-out. |
-| `SWIFTTUI_COMPANION_PORT` | integer, default `0` | Companion port; `0` selects an available port. |
+| `SWIFTTUI_COMPANION_PORT` | `0...65535`, default `0` | Companion port; `0` selects an available port. Invalid values fall back to `0`. |
 
 CLI choices override these defaults. JSON output does not start a companion;
 redirected terminal launch still requires a TTY. See the
@@ -96,7 +96,7 @@ for discovery and SSH forwarding.
 | Variable | Values | Effect |
 | --- | --- | --- |
 | `SWIFTTUI_WEB` | boolean | Enables the web host session. |
-| `SWIFTTUI_PORT` | integer, default `0` | Listen port. `0` picks an ephemeral port. |
+| `SWIFTTUI_PORT` | `0...65535`, default `0` | Listen port. `0` picks an ephemeral port. Invalid values fall back to `0`. |
 | `SWIFTTUI_BIND` | address, default `127.0.0.1` | Listen address. |
 | `SWIFTTUI_OPEN` | boolean | Requests opening the served URL in a browser. |
 | `SWIFTTUI_NO_OPEN` | boolean | Vetoes `SWIFTTUI_OPEN`. |

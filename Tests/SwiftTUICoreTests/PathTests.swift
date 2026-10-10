@@ -5,6 +5,45 @@ import Testing
 
 @Suite
 struct PathTests {
+  @Test("leading segments translate and animate their implicit origin", arguments: [0, 1, 2])
+  func leadingSegmentTransforms(kind: Int) throws {
+    let end = Point(x: 4, y: 0)
+    let segment: Path.Element
+    var built = Path()
+    switch kind {
+    case 0:
+      segment = .line(to: end)
+      built.addLine(to: end)
+    case 1:
+      segment = .quadCurve(to: end, control: Point(x: 2, y: -2))
+      built.addQuadCurve(to: end, control: Point(x: 2, y: -2))
+    default:
+      segment = .curve(to: end, control1: Point(x: 1, y: -2), control2: Point(x: 3, y: -2))
+      built.addCurve(to: end, control1: Point(x: 1, y: -2), control2: Point(x: 3, y: -2))
+    }
+    let remaining: [Path.Element] = [
+      .line(to: Point(x: 4, y: 4)), .line(to: Point(x: 0, y: 4)), .close,
+    ]
+    built.addLine(to: Point(x: 4, y: 4))
+    built.addLine(to: Point(x: 0, y: 4))
+    built.close()
+    let explicit = Path([.move(to: .zero), segment] + remaining)
+    for path in [built, Path([segment] + remaining), Path([.close, segment] + remaining)] {
+      let translated = path.translatedBy(dx: 10, dy: 8)
+      let expected = explicit.translatedBy(dx: 10, dy: 8)
+      #expect(translated.flattened() == expected.flattened())
+      #expect(translated.boundingRect == expected.boundingRect)
+      #expect(translated.contains(Point(x: 10.5, y: 8.5)))
+      #expect(!translated.contains(Point(x: 1, y: 1)))
+      #expect(path.isInterpolable(to: translated))
+      let halfway = path.interpolated(to: translated, progress: 0.5)
+      #expect(halfway.flattened() == explicit.translatedBy(dx: 5, dy: 4).flattened())
+      var animated = path
+      animated.animatableData = translated.animatableData
+      #expect(animated.flattened() == expected.flattened())
+    }
+  }
+
   @Test("leading lines render and hit-test from the implicit origin")
   func leadingLines() {
     let endpoint = Point(x: 4, y: 4)
