@@ -393,6 +393,7 @@ public final class FrameScheduler: FrameScheduling, ThreadSafeInvalidating, Inte
   }
 
   public func requestInvalidation(of identities: Set<Identity>) {
+    SynchronousInvalidationScope.record(scheduler: self)
     coalescingLock.withLock { state in
       if state.pendingCauses.contains(.invalidation) { state.pendingMergedInvalidationCount += 1 }
       state.pendingCauses.insert(.invalidation)
@@ -716,6 +717,7 @@ extension FrameScheduler: AnimationAwareInvalidating {
     customValues: [ObjectIdentifier: AnyHashableSendable],
     tracksVelocity: Bool
   ) {
+    SynchronousInvalidationScope.record(scheduler: self)
     coalescingLock.withLock { state in
       if state.pendingCauses.contains(.invalidation) { state.pendingMergedInvalidationCount += 1 }
       state.pendingCauses.insert(.invalidation)

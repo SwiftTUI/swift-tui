@@ -20,7 +20,8 @@ extension RunLoop {
     renderedFrames: inout Int,
     frameBudget: Int? = nil,
     eventPump: EventPump? = nil,
-    appliesWorkBudget: Bool = true
+    appliesWorkBudget: Bool = true,
+    isCooperativeExitFlush: Bool = false
   ) throws {
     guard beginTerminalRenderPassIfAvailable() else {
       return
@@ -99,6 +100,7 @@ extension RunLoop {
 
       var geometry: HostGeometryStamp?
       var artifacts: FrameArtifacts?
+      var requiresFollowUp = false
       while true {
         applyRenderPassEvaluationPolicy(convergence: convergence)
         let passScheduledFrame =
@@ -142,11 +144,11 @@ extension RunLoop {
         lifecycleCoordinator.absorbPublishedRegistrations(
           localLifecycleRegistry.snapshot()
         )
-        let outcome = try processFocusSyncIteration(
-          renderedArtifacts,
-          convergence: &convergence
-        )
-        switch outcome {
+        let focusSync = try trackExitFollowUp(enabled: isCooperativeExitFlush) {
+          try processFocusSyncIteration(renderedArtifacts, convergence: &convergence)
+        }
+        requiresFollowUp = requiresFollowUp || focusSync.didRequestInvalidation
+        switch focusSync.value {
         case .rerender:
           // The single eager focus-location re-render (capped by
           // `didEagerFocusLocationRerender`) — loop once more, then converge.
@@ -160,7 +162,7 @@ extension RunLoop {
       guard let artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
-      try applyAcquiredFrame(
+      let appliedFrameRequiresFollowUp = try applyAcquiredFrame(
         artifacts,
         scheduledFrame: scheduledFrame,
         consumedAt: consumedAt,
@@ -172,9 +174,14 @@ extension RunLoop {
         ingressAcquisition: ingressAcquisition,
         answeredInputs: answeredInputs,
         hasFrameSink: hasFrameSink,
+        tracksFollowUpInvalidations: isCooperativeExitFlush,
         renderedFrames: &renderedFrames
       )
       previousRenderedState = currentState
+      let hasRequiredFollowUp = requiresFollowUp || appliedFrameRequiresFollowUp
+      if isCooperativeExitFlush && !hasRequiredFollowUp {
+        break
+      }
       if terminalHandoffInProgress {
         break
       }
@@ -381,8 +388,9 @@ extension RunLoop {
     ingressAcquisition: IngressAcquisitionSnapshot,
     answeredInputs: AnsweredInputs?,
     hasFrameSink: Bool,
+    tracksFollowUpInvalidations: Bool,
     renderedFrames: inout Int
-  ) throws {
+  ) throws -> Bool {
     var artifacts = acquiredArtifacts
     reportRuntimeIssues(artifacts.diagnostics.runtime.issues)
     reportNewSoundnessProbeViolations()
@@ -418,37 +426,42 @@ extension RunLoop {
     publishedAccessibilitySnapshot = artifacts.semanticSnapshot
     recordPresentedRasterSurface(artifacts.rasterSurface)
     previousPresentedScrollLedger = scrollTranslation.ledger
-    reportRuntimeIssues(
+    let lifecycleFollowUp = trackExitFollowUp(enabled: tracksFollowUpInvalidations) {
       lifecycleCoordinator.applyCommittedFrame(
         plan: artifacts.commitPlan,
         currentLifecycleRegistry: localLifecycleRegistry,
         currentTaskRegistry: localTaskRegistry
       )
-    )
-    // AFTER the lifecycle dispatch, so a completion's state writes get their
-    // own resolve before any same-frame `onChange` can read them (the stuck-
-    // ripple absorbing state), and BEFORE `flushPostActionInvalidations` so
-    // the writes' invalidations flow into this frame's flush as they did
-    // when completions fired at commit.
-    fireDeferredAnimationCompletions()
-    hotReloadSession?.finishCommittedReplay()
-    acknowledgeHotReloadCommit()
-    updateFocusPresentation(focusPresentation)
-    // Record the committed focus so the next frame's reuse-safety gate can
-    // detect a focus move (see ``retainedReuseSuppressionScopeForFrameSafety()``).
-    previousFrameFocusIdentity = focusTracker.currentFocusIdentity
-    previousFramePressedIdentity = pressedIdentity
-    // The committed frame reflected every pending focus move; endpoints
-    // deferred by the narrowing filter are spent. (Superseded frames do not
-    // reach here, so their replays keep re-deriving the same contribution.)
-    focusTrackerInvalidationFilter?.clearPendingMoveEndpoints()
-    // A frame was genuinely applied: the pre-start cancel run is broken.
-    consecutivePreStartCancelCount = 0
-    let preferenceObservationChanged = localPreferenceObservationRegistry.applyChanges(
-      since: previousPreferenceObservations
-    )
-    previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
-    flushPostActionInvalidations()
+    }
+    reportRuntimeIssues(lifecycleFollowUp.value)
+    let followUp = trackExitFollowUp(enabled: tracksFollowUpInvalidations) {
+      // AFTER the lifecycle dispatch, so a completion's state writes get their
+      // own resolve before any same-frame `onChange` can read them (the stuck-
+      // ripple absorbing state), and BEFORE `flushPostActionInvalidations` so
+      // the writes' invalidations flow into this frame's flush as they did
+      // when completions fired at commit.
+      fireDeferredAnimationCompletions()
+      hotReloadSession?.finishCommittedReplay()
+      acknowledgeHotReloadCommit()
+      updateFocusPresentation(focusPresentation)
+      // Record the committed focus so the next frame's reuse-safety gate can
+      // detect a focus move (see ``retainedReuseSuppressionScopeForFrameSafety()``).
+      previousFrameFocusIdentity = focusTracker.currentFocusIdentity
+      previousFramePressedIdentity = pressedIdentity
+      // The committed frame reflected every pending focus move; endpoints
+      // deferred by the narrowing filter are spent. (Superseded frames do not
+      // reach here, so their replays keep re-deriving the same contribution.)
+      focusTrackerInvalidationFilter?.clearPendingMoveEndpoints()
+      // A frame was genuinely applied: the pre-start cancel run is broken.
+      consecutivePreStartCancelCount = 0
+      let preferenceObservationChanged = localPreferenceObservationRegistry.applyChanges(
+        since: previousPreferenceObservations
+      )
+      previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
+      flushPostActionInvalidations()
+      return preferenceObservationChanged
+    }
+    let preferenceObservationChanged = followUp.value
     // After rendering, request the next animation frame deadline
     // whenever the tick reported pending work.  Phase 4 split the
     // tick result so ``hasPendingWork`` is the unambiguous "schedule
@@ -512,12 +525,30 @@ extension RunLoop {
       renderedFrames: renderedFrames
     )
 
-    if let transientPressedIdentity,
-      transientPressedIdentity == pressedIdentity
-    {
-      self.transientPressedIdentity = nil
-      setPressedIdentity(nil, transient: false)
+    let pressedFollowUp = trackExitFollowUp(enabled: tracksFollowUpInvalidations) {
+      if let transientPressedIdentity,
+        transientPressedIdentity == pressedIdentity
+      {
+        self.transientPressedIdentity = nil
+        setPressedIdentity(nil, transient: false)
+      }
     }
+    return lifecycleFollowUp.didRequestInvalidation || followUp.didRequestInvalidation
+      || pressedFollowUp.didRequestInvalidation
+  }
+
+  /// Only frame-owned synchronous callbacks can require another exit-flush
+  /// presentation. Independent producers, frame presentation and diagnostics do
+  /// not extend the flush. Unknown schedulers keep the original bounded drain.
+  private func trackExitFollowUp<Value>(
+    enabled: Bool,
+    _ operation: () throws -> Value
+  ) rethrows -> (value: Value, didRequestInvalidation: Bool) {
+    guard enabled else { return (try operation(), false) }
+    guard let frameScheduler = scheduler as? FrameScheduler else {
+      return (try operation(), true)
+    }
+    return try SynchronousInvalidationScope.track(scheduler: frameScheduler, operation)
   }
 
   package func updateTerminalPointerHoverModeIfNeeded() throws {
@@ -546,13 +577,17 @@ extension RunLoop {
   ///   - appliesWorkBudget: whether `drainPassWorkBudget` (when set) bounds
   ///     this pass. The cooperative exit flush passes `false` so a short
   ///     follow-up chain still presents the input handled in its batch before
-  ///     exit — there is no further input to serve, so the budget has no
-  ///     purpose there.
+  ///     exit. Cooperative flushes instead stop once a presentation and its
+  ///     synchronous UI follow-ups have completed, still within the count cap.
+  ///   - isCooperativeExitFlush: stop after a real presentation unless its
+  ///     synchronous focus/lifecycle callbacks requested a follow-up. Skipped
+  ///     and elided acquisitions cannot satisfy the presentation requirement.
   package func renderPendingFramesAsync(
     renderedFrames: inout Int,
     eventPump: EventPump?,
     frameBudget: Int? = nil,
-    appliesWorkBudget: Bool = true
+    appliesWorkBudget: Bool = true,
+    isCooperativeExitFlush: Bool = false
   ) async throws -> RunLoopExitReason? {
     guard beginTerminalRenderPassIfAvailable() else {
       return nil
@@ -645,6 +680,7 @@ extension RunLoop {
 
       var acquisition = FrameAcquisitionState()
       var artifacts: FrameArtifacts?
+      var requiresFollowUp = false
       // The focus-sync convergence loop is the one place the runtime must
       // suspend (the async render). Acquisition is the only strategy
       // difference (ADR-0021); the per-iteration side effects
@@ -738,11 +774,11 @@ extension RunLoop {
             tailJobState: tailJobState
           )
           artifacts = renderedArtifacts
-          let outcome = try processFocusSyncIteration(
-            renderedArtifacts,
-            convergence: &convergence
-          )
-          switch outcome {
+          let focusSync = try trackExitFollowUp(enabled: isCooperativeExitFlush) {
+            try processFocusSyncIteration(renderedArtifacts, convergence: &convergence)
+          }
+          requiresFollowUp = requiresFollowUp || focusSync.didRequestInvalidation
+          switch focusSync.value {
           case .rerender:
             // The single eager focus-location re-render (capped by
             // `didEagerFocusLocationRerender`) — loop once more, then converge.
@@ -756,7 +792,7 @@ extension RunLoop {
       guard let artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
-      try applyAcquiredFrame(
+      let appliedFrameRequiresFollowUp = try applyAcquiredFrame(
         artifacts,
         scheduledFrame: scheduledFrame,
         consumedAt: consumedAt,
@@ -768,9 +804,14 @@ extension RunLoop {
         ingressAcquisition: ingressAcquisition,
         answeredInputs: answeredInputs,
         hasFrameSink: hasFrameSink,
+        tracksFollowUpInvalidations: isCooperativeExitFlush,
         renderedFrames: &renderedFrames
       )
       previousRenderedState = currentState
+      let hasRequiredFollowUp = requiresFollowUp || appliedFrameRequiresFollowUp
+      if isCooperativeExitFlush && !hasRequiredFollowUp {
+        break frameLoop
+      }
       // The pending-input yield that used to sit here runs at the top of the
       // loop, so skipped and elided acquisitions are covered too.
     }
