@@ -687,22 +687,14 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
                 return false
               }())
           if shouldFlushBeforeExit {
-            // Cooperative exits allow the normal bounded drain so short
-            // follow-up chains can present the input handled in this batch.
-            // They cannot wait for quiescence: a periodic state writer can
-            // keep invalidating faster than frames render (STUI-529).
+            // Cooperative exits present the final input and its synchronous
+            // UI follow-ups, without draining unrelated producer writes.
+            // Skipped acquisitions still retry within the normal count cap.
             // Signals retain the stricter single-acquisition flush.
-            let signalExit: Bool = {
-              if case .signal = exitReason {
-                return true
-              }
-              return false
-            }()
             if let flushedExitReason = try await renderPendingFramesAsync(
               renderedFrames: &renderedFrames,
               eventPump: eventPump,
-              frameBudget: signalExit ? 1 : nil,
-              appliesWorkBudget: false
+              drainPolicy: FrameDrainPolicy(exitReason: exitReason)
             ) {
               return RunLoopResult(
                 finalState: stateContainer.state,

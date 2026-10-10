@@ -333,11 +333,8 @@ extension RunLoop {
         if shouldFlushBeforeExit {
           try renderPendingFrames(
             renderedFrames: &renderedFrames,
-            frameBudget: { () -> Int? in
-              if case .signal = exitReason { return 1 }
-              return nil
-            }(),
-            eventPump: eventPump, appliesWorkBudget: false)
+            eventPump: eventPump,
+            drainPolicy: FrameDrainPolicy(exitReason: exitReason))
         }
         if let programmatic = consumeProgrammaticTerminationRequest() {
           return programmatic
