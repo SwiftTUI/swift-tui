@@ -567,16 +567,23 @@ package final class LocalScrollPositionRegistry: Equatable {
       next.y += focusRect.maxY - route.viewportRect.maxY
     }
 
-    next.x = clampedOffset(
-      next.x,
-      contentLength: route.contentBounds.size.width,
-      viewportLength: route.viewportRect.size.width
-    )
-    next.y = clampedOffset(
-      next.y,
-      contentLength: route.contentBounds.size.height,
-      viewportLength: route.viewportRect.size.height
-    )
+    // Collections own their usable viewport, which can exclude fixed chrome
+    // and overflow indicators. Preserve a visible axis's producer-owned offset
+    // instead of normalizing it against the raw route bounds.
+    if next.x != currentOffset.x {
+      next.x = clampedOffset(
+        next.x,
+        contentLength: route.contentBounds.size.width,
+        viewportLength: route.viewportRect.size.width
+      )
+    }
+    if next.y != currentOffset.y {
+      next.y = clampedOffset(
+        next.y,
+        contentLength: route.contentBounds.size.height,
+        viewportLength: route.viewportRect.size.height
+      )
+    }
     return next
   }
 

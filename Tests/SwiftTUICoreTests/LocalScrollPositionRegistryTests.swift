@@ -134,6 +134,108 @@ struct LocalScrollPositionRegistryTests {
     #expect(offset == .init(x: 0, y: 2))
   }
 
+  @Test("visible focused rect preserves the producer's usable-viewport offset")
+  func visibleFocusedRectPreservesProducerOffset() {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("Scroll")
+    let focusedIdentity = testIdentity("Scroll", "Content", "Button")
+    // Two indicator lines leave six usable rows in an eight-line viewport.
+    // The collection's final six-row window starts at row six, not row four.
+    var offset = ScrollOffset(x: 0, y: 6)
+
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+
+    let changed = registry.sync(
+      focusedIdentity: focusedIdentity,
+      focusRegions: [
+        FocusRegion(
+          identity: focusedIdentity,
+          rect: CellRect(origin: CellPoint(x: 0, y: 2), size: CellSize(width: 4, height: 1))
+        )
+      ],
+      scrollRoutes: [
+        ScrollRoute(
+          identity: scrollIdentity,
+          viewportRect: CellRect(origin: .zero, size: CellSize(width: 10, height: 8)),
+          contentBounds: CellRect(
+            origin: CellPoint(x: 0, y: -6), size: CellSize(width: 10, height: 12))
+        )
+      ]
+    )
+
+    #expect(!changed)
+    #expect(offset == ScrollOffset(x: 0, y: 6))
+  }
+
+  @Test(
+    "focus reveal preserves the producer's offset on the axis that needs no movement",
+    arguments: [
+      (
+        currentOffset: ScrollOffset(x: 2, y: 6), targetOrigin: CellPoint(x: -1, y: 2),
+        expectedOffset: ScrollOffset(x: 1, y: 6)
+      ),
+      (
+        currentOffset: ScrollOffset(x: 2, y: 6), targetOrigin: CellPoint(x: 8, y: 2),
+        expectedOffset: ScrollOffset(x: 3, y: 6)
+      ),
+      (
+        currentOffset: ScrollOffset(x: 6, y: 2), targetOrigin: CellPoint(x: 2, y: -1),
+        expectedOffset: ScrollOffset(x: 6, y: 1)
+      ),
+      (
+        currentOffset: ScrollOffset(x: 6, y: 2), targetOrigin: CellPoint(x: 2, y: 8),
+        expectedOffset: ScrollOffset(x: 6, y: 3)
+      ),
+      (
+        currentOffset: ScrollOffset(x: 0, y: 6), targetOrigin: CellPoint(x: -1, y: 2),
+        expectedOffset: ScrollOffset(x: 0, y: 6)
+      ),
+      (
+        currentOffset: ScrollOffset(x: 4, y: 6), targetOrigin: CellPoint(x: 8, y: 2),
+        expectedOffset: ScrollOffset(x: 4, y: 6)
+      ),
+    ])
+  func focusRevealPreservesOffsetOnUnmovedAxis(
+    currentOffset: ScrollOffset, targetOrigin: CellPoint, expectedOffset: ScrollOffset
+  ) {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("Scroll")
+    let focusedIdentity = testIdentity("Scroll", "Content", "Button")
+    var offset = currentOffset
+
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+
+    let changed = registry.sync(
+      focusedIdentity: focusedIdentity,
+      focusRegions: [
+        FocusRegion(
+          identity: focusedIdentity,
+          rect: CellRect(origin: targetOrigin, size: CellSize(width: 1, height: 1))
+        )
+      ],
+      scrollRoutes: [
+        ScrollRoute(
+          identity: scrollIdentity,
+          viewportRect: CellRect(origin: .zero, size: CellSize(width: 8, height: 8)),
+          contentBounds: CellRect(
+            origin: CellPoint(x: -currentOffset.x, y: -currentOffset.y),
+            size: CellSize(width: 12, height: 12))
+        )
+      ]
+    )
+
+    #expect(changed == (expectedOffset != currentOffset))
+    #expect(offset == expectedOffset)
+  }
+
   /// Regression for "wheel scroll stalls partway down, must click to continue":
   /// once a control is focused, focus-reveal must NOT re-assert itself every
   /// frame and drag the offset back when the user scrolls that control out of
@@ -273,6 +375,46 @@ struct LocalScrollPositionRegistryTests {
 
     #expect(changed)
     #expect(offset == .init(x: 0, y: 3))
+  }
+
+  @Test("unanchored scrollTo a visible target preserves the producer's offset")
+  func unanchoredScrollToVisibleTargetPreservesProducerOffset() {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("Scroll")
+    let targetIdentity = testIdentity("Scroll", "Content", "Target")
+    var offset = ScrollOffset(x: 0, y: 6)
+
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+    registry.updateGeometry(
+      scrollRoutes: [
+        ScrollRoute(
+          identity: scrollIdentity,
+          viewportRect: CellRect(origin: .zero, size: CellSize(width: 10, height: 8)),
+          contentBounds: CellRect(
+            origin: CellPoint(x: 0, y: -6), size: CellSize(width: 10, height: 12))
+        )
+      ],
+      scrollTargets: [
+        ScrollTarget(
+          identity: targetIdentity,
+          scrollIdentity: scrollIdentity,
+          rect: CellRect(origin: CellPoint(x: 0, y: 2), size: CellSize(width: 4, height: 1))
+        )
+      ]
+    )
+
+    let changed = registry.scrollToTarget(
+      ScrollTargetQuery(identity: targetIdentity),
+      anchor: nil,
+      scopeIdentity: nil
+    )
+
+    #expect(!changed)
+    #expect(offset == ScrollOffset(x: 0, y: 6))
   }
 
   @Test("scrollTo target with bottom anchor aligns to the viewport bottom")

@@ -117,6 +117,45 @@ struct CollectionScrollCurrencyTests {
     #expect(scrollCurrencySelection(harness.frame) == 0, "and the selection to the first row")
   }
 
+  @Test("compact checklist arrow navigation reaches every row and preserves focused activation")
+  func compactChecklistKeepsRevealedRowsFocused() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("CompactChecklistFocus"),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      CompactCurrencyChecklist()
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("«0»")
+
+    func expectFocusedRow(_ row: Int) throws {
+      let identity = try harness.focusIdentity(forText: "«\(row)»")
+      #expect(
+        harness.runLoop.focusTracker.currentFocusIdentity == identity,
+        "row \(row) must remain visible and focused:\n\(harness.frame)"
+      )
+    }
+
+    // Eight lines leave six usable rows once both overflow indicators appear.
+    // Generic focus clamping used the raw height and moved a valid anchor back,
+    // hiding the requested row and falling back to the first visible row.
+    for row in 1..<12 {
+      _ = try harness.pressKey(KeyPress(.arrowDown))
+      try expectFocusedRow(row)
+    }
+
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(harness.frame.contains("checked=[11]"))
+    _ = try harness.pressKey(KeyPress(.space))
+    #expect(harness.frame.contains("checked=[]"))
+
+    for row in (0..<11).reversed() {
+      _ = try harness.pressKey(KeyPress(.arrowUp))
+      try expectFocusedRow(row)
+    }
+  }
+
   @Test("T-02: the wheel moves the window and leaves the selection alone")
   func wheelScrollsWithoutChangingSelection() throws {
     let harness = try StressRuntimeHarness(
@@ -438,6 +477,34 @@ enum TallRowBottomMove: CustomStringConvertible, Sendable {
 }
 
 // MARK: - Fixtures
+
+@MainActor
+private struct CompactCurrencyChecklist: View {
+  @State private var selection: Set<Int> = []
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      List(0..<12, id: \.self, selection: $selection) { row in
+        Text("«\(row)»")
+      }
+      .listStyle(CompactCurrencyListStyle())
+      .focusable(false)
+      .frame(height: 8)
+      Text("checked=\(selection.sorted())")
+    }
+  }
+}
+
+private struct CompactCurrencyListStyle: ListStyle, Equatable {
+  @MainActor
+  func resolvePresentation(for configuration: ListStyleConfiguration) -> ListStylePresentation {
+    ListStylePresentation(
+      contentInsets: EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0),
+      showsRowSeparators: false,
+      showsSectionSeparators: false
+    )
+  }
+}
 
 @MainActor
 private struct TallRowCurrencyCollection: View {
