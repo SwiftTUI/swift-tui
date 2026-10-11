@@ -30,6 +30,14 @@ extension ResolvedNode {
     var canRefreshWitness = true
     while let (lhs, rhs) = pending.popLast() {
       if Mode.isEnabled { work.measurementNodes += 1 }
+      // Hosted collections carry their visible layout through measurement.
+      // Reusing it also requires the same scroll anchor and painted chrome.
+      let carriesCollectionLayout =
+        lhs.semanticMetadata.hostedCollectionContainer != nil
+        || rhs.semanticMetadata.hostedCollectionContainer != nil
+      if carriesCollectionLayout, lhs.drawPayload != rhs.drawPayload {
+        return .init(isCompatible: false, canRefreshWitness: false)
+      }
       guard
         lhs.structuralPath == rhs.structuralPath,
         lhs.kind == rhs.kind,

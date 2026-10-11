@@ -142,6 +142,8 @@ extension ListStylePresentation {
   /// cell tall — the historical model, so those callers are unaffected.
   /// Supplying it is what makes measure, place, draw, and semantics agree on
   /// where a tall row's chrome goes (register item D19).
+  /// `itemSizes` carries eager child measurements by payload item index, so
+  /// authored headers and footers contribute their measured cells too.
   /// `rowWindow` bounds line GENERATION to a band of rows, for the case where
   /// `bounds` is not the viewport: inside a `ScrollView` a hosted collection is
   /// laid out against its own full content height, so asking for "the visible
@@ -154,6 +156,7 @@ extension ListStylePresentation {
     for payload: ListPayload,
     in bounds: CellRect,
     rowHeights: [Int: Int]? = nil,
+    itemSizes: [ChildAllocation] = [],
     rowWindow: Range<Int>? = nil
   ) -> ListVisibleLayout {
     ListLayoutDerivationProbe.recordDerivation()
@@ -162,6 +165,7 @@ extension ListStylePresentation {
       for: payload,
       viewportLineCount: contentBounds.size.height,
       rowHeights: rowHeights,
+      itemSizes: itemSizes,
       rowWindow: rowWindow
     )
     var lines = generated.lines
@@ -178,8 +182,8 @@ extension ListStylePresentation {
       } ?? 0
     var cursor = generated.firstLinePosition + extraBefore
     for index in lines.indices {
-      let height =
-        lines[index].rowIndex.flatMap { rowHeights?[$0] }.map { max(1, $0) } ?? 1
+      let height = listLineHeight(
+        lines[index], rowHeights: rowHeights, itemSizes: itemSizes)
       lines[index].height = height
       lines[index].yOffset = cursor
       cursor += height
@@ -198,8 +202,49 @@ extension ListStylePresentation {
       ),
       totalContentHeight: totalContentHeight
     )
-    layout.scrollMetadata = .init(
-      maximumAnchorRow: generated.maximumAnchorRow, position: generated.scrollPosition)
+    // Row extents and the visible interval use dataset-body cells. A realized
+    // window only bounds generation; it does not move the viewport itself.
+    let navigation: CollectionScrollLayout?
+    if payload.isViewportBacked {
+      let geometry = CollectionScrollGeometry(
+        rowCount: payload.rowCount,
+        rowSpan: listRowDisplaySpan,
+        chromeInset: 0,
+        rowHeights: rowHeights ?? [:]
+      )
+      let showsIndicatorLines =
+        geometry.displayLineCount > contentBounds.size.height
+        && payload.showsIndicators && contentBounds.size.height >= 3
+      let capacity = max(0, contentBounds.size.height - (showsIndicatorLines ? 2 : 0))
+      let offset: Int
+      if let position = generated.scrollPosition {
+        offset = position.cellOffset
+      } else if geometry.displayLineCount <= contentBounds.size.height {
+        offset = 0
+      } else {
+        let window = viewportBackedListWindow(
+          itemCount: payload.rowCount,
+          selectedRowIndex: payload.selectedRowIndex,
+          anchorRowIndex: payload.scrollAnchor?.rowIndex(rowCount: payload.rowCount),
+          showsIndicators: payload.showsIndicators,
+          viewportLineCount: contentBounds.size.height
+        )
+        offset =
+          window.offset
+          + tallRowExtraCells(in: rowHeights ?? [:]) { $0 * listRowDisplaySpan < window.offset }
+      }
+      navigation = CollectionScrollLayout(
+        geometry: geometry,
+        visibleLines: offset..<(offset + capacity),
+        anchor: payload.scrollAnchor)
+    } else {
+      navigation = generated.navigation
+    }
+    layout.scrollMetadata = CollectionScrollLayoutMetadata(
+      maximumAnchorRow: generated.maximumAnchorRow,
+      position: generated.scrollPosition,
+      navigation: navigation
+    )
     return layout
   }
 
@@ -364,13 +409,15 @@ extension ListStylePresentation {
     trailingLineCount: Int,
     isWindowed: Bool,
     maximumAnchorRow: Int?,
-    scrollPosition: CollectionScrollPosition?
+    scrollPosition: CollectionScrollPosition?,
+    navigation: CollectionScrollLayout?
   )
 
   private func visibleListLines(
     for payload: ListPayload,
     viewportLineCount: Int,
     rowHeights: [Int: Int]?,
+    itemSizes: [ChildAllocation],
     rowWindow: Range<Int>?
   ) -> GeneratedListLines {
     if payload.isViewportBacked {
@@ -381,83 +428,136 @@ extension ListStylePresentation {
         rowWindow: rowWindow
       )
     }
-    // The materialized line model has no arithmetic row-to-line map (headers,
-    // footers, and section separators interleave), so it cannot be windowed
-    // this way; it is also the path with no hosted children to window against.
-    let displayLines = materializedListLines(for: payload)
-    guard viewportLineCount > 0 else {
-      return ([], 0, 0, false, nil, nil)
-    }
+    return materializedVisibleListLines(
+      for: payload,
+      viewportLineCount: viewportLineCount,
+      rowHeights: rowHeights,
+      itemSizes: itemSizes
+    )
+  }
 
-    if displayLines.count > viewportLineCount {
-      let visibleLineCount =
-        payload.showsIndicators && viewportLineCount >= 3
-        ? max(1, viewportLineCount - 2)
-        : viewportLineCount
-      let maxOffset = max(0, displayLines.count - visibleLineCount)
-      let offset: Int
-      if let anchorRowIndex = payload.scrollAnchorRowIndex {
-        // The materialized line array is not uniformly spaced (headers,
-        // footers, and section separators interleave), so the anchor ROW is
-        // mapped to its line here rather than by arithmetic. Falling back to
-        // the last line keeps a stale anchor past the end from collapsing the
-        // window to the top.
-        let anchorLineIndex =
-          displayLines.firstIndex { $0.rowIndex == anchorRowIndex }
-          ?? (anchorRowIndex > 0 ? displayLines.count - 1 : 0)
-        offset = min(max(0, anchorLineIndex), maxOffset)
+  private func listLineHeight(
+    _ line: ListDisplayLine,
+    rowHeights: [Int: Int]?,
+    itemSizes: [ChildAllocation]
+  ) -> Int {
+    // Item indices include authored headers and footers; selectable row indices
+    // do not. Generated separators have no measured child and remain one cell.
+    if case .separator = line.kind {
+      return 1
+    }
+    if let itemIndex = line.itemIndex,
+      itemSizes.indices.contains(itemIndex)
+    {
+      return max(1, itemSizes[itemIndex].size.height)
+    }
+    return line.rowIndex.flatMap { rowHeights?[$0] }.map { max(1, $0) } ?? 1
+  }
+
+  private func materializedVisibleListLines(
+    for payload: ListPayload,
+    viewportLineCount: Int,
+    rowHeights: [Int: Int]?,
+    itemSizes: [ChildAllocation]
+  ) -> GeneratedListLines {
+    var displayLines = materializedListLines(for: payload)
+    var cursor = 0
+    var rowRanges: [Range<Int>] = []
+    for index in displayLines.indices {
+      let height = listLineHeight(
+        displayLines[index], rowHeights: rowHeights, itemSizes: itemSizes)
+      displayLines[index].height = height
+      displayLines[index].yOffset = cursor
+      if displayLines[index].rowIndex != nil {
+        rowRanges.append(cursor..<(cursor + height))
+      }
+      cursor += height
+    }
+    let geometry = CollectionScrollGeometry(rowRanges: rowRanges, displayLineCount: cursor)
+    guard viewportLineCount > 0, !displayLines.isEmpty else {
+      let navigation = CollectionScrollLayout(
+        geometry: geometry, visibleLines: 0..<0, anchor: payload.scrollAnchor)
+      return ([], 0, 0, false, nil, nil, navigation)
+    }
+    let showsIndicatorLines =
+      cursor > viewportLineCount
+      && payload.showsIndicators && viewportLineCount >= 3
+    let capacity = showsIndicatorLines ? max(1, viewportLineCount - 2) : viewportLineCount
+    var maxOffset = displayLines.count
+    var tailCells = 0
+    while maxOffset > 0, tailCells + displayLines[maxOffset - 1].height <= capacity {
+      maxOffset -= 1
+      tailCells += displayLines[maxOffset].height
+    }
+    maxOffset = min(maxOffset, displayLines.count - 1)
+    let offset: Int
+    if cursor <= viewportLineCount {
+      offset = 0
+    } else if let anchor = payload.scrollAnchor {
+      // Start and end include section-only cells. A row anchor targets that
+      // row's measured position, even when a header precedes the first row.
+      switch anchor {
+      case .start:
+        offset = 0
+      case .row(let rowIndex):
+        let anchorLine =
+          displayLines.firstIndex { $0.rowIndex == max(0, rowIndex) }
+          ?? displayLines.count - 1
+        offset = min(anchorLine, maxOffset)
+      case .end:
+        offset = maxOffset
+      }
+    } else if let selectedRowIndex = payload.selectedRowIndex,
+      let selectedLine = displayLines.firstIndex(where: { $0.rowIndex == selectedRowIndex })
+    {
+      let selectedCell = displayLines[selectedLine].yOffset
+      let startCell = max(0, selectedCell - capacity / 2)
+      let centredLine = displayLines.lastIndex { $0.yOffset <= startCell } ?? 0
+      let selectedHeight = min(capacity, displayLines[selectedLine].height)
+      let selectedEnd = selectedCell + selectedHeight
+      let centredEnd = displayLines[centredLine].yOffset + capacity
+      if selectedEnd <= centredEnd {
+        offset = min(centredLine, maxOffset)
       } else {
-        let selectedLineIndex = selectedListLineIndex(
-          in: displayLines,
-          selectedRowIndex: payload.selectedRowIndex
-        )
-        let lineIndex = min(
-          max(selectedLineIndex ?? 0, 0),
-          max(0, displayLines.count - 1)
-        )
-        offset = min(max(0, lineIndex - (visibleLineCount / 2)), maxOffset)
+        // Rounding the centred start into a tall header can hide the selected
+        // row. Keep preceding lines only when the measured row still fits.
+        let fittedLine =
+          displayLines.firstIndex { $0.yOffset >= selectedEnd - capacity }
+          ?? selectedLine
+        offset = min(fittedLine, maxOffset)
       }
-      let end = min(displayLines.count, offset + visibleLineCount)
-      guard payload.showsIndicators, viewportLineCount >= 3 else {
-        return (Array(displayLines[offset..<end]), 0, 0, false, nil, nil)
-      }
-      var visible: [ListDisplayLine] = []
-      visible.reserveCapacity(visibleLineCount + 2)
-      visible.append(
-        .init(
-          kind: .text(
-            "↑", .init(foregroundStyle: .semantic(.separator), opacity: payload.opacity)),
-          isHeader: true,
-          rowIndex: nil
-        )
-      )
-      if offset == 0 {
-        visible[0] = .init(
-          kind: .text("", .init(foregroundStyle: .semantic(.muted), opacity: payload.opacity)),
-          isHeader: true,
-          rowIndex: nil
-        )
-      }
-      visible.append(contentsOf: displayLines[offset..<end])
-      visible.append(
-        .init(
-          kind: .text(
-            "↓", .init(foregroundStyle: .semantic(.separator), opacity: payload.opacity)),
-          isHeader: true,
-          rowIndex: nil
-        )
-      )
-      if end >= displayLines.count {
-        visible[visible.count - 1] = .init(
-          kind: .text("", .init(foregroundStyle: .semantic(.muted), opacity: payload.opacity)),
-          isHeader: true,
-          rowIndex: nil
-        )
-      }
-      return (visible, 0, 0, false, nil, nil)
+    } else {
+      offset = 0
     }
-
-    return (Array(displayLines.prefix(viewportLineCount)), 0, 0, false, nil, nil)
+    var end = offset
+    var cells = 0
+    while end < displayLines.count, cells + displayLines[end].height <= capacity {
+      cells += displayLines[end].height
+      end += 1
+    }
+    if end == offset {
+      // An oversized row still places its first cells inside the viewport.
+      cells = displayLines[offset].height
+      end = offset + 1
+    }
+    var visible = Array(displayLines[offset..<end])
+    let cellOffset = displayLines[offset].yOffset
+    let maximumAnchorRow = geometry.row(atOrAfterLine: displayLines[maxOffset].yOffset)
+    let position = CollectionScrollPosition(
+      cellOffset: cellOffset, isAtStart: offset == 0, isAtEnd: offset == maxOffset)
+    let navigation = CollectionScrollLayout(
+      geometry: geometry, visibleLines: cellOffset..<(cellOffset + capacity),
+      anchor: payload.scrollAnchor)
+    if showsIndicatorLines {
+      let style = TextStyle(foregroundStyle: .semantic(.separator), opacity: payload.opacity)
+      func indicator(_ symbol: String) -> ListDisplayLine {
+        ListDisplayLine(kind: .text(symbol, style), isHeader: true, rowIndex: nil)
+      }
+      visible.append(contentsOf: Array(repeating: indicator(""), count: max(0, capacity - cells)))
+      visible.insert(indicator(offset == 0 ? "" : "↑"), at: 0)
+      visible.append(indicator(end >= displayLines.count ? "" : "↓"))
+    }
+    return (visible, 0, 0, false, maximumAnchorRow, position, navigation)
   }
 
   private func viewportBackedVisibleListLines(
@@ -467,14 +567,14 @@ extension ListStylePresentation {
     rowWindow: Range<Int>?
   ) -> GeneratedListLines {
     guard viewportLineCount > 0, payload.rowCount > 0 else {
-      return ([], 0, 0, false, nil, nil)
+      return ([], 0, 0, false, nil, nil, nil)
     }
 
     let usesSectionChrome = container != nil && chromeScope == .eachSection
     let window = viewportBackedListWindow(
       itemCount: payload.rowCount,
       selectedRowIndex: payload.selectedRowIndex,
-      anchorRowIndex: payload.scrollAnchorRowIndex,
+      anchorRowIndex: payload.scrollAnchor?.rowIndex(rowCount: payload.rowCount),
       showsIndicators: payload.showsIndicators,
       viewportLineCount: viewportLineCount
     )
@@ -512,7 +612,7 @@ extension ListStylePresentation {
     if isWindowed {
       // No overflow indicators: a windowed generation only happens when the
       // bounds cover the whole content, where nothing is hidden to indicate.
-      return (visible, offset, max(0, displayLineCount - end), true, nil, nil)
+      return (visible, offset, max(0, displayLineCount - end), true, nil, nil, nil)
     }
 
     let rowCount = payload.rowCount
@@ -532,7 +632,7 @@ extension ListStylePresentation {
       payload.showsIndicators,
       viewportLineCount >= 3
     else {
-      return (visible, 0, 0, false, nil, nil)
+      return (visible, 0, 0, false, nil, nil, nil)
     }
 
     let indicatorStyle = TextStyle(
@@ -554,7 +654,7 @@ extension ListStylePresentation {
         rowIndex: nil
       )
     )
-    return (visible, 0, 0, false, nil, nil)
+    return (visible, 0, 0, false, nil, nil, nil)
   }
 
   /// The viewport's lines when rows taller than one cell are known: the
@@ -583,7 +683,7 @@ extension ListStylePresentation {
     guard displayCellCount > viewportLineCount else {
       return (
         (0..<displayLineCount).map(line(at:)), 0, 0, false, 0,
-        .init(cellOffset: 0, isAtStart: true, isAtEnd: true)
+        .init(cellOffset: 0, isAtStart: true, isAtEnd: true), nil
       )
     }
     func lineHeight(_ position: Int) -> Int {
@@ -601,7 +701,7 @@ extension ListStylePresentation {
     }
     maxOffset = min(maxOffset, displayLineCount - 1)
     let offset =
-      if let anchorRowIndex = payload.scrollAnchorRowIndex {
+      if let anchorRowIndex = payload.scrollAnchor?.rowIndex(rowCount: payload.rowCount) {
         min(max(0, anchorRowIndex) * rowSpan, maxOffset)
       } else {
         min(window.offset, maxOffset)
@@ -618,14 +718,13 @@ extension ListStylePresentation {
       end = offset + 1
     }
     var visible = (offset..<end).map(line(at:))
-    // The one-line clamp the scroll currency uses stops short of the bottom
-    // when rows are taller; publish the anchor row that shows the last row.
+    // Navigation shares the endpoint that fits the final row as a whole.
     let maximumAnchorRow = (maxOffset + rowSpan - 1) / rowSpan
     let position = CollectionScrollPosition(
       cellOffset: offset + tallRowExtraCells(in: rowHeights) { $0 * rowSpan < offset },
       isAtStart: offset == 0, isAtEnd: offset == maxOffset)
     guard showsIndicatorLines else {
-      return (visible, 0, 0, false, maximumAnchorRow, position)
+      return (visible, 0, 0, false, maximumAnchorRow, position, nil)
     }
 
     let indicatorStyle = TextStyle(
@@ -640,7 +739,7 @@ extension ListStylePresentation {
     visible.append(contentsOf: Array(repeating: indicator(""), count: max(0, capacity - cells)))
     visible.insert(indicator(offset == 0 ? "" : "↑"), at: 0)
     visible.append(indicator(end >= displayLineCount ? "" : "↓"))
-    return (visible, 0, 0, false, maximumAnchorRow, position)
+    return (visible, 0, 0, false, maximumAnchorRow, position, nil)
   }
 
   private func viewportBackedListLine(

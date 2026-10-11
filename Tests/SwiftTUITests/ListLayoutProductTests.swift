@@ -12,6 +12,92 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct ListLayoutProductTests {
+  @Test(
+    "intrinsic padded rows retain their cells in indexed and builder lists",
+    arguments: [false, true]
+  )
+  func intrinsicPaddedRowsKeepTheirSpacing(builder: Bool) throws {
+    let artifacts = DefaultRenderer().render(
+      PaddedLayoutList(builder: builder).listStyle(MeasuredLayoutListStyle()),
+      context: ResolveContext(
+        identity: testIdentity("IntrinsicPaddedRows", builder ? "Builder" : "Indexed"),
+        applyEnvironmentValues: false
+      ),
+      proposal: ProposedSize(width: .finite(32), height: .unspecified)
+    )
+    let lines = artifacts.rasterSurface.lines
+    let surface = lines.joined(separator: "\n")
+
+    #expect(lines.count == 9, "three three-line rows occupy nine cells:\n\(surface)")
+    for (label, expectedLine) in [("«0»", 1), ("«1»", 4), ("«2»", 7)] {
+      let actualLine = try #require(lines.firstIndex { $0.contains(label) }, "\(surface)")
+      #expect(actualLine == expectedLine, "\(label) retains its padding:\n\(surface)")
+    }
+  }
+
+  @Test("a finite builder list places mixed-height rows on distinct cells")
+  func finiteBuilderPreservesMixedRowHeights() throws {
+    let artifacts = DefaultRenderer().render(
+      List {
+        Text("short")
+        Text("padded").padding(.vertical, 1)
+        VStack(alignment: .leading, spacing: 0) {
+          Text("two-a")
+          Text("two-b")
+        }
+      }
+      .listStyle(MeasuredLayoutListStyle()),
+      context: ResolveContext(
+        identity: testIdentity("FiniteBuilderMixedHeights"), applyEnvironmentValues: false),
+      proposal: ProposedSize(width: .finite(32), height: .finite(8))
+    )
+    let lines = artifacts.rasterSurface.lines
+    let surface = lines.joined(separator: "\n")
+
+    for (label, expectedLine) in [("short", 0), ("padded", 2), ("two-a", 4), ("two-b", 5)] {
+      let actualLine = try #require(lines.firstIndex { $0.contains(label) }, "\(surface)")
+      #expect(actualLine == expectedLine, "\(label) uses its own measured cells:\n\(surface)")
+    }
+  }
+
+  @Test("a finite builder list retains section headers and footers around padded rows")
+  func finiteBuilderPreservesSectionChrome() throws {
+    let artifacts = DefaultRenderer().render(
+      List {
+        Section {
+          Text("first-row").padding(.vertical, 1)
+        } header: {
+          Text("first-header")
+        } footer: {
+          Text("first-footer")
+        }
+        Section {
+          Text("second-row").padding(.vertical, 1)
+        } header: {
+          Text("second-header")
+        } footer: {
+          Text("second-footer")
+        }
+      }
+      .listStyle(MeasuredLayoutListStyle()),
+      context: ResolveContext(
+        identity: testIdentity("FiniteBuilderSectionChrome"), applyEnvironmentValues: false),
+      proposal: ProposedSize(width: .finite(32), height: .finite(12))
+    )
+    let lines = artifacts.rasterSurface.lines
+    let surface = lines.joined(separator: "\n")
+
+    // Each section has one header cell, three row cells, and one footer cell.
+    let expectedLines = [
+      ("first-header", 0), ("first-row", 2), ("first-footer", 4),
+      ("second-header", 5), ("second-row", 7), ("second-footer", 9),
+    ]
+    for (label, expectedLine) in expectedLines {
+      let actualLine = try #require(lines.firstIndex { $0.contains(label) }, "\(surface)")
+      #expect(actualLine == expectedLine, "\(label) preserves section geometry:\n\(surface)")
+    }
+  }
+
   @Test("T-30: a 2-line row keeps its marker, content, and successors aligned")
   func tallRowsStayAligned() throws {
     // Flipped from C-06, which pinned the marker landing one cell ABOVE its
@@ -193,6 +279,36 @@ struct ListLayoutProductTests {
       }
       #expect(index == first + row, "one cell per row, exactly as before")
     }
+  }
+}
+
+@MainActor
+private struct PaddedLayoutList: View {
+  let builder: Bool
+
+  var body: some View {
+    if builder {
+      List {
+        ForEach(0..<3, id: \.self) { row in
+          Text("«\(row)»").padding(.vertical, 1)
+        }
+      }
+    } else {
+      List(0..<3, id: \.self) { row in
+        Text("«\(row)»").padding(.vertical, 1)
+      }
+    }
+  }
+}
+
+private struct MeasuredLayoutListStyle: ListStyle, Equatable {
+  @MainActor
+  func resolvePresentation(for configuration: ListStyleConfiguration) -> ListStylePresentation {
+    ListStylePresentation(
+      contentInsets: EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0),
+      showsRowSeparators: false,
+      showsSectionSeparators: false
+    )
   }
 }
 

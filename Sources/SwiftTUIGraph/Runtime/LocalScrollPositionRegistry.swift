@@ -18,6 +18,9 @@ package struct ScrollPositionRegistrationSnapshot {
   package var ownerViewNodeID: ViewNodeID?
   package var currentOffset: @MainActor () -> ScrollOffset
   package var applyOffset: @MainActor (ScrollOffset) -> Void
+  /// The logical collection position remains stable while estimated cell
+  /// offsets change. It also detects input that supersedes a pending command.
+  package var currentCollectionAnchor: @MainActor () -> CollectionScrollAnchor?
   /// The authored binding's source token, when its producer supplies one.
   /// Registrations rebuild every resolve pass, so "registration replaced"
   /// never means "binding replaced" — this token is the only currency that
@@ -26,10 +29,10 @@ package struct ScrollPositionRegistrationSnapshot {
   /// momentum to retire a fling whose binding was swapped out from under
   /// it. Nil (raw closures carry no identity) disables the distinction.
   package var bindingSourceID: AnyID?
-  /// Reveals a scroll target this route owns but that the placement walk never
-  /// saw — a viewport-backed collection's out-of-window rows, which have no
-  /// placed node and whose identities would cost O(dataset) to publish
-  /// eagerly. The producer performs the move itself and reports whether
+  /// Reveals a collection row, including rows outside the placed window whose
+  /// identities would cost O(dataset) to publish eagerly. The same calculation
+  /// handles placed rows so their measured height and usable viewport agree.
+  /// The producer performs the move itself and reports whether
   /// anything changed, because a collection's usable window is smaller than
   /// its raw viewport rect (overflow indicators, fixed table chrome), so the
   /// offset arithmetic here cannot express the right answer for it. Returns
@@ -49,6 +52,7 @@ package struct ScrollPositionRegistrationSnapshot {
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
+    currentCollectionAnchor: @escaping @MainActor () -> CollectionScrollAnchor? = { nil },
     revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil,
     scrollToEdge: (@MainActor (Edge) -> Bool)? = nil
   ) {
@@ -56,6 +60,7 @@ package struct ScrollPositionRegistrationSnapshot {
     self.ownerViewNodeID = ownerViewNodeID
     self.currentOffset = currentOffset
     self.applyOffset = applyOffset
+    self.currentCollectionAnchor = currentCollectionAnchor
     self.bindingSourceID = bindingSourceID
     self.revealTarget = revealTarget
     self.scrollToEdge = scrollToEdge
@@ -74,6 +79,12 @@ package final class LocalScrollPositionRegistry: Equatable {
     var requestedOffset: ScrollOffset
   }
   private var pendingLazyTargets: [Identity: PendingLazyTarget] = [:]
+  private struct PendingCollectionTarget {
+    let query: ScrollTargetQuery
+    let anchor: UnitPoint?
+    let requestedAnchor: CollectionScrollAnchor
+  }
+  private var pendingCollectionTargets: [Identity: PendingCollectionTarget] = [:]
   /// What each scroll route last auto-revealed (focused element + text cursor),
   /// keyed by the route identity. Lets `sync` fire focus-reveal only when focus
   /// (or a focused text cursor) *changes*, not as a standing per-frame constraint
@@ -111,6 +122,7 @@ package final class LocalScrollPositionRegistry: Equatable {
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
+    currentCollectionAnchor: @escaping @MainActor () -> CollectionScrollAnchor? = { nil },
     revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil,
     scrollToEdge: (@MainActor (Edge) -> Bool)? = nil
   ) {
@@ -120,6 +132,7 @@ package final class LocalScrollPositionRegistry: Equatable {
       currentOffset: currentOffset,
       applyOffset: applyOffset,
       bindingSourceID: bindingSourceID,
+      currentCollectionAnchor: currentCollectionAnchor,
       revealTarget: revealTarget,
       scrollToEdge: scrollToEdge
     )
@@ -139,6 +152,35 @@ package final class LocalScrollPositionRegistry: Equatable {
   ) {
     latestScrollRoutes = scrollRoutes
     latestScrollTargets = scrollTargets
+  }
+
+  /// Preserve a focused collection row when a resized viewport no longer
+  /// contains it. A new scroll request takes precedence over this correction.
+  package func revealCollectionFocusAfterResize(
+    _ focusedRegion: FocusRegion,
+    previousRoutes: [ScrollRoute],
+    scrollRoutes: [ScrollRoute],
+    scrollTargets: [ScrollTarget]
+  ) -> Bool {
+    guard let owner = focusedRegion.ownerIdentity,
+      let ownerNodeID = focusedRegion.ownerNodeID,
+      let registration = registrations[owner],
+      registration.ownerViewNodeID == ownerNodeID,
+      let previous = previousRoutes.first(where: { $0.identity == owner }),
+      let route = scrollRoutes.first(where: { $0.identity == owner }),
+      let previousLayout = previous.collectionScrollLayout,
+      let layout = route.collectionScrollLayout,
+      previousLayout.anchor == layout.anchor,
+      registration.currentCollectionAnchor() == previousLayout.anchor
+    else { return false }
+
+    let viewportSizeChanged = previous.viewportRect.size != route.viewportRect.size
+    let usableHeightChanged = previousLayout.visibleLines.count != layout.visibleLines.count
+    guard viewportSizeChanged || usableHeightChanged else { return false }
+
+    updateGeometry(scrollRoutes: scrollRoutes, scrollTargets: scrollTargets)
+    return registration.revealTarget?(ScrollTargetQuery(identity: focusedRegion.identity), nil)
+      == true
   }
 
   /// Apply geometry refinement only when its owning frame commits. Abandoned
@@ -196,6 +238,10 @@ package final class LocalScrollPositionRegistry: Equatable {
       let route = latestScrollRoutes.first(where: { $0.identity == target.scrollIdentity }),
       let registration = registrations[target.scrollIdentity]
     {
+      if let handled = registration.revealTarget?(query, anchor) {
+        recordCollectionTarget(query, anchor: anchor, registration: registration, changed: handled)
+        return handled
+      }
       let original = registration.currentOffset()
       let changed = scrollTo(
         rect: target.rect,
@@ -224,9 +270,22 @@ package final class LocalScrollPositionRegistry: Equatable {
       else {
         continue
       }
+      recordCollectionTarget(query, anchor: anchor, registration: registration, changed: handled)
       return handled
     }
     return false
+  }
+
+  private func recordCollectionTarget(
+    _ query: ScrollTargetQuery,
+    anchor: UnitPoint?,
+    registration: ScrollPositionRegistrationSnapshot,
+    changed: Bool
+  ) {
+    pendingCollectionTargets.removeValue(forKey: registration.identity)
+    guard changed, let requestedAnchor = registration.currentCollectionAnchor() else { return }
+    pendingCollectionTargets[registration.identity] = PendingCollectionTarget(
+      query: query, anchor: anchor, requestedAnchor: requestedAnchor)
   }
 
   private func scrollTo(
@@ -384,6 +443,21 @@ package final class LocalScrollPositionRegistry: Equatable {
         registration.applyOffset(pending.originalOffset)
         return true
       }
+    }
+
+    // Refine once the requested collection window has been measured. Using
+    // its logical anchor avoids mistaking a height correction for new input.
+    for (identity, pending) in pendingCollectionTargets {
+      guard let route = scrollRoutes.first(where: { $0.identity == identity }),
+        let registration = registrations[identity],
+        registration.currentCollectionAnchor() == pending.requestedAnchor
+      else {
+        pendingCollectionTargets.removeValue(forKey: identity)
+        continue
+      }
+      guard route.collectionScrollLayout?.anchor == pending.requestedAnchor else { continue }
+      pendingCollectionTargets.removeValue(forKey: identity)
+      if registration.revealTarget?(pending.query, pending.anchor) == true { return true }
     }
 
     // Drop reveal anchors whose scroll route is no longer live. `sync` receives
@@ -569,7 +643,10 @@ package final class LocalScrollPositionRegistry: Equatable {
       next.x += focusRect.maxX - route.viewportRect.maxX
     }
 
-    if focusRect.origin.y < route.viewportRect.origin.y {
+    // A target taller than the viewport cannot show both edges. Keep its
+    // start visible instead of moving past it to reveal the bottom.
+    let exceedsViewportHeight = focusRect.size.height > route.viewportRect.size.height
+    if focusRect.origin.y < route.viewportRect.origin.y || exceedsViewportHeight {
       next.y += focusRect.origin.y - route.viewportRect.origin.y
     } else if focusRect.maxY > route.viewportRect.maxY {
       next.y += focusRect.maxY - route.viewportRect.maxY
@@ -640,6 +717,12 @@ package final class LocalScrollPositionRegistry: Equatable {
     scopeIdentity: Identity?
   ) -> Int? {
     firstRoute(matching: scopeIdentity)?.collectionMaximumAnchorRow
+  }
+
+  package func collectionScrollLayout(
+    scopeIdentity: Identity?
+  ) -> CollectionScrollLayout? {
+    firstRoute(matching: scopeIdentity)?.collectionScrollLayout
   }
 
   /// Clamps `offset` against the live geometry of the route matching

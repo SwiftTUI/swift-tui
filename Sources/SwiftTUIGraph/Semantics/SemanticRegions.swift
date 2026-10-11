@@ -88,14 +88,13 @@ package struct CollectionScrollPosition: Equatable, Sendable {
 
 public struct ScrollRoute: Equatable, Sendable {
   package var collectionScrollPosition: CollectionScrollPosition? = nil
+  package var collectionScrollLayout: CollectionScrollLayout? = nil
 
   /// Authored motion policy at this route, refreshed with each semantic frame.
   package var reducesMotion = false
   package var scrollAnchorCorrection: LazyScrollAnchorCorrection? = nil
-  /// For a viewport-backed collection whose rows render taller than one cell,
-  /// the largest scroll anchor row whose window still ends at the last row, as
-  /// its layout drew it. The collection's scroll currency counts one line per
-  /// row and clamps against this instead, so the last rows stay reachable.
+  /// The largest row anchor from whole-row fitting, including the space taken
+  /// by fixed chrome and indicators. It can differ from a cell-offset clamp.
   package var collectionMaximumAnchorRow: Int? = nil
   public var identity: Identity
   package var viewNodeID: ViewNodeID?

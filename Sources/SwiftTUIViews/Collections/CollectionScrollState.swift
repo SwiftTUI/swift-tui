@@ -1,96 +1,5 @@
 @_spi(Testing) import SwiftTUICore
 
-/// The scroll currency of a collection: the dataset row pinned to the top of
-/// the viewport, from which the visible window is derived.
-///
-/// Before this existed the window was recomputed every frame as
-/// `clamp(selectedRowIndex − visibleLineCount / 2)`, which made "what is
-/// selected" and "where am I looking" the same variable — a non-selectable
-/// collection could not scroll at all, and every selection change dragged the
-/// viewport with it. Storing the anchor separates the two: selection now
-/// *follows* the window instead of *being* it.
-package struct CollectionScrollAnchor: Equatable, Sendable {
-  /// The dataset row index pinned to the top of the viewport.
-  package var firstVisibleItemIndex: Int
-  /// How many display lines into that row the viewport starts. Always 0 while
-  /// every row occupies one display line; the field exists so the currency
-  /// keeps its shape once real per-row heights land.
-  package var intraItemLineOffset: Int
-
-  package init(
-    firstVisibleItemIndex: Int,
-    intraItemLineOffset: Int = 0
-  ) {
-    self.firstVisibleItemIndex = firstVisibleItemIndex
-    self.intraItemLineOffset = intraItemLineOffset
-  }
-}
-
-/// The display-line arithmetic of a collection body: how many lines one row
-/// occupies (2 when the style draws row separators) and how many chrome lines
-/// precede row 0.
-///
-/// For the materialized (non-viewport-backed) list path this model is an
-/// under-estimate — interleaved headers, footers, and section separators add
-/// lines it does not count. That direction is deliberate: it makes every
-/// derived extent conservative, so the anchor can never be stored past the
-/// true end of the content, which is what would make reverse scrolling spin
-/// before the viewport moves.
-package struct CollectionScrollGeometry: Equatable, Sendable {
-  package var rowCount: Int
-  package var rowSpan: Int
-  package var chromeInset: Int
-
-  package init(
-    rowCount: Int,
-    rowSpan: Int,
-    chromeInset: Int
-  ) {
-    self.rowCount = max(0, rowCount)
-    self.rowSpan = max(1, rowSpan)
-    self.chromeInset = max(0, chromeInset)
-  }
-
-  package var displayLineCount: Int {
-    guard rowCount > 0 else {
-      return chromeInset
-    }
-    return chromeInset + rowCount * rowSpan - (rowSpan - 1)
-  }
-
-  package var lastRowIndex: Int {
-    max(0, rowCount - 1)
-  }
-
-  package func line(forRow rowIndex: Int) -> Int {
-    chromeInset + min(max(0, rowIndex), lastRowIndex) * rowSpan
-  }
-
-  /// The first row at or after `line` — the row that is fully visible when the
-  /// viewport starts there. Reveal-shaped conversions round this way so a
-  /// partially covered row is never reported as the anchor.
-  package func row(atOrAfterLine line: Int) -> Int {
-    let body = max(0, line - chromeInset)
-    return min((body + rowSpan - 1) / rowSpan, lastRowIndex)
-  }
-
-  /// The last row at or before `line`. Extent maths rounds this way; rounding
-  /// up would let the anchor overshoot the end of the dataset.
-  package func row(atOrBeforeLine line: Int) -> Int {
-    let body = max(0, line - chromeInset)
-    return min(body / rowSpan, lastRowIndex)
-  }
-
-  /// The largest anchor row that still fills a `viewportLineCount`-line
-  /// viewport. Without synced geometry the dataset bound is the only clamp.
-  package func maxAnchorRow(viewportLineCount: Int) -> Int {
-    guard viewportLineCount > 0 else {
-      return lastRowIndex
-    }
-    return row(atOrBeforeLine: max(0, displayLineCount - viewportLineCount))
-  }
-}
-
 /// The read/write face of a collection's stored scroll anchor, plus the
 /// movement vocabulary its input handlers need.
 ///
@@ -103,7 +12,7 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
 @MainActor
 package struct CollectionScrollCurrency {
   package let identity: Identity
-  package let geometry: CollectionScrollGeometry
+  private let estimatedGeometry: CollectionScrollGeometry
   private let ownerNode: SwiftTUICore.ViewNode?
   private let registry: LocalScrollPositionRegistry?
   /// The window the layout would show for a given viewport height with no
@@ -123,27 +32,37 @@ package struct CollectionScrollCurrency {
     windowMetrics: @escaping @MainActor (Int) -> (offset: Int, visibleLineCount: Int)
   ) {
     self.identity = identity
-    self.geometry = geometry
+    estimatedGeometry = geometry
     self.ownerNode = ownerNode
     self.registry = registry
     self.windowMetrics = windowMetrics
   }
 
-  /// The stored anchor row clamped into the live dataset, or `nil` when
-  /// nothing has scrolled this collection yet.
-  package var storedAnchorRow: Int? {
-    storedCollectionScrollAnchor(in: ownerNode).map { anchor in
-      min(max(0, anchor.firstVisibleItemIndex), geometry.lastRowIndex)
-    }
+  private var layout: CollectionScrollLayout? {
+    guard let layout = registry?.collectionScrollLayout(scopeIdentity: identity),
+      layout.geometry.rowCount == estimatedGeometry.rowCount
+    else { return nil }
+    return layout
   }
 
-  /// The row currently at the top of the viewport, from the stored anchor or —
-  /// before anything has scrolled — from the selection-centred fallback the
-  /// layout still applies. An anchor stored at the end of the dataset (see
-  /// ``setAnchorRow(_:)``) reads as the last anchor that fills the window.
+  package var geometry: CollectionScrollGeometry {
+    layout?.geometry ?? estimatedGeometry
+  }
+
+  package var storedAnchor: CollectionScrollAnchor? {
+    storedCollectionScrollAnchor(in: ownerNode)
+  }
+
+  /// The current row, after layout has fitted the requested anchor to its
+  /// measured viewport. Before that frame, use the latest known extent.
   package var effectiveAnchorRow: Int {
-    if let storedAnchorRow {
-      return min(storedAnchorRow, maxAnchorRow)
+    if let layout, layout.anchor == storedAnchor {
+      // Whole-row fitting may leave a separator at the top of a table. The
+      // following row, not the row before that separator, starts this window.
+      return geometry.row(atOrAfterLine: layout.visibleLines.lowerBound)
+    }
+    if let storedAnchor {
+      return min(storedAnchor.rowIndex(rowCount: geometry.rowCount), maxAnchorRow)
     }
     return geometry.row(atOrBeforeLine: windowMetrics(viewportLineCount).offset)
   }
@@ -155,8 +74,8 @@ package struct CollectionScrollCurrency {
   }
 
   /// The largest anchor row that still fills the window. The geometry counts
-  /// one line per row; when rows render taller the layout publishes the row
-  /// it actually drew for the bottom, and that is the bound.
+  /// the known row heights; layout also accounts for interleaved chrome and
+  /// whole-row fitting at the bottom of the viewport.
   private var maxAnchorRow: Int {
     registry?.collectionMaximumAnchorRow(scopeIdentity: identity)
       ?? geometry.maxAnchorRow(viewportLineCount: visibleLineCount)
@@ -167,6 +86,7 @@ package struct CollectionScrollCurrency {
   /// overflow indicators and fixed chrome consume, and clamping the anchor
   /// against the raw height leaves the last rows of the dataset unreachable.
   package var visibleLineCount: Int {
+    if let layout { return layout.visibleLines.count }
     let viewport = viewportLineCount
     guard viewport > 0 else {
       return 0
@@ -174,58 +94,47 @@ package struct CollectionScrollCurrency {
     return max(1, windowMetrics(viewport).visibleLineCount)
   }
 
-  /// Writes the currently-shown top row into the slot when nothing is stored
-  /// yet, so the window stops silently tracking the selection.
-  ///
-  /// Without this, a selection move while the anchor is still `nil` would be
-  /// re-centred by the fallback no matter how minimal `reveal` was: the
-  /// fallback *is* the selection. Pinning at the moment of the first
-  /// selection-moving keypress is what makes "selection follows the window"
-  /// true from the very first arrow press, while leaving a purely
-  /// re-rendered payload (no interaction) on the historical path.
+  /// Capture the initial window before selection starts following it.
   @discardableResult
   package func pinCurrentAnchor() -> Bool {
-    guard storedAnchorRow == nil else {
-      return false
-    }
-    setStoredCollectionScrollAnchor(
-      CollectionScrollAnchor(firstVisibleItemIndex: effectiveAnchorRow),
-      in: ownerNode,
-      invalidationIdentity: identity
-    )
-    return true
+    guard storedAnchor == nil else { return false }
+    let offset = currentOffset().y
+    let anchor: CollectionScrollAnchor = offset == 0 ? .start : .row(effectiveAnchorRow)
+    return setAnchor(anchor)
   }
 
   package func currentOffset() -> ScrollOffset {
-    ScrollOffset(y: geometry.line(forRow: effectiveAnchorRow))
+    if let layout, layout.anchor == storedAnchor {
+      return ScrollOffset(y: layout.visibleLines.lowerBound)
+    }
+    let offset: Int
+    switch storedAnchor {
+    case .start: offset = 0
+    case .end: offset = max(0, geometry.displayLineCount - visibleLineCount)
+    case .row(let index): offset = geometry.line(forRow: min(index, maxAnchorRow))
+    case nil: offset = windowMetrics(viewportLineCount).offset
+    }
+    return ScrollOffset(y: offset)
   }
 
   package func applyOffset(_ offset: ScrollOffset) {
-    setAnchorRow(geometry.row(atOrAfterLine: offset.y))
+    if offset.y <= 0 {
+      _ = setAnchor(.start)
+    } else {
+      setAnchorRow(geometry.row(atOrAfterLine: offset.y))
+    }
   }
 
-  /// Moves the top of the viewport to `rowIndex`, clamped to the rows that
-  /// still fill the window.
-  ///
-  /// A move that reaches that clamp stores the dataset's last row instead: the
-  /// clamp is only as exact as the row heights known so far (rows never
-  /// realized count as one line), and the layout, which measures the rows it
-  /// realizes, pulls an end-of-dataset anchor back to the row that shows the
-  /// last row whole. With one-line rows the two clamps agree.
+  @discardableResult
+  private func setAnchor(_ anchor: CollectionScrollAnchor) -> Bool {
+    guard storedAnchor != anchor else { return false }
+    setStoredCollectionScrollAnchor(anchor, in: ownerNode, invalidationIdentity: identity)
+    return true
+  }
+
   @discardableResult
   package func setAnchorRow(_ rowIndex: Int) -> Bool {
-    let maxAnchorRow = self.maxAnchorRow
-    let target = rowIndex >= maxAnchorRow ? geometry.lastRowIndex : max(0, rowIndex)
-    let moves = min(target, maxAnchorRow) != effectiveAnchorRow
-    guard moves || (storedAnchorRow.map { $0 != target } ?? false) else {
-      return false
-    }
-    setStoredCollectionScrollAnchor(
-      CollectionScrollAnchor(firstVisibleItemIndex: target),
-      in: ownerNode,
-      invalidationIdentity: identity
-    )
-    return true
+    setAnchor(.row(min(max(0, rowIndex), geometry.lastRowIndex)))
   }
 
   /// Moves the anchor by whole rows.
@@ -239,7 +148,10 @@ package struct CollectionScrollCurrency {
     guard rows != 0 else {
       return false
     }
-    return setAnchorRow(effectiveAnchorRow + rows)
+    let destination = effectiveAnchorRow + rows
+    if destination < 0 { return setAnchor(.start) }
+    if destination >= maxAnchorRow { return setAnchor(.end) }
+    return setAnchorRow(destination)
   }
 
   @discardableResult
@@ -253,18 +165,26 @@ package struct CollectionScrollCurrency {
       // keypress still moves rather than reading as inert.
       return scroll(byRows: pages)
     }
-    // One line of overlap between pages, the usual pager convention.
-    let rows = max(1, max(1, visible - 1) / geometry.rowSpan)
-    return scroll(byRows: pages * rows)
+    // Preserve a line of overlap where whole-row fitting permits it. Round
+    // toward the current page so a tall row is not skipped between pages.
+    let current = effectiveAnchorRow
+    let destination = geometry.line(forRow: current) + pages * max(1, visible - 1)
+    let target =
+      pages > 0
+      ? max(current + 1, geometry.row(atOrBeforeLine: destination))
+      : min(current - 1, geometry.row(atOrAfterLine: destination))
+    if target < 0 { return setAnchor(.start) }
+    if target > geometry.lastRowIndex { return setAnchor(.end) }
+    return setAnchorRow(target)
   }
 
   @discardableResult
   package func scroll(toEdge edge: Edge) -> Bool {
     switch edge {
     case .top:
-      return setAnchorRow(0)
+      return setAnchor(.start)
     case .bottom:
-      return setAnchorRow(geometry.lastRowIndex)
+      return setAnchor(.end)
     case .leading, .trailing:
       return false
     }
@@ -275,13 +195,8 @@ package struct CollectionScrollCurrency {
   /// already that far inside the window. This is what makes a selection step
   /// *follow* the window instead of recentring it.
   ///
-  /// The margin is not cosmetic. Focus regions are published from the
-  /// committed frame, so a row must already be drawn before focus can move
-  /// onto it. Revealing with zero margin parks the selected row exactly on the
-  /// window edge, leaving its neighbour undrawn — and the next arrow press
-  /// then walks focus straight out of the collection instead of stepping to
-  /// that row. One row of context is the smallest margin that keeps row
-  /// navigation closed over the collection.
+  /// Context is bounded by the space left after the target row. Oversized
+  /// rows align at their start rather than alternating between their edges.
   @discardableResult
   package func reveal(
     row rowIndex: Int,
@@ -294,24 +209,25 @@ package struct CollectionScrollCurrency {
       return false
     }
     let target = min(max(0, rowIndex), geometry.lastRowIndex)
-    let targetLine = geometry.line(forRow: target)
-    let anchorLine = geometry.line(forRow: effectiveAnchorRow)
-    // A margin wider than the window would thrash; keep at least the target
-    // itself visible.
-    let marginLines = min(
-      max(0, margin) * geometry.rowSpan,
-      max(0, (visibleLines - geometry.rowSpan) / 2)
-    )
-    if targetLine - marginLines < anchorLine {
-      return setAnchorRow(geometry.row(atOrBeforeLine: max(0, targetLine - marginLines)))
+    let targetLines = geometry.lineRange(forRow: target)
+    let anchorLine = currentOffset().y
+    let contextLimit = max(0, (visibleLines - targetLines.count) / 2)
+    let firstContextRow = max(0, target - max(0, margin))
+    let lastContextRow = min(geometry.lastRowIndex, target + max(0, margin))
+    let precedingContext = min(
+      contextLimit, targetLines.lowerBound - geometry.line(forRow: firstContextRow))
+    let followingContext = min(
+      contextLimit, geometry.lineRange(forRow: lastContextRow).upperBound - targetLines.upperBound)
+    let firstLine = max(0, targetLines.lowerBound - precedingContext)
+    if firstLine < anchorLine {
+      // Rounding into a tall preceding row could consume the space reserved
+      // for the target. Omit context that cannot fit as a whole row.
+      return setAnchorRow(geometry.row(atOrAfterLine: firstLine))
     }
-    if targetLine + geometry.rowSpan + marginLines > anchorLine + visibleLines {
-      return setAnchorRow(
-        geometry.row(
-          atOrAfterLine: min(
-            targetLine, max(0, targetLine + geometry.rowSpan + marginLines - visibleLines))
-        )
-      )
+    if targetLines.upperBound + followingContext > anchorLine + visibleLines {
+      let firstVisibleLine = min(
+        targetLines.lowerBound, max(0, targetLines.upperBound + followingContext - visibleLines))
+      return setAnchorRow(geometry.row(atOrAfterLine: firstVisibleLine))
     }
     return false
   }
@@ -341,9 +257,9 @@ package struct CollectionScrollCurrency {
     guard visible > 0 else {
       return setAnchorRow(rowIndex)
     }
-    let targetLine = geometry.line(forRow: rowIndex)
-    let offsetLines = Int((Double(max(0, visible - geometry.rowSpan)) * anchor.y).rounded())
-    return setAnchorRow(geometry.row(atOrAfterLine: max(0, targetLine - offsetLines)))
+    let targetLines = geometry.lineRange(forRow: rowIndex)
+    let offsetLines = Int((Double(max(0, visible - targetLines.count)) * anchor.y).rounded())
+    return setAnchorRow(geometry.row(atOrAfterLine: max(0, targetLines.lowerBound - offsetLines)))
   }
 }
 

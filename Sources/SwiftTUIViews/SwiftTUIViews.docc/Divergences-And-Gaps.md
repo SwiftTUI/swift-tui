@@ -489,10 +489,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   is destruction or clobbering of authored values: an authored or ambient
   `lineLimit`/`truncationMode` reaches hosted rows and cells (rows grow to
   their measured height, and the payload boundary carries the attributes for
-  flattened text). Flattened section chrome (headers/footers) honors the
-  truncation mode but renders one line; an authored limit above one there
-  reports a `collection.unsupportedSectionChromeLineLimit` runtime issue and
-  clamps. Low-level flattened `ListPayload`/`TablePayload` text remains a
+  flattened text). Hosted section headers and footers also retain their
+  authored limits and measured heights. Low-level flattened
+  `ListPayload`/`TablePayload` text remains a
   *Ratified* single-line representation. Use hosted `List` rows and `Table`
   cells for multiline content: their measured heights drive placement, chrome,
   and semantics together. Inside a `ScrollView`, a row keeps its last measured

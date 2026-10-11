@@ -160,6 +160,7 @@ extension RunLoop {
     _ renderedArtifacts: FrameArtifacts,
     convergence: inout FocusSyncConvergenceState
   ) throws -> FocusSyncIterationOutcome {
+    let previousScrollRoutes = latestSemanticSnapshot.scrollRoutes
     latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
     // Order is load-bearing (F101): gesture pruning first, then the pointer
     // capture/hover paired-region pass below. The pointer registry does not
@@ -230,6 +231,43 @@ extension RunLoop {
     let shouldApplyDefaultFocus =
       focusTracker.currentFocusIdentity == nil && !focusTracker.isPreservingNoFocus
       || (nextModalFocusScopePath != nil && nextModalFocusScopePath != previousModalFocusScopePath)
+    let desiredFocusRequest = localFocusBindingRegistry.desiredFocusRequest(
+      allowedIdentities: Set(renderedArtifacts.semanticSnapshot.focusRegions.map(\.identity))
+    )
+    let defaultFocusRequest = localDefaultFocusRegistry.desiredFocusRequest(
+      focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
+      shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyDefaultFocus
+    )
+
+    // Resize can wrap a visible row out of the collection's window. Reveal it
+    // before replacing the focus regions, using the existing one-pass budget.
+    if !convergence.didEagerFocusLocationRerender, pendingKeyFocus == nil,
+      hotReloadSession?.pendingFocus == nil,
+      desiredFocusRequest == .none, defaultFocusRequest == .none,
+      nextModalFocusScopePath == previousModalFocusScopePath,
+      let focusedIdentity = focusTracker.currentFocusIdentity,
+      let focusedRegion = focusTracker.focusRegions.first(where: { $0.identity == focusedIdentity }
+      ),
+      !renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
+        $0.identity == focusedIdentity
+      }),
+      localScrollPositionRegistry.revealCollectionFocusAfterResize(
+        focusedRegion,
+        previousRoutes: previousScrollRoutes,
+        scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
+        scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets
+      )
+    {
+      convergence.scrollPositionChanged = true
+      convergence.didEagerFocusLocationRerender = true
+      convergence.rerenderedForFocusSync = true
+      convergence.midFrameRelocationInvalidations.formUnion(
+        schedulerPendingInvalidations().subtracting(convergence.pendingInvalidationsAtPassStart))
+      appendLifecycleCarryForward(
+        renderedArtifacts.commitPlan.lifecycle, into: &convergence.lifecycleCarryForward)
+      return .rerender
+    }
+
     let focusIdentityBeforeRegionUpdate = focusTracker.currentFocusIdentity
     let hadFocusBeforeRegionUpdate = focusIdentityBeforeRegionUpdate != nil
     var focusChanged = focusTracker.updateRegions(
@@ -302,14 +340,7 @@ extension RunLoop {
     // location change for the eager re-render below.
     let focusJustEstablished =
       !hadFocusBeforeRegionUpdate && focusTracker.currentFocusIdentity != nil
-    let desiredFocusRequest = localFocusBindingRegistry.desiredFocusRequest(
-      allowedIdentities: Set(renderedArtifacts.semanticSnapshot.focusRegions.map(\.identity))
-    )
     let appliedFocusRequest = applyDesiredFocusRequest(desiredFocusRequest)
-    let defaultFocusRequest = localDefaultFocusRegistry.desiredFocusRequest(
-      focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
-      shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyDefaultFocus
-    )
     let appliedDefaultFocusRequest = applyDesiredFocusRequest(defaultFocusRequest)
     // Binding `.defaultFocus` arrivals — fresh subtrees whose default lost
     // the resolve-time race to an already-focused control — arbitrate

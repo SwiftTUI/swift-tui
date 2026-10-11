@@ -593,7 +593,14 @@ extension LayoutEngine {
           in: bounds
         )
     else {
-      return payload.style.visibleListLayout(for: payload, in: bounds)
+      let allocation = measured.containerAllocationSnapshot
+      return payload.style.visibleListLayout(
+        for: payload,
+        in: bounds,
+        rowHeights: allocation?.hostedCollection?.tallRowHeights,
+        itemSizes: resolved.indexedChildSource == nil ? allocation?.childSizes ?? [] : [],
+        rowWindow: allocation?.hostedCollection?.measuredWindow
+      )
     }
     return stored.translated(by: bounds.origin)
   }

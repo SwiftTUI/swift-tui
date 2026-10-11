@@ -1,4 +1,30 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 extension LayoutEngine {
+  /// Eager lists use item indices, including headers and footers. Capture their
+  /// measured layout just as the indexed path captures its realized row window.
+  func measuredHostedListAllocation(
+    for resolved: ResolvedNode,
+    childSizes: [ChildAllocation],
+    measuredSize: CellSize
+  ) -> HostedCollectionAllocationSnapshot? {
+    guard case .intrinsic = resolved.layoutBehavior,
+      resolved.semanticMetadata.hostedCollectionContainer?.kind == .list,
+      resolved.indexedChildSource == nil,
+      case .list(let payload) = resolved.drawPayload
+    else {
+      return nil
+    }
+    return HostedCollectionAllocationSnapshot(
+      sourceIndices: Array(childSizes.indices),
+      listLayout: payload.style.visibleListLayout(
+        for: payload,
+        in: CellRect(origin: .zero, size: measuredSize),
+        itemSizes: childSizes
+      )
+    )
+  }
+
   /// The measured size of a hosted List.
   ///
   /// `sourceIndices` names the item each measurement belongs to. Without it,

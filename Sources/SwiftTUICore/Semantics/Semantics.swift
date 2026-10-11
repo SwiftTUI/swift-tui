@@ -251,6 +251,9 @@ package struct SemanticExtractor: Sendable {
           scrollRoutes[scrollRoutes.count - 1].collectionMaximumAnchorRow =
             node.hostedTableVisibleLayout?.maximumAnchorRow
             ?? node.hostedListVisibleLayout?.maximumAnchorRow
+          scrollRoutes[scrollRoutes.count - 1].collectionScrollLayout =
+            node.hostedTableVisibleLayout?.scrollMetadata?.navigation
+            ?? node.hostedListVisibleLayout?.scrollMetadata?.navigation
           selectionRoutes.append(
             SelectionRoute(identity: node.identity, role: scrollRole)
           )
