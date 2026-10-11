@@ -461,10 +461,11 @@ and dropped frames, before returning to input and termination handling. Pending
 work stays in the scheduler for the next pass. The deadline-arm cut also defers
 deadlines armed during the pass. Both bounds are needed: periodic state writes
 can keep invalidating faster than frames render, without consuming a deadline.
-Cooperative exit flushes stop after presenting the final input and its synchronous
-UI follow-ups. A skipped or elided acquisition does not satisfy that presentation
-requirement. Focus synchronization, lifecycle callbacks, animation completions,
-preference observations and pressed-state cleanup can request another frame;
+With the native `FrameScheduler`, cooperative exit flushes stop after presenting
+the final input and its synchronous UI follow-ups. A skipped or elided acquisition
+does not satisfy that presentation requirement. Focus synchronization, lifecycle
+callbacks, animation completions, preference observations and pressed-state cleanup
+can request another frame;
 independent background producers, frame presentation and diagnostic sinks do not
 extend the flush. The same 16-acquisition cap still bounds retries and callback
 chains. Signal exits retain their stricter one-acquisition flush.

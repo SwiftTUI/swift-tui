@@ -245,7 +245,7 @@ struct RunLoopDrainFairnessTests {
       }
     }
     do {
-      await workerGate.waitUntilBlocked()
+      try await waitUntil { workerGate.rasterEntryCount > 0 }
 
       harness.input.send(.key(.return))
       if inputEnds {
