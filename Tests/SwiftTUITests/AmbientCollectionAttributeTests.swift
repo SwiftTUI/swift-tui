@@ -9,8 +9,7 @@ import Testing
 // and ambient text-layout attributes reach List/Table rows and cells instead
 // of being destroyed at the payload boundary or clobbered on the hosted
 // path. The default row limit REMAINS 1 (ratified terminal-native default);
-// an unhonorable authored value on flattened section chrome reports a
-// runtime issue and renders one line.
+// authored section headers retain their measured text lines.
 @MainActor
 @Suite
 struct AmbientCollectionAttributeTests {
@@ -89,22 +88,28 @@ struct AmbientCollectionAttributeTests {
     #expect(rowText?.truncationMode == .head)
   }
 
-  @Test("a section header clamps an unhonorable authored lineLimit and reports it")
-  func sectionHeaderClampsUnhonorableLineLimitWithRuntimeIssue() {
+  @Test("a hosted section header honors an authored three-line limit")
+  func hostedSectionHeaderHonorsAuthoredLineLimit() throws {
     let artifacts = DefaultRenderer().render(
       List {
         Section {
           Text("Row")
         } header: {
-          Text("alpha beta gamma delta").lineLimit(3)
+          Text("header-a\nheader-b\nheader-c").lineLimit(3)
         }
       },
-      context: .init(identity: testIdentity("HeaderClampList")),
+      context: .init(identity: testIdentity("TallHeaderList")),
       proposal: .init(width: .finite(14), height: .finite(8))
     )
 
+    let lines = artifacts.rasterSurface.lines
+    let headerStart = try #require(lines.firstIndex { $0.contains("header-a") })
+    #expect(lines.firstIndex { $0.contains("header-b") } == headerStart + 1)
+    #expect(lines.firstIndex { $0.contains("header-c") } == headerStart + 2)
+    let rowLine = try #require(lines.firstIndex { $0.contains("Row") })
+    #expect(rowLine > headerStart + 2)
     #expect(
-      artifacts.diagnostics.runtime.issues.map(\.code).contains(
+      !artifacts.diagnostics.runtime.issues.map(\.code).contains(
         "collection.unsupportedSectionChromeLineLimit"
       )
     )

@@ -37,10 +37,8 @@ package struct TableVisibleLayout: Equatable, Sendable {
   /// Total cells the visible lines occupy, which exceeds `lines.count`
   /// whenever a hosted row measured taller than one cell.
   package var totalContentHeight: Int
-  /// The largest scroll anchor row whose window still ends at the last row,
-  /// when rows taller than one cell make it differ from the one-line
-  /// arithmetic the scroll currency uses; `nil` otherwise. Scroll routing
-  /// publishes it so the currency clamps against the rows actually drawn.
+  /// The largest row anchor from whole-row fitting when taller rows require
+  /// a different endpoint from the uniform-row estimate.
   package var maximumAnchorRow: Int? { scrollMetadata?.maximumAnchorRow }
   /// Cell-based position and measured endpoints for browser scroll chaining.
   package var scrollPosition: CollectionScrollPosition? { scrollMetadata?.position }
@@ -332,8 +330,39 @@ extension DrawExtractor {
       widths: widths,
       totalContentHeight: generated.totalLineCount + extraCells + extraAfter
     )
-    layout.scrollMetadata = .init(
-      maximumAnchorRow: generated.maximumAnchorRow, position: generated.scrollPosition)
+    let geometry = CollectionScrollGeometry(
+      rowCount: payload.rows.count,
+      rowSpan: 2,
+      chromeInset: 0,
+      rowHeights: rowHeights ?? [:]
+    )
+    // The body starts below fixed table headers and ends above the bottom
+    // border. Indicators consume body cells; padding between whole rows does
+    // not, because those cells remain available to reveal a different row.
+    let fixedTopCount = payload.showsHeaders ? 3 : 1
+    let bodyCapacity = max(0, bounds.size.height - fixedTopCount - 1)
+    let offset = generated.scrollPosition?.cellOffset ?? 0
+    let indicatorCount: Int
+    if payload.showsIndicators, let position = generated.scrollPosition {
+      indicatorCount = (position.isAtStart ? 0 : 1) + (position.isAtEnd ? 0 : 1)
+    } else {
+      indicatorCount = 0
+    }
+    let navigation: CollectionScrollLayout?
+    if payload.isViewportBacked {
+      let capacity = max(0, bodyCapacity - indicatorCount)
+      navigation = CollectionScrollLayout(
+        geometry: geometry,
+        visibleLines: offset..<(offset + capacity),
+        anchor: payload.scrollAnchor)
+    } else {
+      navigation = nil
+    }
+    layout.scrollMetadata = CollectionScrollLayoutMetadata(
+      maximumAnchorRow: generated.maximumAnchorRow,
+      position: generated.scrollPosition,
+      navigation: navigation
+    )
     return layout
   }
 
@@ -391,7 +420,7 @@ extension DrawExtractor {
     let bodyEnd = max(bodyStart, displayLines.count - fixedBottomCount)
     let bodyLines = Array(displayLines[bodyStart..<bodyEnd])
     let bodyCapacity = viewportLineCount - fixedTopCount - fixedBottomCount
-    let anchorLine = payload.scrollAnchorRowIndex.map { row in
+    let anchorLine = (payload.scrollAnchor?.rowIndex(rowCount: payload.rows.count)).map { row in
       bodyLines.firstIndex { $0.role == .row && ($0.rowIndex ?? -1) >= row }
         ?? max(0, bodyLines.count - 1)
     }
@@ -549,7 +578,8 @@ extension DrawExtractor {
     )
     // A stored anchor pins the top of the body window; without one the window
     // stays centred on the selection, which is what payload-only callers get.
-    let anchorLine = payload.scrollAnchorRowIndex.map { rowIndex in
+    let anchorRow = payload.scrollAnchor?.rowIndex(rowCount: payload.rows.count)
+    let anchorLine = anchorRow.map { rowIndex in
       min(max(0, rowIndex) * 2, max(0, bodyLineCount - 1))
     }
     // The window is measured in cells, so tall rows fill it sooner. With
@@ -578,9 +608,8 @@ extension DrawExtractor {
       }
       return (offset, max(end, min(bodyLineCount, offset + 1)), maxOffset)
     }
-    // Rows taller than one cell make the scroll currency's one-line clamp stop
-    // short of the bottom; publish the anchor row that shows the last row
-    // whole (the row at or after the bottom window's first line) instead.
+    // Publish the first row at the fitted end window so navigation uses the
+    // same whole-row endpoint as placement.
     func maximumAnchorRow(_ range: (offset: Int, end: Int, maxOffset: Int)) -> Int? {
       bodyCellCount > bodyLineCount ? (range.maxOffset + 1) / 2 : nil
     }

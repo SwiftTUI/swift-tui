@@ -1041,7 +1041,7 @@ struct DormantTabStateTests {
     let sourceGraph = ViewGraph()
     sourceGraph.beginFrame()
     let sourceNode = sourceGraph.beginEvaluation(identity: root, invalidator: nil)
-    let expected = CollectionScrollAnchor(firstVisibleItemIndex: 17, intraItemLineOffset: 0)
+    let expected = CollectionScrollAnchor.row(17)
     setStoredCollectionScrollAnchor(expected, in: sourceNode)
     withPersistentDormantStateSlot {
       sourceNode.setStateSlotSilently(

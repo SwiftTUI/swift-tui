@@ -34,14 +34,16 @@ extension LayoutEngine {
         passContext: passContext
       )
     }
+    let measuredSize = clampedSize(rawSize, proposal: clampingProposal)
     let measured = MeasuredNode(
       viewNodeID: node.viewNodeID,
       identity: node.identity,
       proposal: originalProposal,
-      measuredSize: clampedSize(rawSize, proposal: clampingProposal),
+      measuredSize: measuredSize,
       childMeasurements: storedChildMeasurements,
       containerAllocationSnapshot: containerAllocationSnapshot(
         for: node,
+        measuredSize: measuredSize,
         childMeasurements: childMeasurements,
         selectedChildIndex: selectedChildIndex,
         issuedProposals: issuedProposals,
@@ -54,6 +56,7 @@ extension LayoutEngine {
 
   private func containerAllocationSnapshot(
     for resolved: ResolvedNode,
+    measuredSize: CellSize,
     childMeasurements: [MeasuredNode],
     selectedChildIndex: Int?,
     issuedProposals: [ChildIssuedProposalRecord]?,
@@ -88,12 +91,18 @@ extension LayoutEngine {
       lazyStackSnapshot = nil
     }
 
+    let childSizes = childMeasurements.map {
+      ChildAllocation(identity: $0.identity, size: $0.measuredSize)
+    }
     return ContainerAllocationSnapshot(
-      childSizes: childMeasurements.map {
-        ChildAllocation(identity: $0.identity, size: $0.measuredSize)
-      },
+      childSizes: childSizes,
       selectedChildIndex: chosenChildIndex,
       lazyStack: lazyStackSnapshot,
+      hostedCollection: measuredHostedListAllocation(
+        for: resolved,
+        childSizes: childSizes,
+        measuredSize: measuredSize
+      ),
       childIssuedProposals: resolvedIssuedProposalRecords(
         for: resolved,
         childMeasurements: childMeasurements,

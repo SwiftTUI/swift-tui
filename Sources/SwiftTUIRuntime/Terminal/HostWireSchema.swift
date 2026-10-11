@@ -235,6 +235,10 @@ package enum HostWireSchema {
         "collectionScrollPosition",
         wire: .notSerialized(
           "measured layout position applied to contentOffset before host projection")),
+      .init(
+        "collectionScrollLayout",
+        wire: .notSerialized(
+          "measured row geometry and viewport consumed by native collection navigation")),
       .init("identity", wire: .key("id")),
       .init(
         "viewNodeID",

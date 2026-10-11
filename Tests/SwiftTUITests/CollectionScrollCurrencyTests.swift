@@ -15,6 +15,374 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct CollectionScrollCurrencyTests {
+  @Test("section edges retain multi-cell headers and footers separately from their row")
+  func sectionEdgesRemainReachableAroundTallRow() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("MeasuredSectionEdges"),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      SectionEdgeCurrencyRows()
+    }
+    defer { harness.shutdown() }
+
+    let listIdentity = try #require(
+      harness.runLoop.latestSemanticSnapshot.scrollRoutes.first?.identity)
+    _ = try harness.focus(listIdentity)
+    _ = try harness.pressKey(KeyPress(.home))
+    for line in 0..<3 {
+      #expect(harness.frame.contains("header:\(line)"), "\(harness.frame)")
+    }
+    _ = try harness.pressKey(KeyPress(.end))
+    #expect(harness.frame.contains("footer:0"), "\(harness.frame)")
+    #expect(harness.frame.contains("footer:1"), "\(harness.frame)")
+    _ = try harness.pressKey(KeyPress(.home))
+    for line in 0..<3 {
+      #expect(harness.frame.contains("header:\(line)"), "\(harness.frame)")
+    }
+
+    _ = try harness.clickText("Reveal row")
+    for line in 0..<3 {
+      try #require(harness.frame.contains("«0»:\(line)"), "\(harness.frame)")
+    }
+    _ = try harness.clickText("«0»:0")
+    try requireMeasuredCurrencyRow(0, lines: 3, collection: .sectionList, in: harness)
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(harness.frame.contains("activated=0"), "\(harness.frame)")
+
+    _ = try harness.pressKey(KeyPress(.end))
+    #expect(harness.frame.contains("footer:0"), "\(harness.frame)")
+    #expect(harness.frame.contains("footer:1"), "\(harness.frame)")
+    _ = try harness.pressKey(KeyPress(.home))
+    for line in 0..<3 {
+      #expect(harness.frame.contains("header:\(line)"), "\(harness.frame)")
+    }
+  }
+
+  @Test(
+    "one proxy command aligns an unrealized tall row and subsequent wheel input wins",
+    arguments: MeasuredCurrencyAnchor.allCases
+  )
+  private func proxyRevealsMeasuredTargetOnce(anchor: MeasuredCurrencyAnchor) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("MeasuredCurrencyProxy", anchor.rawValue),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      MeasuredProxyCurrencyRows(anchor: anchor)
+    }
+    defer { harness.shutdown() }
+
+    #expect(!harness.frame.contains("«50»:0"))
+    _ = try harness.clickText("Jump")
+
+    let expectedFirstCell: Int
+    switch anchor {
+    case .top: expectedFirstCell = 0
+    case .center, .reveal: expectedFirstCell = 1
+    case .bottom: expectedFirstCell = 2
+    }
+
+    func requireTarget(firstCell: Int) throws {
+      let viewport = try #require(harness.runLoop.latestSemanticSnapshot.scrollRoutes.first)
+      let lines = harness.frame.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+      let first = try #require(lines.firstIndex { $0.contains("«50»:0") })
+      let last = try #require(lines.firstIndex { $0.contains("«50»:2") })
+      #expect(first == viewport.viewportRect.origin.y + firstCell, "\(harness.frame)")
+      #expect(last == first + 2, "all three target cells retain their placement")
+    }
+
+    try requireTarget(firstCell: expectedFirstCell)
+    let point = try #require(harness.point(forText: "«50»:0"))
+    _ = try harness.scrollPointer(at: point, deltaY: 1)
+    if anchor == .top {
+      #expect(!harness.frame.contains("«50»:0"), "one row down leaves the target above")
+      #expect(harness.frame.contains("«51»:0"), "\(harness.frame)")
+    } else {
+      try requireTarget(firstCell: expectedFirstCell - 1)
+    }
+    _ = try harness.scrollPointer(at: point, deltaY: -1)
+    try requireTarget(firstCell: expectedFirstCell)
+  }
+
+  @Test("paging three-cell rows preserves overlap and reverses to the first row")
+  func pagingUsesMeasuredCells() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("MeasuredCurrencyPaging"),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      List(0..<20, id: \.self) { row in
+        MeasuredCurrencyRow(row: row, lines: 3)
+      }
+      .listStyle(CompactCurrencyListStyle())
+      .scrollIndicators(.hidden)
+      .frame(height: 9)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("«0»:0")
+    _ = try harness.pressKey(KeyPress(.pageDown))
+    #expect(scrollCurrencyRows(harness.frame).min() == 2, "\(harness.frame)")
+    #expect(harness.frame.contains("«2»:2"), "the overlapping row remains complete")
+    _ = try harness.pressKey(KeyPress(.pageUp))
+    #expect(scrollCurrencyRows(harness.frame).min() == 0, "\(harness.frame)")
+    #expect(harness.frame.contains("«0»:2"), "\(harness.frame)")
+  }
+
+  @Test("reverse reveal keeps a tall target visible after a taller predecessor")
+  func reverseRevealKeepsTheWholeTargetVisible() throws {
+    let rowHeights = [4, 3, 3, 3]
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ReverseMeasuredCurrencyReveal"),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      MeasuredCurrencyRows(
+        collection: .indexedList, rowHeights: rowHeights, viewportHeight: 5)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("«0»:0")
+    for row in 1..<4 {
+      _ = try harness.pressKey(KeyPress(.arrowDown))
+      try requireMeasuredCurrencyRow(
+        row, lines: rowHeights[row], collection: .indexedList, in: harness)
+    }
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(harness.frame.contains("activated=3"), "\(harness.frame)")
+
+    // Row 1 needs three cells; anchoring on its four-cell predecessor hides its end.
+    for row in (0..<3).reversed() {
+      _ = try harness.pressKey(KeyPress(.arrowUp))
+      try requireMeasuredCurrencyRow(
+        row, lines: rowHeights[row], collection: .indexedList, in: harness)
+    }
+  }
+
+  @Test(
+    "mixed-height rows stay focused through overflow and section chrome",
+    arguments: MeasuredCurrencyCollection.allCases
+  )
+  private func mixedRowsKeepNavigationAndActivation(collection: MeasuredCurrencyCollection) throws {
+    let rowHeights = [1, 3, 2, 1, 3, 2, 1, 3, 2, 1, 3, 2]
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("MixedCurrencyNavigation", collection.rawValue),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      MeasuredCurrencyRows(collection: collection, rowHeights: rowHeights)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("«0»:0")
+    try requireMeasuredCurrencyRow(0, lines: 1, collection: collection, in: harness)
+    for row in 1..<12 {
+      _ = try harness.pressKey(KeyPress(.arrowDown))
+      try requireMeasuredCurrencyRow(
+        row, lines: rowHeights[row], collection: collection, in: harness)
+    }
+
+    _ = try harness.pressKey(KeyPress(.return))
+    let activation = collection == .indexedTable ? "checked=[11]" : "activated=11"
+    #expect(harness.frame.contains(activation), "\(harness.frame)")
+    if collection == .indexedTable {
+      _ = try harness.pressKey(KeyPress(.space))
+    }
+
+    for row in (0..<11).reversed() {
+      _ = try harness.pressKey(KeyPress(.arrowUp))
+      try requireMeasuredCurrencyRow(
+        row, lines: rowHeights[row], collection: collection, in: harness)
+    }
+  }
+
+  @Test(
+    "an oversized row reveals its start and preserves successor and reverse navigation",
+    arguments: [MeasuredCurrencyCollection.indexedList, .indexedTable]
+  )
+  private func oversizedRowsKeepTheirStartVisible(collection: MeasuredCurrencyCollection) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("OversizedCurrencyNavigation", collection.rawValue),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      MeasuredCurrencyRows(collection: collection, rowHeights: [1, 10, 1])
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("«0»:0")
+    try requireMeasuredCurrencyRow(0, lines: 1, collection: collection, in: harness)
+    _ = try harness.pressKey(KeyPress(.arrowDown))
+
+    func requireOversizedStart() throws {
+      try requireMeasuredCurrencyRow(1, lines: 1, collection: collection, in: harness)
+      let lines = harness.frame.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+      let firstCell = try #require(lines.firstIndex { $0.contains("«1»:0") })
+      let viewport = try #require(harness.runLoop.latestSemanticSnapshot.scrollRoutes.first)
+      #expect(
+        firstCell == viewport.viewportRect.origin.y,
+        "a row taller than the viewport aligns its start with the body:\n\(harness.frame)"
+      )
+      #expect(!harness.frame.contains("«1»:9"), "the ten-cell row exceeds the viewport")
+    }
+
+    try requireOversizedStart()
+    _ = try harness.pressKey(KeyPress(.arrowDown))
+    try requireMeasuredCurrencyRow(2, lines: 1, collection: collection, in: harness)
+    _ = try harness.pressKey(KeyPress(.return))
+    let activation = collection == .indexedTable ? "checked=[2]" : "activated=2"
+    #expect(harness.frame.contains(activation), "\(harness.frame)")
+    if collection == .indexedTable {
+      _ = try harness.pressKey(KeyPress(.space))
+    }
+
+    _ = try harness.pressKey(KeyPress(.arrowUp))
+    try requireOversizedStart()
+    _ = try harness.pressKey(KeyPress(.arrowUp))
+    try requireMeasuredCurrencyRow(0, lines: 1, collection: collection, in: harness)
+  }
+
+  @Test("same-ID row height changes replace placement and navigation measurements")
+  func rowHeightChangesPreserveNavigation() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ChangingCurrencyRowHeight"),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      ChangingCurrencyRows()
+    }
+    defer { harness.shutdown() }
+
+    func requireSuccessor(after height: Int) throws {
+      let lines = harness.frame.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+      let first = try #require(lines.firstIndex { $0.contains("«0»:0") })
+      let successor = try #require(lines.firstIndex { $0.contains("«1»:0") })
+      #expect(successor == first + height, "the successor follows the current height")
+    }
+
+    try requireSuccessor(after: 1)
+    for (phase, height) in [3, 1].enumerated() {
+      _ = try harness.clickText("Change height")
+      try requireSuccessor(after: height)
+      _ = try harness.focusText("«0»:0")
+      try requireMeasuredCurrencyRow(0, lines: height, collection: .indexedList, in: harness)
+
+      for row in 1..<12 {
+        _ = try harness.pressKey(KeyPress(.arrowDown))
+        try requireMeasuredCurrencyRow(row, lines: 1, collection: .indexedList, in: harness)
+      }
+      _ = try harness.pressKey(KeyPress(.return))
+      #expect(harness.frame.contains("activated=11"), "\(harness.frame)")
+      #expect(harness.frame.contains("activations=\(phase + 1)"), "\(harness.frame)")
+      for row in (0..<11).reversed() {
+        _ = try harness.pressKey(KeyPress(.arrowUp))
+        try requireMeasuredCurrencyRow(
+          row, lines: row == 0 ? height : 1, collection: .indexedList, in: harness)
+      }
+    }
+  }
+
+  @Test("collection width changes remeasure wrapped rows and preserve navigation")
+  func collectionWidthChangesPreserveNavigation() throws {
+    final class WidthBox {
+      var value = 32
+    }
+    let width = WidthBox()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("WrappingCurrencyRowWidth"),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      WrappingCurrencyRows(width: width.value)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("«0»:0")
+    try requireWrappedCurrencyRow(0, height: 1, in: harness)
+    try requireCompactCurrencySuccessor(after: 0, in: harness)
+    for row in 1...8 {
+      _ = try harness.pressKey(KeyPress(.arrowDown))
+      try requireWrappedCurrencyRow(row, height: 1, in: harness)
+    }
+    let selectedIdentity = harness.runLoop.focusTracker.currentFocusIdentity
+
+    // The rows and text stay fixed; only the collection's available width changes.
+    width.value = 10
+    _ = try harness.renderAfterExternalMutation()
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == selectedIdentity)
+    try requireWrappedCurrencyRow(8, height: 3, in: harness)
+    for row in 9..<12 {
+      _ = try harness.pressKey(KeyPress(.arrowDown))
+      try requireWrappedCurrencyRow(row, height: 3, in: harness)
+    }
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(harness.frame.contains("activated=11"), "\(harness.frame)")
+    #expect(harness.frame.contains("activations=1"), "\(harness.frame)")
+    for row in (4..<11).reversed() {
+      _ = try harness.pressKey(KeyPress(.arrowUp))
+      try requireWrappedCurrencyRow(row, height: 3, in: harness)
+    }
+
+    let reverseIdentity = harness.runLoop.focusTracker.currentFocusIdentity
+    width.value = 32
+    _ = try harness.renderAfterExternalMutation()
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == reverseIdentity)
+    try requireWrappedCurrencyRow(4, height: 1, in: harness)
+    try requireCompactCurrencySuccessor(after: 4, in: harness)
+    #expect(harness.frame.contains("activated=11"), "\(harness.frame)")
+    #expect(harness.frame.contains("activations=1"), "\(harness.frame)")
+    for row in 5..<12 {
+      _ = try harness.pressKey(KeyPress(.arrowDown))
+      try requireWrappedCurrencyRow(row, height: 1, in: harness)
+    }
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(harness.frame.contains("activated=11"), "\(harness.frame)")
+    #expect(harness.frame.contains("activations=2"), "\(harness.frame)")
+    for row in (0..<11).reversed() {
+      _ = try harness.pressKey(KeyPress(.arrowUp))
+      try requireWrappedCurrencyRow(row, height: 1, in: harness)
+    }
+  }
+
+  @Test(
+    "padded rows stay visible and focused down and back, including final-row activation",
+    arguments: PaddedCurrencySelection.allCases
+  )
+  private func paddedRowsKeepNavigationAndActivation(selection: PaddedCurrencySelection) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PaddedCurrencyNavigation", selection.rawValue),
+      size: CellSize(width: 32, height: 12)
+    ) {
+      PaddedCurrencyList(selection: selection)
+    }
+    defer { harness.shutdown() }
+
+    _ = try harness.focusText("«0»")
+
+    func requireFocusedRow(_ row: Int) throws {
+      let identity = try harness.focusIdentity(forText: "«\(row)»")
+      try #require(
+        harness.runLoop.focusTracker.currentFocusIdentity == identity,
+        "\(selection.rawValue): row \(row) must be painted inside the focused region:\n\(harness.frame)"
+      )
+      if selection == .automaticSingle {
+        #expect(scrollCurrencySelection(harness.frame) == row, "\(harness.frame)")
+      }
+    }
+
+    try requireFocusedRow(0)
+    for row in 1..<12 {
+      _ = try harness.pressKey(KeyPress(.arrowDown))
+      try requireFocusedRow(row)
+    }
+
+    _ = try harness.pressKey(KeyPress(.return))
+    switch selection {
+    case .automaticSingle:
+      #expect(harness.frame.contains("activated=11"), "\(harness.frame)")
+    case .automaticMultiple, .compactMultiple:
+      #expect(harness.frame.contains("checked=[11]"), "\(harness.frame)")
+    }
+
+    for row in (0..<11).reversed() {
+      _ = try harness.pressKey(KeyPress(.arrowUp))
+      try requireFocusedRow(row)
+    }
+  }
+
   @Test("reveal keeps the target row's anchor when visibleLineCount < rowSpan")
   func revealDoesNotOvershootAnchorPastTarget() throws {
     let identity = testIdentity("RevealOvershootDirect")
@@ -334,7 +702,7 @@ struct CollectionScrollCurrencyTests {
       selectedRowIndex: 0,
       style: .plain
     )
-    #expect(payload.scrollAnchorRowIndex == nil)
+    #expect(payload.scrollAnchor == nil)
     #expect(!payload.isViewportBacked)
   }
 
@@ -479,6 +847,266 @@ enum TallRowBottomMove: CustomStringConvertible, Sendable {
 // MARK: - Fixtures
 
 @MainActor
+private struct SectionEdgeCurrencyRows: View {
+  @State private var selected: Int? = nil
+  @State private var activated: Int? = nil
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Reveal row") { _ = proxy.scrollTo("edge-row") }
+        List(selection: $selected, onActivate: { activated = $0 }) {
+          Section {
+            MeasuredCurrencyRow(row: 0, lines: 3).tag(0).id("edge-row")
+          } header: {
+            VStack(alignment: .leading, spacing: 0) {
+              Text("header:0")
+              Text("header:1")
+              Text("header:2")
+            }
+          } footer: {
+            VStack(alignment: .leading, spacing: 0) {
+              Text("footer:0")
+              Text("footer:1")
+            }
+          }
+        }
+        .listStyle(CompactCurrencyListStyle())
+        .scrollIndicators(.hidden)
+        .focusable()
+        .frame(height: 4)
+        Text("sel=\(selected ?? -1)")
+        Text("activated=\(activated ?? -1)")
+      }
+    }
+  }
+}
+
+private enum MeasuredCurrencyAnchor: String, CaseIterable, Sendable {
+  case top
+  case center
+  case bottom
+  case reveal
+
+  var point: UnitPoint? {
+    switch self {
+    case .top: .top
+    case .center: .center
+    case .bottom: .bottom
+    case .reveal: nil
+    }
+  }
+}
+
+@MainActor
+private struct MeasuredProxyCurrencyRows: View {
+  let anchor: MeasuredCurrencyAnchor
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Jump") { _ = proxy.scrollTo(50, anchor: anchor.point) }
+        List(0..<100, id: \.self) { row in
+          MeasuredCurrencyRow(row: row, lines: row == 50 ? 3 : 1)
+        }
+        .listStyle(CompactCurrencyListStyle())
+        .scrollIndicators(.hidden)
+        .frame(height: 5)
+      }
+    }
+  }
+}
+
+private enum MeasuredCurrencyCollection: String, CaseIterable, Sendable {
+  case indexedList
+  case indexedTable
+  case sectionList
+}
+
+@MainActor
+private struct MeasuredCurrencyRows: View {
+  let collection: MeasuredCurrencyCollection
+  let rowHeights: [Int]
+  let viewportHeight: Int
+  @State private var selected: Int? = 0
+  @State private var checked: Set<Int> = []
+  @State private var activated: Int? = nil
+
+  init(
+    collection: MeasuredCurrencyCollection, rowHeights: [Int], viewportHeight: Int = 8
+  ) {
+    self.collection = collection
+    self.rowHeights = rowHeights
+    self.viewportHeight = viewportHeight
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      switch collection {
+      case .indexedList:
+        List(0..<rowHeights.count, id: \.self, selection: $selected, onActivate: { activated = $0 })
+        {
+          row in
+          MeasuredCurrencyRow(row: row, lines: rowHeights[row])
+        }
+        .listStyle(CompactCurrencyListStyle())
+        .scrollIndicators(.hidden)
+        .frame(height: viewportHeight)
+      case .indexedTable:
+        Table(
+          0..<rowHeights.count, id: \.self, selection: $checked,
+          columns: [TableColumn("Value", width: 20)]
+        ) { row in
+          MeasuredCurrencyRow(row: row, lines: rowHeights[row])
+        }
+        .tableHeaders(.hidden)
+        .scrollIndicators(.hidden)
+        .frame(height: viewportHeight)
+      case .sectionList:
+        List(selection: $selected, onActivate: { activated = $0 }) {
+          Section {
+            ForEach(0..<6, id: \.self) { row in
+              MeasuredCurrencyRow(row: row, lines: rowHeights[row]).tag(row)
+            }
+          } header: {
+            Text("First header")
+          } footer: {
+            Text("First footer")
+          }
+          Section {
+            ForEach(6..<12, id: \.self) { row in
+              MeasuredCurrencyRow(row: row, lines: rowHeights[row]).tag(row)
+            }
+          } header: {
+            Text("Second header")
+          } footer: {
+            Text("Second footer")
+          }
+        }
+        .listStyle(CompactCurrencyListStyle())
+        .frame(height: viewportHeight)
+      }
+      Text("sel=\(selected ?? -1)")
+      Text("activated=\(activated ?? -1)")
+      Text("checked=\(checked.sorted())")
+    }
+  }
+}
+
+@MainActor
+private struct ChangingCurrencyRows: View {
+  @State private var isTall = false
+  @State private var selected: Int? = 0
+  @State private var activated: Int? = nil
+  @State private var activations = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Change height") { isTall.toggle() }
+      List(
+        0..<12, id: \.self, selection: $selected,
+        onActivate: { row in
+          activated = row
+          activations += 1
+        }
+      ) { row in
+        MeasuredCurrencyRow(row: row, lines: row == 0 && isTall ? 3 : 1)
+      }
+      .listStyle(CompactCurrencyListStyle())
+      .scrollIndicators(.hidden)
+      .frame(height: 8)
+      Text("sel=\(selected ?? -1)")
+      Text("activated=\(activated ?? -1)")
+      Text("activations=\(activations)")
+    }
+  }
+}
+
+@MainActor
+private struct WrappingCurrencyRows: View {
+  let width: Int
+  @State private var selected: Int? = 0
+  @State private var activated: Int? = nil
+  @State private var activations = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      List(
+        0..<12, id: \.self, selection: $selected,
+        onActivate: { row in
+          activated = row
+          activations += 1
+        }
+      ) { row in
+        Text("«\(row)»:0 «\(row)»:1 «\(row)»:2").lineLimit(3)
+      }
+      .listStyle(CompactCurrencyListStyle())
+      .scrollIndicators(.hidden)
+      .frame(width: width, height: 8)
+      Text("sel=\(selected ?? -1)")
+      Text("activated=\(activated ?? -1)")
+      Text("activations=\(activations)")
+    }
+  }
+}
+
+@MainActor
+private struct MeasuredCurrencyRow: View {
+  let row: Int
+  let lines: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(0..<lines, id: \.self) { line in
+        Text("«\(row)»:\(line)")
+      }
+    }
+  }
+}
+
+private enum PaddedCurrencySelection: String, CaseIterable, Sendable {
+  case automaticSingle
+  case automaticMultiple
+  case compactMultiple
+}
+
+@MainActor
+private struct PaddedCurrencyList: View {
+  let selection: PaddedCurrencySelection
+  @State private var selected: Int? = 0
+  @State private var checked: Set<Int> = []
+  @State private var activated: Int? = nil
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      switch selection {
+      case .automaticSingle:
+        List(0..<12, id: \.self, selection: $selected, onActivate: { activated = $0 }) { row in
+          Text("«\(row)»").padding(.vertical, 1)
+        }
+        .focusable()
+        .frame(height: 8)
+      case .automaticMultiple:
+        multipleList
+      case .compactMultiple:
+        multipleList.listStyle(CompactCurrencyListStyle())
+      }
+      Text("sel=\(selected ?? -1)")
+      Text("activated=\(activated ?? -1)")
+      Text("checked=\(checked.sorted())")
+    }
+  }
+
+  private var multipleList: some View {
+    List(0..<12, id: \.self, selection: $checked) { row in
+      Text("«\(row)»").padding(.vertical, 1)
+    }
+    .focusable(false)
+    .frame(height: 8)
+  }
+}
+
+@MainActor
 private struct CompactCurrencyChecklist: View {
   @State private var selection: Set<Int> = []
 
@@ -601,6 +1229,64 @@ private struct ScrollToCurrencyList: View {
 }
 
 // MARK: - Support
+
+@MainActor
+private func requireWrappedCurrencyRow<Content: View>(
+  _ row: Int,
+  height: Int,
+  in harness: StressRuntimeHarness<Content>
+) throws {
+  try requireMeasuredCurrencyRow(row, lines: height, collection: .indexedList, in: harness)
+  let lines = harness.frame.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+  let firstIndex = lines.firstIndex { $0.contains("«\(row)»:0") }
+  let first = try #require(firstIndex)
+  for token in 1..<3 {
+    let tokenIndex = lines.firstIndex { $0.contains("«\(row)»:\(token)") }
+    let actualLine = try #require(tokenIndex)
+    let expectedLine = height == 1 ? first : first + token
+    #expect(actualLine == expectedLine, "\(harness.frame)")
+  }
+}
+
+@MainActor
+private func requireCompactCurrencySuccessor<Content: View>(
+  after row: Int,
+  in harness: StressRuntimeHarness<Content>
+) throws {
+  let lines = harness.frame.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+  let firstIndex = lines.firstIndex { $0.contains("«\(row)»:0") }
+  let successorIndex = lines.firstIndex { $0.contains("«\(row + 1)»:0") }
+  let first = try #require(firstIndex)
+  let successor = try #require(successorIndex)
+  #expect(successor == first + 1, "one-cell rows place their successor on the next line")
+}
+
+@MainActor
+private func requireMeasuredCurrencyRow<Content: View>(
+  _ row: Int,
+  lines: Int,
+  collection: MeasuredCurrencyCollection,
+  in harness: StressRuntimeHarness<Content>
+) throws {
+  let firstLabel = "«\(row)»:0"
+  let identity = try harness.focusIdentity(forText: firstLabel)
+  try #require(
+    harness.runLoop.focusTracker.currentFocusIdentity == identity,
+    "row \(row) remains visible inside the focused region:\n\(harness.frame)"
+  )
+  #expect(harness.frame.contains("«\(row)»:\(lines - 1)"), "\(harness.frame)")
+
+  switch collection {
+  case .indexedList, .sectionList:
+    #expect(scrollCurrencySelection(harness.frame) == row, "\(harness.frame)")
+  case .indexedTable:
+    // Table keeps container focus; activation independently identifies its active row.
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(harness.frame.contains("checked=[\(row)]"), "\(harness.frame)")
+    _ = try harness.pressKey(KeyPress(.space))
+    #expect(harness.frame.contains("checked=[]"), "\(harness.frame)")
+  }
+}
 
 @MainActor
 private func renderingSelectableList(
