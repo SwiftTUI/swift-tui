@@ -335,7 +335,10 @@ struct RunLoopDrainFairnessTests {
     if synchronous {
       runLoop.renderMode = .sync
     } else {
-      runLoop.renderMode = .async
+      // Complete the eager rerender so this test requires a separate follow-up
+      // presentation. Cancelling it can legitimately fold the hover-exit write
+      // into the retry's only presentation; cancellation is covered separately.
+      runLoop.renderMode = .asyncNoCancel
     }
     runLoop.frameSink = producer
     let runTask = Task { try await runLoop.run() }
@@ -383,6 +386,7 @@ struct RunLoopDrainFairnessTests {
     #expect(runLoop.focusTracker.currentFocusIdentity != firstFocus.identity)
     #expect(runLoop.focusTracker.currentFocusIdentity != nil)
     #expect(producer.committedFrames == 2)
+    #expect(producer.focusSyncRerenders == [1, 0])
     #expect(producer.isActive)
   }
 
@@ -550,15 +554,17 @@ private struct HoverExitFixture: View {
 private final class HoverExitProducer: FrameDiagnosticSink {
   private let state: StateContainer<HoverExitState>
   var isActive = false
-  private(set) var committedFrames = 0
+  private(set) var focusSyncRerenders: [Int] = []
+
+  var committedFrames: Int { focusSyncRerenders.count }
 
   init(state: StateContainer<HoverExitState>) {
     self.state = state
   }
 
   func record(_ sample: RuntimeFrameSample) {
-    guard case .committed = sample, isActive else { return }
-    committedFrames += 1
+    guard case .committed(let committed) = sample, isActive else { return }
+    focusSyncRerenders.append(committed.focusSyncRerenders)
     if committedFrames < PeriodicInvalidationSink.safetyLimit {
       state.mutate {
         $0 = HoverExitState(
