@@ -200,6 +200,70 @@ struct CompositeAccessibilityTests {
     #expect(!nodes().contains { $0.label == "Nested action" })
   }
 
+  @Test("nested inline menus retain their own content regions and trigger ancestry")
+  func nestedInlineMenus() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NestedInlineMenus"),
+      size: CellSize(width: 48, height: 12)
+    ) {
+      Menu("Outer commands") {
+        Menu("Inner commands") {
+          Button("Nested command") {}
+        }.menuStyle(.inline)
+      }.menuStyle(.inline)
+    }
+    defer { harness.shutdown() }
+    var frames = 0
+    func nodes() -> [AccessibilityNode] {
+      harness.runLoop.publishedAccessibilitySnapshot.accessibilityNodes
+    }
+    func node(_ label: String) throws -> AccessibilityNode {
+      try #require(nodes().first { $0.label == label })
+    }
+    func expand(_ label: String) throws {
+      let target = try #require(node(label).actionTarget)
+      #expect(
+        harness.runLoop.handleAccessibilityAction(
+          AccessibilityActionRequest(target: target, action: .setValue(.boolean(true))))
+          == .accepted)
+      try harness.runLoop.renderPendingFrames(renderedFrames: &frames)
+    }
+    try expand("Outer commands")
+    try expand("Inner commands")
+    let snapshot = nodes()
+    func hasAncestor(_ element: AccessibilityNode, _ ancestor: AccessibilityNode) -> Bool {
+      var parent = element.parentIdentity
+      var visited: Set<Identity> = []
+      while let identity = parent, visited.insert(identity).inserted {
+        if identity == ancestor.identity { return true }
+        parent = snapshot.first { $0.identity == identity }?.parentIdentity
+      }
+      return false
+    }
+    let outer = try node("Outer commands")
+    let inner = try node("Inner commands")
+    let outerMenu = try #require(nodes().first { $0.properties?.labelledBy == [outer.identity] })
+    let innerMenu = try #require(nodes().first { $0.properties?.labelledBy == [inner.identity] })
+    let outerContainer = try #require(nodes().first { $0.identity == outer.parentIdentity })
+    let innerContainer = try #require(nodes().first { $0.identity == inner.parentIdentity })
+    #expect(outer.role == .button)
+    #expect(inner.role == .menuItem)
+    #expect(outer.properties?.popup == .menu)
+    #expect(inner.properties?.popup == .menu)
+    #expect(outer.properties?.controls == [outerMenu.identity])
+    #expect(inner.properties?.controls == [innerMenu.identity])
+    #expect(outerMenu.role == .menu)
+    #expect(innerMenu.role == .menu)
+    #expect(innerMenu.identity != outerMenu.identity)
+    // Menu's retained content host is a structural ancestor of its region.
+    #expect(hasAncestor(outerMenu, outerContainer))
+    #expect(innerContainer.parentIdentity == outerMenu.identity)
+    #expect(hasAncestor(innerMenu, innerContainer))
+    #expect(try node("Nested command").parentIdentity == innerMenu.identity)
+    #expect(try node("Nested command").role == .menuItem)
+    #expect(nodes().filter { $0.role == .menu }.count == 2)
+    #expect(!nodes().contains { $0.role == .region })
+  }
 }
 
 private struct AccessibleTabsFixture: View {

@@ -806,6 +806,11 @@ navigation containers retain their document content when they expose named
 Dismiss/Back operations. Browser-specific arrow navigation remains in the web
 package's `AccessibilityTree.ts`.
 
+Disclosed content remains transparent to the style's enclosing layout. Its
+resolved payload roots point to the disclosure's semantic region; expansion
+extraction publishes that region using their placed bounds without inserting
+a layout wrapper or replacing authored text and control roles.
+
 Accessibility preferences use the inert `AccessibilityPreferences` and
 `AccessibilityColorProfile` vocabulary in `SwiftTUIPrimitives/Styling`.
 `RuntimePolicyEnvironment` exposes effective choices to views and style snapshots;

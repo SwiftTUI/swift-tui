@@ -270,8 +270,8 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
   }
 }
 
-/// Keep the labelled region separate from its payload: fusing a region role
-/// onto a single Text or Button replaces that child's own reading semantics.
+/// Route semantic content without introducing a layout child. The semantics
+/// phase supplies the labelled region separately from the authored payload.
 private struct DisclosureAccessibilityContent: PrimitiveView, IterativeResolvableView {
   let payload: CapturedSubviewPayload
   let controlIdentity: Identity?
@@ -279,13 +279,23 @@ private struct DisclosureAccessibilityContent: PrimitiveView, IterativeResolvabl
   func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     payload.resolveElementsWork(in: context.child(component: .named("DisclosureContent"))).map {
       completed in
-      let children = markingAccessibilityContent(completed)
+      var children = markingAccessibilityContent(completed)
       guard let controlIdentity else { return children }
+      let contentIdentity = controlIdentity.child(.named("AccessibilityDisclosureContent"))
+      if !children.isEmpty {
+        for index in children.indices {
+          var structure =
+            children[index].semanticMetadata.accessibilityStructure ?? AccessibilityStructure()
+          structure.parent = contentIdentity
+          children[index].semanticMetadata.accessibilityStructure = structure
+        }
+        return children
+      }
+      // An expanded empty slot still publishes its region and relationship.
       var metadata = SemanticMetadata(accessibilityRole: .region)
       metadata.isAccessibilityContent = true
-      metadata.accessibilityProperties = .init(
-        labelledBy: [controlIdentity],
-        identifier: controlIdentity.child(.named("AccessibilityDisclosureContent")))
+      metadata.accessibilityProperties = AccessibilityProperties(
+        labelledBy: [controlIdentity], identifier: contentIdentity)
       return [
         ResolvedNode(
           identity: context.identity, kind: .view("DisclosureContent"), children: children,
