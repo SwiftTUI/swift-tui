@@ -146,7 +146,9 @@ struct LocalScrollPositionRegistryTests {
     registry.register(
       identity: scrollIdentity,
       currentOffset: { offset },
-      applyOffset: { offset = $0 }
+      applyOffset: { offset = $0 },
+      // Collections register a resolver for targets outside their placed window.
+      revealTarget: { _, _ in nil }
     )
 
     let changed = registry.sync(
@@ -210,7 +212,9 @@ struct LocalScrollPositionRegistryTests {
     registry.register(
       identity: scrollIdentity,
       currentOffset: { offset },
-      applyOffset: { offset = $0 }
+      applyOffset: { offset = $0 },
+      // Collections register a resolver for targets outside their placed window.
+      revealTarget: { _, _ in nil }
     )
 
     let changed = registry.sync(
@@ -234,6 +238,49 @@ struct LocalScrollPositionRegistryTests {
 
     #expect(changed == (expectedOffset != currentOffset))
     #expect(offset == expectedOffset)
+  }
+
+  @Test(
+    "ordinary focus reveal uses the clamped offset after viewport growth",
+    arguments: [false, true], [18, 11]
+  )
+  func focusRevealAfterViewportGrowth(horizontal: Bool, targetCoordinate: Int) {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("ResizedScroll")
+    let focusedIdentity = testIdentity("ResizedScroll", "Content", "Target")
+    // A twenty-cell document scrolled to the end of a four-cell viewport
+    // stores 16. Growing the viewport to eight cells places it at 12 while
+    // the binding still holds 16. Reveal must use that actual placement.
+    var offset = horizontal ? ScrollOffset(x: 16) : ScrollOffset(y: 16)
+    registry.register(
+      identity: scrollIdentity,
+      currentOffset: { offset },
+      applyOffset: { offset = $0 }
+    )
+    let route = ScrollRoute(
+      identity: scrollIdentity,
+      viewportRect: CellRect(origin: .zero, size: CellSize(width: 8, height: 8)),
+      contentBounds: CellRect(
+        origin: horizontal ? CellPoint(x: -12, y: 0) : CellPoint(x: 0, y: -12),
+        size: horizontal ? CellSize(width: 20, height: 8) : CellSize(width: 8, height: 20))
+    )
+    let target = CellRect(
+      origin: horizontal
+        ? CellPoint(x: targetCoordinate - 12, y: 0)
+        : CellPoint(x: 0, y: targetCoordinate - 12),
+      size: CellSize(width: 1, height: 1)
+    )
+
+    let changed = registry.sync(
+      focusedIdentity: focusedIdentity,
+      focusRegions: [FocusRegion(identity: focusedIdentity, rect: target)],
+      scrollRoutes: [route]
+    )
+
+    // Row/column 18 is already visible; 11 is immediately before the viewport.
+    let expected = targetCoordinate == 18 ? 12 : 11
+    #expect(changed)
+    #expect(offset == (horizontal ? ScrollOffset(x: expected) : ScrollOffset(y: expected)))
   }
 
   /// Regression for "wheel scroll stalls partway down, must click to continue":
@@ -387,7 +434,9 @@ struct LocalScrollPositionRegistryTests {
     registry.register(
       identity: scrollIdentity,
       currentOffset: { offset },
-      applyOffset: { offset = $0 }
+      applyOffset: { offset = $0 },
+      // Collections register a resolver for targets outside their placed window.
+      revealTarget: { _, _ in nil }
     )
     registry.updateGeometry(
       scrollRoutes: [
