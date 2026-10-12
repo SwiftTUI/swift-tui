@@ -94,8 +94,8 @@ public struct TablePayload: Equatable, Sendable {
   public var showsIndicators: Bool
   public var opacity: Double
   package var isViewportBacked: Bool = false
-  /// The stored scroll currency — see ``ListPayload/scrollAnchorRowIndex``.
-  package var scrollAnchorRowIndex: Int?
+  /// The stored scroll currency — see ``ListPayload/scrollAnchor``.
+  package var scrollAnchor: CollectionScrollAnchor?
 
   public init(
     columns: [TableColumnPayload],

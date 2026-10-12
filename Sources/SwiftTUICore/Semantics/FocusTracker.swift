@@ -436,6 +436,14 @@ extension FocusTracker {
       return sectionIndex
     }
 
+    // A hosted row may leave the viewport while its collection remains. Keep
+    // focus with that owner when it is explicitly focusable.
+    if let ownerIdentity = previousRegion.ownerIdentity,
+      let ownerIndex = regions.firstIndex(where: { $0.identity == ownerIdentity })
+    {
+      return ownerIndex
+    }
+
     guard !previousRegion.scopePath.isEmpty else {
       return nil
     }

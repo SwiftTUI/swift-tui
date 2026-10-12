@@ -37,10 +37,8 @@ package struct TableVisibleLayout: Equatable, Sendable {
   /// Total cells the visible lines occupy, which exceeds `lines.count`
   /// whenever a hosted row measured taller than one cell.
   package var totalContentHeight: Int
-  /// The largest scroll anchor row whose window still ends at the last row,
-  /// when rows taller than one cell make it differ from the one-line
-  /// arithmetic the scroll currency uses; `nil` otherwise. Scroll routing
-  /// publishes it so the currency clamps against the rows actually drawn.
+  /// The largest row anchor from whole-row fitting when taller rows require
+  /// a different endpoint from the uniform-row estimate.
   package var maximumAnchorRow: Int? { scrollMetadata?.maximumAnchorRow }
   /// Cell-based position and measured endpoints for browser scroll chaining.
   package var scrollPosition: CollectionScrollPosition? { scrollMetadata?.position }
@@ -288,6 +286,8 @@ extension DrawExtractor {
   ) -> TableVisibleLayout {
     TableLayoutDerivationProbe.recordDerivation()
     let bounds = tableInsetBounds(for: payload, in: bounds)
+    let geometry = CollectionScrollGeometry(
+      rowCount: payload.rows.count, rowSpan: 2, rowHeights: rowHeights ?? [:])
     let widths =
       columnWidths
       ?? measureTableColumnWidths(
@@ -297,6 +297,7 @@ extension DrawExtractor {
     let generated = visibleTableLines(
       for: payload,
       viewportLineCount: bounds.size.height,
+      geometry: geometry,
       showsIndicators: payload.showsIndicators,
       widths: widths,
       rowHeights: rowHeights,
@@ -311,11 +312,12 @@ extension DrawExtractor {
       ? [] : lines.filter { $0.role == .row }.compactMap(\.rowIndex)
     var extraCells =
       windowRows.min().map { first in
-        tallRowExtraCells(in: rowHeights ?? [:]) { $0 < first }
+        geometry.line(forRow: first) - first * geometry.rowSpan
       } ?? 0
     let extraAfter =
       windowRows.max().map { last in
-        tallRowExtraCells(in: rowHeights ?? [:]) { $0 > last }
+        geometry.displayLineCount - geometry.lineRange(forRow: last).upperBound
+          - (geometry.rowCount - last - 1) * geometry.rowSpan
       } ?? 0
     for index in lines.indices {
       let height =
@@ -332,8 +334,24 @@ extension DrawExtractor {
       widths: widths,
       totalContentHeight: generated.totalLineCount + extraCells + extraAfter
     )
-    layout.scrollMetadata = .init(
-      maximumAnchorRow: generated.maximumAnchorRow, position: generated.scrollPosition)
+    // Consume the exact body capacity used by whole-row fitting. Small tables
+    // may omit an overflow indicator to preserve a row; recomputing capacity
+    // from endpoint flags would incorrectly publish an empty viewport.
+    let offset = generated.scrollPosition?.cellOffset ?? 0
+    let navigation: CollectionScrollLayout?
+    if payload.isViewportBacked {
+      navigation = CollectionScrollLayout(
+        geometry: geometry,
+        visibleLines: offset..<(offset + generated.visibleBodyLineCount),
+        anchor: payload.scrollAnchor)
+    } else {
+      navigation = nil
+    }
+    layout.scrollMetadata = CollectionScrollLayoutMetadata(
+      maximumAnchorRow: generated.maximumAnchorRow,
+      position: generated.scrollPosition,
+      navigation: navigation
+    )
     return layout
   }
 
@@ -345,12 +363,14 @@ extension DrawExtractor {
     linePositions: [Int]?,
     totalLineCount: Int,
     maximumAnchorRow: Int?,
-    scrollPosition: CollectionScrollPosition?
+    scrollPosition: CollectionScrollPosition?,
+    visibleBodyLineCount: Int
   )
 
   private func visibleTableLines(
     for payload: TablePayload,
     viewportLineCount: Int,
+    geometry: CollectionScrollGeometry,
     showsIndicators: Bool,
     widths: [Int],
     rowHeights: [Int: Int]?,
@@ -360,6 +380,7 @@ extension DrawExtractor {
       return viewportBackedVisibleTableLines(
         for: payload,
         viewportLineCount: viewportLineCount,
+        geometry: geometry,
         showsIndicators: showsIndicators,
         widths: widths,
         rowHeights: rowHeights,
@@ -374,24 +395,24 @@ extension DrawExtractor {
     )
 
     guard viewportLineCount > 0 else {
-      return ([], nil, 0, nil, nil)
+      return ([], nil, 0, nil, nil, 0)
     }
     guard displayLines.count > viewportLineCount else {
-      return (displayLines, nil, displayLines.count, nil, nil)
+      return (displayLines, nil, displayLines.count, nil, nil, 0)
     }
 
     let fixedTopCount = min(displayLines.count, payload.showsHeaders ? 3 : 1)
     let fixedBottomCount = displayLines.isEmpty ? 0 : 1
     guard viewportLineCount > fixedTopCount + fixedBottomCount else {
       let clamped = Array(displayLines.prefix(viewportLineCount))
-      return (clamped, nil, clamped.count, nil, nil)
+      return (clamped, nil, clamped.count, nil, nil, 0)
     }
 
     let bodyStart = fixedTopCount
     let bodyEnd = max(bodyStart, displayLines.count - fixedBottomCount)
     let bodyLines = Array(displayLines[bodyStart..<bodyEnd])
     let bodyCapacity = viewportLineCount - fixedTopCount - fixedBottomCount
-    let anchorLine = payload.scrollAnchorRowIndex.map { row in
+    let anchorLine = (payload.scrollAnchor?.rowIndex(rowCount: payload.rows.count)).map { row in
       bodyLines.firstIndex { $0.role == .row && ($0.rowIndex ?? -1) >= row }
         ?? max(0, bodyLines.count - 1)
     }
@@ -401,7 +422,7 @@ extension DrawExtractor {
         Array(displayLines.prefix(fixedTopCount))
         + bodyLines
         + Array(displayLines.suffix(fixedBottomCount))
-      return (all, nil, all.count, nil, nil)
+      return (all, nil, all.count, nil, nil, 0)
     }
 
     if !showsIndicators {
@@ -414,7 +435,7 @@ extension DrawExtractor {
         Array(displayLines.prefix(fixedTopCount))
         + window.lines
         + Array(displayLines.suffix(fixedBottomCount))
-      return (visible, nil, visible.count, nil, nil)
+      return (visible, nil, visible.count, nil, nil, 0)
     }
 
     let anchoredOffset = visibleTableBodyWindow(
@@ -461,19 +482,20 @@ extension DrawExtractor {
       Array(displayLines.prefix(fixedTopCount))
       + Array(visibleBody.prefix(bodyCapacity))
       + Array(displayLines.suffix(fixedBottomCount))
-    return (visible, nil, visible.count, nil, nil)
+    return (visible, nil, visible.count, nil, nil, 0)
   }
 
   private func viewportBackedVisibleTableLines(
     for payload: TablePayload,
     viewportLineCount: Int,
+    geometry: CollectionScrollGeometry,
     showsIndicators: Bool,
     widths: [Int],
     rowHeights: [Int: Int]?,
     rowWindow: Range<Int>?
   ) -> GeneratedTableLines {
     guard viewportLineCount > 0 else {
-      return ([], nil, 0, nil, nil)
+      return ([], nil, 0, nil, nil, 0)
     }
 
     var chromePayload = payload
@@ -485,17 +507,14 @@ extension DrawExtractor {
     let bottom = chrome.last.map { [$0] } ?? []
     guard viewportLineCount > top.count + bottom.count else {
       let clamped = Array(top.prefix(viewportLineCount))
-      return (clamped, nil, clamped.count, nil, nil)
+      return (clamped, nil, clamped.count, nil, nil, 0)
     }
 
     let bodyLineCount = payload.rows.isEmpty ? 0 : payload.rows.count * 2 - 1
     let bodyCapacity = viewportLineCount - top.count - bottom.count
     // The body's cells: a row line is as tall as its hosted row measured, so
     // the rows `rowHeights` knows are taller add their extra cells.
-    let rowCount = payload.rows.count
-    let bodyCellCount =
-      bodyLineCount
-      + tallRowExtraCells(in: rowHeights ?? [:]) { (0..<rowCount).contains($0) }
+    let bodyCellCount = geometry.displayLineCount
     func lineHeight(_ position: Int) -> Int {
       position % 2 == 0 ? max(1, rowHeights?[position / 2] ?? 1) : 1
     }
@@ -514,7 +533,7 @@ extension DrawExtractor {
             widths: widths
           )
           + bottom
-        return (all, nil, totalLineCount, nil, nil)
+        return (all, nil, totalLineCount, nil, nil, bodyCapacity)
       }
 
       let windowStart = max(0, rowWindow.lowerBound * 2)
@@ -528,7 +547,7 @@ extension DrawExtractor {
             widths: widths
           )
           + bottom
-        return (all, nil, totalLineCount, nil, nil)
+        return (all, nil, totalLineCount, nil, nil, bodyCapacity)
       }
 
       let body = viewportBackedTableBodyLines(
@@ -540,7 +559,7 @@ extension DrawExtractor {
         Array(0..<top.count)
         + (windowStart..<windowEnd).map { top.count + $0 }
         + (bottom.isEmpty ? [] : [top.count + bodyLineCount])
-      return (top + body + bottom, positions, totalLineCount, nil, nil)
+      return (top + body + bottom, positions, totalLineCount, nil, nil, bodyCapacity)
     }
 
     let selectedLine = min(
@@ -549,7 +568,8 @@ extension DrawExtractor {
     )
     // A stored anchor pins the top of the body window; without one the window
     // stays centred on the selection, which is what payload-only callers get.
-    let anchorLine = payload.scrollAnchorRowIndex.map { rowIndex in
+    let anchorRow = payload.scrollAnchor?.rowIndex(rowCount: payload.rows.count)
+    let anchorLine = anchorRow.map { rowIndex in
       min(max(0, rowIndex) * 2, max(0, bodyLineCount - 1))
     }
     // The window is measured in cells, so tall rows fill it sooner. With
@@ -578,18 +598,17 @@ extension DrawExtractor {
       }
       return (offset, max(end, min(bodyLineCount, offset + 1)), maxOffset)
     }
-    // Rows taller than one cell make the scroll currency's one-line clamp stop
-    // short of the bottom; publish the anchor row that shows the last row
-    // whole (the row at or after the bottom window's first line) instead.
+    // Publish the first row at the fitted end window so navigation uses the
+    // same whole-row endpoint as placement.
     func maximumAnchorRow(_ range: (offset: Int, end: Int, maxOffset: Int)) -> Int? {
       bodyCellCount > bodyLineCount ? (range.maxOffset + 1) / 2 : nil
     }
     func scrollPosition(_ range: (offset: Int, end: Int, maxOffset: Int))
       -> CollectionScrollPosition
     {
-      CollectionScrollPosition(
-        cellOffset: range.offset
-          + tallRowExtraCells(in: rowHeights ?? [:]) { $0 * 2 < range.offset },
+      let row = geometry.lineRange(forRow: range.offset / geometry.rowSpan)
+      return CollectionScrollPosition(
+        cellOffset: range.offset.isMultiple(of: geometry.rowSpan) ? row.lowerBound : row.upperBound,
         isAtStart: range.offset == 0, isAtEnd: range.offset == range.maxOffset)
     }
     // A window whose next row does not fit leaves cells unused. Blank body
@@ -619,7 +638,9 @@ extension DrawExtractor {
           capacity: bodyCapacity
         )
         + bottom
-      return (visible, nil, visible.count, maximumAnchorRow(range), scrollPosition(range))
+      return (
+        visible, nil, visible.count, maximumAnchorRow(range), scrollPosition(range), bodyCapacity
+      )
     }
 
     let initial = window(capacity: bodyCapacity)
@@ -650,7 +671,10 @@ extension DrawExtractor {
       )
     }
     let visible = top + Array(visibleBody.prefix(bodyCapacity)) + bottom
-    return (visible, nil, visible.count, maximumAnchorRow(range), scrollPosition(range))
+    return (
+      visible, nil, visible.count, maximumAnchorRow(range), scrollPosition(range),
+      bodyWindowCapacity
+    )
   }
 
   private func viewportBackedTableBodyLines(

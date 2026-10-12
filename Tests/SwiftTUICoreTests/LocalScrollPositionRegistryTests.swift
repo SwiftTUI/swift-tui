@@ -6,6 +6,48 @@ import Testing
 @MainActor
 @Suite
 struct LocalScrollPositionRegistryTests {
+  @Test(
+    "same-anchor collection commands refine the latest target once and yield to newer input",
+    arguments: [false, true], [false, true]
+  )
+  func repeatedCollectionCommandRefinement(replacesTarget: Bool, newerInput: Bool) {
+    let registry = LocalScrollPositionRegistry()
+    let identity = testIdentity("RepeatedCollectionCommand")
+    let first = ScrollTargetQuery(identity: identity.child(.named("First")))
+    let second =
+      replacesTarget ? ScrollTargetQuery(identity: identity.child(.named("Second"))) : first
+    var anchor: CollectionScrollAnchor?
+    var queries: [ScrollTargetQuery] = []
+    registry.register(
+      identity: identity,
+      currentOffset: { .zero },
+      applyOffset: { _ in },
+      currentCollectionAnchor: { anchor },
+      revealTarget: { query, _ in
+        queries.append(query)
+        let changed = anchor != .row(45)
+        anchor = .row(45)
+        return changed
+      }
+    )
+    var route = ScrollRoute(
+      identity: identity,
+      viewportRect: .init(origin: .zero, size: .init(width: 20, height: 5)),
+      contentBounds: .init(origin: .zero, size: .init(width: 20, height: 100)))
+    registry.updateGeometry(scrollRoutes: [route], scrollTargets: [])
+    #expect(registry.scrollToTarget(first, anchor: .bottom, scopeIdentity: nil))
+    #expect(!registry.scrollToTarget(second, anchor: .bottom, scopeIdentity: nil))
+    if newerInput { anchor = .row(46) }
+    route.collectionScrollLayout = .init(
+      geometry: .init(rowCount: 100, rowSpan: 1, rowHeights: [50: 3]),
+      visibleLines: 45..<50, anchor: .row(45))
+    for _ in 0..<2 {
+      _ = registry.sync(focusedIdentity: nil, focusRegions: [], scrollRoutes: [route])
+    }
+    #expect(queries == (newerInput ? [first, second] : [first, second, second]))
+    #expect(anchor == (newerInput ? .row(46) : .row(45)))
+  }
+
   @Test("scroll route initializers preserve explicit content offsets")
   func scrollRouteInitializersPreserveExplicitContentOffsets() {
     let identity = testIdentity("Scroll")
@@ -30,6 +72,93 @@ struct LocalScrollPositionRegistryTests {
 
     #expect(publicRoute.contentOffset == contentOffset)
     #expect(packageRoute.contentOffset == contentOffset)
+  }
+
+  @Test(
+    "collection resize focus recovery yields to a newer logical scroll anchor",
+    arguments: [false, true]
+  )
+  func collectionResizeFocusRecoveryHonorsScrollAnchor(hasNewerAnchor: Bool) {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("ResizeCollection")
+    let focusedIdentity = testIdentity("ResizeCollection", "Row", "8")
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let ownerNode = graph.beginEvaluation(identity: scrollIdentity, invalidator: nil)
+    var logicalAnchor: CollectionScrollAnchor? = .row(3)
+    var offset = ScrollOffset(x: 0, y: 9)
+    var revealCalls = 0
+    var offsetWrites = 0
+
+    ViewNodeContext.withValue(ownerNode) {
+      registry.register(
+        identity: scrollIdentity,
+        currentOffset: { offset },
+        applyOffset: {
+          offsetWrites += 1
+          offset = $0
+        },
+        currentCollectionAnchor: { logicalAnchor },
+        revealTarget: { query, anchor in
+          revealCalls += 1
+          #expect(query == ScrollTargetQuery(identity: focusedIdentity))
+          #expect(anchor == nil)
+          logicalAnchor = .row(7)
+          offset = ScrollOffset(x: 0, y: 21)
+          return true
+        }
+      )
+    }
+
+    let focusedRegion = FocusRegion(
+      identity: focusedIdentity,
+      rect: CellRect(origin: CellPoint(x: 0, y: 5), size: CellSize(width: 5, height: 1)),
+      modalFocusScopePath: nil,
+      ownerNodeID: ownerNode.viewNodeID,
+      ownerIdentity: scrollIdentity
+    )
+    var previousRoute = ScrollRoute(
+      identity: scrollIdentity,
+      viewNodeID: ownerNode.viewNodeID,
+      viewportRect: CellRect(origin: .zero, size: CellSize(width: 32, height: 8)),
+      contentBounds: CellRect(origin: CellPoint(x: 0, y: -3), size: CellSize(width: 32, height: 12))
+    )
+    previousRoute.collectionScrollLayout = CollectionScrollLayout(
+      geometry: CollectionScrollGeometry(rowCount: 12, rowSpan: 1),
+      visibleLines: 3..<11,
+      anchor: .row(3)
+    )
+    var resizedRoute = ScrollRoute(
+      identity: scrollIdentity,
+      viewNodeID: ownerNode.viewNodeID,
+      viewportRect: CellRect(origin: .zero, size: CellSize(width: 10, height: 8)),
+      contentBounds: CellRect(origin: CellPoint(x: 0, y: -9), size: CellSize(width: 10, height: 36))
+    )
+    resizedRoute.collectionScrollLayout = CollectionScrollLayout(
+      geometry: CollectionScrollGeometry(
+        rowCount: 12, rowSpan: 1,
+        rowHeights: Dictionary(uniqueKeysWithValues: (0..<12).map { ($0, 3) })),
+      visibleLines: 9..<17,
+      anchor: .row(3)
+    )
+
+    // A command arriving after measurement must retain priority over resize recovery.
+    if hasNewerAnchor {
+      logicalAnchor = .end
+      offset = ScrollOffset(x: 0, y: 28)
+    }
+    let changed = registry.revealCollectionFocusAfterResize(
+      focusedRegion,
+      previousRoutes: [previousRoute],
+      scrollRoutes: [resizedRoute],
+      scrollTargets: []
+    )
+
+    #expect(changed == !hasNewerAnchor)
+    #expect(revealCalls == (hasNewerAnchor ? 0 : 1))
+    #expect(offsetWrites == 0)
+    #expect(offset == ScrollOffset(x: 0, y: hasNewerAnchor ? 28 : 21))
+    #expect(logicalAnchor == (hasNewerAnchor ? .end : .row(7)))
   }
 
   @Test("focused rect below viewport scrolls by the minimum reveal delta")

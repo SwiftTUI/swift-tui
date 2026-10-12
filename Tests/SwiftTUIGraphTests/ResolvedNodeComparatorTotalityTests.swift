@@ -82,7 +82,6 @@ struct ResolvedNodeComparatorTotalityTests {
       "drawMetadata": "measurement cache key: draw styling cannot change measured size",
       "drawEffects": "measurement cache key: draw effects cannot change measured size",
       "surfaceComposition": "measurement cache key: compositing cannot change measured size",
-      "semanticMetadata": "measurement cache key: semantics cannot change measured size",
       "lifecycleMetadata": "measurement cache key: lifecycle cannot change measured size",
       "handlerInventory": "measurement cache key: registrations cannot change measured size",
       "preferenceValues": "measurement cache key: preferences cannot change measured size",
