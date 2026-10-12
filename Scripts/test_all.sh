@@ -943,10 +943,12 @@ elif [ "$lane" = core ]; then
     "$(swift_command_text test --filter SwiftTUICLITests)" \
     run_swift test --filter SwiftTUICLITests
 
+  # Last-owner assertions inspect released descriptor numbers. Serialize sibling
+  # PTY suites so another test cannot reopen those numbers before the assertion.
   run_function_step \
     "Run SwiftTUIPTYPrimitives tests" \
-    "$(swift_command_text test --filter SwiftTUIPTYPrimitivesTests)" \
-    run_swift test --filter SwiftTUIPTYPrimitivesTests
+    "$(swift_command_text test --no-parallel --filter SwiftTUIPTYPrimitivesTests)" \
+    run_swift test --no-parallel --filter SwiftTUIPTYPrimitivesTests
 
   run_function_step \
     "Run SwiftTUIWebHost tests" \
@@ -1106,10 +1108,12 @@ if [ "$lane" = all ]; then
     "$(swift_command_text test --filter SwiftTUICLITests)" \
     run_swift test --filter SwiftTUICLITests
 
+  # Last-owner assertions inspect released descriptor numbers. Serialize sibling
+  # PTY suites so another test cannot reopen those numbers before the assertion.
   run_function_step \
     "Run SwiftTUIPTYPrimitives tests" \
-    "$(swift_command_text test --filter SwiftTUIPTYPrimitivesTests)" \
-    run_swift test --filter SwiftTUIPTYPrimitivesTests
+    "$(swift_command_text test --no-parallel --filter SwiftTUIPTYPrimitivesTests)" \
+    run_swift test --no-parallel --filter SwiftTUIPTYPrimitivesTests
 
   run_function_step \
     "Run SwiftTUIWASISurfaceBridge tests" \
