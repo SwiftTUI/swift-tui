@@ -622,13 +622,23 @@ struct RunLoopDrainFairnessTests {
       harness.surface.frames.last?.contains("input 0") == true && harness.lifetime.taskStarted
     }
     let faultIdentity = testIdentity("ExitDiagnosticWriter", "MissingTask")
-    // Explicit fault injection at the existing carry-forward boundary: the
-    // lifecycle skip contract must report this unmatched committed callback.
-    // This is the same missing handler registration exercised directly
-    // in LifecycleCoordinatorSkipTests, now routed through the real run loop.
-    harness.runLoop.deferredLifecycleCarryForward.append(
-      LifecycleCommitEntry(
-        identity: faultIdentity, operation: .appear(handlerIDs: ["synthetic-missing-appear"])))
+    // Inject at the acquisition answering input: an already-presented startup
+    // frame can still have a normal follow-up pending when readiness returns.
+    // Injecting earlier lets that follow-up report the issue before exit.
+    let previousAcquisition = harness.runLoop.frameClockDidAcquire
+    var didInjectFault = false
+    harness.runLoop.frameClockDidAcquire = { [weak runLoop = harness.runLoop] instant in
+      previousAcquisition?(instant)
+      guard let runLoop, runLoop.stateContainer.state.inputValue == 1, !didInjectFault else {
+        return
+      }
+      didInjectFault = true
+      // The same missing registration as LifecycleCoordinatorSkipTests,
+      // delivered through the real run loop's carry-forward boundary.
+      runLoop.deferredLifecycleCarryForward.append(
+        LifecycleCommitEntry(
+          identity: faultIdentity, operation: .appear(handlerIDs: ["synthetic-missing-appear"])))
+    }
     let state = harness.runLoop.stateContainer
     var reportedIssues: [RuntimeIssue] = []
     harness.runLoop.runtimeIssueSink = RuntimeIssueSink { issue in
@@ -640,6 +650,13 @@ struct RunLoopDrainFairnessTests {
         $0 = CooperativeExitState(inputValue: $0.inputValue, tick: $0.tick + 1)
       }
     }
+    // Make the pre-input follow-up explicit so this test also catches an
+    // injection that accidentally escapes into ordinary startup rendering.
+    let startupFrameCount = harness.surface.frames.count
+    harness.scheduler.requestInvalidation(of: [harness.root])
+    try await waitUntil { harness.surface.frames.count > startupFrameCount }
+    #expect(reportedIssues.isEmpty)
+    #expect(state.state.tick == 0)
     harness.input.send(.key(.return))
     if inputEnds {
       harness.input.finish()
@@ -651,6 +668,7 @@ struct RunLoopDrainFairnessTests {
     let result = try await valueWithTimeout { try await runTask.value }
     try await waitUntil { harness.lifetime.taskCancelled }
 
+    #expect(didInjectFault)
     #expect(reportedIssues.count == 1)
     #expect(reportedIssues.first?.code == "lifecycle.appearHandlerSkipped")
     #expect(reportedIssues.first?.identity == faultIdentity)
@@ -660,7 +678,9 @@ struct RunLoopDrainFairnessTests {
     // The issue sink and independent producer both wrote after presentation.
     // Those writes remain pending rather than extending required exit work.
     #expect(result.finalState.tick == 2)
-    #expect(harness.surface.lastFrameContainsLine("input 1 tick 0"))
+    #expect(
+      harness.surface.lastFrameContainsLine("input 1 tick 0"),
+      "Presented frames: \(harness.surface.frames)")
     #expect(harness.producer.committedFrames == 1)
     #expect(harness.producer.acquiredFrames == 1)
     #expect(harness.scheduler.hasPendingFrame(at: .now()))
