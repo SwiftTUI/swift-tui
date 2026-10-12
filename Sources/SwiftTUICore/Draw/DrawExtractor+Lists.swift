@@ -19,9 +19,8 @@ package struct ListDisplayLine: Equatable, Sendable {
   /// The truncation mode for this line's flattened text, carried from the
   /// item payload so authored/ambient modes survive the flattening.
   package var truncationMode: TextTruncationMode
-  /// Cells this line occupies. Greater than 1 when the hosted row measured
-  /// taller than one cell; 1 for every chrome line and for the payload-only
-  /// line model, which has no measured children to ask.
+  /// Cells this line occupies. Hosted rows, headers and footers use their
+  /// measured heights; generated separators and payload-only lines use one.
   package var height: Int
   /// This line's first cell, relative to the layout's content bounds.
   ///
@@ -58,17 +57,25 @@ package struct ListDisplayLine: Equatable, Sendable {
 package final class CollectionScrollLayoutMetadata: Equatable, Sendable {
   package let maximumAnchorRow: Int?
   package let position: CollectionScrollPosition?
+  package let navigation: CollectionScrollLayout?
 
-  package init?(maximumAnchorRow: Int?, position: CollectionScrollPosition?) {
-    guard maximumAnchorRow != nil || position != nil else { return nil }
+  package init?(
+    maximumAnchorRow: Int?,
+    position: CollectionScrollPosition?,
+    navigation: CollectionScrollLayout? = nil
+  ) {
+    guard maximumAnchorRow != nil || position != nil || navigation != nil else { return nil }
     self.maximumAnchorRow = maximumAnchorRow
     self.position = position
+    self.navigation = navigation
   }
 
   package static func == (lhs: CollectionScrollLayoutMetadata, rhs: CollectionScrollLayoutMetadata)
     -> Bool
   {
-    lhs === rhs || (lhs.maximumAnchorRow == rhs.maximumAnchorRow && lhs.position == rhs.position)
+    lhs === rhs
+      || (lhs.maximumAnchorRow == rhs.maximumAnchorRow && lhs.position == rhs.position
+        && lhs.navigation == rhs.navigation)
   }
 }
 
@@ -79,9 +86,7 @@ package struct ListVisibleLayout: Equatable, Sendable {
   /// Total cells the visible lines occupy, which exceeds `lines.count`
   /// whenever any row measured taller than one cell.
   package var totalContentHeight: Int
-  /// The table twin's ``TableVisibleLayout/maximumAnchorRow``: the largest
-  /// scroll anchor row whose window still ends at the last row, when taller
-  /// rows make it differ from the currency's one-line arithmetic.
+  /// The largest row anchor from whole-row fitting, shared with navigation.
   package var maximumAnchorRow: Int? { scrollMetadata?.maximumAnchorRow }
   /// Cell-based position and measured endpoints for browser scroll chaining.
   package var scrollPosition: CollectionScrollPosition? { scrollMetadata?.position }

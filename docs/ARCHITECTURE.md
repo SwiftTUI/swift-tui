@@ -78,6 +78,22 @@ runs on its work stack and records exact fragment allocations separately from
 dense logical-element estimates. The scroll placement applies anchor corrections;
 `LocalScrollPositionRegistry` synchronizes bindings only for committed geometry.
 
+`SwiftTUIGraph/Semantics/CollectionScrollGeometry.swift` describes collection row
+extents in display lines. Core publishes measured rows and the usable viewport
+together in `CollectionScrollLayout`; collection input handlers consume that
+geometry through `LocalScrollPositionRegistry`. Indexed collections retain
+sparse measurements and estimate unrealized rows without evaluating the dataset.
+Hosted collection measurement hints and list/table layout use the same sparse
+row extents as input handlers; separator fitting remains a layout policy.
+The primitive `CollectionScrollAnchor` distinguishes a requested row from the
+start and end, which can include section headers and footers. Programmatic targets
+receive one correction after their requested window is measured, only while
+the requested anchor remains current.
+When a viewport resize removes a focused collection row from the visible window,
+the runtime prepares its reveal before replacing focus regions. This uses the
+existing single eager focus-sync rerender and yields to explicit focus or scroll
+requests.
+
 `SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
 examples, and the public website can live in sibling organization repositories.
 The public Swift products below live in this package. The engine

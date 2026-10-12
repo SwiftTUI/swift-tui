@@ -341,6 +341,7 @@ package struct HandlerDescriptorIntake {
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
+    currentCollectionAnchor: @escaping @MainActor () -> CollectionScrollAnchor? = { nil },
     revealTarget: (@MainActor (ScrollTargetQuery, UnitPoint?) -> Bool?)? = nil,
     scrollToEdge: (@MainActor (Edge) -> Bool)? = nil
   ) {
@@ -370,6 +371,7 @@ package struct HandlerDescriptorIntake {
         }
       },
       bindingSourceID: bindingSourceID,
+      currentCollectionAnchor: currentCollectionAnchor,
       revealTarget: wrappedReveal,
       scrollToEdge: wrappedEdge
     )

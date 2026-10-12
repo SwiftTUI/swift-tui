@@ -171,10 +171,7 @@ extension List {
           identity: context.identity,
           geometry: CollectionScrollGeometry(
             rowCount: rowCount,
-            rowSpan: listStyle.listRowDisplaySpan,
-            // Chrome border rows are layout-bearing content insets, not display
-            // lines: line 0 of every list style's scrollable stream is row 0.
-            chromeInset: 0
+            rowSpan: listStyle.listRowDisplaySpan
           ),
           ownerNode: ownerNode,
           registry: context.scrollCommandRegistry,
@@ -239,9 +236,23 @@ extension List {
             identity: context.identity,
             currentOffset: { scrollCurrency.currentOffset() },
             applyOffset: { scrollCurrency.applyOffset($0) },
+            currentCollectionAnchor: { scrollCurrency.storedAnchor },
             revealTarget: { query, anchor in
               scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
-                indexedSource?.elementIndex(matching: query)
+                if let identity = query.identity,
+                  let index = listRowIndex(parsedFrom: identity, container: context.identity),
+                  rows.indices.contains(index)
+                {
+                  return index
+                }
+                if let indexedSource { return indexedSource.elementIndex(matching: query) }
+                return rows.firstIndex { row in
+                  if let identity = query.identity, row.identity == identity { return true }
+                  if let component = query.explicitIDComponent {
+                    return row.identity.lastComponent == component
+                  }
+                  return false
+                }
               }
             },
             scrollToEdge: { scrollCurrency.scroll(toEdge: $0) }
@@ -428,7 +439,7 @@ extension List {
         // Carry the count instead of the array.
         payload.virtualRowCount = rows.count
       }
-      payload.scrollAnchorRowIndex = scrollCurrency?.storedAnchorRow
+      payload.scrollAnchor = scrollCurrency?.storedAnchor
 
       var metadata = focusableControlMetadata(
         // A selectable list signals focus at the row layer, so the container
@@ -625,7 +636,7 @@ extension List {
         let label = resolvedNodeLabelText(from: child)
         if !label.isEmpty {
           result.items.append(
-            sectionChromeItem(kind: .header, text: label, node: child, into: &result)
+            sectionChromeItem(kind: .header, text: label, node: child)
           )
           child.semanticMetadata.hostedCollectionItem = .init(role: .listHeader)
           result.children.append(child)
@@ -634,13 +645,19 @@ extension List {
         let label = resolvedNodeLabelText(from: child)
         if !label.isEmpty {
           result.items.append(
-            sectionChromeItem(kind: .footer, text: label, node: child, into: &result)
+            sectionChromeItem(kind: .footer, text: label, node: child)
           )
           child.semanticMetadata.hostedCollectionItem = .init(role: .listFooter)
           result.children.append(child)
         }
       default:
-        collectItems(from: child.children, into: &result)
+        for var row in child.children {
+          if containsHostedCollectionRowBoundary(row) {
+            collectItems(from: [row], into: &result)
+          } else {
+            appendRow(node: &row, to: &result)
+          }
+        }
       }
     }
     let sectionChildren = result.children[start...]
@@ -661,39 +678,19 @@ extension List {
     }
   }
 
-  /// Builds a header/footer item, carrying the authored text attributes off
-  /// the flattened subtree. Section chrome lines are always drawn from the
-  /// flattened payload (even in hosted lists) at a single line, so an
-  /// authored limit above 1 cannot be honored: it clamps to 1 and reports a
-  /// runtime issue — the framework's fail-loud preference over silent
-  /// truncation.
+  /// Carries section text attributes into the payload fallback. Hosted headers
+  /// and footers retain their child views and use their measured heights.
   private func sectionChromeItem(
     kind: ListItemPayload.Kind,
     text: String,
-    node: ResolvedNode,
-    into result: inout ResolvedItems
+    node: ResolvedNode
   ) -> ListItemPayload {
     let textAttributes = flattenedTextLayoutAttributes(from: node)
-    var lineLimit = textAttributes.lineLimit
-    if let authored = lineLimit, authored > 1 {
-      lineLimit = 1
-      result.runtimeIssues.append(
-        RuntimeIssue(
-          severity: .warning,
-          code: "collection.unsupportedSectionChromeLineLimit",
-          message:
-            "A list \(kind == .header ? "header" : "footer") asked for lineLimit \(authored), "
-            + "but section chrome renders single-line; clamping to 1.",
-          identity: node.identity,
-          source: "List"
-        )
-      )
-    }
     return .init(
       kind: kind,
       text: text,
       style: listItemTextStyle(from: node.drawMetadata),
-      lineLimit: lineLimit,
+      lineLimit: textAttributes.lineLimit,
       truncationMode: textAttributes.truncationMode
     )
   }

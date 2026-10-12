@@ -227,7 +227,7 @@ extension Table {
         let anchorRow = selectedIndex
         scrollCurrency = CollectionScrollCurrency(
           identity: context.identity,
-          geometry: CollectionScrollGeometry(rowCount: rowCount, rowSpan: 2, chromeInset: 0),
+          geometry: CollectionScrollGeometry(rowCount: rowCount, rowSpan: 2),
           ownerNode: ownerNode,
           registry: context.scrollCommandRegistry,
           windowMetrics: { viewportLineCount in
@@ -281,6 +281,7 @@ extension Table {
             identity: context.identity,
             currentOffset: { scrollCurrency.currentOffset() },
             applyOffset: { scrollCurrency.applyOffset($0) },
+            currentCollectionAnchor: { scrollCurrency.storedAnchor },
             revealTarget: { query, anchor in
               scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
                 indexedSource?.elementIndex(matching: query)
@@ -439,7 +440,7 @@ extension Table {
         opacity: chrome.opacity
       )
       payload.isViewportBacked = resolvedContent.indexedSource != nil
-      payload.scrollAnchorRowIndex = scrollCurrency?.storedAnchorRow
+      payload.scrollAnchor = scrollCurrency?.storedAnchor
 
       var metadata = focusableControlMetadata(
         // See the matching note in `List.resolvedNode`: a non-selectable
