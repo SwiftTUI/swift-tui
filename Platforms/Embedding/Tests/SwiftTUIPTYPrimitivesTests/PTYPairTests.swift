@@ -260,29 +260,47 @@
     }
 
     @Test("last-owner cleanup preserves transferred and reused descriptors")
-    func finalOwnerCleanup() async throws {
-      for iteration in 0..<100 {
+    func finalOwnerCleanup() async {
+      // STUI-922: isolate ownership from other suites, and observe closure at
+      // the peer of a pipe. Even in a fresh process, runtime threads can reuse
+      // a closed descriptor number before fcntl checks it.
+      await #expect(processExitsWith: .success) {
+        for iteration in 0..<100 {
+          let master = try descriptorLifetimePipe()
+          defer { closeFD(master.reader) }
+          let slave = try descriptorLifetimePipe()
+          defer { closeFD(slave.reader) }
+          // Cleanup only owns descriptors; it does not require terminal I/O.
+          // Pipe writers let us observe the exact owned resources through EOF.
+          let handles = PTYHandles(
+            masterFD: master.writer, slaveFD: slave.writer, slavePath: "lifetime-probe")
+          var pair: PTYPair? = PTYPair(handles: handles, retainSlaveFD: true)
+          let transferred = iteration.isMultiple(of: 2)
+          if transferred { #expect(await pair?.releaseSlaveFD() == handles.slaveFD) }
+          if iteration.isMultiple(of: 3) { await pair?.close() }
+          weak let weakPair = pair
+          pair = nil
+          #expect(weakPair == nil)
+          try await requireWriterClosed(master.reader, owner: "master")
+          if transferred {
+            // A transferred writer must still keep its original pipe open.
+            var readiness = pollfd(fd: slave.reader, events: Int16(POLLIN), revents: 0)
+            try #require(
+              unsafe poll(&readiness, 1, 0) == 0, "transferred slave writer closed with the actor")
+            closeFD(slave.writer)
+          }
+          try await requireWriterClosed(slave.reader, owner: "slave")
+        }
         let handles = try openPTY()
         var pair: PTYPair? = PTYPair(handles: handles, retainSlaveFD: true)
-        let transferred = iteration.isMultiple(of: 2)
-        if transferred { #expect(await pair?.releaseSlaveFD() == handles.slaveFD) }
-        if iteration.isMultiple(of: 3) { await pair?.close() }
-        weak let weakPair = pair
+        _ = await pair?.read()
+        await pair?.close()
+        let replacement = unsafe open("/dev/null", O_RDONLY)
+        defer { closeFD(replacement) }
         pair = nil
-        #expect(weakPair == nil)
-        #expect(fcntl(handles.masterFD, F_GETFD) == -1)
-        #expect((fcntl(handles.slaveFD, F_GETFD) >= 0) == transferred)
-        if transferred { closeFD(handles.slaveFD) }
+        // A source cancel handler owns a duplicate, never the now-reusable master.
+        #expect(fcntl(replacement, F_GETFD) >= 0)
       }
-      let handles = try openPTY()
-      var pair: PTYPair? = PTYPair(handles: handles, retainSlaveFD: true)
-      _ = await pair?.read()
-      await pair?.close()
-      let replacement = unsafe open("/dev/null", O_RDONLY)
-      defer { closeFD(replacement) }
-      pair = nil
-      // A source cancel handler owns a duplicate, never the now-reusable master.
-      #expect(fcntl(replacement, F_GETFD) >= 0)
     }
 
     @Test("openPTY resolves slave paths while other threads open PTYs")
@@ -315,6 +333,28 @@
       #expect(
         failures.isEmpty, "\(failures.count) of 400 opens failed; first: \(failures.first ?? "")")
     }
+  }
+
+  private func descriptorLifetimePipe() throws -> (reader: Int32, writer: Int32) {
+    var descriptors: [Int32] = [-1, -1]
+    try #require(openTestPipe(&descriptors, nonblockingRead: true) == 0)
+    return (descriptors[0], descriptors[1])
+  }
+
+  private func requireWriterClosed(_ reader: Int32, owner: String) async throws {
+    // Wait for EOF rather than assuming a cleared weak reference means the
+    // final release on another executor has finished running the deinitializer.
+    let ready = await withCheckedContinuation { continuation in
+      // A missing close must not block the cooperative executor needed by
+      // the actor's final release. The timeout bounds a leaking regression.
+      DispatchQueue.global().async {
+        var readiness = pollfd(fd: reader, events: Int16(POLLIN), revents: 0)
+        continuation.resume(returning: unsafe poll(&readiness, 1, 5_000))
+      }
+    }
+    try #require(ready == 1, "\(owner) writer did not close")
+    var byte: UInt8 = 0
+    try #require(unsafe read(reader, &byte, 1) == 0, "\(owner) pipe did not reach EOF")
   }
 
   private func pendingWrites(_ pair: PTYPair, atLeast target: Int) async {
