@@ -461,8 +461,42 @@ and dropped frames, before returning to input and termination handling. Pending
 work stays in the scheduler for the next pass. The deadline-arm cut also defers
 deadlines armed during the pass. Both bounds are needed: periodic state writes
 can keep invalidating faster than frames render, without consuming a deadline.
-Cooperative exit flushes use the same finite drain; signal exits admit only one
-acquisition. Short state and focus follow-up chains can settle within a pass.
+Cooperative exit is resolved before any exit work. A pending programmatic request
+is considered first, followed by the event's termination handlers. A veto requests
+an ordinary root invalidation and continues the event batch without flushing or
+cancelling tasks. End-of-input notifies the handlers but cannot be vetoed.
+
+Once the exit proceeds, the run loop cancels its active `.task` bodies and refuses
+new starts. Lifecycle handlers remain available for the final presentation. If
+an earlier event in the batch was handled, the native `FrameScheduler` flushes
+the coalesced input and the synchronous follow-ups it requests: focus
+synchronization (including the eager focus rerender), lifecycle callbacks,
+animation completions, preference observations and pressed-state cleanup.
+A skipped or elided acquisition does not satisfy the presentation requirement.
+The existing 16-acquisition cap bounds retries and callback chains. Input arriving
+after an accepted exit does not interrupt that owed work. Signal exits
+retain their one-acquisition flush, including when only a pending frame preceded
+the signal. Full lifecycle shutdown runs when the session returns.
+
+The drain policy selects normal rendering, cooperative exit or signal exit;
+frame application reports callback invalidations independently of that policy.
+Only cooperative exits compare the scheduler's invalidation-request generation
+before and after synchronous callback phases. SwiftTUIGraph and state writes need
+no additional instrumentation. Normal rendering and signal drains take no such
+snapshots. Custom schedulers with unavailable generation observations retain the
+original bounded drain without a new protocol requirement.
+
+Task, timer, animation-deadline, presentation and diagnostic-sink writes outside
+those callback phases earn no additional frames. Caller-owned producers are not
+cancelled. An off-main write racing a synchronous callback is conservatively
+counted as a follow-up; repeated races remain bounded by the acquisition cap.
+This is a presentation-work rule, not a snapshot of state at the exit event:
+asynchronous writes that land before an owed frame reads state may appear in
+that frame, and the returned `finalState` remains timing-dependent. Task
+cancellation is cooperative and does not await task completion.
+
+There is no wall-time bound. An expensive owed frame or synchronous callback
+still takes as long as it takes.
 
 ## Diagnostics
 

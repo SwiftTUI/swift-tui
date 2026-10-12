@@ -35,6 +35,22 @@ final class TaskRunner {
   private var keyByLogicalTask: [LogicalTaskKey: ActiveTaskKey] = [:]
   private var nextGeneration = 0
 
+  private(set) var isShuttingDown = false
+  package private(set) var refusedStartsAfterShutdownCount = 0
+
+  func beginShutdown() {
+    guard !isShuttingDown else { return }
+    isShuttingDown = true
+    cancelAll()
+  }
+
+  /// Refuse before lifecycle registration lookup: shutdown is not a lost task.
+  func refuseStartIfShuttingDown() -> Bool {
+    guard isShuttingDown else { return false }
+    refusedStartsAfterShutdownCount += 1
+    return true
+  }
+
   deinit {
     // Owner release is also shutdown: dropping unstructured task handles
     // alone does not cancel the work that they represent.
@@ -48,7 +64,8 @@ final class TaskRunner {
     viewNodeID: ViewNodeID,
     identity: Identity,
     registration: TaskRegistration
-  ) -> Task<Void, Never> {
+  ) -> Task<Void, Never>? {
+    guard !refuseStartIfShuttingDown() else { return nil }
     let descriptor = registration.descriptor
     let key = ActiveTaskKey(viewNodeID: viewNodeID, descriptorID: descriptor.id)
     cancel(key: key)
@@ -92,7 +109,7 @@ final class TaskRunner {
     identity: Identity,
     matching descriptor: TaskDescriptor
   ) {
-    guard source != destination else { return }
+    guard !isShuttingDown, source != destination else { return }
     let sourceKey = ActiveTaskKey(viewNodeID: source, descriptorID: descriptor.id)
     let destinationKey = ActiveTaskKey(viewNodeID: destination, descriptorID: descriptor.id)
     guard let activeTask = activeTasks[sourceKey],
@@ -116,6 +133,7 @@ final class TaskRunner {
     viewNodeID: ViewNodeID,
     matching descriptor: TaskDescriptor? = nil
   ) {
+    guard !isShuttingDown else { return }
     if let descriptor {
       let key = ActiveTaskKey(viewNodeID: viewNodeID, descriptorID: descriptor.id)
       if activeTasks[key]?.descriptor == descriptor { cancel(key: key) }

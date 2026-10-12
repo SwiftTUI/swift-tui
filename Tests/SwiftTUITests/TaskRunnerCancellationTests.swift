@@ -7,18 +7,76 @@ import Testing
 @MainActor
 @Suite("Task runner cancellation", .timeLimit(.minutes(1)))
 struct TaskRunnerCancellationTests {
+  @Test("shutdown cancels once and refuses starts without entering user code")
+  func shutdownRefusesStarts() async throws {
+    let runner = TaskRunner()
+    let node = ViewNodeID(rawValue: 1)
+    let identity = Identity(components: ["shutdown"])
+    let descriptor = TaskDescriptor(id: "work", priority: .medium)
+    var didRun = false
+    let registration = TaskRegistration(descriptor: descriptor) { didRun = true }
+    let task = try #require(
+      runner.start(
+        viewNodeID: node, identity: identity, registration: registration))
+    runner.beginShutdown()
+    runner.beginShutdown()
+    runner.cancel(viewNodeID: node, matching: descriptor)
+    runner.transfer(
+      from: node, to: ViewNodeID(rawValue: 2), identity: identity, matching: descriptor)
+    #expect(task.isCancelled)
+    #expect(runner.isShuttingDown)
+    #expect(runner.activeTaskCount == 0)
+    #expect(runner.start(viewNodeID: node, identity: identity, registration: registration) == nil)
+    #expect(runner.refusedStartsAfterShutdownCount == 1)
+    await task.value
+    #expect(!didRun)
+  }
+
+  @Test("shutdown refuses even unregistered committed starts without reporting a skip")
+  func shutdownRefusalIsNotASkip() {
+    let runner = TaskRunner()
+    let coordinator = LifecycleCoordinator(taskRunner: runner, assertsOnTaskStartSkip: true)
+    let identity = Identity(components: ["shutdown"])
+    let registry = LocalLifecycleRegistry()
+    var appearances = 0
+    var disappearances = 0
+    let appearID = registry.registerAppear(identity: identity, ordinal: 0) { appearances += 1 }
+    let disappearID = registry.registerDisappear(identity: identity, ordinal: 0) {
+      disappearances += 1
+    }
+    coordinator.absorbPublishedRegistrations(registry.snapshot())
+    coordinator.beginShutdown()
+    let issues = coordinator.applyCommittedFrame(
+      plan: .init(lifecycle: [
+        .init(identity: identity, operation: .appear(handlerIDs: [appearID])),
+        .init(identity: identity, operation: .disappear(handlerIDs: [disappearID])),
+        .init(identity: identity, operation: .taskStart(.init(id: "missing", priority: .medium))),
+      ]), currentLifecycleRegistry: registry, currentTaskRegistry: .init())
+    #expect(issues.isEmpty)
+    #expect(coordinator.taskStartSkipCount == 0)
+    #expect(coordinator.refusedStartsAfterShutdownCount == 1)
+    #expect(appearances == 1)
+    #expect(disappearances == 1)
+    coordinator.shutdown()
+    coordinator.shutdown()
+    #expect(runner.isShuttingDown)
+    #expect(runner.activeTaskCount == 0)
+    #expect(coordinator.previousLifecycleHandlers.disappearHandlers.isEmpty)
+  }
+
   @Test("releasing the owner before actor entry skips the user operation")
   func ownerReleaseBeforeStart() async throws {
     var runner: TaskRunner? = TaskRunner()
     weak let weakRunner = runner
     var didRun = false
-    let task = try #require(runner).start(
-      viewNodeID: ViewNodeID(rawValue: 1),
-      identity: Identity(components: ["released-owner"]),
-      registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
-        didRun = true
-      }
-    )
+    let task = try #require(
+      runner?.start(
+        viewNodeID: ViewNodeID(rawValue: 1),
+        identity: Identity(components: ["released-owner"]),
+        registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
+          didRun = true
+        }
+      ))
 
     // Releasing the only owner cannot yield this actor to the queued work.
     runner = nil
@@ -36,22 +94,23 @@ struct TaskRunnerCancellationTests {
     let cancellationObserved = Mutex(false)
     var resumeOperation: CheckedContinuation<Void, Never>?
     var continuedWithoutCancellation = false
-    let task = try #require(runner).start(
-      viewNodeID: ViewNodeID(rawValue: 1),
-      identity: Identity(components: ["suspended-owner"]),
-      registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
-        await withTaskCancellationHandler {
-          await withCheckedContinuation { continuation in
-            resumeOperation = continuation
-            entered.continuation.yield(())
-            entered.continuation.finish()
+    let task = try #require(
+      runner?.start(
+        viewNodeID: ViewNodeID(rawValue: 1),
+        identity: Identity(components: ["suspended-owner"]),
+        registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
+          await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+              resumeOperation = continuation
+              entered.continuation.yield(())
+              entered.continuation.finish()
+            }
+            continuedWithoutCancellation = !Task.isCancelled
+          } onCancel: {
+            cancellationObserved.withLock { $0 = true }
           }
-          continuedWithoutCancellation = !Task.isCancelled
-        } onCancel: {
-          cancellationObserved.withLock { $0 = true }
         }
-      }
-    )
+      ))
 
     var entry = entered.stream.makeAsyncIterator()
     _ = await entry.next()
@@ -68,17 +127,18 @@ struct TaskRunnerCancellationTests {
   }
 
   @Test("cancellation before actor entry skips the user operation", arguments: [false, true])
-  func cancellationBeforeStart(cancelAll: Bool) async {
+  func cancellationBeforeStart(cancelAll: Bool) async throws {
     let runner = TaskRunner()
     let nodeID = ViewNodeID(rawValue: 1)
     var didRun = false
-    let task = runner.start(
-      viewNodeID: nodeID,
-      identity: Identity(components: ["cancelled-owner"]),
-      registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
-        didRun = true
-      }
-    )
+    let task = try #require(
+      runner.start(
+        viewNodeID: nodeID,
+        identity: Identity(components: ["cancelled-owner"]),
+        registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
+          didRun = true
+        }
+      ))
     // No suspension has occurred on this actor, so the queued task cannot
     // have entered the closure before its owner retires it.
     if cancelAll {
@@ -92,25 +152,27 @@ struct TaskRunnerCancellationTests {
   }
 
   @Test("a replacement skips retired work and runs the current operation")
-  func replacementBeforeStart() async {
+  func replacementBeforeStart() async throws {
     let runner = TaskRunner()
     let nodeID = ViewNodeID(rawValue: 1)
     let identity = Identity(components: ["replaced-owner"])
     var operations: [String] = []
-    let retired = runner.start(
-      viewNodeID: nodeID,
-      identity: identity,
-      registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
-        operations.append("retired")
-      }
-    )
-    let current = runner.start(
-      viewNodeID: nodeID,
-      identity: identity,
-      registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
-        operations.append("current")
-      }
-    )
+    let retired = try #require(
+      runner.start(
+        viewNodeID: nodeID,
+        identity: identity,
+        registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
+          operations.append("retired")
+        }
+      ))
+    let current = try #require(
+      runner.start(
+        viewNodeID: nodeID,
+        identity: identity,
+        registration: TaskRegistration(descriptor: TaskDescriptor(id: "work", priority: .medium)) {
+          operations.append("current")
+        }
+      ))
     await retired.value
     await current.value
     #expect(operations == ["current"])

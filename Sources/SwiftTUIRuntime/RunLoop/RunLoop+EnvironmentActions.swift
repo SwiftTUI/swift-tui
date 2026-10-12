@@ -23,6 +23,25 @@ extension RunLoop {
     }
   }
 
+  package enum ExitResolution: Equatable {
+    case proceed(RunLoopExitReason)
+    case cancelled
+  }
+
+  /// Resolve preemption and veto before flushing or stopping owned work.
+  package func resolveExit(for exitReason: RunLoopExitReason) -> ExitResolution {
+    if let programmatic = consumeProgrammaticTerminationRequest() {
+      lifecycleCoordinator.beginShutdown()
+      return .proceed(programmatic)
+    }
+    if terminationDisposition(for: exitReason) == .cancel {
+      scheduler.requestInvalidation(of: [rootIdentity])
+      return .cancelled
+    }
+    lifecycleCoordinator.beginShutdown()
+    return .proceed(exitReason)
+  }
+
   package func consumeProgrammaticTerminationRequest() -> RunLoopExitReason? {
     guard hasPendingProgrammaticTermination else { return nil }
     hasPendingProgrammaticTermination = false

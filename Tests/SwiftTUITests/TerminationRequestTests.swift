@@ -1,3 +1,4 @@
+@_spi(Testing) import SwiftTUITestSupport
 import Synchronization
 import Testing
 
@@ -8,17 +9,25 @@ import Testing
 @MainActor
 @Suite("Termination requests")
 struct TerminationRequestTests {
-  @Test("synchronous signal exit acquires at most one pending frame")
-  func synchronousSignalFlushIsBounded() throws {
+  @Test("signal exit acquires at most one pending frame", arguments: [false, true])
+  func synchronousSignalFlushIsBounded(synchronous: Bool) async throws {
     let root = testIdentity("SyncSignalFlush")
     let scheduler = FrameScheduler()
+    let surface = TerminationTestTerminalHost()
+    var framesAtDisposition = 0
     let runLoop = RunLoop(
-      rootIdentity: root, presentationSurface: TerminationTestTerminalHost(),
-      terminalInputReader: TerminationTestInputReader(events: []),
-      signalReader: TerminationTestSignalReader(signals: []), scheduler: scheduler,
+      rootIdentity: root, presentationSurface: surface,
+      terminalInputReader: TerminationTestInputReader(events: [], finishAfterEvents: false),
+      signalReader: TerminationTestSignalReader(signals: synchronous ? [] : ["SIGTERM"]),
+      scheduler: scheduler,
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
       focusTracker: FocusTracker(invalidationIdentities: [root]),
-      viewBuilder: { _, _ in Text("pending") })
+      viewBuilder: { _, _ in
+        Text("pending").onTerminationRequest { _ in
+          framesAtDisposition = surface.frames.count
+          return .allow
+        }
+      })
     runLoop.isSessionActive = true
     defer {
       runLoop.isSessionActive = false
@@ -26,6 +35,12 @@ struct TerminationRequestTests {
     }
     runLoop.frameSink = SignalExitFrameSink(scheduler: scheduler, root: root)
     scheduler.requestInvalidation(of: [root])
+    if !synchronous {
+      let result = try await runLoop.run()
+      #expect(result.exitReason == .signal("SIGTERM"))
+      #expect(surface.frames.count - framesAtDisposition == 1)
+      return
+    }
     let buffer = EventPumpBuffer()
     _ = buffer.enqueue(.signal("SIGTERM"))
     var frames = 0
@@ -55,27 +70,37 @@ struct TerminationRequestTests {
   {
     let recorder = TerminationRecorder()
     let exitKey = KeyPress(.character("c"), modifiers: .ctrl)
+    let input = CooperativeExitInputReader()
+    input.send(.key(.space))
+    input.send(.key(exitKey))
+    defer { input.finish() }
     let root = testIdentity("BatchedProgrammaticTermination")
+    let surface = TerminationTestTerminalHost()
+    let state = StateContainer(initialState: 0, invalidationIdentities: [root])
     let runLoop = RunLoop(
       rootIdentity: root,
-      presentationSurface: TerminationTestTerminalHost(),
-      terminalInputReader: TerminationTestInputReader(
-        events: [.key(KeyPress(.space)), .key(exitKey)]),
+      presentationSurface: surface,
+      terminalInputReader: input,
       signalReader: TerminationTestSignalReader(signals: []),
       scheduler: FrameScheduler(),
-      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      stateContainer: state,
       focusTracker: FocusTracker(invalidationIdentities: [root]),
-      viewBuilder: { _, _ in
-        ButtonTerminationFixture()
-          .onTerminationRequest { request in
-            recorder.requests.append(request)
-            return cancelProgrammatic && request == .programmatic ? .cancel : .allow
-          }
+      viewBuilder: { value, _ in
+        VStack {
+          Text("decision \(value)")
+          ButtonTerminationFixture()
+        }
+        .onTerminationRequest { request in
+          recorder.requests.append(request)
+          state.mutate { $0 += 1 }
+          return cancelProgrammatic && request == .programmatic ? .cancel : .allow
+        }
       }
     )
     let exitReason: RunLoopExitReason?
     if synchronous {
       runLoop.isSessionActive = true
+      state.invalidator = runLoop.scheduler
       defer {
         runLoop.isSessionActive = false
         runLoop.lifecycleCoordinator.shutdown()
@@ -95,26 +120,92 @@ struct TerminationRequestTests {
     } else {
       exitReason = try await runLoop.run().exitReason
     }
+    #expect(surface.frames.last?.contains("decision \(cancelProgrammatic ? 2 : 1)") == true)
     #expect(exitReason == (cancelProgrammatic ? .userExit(exitKey) : .programmatic))
     #expect(
       recorder.requests
         == (cancelProgrammatic ? [.programmatic, .userExit(exitKey)] : [.programmatic]))
   }
 
-  @Test("onTerminationRequest can cancel an exit key and allow a later one")
-  func terminationRequestCanCancelExitKey() async throws {
+  @Test(
+    "onTerminationRequest can cancel without flushing or stopping owned tasks",
+    arguments: [false, true])
+  func terminationRequestCanCancelExitKey(synchronous: Bool) async throws {
     let recorder = TerminationRecorder()
     let exitKey = KeyPress(.character("c"), modifiers: .ctrl)
-
-    let result = try await runTerminationHarness(
-      events: [.key(exitKey), .key(exitKey)]
-    ) { request in
-      recorder.requests.append(request)
-      return recorder.requests.count == 1 ? .cancel : .allow
+    let input = CooperativeExitInputReader()
+    for event: InputEvent in [
+      .key(.init(.return)), .key(exitKey), .key(.init(.character("v"))), .key(exitKey),
+    ] { input.send(event) }
+    defer { input.finish() }
+    let root = testIdentity("VetoBeforeFlush")
+    let surface = TerminationTestTerminalHost()
+    let state = StateContainer(initialState: 0, invalidationIdentities: [root])
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: root, presentationSurface: surface,
+      terminalInputReader: input, scheduler: scheduler, stateContainer: state,
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      keyHandler: { key, _, state in
+        if key == KeyPress(.return) {
+          state.mutate { $0 = 1 }
+          return .handled
+        }
+        if key == KeyPress(.character("v")) {
+          #expect(surface.frames.count == 1)
+          #expect(recorder.activeTasks?() == 1)
+          recorder.checkedVeto = true
+          return .handled
+        }
+        return .ignored
+      },
+      viewBuilder: { value, _ in
+        Text("value \(value)")
+          .task { await suspendUntilCancelled() }
+          .onTerminationRequest { request in
+            recorder.requests.append(request)
+            if recorder.requests.count == 1 { return .cancel }
+            state.mutate { $0 = 2 }
+            return .allow
+          }
+      })
+    recorder.activeTasks = { [weak runLoop] in runLoop?.lifecycleCoordinator.activeTaskCount ?? 0 }
+    if synchronous {
+      runLoop.isSessionActive = true
+      state.invalidator = scheduler
+      defer {
+        runLoop.isSessionActive = false
+        runLoop.lifecycleCoordinator.shutdown()
+      }
+      var frames = 0
+      scheduler.requestInvalidation(of: [root])
+      try runLoop.renderPendingFrames(renderedFrames: &frames)
+      let buffer = EventPumpBuffer()
+      _ = buffer.enqueue(.input(.key(.init(.return))))
+      _ = buffer.enqueue(.input(.key(exitKey)))
+      _ = buffer.enqueue(.input(.key(.init(.character("v")))))
+      #expect(
+        try runLoop.processPendingEventsSynchronously(
+          from: .init(
+            stream: AsyncStream { $0.finish() }, drainEvents: { buffer.drain() },
+            hasPendingEvents: { buffer.hasPendingEvents() }, cancel: {},
+            scheduleDeadlineWake: { _ in }), renderedFrames: &frames) == nil)
+      #expect(surface.frames.last?.contains("value 1") == true)
+      #expect(runLoop.lifecycleCoordinator.activeTaskCount == 1)
+      _ = buffer.enqueue(.input(.key(.init(.return))))
+      _ = buffer.enqueue(.input(.key(exitKey)))
+      #expect(
+        try runLoop.processPendingEventsSynchronously(
+          from: .init(
+            stream: AsyncStream { $0.finish() }, drainEvents: { buffer.drain() },
+            hasPendingEvents: { buffer.hasPendingEvents() }, cancel: {},
+            scheduleDeadlineWake: { _ in }), renderedFrames: &frames) == .userExit(exitKey))
+    } else {
+      #expect(try await runLoop.run().exitReason == .userExit(exitKey))
     }
-
-    #expect(result.exitReason == .userExit(exitKey))
+    #expect(recorder.checkedVeto)
     #expect(recorder.requests == [.userExit(exitKey), .userExit(exitKey)])
+    #expect(surface.frames.last?.contains("value 2") == true)
   }
 
   @Test("default exit binding is Ctrl+C alone; Ctrl+D is left to apps")
@@ -247,7 +338,7 @@ struct TerminationRequestTests {
 
     let result = try await runTerminationHarness { request in
       recorder.requests.append(request)
-      return .allow
+      return .cancel
     }
 
     #expect(result.exitReason == .inputEnded)
@@ -257,6 +348,8 @@ struct TerminationRequestTests {
 
 private final class TerminationRecorder {
   var requests: [TerminationRequest] = []
+  var activeTasks: (@MainActor () -> Int)?
+  var checkedVeto = false
 }
 
 private struct ProgrammaticTerminationFixture: View {
@@ -331,6 +424,7 @@ private struct SelfInvalidatingAnimationFixture: View {
 }
 
 private final class TerminationTestTerminalHost: PresentationSurface {
+  var frames: [String] = []
   var surfaceSize: CellSize { CellSize(width: 20, height: 4) }
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
@@ -343,7 +437,8 @@ private final class TerminationTestTerminalHost: PresentationSurface {
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
-    TerminalPresentationMetrics.fullRepaint(
+    frames.append(TerminalSurfaceRenderer(capabilityProfile: capabilityProfile).render(surface))
+    return TerminalPresentationMetrics.fullRepaint(
       for: surface,
       capabilityProfile: capabilityProfile
     )
