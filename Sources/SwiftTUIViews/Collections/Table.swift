@@ -227,7 +227,7 @@ extension Table {
         let anchorRow = selectedIndex
         scrollCurrency = CollectionScrollCurrency(
           identity: context.identity,
-          geometry: CollectionScrollGeometry(rowCount: rowCount, rowSpan: 2, chromeInset: 0),
+          geometry: CollectionScrollGeometry(rowCount: rowCount, rowSpan: 2),
           ownerNode: ownerNode,
           registry: context.scrollCommandRegistry,
           windowMetrics: { viewportLineCount in

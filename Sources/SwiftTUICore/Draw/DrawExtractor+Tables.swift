@@ -286,6 +286,8 @@ extension DrawExtractor {
   ) -> TableVisibleLayout {
     TableLayoutDerivationProbe.recordDerivation()
     let bounds = tableInsetBounds(for: payload, in: bounds)
+    let geometry = CollectionScrollGeometry(
+      rowCount: payload.rows.count, rowSpan: 2, rowHeights: rowHeights ?? [:])
     let widths =
       columnWidths
       ?? measureTableColumnWidths(
@@ -295,6 +297,7 @@ extension DrawExtractor {
     let generated = visibleTableLines(
       for: payload,
       viewportLineCount: bounds.size.height,
+      geometry: geometry,
       showsIndicators: payload.showsIndicators,
       widths: widths,
       rowHeights: rowHeights,
@@ -309,11 +312,12 @@ extension DrawExtractor {
       ? [] : lines.filter { $0.role == .row }.compactMap(\.rowIndex)
     var extraCells =
       windowRows.min().map { first in
-        tallRowExtraCells(in: rowHeights ?? [:]) { $0 < first }
+        geometry.line(forRow: first) - first * geometry.rowSpan
       } ?? 0
     let extraAfter =
       windowRows.max().map { last in
-        tallRowExtraCells(in: rowHeights ?? [:]) { $0 > last }
+        geometry.displayLineCount - geometry.lineRange(forRow: last).upperBound
+          - (geometry.rowCount - last - 1) * geometry.rowSpan
       } ?? 0
     for index in lines.indices {
       let height =
@@ -329,12 +333,6 @@ extension DrawExtractor {
       lines: lines,
       widths: widths,
       totalContentHeight: generated.totalLineCount + extraCells + extraAfter
-    )
-    let geometry = CollectionScrollGeometry(
-      rowCount: payload.rows.count,
-      rowSpan: 2,
-      chromeInset: 0,
-      rowHeights: rowHeights ?? [:]
     )
     // The body starts below fixed table headers and ends above the bottom
     // border. Indicators consume body cells; padding between whole rows does
@@ -380,6 +378,7 @@ extension DrawExtractor {
   private func visibleTableLines(
     for payload: TablePayload,
     viewportLineCount: Int,
+    geometry: CollectionScrollGeometry,
     showsIndicators: Bool,
     widths: [Int],
     rowHeights: [Int: Int]?,
@@ -389,6 +388,7 @@ extension DrawExtractor {
       return viewportBackedVisibleTableLines(
         for: payload,
         viewportLineCount: viewportLineCount,
+        geometry: geometry,
         showsIndicators: showsIndicators,
         widths: widths,
         rowHeights: rowHeights,
@@ -496,6 +496,7 @@ extension DrawExtractor {
   private func viewportBackedVisibleTableLines(
     for payload: TablePayload,
     viewportLineCount: Int,
+    geometry: CollectionScrollGeometry,
     showsIndicators: Bool,
     widths: [Int],
     rowHeights: [Int: Int]?,
@@ -521,10 +522,7 @@ extension DrawExtractor {
     let bodyCapacity = viewportLineCount - top.count - bottom.count
     // The body's cells: a row line is as tall as its hosted row measured, so
     // the rows `rowHeights` knows are taller add their extra cells.
-    let rowCount = payload.rows.count
-    let bodyCellCount =
-      bodyLineCount
-      + tallRowExtraCells(in: rowHeights ?? [:]) { (0..<rowCount).contains($0) }
+    let bodyCellCount = geometry.displayLineCount
     func lineHeight(_ position: Int) -> Int {
       position % 2 == 0 ? max(1, rowHeights?[position / 2] ?? 1) : 1
     }
@@ -616,9 +614,9 @@ extension DrawExtractor {
     func scrollPosition(_ range: (offset: Int, end: Int, maxOffset: Int))
       -> CollectionScrollPosition
     {
-      CollectionScrollPosition(
-        cellOffset: range.offset
-          + tallRowExtraCells(in: rowHeights ?? [:]) { $0 * 2 < range.offset },
+      let row = geometry.lineRange(forRow: range.offset / geometry.rowSpan)
+      return CollectionScrollPosition(
+        cellOffset: range.offset.isMultiple(of: geometry.rowSpan) ? row.lowerBound : row.upperBound,
         isAtStart: range.offset == 0, isAtEnd: range.offset == range.maxOffset)
     }
     // A window whose next row does not fit leaves cells unused. Blank body

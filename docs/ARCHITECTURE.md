@@ -83,6 +83,8 @@ extents in display lines. Core publishes measured rows and the usable viewport
 together in `CollectionScrollLayout`; collection input handlers consume that
 geometry through `LocalScrollPositionRegistry`. Indexed collections retain
 sparse measurements and estimate unrealized rows without evaluating the dataset.
+Hosted collection measurement hints and list/table layout use the same sparse
+row extents as input handlers; separator fitting remains a layout policy.
 The primitive `CollectionScrollAnchor` distinguishes a requested row from the
 start and end, which can include section headers and footers. Programmatic targets
 receive one correction after their requested window is measured, only while

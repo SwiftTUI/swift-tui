@@ -161,9 +161,12 @@ extension ListStylePresentation {
   ) -> ListVisibleLayout {
     ListLayoutDerivationProbe.recordDerivation()
     let contentBounds = listContentBounds(in: bounds)
+    let geometry = CollectionScrollGeometry(
+      rowCount: payload.rowCount, rowSpan: listRowDisplaySpan, rowHeights: rowHeights ?? [:])
     let generated = visibleListLines(
       for: payload,
       viewportLineCount: contentBounds.size.height,
+      geometry: geometry,
       rowHeights: rowHeights,
       itemSizes: itemSizes,
       rowWindow: rowWindow
@@ -174,11 +177,12 @@ extension ListStylePresentation {
     let windowRows = generated.isWindowed ? lines.compactMap(\.rowIndex) : []
     let extraBefore =
       windowRows.min().map { first in
-        tallRowExtraCells(in: rowHeights ?? [:]) { $0 < first }
+        geometry.line(forRow: first) - first * geometry.rowSpan
       } ?? 0
     let extraAfter =
       windowRows.max().map { last in
-        tallRowExtraCells(in: rowHeights ?? [:]) { $0 > last }
+        geometry.displayLineCount - geometry.lineRange(forRow: last).upperBound
+          - (geometry.rowCount - last - 1) * geometry.rowSpan
       } ?? 0
     var cursor = generated.firstLinePosition + extraBefore
     for index in lines.indices {
@@ -206,12 +210,6 @@ extension ListStylePresentation {
     // window only bounds generation; it does not move the viewport itself.
     let navigation: CollectionScrollLayout?
     if payload.isViewportBacked {
-      let geometry = CollectionScrollGeometry(
-        rowCount: payload.rowCount,
-        rowSpan: listRowDisplaySpan,
-        chromeInset: 0,
-        rowHeights: rowHeights ?? [:]
-      )
       let showsIndicatorLines =
         geometry.displayLineCount > contentBounds.size.height
         && payload.showsIndicators && contentBounds.size.height >= 3
@@ -229,9 +227,8 @@ extension ListStylePresentation {
           showsIndicators: payload.showsIndicators,
           viewportLineCount: contentBounds.size.height
         )
-        offset =
-          window.offset
-          + tallRowExtraCells(in: rowHeights ?? [:]) { $0 * listRowDisplaySpan < window.offset }
+        let row = geometry.lineRange(forRow: window.offset / listRowDisplaySpan)
+        offset = window.offset.isMultiple(of: listRowDisplaySpan) ? row.lowerBound : row.upperBound
       }
       navigation = CollectionScrollLayout(
         geometry: geometry,
@@ -416,6 +413,7 @@ extension ListStylePresentation {
   private func visibleListLines(
     for payload: ListPayload,
     viewportLineCount: Int,
+    geometry: CollectionScrollGeometry,
     rowHeights: [Int: Int]?,
     itemSizes: [ChildAllocation],
     rowWindow: Range<Int>?
@@ -424,6 +422,7 @@ extension ListStylePresentation {
       return viewportBackedVisibleListLines(
         for: payload,
         viewportLineCount: viewportLineCount,
+        geometry: geometry,
         rowHeights: rowHeights,
         rowWindow: rowWindow
       )
@@ -507,8 +506,8 @@ extension ListStylePresentation {
       case .end:
         offset = maxOffset
       }
-    } else if let selectedRowIndex = payload.selectedRowIndex,
-      let selectedLine = displayLines.firstIndex(where: { $0.rowIndex == selectedRowIndex })
+    } else if let selectedLine = selectedListLineIndex(
+      in: displayLines, selectedRowIndex: payload.selectedRowIndex)
     {
       let selectedCell = displayLines[selectedLine].yOffset
       let startCell = max(0, selectedCell - capacity / 2)
@@ -563,6 +562,7 @@ extension ListStylePresentation {
   private func viewportBackedVisibleListLines(
     for payload: ListPayload,
     viewportLineCount: Int,
+    geometry: CollectionScrollGeometry,
     rowHeights: [Int: Int]?,
     rowWindow: Range<Int>?
   ) -> GeneratedListLines {
@@ -615,14 +615,12 @@ extension ListStylePresentation {
       return (visible, offset, max(0, displayLineCount - end), true, nil, nil, nil)
     }
 
-    let rowCount = payload.rowCount
-    let extraCells = tallRowExtraCells(in: rowHeights ?? [:]) { (0..<rowCount).contains($0) }
-    if extraCells > 0 {
+    if geometry.displayLineCount > displayLineCount {
       return heightAwareViewportListLines(
         for: payload,
         window: window,
         viewportLineCount: viewportLineCount,
-        displayCellCount: displayLineCount + extraCells,
+        geometry: geometry,
         rowHeights: rowHeights ?? [:],
         usesSectionChrome: usesSectionChrome
       )
@@ -666,7 +664,7 @@ extension ListStylePresentation {
     for payload: ListPayload,
     window: ListLineWindow,
     viewportLineCount: Int,
-    displayCellCount: Int,
+    geometry: CollectionScrollGeometry,
     rowHeights: [Int: Int],
     usesSectionChrome: Bool
   ) -> GeneratedListLines {
@@ -680,7 +678,7 @@ extension ListStylePresentation {
         rowSpan: rowSpan
       )
     }
-    guard displayCellCount > viewportLineCount else {
+    guard geometry.displayLineCount > viewportLineCount else {
       return (
         (0..<displayLineCount).map(line(at:)), 0, 0, false, 0,
         .init(cellOffset: 0, isAtStart: true, isAtEnd: true), nil
@@ -720,8 +718,9 @@ extension ListStylePresentation {
     var visible = (offset..<end).map(line(at:))
     // Navigation shares the endpoint that fits the final row as a whole.
     let maximumAnchorRow = (maxOffset + rowSpan - 1) / rowSpan
+    let anchorRow = geometry.lineRange(forRow: offset / rowSpan)
     let position = CollectionScrollPosition(
-      cellOffset: offset + tallRowExtraCells(in: rowHeights) { $0 * rowSpan < offset },
+      cellOffset: offset.isMultiple(of: rowSpan) ? anchorRow.lowerBound : anchorRow.upperBound,
       isAtStart: offset == 0, isAtEnd: offset == maxOffset)
     guard showsIndicatorLines else {
       return (visible, 0, 0, false, maximumAnchorRow, position, nil)
