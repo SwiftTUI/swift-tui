@@ -13,11 +13,12 @@ struct TaskRunnerTransferTests {
   private let destination = ViewNodeID(rawValue: 42)
 
   @Test("deferred commits preserve repeated transfers and cancellation order")
-  func carriedTransferSequence() async {
+  func carriedTransferSequence() async throws {
     let runner = TaskRunner()
-    let task = runner.start(
-      viewNodeID: source, identity: identity,
-      registration: TaskRegistration(descriptor: descriptor) { await suspendUntilCancelled() })
+    let task = try #require(
+      runner.start(
+        viewNodeID: source, identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) { await suspendUntilCancelled() }))
     let outward = LifecycleCommitEntry(
       viewNodeID: destination, identity: identity,
       operation: .taskTransfer(from: source, descriptor: descriptor))
@@ -64,12 +65,13 @@ struct TaskRunnerTransferTests {
   }
 
   @Test("completion follows repeated transfers without restarting")
-  func completionAfterTransfers() async {
+  func completionAfterTransfers() async throws {
     let runner = TaskRunner()
     var starts = 0
-    let task = runner.start(
-      viewNodeID: source, identity: identity,
-      registration: TaskRegistration(descriptor: descriptor) { starts += 1 })
+    let task = try #require(
+      runner.start(
+        viewNodeID: source, identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) { starts += 1 }))
     runner.transfer(from: source, to: destination, identity: identity, matching: descriptor)
     runner.transfer(from: destination, to: source, identity: identity, matching: descriptor)
     runner.transfer(from: source, to: destination, identity: identity, matching: descriptor)
@@ -80,19 +82,20 @@ struct TaskRunnerTransferTests {
   }
 
   @Test("a suspended task cancels under its new owner")
-  func cancellationAfterTransfer() async {
+  func cancellationAfterTransfer() async throws {
     let runner = TaskRunner()
     let entered = AsyncStream<Void>.makeStream()
     var resume: CheckedContinuation<Void, Never>?
-    let task = runner.start(
-      viewNodeID: source, identity: identity,
-      registration: TaskRegistration(descriptor: descriptor) {
-        await withCheckedContinuation {
-          resume = $0
-          entered.continuation.yield(())
-          entered.continuation.finish()
-        }
-      })
+    let task = try #require(
+      runner.start(
+        viewNodeID: source, identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) {
+          await withCheckedContinuation {
+            resume = $0
+            entered.continuation.yield(())
+            entered.continuation.finish()
+          }
+        }))
     for await _ in entered.stream {}
     runner.transfer(from: source, to: destination, identity: identity, matching: descriptor)
     runner.cancel(viewNodeID: source)
@@ -105,24 +108,26 @@ struct TaskRunnerTransferTests {
   }
 
   @Test("late completion cannot remove a replacement after transfer")
-  func staleCompletionAfterTransfer() async {
+  func staleCompletionAfterTransfer() async throws {
     let runner = TaskRunner()
     let entered = AsyncStream<Void>.makeStream()
     var resume: CheckedContinuation<Void, Never>?
-    let old = runner.start(
-      viewNodeID: source, identity: identity,
-      registration: TaskRegistration(descriptor: descriptor) {
-        await withCheckedContinuation {
-          resume = $0
-          entered.continuation.yield(())
-          entered.continuation.finish()
-        }
-      })
+    let old = try #require(
+      runner.start(
+        viewNodeID: source, identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) {
+          await withCheckedContinuation {
+            resume = $0
+            entered.continuation.yield(())
+            entered.continuation.finish()
+          }
+        }))
     for await _ in entered.stream {}
     runner.transfer(from: source, to: destination, identity: identity, matching: descriptor)
-    let replacement = runner.start(
-      viewNodeID: destination, identity: identity,
-      registration: TaskRegistration(descriptor: descriptor) { await suspendUntilCancelled() })
+    let replacement = try #require(
+      runner.start(
+        viewNodeID: destination, identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) { await suspendUntilCancelled() }))
     #expect(old.isCancelled)
     resume?.resume()
     await old.value
@@ -133,15 +138,17 @@ struct TaskRunnerTransferTests {
   }
 
   @Test("transfer checks full descriptor and identity and leaves sibling tasks owned")
-  func exactOwnershipOnly() async {
+  func exactOwnershipOnly() async throws {
     let runner = TaskRunner()
     let sibling = TaskDescriptor(id: "sibling", priority: .medium)
-    let first = runner.start(
-      viewNodeID: source, identity: identity,
-      registration: TaskRegistration(descriptor: descriptor) {})
-    let second = runner.start(
-      viewNodeID: source, identity: identity,
-      registration: TaskRegistration(descriptor: sibling) {})
+    let first = try #require(
+      runner.start(
+        viewNodeID: source, identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) {}))
+    let second = try #require(
+      runner.start(
+        viewNodeID: source, identity: identity,
+        registration: TaskRegistration(descriptor: sibling) {}))
     runner.transfer(
       from: source, to: destination, identity: Identity(components: ["Other"]),
       matching: descriptor)
@@ -160,14 +167,16 @@ struct TaskRunnerTransferTests {
   }
 
   @Test("a destination collision retires the source without overwriting live work")
-  func destinationCollision() async {
+  func destinationCollision() async throws {
     let runner = TaskRunner()
-    let first = runner.start(
-      viewNodeID: source, identity: identity,
-      registration: TaskRegistration(descriptor: descriptor) {})
-    let second = runner.start(
-      viewNodeID: destination, identity: Identity(components: ["Other"]),
-      registration: TaskRegistration(descriptor: descriptor) {})
+    let first = try #require(
+      runner.start(
+        viewNodeID: source, identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) {}))
+    let second = try #require(
+      runner.start(
+        viewNodeID: destination, identity: Identity(components: ["Other"]),
+        registration: TaskRegistration(descriptor: descriptor) {}))
     runner.transfer(from: source, to: destination, identity: identity, matching: descriptor)
     #expect(first.isCancelled)
     #expect(!second.isCancelled)
@@ -178,16 +187,18 @@ struct TaskRunnerTransferTests {
   }
 
   @Test("a priority replacement cancels the handle occupying the descriptor slot")
-  func changedPriorityReplacesHandle() async {
+  func changedPriorityReplacesHandle() async throws {
     let runner = TaskRunner()
-    let first = runner.start(
-      viewNodeID: source, identity: identity,
-      registration: TaskRegistration(descriptor: descriptor) {})
-    let replacement = runner.start(
-      viewNodeID: source, identity: identity,
-      registration: TaskRegistration(
-        descriptor: TaskDescriptor(id: descriptor.id, priority: .high)
-      ) {})
+    let first = try #require(
+      runner.start(
+        viewNodeID: source, identity: identity,
+        registration: TaskRegistration(descriptor: descriptor) {}))
+    let replacement = try #require(
+      runner.start(
+        viewNodeID: source, identity: identity,
+        registration: TaskRegistration(
+          descriptor: TaskDescriptor(id: descriptor.id, priority: .high)
+        ) {}))
     #expect(first.isCancelled)
     #expect(!replacement.isCancelled)
     await first.value

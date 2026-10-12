@@ -165,13 +165,22 @@ package final class LifecycleCoordinator {
     previousLifecycleHandlers.absorbNewer(snapshot)
   }
 
+  func beginShutdown() {
+    taskRunner.beginShutdown()
+  }
+
   func shutdown() {
-    taskRunner.cancelAll()
+    beginShutdown()
+    retainedTaskRegistrations.removeAll()
     previousLifecycleHandlers = .init()
   }
 
   package var activeTaskDescriptors: [Identity: [TaskDescriptor]] {
     taskRunner.activeTaskDescriptors
+  }
+
+  package var refusedStartsAfterShutdownCount: Int {
+    taskRunner.refusedStartsAfterShutdownCount
   }
 
   package var activeTaskCount: Int {
@@ -218,6 +227,7 @@ package final class LifecycleCoordinator {
         recordHandlerSkip(.change, entry: entry, handlerID: handlerID, into: &skipIssues)
       }
     case .taskStart(let descriptor):
+      guard !taskRunner.refuseStartIfShuttingDown() else { return }
       var registration = currentTaskRegistry.registration(
         for: entry.identity,
         descriptor: descriptor

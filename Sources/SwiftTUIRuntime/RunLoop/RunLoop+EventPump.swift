@@ -321,11 +321,19 @@ extension RunLoop {
     for pumpedEvent in renderEventDrain.events {
       let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
       if let exitReason = handle(pumpedEvent.event, arrival: pumpedEvent.arrival) {
+        let effectiveExit: RunLoopExitReason
+        switch resolveExit(for: exitReason) {
+        case .cancelled:
+          handledNonExitEvent = true
+          continue
+        case .proceed(let reason):
+          effectiveExit = reason
+        }
         let shouldFlushBeforeExit =
           handledNonExitEvent
           || (hadReadyFrameBeforeEvent
             && {
-              if case .signal = exitReason {
+              if case .signal = effectiveExit {
                 return true
               }
               return false
@@ -333,21 +341,10 @@ extension RunLoop {
         if shouldFlushBeforeExit {
           try renderPendingFrames(
             renderedFrames: &renderedFrames,
-            frameBudget: { () -> Int? in
-              if case .signal = exitReason { return 1 }
-              return nil
-            }(),
-            eventPump: eventPump, appliesWorkBudget: false)
+            eventPump: eventPump,
+            drainPolicy: FrameDrainPolicy(exitReason: effectiveExit))
         }
-        if let programmatic = consumeProgrammaticTerminationRequest() {
-          return programmatic
-        }
-        if terminationDisposition(for: exitReason) == .cancel {
-          scheduler.requestInvalidation(of: [rootIdentity])
-          handledNonExitEvent = true
-          continue
-        }
-        return exitReason
+        return effectiveExit
       }
       handledNonExitEvent = true
     }
