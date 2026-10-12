@@ -308,7 +308,8 @@ struct DeterministicCounterTests {
     // 4 iterations: 1 = first render, 2-3 discarded, 4 measured — the
     // smallest run that exercises every bucket of the D3 protocol. The lane
     // itself throws on any counter drift, so passing IS the identity proof.
-    let report = try BenchColdLane.run(MemoEquatableBoundaryScenario(), iterations: 4)
+    let member = try #require(BenchSuite.member(named: .memoEquatableBoundary))
+    let report = try BenchColdLane.run(member, iterations: 4)
     #expect(report.iterations == 4)
     #expect(report.renderMs.sampleCount == 1)
     #expect(report.firstRenderMs > 0)
@@ -329,13 +330,24 @@ struct DeterministicCounterTests {
   @Test("deep-grid cold lane pins a deep regular built-in tree")
   @MainActor
   func deepGridColdLanePinsBranchingShape() throws {
-    let report = try BenchColdLane.run(BenchDeepGridScenario(), iterations: 4)
+    let member = try #require(BenchSuite.member(named: .benchDeepGrid))
+    let report = try BenchColdLane.run(member, iterations: 4)
     // Exact values are the committed baseline's job (Stage 3); here assert
     // the shape signals: 255 binary splits' worth of built-in container
     // work, 256 leaves in the draw tree, and no custom layouts anywhere.
     #expect((report.counters.builtinContainerMeasures ?? 0) >= 255)
     #expect((report.counters.drawNodes ?? 0) >= 256)
     #expect(report.counters.customContainerMeasures == 0)
+  }
+
+  @Test("cold lane rejects a member whose scenario is not cold-renderable")
+  @MainActor
+  func coldLaneRejectsNonRenderableMember() {
+    let member = BenchMember(
+      scenario: .scrollJump, warmModes: [], warmSyncRatchets: false)
+    #expect(throws: PerfBenchError.memberNotColdRenderable(member.scenario.rawValue)) {
+      _ = try BenchColdLane.run(member, iterations: 4)
+    }
   }
 
   @Test("every suite member supports the cold lane")

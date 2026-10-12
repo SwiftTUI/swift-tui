@@ -11,15 +11,22 @@ public struct BenchMember: Equatable, Sendable {
   /// Whether the warm `sync` lane's counters join the committed ratchet
   /// (D4: the click-driven closed-loop members only).
   public var warmSyncRatchets: Bool
+  /// Whether the cold lane collects text paint-loop visits for this member.
+  ///
+  /// Defaults to disabled. Enable it for workloads whose baseline should pin text
+  /// traversal (i.e. text clipping); most members and warm lanes do not record text line visits.
+  public var recordsTextLineVisits: Bool
 
   public init(
     scenario: PerfScenarioName,
     warmModes: [RuntimeRenderMode],
-    warmSyncRatchets: Bool
+    warmSyncRatchets: Bool,
+    recordsTextLineVisits: Bool = false
   ) {
     self.scenario = scenario
     self.warmModes = warmModes
     self.warmSyncRatchets = warmSyncRatchets
+    self.recordsTextLineVisits = recordsTextLineVisits
   }
 }
 
@@ -27,7 +34,7 @@ public struct BenchMember: Equatable, Sendable {
 /// "the benchmark" is exactly what `bench` runs and an outside reader can
 /// cite it by member name.
 public enum BenchSuite {
-  /// D2's original five members plus the preview-readiness Stage-0 controls.
+  /// D2's original members, preview-readiness controls, and clipped-text workloads.
   ///
   /// `warmSyncRatchets` is FALSE everywhere: recording the baseline failed
   /// D3's determinism proof for the warm lanes twice, with different counter
@@ -39,6 +46,42 @@ public enum BenchSuite {
   /// ratchet is cold-lane only; the variance itself is filed as a finding.
   /// Flip a member back only after the frame-census variance is pinned.
   public static let members: [BenchMember] = [
+    BenchMember(
+      scenario: .textClippingPlainVisible,
+      warmModes: [.sync],
+      warmSyncRatchets: false,
+      recordsTextLineVisits: true
+    ),
+    BenchMember(
+      scenario: .textClippingPlainTop,
+      warmModes: [.sync],
+      warmSyncRatchets: false,
+      recordsTextLineVisits: true
+    ),
+    BenchMember(
+      scenario: .textClippingPlainMiddle,
+      warmModes: [.sync],
+      warmSyncRatchets: false,
+      recordsTextLineVisits: true
+    ),
+    BenchMember(
+      scenario: .textClippingRichVisible,
+      warmModes: [.sync],
+      warmSyncRatchets: false,
+      recordsTextLineVisits: true
+    ),
+    BenchMember(
+      scenario: .textClippingRichTop,
+      warmModes: [.sync],
+      warmSyncRatchets: false,
+      recordsTextLineVisits: true
+    ),
+    BenchMember(
+      scenario: .textClippingRichMiddle,
+      warmModes: [.sync],
+      warmSyncRatchets: false,
+      recordsTextLineVisits: true
+    ),
     BenchMember(
       scenario: .benchDeepGrid,
       warmModes: [.sync, .async],

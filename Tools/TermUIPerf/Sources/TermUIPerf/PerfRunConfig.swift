@@ -102,9 +102,22 @@ public struct PerfCompareConfig: Equatable, Sendable {
   }
 }
 
+/// Names registered UI workloads accepted by the standard run and benchmark commands.
 public enum PerfScenarioName: String, CaseIterable, Equatable, Sendable {
   case benchDeepGrid = "bench-deep-grid"
   case benchStorm = "bench-storm"
+  /// Measures an eight-line control using ordinary text.
+  case textClippingPlainVisible = "bench-text-clipping-plain-visible"
+  /// Measures the first eight rows of a tall document using ordinary text.
+  case textClippingPlainTop = "bench-text-clipping-plain-top"
+  /// Measures eight middle rows of a tall document using ordinary text.
+  case textClippingPlainMiddle = "bench-text-clipping-plain-middle"
+  /// Measures an eight-line control using link-bearing text.
+  case textClippingRichVisible = "bench-text-clipping-rich-visible"
+  /// Measures the first eight rows of a tall document using link-bearing text.
+  case textClippingRichTop = "bench-text-clipping-rich-top"
+  /// Measures eight middle rows of a tall document using link-bearing text.
+  case textClippingRichMiddle = "bench-text-clipping-rich-middle"
   case exampleAppShellWorkflow = "example-app-shell-workflow"
   case galleryAnimationClick = "gallery-animation-click"
   case layoutScrollBurst = "layout-scroll-burst"

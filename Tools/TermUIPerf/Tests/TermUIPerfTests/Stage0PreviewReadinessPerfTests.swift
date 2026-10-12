@@ -10,15 +10,18 @@ struct Stage0PreviewReadinessPerfTests {
   @Test("focused cold scenarios are non-vacuous")
   @MainActor
   func focusedColdScenariosAreNonVacuous() throws {
-    let dynamic = try BenchColdLane.run(DynamicPropertyHeavyScenario(), iterations: 4)
+    let dynamicMember = try #require(BenchSuite.member(named: .dynamicPropertyHeavy))
+    let dynamic = try BenchColdLane.run(dynamicMember, iterations: 4)
     #expect((dynamic.counters.resolvedComputed ?? 0) >= 64)
     #expect((dynamic.counters.drawNodes ?? 0) >= 64)
 
-    let tabs = try BenchColdLane.run(GalleryTabSwitchScenario(), iterations: 4)
+    let tabsMember = try #require(BenchSuite.member(named: .galleryTabSwitch))
+    let tabs = try BenchColdLane.run(tabsMember, iterations: 4)
     #expect((tabs.counters.resolvedComputed ?? 0) >= 32)
     #expect((tabs.counters.drawNodes ?? 0) >= 24)
 
-    let image = try BenchColdLane.run(StillImagePresentationScenario(), iterations: 4)
+    let imageMember = try #require(BenchSuite.member(named: .stillImagePresentation))
+    let image = try BenchColdLane.run(imageMember, iterations: 4)
     #expect(image.counters.rasterImageAttachments == 1)
     #expect((image.counters.presentCells ?? 0) > 0)
   }

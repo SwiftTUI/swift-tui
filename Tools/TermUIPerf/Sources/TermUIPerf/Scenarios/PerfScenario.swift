@@ -147,6 +147,7 @@ extension PerfScenario {
   public var initialFrameTimeout: Duration { .seconds(2) }
 }
 
+/// Supplies built-in and startup-registered workloads to the existing scenario runner.
 public enum PerfScenarioRegistry {
   /// Extension point for scenarios registered at startup that cannot live in
   /// this package's committed sources — e.g. coordination-only scenarios that
@@ -155,11 +156,18 @@ public enum PerfScenarioRegistry {
   @MainActor
   public static var additionalScenarios: [any PerfScenario] = []
 
+  /// Every built-in scenario, followed by workloads registered before command parsing.
   @MainActor
   public static var all: [any PerfScenario] {
     [
       BenchDeepGridScenario(),
       BenchStormScenario(),
+      TextClippingScenario(painter: .plain, position: .visible),
+      TextClippingScenario(painter: .plain, position: .top),
+      TextClippingScenario(painter: .plain, position: .middle),
+      TextClippingScenario(painter: .rich, position: .visible),
+      TextClippingScenario(painter: .rich, position: .top),
+      TextClippingScenario(painter: .rich, position: .middle),
       ExampleAppShellWorkflowScenario(),
       GalleryAnimationClickScenario(),
       LayoutScrollBurstScenario(),

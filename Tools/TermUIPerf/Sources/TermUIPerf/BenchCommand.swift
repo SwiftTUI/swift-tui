@@ -182,13 +182,7 @@ public enum BenchCommand {
     for member in selected {
       // Cold lane first: it is cheap, and its determinism check failing
       // should abort before the member's multi-minute warm lanes run.
-      guard
-        let coldRenderable = PerfScenarioRegistry.scenario(named: member.scenario)
-          as? any BenchColdRenderable
-      else {
-        throw PerfBenchError.memberNotColdRenderable(member.scenario.rawValue)
-      }
-      let cold = try BenchColdLane.run(coldRenderable, iterations: config.coldIterations)
+      let cold = try BenchColdLane.run(member, iterations: config.coldIterations)
 
       var lanes: [PerfBenchLaneReport] = []
       for mode in member.warmModes where !config.skipWarm {
