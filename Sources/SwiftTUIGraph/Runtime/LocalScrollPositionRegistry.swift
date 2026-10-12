@@ -240,7 +240,8 @@ package final class LocalScrollPositionRegistry: Equatable {
       currentOffset,
       scrolling: targetRect,
       anchor: anchor,
-      in: route
+      in: route,
+      preservesProducerOffset: registration.revealTarget != nil
     )
     guard adjustedOffset != currentOffset else {
       return false
@@ -479,7 +480,8 @@ package final class LocalScrollPositionRegistry: Equatable {
       let adjustedOffset = adjustedOffset(
         currentOffset,
         revealing: followsCursor ? revealRect : (focusedTarget?.rect ?? revealRect),
-        in: route
+        in: route,
+        preservesProducerOffset: registration.revealTarget != nil
       )
       guard adjustedOffset != currentOffset else {
         continue
@@ -551,9 +553,15 @@ package final class LocalScrollPositionRegistry: Equatable {
   private func adjustedOffset(
     _ currentOffset: ScrollOffset,
     revealing focusRect: CellRect,
-    in route: ScrollRoute
+    in route: ScrollRoute,
+    preservesProducerOffset: Bool
   ) -> ScrollOffset {
-    var next = currentOffset
+    // A collection's target resolver owns its scroll range, including space
+    // reserved for chrome and indicators. Ordinary ScrollView layout instead
+    // clamps against the route bounds without writing back to its binding.
+    // After a resize, apply reveal deltas to that clamped offset so a stale
+    // binding cannot leave the requested target outside the viewport.
+    var next = preservesProducerOffset ? currentOffset : clampedOffset(currentOffset, in: route)
 
     if focusRect.origin.x < route.viewportRect.origin.x {
       next.x += focusRect.origin.x - route.viewportRect.origin.x
@@ -570,14 +578,14 @@ package final class LocalScrollPositionRegistry: Equatable {
     // Collections own their usable viewport, which can exclude fixed chrome
     // and overflow indicators. Preserve a visible axis's producer-owned offset
     // instead of normalizing it against the raw route bounds.
-    if next.x != currentOffset.x {
+    if !preservesProducerOffset || next.x != currentOffset.x {
       next.x = clampedOffset(
         next.x,
         contentLength: route.contentBounds.size.width,
         viewportLength: route.viewportRect.size.width
       )
     }
-    if next.y != currentOffset.y {
+    if !preservesProducerOffset || next.y != currentOffset.y {
       next.y = clampedOffset(
         next.y,
         contentLength: route.contentBounds.size.height,
@@ -591,13 +599,15 @@ package final class LocalScrollPositionRegistry: Equatable {
     _ currentOffset: ScrollOffset,
     scrolling targetRect: CellRect,
     anchor: UnitPoint?,
-    in route: ScrollRoute
+    in route: ScrollRoute,
+    preservesProducerOffset: Bool
   ) -> ScrollOffset {
     guard let anchor else {
       return adjustedOffset(
         currentOffset,
         revealing: targetRect,
-        in: route
+        in: route,
+        preservesProducerOffset: preservesProducerOffset
       )
     }
 
