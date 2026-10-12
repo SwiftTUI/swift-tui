@@ -1,6 +1,6 @@
 import Synchronization
 
-/// Per-paint work tallies for text-line traversal and fill sampling.
+/// Per-paint raster work tallies (plan 2026-09-24-001 §4A/§4C, STUI-618).
 ///
 /// These separate *less work* from *faster work*: an output-correct fill that
 /// still samples every cell of its rectangle reports the same `radialSamples`
@@ -8,13 +8,11 @@ import Synchronization
 package struct RasterWorkCounters: Equatable, Sendable {
   /// Fill commands that reached the cell walk.
   package var fills = 0
-  /// Actual iterations of a text painter's line loop, including clean rows it
-  /// rejects.
+  /// Actual iterations of a text painter's line loop, including clean rows it rejects.
   ///
   /// Counts traversal of all lines before the dirty-row check. For example, if
   /// only eight lines out of a two-thousand-line document are visible in the
-  /// viewport, the counter should only record visits to those visible in the
-  /// viewport.
+  /// viewport, the counter should only record visits to those 8 visible lines.
   package var textLineVisits = 0
   /// Cells the walk considered (the geometry test ran for each).
   package var visitedCells = 0
