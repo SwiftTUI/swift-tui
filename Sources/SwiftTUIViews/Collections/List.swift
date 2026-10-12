@@ -171,10 +171,7 @@ extension List {
           identity: context.identity,
           geometry: CollectionScrollGeometry(
             rowCount: rowCount,
-            rowSpan: listStyle.listRowDisplaySpan,
-            // Chrome border rows are layout-bearing content insets, not display
-            // lines: line 0 of every list style's scrollable stream is row 0.
-            chromeInset: 0
+            rowSpan: listStyle.listRowDisplaySpan
           ),
           ownerNode: ownerNode,
           registry: context.scrollCommandRegistry,

@@ -409,10 +409,9 @@ extension LayoutEngine {
     let stride = max(1, rowStride)
     let offset = max(0, hint.contentOffset.y)
     let overscan = 1
-    let anchor = min(
-      max(0, count - 1),
-      hostedCollectionRow(atLine: offset, rowStride: stride, tallRowHeights: tallRowHeights)
-    )
+    let geometry = CollectionScrollGeometry(
+      rowCount: count, rowSpan: stride, rowHeights: tallRowHeights)
+    let anchor = geometry.row(atOrBeforeLine: offset)
     let rowsPerViewport = (hint.viewportSize.height + stride - 1) / stride
     let lower = max(0, anchor - overscan)
     let upper = min(count, anchor + rowsPerViewport + overscan + 1)
@@ -422,28 +421,6 @@ extension LayoutEngine {
     return lower..<upper
   }
 
-  /// The row whose display lines contain content line `line`: rows are
-  /// `rowStride` lines apart, and each row `tallRowHeights` knows is taller
-  /// than one cell pushes every later row down by its extra cells.
-  func hostedCollectionRow(
-    atLine line: Int,
-    rowStride: Int,
-    tallRowHeights: [Int: Int]
-  ) -> Int {
-    var extraBefore = 0
-    for (row, height) in tallRowHeights.sorted(by: { $0.key < $1.key }) {
-      let start = row * rowStride + extraBefore
-      guard line >= start else {
-        break
-      }
-      let extra = max(0, height - 1)
-      if line < start + rowStride + extra {
-        return row
-      }
-      extraBefore += extra
-    }
-    return (line - extraBefore) / rowStride
-  }
 }
 
 /// The cells the rows `tallRowHeights` knows are taller than one cell add to a

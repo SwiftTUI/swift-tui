@@ -183,17 +183,19 @@ struct HostedCollectionHintWindowingTests {
     let engine = LayoutEngine()
     // Row 2 spans lines 2...6 and row 3 starts at line 7.
     let tallRowHeights = [2: 5]
-    #expect(
-      engine.hostedCollectionRow(atLine: 1, rowStride: 1, tallRowHeights: tallRowHeights) == 1)
-    #expect(
-      engine.hostedCollectionRow(atLine: 6, rowStride: 1, tallRowHeights: tallRowHeights) == 2)
-    #expect(
-      engine.hostedCollectionRow(atLine: 7, rowStride: 1, tallRowHeights: tallRowHeights) == 3)
+    let geometry = CollectionScrollGeometry(rowCount: 2_000, rowSpan: 1, rowHeights: tallRowHeights)
+    #expect(geometry.row(atOrBeforeLine: 1) == 1)
+    #expect(geometry.row(atOrBeforeLine: 6) == 2)
+    #expect(geometry.row(atOrBeforeLine: 7) == 3)
+    #expect(geometry.lineRange(forRow: 2) == 2..<7)
+    #expect(geometry.displayLineCount == 2_004)
     // With separators the row after the tall one starts past its separator.
-    #expect(
-      engine.hostedCollectionRow(atLine: 9, rowStride: 2, tallRowHeights: tallRowHeights) == 2)
-    #expect(
-      engine.hostedCollectionRow(atLine: 10, rowStride: 2, tallRowHeights: tallRowHeights) == 3)
+    let separated = CollectionScrollGeometry(
+      rowCount: 2_000, rowSpan: 2, rowHeights: tallRowHeights)
+    #expect(separated.row(atOrBeforeLine: 9) == 2)
+    #expect(separated.row(atOrBeforeLine: 10) == 3)
+    #expect(separated.lineRange(forRow: 2) == 4..<9)
+    #expect(separated.displayLineCount == 4_003)
 
     let window = engine.hostedCollectionHintWindow(
       hint: MeasureViewportHint(

@@ -3,7 +3,7 @@
 /// rows that have not been measured yet.
 package struct CollectionScrollGeometry: Equatable, Sendable {
   private enum Rows: Equatable, Sendable {
-    case indexed(count: Int, span: Int, chromeInset: Int, measured: [MeasuredRow])
+    case indexed(count: Int, span: Int, measured: [MeasuredRow])
     case materialized(ranges: [Range<Int>], displayLineCount: Int)
   }
 
@@ -18,7 +18,6 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
   package init(
     rowCount: Int,
     rowSpan: Int,
-    chromeInset: Int,
     rowHeights: [Int: Int] = [:]
   ) {
     let count = max(0, rowCount)
@@ -32,7 +31,7 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
       return row
     }
     rows = .indexed(
-      count: count, span: max(1, rowSpan), chromeInset: max(0, chromeInset), measured: measured)
+      count: count, span: max(1, rowSpan), measured: measured)
   }
 
   package init(rowRanges: [Range<Int>], displayLineCount: Int) {
@@ -41,7 +40,7 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
 
   package var rowCount: Int {
     switch rows {
-    case .indexed(let count, _, _, _): count
+    case .indexed(let count, _, _): count
     case .materialized(let ranges, _): ranges.count
     }
   }
@@ -49,7 +48,7 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
   /// The minimum stride used to bound an interaction band before measurement.
   package var rowSpan: Int {
     switch rows {
-    case .indexed(_, let span, _, _): span
+    case .indexed(_, let span, _): span
     case .materialized: 1
     }
   }
@@ -58,11 +57,11 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
 
   package var displayLineCount: Int {
     switch rows {
-    case .indexed(let count, let span, let chromeInset, let measured):
-      guard count > 0 else { return chromeInset }
+    case .indexed(let count, let span, let measured):
+      guard count > 0 else { return 0 }
       let last = measured.last
       let extraLines = last.map { $0.precedingExtraLines + $0.height - 1 } ?? 0
-      return chromeInset + count * span - (span - 1) + extraLines
+      return count * span - (span - 1) + extraLines
     case .materialized(_, let displayLineCount):
       return displayLineCount
     }
@@ -76,12 +75,12 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
   package func lineRange(forRow rowIndex: Int) -> Range<Int> {
     let index = min(max(0, rowIndex), lastRowIndex)
     switch rows {
-    case .indexed(let count, let span, let chromeInset, let measured):
-      guard count > 0 else { return chromeInset..<chromeInset }
+    case .indexed(let count, let span, let measured):
+      guard count > 0 else { return 0..<0 }
       let insertion = firstMeasuredRow(atOrAfter: index, in: measured)
       let previous = insertion > 0 ? measured[insertion - 1] : nil
       let extraLines = previous.map { $0.precedingExtraLines + $0.height - 1 } ?? 0
-      let start = chromeInset + index * span + extraLines
+      let start = index * span + extraLines
       let height =
         insertion < measured.count && measured[insertion].index == index
         ? measured[insertion].height : 1

@@ -82,7 +82,7 @@ struct LocalScrollPositionRegistryTests {
       contentBounds: CellRect(origin: CellPoint(x: 0, y: -3), size: CellSize(width: 32, height: 12))
     )
     previousRoute.collectionScrollLayout = CollectionScrollLayout(
-      geometry: CollectionScrollGeometry(rowCount: 12, rowSpan: 1, chromeInset: 0),
+      geometry: CollectionScrollGeometry(rowCount: 12, rowSpan: 1),
       visibleLines: 3..<11,
       anchor: .row(3)
     )
@@ -94,7 +94,7 @@ struct LocalScrollPositionRegistryTests {
     )
     resizedRoute.collectionScrollLayout = CollectionScrollLayout(
       geometry: CollectionScrollGeometry(
-        rowCount: 12, rowSpan: 1, chromeInset: 0,
+        rowCount: 12, rowSpan: 1,
         rowHeights: Dictionary(uniqueKeysWithValues: (0..<12).map { ($0, 3) })),
       visibleLines: 9..<17,
       anchor: .row(3)

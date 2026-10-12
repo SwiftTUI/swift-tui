@@ -186,6 +186,25 @@ struct ListLayoutProductTests {
     #expect(layout.totalContentHeight == layout.lines.count)
   }
 
+  @Test(
+    "an overflowing payload-only list reveals its first row without a valid selection",
+    arguments: [nil, 99] as [Int?]
+  )
+  func payloadOnlyListKeepsFirstRowVisible(selectedRowIndex: Int?) {
+    let headers = (0..<4).map { ListItemPayload(kind: .header, text: "header \($0)") }
+    let rows = (0..<5).map { ListItemPayload(kind: .row, text: "row \($0)") }
+    let payload = ListPayload(
+      items: headers + rows, selectedRowIndex: selectedRowIndex, style: .plain)
+    let layout = payload.style.visibleListLayout(
+      for: payload,
+      in: CellRect(origin: .zero, size: CellSize(width: 20, height: 4))
+    )
+
+    // Two indicator cells leave room for the last header and the first row.
+    #expect(layout.lines.compactMap(\.itemIndex) == [3, 4])
+    #expect(layout.lines.compactMap(\.rowIndex) == [0])
+  }
+
   @Test("T-33: a windowed measurement attributes row heights to their own rows")
   func windowedHeightsAreAttributedBySourceIndex() throws {
     // The measured size used to zip window measurements POSITIONALLY against

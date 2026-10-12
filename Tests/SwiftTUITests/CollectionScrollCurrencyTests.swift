@@ -400,7 +400,7 @@ struct CollectionScrollCurrencyTests {
 
     let currency = CollectionScrollCurrency(
       identity: identity,
-      geometry: CollectionScrollGeometry(rowCount: 10, rowSpan: 2, chromeInset: 0),
+      geometry: CollectionScrollGeometry(rowCount: 10, rowSpan: 2),
       ownerNode: ownerNode,
       registry: registry,
       windowMetrics: { _ in (offset: 0, visibleLineCount: 1) }
