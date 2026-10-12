@@ -8,6 +8,73 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-12
+
+SwiftTUI 0.17.0 adds a sequential terminal reader, reduces offscreen text
+painting, and fixes focus-reveal scrolling and cooperative shutdown. The
+coordinated chart and terminal-embedding packages add semantic data and output
+review.
+
+### Added
+
+- A sequential terminal reader for ordinary terminal apps: start with `--reader`
+  or `SWIFTTUI_READER=1`, and switch between reader and grid with F12. Read,
+  search, navigate scenes, invoke semantic actions, and edit text through the
+  same application state used by the browser companion (STUI-673, STUI-674).
+
+### Changed
+
+- Skip painting offscreen lines and resolving styles for unwritable glyphs in
+  ordinary, rich, preformatted, and styled preformatted text. Thanks to
+  [@vmarcella](https://github.com/vmarcella) for
+  [#44](https://github.com/SwiftTUI/swift-tui/pull/44). A follow-up preserves
+  the right clipping boundary for wrapped text.
+
+### Fixed
+
+- Preserve collection-owned offsets on axes that do not need focus-reveal
+  movement, keeping final rows reachable in compact multi-selection lists.
+  Thanks to [@echoz](https://github.com/echoz) for
+  [#46](https://github.com/SwiftTUI/swift-tui/pull/46). A follow-up starts
+  ordinary scroll-view reveals from the clamped offset after viewport growth.
+- Finish cooperative quit/EOF flushing after required presentations and their
+  synchronous UI follow-ups, without draining unrelated producer work to the
+  acquisition cap. Termination handlers decide before the flush; once exit
+  proceeds, owned tasks are cancelled and new task starts are refused. Cancelled
+  acquisitions still retry within the existing bound. The landed [#48](https://github.com/SwiftTUI/swift-tui/pull/48) is
+  derived from [@echoz](https://github.com/echoz)'s
+  [#45](https://github.com/SwiftTUI/swift-tui/pull/45), including the policy
+  design, drain wiring, and regression coverage (STUI-917).
+- Preserve implicit leading path origins through transforms (STUI-911).
+- Keep fresh terminal clicks valid after browser-companion zoom changes
+  (STUI-912).
+- Name popover-tip accessibility surfaces from their title, and keep Picker
+  menus open when an accessibility selection leaves the value unchanged
+  (STUI-913, STUI-914).
+- Validate companion and WebHost ports read from the environment (STUI-915).
+
+### Coordinated packages
+
+- `SwiftTUICharts` adds navigable exact source data, search and remembered-point
+  comparison, units, and color-independent chart presentations (STUI-663).
+- `SwiftTUITerminalView` adds frozen output review, scrollback navigation, copy,
+  and semantic line input while the child terminal continues running
+  (STUI-664).
+- Browser packages, native hosts, examples, the counter demo, and documentation
+  move together to 0.17.0. Accessibility implementation and automated coverage
+  retain the host qualification limits documented by each package.
+
+### New contributors
+
+- Welcome [@vmarcella](https://github.com/vmarcella) (Vincenzo Marcella), whose
+  first contribution [#44](https://github.com/SwiftTUI/swift-tui/pull/44)
+  avoids offscreen text painting.
+- Welcome [@echoz](https://github.com/echoz) (Jeremy Foo), with two contributions
+  in this release: the focus-reveal correction in
+  [#46](https://github.com/SwiftTUI/swift-tui/pull/46), and the cooperative-exit
+  work in [#45](https://github.com/SwiftTUI/swift-tui/pull/45) from which the
+  landed [#48](https://github.com/SwiftTUI/swift-tui/pull/48) is derived.
+
 ## [0.16.0] - 2026-10-08
 
 More content and controls participate in accessibility, interactive terminal
@@ -2241,7 +2308,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.16.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.17.0...HEAD
+[0.17.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.17.0
 [0.16.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.16.0
 [0.15.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.15.1
 [0.15.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.15.0
