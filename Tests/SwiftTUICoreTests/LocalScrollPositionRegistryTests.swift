@@ -6,6 +6,48 @@ import Testing
 @MainActor
 @Suite
 struct LocalScrollPositionRegistryTests {
+  @Test(
+    "same-anchor collection commands refine the latest target once and yield to newer input",
+    arguments: [false, true], [false, true]
+  )
+  func repeatedCollectionCommandRefinement(replacesTarget: Bool, newerInput: Bool) {
+    let registry = LocalScrollPositionRegistry()
+    let identity = testIdentity("RepeatedCollectionCommand")
+    let first = ScrollTargetQuery(identity: identity.child(.named("First")))
+    let second =
+      replacesTarget ? ScrollTargetQuery(identity: identity.child(.named("Second"))) : first
+    var anchor: CollectionScrollAnchor?
+    var queries: [ScrollTargetQuery] = []
+    registry.register(
+      identity: identity,
+      currentOffset: { .zero },
+      applyOffset: { _ in },
+      currentCollectionAnchor: { anchor },
+      revealTarget: { query, _ in
+        queries.append(query)
+        let changed = anchor != .row(45)
+        anchor = .row(45)
+        return changed
+      }
+    )
+    var route = ScrollRoute(
+      identity: identity,
+      viewportRect: .init(origin: .zero, size: .init(width: 20, height: 5)),
+      contentBounds: .init(origin: .zero, size: .init(width: 20, height: 100)))
+    registry.updateGeometry(scrollRoutes: [route], scrollTargets: [])
+    #expect(registry.scrollToTarget(first, anchor: .bottom, scopeIdentity: nil))
+    #expect(!registry.scrollToTarget(second, anchor: .bottom, scopeIdentity: nil))
+    if newerInput { anchor = .row(46) }
+    route.collectionScrollLayout = .init(
+      geometry: .init(rowCount: 100, rowSpan: 1, rowHeights: [50: 3]),
+      visibleLines: 45..<50, anchor: .row(45))
+    for _ in 0..<2 {
+      _ = registry.sync(focusedIdentity: nil, focusRegions: [], scrollRoutes: [route])
+    }
+    #expect(queries == (newerInput ? [first, second] : [first, second, second]))
+    #expect(anchor == (newerInput ? .row(46) : .row(45)))
+  }
+
   @Test("scroll route initializers preserve explicit content offsets")
   func scrollRouteInitializersPreserveExplicitContentOffsets() {
     let identity = testIdentity("Scroll")

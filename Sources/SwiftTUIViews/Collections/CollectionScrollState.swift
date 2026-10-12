@@ -148,9 +148,14 @@ package struct CollectionScrollCurrency {
     guard rows != 0 else {
       return false
     }
-    let destination = effectiveAnchorRow + rows
+    // A footer-only end window is one position beyond the final row. Count
+    // it separately when reversing so that row is not skipped in either direction.
+    let current = effectiveAnchorRow
+    let startsAfterLastRow =
+      currentOffset().y >= geometry.lineRange(forRow: geometry.lastRowIndex).upperBound
+    let destination = current + rows + (rows < 0 && startsAfterLastRow ? 1 : 0)
     if destination < 0 { return setAnchor(.start) }
-    if destination >= maxAnchorRow { return setAnchor(.end) }
+    if destination > maxAnchorRow { return setAnchor(.end) }
     return setAnchorRow(destination)
   }
 
