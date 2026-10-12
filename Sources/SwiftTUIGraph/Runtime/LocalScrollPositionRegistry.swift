@@ -282,8 +282,11 @@ package final class LocalScrollPositionRegistry: Equatable {
     registration: ScrollPositionRegistrationSnapshot,
     changed: Bool
   ) {
-    pendingCollectionTargets.removeValue(forKey: registration.identity)
-    guard changed, let requestedAnchor = registration.currentCollectionAnchor() else { return }
+    guard let requestedAnchor = registration.currentCollectionAnchor() else { return }
+    let pending = pendingCollectionTargets.removeValue(forKey: registration.identity)
+    // A second command can request the same estimated anchor before its frame
+    // measures the target. It still needs refinement, even without a new write.
+    guard changed || pending?.requestedAnchor == requestedAnchor else { return }
     pendingCollectionTargets[registration.identity] = PendingCollectionTarget(
       query: query, anchor: anchor, requestedAnchor: requestedAnchor)
   }
