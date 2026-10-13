@@ -562,50 +562,50 @@ public enum PerfScenarioRunner {
       presentationSurface: presentationSurface,
       terminalInputReader: inputReader,
       signalReader: signalReader,
-      frameSink: framesSink
+      frameSink: framesSink,
+      renderMode: options.renderMode
     )
 
     let startedAt = timestampString()
     let memorySampler = PerfMemorySampler()
     var events: [PerfEventRecord] = []
-    let cpuReadings = try await withRenderModeEnvironment(options.renderMode) {
-      try await CPUSampler.collect(interval: options.cpuSampleInterval) { @MainActor in
-        let runTask = Task { @MainActor in
-          try await selection.run(
-            sessionName: scenario.name.rawValue,
-            resources: resources,
-            stateContainer: stateContainer,
-            focusTracker: focusTracker
-          )
-        }
+    let cpuReadings = try await CPUSampler.collect(interval: options.cpuSampleInterval) {
+      @MainActor in
+      let runTask = Task { @MainActor in
+        try await selection.run(
+          sessionName: scenario.name.rawValue,
+          resources: resources,
+          stateContainer: stateContainer,
+          focusTracker: focusTracker
+        )
+      }
 
-        var memoryTask: Task<Void, Never>?
-        do {
-          _ = try await waitForPresentedFrame(
-            in: terminalHost,
-            timeout: scenario.initialFrameTimeout
-          )
-          memoryTask = memorySampler.startSampling(interval: options.memorySampleInterval)
-          events = try await drive(
-            PerfScenarioDriver(
-              inputReader: inputReader,
-              terminalHost: terminalHost
-            ))
-          if options.memoryIdleWindow > .zero {
-            try? await Task.sleep(for: options.memoryIdleWindow)
-          }
-          memoryTask?.cancel()
-          inputReader.finish()
-          signalReader.finish()
-          _ = try await runTask.value
-        } catch {
-          memoryTask?.cancel()
-          inputReader.finish()
-          signalReader.finish()
-          runTask.cancel()
-          _ = try? await runTask.value
-          throw error
+      var memoryTask: Task<Void, Never>?
+      do {
+        _ = try await waitForPresentedFrame(
+          in: terminalHost,
+          timeout: scenario.initialFrameTimeout
+        )
+        memoryTask = memorySampler.startSampling(interval: options.memorySampleInterval)
+        events = try await drive(
+          PerfScenarioDriver(
+            inputReader: inputReader,
+            terminalHost: terminalHost
+          ))
+        if options.memoryIdleWindow > .zero {
+          try? await Task.sleep(for: options.memoryIdleWindow)
         }
+        memoryTask?.cancel()
+        inputReader.finish()
+        signalReader.finish()
+        _ = try await runTask.value
+      } catch {
+        memoryTask?.cancel()
+        inputReader.finish()
+        signalReader.finish()
+        runTask.cancel()
+        _ = try? await runTask.value
+        throw error
       }
     }
     let cpuSamples = cpuReadings.map(PerfCPUSample.init(from:))
@@ -853,20 +853,6 @@ public enum PerfScenarioRunner {
     let data = pipe.fileHandleForReading.readDataToEndOfFile()
     return String(data: data, encoding: .utf8)?
       .trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  @MainActor
-  private static func withRenderModeEnvironment<T>(
-    _ mode: RuntimeRenderMode,
-    operation: () async throws -> T
-  ) async throws -> T {
-    let key = RuntimeRenderMode.environmentVariableName
-    let oldValue = environmentValue(key)
-    try setEnvironmentValue(mode.rawValue, for: key)
-    defer {
-      try? setEnvironmentValue(oldValue, for: key)
-    }
-    return try await operation()
   }
 
   private static func environmentValue(_ key: String) -> String? {
