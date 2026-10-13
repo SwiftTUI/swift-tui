@@ -192,6 +192,8 @@ SwiftTUIRuntime.TerminalPresentationMetrics.rasterHostMetrics(for:damage:bytesWr
 SwiftTUIRuntime.TerminalRenderStyleCodec
 SwiftTUIRuntime.TerminalRenderStyleCodec.decodeBase64(_:)
 SwiftTUIRuntime.TerminalRenderStyleCodec.encodeBase64(_:)
+SwiftTUIRuntime.TextRasterWorkProbe
+SwiftTUIRuntime.TextRasterWorkProbe.measure(_:)
 SwiftTUIRuntime.VirtualFrameClock
 SwiftTUIRuntime.VirtualFrameClock.advance(by:)
 SwiftTUIRuntime.VirtualFrameClock.init(_:)

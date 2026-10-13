@@ -92,19 +92,39 @@ enum BenchColdLane {
   /// `first_render_ms`.
   static let discardedWarmupIterations = 2
 
+  /// Runs a registered workload with its member's cold measurement settings.
+  /// - Parameters:
+  ///   - member: Workload identity and benchmark configuration.
+  ///   - iterations: Number of fresh renders to perform.
+  /// - Returns: Render timings and the counter values shared by all iterations.
+  /// - Throws: `PerfBenchError.memberNotColdRenderable` if the workload does not
+  ///   support the cold lane, or `BenchColdLaneError.counterDrift` if counters vary.
   @MainActor
   static func run(
-    _ scenario: any BenchColdRenderable,
+    _ member: BenchMember,
     iterations: Int = defaultIterations
   ) throws -> PerfBenchColdReport {
-    try runOpened(scenario, iterations: iterations)
+    try runOpened(member, iterations: iterations)
   }
 
+  /// Times fresh renders and verifies that every iteration reproduces its work counters.
+  /// - Parameters:
+  ///   - member: Registered workload and its cold measurement settings.
+  ///   - iterations: Number of fresh renders; the first three are excluded from statistics.
+  /// - Returns: Render timings and the counter values shared by all iterations.
+  /// - Throws: `PerfBenchError.memberNotColdRenderable` if the workload does not
+  ///   support the cold lane, or `BenchColdLaneError.counterDrift` if counters vary.
   @MainActor
-  private static func runOpened<S: BenchColdRenderable>(
-    _ scenario: S,
+  private static func runOpened(
+    _ member: BenchMember,
     iterations: Int
   ) throws -> PerfBenchColdReport {
+    guard
+      let scenario = PerfScenarioRegistry.scenario(named: member.scenario)
+        as? any BenchColdRenderable
+    else {
+      throw PerfBenchError.memberNotColdRenderable(member.scenario.rawValue)
+    }
     let size = scenario.defaultTerminalSize
     let proposal = ProposedSize(width: size.columns, height: size.rows)
 
@@ -113,17 +133,30 @@ enum BenchColdLane {
     var phaseTimes: [FramePhaseTimings] = []
     var canonical: PerfDeterministicCounters?
     for iteration in 1...iterations {
-      // Fresh view AND fresh renderer/graph each iteration: the lane
-      // measures construction + first layout + first raster, so nothing may
-      // carry over except process-global per-type caches — which is exactly
-      // what the iteration-1 split exists to expose.
+      // Build the payload and renderer before timing. Each timed render has
+      // a fresh graph; only process-global caches can carry across iterations.
       let root = scenario.makeColdRoot()
       let renderer = DefaultRenderer()
       let start = monotonicSeconds()
-      let snapshot = renderer.render(root, proposal: proposal)
+      let snapshot: RenderSnapshot
+      let textLineVisits: Int?
+
+      // Measure text line visits if the member has the corresponding toggle
+      // enabled.
+      if member.recordsTextLineVisits {
+        let measured = TextRasterWorkProbe.measure {
+          renderer.render(root, proposal: proposal)
+        }
+        snapshot = measured.result
+        textLineVisits = measured.textLineVisits
+      } else {
+        snapshot = renderer.render(root, proposal: proposal)
+        textLineVisits = nil
+      }
       let elapsedMs = (monotonicSeconds() - start) * 1000
 
-      let counters = coldCounters(from: snapshot)
+      var counters = coldCounters(from: snapshot)
+      counters.textLineVisits = textLineVisits
       if let canonical {
         guard counters == canonical else {
           throw BenchColdLaneError.counterDrift(

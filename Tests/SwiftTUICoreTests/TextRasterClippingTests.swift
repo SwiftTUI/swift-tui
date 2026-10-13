@@ -42,7 +42,7 @@ struct TextRasterClippingTests {
     }
   }
 
-  /// Only the middle eight lines of a tall block belong in the clipped viewport.
+  /// A tall block paints and visits only its eight visible middle lines.
   /// - Parameter family: Painter used for the two-thousand-line payload.
   @Test(
     "a scrolled two-thousand-line block shows the correct eight lines",
@@ -53,13 +53,17 @@ struct TextRasterClippingTests {
     let node = DrawNode(
       identity: testIdentity("tall-text"), bounds: bounds, clipBounds: clip,
       commands: [family.command(bounds: bounds, lines: (0..<2_000).map { "row \($0)" })])
-    let surface = Rasterizer().rasterize(node, minimumSize: clip.size)
+    let probe = RasterWorkProbe()
+    let surface = Rasterizer.$workProbe.withValue(probe) {
+      Rasterizer().rasterize(node, minimumSize: clip.size)
+    }
+    #expect(probe.snapshot().textLineVisits == 8)
     #expect(surface.size == clip.size)
     #expect(surface.lines == (1_000..<1_008).map { "row \($0)" })
     #expect(surface.presentationLayers.count == 8)
   }
 
-  /// Repainting separate damaged rows must preserve clean rows and translucent styles.
+  /// Repainting separate damaged rows preserves clean rows and counts their traversal.
   /// - Parameter family: Painter used for the changed, partially visible text block.
   @Test(
     "incremental clipping agrees with fresh output for disjoint damaged rows",
@@ -79,8 +83,13 @@ struct TextRasterClippingTests {
     lines[10] = "new 10"
     node.commands = [family.command(bounds: bounds, lines: lines, style: style)]
     let fresh = rasterizer.rasterize(node, minimumSize: size)
-    let incremental = rasterizer.rasterizeCollectingVisibleIdentities(
-      node, minimumSize: size, previousSurface: previous, damage: .init(dirtyRows: [1, 5]))
+    let probe = RasterWorkProbe()
+    let incremental = Rasterizer.$workProbe.withValue(probe) {
+      rasterizer.rasterizeCollectingVisibleIdentities(
+        node, minimumSize: size, previousSurface: previous, damage: .init(dirtyRows: [1, 5]))
+    }
+    // Six candidates reach the line loop even though only two rows are dirty.
+    #expect(probe.snapshot().textLineVisits == 6)
     #expect(incremental.path == .incremental)
     #expect(incremental.incrementalMismatch == nil)
     #expect(incremental.surface == fresh)

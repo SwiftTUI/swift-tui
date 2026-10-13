@@ -117,6 +117,11 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
   /// frame diagnostics do not currently carry this column, so it stays absent
   /// there rather than fabricating a zero.
   public var rasterImageAttachments: Int?
+  /// Actual text paint-loop visits collected by opted-in cold workloads.
+  ///
+  /// Counts candidate lines before the dirty-row check. `nil` means traversal
+  /// was not measured.
+  public var textLineVisits: Int? = nil
   /// UTF-8 bytes presented. Meaningful as a wire number only when the
   /// emission lane was armed; the in-process host's byte count is still
   /// deterministic and still ratchets. `nil` in the cold lane — the one-shot
@@ -236,6 +241,7 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     self.validationViewportNodes = validationViewportNodes
   }
 
+  /// Stable artifact keys; absent optional metrics retain their unmeasured meaning.
   private enum CodingKeys: String, CodingKey {
     case committedFrames = "committed_frames"
     case answeredInputs = "answered_inputs"
@@ -244,6 +250,8 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
     case measuredComputed = "measured_computed"
     case drawNodes = "draw_nodes"
     case rasterImageAttachments = "raster_image_attachments"
+    /// Opt-in cold text paint-loop traversal count.
+    case textLineVisits = "text_line_visits"
     case presentBytes = "present_bytes"
     case presentCells = "present_cells"
     case damageCells = "damage_cells"
@@ -275,6 +283,7 @@ public struct PerfDeterministicCounters: Codable, Equatable, Sendable {
   }
 }
 
+/// Reduces frame work and exposes every measured counter to reports and baseline checks.
 extension PerfDeterministicCounters {
   /// Sums the parsed per-frame counters into run totals.
   ///
@@ -341,7 +350,7 @@ extension PerfDeterministicCounters {
     )
   }
 
-  /// The recorded counters as `(column name, total)` pairs in declaration
+  /// The recorded counters as `(counter name, total)` pairs in declaration
   /// order. Absent optionals are omitted, so a consumer (aggregate reducer,
   /// compare printer, the Stage-3 ratchet) never invents a zero for a
   /// counter this run did not measure.
@@ -360,6 +369,7 @@ extension PerfDeterministicCounters {
     append("measured_computed", measuredComputed)
     append("draw_nodes", drawNodes)
     append("raster_image_attachments", rasterImageAttachments)
+    append("text_line_visits", textLineVisits)
     append("present_bytes", presentBytes)
     append("present_cells", presentCells)
     append("damage_cells", damageCells)

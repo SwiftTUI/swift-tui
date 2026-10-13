@@ -8,6 +8,12 @@ import Synchronization
 package struct RasterWorkCounters: Equatable, Sendable {
   /// Fill commands that reached the cell walk.
   package var fills = 0
+  /// Actual iterations of a text painter's line loop, including clean rows it rejects.
+  ///
+  /// Counts traversal of all lines before the dirty-row check. For example, if
+  /// only eight lines out of a two-thousand-line document are visible in the
+  /// viewport, the counter should only record visits to those 8 visible lines.
+  package var textLineVisits = 0
   /// Cells the walk considered (the geometry test ran for each).
   package var visitedCells = 0
   /// Radial-gradient samples computed.
@@ -28,6 +34,7 @@ package struct RasterWorkCounters: Equatable, Sendable {
 
   package static func += (lhs: inout RasterWorkCounters, rhs: RasterWorkCounters) {
     lhs.fills += rhs.fills
+    lhs.textLineVisits += rhs.textLineVisits
     lhs.visitedCells += rhs.visitedCells
     lhs.radialSamples += rhs.radialSamples
     lhs.zeroAlphaSkips += rhs.zeroAlphaSkips
@@ -40,10 +47,10 @@ package struct RasterWorkCounters: Equatable, Sendable {
 
 /// An opt-in accumulator for ``RasterWorkCounters``.
 ///
-/// The rasterizer may run on the frame-tail worker, so a fill tallies into a
-/// local value and flushes it once, under the probe's lock, at the end of the
-/// fill. A disarmed run touches nothing but one task-local read and one flag
-/// read per fill.
+/// The rasterizer may run on the frame-tail worker, so each painter tallies into a
+/// local value and flushes it once, under the probe's lock, when it finishes.
+/// Text painters increment their local line counter only while a probe is active;
+/// no lock is acquired inside their line loops.
 ///
 /// Two ways to arm it:
 /// - Bind ``Rasterizer/workProbe`` for a scope (tests; isolated per task).
@@ -76,7 +83,7 @@ package final class RasterWorkProbe: Sendable {
     counters.withLock { $0 += work }
   }
 
-  /// The probe a fill should flush into, or `nil` when none is armed.
+  /// The probe a painter should flush into, or `nil` when collection is disabled.
   static func active() -> RasterWorkProbe? {
     if let bound = Rasterizer.workProbe {
       return bound

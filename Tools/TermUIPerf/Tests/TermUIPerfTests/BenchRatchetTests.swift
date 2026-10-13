@@ -150,17 +150,10 @@ struct BenchRatchetTests {
   func coldLanesReproduceCommittedDebugBaseline() throws {
     let baseline = try PerfBenchBaseline.load(from: PerfBenchBaseline.defaultLocation())
     for member in BenchSuite.members {
-      guard
-        let scenario = PerfScenarioRegistry.scenario(named: member.scenario)
-          as? any BenchColdRenderable
-      else {
-        Issue.record("suite member \(member.scenario.rawValue) is not cold-renderable")
-        continue
-      }
       // Counter identity does not depend on the iteration count, so the
       // smoke tier runs the minimum that still exercises every protocol
       // bucket (first render, discarded warm-up, measured).
-      let report = try BenchColdLane.run(scenario, iterations: 4)
+      let report = try BenchColdLane.run(member, iterations: 4)
       let rows = BenchRatchet.evaluate(
         current: report.counters.valuesByName,
         baseline: baseline.entries(

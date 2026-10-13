@@ -85,3 +85,32 @@ extension FrameDiagnosticWork {
     )
   }
 }
+
+/// Collects text paint-loop work for an isolated synchronous diagnostic operation.
+///
+/// During the operation, this task-local probe takes precedence over the process-wide
+/// raster probe. The previous task-local binding is restored on return or throw.
+///
+/// Collection is opt-in and intended for one-shot benchmarks, not normal rendering.
+/// The count is captured after the operation returns. This API does not wait for
+/// separately scheduled work.
+@_spi(Runners) @MainActor public enum TextRasterWorkProbe {
+  /// Runs synchronous rendering work and counts text-line paint-loop iterations.
+  ///
+  /// Lines excluded before the loop do not count. Lines visited but later skipped
+  /// without painting do count.
+  ///
+  /// - Parameter operation: Rendering work performed on the current task, such as
+  ///   ``DefaultRenderer/render(_:context:proposal:frameInstant:)``.
+  ///
+  /// - Returns: The operation's result and the total number of text-line visits.
+  ///
+  /// - Throws: Any error thrown by `operation`; the prior probe binding is restored.
+  public static func measure<Result>(
+    _ operation: () throws -> Result
+  ) rethrows -> (result: Result, textLineVisits: Int) {
+    let probe = RasterWorkProbe()
+    let result = try Rasterizer.$workProbe.withValue(probe, operation: operation)
+    return (result, probe.snapshot().textLineVisits)
+  }
+}

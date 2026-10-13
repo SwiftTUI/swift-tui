@@ -1,4 +1,3 @@
-/// Paints draw commands into terminal cells while preserving clipping and presentation effects.
 extension Rasterizer {
   private struct PaintContext {
     var clip: CellRect?
@@ -599,7 +598,14 @@ extension Rasterizer {
         let lineRange = textPaintLineRange(
           bounds: bounds, lineCount: layout.lines.count, clip: frame.clip,
           surfaceSize: surfaceSize)
+
+        let textWorkProbe = RasterWorkProbe.active()
+        var textWork = RasterWorkCounters()
+        defer { textWorkProbe?.record(textWork) }
         for lineIndex in lineRange {
+          // Count actual traversal before a clean-row rejection. Output counts
+          // alone would miss a regression that resumes walking hidden lines.
+          if textWorkProbe != nil { textWork.textLineVisits += 1 }
           let line = layout.lines[lineIndex]
           // Per-line cull (D70): hoists the exact-set clamp from cell to line
           // granularity, so a command that STRADDLES two damage bands resolves
@@ -686,7 +692,13 @@ extension Rasterizer {
         // does not shift their positions or the colors sampled for them.
         let lineRange = textPaintLineRange(
           bounds: bounds, lineCount: lines.count, clip: frame.clip, surfaceSize: surfaceSize)
+        let textWorkProbe = RasterWorkProbe.active()
+        var textWork = RasterWorkCounters()
+        defer { textWorkProbe?.record(textWork) }
         for lineIndex in lineRange {
+          // Count actual traversal before a clean-row rejection. Output counts
+          // alone would miss a regression that resumes walking hidden lines.
+          if textWorkProbe != nil { textWork.textLineVisits += 1 }
           let line = lines[lineIndex]
           // Per-line cull (D70) — also skips `clusterize` for clean lines.
           if let dirtyRows, !dirtyRows.contains(bounds.origin.y + lineIndex) {
@@ -759,7 +771,13 @@ extension Rasterizer {
         // does not shift their positions or the colors sampled for them.
         let lineRange = textPaintLineRange(
           bounds: bounds, lineCount: lines.count, clip: frame.clip, surfaceSize: surfaceSize)
+        let textWorkProbe = RasterWorkProbe.active()
+        var textWork = RasterWorkCounters()
+        defer { textWorkProbe?.record(textWork) }
         for lineIndex in lineRange {
+          // Count actual traversal before a clean-row rejection. Output counts
+          // alone would miss a regression that resumes walking hidden lines.
+          if textWorkProbe != nil { textWork.textLineVisits += 1 }
           let line = lines[lineIndex]
           // Per-line cull (D70) — also skips the per-run style merge and
           // `clusterize` for clean lines.
@@ -874,7 +892,13 @@ extension Rasterizer {
         let lineRange = textPaintLineRange(
           bounds: bounds, lineCount: layout.lines.count, clip: frame.clip,
           surfaceSize: surfaceSize)
+        let textWorkProbe = RasterWorkProbe.active()
+        var textWork = RasterWorkCounters()
+        defer { textWorkProbe?.record(textWork) }
         for lineIndex in lineRange {
+          // Count actual traversal before a clean-row rejection. Output counts
+          // alone would miss a regression that resumes walking hidden lines.
+          if textWorkProbe != nil { textWork.textLineVisits += 1 }
           let line = layout.lines[lineIndex]
           // Per-line cull (D70).
           if let dirtyRows, !dirtyRows.contains(bounds.origin.y + lineIndex) {
