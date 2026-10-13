@@ -144,18 +144,6 @@ struct HandlerDescriptorIntakeOrderTests {
     #expect(fallback.dispatchScope?.viewIdentity == ownerIdentity)
   }
 
-  @Test("fallbackSnapshot: the ambient beats the stored snapshot")
-  func fallbackSnapshotOrder() {
-    let snapshot = ImperativeAuthoringContextSnapshot(authoringContext(ownerIdentity))
-    let intake = withAmbientScope {
-      HandlerDescriptorIntake(context: context, fallbackSnapshot: snapshot)
-    }
-    #expect(intake.dispatchScope?.viewIdentity == ambientIdentity)
-
-    let fallback = HandlerDescriptorIntake(context: context, fallbackSnapshot: snapshot)
-    #expect(fallback.dispatchScope?.viewIdentity == ownerIdentity)
-  }
-
   @Test("preferringSnapshot: the stored snapshot beats the ambient")
   func preferringSnapshotOrder() {
     let snapshot = ImperativeAuthoringContextSnapshot(authoringContext(ownerIdentity))
@@ -179,7 +167,6 @@ struct HandlerDescriptorIntakeOrderTests {
       [
         HandlerDescriptorIntake(context: context, preferringAuthoringScope: owner),
         HandlerDescriptorIntake(context: context, fallbackAuthoringScope: owner),
-        HandlerDescriptorIntake(context: context, fallbackSnapshot: snapshot),
         HandlerDescriptorIntake(context: context, preferringSnapshot: snapshot),
       ]
     }
