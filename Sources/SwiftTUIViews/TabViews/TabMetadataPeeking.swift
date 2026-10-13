@@ -49,14 +49,9 @@ package protocol TabMetadataPeekingView {
 }
 
 /// Declaration-level hook for `Tab`-style child declarations.
-///
-/// Future `ModifiedContent` chains that wrap a `Tab` declaration may
-/// also conform so the selected child can still resolve directly
-/// without a declaration wrapper node.
 @MainActor
 package protocol TabDeclarationView {
   var tabDeclarationMetadata: PeekedTabChildMetadata { get }
-  func resolveTabDeclarationContent(in context: ResolveContext) -> ResolvedNode
 }
 
 extension ModifiedContent: TabMetadataPeekingView
@@ -86,10 +81,6 @@ where Content: TabDeclarationView & View, Modifier: ViewModifier {
       return result
     }
     return content.tabDeclarationMetadata
-  }
-
-  package func resolveTabDeclarationContent(in context: ResolveContext) -> ResolvedNode {
-    resolveView(self, in: context)
   }
 }
 
