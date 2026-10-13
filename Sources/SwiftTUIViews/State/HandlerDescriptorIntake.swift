@@ -30,8 +30,8 @@ import SwiftTUICore
 //   resolve-time ambient context is the fallback. Control-family order
 //   (Button): the user's action closure captures the *enclosing* view's
 //   `@State`, so the enclosing body's scope is the correct mutation target.
-// - `fallbackAuthoringScope:` / `fallbackSnapshot:` — the resolve-time
-//   ambient context wins; the stored scope/snapshot from the public API call
+// - `fallbackAuthoringScope:` — the resolve-time
+//   ambient context wins; the stored scope from the public API call
 //   site is the fallback for registrations that resolve outside an authoring
 //   pass. Modifier-family order (toggle, lifecycle).
 // - `preferringSnapshot:` — a public-API capture wins over the resolve-time
@@ -70,16 +70,6 @@ package struct HandlerDescriptorIntake {
     dispatchScope =
       (currentImperativeAuthoringContextSnapshot()
       ?? ImperativeAuthoringContextSnapshot(authoringScope))?
-      .withEnvironmentValues(context.environmentValues)
-  }
-
-  package init(
-    context: ResolveContext,
-    fallbackSnapshot snapshot: ImperativeAuthoringContextSnapshot?
-  ) {
-    self.context = context
-    dispatchScope =
-      (currentImperativeAuthoringContextSnapshot() ?? snapshot)?
       .withEnvironmentValues(context.environmentValues)
   }
 
