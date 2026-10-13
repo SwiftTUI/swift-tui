@@ -38,16 +38,4 @@ extension Tab: TabDeclarationView {
       tag: SelectionTag(value: selectionValue)
     )
   }
-
-  package func resolveTabDeclarationContent(
-    in context: ResolveContext
-  ) -> ResolvedNode {
-    let lowered =
-      content
-      .semanticMetadata(
-        .init(tabItemLabel: label)
-      )
-      .tag(selectionValue)
-    return lowered.resolve(in: context)
-  }
 }
