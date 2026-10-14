@@ -27,7 +27,7 @@ struct DisclosureGroupContentLayoutTests {
     let region = try #require(nodes.first { $0.role == .region })
     #expect(trigger.properties?.controls == [region.identity])
     #expect(region.properties?.labelledBy == [trigger.identity])
-    #expect(region.parentIdentity == trigger.parentIdentity)
+    try expectContentAncestry(region, trigger: trigger, nodes: nodes)
     #expect(
       region.rect
         == CellRect(
@@ -97,7 +97,7 @@ struct DisclosureGroupContentLayoutTests {
     #expect(section.parentIdentity == outerRegion.identity)
     #expect(nodes.first { $0.label == "Grouped" }?.parentIdentity == section.identity)
     #expect(innerContainer.parentIdentity == section.identity)
-    #expect(innerRegion.parentIdentity == innerContainer.identity)
+    try expectContentAncestry(innerRegion, trigger: inner, nodes: nodes)
     #expect(inner.properties?.controls == [innerRegion.identity])
     #expect(nodes.first { $0.label == "Nested action" }?.parentIdentity == innerRegion.identity)
     #expect(nodes.first { $0.label == "Nested action" }?.role == .button)
@@ -129,7 +129,7 @@ struct DisclosureGroupContentLayoutTests {
     let innerContainer = try #require(nodes.first { $0.identity == inner.parentIdentity })
     #expect(outerRegion.role == .region)
     #expect(outer.properties?.controls == [outerRegion.identity])
-    #expect(outerRegion.parentIdentity == outer.parentIdentity)
+    try expectContentAncestry(outerRegion, trigger: outer, nodes: nodes)
     #expect(nodes.first { $0.label == "Outer content" }?.parentIdentity == outerRegion.identity)
     #expect(innerContainer.parentIdentity == outerRegion.identity)
     #expect(inner.properties?.expanded == innerExpanded)
@@ -143,7 +143,7 @@ struct DisclosureGroupContentLayoutTests {
     #expect(innerRegion.role == .region)
     #expect(innerRegion.identity != outerRegion.identity)
     #expect(inner.properties?.controls == [innerRegion.identity])
-    #expect(innerRegion.parentIdentity == innerContainer.identity)
+    try expectContentAncestry(innerRegion, trigger: inner, nodes: nodes)
     #expect(nodes.first { $0.label == "Inner content" }?.parentIdentity == innerRegion.identity)
     #expect(nodes.filter { $0.role == .region }.count == 2)
   }
@@ -187,4 +187,21 @@ private struct RowDisclosureStyle: DisclosureGroupStyle {
       }
     }
   }
+}
+
+// The style may insert semantic containers between the region and its owner.
+// Interactive descendants must still be outside the trigger button's subtree.
+private func expectContentAncestry(
+  _ region: AccessibilityNode, trigger: AccessibilityNode, nodes: [AccessibilityNode]
+) throws {
+  let container = try #require(trigger.parentIdentity)
+  var parent = region.parentIdentity
+  var visited: Set<Identity> = []
+  while let identity = parent, visited.insert(identity).inserted {
+    let ancestor = try #require(nodes.first { $0.identity == identity })
+    #expect(identity != trigger.identity)
+    if identity == container { return }
+    parent = ancestor.parentIdentity
+  }
+  Issue.record("Disclosure region has no ancestor matching its trigger's container")
 }

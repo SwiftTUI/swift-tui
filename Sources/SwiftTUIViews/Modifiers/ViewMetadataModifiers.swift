@@ -498,6 +498,18 @@ public struct SemanticMetadataModifier: IterativePrimitiveViewModifier, Sendable
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
+    if metadata == SemanticMetadata(accessibilityHidden: true) {
+      // Hiding is a subtree mask, so preserve it on every layout element.
+      // A normalized multi-element group may be spliced by a conditional or
+      // enclosing builder, discarding a flag attached only to that group.
+      return content.resolveElementsWork(in: context).map { completed in
+        completed.map { completed in
+          var node = completed
+          node.semanticMetadata.accessibilityHidden = true
+          return node
+        }
+      }
+    }
     return content.resolveWork(in: context).map { completed in
       if let label = metadata.accessibilityLabel,
         metadata == SemanticMetadata(accessibilityLabel: label),

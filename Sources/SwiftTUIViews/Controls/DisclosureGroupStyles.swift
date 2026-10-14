@@ -270,8 +270,8 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
   }
 }
 
-/// Route semantic content without introducing a layout child. The semantics
-/// phase supplies the labelled region separately from the authored payload.
+/// Mark a content slot without introducing a layout child. The semantics phase
+/// inserts its labelled region beneath the style's enclosing semantic parent.
 private struct DisclosureAccessibilityContent: PrimitiveView, IterativeResolvableView {
   let payload: CapturedSubviewPayload
   let controlIdentity: Identity?
@@ -281,27 +281,24 @@ private struct DisclosureAccessibilityContent: PrimitiveView, IterativeResolvabl
       completed in
       var children = markingAccessibilityContent(completed)
       guard let controlIdentity else { return children }
-      let contentIdentity = controlIdentity.child(.named("AccessibilityDisclosureContent"))
-      if !children.isEmpty {
-        for index in children.indices {
-          var structure =
-            children[index].semanticMetadata.accessibilityStructure ?? AccessibilityStructure()
-          structure.parent = contentIdentity
-          children[index].semanticMetadata.accessibilityStructure = structure
-        }
-        return children
+      if children.isEmpty {
+        // An expanded empty slot still publishes its region and relationship.
+        children = [
+          ResolvedNode(
+            identity: context.identity, kind: .view("DisclosureContent"),
+            environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
+        ]
       }
-      // An expanded empty slot still publishes its region and relationship.
-      var metadata = SemanticMetadata(accessibilityRole: .region)
-      metadata.isAccessibilityContent = true
-      metadata.accessibilityProperties = AccessibilityProperties(
-        labelledBy: [controlIdentity], identifier: contentIdentity)
-      return [
-        ResolvedNode(
-          identity: context.identity, kind: .view("DisclosureContent"), children: children,
-          environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
-          semanticMetadata: metadata)
-      ]
+      let region = AccessibilityDisclosureContentMetadata(
+        identity: context.identity.child(.named("AccessibilityDisclosureContent")),
+        controlIdentity: controlIdentity, isEnabled: context.environment.style.isEnabled)
+      for index in children.indices {
+        var structure =
+          children[index].semanticMetadata.accessibilityStructure ?? AccessibilityStructure()
+        structure.disclosureContent = region
+        children[index].semanticMetadata.accessibilityStructure = structure
+      }
+      return children
     }
   }
 }

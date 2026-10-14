@@ -693,8 +693,23 @@ package struct AccessibilityStructure: Equatable, Sendable {
   package var navigationCategories: [String] = []
   package var tabs: [AccessibilityTabMetadata]? = nil
   package var expansion: AccessibilityExpansionMetadata? = nil
+  package var disclosureContent: AccessibilityDisclosureContentMetadata? = nil
   package var collectionNavigation: AccessibilityCollectionNavigation? = nil
   package init() {}
+}
+
+/// The roots of one placed disclosure slot share a semantic region without
+/// overriding the accessibility ancestry supplied by its style.
+package struct AccessibilityDisclosureContentMetadata: Equatable, Sendable {
+  package var identity: Identity
+  package var controlIdentity: Identity
+  package var isEnabled: Bool
+
+  package init(identity: Identity, controlIdentity: Identity, isEnabled: Bool) {
+    self.identity = identity
+    self.controlIdentity = controlIdentity
+    self.isEnabled = isEnabled
+  }
 }
 
 /// A bounded navigator for a collection's logical records, independent of its
