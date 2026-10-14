@@ -217,7 +217,7 @@ extension SemanticExtractor {
           node, focusIdentities: focusIdentities,
           textPresentation: frame.textPresentation
         )
-          || hasEmittedChild
+          || hasEmittedChild || metadata.accessibilityStructure?.disclosureContent != nil
         {
           emittedSubtrees.insert(node.identity)
         }
@@ -282,6 +282,9 @@ extension SemanticExtractor {
 
     var nodes: [AccessibilityNode] = []
     var expansionContentParents: [Identity: Identity] = [:]
+    var disclosureRegionIndices: [Identity: Int] = [:]
+    var disclosureRegionsByControl: [Identity: [Identity]] = [:]
+    var disclosureTriggerIndices: [Int] = []
     var nextEmitTraversalOrdinal = 0
     var emitStack:
       [(
@@ -302,6 +305,23 @@ extension SemanticExtractor {
         node.semanticMetadata.accessibilityStructure?.parent
         ?? frame.emittedParentIdentity
       let language = node.semanticMetadata.accessibilityProperties?.language ?? frame.language
+      if let content = node.semanticMetadata.accessibilityStructure?.disclosureContent {
+        let identity = content.identity.strippingEntityOccurrences
+        if let index = disclosureRegionIndices[identity] {
+          nodes[index].rect = nodes[index].rect.union(semanticBounds(for: node))
+        } else {
+          let owner = content.controlIdentity.strippingEntityOccurrences
+          var region = AccessibilityNode(
+            identity: identity, parentIdentity: childParentIdentity?.strippingEntityOccurrences,
+            rect: semanticBounds(for: node), role: .region)
+          region.isEnabled = content.isEnabled
+          region.properties = .init(language: frame.language, labelledBy: [owner])
+          disclosureRegionIndices[identity] = nodes.count
+          disclosureRegionsByControl[owner, default: []].append(identity)
+          nodes.append(region)
+        }
+        childParentIdentity = identity
+      }
       var listCount = frame.listCount
       let collectionReadOnly =
         node.semanticMetadata.hostedCollectionContainer != nil
@@ -367,6 +387,15 @@ extension SemanticExtractor {
             accessibilityNode.role = .group
           }
           let expansionNodes = expansionAccessibilityNodes(for: node, original: accessibilityNode)
+          if let expansion = node.semanticMetadata.accessibilityStructure?.expansion,
+            expansion.popup != .menu, expansion.expanded,
+            accessibilityNode.properties?.controls == nil
+          {
+            // Regions are discovered at their visible slot placements. Authored
+            // controls overrides still win, and final reference resolution drops
+            // regions consumed by grouping or excluded by modal presentation.
+            disclosureTriggerIndices.append(nodes.count + 1)
+          }
           if case .tableRow = node.semanticMetadata.hostedCollectionItem?.role {
             installCollectionReview(on: &accessibilityNode, for: node)
           }
@@ -392,9 +421,14 @@ extension SemanticExtractor {
       }
     }
 
+    for index in disclosureTriggerIndices {
+      let controls = disclosureRegionsByControl[nodes[index].identity] ?? []
+      nodes[index].properties = (nodes[index].properties ?? .init()).merging(
+        .init(controls: controls))
+    }
     nodes = applyingAccessibilityStructure(to: nodes, structures: structures)
     // Apply authored child behavior to the whole primitive first. Afterwards
-    // its surviving content becomes the trigger's sibling for valid button ARIA.
+    // its surviving content moves outside the trigger's branch for valid button ARIA.
     for index in nodes.indices {
       if let parent = nodes[index].parentIdentity, let container = expansionContentParents[parent] {
         nodes[index].parentIdentity = container

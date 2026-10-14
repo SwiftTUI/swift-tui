@@ -1,6 +1,6 @@
 extension SemanticExtractor {
-  /// A trigger and its disclosed commands/content are siblings, so a button
-  /// never owns interactive descendants in the accessibility tree.
+  /// A trigger and its disclosed commands/content occupy separate branches, so
+  /// a button never owns interactive descendants in the accessibility tree.
   func expansionAccessibilityNodes(for node: PlacedNode, original: AccessibilityNode)
     -> [AccessibilityNode]?
   {
@@ -17,12 +17,25 @@ extension SemanticExtractor {
     if original.role == .menu || original.role == .disclosureGroup { trigger.role = .button }
     trigger.properties = AccessibilityProperties(
       expanded: expansion.expanded, popup: expansion.popup,
-      controls: expansion.expanded ? [expansion.contentIdentity] : []
+      controls: expansion.expanded && expansion.popup == .menu ? [expansion.contentIdentity] : []
     ).merging(original.properties ?? .init())
     var stack = [node]
     var triggerRect: CellRect?
     while let child = stack.popLast() {
-      if child.isTransient { continue }
+      if child.isTransient || child.semanticMetadata.accessibilityHidden { continue }
+      if child.semanticMetadata.accessibilityStructure?.disclosureContent?
+        .controlIdentity.strippingEntityOccurrences == original.identity
+      {
+        // A content slot cannot supply its owner's trigger. Keep nested
+        // expansions outside this scan even when the style places content first.
+        continue
+      }
+      if expansion.popup == .menu,
+        child.semanticMetadata.accessibilityProperties?.identifier?.strippingEntityOccurrences
+          == expansion.contentIdentity.strippingEntityOccurrences
+      {
+        continue
+      }
       if child.semanticMetadata.explicitRouteIdentity == expansion.visualIdentity {
         triggerRect = child.bounds
         break

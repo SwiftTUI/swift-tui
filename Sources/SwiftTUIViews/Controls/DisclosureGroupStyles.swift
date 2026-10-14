@@ -270,8 +270,8 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
   }
 }
 
-/// Keep the labelled region separate from its payload: fusing a region role
-/// onto a single Text or Button replaces that child's own reading semantics.
+/// Mark a content slot without introducing a layout child. The semantics phase
+/// inserts its labelled region beneath the style's enclosing semantic parent.
 private struct DisclosureAccessibilityContent: PrimitiveView, IterativeResolvableView {
   let payload: CapturedSubviewPayload
   let controlIdentity: Identity?
@@ -279,19 +279,26 @@ private struct DisclosureAccessibilityContent: PrimitiveView, IterativeResolvabl
   func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     payload.resolveElementsWork(in: context.child(component: .named("DisclosureContent"))).map {
       completed in
-      let children = markingAccessibilityContent(completed)
+      var children = markingAccessibilityContent(completed)
       guard let controlIdentity else { return children }
-      var metadata = SemanticMetadata(accessibilityRole: .region)
-      metadata.isAccessibilityContent = true
-      metadata.accessibilityProperties = .init(
-        labelledBy: [controlIdentity],
-        identifier: controlIdentity.child(.named("AccessibilityDisclosureContent")))
-      return [
-        ResolvedNode(
-          identity: context.identity, kind: .view("DisclosureContent"), children: children,
-          environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
-          semanticMetadata: metadata)
-      ]
+      if children.isEmpty {
+        // An expanded empty slot still publishes its region and relationship.
+        children = [
+          ResolvedNode(
+            identity: context.identity, kind: .view("DisclosureContent"),
+            environmentSnapshot: context.environment, transactionSnapshot: context.transaction)
+        ]
+      }
+      let region = AccessibilityDisclosureContentMetadata(
+        identity: context.identity.child(.named("AccessibilityDisclosureContent")),
+        controlIdentity: controlIdentity, isEnabled: context.environment.style.isEnabled)
+      for index in children.indices {
+        var structure =
+          children[index].semanticMetadata.accessibilityStructure ?? AccessibilityStructure()
+        structure.disclosureContent = region
+        children[index].semanticMetadata.accessibilityStructure = structure
+      }
+      return children
     }
   }
 }

@@ -822,6 +822,15 @@ navigation containers retain their document content when they expose named
 Dismiss/Back operations. Browser-specific arrow navigation remains in the web
 package's `AccessibilityTree.ts`.
 
+Disclosed content remains transparent to the style's enclosing layout. Its
+resolved payload roots carry slot membership without overriding semantic
+parents. Accessibility extraction inserts each visible slot's region beneath
+its enclosing semantic parent and unions its roots' placed bounds. Authored
+grouping then applies to the region and its content together; hidden subtrees
+publish no region. Each trigger controls its surviving regions, including
+separate placements of the same content slot. No layout wrapper is inserted,
+and authored text and control roles remain intact.
+
 Accessibility preferences use the inert `AccessibilityPreferences` and
 `AccessibilityColorProfile` vocabulary in `SwiftTUIPrimitives/Styling`.
 `RuntimePolicyEnvironment` exposes effective choices to views and style snapshots;
