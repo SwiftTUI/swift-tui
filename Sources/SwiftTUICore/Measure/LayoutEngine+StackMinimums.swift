@@ -194,9 +194,18 @@ extension LayoutEngine {
     var minimums: [Identity: Int] = [:]
 
     while let frame = work.popLast() {
-      if isFixedSize(frame.node.layoutMetadata, on: axis) || isSpacer(frame.node) {
+      if isFixedSize(frame.node.layoutMetadata, on: axis) {
         minimums[frame.node.identity] = mainDimension(
           of: frame.idealMeasurement.measuredSize,
+          for: axis
+        )
+        continue
+      }
+      if isSpacer(frame.node) {
+        // Cross reconciliation may already have stretched this Spacer. Its
+        // allocation is not a minimum; the intrinsic size retains minLength.
+        minimums[frame.node.identity] = mainDimension(
+          of: frame.node.intrinsicSize ?? frame.idealMeasurement.measuredSize,
           for: axis
         )
         continue
