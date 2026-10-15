@@ -77,14 +77,10 @@ struct LocalScrollPositionRegistryTests {
   @Test(
     "collection resize focus recovery observes viewport and row changes and yields to newer input",
     arguments: [false, true],
-    [
-      (viewport: false, rows: false, count: 12), (viewport: true, rows: false, count: 12),
-      (viewport: false, rows: true, count: 12), (viewport: true, rows: true, count: 12),
-      (viewport: false, rows: false, count: 11), (viewport: false, rows: true, count: 11),
-    ]
+    CollectionRecoveryChange.allCases
   )
-  func collectionResizeFocusRecoveryHonorsScrollAnchor(
-    hasNewerAnchor: Bool, changes: (viewport: Bool, rows: Bool, count: Int)
+  private func collectionResizeFocusRecoveryHonorsScrollAnchor(
+    hasNewerAnchor: Bool, change: CollectionRecoveryChange
   ) {
     let registry = LocalScrollPositionRegistry()
     let scrollIdentity = testIdentity("ResizeCollection")
@@ -124,6 +120,54 @@ struct LocalScrollPositionRegistryTests {
       ownerNodeID: ownerNode.viewNodeID,
       ownerIdentity: scrollIdentity
     )
+    var previousGeometry = CollectionScrollGeometry(rowCount: 12, rowSpan: 1)
+    var nextGeometry = previousGeometry
+    var viewportSize = CellSize(width: 32, height: 8)
+    var visibleLines = 3..<11
+    let expectsGeometryRecovery: Bool
+    switch change {
+    case .unchanged:
+      expectsGeometryRecovery = false
+    case .viewportWidth:
+      viewportSize = CellSize(width: 10, height: 8)
+      expectsGeometryRecovery = true
+    case .viewportHeight:
+      viewportSize = CellSize(width: 32, height: 12)
+      expectsGeometryRecovery = true
+    case .usableHeight:
+      visibleLines = 3..<9
+      expectsGeometryRecovery = true
+    case .estimatedRowSpan:
+      nextGeometry = CollectionScrollGeometry(rowCount: 12, rowSpan: 3)
+      expectsGeometryRecovery = true
+    case .measuredRowGrowth:
+      nextGeometry = CollectionScrollGeometry(rowCount: 12, rowSpan: 1, rowHeights: [7: 3])
+      expectsGeometryRecovery = true
+    case .measuredRowShrink:
+      previousGeometry = CollectionScrollGeometry(rowCount: 12, rowSpan: 1, rowHeights: [7: 3])
+      expectsGeometryRecovery = true
+    case .redistributedHeights:
+      previousGeometry = CollectionScrollGeometry(rowCount: 12, rowSpan: 1, rowHeights: [9: 4])
+      nextGeometry = CollectionScrollGeometry(rowCount: 12, rowSpan: 1, rowHeights: [6: 4])
+      expectsGeometryRecovery = true
+    case .viewportAndRows:
+      viewportSize = CellSize(width: 10, height: 8)
+      nextGeometry = CollectionScrollGeometry(rowCount: 12, rowSpan: 3)
+      expectsGeometryRecovery = true
+    case .removedRow:
+      nextGeometry = CollectionScrollGeometry(rowCount: 11, rowSpan: 1)
+      expectsGeometryRecovery = false
+    case .removedRowAndGrowth:
+      nextGeometry = CollectionScrollGeometry(rowCount: 11, rowSpan: 3)
+      expectsGeometryRecovery = false
+    case .appendedRow:
+      nextGeometry = CollectionScrollGeometry(rowCount: 13, rowSpan: 1)
+      expectsGeometryRecovery = false
+    case .removedRowAndViewport:
+      viewportSize = CellSize(width: 32, height: 12)
+      nextGeometry = CollectionScrollGeometry(rowCount: 11, rowSpan: 1)
+      expectsGeometryRecovery = true
+    }
     var previousRoute = ScrollRoute(
       identity: scrollIdentity,
       viewNodeID: ownerNode.viewNodeID,
@@ -131,23 +175,19 @@ struct LocalScrollPositionRegistryTests {
       contentBounds: CellRect(origin: CellPoint(x: 0, y: -3), size: CellSize(width: 32, height: 12))
     )
     previousRoute.collectionScrollLayout = CollectionScrollLayout(
-      geometry: CollectionScrollGeometry(rowCount: 12, rowSpan: 1),
+      geometry: previousGeometry,
       visibleLines: 3..<11,
       anchor: .row(3)
     )
     var resizedRoute = ScrollRoute(
       identity: scrollIdentity,
       viewNodeID: ownerNode.viewNodeID,
-      viewportRect: CellRect(
-        origin: .zero, size: CellSize(width: changes.viewport ? 10 : 32, height: 8)),
+      viewportRect: CellRect(origin: .zero, size: viewportSize),
       contentBounds: CellRect(origin: CellPoint(x: 0, y: -9), size: CellSize(width: 10, height: 36))
     )
     resizedRoute.collectionScrollLayout = CollectionScrollLayout(
-      geometry: CollectionScrollGeometry(
-        rowCount: changes.count, rowSpan: 1,
-        rowHeights: changes.rows
-          ? Dictionary(uniqueKeysWithValues: (0..<changes.count).map { ($0, 3) }) : [:]),
-      visibleLines: 9..<17,
+      geometry: nextGeometry,
+      visibleLines: visibleLines,
       anchor: .row(3)
     )
 
@@ -163,9 +203,7 @@ struct LocalScrollPositionRegistryTests {
       scrollTargets: []
     )
 
-    // Removing rows keeps the existing focus fallback instead of becoming a resize correction.
-    let hasSameRowCount = changes.count == 12
-    let shouldRecover = !hasNewerAnchor && (changes.viewport || (changes.rows && hasSameRowCount))
+    let shouldRecover = !hasNewerAnchor && expectsGeometryRecovery
     let expectedOffset: Int
     let expectedAnchor: CollectionScrollAnchor
     if hasNewerAnchor {
@@ -183,6 +221,66 @@ struct LocalScrollPositionRegistryTests {
     #expect(offsetWrites == 0)
     #expect(offset == ScrollOffset(x: 0, y: expectedOffset))
     #expect(logicalAnchor == expectedAnchor)
+  }
+
+  @Test("collection recovery rejects a departed owner and preserves an unrelated scroll binding")
+  func collectionRecoveryRequiresTheCurrentOwner() {
+    let registry = LocalScrollPositionRegistry()
+    let collection = testIdentity("ReplacedCollection")
+    let sibling = testIdentity("SiblingCollection")
+    let departedOwner = ViewNodeID(rawValue: 1)
+    let currentOwner = ViewNodeID(rawValue: 2)
+    var revealCalls = 0
+    var offsetWrites = 0
+    let registration = ScrollPositionRegistrationSnapshot(
+      identity: collection,
+      ownerViewNodeID: currentOwner,
+      currentOffset: { ScrollOffset(x: 0, y: 3) },
+      applyOffset: { _ in offsetWrites += 1 },
+      currentCollectionAnchor: { .row(3) },
+      revealTarget: { _, _ in
+        revealCalls += 1
+        return true
+      }
+    )
+    let siblingRegistration = ScrollPositionRegistrationSnapshot(
+      identity: sibling,
+      ownerViewNodeID: departedOwner,
+      currentOffset: { ScrollOffset(x: 0, y: 5) },
+      applyOffset: { _ in offsetWrites += 1 },
+      currentCollectionAnchor: { .row(5) },
+      revealTarget: { _, _ in
+        revealCalls += 1
+        return true
+      }
+    )
+    registry.restore([registration, siblingRegistration])
+    let staleFocus = FocusRegion(
+      identity: collection.child(.named("Row7")),
+      rect: CellRect(origin: .zero, size: CellSize(width: 8, height: 1)),
+      modalFocusScopePath: nil, ownerNodeID: departedOwner, ownerIdentity: collection)
+    var previous = ScrollRoute(
+      identity: collection, viewNodeID: departedOwner,
+      viewportRect: CellRect(origin: .zero, size: CellSize(width: 20, height: 6)),
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 12)))
+    previous.collectionScrollLayout = CollectionScrollLayout(
+      geometry: CollectionScrollGeometry(rowCount: 12, rowSpan: 1),
+      visibleLines: 3..<9, anchor: .row(3))
+    var current = ScrollRoute(
+      identity: collection, viewNodeID: currentOwner,
+      viewportRect: previous.viewportRect,
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 36)))
+    current.collectionScrollLayout = CollectionScrollLayout(
+      geometry: CollectionScrollGeometry(rowCount: 12, rowSpan: 3),
+      visibleLines: 9..<15, anchor: .row(3))
+
+    let recovered = registry.revealCollectionFocusAfterResize(
+      staleFocus, previousRoutes: [previous], scrollRoutes: [current], scrollTargets: [])
+
+    #expect(!recovered)
+    #expect(revealCalls == 0)
+    #expect(offsetWrites == 0)
+    #expect(registry.snapshot().count == 2)
   }
 
   @Test("focused rect below viewport scrolls by the minimum reveal delta")
@@ -803,4 +901,20 @@ struct LocalScrollPositionRegistryTests {
     #expect(enriched[0].contentOffset == .init(x: 1, y: 4))
     #expect(enriched[1].contentOffset == .zero)
   }
+}
+
+private enum CollectionRecoveryChange: String, CaseIterable {
+  case unchanged
+  case viewportWidth
+  case viewportHeight
+  case usableHeight
+  case estimatedRowSpan
+  case measuredRowGrowth
+  case measuredRowShrink
+  case redistributedHeights
+  case viewportAndRows
+  case removedRow
+  case removedRowAndGrowth
+  case appendedRow
+  case removedRowAndViewport
 }

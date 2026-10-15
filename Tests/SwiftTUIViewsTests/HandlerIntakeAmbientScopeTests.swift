@@ -127,14 +127,17 @@ struct HandlerDescriptorIntakeOrderTests {
     context.viewGraph = usesGraph ? graph : nil
     context.localScrollPositionRegistry = registry
     let intake = HandlerDescriptorIntake(context: context)
+    var offset = ScrollOffset.zero
     ViewNodeContext.withValue(ambient) {
       intake.registerScrollPosition(
-        identity: ownerIdentity, currentOffset: { .zero }, applyOffset: { _ in })
+        identity: ownerIdentity, currentOffset: { offset }, applyOffset: { offset = $0 })
     }
 
     let expectedOwner = usesGraph ? owner : ambient
     let registration = try #require(registry.snapshot().first)
     #expect(registration.ownerViewNodeID == expectedOwner.viewNodeID)
+    registration.applyOffset(ScrollOffset(x: 2, y: 7))
+    #expect(offset == ScrollOffset(x: 2, y: 7))
     #expect(expectedOwner.registeredHandlers.scrollPosition.registrations.count == 1)
     if owner !== ambient {
       let otherNode = usesGraph ? ambient : owner
@@ -143,7 +146,11 @@ struct HandlerDescriptorIntakeOrderTests {
 
     registry.reset()
     registry.restore(expectedOwner.registeredHandlers.scrollPosition.registrations)
-    #expect(registry.snapshot().first?.ownerViewNodeID == expectedOwner.viewNodeID)
+    let replayed = try #require(registry.snapshot().first)
+    #expect(replayed.ownerViewNodeID == expectedOwner.viewNodeID)
+    #expect(replayed.currentOffset() == ScrollOffset(x: 2, y: 7))
+    replayed.applyOffset(ScrollOffset(x: 3, y: 11))
+    #expect(offset == ScrollOffset(x: 3, y: 11))
     registry.removeUnjustifiedRegistrations { nodeID in
       nodeID == expectedOwner.viewNodeID ? expectedOwner.registeredHandlers : nil
     }
