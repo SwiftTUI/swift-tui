@@ -287,7 +287,7 @@ extension DrawExtractor {
     TableLayoutDerivationProbe.recordDerivation()
     let bounds = tableInsetBounds(for: payload, in: bounds)
     let geometry = CollectionScrollGeometry(
-      rowCount: payload.rows.count, rowSpan: 2, rowHeights: rowHeights ?? [:])
+      rowCount: payload.rowCount, rowSpan: 2, rowHeights: rowHeights ?? [:])
     let widths =
       columnWidths
       ?? measureTableColumnWidths(
@@ -412,7 +412,7 @@ extension DrawExtractor {
     let bodyEnd = max(bodyStart, displayLines.count - fixedBottomCount)
     let bodyLines = Array(displayLines[bodyStart..<bodyEnd])
     let bodyCapacity = viewportLineCount - fixedTopCount - fixedBottomCount
-    let anchorLine = (payload.scrollAnchor?.rowIndex(rowCount: payload.rows.count)).map { row in
+    let anchorLine = (payload.scrollAnchor?.rowIndex(rowCount: payload.rowCount)).map { row in
       bodyLines.firstIndex { $0.role == .row && ($0.rowIndex ?? -1) >= row }
         ?? max(0, bodyLines.count - 1)
     }
@@ -510,7 +510,7 @@ extension DrawExtractor {
       return (clamped, nil, clamped.count, nil, nil, 0)
     }
 
-    let bodyLineCount = payload.rows.isEmpty ? 0 : payload.rows.count * 2 - 1
+    let bodyLineCount = payload.rowCount == 0 ? 0 : payload.rowCount * 2 - 1
     let bodyCapacity = viewportLineCount - top.count - bottom.count
     // The body's cells: a row line is as tall as its hosted row measured, so
     // the rows `rowHeights` knows are taller add their extra cells.
@@ -568,7 +568,7 @@ extension DrawExtractor {
     )
     // A stored anchor pins the top of the body window; without one the window
     // stays centred on the selection, which is what payload-only callers get.
-    let anchorRow = payload.scrollAnchor?.rowIndex(rowCount: payload.rows.count)
+    let anchorRow = payload.scrollAnchor?.rowIndex(rowCount: payload.rowCount)
     let anchorLine = anchorRow.map { rowIndex in
       min(max(0, rowIndex) * 2, max(0, bodyLineCount - 1))
     }
@@ -704,7 +704,9 @@ extension DrawExtractor {
       }
 
       let rowIndex = position / 2
-      let row = payload.rows[rowIndex]
+      let row =
+        payload.rows.indices.contains(rowIndex)
+        ? payload.rows[rowIndex] : TableRowPayload(cells: [])
       let isSelected = rowIndex == payload.selectedRowIndex
       let rowTextStyle = resolvedTableRowTextStyle(
         row: row,

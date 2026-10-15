@@ -65,6 +65,19 @@ public struct ListItemPayload: Equatable, Sendable {
 public struct ListPayload: Equatable, Sendable {
   public var items: [ListItemPayload]
   public var selectedRowIndex: Int?
+  /// Membership for multi-selection; nil preserves the single active-row contract.
+  package var selectedRowIndices: Set<Int>?
+
+  package func isRowSelected(_ index: Int) -> Bool {
+    selectedRowIndices?.contains(index) ?? (selectedRowIndex == index)
+  }
+
+  package func selectionMarker(for index: Int) -> String {
+    guard showsSelectionMarker else { return "" }
+    if isRowSelected(index) { return "▌ " }
+    return selectedRowIndices != nil && selectedRowIndex == index ? "> " : "  "
+  }
+
   public var style: ListStylePresentation
   public var foregroundStyle: AnyShapeStyle?
   public var backgroundStyle: AnyShapeStyle?

@@ -15,6 +15,44 @@ import Testing
 @MainActor
 @Suite
 struct TerminalGraphicsProtocolTests {
+  @Test(
+    "reader-to-grid appearance probes suspend input and restore decoder capabilities",
+    arguments: [false, true])
+  func readerToGridProbesAndCapabilities(useGridCommand: Bool) throws {
+    let gate = SpyInputSuspensionGate()
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true, cellPixelSize: .init(width: 10, height: 20))
+    let reads = LockedBox<[Bool]>([])
+    controller.onRead = { reads.withLock { $0.append(gate.isSuspended) } }
+    let host = TerminalHost(
+      inputFileDescriptor: 0, outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24), controller: controller,
+      capabilityProfile: .trueColor, environment: ["TERM": "xterm-kitty"])
+    host.inputSuspensionGate = gate
+    let surface = TerminalReaderSurface(terminal: host, enabled: true)
+    let source = ReaderCapabilitySpy()
+    let input = TerminalReaderInput(source: source, surface: surface)
+    try surface.enableRawMode()
+    defer { try? surface.disableRawMode() }
+    input.updateInputCapabilities(surface.resolvedInputCapabilities)
+    #expect(source.capabilities.mouseCoordinateMode == .disabled)
+    reads.withLock { $0.removeAll() }
+
+    if useGridCommand {
+      for char in "grid" { _ = try input.process(.key(.character(char))) }
+      _ = try input.process(.key(.return))
+    } else {
+      _ = try input.process(.key(.functionKey(12)))
+    }
+
+    #expect(!surface.isReading)
+    #expect(host.resolvedInputCapabilities.mouseCoordinateMode.usesTerminalPixels)
+    #expect(source.capabilities == host.resolvedInputCapabilities)
+    #expect(controller.writes.joined().contains("\u{001B}]10;?"))
+    #expect(!reads.value.isEmpty)
+    #expect(reads.value.allSatisfy { $0 }, "Every mid-session probe must own the input descriptor")
+  }
+
   @Test("graphics probes read the input descriptor only while the reader is suspended")
   func graphicsProbesReadOnlyWhileInputReaderSuspended() throws {
     // F42: the probe's blocking reads race the live InputReader's dispatch
@@ -2118,8 +2156,6 @@ private final class GraphicsProtocolMockTerminalController:
     cellPixelSizeValue
   }
 
-
-
   func write(_ output: String, to _: Int32) throws {
     writesStorage.withLock { $0.append(output) }
   }
@@ -2155,5 +2191,14 @@ private final class SpyInputSuspensionGate: TerminalInputSuspending {
     }
     defer { state.withLock { $0.depth -= 1 } }
     return try body()
+  }
+}
+
+private final class ReaderCapabilitySpy: TerminalInputReading, TerminalInputCapabilityConfiguring {
+  private let storage = LockedBox(ResolvedTerminalInputCapabilities())
+  var capabilities: ResolvedTerminalInputCapabilities { storage.value }
+  func inputEvents() -> AsyncStream<InputEvent> { AsyncStream { $0.finish() } }
+  func updateInputCapabilities(_ capabilities: ResolvedTerminalInputCapabilities) {
+    storage.withLock { $0 = capabilities }
   }
 }

@@ -7,8 +7,10 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct CollectionScrollBoundaryTests {
-  @Test("wheel scrolling visits the final row before and after a footer-only window")
-  func wheelVisitsLastRowBeforeFooter() throws {
+  @Test(
+    "wheel and page scrolling visit the final row before and after a footer-only window",
+    arguments: [false, true])
+  func wheelVisitsLastRowBeforeFooter(usePageUp: Bool) throws {
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("CollectionBoundaryFooterWheel"), size: .init(width: 32, height: 8)
     ) {
@@ -24,9 +26,11 @@ struct CollectionScrollBoundaryTests {
             ForEach(0..<4, id: \.self) { line in Text("footer:\(line)") }
           }
         }
-      }.listStyle(BoundaryCurrencyListStyle()).scrollIndicators(.hidden).frame(height: 4)
+      }.listStyle(BoundaryCurrencyListStyle()).scrollIndicators(.hidden).focusable().frame(
+        height: 4)
     }
     defer { harness.shutdown() }
+    if usePageUp { _ = try harness.focusText("«0»") }
     let point = try #require(harness.point(forText: "«0»"))
     _ = try harness.scrollPointer(at: point, deltaY: 1)
     try #require(harness.frame.contains("«1»"), "\(harness.frame)")
@@ -35,7 +39,11 @@ struct CollectionScrollBoundaryTests {
     _ = try harness.scrollPointer(at: point, deltaY: 1)
     try #require(harness.frame.contains("footer:3"), "\(harness.frame)")
     for row in (0..<3).reversed() {
-      _ = try harness.scrollPointer(at: point, deltaY: -1)
+      if usePageUp {
+        _ = try harness.pressKey(KeyPress(.pageUp))
+      } else {
+        _ = try harness.scrollPointer(at: point, deltaY: -1)
+      }
       try #require(harness.frame.contains("«\(row)»"), "\(harness.frame)")
     }
   }

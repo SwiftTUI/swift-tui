@@ -252,9 +252,6 @@ extension SemanticExtractor {
       guard line.role == .row, let rowIndex = line.rowIndex else {
         continue
       }
-      guard payload.rows.indices.contains(rowIndex), payload.rows[rowIndex].tag != nil else {
-        continue
-      }
 
       let hostedRow =
         hostsCommittedRows
@@ -262,10 +259,14 @@ extension SemanticExtractor {
           child.semanticMetadata.hostedCollectionItem?.role == .tableRow(rowIndex: rowIndex)
         }
         : nil
-      if hostsCommittedRows,
-        hostedRow?.semanticMetadata.hostedCollectionItem?.isSelectable != true
-      {
-        continue
+      if hostsCommittedRows {
+        guard hostedRow?.semanticMetadata.hostedCollectionItem?.isSelectable == true else {
+          continue
+        }
+      } else {
+        guard payload.rows.indices.contains(rowIndex), payload.rows[rowIndex].tag != nil else {
+          continue
+        }
       }
 
       let lineRect =

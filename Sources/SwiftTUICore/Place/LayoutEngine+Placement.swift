@@ -77,6 +77,15 @@ extension LayoutEngine {
         in: bounds
       )
     }
+    // Chaining uses the measured body extent and its usable window. Fixed
+    // chrome occupies viewport cells but does not scroll with the rows.
+    if let navigation = node.hostedListVisibleLayout?.scrollMetadata?.navigation
+      ?? node.hostedTableVisibleLayout?.scrollMetadata?.navigation
+    {
+      let viewportHeight = (node.scrollViewportRect ?? bounds).size.height
+      let fixedHeight = max(0, viewportHeight - navigation.visibleLines.count)
+      node.contentBounds.size.height = navigation.geometry.displayLineCount + fixedHeight
+    }
     return node
   }
 

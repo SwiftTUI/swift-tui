@@ -15,6 +15,30 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct CollectionScrollCurrencyTests {
+  @Test("web chaining retains headroom until a tall materialized list reaches its measured end")
+  func tallMaterializedListChaining() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TallMaterializedChaining"), size: .init(width: 26, height: 10)
+    ) {
+      List {
+        ForEach(0..<20, id: \.self) { Text("«\($0)»a\n«\($0)»b\n«\($0)»c") }
+      }.frame(height: 10)
+    }
+    defer { harness.shutdown() }
+    let point = try #require(harness.point(forText: "«0»a"))
+    for _ in 0..<40 {
+      let route = try #require(
+        harness.runLoop.localScrollPositionRegistry.routesWithCurrentOffsets(
+          harness.runLoop.latestSemanticSnapshot.scrollRoutes
+        ).first)
+      let maximum = max(0, route.contentBounds.size.height - route.viewportRect.size.height)
+      if route.contentOffset.y >= maximum { break }
+      _ = try harness.scrollPointer(at: point, deltaY: 1)
+    }
+    #expect(
+      harness.frame.contains("«19»c"), "web forwarding must reach the last row: \(harness.frame)")
+  }
+
   @Test("section edges retain multi-cell headers and footers separately from their row")
   func sectionEdgesRemainReachableAroundTallRow() throws {
     let harness = try StressRuntimeHarness(

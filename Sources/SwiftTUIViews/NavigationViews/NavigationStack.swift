@@ -572,8 +572,13 @@ private func resolveValuePath(
           )
         )
 
+        // Nested declarations belong to this pushed instance, independent of
+        // the source's current structural path and of other pushed instances.
         return NavigationDestinationSurface(instance: instance)
-          .resolveWork(in: context.replacingIdentity(with: instanceIdentity)).flatMap { completed in
+          .resolveWork(
+            in: context.replacingIdentity(with: instanceIdentity)
+              .settingEnvironment(\.navigationDestinationDeclarationScope, to: instanceIdentity)
+          ).flatMap { completed in
             visibleNode = completed
             if let contentNodeID = visibleNode.children.first?.viewNodeID {
               activeSurfaceContentNodeIDs.append(contentNodeID)
@@ -666,8 +671,13 @@ private func resolveActiveDestinationChain(
           )
         )
 
+        // Nested declarations belong to this pushed instance, independent of
+        // the source's current structural path and of other pushed instances.
         return NavigationDestinationSurface(instance: instance)
-          .resolveWork(in: context.replacingIdentity(with: instance.identity)).flatMap {
+          .resolveWork(
+            in: context.replacingIdentity(with: instance.identity)
+              .settingEnvironment(\.navigationDestinationDeclarationScope, to: instance.identity)
+          ).flatMap {
             completed in
             visibleNode = completed
             // The surface's own node collapses onto the reused stack node under a

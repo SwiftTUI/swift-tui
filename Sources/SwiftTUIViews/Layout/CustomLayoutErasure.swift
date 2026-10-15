@@ -602,17 +602,24 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
       var placement =
         placementRecorder.placement(for: child.identity)
         ?? defaultPlacement(in: bounds, proposal: measured.proposal)
+      let declaresViewport = placement.viewportContext != nil
+      if declaresViewport {
+        placement.viewportContext?.scrollIdentity = node.identity
+      } else {
+        placement.viewportContext = passContext?.scrollViewportContext
+      }
       // A placement that carries a viewport context (a scroll layout placing
       // its content) re-declares it as a measure-viewport hint for this
       // placement-time re-measure, so windowed lazy containers in the
       // subtree stay windowed here too (Stage 2.2) — the sizeThatFits-side
       // hint is out of scope by now.
-      let placementMeasureHint = placement.viewportContext.map { context in
+      let placementMeasureHint = (declaresViewport ? placement.viewportContext : nil).map {
+        context in
         MeasureViewportHint(
           axes: context.axes,
           contentOffset: context.contentOffset,
           viewportSize: context.viewportRect.size,
-          scrollIdentity: node.identity
+          scrollIdentity: context.scrollIdentity
         )
       }
       let childMeasurement: MeasuredNode
@@ -632,7 +639,7 @@ final class LayoutWorkerProxy<L: Layout>: WorkerCustomLayoutProxy,
         )
       }
       var anchorCorrection: LazyScrollAnchorCorrection?
-      if var viewport = placement.viewportContext {
+      if declaresViewport, var viewport = placement.viewportContext {
         // Correction belongs to this scroll placement, not to the lazy stack's
         // local allocation. Descend measurement wrappers but stop at the first
         // claimed lazy allocation (nested scroll owners have their own placement).

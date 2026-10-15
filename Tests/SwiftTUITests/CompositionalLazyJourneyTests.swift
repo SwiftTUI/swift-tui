@@ -7,12 +7,12 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct CompositionalLazyJourneyTests {
-  @Test("wheel then prepend delete and reorder preserve a visible row")
-  func edits() throws {
+  @Test("wheel then prepend delete and reorder preserve a visible row", arguments: [false, true])
+  func edits(custom: Bool) throws {
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("CompositeEdits"),
       size: .init(width: 50, height: 14)
-    ) { CompositionEditFixture() }
+    ) { CompositionEditFixture(custom: custom) }
     defer { harness.shutdown() }
     let point = try #require(harness.point(forText: "row 3"))
     for _ in 0..<8 { _ = try harness.scrollPointer(at: point, deltaY: 1) }
@@ -28,6 +28,30 @@ struct CompositionalLazyJourneyTests {
     #expect(harness.point(forText: "row 8") == successor)
     _ = try harness.scrollPointer(at: point, deltaY: 1)
     #expect(harness.point(forText: "row 12")?.y == before.y - 1)
+  }
+
+  @Test("author layouts preserve bounded lazy placement", arguments: [false, true])
+  func customLayoutWindowing(horizontal: Bool) {
+    IndexedChildRealizationProbe.reset()
+    let result = DefaultRenderer().render(
+      ScrollView(horizontal ? .horizontal : .vertical) {
+        CompositionPassThroughLayout {
+          if horizontal {
+            LazyHStack { ForEach(0..<1000, id: \.self) { Text("row \($0)") } }
+          } else {
+            LazyVStack { ForEach(0..<1000, id: \.self) { Text("row \($0)") } }
+          }
+        }
+      }, proposal: .init(width: 40, height: 12))
+    #expect(IndexedChildRealizationProbe.realizedChildCount < 80)
+    var pending = [result.placedTree]
+    var fragments = 0
+    while let node = pending.popLast() {
+      fragments += node.lazyStackAllocationSnapshot?.fragments?.count ?? 0
+      pending.append(contentsOf: node.children)
+    }
+    #expect(fragments > 0 && fragments < 80)
+    #expect(result.rasterSurface.lines.joined().contains("row 0"))
   }
 
   @Test("far scrollTo refines its target and an empty target preserves the viewport")
@@ -218,6 +242,7 @@ struct CompositionalLazyJourneyTests {
 }
 
 private struct CompositionEditFixture: View {
+  var custom = false
   @State private var rows = Array(0..<1000)
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -226,14 +251,18 @@ private struct CompositionEditFixture: View {
       Button("Reorder prefix") { rows.swapAt(0, 1) }
       Button("Delete anchor") { rows.removeAll { $0 == 7 } }
       ScrollView {
-        LazyVStack(alignment: .leading) {
-          Text("header")
-          ForEach(rows, id: \.self) { Text("row \($0)") }
-          Text("footer")
-        }
+        if custom { CompositionPassThroughLayout { document } } else { document }
       }
     }
   }
+  private var document: some View {
+    LazyVStack(alignment: .leading) {
+      Text("header")
+      ForEach(rows, id: \.self) { Text("row \($0)") }
+      Text("footer")
+    }
+  }
+
 }
 
 private struct CompositionTargetFixture: View {
@@ -296,5 +325,18 @@ private struct HorizontalCompositionFixture: View {
         }
       }
     }
+  }
+}
+
+private struct CompositionPassThroughLayout: Layout {
+  func sizeThatFits(proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout Void)
+    -> LayoutSize
+  {
+    subviews.first?.sizeThatFits(proposal) ?? .zero
+  }
+  func placeSubviews(
+    in bounds: LayoutRect, proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout Void
+  ) {
+    subviews.first?.place(at: bounds.origin, proposal: proposal)
   }
 }

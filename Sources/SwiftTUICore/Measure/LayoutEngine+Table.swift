@@ -71,7 +71,7 @@ extension LayoutEngine {
     }
 
     if payload.isViewportBacked {
-      lineMetrics.height += payload.rows.count + max(0, payload.rows.count - 1)
+      lineMetrics.height += payload.rowCount + max(0, payload.rowCount - 1)
     } else {
       for (index, row) in payload.rows.enumerated() {
         lineMetrics.height += 1

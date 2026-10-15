@@ -18,6 +18,37 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct LazyStackIdealPassWindowingTests {
+  @Test(
+    "estimate-derived wrappers cannot populate the exact measurement cache",
+    arguments: [false, true])
+  func wrapperProbeDoesNotPoisonCommit(custom: Bool) {
+    @ViewBuilder func content() -> some View {
+      LazyVStack(spacing: 0) {
+        ForEach(0..<100, id: \.self) { row in
+          Text(row.isMultiple(of: 2) ? "short" : "tall\nsecond")
+        }
+      }
+    }
+    @ViewBuilder func wrapped() -> some View {
+      if custom { EstimatePassThroughLayout { content() } } else { content().padding(1) }
+    }
+    var node = resolveView(
+      wrapped(), in: .init(identity: testIdentity("EstimateWrapper", "\(custom)")))
+    node.viewNodeID = .init(rawValue: 999)
+    let cache = MeasurementCache()
+    let engine = LayoutEngine(cache: cache)
+    let proposal = ProposedSize(width: 20, height: nil)
+    _ = engine.measure(node, proposal: proposal, passContext: .init(), grade: .probe)
+    let wasCached = cache.lookup(resolved: node, proposal: proposal) != nil
+    #expect(
+      !wasCached, "a wrapper inherits approximation even when its own size computation is exact")
+    let committed = engine.measure(node, proposal: proposal)
+    let fresh = LayoutEngine().measure(node, proposal: proposal)
+    #expect(committed.measuredSize == fresh.measuredSize)
+    #expect(committed.subtreeNodeCount == fresh.subtreeNodeCount)
+    if !custom { #expect(committed.measuredSize.height == 152) }
+  }
+
   private static let blockCount = 300
 
   /// The appendix document: `LazyVStack(spacing: 1) { ForEach(0..<300) }`
@@ -193,5 +224,18 @@ struct LazyStackIdealPassWindowingTests {
     #expect(surface.contains("row 100"))
     #expect(surface.contains("row 199"), "the estimate matches the exact content:\n\(surface)")
     #expect(surface.contains("below"))
+  }
+}
+
+private struct EstimatePassThroughLayout: Layout {
+  func sizeThatFits(proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout Void)
+    -> LayoutSize
+  {
+    subviews.first?.sizeThatFits(proposal) ?? .zero
+  }
+  func placeSubviews(
+    in bounds: LayoutRect, proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout Void
+  ) {
+    subviews.first?.place(at: bounds.origin, proposal: proposal)
   }
 }

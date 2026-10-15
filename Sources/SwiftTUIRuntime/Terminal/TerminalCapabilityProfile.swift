@@ -158,9 +158,9 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       glyphLevel: glyphLevel,
       colorLevel: colorLevel,
       emitsStyleEscapeSequences: colorLevel != .none,
-      supportsHyperlinks: supportsHyperlinks(term: term),
+      supportsHyperlinks: supportsHyperlinks(term: term, environment: environment),
       supportsMouseReporting: supportsMouseReporting(term: term),
-      supportsSynchronizedOutput: supportsSynchronizedOutput(term: term)
+      supportsSynchronizedOutput: supportsSynchronizedOutput(term: term, environment: environment)
     )
     // DECSTBM/SU/SD are VT100-core: default on for any non-dumb TTY (this
     // branch), independent of the rich-feature term list. The
@@ -223,66 +223,73 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       colorLevel = .trueColor
     }
 
-    let isWindowsTerminal = environment["WT_SESSION"] != nil
-    let richFeatures =
-      isWindowsTerminal || supportsRichTerminalFeatures(term: term)
+    let isWindowsTerminal =
+      environment["WT_SESSION"] != nil
+      && (term.isEmpty || term == "xterm" || term == "xterm-256color")
     var profile = Self(
       glyphLevel: glyphLevel,
       colorLevel: colorLevel,
       emitsStyleEscapeSequences: colorLevel != .none,
-      supportsHyperlinks: richFeatures,
+      supportsHyperlinks: isWindowsTerminal
+        || supportsHyperlinks(term: term, environment: environment),
       // The input pump owns mouse on the local console: conhost's
       // MOUSE_EVENT records and Windows Terminal's SGR bytes decode through
       // the same path. A foreign TERM is honored by the POSIX list.
-      supportsMouseReporting: term.isEmpty ? true : richFeatures,
-      supportsSynchronizedOutput: richFeatures
+      supportsMouseReporting: term.isEmpty || supportsMouseReporting(term: term),
+      supportsSynchronizedOutput: isWindowsTerminal
+        || supportsSynchronizedOutput(term: term, environment: environment)
     )
     // conhost documents DECSTBM with SU/SD; VT100-core here as on POSIX.
     profile.supportsScrollRegions = true
     return profile
   }
 
-  private static func supportsHyperlinks(
-    term: String
-  ) -> Bool {
-    supportsRichTerminalFeatures(term: term)
+  // These protocols have different adoption histories. In particular, xterm's
+  // SGR mouse support does not imply OSC 8 or synchronized output, and rxvt's
+  // mouse protocol is not SGR. Match terminal families, never arbitrary substrings.
+  private static func matches(_ term: String, families: [String]) -> Bool {
+    families.contains { term == $0 || term.hasPrefix($0 + "-") }
   }
 
-  private static func supportsMouseReporting(
-    term: String
-  ) -> Bool {
-    supportsRichTerminalFeatures(term: term)
-  }
-
-  private static func supportsSynchronizedOutput(
-    term: String
-  ) -> Bool {
-    supportsRichTerminalFeatures(term: term)
-  }
-
-  private static func supportsRichTerminalFeatures(
-    term: String
-  ) -> Bool {
-    guard !term.isEmpty, term != "dumb" else {
-      return false
+  private static func identifiedTerminal(term: String, environment: [String: String]) -> String {
+    // TERM_PROGRAM can survive inside a multiplexer. Only refine generic xterm
+    // entries; an intervening terminal's explicit TERM remains authoritative.
+    guard term == "xterm" || term == "xterm-256color" else { return term }
+    switch environment["TERM_PROGRAM"]?.lowercased() {
+    case "wezterm": return "wezterm"
+    case "ghostty": return "ghostty"
+    case "iterm.app": return "iterm2"
+    default: return term
     }
+  }
 
-    let sgrCapableTerms = [
-      "xterm",
-      "screen",
-      "tmux",
-      "wezterm",
-      "kitty",
-      "ghostty",
-      "rxvt",
-      "alacritty",
-      "foot",
-      "st",
-    ]
+  private static func supportsHyperlinks(term: String, environment: [String: String]) -> Bool {
+    matches(
+      identifiedTerminal(term: term, environment: environment),
+      families: [
+        "wezterm", "kitty", "xterm-kitty", "ghostty", "xterm-ghostty", "alacritty",
+        "foot", "konsole", "mintty", "tmux", "iterm2",
+      ])
+  }
 
-    return sgrCapableTerms.contains { candidate in
-      term.contains(candidate)
-    }
+  private static func supportsMouseReporting(term: String) -> Bool {
+    matches(
+      term,
+      families: [
+        "xterm", "screen", "tmux", "wezterm", "kitty", "ghostty", "alacritty",
+        "foot", "st", "konsole", "mintty", "putty", "iterm2",
+      ])
+  }
+
+  private static func supportsSynchronizedOutput(term: String, environment: [String: String])
+    -> Bool
+  {
+    matches(
+      identifiedTerminal(term: term, environment: environment),
+      families: [
+        "wezterm", "kitty", "xterm-kitty", "ghostty", "xterm-ghostty", "alacritty",
+        "foot", "konsole", "mintty", "tmux", "iterm2",
+      ])
   }
 }
 

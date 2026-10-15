@@ -61,13 +61,20 @@ extension LayoutEngine {
         )
       }
     case .overlay(let alignment):
+      let childCount = min(resolved.children.count, measured.childMeasurements.count)
+      if resolved.children.count != measured.childMeasurements.count {
+        passContext?.recordPlacementChildMismatch(
+          identity: resolved.identity, behavior: "overlay",
+          childCount: resolved.children.count, measurementCount: measured.childMeasurements.count)
+      }
       let alignmentMetrics = overlayAlignmentMetrics(
         for: resolved.children,
         childMeasurements: measured.childMeasurements,
         alignment: alignment,
         passContext: passContext
       )
-      return measured.childMeasurements.enumerated().map { index, childMeasurement in
+      return (0..<childCount).map { index in
+        let childMeasurement = measured.childMeasurements[index]
         let childDimensions = viewDimensions(
           for: resolved.children[index],
           measured: childMeasurement,

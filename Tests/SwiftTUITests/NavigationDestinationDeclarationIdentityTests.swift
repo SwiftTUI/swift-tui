@@ -7,6 +7,24 @@ import Testing
 @Suite
 struct NavigationDestinationDeclarationIdentityTests {
   @Test(
+    "declarations inside pushed surfaces keep state across source reorder",
+    arguments: [false, true])
+  func nestedSourceReorder(usesPath: Bool) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NestedDeclarationReorder"), size: .init(width: 50, height: 10)
+    ) {
+      NestedDeclarationRoot(usesPath: usesPath)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Push nested")
+    for count in 1...4 {
+      _ = try harness.clickText("Increment")
+      let frame = try harness.clickText("Replace destination")
+      #expect(frame.contains("local \(count)"))
+    }
+  }
+
+  @Test(
     "replacing an active declaration at a stable source starts fresh state",
     arguments: [false, true])
   func sameFrameReplacement(usesItem: Bool) throws {
@@ -25,6 +43,48 @@ struct NavigationDestinationDeclarationIdentityTests {
       #expect(replaced.contains("destination \(second ? "B" : "A") local 0"))
       #expect(!replaced.contains("local 1"))
     }
+  }
+}
+
+@MainActor
+private struct NestedDeclarationRoot: View {
+  let usesPath: Bool
+  @State private var path = [1]
+  @State private var presented = true
+  var body: some View {
+    if usesPath {
+      NavigationStack(path: $path) {
+        Text("Root").navigationDestination(for: Int.self) { _ in NestedDeclarationSource() }
+      }
+    } else {
+      NavigationStack {
+        Text("Root").navigationDestination(isPresented: $presented) { NestedDeclarationSource() }
+      }
+    }
+  }
+}
+
+@MainActor
+private struct NestedDeclarationSource: View {
+  @State private var presented = false
+  @State private var reversed = false
+  var body: some View {
+    VStack {
+      if reversed {
+        Text("Peer")
+        source
+      } else {
+        source
+        Text("Peer")
+      }
+    }
+  }
+  private var source: some View {
+    Button("Push nested") { presented = true }
+      .id("nested-source")
+      .navigationDestination(isPresented: $presented) {
+        ReplacementDestination(label: "nested") { reversed.toggle() }
+      }
   }
 }
 

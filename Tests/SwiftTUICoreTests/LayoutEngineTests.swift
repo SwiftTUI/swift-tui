@@ -2656,6 +2656,36 @@ private struct TestIndexedChildSource: IndexedChildSource {
 @MainActor
 @Suite("Placement mismatch diagnostics (F166)")
 struct PlacementMismatchDiagnosticsTests {
+  @Test(
+    "overlays place only paired children and diagnose both count mismatches",
+    arguments: [0, 1, 2, 3])
+  func overlayMismatch(measurementCount: Int) {
+    let children = (0..<2).map {
+      ResolvedNode(identity: testIdentity("OverlayMismatch", "\($0)"), kind: .view("Child"))
+    }
+    var overlay = ResolvedNode(
+      identity: testIdentity("OverlayMismatch"),
+      kind: .view("Overlay"), children: children)
+    overlay.layoutBehavior = .overlay(alignment: .center)
+    let measured = MeasuredNode(
+      identity: overlay.identity, proposal: .unspecified,
+      measuredSize: .init(width: 10, height: 4),
+      childMeasurements: (0..<measurementCount).map {
+        MeasuredNode(
+          identity: testIdentity("OverlayMismatch", "\($0)"),
+          proposal: .unspecified, measuredSize: .init(width: 2, height: 1))
+      })
+    let pass = LayoutPassContext()
+    let requests = LayoutEngine().placementRequests(
+      for: overlay, measured: measured,
+      in: .init(origin: .zero, size: measured.measuredSize), viewportContext: nil, passContext: pass
+    )
+    #expect(requests.count == min(2, measurementCount))
+    #expect(
+      pass.runtimeIssues.filter { $0.code == "layout.placementChildMismatch" }.count
+        == (measurementCount == 2 ? 0 : 1))
+  }
+
   @Test("a wrapper with a child but no measurement records a mismatch issue")
   func wrapperMismatchRecordsIssue() {
     let engine = LayoutEngine()

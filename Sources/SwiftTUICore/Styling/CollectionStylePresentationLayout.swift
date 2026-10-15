@@ -764,7 +764,7 @@ extension ListStylePresentation {
       payload.items.indices.contains(rowIndex)
       ? payload.items[rowIndex]
       : ListItemPayload(kind: .row, text: "")
-    let isSelected = rowIndex == payload.selectedRowIndex
+    let isSelected = payload.isRowSelected(rowIndex)
     var style = item.style
     if let rowForegroundStyle = item.rowForegroundStyle {
       style.foregroundStyle = rowForegroundStyle
@@ -775,7 +775,7 @@ extension ListStylePresentation {
       style.foregroundStyle = selectedForegroundStyle
     }
     style.opacity *= payload.opacity
-    let marker = payload.showsSelectionMarker ? (isSelected ? "▌ " : "  ") : ""
+    let marker = payload.selectionMarker(for: rowIndex)
     let markerStyle = TextStyle(
       foregroundStyle: isSelected
         ? (payload.selectedRowMarkerStyle ?? payload.selectedRowForegroundStyle
@@ -891,11 +891,9 @@ extension ListStylePresentation {
           styleOverride.foregroundStyle = payload.foregroundStyle ?? .semantic(.foreground)
         }
         styleOverride.opacity *= payload.opacity
-        let isSelected = rowIndex == payload.selectedRowIndex
+        let isSelected = payload.isRowSelected(rowIndex)
         let marker =
-          payload.showsSelectionMarker
-          ? (isSelected ? "▌ " : "  ")
-          : ""
+          payload.selectionMarker(for: rowIndex)
         let markerStyle = TextStyle(
           foregroundStyle: isSelected
             ? (payload.selectedRowMarkerStyle ?? payload.selectedRowForegroundStyle ?? payload

@@ -141,6 +141,9 @@ package final class MeasurementCache: Sendable {
     _ node: MeasuredNode,
     for resolved: ResolvedNode
   ) {
+    // Exact-key service is grade-blind, so no approximation or wrapper derived
+    // from one may enter this cache, even under the exact same proposal.
+    guard !node.isEstimateDerived else { return }
     storage.withLock { storage in
       storage.stores += 1
       guard let viewNodeID = node.viewNodeID ?? resolved.viewNodeID else {

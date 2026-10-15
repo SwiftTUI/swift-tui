@@ -119,6 +119,18 @@ package struct HostedCollectionRowSelection: Sendable {
   }
 }
 
+/// Selection metadata retained with the dataset's identity artifacts. Cache the
+/// selectable indices too: deriving them on each Table resolve scans the dataset.
+package struct HostedCollectionRowSelections: Sendable {
+  package var rows: [HostedCollectionRowSelection]
+  package var selectableIndices: [Int]
+
+  package init(rows: [HostedCollectionRowSelection] = []) {
+    self.rows = rows
+    selectableIndices = rows.indices.filter { rows[$0].tag != nil }
+  }
+}
+
 /// The inputs, besides the retained artifacts themselves, that determine a
 /// hosted collection's row-selection snapshot: whether the container's policy
 /// selects at all, and the selection value type the tags must cast to. Equal
@@ -142,8 +154,8 @@ package struct HostedRowSelectionCacheKey: Equatable, Sendable {
 package protocol RowSelectionCachingIndexedChildSource {
   func retainedRowSelections(
     key: HostedRowSelectionCacheKey,
-    build: () -> [HostedCollectionRowSelection]
-  ) -> [HostedCollectionRowSelection]
+    build: () -> HostedCollectionRowSelections
+  ) -> HostedCollectionRowSelections
 }
 
 /// Instrumentation (the F118 probe pattern): counts how many distinct
@@ -238,7 +250,7 @@ private final class ForEachSourceIdentityArtifacts<ID: Hashable & Sendable>:
   /// container's builder on any key change, and it dies with the artifacts on
   /// any ids change.
   var rowSelectionsKey: HostedRowSelectionCacheKey?
-  var rowSelections: [HostedCollectionRowSelection] = []
+  var rowSelections = HostedCollectionRowSelections()
 
   init(
     identityRoot: Identity,
@@ -602,8 +614,8 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, Content: View {
 extension ForEachIndexedChildSource: RowSelectionCachingIndexedChildSource {
   package func retainedRowSelections(
     key: HostedRowSelectionCacheKey,
-    build: () -> [HostedCollectionRowSelection]
-  ) -> [HostedCollectionRowSelection] {
+    build: () -> HostedCollectionRowSelections
+  ) -> HostedCollectionRowSelections {
     guard HostedCollectionResolveReuse.isEnabled else {
       return build()
     }

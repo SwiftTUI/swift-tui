@@ -602,6 +602,14 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
     private func performAppearanceQuery(
       _ query: TerminalAppearanceQuery
     ) throws -> Color? {
+      try withInputSuspensionGate {
+        try performAppearanceQueryOnUncontendedDescriptor(query)
+      }
+    }
+
+    private func performAppearanceQueryOnUncontendedDescriptor(
+      _ query: TerminalAppearanceQuery
+    ) throws -> Color? {
       try writeSynchronously(query.request)
       var buffer: [UInt8] = []
       let timeoutMilliseconds = 40

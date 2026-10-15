@@ -2,10 +2,10 @@
 /// persist as frame geometry — or is a probe whose discard is provable at the
 /// site that scheduled it (plan 2026-08-11-004 Stage 1).
 ///
-/// Grade is a property of the REQUEST, never of the product: exact-key cache
-/// entries stay grade-blind because the same `(node, proposal)` key yields
-/// the same product, so a probe-born entry legally serves a later
-/// commit-grade exact lookup. What grade gates is serve LATITUDE — a cache
+/// Grade is a property of the request. Exact-key cache entries stay grade-blind:
+/// an exact probe-born entry can serve a later commit-grade lookup. Products
+/// derived from a hintless lazy estimate carry separate approximation provenance
+/// and are excluded from both exact-key and retained measurement reuse. What grade gates is serve LATITUDE — a cache
 /// tier may answer a probe-grade request with a broadened (non-exact) serve
 /// it must never hand to a commit-grade request. The fail-loud guard for
 /// that boundary is `LayoutPassContext.recordProbeLatitudeServe`.

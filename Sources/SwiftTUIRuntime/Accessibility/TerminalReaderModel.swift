@@ -79,7 +79,9 @@ package struct TerminalReaderModel {
     }
     if let focus = frame.semantics.accessibilityFocusRequest, focus.generation != focusGeneration {
       focusGeneration = focus.generation
-      if let node = chunks.first(where: { $0.node.actionTarget == focus.target }) {
+      if let target = focus.target,
+        let node = chunks.first(where: { $0.node.actionTarget == target })
+      {
         current = node.id
         notices.append("Application moved assistive focus. " + node.text)
       }

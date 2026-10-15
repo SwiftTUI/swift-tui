@@ -137,13 +137,23 @@ extension LayoutEngine {
         passContext?.exitCustomLayoutCompatibilityBoundary()
       }
 
-      let children = handle.placeSubviews(
-        engine: self,
-        node: node,
-        measured: measured,
-        in: bounds,
-        passContext: passContext
-      )
+      let context = passContext ?? LayoutPassContext()
+      let inheritedViewport = viewportContext ?? context.scrollViewportContext
+      let inheritedHint = inheritedViewport.map {
+        MeasureViewportHint(
+          axes: $0.axes, contentOffset: $0.contentOffset,
+          viewportSize: $0.viewportRect.size, scrollIdentity: $0.scrollIdentity)
+      }
+      // A custom layout re-enters measurement during placement. Keep both the
+      // viewport and its owning scroll identity across that boundary, sharing
+      // an existing hint's claim when this is a nested author layout.
+      let hint = inheritedHint == context.currentMeasureViewportHint ? nil : inheritedHint
+      let children = context.withScrollViewportContext(inheritedViewport) {
+        context.withMeasureViewportHint(hint) {
+          handle.placeSubviews(
+            engine: self, node: node, measured: measured, in: bounds, passContext: context)
+        }
+      }
       results.append(
         placedNode(
           from: node,

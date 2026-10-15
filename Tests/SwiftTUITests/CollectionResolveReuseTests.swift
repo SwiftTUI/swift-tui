@@ -15,6 +15,40 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct CollectionResolveReuseTests {
+  @Test(
+    "indexed tables retain selection artifacts and store only a row count",
+    arguments: [100, 10_000])
+  func indexedTableReusesRows(count: Int) throws {
+    let rendered = DefaultRenderer().render(
+      Table(0..<count, id: \.self, columns: [.init("Row", width: 12)]) { row in
+        TableRow { Text("«\(row)»") }
+      }, proposal: .init(width: 24, height: 10))
+    guard case .table(let payload) = rendered.resolvedTree.drawPayload else {
+      Issue.record("missing table payload")
+      return
+    }
+    #expect(payload.rowCount == count)
+    #expect(payload.rows.count == 0, "indexed rows belong to committed children, not payload stubs")
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("TableResolveReuse", "\(count)"),
+      size: .init(width: 24, height: 12)
+    ) { ReuseProbeTable(count: count) }
+    defer { harness.shutdown() }
+    let point = try #require(harness.point(forText: "«0»"))
+    _ = try harness.scrollPointer(at: point, deltaY: 1)
+    IndexedChildSourceArtifactsProbe.reset()
+    for _ in 0..<3 { _ = try harness.scrollPointer(at: point, deltaY: 1) }
+    #expect(scrollCurrencyRowMarkers(harness.frame).contains(4))
+    #if DEBUG
+      #expect(IndexedChildSourceArtifactsProbe.rowSelectionReuseCount > 0)
+      #expect(IndexedChildSourceArtifactsProbe.freshMintCount == 0)
+    #endif
+    _ = try harness.clickText("«4»")
+    #expect(harness.frame.contains("sel=4"))
+    _ = try harness.pressKey(KeyPress(.arrowDown))
+    #expect(harness.frame.contains("sel=5"))
+  }
+
   @Test("witness detection: range shapes with the identity keypath, nothing else")
   func integerRangeWitnessDetection() {
     #expect(
@@ -225,4 +259,19 @@ private func scrollCurrencyRowMarkers(
     }
   }
   return rows
+}
+
+@MainActor
+private struct ReuseProbeTable: View {
+  let count: Int
+  @State private var selection: Int? = 0
+  var body: some View {
+    VStack(spacing: 0) {
+      Text("sel=\(selection ?? -1)")
+      Table(0..<count, id: \.self, selection: $selection, columns: [.init("Row", width: 12)]) {
+        row in
+        TableRow { Text("«\(row)»") }
+      }.frame(height: 10)
+    }
+  }
 }

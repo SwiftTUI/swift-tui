@@ -8,6 +8,27 @@ import Testing
 @MainActor
 @Suite
 struct TerminalReaderTests {
+  @Test("clearing assistive focus preserves review and consumes the request generation")
+  func clearAssistiveFocusPreservesReview() {
+    var model = TerminalReaderModel()
+    let heading = node("Heading", role: .heading(level: 1))
+    var button = node("Action", role: .button)
+    button.actionTarget = "action#1"
+    var snapshot = frame(1, [heading, button])
+    snapshot.semantics.accessibilityFocusRequest = .init(generation: 1, target: "action#1")
+    #expect(model.update(snapshot).joined().contains("Application moved assistive focus"))
+    let reviewed = model.current
+    snapshot.sequence = 2
+    snapshot.semantics.accessibilityFocusRequest = .init(generation: 2, target: nil)
+    #expect(!model.update(snapshot).joined().contains("Application moved assistive focus"))
+    #expect(model.current == reviewed)
+    #expect(model.update(snapshot).isEmpty)
+    snapshot.sequence = 3
+    snapshot.semantics.accessibilityFocusRequest = .init(generation: 3, target: "missing#1")
+    #expect(model.update(snapshot).isEmpty)
+    #expect(model.current == reviewed)
+  }
+
   @Test("unnamed layout wrappers do not create stops and descendants retain meaningful hierarchy")
   func layoutWrappers() {
     var model = TerminalReaderModel()

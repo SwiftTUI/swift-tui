@@ -173,11 +173,15 @@ package struct CollectionScrollCurrency {
     // Preserve a line of overlap where whole-row fitting permits it. Round
     // toward the current page so a tall row is not skipped between pages.
     let current = effectiveAnchorRow
-    let destination = geometry.line(forRow: current) + pages * max(1, visible - 1)
+    let offset = currentOffset().y
+    let startsAfterLastRow =
+      offset >= geometry.lineRange(forRow: geometry.lastRowIndex).upperBound
+    let currentLine = startsAfterLastRow ? offset : geometry.line(forRow: current)
+    let destination = currentLine + pages * max(1, visible - 1)
     let target =
       pages > 0
       ? max(current + 1, geometry.row(atOrBeforeLine: destination))
-      : min(current - 1, geometry.row(atOrAfterLine: destination))
+      : min(current - (startsAfterLastRow ? 0 : 1), geometry.row(atOrAfterLine: destination))
     if target < 0 { return setAnchor(.start) }
     if target > geometry.lastRowIndex { return setAnchor(.end) }
     return setAnchorRow(target)

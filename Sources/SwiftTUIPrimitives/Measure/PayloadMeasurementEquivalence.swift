@@ -65,6 +65,8 @@ extension ListPayload {
   ) -> Bool {
     style == other.style
       && selectedRowIndex == other.selectedRowIndex
+      // The retained visible-layout product includes selection chrome.
+      && selectedRowIndices == other.selectedRowIndices
       && showsSelectionMarker == other.showsSelectionMarker
       // Not `items.count`: a viewport-backed payload stores no items, so its
       // row count lives in `virtualRowCount` and comparing the arrays alone
@@ -102,6 +104,7 @@ extension TablePayload {
   ) -> Bool {
     style == other.style
       && showsHeaders == other.showsHeaders
+      && rowCount == other.rowCount
       && columns.isEquivalentForMeasurement(to: other.columns)
       && rows.isEquivalentForMeasurement(to: other.rows)
   }

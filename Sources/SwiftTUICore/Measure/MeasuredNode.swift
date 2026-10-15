@@ -238,9 +238,13 @@ package struct MeasuredNode: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
   package var identity: Identity
   package var proposal: ProposedSize
+  /// True when any sizing input came from a hintless lazy ideal estimate.
+  /// Approximation propagates through wrappers even when children are elided.
+  package private(set) var isEstimateDerived: Bool
   package var measuredSize: CellSize
   package var childMeasurements: [MeasuredNode] {
     didSet {
+      isEstimateDerived = isEstimateDerived || childMeasurements.contains { $0.isEstimateDerived }
       recomputeSubtreeNodeCount()
     }
   }
@@ -253,11 +257,14 @@ package struct MeasuredNode: Equatable, Sendable {
     proposal: ProposedSize,
     measuredSize: CellSize,
     childMeasurements: [MeasuredNode] = [],
-    containerAllocationSnapshot: ContainerAllocationSnapshot? = nil
+    containerAllocationSnapshot: ContainerAllocationSnapshot? = nil,
+    isEstimateDerived: Bool = false
   ) {
     self.viewNodeID = viewNodeID
     self.identity = identity
     self.proposal = proposal
+    self.isEstimateDerived =
+      isEstimateDerived || childMeasurements.contains { $0.isEstimateDerived }
     self.measuredSize = measuredSize
     self.childMeasurements = childMeasurements
     self.containerAllocationSnapshot = containerAllocationSnapshot
@@ -270,11 +277,14 @@ package struct MeasuredNode: Equatable, Sendable {
     proposal: ProposedSize,
     measuredSize: CellSize,
     childMeasurements: [MeasuredNode] = [],
-    containerAllocationSnapshot: ContainerAllocationSnapshot? = nil
+    containerAllocationSnapshot: ContainerAllocationSnapshot? = nil,
+    isEstimateDerived: Bool = false
   ) {
     self.viewNodeID = nil
     self.identity = identity
     self.proposal = proposal
+    self.isEstimateDerived =
+      isEstimateDerived || childMeasurements.contains { $0.isEstimateDerived }
     self.measuredSize = measuredSize
     self.childMeasurements = childMeasurements
     self.containerAllocationSnapshot = containerAllocationSnapshot
@@ -327,6 +337,7 @@ package struct MeasuredNode: Equatable, Sendable {
       if Mode.isEnabled { work.measuredEqualityNodes += 1 }
       guard
         lhs.subtreeNodeCount == rhs.subtreeNodeCount,
+        lhs.isEstimateDerived == rhs.isEstimateDerived,
         lhs.viewNodeID == rhs.viewNodeID,
         lhs.identity == rhs.identity,
         lhs.proposal == rhs.proposal,

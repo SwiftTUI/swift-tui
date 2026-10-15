@@ -57,6 +57,22 @@ package func openLinkInSystem(
     searchPath: Bool,
     onExit: (@Sendable (pid_t) -> Void)? = nil
   ) -> Bool {
+    #if canImport(Darwin)
+      var fileActions: posix_spawn_file_actions_t? = nil
+    #else
+      var fileActions = unsafe posix_spawn_file_actions_t()
+    #endif
+    guard unsafe posix_spawn_file_actions_init(&fileActions) == 0 else { return false }
+    defer { _ = unsafe posix_spawn_file_actions_destroy(&fileActions) }
+    // The helper must neither consume terminal input nor interleave output
+    // with the renderer. Open in the child so the parent owns no extra fd.
+    for descriptor in [STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO] {
+      let result = "/dev/null".withCString { path in
+        unsafe posix_spawn_file_actions_addopen(
+          &fileActions, descriptor, path, descriptor == STDIN_FILENO ? O_RDONLY : O_WRONLY, 0)
+      }
+      guard result == 0 else { return false }
+    }
     var pid = pid_t()
     var cArguments: [UnsafeMutablePointer<CChar>?] = unsafe arguments.map { argument in
       argument.withCString { cString in
@@ -88,7 +104,7 @@ package func openLinkInSystem(
         return unsafe posix_spawnp(
           &pid,
           executable,
-          nil,
+          &fileActions,
           nil,
           baseAddress,
           environment
@@ -99,7 +115,7 @@ package func openLinkInSystem(
         unsafe posix_spawn(
           &pid,
           commandCString,
-          nil,
+          &fileActions,
           nil,
           baseAddress,
           environment

@@ -16,6 +16,15 @@ extension LayoutEngine {
       for: node,
       effectiveProposal: effectiveProposal
     )
+    let sizingContext = passContext ?? LayoutPassContext()
+    // Built-ins expose their sizing inputs in childMeasurements. Only author
+    // hooks can consume extra probes whose products are absent from that array.
+    let estimatesBeforeSizing: Int?
+    if case .custom = node.layoutBehavior {
+      estimatesBeforeSizing = sizingContext.estimatedMeasurementCount
+    } else {
+      estimatesBeforeSizing = nil
+    }
     let rawSize: CellSize
     if case .viewThatFits = node.layoutBehavior {
       rawSize =
@@ -31,7 +40,7 @@ extension LayoutEngine {
         for: node,
         childMeasurements: childMeasurements,
         proposal: effectiveProposal,
-        passContext: passContext
+        passContext: sizingContext
       )
     }
     let measuredSize = clampedSize(rawSize, proposal: clampingProposal)
@@ -48,7 +57,9 @@ extension LayoutEngine {
         selectedChildIndex: selectedChildIndex,
         issuedProposals: issuedProposals,
         passContext: passContext
-      )
+      ),
+      isEstimateDerived: childMeasurements.contains { $0.isEstimateDerived }
+        || estimatesBeforeSizing.map { sizingContext.estimatedMeasurementCount != $0 } == true
     )
     cache?.store(measured, for: node)
     return measured

@@ -120,6 +120,34 @@ package enum CollectionSelectionPolicy<Value: Hashable & Sendable> {
     }
   }
 
+  /// Reuse the dataset's slim selection metadata without rebuilding payload rows.
+  package func rowSelections(in source: any IndexedChildSource) -> HostedCollectionRowSelections {
+    let build = {
+      HostedCollectionRowSelections(
+        rows: (0..<source.count).map { index in
+          let tag = source.elementSelectionTag(at: index).flatMap { tag in
+            isSelectable && value(from: tag) != nil ? tag : nil
+          }
+          return HostedCollectionRowSelection(tag: tag, identity: source.elementIdentity(at: index))
+        })
+    }
+    if let caching = source as? any RowSelectionCachingIndexedChildSource {
+      return caching.retainedRowSelections(
+        key: .init(isSelectable: isSelectable, selectionValueType: ObjectIdentifier(Value.self)),
+        build: build)
+    }
+    return build()
+  }
+
+  /// Multi-selection paints membership separately from the active keyboard row.
+  package func selectedIndices(in source: any IndexedChildSource) -> Set<Int> {
+    guard case .multiple(let binding) = self else { return [] }
+    return Set(
+      binding.wrappedValue.compactMap {
+        source.elementIndex(forSelectionTag: SelectionTag(value: $0, includeOptional: true))
+      })
+  }
+
   /// Locate the first selected row in dataset order without scanning unselected rows.
   package func selectedIndex(in source: any IndexedChildSource) -> Int? {
     switch self {

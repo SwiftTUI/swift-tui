@@ -344,7 +344,10 @@ extension RunLoop {
             eventPump: eventPump,
             drainPolicy: FrameDrainPolicy(exitReason: effectiveExit))
         }
-        return effectiveExit
+        // Flush callbacks can request termination after the original exit
+        // disposition. Dispatch that request too; its veto leaves the already
+        // accepted event exit in force.
+        return consumeProgrammaticTerminationRequest() ?? effectiveExit
       }
       handledNonExitEvent = true
     }

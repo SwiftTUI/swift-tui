@@ -9,6 +9,64 @@ import Testing
 @MainActor
 @Suite("Termination requests")
 struct TerminationRequestTests {
+  @Test(
+    "termination raised by exit-flush callbacks is dispatched in both pumps",
+    arguments: [false, true], [false, true])
+  func terminationDuringExitFlush(synchronous: Bool, cancelProgrammatic: Bool) async throws {
+    let recorder = TerminationRecorder()
+    let root = testIdentity("LateExitFlush")
+    let exitKey = KeyPress(.character("c"), modifiers: .ctrl)
+    let input = CooperativeExitInputReader()
+    input.send(.key(.return))
+    input.send(.key(exitKey))
+    defer { input.finish() }
+    let scheduler = FrameScheduler()
+    let state = StateContainer(initialState: 0, invalidationIdentities: [root])
+    let loop = RunLoop(
+      rootIdentity: root, presentationSurface: TerminationTestTerminalHost(),
+      terminalInputReader: input, scheduler: scheduler, stateContainer: state,
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      keyHandler: { key, _, state in
+        guard key == KeyPress(.return) else { return .ignored }
+        state.mutate { $0 += 1 }
+        return .handled
+      },
+      viewBuilder: { value, _ in
+        ExitFlushTerminationFixture(value: value)
+          .onTerminationRequest { request in
+            recorder.requests.append(request)
+            return request == .programmatic && cancelProgrammatic ? .cancel : .allow
+          }
+      })
+    let exit: RunLoopExitReason?
+    if synchronous {
+      loop.isSessionActive = true
+      state.invalidator = scheduler
+      defer {
+        loop.isSessionActive = false
+        loop.lifecycleCoordinator.shutdown()
+      }
+      var frames = 0
+      scheduler.requestInvalidation(of: [root])
+      try loop.renderPendingFrames(renderedFrames: &frames)
+      let buffer = EventPumpBuffer()
+      _ = buffer.enqueue(.input(.key(.return)))
+      _ = buffer.enqueue(.input(.key(exitKey)))
+      exit = try loop.processPendingEventsSynchronously(
+        from: .init(
+          stream: AsyncStream { $0.finish() }, drainEvents: { buffer.drain() },
+          hasPendingEvents: { buffer.hasPendingEvents() }, cancel: {},
+          scheduleDeadlineWake: { _ in }),
+        renderedFrames: &frames)
+    } else {
+      exit = try await loop.run().exitReason
+    }
+    // A veto of the late request does not revoke the earlier accepted exit.
+    #expect(exit == (cancelProgrammatic ? .userExit(exitKey) : .programmatic))
+    #expect(recorder.requests == [.userExit(exitKey), .programmatic])
+    #expect(!loop.hasPendingProgrammaticTermination)
+  }
+
   @Test("signal exit acquires at most one pending frame", arguments: [false, true])
   func synchronousSignalFlushIsBounded(synchronous: Bool) async throws {
     let root = testIdentity("SyncSignalFlush")
@@ -358,6 +416,14 @@ private struct ProgrammaticTerminationFixture: View {
   var body: some View {
     Text("requesting termination")
       .task { _ = requestTermination() }
+  }
+}
+
+private struct ExitFlushTerminationFixture: View {
+  let value: Int
+  @Environment(\.requestTermination) private var requestTermination
+  var body: some View {
+    Text("value \(value)").onChange(of: value) { _, _ in requestTermination() }
   }
 }
 

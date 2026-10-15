@@ -12,6 +12,7 @@ import Synchronization
 // live in `RetainedFrameQueries.swift`.
 
 package struct ScrollViewportContext: Equatable, Sendable {
+  package var scrollIdentity: Identity?
   package var axes: AxisSet
   package var viewportRect: CellRect
   package var contentOffset: CellPoint
@@ -19,8 +20,10 @@ package struct ScrollViewportContext: Equatable, Sendable {
   package init(
     axes: AxisSet,
     viewportRect: CellRect,
-    contentOffset: CellPoint
+    contentOffset: CellPoint,
+    scrollIdentity: Identity? = nil
   ) {
+    self.scrollIdentity = scrollIdentity
     self.axes = axes
     self.viewportRect = viewportRect
     self.contentOffset = contentOffset
@@ -86,6 +89,7 @@ package final class LayoutPassContext: Sendable {
   }
 
   private struct MutableState: Sendable {
+    var estimatedMeasurementCount = 0
     var scrollViewportContext: ScrollViewportContext?
     var measureViewportHints: [MeasureViewportHintEntry]
     /// One frame per in-flight custom-layout `measureContainer`, innermost
@@ -207,8 +211,31 @@ package final class LayoutPassContext: Sendable {
     )
   }
 
+  /// Counts approximate serves, including author sizing probes whose products
+  /// do not appear in the custom container's pre-measured child array.
+  package var estimatedMeasurementCount: Int {
+    state.withLock { $0.estimatedMeasurementCount }
+  }
+
+  package func recordEstimatedMeasurement() {
+    state.withLock { $0.estimatedMeasurementCount += 1 }
+  }
+
   package var scrollViewportContext: ScrollViewportContext? {
     state.withLock { $0.scrollViewportContext }
+  }
+
+  /// Carries the current work-stack viewport across native custom-layout re-entry.
+  package func withScrollViewportContext<Result>(
+    _ viewport: ScrollViewportContext?, _ body: () -> Result
+  ) -> Result {
+    let previous = state.withLock {
+      let previous = $0.scrollViewportContext
+      $0.scrollViewportContext = viewport
+      return previous
+    }
+    defer { state.withLock { $0.scrollViewportContext = previous } }
+    return body()
   }
 
   /// The custom-layout re-entry budget this context was constructed with. The

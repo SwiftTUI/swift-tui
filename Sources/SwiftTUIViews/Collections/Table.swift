@@ -87,6 +87,7 @@ public struct Table<SelectionValue: Hashable & Sendable, Rows: View>: PrimitiveV
 extension Table {
   private struct ResolvedRows {
     var payloads: [TableRowPayload] = []
+    var selections = HostedCollectionRowSelections()
     var children: [ResolvedNode] = []
     var runtimeIssues: [RuntimeIssue] = []
     var indexedSource: (any IndexedChildSource)?
@@ -145,24 +146,19 @@ extension Table {
     }
     return resolvedContentWork.map { completed in
       var resolvedContent = completed
-      let resolvedRows = resolvedContent.payloads
+      let resolvedRows = resolvedContent.selections.rows
       if resolvedContent.indexedSource == nil {
         resolvedContent.children = hostedTableRowNodes(
           resolvedContent.children,
           columns: resolvedColumns,
-          rows: resolvedRows,
+          rows: resolvedContent.payloads,
           joinGlyph: tableStyle.borderGlyphs.columnJoin
         )
         if let graph = context.viewGraph {
           resolvedContent.children = resolvedContent.children.map(graph.installResolvedPresentation)
         }
       }
-      let selectableRowIndices = resolvedRows.indices.filter { index in
-        guard let tag = resolvedRows[index].tag else {
-          return false
-        }
-        return pickerSelectionValue(from: tag, as: SelectionValue.self) != nil
-      }
+      let selectableRowIndices = resolvedContent.selections.selectableIndices
       // See the matching note in `List.resolvedNode` (register item D18).
       let selectedIndex: Int? =
         if let source = resolvedContent.indexedSource {
@@ -271,9 +267,6 @@ extension Table {
           context: context,
           fallbackAuthoringScope: nil
         )
-        let selectableTags = selectableRowIndices.compactMap { rowIndex in
-          resolvedRows[rowIndex].tag
-        }
 
         if let scrollCurrency {
           let indexedSource = resolvedContent.indexedSource
@@ -354,6 +347,7 @@ extension Table {
             return false
           }
 
+          let selectableTags = selectableRowIndices.compactMap { resolvedRows[$0].tag }
           guard policy.step(orderedTags: selectableTags, delta: delta) else {
             return false
           }
@@ -425,7 +419,7 @@ extension Table {
 
       var payload = TablePayload(
         columns: resolvedColumns,
-        rows: resolvedRows,
+        rows: resolvedContent.payloads,
         selectedRowIndex: selectionPolicy.isMultiple ? activeRowIndex : selectedIndex,
         style: tableStyle,
         foregroundStyle: chrome.foregroundStyle,
@@ -440,6 +434,7 @@ extension Table {
         opacity: chrome.opacity
       )
       payload.isViewportBacked = resolvedContent.indexedSource != nil
+      if resolvedContent.indexedSource != nil { payload.virtualRowCount = resolvedRows.count }
       payload.scrollAnchor = scrollCurrency?.storedAnchor
 
       var metadata = focusableControlMetadata(
@@ -573,6 +568,10 @@ extension Table {
     .map { nodes in
       var result = ResolvedRows()
       collectTableRows(from: nodes, into: &result)
+      result.selections = .init(
+        rows: zip(result.payloads, result.children).map {
+          .init(tag: $0.tag, identity: $1.identity)
+        })
       return result
     }
   }
@@ -584,19 +583,7 @@ extension Table {
     tableStyle: TableStylePresentation
   ) -> ResolvedRows {
     var result = ResolvedRows()
-    result.payloads.reserveCapacity(source.count)
-    for index in 0..<source.count {
-      let candidateTag = source.elementSelectionTag(at: index)
-      let compatibleTag = candidateTag.flatMap { tag in
-        selectionPolicy.isSelectable && selectionPolicy.value(from: tag) != nil ? tag : nil
-      }
-      result.payloads.append(
-        .init(
-          tag: compatibleTag,
-          cells: columns.map { _ in .init(text: "") }
-        )
-      )
-    }
+    result.selections = selectionPolicy.rowSelections(in: source)
 
     let policy = selectionPolicy
     // Single selection is one indexed lookup, not a binding read for every

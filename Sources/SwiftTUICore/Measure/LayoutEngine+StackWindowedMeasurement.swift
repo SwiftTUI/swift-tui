@@ -420,6 +420,7 @@ extension LayoutEngine {
     if let passContext,
       let snapshot = retainedLazyStackSnapshot(for: node, axis: axis, passContext: passContext)
     {
+      passContext.recordEstimatedMeasurement()
       results.append(
         lazyStackIdealEstimateProduct(
           for: node,
@@ -436,6 +437,7 @@ extension LayoutEngine {
     guard count >= Self.lazyStackIdealEstimateMinimumCount else {
       return false
     }
+    passContext?.recordEstimatedMeasurement()
     let probeElements = source.childElements(at: 0)
     scheduleChildren(
       probeElements,
@@ -506,7 +508,8 @@ extension LayoutEngine {
         proposal: clampingProposal(for: node, effectiveProposal: effectiveProposal)
       ),
       childMeasurements: [],
-      containerAllocationSnapshot: nil
+      containerAllocationSnapshot: nil,
+      isEstimateDerived: true
     )
   }
 

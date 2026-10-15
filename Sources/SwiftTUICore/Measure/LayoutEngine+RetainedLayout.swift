@@ -32,6 +32,7 @@ extension LayoutEngine {
       let previousResolved = retainedLayout.resolvedNode(for: resolved.identity),
       let previousMeasured = retainedLayout.measuredNode(for: resolved.identity),
       previousMeasured.proposal == proposal,
+      !previousMeasured.isEstimateDerived,
       previousResolved.measurementEquivalence(
         to: resolved, recorder: passContext?.retainedValidationRecorder?.comparisons
       ).isCompatible

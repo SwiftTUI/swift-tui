@@ -7,6 +7,41 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct NodeHostedCollectionRowsTests {
+  @Test(
+    "multi-selection paints every member while focus and toggles stay independent",
+    arguments: [false, true])
+  func multipleListSelectionPaintsMembers(indexed: Bool) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("MultipleListPaint", "\(indexed)"),
+      size: .init(width: 24, height: 12)
+    ) { MultipleListPaintFixture(indexed: indexed) }
+    defer { harness.shutdown() }
+    func marked(_ row: Int) -> Bool {
+      guard
+        let line = harness.frame.split(whereSeparator: \.isNewline).first(where: {
+          $0.contains("row \(row)")
+        }),
+        let label = line.firstIndex(of: "r")
+      else { return false }
+      return line[..<label].contains { $0 == "▌" }
+    }
+    func expectSelection(_ expected: Set<Int>) {
+      let markedRows = Set((0..<3).filter(marked))
+      #expect(markedRows == expected, "\(harness.frame)")
+    }
+    expectSelection([0, 2])
+    _ = try harness.focusText("row 1")
+    expectSelection([0, 2])
+    _ = try harness.pressKey(KeyPress(.space))
+    expectSelection([0, 1, 2])
+    _ = try harness.pressKey(KeyPress(.space))
+    expectSelection([0, 2])
+    let point = try #require(harness.point(forText: "row 2"))
+    for _ in 0..<5 { _ = try harness.scrollPointer(at: point, deltaY: 1) }
+    for _ in 0..<5 { _ = try harness.scrollPointer(at: point, deltaY: -1) }
+    expectSelection([0, 2])
+  }
+
   @Test("multi-selection anchor follows dataset order in indexed lists and tables")
   func indexedMultipleSelectionHasStableAnchor() {
     let selection: Set<Int> = [10, 50, 90, 999]
@@ -844,4 +879,21 @@ private func firstResolvedNode(
 
 private func allResolvedNodes(in root: ResolvedNode) -> [ResolvedNode] {
   [root] + root.children.flatMap(allResolvedNodes)
+}
+
+@MainActor
+private struct MultipleListPaintFixture: View {
+  let indexed: Bool
+  @State private var selection: Set<Int> = [0, 2]
+  var body: some View {
+    Group {
+      if indexed {
+        List(0..<20, id: \.self, selection: $selection) { Text("row \($0)") }
+      } else {
+        List(selection: $selection) {
+          ForEach(0..<20, id: \.self) { Text("row \($0)").tag($0) }
+        }
+      }
+    }.frame(height: 10)
+  }
 }

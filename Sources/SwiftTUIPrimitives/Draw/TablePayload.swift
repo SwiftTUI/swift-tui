@@ -96,6 +96,9 @@ public struct TablePayload: Equatable, Sendable {
   package var isViewportBacked: Bool = false
   /// The stored scroll currency — see ``ListPayload/scrollAnchor``.
   package var scrollAnchor: CollectionScrollAnchor?
+  /// Indexed tables commit their row content as children, without payload stubs.
+  package var virtualRowCount: Int?
+  package var rowCount: Int { virtualRowCount ?? rows.count }
 
   public init(
     columns: [TableColumnPayload],

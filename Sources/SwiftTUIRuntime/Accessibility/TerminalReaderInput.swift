@@ -43,9 +43,7 @@ package final class TerminalReaderInput: @preconcurrency TerminalInputReading,
     if case .key(let press) = event, press.key == .functionKey(12) {
       line = ""
       rejectedLine = false
-      sceneHub?.reset()
-      try surface.setReading(!surface.isReading)
-      updateInputCapabilities(surface.resolvedInputCapabilities)
+      try setReading(!surface.isReading)
       return ([], false)
     }
     guard surface.isReading else { return ([event], false) }
@@ -102,8 +100,7 @@ package final class TerminalReaderInput: @preconcurrency TerminalInputReading,
         try surface.emit(result.output)
         if result.exit { return ([], true) }
         if result.grid {
-          sceneHub?.reset()
-          try self.surface.setReading(false)
+          try setReading(false)
           return ([], false)
         }
         try surface.prompt()
@@ -145,6 +142,12 @@ package final class TerminalReaderInput: @preconcurrency TerminalInputReading,
     default: break
     }
     return ([], false)
+  }
+
+  private func setReading(_ enabled: Bool) throws {
+    sceneHub?.reset()
+    try surface.setReading(enabled)
+    updateInputCapabilities(surface.resolvedInputCapabilities)
   }
 
   private func append(_ text: String) throws {

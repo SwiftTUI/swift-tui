@@ -118,7 +118,7 @@ extension LayoutEngine {
       case .stack(let stackAxis, _, _, _), .lazyStack(let stackAxis, _, _, _):
         if stackAxis == axis,
           current.children.contains(where: {
-            isSpacer($0) && !isFixedSize($0.layoutMetadata, on: axis)
+            isStackSpacer($0, axis: axis)
           })
         {
           return true

@@ -18,6 +18,29 @@ import Testing
 /// break — a spacer still has to stretch along its own axis.
 @MainActor
 struct SpacerCrossAxisFlexibilityTests {
+  @Test("a nested stack expands when its only Spacer is wrapped")
+  func nestedWrappedSpacerReconcilesCrossAxis() {
+    let row = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 0) {
+          Text("end")
+          Spacer().padding(.horizontal, 4)
+        }
+        Text("1234567890123456789")
+      }, proposal: .unspecified)
+    #expect(row.placedTree.children[0].bounds.size.width == 19)
+
+    let column = DefaultRenderer().render(
+      HStack(alignment: .top, spacing: 0) {
+        VStack(spacing: 0) {
+          Text("end")
+          Spacer().padding(.vertical, 2).offset(x: 0, y: 0)
+        }
+        Text("1\n2\n3\n4\n5\n6\n7\n8\n9")
+      }, proposal: .unspecified)
+    #expect(column.placedTree.children[0].bounds.size.height == 9)
+  }
+
   @Test("wrapped Spacers fill public stacks without propagating underfill to their parent")
   func wrappedSpacerFillsParent() {
     let rendered = DefaultRenderer().render(

@@ -714,7 +714,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
           return RunLoopResult(
             finalState: stateContainer.state,
             renderedFrames: renderedFrames,
-            exitReason: effectiveExit
+            exitReason: consumeProgrammaticTerminationRequest() ?? effectiveExit
           )
         }
         handledNonExitEvent = true

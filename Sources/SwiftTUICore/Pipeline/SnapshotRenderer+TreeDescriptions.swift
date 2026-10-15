@@ -134,7 +134,7 @@ extension SnapshotRenderer {
         "list(style=\(payload.style),items=\(payload.items.count),selected=\(payload.selectedRowIndex.map { String($0) } ?? "nil"))"
     case .table(let payload):
       return
-        "table(style=\(payload.style),rows=\(payload.rows.count),selected=\(payload.selectedRowIndex.map { String($0) } ?? "nil"))"
+        "table(style=\(payload.style),rows=\(payload.rowCount),selected=\(payload.selectedRowIndex.map { String($0) } ?? "nil"))"
     case .canvas(let payload):
       return "canvas(drawing=\(type(of: payload.drawing)))"
     case .foreignSurface(let payload):

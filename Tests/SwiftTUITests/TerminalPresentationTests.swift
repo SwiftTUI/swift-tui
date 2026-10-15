@@ -15,6 +15,44 @@ import Testing
 @MainActor
 @Suite
 struct TerminalPresentationTests {
+  @Test(
+    "terminal features are independent and terminal names match at family boundaries",
+    arguments: [
+      ("screen-256color", false, true, false),
+      ("rxvt-unicode-256color", false, false, false),
+      ("st-256color", false, true, false),
+      ("mystery", false, false, false),
+      ("not-xterm", false, false, false),
+      ("xterm-256color", false, true, false),
+      ("konsole-256color", true, true, true),
+      ("mintty", true, true, true),
+      ("putty-256color", false, true, false),
+      ("tmux-256color", true, true, true),
+      ("xterm-kitty", true, true, true),
+    ])
+  func independentTerminalFeatures(testCase: (String, Bool, Bool, Bool)) {
+    let (term, links, mouse, sync) = testCase
+    for windows in [false, true] {
+      let profile =
+        windows
+        ? TerminalCapabilityProfile.detectWindowsConsole(environment: ["TERM": term], isTTY: true)
+        : TerminalCapabilityProfile.detectPOSIXTerminal(environment: ["TERM": term], isTTY: true)
+      #expect(profile.supportsHyperlinks == links)
+      #expect(profile.supportsMouseReporting == mouse)
+      #expect(profile.supportsSynchronizedOutput == sync)
+    }
+  }
+
+  @Test("emulator identity refines generic TERM but cannot bypass an intervening screen")
+  func terminalProgramRefinement() {
+    for term in ["xterm-256color", "screen-256color", "dumb"] {
+      let profile = TerminalCapabilityProfile.detectPOSIXTerminal(
+        environment: ["TERM": term, "TERM_PROGRAM": "WezTerm"], isTTY: true)
+      #expect(profile.supportsHyperlinks == (term == "xterm-256color"))
+      #expect(profile.supportsSynchronizedOutput == (term == "xterm-256color"))
+    }
+  }
+
   @Test("capability detection prefers true color under UTF-8 terminals")
   func capabilityDetectionPrefersTrueColor() {
     let profile = TerminalCapabilityProfile.detectPOSIXTerminal(
@@ -30,9 +68,9 @@ struct TerminalPresentationTests {
       glyphLevel: .unicode,
       colorLevel: .trueColor,
       emitsStyleEscapeSequences: true,
-      supportsHyperlinks: true,
+      supportsHyperlinks: false,
       supportsMouseReporting: true,
-      supportsSynchronizedOutput: true
+      supportsSynchronizedOutput: false
     )
     // DECSTBM/SU/SD are VT100-core: any non-dumb TTY detects them on.
     expected.supportsScrollRegions = true
@@ -61,9 +99,9 @@ struct TerminalPresentationTests {
       glyphLevel: .unicode,
       colorLevel: .none,
       emitsStyleEscapeSequences: false,
-      supportsHyperlinks: true,
+      supportsHyperlinks: false,
       supportsMouseReporting: true,
-      supportsSynchronizedOutput: true
+      supportsSynchronizedOutput: false
     )
     // NO_COLOR silences styling, not the VT100-core scroll vocabulary.
     expectedNoColor.supportsScrollRegions = true
@@ -174,7 +212,7 @@ struct TerminalPresentationTests {
   func capabilityDetectionTracksSynchronizedOutputSupport() {
     let supported = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
-        "TERM": "xterm-256color",
+        "TERM": "xterm-kitty",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: true
@@ -188,7 +226,7 @@ struct TerminalPresentationTests {
     )
     let redirected = TerminalCapabilityProfile.detectPOSIXTerminal(
       environment: [
-        "TERM": "xterm-256color",
+        "TERM": "xterm-kitty",
         "LANG": "en_US.UTF-8",
       ],
       isTTY: false
@@ -284,7 +322,7 @@ struct TerminalPresentationTests {
     // WezTerm and ssh-into-Windows sessions export their own TERM; those
     // read like the POSIX arm rather than the console-host floor.
     let wezterm = TerminalCapabilityProfile.detectWindowsConsole(
-      environment: ["TERM": "xterm-256color", "COLORTERM": "truecolor"],
+      environment: ["TERM": "xterm-256color", "COLORTERM": "truecolor", "TERM_PROGRAM": "WezTerm"],
       isTTY: true
     )
     let ansi256 = TerminalCapabilityProfile.detectWindowsConsole(
