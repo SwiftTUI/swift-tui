@@ -50,7 +50,7 @@ struct WebHostBrowserBundleTests {
       #expect(resource.data.starts(with: Array("wOF2".utf8)))
       totalBytes += resource.data.count
     }
-    #expect(totalBytes == 167584)
+    #expect(totalBytes == 407732)
     let licensePath = try #require(paths.first { $0.hasSuffix("/LICENSE.md") })
     let license = try WebHostBrowserBundle.resource(for: "/\(licensePath)")
     #expect(

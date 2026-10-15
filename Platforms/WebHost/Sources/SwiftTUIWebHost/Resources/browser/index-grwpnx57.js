@@ -1,22 +1,22 @@
 // src/DomFontResources.ts
-var DOM_FONT_FAMILY = "SwiftTUI Core Candidate 3";
-var DOM_FONT_ASSET_PATH = "assets/swifttui-fonts/6ec060766aae/";
+var DOM_FONT_FAMILY = "Ioskeley Mono";
+var DOM_FONT_ASSET_PATH = "assets/swifttui-fonts/7d231a426067/";
 var DOM_FONT_FALLBACK = '"Menlo", "Consolas", "Liberation Mono", monospace';
 var DOM_UNICODE_FALLBACK = '"PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace';
 var DOM_FONT_FACES = [
   {
-    file: "SwiftTUICoreCandidate3-Regular.woff2",
+    file: "IoskeleyMono-Regular.woff2",
     weight: "400",
     style: "normal"
   },
-  { file: "SwiftTUICoreCandidate3-Bold.woff2", weight: "700", style: "normal" },
+  { file: "IoskeleyMono-Bold.woff2", weight: "700", style: "normal" },
   {
-    file: "SwiftTUICoreCandidate3-Italic.woff2",
+    file: "IoskeleyMono-Italic.woff2",
     weight: "400",
     style: "italic"
   },
   {
-    file: "SwiftTUICoreCandidate3-BoldItalic.woff2",
+    file: "IoskeleyMono-BoldItalic.woff2",
     weight: "700",
     style: "italic"
   }
