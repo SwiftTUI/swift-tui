@@ -333,9 +333,8 @@ extension LayoutEngine {
       let snapshot = previousMeasured?.containerAllocationSnapshot?.hostedCollection,
       !snapshot.tallRowHeights.isEmpty,
       let previousSource = previousResolved?.indexedChildSource,
-      // A live retained source is only safe to read on the main actor, which a
-      // live current source proves (see `retainedLazyStackSnapshot`).
-      previousSource.canRunOnWorker || !source.canRunOnWorker,
+      // The signature is immutable metadata, including on a live source.
+      // Comparing it does not realize rows or touch main-actor state.
       previousSource.measurementSignature == source.measurementSignature
     else {
       return [:]

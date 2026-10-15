@@ -1554,8 +1554,8 @@ struct LayoutEngineTests {
     #expect(counter.count - realizationsBefore == 5)
   }
 
-  @Test("rewindowing preserves the already-scrolled prefix allocation")
-  func rewindowingPreservesAlreadyScrolledPrefixAllocation() throws {
+  @Test("rewindowing preserves the already-scrolled prefix allocation", arguments: [false, true])
+  func rewindowingPreservesAlreadyScrolledPrefixAllocation(usesWorkerSnapshot: Bool) throws {
     // The visible band's mean is allowed to refine the unseen tail so scroll
     // reach converges. It must not rewrite rows before the new window: doing
     // that changes the visible window's origin and makes content jump in the
@@ -1623,8 +1623,21 @@ struct LayoutEngineTests {
     )
     defer { secondContext.popMeasureViewportHint() }
 
+    var current = lazy
+    if usesWorkerSnapshot {
+      let source = try #require(lazy.indexedChildSource)
+      current.indexedChildSource = IndexedChildSourceSnapshot(
+        identityRoot: source.identityRoot,
+        measurementSignature: source.measurementSignature,
+        children: rows,
+        elements: rows.map { [$0] },
+        identities: rows.indices.map { source.elementIdentity(at: $0) },
+        tags: rows.map { _ in nil },
+        segments: rows.indices.map { source.estimationSegment(at: $0) }
+      )
+    }
     let secondProduct = engine.measure(
-      lazy,
+      current,
       proposal: ProposedSize(width: .finite(8), height: .unspecified),
       passContext: secondContext
     )
@@ -1634,6 +1647,7 @@ struct LayoutEngineTests {
     #expect(secondSnapshot.exactElementIndices.isSuperset(of: 11..<19))
     #expect((secondSnapshot.estimatedRowStride ?? 0) > (firstSnapshot.estimatedRowStride ?? 0))
     #expect(secondSnapshot.childMainLengths.last == 5)
+    #expect(Array(secondSnapshot.childMainLengths.prefix(7)) == [1, 1, 1, 1, 1, 1, 1])
     #expect(
       Array(secondSnapshot.childMainLengths[..<secondWindow.lowerBound])
         == Array(firstSnapshot.childMainLengths[..<secondWindow.lowerBound])
