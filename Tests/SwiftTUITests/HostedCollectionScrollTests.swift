@@ -6,6 +6,66 @@ import Testing
 @MainActor
 @Suite(.serialized, .timeLimit(.minutes(1)))
 struct HostedCollectionScrollTests {
+  @Test("the first committed navigation frame uses changed hidden row geometry")
+  func hiddenRowChangesKeepFirstNavigationFrame() async throws {
+    let recorder = HostedCollectionFrameRecorder()
+    let surface = HostedRasterSurface(
+      surfaceSize: CellSize(width: 32, height: 12),
+      appearance: .fallback,
+      onFrame: { recorder.receive($0) }
+    )
+    let session = try HostedSceneSession(
+      for: HostedRowGrowthListApp(multiple: false),
+      sceneID: WindowIdentifier("row-growth-list"),
+      surface: surface
+    )
+    let run = Task { try await session.start() }
+    do {
+      var previous = try await recorder.wait(description: "initial row") {
+        $0.focusesHostedRow(0)
+      }
+      for padding in [1, 0] {
+        #expect(!previous.raster.lines.contains { $0.contains("Row 07") })
+        session.send(.key(KeyPress(.character("p"), modifiers: .ctrl)))
+        previous = try await recorder.wait(
+          after: previous.sequence, description: "hidden padding changes to \(padding)"
+        ) { $0.containsHostedToken("Padding=\(padding)") && $0.focusesHostedRow(0) }
+        #expect(!previous.raster.lines.contains { $0.contains("Row 07") })
+
+        for row in 1...7 {
+          let before = previous.sequence
+          session.send(.key(KeyPress(.arrowDown)))
+          previous = try await recorder.wait(
+            after: before, description: "reveal changed row \(row)"
+          ) { $0.focusesHostedRow(row) }
+          let first = try recorder.firstFrame(after: before, containing: "Selected=\(row)")
+          try #require(first.focusesHostedRow(row), "\(first.raster.lines)")
+          let region = try #require(
+            first.semantics.focusRegions.first { $0.identity == first.focusedIdentity })
+          #expect(region.rect.size.height == 1 + row % 3 + padding * 2)
+          for detail in 0..<(row % 3) {
+            #expect(first.raster.lines.contains { $0.contains("Detail \(row):\(detail)") })
+          }
+        }
+        for row in (0..<7).reversed() {
+          let before = previous.sequence
+          session.send(.key(KeyPress(.arrowUp)))
+          previous = try await recorder.wait(
+            after: before, description: "reverse to row \(row)"
+          ) { $0.focusesHostedRow(row) }
+          let first = try recorder.firstFrame(after: before, containing: "Selected=\(row)")
+          #expect(first.focusesHostedRow(row), "\(first.raster.lines)")
+        }
+      }
+      #expect(try await session.stopAndWait() == .inputEnded)
+      #expect(try await run.value == .inputEnded)
+    } catch {
+      session.stop()
+      _ = await run.result
+      throw error
+    }
+  }
+
   @Test(
     "scene-hosted row growth preserves focus and selection in an unchanged viewport",
     arguments: [false, true]

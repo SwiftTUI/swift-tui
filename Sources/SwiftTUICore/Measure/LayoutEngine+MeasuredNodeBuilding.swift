@@ -113,7 +113,12 @@ extension LayoutEngine {
         for: resolved,
         childSizes: childSizes,
         measuredSize: measuredSize
-      ),
+      )
+        ?? measuredHostedTableAllocation(
+          for: resolved,
+          childSizes: childSizes,
+          measuredSize: measuredSize
+        ),
       childIssuedProposals: resolvedIssuedProposalRecords(
         for: resolved,
         childMeasurements: childMeasurements,

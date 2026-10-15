@@ -85,6 +85,9 @@ geometry through `LocalScrollPositionRegistry`. Indexed collections retain
 sparse measurements and estimate unrealized rows without evaluating the dataset.
 Hosted collection measurement hints and list/table layout use the same sparse
 row extents as input handlers; separator fitting remains a layout policy.
+Eager hosted tables retain measured row heights in their allocation snapshot.
+Placement, border layout, and navigation use those heights together; flattened
+payload-only tables retain their single-line representation.
 The primitive `CollectionScrollAnchor` distinguishes a requested row from the
 start and end, which can include section headers and footers. Programmatic targets
 receive one correction after their requested window is measured, only while
@@ -852,6 +855,9 @@ logical entries without invoking row producers, and keeps disclosure state above
 the lazy recycling boundary. A direct `OutlineGroup` in a List supplies an indexed
 source; standalone outlines use a lazy stack. IDs include the ancestor path, so
 repeated IDs under different branches retain separate disclosure state.
+Direct outline List initializers supply their own row tag. OutlineGroup omits
+its automatic tag only for that adapter, preserving the public initializer types.
+Authored rows with multiple selection tags still report ambiguity.
 
 `Collections/CollectionAccessibilityNavigation.swift` stores two logical review
 bookmarks and exposes a position control plus first/last/page/read/return actions.

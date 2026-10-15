@@ -294,6 +294,10 @@ extension DrawExtractor {
         columns: payload.columns,
         rows: payload.isViewportBacked ? [] : payload.rows
       )
+    if !payload.isViewportBacked, let rowHeights {
+      return materializedHostedTableLayout(
+        for: payload, in: bounds, widths: widths, rowHeights: rowHeights)
+    }
     let generated = visibleTableLines(
       for: payload,
       viewportLineCount: bounds.size.height,
@@ -352,6 +356,142 @@ extension DrawExtractor {
       position: generated.scrollPosition,
       navigation: navigation
     )
+    return layout
+  }
+
+  /// Hosted eager rows retain their measured cells, including optional separators.
+  /// Payload-only tables keep the historical single-line materialized path.
+  private func materializedHostedTableLayout(
+    for payload: TablePayload,
+    in bounds: CellRect,
+    widths: [Int],
+    rowHeights: [Int: Int]
+  ) -> TableVisibleLayout {
+    let displayLines = materializedTableLines(for: payload, widths: widths)
+    let topCount = min(displayLines.count, payload.showsHeaders ? 3 : 1)
+    let bottomCount = displayLines.isEmpty ? 0 : 1
+    let top = Array(displayLines.prefix(topCount))
+    let bottom = Array(displayLines.suffix(bottomCount))
+    var body = Array(displayLines.dropFirst(topCount).dropLast(bottomCount))
+    var cursor = 0
+    var rowRanges: [Range<Int>] = []
+    for index in body.indices {
+      let height = body[index].rowIndex.flatMap { rowHeights[$0] }.map { max(1, $0) } ?? 1
+      body[index].height = height
+      body[index].yOffset = cursor
+      if body[index].rowIndex != nil { rowRanges.append(cursor..<(cursor + height)) }
+      cursor += height
+    }
+    let geometry = CollectionScrollGeometry(rowRanges: rowRanges, displayLineCount: cursor)
+    let bodyCapacity = max(0, bounds.size.height - topCount - bottomCount)
+    guard bodyCapacity > 0, !body.isEmpty else {
+      var lines = Array(displayLines.prefix(max(0, bounds.size.height)))
+      for index in lines.indices { lines[index].yOffset = index }
+      return TableVisibleLayout(
+        contentBounds: bounds, lines: lines, widths: widths, totalContentHeight: lines.count)
+    }
+
+    func window(capacity: Int) -> (offset: Int, end: Int, maximum: Int) {
+      var maximum = body.count
+      var tailCells = 0
+      while maximum > 0, tailCells + body[maximum - 1].height <= capacity {
+        maximum -= 1
+        tailCells += body[maximum].height
+      }
+      maximum = min(maximum, body.count - 1)
+      let offset: Int
+      if cursor <= capacity {
+        offset = 0
+      } else if let anchor = payload.scrollAnchor {
+        switch anchor {
+        case .start:
+          offset = 0
+        case .row(let row):
+          let target = body.firstIndex { $0.rowIndex == row } ?? maximum
+          offset = min(target, maximum)
+        case .end:
+          offset = maximum
+        }
+      } else {
+        let selected = selectedTableLineIndex(in: body) ?? 0
+        let startCell = max(0, body[selected].yOffset - capacity / 2)
+        let centred = body.lastIndex { $0.yOffset <= startCell } ?? 0
+        let selectedEnd = body[selected].yOffset + min(capacity, body[selected].height)
+        if selectedEnd <= body[centred].yOffset + capacity {
+          offset = min(centred, maximum)
+        } else {
+          let fitted = body.firstIndex { $0.yOffset >= selectedEnd - capacity } ?? selected
+          offset = min(fitted, maximum)
+        }
+      }
+      var end = offset
+      var cells = 0
+      while end < body.count, cells + body[end].height <= capacity {
+        cells += body[end].height
+        end += 1
+      }
+      // Oversized rows still expose their leading cells and remain navigable.
+      return (offset, max(end, offset + 1), maximum)
+    }
+
+    var showsIndicators =
+      payload.showsIndicators && cursor > bodyCapacity && bodyCapacity >= 3
+    var capacity = bodyCapacity
+    var range = window(capacity: capacity)
+    if showsIndicators {
+      var reservedIndicators = 0
+      // A smaller window can expose another hidden edge. Reservations only
+      // increase, so both indicator edges settle in at most two refinements.
+      for _ in 0..<2 {
+        let requiredIndicators = (range.offset > 0 ? 1 : 0) + (range.end < body.count ? 1 : 0)
+        guard requiredIndicators > reservedIndicators else { break }
+        reservedIndicators = requiredIndicators
+        capacity = max(1, bodyCapacity - reservedIndicators)
+        range = window(capacity: capacity)
+      }
+    }
+    let firstLineHeight = body[range.offset].height
+    let firstLineExceedsWindow = firstLineHeight > capacity
+    let firstLineFitsBody = firstLineHeight <= bodyCapacity
+    if showsIndicators && firstLineExceedsWindow && firstLineFitsBody {
+      // Overflow chrome must not make an otherwise fitting row oversized.
+      showsIndicators = false
+      capacity = bodyCapacity
+      range = window(capacity: capacity)
+    }
+    var visibleBody: [TableDisplayLine] = []
+    if showsIndicators, range.offset > 0 {
+      visibleBody.append(overflowIndicatorLine(widths: widths, payload: payload, symbol: "↑"))
+    }
+    visibleBody.append(contentsOf: body[range.offset..<range.end])
+    let hidesBelow = showsIndicators && range.end < body.count
+    let usedCells = visibleBody.reduce(0) { $0 + $1.height }
+    if cursor > bodyCapacity {
+      let padding = max(0, bodyCapacity - usedCells - (hidesBelow ? 1 : 0))
+      visibleBody.append(
+        contentsOf: Array(
+          repeating: overflowIndicatorLine(widths: widths, payload: payload, symbol: ""),
+          count: padding))
+    }
+    if hidesBelow {
+      visibleBody.append(overflowIndicatorLine(widths: widths, payload: payload, symbol: "↓"))
+    }
+    var lines = top + visibleBody + bottom
+    var yOffset = 0
+    for index in lines.indices {
+      lines[index].yOffset = yOffset
+      yOffset += lines[index].height
+    }
+    let offset = body[range.offset].yOffset
+    let position = CollectionScrollPosition(
+      cellOffset: offset, isAtStart: range.offset == 0, isAtEnd: range.offset == range.maximum)
+    let navigation = CollectionScrollLayout(
+      geometry: geometry, visibleLines: offset..<(offset + capacity), anchor: payload.scrollAnchor)
+    var layout = TableVisibleLayout(
+      contentBounds: bounds, lines: lines, widths: widths, totalContentHeight: yOffset)
+    layout.scrollMetadata = CollectionScrollLayoutMetadata(
+      maximumAnchorRow: geometry.row(atOrAfterLine: body[range.maximum].yOffset),
+      position: position, navigation: navigation)
     return layout
   }
 

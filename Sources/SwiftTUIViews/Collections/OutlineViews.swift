@@ -31,6 +31,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
   private let children: (Data.Element) -> [Data.Element]
   private let rowContent: (Data.Element) -> RowContent
   private let authoringScope: AuthoringContext?
+  private let hasListProvidedRowContentTag: Bool
 
   public init(
     _ data: Data,
@@ -43,6 +44,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
     self.children = { $0[keyPath: children] ?? [] }
     self.rowContent = rowContent
     authoringScope = currentAuthoringContext()
+    hasListProvidedRowContentTag = false
   }
 
   public init(
@@ -56,6 +58,17 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
     self.children = { $0[keyPath: children] }
     self.rowContent = rowContent
     authoringScope = currentAuthoringContext()
+    hasListProvidedRowContentTag = false
+  }
+
+  private init(listTaggedRowContentFrom outline: Self) {
+    _collapsed = outline._collapsed
+    elements = outline.elements
+    id = outline.id
+    children = outline.children
+    rowContent = outline.rowContent
+    authoringScope = outline.authoringScope
+    hasListProvidedRowContentTag = true
   }
 
   public var body: some View {
@@ -66,6 +79,10 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
     }.accessibilityRole(.list)
   }
 
+  func withListProvidedRowContentTag() -> Self {
+    OutlineGroup(listTaggedRowContentFrom: self)
+  }
+
   private func rows(_ entries: [OutlineEntry<Data.Element, ID>], collapsed: Binding<Set<[ID]>>)
     -> some View & IndexedChildSourceView
   {
@@ -73,6 +90,12 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
       EnvironmentReader(\.outlineStyle) { style in
         EnvironmentReader(\.styleEnvironmentSnapshot) { environment in
           let presentation = style.presentation(for: .init(styleEnvironment: environment))
+          // Direct List initializers retain their public tagged RowContent type.
+          // Only that known adapter tag replaces the outline's automatic tag;
+          // authored tags remain subject to the ordinary ambiguity checks.
+          let automaticTag =
+            hasListProvidedRowContentTag
+            ? nil : SelectionTag(value: entry.identifier, includeOptional: true)
           OutlineRow(
             prefix: outlinePrefix(
               ancestry: entry.ancestry, isLast: entry.isLast, style: presentation),
@@ -91,7 +114,9 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
                 }) : nil,
             level: entry.ancestry.count + 1, position: entry.position, count: entry.count
           )
-          .tag(entry.identifier)
+          .modifier(
+            SemanticMetadataModifier(metadata: SemanticMetadata(selectionTag: automaticTag))
+          )
           .accessibilityRole(.custom("listitem"))
           .accessibilityProperties(
             .init(
@@ -198,7 +223,7 @@ extension List {
             includeOptional: true
           )
         )
-      }
+      }.withListProvidedRowContentTag()
     }
   }
 
@@ -227,7 +252,7 @@ extension List {
             includeOptional: true
           )
         )
-      }
+      }.withListProvidedRowContentTag()
     }
   }
 
@@ -256,7 +281,7 @@ extension List {
             includeOptional: true
           )
         )
-      }
+      }.withListProvidedRowContentTag()
     }
   }
 
@@ -285,7 +310,7 @@ extension List {
             includeOptional: true
           )
         )
-      }
+      }.withListProvidedRowContentTag()
     }
   }
 }

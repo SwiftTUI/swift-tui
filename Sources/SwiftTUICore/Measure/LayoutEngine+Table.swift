@@ -1,4 +1,34 @@
+@_spi(Testing) import SwiftTUIPrimitives
+
 extension LayoutEngine {
+  /// Eager tables retain the same measured row geometry as indexed tables.
+  func measuredHostedTableAllocation(
+    for resolved: ResolvedNode,
+    childSizes: [ChildAllocation],
+    measuredSize: CellSize
+  ) -> HostedCollectionAllocationSnapshot? {
+    guard case .intrinsic = resolved.layoutBehavior,
+      resolved.semanticMetadata.hostedCollectionContainer?.kind == .table,
+      resolved.indexedChildSource == nil,
+      case .table(let payload) = resolved.drawPayload
+    else { return nil }
+
+    let rowHeights = Dictionary(
+      uniqueKeysWithValues: childSizes.enumerated().compactMap { index, child in
+        child.size.height > 1 ? (index, child.size.height) : nil
+      })
+    let columnWidths = measureTableColumnWidths(columns: payload.columns, rows: payload.rows)
+    return HostedCollectionAllocationSnapshot(
+      sourceIndices: Array(childSizes.indices),
+      tableColumnWidths: columnWidths,
+      tableLayout: DrawExtractor().visibleTableLayout(
+        for: payload,
+        in: CellRect(origin: .zero, size: measuredSize),
+        columnWidths: columnWidths,
+        rowHeights: rowHeights),
+      tallRowHeights: rowHeights)
+  }
+
   /// The measured size of a hosted Table, on the terms of
   /// ``measuredHostedListSize(for:childMeasurements:sourceIndices:retainedTallRowHeights:proposal:)``.
   package func measuredHostedTableSize(
