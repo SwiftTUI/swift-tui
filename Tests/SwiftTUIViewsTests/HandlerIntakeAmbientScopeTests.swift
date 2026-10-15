@@ -111,6 +111,47 @@ struct HandlerDescriptorIntakeOrderTests {
     }
   }
 
+  @Test(
+    "scroll registration and replay use the route's graph node before the ambient node",
+    arguments: [false, true], [false, true]
+  )
+  func scrollRegistrationOwner(usesGraph: Bool, ambientMatches: Bool) throws {
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let owner = graph.beginEvaluation(identity: ownerIdentity, invalidator: nil)
+    let ambient =
+      ambientMatches
+      ? owner : graph.beginEvaluation(identity: ambientIdentity, invalidator: nil)
+    let registry = LocalScrollPositionRegistry()
+    var context = ResolveContext(identity: ownerIdentity)
+    context.viewGraph = usesGraph ? graph : nil
+    context.localScrollPositionRegistry = registry
+    let intake = HandlerDescriptorIntake(context: context)
+    ViewNodeContext.withValue(ambient) {
+      intake.registerScrollPosition(
+        identity: ownerIdentity, currentOffset: { .zero }, applyOffset: { _ in })
+    }
+
+    let expectedOwner = usesGraph ? owner : ambient
+    let registration = try #require(registry.snapshot().first)
+    #expect(registration.ownerViewNodeID == expectedOwner.viewNodeID)
+    #expect(expectedOwner.registeredHandlers.scrollPosition.registrations.count == 1)
+    if owner !== ambient {
+      let otherNode = usesGraph ? ambient : owner
+      #expect(otherNode.registeredHandlers.scrollPosition.registrations.isEmpty)
+    }
+
+    registry.reset()
+    registry.restore(expectedOwner.registeredHandlers.scrollPosition.registrations)
+    #expect(registry.snapshot().first?.ownerViewNodeID == expectedOwner.viewNodeID)
+    registry.removeUnjustifiedRegistrations { nodeID in
+      nodeID == expectedOwner.viewNodeID ? expectedOwner.registeredHandlers : nil
+    }
+    #expect(registry.snapshot().count == 1)
+    registry.removeUnjustifiedRegistrations { _ in nil }
+    #expect(registry.snapshot().isEmpty)
+  }
+
   @Test("preferringAuthoringScope: the construction scope beats the ambient")
   func preferringAuthoringScopeOrder() {
     let intake = withAmbientScope {

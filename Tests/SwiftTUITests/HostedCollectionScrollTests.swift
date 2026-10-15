@@ -6,6 +6,74 @@ import Testing
 @MainActor
 @Suite(.serialized, .timeLimit(.minutes(1)))
 struct HostedCollectionScrollTests {
+  @Test(
+    "scene-hosted row growth preserves focus and selection in an unchanged viewport",
+    arguments: [false, true]
+  )
+  func rowGrowthKeepsFocusedRow(multiple: Bool) async throws {
+    let recorder = HostedCollectionFrameRecorder()
+    let surface = HostedRasterSurface(
+      surfaceSize: CellSize(width: 32, height: 12),
+      appearance: .fallback,
+      onFrame: { recorder.receive($0) }
+    )
+    let session = try HostedSceneSession(
+      for: HostedRowGrowthListApp(multiple: multiple),
+      sceneID: WindowIdentifier("row-growth-list"),
+      surface: surface
+    )
+    let run = Task { try await session.start() }
+    do {
+      var previous = try await recorder.wait(description: "initial focus on row 0") {
+        $0.focusesHostedRow(0)
+      }
+      for row in 1...7 {
+        session.send(.key(KeyPress(.arrowDown)))
+        previous = try await recorder.wait(
+          after: previous.sequence, description: "downward focus on row \(row)"
+        ) { $0.focusesHostedRow(row) }
+      }
+      if multiple {
+        session.send(.key(KeyPress(.space)))
+        previous = try await recorder.wait(
+          after: previous.sequence, description: "check row 7 and retain offscreen row 0"
+        ) { $0.containsHostedToken("Checked=0,7") && $0.focusesHostedRow(7) }
+      }
+      #expect(!previous.raster.lines.contains { $0.contains("Row 00") })
+      let focusedIdentity = previous.focusedIdentity
+      let viewport = try #require(previous.semantics.scrollRoutes.first?.viewportRect)
+      for padding in [1, 0] {
+        session.send(.key(KeyPress(.character("p"), modifiers: .ctrl)))
+        previous = try await recorder.wait(
+          after: previous.sequence, description: "row padding changes to \(padding)"
+        ) { $0.containsHostedToken("Padding=\(padding)") }
+        let raster = previous.raster.lines.joined(separator: "\n")
+        let targetIsFocused = previous.focusesHostedRow(7)
+        try #require(targetIsFocused, "row growth preserves focus:\n\(raster)")
+        #expect(previous.focusedIdentity == focusedIdentity)
+        #expect(previous.semantics.scrollRoutes.first?.viewportRect == viewport)
+        #expect(previous.containsHostedToken(multiple ? "Checked=0,7" : "Selected=7"))
+        let region = try #require(
+          previous.semantics.focusRegions.first { $0.identity == focusedIdentity })
+        #expect(region.rect.size.height == (padding == 0 ? 2 : 4))
+      }
+      session.send(.key(KeyPress(.return)))
+      previous = try await recorder.wait(
+        after: previous.sequence, description: "Return acts on the retained row 7"
+      ) {
+        $0.containsHostedToken(multiple ? "Checked=0" : "Activated=7")
+          && $0.focusesHostedRow(7)
+      }
+      #expect(previous.containsHostedToken(multiple ? "Count=0" : "Count=1"))
+      #expect(try await session.stopAndWait() == .inputEnded)
+      #expect(try await run.value == .inputEnded)
+    } catch {
+      session.stop()
+      _ = await run.result
+      throw error
+    }
+  }
+
   @Test("scene-hosted mixed-height list reveals every selected row when navigation reverses")
   func mixedHeightListKeepsReverseNavigationTarget() async throws {
     let recorder = HostedCollectionFrameRecorder()
@@ -60,6 +128,82 @@ struct HostedCollectionScrollTests {
       _ = await run.result
       throw error
     }
+  }
+}
+
+private struct HostedRowGrowthListApp {
+  let multiple: Bool
+
+  nonisolated init() {
+    multiple = false
+  }
+
+  nonisolated init(multiple: Bool) {
+    self.multiple = multiple
+  }
+}
+
+extension HostedRowGrowthListApp: App {
+  var body: some Scene {
+    WindowGroup(id: WindowIdentifier("row-growth-list")) {
+      HostedRowGrowthListView(multiple: multiple)
+    }
+    .exitOnKeys([])
+  }
+}
+
+@MainActor
+private struct HostedRowGrowthListView {
+  let multiple: Bool
+  @State private var selected: Int? = 0
+  @State private var checked: Set<Int> = [0]
+  @State private var padding = 0
+  @State private var activated: Int?
+  @State private var activationCount = 0
+
+  private func rowContent(_ row: HostedMixedHeightRow) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text(row.title)
+      ForEach(0..<(row.id % 3), id: \.self) { line in Text("Detail \(row.id):\(line)") }
+    }
+    .padding(.vertical, padding)
+  }
+}
+
+extension HostedRowGrowthListView: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Group {
+        if multiple {
+          List(HostedMixedHeightRow.fixtures, selection: $checked) { row in rowContent(row) }
+        } else {
+          List(
+            HostedMixedHeightRow.fixtures, selection: $selected,
+            onActivate: { row in
+              activated = row
+              activationCount += 1
+            }
+          ) { row in rowContent(row) }
+        }
+      }
+      .listStyle(HostedRowGrowthListStyle())
+      .focusable(false)
+      .frame(height: 8, alignment: .topLeading)
+      Text("Selected=\(selected.map { String($0) } ?? "-")")
+      Text("Checked=\(checked.sorted().map { String($0) }.joined(separator: ","))")
+      Text("Activated=\(activated.map { String($0) } ?? "-") Count=\(activationCount)")
+      Text("Padding=\(padding)")
+    }
+    .onKeyPress(.character("p"), modifiers: .ctrl) { _ in
+      padding = 1 - padding
+      return .handled
+    }
+  }
+}
+
+private struct HostedRowGrowthListStyle: ListStyle {
+  func resolvePresentation(for configuration: ListStyleConfiguration) -> ListStylePresentation {
+    ListStylePresentation(showsRowSeparators: false, showsSectionSeparators: false)
   }
 }
 

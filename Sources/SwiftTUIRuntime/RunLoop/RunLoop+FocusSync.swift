@@ -239,8 +239,8 @@ extension RunLoop {
       shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyDefaultFocus
     )
 
-    // Resize can wrap a visible row out of the collection's window. Reveal it
-    // before replacing the focus regions, using the existing one-pass budget.
+    // Changes to row heights or viewport size can hide the focused collection row.
+    // Reveal it before replacing focus regions, using the existing one-pass budget.
     if !convergence.didEagerFocusLocationRerender, pendingKeyFocus == nil,
       hotReloadSession?.pendingFocus == nil,
       desiredFocusRequest == .none, defaultFocusRequest == .none,

@@ -89,10 +89,13 @@ The primitive `CollectionScrollAnchor` distinguishes a requested row from the
 start and end, which can include section headers and footers. Programmatic targets
 receive one correction after their requested window is measured, only while
 the requested anchor remains current.
-When a viewport resize removes a focused collection row from the visible window,
-the runtime prepares its reveal before replacing focus regions. This uses the
-existing single eager focus-sync rerender and yields to explicit focus or scroll
-requests.
+Scroll registrations and their replay records belong to the graph node for the
+scroll route, including when deferred resolution finishes under a child's ambient
+node.
+When a viewport resize or measured row-height change removes a focused collection
+row from the visible window, the runtime prepares its reveal before replacing
+focus regions. This uses the existing single eager focus-sync rerender and yields
+to explicit focus or scroll requests.
 
 `SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
 examples, and the public website can live in sibling organization repositories.

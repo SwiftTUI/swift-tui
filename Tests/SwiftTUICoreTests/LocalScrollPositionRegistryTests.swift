@@ -75,10 +75,17 @@ struct LocalScrollPositionRegistryTests {
   }
 
   @Test(
-    "collection resize focus recovery yields to a newer logical scroll anchor",
-    arguments: [false, true]
+    "collection resize focus recovery observes viewport and row changes and yields to newer input",
+    arguments: [false, true],
+    [
+      (viewport: false, rows: false, count: 12), (viewport: true, rows: false, count: 12),
+      (viewport: false, rows: true, count: 12), (viewport: true, rows: true, count: 12),
+      (viewport: false, rows: false, count: 11), (viewport: false, rows: true, count: 11),
+    ]
   )
-  func collectionResizeFocusRecoveryHonorsScrollAnchor(hasNewerAnchor: Bool) {
+  func collectionResizeFocusRecoveryHonorsScrollAnchor(
+    hasNewerAnchor: Bool, changes: (viewport: Bool, rows: Bool, count: Int)
+  ) {
     let registry = LocalScrollPositionRegistry()
     let scrollIdentity = testIdentity("ResizeCollection")
     let focusedIdentity = testIdentity("ResizeCollection", "Row", "8")
@@ -131,13 +138,15 @@ struct LocalScrollPositionRegistryTests {
     var resizedRoute = ScrollRoute(
       identity: scrollIdentity,
       viewNodeID: ownerNode.viewNodeID,
-      viewportRect: CellRect(origin: .zero, size: CellSize(width: 10, height: 8)),
+      viewportRect: CellRect(
+        origin: .zero, size: CellSize(width: changes.viewport ? 10 : 32, height: 8)),
       contentBounds: CellRect(origin: CellPoint(x: 0, y: -9), size: CellSize(width: 10, height: 36))
     )
     resizedRoute.collectionScrollLayout = CollectionScrollLayout(
       geometry: CollectionScrollGeometry(
-        rowCount: 12, rowSpan: 1,
-        rowHeights: Dictionary(uniqueKeysWithValues: (0..<12).map { ($0, 3) })),
+        rowCount: changes.count, rowSpan: 1,
+        rowHeights: changes.rows
+          ? Dictionary(uniqueKeysWithValues: (0..<changes.count).map { ($0, 3) }) : [:]),
       visibleLines: 9..<17,
       anchor: .row(3)
     )
@@ -154,11 +163,26 @@ struct LocalScrollPositionRegistryTests {
       scrollTargets: []
     )
 
-    #expect(changed == !hasNewerAnchor)
-    #expect(revealCalls == (hasNewerAnchor ? 0 : 1))
+    // Removing rows keeps the existing focus fallback instead of becoming a resize correction.
+    let hasSameRowCount = changes.count == 12
+    let shouldRecover = !hasNewerAnchor && (changes.viewport || (changes.rows && hasSameRowCount))
+    let expectedOffset: Int
+    let expectedAnchor: CollectionScrollAnchor
+    if hasNewerAnchor {
+      expectedOffset = 28
+      expectedAnchor = .end
+    } else if shouldRecover {
+      expectedOffset = 21
+      expectedAnchor = .row(7)
+    } else {
+      expectedOffset = 9
+      expectedAnchor = .row(3)
+    }
+    #expect(changed == shouldRecover)
+    #expect(revealCalls == (shouldRecover ? 1 : 0))
     #expect(offsetWrites == 0)
-    #expect(offset == ScrollOffset(x: 0, y: hasNewerAnchor ? 28 : 21))
-    #expect(logicalAnchor == (hasNewerAnchor ? .end : .row(7)))
+    #expect(offset == ScrollOffset(x: 0, y: expectedOffset))
+    #expect(logicalAnchor == expectedAnchor)
   }
 
   @Test("focused rect below viewport scrolls by the minimum reveal delta")

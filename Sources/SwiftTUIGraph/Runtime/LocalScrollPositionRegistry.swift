@@ -154,8 +154,8 @@ package final class LocalScrollPositionRegistry: Equatable {
     latestScrollTargets = scrollTargets
   }
 
-  /// Preserve a focused collection row when a resized viewport no longer
-  /// contains it. A new scroll request takes precedence over this correction.
+  /// Preserve a focused collection row when changed row heights or viewport size hide it.
+  /// A new scroll request takes precedence over this correction.
   package func revealCollectionFocusAfterResize(
     _ focusedRegion: FocusRegion,
     previousRoutes: [ScrollRoute],
@@ -176,7 +176,10 @@ package final class LocalScrollPositionRegistry: Equatable {
 
     let viewportSizeChanged = previous.viewportRect.size != route.viewportRect.size
     let usableHeightChanged = previousLayout.visibleLines.count != layout.visibleLines.count
-    guard viewportSizeChanged || usableHeightChanged else { return false }
+    // Removing rows keeps the existing focus fallback rather than requesting resize recovery.
+    let hasSameRowCount = previousLayout.geometry.rowCount == layout.geometry.rowCount
+    let rowGeometryChanged = hasSameRowCount && previousLayout.geometry != layout.geometry
+    guard viewportSizeChanged || usableHeightChanged || rowGeometryChanged else { return false }
 
     updateGeometry(scrollRoutes: scrollRoutes, scrollTargets: scrollTargets)
     return registration.revealTarget?(ScrollTargetQuery(identity: focusedRegion.identity), nil)
