@@ -8,6 +8,49 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-14
+
+SwiftTUI 0.18.0 improves variable-height collection scrolling, fixes composed
+layout and terminal behavior, and makes browser renderer packaging explicit.
+
+### Added
+
+- App-owned browser bundles for the terminal companion, selected through
+  `WebHostConfig.browserAssetsPath` or the runtime configuration. Build a
+  standalone Canvas or experimental DOM companion with `swifttui-web build:web`
+  (STUI-945).
+- Text-clipping benchmarks and a `text_line_visits` work counter. Thanks to
+  [@vmarcella](https://github.com/vmarcella) for
+  [#52](https://github.com/SwiftTUI/swift-tui/pull/52).
+
+### Changed
+
+- The bundled terminal companion ships only Canvas and its semantic sidecar.
+  Experimental DOM requires an app-owned bundle; `?renderer=dom` cannot switch
+  the built-in companion. DOM bundles use packaged Ioskeley Mono fonts
+  (STUI-926, STUI-945).
+- Lists, tables, and lazy stacks share sparse measured row geometry for
+  layout, scroll extents, and target refinement (STUI-921).
+
+### Fixed
+
+- Retain variable row heights across worker snapshots so upward keyboard
+  navigation preserves selection, focus, and visible row geometry. Preserve
+  final-row and footer navigation, multi-selection painting, and pending
+  `scrollTo` refinement (STUI-921, STUI-927–STUI-941,
+  [#56](https://github.com/SwiftTUI/swift-tui/pull/56)).
+- Preserve authored child layout in custom `DisclosureGroupStyle` content.
+  Thanks to [@echoz](https://github.com/echoz) for the contribution in
+  [#49](https://github.com/SwiftTUI/swift-tui/pull/49).
+- Respect declared Spacer minima and wrapped flexibility, retain nested
+  destination state, preserve scroll viewport ownership through custom Layout
+  placement, and reject estimate-derived wrappers for exact measurement reuse.
+- Coordinate terminal probes with reader-mode capabilities, detect terminal
+  protocols independently, detach link-helper standard descriptors, and honor
+  termination requests raised during exit flushing (STUI-927–STUI-941).
+- Isolate benchmark render modes and make PTY cleanup regressions independent
+  of concurrent descriptor reuse.
+
 ## [0.17.0] - 2026-10-12
 
 SwiftTUI 0.17.0 adds a sequential terminal reader, reduces offscreen text
@@ -2308,7 +2351,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.17.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.18.0...HEAD
+[0.18.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.0
 [0.17.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.17.0
 [0.16.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.16.0
 [0.15.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.15.1
