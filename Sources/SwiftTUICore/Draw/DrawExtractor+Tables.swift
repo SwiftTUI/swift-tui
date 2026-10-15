@@ -434,8 +434,9 @@ extension DrawExtractor {
       return (offset, max(end, offset + 1), maximum)
     }
 
+    let maximumIndicators = min(2, bodyCapacity - 1)
     var showsIndicators =
-      payload.showsIndicators && cursor > bodyCapacity && bodyCapacity >= 3
+      payload.showsIndicators && cursor > bodyCapacity && bodyCapacity >= 2
     var capacity = bodyCapacity
     var range = window(capacity: capacity)
     if showsIndicators {
@@ -443,7 +444,8 @@ extension DrawExtractor {
       // A smaller window can expose another hidden edge. Reservations only
       // increase, so both indicator edges settle in at most two refinements.
       for _ in 0..<2 {
-        let requiredIndicators = (range.offset > 0 ? 1 : 0) + (range.end < body.count ? 1 : 0)
+        let hiddenEdges = (range.offset > 0 ? 1 : 0) + (range.end < body.count ? 1 : 0)
+        let requiredIndicators = min(hiddenEdges, maximumIndicators)
         guard requiredIndicators > reservedIndicators else { break }
         reservedIndicators = requiredIndicators
         capacity = max(1, bodyCapacity - reservedIndicators)
@@ -460,11 +462,13 @@ extension DrawExtractor {
       range = window(capacity: capacity)
     }
     var visibleBody: [TableDisplayLine] = []
-    if showsIndicators, range.offset > 0 {
+    let hidesAbove = showsIndicators && range.offset > 0
+    if hidesAbove {
       visibleBody.append(overflowIndicatorLine(widths: widths, payload: payload, symbol: "↑"))
     }
     visibleBody.append(contentsOf: body[range.offset..<range.end])
-    let hidesBelow = showsIndicators && range.end < body.count
+    let hasRoomForLowerIndicator = !hidesAbove || maximumIndicators > 1
+    let hidesBelow = showsIndicators && range.end < body.count && hasRoomForLowerIndicator
     let usedCells = visibleBody.reduce(0) { $0 + $1.height }
     if cursor > bodyCapacity {
       let padding = max(0, bodyCapacity - usedCells - (hidesBelow ? 1 : 0))

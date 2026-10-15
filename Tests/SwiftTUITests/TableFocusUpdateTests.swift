@@ -84,6 +84,9 @@ struct TableFocusUpdateTests {
     try #require(painted.indices.contains(first))
     #expect(painted[first].contains("Window1:0"), "\(painted.joined(separator: "\n"))")
     let bodyCapacity = geometry.height - (geometry.headers ? 4 : 2)
+    if geometry.rowLines == 1, bodyCapacity >= 2 {
+      #expect(painted.contains { $0.contains("↑") || $0.contains("↓") })
+    }
     if geometry.rowLines <= bodyCapacity {
       for line in 0..<geometry.rowLines {
         try #require(painted.indices.contains(first + line))
