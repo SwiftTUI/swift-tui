@@ -21,6 +21,8 @@ package struct WebHostLoopbackServer: WebHostServer {
     token: WebHostToken,
     scenes: [WebHostSceneDescriptor]
   ) async throws -> WebHostServerSession {
+    let browserBundle = WebHostBrowserBundle(directory: configuration.browserAssetsPath)
+    _ = try browserBundle.resource(for: "/")
     guard !scenes.isEmpty, Set(scenes.map(\.id)).count == scenes.count else {
       throw WebHostServerError.invalidScenes
     }
@@ -79,7 +81,8 @@ package struct WebHostLoopbackServer: WebHostServer {
       token: token,
       scenes: scenes,
       port: port,
-      maxMessageBytes: Self.maxMessageBytes
+      maxMessageBytes: Self.maxMessageBytes,
+      browserBundle: WebHostBrowserBundle(directory: configuration.browserAssetsPath)
     )
     let coordinator = WebHostConnectionCoordinator(
       listenerFD: listenerFD,
@@ -631,6 +634,7 @@ struct WebHostRouteTable: Sendable {
   var scenes: [WebHostSceneDescriptor]
   var port: Int
   var maxMessageBytes: Int
+  var browserBundle: WebHostBrowserBundle = .bundled
 
   enum RoutedRequest: Equatable, Sendable {
     case plain(WebHostHTTPResponse)
@@ -654,7 +658,7 @@ struct WebHostRouteTable: Sendable {
         case "/":
           do {
             return .ok(
-              body: Array(try WebHostBrowserBundle.indexHTML(token: token)),
+              body: Array(try browserBundle.indexHTML(token: token)),
               contentType: "text/html; charset=utf-8"
             )
           } catch {
@@ -667,7 +671,7 @@ struct WebHostRouteTable: Sendable {
           )
         default:
           do {
-            let resource = try WebHostBrowserBundle.resource(for: head.path)
+            let resource = try browserBundle.resource(for: head.path)
             return .ok(body: Array(resource.data), contentType: resource.contentType)
           } catch {
             return .notFound()

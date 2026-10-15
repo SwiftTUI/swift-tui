@@ -34,7 +34,7 @@ struct WebHostRunnerTests {
     let task = Task { @MainActor in
       try await WebHostRunner.run(
         MultipleSceneApp(),
-        configuration: .init(web: .init()),
+        configuration: .builder().web().browserAssets(at: "/app/browser").build(),
         server: server,
         token: WebHostToken(rawValue: "test-token"),
         browserOpener: RecordingBrowserOpener(),
@@ -43,6 +43,7 @@ struct WebHostRunnerTests {
     }
 
     let scene = await server.startedScene()
+    #expect(await server.configuration?.browserAssetsPath == "/app/browser")
     #expect(scene.id == "primary")
     #expect(scene.isDefault == true)
     #expect(Set(await server.startedSession().channels.keys) == ["primary", "secondary"])
@@ -378,6 +379,7 @@ private func row(
 }
 
 private actor FakeWebHostServer: WebHostServer {
+  private(set) var configuration: WebHostConfig?
   private var session: WebHostServerSession?
   private var scene: WebHostSceneDescriptor?
   private var continuation: CheckedContinuation<WebHostServerSession, Never>?
@@ -389,6 +391,7 @@ private actor FakeWebHostServer: WebHostServer {
     token: WebHostToken,
     scenes: [WebHostSceneDescriptor]
   ) async throws -> WebHostServerSession {
+    self.configuration = configuration
     let scene = scenes.first(where: \.isDefault) ?? scenes[0]
     let channels = Dictionary(uniqueKeysWithValues: scenes.map { ($0.id, WebHostSceneChannel()) })
     let channel = channels[scene.id]!

@@ -40,6 +40,15 @@ struct RuntimeConfigurationBuilderTests {
     #expect(configuration.web?.sceneID == nil)
   }
 
+  @Test("Custom browser assets apply independently of launch mode")
+  func browserAssets() {
+    let builder = RuntimeConfiguration.builder().browserAssets(at: "/app/browser")
+    #expect(RuntimeConfiguration.default.browserAssetsPath == nil)
+    #expect(builder.companion(.on).build().browserAssetsPath == "/app/browser")
+    #expect(builder.web().build().browserAssetsPath == "/app/browser")
+    #expect(builder.build().web == nil)
+  }
+
   @Test("Builder web() sets selected scene")
   func builderWebConfigSceneID() {
     let configuration = RuntimeConfiguration.builder()

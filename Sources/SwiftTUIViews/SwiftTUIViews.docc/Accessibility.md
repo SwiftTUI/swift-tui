@@ -7,7 +7,12 @@ application task; a label or role alone does not make a custom control operable.
 ## Overview
 
 Canvas and DOM browser hosts mount a semantic sidecar and route supported
-assistive actions back to Swift. Default terminal apps also include a sequential
+assistive actions back to Swift. The default `SwiftTUI` app packages only the
+Canvas browser accessibility surface. DOM is experimental and requires an
+explicitly built, app-owned browser bundle; see
+[Browser Companion](https://swifttui.sh/docs/documentation/swifttuiwebhostcli/browser-companion).
+
+Default terminal apps also include a sequential
 semantic reader: start with `--reader`, set `SWIFTTUI_READER=1`, or press F12.
 It reads the same committed content and dispatches the same typed actions while
 retaining application state. Use `help` for navigation, editing, scene selection,

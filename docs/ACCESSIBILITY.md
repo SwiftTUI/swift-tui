@@ -19,6 +19,10 @@ presentation. Thus, one snapshot stays valid when focus moves.
 
 ## Snapshot consumers and their limits
 
+The batteries-included app ships only the Canvas browser companion. The
+experimental DOM painter and fonts are excluded from its resources; apps can
+serve an explicitly built DOM bundle through `RuntimeConfiguration.browserAssetsPath`.
+
 | Consumer | Current behavior | Evidence boundary |
 | --- | --- | --- |
 | Terminal cursor mode | Uses focus and cursor anchors to position the hardware cursor. Off by default; text input retains its caret. | Emits terminal bytes, not a semantic tree or spoken announcement. Reader compatibility requires testing. |

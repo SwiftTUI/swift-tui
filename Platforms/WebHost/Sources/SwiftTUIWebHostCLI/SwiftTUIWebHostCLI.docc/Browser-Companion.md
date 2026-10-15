@@ -9,6 +9,8 @@ On macOS, Linux, and Windows, an interactive `SwiftTUI` app launched with its de
 browser for Canvas presentation and semantic controls. It uses assets packaged
 with the executable; Node, Bun, a CDN, and an app-specific web build are unnecessary.
 No browser opens automatically. The page's Scene selector reaches every app scene.
+Only the Canvas painter and semantic accessibility controls ship in this default
+bundle. The experimental DOM painter and its font assets are excluded.
 
 From another terminal, `myapp --companion-url` prints the URLs of running instances
 of that executable. POSIX discovery sockets containing bearer URLs are owner-only.
@@ -35,6 +37,62 @@ use `--web` for browser-only/headless operation. A custom main can use `RuntimeC
 The terminal-only `SwiftTUICLI` product has no server; explicit `on` requires the
 combined WebHost launcher. Windows secondary scenes are browser-only; POSIX PTY
 attachment remains available on macOS/Linux.
+
+## Opt into the experimental DOM renderer
+
+Build a separate browser bundle for your app using `@swifttui/build` with Bun
+installed for browser bundling. No Swift or WASM build is needed for a native
+app's companion:
+
+```sh
+npm install --save-dev @swifttui/build
+npx swifttui-web build:web --renderer dom --dist browser
+```
+
+Copy the generated `browser` directory into your executable target's `Resources`
+directory. Add `.copy("Resources/browser")` to that target's `resources` in
+`Package.swift`, then use a custom entry point to select that directory:
+
+```swift
+import Foundation
+import SwiftTUI
+
+struct MyApp: SwiftTUI.App {
+  var body: some Scene {
+    WindowGroup { Text("Hello from SwiftTUI") }
+  }
+}
+
+@main
+enum Main {
+  @MainActor static func main() async throws {
+    let options = try SwiftTUIOptions.parse()
+    var configuration = options.runtimeConfiguration()
+    configuration.browserAssetsPath = Bundle.module.resourceURL!
+      .appendingPathComponent("browser", isDirectory: true).path
+    try await WebHostCLIRunner.run(MyApp.self, configuration: configuration)
+  }
+}
+```
+
+This preserves the framework CLI options, including `--companion off`,
+`--companion-url`, and browser-only `--web`. The same assets are served in both
+launch modes. Apps with their own command parser can set `browserAssetsPath` on
+their resolved configuration before calling `WebHostCLIRunner.run`.
+For a launcher without argument parsing, use
+`RuntimeConfiguration.builder().browserAssets(at: path).build()`.
+
+Ship the entire generated directory, including its DOM fonts and license.
+A missing directory or index fails startup with an error. The selected bundle
+sets its renderer default: adding `?renderer=dom` to the built-in Canvas URL
+cannot enable code that was excluded from the build. To build an app-owned
+Canvas bundle instead, use `--renderer canvas` (the build default).
+
+DOM remains experimental. See the browser package's
+[renderer guide](https://github.com/SwiftTUI/swift-tui-web/tree/main/packages/web#renderers)
+for its behavior, accessibility qualification, and known limits. For WASM web
+deployments, select the renderer in the browser build as described there; the
+Swift WASM artifact is shared by both renderers.
 
 ## SSH
 

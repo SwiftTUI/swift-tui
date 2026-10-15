@@ -9,7 +9,9 @@ package enum WebHostCompanion {
     server: any WebHostServer = WebHostLoopbackServer(), token: WebHostToken = WebHostToken()
   ) async throws -> SharedSceneCompanionSession {
     let session = try await server.start(
-      configuration: WebHostConfig(bind: "127.0.0.1", port: configuration.companionPort),
+      configuration: WebHostConfig(
+        bind: "127.0.0.1", port: configuration.companionPort,
+        browserAssetsPath: configuration.browserAssetsPath),
       token: token,
       scenes: endpoints.enumerated().map { index, endpoint in
         .init(
@@ -31,9 +33,7 @@ package enum WebHostCompanion {
         if transport.isConnected { try? transport.notifyRuntimeIssue(issue) }
       }
     }
-    var url = URLComponents(url: session.url(path: "/"), resolvingAgainstBaseURL: false)!
-    url.queryItems = (url.queryItems ?? []) + [URLQueryItem(name: "renderer", value: "canvas")]
     return SharedSceneCompanionSession(
-      url: url.url!.absoluteString, stop: { await session.stop() })
+      url: session.url(path: "/").absoluteString, stop: { await session.stop() })
   }
 }

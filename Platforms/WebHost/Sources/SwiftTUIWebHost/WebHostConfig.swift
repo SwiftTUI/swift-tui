@@ -7,17 +7,21 @@ public struct WebHostConfig: Equatable, Sendable {
   public var port: Int
   public var openBrowser: Bool
   public var sceneID: WindowIdentifier?
+  /// App-owned browser assets; `nil` uses the bundled Canvas-only page.
+  public var browserAssetsPath: String?
 
   public init(
     bind: String = "127.0.0.1",
     port: Int = 9123,
     openBrowser: Bool = false,
-    sceneID: WindowIdentifier? = nil
+    sceneID: WindowIdentifier? = nil,
+    browserAssetsPath: String? = nil
   ) {
     self.bind = bind
     self.port = port
     self.openBrowser = openBrowser
     self.sceneID = sceneID
+    self.browserAssetsPath = browserAssetsPath
   }
 
   public init(_ webConfig: RuntimeConfiguration.WebConfig) {

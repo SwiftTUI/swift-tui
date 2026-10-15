@@ -16,8 +16,15 @@ package struct WebHostBrowserResource: Equatable, Sendable {
   }
 }
 
-package enum WebHostBrowserBundle {
-  package static func resource(
+package struct WebHostBrowserBundle: Sendable {
+  package static let bundled = WebHostBrowserBundle()
+  private let directory: String?
+
+  package init(directory: String? = nil) {
+    self.directory = directory
+  }
+
+  package func resource(
     for requestPath: String
   ) throws -> WebHostBrowserResource {
     let path = try normalizedResourcePath(for: requestPath)
@@ -29,7 +36,7 @@ package enum WebHostBrowserBundle {
     )
   }
 
-  package static func indexHTML(
+  package func indexHTML(
     token: WebHostToken
   ) throws -> Data {
     let resource = try resource(for: "/")
@@ -42,7 +49,7 @@ package enum WebHostBrowserBundle {
     return Data(html.utf8)
   }
 
-  package static func contentType(
+  package func contentType(
     for path: String
   ) -> String {
     switch URL(fileURLWithPath: path).pathExtension.lowercased() {
@@ -71,7 +78,7 @@ package enum WebHostBrowserBundle {
     }
   }
 
-  package static func assetPaths() throws -> [String] {
+  package func assetPaths() throws -> [String] {
     let baseURL = try browserResourceDirectory()
     guard let enumerator = FileManager.default.enumerator(atPath: baseURL.path) else {
       return []
@@ -94,7 +101,7 @@ package enum WebHostBrowserBundle {
     return paths.sorted()
   }
 
-  private static func normalizedResourcePath(
+  private func normalizedResourcePath(
     for requestPath: String
   ) throws -> String {
     let pathWithoutQuery =
@@ -118,29 +125,38 @@ package enum WebHostBrowserBundle {
     return path
   }
 
-  private static func primaryJavaScriptAssetPath() throws -> String {
+  private func primaryJavaScriptAssetPath() throws -> String {
     guard let path = try assetPaths().first(where: { $0.hasSuffix(".js") }) else {
       throw WebHostBrowserBundleError.notFound("static/webhost.js")
     }
     return path
   }
 
-  private static func resourceURL(
+  private func resourceURL(
     for path: String
   ) throws -> URL {
     let baseURL = try browserResourceDirectory()
-    let url = baseURL.appendingPathComponent(path, isDirectory: false).standardizedFileURL
-    let basePath = baseURL.standardizedFileURL.path
+    let url = baseURL.appendingPathComponent(path, isDirectory: false)
+      .standardizedFileURL.resolvingSymlinksInPath()
+    let basePath = baseURL.standardizedFileURL.resolvingSymlinksInPath().path
     guard url.path.hasPrefix(basePath + "/") else {
       throw WebHostBrowserBundleError.notFound(path)
     }
-    guard FileManager.default.fileExists(atPath: url.path) else {
+    guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else {
       throw WebHostBrowserBundleError.notFound(path)
     }
     return url
   }
 
-  private static func browserResourceDirectory() throws -> URL {
+  private func browserResourceDirectory() throws -> URL {
+    if let directory {
+      let url = URL(fileURLWithPath: directory, isDirectory: true)
+        .standardizedFileURL.resolvingSymlinksInPath()
+      guard (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else {
+        throw WebHostBrowserBundleError.missingDirectory(directory)
+      }
+      return url
+    }
     // `.copy("Resources/browser")` preserves the directory in SwiftPM's module
     // bundle, so request paths remain rooted at its contents rather than at the
     // module bundle itself.
@@ -160,11 +176,14 @@ package enum WebHostBrowserBundle {
 }
 
 package enum WebHostBrowserBundleError: Error, Equatable, Sendable, CustomStringConvertible {
+  case missingDirectory(String)
   case missingBundle
   case notFound(String)
 
   package var description: String {
     switch self {
+    case .missingDirectory(let path):
+      return "The custom WebHost browser bundle directory is missing: \(path)."
     case .missingBundle:
       return "The WebHost browser bundle is missing."
     case .notFound(let path):

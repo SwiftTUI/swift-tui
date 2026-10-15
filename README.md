@@ -171,7 +171,11 @@ description.
 
 Interactive macOS/Linux/Windows launches offer a Canvas browser companion for the same
 running app; open the URL printed before full screen (`--companion off` disables
-it). The same `App` also runs browser-only — launch it with `--web` to serve it over localhost, or compile it with the
+it). The packaged accessibility surface includes only Canvas and its semantic
+controls; the experimental DOM renderer and its fonts are excluded. To serve
+DOM, build an app-owned browser bundle and select it in your custom launcher;
+see [Browser Companion](Platforms/WebHost/Sources/SwiftTUIWebHostCLI/SwiftTUIWebHostCLI.docc/Browser-Companion.md#opt-into-the-experimental-dom-renderer).
+The same `App` also runs browser-only — launch it with `--web` to serve it over localhost, or compile it with the
 `SwiftTUIWASI` product and ship it as a static bundle with
 [`@swifttui/web`](https://github.com/SwiftTUI/swift-tui-web), which is what the
 live demo is — and inside native apps through

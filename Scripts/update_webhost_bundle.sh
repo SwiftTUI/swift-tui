@@ -64,7 +64,8 @@ build_dir="$(mktemp -d "${TMPDIR:-/tmp}/webhost-bundle.XXXXXX")"
 trap 'rm -rf "$build_dir"' EXIT
 
 (cd "$web_checkout" && bun install --frozen-lockfile)
-(cd "$web_checkout/packages/web" && bun run cli.ts build:web --dist "$build_dir")
+(cd "$web_checkout" && bun run build:packages)
+(cd "$web_checkout/packages/web" && bun run cli.ts build:web --renderer canvas --dist "$build_dir")
 
 [ -f "$build_dir/index.html" ] || {
   echo "Missing $build_dir/index.html" >&2

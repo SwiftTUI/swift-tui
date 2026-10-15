@@ -16,6 +16,10 @@ public struct RuntimeConfiguration: Sendable, Equatable {
   public var companion: CompanionMode = .auto
   /// Companion listener port; zero asks the OS for an available loopback port.
   public var companionPort: Int = 0
+  /// Custom browser bundle directory for both the companion and browser-only launch.
+  /// `nil` serves the packaged Canvas-only accessibility surface. Build a bundle
+  /// with `swifttui-web build:web --renderer dom` to opt into experimental DOM rendering.
+  public var browserAssetsPath: String?
   /// Prints companion URLs for running instances of this executable, then exits.
   public var printCompanionURL = false
   /// Starts the sequential terminal reader. F12 also switches modes in a running app.

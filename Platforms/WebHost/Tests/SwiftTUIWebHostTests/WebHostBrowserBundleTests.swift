@@ -6,7 +6,7 @@ import Testing
 struct WebHostBrowserBundleTests {
   @Test("browser bundle contains index and JavaScript assets")
   func browserBundleContainsIndexAndJavaScriptAssets() throws {
-    let paths = try WebHostBrowserBundle.assetPaths()
+    let paths = try WebHostBrowserBundle.bundled.assetPaths()
 
     #expect(paths.contains("index.html"))
     #expect(paths.contains { $0.hasSuffix(".js") })
@@ -14,16 +14,18 @@ struct WebHostBrowserBundleTests {
 
   @Test("browser bundle resource lookup returns stable content types")
   func browserBundleResourceLookupReturnsStableContentTypes() throws {
-    let index = try WebHostBrowserBundle.resource(for: "/")
+    let index = try WebHostBrowserBundle.bundled.resource(for: "/")
     let scriptPath = try #require(
-      try WebHostBrowserBundle.assetPaths().first { $0.hasSuffix(".js") })
-    let script = try WebHostBrowserBundle.resource(for: "/\(scriptPath)")
+      try WebHostBrowserBundle.bundled.assetPaths().first { $0.hasSuffix(".js") })
+    let script = try WebHostBrowserBundle.bundled.resource(for: "/\(scriptPath)")
 
     #expect(index.contentType.hasPrefix("text/html"))
     #expect(script.contentType.hasPrefix("application/javascript"))
 
-    if let cssPath = try WebHostBrowserBundle.assetPaths().first(where: { $0.hasSuffix(".css") }) {
-      let css = try WebHostBrowserBundle.resource(for: "/\(cssPath)")
+    if let cssPath = try WebHostBrowserBundle.bundled.assetPaths().first(where: {
+      $0.hasSuffix(".css")
+    }) {
+      let css = try WebHostBrowserBundle.bundled.resource(for: "/\(cssPath)")
       #expect(css.contentType.hasPrefix("text/css"))
     }
   }
@@ -31,31 +33,25 @@ struct WebHostBrowserBundleTests {
   @Test("browser bundle index injects tokenized asset URLs")
   func browserBundleIndexInjectsTokenizedAssetURLs() throws {
     let html = String(
-      decoding: try WebHostBrowserBundle.indexHTML(token: WebHostToken(rawValue: "test-token")),
+      decoding: try WebHostBrowserBundle.bundled.indexHTML(
+        token: WebHostToken(rawValue: "test-token")),
       as: UTF8.self
     )
 
     #expect(html.contains("?token=test-token"))
   }
 
-  @Test("browser bundle serves all DOM font faces and their license")
-  func browserBundleServesDOMFonts() throws {
-    let paths = try WebHostBrowserBundle.assetPaths()
-    let fonts = paths.filter { $0.hasSuffix(".woff2") }
-    #expect(fonts.count == 4)
-    var totalBytes = 0
-    for path in fonts {
-      let resource = try WebHostBrowserBundle.resource(for: "/\(path)")
-      #expect(resource.contentType == "font/woff2")
-      #expect(resource.data.starts(with: Array("wOF2".utf8)))
-      totalBytes += resource.data.count
-    }
-    #expect(totalBytes == 407732)
-    let licensePath = try #require(paths.first { $0.hasSuffix("/LICENSE.md") })
-    let license = try WebHostBrowserBundle.resource(for: "/\(licensePath)")
-    #expect(
-      String(decoding: license.data, as: UTF8.self).uppercased().contains("SIL OPEN FONT LICENSE")
-    )
+  @Test("default browser bundle excludes the experimental DOM painter and fonts")
+  func browserBundleIsCanvasOnly() throws {
+    let paths = try WebHostBrowserBundle.bundled.assetPaths()
+    #expect(!paths.contains { $0.hasSuffix(".woff2") || $0.contains("swifttui-fonts") })
+    let scripts = try paths.filter { $0.hasSuffix(".js") }.map {
+      String(decoding: try WebHostBrowserBundle.bundled.resource(for: "/\($0)").data, as: UTF8.self)
+    }.joined()
+    #expect(scripts.contains("CanvasSurfacePainter"))
+    #expect(!scripts.contains("DomSurfacePainter"))
+    #expect(!scripts.contains("DomFontResources"))
+    #expect(!scripts.contains("IoskeleyMono-"))
   }
 
   @Test("browser bundle records the swift-tui-web revision it was built from")
@@ -63,7 +59,7 @@ struct WebHostBrowserBundleTests {
     // Scripts/update_webhost_bundle.sh writes this stamp; the coordination
     // root's webhost_bundle_provenance gate compares it against the pinned
     // swift-tui-web submodule to catch stale vendored bundles (F56).
-    let provenance = try WebHostBrowserBundle.resource(for: "/bundle-provenance.json")
+    let provenance = try WebHostBrowserBundle.bundled.resource(for: "/bundle-provenance.json")
     let decoded = try JSONSerialization.jsonObject(with: provenance.data)
     let record = try #require(decoded as? [String: Any])
 

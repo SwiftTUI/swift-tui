@@ -77,7 +77,8 @@ public enum WebHostRunner {
       throw AppLaunchError.noScenes
     }
 
-    let webConfiguration = configuration.web.map(WebHostConfig.init) ?? WebHostConfig()
+    var webConfiguration = configuration.web.map(WebHostConfig.init) ?? WebHostConfig()
+    webConfiguration.browserAssetsPath = configuration.browserAssetsPath
     let selection = try selectedScene(
       from: selections,
       requestedSceneID: webConfiguration.sceneID

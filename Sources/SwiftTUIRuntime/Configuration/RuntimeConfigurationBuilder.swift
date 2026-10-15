@@ -75,6 +75,14 @@ extension RuntimeConfiguration {
       return copy
     }
 
+    /// Serves an app-owned browser bundle in companion and browser-only modes.
+    /// The directory must contain `index.html` and its JavaScript/assets.
+    public func browserAssets(at path: String) -> Self {
+      var copy = self
+      copy.configuration.browserAssetsPath = path
+      return copy
+    }
+
     public func web(
       port: Int = 0,
       bind: String = "127.0.0.1",

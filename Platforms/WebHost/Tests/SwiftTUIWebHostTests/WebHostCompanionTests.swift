@@ -10,8 +10,8 @@ import Testing
 struct WebHostCompanionTests {
   @Test(
     "companion attaches to an already edited terminal graph and survives browser departure",
-    .timeLimit(.minutes(1)))
-  func terminalAndBrowserShareState() async throws {
+    .timeLimit(.minutes(1)), arguments: [nil, "/app/custom-browser"] as [String?])
+  func terminalAndBrowserShareState(browserAssetsPath: String?) async throws {
     let selection = collectWindowSceneSelections(
       from: WindowGroup("Counter", id: "counter") {
         SharedCounterView()
@@ -34,9 +34,12 @@ struct WebHostCompanionTests {
     input.send(.key(.init(.return)))
     await terminal.changed.wait { terminal.text.contains("Count 1") }
     let server = CompanionTestServer()
+    var configuration = RuntimeConfiguration.default
+    configuration.browserAssetsPath = browserAssetsPath
     let companion = try await WebHostCompanion.start(
-      endpoints: [endpoint], configuration: .default, server: server)
-    #expect(companion.url.contains("renderer=canvas"))
+      endpoints: [endpoint], configuration: configuration, server: server)
+    #expect(!companion.url.contains("renderer="))
+    #expect(await server.configuration?.browserAssetsPath == browserAssetsPath)
     let channel = try #require(await server.session?.channel)
     func attach() async -> (
       AsyncStream<WebHostSocketMessage>.Continuation, AsyncStream<WebHostSocketMessage>.Iterator
@@ -141,12 +144,14 @@ private final class CompanionTestInput: TerminalInputReading {
 }
 
 private actor CompanionTestServer: WebHostServer {
+  var configuration: WebHostConfig?
   var session: WebHostServerSession?
   var stopped = false
   func start(configuration: WebHostConfig, token: WebHostToken, scenes: [WebHostSceneDescriptor])
     async throws -> WebHostServerSession
   {
     #expect(configuration.bind == "127.0.0.1")
+    self.configuration = configuration
     let channels = Dictionary(uniqueKeysWithValues: scenes.map { ($0.id, WebHostSceneChannel()) })
     let session = WebHostServerSession(
       baseURL: URL(string: "http://127.0.0.1:12345/")!,

@@ -2868,6 +2868,7 @@ SwiftTUIRuntime.RunLoopResult.renderedFrames
 SwiftTUIRuntime.RuntimeConfiguration
 SwiftTUIRuntime.RuntimeConfiguration.Builder
 SwiftTUIRuntime.RuntimeConfiguration.Builder.accessibilityPreferences(_:)
+SwiftTUIRuntime.RuntimeConfiguration.Builder.browserAssets(at:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.build()
 SwiftTUIRuntime.RuntimeConfiguration.Builder.color(_:)
 SwiftTUIRuntime.RuntimeConfiguration.Builder.companion(_:port:)
@@ -2908,6 +2909,7 @@ SwiftTUIRuntime.RuntimeConfiguration.WebConfig.openBrowser
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig.port
 SwiftTUIRuntime.RuntimeConfiguration.WebConfig.sceneID
 SwiftTUIRuntime.RuntimeConfiguration.accessibilityPreferences
+SwiftTUIRuntime.RuntimeConfiguration.browserAssetsPath
 SwiftTUIRuntime.RuntimeConfiguration.builder()
 SwiftTUIRuntime.RuntimeConfiguration.color
 SwiftTUIRuntime.RuntimeConfiguration.companion
@@ -5719,8 +5721,9 @@ SwiftTUIWASI.WASIRunnerError.description
 SwiftTUIWASI.WASIRunnerError.nativeExecutionUnsupported
 SwiftTUIWebHost.WebHostConfig
 SwiftTUIWebHost.WebHostConfig.bind
+SwiftTUIWebHost.WebHostConfig.browserAssetsPath
 SwiftTUIWebHost.WebHostConfig.init(_:)
-SwiftTUIWebHost.WebHostConfig.init(bind:port:openBrowser:sceneID:)
+SwiftTUIWebHost.WebHostConfig.init(bind:port:openBrowser:sceneID:browserAssetsPath:)
 SwiftTUIWebHost.WebHostConfig.openBrowser
 SwiftTUIWebHost.WebHostConfig.port
 SwiftTUIWebHost.WebHostConfig.sceneID

@@ -8,6 +8,53 @@ import Testing
 #endif
 
 struct WebHostServerTests {
+  @Test("custom browser bundles serve authenticated assets and cannot escape their directory")
+  func customBrowserBundle() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let browser = directory.appendingPathComponent("browser")
+    try FileManager.default.createDirectory(at: browser, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    try Data("<script src=\"./dom.js\"></script>".utf8).write(
+      to: browser.appendingPathComponent("index.html"))
+    try Data("custom DOM entrypoint".utf8).write(to: browser.appendingPathComponent("dom.js"))
+    try Data("private".utf8).write(to: directory.appendingPathComponent("outside.js"))
+    #if !os(Windows)
+      try FileManager.default.createSymbolicLink(
+        at: browser.appendingPathComponent("escape.js"),
+        withDestinationURL: directory.appendingPathComponent("outside.js"))
+    #endif
+    try await withServer(browserAssetsPath: browser.path) { session in
+      let (data, response) = try await serverData(from: session.url(path: "/"))
+      #expect(try statusCode(from: response) == 200)
+      #expect(String(decoding: data, as: UTF8.self).contains("dom.js?token=test-token"))
+      let (script, scriptResponse) = try await serverData(from: session.url(path: "/dom.js"))
+      #expect(try statusCode(from: scriptResponse) == 200)
+      #expect(String(decoding: script, as: UTF8.self) == "custom DOM entrypoint")
+      let (_, unauthorized) = try await serverData(
+        from: session.url(path: "/dom.js", includeToken: false))
+      #expect(try statusCode(from: unauthorized) == 403)
+      let (_, missing) = try await serverData(from: session.url(path: "/missing.js"))
+      #expect(try statusCode(from: missing) == 404)
+      #if !os(Windows)
+        let (_, escaped) = try await serverData(from: session.url(path: "/escape.js"))
+        #expect(try statusCode(from: escaped) == 404)
+      #endif
+    }
+    #expect(throws: WebHostBrowserBundleError.self) {
+      try WebHostBrowserBundle(directory: browser.path).resource(for: "/../outside.js")
+    }
+  }
+
+  @Test("a missing custom browser directory fails startup instead of serving the default")
+  func missingCustomBrowserBundle() async throws {
+    let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+    await #expect(throws: WebHostBrowserBundleError.missingDirectory(path)) {
+      try await WebHostLoopbackServer().start(
+        configuration: .init(port: 0, browserAssetsPath: path),
+        token: WebHostToken(), scenes: [.init(id: "main")])
+    }
+  }
+
   @Test("default port policy uses preferred range while explicit zero is kernel assigned")
   func defaultPortPolicyUsesPreferredRangeWhileExplicitZeroIsKernelAssigned() {
     #expect(WebHostConfig().candidatePorts == Array(9123...9132))
@@ -178,13 +225,14 @@ struct WebHostServerTests {
 
 func withServer(
   scenes: [WebHostSceneDescriptor] = [.init(id: "main", title: "Main")],
+  browserAssetsPath: String? = nil,
   _ body: (WebHostServerSession) async throws -> Void
 ) async throws {
   await webHostNetworkTestGate.enter()
   do {
     let server = WebHostLoopbackServer()
     let session = try await server.start(
-      configuration: .init(bind: "127.0.0.1", port: 0),
+      configuration: .init(bind: "127.0.0.1", port: 0, browserAssetsPath: browserAssetsPath),
       token: WebHostToken(rawValue: "test-token"),
       scenes: scenes
     )
