@@ -34,7 +34,9 @@ public import SwiftTUICore
 ///           configuration.label
 ///         }
 ///       }
-///       configuration.content.padding(.leading, 2)
+///       VStack(alignment: .leading, spacing: 0) {
+///         configuration.content
+///       }.padding(.leading, 2)
 ///     }
 ///   }
 /// }
@@ -149,6 +151,9 @@ public struct DisclosureGroupStyleConfiguration: Sendable {
   /// ``DisclosureGroupStyleConfiguration/isExpanded`` is true, so placing this
   /// view unconditionally renders nothing in the collapsed state. Placing it in
   /// the body keeps the authored content's state and authoring scope.
+  /// Multiple authored children participate in the style's enclosing layout.
+  /// To indent them as a column, place this slot in a `VStack` and pad that
+  /// stack, so the padding wraps one laid-out view.
   public struct Content: View, Sendable {
     package let payload: CapturedSubviewPayload
     package var controlIdentity: Identity? = nil
@@ -465,7 +470,9 @@ private struct DisclosureGroupStyleBody: View {
         }
       }
       if configuration.isExpanded {
-        configuration.content.padding(.leading, 1)
+        VStack(alignment: .leading, spacing: 0) {
+          configuration.content
+        }.padding(.leading, 1)
       }
     }
   }

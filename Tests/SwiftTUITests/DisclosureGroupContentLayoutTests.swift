@@ -6,6 +6,38 @@ import Testing
 
 @MainActor
 struct DisclosureGroupContentLayoutTests {
+  @Test(
+    "built-in disclosure styles stack every expanded child before indenting",
+    arguments: [AnyDisclosureGroupStyle.automatic, .compact], [false, true])
+  func builtInContent(style: AnyDisclosureGroupStyle, repeated: Bool) throws {
+    let artifacts = DefaultRenderer().render(
+      DisclosureGroup("Details", isExpanded: .constant(true)) {
+        if repeated {
+          ForEach(["First", "Second", "Third"], id: \.self) { Text($0) }
+        } else {
+          Text("First")
+          Text("Second")
+          HStack(spacing: 1) {
+            Text("Third")
+            Text("row")
+          }
+        }
+      }.disclosureGroupStyle(style),
+      proposal: ProposedViewSize(width: 24, height: 6))
+    let lines = artifacts.rasterSurface.lines
+    #expect(lines[1].hasPrefix(" First"))
+    #expect(lines[2].hasPrefix(" Second"))
+    #expect(lines[3].hasPrefix(repeated ? " Third" : " Third row"))
+    let nodes = artifacts.semanticSnapshot.accessibilityNodes
+    let trigger = try #require(nodes.first { $0.label == "Details" })
+    let region = try #require(nodes.first { $0.role == .region })
+    #expect(trigger.properties?.controls == [region.identity])
+    #expect(region.properties?.labelledBy == [trigger.identity])
+    #expect(region.rect.origin == CellPoint(x: 1, y: 1))
+    #expect(region.rect.size.height == 3)
+    try expectContentAncestry(region, trigger: trigger, nodes: nodes)
+  }
+
   @Test("custom disclosure columns retain every authored layout element")
   func columnContent() throws {
     let artifacts = DefaultRenderer().render(
