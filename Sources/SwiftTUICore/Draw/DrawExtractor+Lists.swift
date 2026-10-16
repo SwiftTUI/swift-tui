@@ -58,16 +58,27 @@ package final class CollectionScrollLayoutMetadata: Equatable, Sendable {
   package let maximumAnchorRow: Int?
   package let position: CollectionScrollPosition?
   package let navigation: CollectionScrollLayout?
+  /// Positioned rows clip to the usable body below fixed chrome/indicators.
+  package let bodyStart: Int?
 
   package init?(
     maximumAnchorRow: Int?,
     position: CollectionScrollPosition?,
-    navigation: CollectionScrollLayout? = nil
+    navigation: CollectionScrollLayout? = nil,
+    bodyStart: Int? = nil
   ) {
     guard maximumAnchorRow != nil || position != nil || navigation != nil else { return nil }
     self.maximumAnchorRow = maximumAnchorRow
     self.position = position
     self.navigation = navigation
+    self.bodyStart = bodyStart
+  }
+
+  package func bodyClip(in bounds: CellRect) -> CellRect? {
+    guard let bodyStart, let navigation else { return nil }
+    return .init(
+      origin: .init(x: bounds.origin.x, y: bounds.origin.y + bodyStart),
+      size: .init(width: bounds.size.width, height: navigation.visibleLines.count))
   }
 
   package static func == (lhs: CollectionScrollLayoutMetadata, rhs: CollectionScrollLayoutMetadata)
@@ -75,7 +86,7 @@ package final class CollectionScrollLayoutMetadata: Equatable, Sendable {
   {
     lhs === rhs
       || (lhs.maximumAnchorRow == rhs.maximumAnchorRow && lhs.position == rhs.position
-        && lhs.navigation == rhs.navigation)
+        && lhs.navigation == rhs.navigation && lhs.bodyStart == rhs.bodyStart)
   }
 }
 
@@ -91,6 +102,7 @@ package struct ListVisibleLayout: Equatable, Sendable {
   /// Cell-based position and measured endpoints for browser scroll chaining.
   package var scrollPosition: CollectionScrollPosition? { scrollMetadata?.position }
   package var scrollMetadata: CollectionScrollLayoutMetadata?
+  package var bodyClip: CellRect? { scrollMetadata?.bodyClip(in: contentBounds) }
 
   package init(
     contentBounds: CellRect,
@@ -164,10 +176,14 @@ extension DrawExtractor {
     let lines = layout.lines
 
     for line in lines {
-      let lineBounds = CellRect(
+      var lineBounds = CellRect(
         origin: .init(x: contentBounds.origin.x, y: contentBounds.origin.y + line.yOffset),
         size: .init(width: contentBounds.size.width, height: max(1, line.height))
       )
+      if let clip = layout.bodyClip, line.itemIndex != nil || line.rowIndex != nil {
+        guard let visible = lineBounds.intersection(clip) else { continue }
+        lineBounds = visible
+      }
 
       switch line.kind {
       case .text(let content, let style):

@@ -163,6 +163,13 @@ extension ListStylePresentation {
     let contentBounds = listContentBounds(in: bounds)
     let geometry = CollectionScrollGeometry(
       rowCount: payload.rowCount, rowSpan: listRowDisplaySpan, rowHeights: rowHeights ?? [:])
+    if case .position = payload.scrollAnchor, contentBounds.size.height > 0,
+      !payload.isViewportBacked || geometry.displayLineCount > contentBounds.size.height
+    {
+      return positionedListLayout(
+        for: payload, in: contentBounds, geometry: geometry,
+        rowHeights: rowHeights, itemSizes: itemSizes)
+    }
     let generated = visibleListLines(
       for: payload,
       viewportLineCount: contentBounds.size.height,
@@ -242,6 +249,85 @@ extension ListStylePresentation {
       position: generated.scrollPosition,
       navigation: navigation
     )
+    return layout
+  }
+
+  /// Explicit cell positioning can start inside a row. Preserve that row's
+  /// measured origin and clip it, instead of rounding the requested line away.
+  private func positionedListLayout(
+    for payload: ListPayload, in bounds: CellRect,
+    geometry estimatedGeometry: CollectionScrollGeometry,
+    rowHeights: [Int: Int]?, itemSizes: [ChildAllocation]
+  ) -> ListVisibleLayout {
+    var geometry = estimatedGeometry
+    var body: [ListDisplayLine] = []
+    if !payload.isViewportBacked {
+      body = materializedListLines(for: payload)
+      var cursor = 0
+      var ranges: [Range<Int>] = []
+      for index in body.indices {
+        body[index].height = listLineHeight(
+          body[index], rowHeights: rowHeights, itemSizes: itemSizes)
+        body[index].yOffset = cursor
+        if body[index].rowIndex != nil { ranges.append(cursor..<(cursor + body[index].height)) }
+        cursor += body[index].height
+      }
+      geometry = .init(rowRanges: ranges, displayLineCount: cursor)
+    }
+    let indicators =
+      payload.showsIndicators && geometry.displayLineCount > bounds.size.height
+      && bounds.size.height >= 3
+    let capacity = bounds.size.height - (indicators ? 2 : 0)
+    let offset = geometry.positionedOffset(for: payload.scrollAnchor, capacity: capacity) ?? 0
+    let end = offset + capacity
+    if payload.isViewportBacked, geometry.rowCount > 0 {
+      var row = geometry.row(atOrBeforeLine: offset)
+      while row < geometry.rowCount, geometry.line(forRow: row) < end {
+        let range = geometry.lineRange(forRow: row)
+        var line = viewportBackedListLine(
+          at: row * geometry.rowSpan, payload: payload,
+          usesSectionChrome: container != nil && chromeScope == .eachSection,
+          rowSpan: geometry.rowSpan)
+        line.height = range.count
+        line.yOffset = range.lowerBound
+        body.append(line)
+        if geometry.rowSpan > 1, row + 1 < geometry.rowCount {
+          var separator = viewportBackedListLine(
+            at: row * geometry.rowSpan + 1, payload: payload,
+            usesSectionChrome: container != nil && chromeScope == .eachSection,
+            rowSpan: geometry.rowSpan)
+          separator.yOffset = range.upperBound
+          body.append(separator)
+        }
+        row += 1
+      }
+    }
+    var lines = body.filter { $0.yOffset < end && $0.yOffset + $0.height > offset }
+    for index in lines.indices { lines[index].yOffset += (indicators ? 1 : 0) - offset }
+    if indicators {
+      let style = TextStyle(foregroundStyle: .semantic(.separator), opacity: payload.opacity)
+      lines.insert(
+        .init(
+          kind: .text(offset == 0 ? "" : "↑", style), isHeader: true,
+          rowIndex: nil, yOffset: 0), at: 0)
+      lines.append(
+        .init(
+          kind: .text(end >= geometry.displayLineCount ? "" : "↓", style),
+          isHeader: true, rowIndex: nil, yOffset: bounds.size.height - 1))
+    }
+    var layout = ListVisibleLayout(
+      contentBounds: bounds, lines: lines,
+      sectionChromeBounds: sectionChromeBounds(
+        for: payload, lines: lines, in: bounds, totalContentHeight: bounds.size.height,
+        isWindowed: false), totalContentHeight: bounds.size.height)
+    layout.scrollMetadata = .init(
+      maximumAnchorRow: geometry.maxAnchorRow(viewportLineCount: capacity),
+      position: .init(
+        cellOffset: offset, isAtStart: offset == 0,
+        isAtEnd: end >= geometry.displayLineCount),
+      navigation: .init(
+        geometry: geometry, visibleLines: offset..<end, anchor: payload.scrollAnchor),
+      bodyStart: indicators ? 1 : 0)
     return layout
   }
 
@@ -498,7 +584,7 @@ extension ListStylePresentation {
       switch anchor {
       case .start:
         offset = 0
-      case .row(let rowIndex):
+      case .row(let rowIndex), .position(let rowIndex, _):
         let anchorLine =
           displayLines.firstIndex { $0.rowIndex == max(0, rowIndex) }
           ?? displayLines.count - 1

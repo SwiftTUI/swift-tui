@@ -77,6 +77,15 @@ extension LayoutEngine {
         in: bounds
       )
     }
+    if let clip = node.hostedListVisibleLayout?.bodyClip ?? node.hostedTableVisibleLayout?.bodyClip
+    {
+      for index in node.children.indices {
+        node.children[index].clipBounds =
+          node.children[index].clipBounds.map {
+            $0.intersection(clip) ?? .init(origin: clip.origin, size: .zero)
+          } ?? clip
+      }
+    }
     // Chaining uses the measured body extent and its usable window. Fixed
     // chrome occupies viewport cells but does not scroll with the rows.
     if let navigation = node.hostedListVisibleLayout?.scrollMetadata?.navigation

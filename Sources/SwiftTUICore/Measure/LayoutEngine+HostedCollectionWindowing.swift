@@ -70,6 +70,12 @@ extension LayoutEngine {
       // both exact and cheap.
       let visibleIndices: [Int]
       switch (collection.kind, node.drawPayload) {
+      case (.list, .list(let payload)) where isCellPosition(payload.scrollAnchor):
+        visibleIndices = positionedHostedCollectionWindow(
+          anchor: payload.scrollAnchor, count: source.count, capacity: concreteSize.height)
+      case (.table, .table(let payload)) where isCellPosition(payload.scrollAnchor):
+        visibleIndices = positionedHostedCollectionWindow(
+          anchor: payload.scrollAnchor, count: source.count, capacity: concreteSize.height)
       case (.list, .list(let payload)):
         visibleIndices = payload.style.visibleListLayout(for: payload, in: bounds).lines.compactMap(
           \.itemIndex
@@ -381,6 +387,24 @@ extension LayoutEngine {
     let lower = max(0, first - 1)
     let upper = min(count, last + 2)
     return Array(lower..<upper)
+  }
+
+  /// A cell position starts inside its anchor row. Realize a bounded band
+  /// around that row before measuring it; estimating every row as one cell
+  /// would skip a tall anchor, while using retained heights would change the
+  /// realization window after an otherwise reusable frame. One row per cell
+  /// bounds both the visible suffix and any backfill at the content's end.
+  private func positionedHostedCollectionWindow(
+    anchor: CollectionScrollAnchor?, count: Int, capacity: Int
+  ) -> [Int] {
+    let row = anchor?.rowIndex(rowCount: count) ?? 0
+    let span = max(1, capacity)
+    return Array(max(0, row - span)..<min(count, row + span + 1))
+  }
+
+  private func isCellPosition(_ anchor: CollectionScrollAnchor?) -> Bool {
+    if case .position = anchor { return true }
+    return false
   }
 
   /// The estimated-visible row band for a hosted collection under a scroll

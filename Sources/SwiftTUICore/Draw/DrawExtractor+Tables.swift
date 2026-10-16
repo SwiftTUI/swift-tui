@@ -43,6 +43,7 @@ package struct TableVisibleLayout: Equatable, Sendable {
   /// Cell-based position and measured endpoints for browser scroll chaining.
   package var scrollPosition: CollectionScrollPosition? { scrollMetadata?.position }
   package var scrollMetadata: CollectionScrollLayoutMetadata?
+  package var bodyClip: CellRect? { scrollMetadata?.bodyClip(in: contentBounds) }
 
   package init(
     contentBounds: CellRect,
@@ -124,10 +125,14 @@ extension DrawExtractor {
     let lines = layout.lines
 
     for line in lines {
-      let lineBounds = CellRect(
+      var lineBounds = CellRect(
         origin: .init(x: contentBounds.origin.x, y: contentBounds.origin.y + line.yOffset),
         size: .init(width: contentBounds.size.width, height: max(1, line.height))
       )
+      if let clip = layout.bodyClip, line.role == .row {
+        guard let visible = lineBounds.intersection(clip) else { continue }
+        lineBounds = visible
+      }
 
       if let backgroundStyle = line.backgroundStyle {
         commands.append(
@@ -294,6 +299,16 @@ extension DrawExtractor {
         columns: payload.columns,
         rows: payload.isViewportBacked ? [] : payload.rows
       )
+    if case .position = payload.scrollAnchor,
+      bounds.size.height > tableChromeLineCounts(for: payload).top + 1,
+      !payload.isViewportBacked
+        || geometry.displayLineCount > bounds.size.height - tableChromeLineCounts(for: payload).top
+          - 1
+    {
+      return positionedTableLayout(
+        for: payload, in: bounds, widths: widths, rowHeights: rowHeights ?? [:],
+        geometry: geometry)
+    }
     if !payload.isViewportBacked, let rowHeights {
       return materializedHostedTableLayout(
         for: payload, in: bounds, widths: widths, rowHeights: rowHeights)
@@ -359,6 +374,86 @@ extension DrawExtractor {
     return layout
   }
 
+  private func positionedTableLayout(
+    for payload: TablePayload, in bounds: CellRect, widths: [Int],
+    rowHeights: [Int: Int], geometry estimatedGeometry: CollectionScrollGeometry
+  ) -> TableVisibleLayout {
+    var chromePayload = payload
+    if payload.isViewportBacked { chromePayload.rows = [] }
+    let all = materializedTableLines(for: chromePayload, widths: widths)
+    let topCount = min(all.count, tableChromeLineCounts(for: payload).top)
+    let top = Array(all.prefix(topCount))
+    var bottom = Array(all.suffix(1))
+    var body = payload.isViewportBacked ? [] : Array(all.dropFirst(topCount).dropLast())
+    var geometry = estimatedGeometry
+    if !payload.isViewportBacked {
+      var cursor = 0
+      var ranges: [Range<Int>] = []
+      for index in body.indices {
+        body[index].height = body[index].rowIndex.flatMap { rowHeights[$0] }.map { max(1, $0) } ?? 1
+        body[index].yOffset = cursor
+        if body[index].rowIndex != nil { ranges.append(cursor..<(cursor + body[index].height)) }
+        cursor += body[index].height
+      }
+      geometry = .init(rowRanges: ranges, displayLineCount: cursor)
+    }
+    let bodyCapacity = max(1, bounds.size.height - top.count - bottom.count)
+    let indicators =
+      payload.showsIndicators && geometry.displayLineCount > bodyCapacity
+      && bodyCapacity >= 3
+    let capacity = bodyCapacity - (indicators ? 2 : 0)
+    let offset = geometry.positionedOffset(for: payload.scrollAnchor, capacity: capacity) ?? 0
+    let end = offset + capacity
+    if payload.isViewportBacked, geometry.rowCount > 0 {
+      let first = geometry.row(atOrBeforeLine: offset)
+      var last = first
+      while last < geometry.rowCount, geometry.line(forRow: last) < end { last += 1 }
+      let endPosition = min(geometry.rowCount * 2 - 1, last * 2)
+      body = viewportBackedTableBodyLines(
+        positions: (first * 2)..<endPosition,
+        payload: payload, widths: widths)
+      for index in body.indices {
+        let position = first * 2 + index
+        let range = geometry.lineRange(forRow: position / 2)
+        body[index].height = position.isMultiple(of: 2) ? range.count : 1
+        body[index].yOffset = position.isMultiple(of: 2) ? range.lowerBound : range.upperBound
+      }
+    }
+    let bodyStart = top.count + (indicators ? 1 : 0)
+    var lines = top
+    for index in lines.indices { lines[index].yOffset = index }
+    var visible = body.filter { $0.yOffset < end && $0.yOffset + $0.height > offset }
+    for index in visible.indices { visible[index].yOffset += bodyStart - offset }
+    lines.append(contentsOf: visible)
+    if indicators {
+      var above = overflowIndicatorLine(
+        widths: widths, payload: payload, symbol: offset == 0 ? "" : "↑")
+      above.yOffset = top.count
+      lines.append(above)
+      var below = overflowIndicatorLine(
+        widths: widths, payload: payload,
+        symbol: end >= geometry.displayLineCount ? "" : "↓")
+      below.yOffset = bodyStart + capacity
+      lines.append(below)
+    }
+    for index in bottom.indices {
+      bottom[index].yOffset = bounds.size.height - bottom.count + index
+    }
+    lines.append(contentsOf: bottom)
+    var layout = TableVisibleLayout(
+      contentBounds: bounds, lines: lines, widths: widths,
+      totalContentHeight: bounds.size.height)
+    layout.scrollMetadata = .init(
+      maximumAnchorRow: geometry.maxAnchorRow(viewportLineCount: capacity),
+      position: .init(
+        cellOffset: offset, isAtStart: offset == 0,
+        isAtEnd: end >= geometry.displayLineCount),
+      navigation: .init(
+        geometry: geometry, visibleLines: offset..<end, anchor: payload.scrollAnchor),
+      bodyStart: bodyStart)
+    return layout
+  }
+
   /// Hosted eager rows retain their measured cells, including optional separators.
   /// Payload-only tables keep the historical single-line materialized path.
   private func materializedHostedTableLayout(
@@ -406,7 +501,7 @@ extension DrawExtractor {
         switch anchor {
         case .start:
           offset = 0
-        case .row(let row):
+        case .row(let row), .position(let row, _):
           let target = body.firstIndex { $0.rowIndex == row } ?? maximum
           offset = min(target, maximum)
         case .end:

@@ -15,6 +15,121 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct CollectionScrollCurrencyTests {
+  @Test(
+    "explicit anchors retain offsets inside a tall preceding row",
+    arguments: [MeasuredCurrencyAnchor.top, .center, .bottom], [false, true])
+  private func explicitAnchorInsideTallRow(anchor: MeasuredCurrencyAnchor, indexed: Bool) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PartialRowAnchor", anchor.rawValue, String(indexed)),
+      size: .init(width: 32, height: 14)
+    ) {
+      ScrollViewReader { proxy in
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Jump") { _ = proxy.scrollTo(1, anchor: anchor.point) }
+          if indexed {
+            List(0..<12, id: \.self) { row in
+              MeasuredCurrencyRow(row: row, lines: row == 0 ? 9 : 2)
+            }
+            .listStyle(CompactCurrencyListStyle())
+            .scrollIndicators(.hidden)
+            .frame(height: 10)
+          } else {
+            List {
+              ForEach(0..<12, id: \.self) { row in
+                MeasuredCurrencyRow(row: row, lines: row == 0 ? 9 : 2).id(row)
+              }
+            }
+            .listStyle(CompactCurrencyListStyle())
+            .scrollIndicators(.hidden)
+            .frame(height: 10)
+          }
+          Text("After list")
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Jump")
+    let viewport = try #require(harness.runLoop.latestSemanticSnapshot.scrollRoutes.first)
+    let lines = harness.frame.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+    let first = try #require(lines.firstIndex { $0.contains("«1»:0") }, "\(harness.frame)")
+    let expected = anchor == .top ? 0 : anchor == .center ? 4 : 8
+    #expect(first == viewport.viewportRect.origin.y + expected, "\(harness.frame)")
+    #expect(lines[first + 1].contains("«1»:1"))
+    #expect(lines[0].contains("Jump"))
+    #expect(lines[11].contains("After list"))
+  }
+
+  @Test("offset scrolling reaches and retains the same footer end as the End key")
+  func offsetScrollReachesFooterEnd() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("FooterOffsetEnd"), size: .init(width: 32, height: 12)
+    ) { SectionEdgeCurrencyRows() }
+    defer { harness.shutdown() }
+    let registry = harness.runLoop.localScrollPositionRegistry
+    let identity = try #require(harness.runLoop.latestSemanticSnapshot.scrollRoutes.first?.identity)
+    _ = try harness.focus(identity)
+    _ = try harness.pressKey(KeyPress(.end))
+    let endOffset = try #require(
+      registry.routesWithCurrentOffsets(harness.runLoop.latestSemanticSnapshot.scrollRoutes).first?
+        .contentOffset)
+    _ = try harness.pressKey(KeyPress(.home))
+    _ = registry.scrollBy(x: 0, y: 100, scopeIdentity: identity)
+    try harness.render()
+    #expect(harness.frame.contains("footer:0"), "\(harness.frame)")
+    #expect(harness.frame.contains("footer:1"), "\(harness.frame)")
+    #expect(
+      registry.routesWithCurrentOffsets(harness.runLoop.latestSemanticSnapshot.scrollRoutes).first?
+        .contentOffset == endOffset)
+    #expect(registry.collectionScrollLayout(scopeIdentity: identity)?.anchor == .end)
+  }
+
+  @Test(
+    "table explicit anchors clip tall preceding rows without covering fixed chrome",
+    arguments: [MeasuredCurrencyAnchor.top, .center, .bottom], [false, true])
+  private func tableExplicitAnchorInsideTallRow(anchor: MeasuredCurrencyAnchor, indexed: Bool)
+    throws
+  {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PartialTableRowAnchor", anchor.rawValue, String(indexed)),
+      size: .init(width: 32, height: 16)
+    ) {
+      ScrollViewReader { proxy in
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Jump") { _ = proxy.scrollTo(1, anchor: anchor.point) }
+          if indexed {
+            Table(0..<12, id: \.self, columns: [TableColumn("Value", width: 20)]) { row in
+              MeasuredCurrencyRow(row: row, lines: row == 0 ? 9 : 2)
+            }
+            .tableHeaders(.hidden)
+            .scrollIndicators(.hidden)
+            .frame(height: 12)
+          } else {
+            Table(columns: [TableColumn("Value", width: 20)]) {
+              ForEach(0..<12, id: \.self) { row in
+                TableRow { MeasuredCurrencyRow(row: row, lines: row == 0 ? 9 : 2) }.id(row)
+              }
+            }
+            .tableHeaders(.hidden)
+            .scrollIndicators(.hidden)
+            .frame(height: 12)
+          }
+          Text("After table")
+        }
+      }
+    }
+    defer { harness.shutdown() }
+    _ = try harness.clickText("Jump")
+    let lines = harness.frame.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+    let first = try #require(lines.firstIndex { $0.contains("«1»:0") }, "\(harness.frame)")
+    let expected = anchor == .top ? 0 : anchor == .center ? 4 : 8
+    #expect(first == 2 + expected, "\(harness.frame)")
+    #expect(lines[first + 1].contains("«1»:1"))
+    #expect(lines[0].contains("Jump"))
+    #expect(!lines[1].contains("«"))
+    #expect(!lines[12].contains("«"))
+    #expect(lines[13].contains("After table"))
+  }
+
   @Test("web chaining retains headroom until a tall materialized list reaches its measured end")
   func tallMaterializedListChaining() throws {
     let harness = try StressRuntimeHarness(

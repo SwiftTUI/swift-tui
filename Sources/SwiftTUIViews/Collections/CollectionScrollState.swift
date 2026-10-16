@@ -57,11 +57,17 @@ package struct CollectionScrollCurrency {
   /// measured viewport. Before that frame, use the latest known extent.
   package var effectiveAnchorRow: Int {
     if let layout, layout.anchor == storedAnchor {
+      if case .position = storedAnchor {
+        return geometry.row(atOrBeforeLine: layout.visibleLines.lowerBound)
+      }
       // Whole-row fitting may leave a separator at the top of a table. The
       // following row, not the row before that separator, starts this window.
       return geometry.row(atOrAfterLine: layout.visibleLines.lowerBound)
     }
     if let storedAnchor {
+      if case .position = storedAnchor {
+        return storedAnchor.rowIndex(rowCount: geometry.rowCount)
+      }
       return min(storedAnchor.rowIndex(rowCount: geometry.rowCount), maxAnchorRow)
     }
     return geometry.row(atOrBeforeLine: windowMetrics(viewportLineCount).offset)
@@ -112,6 +118,8 @@ package struct CollectionScrollCurrency {
     case .start: offset = 0
     case .end: offset = max(0, geometry.displayLineCount - visibleLineCount)
     case .row(let index): offset = geometry.line(forRow: min(index, maxAnchorRow))
+    case .position:
+      offset = geometry.positionedOffset(for: storedAnchor, capacity: visibleLineCount) ?? 0
     case nil: offset = windowMetrics(viewportLineCount).offset
     }
     return ScrollOffset(y: offset)
@@ -120,8 +128,12 @@ package struct CollectionScrollCurrency {
   package func applyOffset(_ offset: ScrollOffset) {
     if offset.y <= 0 {
       _ = setAnchor(.start)
+    } else if visibleLineCount > 0,
+      offset.y >= max(0, geometry.displayLineCount - visibleLineCount)
+    {
+      _ = setAnchor(.end)
     } else {
-      setAnchorRow(geometry.row(atOrAfterLine: offset.y))
+      _ = setAnchorLine(offset.y)
     }
   }
 
@@ -135,6 +147,14 @@ package struct CollectionScrollCurrency {
   @discardableResult
   package func setAnchorRow(_ rowIndex: Int) -> Bool {
     setAnchor(.row(min(max(0, rowIndex), geometry.lastRowIndex)))
+  }
+
+  private func setAnchorLine(_ line: Int) -> Bool {
+    if line <= 0 { return setAnchor(.start) }
+    let row = geometry.row(atOrBeforeLine: line)
+    let offset = line - geometry.line(forRow: row)
+    return offset == 0
+      ? setAnchorRow(row) : setAnchor(.position(row: row, lineOffset: offset))
   }
 
   /// Moves the anchor by whole rows.
@@ -268,7 +288,7 @@ package struct CollectionScrollCurrency {
     }
     let targetLines = geometry.lineRange(forRow: rowIndex)
     let offsetLines = Int((Double(max(0, visible - targetLines.count)) * anchor.y).rounded())
-    return setAnchorRow(geometry.row(atOrAfterLine: max(0, targetLines.lowerBound - offsetLines)))
+    return setAnchorLine(max(0, targetLines.lowerBound - offsetLines))
   }
 }
 

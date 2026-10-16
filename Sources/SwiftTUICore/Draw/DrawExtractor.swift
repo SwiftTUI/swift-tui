@@ -498,6 +498,16 @@ extension DrawExtractor {
     }
 
     var clippedChildNodes = childNodes
+    if let clip = placed.hostedListVisibleLayout?.bodyClip
+      ?? placed.hostedTableVisibleLayout?.bodyClip
+    {
+      for index in clippedChildNodes.indices {
+        clippedChildNodes[index].clipBounds =
+          clippedChildNodes[index].clipBounds.map {
+            $0.intersection(clip) ?? .init(origin: clip.origin, size: .zero)
+          } ?? clip
+      }
+    }
     if drawMetadata.scrollIndicatorAppearance != nil,
       let contentClip = placed.scrollViewportRect
     {

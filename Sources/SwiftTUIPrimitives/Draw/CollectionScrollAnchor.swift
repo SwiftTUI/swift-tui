@@ -3,6 +3,8 @@
 package enum CollectionScrollAnchor: Equatable, Sendable {
   case start
   case row(Int)
+  /// A cell position relative to a row, including positions inside tall rows.
+  case position(row: Int, lineOffset: Int)
   case end
 
   package func rowIndex(rowCount: Int) -> Int {
@@ -10,6 +12,7 @@ package enum CollectionScrollAnchor: Equatable, Sendable {
     switch self {
     case .start: return 0
     case .row(let index): return min(max(0, index), last)
+    case .position(let index, _): return min(max(0, index), last)
     case .end: return last
     }
   }
