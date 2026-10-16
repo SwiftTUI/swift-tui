@@ -13,6 +13,15 @@ public final class InputReader: InputReading, TerminalInputReading,
   private let mouseCoordinateMode: Mutex<MouseCoordinateMode>
   private let controlHandler: @Sendable (TerminalControlMessage) -> Void
   private let controlChannelEnabled: Bool
+  private let probeInput = Mutex<[UInt8]>([])
+
+  private func takeProbeInput() -> [UInt8] {
+    probeInput.withLock { bytes in
+      let result = bytes
+      bytes.removeAll(keepingCapacity: true)
+      return result
+    }
+  }
   #if canImport(WASILibc) || canImport(ucrt)
     private let pollGate = TerminalInputPollGate()
   #endif
@@ -23,7 +32,11 @@ public final class InputReader: InputReading, TerminalInputReading,
     /// descriptor (F42).
     private struct SuspendableSourceRegistry {
       var nextID: UInt64 = 0
-      var sources: [UInt64: (source: any DispatchSourceRead, queue: DispatchQueue)] = [:]
+      var sources:
+        [UInt64: (
+          source: any DispatchSourceRead, queue: DispatchQueue,
+          replay: any DispatchSourceUserDataAdd
+        )] = [:]
     }
 
     private let suspendableSources = OSAllocatedUnfairLock(
@@ -32,11 +45,12 @@ public final class InputReader: InputReading, TerminalInputReading,
 
     private func registerSuspendableSource(
       _ source: any DispatchSourceRead,
-      queue: DispatchQueue
+      queue: DispatchQueue,
+      replay: any DispatchSourceUserDataAdd
     ) -> UInt64 {
       suspendableSources.withLockUnchecked { registry in
         registry.nextID += 1
-        registry.sources[registry.nextID] = (source, queue)
+        registry.sources[registry.nextID] = (source, queue, replay)
         return registry.nextID
       }
     }
@@ -177,7 +191,9 @@ extension InputReader {
         while !Task.isCancelled {
           guard
             let result = pollGate.read({
-              readTerminalInputChunk(from: fileDescriptor, maxBytes: 512)
+              let replay = takeProbeInput()
+              return replay.isEmpty
+                ? readTerminalInputChunk(from: fileDescriptor, maxBytes: 512) : .bytes(replay)
             })
           else {
             try? await Task.sleep(nanoseconds: 2_000_000)
@@ -260,7 +276,9 @@ extension InputReader {
         while !Task.isCancelled {
           guard
             let result = pollGate.read({
-              readTerminalInputChunk(from: fileDescriptor, maxBytes: 512)
+              let replay = takeProbeInput()
+              return replay.isEmpty
+                ? readTerminalInputChunk(from: fileDescriptor, maxBytes: 512) : .bytes(replay)
             })
           else {
             try? await Task.sleep(nanoseconds: 2_000_000)
@@ -343,7 +361,10 @@ extension InputReader {
         while !Task.isCancelled {
           guard
             let result = pollGate.read({
-              Self.readWindowsInput(controller: controller, fileDescriptor: fileDescriptor)
+              let replay = takeProbeInput()
+              return replay.isEmpty
+                ? Self.readWindowsInput(controller: controller, fileDescriptor: fileDescriptor)
+                : .bytes(replay)
             })
           else {
             try? await Task.sleep(nanoseconds: 2_000_000)
@@ -423,7 +444,10 @@ extension InputReader {
         while !Task.isCancelled {
           guard
             let result = pollGate.read({
-              Self.readWindowsInput(controller: controller, fileDescriptor: fileDescriptor)
+              let replay = takeProbeInput()
+              return replay.isEmpty
+                ? Self.readWindowsInput(controller: controller, fileDescriptor: fileDescriptor)
+                : .bytes(replay)
             })
           else {
             try? await Task.sleep(nanoseconds: 2_000_000)
@@ -479,7 +503,6 @@ extension InputReader {
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
-        let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<InputEvent>(
           mouseCoordinateMode: mouseCoordinateMode,
           currentMouseCoordinateMode: { [weak self] in
@@ -563,13 +586,9 @@ extension InputReader {
           )
         }
 
-        source.setEventHandler {
-          let drainResult = drainAvailableTerminalInput(
-            from: fileDescriptor,
-            maxBytesPerRead: 256
-          )
-          if !drainResult.bytes.isEmpty {
-            let decoded = decoder.decode(drainResult.bytes)
+        let consumeInput = { (bytes: [UInt8]) in
+          if !bytes.isEmpty {
+            let decoded = decoder.decode(bytes)
             for message in decoded.controlMessages {
               flushPendingMouseEvents()
               controlHandler(message)
@@ -586,7 +605,18 @@ extension InputReader {
             }
             reconcileEscapeDisambiguation()
           }
-
+        }
+        let replaySource = DispatchSource.makeUserDataAddSource(queue: queue)
+        replaySource.setEventHandler { consumeInput(self.takeProbeInput()) }
+        let suspendableID = self.registerSuspendableSource(
+          source, queue: queue, replay: replaySource)
+        source.setEventHandler {
+          consumeInput(self.takeProbeInput())
+          let drainResult = drainAvailableTerminalInput(
+            from: fileDescriptor,
+            maxBytesPerRead: 256
+          )
+          consumeInput(drainResult.bytes)
           if drainResult.shouldFinish {
             flushPendingMouseEvents()
             flushPendingEscape()
@@ -601,12 +631,15 @@ extension InputReader {
         // deregistration and crash it (Linux release soundness lane).
         source.setCancelHandler {
           self.unregisterSuspendableSource(suspendableID)
+          replaySource.cancel()
           scheduledFlush?.cancel()
           scheduledEscapeFlush?.cancel()
           flushPendingMouseEvents()
           continuation.finish()
         }
 
+        replaySource.resume()
+        replaySource.add(data: 1)
         source.resume()
 
         return { _ in
@@ -626,7 +659,6 @@ extension InputReader {
         let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
-        let suspendableID = self.registerSuspendableSource(source, queue: queue)
         var decoder = TerminalInputEventDecoder<Event>(
           mouseCoordinateMode: mouseCoordinateMode,
           currentMouseCoordinateMode: { [weak self] in
@@ -665,13 +697,9 @@ extension InputReader {
           )
         }
 
-        source.setEventHandler {
-          let drainResult = drainAvailableTerminalInput(
-            from: fileDescriptor,
-            maxBytesPerRead: 256
-          )
-          if !drainResult.bytes.isEmpty {
-            let decoded = decoder.decode(drainResult.bytes)
+        let consumeInput = { (bytes: [UInt8]) in
+          if !bytes.isEmpty {
+            let decoded = decoder.decode(bytes)
             for message in decoded.controlMessages {
               controlHandler(message)
             }
@@ -681,7 +709,18 @@ extension InputReader {
             }
             reconcileEscapeDisambiguation()
           }
-
+        }
+        let replaySource = DispatchSource.makeUserDataAddSource(queue: queue)
+        replaySource.setEventHandler { consumeInput(self.takeProbeInput()) }
+        let suspendableID = self.registerSuspendableSource(
+          source, queue: queue, replay: replaySource)
+        source.setEventHandler {
+          consumeInput(self.takeProbeInput())
+          let drainResult = drainAvailableTerminalInput(
+            from: fileDescriptor,
+            maxBytesPerRead: 256
+          )
+          consumeInput(drainResult.bytes)
           if drainResult.shouldFinish {
             scheduledEscapeFlush?.cancel()
             scheduledEscapeFlush = nil
@@ -695,10 +734,13 @@ extension InputReader {
         // Finish only after deregistration; see the input-event stream above.
         source.setCancelHandler {
           self.unregisterSuspendableSource(suspendableID)
+          replaySource.cancel()
           scheduledEscapeFlush?.cancel()
           continuation.finish()
         }
 
+        replaySource.resume()
+        replaySource.add(data: 1)
         source.resume()
 
         return { _ in
@@ -710,6 +752,17 @@ extension InputReader {
 }
 
 extension InputReader: TerminalInputHandoffSuspending {
+  package func replayProbeInput(_ bytes: [UInt8]) {
+    guard !bytes.isEmpty else { return }
+    probeInput.withLock { $0.append(contentsOf: bytes) }
+    #if !canImport(WASILibc) && !canImport(ucrt)
+      let entries = suspendableSources.withLockUnchecked { registry in
+        Array(registry.sources.values)
+      }
+      for entry in entries { entry.replay.add(data: 1) }
+    #endif
+  }
+
   /// Suspends every live read source, barriers their queues so no in-flight
   /// drain can still consume the probe's reply, runs `body`, then resumes.
   /// Called from the main-actor capability probe; not reentrant.

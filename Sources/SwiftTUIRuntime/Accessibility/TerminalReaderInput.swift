@@ -169,6 +169,10 @@ package final class TerminalReaderInput: @preconcurrency TerminalInputReading,
   package func updateInputCapabilities(_ capabilities: ResolvedTerminalInputCapabilities) {
     (source as? any TerminalInputCapabilityConfiguring)?.updateInputCapabilities(capabilities)
   }
+  package nonisolated func replayProbeInput(_ bytes: [UInt8]) {
+    handoff?.replayProbeInput(bytes)
+  }
+
   package nonisolated func withInputSuspended<T>(_ body: () throws -> T) rethrows -> T {
     if let handoff { return try handoff.withInputSuspended(body) }
     return try body()

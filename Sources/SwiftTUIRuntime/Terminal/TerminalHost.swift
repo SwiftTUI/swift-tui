@@ -623,6 +623,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         guard !bytes.isEmpty else {
           break
         }
+        inputSuspensionGate?.replayProbeInput(bytes)
         buffer.append(contentsOf: bytes)
 
         if let response = query.extractResponse(from: buffer),

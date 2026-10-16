@@ -200,6 +200,7 @@ import SwiftTUICore
         if bytes.isEmpty {
           break
         }
+        inputSuspensionGate?.replayProbeInput(bytes)
         buffer.append(contentsOf: bytes)
 
         switch query {

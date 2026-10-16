@@ -296,6 +296,8 @@ private final class HandoffInputReader: TerminalInputReading, TerminalInputHando
     recorder.append("synchronize-input-capabilities")
   }
 
+  func replayProbeInput(_: [UInt8]) {}
+
   func withInputSuspended<T>(_ body: () throws -> T) rethrows -> T {
     recorder.append("suspend-input")
     defer {

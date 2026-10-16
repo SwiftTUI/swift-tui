@@ -11,6 +11,11 @@
 /// uncontended descriptor and real terminals answer in milliseconds.
 package protocol TerminalInputSuspending: Sendable {
   func withInputSuspended<T>(_ body: () throws -> T) rethrows -> T
+  /// Returns bytes read by a capability probe to the ordinary input decoder.
+  /// Call inside the suspension window, before descriptor reading resumes.
+  /// The decoder discards protocol replies and retains interleaved user input
+  /// and incomplete sequences in their original order.
+  func replayProbeInput(_ bytes: [UInt8])
 }
 
 /// Extends descriptor-probe suspension across an awaited terminal handoff.

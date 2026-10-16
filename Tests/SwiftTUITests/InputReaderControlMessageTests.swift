@@ -19,6 +19,38 @@
   @Suite
   struct InputReaderControlMessageTests {
     @Test(
+      "probe replay uses the live decoder before subsequent descriptor bytes",
+      arguments: [false, true], [false, true])
+    func probeReplay(terminalEvents: Bool, beforeStream: Bool) async throws {
+      var descriptors: [Int32] = [-1, -1]
+      try #require(unsafe pipe(&descriptors) == 0)
+      defer { _ = close(descriptors[0]) }
+      let flags = fcntl(descriptors[0], F_GETFL)
+      try #require(fcntl(descriptors[0], F_SETFL, flags | O_NONBLOCK) == 0)
+      let reader = InputReader(fileDescriptor: descriptors[0])
+      let prefix =
+        Array("a\u{1B}]10;rgb:f/f/f\u{7}b\u{1B}[?1016;2$y\u{1B}[?5u\u{1B}[?62;4c".utf8)
+        + Array("😀".utf8.prefix(2))
+      func replay() {
+        reader.withInputSuspended { reader.replayProbeInput(prefix) }
+      }
+      if beforeStream { replay() }
+      let events = terminalEvents ? reader.inputEvents() : nil
+      let keys = terminalEvents ? nil : reader.events()
+      if !beforeStream { replay() }
+      try writeAllBytes(Array("😀".utf8.dropFirst(2)) + Array("c".utf8), to: descriptors[1])
+      _ = close(descriptors[1])
+      var received: [InputEvent] = []
+      if let events {
+        for await event in events { received.append(event) }
+      } else if let keys {
+        for await key in keys { received.append(.key(key)) }
+      }
+      #expect(received == Array("ab😀c").map { .key(.character($0)) })
+      #expect(reader.liveReadSourceCount == 0)
+    }
+
+    @Test(
       "STUI-510: EOF resolves pending escape prefixes on both streams",
       arguments: [false, true], ["\u{1B}", "\u{1B}O", "\u{1B}]", "\u{1B}P", "\u{1B}]unfinished"])
     func escapeAtEOF(terminalEvents: Bool, suffix: String) async throws {

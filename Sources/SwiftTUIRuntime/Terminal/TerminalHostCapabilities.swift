@@ -227,6 +227,7 @@ import SwiftTUICore
           }
           continue
         }
+        inputSuspensionGate?.replayProbeInput(bytes)
         buffer.append(contentsOf: bytes)
 
         switch query {

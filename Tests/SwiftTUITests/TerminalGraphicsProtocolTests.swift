@@ -15,6 +15,33 @@ import Testing
 @MainActor
 @Suite
 struct TerminalGraphicsProtocolTests {
+  @Test("every capability probe returns interleaved input on success and timeout")
+  func capabilityProbesPreserveInput() throws {
+    let gate = SpyInputSuspensionGate()
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [Array("a\u{1B}]10;rgb:f/f/f\u{7}b".utf8), Array("c".utf8), []])
+    let host = TerminalHost(
+      inputFileDescriptor: 0, outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24), controller: controller,
+      capabilityProfile: .trueColor, environment: ["TERM": "unknown"])
+    host.inputSuspensionGate = gate
+    let surface = TerminalReaderSurface(terminal: host, enabled: true)
+    try surface.enableRawMode()
+    defer { try? surface.disableRawMode() }
+    try surface.setReading(false)
+    #expect(gate.replayed == Array("a\u{1B}]10;rgb:f/f/f\u{7}bc".utf8))
+
+    controller.enqueue([Array("d\u{1B}[?1016;2$ye".utf8)])
+    _ = try host.performInputCapabilityQuery(.decPrivateMode(mode: 1016))
+    controller.enqueue([Array("f\u{1B}[?5u\u{1B}[?62;4cg".utf8)])
+    _ = try host.performInputCapabilityQuery(.kittyKeyboardFlags)
+    controller.enqueue([Array("h\u{1B}[?62;4ci".utf8), []])
+    _ = host.resolvedGraphicsCapabilities(probingProtocols: true)
+    var parser = TerminalInputParser()
+    #expect(parser.feed(gate.replayed) == Array("abcdefghi").map { .key(.character($0)) })
+  }
+
   @Test(
     "reader-to-grid appearance probes suspend input and restore decoder capabilities",
     arguments: [false, true])
@@ -2142,6 +2169,10 @@ private final class GraphicsProtocolMockTerminalController:
     isTTYValue
   }
 
+  func enqueue(_ responses: [[UInt8]]) {
+    queuedReadResponsesStorage.withLock { $0.append(contentsOf: responses) }
+  }
+
   func enterRawMode(input _: Int32, output _: Int32) throws -> TerminalModeSnapshot {
     TerminalModeSnapshot()
   }
@@ -2180,6 +2211,12 @@ private final class GraphicsProtocolMockTerminalController:
 /// happen inside one (F42).
 private final class SpyInputSuspensionGate: TerminalInputSuspending {
   private let state = LockedBox<(engagements: Int, depth: Int)>((0, 0))
+  private let replayStorage = LockedBox<[UInt8]>([])
+  var replayed: [UInt8] { replayStorage.value }
+  func replayProbeInput(_ bytes: [UInt8]) {
+    #expect(isSuspended)
+    replayStorage.withLock { $0.append(contentsOf: bytes) }
+  }
 
   var engagements: Int { state.value.engagements }
   var isSuspended: Bool { state.value.depth > 0 }
