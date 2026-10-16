@@ -7,6 +7,68 @@ import Testing
 @Suite
 struct LocalScrollPositionRegistryTests {
   @Test(
+    "nonmatching and unrelated-route commands do not suppress focus relocation",
+    arguments: [false, true]
+  )
+  func commandsOnlySuppressTheirOwnRoute(targetsOtherRoute: Bool) {
+    let registry = LocalScrollPositionRegistry()
+    let scroll = testIdentity("CommandScope", "Scroll")
+    let other = testIdentity("CommandScope", "Other")
+    let focus = scroll.child(.named("Button"))
+    var offset = ScrollOffset.zero
+    registry.register(identity: scroll, currentOffset: { offset }, applyOffset: { offset = $0 })
+    registry.register(identity: other, currentOffset: { .zero }, applyOffset: { _ in })
+    let viewport = CellRect(origin: .zero, size: CellSize(width: 20, height: 5))
+    let route = ScrollRoute(
+      identity: scroll, viewportRect: viewport,
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 30)))
+    let otherRoute = ScrollRoute(
+      identity: other, viewportRect: viewport,
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 30)))
+    let region = FocusRegion(
+      identity: focus, rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)))
+    _ = registry.sync(
+      focusedIdentity: focus, focusRegions: [region], scrollRoutes: [route, otherRoute],
+      scrollTargets: [ScrollTarget(identity: focus, scrollIdentity: scroll, rect: region.rect)])
+    if targetsOtherRoute {
+      #expect(!registry.scrollTo(y: 0, scopeIdentity: other))
+    } else {
+      #expect(
+        !registry.scrollToTarget(
+          ScrollTargetQuery(identity: testIdentity("Missing")), anchor: nil, scopeIdentity: scroll))
+    }
+    let moved = CellRect(origin: CellPoint(x: 0, y: 12), size: CellSize(width: 4, height: 1))
+    #expect(
+      registry.sync(
+        focusedIdentity: focus, focusRegions: [region], scrollRoutes: [route, otherRoute],
+        scrollTargets: [ScrollTarget(identity: focus, scrollIdentity: scroll, rect: moved)]))
+    #expect(offset == ScrollOffset(x: 0, y: 8))
+  }
+
+  @Test("new focus retains priority over an equal-offset command")
+  func newFocusRevealsAfterEqualOffsetCommand() {
+    let registry = LocalScrollPositionRegistry()
+    let scroll = testIdentity("NewFocusCommand")
+    let first = scroll.child(.named("First"))
+    let next = scroll.child(.named("Next"))
+    var offset = ScrollOffset.zero
+    registry.register(identity: scroll, currentOffset: { offset }, applyOffset: { offset = $0 })
+    let route = ScrollRoute(
+      identity: scroll,
+      viewportRect: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 30)))
+    let firstRegion = FocusRegion(
+      identity: first, rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)))
+    let nextRegion = FocusRegion(
+      identity: next,
+      rect: CellRect(origin: CellPoint(x: 0, y: 12), size: CellSize(width: 4, height: 1)))
+    _ = registry.sync(focusedIdentity: first, focusRegions: [firstRegion], scrollRoutes: [route])
+    #expect(!registry.scrollTo(y: 0, scopeIdentity: scroll))
+    #expect(registry.sync(focusedIdentity: next, focusRegions: [nextRegion], scrollRoutes: [route]))
+    #expect(offset == ScrollOffset(x: 0, y: 8))
+  }
+
+  @Test(
     "same-anchor collection commands refine the latest target once and yield to newer input",
     arguments: [false, true], [false, true]
   )

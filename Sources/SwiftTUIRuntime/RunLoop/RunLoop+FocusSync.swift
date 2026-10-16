@@ -161,6 +161,7 @@ extension RunLoop {
     convergence: inout FocusSyncConvergenceState
   ) throws -> FocusSyncIterationOutcome {
     let previousScrollRoutes = latestSemanticSnapshot.scrollRoutes
+    let previousScrollTargets = latestSemanticSnapshot.scrollTargets
     latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
     // Order is load-bearing (F101): gesture pruning first, then the pointer
     // capture/hover paired-region pass below. The pointer registry does not
@@ -239,25 +240,37 @@ extension RunLoop {
       shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyDefaultFocus
     )
 
-    // Changes to row heights or viewport size can hide the focused collection row.
-    // Reveal it before replacing focus regions, using the existing one-pass budget.
-    if !convergence.didEagerFocusLocationRerender, pendingKeyFocus == nil,
-      hotReloadSession?.pendingFocus == nil,
-      desiredFocusRequest == .none, defaultFocusRequest == .none,
-      nextModalFocusScopePath == previousModalFocusScopePath,
+    // Recover a displaced visible target before replacing the old focus regions.
+    // Authored focus requests and modal transitions retain priority.
+    let canRecoverFocusedGeometry =
+      !convergence.didEagerFocusLocationRerender && pendingKeyFocus == nil
+      && hotReloadSession?.pendingFocus == nil && desiredFocusRequest == .none
+      && defaultFocusRequest == .none
+      && nextModalFocusScopePath == previousModalFocusScopePath
+    var recoveredFocusedGeometry = false
+    if canRecoverFocusedGeometry,
       let focusedIdentity = focusTracker.currentFocusIdentity,
-      let focusedRegion = focusTracker.focusRegions.first(where: { $0.identity == focusedIdentity }
-      ),
-      localScrollPositionRegistry.revealCollectionFocusAfterResize(
-        focusedRegion,
-        currentFocusedRegion: renderedArtifacts.semanticSnapshot.focusRegions.first {
-          $0.identity == focusedIdentity
-        },
-        previousRoutes: previousScrollRoutes,
-        scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
-        scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets
-      )
+      let focusedRegion = focusTracker.focusRegions.first(where: { $0.identity == focusedIdentity })
     {
+      recoveredFocusedGeometry = localScrollPositionRegistry.revealFocusAfterGeometryChange(
+        focusedRegion,
+        previousRoutes: previousScrollRoutes,
+        previousTargets: previousScrollTargets,
+        scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
+        scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets,
+        focusRegions: renderedArtifacts.semanticSnapshot.focusRegions)
+      if !recoveredFocusedGeometry {
+        recoveredFocusedGeometry = localScrollPositionRegistry.revealCollectionFocusAfterResize(
+          focusedRegion,
+          currentFocusedRegion: renderedArtifacts.semanticSnapshot.focusRegions.first {
+            $0.identity == focusedIdentity
+          },
+          previousRoutes: previousScrollRoutes,
+          scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
+          scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets)
+      }
+    }
+    if recoveredFocusedGeometry {
       convergence.scrollPositionChanged = true
       convergence.didEagerFocusLocationRerender = true
       convergence.rerenderedForFocusSync = true
