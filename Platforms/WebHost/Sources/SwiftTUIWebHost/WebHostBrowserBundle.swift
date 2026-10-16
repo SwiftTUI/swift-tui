@@ -113,11 +113,13 @@ package struct WebHostBrowserBundle: Sendable {
     if path.isEmpty {
       return "index.html"
     }
-    if path == "static/webhost.js" {
-      return try primaryJavaScriptAssetPath()
-    }
-    if path.hasPrefix("static/") {
-      path.removeFirst("static/".count)
+    if directory == nil {
+      if path == "static/webhost.js" {
+        return try primaryJavaScriptAssetPath()
+      }
+      if path.hasPrefix("static/") {
+        path.removeFirst("static/".count)
+      }
     }
     guard !path.split(separator: "/").contains("..") else {
       throw WebHostBrowserBundleError.notFound(requestPath)

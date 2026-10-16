@@ -21,6 +21,8 @@ struct WebHostBrowserBundleTests {
 
     #expect(index.contentType.hasPrefix("text/html"))
     #expect(script.contentType.hasPrefix("application/javascript"))
+    #expect(try WebHostBrowserBundle.bundled.resource(for: "/static/webhost.js") == script)
+    #expect(try WebHostBrowserBundle.bundled.resource(for: "/static/\(scriptPath)") == script)
 
     if let cssPath = try WebHostBrowserBundle.bundled.assetPaths().first(where: {
       $0.hasSuffix(".css")

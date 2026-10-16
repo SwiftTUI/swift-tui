@@ -17,6 +17,16 @@ struct WebHostServerTests {
     try Data("<script src=\"./dom.js\"></script>".utf8).write(
       to: browser.appendingPathComponent("index.html"))
     try Data("custom DOM entrypoint".utf8).write(to: browser.appendingPathComponent("dom.js"))
+    try FileManager.default.createDirectory(
+      at: browser.appendingPathComponent("static/fonts"), withIntermediateDirectories: true)
+    let staticAssets = [
+      "static/dom.js": "nested entrypoint",
+      "static/webhost.js": "custom legacy-named entrypoint",
+      "static/fonts/test.woff2": "custom font",
+    ]
+    for (path, contents) in staticAssets {
+      try Data(contents.utf8).write(to: browser.appendingPathComponent(path))
+    }
     try Data("private".utf8).write(to: directory.appendingPathComponent("outside.js"))
     #if !os(Windows)
       try FileManager.default.createSymbolicLink(
@@ -30,6 +40,11 @@ struct WebHostServerTests {
       let (script, scriptResponse) = try await serverData(from: session.url(path: "/dom.js"))
       #expect(try statusCode(from: scriptResponse) == 200)
       #expect(String(decoding: script, as: UTF8.self) == "custom DOM entrypoint")
+      for (path, contents) in staticAssets {
+        let (asset, response) = try await serverData(from: session.url(path: "/\(path)"))
+        #expect(try statusCode(from: response) == 200)
+        #expect(String(decoding: asset, as: UTF8.self) == contents)
+      }
       let (_, unauthorized) = try await serverData(
         from: session.url(path: "/dom.js", includeToken: false))
       #expect(try statusCode(from: unauthorized) == 403)
