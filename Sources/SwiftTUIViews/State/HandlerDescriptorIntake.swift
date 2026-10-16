@@ -352,19 +352,24 @@ package struct HandlerDescriptorIntake {
         }
       }
     }
-    context.localScrollPositionRegistry?.register(
-      identity: identity,
-      currentOffset: currentOffset,
-      applyOffset: { offset in
-        withImperativeAuthoringContext(scope) {
-          applyOffset(offset)
-        }
-      },
-      bindingSourceID: bindingSourceID,
-      currentCollectionAnchor: currentCollectionAnchor,
-      revealTarget: wrappedReveal,
-      scrollToEdge: wrappedEdge
-    )
+    // Deferred collection resolution can finish under a child's ambient node.
+    // The scroll route and its replay record belong to the resolved container.
+    let ownerNode = context.viewGraph?.nodeForIdentity(identity) ?? ViewNodeContext.current
+    ViewNodeContext.withValue(ownerNode) {
+      context.localScrollPositionRegistry?.register(
+        identity: identity,
+        currentOffset: currentOffset,
+        applyOffset: { offset in
+          withImperativeAuthoringContext(scope) {
+            applyOffset(offset)
+          }
+        },
+        bindingSourceID: bindingSourceID,
+        currentCollectionAnchor: currentCollectionAnchor,
+        revealTarget: wrappedReveal,
+        scrollToEdge: wrappedEdge
+      )
+    }
   }
 
   // MARK: Lifecycle family

@@ -1210,6 +1210,14 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/CollectionControlUpdateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises native collection geometry, focus, and actions through the composed renderer or host."
+    },
+    "Tests/SwiftTUITests/CollectionFocusRecoveryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises native collection geometry, focus, and actions through the composed renderer or host."
+    },
     "Tests/SwiftTUITests/CollectionProbeArmingTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
@@ -1233,6 +1241,10 @@
     "Tests/SwiftTUITests/CollectionStyleValidationTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/CollectionViewportRecoveryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises table selection visibility and list item identity through the composed runtime."
     },
     "Tests/SwiftTUITests/CommittedScrollTranslationTests.swift": {
       "category": "runtime-integration",
@@ -1698,6 +1710,10 @@
       "category": "source-policy",
       "reason": "Reads repository sources or manifests to check a structural contract."
     },
+    "Tests/SwiftTUITests/HiddenListFocusTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises native collection geometry, focus, and actions through the composed renderer or host."
+    },
     "Tests/SwiftTUITests/HostFrameProjectionContractTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
@@ -1725,6 +1741,10 @@
     "Tests/SwiftTUITests/HostedCollectionHintWindowingTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/HostedCollectionScrollTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises native collection geometry, focus, and actions through the composed renderer or host."
     },
     "Tests/SwiftTUITests/HostedFrameHistoryRetentionTests.swift": {
       "category": "runtime-integration",
@@ -2029,6 +2049,10 @@
     "Tests/SwiftTUITests/OrderedImageCompositionTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/OutlineFocusUpdateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises native collection geometry, focus, and actions through the composed renderer or host."
     },
     "Tests/SwiftTUITests/OutlineIndentationTests.swift": {
       "category": "runtime-integration",
@@ -2617,6 +2641,10 @@
     "Tests/SwiftTUITests/TableColumnWidthPassTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/TableFocusUpdateTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises native collection geometry, focus, and actions through the composed renderer or host."
     },
     "Tests/SwiftTUITests/TableLayoutProductTests.swift": {
       "category": "runtime-integration",

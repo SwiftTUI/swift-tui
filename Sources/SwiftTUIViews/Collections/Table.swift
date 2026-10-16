@@ -277,7 +277,17 @@ extension Table {
             currentCollectionAnchor: { scrollCurrency.storedAnchor },
             revealTarget: { query, anchor in
               scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
-                indexedSource?.elementIndex(matching: query)
+                if let index = query.expectedCollectionRowIndex {
+                  guard resolvedRows.indices.contains(index),
+                    resolvedRows[index].identity == query.identity
+                  else { return nil }
+                  return index
+                }
+                if let indexedSource { return indexedSource.elementIndex(matching: query) }
+                return resolvedRows.firstIndex { row in
+                  if let identity = query.identity { return row.identity == identity }
+                  return query.explicitIDComponent == row.identity.lastComponent
+                }
               }
             },
             scrollToEdge: { scrollCurrency.scroll(toEdge: $0) }
@@ -296,6 +306,18 @@ extension Table {
           }
         }
 
+        // Selection movement receives the same one-shot measured-window refinement
+        // as scrollTo, including space claimed by newly visible overflow indicators.
+        let revealRow: (Int) -> Void = { index in
+          guard let scrollCurrency else { return }
+          if let registry = context.scrollCommandRegistry {
+            _ = registry.scrollToTarget(
+              ScrollTargetQuery(identity: resolvedRows[index].identity),
+              anchor: nil, scopeIdentity: context.identity)
+          } else {
+            scrollCurrency.reveal(row: index)
+          }
+        }
         intake.registerKeyPressHandler(identity: context.identity) { keyPress in
           guard keyPress.modifiers.isEmpty else {
             return false
@@ -326,7 +348,7 @@ extension Table {
               let index = selectableRowIndices[next]
               scrollCurrency?.pinCurrentAnchor()
               setActiveRow(index)
-              scrollCurrency?.reveal(row: index)
+              revealRow(index)
               return true
             default:
               return false
@@ -359,7 +381,7 @@ extension Table {
             if let selectedRow = resolvedRows.firstIndex(where: { row in
               row.tag.map(policy.contains) == true
             }) {
-              scrollCurrency.reveal(row: selectedRow)
+              revealRow(selectedRow)
             }
           }
           return true
@@ -454,6 +476,10 @@ extension Table {
         metadata.accessibilityStructure = structure
       }
       metadata.hostedCollectionContainer?.hasSelection = isSelectable
+      if let index = payload.selectedRowIndex, resolvedRows.indices.contains(index) {
+        metadata.hostedCollectionContainer?.focusTarget = CollectionFocusTarget(
+          itemIdentity: resolvedRows[index].identity, rowIndex: index)
+      }
       metadata.hostedCollectionContainer?.headerSorts = columns.map(\.sort)
       metadata.accessibilityProperties = .init(
         rowCount: resolvedRows.count + 1,

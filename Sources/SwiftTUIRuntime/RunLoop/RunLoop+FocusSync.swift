@@ -239,8 +239,8 @@ extension RunLoop {
       shouldApplyInitialDefault: desiredFocusRequest == .none && shouldApplyDefaultFocus
     )
 
-    // Resize can wrap a visible row out of the collection's window. Reveal it
-    // before replacing the focus regions, using the existing one-pass budget.
+    // Changes to row heights or viewport size can hide the focused collection row.
+    // Reveal it before replacing focus regions, using the existing one-pass budget.
     if !convergence.didEagerFocusLocationRerender, pendingKeyFocus == nil,
       hotReloadSession?.pendingFocus == nil,
       desiredFocusRequest == .none, defaultFocusRequest == .none,
@@ -248,11 +248,11 @@ extension RunLoop {
       let focusedIdentity = focusTracker.currentFocusIdentity,
       let focusedRegion = focusTracker.focusRegions.first(where: { $0.identity == focusedIdentity }
       ),
-      !renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
-        $0.identity == focusedIdentity
-      }),
       localScrollPositionRegistry.revealCollectionFocusAfterResize(
         focusedRegion,
+        currentFocusedRegion: renderedArtifacts.semanticSnapshot.focusRegions.first {
+          $0.identity == focusedIdentity
+        },
         previousRoutes: previousScrollRoutes,
         scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
         scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets

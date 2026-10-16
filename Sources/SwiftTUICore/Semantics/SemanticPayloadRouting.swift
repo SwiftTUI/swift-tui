@@ -219,7 +219,10 @@ extension SemanticExtractor {
             sectionIdentity: sectionIdentity ?? node.identity,
             modalFocusScopePath: modalFocusScopePath,
             ownerNodeID: node.viewNodeID,
-            ownerIdentity: node.identity
+            ownerIdentity: node.identity,
+            collectionFocusTarget: hostedRow.map {
+              CollectionFocusTarget(itemIdentity: $0.identity, rowIndex: rowIndex)
+            }
           )
         )
       }

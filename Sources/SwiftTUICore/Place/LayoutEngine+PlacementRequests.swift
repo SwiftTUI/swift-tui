@@ -636,7 +636,8 @@ extension LayoutEngine {
       return DrawExtractor().visibleTableLayout(
         for: payload,
         in: bounds,
-        columnWidths: measured.containerAllocationSnapshot?.hostedCollection?.tableColumnWidths
+        columnWidths: measured.containerAllocationSnapshot?.hostedCollection?.tableColumnWidths,
+        rowHeights: measured.containerAllocationSnapshot?.hostedCollection?.tallRowHeights
       )
     }
     return stored.translated(by: bounds.origin)

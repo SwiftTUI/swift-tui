@@ -111,6 +111,54 @@ struct HandlerDescriptorIntakeOrderTests {
     }
   }
 
+  @Test(
+    "scroll registration and replay use the route's graph node before the ambient node",
+    arguments: [false, true], [false, true]
+  )
+  func scrollRegistrationOwner(usesGraph: Bool, ambientMatches: Bool) throws {
+    let graph = ViewGraph()
+    graph.beginFrame()
+    let owner = graph.beginEvaluation(identity: ownerIdentity, invalidator: nil)
+    let ambient =
+      ambientMatches
+      ? owner : graph.beginEvaluation(identity: ambientIdentity, invalidator: nil)
+    let registry = LocalScrollPositionRegistry()
+    var context = ResolveContext(identity: ownerIdentity)
+    context.viewGraph = usesGraph ? graph : nil
+    context.localScrollPositionRegistry = registry
+    let intake = HandlerDescriptorIntake(context: context)
+    var offset = ScrollOffset.zero
+    ViewNodeContext.withValue(ambient) {
+      intake.registerScrollPosition(
+        identity: ownerIdentity, currentOffset: { offset }, applyOffset: { offset = $0 })
+    }
+
+    let expectedOwner = usesGraph ? owner : ambient
+    let registration = try #require(registry.snapshot().first)
+    #expect(registration.ownerViewNodeID == expectedOwner.viewNodeID)
+    registration.applyOffset(ScrollOffset(x: 2, y: 7))
+    #expect(offset == ScrollOffset(x: 2, y: 7))
+    #expect(expectedOwner.registeredHandlers.scrollPosition.registrations.count == 1)
+    if owner !== ambient {
+      let otherNode = usesGraph ? ambient : owner
+      #expect(otherNode.registeredHandlers.scrollPosition.registrations.isEmpty)
+    }
+
+    registry.reset()
+    registry.restore(expectedOwner.registeredHandlers.scrollPosition.registrations)
+    let replayed = try #require(registry.snapshot().first)
+    #expect(replayed.ownerViewNodeID == expectedOwner.viewNodeID)
+    #expect(replayed.currentOffset() == ScrollOffset(x: 2, y: 7))
+    replayed.applyOffset(ScrollOffset(x: 3, y: 11))
+    #expect(offset == ScrollOffset(x: 3, y: 11))
+    registry.removeUnjustifiedRegistrations { nodeID in
+      nodeID == expectedOwner.viewNodeID ? expectedOwner.registeredHandlers : nil
+    }
+    #expect(registry.snapshot().count == 1)
+    registry.removeUnjustifiedRegistrations { _ in nil }
+    #expect(registry.snapshot().isEmpty)
+  }
+
   @Test("preferringAuthoringScope: the construction scope beats the ambient")
   func preferringAuthoringScopeOrder() {
     let intake = withAmbientScope {
