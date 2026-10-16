@@ -66,6 +66,70 @@ struct ScrollFocusPriorityTests {
     )
   }
 
+  @Test(arguments: [false, true], NestedViewportChange.allCases)
+  func shrinkingNestedViewportsKeepsFocusVisible(
+    crossesAxes: Bool, change: NestedViewportChange
+  ) throws {
+    let outer = FocusPriorityOffset()
+    let inner = FocusPriorityOffset()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("NestedViewportShrink", String(crossesAxes), change.rawValue),
+      size: CellSize(width: 48, height: 12)
+    ) {
+      NestedFocusPriorityFixture(
+        outer: outer, inner: inner, crossesAxes: crossesAxes, viewportChange: change)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.focusText("Away")
+    _ = try harness.focus(NestedFocusPriorityFixture.targetIdentity)
+    try #require(harness.frame.contains("TARGET"))
+    let previousInnerOffset = inner.value
+    _ = try harness.pressKey(KeyPress(.character("g"), modifiers: .ctrl))
+    #expect(harness.frame.contains("TARGET"), "\(harness.frame)")
+    #expect(
+      harness.runLoop.focusTracker.currentFocusIdentity == NestedFocusPriorityFixture.targetIdentity
+    )
+    if crossesAxes {
+      #expect(outer.value.y == 14)
+      #expect(inner.value == previousInnerOffset)
+    } else {
+      #expect(outer.value.y == (change == .both ? 15 : 17))
+      #expect(inner.value.y == (change == .both ? 11 : 9))
+    }
+  }
+
+  @Test
+  func outerResizeDoesNotRecoverAControlHiddenByTheInnerViewport() throws {
+    let outer = FocusPriorityOffset()
+    let inner = FocusPriorityOffset()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("HiddenInnerViewportShrink"),
+      size: CellSize(width: 48, height: 20)
+    ) {
+      NestedFocusPriorityFixture(
+        outer: outer, inner: inner, crossesAxes: false, viewportChange: .outerOnly,
+        initialOuterHeight: 12, usesLongInnerTail: true)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.focusText("Away")
+    _ = try harness.focus(NestedFocusPriorityFixture.targetIdentity)
+    try #require(harness.frame.contains("TARGET"))
+    let previousOuterOffset = outer.value
+    let target = try #require(
+      harness.runLoop.latestSemanticSnapshot.scrollTargets.first {
+        $0.identity == NestedFocusPriorityFixture.targetIdentity
+      })
+    try #require(
+      harness.runLoop.localScrollPositionRegistry.scrollTo(
+        y: 14, scopeIdentity: target.scrollIdentity))
+    _ = try harness.renderAfterExternalMutation()
+    try #require(!harness.frame.contains("TARGET"))
+    #expect(outer.value == previousOuterOffset)
+    _ = try harness.pressKey(KeyPress(.character("g"), modifiers: .ctrl))
+    #expect(outer.value == previousOuterOffset)
+    #expect(!harness.frame.contains("TARGET"))
+  }
+
   @Test(arguments: [false, true])
   func scrollingInnerViewportDoesNotMoveOuterViewport(crossesAxes: Bool) throws {
     let outer = FocusPriorityOffset()
@@ -96,6 +160,10 @@ struct ScrollFocusPriorityTests {
     #expect(outer.value == previousOuterOffset)
   }
 
+}
+
+enum NestedViewportChange: String, CaseIterable, Sendable {
+  case outerOnly, both
 }
 
 @MainActor
@@ -142,6 +210,10 @@ private struct NestedFocusPriorityFixture: View {
   let outer: FocusPriorityOffset
   let inner: FocusPriorityOffset
   let crossesAxes: Bool
+  var viewportChange: NestedViewportChange?
+  var initialOuterHeight = 6
+  var usesLongInnerTail = false
+  @State private var changed = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -157,12 +229,19 @@ private struct NestedFocusPriorityFixture: View {
             }
           }
           .scrollIndicators(.hidden)
-          .frame(width: 28, height: 4, alignment: .topLeading)
+          .frame(
+            width: 28, height: changed && viewportChange == .both ? 2 : 4,
+            alignment: .topLeading)
           Text("End")
         }
       }
       .scrollIndicators(.hidden)
-      .frame(width: 32, height: 6, alignment: .topLeading)
+      .frame(width: 32, height: changed ? 3 : initialOuterHeight, alignment: .topLeading)
+    }
+    .onKeyPress(.character("g"), modifiers: .ctrl) { _ in
+      guard viewportChange != nil else { return .ignored }
+      changed = true
+      return .handled
     }
   }
 
@@ -170,7 +249,11 @@ private struct NestedFocusPriorityFixture: View {
   private var innerRows: some View {
     ForEach(0..<12, id: \.self) { row in Text("Inner \(row)") }
     Text("TARGET").id(Self.targetIdentity).focusable()
-    Text("Tail")
+    if usesLongInnerTail {
+      ForEach(0..<12, id: \.self) { row in Text("Tail \(row)") }
+    } else {
+      Text("Tail")
+    }
   }
 
 }
