@@ -114,6 +114,11 @@ private final class RecoveryActivationLedger {
   var activated: [Int] = []
   var evaluatedRows: Set<Int> = []
   var rowEvaluations = 0
+
+  func recordEvaluation(of row: Int) {
+    evaluatedRows.insert(row)
+    rowEvaluations += 1
+  }
 }
 
 @MainActor
@@ -165,8 +170,7 @@ private struct RecoveryScrollFixture: View {
 
   private var rows: some View {
     ForEach(0..<rowCount, id: \.self) { row in
-      let _ = ledger.evaluatedRows.insert(row)
-      let _ = { ledger.rowEvaluations += 1 }()
+      let _ = ledger.recordEvaluation(of: row)
       let grew = changed && change == .precedingGrowth && row == 3
       Button {
         ledger.activated.append(row)

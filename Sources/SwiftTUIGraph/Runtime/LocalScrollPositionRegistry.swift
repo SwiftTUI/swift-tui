@@ -241,59 +241,112 @@ package final class LocalScrollPositionRegistry: Equatable {
     {
       return false
     }
-    for route in scrollRoutes.reversed() {
-      guard route.collectionScrollLayout == nil,
-        let previous = previousRoutes.first(where: { $0.identity == route.identity }),
+    guard
+      let previousTarget = previousTargets.first(where: {
+        $0.identity == focusedRegion.identity
+      })
+    else { return false }
+    let previousChain = containingRoutes(
+      startingAt: previousTarget.scrollIdentity, routes: previousRoutes, targets: previousTargets)
+    guard !previousChain.isEmpty else { return false }
+    var visibleRect: CellRect? = previousTarget.rect
+    for route in previousChain {
+      visibleRect = visibleRect?.intersection(route.viewportRect)
+    }
+    // A target hidden by an inner viewport is not visible merely because its
+    // unclipped rectangle intersects a larger outer viewport.
+    guard visibleRect != nil else { return false }
+
+    let currentTarget: (rect: CellRect, scrollIdentity: Identity)
+    if let target = scrollTargets.first(where: { $0.identity == focusedRegion.identity }) {
+      currentTarget = (target.rect, target.scrollIdentity)
+    } else {
+      // A surviving allocation row permits one speculative realization. It
+      // cannot establish that the focused descendant still exists afterward.
+      let lazyTarget = scrollTargets.filter {
+        $0.role == .lazyElement && focusedRegion.identity.isDescendant(of: $0.identity)
+      }.max { $0.identity.components.count < $1.identity.components.count }
+      guard let lazyTarget,
+        let previousAncestor = previousTargets.first(where: {
+          $0.scrollIdentity == lazyTarget.scrollIdentity && $0.identity == lazyTarget.identity
+        })
+      else { return false }
+      let rect = CellRect(
+        origin: CellPoint(
+          x: lazyTarget.rect.origin.x + previousTarget.rect.origin.x
+            - previousAncestor.rect.origin.x,
+          y: lazyTarget.rect.origin.y + previousTarget.rect.origin.y
+            - previousAncestor.rect.origin.y),
+        size: previousTarget.rect.size)
+      currentTarget = (rect, lazyTarget.scrollIdentity)
+    }
+    let currentChain = containingRoutes(
+      startingAt: currentTarget.scrollIdentity, routes: scrollRoutes, targets: scrollTargets)
+    guard !currentChain.isEmpty else { return false }
+    var routePairs:
+      [(
+        route: ScrollRoute, previous: ScrollRoute,
+        registration: ScrollPositionRegistrationSnapshot, position: SyncedPosition
+      )] = []
+    // Validate the whole chain before changing any offset. A deliberate scroll
+    // or replaced owner at any containing viewport takes precedence throughout.
+    for route in currentChain {
+      guard let previous = previousChain.first(where: { $0.identity == route.identity }),
         let ownerNodeID = previous.viewNodeID, route.viewNodeID == ownerNodeID,
         let registration = registrations[route.identity],
         registration.ownerViewNodeID == ownerNodeID,
-        lastSyncedPositions[route.identity] != nil,
-        !hasNewScrollInput(in: route, registration: registration),
-        let previousTarget = previousTargets.first(where: {
-          $0.scrollIdentity == route.identity && $0.identity == focusedRegion.identity
-        }),
-        previousTarget.rect.intersection(previous.viewportRect) != nil
-      else { continue }
-
-      let targetRect: CellRect
-      if let target = scrollTargets.first(where: {
-        $0.scrollIdentity == route.identity && $0.identity == focusedRegion.identity
-      }) {
-        targetRect = target.rect
-      } else {
-        // The nearest allocation ancestor must still be present. An arbitrary
-        // placed ancestor cannot prove that a removed focused control survives.
-        let lazyTarget = scrollTargets.filter {
-          $0.scrollIdentity == route.identity && $0.role == .lazyElement
-            && focusedRegion.identity.isDescendant(of: $0.identity)
-        }.max { $0.identity.components.count < $1.identity.components.count }
-        guard let lazyTarget,
-          let previousAncestor = previousTargets.first(where: {
-            $0.scrollIdentity == route.identity && $0.identity == lazyTarget.identity
-          })
-        else { continue }
-        targetRect = CellRect(
-          origin: CellPoint(
-            x: lazyTarget.rect.origin.x + previousTarget.rect.origin.x
-              - previousAncestor.rect.origin.x,
-            y: lazyTarget.rect.origin.y + previousTarget.rect.origin.y
-              - previousAncestor.rect.origin.y),
-          size: previousTarget.rect.size)
+        let position = lastSyncedPositions[route.identity],
+        !hasNewScrollInput(in: route, registration: registration)
+      else { return false }
+      if let previousLayout = previous.collectionScrollLayout,
+        registration.currentCollectionAnchor() != previousLayout.anchor
+      {
+        return false
       }
-      let previousContentRect = contentRect(previousTarget.rect, in: previous)
-      let currentContentRect = contentRect(targetRect, in: route)
-      let viewportSizeChanged = previous.viewportRect.size != route.viewportRect.size
-      let targetGeometryChanged = previousContentRect != currentContentRect
-      guard viewportSizeChanged || targetGeometryChanged else { continue }
-
-      let currentOffset = registration.currentOffset()
-      let next = adjustedOffset(
-        currentOffset, revealing: targetRect, in: route, preservesProducerOffset: false)
-      guard next != currentOffset else { continue }
-      registration.applyOffset(next)
-      return true
+      routePairs.append((route, previous, registration, position))
     }
-    return false
+
+    var changed = false
+    var projectedRect = currentTarget.rect
+    var previousDescendantOffset = ScrollOffset.zero
+    var currentDescendantOffset = ScrollOffset.zero
+    for pair in routePairs {
+      let route = pair.route
+      let registration = pair.registration
+      let preservesProducerOffset = registration.revealTarget != nil
+      let previousOffset = layoutOffset(
+        pair.position.offset, in: pair.previous, preservesProducerOffset: preservesProducerOffset)
+      let currentOffset = registration.currentOffset()
+      let placedOffset = layoutOffset(
+        currentOffset, in: route, preservesProducerOffset: preservesProducerOffset)
+      let previousContentRect = contentRect(
+        previousTarget.rect, in: pair.previous, descendantOffset: previousDescendantOffset)
+      let currentContentRect = contentRect(
+        projectedRect, in: route, descendantOffset: currentDescendantOffset)
+      let viewportSizeChanged = pair.previous.viewportRect.size != route.viewportRect.size
+      let targetGeometryChanged = previousContentRect != currentContentRect
+      var nextOffset = placedOffset
+      if route.collectionScrollLayout == nil, viewportSizeChanged || targetGeometryChanged {
+        nextOffset = adjustedOffset(
+          currentOffset, revealing: projectedRect, in: route, preservesProducerOffset: false)
+        if nextOffset != currentOffset {
+          registration.applyOffset(nextOffset)
+          projectedRect = CellRect(
+            origin: CellPoint(
+              x: projectedRect.origin.x - (nextOffset.x - placedOffset.x),
+              y: projectedRect.origin.y - (nextOffset.y - placedOffset.y)),
+            size: projectedRect.size)
+          changed = true
+        }
+      }
+      previousDescendantOffset = ScrollOffset(
+        x: previousDescendantOffset.x + previousOffset.x,
+        y: previousDescendantOffset.y + previousOffset.y)
+      currentDescendantOffset = ScrollOffset(
+        x: currentDescendantOffset.x + nextOffset.x,
+        y: currentDescendantOffset.y + nextOffset.y)
+    }
+    return changed
   }
 
   /// Apply geometry refinement only when its owning frame commits. Abandoned
@@ -686,12 +739,12 @@ package final class LocalScrollPositionRegistry: Equatable {
       }
       let contentAnchor: CellPoint?
       if focusedTarget != nil || inheritedRect != nil {
-        let contentOrigin = contentRect(targetRect, in: route).origin
         // Inner scrolling changes viewport coordinates, not content geometry.
         // Normalize it out of the ancestor's one-shot reveal key.
-        contentAnchor = CellPoint(
-          x: contentOrigin.x + descendantOffset.x,
-          y: contentOrigin.y + descendantOffset.y)
+        contentAnchor =
+          contentRect(
+            targetRect, in: route, descendantOffset: descendantOffset
+          ).origin
       } else {
         contentAnchor = nil
       }
@@ -704,17 +757,13 @@ package final class LocalScrollPositionRegistry: Equatable {
       let isFreshReveal = previousReveal != revealKey
       lastRevealAnchors[route.identity] = revealKey
       let currentOffset = registration.currentOffset()
-      let layoutOffset: ScrollOffset
-      if registration.revealTarget != nil {
-        layoutOffset = currentOffset
-      } else {
-        layoutOffset = clampedOffset(currentOffset, in: route)
-      }
+      let placedOffset = layoutOffset(
+        currentOffset, in: route, preservesProducerOffset: registration.revealTarget != nil)
       containingScrollTargets[route.identity] = (
         targetRect,
         ScrollOffset(
-          x: layoutOffset.x + descendantOffset.x,
-          y: layoutOffset.y + descendantOffset.y)
+          x: placedOffset.x + descendantOffset.x,
+          y: placedOffset.y + descendantOffset.y)
       )
       let hasNewInput =
         explicitScrollRoutes.contains(route.identity)
@@ -737,8 +786,8 @@ package final class LocalScrollPositionRegistry: Equatable {
       registration.applyOffset(adjustedOffset)
       let correctedRect = CellRect(
         origin: CellPoint(
-          x: targetRect.origin.x - (adjustedOffset.x - layoutOffset.x),
-          y: targetRect.origin.y - (adjustedOffset.y - layoutOffset.y)),
+          x: targetRect.origin.x - (adjustedOffset.x - placedOffset.x),
+          y: targetRect.origin.y - (adjustedOffset.y - placedOffset.y)),
         size: targetRect.size)
       containingScrollTargets[route.identity] = (
         correctedRect,
@@ -808,12 +857,37 @@ package final class LocalScrollPositionRegistry: Equatable {
     Array(registrations.values)
   }
 
-  private func contentRect(_ rect: CellRect, in route: ScrollRoute) -> CellRect {
+  private func containingRoutes(
+    startingAt identity: Identity, routes: [ScrollRoute], targets: [ScrollTarget]
+  ) -> [ScrollRoute] {
+    var chain: [ScrollRoute] = []
+    var owner = identity
+    for _ in routes {
+      guard let route = routes.first(where: { $0.identity == owner }),
+        !chain.contains(where: { $0.identity == owner })
+      else { return [] }
+      chain.append(route)
+      guard let parent = targets.first(where: { $0.identity == owner }) else { return chain }
+      owner = parent.scrollIdentity
+    }
+    return []
+  }
+
+  private func contentRect(
+    _ rect: CellRect, in route: ScrollRoute, descendantOffset: ScrollOffset = .zero
+  ) -> CellRect {
     CellRect(
       origin: CellPoint(
-        x: rect.origin.x - route.contentBounds.origin.x,
-        y: rect.origin.y - route.contentBounds.origin.y),
+        x: rect.origin.x - route.contentBounds.origin.x + descendantOffset.x,
+        y: rect.origin.y - route.contentBounds.origin.y + descendantOffset.y),
       size: rect.size)
+  }
+
+  private func layoutOffset(
+    _ offset: ScrollOffset, in route: ScrollRoute, preservesProducerOffset: Bool
+  ) -> ScrollOffset {
+    if preservesProducerOffset { return offset }
+    return clampedOffset(offset, in: route)
   }
 
   private func hasNewScrollInput(
