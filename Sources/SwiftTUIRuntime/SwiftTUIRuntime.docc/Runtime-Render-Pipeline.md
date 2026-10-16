@@ -326,7 +326,11 @@ only in the visible range. Hosts and tests can observe these results:
   interaction regions, and are not focus-traversal targets until scrolled
   into view. This behavior matches the SwiftUI lazy contract. Offscreen lazy
   rows do not exist yet. `scrollTo` still reaches them through the estimated
-  frames in the allocation snapshot.
+  frames in the allocation snapshot. A previously visible focused control
+  displaced by viewport or preceding-content changes can use that same allocation
+  estimate for one bounded focus-sync rerender before focus regions are replaced.
+  The rerender determines whether the control still exists; missing controls use
+  ordinary fallback. Explicit focus and scroll requests retain priority.
 - The container's content size is an estimate that refines as real
   measurements replace estimates when the window moves. The scroll offset
   registry re-anchors on content-size change.
