@@ -1242,6 +1242,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/CollectionViewportRecoveryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises table selection visibility and list item identity through the composed runtime."
+    },
     "Tests/SwiftTUITests/CommittedScrollTranslationTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."

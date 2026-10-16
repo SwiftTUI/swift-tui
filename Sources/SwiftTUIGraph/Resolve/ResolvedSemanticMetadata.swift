@@ -529,6 +529,7 @@ package struct HostedCollectionContainerMetadata: Equatable, Sendable {
   package var isSourceBacked: Bool
   package var hasSelection: Bool = false
   package var headerSorts: [AccessibilitySortDirection?] = []
+  package var focusTarget: CollectionFocusTarget? = nil
 
   package init(
     kind: HostedCollectionContainerKind,

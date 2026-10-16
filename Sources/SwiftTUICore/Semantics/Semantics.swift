@@ -184,7 +184,8 @@ package struct SemanticExtractor: Sendable {
               sectionIdentity: sectionIdentity,
               modalFocusScopePath: modalFocusScopePath,
               ownerNodeID: node.viewNodeID,
-              ownerIdentity: node.identity
+              ownerIdentity: node.identity,
+              collectionFocusTarget: node.semanticMetadata.hostedCollectionContainer?.focusTarget
             )
           )
         }

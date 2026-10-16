@@ -239,6 +239,12 @@ extension List {
             currentCollectionAnchor: { scrollCurrency.storedAnchor },
             revealTarget: { query, anchor in
               scrollCurrency.revealTarget(for: query, anchor: anchor) { query in
+                if let index = query.expectedCollectionRowIndex {
+                  guard rows.indices.contains(index), rows[index].identity == query.identity else {
+                    return nil
+                  }
+                  return index
+                }
                 if let identity = query.identity,
                   let index = listRowIndex(parsedFrom: identity, container: context.identity),
                   rows.indices.contains(index)

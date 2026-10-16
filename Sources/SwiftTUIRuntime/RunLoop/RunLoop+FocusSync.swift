@@ -248,11 +248,11 @@ extension RunLoop {
       let focusedIdentity = focusTracker.currentFocusIdentity,
       let focusedRegion = focusTracker.focusRegions.first(where: { $0.identity == focusedIdentity }
       ),
-      !renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {
-        $0.identity == focusedIdentity
-      }),
       localScrollPositionRegistry.revealCollectionFocusAfterResize(
         focusedRegion,
+        currentFocusedRegion: renderedArtifacts.semanticSnapshot.focusRegions.first {
+          $0.identity == focusedIdentity
+        },
         previousRoutes: previousScrollRoutes,
         scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes,
         scrollTargets: renderedArtifacts.semanticSnapshot.scrollTargets

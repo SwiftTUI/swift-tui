@@ -1,3 +1,14 @@
+/// The authored item and logical row behind a collection's keyboard focus.
+package struct CollectionFocusTarget: Equatable, Sendable {
+  package var itemIdentity: Identity
+  package var rowIndex: Int
+
+  package init(itemIdentity: Identity, rowIndex: Int) {
+    self.itemIdentity = itemIdentity
+    self.rowIndex = rowIndex
+  }
+}
+
 /// A focusable region extracted from the placed tree.
 /// Equality deliberately includes `package`-level bookkeeping fields (F120).
 /// These types carry change detection through the frame pipeline.
@@ -13,6 +24,8 @@ public struct FocusRegion: Equatable, Sendable {
   /// The producing value's identity. A fused modifier node can have a
   /// different structural identity from its List or other control payload.
   package var ownerIdentity: Identity?
+  /// The authored item behind positional list focus or a table's active row.
+  package var collectionFocusTarget: CollectionFocusTarget? = nil
   package var scopePath: [Identity]
   package var sectionIdentity: Identity?
   package var modalFocusScopePath: [Identity]?
@@ -42,13 +55,15 @@ public struct FocusRegion: Equatable, Sendable {
     sectionIdentity: Identity? = nil,
     modalFocusScopePath: [Identity]?,
     ownerNodeID: ViewNodeID? = nil,
-    ownerIdentity: Identity? = nil
+    ownerIdentity: Identity? = nil,
+    collectionFocusTarget: CollectionFocusTarget? = nil
   ) {
     self.identity = identity
     self.rect = rect
     self.focusInteractions = focusInteractions
     self.ownerNodeID = ownerNodeID
     self.ownerIdentity = ownerIdentity
+    self.collectionFocusTarget = collectionFocusTarget
     self.scopePath = scopePath
     self.sectionIdentity = sectionIdentity
     self.modalFocusScopePath = modalFocusScopePath
@@ -173,6 +188,8 @@ package struct ScrollTarget: Equatable, Sendable {
 package struct ScrollTargetQuery: Equatable, Sendable {
   package var identity: Identity?
   package var explicitIDComponent: String?
+  /// Recovery must not reveal a replacement item at a synthetic row index.
+  package var expectedCollectionRowIndex: Int? = nil
 
   package init(
     identity: Identity? = nil,

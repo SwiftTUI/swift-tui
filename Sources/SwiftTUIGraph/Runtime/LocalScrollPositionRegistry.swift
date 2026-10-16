@@ -158,6 +158,7 @@ package final class LocalScrollPositionRegistry: Equatable {
   /// A new scroll request takes precedence over this correction.
   package func revealCollectionFocusAfterResize(
     _ focusedRegion: FocusRegion,
+    currentFocusedRegion: FocusRegion? = nil,
     previousRoutes: [ScrollRoute],
     scrollRoutes: [ScrollRoute],
     scrollTargets: [ScrollTarget]
@@ -176,14 +177,42 @@ package final class LocalScrollPositionRegistry: Equatable {
 
     let viewportSizeChanged = previous.viewportRect.size != route.viewportRect.size
     let usableHeightChanged = previousLayout.visibleLines.count != layout.visibleLines.count
-    // Removing rows keeps the existing focus fallback rather than requesting resize recovery.
     let hasSameRowCount = previousLayout.geometry.rowCount == layout.geometry.rowCount
-    let rowGeometryChanged = hasSameRowCount && previousLayout.geometry != layout.geometry
+    let canValidateItem = focusedRegion.collectionFocusTarget != nil
+    let rowGeometryChanged =
+      (hasSameRowCount || canValidateItem) && previousLayout.geometry != layout.geometry
     guard viewportSizeChanged || usableHeightChanged || rowGeometryChanged else { return false }
 
+    var target = focusedRegion.collectionFocusTarget
+    if let currentFocusedRegion {
+      // A table keeps container focus when its selected row leaves the window.
+      // Recover only the same, previously visible item; wheel scrolling away
+      // from selection and authored selection changes are not focus recovery.
+      guard focusedRegion.identity == owner,
+        let previousTarget = target,
+        let currentTarget = currentFocusedRegion.collectionFocusTarget,
+        previousTarget.itemIdentity == currentTarget.itemIdentity,
+        collectionTargetIsVisible(previousTarget, in: previousLayout),
+        !collectionTargetIsVisible(currentTarget, in: layout)
+      else { return false }
+      target = currentTarget
+    }
+    var query = ScrollTargetQuery(identity: target?.itemIdentity ?? focusedRegion.identity)
+    query.expectedCollectionRowIndex = target?.rowIndex
     updateGeometry(scrollRoutes: scrollRoutes, scrollTargets: scrollTargets)
-    return registration.revealTarget?(ScrollTargetQuery(identity: focusedRegion.identity), nil)
-      == true
+    return registration.revealTarget?(query, nil) == true
+  }
+
+  private func collectionTargetIsVisible(
+    _ target: CollectionFocusTarget, in layout: CollectionScrollLayout
+  ) -> Bool {
+    guard target.rowIndex >= 0, target.rowIndex < layout.geometry.rowCount,
+      !layout.visibleLines.isEmpty
+    else { return false }
+    let row = layout.geometry.lineRange(forRow: target.rowIndex)
+    let leadingEnd = row.lowerBound + min(row.count, layout.visibleLines.count)
+    return row.lowerBound >= layout.visibleLines.lowerBound
+      && leadingEnd <= layout.visibleLines.upperBound
   }
 
   /// Apply geometry refinement only when its owning frame commits. Abandoned

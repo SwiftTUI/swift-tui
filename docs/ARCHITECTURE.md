@@ -97,8 +97,13 @@ scroll route, including when deferred resolution finishes under a child's ambien
 node.
 When a viewport resize or measured row-height change removes a focused collection
 row from the visible window, the runtime prepares its reveal before replacing
-focus regions. This uses the existing single eager focus-sync rerender and yields
-to explicit focus or scroll requests.
+focus regions. Recovery validates the authored item behind a positional list row,
+so appending or removing trailing rows does not suppress recovery or reveal a
+replacement item. Tables carry their active item with container focus and recover
+it only when it was previously visible. Keyboard table reveals receive one measured
+window correction, including changes in overflow-indicator capacity. These paths
+use the existing single eager focus-sync rerender and yield to explicit focus or
+scroll requests.
 
 `SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
 examples, and the public website can live in sibling organization repositories.
