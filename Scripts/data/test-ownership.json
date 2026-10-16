@@ -1330,6 +1330,10 @@
       "category": "source-policy",
       "reason": "Reads repository sources or manifests to check a structural contract."
     },
+    "Tests/SwiftTUITests/DefaultPaletteViewportTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises native palette selection, activation and host resize through the run loop."
+    },
     "Tests/SwiftTUITests/DefaultPaletteVisibleWindowTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
