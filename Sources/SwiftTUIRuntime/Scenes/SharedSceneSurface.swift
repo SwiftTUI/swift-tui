@@ -178,7 +178,9 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
     // Browser paste arrives from that browser. Never read the server's clipboard
     // on behalf of an attached browser or a task launched by its input.
     guard InputDispatchContext.origin != .browser else { return nil }
-    if let reader = terminal as? TerminalReaderSurface, reader.externalReaderOutput != nil {
+    if InputDispatchContext.origin == .terminal,
+      let reader = terminal as? TerminalReaderSurface, reader.externalReaderOutput != nil
+    {
       return try reader.readClipboard()
     }
     guard terminalIsAttached else { return nil }

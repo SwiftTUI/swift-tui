@@ -10,6 +10,7 @@ package struct TerminalReaderEditor {
   var supportsTextEdit: Bool
   var supportsSelection: Bool
   var original: String
+  var hasEditedText = false
 }
 
 extension TerminalReaderCommands {
@@ -110,15 +111,20 @@ extension TerminalReaderCommands {
       }
       text.insert(contentsOf: added, at: draft.anchor)
       let result = String(text)
+      draft.hasEditedText = draft.hasEditedText || verb == "replace" || result != draft.text
       draft.text = result
       draft.head = draft.anchor + added.count
       draft.anchor = draft.head
     case "save":
+      if draft.secure && !draft.hasEditedText {
+        editor = nil
+        return .init(output: "Protected value unchanged.")
+      }
       let anchor = draft.text.prefix(draft.anchor).utf16.count
       let head = draft.text.prefix(draft.head).utf16.count
       let edit = AccessibilityTextEdit(text: draft.text, anchor: anchor, head: head)
       let action: AccessibilityAction
-      if draft.text == draft.original && draft.supportsSelection {
+      if !draft.secure && draft.text == draft.original && draft.supportsSelection {
         action = .selectText(edit)
       } else if draft.readOnly {
         return .init(output: "Read-only text cannot be changed.")

@@ -217,6 +217,15 @@ struct TerminalReaderTests {
         try b.surface.writeClipboard("review")
       })
     #expect(primaryHost.copied == "review" && secondaryHost.copied == nil)
+    primaryHost.clipboard = "operator clipboard"
+    #expect(try b.surface.readClipboard() == nil)
+    #expect(
+      try InputDispatchContext.$origin.withValue(.browser) { try b.surface.readClipboard() } == nil)
+    #expect(primaryHost.clipboardReads == 0 && secondaryHost.clipboardReads == 0)
+    #expect(
+      try InputDispatchContext.$origin.withValue(.terminal) { try b.surface.readClipboard() }
+        == "operator clipboard")
+    #expect(primaryHost.clipboardReads == 1 && secondaryHost.clipboardReads == 0)
     hub.reset()
     #expect(hub.selectedSurface === primary)
     #expect(secondary.commands.model.currentChunk?.node.identity == button.identity)
@@ -320,6 +329,36 @@ struct TerminalReaderTests {
     #expect(commands.editor == nil)
   }
 
+  @Test("untouched protected drafts never submit an action", arguments: [false, true])
+  func untouchedSecureDraft(supportsSelection: Bool) {
+    var commands = TerminalReaderCommands()
+    var field = node("Password", role: .secureField)
+    field.actionTarget = "password#1"
+    field.control = .init(actions: supportsSelection ? [.setValue, .selectText] : [.setValue])
+    _ = commands.model.update(frame(1, [field]))
+    _ = commands.command("edit")
+    _ = commands.command("read")
+    _ = commands.command("select 0 0")
+    _ = commands.command("delete")
+    _ = commands.command("insert")
+    #expect(commands.command("save").request == nil)
+    #expect(commands.pendingRequest == nil)
+    #expect(commands.editor == nil)
+  }
+
+  @Test("an explicit protected replacement can clear the value", arguments: [false, true])
+  func clearSecureDraft(supportsSelection: Bool) {
+    var commands = TerminalReaderCommands()
+    var field = node("Password", role: .secureField)
+    field.actionTarget = "password#1"
+    field.control = .init(actions: supportsSelection ? [.setValue, .selectText] : [.setValue])
+    _ = commands.model.update(frame(1, [field]))
+    _ = commands.command("edit")
+    _ = commands.command("replace")
+    #expect(commands.command("save").request?.action == .setValue(.text("")))
+    #expect(commands.editor == nil)
+  }
+
   @Test("protected input never echoes into output, history, pending updates or request metadata")
   func secureInput() throws {
     let terminal = ReaderRecordingHost()
@@ -394,13 +433,21 @@ private final class ReaderEmptyInput: TerminalInputReading {
   func inputEvents() -> AsyncStream<InputEvent> { AsyncStream { $0.finish() } }
 }
 
-private final class ReaderRecordingHost: PresentationSurface, ClipboardWritingPresentationSurface {
+private final class ReaderRecordingHost: PresentationSurface, ClipboardWritingPresentationSurface,
+  ClipboardReadingPresentationSurface
+{
   let surfaceSize = CellSize(width: 40, height: 12)
   let capabilityProfile = TerminalCapabilityProfile.previewUnicode
   let appearance = TerminalAppearance.fallback
   var output = ""
   var frames: [RasterSurface] = []
   var copied: String?
+  var clipboard: String?
+  var clipboardReads = 0
+  @MainActor func readClipboard() throws -> String? {
+    clipboardReads += 1
+    return clipboard
+  }
   @MainActor func writeClipboard(_ text: String) throws -> Bool {
     copied = text
     return true
