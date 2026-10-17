@@ -163,6 +163,17 @@ struct StrokeTrackTests {
     #expect(render(width: 4, height: 3, borderSet: .ascii, sides: .top)[0] == "----")
   }
 
+  @Test("legacy dashed palettes keep line weights and half-cell endpoints")
+  func legacyDashPalettesUseLinePens() {
+    let palettes: [(BorderSet, BorderSet)] = [(.dashed, .single), (.dashedHeavy, .heavy)]
+    for (dashed, solid) in palettes {
+      let pen = StrokePen(borderSet: dashed, roundsCorners: false)
+      #expect(pen == StrokePen(borderSet: solid, roundsCorners: false))
+      #expect(pen.samplesEachArm)
+      #expect(StrokeMask(StrokeStyle(borderSet: dashed)).dash != nil)
+    }
+  }
+
   @Test("a palette that draws nothing, or differs from side to side, is an edge pen")
   func edgePenClassification() {
     for borderSet in [BorderSet.hidden, .none, .innerHalfBlock, .outerHalfBlock] {

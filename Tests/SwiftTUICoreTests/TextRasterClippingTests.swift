@@ -60,7 +60,16 @@ struct TextRasterClippingTests {
     #expect(probe.snapshot().textLineVisits == 8)
     #expect(surface.size == clip.size)
     #expect(surface.lines == (1_000..<1_008).map { "row \($0)" })
-    #expect(surface.presentationLayers.count == 8)
+    // Foreground-only spaces do not occlude an image beneath the text.
+    // Each visible row has two painted runs, with the original gap preserved.
+    #expect(
+      surface.presentationLayers.map(\.bounds)
+        == (0..<8).flatMap { y in
+          [
+            CellRect(origin: .init(x: 0, y: y), size: .init(width: 3, height: 1)),
+            CellRect(origin: .init(x: 4, y: y), size: .init(width: 4, height: 1)),
+          ]
+        })
   }
 
   /// Repainting separate damaged rows preserves clean rows and counts their traversal.
@@ -140,7 +149,11 @@ struct TextRasterClippingTests {
         .init(character: "é", style: family.expectedStyle, hyperlink: family.expectedHyperlink),
         .empty,
       ])
-    #expect(surface.presentationLayers.map(\.bounds) == [clip])
+    #expect(
+      surface.presentationLayers.map(\.bounds) == [
+        CellRect(origin: .init(x: 1, y: 0), size: .init(width: 2, height: 1)),
+        CellRect(origin: .init(x: 4, y: 0), size: .init(width: 1, height: 1)),
+      ])
   }
 
   /// A clipped final glyph must not let trailing zero-width text overwrite neighboring cells.

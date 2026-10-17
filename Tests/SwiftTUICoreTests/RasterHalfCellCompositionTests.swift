@@ -14,8 +14,8 @@ struct RasterHalfCellCompositionTests {
       style: .init(foregroundColor: translucent))
     let composed = try #require(compositeVerticalBlockCell(source, over: underlay))
     let mixed = Color.green.mixed(with: .red, amount: 0.4)
-    #expect(composed.character == "▀")
-    #expect(composed.style?.foregroundColor == (reversed ? mixed : .blue))
-    #expect(composed.style?.backgroundColor == (reversed ? .blue : mixed))
+    #expect(composed.character == source.character)
+    #expect(composed.style?.foregroundColor == mixed)
+    #expect(composed.style?.backgroundColor == .blue)
   }
 }

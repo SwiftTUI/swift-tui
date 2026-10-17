@@ -36,7 +36,17 @@ struct AdversarialSetBRasterTests {
         identity: testIdentity("SetBRaster", "041-edge"),
         bounds: .init(origin: .zero, size: .init(width: 4, height: 1)),
         commands: [painter.command(bounds: textBounds, line: "abc漢")])
-      let edgeSurface = Rasterizer().rasterize(edge, minimumSize: .init(width: 4, height: 1))
+      // Automatic allocation includes the command's paint extent, even when
+      // it exceeds its node's layout bounds. Exercise an actual fixed screen
+      // separately so the surface-edge rule still reaches both text painters.
+      let rasterizer = Rasterizer()
+      #expect(rasterizer.rasterize(edge).size == CellSize(width: 5, height: 1))
+      var cells = [Array(repeating: RasterCell.empty, count: 4)]
+      var images: [RasterImageAttachment] = []
+      rasterizer.paint(
+        commands: edge.commands, environment: .init(), cells: &cells,
+        imageAttachments: &images, clip: nil)
+      let edgeSurface = RasterSurface(size: .init(width: 4, height: 1), cells: cells)
       let edgeLines = edgeSurface.lines
       #expect(edgeSurface.size == CellSize(width: 4, height: 1), "\(painter)")
       #expect(edgeLines == ["abc漢"], "\(painter): \(edgeLines)")

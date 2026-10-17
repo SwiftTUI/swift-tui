@@ -161,6 +161,44 @@ extension DrawCommand {
   /// band row its bounding box covers. Everything else reports its bounds.
   package var inkRects: [CellRect] {
     switch self {
+    case .group, .clip:
+      return containerInkRects()
+    default:
+      return primitiveInkRects
+    }
+  }
+
+  /// Container commands can be arbitrarily deep. Their geometry walk uses
+  /// heap frames just like painting; a recursive property getter overflows
+  /// worker stacks before the iterative painter can visit the commands.
+  private func containerInkRects() -> [CellRect] {
+    enum Frame {
+      case visit(DrawCommand)
+      case finishGroup(bounds: CellRect, outputCount: Int)
+    }
+    var result: [CellRect] = []
+    var work: [Frame] = [.visit(self)]
+    while let frame = work.popLast() {
+      switch frame {
+      case .finishGroup(let bounds, let outputCount):
+        if result.count == outputCount { result.append(bounds) }
+      case .visit(let command):
+        switch command {
+        case .group(let bounds, let children):
+          work.append(.finishGroup(bounds: bounds, outputCount: result.count))
+          for child in children.reversed() { work.append(.visit(child)) }
+        case .clip(_, let child):
+          work.append(.visit(child))
+        default:
+          result.append(contentsOf: command.primitiveInkRects)
+        }
+      }
+    }
+    return result
+  }
+
+  private var primitiveInkRects: [CellRect] {
+    switch self {
     case .stroke(let bounds, .rectangle, 0, _, let strokeStyle, _, nil):
       return Self.perimeterRects(of: bounds, thickness: max(1, strokeStyle.legacyLineWidth))
     case .border(let bounds, _, _, nil, _, _, let sides):
@@ -189,11 +227,6 @@ extension DrawCommand {
     case .fill(let bounds, _, let inset, _, _) where inset < 0,
       .stroke(let bounds, _, let inset, _, _, _, _) where inset < 0:
       return shapeInsetBounds(bounds, by: inset).map { [$0] } ?? []
-    case .group(let bounds, let children):
-      let childRects = children.flatMap(\.inkRects)
-      return childRects.isEmpty ? [bounds] : childRects
-    case .clip(_, let child):
-      return child.inkRects
     default:
       return [topLevelBounds]
     }

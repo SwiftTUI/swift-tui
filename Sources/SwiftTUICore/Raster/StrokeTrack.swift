@@ -569,7 +569,6 @@ package enum StrokePen: Equatable, Sendable {
       vertical.north != .none, vertical.north == vertical.south,
       vertical.east == .none, vertical.west == .none,
       borderSet.bottom == borderSet.top, borderSet.right == borderSet.left,
-      borderSet.top.count == 1, borderSet.left.count == 1,
       Self.cornersMatch(borderSet, horizontal: horizontal.east, vertical: vertical.north)
     {
       self = .line(
@@ -603,8 +602,10 @@ package enum StrokePen: Equatable, Sendable {
       ))
   }
 
-  /// Classification must preserve the complete authored palette. A custom
-  /// edge or corner that a line alphabet cannot reproduce uses the edge pen.
+  /// Classification preserves authored edges and corners. Legacy multi-glyph
+  /// edge strings carry their rhythm in StrokeMask, while their first glyph
+  /// still supplies the line weight and must retain half-cell dash endpoints.
+  /// A custom edge or corner outside that alphabet uses the edge pen.
   private static func cornersMatch(
     _ set: BorderSet, horizontal: LineWeight, vertical: LineWeight
   ) -> Bool {

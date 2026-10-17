@@ -28,7 +28,13 @@ package func compositeVerticalBlockCell(
   let bottom = composed(sourceBottom, over: underBottom)
   var style = source.style ?? .init()
   let character: Character
-  if let top {
+  if source.character == "▄", let bottom {
+    // Preserve the authored glyph orientation. Both channel assignments encode
+    // the same coverage, but controls and copied text still carry this glyph.
+    character = "▄"
+    style.foregroundColor = bottom
+    style.backgroundColor = top
+  } else if let top {
     character = "▀"
     style.foregroundColor = top
     style.backgroundColor = bottom

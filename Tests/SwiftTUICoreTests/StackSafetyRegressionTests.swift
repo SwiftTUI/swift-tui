@@ -145,6 +145,27 @@ struct StackSafetyRegressionTests {
     #expect(surface.cells[0][0].character == "A")
   }
 
+  @Test("nested command extents preserve child order, empty groups, and signed insets")
+  func nestedCommandExtentsPreserveCoverage() {
+    let outer = CellRect(origin: .zero, size: .init(width: 1, height: 1))
+    let empty = CellRect(origin: .init(x: 9, y: 4), size: .init(width: 2, height: 2))
+    let shape = DrawCommand.fill(
+      bounds: outer, geometry: .rectangle, insetAmount: -2,
+      style: .color(.red), mode: .full)
+    var command = DrawCommand.group(
+      bounds: outer,
+      children: [
+        .group(bounds: empty, children: []), .clip(bounds: outer, child: shape),
+      ])
+    for _ in 0..<256 {
+      command = .group(bounds: outer, children: [.clip(bounds: outer, child: command)])
+    }
+    #expect(
+      command.inkRects == [
+        empty, CellRect(origin: .init(x: -2, y: -2), size: .init(width: 5, height: 5)),
+      ])
+  }
+
   @Test("deep wrapper chains measure and place through layout engine")
   func deepWrapperChainsMeasureAndPlaceThroughLayoutEngine() {
     let engine = LayoutEngine()
