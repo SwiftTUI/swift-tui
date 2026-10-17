@@ -184,7 +184,7 @@ public enum WASIRunner {
           environmentValue(named: name)
         }
       )
-      let inputReader = WebSurfaceInputReader { message in
+      let inputReader = WebSurfaceInputReader(wireCapabilities: host.wireCapabilities) { message in
         switch message {
         case .geometry(let request):
           if host.updateGeometry(request) { signalReader.send("SIGWINCH") }

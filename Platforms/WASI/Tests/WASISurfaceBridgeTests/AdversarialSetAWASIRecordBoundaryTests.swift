@@ -51,6 +51,7 @@ struct AdversarialSetAWASIRecordBoundaryTests {
   @Test func setA954AStaleGeometryCannotReplaceTheCurrentPointerMetrics() throws {
     // Hypothesis: an old geometry is suppressed as a control message but still overwrites the parser's subcell metric cache.
     var parser = WebSurfaceInputParser(session: 954)
+    _ = parser.feedRecords(Array("\u{1E}caps:{\"geometryRevisions\":true}\n".utf8))
     _ = parser.feedRecords(command("geometry:9:80:24:10:20"))
     let stale = parser.feedRecords(command("geometry:8:80:24:30:40"))
     #expect(stale.isEmpty)
@@ -62,6 +63,7 @@ struct AdversarialSetAWASIRecordBoundaryTests {
   @Test func setA955AcceptedGeometryPreventsLegacyResizeFromReplacingMetrics() throws {
     // Hypothesis: a legacy resize arriving after geometry negotiation changes the coordinate system of stamped input.
     var parser = WebSurfaceInputParser(session: 955)
+    _ = parser.feedRecords(Array("\u{1E}caps:{\"geometryRevisions\":true}\n".utf8))
     _ = parser.feedRecords(command("geometry:3:80:24:10:20"))
     let legacy = parser.feedRecords(command("resize:40:12:30:40"))
     #expect(

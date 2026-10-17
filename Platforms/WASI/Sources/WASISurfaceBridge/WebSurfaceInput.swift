@@ -26,10 +26,11 @@ package final class WebSurfaceInputReader: TerminalInputReading, SynchronousInpu
   /// Pull-delivery state. Only the main actor touches it — the boundary pull
   /// and the idle poll are both main-actor isolated — and the mutex is what
   /// lets a `Sendable` class hold the parser.
-  private let pull = Mutex(PullState())
+  private let pull: Mutex<PullState>
+  private let wireCapabilities: HostWireCapabilities
 
   private struct PullState {
-    var parser = WebSurfaceInputParser()
+    var parser: WebSurfaceInputParser
     var sink: InputPullDeliverySink?
     var pollingTask: Task<Void, Never>?
     var ended = false
@@ -43,9 +44,12 @@ package final class WebSurfaceInputReader: TerminalInputReading, SynchronousInpu
 
   package init(
     fileDescriptor: Int32 = webSurfaceStandardInputFileDescriptor,
+    wireCapabilities: HostWireCapabilities = .init(),
     controlHandler: @escaping @Sendable (WebSurfaceInputControlMessage) -> Void = { _ in }
   ) {
     self.fileDescriptor = fileDescriptor
+    self.wireCapabilities = wireCapabilities
+    self.pull = Mutex(PullState(parser: WebSurfaceInputParser(fixedCapabilities: wireCapabilities)))
     self.controlHandler = controlHandler
   }
 
@@ -104,6 +108,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, SynchronousInpu
         continue
       }
       if bytesRead < 0, webSurfaceErrnoIsWouldBlock(webSurfaceErrno) {
+        delivered += deliver(pull.withLock { $0.parser.flushIdleInput() }, through: sink)
         break
       }
       // EOF or a non-retryable error: the source is gone.
@@ -111,6 +116,7 @@ package final class WebSurfaceInputReader: TerminalInputReading, SynchronousInpu
       break
     }
     if ended {
+      delivered += deliver(pull.withLock { $0.parser.flushTerminalInput() }, through: sink)
       let firstEnd = pull.withLock { state -> Bool in
         defer { state.ended = true }
         return !state.ended
@@ -173,8 +179,9 @@ package final class WebSurfaceInputReader: TerminalInputReading, SynchronousInpu
     AsyncStream { continuation in
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
+      let wireCapabilities = self.wireCapabilities
       let task = Task.detached {
-        var parser = WebSurfaceInputParser()
+        var parser = WebSurfaceInputParser(fixedCapabilities: wireCapabilities)
         var backoff = InputPollBackoff()
 
         while !Task.isCancelled {
@@ -201,11 +208,13 @@ package final class WebSurfaceInputReader: TerminalInputReading, SynchronousInpu
           }
 
           if bytesRead < 0, webSurfaceErrnoIsWouldBlock(webSurfaceErrno) {
+            for case .input(let event) in parser.flushIdleInput() { continuation.yield(event) }
             try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
             backoff.recordIdlePoll()
             continue
           }
 
+          for case .input(let event) in parser.flushTerminalInput() { continuation.yield(event) }
           continuation.finish()
           return
         }

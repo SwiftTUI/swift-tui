@@ -1,4 +1,25 @@
 extension String {
+  /// Replaces character offsets, then maps the insertion endpoint through the
+  /// result's grapheme boundaries. Inserted scalars can join either neighbor.
+  package func replacingCharacters(
+    in range: Range<Int>, with replacement: String
+  ) -> (text: String, caret: Int) {
+    let count = self.count
+    let lower = index(startIndex, offsetBy: max(0, min(count, range.lowerBound)))
+    let upper = index(startIndex, offsetBy: max(0, min(count, range.upperBound)))
+    let insertionEnd = self[..<lower].utf8.count + replacement.utf8.count
+    var copy = self
+    copy.replaceSubrange(lower..<upper, with: replacement)
+    var byteOffset = 0
+    var caret = 0
+    for character in copy {
+      guard byteOffset < insertionEnd else { break }
+      byteOffset += character.utf8.count
+      caret += 1
+    }
+    return (copy, caret)
+  }
+
   package func firstLiteralRange(
     of literal: String
   ) -> Range<String.Index>? {

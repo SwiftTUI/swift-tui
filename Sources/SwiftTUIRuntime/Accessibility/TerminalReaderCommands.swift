@@ -28,9 +28,9 @@ package struct TerminalReaderCommands {
   }
 
   package mutating func command(_ line: String) -> TerminalReaderCommandResult {
-    let parts = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false)
-    let verb = String(parts.first ?? "").lowercased()
-    let value = parts.count > 1 ? String(parts[1]) : ""
+    let parts = line.utf8.split(separator: 0x20, maxSplits: 1, omittingEmptySubsequences: false)
+    let verb = parts.first.map { String(decoding: $0, as: UTF8.self).lowercased() } ?? ""
+    let value = parts.count > 1 ? String(decoding: parts[1], as: UTF8.self) : ""
     if verb == "quit" || verb == "q" {
       editor = nil
       return .init(output: "Return to shell.", exit: true)

@@ -1,16 +1,5 @@
 import SwiftTUICore
 
-/// Returns `true` when `buffer` begins with the 6-byte bracketed-paste
-/// start marker `ESC [ 2 0 0 ~`.  Pure and side-effect free.
-private func matchesBracketedPasteStart(_ buffer: [UInt8]) -> Bool {
-  let marker: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
-  guard buffer.count >= marker.count else { return false }
-  for index in 0..<marker.count where buffer[index] != marker[index] {
-    return false
-  }
-  return true
-}
-
 /// Incrementally parses terminal bytes into normalized keyboard and mouse
 /// events.
 public struct TerminalInputParser: Sendable {
@@ -47,7 +36,7 @@ public struct TerminalInputParser: Sendable {
     return events
   }
 
-  /// True when the buffer holds only a lone ESC that cannot yet be
+  /// True when an incomplete escape envelope cannot yet be
   /// disambiguated between a bare Escape keypress and the first byte of a
   /// longer escape sequence. The run loop arms an idle escape-timeout whenever
   /// this is set and calls ``flush()`` on expiry; an arriving continuation
@@ -61,7 +50,9 @@ public struct TerminalInputParser: Sendable {
     // prefix may be a control string whose writer died before the ST
     // terminator (F139). The idle flush resolves both; without it the
     // parser would buffer — and eat — all input forever.
-    return isIncompleteSS3 || unterminatedControlStringIntroducer != nil
+    return isIncompleteSS3 || bufferedBytes.first == 0x9B
+      || bufferedBytes.starts(with: [0x1B, 0x5B])
+      || unterminatedControlStringIntroducer != nil
   }
 
   private var isIncompleteSS3: Bool { bufferedBytes == [0x1B, 0x4F] }
@@ -88,22 +79,33 @@ public struct TerminalInputParser: Sendable {
     }
   }
 
-  /// Drains a lingering lone ESC as an Escape key press.
+  /// Resolves incomplete escape input at an explicit idle timeout or EOF.
   ///
   /// A bare ESC stays buffered by `parseNextEvent()` because it is
   /// byte-identical to the first byte of a real Escape keypress and of every
   /// escape sequence. The run loop calls this on a short idle timeout (the vim
   /// `ttimeoutlen` model) to commit a bare Escape once no continuation byte has
   /// followed. If a lone ESC was pending, this function returns `[.key(.escape)]`.
-  /// Incomplete SS3 and bare seven-bit control introducers resolve to Alt
-  /// chords; incomplete control payloads (including C1 OSC) are discarded.
+  /// Bare CSI, SS3 and seven-bit control introducers resolve to Alt chords;
+  /// incomplete control payloads are discarded and unfinished paste text is recovered.
   public mutating func flush() -> [InputEvent] {
     guard isAwaitingEscapeDisambiguation else {
       return []
     }
-    if isIncompleteSS3 {
+    let csiPrefix = bufferedBytes.first == 0x9B ? 1 : 2
+    if bufferedBytes.dropFirst(csiPrefix).starts(with: [0x32, 0x30, 0x30, 0x7E]) {
+      let content = String(decoding: bufferedBytes.dropFirst(csiPrefix + 4), as: UTF8.self)
       bufferedBytes.removeAll(keepingCapacity: true)
-      return [.key(KeyPress(.character("O"), modifiers: .alt))]
+      return [.paste(PasteEvent(content: content))]
+    }
+    if isIncompleteSS3 || bufferedBytes == [0x1B, 0x5B] {
+      let character = Character(UnicodeScalar(bufferedBytes[1]))
+      bufferedBytes.removeAll(keepingCapacity: true)
+      return [.key(KeyPress(.character(character), modifiers: .alt))]
+    }
+    if bufferedBytes.first == 0x9B || bufferedBytes.starts(with: [0x1B, 0x5B]) {
+      bufferedBytes.removeAll(keepingCapacity: true)
+      return []
     }
     if let introducer = unterminatedControlStringIntroducer {
       // At an explicit timeout/EOF, ESC + introducer resolves to Alt+letter.
@@ -147,6 +149,13 @@ extension TerminalInputParser {
     }
 
     switch firstByte {
+    case 0x00:
+      bufferedBytes.removeFirst()
+      return .key(KeyPress(.space, modifiers: .ctrl))
+    case 0x1C...0x1F:
+      bufferedBytes.removeFirst()
+      return .key(
+        KeyPress(.character(Character(UnicodeScalar(firstByte + 0x40))), modifiers: .ctrl))
     case 0x08, 0x7F:
       // 0x08 (Ctrl+H) and 0x7F (DEL) both map to backspace. This must be
       // matched before the Ctrl-letter range so 0x08 is not swallowed as Ctrl+H.
@@ -170,7 +179,7 @@ extension TerminalInputParser {
     case 0x1B:
       return parseEscapeSequence()
     case 0x9B:
-      return parseEightBitCSI()
+      return parseCSI(prefixLength: 1)
     case 0x9D:
       return discardControlString(prefixLength: 1, terminatesWithBEL: true)
     case 0x20:
@@ -193,35 +202,27 @@ extension TerminalInputParser {
   /// unbracketed pastes) as raw UTF-8, and a read boundary can split a
   /// sequence anywhere — a sequence whose continuation bytes have not
   /// arrived yet stays buffered instead of being dropped byte-by-byte.
-  private mutating func parseUTF8Character() -> InputEvent? {
-    let leadByte = bufferedBytes[0]
-    let continuationCount: Int
+  private mutating func parseUTF8Character(prefixLength: Int = 0) -> InputEvent? {
+    let leadByte = bufferedBytes[prefixLength]
+    let sequenceLength: Int
     switch leadByte {
-    case 0xC2...0xDF: continuationCount = 1
-    case 0xE0...0xEF: continuationCount = 2
-    case 0xF0...0xF4: continuationCount = 3
+    case 0xC2...0xDF: sequenceLength = 2
+    case 0xE0...0xEF: sequenceLength = 3
+    case 0xF0...0xF4: sequenceLength = 4
     default:
-      // Stray continuation byte or invalid lead — drop it, keep draining.
-      bufferedBytes.removeFirst()
+      bufferedBytes.removeFirst(prefixLength + 1)
       return nil
     }
-    let sequenceLength = 1 + continuationCount
-    guard bufferedBytes.count >= sequenceLength else {
-      return nil  // split across reads — wait for the continuation bytes
-    }
-    let sequence = Array(bufferedBytes[0..<sequenceLength])
-    guard sequence.dropFirst().allSatisfy({ (0x80...0xBF).contains($0) }) else {
-      bufferedBytes.removeFirst()
+    let available = bufferedBytes.dropFirst(prefixLength).prefix(sequenceLength)
+    guard available.dropFirst().allSatisfy({ (0x80...0xBF).contains($0) }) else {
+      bufferedBytes.removeFirst(prefixLength + 1)
       return nil
     }
-    bufferedBytes.removeFirst(sequenceLength)
-    let decoded = String(decoding: sequence, as: UTF8.self)
-    // Overlong/surrogate encodings decode to U+FFFD replacement characters;
-    // consume them silently rather than emitting synthetic text.
-    guard decoded.unicodeScalars.count == 1, decoded != "\u{FFFD}" else {
-      return nil
-    }
-    return .key(KeyPress(.character(Character(decoded))))
+    guard available.count == sequenceLength else { return nil }
+    let decoded = String(validating: available, as: UTF8.self)
+    bufferedBytes.removeFirst(prefixLength + sequenceLength)
+    guard let decoded, decoded.unicodeScalars.count == 1 else { return nil }
+    return .key(KeyPress(.character(Character(decoded)), modifiers: prefixLength == 0 ? [] : .alt))
   }
 
   private mutating func parseEscapeSequence() -> InputEvent? {
@@ -277,6 +278,9 @@ extension TerminalInputParser {
     }
 
     guard bufferedBytes[1] == 0x5B else {
+      if bufferedBytes[1] >= 0x80 {
+        return parseUTF8Character(prefixLength: 1)
+      }
       // Alt+key: ESC followed by a printable byte
       if (0x20...0x7E).contains(bufferedBytes[1]) {
         let byte = bufferedBytes[1]
@@ -299,6 +303,13 @@ extension TerminalInputParser {
       // some terminals prefix arrow chords with a second ESC, and consuming
       // it as Alt+Escape would strand the sequence tail as literal text.
       switch bufferedBytes[1] {
+      case 0x00:
+        bufferedBytes.removeFirst(2)
+        return .key(KeyPress(.space, modifiers: [.ctrl, .alt]))
+      case 0x1C...0x1F:
+        let character = Character(UnicodeScalar(bufferedBytes[1] + 0x40))
+        bufferedBytes.removeFirst(2)
+        return .key(KeyPress(.character(character), modifiers: [.ctrl, .alt]))
       case 0x0A, 0x0D:
         bufferedBytes.removeFirst(2)
         return .key(KeyPress(.return, modifiers: .alt))
@@ -319,145 +330,66 @@ extension TerminalInputParser {
       }
     }
 
-    guard bufferedBytes.count > 2 else {
-      return nil
-    }
-
-    if bufferedBytes[2] == 0x3F {
-      return discardCSI(prefixLength: 2)
-    }
-
-    // Bracketed-paste start: ESC [ 2 0 0 ~ ... ESC [ 2 0 1 ~
-    if matchesBracketedPasteStart(bufferedBytes) {
-      return parseBracketedPaste()
-    }
-
-    if bufferedBytes[2] == 0x3C {
-      return parseSGRMouseSequence()
-    }
-
-    // VT220 "tilde" function keys arrive as ESC [ <number> [;<modifier>] ~
-    // (Home/End/Insert/Delete/PageUp/PageDown and F-keys) and are 4+ bytes
-    // long. Detect the digit-led parameter run and, when it terminates in '~',
-    // consume the whole envelope as a unit. Without this the 3-byte
-    // fall-through below emits a bare Escape (which can dismiss a modal or pop
-    // navigation) and leaves the trailing '~' to be inserted as literal text.
-    if (0x30...0x39).contains(bufferedBytes[2]) {
-      var index = 2
-      while index < bufferedBytes.count, (0x30...0x3F).contains(bufferedBytes[index]) {
-        index += 1
-      }
-      guard index < bufferedBytes.count else {
-        return nil  // terminator not buffered yet — wait for more bytes
-      }
-      let parameterBytes = Array(bufferedBytes[2..<index])
-
-      // A malformed Kitty event subparameter can put an alphabetic byte where
-      // a number belongs immediately before the `u` terminator. Treat that as
-      // one rejected Kitty envelope instead of leaking both its CSI prefix and
-      // terminator as user input. Wait across a read boundary so the recovery
-      // remains atomic when the `u` has not arrived yet.
-      if parameterBytes.contains(0x3A), bufferedBytes[index] != 0x75 {
-        guard index + 1 < bufferedBytes.count else {
-          return nil
-        }
-        if bufferedBytes[index + 1] == 0x75 {
-          bufferedBytes.removeFirst(index + 2)
-          return nil
-        }
-      }
-      if bufferedBytes[index] == 0x7E {
-        bufferedBytes.removeFirst(index + 1)
-        if let event = tildeKeyEvent(parameterBytes: parameterBytes) {
-          return event
-        }
-        // The envelope was consumed but maps to no KeyEvent (e.g. Delete).
-        // Keep draining the buffer instead of reporting end-of-input, so a
-        // following keystroke in the same chunk is not stranded.
-        return nil
-      }
-      // Kitty keyboard protocol key: ESC [ <params> u. Parsed whether or not
-      // this host pushed the enhancement flags: terminals never emit CSI u
-      // envelopes unprompted, and consuming them whole means a stray envelope
-      // can never mangle into an Escape plus literal parameter text.
-      if bufferedBytes[index] == 0x75 {
-        bufferedBytes.removeFirst(index + 1)
-        if let event = kittyKeyEvent(parameterBytes: parameterBytes) {
-          return event
-        }
-        // Consumed whole with no deliverable event (key release, modifier
-        // set the framework cannot represent, or an unmapped functional
-        // code). Keep draining the buffer.
-        return nil
-      }
-      if bufferedBytes[index] == 0x74 {
-        bufferedBytes.removeFirst(index + 1)
-        return nil
-      }
-      // Letter-terminated parameterized sequence (e.g. ESC[1;5A): fall through
-      // to the existing modifier handling below.
-    }
-
-    // CSI sequences with modifier parameters: ESC[1;{mod}{key}
-    if bufferedBytes[2] == 0x31 {
-      return parseCSIModifierSequence()
-    }
-
-    switch bufferedBytes[2] {
-    case 0x41:
-      bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.arrowUp))
-    case 0x42:
-      bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.arrowDown))
-    case 0x43:
-      bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.arrowRight))
-    case 0x44:
-      bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.arrowLeft))
-    case 0x48:
-      bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.home))
-    case 0x46:
-      bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.end))
-    case 0x5A:
-      bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.tab, modifiers: .shift))
-    default:
-      return discardCSI(prefixLength: 2)
-    }
+    return parseCSI(prefixLength: 2)
   }
 
-  private mutating func parseEightBitCSI() -> InputEvent? {
-    guard bufferedBytes.count > 1 else {
+  /// Scan one complete CSI envelope before interpreting any parameters.
+  /// Unsupported replies and intermediate-byte commands stay atomic too.
+  private mutating func parseCSI(prefixLength: Int) -> InputEvent? {
+    guard bufferedBytes.count > prefixLength else { return nil }
+    if bufferedBytes.dropFirst(prefixLength).starts(with: [0x32, 0x30, 0x30, 0x7E]) {
+      return parseBracketedPaste(prefixLength: prefixLength)
+    }
+    if bufferedBytes[prefixLength] == 0x3C {
+      return parseSGRMouseSequence(prefixLength: prefixLength)
+    }
+    if bufferedBytes[prefixLength] == 0x4D {
+      // X10 carries exactly three binary report bytes after CSI M. This host
+      // negotiates SGR mouse, but unsolicited legacy reports must not type.
+      guard bufferedBytes.count >= prefixLength + 4 else { return nil }
+      bufferedBytes.removeFirst(prefixLength + 4)
       return nil
     }
-    guard bufferedBytes[1] == 0x3F else {
-      bufferedBytes.removeFirst()
-      return nil
-    }
-    return discardCSI(prefixLength: 1)
-  }
-
-  private mutating func discardCSI(prefixLength: Int) -> InputEvent? {
     var index = prefixLength
     while index < bufferedBytes.count, (0x30...0x3F).contains(bufferedBytes[index]) {
       index += 1
     }
+    let parameters = Array(bufferedBytes[prefixLength..<index])
+    let parameterEnd = index
     while index < bufferedBytes.count, (0x20...0x2F).contains(bufferedBytes[index]) {
       index += 1
     }
-    guard index < bufferedBytes.count else {
-      return nil
+    guard index < bufferedBytes.count else { return nil }
+    // Preserve atomic recovery for malformed Kitty event subparameters.
+    if parameters.contains(0x3A), bufferedBytes[index] != 0x75 {
+      guard index + 1 < bufferedBytes.count else { return nil }
+      if bufferedBytes[index + 1] == 0x75 {
+        bufferedBytes.removeFirst(index + 2)
+        return nil
+      }
     }
-    guard (0x40...0x7E).contains(bufferedBytes[index]) else {
-      bufferedBytes.removeFirst()
+    let final = bufferedBytes[index]
+    guard (0x40...0x7E).contains(final) else {
+      // Drop the malformed prefix, then reconsider the offending byte as a
+      // new envelope or key instead of leaking the parameter bytes.
+      bufferedBytes.removeFirst(index)
       return nil
     }
     bufferedBytes.removeFirst(index + 1)
-    return nil
+    guard index == parameterEnd else { return nil }
+    switch final {
+    case 0x7E: return tildeKeyEvent(parameterBytes: parameters)
+    case 0x75: return kittyKeyEvent(parameterBytes: parameters)
+    case 0x5A where parameters.isEmpty: return .key(KeyPress(.tab, modifiers: .shift))
+    default:
+      guard let key = csiTerminalKey(from: final) else { return nil }
+      if parameters.isEmpty { return .key(KeyPress(key)) }
+      let groups = parameters.split(separator: 0x3B, omittingEmptySubsequences: false)
+      guard groups.count == 2, groups[0] == [0x31],
+        let modifiers = csiModifiers(from: Array(groups[1]))
+      else { return nil }
+      return .key(KeyPress(key, modifiers: modifiers))
+    }
   }
 
   private mutating func discardControlString(
@@ -501,47 +433,6 @@ extension TerminalInputParser {
     return nil
   }
 
-  /// Parses CSI sequences with modifier parameters: `ESC[1;{mod}{key}`
-  ///
-  /// The xterm modifier parameter convention is: value = 1 + bitmask
-  /// where shift=1, alt=2, ctrl=4.
-  private mutating func parseCSIModifierSequence() -> InputEvent? {
-    // Expect at least ESC [ 1 ; {mod} {key} = 6 bytes minimum
-    guard bufferedBytes.count >= 6,
-      bufferedBytes[3] == 0x3B  // semicolon
-    else {
-      // Not a modifier sequence: discard the whole scanned envelope
-      // silently, exactly like every other unmapped CSI. The old
-      // fall-through consumed three bytes and emitted `.escape`, leaking a
-      // modal-dismissing Escape plus the envelope tail as literal text
-      // (F165). `discardCSI` waits across a read boundary when the final
-      // byte has not arrived, so the recovery stays atomic.
-      return discardCSI(prefixLength: 2)
-    }
-
-    // Find the terminal byte (an uppercase letter)
-    var index = 4
-    while index < bufferedBytes.count, (0x30...0x39).contains(bufferedBytes[index]) {
-      index += 1
-    }
-
-    guard index < bufferedBytes.count else {
-      return nil  // incomplete sequence, wait for more bytes
-    }
-
-    let terminalByte = bufferedBytes[index]
-    let modifierBytes = Array(bufferedBytes[4..<index])
-    bufferedBytes.removeFirst(index + 1)
-
-    let modifiers = csiModifiers(from: modifierBytes)
-
-    guard let key = csiTerminalKey(from: terminalByte) else {
-      return nil
-    }
-
-    return .key(KeyPress(key, modifiers: modifiers))
-  }
-
   /// Maps an already-consumed VT220 tilde key envelope (`ESC [ n [;mod] ~`) to
   /// an input event, honoring any xterm modifier parameter. Unknown numbers
   /// (unassigned VT220 slots) consume the envelope and map to nothing — the
@@ -552,14 +443,22 @@ extension TerminalInputParser {
       separator: 0x3B,  // ';'
       omittingEmptySubsequences: false
     )
+    if groups.count == 3, groups[0] == [0x32, 0x37] {
+      guard let modifiers = csiModifiers(from: Array(groups[1])),
+        let code = asciiInteger(from: groups[2]), let key = kittyKey(fromCodePoint: code)
+      else { return nil }
+      return .key(KeyPress(key, modifiers: modifiers))
+    }
     guard groups.count <= 2 else {
       return nil
     }
     guard let keyGroup = groups.first, let keyID = asciiInteger(from: keyGroup) else {
       return nil
     }
-    let modifiers: EventModifiers =
-      groups.count > 1 ? csiModifiers(from: Array(groups[1])) : []
+    guard
+      let modifiers: EventModifiers =
+        groups.count > 1 ? csiModifiers(from: Array(groups[1])) : []
+    else { return nil }
     let key: KeyEvent
     switch keyID {
     case 1, 7:
@@ -654,19 +553,10 @@ extension TerminalInputParser {
       // Any other bit the framework cannot represent swallows the event:
       // delivering super+j as a plain "j" would type text the user never
       // intended.
-      let bitmask = (modifierValue - 1) & ~(64 | 128)
-      guard bitmask & ~(1 | 2 | 4) == 0 else {
+      guard let decoded = keyboardModifiers(value: modifierValue, ignoringLocks: true) else {
         return nil
       }
-      if bitmask & 1 != 0 {
-        modifiers.insert(.shift)
-      }
-      if bitmask & 2 != 0 {
-        modifiers.insert(.alt)
-      }
-      if bitmask & 4 != 0 {
-        modifiers.insert(.ctrl)
-      }
+      modifiers = decoded
     }
 
     guard let key = kittyKey(fromCodePoint: keyCode) else {
@@ -733,22 +623,21 @@ extension TerminalInputParser {
     }
   }
 
-  private func csiModifiers(from bytes: [UInt8]) -> EventModifiers {
-    guard let value = asciiInteger(from: ArraySlice(bytes)) else {
-      return []
-    }
-    // xterm convention: modifier = 1 + bitmask (shift=1, alt=2, ctrl=4)
-    let bitmask = value - 1
+  private func csiModifiers(from bytes: [UInt8]) -> EventModifiers? {
+    guard let value = asciiInteger(from: ArraySlice(bytes)) else { return nil }
+    // Legacy zero has the default value, one. Never subtract from zero or
+    // silently turn unsupported Meta/Super chords into unmodified input.
+    return keyboardModifiers(value: max(1, value), ignoringLocks: false)
+  }
+
+  private func keyboardModifiers(value: Int, ignoringLocks: Bool) -> EventModifiers? {
+    guard value >= 1 else { return nil }
+    let bitmask = (value - 1) & ~(ignoringLocks ? (64 | 128) : 0)
+    guard bitmask & ~7 == 0 else { return nil }
     var modifiers: EventModifiers = []
-    if (bitmask & 1) != 0 {
-      modifiers.insert(.shift)
-    }
-    if (bitmask & 2) != 0 {
-      modifiers.insert(.alt)
-    }
-    if (bitmask & 4) != 0 {
-      modifiers.insert(.ctrl)
-    }
+    if bitmask & 1 != 0 { modifiers.insert(.shift) }
+    if bitmask & 2 != 0 { modifiers.insert(.alt) }
+    if bitmask & 4 != 0 { modifiers.insert(.ctrl) }
     return modifiers
   }
 
@@ -776,36 +665,23 @@ extension TerminalInputParser {
   /// If the matching end marker is already buffered, the whole envelope is
   /// consumed and a `.paste` event is returned.  Otherwise the buffer is left
   /// untouched so the caller can wait for more bytes.
-  private mutating func parseBracketedPaste() -> InputEvent? {
-    // Buffer layout at entry: ESC [ 2 0 0 ~ <payload> ESC [ 2 0 1 ~
-    let startMarker: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
-    let endMarker: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
-    guard bufferedBytes.count >= startMarker.count else { return nil }
-    // Look for the end marker anywhere after the start marker.
-    let payloadStart = startMarker.count
-    var searchIndex = payloadStart
-    let totalCount = bufferedBytes.count
-    while searchIndex + endMarker.count <= totalCount {
-      var matches = true
-      for offset in 0..<endMarker.count
-      where bufferedBytes[searchIndex + offset] != endMarker[offset] {
-        matches = false
-        break
-      }
-      if matches {
-        let payloadBytes = Array(bufferedBytes[payloadStart..<searchIndex])
-        bufferedBytes.removeFirst(searchIndex + endMarker.count)
-        let content = String(decoding: payloadBytes, as: UTF8.self)
+  private mutating func parseBracketedPaste(prefixLength: Int) -> InputEvent? {
+    let payloadStart = prefixLength + 4
+    let endMarkers: [[UInt8]] = [
+      [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E], [0x9B, 0x32, 0x30, 0x31, 0x7E],
+    ]
+    for index in payloadStart..<bufferedBytes.count {
+      for marker in endMarkers where bufferedBytes[index...].starts(with: marker) {
+        let content = String(decoding: bufferedBytes[payloadStart..<index], as: UTF8.self)
+        bufferedBytes.removeFirst(index + marker.count)
         return .paste(PasteEvent(content: content))
       }
-      searchIndex += 1
     }
-    // End marker not yet seen — keep buffering.
     return nil
   }
 
-  private mutating func parseSGRMouseSequence() -> InputEvent? {
-    var index = 3
+  private mutating func parseSGRMouseSequence(prefixLength: Int) -> InputEvent? {
+    var index = prefixLength + 1
     while index < bufferedBytes.count,
       bufferedBytes[index] != 0x4D,
       bufferedBytes[index] != 0x6D
@@ -823,7 +699,7 @@ extension TerminalInputParser {
     }
 
     let terminator = bufferedBytes[index]
-    let parameterBytes = Array(bufferedBytes[3..<index])
+    let parameterBytes = Array(bufferedBytes[(prefixLength + 1)..<index])
     bufferedBytes.removeFirst(index + 1)
 
     let parameters = parameterBytes.split(separator: 0x3B)

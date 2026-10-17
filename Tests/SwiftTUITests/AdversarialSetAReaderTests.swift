@@ -66,7 +66,7 @@ struct AdversarialSetAReaderTests {
     var reader = editing(field(text: "ex"))
     _ = reader.command("select 1 1")
     _ = reader.command("insert \u{301}")
-    withKnownIssue("a leading combining mark merges with the delimiter space and hides the verb") {
+    do {
       #expect(reader.editor?.text == "éx")
       #expect(reader.editor?.head == 1)
       #expect(
@@ -129,7 +129,7 @@ struct AdversarialSetAReaderTests {
   @Test func setA053SelectionWithNonnumericTokenIsRejectedAtomically() {
     var reader = editing(field(text: "abcd"))
     _ = reader.command("select 1 garbage 2")
-    withKnownIssue("compactMap(Int.init) discards malformed tokens before the arity check") {
+    do {
       #expect(reader.editor?.anchor == 4)
       #expect(reader.editor?.head == 4)
     }
@@ -138,7 +138,7 @@ struct AdversarialSetAReaderTests {
   @Test func setA054OverflowingSelectionTokenCannotPartiallyParse() {
     var reader = editing(field(text: "abcd"))
     _ = reader.command("select 1 \(String(repeating: "9", count: 80)) 2")
-    withKnownIssue("compactMap(Int.init) discards an overflowing token before the arity check") {
+    do {
       #expect(reader.editor?.anchor == 4)
       #expect(reader.editor?.head == 4)
     }

@@ -245,6 +245,26 @@ struct WebSocketInputReaderTests {
       ])
   }
 
+  @Test("raw terminal prefixes survive separate socket messages and internal chunks")
+  func splitRawTerminalInput() async {
+    let client = await ChannelClient.attached()
+    await client.feed(String(repeating: "x", count: 4095) + "\u{1B}")
+    await client.feed("[A")
+    let events = await client.yieldedEvents()
+    #expect(events.count == 4096)
+    #expect(events.last == .key(.init(.arrowUp)))
+  }
+
+  @Test("a socket's idle Escape resolves without a following message", .timeLimit(.minutes(1)))
+  func idleRawEscape() async {
+    let client = await ChannelClient.attached()
+    await client.feed("\u{1B}")
+    #expect(await client.nextEvent() == .key(.init(.escape)))
+    await client.feed("x")
+    #expect(await client.nextEvent() == .key(.init(.character("x"))))
+    await client.channel.shutdown()
+  }
+
   private static func twoImageFrame(
     sequence: UInt64
   ) -> SemanticHostFrame {
@@ -331,11 +351,13 @@ private struct ChannelClient {
       } else {
         WebSocketInputReader(source: channel)
       }
+    let events = EventRecorder()
+    await reader.process(.connectionOpened(token: token), yielding: events.continuation)
     return Self(
       channel: channel,
       reader: reader,
       token: token,
-      events: EventRecorder(),
+      events: events,
       clientContinuation: clientContinuation!,
       output: output
     )
@@ -349,6 +371,11 @@ private struct ChannelClient {
       .bytes(token: token, Array(text.utf8)),
       yielding: events.continuation
     )
+  }
+
+  func nextEvent() async -> InputEvent? {
+    var iterator = events.stream.makeAsyncIterator()
+    return await iterator.next()
   }
 
   /// Ends the recording and returns every event the reader yielded, in order.

@@ -41,6 +41,7 @@ import Testing
 
   @Test func geometryRecordsPreserveOrderRevisionAndValidatedMetrics() throws {
     var parser = WebSurfaceInputParser(session: 31)
+    _ = parser.feedRecords(Array("\u{1E}caps:{\"geometryRevisions\":true}\n".utf8))
     let records = parser.feedRecords(
       Array(
         ("\u{1E}geometry:9007199254740991:80:24:9:21\n"

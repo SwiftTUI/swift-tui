@@ -91,7 +91,7 @@
       let negativeWidth = parser.feed(Array("\u{1E}resize:-5:24\n".utf8)).controlMessages
       let negativeHeight = parser.feed(Array("\u{1E}resize:80:-1\n".utf8)).controlMessages
       let negativePitch = parser.feed(Array("\u{1E}resize:80:24:-9:-21\n".utf8)).controlMessages
-      withKnownIssue("parseResizeCommand applies max(1, value) before the budget check") {
+      do {
         #expect(negativeWidth.isEmpty, "\(negativeWidth)")
         #expect(negativeHeight.isEmpty, "\(negativeHeight)")
         #expect(
@@ -111,7 +111,7 @@
       let controls = parser.feed(
         Array("\u{1E}resize:80\u{1E}resize:100:30\n".utf8)
       ).controlMessages
-      withKnownIssue("the buffered command absorbs the second introducer and parses as one") {
+      do {
         #expect(events.contains(.key(.init(.return))), "\(events)")
         #expect(!pastes.contains { $0.contains("\u{1E}") }, "\(pastes)")
         #expect(
@@ -131,7 +131,7 @@
         ])
       let paste = parser.feed(Array("\u{1E}paste:%FF\n".utf8)).events
       let key = parser.feed(Array("\u{1E}key:character:%C3:0\n".utf8)).events
-      withKnownIssue("the parser's percent decoder uses String(decoding:) and substitutes U+FFFD") {
+      do {
         #expect(paste.isEmpty, "\(paste)")
         #expect(key.isEmpty, "\(key)")
       }
@@ -168,9 +168,7 @@
       let reported = PointerPrecision.subCell(
         source: .webPixels, metrics: .init(width: 10, height: 22, source: .reported))
       #expect(transport.pointerInputCapabilities.precision == reported)
-      withKnownIssue(
-        "the parser latches the un-negotiated geometry's pitch and stops tracking resize metrics"
-      ) {
+      do {
         #expect(event.location.precision == transport.pointerInputCapabilities.precision)
       }
     }
@@ -190,7 +188,7 @@
       try pipe.write(bytes)
       let delivered = reader.pullPendingInput()
       #expect(recorder.keys.prefix(4095).allSatisfy { $0 == .character("x") })
-      withKnownIssue("feedRecords flushes the byte parser per read, committing the ESC as Escape") {
+      do {
         #expect(delivered == 4096, "\(delivered)")
         #expect(recorder.keys.last == .arrowUp, "\(recorder.keys.suffix(3))")
       }

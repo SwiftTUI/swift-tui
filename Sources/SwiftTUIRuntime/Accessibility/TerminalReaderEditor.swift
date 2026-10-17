@@ -76,17 +76,20 @@ extension TerminalReaderCommands {
           : TerminalReaderModel.safe(draft.text, limit: 65_536)
             + "\nSelection \(draft.anchor) to \(draft.head) of \(draft.text.count) characters.")
     case "select":
-      let offsets = value.split(separator: " ").compactMap { Int($0) }
-      guard offsets.count == 2, offsets.allSatisfy({ $0 >= 0 && $0 <= draft.text.count }) else {
+      let tokens = value.utf8.split(separator: 0x20)
+      guard tokens.count == 2,
+        let anchor = Int(String(decoding: tokens[0], as: UTF8.self)),
+        let head = Int(String(decoding: tokens[1], as: UTF8.self)),
+        (0...draft.text.count).contains(anchor), (0...draft.text.count).contains(head)
+      else {
         return .init(output: "Use select START END with character offsets inside the draft.")
       }
-      draft.anchor = offsets[0]
-      draft.head = offsets[1]
+      draft.anchor = anchor
+      draft.head = head
     case "insert", "replace", "append-line", "delete":
       guard !draft.readOnly else {
         return .init(output: "Read-only text permits selection but not edits.")
       }
-      var text = Array(draft.text)
       let insertion = verb == "delete" ? "" : value
       guard
         insertion.unicodeScalars.allSatisfy({ $0.value >= 32 && !(127...159).contains($0.value) })
@@ -94,27 +97,24 @@ extension TerminalReaderCommands {
         return .init(
           output: "Control characters are not accepted. Use append-line for line breaks.")
       }
-      let lower = min(draft.anchor, draft.head)
-      let upper = max(draft.anchor, draft.head)
+      let range: Range<Int>
       let added: String
-      if verb == "replace" {
-        text = []
-        draft.anchor = 0
+      switch verb {
+      case "replace":
+        range = 0..<draft.text.count
         added = insertion
-      } else if verb == "append-line" {
-        draft.anchor = text.count
+      case "append-line":
+        range = draft.text.count..<draft.text.count
         added = "\n" + insertion
-      } else {
-        text.removeSubrange(lower..<upper)
-        draft.anchor = lower
+      default:
+        range = min(draft.anchor, draft.head)..<max(draft.anchor, draft.head)
         added = insertion
       }
-      text.insert(contentsOf: added, at: draft.anchor)
-      let result = String(text)
-      draft.hasEditedText = draft.hasEditedText || verb == "replace" || result != draft.text
-      draft.text = result
-      draft.head = draft.anchor + added.count
-      draft.anchor = draft.head
+      let result = draft.text.replacingCharacters(in: range, with: added)
+      draft.hasEditedText = draft.hasEditedText || verb == "replace" || result.text != draft.text
+      draft.text = result.text
+      draft.head = result.caret
+      draft.anchor = result.caret
     case "save":
       if draft.secure && !draft.hasEditedText {
         editor = nil

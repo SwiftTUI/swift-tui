@@ -26,20 +26,9 @@ package enum TextInputStringMetrics {
     in text: String,
     with replacement: String
   ) -> (text: String, caret: TextOffset) {
-    let clampedRange = range.clamped(to: TextOffset(text.count))
-    let lower = stringIndex(for: clampedRange.lowerBound, in: text)
-    let upper = stringIndex(for: clampedRange.upperBound, in: text)
-    let insertionEnd = text[..<lower].utf8.count + replacement.utf8.count
-    var copy = text
-    copy.replaceSubrange(lower..<upper, with: replacement)
-    var byteOffset = 0
-    var caret = 0
-    for character in copy {
-      guard byteOffset < insertionEnd else { break }
-      byteOffset += character.utf8.count
-      caret += 1
-    }
-    return (copy, TextOffset(caret))
+    let result = text.replacingCharacters(
+      in: range.lowerBound.rawValue..<range.upperBound.rawValue, with: replacement)
+    return (result.text, TextOffset(result.caret))
   }
 
   package static func substring(

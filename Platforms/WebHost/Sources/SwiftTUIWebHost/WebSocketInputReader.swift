@@ -67,6 +67,8 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
     /// is what separates "was current when it arrived" from "was already
     /// superseded when it arrived" for a chunk that is stale by now.
     var streamToken: UInt64?
+    var idleGeneration: UInt64 = 0
+    var idleTask: Task<Void, Never>?
   }
 
   private let source: any WebHostByteSource
@@ -75,7 +77,52 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
   private let connectionClosed: @Sendable (UInt64) -> Void
   private let inputAllowed: @Sendable () -> Bool
   private let hooks: WebSocketInputReaderTestHooks?
+  private let sharedViewportRequired: Bool
   private let state = Mutex(ReaderState())
+  // Byte parsing and timeout delivery share one ordered lane. Connection
+  // retirement remains independent so a suspended delivery cannot pin a lease.
+  private let inputTail = Mutex<Task<Void, Never>?>(nil)
+
+  private func enqueueInput(_ operation: @escaping @Sendable () async -> Void) async {
+    let task = inputTail.withLock { tail in
+      let previous = tail
+      let next = Task {
+        await previous?.value
+        await operation()
+      }
+      tail = next
+      return next
+    }
+    await task.value
+  }
+
+  private func cancelIdleFlush() {
+    state.withLock { state in
+      state.idleGeneration &+= 1
+      state.idleTask?.cancel()
+      state.idleTask = nil
+    }
+  }
+
+  private func scheduleIdleFlush(
+    token: UInt64, yielding yield: @escaping @Sendable (ScopedInputEvent) -> Bool
+  ) {
+    state.withLock { state in
+      guard state.parserToken == token, state.parser.hasPendingTerminalInput else { return }
+      let generation = state.idleGeneration
+      state.idleTask = Task { [weak self] in
+        do { try await Task.sleep(for: .milliseconds(25)) } catch { return }
+        guard let self else { return }
+        await self.enqueueInput {
+          let records = self.state.withLock { state -> [WebSurfaceInputRecord] in
+            guard state.idleGeneration == generation, state.parserToken == token else { return [] }
+            return state.parser.flushIdleInput()
+          }
+          await self.apply(records, token: token, yielding: yield)
+        }
+      }
+    }
+  }
   private let admissionBudget = WebHostInputAdmissionBudget()
   package var admittedInputSnapshot: WebHostInputAdmissionBudget.Snapshot {
     admissionBudget.snapshot
@@ -91,6 +138,7 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
   /// `channel:transport:` convenience initializer below.
   init(
     source: any WebHostByteSource,
+    sharedViewportRequired: Bool = false,
     hooks: WebSocketInputReaderTestHooks? = nil,
     lifecycle: WebSocketInputReaderLifecycle? = nil,
     controlHandler: @escaping @Sendable (WebSurfaceInputControlMessage, UInt64) async -> Void = {
@@ -98,6 +146,7 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
     }
   ) {
     self.source = source
+    self.sharedViewportRequired = sharedViewportRequired
     if let lifecycle {
       self.inputAllowed = lifecycle.inputAllowed
       self.connectionClosed = lifecycle.connectionClosed
@@ -123,7 +172,7 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
     sharedViewportRequired: Bool = false
   ) {
     self.init(
-      source: channel, hooks: hooks,
+      source: channel, sharedViewportRequired: sharedViewportRequired, hooks: hooks,
       lifecycle: .init(
         connectionOpened: {
           transport.beginGeometrySession($0)
@@ -264,13 +313,19 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
   ) async {
     switch event {
     case .shutdown:
+      cancelIdleFlush()
       finish()
     case .connectionOpened(let token):
+      cancelIdleFlush()
       await openConnection(token: token)
     case .connectionClosed(let token):
+      if state.withLock(\.parserToken) == token { cancelIdleFlush() }
       connectionClosed(token)
     case .bytes(let token, let bytes):
-      await processBytes(token: token, bytes: bytes, yielding: yield)
+      cancelIdleFlush()
+      await enqueueInput {
+        await self.processBytes(token: token, bytes: bytes, yielding: yield)
+      }
     }
   }
 
@@ -281,7 +336,8 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
     let abandoned = state.withLock { state -> (token: UInt64, bytes: [UInt8])? in
       let leftover = state.parser.bufferedCommandBytes
       let previousToken = state.parserToken
-      state.parser = WebSurfaceInputParser(session: token)
+      state.parser = WebSurfaceInputParser(
+        session: token, requiresSharedViewport: sharedViewportRequired)
       state.parserToken = token
       state.streamToken = token
       guard !leftover.isEmpty, let previousToken, previousToken != token else {
@@ -320,36 +376,44 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
       }
       hooks?.parserStateDidChange?(token, state.withLock(\.parser.bufferedCommandBytes).count)
 
-      for record in parsed {
-        switch record {
-        case .control(let message):
-          if case .capabilities = message {
-            await hooks?.beforeApplyParsedRecord?(token, .caps)
-          }
-          guard await source.currentConnectionToken() == token else { continue }
-          await controlHandler(message, token)
-        case .input(let event):
-          await hooks?.beforeApplyParsedRecord?(token, .terminalInput)
-          guard await source.currentConnectionToken() == token else { continue }
-          var scopedEvent = event
-          if case .accessibility(var request) = scopedEvent {
-            request.hostSession = token
-            scopedEvent = .accessibility(request)
-          }
-          guard inputAllowed(), let lease = await source.inputLease(for: token) else { continue }
-          guard let admission = admissionBudget.reserve(Self.inputByteCost(scopedEvent)) else {
-            await source.inputOverloaded(token: token)
-            return
-          }
-          guard
-            yield(
-              ScopedInputEvent(
-                scopedEvent, origin: .browser, lease: lease,
-                admission: admission))
-          else {
-            await source.inputOverloaded(token: token)
-            return
-          }
+      await apply(parsed, token: token, yielding: yield)
+    }
+    scheduleIdleFlush(token: token, yielding: yield)
+  }
+
+  private func apply(
+    _ records: [WebSurfaceInputRecord], token: UInt64,
+    yielding yield: @escaping @Sendable (ScopedInputEvent) -> Bool
+  ) async {
+    for record in records {
+      switch record {
+      case .control(let message):
+        if case .capabilities = message {
+          await hooks?.beforeApplyParsedRecord?(token, .caps)
+        }
+        guard await source.currentConnectionToken() == token else { continue }
+        await controlHandler(message, token)
+      case .input(let event):
+        await hooks?.beforeApplyParsedRecord?(token, .terminalInput)
+        guard await source.currentConnectionToken() == token else { continue }
+        var scopedEvent = event
+        if case .accessibility(var request) = scopedEvent {
+          request.hostSession = token
+          scopedEvent = .accessibility(request)
+        }
+        guard inputAllowed(), let lease = await source.inputLease(for: token) else { continue }
+        guard let admission = admissionBudget.reserve(Self.inputByteCost(scopedEvent)) else {
+          await source.inputOverloaded(token: token)
+          return
+        }
+        guard
+          yield(
+            ScopedInputEvent(
+              scopedEvent, origin: .browser, lease: lease,
+              admission: admission))
+        else {
+          await source.inputOverloaded(token: token)
+          return
         }
       }
     }

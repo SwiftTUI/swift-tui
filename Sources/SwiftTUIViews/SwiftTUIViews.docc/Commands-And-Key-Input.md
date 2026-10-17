@@ -24,6 +24,22 @@ SwiftTUI splits it into layers you opt into per view:
 Reach for `keyCommand` when a shortcut belongs to a region of your app.
 Reach for `onKeyPress` when a behavior belongs to one focused control.
 
+## Terminal Decoding
+
+Raw terminal input is incremental: read and socket-message boundaries do not
+complete an escape sequence or UTF-8 scalar. A quiet interval resolves bare
+Escape and ambiguous Alt introducers. EOF also resolves pending input; an
+unfinished bracketed paste yields its accumulated text. Unsupported control
+and mouse envelopes are consumed without typing their payload bytes.
+
+Seven-bit and C1 CSI forms share decoding, as do modifier validation for
+[xterm keyboard encodings](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html)
+and the [Kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/).
+Unrepresentable modifier chords are dropped, including overflowing numeric
+parameters. A legacy modifier value of zero uses the unmodified default.
+Alt accepts UTF-8 characters, and a valid typed replacement character remains
+ordinary text.
+
 ## Declare Shortcuts on a Scope
 
 Key commands attach to an `ActionScope`: a tree-authored region that owns

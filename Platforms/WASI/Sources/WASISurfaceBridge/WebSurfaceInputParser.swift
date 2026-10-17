@@ -23,16 +23,46 @@ package struct WebSurfaceInputParser {
   private var latestGeometryRevision: UInt64 = 0
 
   private let session: UInt64
+  private let fixedCapabilities: HostWireCapabilities?
+  private var geometryRevisions: Bool
+  private var hasDeclaredCapabilities = false
+  private let requiresSharedViewport: Bool
+  private var lastInputAt: ContinuousClock.Instant?
 
-  package init(session: UInt64 = 0) { self.session = session }
+  package init(
+    session: UInt64 = 0, fixedCapabilities: HostWireCapabilities? = nil,
+    requiresSharedViewport: Bool = false
+  ) {
+    self.session = session
+    self.requiresSharedViewport = requiresSharedViewport
+    self.fixedCapabilities = fixedCapabilities
+    self.geometryRevisions = fixedCapabilities?.geometryRevisions ?? false
+  }
+
+  package var hasPendingTerminalInput: Bool {
+    terminalInputParser.isAwaitingEscapeDisambiguation
+  }
+
+  /// A read chunk is never a completion boundary. Readers call this after a
+  /// quiet period, at EOF, or before a protocol control barrier.
+  package mutating func flushTerminalInput() -> [WebSurfaceInputRecord] {
+    terminalInputParser.flush().map(WebSurfaceInputRecord.input)
+  }
+
+  package mutating func flushIdleInput() -> [WebSurfaceInputRecord] {
+    guard let lastInputAt,
+      lastInputAt.duration(to: .now) >= .milliseconds(25)
+    else { return [] }
+    return flushTerminalInput()
+  }
 
   /// The bytes of a control record the parser is still holding, waiting for
   /// its terminating newline. Empty when nothing is buffered.
   ///
   /// Exposed because parser fragments belong to exactly one connection: the
   /// WebHost reader has to be able to see, and discard, a fragment left behind
-  /// when a client is replaced. Terminal input is never buffered here — `feed`
-  /// flushes the byte parser on every call.
+  /// when a client is replaced. Raw terminal fragments are also connection-owned
+  /// and survive ordinary read boundaries.
   package var bufferedCommandBytes: [UInt8] {
     bufferedCommand ?? []
   }
@@ -50,6 +80,7 @@ package struct WebSurfaceInputParser {
   }
 
   package mutating func feedRecords(_ bytes: [UInt8]) -> [WebSurfaceInputRecord] {
+    if !bytes.isEmpty { lastInputAt = .now }
     var payload: [UInt8] = []
     payload.reserveCapacity(min(bytes.count, 4096))
     var records: [WebSurfaceInputRecord] = []
@@ -59,10 +90,16 @@ package struct WebSurfaceInputParser {
         continue
       }
       if bufferedCommand != nil {
-        if byte == 0x0A {
-          let parsed = parseCommand(String(decoding: bufferedCommand ?? [], as: UTF8.self))
-          records.append(contentsOf: parsed.controlMessages.map(WebSurfaceInputRecord.control))
-          records.append(contentsOf: parsed.events.map(WebSurfaceInputRecord.input))
+        if byte == Self.introducer {
+          // A fresh introducer abandons an orphaned, otherwise admitted record.
+          // Overflow discard still runs through LF to preserve the byte budget.
+          bufferedCommand = []
+        } else if byte == 0x0A {
+          if let text = String(validating: bufferedCommand ?? [], as: UTF8.self) {
+            let parsed = parseCommand(text)
+            records.append(contentsOf: parsed.controlMessages.map(WebSurfaceInputRecord.control))
+            records.append(contentsOf: parsed.events.map(WebSurfaceInputRecord.input))
+          }
           bufferedCommand = nil
         } else if (bufferedCommand?.count ?? 0) >= HostWireBudget.recordBytes - 1 {
           bufferedCommand = nil
@@ -88,7 +125,6 @@ package struct WebSurfaceInputParser {
     if !payload.isEmpty {
       records.append(contentsOf: terminalInputParser.feed(payload).map(WebSurfaceInputRecord.input))
     }
-    records.append(contentsOf: terminalInputParser.flush().map(WebSurfaceInputRecord.input))
     return records
   }
 
@@ -133,9 +169,11 @@ package struct WebSurfaceInputParser {
         paragraphSpacing: paragraphSpacing
       )
     else { return nil }
-    guard request.revision > latestGeometryRevision else { return nil }
-    latestGeometryRevision = request.revision
-    cellPixelSize = request.cellPixelSize
+    if geometryRevisions {
+      guard request.revision > latestGeometryRevision else { return nil }
+      latestGeometryRevision = request.revision
+      cellPixelSize = request.cellPixelSize
+    }
     return request
   }
 
@@ -147,27 +185,26 @@ package struct WebSurfaceInputParser {
       components[0] == "resize",
       let width = Int(components[1]),
       let height = Int(components[2]),
-      HostWireBudget.admits(.init(width: max(1, width), height: max(1, height)))
+      width > 0, height > 0,
+      HostWireBudget.admits(.init(width: width, height: height))
     else {
       return nil
     }
 
     let cellPixelSize: PixelSize?
-    if components.count == 5,
-      let cellWidth = Int(components[3]),
-      let cellHeight = Int(components[4])
-    {
-      cellPixelSize = .init(
-        width: max(1, cellWidth),
-        height: max(1, cellHeight)
-      )
+    if components.count == 5 {
+      guard let cellWidth = Int(components[3]), let cellHeight = Int(components[4]),
+        (1...HostGeometryRequest.maximumCellPitch).contains(cellWidth),
+        (1...HostGeometryRequest.maximumCellPitch).contains(cellHeight)
+      else { return nil }
+      cellPixelSize = .init(width: cellWidth, height: cellHeight)
     } else {
       cellPixelSize = nil
     }
     if latestGeometryRevision == 0 { self.cellPixelSize = cellPixelSize }
 
     return .resize(
-      .init(width: max(1, width), height: max(1, height)),
+      .init(width: width, height: height),
       cellPixelSize: cellPixelSize
     )
   }
@@ -187,7 +224,7 @@ package struct WebSurfaceInputParser {
     return .style(style)
   }
 
-  private func parseCapsCommand(
+  private mutating func parseCapsCommand(
     _ text: String
   ) -> WebSurfaceInputControlMessage? {
     let prefix = "caps:"
@@ -203,6 +240,13 @@ package struct WebSurfaceInputParser {
       )
     else {
       return nil
+    }
+    if fixedCapabilities == nil, !hasDeclaredCapabilities,
+      !requiresSharedViewport || (capabilities.geometryRevisions && capabilities.sharedViewport)
+    {
+      hasDeclaredCapabilities = true
+      geometryRevisions = capabilities.geometryRevisions
+      latestGeometryRevision = 0
     }
     return .capabilities(capabilities)
   }
@@ -380,7 +424,8 @@ package struct WebSurfaceInputParser {
   private func splitCommand(
     _ text: String
   ) -> [String] {
-    text.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+    text.utf8.split(separator: 0x3A, omittingEmptySubsequences: false)
+      .map { String(decoding: $0, as: UTF8.self) }
   }
 
   private func keyEvent(
@@ -481,7 +526,7 @@ package struct WebSurfaceInputParser {
       }
     }
 
-    return String(decoding: bytes, as: UTF8.self)
+    return String(validating: bytes, as: UTF8.self)
   }
 
   private func hexadecimalValue(

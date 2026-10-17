@@ -44,14 +44,15 @@ struct InputParserOverflowTests {
       ])
   }
 
-  @Test("Overlong CSI modifier parameter degrades to no modifiers, not a trap")
-  func overlongCSIModifierDegrades() {
+  @Test("Overlong CSI modifier parameter is rejected atomically")
+  func overlongCSIModifierIsRejected() {
     var parser = TerminalInputParser()
 
     // ESC [ 1 ; <overflow> A — the modifier group overflows; csiModifiers must
-    // treat the unparsable value as "no modifiers" and still emit the key.
+    // reject an unrepresentable chord instead of inventing an unmodified key.
     let events = parser.feed(Array("\u{001B}[1;\(overlong)A".utf8))
-    #expect(events == [.key(KeyPress(.arrowUp))])
+    #expect(events.isEmpty)
+    #expect(parser.feed([0x71]) == [.key(.init(.character("q")))])
   }
 
   @Test("Overlong VT220 tilde key-id is dropped, not trapped, and parsing recovers")

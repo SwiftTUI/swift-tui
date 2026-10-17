@@ -34,9 +34,7 @@ struct AdversarialSetBInputParserTests {
     #expect(parser.feed([0x1B, 0x5B]).isEmpty)
     let flushed = parser.flush()
     let next = parser.feed([0x61])
-    withKnownIssue(
-      "ESC [ is not an escape-disambiguation prefix: flush keeps it and the next printable closes the envelope"
-    ) {
+    do {
       #expect(flushed == [.key(KeyPress(.character("["), modifiers: .alt))], "\(flushed)")
       #expect(next == [.key(KeyPress(.character("a")))], "\(next)")
     }
@@ -54,8 +52,7 @@ struct AdversarialSetBInputParserTests {
     let press = parser.feed([0x1B, 0x5B, 0x4D, 0x20, 0x21, 0x21])
     let release = parser.feed([0x1B, 0x5B, 0x4D, 0x23, 0x21, 0x21])
     let wheel = parser.feed([0x1B, 0x5B, 0x4D, 0x60, 0x25, 0x25])
-    withKnownIssue("ESC [ M consumes only its introducer; the three report bytes are typed as keys")
-    {
+    do {
       #expect(keys(press).isEmpty, "\(press)")
       #expect(keys(release).isEmpty, "\(release)")
       #expect(keys(wheel).isEmpty, "\(wheel)")
@@ -76,9 +73,7 @@ struct AdversarialSetBInputParserTests {
     let legacyShiftTab = parser.feed(bytes("\u{1B}[Z"))
     #expect(legacyShiftTab == [.key(KeyPress(.tab, modifiers: .shift))], "\(legacyShiftTab)")
     let altA = parser.feed(bytes("\u{1B}[27;3;97~"))
-    withKnownIssue(
-      "three-parameter tilde envelopes are consumed silently; modifyOtherKeys keys never arrive"
-    ) {
+    do {
       #expect(ctrlEnter == [.key(KeyPress(.return, modifiers: .ctrl))], "\(ctrlEnter)")
       #expect(shiftTab == [.key(KeyPress(.tab, modifiers: .shift))], "\(shiftTab)")
       #expect(altA == [.key(KeyPress(.character("a"), modifiers: .alt))], "\(altA)")
@@ -93,7 +88,7 @@ struct AdversarialSetBInputParserTests {
     let nul = parser.feed([0x00])
     let kittyNul = parser.feed(bytes("\u{1B}[32;5u"))
     #expect(kittyNul == [.key(KeyPress(.space, modifiers: .ctrl))], "\(kittyNul)")
-    withKnownIssue("NUL and 0x1C–0x1F fall through the legacy control table and are dropped") {
+    do {
       #expect(nul == [.key(KeyPress(.space, modifiers: .ctrl))], "\(nul)")
       for (byte, character) in [(UInt8(0x1C), Character("\\")), (0x1D, "]"), (0x1F, "_")] {
         let events = parser.feed([byte])
@@ -117,11 +112,11 @@ struct AdversarialSetBInputParserTests {
   @Test func setB165TypedReplacementCharacterIsDelivered() {
     var parser = TerminalInputParser()
     let typed = parser.feed([0xEF, 0xBF, 0xBD])
-    withKnownIssue("a decoded U+FFFD is indistinguishable from a decoding failure and is dropped") {
+    do {
       #expect(typed == [.key(KeyPress(.character("\u{FFFD}")))], "\(typed)")
     }
     let invalid = parser.feed([0xFF])
-    #expect(keys(invalid).allSatisfy { $0.key != .character("\u{FFFD}") || true }, "\(invalid)")
+    #expect(keys(invalid).allSatisfy { $0.key != .character("\u{FFFD}") }, "\(invalid)")
     let afterInvalid = parser.feed([0x62])
     #expect(afterInvalid.contains(.key(KeyPress(.character("b")))), "\(afterInvalid)")
     let overlong = parser.feed([0xC0, 0x80])
@@ -140,9 +135,7 @@ struct AdversarialSetBInputParserTests {
     let legacyMeta = parser.feed(bytes("\u{1B}[1;9A"))
     let kittyMeta = parser.feed(bytes("\u{1B}[57352;9u"))
     #expect(keys(legacyMeta).allSatisfy { $0.key == .arrowUp }, "\(legacyMeta)")
-    withKnownIssue(
-      "a legacy modifier parameter of 0 underflows to every modifier, and meta is accepted here but rejected on the kitty path"
-    ) {
+    do {
       #expect(zero == [.key(KeyPress(.arrowUp))], "\(zero)")
       #expect(legacyMeta.isEmpty == kittyMeta.isEmpty, "legacy \(legacyMeta) kitty \(kittyMeta)")
     }
@@ -156,9 +149,7 @@ struct AdversarialSetBInputParserTests {
     let kittyAltE = parser.feed(bytes("\u{1B}[233;3u"))
     #expect(kittyAltE == [.key(KeyPress(.character("é"), modifiers: .alt))], "\(kittyAltE)")
     let altEmoji = parser.feed([0x1B, 0xF0, 0x9F, 0x98, 0x80])
-    withKnownIssue(
-      "only 0x20–0x7E after ESC is an Alt chord; a UTF-8 lead byte yields Escape plus the literal"
-    ) {
+    do {
       #expect(altE == [.key(KeyPress(.character("é"), modifiers: .alt))], "\(altE)")
       #expect(!altEmoji.contains(.key(KeyPress(.escape))), "\(altEmoji)")
     }
@@ -175,9 +166,7 @@ struct AdversarialSetBInputParserTests {
     let reply = parser.feed([0x9B, 0x3F, 0x31, 0x3B, 0x32, 0x63])
     #expect(reply.isEmpty, "\(reply)")
     let tilde = parser.feed([0x9B, 0x33, 0x7E])
-    withKnownIssue(
-      "only the 8-bit CSI ? reply form is handled; any other 0x9B envelope types its bytes"
-    ) {
+    do {
       #expect(up == [.key(KeyPress(.arrowUp))] || up.isEmpty, "\(up)")
       #expect(!up.contains(.key(KeyPress(.character("A")))), "\(up)")
       #expect(!shiftTab.contains(.key(KeyPress(.character("Z")))), "\(shiftTab)")
@@ -197,9 +186,7 @@ struct AdversarialSetBInputParserTests {
       flushed.contains(.paste(PasteEvent(content: "abc")))
       || keys(flushed).map(\.key) == [.character("a"), .character("b"), .character("c")]
     let after = parser.feed([0x71])
-    withKnownIssue(
-      "a pending paste start is not flushed, so every later byte is buffered forever (STUI-831 class)"
-    ) {
+    do {
       #expect(!flushed.isEmpty, "the flush recovers the pending paste")
       #expect(recovered, "\(flushed)")
       #expect(after == [.key(KeyPress(.character("q")))], "\(after)")
