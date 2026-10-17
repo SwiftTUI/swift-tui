@@ -45,12 +45,14 @@ public struct TrimmedShape<Base: Shape>: Shape, ResolvableView {
   // A trim of a trimmed shape keeps a share of what the first trim kept.
   public var trimStart: Double {
     let outer = StrokeTrim(from: base.trimStart, to: base.trimEnd)
+    guard !outer.isEmpty else { return outer.from }
     let inner = StrokeTrim(from: from, to: to)
     return outer.from + (outer.to - outer.from) * inner.from
   }
 
   public var trimEnd: Double {
     let outer = StrokeTrim(from: base.trimStart, to: base.trimEnd)
+    guard !outer.isEmpty else { return outer.from }
     let inner = StrokeTrim(from: from, to: to)
     return outer.from + (outer.to - outer.from) * inner.to
   }

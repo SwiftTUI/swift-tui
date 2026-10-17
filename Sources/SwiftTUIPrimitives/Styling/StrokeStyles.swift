@@ -222,14 +222,16 @@ package struct StrokeTrim: Equatable, Sendable {
   package var from: Double
   package var to: Double
 
-  /// Both fractions are clamped to `0...1`. A value that is not finite reads as
-  /// the nearer end, so the interval is always ordered or empty.
+  /// Fractions (including infinities) clamp to `0...1`; NaN makes an empty
+  /// interval. Fill and stroke use this same normalization.
   package init(from: Double, to: Double) {
-    func clamped(_ value: Double, fallback: Double) -> Double {
-      value.isFinite ? min(1, max(0, value)) : fallback
+    guard !from.isNaN, !to.isNaN else {
+      self.from = 0
+      self.to = 0
+      return
     }
-    self.from = clamped(from, fallback: 0)
-    self.to = clamped(to, fallback: 1)
+    self.from = min(1, max(0, from))
+    self.to = min(1, max(0, to))
   }
 
   package var isEmpty: Bool {

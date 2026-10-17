@@ -145,9 +145,7 @@ struct AdversarialSetBShapeTests {
     let nanFill = painted(
       cells(Rectangle().trim(from: .nan, to: 0.5).fill(Color.red), "setB144-d", width: 9, height: 4)
     )
-    withKnownIssue(
-      "a non-finite trim bound reads as the far end on the stroke route (whole ring) and as empty on the fill route"
-    ) {
+    do {
       #expect(
         toMinusInfinity.allSatisfy { $0.trimmingCharacters(in: " ").isEmpty }, "\(toMinusInfinity)")
       #expect(fromInfinity.allSatisfy { $0.trimmingCharacters(in: " ").isEmpty }, "\(fromInfinity)")

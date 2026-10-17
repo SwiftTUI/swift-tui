@@ -14,7 +14,7 @@ struct AdversarialSetAPathStrokeBoundaryTests {
     #expect(empty.path(in: unit).elements.isEmpty)
     #expect(twice.path(in: unit).elements.isEmpty)
     #expect(ink(rows(empty.stroke(), width: 12, height: 6)) == 0)
-    withKnownIssue("STUI-985: reversed trim composition resurrects an empty stroke") {
+    do {
       #expect(ink(rows(twice.stroke(), width: 12, height: 6)) == 0)
     }
   }
@@ -27,7 +27,7 @@ struct AdversarialSetAPathStrokeBoundaryTests {
       if length == 1 {
         #expect(points.count == 2)
       } else {
-        withKnownIssue("STUI-986: squared length overflows or underflows before path trimming") {
+        do {
           #expect(points.count == 2)
         }
       }
@@ -46,7 +46,7 @@ struct AdversarialSetAPathStrokeBoundaryTests {
     // x(t)=6t-5t² reaches 1.8 at t=0.6, then returns to 1.
     let points = path.flattened(tolerance: 0.001).flatMap { $0 }
     #expect(points.last == .init(x: 1, y: 0))
-    withKnownIssue("STUI-987: line flatness discards a collinear curve's endpoint excursion") {
+    do {
       #expect((points.map(\.x).max() ?? 0) > 1.79)
     }
   }
@@ -61,7 +61,7 @@ struct AdversarialSetAPathStrokeBoundaryTests {
     // Distance to the diagonal exceeds 0.0003, far beyond the 0.000001 boundary tolerance.
     #expect(!tiny.scaledBy(sx: 1000, sy: 1000).contains(.init(x: 0, y: 0.5)))
     let exteriorIsContained = tiny.contains(.init(x: 0, y: 0.0005))
-    withKnownIssue("STUI-988: boundary epsilon compares an unnormalized cross product") {
+    do {
       #expect(!exteriorIsContained)
     }
   }
@@ -176,7 +176,7 @@ struct AdversarialSetAPathStrokeBoundaryTests {
       StrokeDashPattern(dash: [1, 2], phase: huge.truncatingRemainder(dividingBy: 3)))
     let position = huge.truncatingRemainder(dividingBy: 3)
     #expect(!reduced.isOn(at: position))
-    withKnownIssue("STUI-989: dash coordinates overflow before modular reduction") {
+    do {
       #expect(pattern.isOn(at: huge) == reduced.isOn(at: position))
     }
   }
@@ -219,7 +219,7 @@ struct AdversarialSetAPathStrokeBoundaryTests {
     // Hypothesis: zero-length track early return bypasses the empty mask after a degenerate path paints its dot.
     let shape = SetAStrokePathShape(value: line(.init(x: 0.5, y: 0.5), .init(x: 0.5, y: 0.5)))
     #expect(ink(rows(shape.stroke(), width: 8, height: 4)) > 0)
-    withKnownIssue("STUI-990: zero-length sampled tracks bypass an empty trim mask") {
+    do {
       #expect(ink(rows(shape.trim(from: 0.5, to: 0.5).stroke(), width: 8, height: 4)) == 0)
     }
   }

@@ -359,7 +359,8 @@ struct StrokeTrackTests {
   @Test("a trim clamps its fractions")
   func trimClamps() {
     #expect(StrokeTrim(from: -1, to: 2) == StrokeTrim(from: 0, to: 1))
-    #expect(StrokeTrim(from: .nan, to: .infinity) == StrokeTrim(from: 0, to: 1))
+    #expect(StrokeTrim(from: .nan, to: .infinity).isEmpty)
+    #expect(StrokeTrim(from: -.infinity, to: .infinity).isWhole)
     #expect(StrokeTrim(from: 0.6, to: 0.4).isEmpty)
   }
 }

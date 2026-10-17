@@ -4,12 +4,47 @@ import Testing
 
 @Suite
 struct PathTrimTests {
+  @Test("trimming normalizes overflowing lengths and preserves finite coordinates")
+  func extremeLengths() throws {
+    let crossing = Path([.move(to: .init(x: -1e308, y: 0)), .line(to: .init(x: 1e308, y: 0))])
+    let points = crossing.trimmedPath(from: 0.25, to: 0.75).flattened().flatMap { $0 }
+    try #require(points.count == 2)
+    #expect(abs(points[0].x / 1e308 + 0.5) < 1e-12)
+    #expect(abs(points[1].x / 1e308 - 0.5) < 1e-12)
+    let repeated = Path([
+      .move(to: .zero), .line(to: .init(x: 1e308, y: 0)),
+      .line(to: .zero), .line(to: .init(x: 1e308, y: 0)),
+    ])
+    #expect(
+      repeated.trimmedPath(from: 1.0 / 3, to: 2.0 / 3).elements == [
+        .move(to: .init(x: 1e308, y: 0)), .line(to: .zero),
+      ])
+  }
+
   /// A 4 x 2 rectangle: 12 units round, starting at the origin and running along
   /// the top edge first.
   private var rectangle: Path {
     var path = Path()
     path.addRect(Rect(origin: Point(x: 0, y: 0), size: Size(width: 4, height: 2)))
     return path
+  }
+
+  @Test("length normalization is independent of the path's translation")
+  func translatedTinyLength() {
+    var path = Path()
+    path.move(to: Point(x: 0, y: 1e308))
+    path.addLine(to: Point(x: 1e-100, y: 1e308))
+    let elements = path.trimmedPath(from: 0.25, to: 0.75).elements
+    #expect(
+      elements == [
+        .move(to: Point(x: 0.25e-100, y: 1e308)),
+        .line(to: Point(x: 0.75e-100, y: 1e308)),
+      ])
+    var crossing = Path()
+    crossing.move(to: Point(x: -1e308, y: 0))
+    crossing.addLine(to: Point(x: 1e308, y: 0))
+    #expect(crossing.contains(.zero))
+    #expect(!crossing.contains(Point(x: 0, y: 1)))
   }
 
   @Test("a trim keeps the fraction of the length between its ends")

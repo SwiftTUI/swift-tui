@@ -17,19 +17,21 @@ package struct StrokeDashPattern: Equatable, Sendable {
     }
     let runs = dash.count.isMultiple(of: 2) ? dash : dash + dash
     let period = runs.reduce(0, +)
-    guard period > 0 else {
+    guard period > 0, period.isFinite else {
       return nil
     }
     self.runs = runs
     self.period = period
-    self.phase = phase.isFinite ? phase : 0
+    let reduced = phase.isFinite ? phase.truncatingRemainder(dividingBy: period) : 0
+    self.phase = reduced < 0 ? reduced + period : reduced
   }
 
   package func isOn(at position: Double) -> Bool {
-    var offset = (position + phase).truncatingRemainder(dividingBy: period)
-    if offset < 0 {
-      offset += period
-    }
+    var offset = position.isFinite ? position.truncatingRemainder(dividingBy: period) : 0
+    if offset < 0 { offset += period }
+    // Add modulo the period without ever forming an overflowing sum.
+    let room = period - phase
+    offset = offset >= room ? offset - room : offset + phase
     for (index, run) in runs.enumerated() {
       if offset < run {
         return index.isMultiple(of: 2)
@@ -89,6 +91,7 @@ package struct StrokeMask: Equatable, Sendable {
   }
 
   package func isOn(at position: Double, trackLength: Double) -> Bool {
+    guard trim?.isEmpty != true else { return false }
     guard trackLength > 0 else {
       return dash?.isOn(at: position) ?? true
     }

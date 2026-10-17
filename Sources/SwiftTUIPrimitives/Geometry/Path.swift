@@ -266,7 +266,8 @@ public struct Path: Equatable, Sendable {
   /// The fractions are of the path's whole length, measured along its
   /// subpaths in the order they were added, as in SwiftUI. Both are clamped to
   /// `0...1`. The result is empty when `from` is not less than `to` or when
-  /// either is not finite. Curves are flattened first, so the result is made of
+  /// either is NaN. Infinite fractions clamp to their respective endpoints.
+  /// Curves are flattened first, so the result is made of
   /// straight segments, and a closed subpath that is cut comes back open.
   ///
   /// Lengths are in this path's own coordinate units. A stroke that is trimmed
@@ -274,20 +275,38 @@ public struct Path: Equatable, Sendable {
   /// same physical share of the outline; see `Shape.trim(from:to:)`.
   public func trimmedPath(from: Double, to: Double, tolerance: Double = 0.01) -> Path {
     var result = Path()
-    guard from.isFinite, to.isFinite else {
-      return result
-    }
-    let lower = min(1, max(0, from))
-    let upper = min(1, max(0, to))
+    let trim = StrokeTrim(from: from, to: to)
+    let lower = trim.from
+    let upper = trim.to
     guard lower < upper else {
       return result
     }
 
     let subpaths = flattened(tolerance: tolerance)
+    // Fractions need relative lengths, not absolute lengths. Normalize all
+    // coordinates by one scale before accumulating so neither squared norms
+    // nor the sum of individually representable segments can overflow.
+    var magnitude = 0.0
+    for points in subpaths {
+      guard points.allSatisfy({ $0.x.isFinite && $0.y.isFinite }) else { return result }
+      for (a, b) in zip(points, points.dropFirst()) {
+        magnitude = max(magnitude, abs(b.x - a.x), abs(b.y - a.y))
+      }
+    }
+    guard magnitude > 0 else { return result }
+    if !magnitude.isFinite { magnitude = .greatestFiniteMagnitude }
+    // A power-of-two scale changes only the exponent. Arbitrary divisors
+    // introduce rounding even for short, exactly representable line lengths.
+    let scale = Double(sign: .plus, exponent: magnitude.exponent, significand: 1)
+    func delta(_ a: Double, _ b: Double) -> Double {
+      let difference = b - a
+      return difference.isFinite ? difference / scale : b / scale - a / scale
+    }
     func distance(_ a: Point, _ b: Point) -> Double {
-      let dx = b.x - a.x
-      let dy = b.y - a.y
-      return (dx * dx + dy * dy).squareRoot()
+      Self.norm(delta(a.x, b.x), delta(a.y, b.y))
+    }
+    func interpolate(_ a: Point, _ b: Point, _ t: Double) -> Point {
+      Point(x: (1 - t) * a.x + t * b.x, y: (1 - t) * a.y + t * b.y)
     }
     var total = 0.0
     for points in subpaths {
@@ -315,10 +334,10 @@ public struct Path: Equatable, Sendable {
         let t0 = max(0, (start - travelled) / length)
         let t1 = min(1, (end - travelled) / length)
         if !penDown {
-          result.move(to: Point(x: a.x + (b.x - a.x) * t0, y: a.y + (b.y - a.y) * t0))
+          result.move(to: interpolate(a, b, t0))
           penDown = true
         }
-        result.addLine(to: Point(x: a.x + (b.x - a.x) * t1, y: a.y + (b.y - a.y) * t1))
+        result.addLine(to: interpolate(a, b, t1))
       }
     }
     return result
@@ -490,7 +509,7 @@ extension Path {
     depth: Int,
     into points: inout [Point]
   ) {
-    if depth >= 18 || pointNearLine(p1, p0, p2, tolerance: tolerance) {
+    if depth >= 18 || pointNearSegment(p1, p0, p2, tolerance: tolerance) {
       points.append(p2)
       return
     }
@@ -525,8 +544,8 @@ extension Path {
     into points: inout [Point]
   ) {
     if depth >= 18
-      || (pointNearLine(p1, p0, p3, tolerance: tolerance)
-        && pointNearLine(p2, p0, p3, tolerance: tolerance))
+      || (pointNearSegment(p1, p0, p3, tolerance: tolerance)
+        && pointNearSegment(p2, p0, p3, tolerance: tolerance))
     {
       points.append(p3)
       return
@@ -542,48 +561,55 @@ extension Path {
   }
 
   private func midpoint(_ a: Point, _ b: Point) -> Point {
-    Point(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+    Point(x: a.x / 2 + b.x / 2, y: a.y / 2 + b.y / 2)
   }
 
-  /// Whether `point`'s perpendicular distance from the line through `a`–`b`
-  /// is within `tolerance`. Uses squared distance to avoid `sqrt` (and any
-  /// Foundation dependency).
-  private func pointNearLine(
-    _ point: Point,
-    _ a: Point,
-    _ b: Point,
-    tolerance: Double
+  /// A control hull near the finite endpoint segment bounds the entire
+  /// curve's approximation error. Distance to the infinite line would discard
+  /// collinear reversals and excursions beyond either endpoint.
+  private func pointNearSegment(
+    _ point: Point, _ a: Point, _ b: Point, tolerance: Double
   ) -> Bool {
+    Self.distance(point, toSegmentFrom: a, to: b) <= tolerance
+  }
+
+  private static func norm(_ x: Double, _ y: Double) -> Double {
+    let scale = max(abs(x), abs(y))
+    guard scale > 0 else { return 0 }
+    guard scale.isFinite else { return .infinity }
+    let nx = x / scale
+    let ny = y / scale
+    return scale * (nx * nx + ny * ny).squareRoot()
+  }
+
+  private static func distance(_ point: Point, toSegmentFrom a: Point, to b: Point) -> Double {
     let dx = b.x - a.x
     let dy = b.y - a.y
-    let lengthSquared = dx * dx + dy * dy
-    let cross = (point.x - a.x) * dy - (point.y - a.y) * dx
-    let tolSquared = tolerance * tolerance
-    if lengthSquared <= 0.000_000_1 {
-      let ddx = point.x - a.x
-      let ddy = point.y - a.y
-      return ddx * ddx + ddy * ddy <= tolSquared
+    let px = point.x - a.x
+    let py = point.y - a.y
+    let scale = max(abs(dx), abs(dy), abs(px), abs(py))
+    guard scale > 0 else { return 0 }
+    if !scale.isFinite {
+      guard [point.x, point.y, a.x, a.y, b.x, b.y].allSatisfy({ $0.isFinite }) else {
+        return .infinity
+      }
+      // Opposite finite endpoints can have an unrepresentable difference.
+      // Divide first in that case; scale the resulting distance back once.
+      let divisor = Double(sign: .plus, exponent: 1023, significand: 1)
+      func scaled(_ p: Point) -> Point { Point(x: p.x / divisor, y: p.y / divisor) }
+      return distance(scaled(point), toSegmentFrom: scaled(a), to: scaled(b)) * divisor
     }
-    return cross * cross <= tolSquared * lengthSquared
+    let x = dx / scale
+    let y = dy / scale
+    let qx = px / scale
+    let qy = py / scale
+    let lengthSquared = x * x + y * y
+    let fraction = lengthSquared > 0 ? min(max((qx * x + qy * y) / lengthSquared, 0), 1) : 0
+    return scale * norm(qx - fraction * x, qy - fraction * y)
   }
 
-  private func pointIsOnSegment(
-    _ point: Point,
-    _ segment: Segment
-  ) -> Bool {
-    let epsilon = 0.000_001
-    let cross =
-      (point.y - segment.start.y) * (segment.end.x - segment.start.x)
-      - (point.x - segment.start.x) * (segment.end.y - segment.start.y)
-    guard abs(cross) <= epsilon else {
-      return false
-    }
-
-    let minX = min(segment.start.x, segment.end.x) - epsilon
-    let maxX = max(segment.start.x, segment.end.x) + epsilon
-    let minY = min(segment.start.y, segment.end.y) - epsilon
-    let maxY = max(segment.start.y, segment.end.y) + epsilon
-    return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
+  private func pointIsOnSegment(_ point: Point, _ segment: Segment) -> Bool {
+    Self.distance(point, toSegmentFrom: segment.start, to: segment.end) <= 0.000_001
   }
 
   /// Returns +1 if the segment crosses the rightward ray from `point` going

@@ -101,7 +101,7 @@ package struct SampledStrokeTrack: Equatable, Sendable {
 
   /// Clears the lit subpixels the mask turns off.
   package func apply(_ mask: StrokeMask, to canvas: inout BrailleCanvas) {
-    guard !mask.isSolid, !points.isEmpty, length > 0 else {
+    guard !mask.isSolid, !points.isEmpty else {
       return
     }
     for y in 0..<canvas.subpixelHeight {
