@@ -2,7 +2,8 @@ import SwiftTUICore
 
 struct RasterImageOverlay: Sendable {
   var size: CellSize
-  var cells: [[RasterCell]]
+  /// Nil means uncovered; a non-nil blank still paints opaque image content.
+  var cells: [[RasterCell?]]
 }
 
 func fallbackRenderMode(
@@ -129,8 +130,8 @@ private func indexedColorOverlay(
     size: sampleSize,
     palette: palette
   )
-  let colors = indices.map { index in
-    index.map { palette[$0] }
+  let colors = indices.enumerated().map { position, index in
+    index.map { palette[$0].withAlpha(Double(samples[position]?.alpha ?? 0) / 255) }
   }
   return halfBlockOverlay(
     colors: colors,
@@ -151,8 +152,8 @@ private func asciiOverlay(
     outputSize: .init(width: cellSize.width, height: cellSize.height)
   )
   let ramp = Array(" .:-=+*#%@")
-  var rows: [[RasterCell]] = Array(
-    repeating: Array(repeating: .empty, count: cellSize.width),
+  var rows: [[RasterCell?]] = Array(
+    repeating: Array(repeating: nil, count: cellSize.width),
     count: cellSize.height
   )
 
@@ -191,8 +192,8 @@ private func halfBlockOverlay(
     return nil
   }
 
-  var rows: [[RasterCell]] = Array(
-    repeating: Array(repeating: .empty, count: cellSize.width),
+  var rows: [[RasterCell?]] = Array(
+    repeating: Array(repeating: nil, count: cellSize.width),
     count: cellSize.height
   )
 

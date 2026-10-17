@@ -22,7 +22,7 @@ public func parseDroppedPaths(_ pasted: String) -> [DroppedPath] {
       currentIsQuoted = false
     }
     guard !current.isEmpty else { return }
-    let decoded = decodeFileURLIfNeeded(current)
+    guard let decoded = decodeFileURLIfNeeded(current), !decoded.utf8.contains(0) else { return }
     // A token is path-shaped only if it starts with `/` or `~`.
     // Single-quoted segments also count — terminals quote paths that
     // contain spaces, and quoted prose is extremely unusual here.
@@ -66,10 +66,9 @@ private func looksLikePath(_ token: String) -> Bool {
   return first == "/" || first == "~"
 }
 
-private func decodeFileURLIfNeeded(_ token: String) -> String {
-  guard token.hasPrefix("file://") else { return token }
-  let pathPart = String(token.dropFirst("file://".count))
-  return percentDecode(pathPart)
+private func decodeFileURLIfNeeded(_ token: String) -> String? {
+  guard token.prefix(7).lowercased() == "file://" else { return token }
+  return localFileURLPathComponent(token).map(percentDecode)
 }
 
 private func percentDecode(_ input: String) -> String {

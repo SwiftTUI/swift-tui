@@ -37,7 +37,6 @@ public struct Image: PrimitiveView, ResolvableView {
   public func resizable() -> Image {
     var copy = self
     copy.isResizable = true
-    copy.scalingMode = .stretch
     return copy
   }
 

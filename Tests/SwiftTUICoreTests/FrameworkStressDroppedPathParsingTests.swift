@@ -99,9 +99,9 @@ struct FrameworkStressDroppedPathParsingTests {
     #expect(parseDroppedPaths("file:///tmp/雪-%E2%98%83.txt") == [DroppedPath("/tmp/雪-☃.txt")])
   }
 
-  @Test("stress dropped path parsing 020 encoded NUL remains data instead of truncating")
-  func droppedPathParsing020EncodedNULRemainsDataInsteadOfTruncating() {
-    #expect(parseDroppedPaths("file:///tmp/a%00b") == [DroppedPath("/tmp/a\0b")])
+  @Test("stress dropped path parsing 020 encoded NUL is rejected before filesystem use")
+  func droppedPathParsing020EncodedNULIsRejected() {
+    #expect(parseDroppedPaths("file:///tmp/a%00b").isEmpty)
   }
 
   @Test("stress dropped path parsing 021 invalid byte after valid UTF-8 preserves valid prefix")
@@ -119,9 +119,10 @@ struct FrameworkStressDroppedPathParsingTests {
     #expect(parseDroppedPaths("file:///tmp/%2Z%20tail") == [DroppedPath("/tmp/%2Z tail")])
   }
 
-  @Test("stress dropped path parsing 024 encoded leading slash still qualifies as a path")
-  func droppedPathParsing024EncodedLeadingSlashStillQualifiesAsAPath() {
-    #expect(parseDroppedPaths("file://%2Ftmp%2Fencoded") == [DroppedPath("/tmp/encoded")])
+  @Test("stress dropped path parsing 024 encoded slash cannot turn an authority into a local path")
+  func droppedPathParsing024EncodedSlashCannotReplaceURLPathSeparator() {
+    #expect(parseDroppedPaths("file://%2Ftmp%2Fencoded").isEmpty)
+    #expect(parseDroppedPaths("file:///%74mp%2Fencoded") == [DroppedPath("/tmp/encoded")])
   }
 
   @Test("stress dropped path parsing 025 multiple file URLs retain source order")

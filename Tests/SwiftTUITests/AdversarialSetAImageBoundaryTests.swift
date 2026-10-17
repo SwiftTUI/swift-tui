@@ -311,8 +311,11 @@ struct AdversarialSetAImageBoundaryTests {
     #expect(a.image.pixels == b.image.pixels)
     #expect(a.attachment.identity == first.identity)
     // Pixel sharing is valid; the cached presentation must still describe the current owner.
-    withKnownIssue("STUI-977: Blend cache retains the first attachment owner's identity") {
+    do {
       #expect(b.attachment.identity == second.identity)
+      #expect(a.id == b.id)
+      #expect(compositor.cacheSnapshot().entryCount == 1)
+      #expect(compositor.cacheSnapshot().decodedHits == 1)
     }
   }
 

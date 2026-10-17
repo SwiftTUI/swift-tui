@@ -204,25 +204,33 @@ extension Rasterizer {
       }
     }
 
+    let composedBlock = compositeVerticalBlockCell(
+      RasterCell(character: character, spanWidth: glyphWidth, style: style, hyperlink: hyperlink),
+      over: cells[y][x], blendMode: blendMode)
     let underlayStyle = cells[y][x].style
     let finalStyle: ResolvedTextStyle?
-    switch (style, underlayStyle) {
-    case (nil, nil):
-      finalStyle = nil
-    case (let overlayStyle?, nil):
-      finalStyle = overlayStyle.isDefault ? nil : overlayStyle
-    case (nil, let underlayStyle?):
-      let compositedStyle = Self.emptyCompositingStyle.composited(
-        over: underlayStyle,
-        blendMode: blendMode
-      )
-      finalStyle = compositedStyle.isDefault ? nil : compositedStyle
-    case (let overlayStyle?, let underlayStyle?):
-      let compositedStyle = overlayStyle.composited(
-        over: underlayStyle,
-        blendMode: blendMode
-      )
-      finalStyle = compositedStyle.isDefault ? nil : compositedStyle
+    if let composedBlock {
+      finalStyle = composedBlock.style
+    } else {
+      switch (style, underlayStyle) {
+      case (nil, nil):
+        finalStyle = nil
+      case (let overlayStyle?, nil):
+        finalStyle = overlayStyle.isDefault ? nil : overlayStyle
+      case (nil, let underlayStyle?):
+        let compositedStyle = Self.emptyCompositingStyle.composited(
+          over: underlayStyle,
+          blendMode: blendMode
+        )
+        finalStyle = compositedStyle.isDefault ? nil : compositedStyle
+      case (let overlayStyle?, let underlayStyle?):
+        let compositedStyle = overlayStyle.composited(
+          over: underlayStyle,
+          blendMode: blendMode
+        )
+        finalStyle = compositedStyle.isDefault ? nil : compositedStyle
+      }
+
     }
 
     for offset in 0..<glyphWidth {
@@ -234,7 +242,7 @@ extension Rasterizer {
     }
 
     cells[y][x] = RasterCell(
-      character: character,
+      character: composedBlock?.character ?? character,
       spanWidth: glyphWidth,
       style: finalStyle,
       hyperlink: hyperlink
@@ -256,13 +264,17 @@ extension Rasterizer {
       }
     }
 
-    presentationRecorder?.appendCellFragment(
-      from: cells,
-      x: x,
-      y: y,
-      width: glyphWidth,
-      effects: presentationEffects
-    )
+    if rasterBackdropCoverage(for: character, spanWidth: glyphWidth) != .none
+      || (style?.backgroundColor?.alpha ?? 0) > 0
+    {
+      presentationRecorder?.appendCellFragment(
+        from: cells,
+        x: x,
+        y: y,
+        width: glyphWidth,
+        effects: presentationEffects
+      )
+    }
   }
 
   internal func clearExistingGlyph(

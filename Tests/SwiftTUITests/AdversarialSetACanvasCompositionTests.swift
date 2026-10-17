@@ -25,7 +25,7 @@ struct AdversarialSetACanvasCompositionTests {
       let actualHalves = halves(actual.cells[0][0])
       #expect(order == 0 ? actualHalves.bottom == .blue : actualHalves.top == .red)
       let halvesMatch = actualHalves == halves(expected.cells[0][0])
-      withKnownIssue("STUI-1024: partial half-block glyph replacement erases the opposite half") {
+      do {
         #expect(
           halvesMatch,
           "order \(order), glyph '\(actual.cells[0][0].character)': top present \(actualHalves.top != nil), bottom present \(actualHalves.bottom != nil); expected red top and blue bottom"

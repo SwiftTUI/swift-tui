@@ -42,15 +42,17 @@ struct AdversarialSetBImageTests {
   }
 
   private func sixel(
-    _ attachment: RasterImageAttachment, cellPixel: PixelSize = .init(width: 8, height: 16)
+    _ attachment: RasterImageAttachment, cellPixel: PixelSize = .init(width: 8, height: 16),
+    renderer: TerminalImageRenderer? = nil
   ) -> String {
     var sent: Set<UInt32> = []
-    return TerminalImageRenderer(repository: ImageAssetRepository()).graphicsWriteSteps(
-      for: [attachment], capabilityProfile: .trueColor,
-      graphicsCapabilities: .init(
-        supportedProtocols: [.sixel], preferredProtocol: .sixel, cellPixelSize: cellPixel),
-      fallbackBackground: .black, transmittedKittyImages: &sent
-    ).joined()
+    return (renderer ?? TerminalImageRenderer(repository: ImageAssetRepository()))
+      .graphicsWriteSteps(
+        for: [attachment], capabilityProfile: .trueColor,
+        graphicsCapabilities: .init(
+          supportedProtocols: [.sixel], preferredProtocol: .sixel, cellPixelSize: cellPixel),
+        fallbackBackground: .black, transmittedKittyImages: &sent
+      ).joined()
   }
 
   // A clipped image on the Sixel route is cropped to its visible cells, not
@@ -63,13 +65,18 @@ struct AdversarialSetBImageTests {
       pngBytes: png, pixelSize: .init(width: 2, height: 1),
       bounds: .init(origin: .zero, size: .init(width: 2, height: 1)),
       visibleBounds: .init(origin: .zero, size: .init(width: 1, height: 1)))
-    let registers = sixelRegisters(in: sixel(attachment))
-    withKnownIssue(
-      "the Sixel payload rescales the whole image into the visible rect instead of cropping it"
-    ) {
+    let renderer = TerminalImageRenderer(repository: ImageAssetRepository())
+    let registers = sixelRegisters(in: sixel(attachment, renderer: renderer))
+    do {
       #expect(!registers.contains { $0[2] > 50 }, "blue register present: \(registers)")
     }
     #expect(registers.contains { $0[0] > 50 }, "red register present: \(registers)")
+    var right = attachment
+    right.visibleBounds.origin.x = 1
+    let rightRegisters = sixelRegisters(in: sixel(right, renderer: renderer))
+    #expect(rightRegisters.contains { $0[2] > 50 })
+    #expect(!rightRegisters.contains { $0[0] > 50 }, "same-size clips have distinct payloads")
+
   }
 
   // The half-block fallback keeps the container background under a
@@ -93,9 +100,7 @@ struct AdversarialSetBImageTests {
     let cell = prepared.cells[0][0]
     #expect(cell.character == "▀", "\(cell)")
     #expect(cell.style?.foregroundColor?.red ?? 0 > 0.9, "\(String(describing: cell.style))")
-    withKnownIssue(
-      "a transparent half yields a foreground-only style, dropping the cell's own background (adjacent to STUI-1024)"
-    ) {
+    do {
       #expect(cell.style?.backgroundColor?.blue ?? 0 > 0.9, "\(String(describing: cell.style))")
     }
   }
@@ -112,9 +117,7 @@ struct AdversarialSetBImageTests {
     let prepared = TerminalImageRenderer(repository: ImageAssetRepository()).preparedSurface(
       for: surface, capabilityProfile: .previewASCII, graphicsCapabilities: .none,
       fallbackBackground: .black)
-    withKnownIssue(
-      "the darkest ramp glyph is a blank with no style, which the overlay treats as invisible and skips"
-    ) {
+    do {
       #expect(prepared.cells[0][0].character == " ", "\(prepared.cells[0][0])")
     }
     let white = try makePNGBytes(
@@ -141,9 +144,7 @@ struct AdversarialSetBImageTests {
         Text("   ")
       }, "spaces", width: 3, height: 3)
     let attachment = try #require(spaces.rasterSurface.imageAttachments.first)
-    withKnownIssue(
-      "space clusters record paint fragments, so a blank text occludes the image's first row"
-    ) {
+    do {
       #expect(
         attachment.unoccludedVisibleBounds == nil,
         "\(String(describing: attachment.unoccludedVisibleBounds))")
@@ -171,7 +172,7 @@ struct AdversarialSetBImageTests {
       Image(data: png).scaledToFit().resizable().frame(width: 6, height: 2), "reordered", width: 6,
       height: 2)
     let reorderedBounds = try #require(reordered.rasterSurface.imageAttachments.first?.bounds)
-    withKnownIssue("resizable() resets the scaling mode to stretch") {
+    do {
       #expect(reorderedBounds.size == CellSize(width: 4, height: 2), "\(reorderedBounds)")
     }
   }
@@ -190,12 +191,16 @@ struct AdversarialSetBImageTests {
     let spoofed = directory.absoluteString + "real.png%00.txt"
     let snapshot = render(Image(fileURLString: spoofed), "nul", width: 4, height: 2)
     let codes = snapshot.diagnostics.runtime.issues.map(\.code)
-    withKnownIssue("percent decoding emits a NUL and the C open call sees only the prefix path") {
+    do {
       #expect(
         snapshot.rasterSurface.imageAttachments.allSatisfy { $0.bounds.size.width == 0 },
         "\(snapshot.rasterSurface.imageAttachments.map(\.bounds))")
       #expect(codes.contains("image.unresolvedSource"), "\(codes)")
     }
+    #expect(parseFileURL(real.absoluteString + "%FF") == nil)
+    #expect(parseFileURL("FILE://LOCALHOST/tmp/example.png") == "/tmp/example.png")
+    let rawNUL = render(Image(path: real.path + "\0suffix"), "raw-nul", width: 4, height: 2)
+    #expect(rawNUL.diagnostics.runtime.issues.contains { $0.code == "image.unresolvedSource" })
     let genuine = render(Image(fileURLString: real.absoluteString), "genuine", width: 4, height: 2)
     #expect(genuine.rasterSurface.imageAttachments.first?.bounds.size.width == 1)
   }
@@ -227,7 +232,7 @@ struct AdversarialSetBImageTests {
       pngBytes: png, pixelSize: .init(width: 2, height: 1),
       bounds: .init(origin: .zero, size: .init(width: 2, height: 1)))
     let registers = sixelRegisters(in: sixel(attachment, cellPixel: .init(width: 1, height: 1)))
-    withKnownIssue("the adaptive palette buckets colours by 16 and averages each bucket") {
+    do {
       #expect(registers.count == 2, "\(registers)")
     }
     let far = try makePNGBytes(

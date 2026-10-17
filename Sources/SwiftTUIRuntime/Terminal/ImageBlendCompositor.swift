@@ -65,36 +65,11 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
 }
 
 @_spi(Runners) public final class ImageBlendCompositor: Sendable {
-  private struct PresentationAttachment: Sendable {
-    var identity: Identity
-    var bounds: CellRect
-    var visibleBounds: CellRect
-    var pixelSize: PixelSize
-    var cellPixelSize: PixelSize?
-    var isResizable: Bool
-    var scalingMode: ImageScalingMode
-
-    var rasterAttachment: RasterImageAttachment {
-      RasterImageAttachment(
-        identity: identity,
-        bounds: bounds,
-        visibleBounds: visibleBounds,
-        source: .data([]),
-        resolvedReference: nil,
-        pixelSize: pixelSize,
-        cellPixelSize: cellPixelSize,
-        isResizable: isResizable,
-        scalingMode: scalingMode,
-        compositing: nil
-      )
-    }
-
-    var retainedByteEstimate: Int {
-      let identityBytes = identity.components.reduce(0) { total, component in
-        total + component.utf8.count
-      }
-      return identityBytes + (MemoryLayout<Int>.stride * 12) + 2
-    }
+  /// Shared cache payloads contain pixels, never an attachment owner's routing
+  /// or placement metadata. Each lookup binds them to the current attachment.
+  private struct DecodedPayload: Sendable {
+    var id: String
+    var image: DecodedImage
   }
 
   private struct CacheEntry: Sendable {
@@ -102,7 +77,6 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     var pixelSize: PixelSize
     var encodedBytes: [UInt8]
     var decodedImage: DecodedImage?
-    var presentationAttachment: PresentationAttachment
 
     var decodedPixelCount: Int {
       decodedImage?.pixels.count ?? 0
@@ -118,7 +92,6 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
 
     var retainedMetadataBytes: Int {
       id.utf8.count
-        + presentationAttachment.retainedByteEstimate
         + (MemoryLayout<Int>.stride * 4)
     }
 
@@ -126,15 +99,9 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       BlendedImageEncodedPayload(id: id, bytes: encodedBytes, pixelSize: pixelSize)
     }
 
-    var decodedVariant: BlendedImageVariant? {
-      guard let decodedImage else {
-        return nil
-      }
-      return BlendedImageVariant(
-        id: id,
-        image: decodedImage,
-        attachment: presentationAttachment.rasterAttachment
-      )
+    var decodedPayload: DecodedPayload? {
+      guard let decodedImage else { return nil }
+      return DecodedPayload(id: id, image: decodedImage)
     }
   }
 
@@ -196,16 +163,16 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
 
     mutating func decodedLookup(
       for key: ImageBlendCacheKey
-    ) -> (variant: BlendedImageVariant?, encodedBytes: [UInt8]?) {
+    ) -> (payload: DecodedPayload?, encodedBytes: [UInt8]?) {
       guard let entry = cache.peek(key) else {
         decodedMisses += 1
         return (nil, nil)
       }
-      if let variant = entry.decodedVariant {
+      if let payload = entry.decodedPayload {
         accessGeneration += 1
         cache.recordAccess(key)
         decodedHits += 1
-        return (variant, entry.encodedBytes)
+        return (payload, entry.encodedBytes)
       }
       decodedMisses += 1
       return (nil, entry.encodedBytes)
@@ -230,7 +197,6 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
     mutating func storeDecodedVariant(
       _ variant: BlendedImageVariant,
       for key: ImageBlendCacheKey,
-      presentationAttachment: PresentationAttachment,
       policy: ImageBlendCompositorCachePolicy
     ) {
       accessGeneration += 1
@@ -240,20 +206,17 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
           id: variant.id,
           pixelSize: variant.image.pixelSize,
           encodedBytes: variant.image.encodedBytes,
-          decodedImage: nil,
-          presentationAttachment: presentationAttachment
+          decodedImage: nil
         )
       entry.id = variant.id
       entry.pixelSize = variant.image.pixelSize
       entry.encodedBytes = variant.image.encodedBytes
       entry.decodedImage = variant.image
-      entry.presentationAttachment = presentationAttachment
       cache.upsert(key, value: entry, cost: Self.cost(for: entry, key: key), policy: policy)
     }
 
     mutating func storeEncodedPayload(
       _ payload: BlendedImageEncodedPayload,
-      presentationAttachment: PresentationAttachment,
       for key: ImageBlendCacheKey,
       policy: ImageBlendCompositorCachePolicy
     ) {
@@ -264,13 +227,11 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
           id: payload.id,
           pixelSize: payload.pixelSize,
           encodedBytes: payload.bytes,
-          decodedImage: nil,
-          presentationAttachment: presentationAttachment
+          decodedImage: nil
         )
       entry.id = payload.id
       entry.pixelSize = payload.pixelSize
       entry.encodedBytes = payload.bytes
-      entry.presentationAttachment = presentationAttachment
       cache.upsert(key, value: entry, cost: Self.cost(for: entry, key: key), policy: policy)
     }
 
@@ -468,8 +429,10 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       placementOpacity: placementOpacity
     )
     let lookup = storage.withLockUnchecked { $0.decodedLookup(for: key) }
-    if let cached = lookup.variant {
-      return cached
+    if let cached = lookup.payload {
+      return BlendedImageVariant(
+        id: cached.id, image: cached.image,
+        attachment: imageBlendPresentationAttachment(from: attachment, outputSize: outputSize))
     }
 
     guard let sourceImage = repository.decodedImage(for: content) else {
@@ -508,14 +471,13 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
         pixelSize: outputSize,
         pixels: pixels
       ),
-      attachment: presentationAttachment.rasterAttachment
+      attachment: presentationAttachment
     )
 
     storage.withLockUnchecked { storage in
       storage.storeDecodedVariant(
         variant,
         for: key,
-        presentationAttachment: presentationAttachment,
         policy: cachePolicy
       )
     }
@@ -584,14 +546,9 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
       bytes: ImageBlendPNGEncoder.encode(pixels: pixels, pixelSize: outputSize),
       pixelSize: outputSize
     )
-    let presentationAttachment = imageBlendPresentationAttachment(
-      from: attachment,
-      outputSize: outputSize
-    )
     storage.withLockUnchecked { storage in
       storage.storeEncodedPayload(
         payload,
-        presentationAttachment: presentationAttachment,
         for: key,
         policy: cachePolicy
       )
@@ -602,11 +559,13 @@ package struct ImageBlendCompositorCacheSnapshot: Sendable, Equatable {
   private func imageBlendPresentationAttachment(
     from attachment: RasterImageAttachment,
     outputSize: PixelSize
-  ) -> PresentationAttachment {
-    PresentationAttachment(
+  ) -> RasterImageAttachment {
+    RasterImageAttachment(
       identity: attachment.identity,
       bounds: attachment.visibleBounds,
       visibleBounds: attachment.visibleBounds,
+      source: .data([]),
+      resolvedReference: nil,
       pixelSize: outputSize,
       cellPixelSize: attachment.cellPixelSize,
       isResizable: attachment.isResizable,

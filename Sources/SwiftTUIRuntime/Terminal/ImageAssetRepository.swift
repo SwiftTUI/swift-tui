@@ -327,6 +327,7 @@ final class ImageAssetRepository: Sendable {
   ) -> ImageAssetReference? {
     switch source {
     case .path(let name):
+      guard !name.utf8.contains(0) else { return nil }
       if name.hasPrefix("/") {
         return .filePath(name)
       }
@@ -553,24 +554,9 @@ private func fileExists(
 func parseFileURL(
   _ rawValue: String
 ) -> String? {
-  let prefix = "file://"
-  guard rawValue.hasPrefix(prefix) else {
-    return nil
-  }
-
-  let suffix = String(rawValue.dropFirst(prefix.count))
-  let pathComponent: String
-  if suffix.hasPrefix("localhost/") {
-    pathComponent = "/" + String(suffix.dropFirst("localhost/".count))
-  } else if suffix.hasPrefix("/") {
-    pathComponent = suffix
-  } else {
-    return nil
-  }
-
-  guard let decoded = percentDecoded(pathComponent) else {
-    return nil
-  }
+  guard let pathComponent = localFileURLPathComponent(rawValue),
+    let decoded = percentDecoded(pathComponent), !decoded.utf8.contains(0)
+  else { return nil }
   #if os(Windows)
     // A file URL spells an absolute drive-lettered path as `/C:/…`; the
     // filesystem wants it without the leading slash (the CRT open path
@@ -620,7 +606,7 @@ private func percentDecoded(
     index += 1
   }
 
-  return String(decoding: bytes, as: UTF8.self)
+  return String(validating: bytes, as: UTF8.self)
 }
 
 private func hexNibble(
@@ -641,7 +627,9 @@ private func hexNibble(
 private func openReadOnlyFile(
   _ path: String
 ) -> Int32 {
-  path.withCString { cPath in
+  // Every source form crosses this C boundary, including raw path initializers.
+  guard !path.utf8.contains(0) else { return -1 }
+  return path.withCString { cPath in
     #if canImport(Darwin)
       unsafe Darwin.open(cPath, O_RDONLY)
     #elseif canImport(Glibc)

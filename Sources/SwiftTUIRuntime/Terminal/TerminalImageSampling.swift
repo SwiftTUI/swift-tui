@@ -1,8 +1,36 @@
 import SwiftTUICore
 
+/// Source coordinates for a clipped placement, normalized before sampling.
+/// Keeping this in the payload key lets equally sized clips share only when
+/// they select the same pixels, independently of their terminal position.
+struct ImageSamplingWindow: Hashable, Sendable {
+  var x: Double
+  var y: Double
+  var width: Double
+  var height: Double
+  static let full = Self(x: 0, y: 0, width: 1, height: 1)
+
+  init(x: Double, y: Double, width: Double, height: Double) {
+    self.x = x
+    self.y = y
+    self.width = width
+    self.height = height
+  }
+
+  init(placement: CellRect, visible: CellRect) {
+    let w = Double(max(1, placement.size.width))
+    let h = Double(max(1, placement.size.height))
+    x = min(1, max(0, (Double(visible.origin.x) - Double(placement.origin.x)) / w))
+    y = min(1, max(0, (Double(visible.origin.y) - Double(placement.origin.y)) / h))
+    width = min(1 - x, max(0, Double(visible.size.width) / w))
+    height = min(1 - y, max(0, Double(visible.size.height) / h))
+  }
+}
+
 func scaledPixels(
   from image: DecodedImage,
-  outputSize: PixelSize
+  outputSize: PixelSize,
+  samplingWindow: ImageSamplingWindow = .full
 ) -> [RGBAImagePixel?] {
   guard
     outputSize.width > 0,
@@ -21,20 +49,22 @@ func scaledPixels(
   for y in 0..<outputSize.height {
     let sourceY = min(
       image.pixelSize.height - 1,
-      Int(
-        (Double((y * 2) + 1) * Double(image.pixelSize.height))
-          / Double(outputSize.height * 2)
-      )
-    )
+      max(
+        0,
+        Int(
+          (samplingWindow.y + (Double(y) + 0.5) / Double(outputSize.height)
+            * samplingWindow.height)
+            * Double(image.pixelSize.height))))
 
     for x in 0..<outputSize.width {
       let sourceX = min(
         image.pixelSize.width - 1,
-        Int(
-          (Double((x * 2) + 1) * Double(image.pixelSize.width))
-            / Double(outputSize.width * 2)
-        )
-      )
+        max(
+          0,
+          Int(
+            (samplingWindow.x + (Double(x) + 0.5) / Double(outputSize.width)
+              * samplingWindow.width)
+              * Double(image.pixelSize.width))))
       let pixel = image.pixels[(sourceY * image.pixelSize.width) + sourceX]
       if pixel.alpha >= 16 {
         output[(y * outputSize.width) + x] = pixel

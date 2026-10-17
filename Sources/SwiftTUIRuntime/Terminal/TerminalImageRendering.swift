@@ -15,6 +15,7 @@ private struct TerminalImageVariantKey: Sendable {
   var mode: TerminalImageRenderMode
   var outputSize: PixelSize
   var paletteSize: Int
+  var samplingWindow: ImageSamplingWindow = .full
 }
 
 extension TerminalImageVariantKey: Hashable {
@@ -25,6 +26,7 @@ extension TerminalImageVariantKey: Hashable {
       && lhs.outputSize.width == rhs.outputSize.width
       && lhs.outputSize.height == rhs.outputSize.height
       && lhs.paletteSize == rhs.paletteSize
+      && lhs.samplingWindow == rhs.samplingWindow
   }
 
   func hash(into hasher: inout Hasher) {
@@ -34,6 +36,7 @@ extension TerminalImageVariantKey: Hashable {
     hasher.combine(outputSize.width)
     hasher.combine(outputSize.height)
     hasher.combine(paletteSize)
+    hasher.combine(samplingWindow)
   }
 }
 
@@ -597,12 +600,15 @@ final class TerminalImageRenderer: Sendable {
       capabilityProfile: capabilityProfile,
       graphicsCapabilities: graphicsCapabilities
     )
+    let samplingWindow = ImageSamplingWindow(
+      placement: attachment.bounds, visible: attachment.effectiveVisibleBounds)
     let key = TerminalImageVariantKey(
       sourceID: sourceID,
       variantID: variantID,
       mode: .sixel,
       outputSize: pixelSize,
-      paletteSize: paletteBudget
+      paletteSize: paletteBudget,
+      samplingWindow: samplingWindow
     )
 
     if let cached = storage.withLockUnchecked({ $0.sixelPayloads.lookup(key) }) {
@@ -613,7 +619,8 @@ final class TerminalImageRenderer: Sendable {
       let payload = makeSixelPayload(
         for: image,
         outputSize: pixelSize,
-        paletteBudget: paletteBudget
+        paletteBudget: paletteBudget,
+        samplingWindow: samplingWindow
       )
     else {
       return nil
@@ -688,11 +695,10 @@ private func apply(
         continue
       }
 
-      let cell = overlay.cells[y][x]
-      guard imageFallbackCellIsVisible(cell) else {
-        continue
-      }
-      cells[targetY][targetX] = cell
+      guard let cell = overlay.cells[y][x] else { continue }
+      cells[targetY][targetX] =
+        compositeVerticalBlockCell(
+          cell, over: cells[targetY][targetX]) ?? cell
     }
   }
 }
@@ -733,10 +739,4 @@ private func normalizedCells(
   }
 
   return cells
-}
-
-private func imageFallbackCellIsVisible(
-  _ cell: RasterCell
-) -> Bool {
-  cell.character != " " || cell.style != nil
 }

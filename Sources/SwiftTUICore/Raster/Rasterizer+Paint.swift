@@ -1139,15 +1139,35 @@ extension Rasterizer {
               continue
             }
             let sourceCell = sourceRow[col]
+            // Normalize the source span before choosing a composition path.
+            // A clipped wide glyph contributes blanks for its visible cells,
+            // including a continuation whose lead lies outside the clip.
+            var copied = sourceCell
+            let leadColumn = sourceCell.continuationLeadX ?? col
+            let leadX = bounds.origin.x + leadColumn
+            let span =
+              sourceRow.indices.contains(leadColumn)
+              ? sourceRow[leadColumn].spanWidth : 0
+            let copyEnd = min(grid.size.width, bounds.size.width, sourceRow.count)
+            if leadColumn < 0 || span < 1 || leadColumn + span > copyEnd
+              || leadX < max(0, effectiveClip.origin.x)
+              || leadX + span
+                > min(cells[y].count, effectiveClip.origin.x + effectiveClip.size.width)
+            {
+              copied = RasterCell(character: " ", style: sourceCell.style)
+            }
+            if let leadX = copied.continuationLeadX {
+              copied.continuationLeadX = bounds.origin.x + leadX
+            }
             if let blendMode {
-              guard sourceCell.spanWidth != 0 else {
+              guard copied.spanWidth != 0 else {
                 continue
               }
               write(
-                sourceCell.character,
-                width: sourceCell.spanWidth,
-                style: sourceCell.style,
-                hyperlink: sourceCell.hyperlink,
+                copied.character,
+                width: copied.spanWidth,
+                style: copied.style,
+                hyperlink: copied.hyperlink,
                 atX: x,
                 y: y,
                 cells: &cells,
@@ -1158,31 +1178,6 @@ extension Rasterizer {
                 presentationEffects: presentationEffects
               )
             } else {
-              // The source grid's continuation back-pointers are in
-              // SOURCE-grid columns; translate them to destination columns
-              // (F167) — span normalization and damage repair follow
-              // `continuationLeadX`, and an untranslated pointer made them
-              // clear the wrong cell at a non-zero origin. And a verbatim
-              // copy over part of an existing wide glyph must clear the
-              // rest of that glyph's span first, or a stale orphaned
-              // continuation survives beside the copy.
-              var copied = sourceCell
-              let leadColumn = sourceCell.continuationLeadX ?? col
-              let leadX = bounds.origin.x + leadColumn
-              let span =
-                sourceRow.indices.contains(leadColumn)
-                ? sourceRow[leadColumn].spanWidth : 0
-              let copyEnd = min(grid.size.width, bounds.size.width, sourceRow.count)
-              if leadColumn < 0 || span < 1 || leadColumn + span > copyEnd
-                || leadX < max(0, effectiveClip.origin.x)
-                || leadX + span
-                  > min(cells[y].count, effectiveClip.origin.x + effectiveClip.size.width)
-              {
-                copied = RasterCell(character: " ", style: sourceCell.style)
-              }
-              if let leadX = copied.continuationLeadX {
-                copied.continuationLeadX = bounds.origin.x + leadX
-              }
               clearExistingGlyph(atX: x, y: y, cells: &cells)
               cells[y][x] = copied
               presentationRecorder?.appendCellFragment(

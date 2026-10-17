@@ -42,7 +42,8 @@ func sixelPaletteBudget(
 func makeSixelPayload(
   for image: DecodedImage,
   outputSize: PixelSize,
-  paletteBudget: Int
+  paletteBudget: Int,
+  samplingWindow: ImageSamplingWindow = .full
 ) -> String? {
   guard outputSize.width > 0, outputSize.height > 0 else {
     return nil
@@ -50,7 +51,8 @@ func makeSixelPayload(
 
   let scaledPixels = scaledPixels(
     from: image,
-    outputSize: outputSize
+    outputSize: outputSize,
+    samplingWindow: samplingWindow
   )
   let palette = adaptivePalette(
     from: scaledPixels,
@@ -207,6 +209,24 @@ private func adaptivePalette(
   guard maxColors > 0 else {
     return []
   }
+
+  // Quantization is needed only when the exact color set exceeds the bank.
+  // Preserve authored colors below that budget, even when they share a coarse
+  // histogram bucket. Stable pixel order also gives deterministic registers.
+  var exact: [Color] = []
+  var seen: Set<Int> = []
+  for pixel in pixels {
+    guard let pixel else { continue }
+    let key = (pixel.red << 16) | (pixel.green << 8) | pixel.blue
+    if seen.insert(key).inserted {
+      exact.append(
+        Color(
+          red: Double(pixel.red) / 255, green: Double(pixel.green) / 255,
+          blue: Double(pixel.blue) / 255))
+      if exact.count > maxColors { break }
+    }
+  }
+  if exact.count <= maxColors { return exact }
 
   struct Bucket {
     var count = 0

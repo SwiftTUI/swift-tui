@@ -119,10 +119,8 @@ struct AdversarialSetBRasterTests {
       // is clipped away, so the surface owns a blank there: neither leg may
       // leave the underlay's "C" showing through, and no orphan may remain.
       let claimed = surface.cells[0][2]
-      withKnownIssue("the blend leg leaves the underlay under a clipped foreign continuation") {
+      do {
         #expect(claimed.character == " ", "\(effectNames): \(claimed)")
-      } when: {
-        "\(effectNames)".contains("blendMode")
       }
       #expect(claimed.spanWidth == 1, "\(effectNames): \(claimed)")
       #expect(claimed.continuationLeadX == nil, "\(effectNames): \(claimed)")

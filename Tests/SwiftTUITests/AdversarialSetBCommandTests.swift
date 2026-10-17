@@ -133,7 +133,7 @@ struct AdversarialSetBCommandTests {
     #expect(parseDroppedPaths("file:///Users/me/a.txt").map(\.rawValue) == ["/Users/me/a.txt"])
     let host = parseDroppedPaths("file://localhost/Users/me/a.txt").map(\.rawValue)
     let upper = parseDroppedPaths("FILE:///Users/me/b.txt").map(\.rawValue)
-    withKnownIssue("only the exact lowercase file:// prefix followed by a slash is decoded") {
+    do {
       #expect(host == ["/Users/me/a.txt"], "\(host)")
       #expect(upper == ["/Users/me/b.txt"], "\(upper)")
     }
