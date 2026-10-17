@@ -136,7 +136,7 @@ struct AdversarialSetARasterTranslationTests {
       #expect(
         Set(expected.cells[3..<15].map { String([$0[2].character, $0[9].character]) }).count > 1)
       let cellsMatch = result.output.surface.cells == expected.cells
-      withKnownIssue("STUI-1013: static stroke row-invariance ignores dash and trim masks") {
+      do {
         #expect(
           cellsMatch,
           "mask \(style), served \(servedRows); \(firstDifference(result.output.surface, expected))"

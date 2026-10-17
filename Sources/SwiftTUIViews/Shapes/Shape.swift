@@ -55,30 +55,7 @@ extension Shape {
   /// outline from the analytic primitive (or return a carried `.path` scaled
   /// into `rect`). Custom shapes override this.
   public func path(in rect: Rect) -> Path {
-    switch geometry {
-    case .rectangle:
-      return Path(rect)
-    case .roundedRectangle(let cornerRadius):
-      return Path(roundedRect: rect, cornerRadius: Double(cornerRadius))
-    case .circle:
-      let diameter = min(rect.size.width, rect.size.height)
-      let inset = Rect(
-        origin: Point(
-          x: rect.origin.x + (rect.size.width - diameter) / 2,
-          y: rect.origin.y + (rect.size.height - diameter) / 2),
-        size: Size(width: diameter, height: diameter))
-      return Path(ellipseIn: inset)
-    case .ellipse:
-      return Path(ellipseIn: rect)
-    case .capsule:
-      return Path(
-        roundedRect: rect,
-        cornerRadius: min(rect.size.width, rect.size.height) / 2)
-    case .path(let boxed, _):
-      return boxed.path
-        .scaledBy(sx: rect.size.width, sy: rect.size.height)
-        .translatedBy(dx: rect.origin.x, dy: rect.origin.y)
-    }
+    geometry.path(in: rect)
   }
 
   public var kindName: String {
@@ -113,9 +90,7 @@ extension Shape {
     guard strokeTrim != nil else {
       return geometry
     }
-    return .path(
-      BoxedPath(path(in: Rect(origin: Point(x: 0, y: 0), size: Size(width: 1, height: 1)))),
-      .nonZero)
+    return .trimmed(geometry, from: trimStart, to: trimEnd)
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {

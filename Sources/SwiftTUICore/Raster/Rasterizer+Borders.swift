@@ -21,6 +21,7 @@ extension Rasterizer {
     }
 
     let shapeBounds = insetBounds(bounds, by: max(0, insetAmount))
+    let geometry = geometry.resolved(in: shapeBounds.size)
     guard shapeBounds.size.width > 0, shapeBounds.size.height > 0 else {
       return
     }
@@ -29,6 +30,8 @@ extension Rasterizer {
       environment: environment,
       bounds: shapeBounds
     )
+
+    if case .constant(nil) = foregroundColorMode { return }
 
     // Curved shapes draw their outline onto a Braille canvas so the
     // stroke resolves to sub-cell precision.
@@ -54,7 +57,7 @@ extension Rasterizer {
         presentationEffects: presentationEffects
       )
       return
-    case .rectangle, .roundedRectangle:
+    case .rectangle, .roundedRectangle, .trimmed:
       break
     }
 
@@ -229,14 +232,14 @@ extension Rasterizer {
     presentationRecorder: RasterPresentationLayerRecorder? = nil,
     presentationEffects: [DrawEffect] = []
   ) {
+    guard
+      let foregroundColor = resolveColor(
+        from: foregroundColorMode, bounds: bounds, sampleX: x, sampleY: y),
+      foregroundColor.alpha > 0
+    else { return }
     let resolvedStyle = accessibilityGraphicStyle(
       ResolvedTextStyle(
-        foregroundColor: resolveColor(
-          from: foregroundColorMode,
-          bounds: bounds,
-          sampleX: x,
-          sampleY: y
-        ),
+        foregroundColor: foregroundColor,
         backgroundColor: resolvedStrokeBackgroundColor(
           explicitBackgroundStyle: backgroundStyle,
           environment: environment,

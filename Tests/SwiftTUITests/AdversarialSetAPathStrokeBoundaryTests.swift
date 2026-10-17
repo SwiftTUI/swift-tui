@@ -272,7 +272,7 @@ struct AdversarialSetAPathStrokeBoundaryTests {
     let original = rows(shape.fill(Color.white), width: 20, height: 10)
     let trimmed = rows(shape.trim(from: 0, to: 0.99).fill(Color.white), width: 20, height: 10)
     #expect(original[5][original[5].index(original[5].startIndex, offsetBy: 10)] == " ")
-    withKnownIssue("STUI-991: trimmed fill geometry replaces the authored even-odd rule") {
+    do {
       #expect(trimmed[5][trimmed[5].index(trimmed[5].startIndex, offsetBy: 10)] == " ")
     }
     #expect(ink(trimmed) > 0)

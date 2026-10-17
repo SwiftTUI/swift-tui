@@ -165,6 +165,8 @@ extension SnapshotRenderer {
         "ellipse"
       case .capsule:
         "capsule"
+      case .trimmed(let base, let from, let to):
+        "\(describe(base)).trim(\(from),\(to))"
       case .path(let boxed, let fillRule):
         "path(elements: \(boxed.path.elements.count), fill: \(fillRule))"
       }

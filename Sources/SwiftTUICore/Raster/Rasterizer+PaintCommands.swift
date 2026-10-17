@@ -18,6 +18,7 @@ extension Rasterizer {
     }
 
     let shapeBounds = insetBounds(bounds, by: max(0, insetAmount))
+    let geometry = geometry.resolved(in: shapeBounds.size)
     guard shapeBounds.size.width > 0, shapeBounds.size.height > 0 else {
       return
     }
@@ -87,7 +88,7 @@ extension Rasterizer {
         presentationEffects: presentationEffects
       )
       return
-    case .rectangle, .roundedRectangle:
+    case .rectangle, .roundedRectangle, .trimmed:
       break
     }
 
@@ -790,7 +791,7 @@ extension Rasterizer {
       } else {
         fillPath(boxed.path, rule: rule, into: &canvas)
       }
-    case .rectangle, .roundedRectangle:
+    case .rectangle, .roundedRectangle, .trimmed:
       // Not reachable: the caller dispatches these to the cell-aligned
       // paint path.  We still need the case for exhaustiveness.
       return
@@ -833,6 +834,7 @@ extension Rasterizer {
           sampleX: targetX,
           sampleY: targetY
         )
+        guard let foregroundColor, foregroundColor.alpha > 0 else { continue }
         let resolved = accessibilityGraphicStyle(
           ResolvedTextStyle(
             foregroundColor: foregroundColor,

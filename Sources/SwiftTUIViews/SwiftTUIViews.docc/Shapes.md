@@ -247,7 +247,8 @@ as a dash end does. A dash on a trimmed stroke is measured from the start of the
 trimmed part. The interval animates on a stroke; see <doc:Animating-Views>.
 
 A fill of a trimmed shape closes the trimmed outline with a straight line and
-fills it, as SwiftUI does. It takes the custom-path route, so it stretches to its
+fills it, as SwiftUI does. The outline is built at its placed size before trimming,
+so corner radii and authored winding rules survive. It takes the custom-path route, so it stretches to its
 frame: a trimmed `Circle` fill is not aspect-corrected the way a `Circle` fill
 is, and its interval does not animate smoothly.
 

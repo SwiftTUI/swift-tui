@@ -230,8 +230,11 @@ extension DrawCommand {
       }
       return (bounds, edge)
     case .stroke(
-      let bounds, let geometry, let insetAmount, let style, _, _, let backgroundStyle)
+      let bounds, let geometry, let insetAmount, let style, let strokeStyle, _, let backgroundStyle)
     where style.isPositionIndependent(in: environment):
+      // A position-independent paint does not make a masked outline uniform.
+      // The dash and trim select different perimeter cells on different rows.
+      guard StrokeMask(strokeStyle).isSolid else { return nil }
       if let backgroundStyle {
         for sideStyle in [
           backgroundStyle.top, backgroundStyle.right, backgroundStyle.bottom,

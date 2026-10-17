@@ -62,8 +62,7 @@ struct AdversarialSetBShapeTests {
     #expect(!fillRows.isEmpty, "\(lines(fill))")
     #expect(!strokeRows.isEmpty, "\(lines(stroke))")
     #expect(strokeRows.allSatisfy { $0 >= 4 }, "stroke rows \(strokeRows)\n\(lines(stroke))")
-    withKnownIssue("a trimmed circle fill starts at the leading edge, half a turn from the stroke")
-    {
+    do {
       #expect(fillRows.allSatisfy { $0 >= 4 }, "fill rows \(fillRows)\n\(lines(fill))")
       #expect(!fillRows.contains(0) && !fillRows.contains(1), "\(lines(fill))")
     }
@@ -81,9 +80,7 @@ struct AdversarialSetBShapeTests {
     let ellipse = try #require(start(Ellipse().path(in: rect)))
     let rounded = try #require(start(RoundedRectangle(cornerRadius: 2).path(in: rect)))
     let capsule = try #require(start(Capsule().path(in: rect)))
-    withKnownIssue(
-      "path(in:) of the rounded primitives starts at the leading edge or the top, not the trailing midpoint"
-    ) {
+    do {
       #expect(circle.x == 15 && circle.y == 5, "\(circle)")
       #expect(ellipse.x == 20 && ellipse.y == 5, "\(ellipse)")
       #expect(rounded.x == 20 && rounded.y == 5, "\(rounded)")
@@ -107,9 +104,7 @@ struct AdversarialSetBShapeTests {
         "setB143-trimmed", width: 12, height: 6))
     let missing = plain.subtracting(trimmed)
     #expect(trimmed.contains([0, 1]) && trimmed.contains([0, 4]))
-    withKnownIssue(
-      "a trimmed rounded rectangle fill is the unit path scaled, so its corners round like an ellipse"
-    ) {
+    do {
       #expect(
         missing.count <= 2,
         "cells lost by trimming: \(missing.sorted { $0.lexicographicallyPrecedes($1) })")
@@ -247,11 +242,14 @@ struct AdversarialSetBShapeTests {
           Text("abcd\nefgh")
           Rectangle().stroke(Color.clear, style: .single)
         }, "setB148-c", width: 4, height: 2))
+    let transparentGradient = LinearGradient(
+      colors: [.clear, .clear], startPoint: .leading, endPoint: .trailing)
+    let gradientStroke = cells(
+      Rectangle().stroke(transparentGradient), "clear-gradient", width: 4, height: 2)
+    #expect(gradientStroke == cells(EmptyView(), "clear-gradient-control", width: 4, height: 2))
     let circle = cells(
       Circle().stroke(SemanticShapeStyle.foreground.opacity(0)), "setB148-d", width: 8, height: 4)
-    withKnownIssue(
-      "the stroke painter has no transparent-style guard: invisible strokes still write glyphs"
-    ) {
+    do {
       #expect(invisible == blank, "\(invisible)")
       #expect(clearOverText == ["abcd", "efgh"], "\(clearOverText)")
       #expect(circle.allSatisfy { dots($0) == 0 }, "\(lines(circle))")

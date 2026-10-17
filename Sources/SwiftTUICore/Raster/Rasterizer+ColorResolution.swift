@@ -36,7 +36,7 @@ extension Rasterizer {
       targetBounds = insetRect
     }
 
-    switch geometry {
+    switch geometry.resolved(in: targetBounds.size) {
     case .rectangle:
       return x >= targetBounds.origin.x
         && x < targetBounds.origin.x + targetBounds.size.width
@@ -74,6 +74,8 @@ extension Rasterizer {
       let isCorner =
         (x == minX || x == maxX) && (y == minY || y == maxY)
       return !isCorner
+    case .trimmed:
+      return false  // Only an empty placed frame leaves a recipe unresolved.
     case .path(let boxed, let rule):
       return pathContainsCell(
         boxed.path,
@@ -181,7 +183,7 @@ extension Rasterizer {
           || insideCap(centerX: cx, centerY: bottom)
           || (py >= top && py <= bottom && abs(px - cx) <= rx)
       }
-    case .rectangle, .roundedRectangle, .path:
+    case .rectangle, .roundedRectangle, .path, .trimmed:
       assertionFailure("curvedShapeContains called with non-curved geometry")
       return false
     }

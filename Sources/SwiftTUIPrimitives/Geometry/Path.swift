@@ -129,12 +129,7 @@ public struct Path: Equatable, Sendable {
       return
     }
     let o = r * Self.kappa
-    move(to: Point(x: minX + r, y: minY))
-    addLine(to: Point(x: maxX - r, y: minY))
-    addCurve(
-      to: Point(x: maxX, y: minY + r),
-      control1: Point(x: maxX - r + o, y: minY),
-      control2: Point(x: maxX, y: minY + r - o))
+    move(to: Point(x: maxX, y: (minY + maxY) / 2))
     addLine(to: Point(x: maxX, y: maxY - r))
     addCurve(
       to: Point(x: maxX - r, y: maxY),
@@ -150,6 +145,11 @@ public struct Path: Equatable, Sendable {
       to: Point(x: minX + r, y: minY),
       control1: Point(x: minX, y: minY + r - o),
       control2: Point(x: minX + r - o, y: minY))
+    addLine(to: Point(x: maxX - r, y: minY))
+    addCurve(
+      to: Point(x: maxX, y: minY + r),
+      control1: Point(x: maxX - r + o, y: minY),
+      control2: Point(x: maxX, y: minY + r - o))
     close()
   }
 
@@ -160,15 +160,7 @@ public struct Path: Equatable, Sendable {
     let ry = rect.size.height / 2
     let ox = rx * Self.kappa
     let oy = ry * Self.kappa
-    move(to: Point(x: cx - rx, y: cy))
-    addCurve(
-      to: Point(x: cx, y: cy - ry),
-      control1: Point(x: cx - rx, y: cy - oy),
-      control2: Point(x: cx - ox, y: cy - ry))
-    addCurve(
-      to: Point(x: cx + rx, y: cy),
-      control1: Point(x: cx + ox, y: cy - ry),
-      control2: Point(x: cx + rx, y: cy - oy))
+    move(to: Point(x: cx + rx, y: cy))
     addCurve(
       to: Point(x: cx, y: cy + ry),
       control1: Point(x: cx + rx, y: cy + oy),
@@ -177,6 +169,14 @@ public struct Path: Equatable, Sendable {
       to: Point(x: cx - rx, y: cy),
       control1: Point(x: cx - ox, y: cy + ry),
       control2: Point(x: cx - rx, y: cy + oy))
+    addCurve(
+      to: Point(x: cx, y: cy - ry),
+      control1: Point(x: cx - rx, y: cy - oy),
+      control2: Point(x: cx - ox, y: cy - ry))
+    addCurve(
+      to: Point(x: cx + rx, y: cy),
+      control1: Point(x: cx + ox, y: cy - ry),
+      control2: Point(x: cx + rx, y: cy - oy))
     close()
   }
 
