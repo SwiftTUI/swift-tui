@@ -49,7 +49,7 @@ func coalescedInputEvents(
   return coalesced
 }
 
-enum InputReaderTiming {
+package enum InputReaderTiming {
   static let mouseEventFlushDelayMilliseconds = 1
 
   /// Idle grace period before a lone ESC held by the parser is committed to an
@@ -59,7 +59,7 @@ enum InputReaderTiming {
   /// the reader flushes it only after this quiet window. Long enough that an
   /// escape sequence split across reads under load still completes before the
   /// flush; short enough that a bare Escape stays responsive.
-  static let escapeDisambiguationDelayMilliseconds = 25
+  package static let escapeDisambiguationDelayMilliseconds = 25
 }
 
 /// Schedule-once-per-cluster state machine for the input reader's

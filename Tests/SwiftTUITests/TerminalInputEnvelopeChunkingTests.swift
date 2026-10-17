@@ -29,6 +29,21 @@ import Testing
     }
   }
 
+  @Test func c1ControlStringsKeepPayloadOpaqueAcrossReads() {
+    for introducer: UInt8 in [0x90, 0x98, 0x9D, 0x9E, 0x9F] {
+      let bytes = [introducer] + Array("payload".utf8) + [0x9C, 0x78]
+      for split in 0...bytes.count {
+        var parser = TerminalInputParser()
+        let events = parser.feed(Array(bytes[..<split])) + parser.feed(Array(bytes[split...]))
+        #expect(events == [.key(.init(.character("x")))])
+      }
+      var unfinished = TerminalInputParser()
+      #expect(unfinished.feed([introducer, 0x61]).isEmpty)
+      #expect(unfinished.flush().isEmpty)
+      #expect(unfinished.feed([0x78]) == [.key(.init(.character("x")))])
+    }
+  }
+
   @Test func explicitRecoveryKeepsControlPayloadsOutOfTyping() {
     for bytes: [UInt8] in [[0x9B], [0x9B, 0x31, 0x3B], [0x1B, 0x5B, 0x4D, 0x20]] {
       var parser = TerminalInputParser()

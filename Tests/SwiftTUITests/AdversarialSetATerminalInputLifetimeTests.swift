@@ -220,8 +220,7 @@
       reader.send([0x1B])
       reader.finish()
       let events = try await terminalLifetimeCollect(stream)
-      withKnownIssue("STUI-1026: Injected EOF clears the Escape token without flushing the parser")
-      {
+      do {
         #expect(events == [.key(.escape)])
       }
     }
@@ -236,7 +235,7 @@
       reader.send(Array("a".utf8))
       reader.finish()
       let events = try await terminalLifetimeCollect(stream)
-      withKnownIssue("STUI-1027: Consumer attachment does not arm an already-buffered Escape") {
+      do {
         #expect(events == [.key(.escape), .key(.character("a"))])
       }
     }
@@ -256,9 +255,7 @@
       reader.finish()
       let events = try await terminalLifetimeCollect(stream)
       #expect(direct.snapshot.isEmpty)
-      withKnownIssue(
-        "STUI-1028: Direct-handler detach leaves a flush token that consumes unowned input"
-      ) {
+      do {
         #expect(events == [.key(.character("a"), modifiers: .alt)])
       }
     }
@@ -274,7 +271,7 @@
       reader.flushPendingEscapeDisambiguation()
       reader.finish()
       let events = try await terminalLifetimeCollect(stream)
-      withKnownIssue("STUI-1029: Escape flush bypasses the pending-mouse ordering barrier") {
+      do {
         #expect(events == [move, .key(.escape)])
       }
     }
@@ -294,7 +291,7 @@
       let trace = observed.withLock { $0 }
       #expect(trace.first == "event")
       #expect(trace.filter { $0 == "end" }.count == 1)
-      withKnownIssue("STUI-1030: The detached buffered-event drain continues after reentrant EOF") {
+      do {
         #expect(trace.last == "end")
       }
     }

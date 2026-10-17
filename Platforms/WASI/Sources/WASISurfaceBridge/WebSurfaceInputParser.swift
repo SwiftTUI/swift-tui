@@ -51,7 +51,8 @@ package struct WebSurfaceInputParser {
 
   package mutating func flushIdleInput() -> [WebSurfaceInputRecord] {
     guard let lastInputAt,
-      lastInputAt.duration(to: .now) >= .milliseconds(25)
+      lastInputAt.duration(to: .now)
+        >= .milliseconds(InputReaderTiming.escapeDisambiguationDelayMilliseconds)
     else { return [] }
     return flushTerminalInput()
   }

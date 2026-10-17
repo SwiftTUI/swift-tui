@@ -60,8 +60,9 @@ public struct TerminalInputParser: Sendable {
   /// The control-string introducer byte when the buffer holds an
   /// unterminated OSC/DCS/PM/APC prefix, else `nil`.
   private var unterminatedControlStringIntroducer: UInt8? {
-    if bufferedBytes.first == 0x9D {
-      return controlStringEnd(prefixLength: 1, terminatesWithBEL: true) == nil ? 0x9D : nil
+    if let first = bufferedBytes.first, [0x90, 0x98, 0x9D, 0x9E, 0x9F].contains(first) {
+      return controlStringEnd(prefixLength: 1, terminatesWithBEL: first == 0x9D) == nil
+        ? first : nil
     }
     guard bufferedBytes.count >= 2, bufferedBytes[0] == 0x1B else {
       return nil
@@ -71,7 +72,7 @@ public struct TerminalInputParser: Sendable {
     case 0x5D:
       return controlStringEnd(prefixLength: 2, terminatesWithBEL: true) == nil
         ? introducer : nil
-    case 0x50, 0x5E, 0x5F:
+    case 0x50, 0x58, 0x5E, 0x5F:
       return controlStringEnd(prefixLength: 2, terminatesWithBEL: false) == nil
         ? introducer : nil
     default:
@@ -180,8 +181,8 @@ extension TerminalInputParser {
       return parseEscapeSequence()
     case 0x9B:
       return parseCSI(prefixLength: 1)
-    case 0x9D:
-      return discardControlString(prefixLength: 1, terminatesWithBEL: true)
+    case 0x90, 0x98, 0x9D, 0x9E, 0x9F:
+      return discardControlString(prefixLength: 1, terminatesWithBEL: firstByte == 0x9D)
     case 0x20:
       bufferedBytes.removeFirst()
       return .key(KeyPress(.space))
@@ -242,7 +243,7 @@ extension TerminalInputParser {
     switch bufferedBytes[1] {
     case 0x5D:
       return discardControlString(prefixLength: 2, terminatesWithBEL: true)
-    case 0x50, 0x5E, 0x5F:
+    case 0x50, 0x58, 0x5E, 0x5F:
       // DCS/PM/APC control strings buffer until their ST terminator
       // arrives, exactly like OSC (F139). The old fall-through parsed a
       // split-read introducer as an Alt+letter chord and then typed the

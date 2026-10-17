@@ -244,11 +244,9 @@ extension InputReader {
             if !pendingMouseEvents.isEmpty {
               flushPendingMouseEvents()
             }
-            // An idle poll is the WASI equivalent of the escape-disambiguation
-            // timeout: a lone ESC that has not been followed by a continuation
-            // byte is committed to a bare Escape. `flushEscape()` is a no-op
-            // unless the parser is holding one.
-            for event in decoder.flushEscape() {
+            // A read would-block is not itself an escape timeout. Keep
+            // fragmented input until the shared quiet interval expires.
+            for event in decoder.flushEscapeIfIdle() {
               continuation.yield(event)
             }
             try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
@@ -322,7 +320,7 @@ extension InputReader {
           case .wouldBlock:
             // An idle poll is the WASI escape-disambiguation timeout: commit a
             // lone buffered ESC to a bare Escape (no-op unless one is pending).
-            for event in decoder.flushEscape() {
+            for event in decoder.flushEscapeIfIdle() {
               continuation.yield(event)
             }
             try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
@@ -424,7 +422,7 @@ extension InputReader {
           if !pendingMouseEvents.isEmpty {
             flushPendingMouseEvents()
           }
-          for event in decoder.flushEscape() {
+          for event in decoder.flushEscapeIfIdle() {
             continuation.yield(event)
           }
           try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
@@ -495,7 +493,7 @@ extension InputReader {
           case .wouldBlock:
             break
           }
-          for event in decoder.flushEscape() {
+          for event in decoder.flushEscapeIfIdle() {
             continuation.yield(event)
           }
           try? await Task.sleep(nanoseconds: backoff.delayNanoseconds)
@@ -560,6 +558,7 @@ extension InputReader {
         // the bare Escape. Both closures run on `queue`, so the shared `decoder`
         // and `scheduledEscapeFlush` need no extra synchronization.
         let flushPendingEscape = {
+          flushPendingMouseEvents()
           scheduledEscapeFlush?.cancel()
           scheduledEscapeFlush = nil
           for event in decoder.flushEscape() {
@@ -573,9 +572,7 @@ extension InputReader {
             scheduledEscapeFlush = nil
             return
           }
-          guard scheduledEscapeFlush == nil else {
-            return
-          }
+          scheduledEscapeFlush?.cancel()
           let workItem = DispatchWorkItem {
             flushPendingEscape()
           }
@@ -701,9 +698,7 @@ extension InputReader {
             scheduledEscapeFlush = nil
             return
           }
-          guard scheduledEscapeFlush == nil else {
-            return
-          }
+          scheduledEscapeFlush?.cancel()
           let workItem = DispatchWorkItem {
             scheduledEscapeFlush = nil
             for event in decoder.flushEscape() {

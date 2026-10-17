@@ -60,7 +60,7 @@ struct ControlChannelGateTests {
     )
   }
 
-  @Test("with the channel off, Ctrl+^ stays inert and following input types normally")
+  @Test("with the channel off, Ctrl+^ is a key and following input types normally")
   func channelOffKeepsTypedInputFlowing() {
     var decoder = makeDecoder(controlChannelEnabled: false)
     // A user types Ctrl+^ (0x1E), then "hi" arrives on the next read. With
@@ -68,6 +68,7 @@ struct ControlChannelGateTests {
     // byte into its command buffer until the next newline — the typed text
     // vanished.
     let control = decoder.decode([0x1E])
+    #expect(control.events == [.key(.init(.character("^"), modifiers: .ctrl))])
     #expect(control.controlMessages.isEmpty)
     let typed = decoder.decode(Array("hi".utf8))
     #expect(typed.controlMessages.isEmpty)

@@ -556,3 +556,16 @@ off. See <doc:Environment-Variables> and <doc:Performance-For-App-Authors>.
 - <doc:Running-Apps>
 - <doc:Host-Integration>
 - <doc:TerminalEmbedding>
+
+## Injected input delivery
+
+Injected byte input, semantic events, pointer coalescing, and escape timeout
+results enter one ordered delivery queue. A single drain owns callbacks; a
+callback may send more input, detach its consumer, or finish the source without
+creating a second drain. EOF fences new sends, resolves pending parser input,
+and follows all accepted events. Consumer detachment retires its timer tokens
+while retaining unfinished parser input for the next consumer.
+
+All readers use the same escape idle interval. Ordinary read boundaries do not
+resolve incomplete input. Recovering an unfinished paste also resets the
+embedded control-record observer so subsequent host records remain controls.

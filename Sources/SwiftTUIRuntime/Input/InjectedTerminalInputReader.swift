@@ -1,25 +1,30 @@
 import Synchronization
 
 package final class InjectedTerminalInputReader: TerminalInputReading, Sendable {
-  package enum MouseFlushScheduling: Sendable {
-    case automatic
-    case manual
-  }
+  package enum MouseFlushScheduling: Sendable { case automatic, manual }
 
   private struct State: Sendable {
     var parser: TerminalInputParser
     var controlParser = ControlMessageParser()
     var continuation: AsyncStream<InputEvent>.Continuation?
     var continuationGeneration: UInt64 = 0
+    var directHandler: (@Sendable (InputEvent) -> Void)?
+    var directFinishHandler: (@Sendable () -> Void)?
     var pendingEvents: [InputEvent] = []
+    var nextEvent = 0
     var pendingMouseEvents: [InputEvent] = []
     var activeMouseFlushToken: UInt64?
     var nextMouseFlushToken: UInt64 = 0
     var activeEscapeFlushToken: UInt64?
     var nextEscapeFlushToken: UInt64 = 0
-    var directHandler: (@Sendable (InputEvent) -> Void)?
-    var directFinishHandler: (@Sendable () -> Void)?
     var finished = false
+    var draining = false
+    var hasConsumer: Bool { directHandler != nil || continuation != nil }
+  }
+
+  private enum Delivery {
+    case event(InputEvent, @Sendable (InputEvent) -> Void)
+    case end(@Sendable () -> Void)
   }
 
   private let state: Mutex<State>
@@ -36,376 +41,236 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     self.controlHandler = controlHandler
   }
 
-  package func send(
-    _ bytes: [UInt8]
-  ) {
-    let (messages, bufferedEvents, continuation, directHandler, escapeFlushToken):
-      (
-        [TerminalControlMessage],
-        [InputEvent],
-        AsyncStream<InputEvent>.Continuation?,
-        (@Sendable (InputEvent) -> Void)?,
-        UInt64?
-      ) = state.withLock { state in
-        guard !state.finished else {
-          return (
-            [],
-            [],
-            nil,
-            nil,
-            nil
-          )
+  package func send(_ bytes: [UInt8]) {
+    let result = state.withLock { state -> ([TerminalControlMessage], UInt64?, UInt64?) in
+      guard !state.finished else { return ([], nil, nil) }
+      let filtered = state.controlParser.feed(bytes)
+      let events = state.parser.feed(filtered.payload)
+      let mouseToken = append(events, to: &state)
+      // This is an idle deadline: continued input renews it, including a
+      // paste arriving in several reads over a slow connection.
+      state.activeEscapeFlushToken = nil
+      let escapeToken = armEscapeFlush(&state)
+      return (filtered.messages, mouseToken, escapeToken)
+    }
+    for message in result.0 { controlHandler(message) }
+    scheduleMouseFlush(result.1)
+    scheduleEscapeFlush(result.2)
+    drain()
+  }
+
+  package func send(_ event: InputEvent) { send([event]) }
+
+  package func send(_ events: [InputEvent]) {
+    guard !events.isEmpty else { return }
+    let token = state.withLock { state -> UInt64? in
+      guard !state.finished else { return nil }
+      state.controlParser.endPendingPaste()
+      let pending = state.parser.flush()
+      state.activeEscapeFlushToken = nil
+      return append(pending + events, to: &state)
+    }
+    scheduleMouseFlush(token)
+    drain()
+  }
+
+  /// One queue owns delivery across stream/direct handoffs, timer callbacks,
+  /// and EOF. Callbacks run outside the lock and may reenter any reader method.
+  /// Reentrant sends and finish append work to the same drain, so EOF cannot
+  /// overtake accepted input or be followed by a detached batch's callbacks.
+  private func drain() {
+    let acquired = state.withLock { state in
+      guard !state.draining, state.hasConsumer else { return false }
+      state.draining = true
+      return true
+    }
+    guard acquired else { return }
+    while let delivery = state.withLock({ state -> Delivery? in
+      if state.nextEvent < state.pendingEvents.count, state.hasConsumer {
+        let event = state.pendingEvents[state.nextEvent]
+        state.nextEvent += 1
+        if let handler = state.directHandler { return .event(event, handler) }
+        if let continuation = state.continuation {
+          return .event(event, { continuation.yield($0) })
         }
-
-        let filtered = state.controlParser.feed(bytes)
-        let events = state.parser.feed(filtered.payload)
-        let directHandler = state.directHandler
-        if directHandler == nil && state.continuation == nil {
-          state.pendingEvents.append(contentsOf: events)
+      }
+      if state.nextEvent == state.pendingEvents.count {
+        state.pendingEvents.removeAll(keepingCapacity: true)
+        state.nextEvent = 0
+        if state.finished, state.hasConsumer {
+          let continuation = state.continuation
+          let onFinish = state.directFinishHandler
+          state.continuation = nil
+          state.directHandler = nil
+          state.directFinishHandler = nil
+          return .end {
+            continuation?.finish()
+            onFinish?()
+          }
         }
-        let hasConsumer = directHandler != nil || state.continuation != nil
-        let escapeFlushToken = armEscapeFlush(&state, hasConsumer: hasConsumer)
-        return (
-          filtered.messages,
-          events,
-          directHandler == nil ? state.continuation : nil,
-          directHandler,
-          escapeFlushToken
-        )
       }
-
-    for message in messages {
-      controlHandler(message)
-    }
-
-    defer { scheduleEscapeFlush(escapeFlushToken) }
-
-    if let directHandler {
-      for event in bufferedEvents {
-        directHandler(event)
+      state.draining = false
+      return nil
+    }) {
+      switch delivery {
+      case .event(let event, let handler): handler(event)
+      case .end(let finish): finish()
       }
-      return
-    }
-
-    guard continuation != nil else {
-      return
-    }
-
-    for event in bufferedEvents {
-      yieldInjectedEvent(event)
     }
   }
 
-  package func send(
-    _ event: InputEvent
-  ) {
-    let (continuation, directHandler):
-      (
-        AsyncStream<InputEvent>.Continuation?,
-        (@Sendable (InputEvent) -> Void)?
-      ) = state.withLock { state in
-        guard !state.finished else {
-          return (
-            nil as AsyncStream<InputEvent>.Continuation?,
-            nil as (@Sendable (InputEvent) -> Void)?
-          )
+  /// Append through the same pointer ordering barrier on every ingress path.
+  /// Direct delivery remains uncoalesced, as required by the synchronous pump.
+  private func append(_ events: [InputEvent], to state: inout State) -> UInt64? {
+    var token: UInt64?
+    for event in events {
+      if state.directHandler == nil, state.continuation != nil,
+        case .mouse(let mouse) = event, mouse.isCoalescible
+      {
+        state.pendingMouseEvents.append(event)
+        if state.activeMouseFlushToken == nil {
+          state.nextMouseFlushToken &+= 1
+          state.activeMouseFlushToken = state.nextMouseFlushToken
+          token = state.activeMouseFlushToken
         }
-
-        if let directHandler = state.directHandler {
-          return (nil, directHandler)
-        }
-
-        guard let continuation = state.continuation else {
-          state.pendingEvents.append(event)
-          return (nil, nil)
-        }
-
-        return (continuation, nil)
+      } else {
+        _ = appendPendingMouse(&state)
+        state.pendingEvents.append(event)
       }
-
-    if let directHandler {
-      directHandler(event)
-      return
     }
-
-    guard continuation != nil else {
-      return
-    }
-
-    yieldInjectedEvent(event)
+    return token
   }
 
-  /// Routes input to `handler` instead of the ``inputEvents()`` stream,
-  /// starting with the events buffered before any consumer attached, and
-  /// reports the end of input to `onFinish` exactly once: from ``finish()``,
-  /// or right away when the reader has already finished. This is the direct
-  /// path's counterpart of the stream finishing. Both closures run outside
-  /// the lock, so they may re-enter `send`.
-  /// ``clearDirectHandler()`` detaches both.
+  @discardableResult
+  private func appendPendingMouse(_ state: inout State) -> [InputEvent] {
+    let events = coalescedInputEvents(state.pendingMouseEvents)
+    state.pendingMouseEvents.removeAll(keepingCapacity: true)
+    state.activeMouseFlushToken = nil
+    state.pendingEvents.append(contentsOf: events)
+    return events
+  }
+
   package func installDirectHandler(
     _ handler: @escaping @Sendable (InputEvent) -> Void,
     onFinish: @escaping @Sendable () -> Void
   ) {
-    let (pendingEvents, isFinished) = state.withLock { state in
-      let pendingEvents = state.pendingEvents
-      state.pendingEvents.removeAll(keepingCapacity: true)
-      if !state.finished {
-        state.directHandler = handler
-        state.directFinishHandler = onFinish
-      }
-      return (pendingEvents, state.finished)
+    let token = state.withLock { state in
+      _ = appendPendingMouse(&state)
+      state.directHandler = handler
+      state.directFinishHandler = onFinish
+      state.activeEscapeFlushToken = nil
+      return armEscapeFlush(&state)
     }
-    for event in pendingEvents {
-      handler(event)
-    }
-    if isFinished {
-      onFinish()
-    }
+    scheduleEscapeFlush(token)
+    drain()
   }
 
   package func clearDirectHandler() {
-    state.withLock { state in
+    let token = state.withLock { state in
       state.directHandler = nil
       state.directFinishHandler = nil
+      state.activeEscapeFlushToken = nil
+      return armEscapeFlush(&state)
     }
-  }
-
-  package func send(
-    _ events: [InputEvent]
-  ) {
-    guard !events.isEmpty else {
-      return
-    }
-
-    for event in events {
-      send(event)
-    }
+    scheduleEscapeFlush(token)
+    drain()
   }
 
   package func finish() {
-    let (continuation, pendingMouseEvents, directFinishHandler):
-      (
-        AsyncStream<InputEvent>.Continuation?,
-        [InputEvent],
-        (@Sendable () -> Void)?
-      ) = state.withLock { state in
-        guard !state.finished else {
-          return (nil, [], nil)
-        }
-
-        state.finished = true
-        let continuation = state.continuation
-        state.continuation = nil
-        state.directHandler = nil
-        let directFinishHandler = state.directFinishHandler
-        state.directFinishHandler = nil
-        let pendingMouseEvents = coalescedInputEvents(state.pendingMouseEvents)
-        state.pendingMouseEvents.removeAll(keepingCapacity: true)
-        state.activeMouseFlushToken = nil
-        state.activeEscapeFlushToken = nil
-        return (continuation, pendingMouseEvents, directFinishHandler)
-      }
-
-    for event in pendingMouseEvents {
-      continuation?.yield(event)
+    state.withLock { state in
+      guard !state.finished else { return }
+      state.finished = true
+      state.controlParser.endPendingPaste()
+      let events = state.parser.flush()
+      _ = append(events, to: &state)
+      _ = appendPendingMouse(&state)
+      state.activeEscapeFlushToken = nil
     }
-    continuation?.finish()
-    directFinishHandler?()
-  }
-
-  @discardableResult
-  package func flushPendingCoalescedMouseEvents() -> [InputEvent] {
-    let (continuation, flushedMouseEvents) = flushPendingMouseEvents()
-    for event in flushedMouseEvents {
-      continuation?.yield(event)
-    }
-    return flushedMouseEvents
+    drain()
   }
 
   package func inputEvents() -> AsyncStream<InputEvent> {
     makeManagedAsyncStream { continuation in
-      let (generation, shouldFinish, pendingEvents) = self.state.withLock { state in
+      let (generation, token) = self.state.withLock { state in
         state.continuationGeneration &+= 1
         state.continuation = continuation
-        let pendingEvents = state.pendingEvents
-        state.pendingEvents.removeAll(keepingCapacity: true)
-        return (
-          state.continuationGeneration,
-          state.finished,
-          pendingEvents
-        )
+        state.activeEscapeFlushToken = nil
+        return (state.continuationGeneration, self.armEscapeFlush(&state))
       }
-
-      for event in pendingEvents {
-        continuation.yield(event)
-      }
-
-      if shouldFinish {
-        continuation.finish()
-        return { _ in }
-      }
-
+      self.scheduleEscapeFlush(token)
+      self.drain()
       return { _ in
-        self.state.withLock { state in
-          guard state.continuationGeneration == generation else {
-            return
-          }
+        let token = self.state.withLock { state -> UInt64? in
+          guard state.continuationGeneration == generation else { return nil }
           state.continuation = nil
-          state.activeMouseFlushToken = nil
+          // Preserve admitted input across a consumer handoff. A retired
+          // timer cannot drain the parser while nobody owns delivery.
+          _ = self.appendPendingMouse(&state)
           state.activeEscapeFlushToken = nil
+          return self.armEscapeFlush(&state)
         }
+        self.scheduleEscapeFlush(token)
+        self.drain()
       }
     }
   }
 
-  private func yieldInjectedEvent(
-    _ event: InputEvent
-  ) {
-    switch event {
-    case .mouse(let mouseEvent) where mouseEvent.isCoalescible:
-      scheduleCoalescedMouseFlush(for: .mouse(mouseEvent))
-    default:
-      let (continuation, flushedMouseEvents) = flushPendingMouseEvents()
-      for flushedEvent in flushedMouseEvents {
-        continuation?.yield(flushedEvent)
-      }
-      let currentContinuation = state.withLock { $0.continuation }
-      currentContinuation?.yield(event)
-    }
+  @discardableResult
+  package func flushPendingCoalescedMouseEvents() -> [InputEvent] {
+    flushMouse(matching: nil)
   }
 
-  private func scheduleCoalescedMouseFlush(
-    for event: InputEvent
-  ) {
-    let token: UInt64? = state.withLock { state in
-      state.pendingMouseEvents.append(event)
-      guard state.activeMouseFlushToken == nil else {
-        return nil
-      }
-
-      state.nextMouseFlushToken += 1
-      let token = state.nextMouseFlushToken
-      state.activeMouseFlushToken = token
-      return token
+  private func flushMouse(matching token: UInt64?) -> [InputEvent] {
+    let events = state.withLock { state in
+      if let token, state.activeMouseFlushToken != token { return [InputEvent]() }
+      return appendPendingMouse(&state)
     }
+    drain()
+    return events
+  }
 
-    guard let token else {
-      return
-    }
-    guard mouseFlushScheduling == .automatic else {
-      return
-    }
-
+  private func scheduleMouseFlush(_ token: UInt64?) {
+    guard let token, mouseFlushScheduling == .automatic else { return }
     Task { [weak self] in
-      try? await Task.sleep(
-        nanoseconds: UInt64(InputReaderTiming.mouseEventFlushDelayMilliseconds) * 1_000_000
-      )
-      let (continuation, flushedMouseEvents) =
-        self?.flushPendingMouseEvents(
-          matching: token
-        ) ?? (nil, [])
-      for flushedEvent in flushedMouseEvents {
-        continuation?.yield(flushedEvent)
-      }
+      try? await Task.sleep(for: .milliseconds(InputReaderTiming.mouseEventFlushDelayMilliseconds))
+      _ = self?.flushMouse(matching: token)
     }
   }
 
-  private func flushPendingMouseEvents(
-    matching token: UInt64? = nil
-  ) -> (
-    AsyncStream<InputEvent>.Continuation?,
-    [InputEvent]
-  ) {
-    state.withLock { state in
-      if let token, state.activeMouseFlushToken != token {
-        return (state.continuation, [])
-      }
-
-      let continuation = state.continuation
-      let flushedMouseEvents = coalescedInputEvents(state.pendingMouseEvents)
-      state.pendingMouseEvents.removeAll(keepingCapacity: true)
-      state.activeMouseFlushToken = nil
-      return (continuation, flushedMouseEvents)
-    }
-  }
-
-  // MARK: - Escape disambiguation (vim `ttimeoutlen`)
-
-  /// Mints an escape-flush token when the parser is holding a lone ESC and a
-  /// consumer is attached; returns `nil` (and releases any pending token) once
-  /// a continuation byte has completed or advanced the sequence. Mirrors the
-  /// mouse-flush schedule-once invariant so a token is only re-armed after the
-  /// previous one resolves. Must be called with `state` locked.
-  private func armEscapeFlush(
-    _ state: inout State,
-    hasConsumer: Bool
-  ) -> UInt64? {
-    guard state.parser.isAwaitingEscapeDisambiguation, hasConsumer else {
+  private func armEscapeFlush(_ state: inout State) -> UInt64? {
+    guard !state.finished, state.hasConsumer, state.parser.isAwaitingEscapeDisambiguation else {
       state.activeEscapeFlushToken = nil
       return nil
     }
-    guard state.activeEscapeFlushToken == nil else {
-      return nil
-    }
-    state.nextEscapeFlushToken += 1
-    let token = state.nextEscapeFlushToken
-    state.activeEscapeFlushToken = token
-    return token
+    guard state.activeEscapeFlushToken == nil else { return nil }
+    state.nextEscapeFlushToken &+= 1
+    state.activeEscapeFlushToken = state.nextEscapeFlushToken
+    return state.activeEscapeFlushToken
   }
 
-  private func scheduleEscapeFlush(
-    _ token: UInt64?
-  ) {
-    guard let token, mouseFlushScheduling == .automatic else {
-      return
-    }
-
+  private func scheduleEscapeFlush(_ token: UInt64?) {
+    guard let token, mouseFlushScheduling == .automatic else { return }
     Task { [weak self] in
       try? await Task.sleep(
-        nanoseconds: UInt64(InputReaderTiming.escapeDisambiguationDelayMilliseconds) * 1_000_000
-      )
+        for: .milliseconds(InputReaderTiming.escapeDisambiguationDelayMilliseconds))
       self?.flushEscape(matching: token)
     }
   }
 
-  /// Drains a manually scheduled disambiguation, if its consumer still owns it.
   package func flushPendingEscapeDisambiguation() {
-    if let token = state.withLock({ $0.activeEscapeFlushToken }) {
-      flushEscape(matching: token)
-    }
+    if let token = state.withLock({ $0.activeEscapeFlushToken }) { flushEscape(matching: token) }
   }
 
-  private func flushEscape(
-    matching token: UInt64
-  ) {
-    let (continuation, directHandler, events):
-      (
-        AsyncStream<InputEvent>.Continuation?,
-        (@Sendable (InputEvent) -> Void)?,
-        [InputEvent]
-      ) = state.withLock { state in
-        guard state.activeEscapeFlushToken == token else {
-          return (nil, nil, [])
-        }
-        state.activeEscapeFlushToken = nil
-        // A continuation byte may have completed the sequence after the token
-        // was minted; `flush()` returns empty in that case.
-        return (state.continuation, state.directHandler, state.parser.flush())
+  private func flushEscape(matching token: UInt64) {
+    state.withLock { state in
+      guard state.activeEscapeFlushToken == token, state.hasConsumer, !state.finished else {
+        return
       }
-
-    guard !events.isEmpty else {
-      return
+      state.activeEscapeFlushToken = nil
+      state.controlParser.endPendingPaste()
+      let events = state.parser.flush()
+      _ = append(events, to: &state)
     }
-
-    if let directHandler {
-      for event in events {
-        directHandler(event)
-      }
-      return
-    }
-
-    for event in events {
-      continuation?.yield(event)
-    }
+    drain()
   }
 }

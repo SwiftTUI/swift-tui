@@ -13,6 +13,13 @@ package struct ControlMessageParser {
 
   package init() {}
 
+  /// The byte decoder has resolved a pending paste at an idle/EOF boundary.
+  /// Its framing observer must leave the same transaction at that boundary.
+  package mutating func endPendingPaste() {
+    isPasting = false
+    pasteBoundaryOffset = 0
+  }
+
   package mutating func feed(
     _ bytes: [UInt8]
   ) -> (payload: [UInt8], messages: [TerminalControlMessage]) {

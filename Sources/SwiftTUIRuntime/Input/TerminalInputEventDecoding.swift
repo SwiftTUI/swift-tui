@@ -6,6 +6,7 @@ struct TerminalInputDecodedBatch<Event: Sendable> {
 struct TerminalInputEventDecoder<Event: Sendable> {
   private var parser: TerminalInputParser
   private var controlParser = ControlMessageParser()
+  private var lastInputAt: ContinuousClock.Instant?
   private let controlChannelEnabled: Bool
   private let currentMouseCoordinateMode: (@Sendable () -> MouseCoordinateMode)?
   private let transform: @Sendable (inout TerminalInputParser, [UInt8]) -> [Event]
@@ -42,6 +43,7 @@ struct TerminalInputEventDecoder<Event: Sendable> {
     _ bytes: [UInt8]
   ) -> TerminalInputDecodedBatch<Event> {
     refreshMouseCoordinateMode()
+    if !bytes.isEmpty { lastInputAt = .now }
     guard controlChannelEnabled else {
       return TerminalInputDecodedBatch(
         controlMessages: [],
@@ -60,6 +62,7 @@ struct TerminalInputEventDecoder<Event: Sendable> {
   /// receive it. Returns an empty array when no lone ESC is pending.
   mutating func flushEscape() -> [Event] {
     refreshMouseCoordinateMode()
+    controlParser.endPendingPaste()
     return flushTransform(&parser)
   }
 

@@ -111,7 +111,10 @@ package final class WebSocketInputReader: ScopedInputReading, Sendable {
       guard state.parserToken == token, state.parser.hasPendingTerminalInput else { return }
       let generation = state.idleGeneration
       state.idleTask = Task { [weak self] in
-        do { try await Task.sleep(for: .milliseconds(25)) } catch { return }
+        do {
+          try await Task.sleep(
+            for: .milliseconds(InputReaderTiming.escapeDisambiguationDelayMilliseconds))
+        } catch { return }
         guard let self else { return }
         await self.enqueueInput {
           let records = self.state.withLock { state -> [WebSurfaceInputRecord] in
