@@ -194,6 +194,11 @@ package final class ViewGraph {
   private var dependencyIndex: DependencyIndex
   private var frameCommit: FrameCommitState
 
+  package var tracksHotReloadDeclarations: Bool {
+    get { frameCommit.tracksHotReloadDeclarations }
+    set { frameCommit.tracksHotReloadDeclarations = newValue }
+  }
+
   package var hotReloadReplay: HotReloadReplay? {
     get { frameCommit.hotReloadReplay }
     set { frameCommit.hotReloadReplay = newValue }
@@ -835,6 +840,7 @@ package final class ViewGraph {
 
   package func debugTotalStateSnapshot() -> DebugTotalStateSnapshot {
     DebugTotalStateSnapshot(
+      tracksHotReloadDeclarations: tracksHotReloadDeclarations,
       hotReloadReplay: hotReloadReplay,
       hotReloadTypeAliases: hotReloadTypeAliases,
       root: root?.identity,

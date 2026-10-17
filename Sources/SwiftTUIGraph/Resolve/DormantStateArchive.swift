@@ -14,6 +14,7 @@ package struct DormantStateArchive {
     package var identity: Identity
     package var entityIdentity: EntityIdentity?
     package var stateSlots: [StateSlotIdentifier: DormantStateSlotSnapshot]
+    package var declarationNames: [StateSlotIdentifier: [String]] = [:]
   }
 
   package var records: [NodeRecord]
@@ -160,7 +161,10 @@ extension ViewGraph {
           .init(
             identity: node.identity,
             entityIdentity: entityIdentity,
-            stateSlots: persistentSlots
+            stateSlots: persistentSlots,
+            declarationNames: node.hotReloadDeclarationNames.filter {
+              persistentSlots[$0.key] != nil
+            }
           )
         )
       }
@@ -192,6 +196,7 @@ extension ViewGraph {
       // that built it -- taking its `.task`/lifecycle registrations with it.
       // Routing is authored adoption's to decide; seeding is not adoption.
       let node = prepareDynamicPropertyUpdate(identity: record.identity)
+      node.hotReloadDeclarationNames.merge(record.declarationNames) { _, incoming in incoming }
       for (identifier, slot) in record.stateSlots {
         node.restoreStateSlot(
           identifier,

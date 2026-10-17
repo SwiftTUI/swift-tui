@@ -44,7 +44,8 @@ extension ViewNode {
     /// direct update. A successful reuse or outermost fresh evaluation
     /// reconciles the retained token map to this set, revoking wrappers that
     /// disappeared even when one node evaluates more than once in a frame.
-    package var dynamicPropertyLeaseKeysSeenThisUpdate: Set<DynamicPropertyLeaseRegistrationKey> = []
+    package var dynamicPropertyLeaseKeysSeenThisUpdate: Set<DynamicPropertyLeaseRegistrationKey> =
+      []
     /// Stable traversal occurrence within one direct-update census. This
     /// disambiguates repeated same-type wrappers collapsed onto one graph node
     /// (for example two transparent modifiers with the same stored field).
@@ -117,6 +118,7 @@ extension ViewNode {
   /// nonisolated.
   @MainActor
   package struct PersistentState {
+    package var hotReloadDeclarationNames: [StateSlotIdentifier: [String]] = [:]
     package var stateSlots: [StateSlotIdentifier: AnyStateSlot] = [:]
     package var dependencies: DependencySet = .init()
     package var lifecycleState: NodeLifecycleState = .alive

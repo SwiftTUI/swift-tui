@@ -27,6 +27,9 @@ package indirect enum SnapshotValue: Equatable, Sendable {
 }
 
 package struct SnapshotCodingLimits: Sendable {
+  /// Reload snapshots come from the running application's own state. Keep the
+  /// recursion guard, but do not reset ordinary state based on transport budgets.
+  package static let hotReload = Self(maximumValues: .max, maximumUTF8Bytes: .max)
   package var maximumDepth: Int = 128
   package var maximumValues: Int = 65_536
   package var maximumUTF8Bytes: Int = 4_194_304

@@ -13,6 +13,7 @@ package struct HotReloadDiagnostic: Equatable, Sendable {
 package struct HotReloadOwnerSchema: Equatable, Sendable {
   package var identity: Identity
   package var slots: [StateSlotIdentifier: String]
+  package var declarationNames: [StateSlotIdentifier: [String]] = [:]
 }
 
 package struct HotReloadSnapshot: Equatable, Sendable {
@@ -24,6 +25,7 @@ package struct HotReloadSnapshot: Equatable, Sendable {
     package var isDormant = false
     package var participatesInSchema = true
     package var requiresDormantSchema = false
+    package var declarationName: [String]? = nil
   }
   package var sourceRoot: Identity
   package var entries: [Entry]
@@ -50,8 +52,10 @@ package struct HotReloadReplay: Equatable, Sendable {
         snapshot.entries[index].typeName, aliases: typeAliases)
     }
     let owners = owners.map { owner in
-      HotReloadOwnerSchema(identity: owner.identity,
-        slots: owner.slots.mapValues { HotReloadTypeNames.canonical($0, aliases: typeAliases) })
+      HotReloadOwnerSchema(
+        identity: owner.identity,
+        slots: owner.slots.mapValues { HotReloadTypeNames.canonical($0, aliases: typeAliases) },
+        declarationNames: owner.declarationNames)
     }
     self.destinationRoot = destinationRoot
     let sourceGroups = Dictionary(
@@ -91,27 +95,13 @@ package struct HotReloadReplay: Equatable, Sendable {
       let sourceSlots = Dictionary(grouping: entries, by: { $0.address.slot })
       guard sourceSlots.values.allSatisfy({ $0.count == 1 }) else { continue }
       ownerMatches[source] = target
-      let paths = Set(entries.map { $0.address.slot.path })
-      for path in paths {
-        let old = entries.filter { $0.address.slot.path == path }
-          .sorted { $0.address.slot.ordinal < $1.address.slot.ordinal }
-        let new = schema.slots.keys.filter { $0.path == path }.sorted { $0.ordinal < $1.ordinal }
-        let exactSet = Set(old.map { $0.address.slot }) == Set(new)
-        // Synthetic runtime slots have no declaration-rank meaning.
-        let canRank =
-          old.count == new.count
-          && old.allSatisfy { $0.address.slot.ordinal >= 0 }
-          && new.allSatisfy { $0.ordinal >= 0 }
-        guard exactSet || canRank, old.count == new.count else { continue }
-        guard zip(old, new).allSatisfy({ entry, slot in entry.typeName == schema.slots[slot] })
-        else { continue }
-        for (entry, slot) in zip(old, new) {
-          guard entry.value != nil else { continue }
-          pending[.init(owner: target, slot: slot)] = entry
-          accepted.insert(entry.address)
-        }
+      for (entry, slot) in Self.matchingSlots(entries, schema: schema) {
+        guard entry.value != nil else { continue }
+        pending[.init(owner: target, slot: slot)] = entry
+        accepted.insert(entry.address)
       }
     }
+
     for entry in snapshot.entries where !accepted.contains(entry.address) {
       if entry.isDormant, targetGroups[entry.address.owner] == nil,
         !snapshot.ambiguousOwners.contains(entry.address.owner),
@@ -119,7 +109,8 @@ package struct HotReloadReplay: Equatable, Sendable {
         entry.value != nil
       {
         // Inactive payloads have no destination tree to rehearse. Keep only
-        // exact keys; type-check when that payload first materializes.
+        // exact keys; validate declarations when that payload first materializes.
+        // A later non-exact owner reports the refusal instead of retaining a silent drop.
         var deferred = entry
         deferred.requiresDormantSchema = true
         pending[entry.address] = deferred
@@ -134,8 +125,52 @@ package struct HotReloadReplay: Equatable, Sendable {
     sortDiagnostics()
   }
 
+  /// Names identify authored declarations independently of source-line movement.
+  /// Legacy/internal slots without labels retain exact or whole-group rank rules.
+  package static func matchingSlots(
+    _ entries: [HotReloadSnapshot.Entry], schema: HotReloadOwnerSchema
+  ) -> [(HotReloadSnapshot.Entry, StateSlotIdentifier)] {
+    var result: [(HotReloadSnapshot.Entry, StateSlotIdentifier)] = []
+    let namedSources = Dictionary(
+      grouping: entries.filter { $0.declarationName != nil }, by: { $0.declarationName! })
+    let namedTargets = Dictionary(
+      grouping: schema.declarationNames.keys, by: { schema.declarationNames[$0]! })
+    for (name, sources) in namedSources {
+      guard sources.count == 1, let entry = sources.first,
+        let targets = namedTargets[name], targets.count == 1, let slot = targets.first,
+        entry.typeName == schema.slots[slot]
+      else { continue }
+      result.append((entry, slot))
+    }
+    for path in Set(entries.filter { $0.declarationName == nil }.map { $0.address.slot.path }) {
+      let old = entries.filter { $0.address.slot.path == path && $0.declarationName == nil }
+        .sorted { $0.address.slot.ordinal < $1.address.slot.ordinal }
+      let new = schema.slots.keys.filter { $0.path == path && schema.declarationNames[$0] == nil }
+        .sorted { $0.ordinal < $1.ordinal }
+      let exactSet = Set(old.map { $0.address.slot }) == Set(new)
+      let canRank =
+        old.count == new.count
+        && old.allSatisfy { $0.address.slot.ordinal >= 0 }
+        && new.allSatisfy { $0.ordinal >= 0 }
+      if exactSet || canRank, old.count == new.count {
+        // Reserve the whole legacy rank group before considering overlapping ordinals.
+        if zip(old, new).allSatisfy({ $0.typeName == schema.slots[$1] }) {
+          result.append(contentsOf: zip(old, new))
+        }
+      } else {
+        for entry in old
+        where new.contains(entry.address.slot)
+          && entry.typeName == schema.slots[entry.address.slot]
+        {
+          result.append((entry, entry.address.slot))
+        }
+      }
+    }
+    return result
+  }
+
   /// A conservative single-wrapper edit: never erase entity or indexed sibling identity.
-  private static func differsByOneWrapper(_ lhs: Identity, _ rhs: Identity) -> Bool {
+  package static func differsByOneWrapper(_ lhs: Identity, _ rhs: Identity) -> Bool {
     let shorter = lhs.components.count < rhs.components.count ? lhs.components : rhs.components
     let longer = lhs.components.count < rhs.components.count ? rhs.components : lhs.components
     guard longer.count == shorter.count + 1 else { return false }
@@ -171,9 +206,11 @@ package struct HotReloadReplay: Equatable, Sendable {
   package static func decode<Value>(
     _ entry: HotReloadSnapshot.Entry, typeAliases: [String: String] = [:]
   ) throws -> Value {
-    guard entry.typeName == HotReloadTypeNames.canonical(String(reflecting: Value.self), aliases: typeAliases),
+    guard
+      entry.typeName
+        == HotReloadTypeNames.canonical(String(reflecting: Value.self), aliases: typeAliases),
       let type = Value.self as? any Decodable.Type, let value = entry.value,
-      let decoded = try SnapshotCoding.decode(type, from: value) as? Value
+      let decoded = try SnapshotCoding.decode(type, from: value, limits: .hotReload) as? Value
     else { throw SnapshotCodingError.incompatibleContainer }
     return decoded
   }
@@ -225,7 +262,8 @@ extension ViewGraph {
     // application Decodable code runs. It may read or write other live state.
     guard let entry = hotReloadReplay?.takeEntry(for: identity, slot: slot) else { return nil }
     do {
-      let decoded: Value = try HotReloadReplay.decode(entry, typeAliases: hotReloadReplay?.typeAliases ?? [:])
+      let decoded: Value = try HotReloadReplay.decode(
+        entry, typeAliases: hotReloadReplay?.typeAliases ?? [:])
       hotReloadReplay?.restoredCount += 1
       return decoded
     } catch {
@@ -240,7 +278,7 @@ extension ViewGraph {
     var ownerCounts: [Identity: Int] = [:]
     func capture(
       _ slot: AnyStateSlot, identifier: StateSlotIdentifier, identity: Identity,
-      dormant: Bool, depth: Int
+      dormant: Bool, depth: Int, declarationName: [String]?
     ) {
       guard let owner = HotReloadReplay.relative(identity, to: root) else { return }
       let address = HotReloadSlotAddress(owner: owner, slot: identifier)
@@ -250,13 +288,15 @@ extension ViewGraph {
           .init(
             address: address, typeName: slot.storedTypeDescription, value: value,
             isDormant: dormant,
-            participatesInSchema: slot.dormantPolicy.survivesDormancy))
+            participatesInSchema: slot.dormantPolicy.survivesDormancy,
+            declarationName: declarationName))
       } catch {
         entries.append(
           .init(
             address: address, typeName: slot.storedTypeDescription,
             failure: String(describing: error),
-            isDormant: dormant, participatesInSchema: slot.dormantPolicy.survivesDormancy))
+            isDormant: dormant, participatesInSchema: slot.dormantPolicy.survivesDormancy,
+            declarationName: declarationName))
       }
       let archives = slot.hotReloadNestedArchives()
       guard depth < 64 else {
@@ -278,7 +318,7 @@ extension ViewGraph {
           for (key, value) in record.stateSlots {
             capture(
               AnyStateSlot(restoringDormant: value), identifier: key, identity: record.identity,
-              dormant: true, depth: depth + 1)
+              dormant: true, depth: depth + 1, declarationName: record.declarationNames[key])
           }
         }
       }
@@ -289,7 +329,9 @@ extension ViewGraph {
         ownerCounts[owner, default: 0] += 1
       }
       for (identifier, slot) in node.stateSlots where slot.isInitialized {
-        capture(slot, identifier: identifier, identity: node.identity, dormant: false, depth: 0)
+        capture(
+          slot, identifier: identifier, identity: node.identity, dormant: false, depth: 0,
+          declarationName: node.hotReloadDeclarationNames[identifier])
       }
     }
     if hotReloadReplay?.destinationRoot == root {
@@ -317,7 +359,8 @@ extension ViewGraph {
       })
     else { throw HotReloadInstallationError.destinationIsNotFresh }
     hotReloadReplay = HotReloadReplay(
-      snapshot: snapshot, destinationRoot: destinationRoot, owners: owners, typeAliases: typeAliases)
+      snapshot: snapshot, destinationRoot: destinationRoot, owners: owners, typeAliases: typeAliases
+    )
   }
 
   package func finishHotReloadReplay(keepingDormant: Bool = false) -> [HotReloadDiagnostic] {

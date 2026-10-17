@@ -137,6 +137,7 @@ extension ViewGraph {
   /// it monotonic. See the matching per-node generation on ``ViewNode``.
   package struct FrameCommitState {
     package var hotReloadReplay: HotReloadReplay?
+    package var tracksHotReloadDeclarations = false
     package var hotReloadTypeAliases: [String: String] = [:]
     package var currentFrameID: UInt64 = 0
     /// O(1) content token for canonical inputs consumed by the animation

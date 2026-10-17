@@ -59,9 +59,14 @@ snapshots. Scroll offsets and inactive-tab values replay as well. References
 decode into new instances; old closures, task handles and application metadata
 never become replacement state. Non-Codable, transient, ambiguous or changed
 slot schemas reset to authored seeds and produce dropped-slot diagnostics.
-Uninitialized state uses the new seed. Exact structural owners win before the
-limited unique-wrapper and declaration-rank fallback rules. Entity identity and
-sibling position do not become interchangeable. Codable type names must agree;
+Uninitialized state uses the new seed. In-process snapshots have no byte or
+element-count cap; recursive Codable graphs are bounded to 128 levels. Exact structural owners win before the
+limited unique-wrapper fallback. Stored-property declaration names preserve
+state across line shifts, reorders, and added declarations. Internal slots without
+names use conservative exact-address or whole-group declaration-rank matching.
+Inactive owners that move through a wrapper are diagnosed when opened because
+unopened destinations cannot be proven unique. Entity identity and sibling
+position do not become interchangeable. Codable type names must agree;
 file-private or nested types whose reflected name changes may reset.
 
 Old lifecycle work retires before new lifecycle work starts. New bodies, actions

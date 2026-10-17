@@ -11,8 +11,15 @@ package enum HotReloadTypeNames {
       while index < bytes.count, isIdentifier(bytes[index]) { index += 1 }
       if index > start {
         let token = String(decoding: bytes[start..<index], as: UTF8.self)
-        if index < bytes.count, bytes[index] == 46, (start == 0 || bytes[start - 1] != 46),
-          let logical = aliases[token] {
+        let extensionPrefix = Array("(extension in ".utf8)
+        let isExtensionModule =
+          index < bytes.count && bytes[index] == 41
+          && start >= extensionPrefix.count
+          && bytes[(start - extensionPrefix.count)..<start].elementsEqual(extensionPrefix)
+        let isQualifiedModule =
+          index < bytes.count && bytes[index] == 46
+          && (start == 0 || bytes[start - 1] != 46)
+        if isQualifiedModule || isExtensionModule, let logical = aliases[token] {
           result.append(contentsOf: logical.utf8)
         } else {
           result.append(contentsOf: bytes[start..<index])

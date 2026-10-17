@@ -45,9 +45,7 @@ struct AdversarialSetBHotReloadTests {
       owners: [.init(identity: setBOwner, slots: [slot: hostName])], typeAliases: aliases)
     let restored: Int.SetBReloadExtensionPayload? = replay.value(
       for: setBAbsolute(setBOwner), slot: slot)
-    withKnownIssue(
-      "canonical() rewrites only module tokens followed by '.', so an '(extension in Module)' context keeps the image's ABI module name"
-    ) {
+    do {
       #expect(HotReloadTypeNames.canonical(imageName, aliases: aliases) == hostName, "\(imageName)")
       #expect(restored?.value == 9, "\(replay.diagnostics)")
     }
@@ -68,11 +66,13 @@ struct AdversarialSetBHotReloadTests {
       uniqueKeysWithValues: snapshot.entries.map { ($0.address.slot.ordinal, $0) })
     let array = try #require(entries[10])
     let text = try #require(entries[11])
-    withKnownIssue(
-      "SnapshotCodingLimits caps an archive at 65,536 values and 4 MiB of UTF-8; the DocC page states no bound, so the slots reset with a limitExceeded failure"
-    ) {
+    do {
       #expect(array.value != nil && array.failure == nil, "\(array.failure ?? "no failure")")
       #expect(text.value != nil && text.failure == nil, "\(text.failure ?? "no failure")")
+      let restoredArray: [Int] = try HotReloadReplay.decode(array)
+      let restoredText: String = try HotReloadReplay.decode(text)
+      #expect(restoredArray == Array(0..<70_000))
+      #expect(restoredText.utf8.count == 4_194_305)
     }
     #expect(throws: Never.self) { _ = try SnapshotCoding.encode(Array(0..<65_535)) }
     #expect(throws: SnapshotCodingError.limitExceeded) {
@@ -100,11 +100,9 @@ struct AdversarialSetBHotReloadTests {
     #expect(h.frame.contains("a=5 b=7"), "\(h.frame) \(h.session.lastReport)")
     #expect(h.session.lastReport.isEmpty, "\(h.session.lastReport)")
     try h.reload { SetBPairRoot(probe: probe, aLine: 1003, bLine: 1002) }
-    withKnownIssue(
-      "the declaration-rank fallback zips ordinals in sorted order and checks only type names, so reordering two same-typed @State declarations exchanges their values silently"
-    ) {
+    do {
       #expect(
-        h.frame.contains("a=5 b=7") || !h.session.lastReport.isEmpty,
+        h.frame.contains("a=5 b=7") && h.session.lastReport.isEmpty,
         "\(h.frame) \(h.session.lastReport)")
     }
   }
@@ -122,9 +120,7 @@ struct AdversarialSetBHotReloadTests {
     let newStateless = stateless.loop.focusTracker.currentFocusIdentity.flatMap {
       HotReloadReplay.relative($0, to: statelessRoot)
     }
-    withKnownIssue(
-      "focus rebase rides ownerMatches; without a stateful owner above the focused button the stale identity misses setFocus and updateRegions falls back to the first region"
-    ) {
+    do {
       #expect(
         newStateless.map { setBDiffersByOneComponent(oldStateless, $0) } == true,
         "\(oldStateless) -> \(String(describing: newStateless))")
@@ -170,9 +166,7 @@ struct AdversarialSetBHotReloadTests {
     try h.drain()
     let bOrdinal = StateSlotOrdinals.authored(line: 1022, column: 1)
     let reported = h.session.lastReport.contains { $0.address.slot.ordinal == bOrdinal }
-    withKnownIssue(
-      "dormant entries keep only exact keys, so the wrapper rule never reaches an inactive tab and finish(keepingDormant:) keeps the pending entry without a diagnostic"
-    ) {
+    do {
       #expect(h.frame.contains("B count=2") || reported, "\(h.frame) \(h.session.lastReport)")
     }
   }
@@ -191,9 +185,7 @@ struct AdversarialSetBHotReloadTests {
       destinationRoot: setBDestinationRoot,
       owners: [.init(identity: setBOwner, slots: [slot: intName, setBSlot(20): intName])])
     let restored: Int? = replay.value(for: setBAbsolute(setBOwner), slot: slot)
-    withKnownIssue(
-      "a changed declaration count refuses the whole path group even when the surviving slot's ordinal and type match exactly"
-    ) {
+    do {
       #expect(restored == 41, "\(replay.diagnostics)")
     }
 
@@ -209,11 +201,9 @@ struct AdversarialSetBHotReloadTests {
     #expect(h.frame.contains("extra=0"), "\(h.frame)")
     let countOrdinal = StateSlotOrdinals.authored(line: 1010, column: 1)
     #expect(
-      h.session.lastReport.contains { $0.address.slot.ordinal == countOrdinal },
-      "the drop is reported: \(h.session.lastReport)")
-    withKnownIssue(
-      "old.count != new.count refuses the exact-ordinal slot beside the new declaration"
-    ) {
+      !h.session.lastReport.contains { $0.address.slot.ordinal == countOrdinal },
+      "the surviving declaration is preserved: \(h.session.lastReport)")
+    do {
       #expect(h.frame.contains("count=3"), "\(h.frame) \(h.session.lastReport)")
     }
   }
@@ -359,9 +349,7 @@ struct AdversarialSetBHotReloadTests {
       _ = try SnapshotCoding.encode(SetBSilentRecord())
     }
     #expect(throws: Never.self) { _ = try JSONEncoder().encode(SetBDuplicateKeyRecord()) }
-    withKnownIssue(
-      "keyedChild reuses the stored node and store() refuses a non-empty node, so a type that writes one key twice throws incompatibleContainer where JSONEncoder keeps the last value"
-    ) {
+    do {
       let encoded = try SnapshotCoding.encode(SetBDuplicateKeyRecord())
       #expect(encoded == .object(["value": .signed(2)]), "\(encoded)")
     }

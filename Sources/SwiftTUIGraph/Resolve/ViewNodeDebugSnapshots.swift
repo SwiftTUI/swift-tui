@@ -45,6 +45,7 @@ extension ViewNode {
     package var hasStaleIslandDescendant: Bool
     package var hasForeignParentedChild: Bool
     package var children: [Identity]
+    package var hotReloadDeclarationNames: [StateSlotIdentifier: [String]]
     package var stateSlots: [StateSlotSnapshot]
     package var dependencies: DependencySet
     package var lifecycleState: NodeLifecycleState

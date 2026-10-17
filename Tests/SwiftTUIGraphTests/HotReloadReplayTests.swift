@@ -147,23 +147,31 @@ struct HotReloadReplayTests {
     let type = String(reflecting: ReloadModel.self)
     let parts = type.split(separator: ".", maxSplits: 1)
     let encoded = try SnapshotCoding.encode(ReloadModel(count: 42))
-    let address = HotReloadSlotAddress(owner: Identity(components: ["ID[Image.Type]"]), slot: slot(10))
+    let address = HotReloadSlotAddress(
+      owner: Identity(components: ["ID[Image.Type]"]), slot: slot(10))
     for permitsAlias in [false, true] {
       let graph = ViewGraph()
       try graph.installHotReloadReplay(
-        .init(sourceRoot: source, entries: [
-          .init(address: address, typeName: "Image." + parts[1], value: encoded)
-        ]), at: destination,
+        .init(
+          sourceRoot: source,
+          entries: [
+            .init(address: address, typeName: "Image." + parts[1], value: encoded)
+          ]), at: destination,
         owners: [.init(identity: address.owner, slots: [slot(10): type])],
         typeAliases: permitsAlias ? ["Image": String(parts[0])] : [:])
-      let restored: ReloadModel? = graph.restoredHotReloadValue(for: absolute(address.owner), slot: slot(10))
+      let restored: ReloadModel? = graph.restoredHotReloadValue(
+        for: absolute(address.owner), slot: slot(10))
       #expect(restored?.count == (permitsAlias ? 42 : nil))
     }
     let aliases = ["Image": "Logical"]
-    #expect(HotReloadTypeNames.canonical("Swift.Array<Image.Record>", aliases: aliases)
-      == "Swift.Array<Logical.Record>")
-    #expect(HotReloadTypeNames.canonical("OtherImage.Record", aliases: aliases) == "OtherImage.Record")
-    #expect(HotReloadTypeNames.canonical("Container.Image.Record", aliases: aliases) == "Container.Image.Record")
+    #expect(
+      HotReloadTypeNames.canonical("Swift.Array<Image.Record>", aliases: aliases)
+        == "Swift.Array<Logical.Record>")
+    #expect(
+      HotReloadTypeNames.canonical("OtherImage.Record", aliases: aliases) == "OtherImage.Record")
+    #expect(
+      HotReloadTypeNames.canonical("Container.Image.Record", aliases: aliases)
+        == "Container.Image.Record")
     #expect(HotReloadTypeNames.canonical("Image", aliases: aliases) == "Image")
   }
   private let source = Identity(components: ["App", "Generation[0]"])
@@ -206,6 +214,31 @@ struct HotReloadReplayTests {
     new.setStateSlot(ordinal: 10, value: 99)
     #expect(old.stateSlot(ordinal: 10, seed: 0) == 42)
     #expect(graph.finishHotReloadReplay().isEmpty)
+  }
+
+  @Test func declarationNamesOutliveOrdinalsAndRejectRenamedOrAmbiguousSlots() {
+    var a = entry(10, value: 7)
+    var b = entry(20, value: 9)
+    a.declarationName = ["_a"]
+    b.declarationName = ["_b"]
+    var replay = HotReloadReplay(
+      snapshot: .init(sourceRoot: source, entries: [a, b]),
+      destinationRoot: destination,
+      owners: [
+        .init(
+          identity: owner, slots: schema([10, 20, 30]).slots,
+          declarationNames: [slot(20): ["_a"], slot(10): ["_b"], slot(30): ["_new"]])
+      ])
+    let restoredA: Int? = replay.value(for: absolute(owner), slot: slot(20))
+    let restoredB: Int? = replay.value(for: absolute(owner), slot: slot(10))
+    #expect(restoredA == 7 && restoredB == 9 && replay.finish().isEmpty)
+    for names in [[slot(10): ["_renamed"]], [slot(10): ["_a"], slot(20): ["_a"]]] {
+      var rejected = HotReloadReplay(
+        snapshot: .init(sourceRoot: source, entries: [a]), destinationRoot: destination,
+        owners: [.init(identity: owner, slots: schema([10, 20]).slots, declarationNames: names)])
+      let value: Int? = rejected.value(for: absolute(owner), slot: slot(10))
+      #expect(value == nil && rejected.finish().count == 1)
+    }
   }
 
   @Test func shiftedOrdinalsReserveTheWholeGroup() {

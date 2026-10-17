@@ -5,6 +5,7 @@ extension ViewGraph {
   }
 
   package struct DebugTotalStateSnapshot: Equatable {
+    package var tracksHotReloadDeclarations: Bool
     package var hotReloadReplay: HotReloadReplay?
     package var hotReloadTypeAliases: [String: String]
     package var root: Identity?

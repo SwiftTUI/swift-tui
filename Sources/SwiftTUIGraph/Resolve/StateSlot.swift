@@ -204,7 +204,7 @@ package struct AnyStateSlot {
     guard case .value(let value, let type, _) = storage,
       type is any Decodable.Type, let encodable = value as? any Encodable
     else { throw HotReloadSlotCaptureError.notCodable }
-    return try SnapshotCoding.encode(encodable)
+    return try SnapshotCoding.encode(encodable, limits: .hotReload)
   }
 
   @MainActor package func hotReloadNestedArchives() -> [DormantStateArchive] {

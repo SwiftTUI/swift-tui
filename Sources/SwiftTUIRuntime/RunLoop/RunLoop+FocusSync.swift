@@ -283,7 +283,24 @@ extension RunLoop {
     }
     if let pending = hotReloadSession?.pendingFocus {
       hotReloadSession?.pendingFocus = nil
-      focusChanged = focusTracker.setFocus(to: pending) || focusChanged
+      let regions = renderedArtifacts.semanticSnapshot.focusRegions
+      let target: Identity?
+      if regions.contains(where: { $0.identity == pending }) {
+        target = pending
+      } else if let root = hotReloadSession?.generationRoot,
+        let source = HotReloadReplay.relative(pending, to: root)
+      {
+        let matches = regions.compactMap { region -> Identity? in
+          guard let relative = HotReloadReplay.relative(region.identity, to: root),
+            HotReloadReplay.differsByOneWrapper(source, relative)
+          else { return nil }
+          return region.identity
+        }
+        target = matches.count == 1 ? matches.first : nil
+      } else {
+        target = nil
+      }
+      if let target { focusChanged = focusTracker.setFocus(to: target) || focusChanged }
     }
     // A traversal's landing region vanished before any further input: the
     // control revoked its own focusability as a consequence of receiving

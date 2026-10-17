@@ -12,11 +12,12 @@ package func validateDormantHotReloadDeclarations<Value>(in value: Value) {
     let owner = context.stateOwnerHandle,
     let node = liveAuthoringOwnerNode(stateOwnerHandle: owner),
     let graph = node.ownerGraph,
-    graph.needsDormantHotReloadSchema(for: node.identity)
+    graph.tracksHotReloadDeclarations || graph.needsDormantHotReloadSchema(for: node.identity)
   else { return }
   var slots: [StateSlotIdentifier: String] = [:]
+  var names: [StateSlotIdentifier: [String]] = [:]
   var ambiguous = false
-  func visit(_ value: Any, path: StateSlotPath, depth: Int) {
+  func visit(_ value: Any, path: StateSlotPath, labels: [String], depth: Int) {
     guard depth < 64 else {
       ambiguous = true
       return
@@ -24,6 +25,7 @@ package func validateDormantHotReloadDeclarations<Value>(in value: Value) {
     if let declaration = value as? any HotReloadSlotDeclaring {
       if let (slot, type) = declaration.hotReloadDeclaration(path: path) {
         if slots.updateValue(type, forKey: slot) != nil { ambiguous = true }
+        names[slot] = labels
       }
       return
     }
@@ -35,15 +37,19 @@ package func validateDormantHotReloadDeclarations<Value>(in value: Value) {
       if let declaration = child.value as? any HotReloadSlotDeclaring {
         if let (slot, type) = declaration.hotReloadDeclaration(path: path) {
           if slots.updateValue(type, forKey: slot) != nil { ambiguous = true }
+          if let label = child.label { names[slot] = labels + [label] }
         }
       } else {
-        visit(child.value, path: path.appending(index), depth: depth + 1)
+        visit(
+          child.value, path: path.appending(index), labels: labels + [child.label ?? "#\(index)"],
+          depth: depth + 1)
       }
     }
   }
-  visit(value, path: .root, depth: 0)
+  visit(value, path: .root, labels: [], depth: 0)
   // Transparent containers forward their actual authored payload separately.
   guard !slots.isEmpty || ambiguous else { return }
+  node.hotReloadDeclarationNames.merge(names) { _, incoming in incoming }
   graph.validateDormantHotReloadSchema(
-    for: node.identity, slots: slots, ambiguous: ambiguous)
+    for: node.identity, slots: slots, ambiguous: ambiguous, declarationNames: names)
 }

@@ -69,6 +69,7 @@ package final class HotReloadSession {
     for _ in 0..<maximumAttempts {
       let renderer = DefaultRenderer()
       renderer.viewGraph.hotReloadTypeAliases = replayTypeAliases
+      renderer.viewGraph.tracksHotReloadDeclarations = true
       if !schemas.isEmpty {
         try renderer.viewGraph.installHotReloadReplay(
           snapshot, at: newRoot, owners: schemas, typeAliases: replayTypeAliases)
@@ -91,7 +92,8 @@ package final class HotReloadSession {
     }
     guard converged else { throw HotReloadSwapError.schemaDidNotConverge }
     lastReport = graph.finishHotReloadReplay()
-    try graph.installHotReloadReplay(snapshot, at: newRoot, owners: schemas, typeAliases: replayTypeAliases)
+    try graph.installHotReloadReplay(
+      snapshot, at: newRoot, owners: schemas, typeAliases: replayTypeAliases)
     content = replacement
     generation = nextGeneration
     generationRoot = newRoot
@@ -103,7 +105,7 @@ package final class HotReloadSession {
   }
 
   package func finishCommittedReplay() {
-    guard awaitingCommit, let graph, let generationRoot,
+    guard let graph, awaitingCommit || graph.hotReloadReplay != nil, let generationRoot,
       graph.liveIdentitySnapshot().contains(where: {
         $0 == generationRoot || $0.isDescendant(of: generationRoot)
       })
@@ -138,6 +140,7 @@ package struct HotReloadHost: PrimitiveView, IterativeResolvableView {
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     context.viewGraph?.hotReloadTypeAliases = session.replayTypeAliases
+    context.viewGraph?.tracksHotReloadDeclarations = true
     let root = context.identity.child("Generation[\(generation)]")
     session.attach(context: context, generationRoot: root)
     return withAuthoringContext(nil) {

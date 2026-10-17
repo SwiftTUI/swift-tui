@@ -67,12 +67,12 @@ final class SnapshotEncoder: Encoder, SingleValueEncodingContainer {
     return SnapshotEncoder(budget: budget, node: node, codingPath: codingPath + [key])
   }
 
-  func keyedChild(_ key: any CodingKey) -> SnapshotEncoder {
+  func keyedChild(_ key: any CodingKey, replacing: Bool = false) -> SnapshotEncoder {
     guard budget.error == nil, case .keyed = node.storage else {
       budget.error = budget.error ?? .incompatibleContainer
       return self
     }
-    let childNode = node.keyed[key.stringValue] ?? SnapshotEncodingNode()
+    let childNode = (replacing ? nil : node.keyed[key.stringValue]) ?? SnapshotEncodingNode()
     budget.reserve(key.stringValue)
     node.keyed[key.stringValue] = childNode
     return child(key, node: childNode)
@@ -214,9 +214,11 @@ final class SnapshotEncoder: Encoder, SingleValueEncodingContainer {
 private struct SnapshotKeyedEncoder<Key: CodingKey>: KeyedEncodingContainerProtocol {
   let encoder: SnapshotEncoder
   var codingPath: [any CodingKey] { encoder.codingPath }
-  mutating func encodeNil(forKey key: Key) throws { try encoder.keyedChild(key).encodeNil() }
+  mutating func encodeNil(forKey key: Key) throws {
+    try encoder.keyedChild(key, replacing: true).encodeNil()
+  }
   mutating func encode<T: Encodable>(_ value: T, forKey key: Key) throws {
-    try encoder.keyedChild(key).encode(value)
+    try encoder.keyedChild(key, replacing: true).encode(value)
   }
   mutating func nestedContainer<NestedKey: CodingKey>(
     keyedBy type: NestedKey.Type, forKey key: Key

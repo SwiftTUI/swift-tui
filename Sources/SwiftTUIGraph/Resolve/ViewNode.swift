@@ -107,6 +107,11 @@ package final class ViewNode {
     didSet { recordCheckpointMutation() }
   }
 
+  package var hotReloadDeclarationNames: [StateSlotIdentifier: [String]] {
+    get { persistentState.hotReloadDeclarationNames }
+    set { persistentState.hotReloadDeclarationNames = newValue }
+  }
+
   package private(set) var stateSlots: [StateSlotIdentifier: AnyStateSlot] {
     get { persistentState.stateSlots }
     set { persistentState.stateSlots = newValue }
@@ -879,6 +884,7 @@ package final class ViewNode {
 
   package func resetStateSlots() {
     stateSlots.removeAll(keepingCapacity: false)
+    hotReloadDeclarationNames.removeAll(keepingCapacity: false)
   }
 
   /// Like ``resetStateSlots()`` but preserves the slots this node has already
@@ -910,6 +916,9 @@ package final class ViewNode {
       return
     }
     stateSlots = stateSlots.filter { readSlotsOwnedBySelf.contains($0.key) }
+    hotReloadDeclarationNames = hotReloadDeclarationNames.filter {
+      readSlotsOwnedBySelf.contains($0.key)
+    }
   }
 
   package func markDirty() {
@@ -2487,6 +2496,7 @@ extension ViewNode {
       hasStaleIslandDescendant: reuseState.freshness.hasStaleIslandDescendant,
       hasForeignParentedChild: reuseState.freshness.hasForeignParentedChild,
       children: children.map(\.identity),
+      hotReloadDeclarationNames: hotReloadDeclarationNames,
       stateSlots: stateSlots.map { identifier, slot in
         DebugTotalStateSnapshot.StateSlotSnapshot(
           slot: identifier,
