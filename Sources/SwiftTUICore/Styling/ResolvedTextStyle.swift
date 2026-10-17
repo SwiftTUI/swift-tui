@@ -24,7 +24,7 @@ extension ResolvedTextStyle {
         switch (backgroundColor, underlay.backgroundColor) {
         case (let overlay?, let under?) where overlay.alpha < 1:
           under.mixed(
-            with: Color(red: overlay.red, green: overlay.green, blue: overlay.blue),
+            with: overlay.withAlpha(1),
             amount: overlay.alpha)
         case (let overlay?, _):
           overlay

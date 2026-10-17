@@ -34,15 +34,18 @@ extension Color {
   /// default `.perceptual` method: the same clamp of `progress`, the same
   /// alpha lerp, the same per-channel Oklab lerps, and the same
   /// `_fromOklab(…).mapped(to: lower.profile, policy: .compressPerceptual)`
-  /// tail. Keep this body in lockstep with the `.perceptual` case of
-  /// ``Color/interpolated(to:progress:method:)``; the raster equivalence
-  /// tests compare the two over a grid of colors and progress values.
+  /// tail. The public interpolation API delegates here so prepared and
+  /// ordinary sampling share endpoint and gamut semantics.
   package static func perceptualMix(
     _ lower: PreparedPerceptualMixEndpoint,
     _ upper: PreparedPerceptualMixEndpoint,
     progress: Double
   ) -> Color {
     let t = _PrismNumeric.clamp(progress, 0.0, 1.0)
+    if t == 0 { return lower.color }
+    if t == 1 {
+      return upper.color.converted(to: lower.color.profile, gamutMapping: .compressPerceptual)
+    }
     let alpha = _PrismNumeric.lerp(lower.color.alpha, upper.color.alpha, t)
     let a = lower.lab
     let b = upper.lab

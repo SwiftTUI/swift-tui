@@ -257,11 +257,8 @@ public struct BrailleCanvas: Equatable, Sendable {
       }
       return
     }
-    let ryD = Double(ry)
-    let rxD = Double(rx)
     for dy in -ry...ry {
-      let t = Double(dy) / ryD
-      let dxMax = Int((rxD * (1.0 - t * t).squareRoot()).rounded(.down))
+      let dxMax = EllipseRasterization.halfSpan(radiusX: rx, radiusY: ry, offsetY: dy)
       let y = cy + dy
       for dx in -dxMax...dxMax {
         setPixel(x: cx + dx, y: y)
@@ -305,11 +302,13 @@ public struct BrailleCanvas: Equatable, Sendable {
     let twoPi = 2.0 * .pi
     let rxD = Double(rx)
     let ryD = Double(ry)
-    for i in 0..<steps {
+    var previous: (x: Int, y: Int)?
+    for i in 0...steps {
       let angle = twoPi * Double(i) / Double(steps)
       let x = cx + Int((rxD * cos(angle)).rounded())
       let y = cy + Int((ryD * sin(angle)).rounded())
-      setPixel(x: x, y: y)
+      if let previous { line(from: previous, to: (x, y)) } else { setPixel(x: x, y: y) }
+      previous = (x, y)
     }
   }
 }

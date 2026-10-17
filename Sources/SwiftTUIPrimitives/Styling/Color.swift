@@ -316,10 +316,13 @@ extension Color {
     case .clip, .relativeColorimetric, .absoluteColorimetric:
       return preserved._clippedChannels()
     case .compressLightness:
-      return original._compressChroma(to: targetProfile, preserveLightness: false)
-        ?? preserved._clippedChannels()
+      return
+        (original._compressChroma(to: targetProfile, preserveLightness: false)
+        ?? preserved)._clippedChannels()
     case .compressPerceptual:
-      return original._compressPerceptually(to: targetProfile)
+      // The search admits a small numerical tolerance while finding the
+      // boundary. A mapped color itself must lie in the closed target gamut.
+      return original._compressPerceptually(to: targetProfile)._clippedChannels()
     }
   }
 }

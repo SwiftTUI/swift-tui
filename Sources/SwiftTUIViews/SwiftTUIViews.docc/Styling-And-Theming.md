@@ -41,6 +41,18 @@ struct Banner: View {
 Any `ShapeStyle` fits these modifier slots, so everything below — semantic
 roles and gradients included — drops into the same positions.
 
+Mixing and alpha operations clamp NaN amounts to zero. Gamut mapping returns
+channels within the destination gamut; `.preserve` retains extended channels.
+Mutable gradient stops remain sorted by location, with locations clamped to
+`0...1`. Repeated opacity composition multiplies alpha without consuming the
+semantic-alias cycle budget.
+
+Hex exports honor letter case in every format. Explicit short formats quantize
+to nibbles; ARGB formats put alpha first, while the CSS hex parser accepts
+RGB/RGBA ordering. Terminal quantization considers all 16 ANSI slots or the
+ANSI-256 cube and grayscale ramp. Translucent terminal colors use the reported
+background, or the default theme background when none is known.
+
 ## Semantic roles resolve through the theme
 
 Prefer semantic roles over hard-coded colors: they are the intended currency.

@@ -412,9 +412,7 @@ struct AdversarialSetARenderTests {
     let rhs = try #require(b.backgroundColor)
     // The translucent-background branch rebuilds the overlay from RGB alone,
     // interpreting linear-sRGB components as encoded sRGB before mixing.
-    withKnownIssue(
-      "STUI-957: background composition discards the translucent overlay's color profile"
-    ) {
+    do {
       #expect(lhs.deltaE(to: rhs) < 0.0001)
     }
     #expect(abs(lhs.alpha - rhs.alpha) < 0.000001)

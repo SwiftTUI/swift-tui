@@ -158,9 +158,7 @@ struct AdversarialSetBShapeTests {
   // Mixing clamps its fraction; a NaN fraction must yield an endpoint instead
   // of reaching the color-space preconditions.
   @Test func setB145NaNMixingFractionsDoNotTrap() async {
-    await withKnownIssue(
-      "a NaN fraction survives the clamp and trips the color-space preconditions"
-    ) {
+    do {
       await #expect(processExitsWith: .success) {
         let interpolated = Color.red.interpolated(to: .blue, progress: .nan)
         #expect(interpolated.red.isFinite && interpolated.alpha.isFinite, "\(interpolated)")
@@ -190,15 +188,10 @@ struct AdversarialSetBShapeTests {
       (0x000000, 16), (0x5F5F5F, 59), (0x878787, 102), (0xAFAFAF, 145), (0xD7D7D7, 188),
       (0xFFFFFF, 231), (0x5F0000, 52), (0x0000FF, 21), (0xFF5F00, 202),
     ]
-    let misplaced: Set<UInt32> = [0x5F5F5F, 0x878787, 0xFFFFFF, 0x5F0000, 0xFF5F00]
     for entry in expectations {
       let code = renderer.ansi256Code(for: Color(hexRGB: entry.hex))
-      withKnownIssue(
-        "the cube index is rounded on six equal steps, so xterm's 0x5F and 0x87 levels land one index high"
-      ) {
+      do {
         #expect(code == entry.code, "\(String(entry.hex, radix: 16)) → \(code)")
-      } when: {
-        misplaced.contains(entry.hex)
       }
     }
   }
@@ -211,9 +204,7 @@ struct AdversarialSetBShapeTests {
     #expect(nearWhite == 231, "\(nearWhite)")
     let white = renderer.ansi256Code(for: Color.white)
     let translucentWhite = renderer.ansi256Code(for: Color.white.opacity(0.5))
-    withKnownIssue(
-      "Color.white is hand-mapped to gray-ramp index 255 (#EEEEEE); any other white reaches 231"
-    ) {
+    do {
       #expect(white == 231, "\(white)")
       #expect(translucentWhite == white, "\(translucentWhite) vs \(white)")
     }

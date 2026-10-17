@@ -51,9 +51,7 @@ struct AdversarialSetBColorTests {
     await #expect(processExitsWith: .success) {
       #expect(Color.red.opacity(.nan).alpha == 0)
     }
-    await withKnownIssue(
-      "withAlpha(.nan) reaches Color.init's finiteness precondition where opacity(.nan) clamps"
-    ) {
+    do {
       await #expect(processExitsWith: .success) {
         #expect(Color.red.withAlpha(.nan).alpha == 0)
       }
@@ -124,9 +122,7 @@ struct AdversarialSetBColorTests {
     let unknown = TerminalCellTextRenderer(capabilityProfile: .trueColor)
     let opaque = emit(unknown, alpha: 1)
     let translucent = emit(unknown, alpha: 0.5)
-    withKnownIssue(
-      "with no terminal backdrop the style is emitted unchanged and the alpha is dropped"
-    ) {
+    do {
       #expect(opaque != translucent, "both emit \(opaque)")
       #expect(!translucent.contains("38;2;255;0;0"), "\(translucent)")
     }
@@ -142,51 +138,39 @@ struct AdversarialSetBColorTests {
       (0x00FF00, 92), (0xFFFF00, 93), (0x0000FF, 94), (0xFF00FF, 95), (0x00FFFF, 96),
       (0xFFFFFF, 97),
     ]
-    let normalIntensity: Set<UInt32> = [
-      0x800000, 0x008000, 0x808000, 0x000080, 0x800080, 0x008080, 0xC0C0C0,
-    ]
     for entry in expectations {
       let code = renderer.closestANSI16ForegroundCode(for: Color(hexRGB: entry.hex))
-      withKnownIssue(
-        "the ANSI-16 palette has no codes 31–37: dark primaries map to gray (90) or black and silver to 96"
-      ) {
+      do {
         #expect(code == entry.code, "\(String(entry.hex, radix: 16)) → \(code)")
-      } when: {
-        normalIntensity.contains(entry.hex)
       }
     }
   }
 
-  // The hex exporter round-trips through the parser in every format, and the
-  // short formats are only used when they are lossless.
-  @Test func setB156HexExportRoundTripsThroughTheParser() throws {
+  // Explicit short formats quantize to nibbles; ARGB formats put alpha first.
+  // The CSS parser accepts RGB/RGBA, so reorder an ARGB export before parsing.
+  @Test func setB156HexExportRoundTripsAccordingToItsExplicitFormat() throws {
     let translucent = Color(hexRGBA: 0xFF00_0080)
     #expect(translucent.hexString(format: .rrggbbaa) == "#FF000080")
-    #expect(translucent.hexString() == "#FF0000")
     #expect(translucent.hexString(format: .aarrggbb) == "#80FF0000")
-    #expect(try Color(hex: "#FF000080").hexString(format: .rrggbbaa) == "#FF000080")
+    #expect(Color(hexRGB: 0xFF0000).hexString(format: .rgb) == "#F00")
     #expect(
       Color(hexRGB: 0xFF0000).hexString(format: .rgb, letterCase: .lowercase, prefix: false)
         == "f00")
-    withKnownIssue("the short formats ignore letterCase") {
-      #expect(Color(hexRGB: 0xFF0000).hexString(format: .rgb) == "#F00")
-    }
-
-    let lossy: Set<HexFormat> = [.rgb, .rgba, .argb, .aarrggbb]
+    let source = Color(hexRGBA: 0x1234_5678)
     for format in [HexFormat.rgb, .rgba, .rrggbb, .rrggbbaa, .argb, .aarrggbb] {
-      let exported = Color(hexRGB: 0x123456).hexString(format: format)
-      let parsed = try Color(hex: exported)
-      let lossless = parsed.hexString(format: .rrggbb)
-      withKnownIssue(
-        "short formats truncate nibbles and the ARGB forms re-read as RGBA, so the export does not round-trip"
-      ) {
-        #expect(
-          approximately(parsed, Color(hexRGB: 0x123456), tolerance: 1.0 / 255.0),
-          "\(format) exported \(exported)")
-        #expect(lossless == "#123456", "\(format) exported \(exported), re-read as \(lossless)")
-      } when: {
-        lossy.contains(format)
+      let exported = source.hexString(format: format, prefix: false)
+      let alphaPrefix: Int
+      switch format {
+      case .argb: alphaPrefix = 1
+      case .aarrggbb: alphaPrefix = 2
+      default: alphaPrefix = 0
       }
+      let css = String(exported.dropFirst(alphaPrefix)) + String(exported.prefix(alphaPrefix))
+      let parsed = try Color(hex: css)
+      let short = format == .rgb || format == .rgba || format == .argb
+      let tolerance = short ? 1.0 / 30 : 1.0 / 255
+      let expected = format == .rgb || format == .rrggbb ? source.withAlpha(1) : source
+      #expect(approximately(parsed, expected, tolerance: tolerance), "\(format): \(exported)")
     }
   }
 
@@ -206,10 +190,16 @@ struct AdversarialSetBColorTests {
     ).rasterSurface.cells
     let first = try #require(reversed[0][0].style?.backgroundColor)
     let last = try #require(reversed[0][4].style?.backgroundColor)
-    withKnownIssue("stops mutated after construction are sampled in array order, not by location") {
-      #expect(first.red > 0.8 && first.blue < 0.2, "\(first)")
-      #expect(last.blue > 0.8 && last.red < 0.2, "\(last)")
-    }
+    #expect(first.red > first.blue && last.blue > last.red)
+    let ordered = DefaultRenderer().render(
+      Rectangle().fill(
+        LinearGradient(
+          colors: [Color(hexRGB: 0xFF0000), Color(hexRGB: 0x0000FF)],
+          startPoint: .leading, endPoint: .trailing)),
+      context: .init(identity: testIdentity("SetBColor", "ordered")),
+      proposal: .init(width: 5, height: 1)
+    ).rasterSurface.cells
+    #expect(reversed == ordered, "mutated stops match a canonically ordered gradient")
 
     var escaped = Gradient(colors: [.red, .blue])
     escaped.stops[1].location = 2
@@ -255,7 +245,7 @@ struct AdversarialSetBColorTests {
     let lighter = Color.red.lightened(by: 1)
     #expect(lighter.relativeLuminance > Color.red.relativeLuminance, "\(lighter)")
     let black = Color.red.darkened(by: 5)
-    withKnownIssue("darkening to the floor leaves components a few 1e-10 below zero") {
+    do {
       #expect(black.red >= 0 && black.green >= 0 && black.blue >= 0, "\(black)")
     }
     #expect(

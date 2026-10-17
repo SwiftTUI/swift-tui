@@ -11,7 +11,9 @@ public struct Gradient: Equatable, Sendable {
   /// A single stop in a gradient.
   public struct Stop: Equatable, Sendable {
     public var color: Color
-    public var location: Double
+    public var location: Double {
+      didSet { location = _PrismNumeric.clamp(location, 0, 1) }
+    }
 
     public init(color: Color, location: Double) {
       self.color = color
@@ -19,7 +21,9 @@ public struct Gradient: Equatable, Sendable {
     }
   }
 
-  public var stops: [Stop]
+  public var stops: [Stop] {
+    didSet { stops.sort { $0.location < $1.location } }
+  }
 
   public init(stops: [Stop]) {
     self.stops = stops.sorted { $0.location < $1.location }

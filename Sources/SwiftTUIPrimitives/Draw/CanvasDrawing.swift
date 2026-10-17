@@ -62,10 +62,11 @@ public struct CanvasCell: Equatable, Sendable {
 /// silently clipped.
 ///
 /// A context also carries the default ``foreground`` and ``background``
-/// colors that the rasterizer writes for every lit cell the drawing
-/// touches. The rasterizer reads the context's **final** values after
-/// ``CanvasDrawing/draw(into:)`` returns, so mutating either color
-/// during drawing applies to every unstyled grid cell.
+/// colors that the rasterizer writes for every lit cell the drawing touches.
+/// Until ``foreground`` is assigned, the inherited foreground style is sampled
+/// at each cell, preserving gradients. Assigning it applies its final color
+/// to every unstyled grid cell and direct glyph without an explicit foreground.
+/// The rasterizer reads the final ``background`` after drawing returns.
 public struct CanvasContext: Sendable {
   /// The terminal-cell size of the drawing surface.
   public let size: CellSize
@@ -91,7 +92,13 @@ public struct CanvasContext: Sendable {
 
   /// The default foreground color written to every cell the drawing
   /// touches. Starts as the environment's resolved foreground color.
-  public var foreground: Color
+  public var foreground: Color {
+    didSet { foregroundWasAssigned = true }
+  }
+
+  /// Preserve inherited spatial styles unless the drawing explicitly writes
+  /// its final foreground (even if that color equals the initial sample).
+  package private(set) var foregroundWasAssigned = false
 
   /// Optional default background color written to every cell the
   /// drawing touches. Starts `nil` (transparent).
@@ -226,13 +233,7 @@ public struct CanvasContext: Sendable {
     center: Point,
     radius: Double
   ) {
-    let centerPoint = gridSample(for: center)
-    canvas.fillEllipse(
-      centerX: centerPoint.x,
-      centerY: centerPoint.y,
-      radiusX: Self.gridRadius(radius, subdivisions: grid.subdivisionsX),
-      radiusY: Self.gridRadius(radius, subdivisions: grid.subdivisionsY)
-    )
+    fillEllipse(center: center, radiusX: radius, radiusY: radius)
   }
 
   /// Draws the outline of an ellipse in continuous cell space.
@@ -256,13 +257,39 @@ public struct CanvasContext: Sendable {
     radiusX: Double,
     radiusY: Double
   ) {
-    let centerPoint = gridSample(for: center)
-    canvas.fillEllipse(
-      centerX: centerPoint.x,
-      centerY: centerPoint.y,
-      radiusX: Self.gridRadius(radiusX, subdivisions: grid.subdivisionsX),
-      radiusY: Self.gridRadius(radiusY, subdivisions: grid.subdivisionsY)
-    )
+    let rx = abs(radiusX)
+    let ry = abs(radiusY)
+    guard center.x.isFinite, center.y.isFinite, rx.isFinite, ry.isFinite,
+      gridWidth > 0, gridHeight > 0
+    else { return }
+    if rx == 0 || ry == 0 {
+      let point = gridSample(for: center)
+      canvas.fillEllipse(
+        centerX: point.x, centerY: point.y,
+        radiusX: Self.gridRadius(rx, subdivisions: grid.subdivisionsX),
+        radiusY: Self.gridRadius(ry, subdivisions: grid.subdivisionsY))
+      return
+    }
+    // Keep continuous geometry until sampling. Quantizing the center and
+    // radii separately can enlarge a disc into a neighbouring cell.
+    let x0 = max(
+      0, Self.gridCoordinate(center.x - rx, subdivisions: grid.subdivisionsX, rounding: .down))
+    let x1 = min(
+      gridWidth - 1,
+      Self.gridCoordinate(center.x + rx, subdivisions: grid.subdivisionsX, rounding: .up))
+    let y0 = max(
+      0, Self.gridCoordinate(center.y - ry, subdivisions: grid.subdivisionsY, rounding: .down))
+    let y1 = min(
+      gridHeight - 1,
+      Self.gridCoordinate(center.y + ry, subdivisions: grid.subdivisionsY, rounding: .up))
+    guard x0 <= x1, y0 <= y1 else { return }
+    for y in y0...y1 {
+      let dy = (Double(y) / Double(grid.subdivisionsY) - center.y) / ry
+      for x in x0...x1 {
+        let dx = (Double(x) / Double(grid.subdivisionsX) - center.x) / rx
+        if dx * dx + dy * dy <= 1 { canvas.setPixel(x: x, y: y) }
+      }
+    }
   }
 
   /// Lights a single grid sample. Out-of-range coordinates are silently
@@ -355,26 +382,28 @@ public struct CanvasContext: Sendable {
   private func gridRect(
     for rect: Rect
   ) -> (x: Int, y: Int, width: Int, height: Int)? {
-    guard rect.size.width > 0, rect.size.height > 0 else {
+    guard rect.size.width != 0, rect.size.height != 0,
+      rect.origin.x.isFinite, rect.origin.y.isFinite, rect.maxX.isFinite, rect.maxY.isFinite
+    else {
       return nil
     }
     let x0 = Self.gridCoordinate(
-      rect.origin.x,
+      min(rect.origin.x, rect.maxX),
       subdivisions: grid.subdivisionsX,
       rounding: .down
     )
     let y0 = Self.gridCoordinate(
-      rect.origin.y,
+      min(rect.origin.y, rect.maxY),
       subdivisions: grid.subdivisionsY,
       rounding: .down
     )
     let x1 = Self.gridCoordinate(
-      rect.maxX,
+      max(rect.origin.x, rect.maxX),
       subdivisions: grid.subdivisionsX,
       rounding: .up
     )
     let y1 = Self.gridCoordinate(
-      rect.maxY,
+      max(rect.origin.y, rect.maxY),
       subdivisions: grid.subdivisionsY,
       rounding: .up
     )

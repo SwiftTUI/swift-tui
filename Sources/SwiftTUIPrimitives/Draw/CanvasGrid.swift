@@ -227,11 +227,8 @@ package struct CanvasGridBuffer: Equatable, Sendable {
       }
       return
     }
-    let radiusYD = Double(radiusY)
-    let radiusXD = Double(radiusX)
     for dy in -radiusY...radiusY {
-      let t = Double(dy) / radiusYD
-      let dxMax = Int((radiusXD * (1.0 - t * t).squareRoot()).rounded(.down))
+      let dxMax = EllipseRasterization.halfSpan(radiusX: radiusX, radiusY: radiusY, offsetY: dy)
       let y = centerY + dy
       for dx in -dxMax...dxMax {
         setPixel(x: centerX + dx, y: y)

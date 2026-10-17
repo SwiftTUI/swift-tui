@@ -48,7 +48,7 @@ public func pow(_ base: Int, _ exponent: Int) -> Int? {
 @usableFromInline
 internal enum _PrismNumeric {
   static func clamp(_ value: Double, _ lower: Double, _ upper: Double) -> Double {
-    min(max(value, lower), upper)
+    value.isNaN ? lower : min(max(value, lower), upper)
   }
 
   static func lerp(_ a: Double, _ b: Double, _ t: Double) -> Double {

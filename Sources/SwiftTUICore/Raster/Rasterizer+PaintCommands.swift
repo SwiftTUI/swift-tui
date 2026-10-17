@@ -185,16 +185,19 @@ extension Rasterizer {
           // cell so gradient paints sample at the current point.
           let localX = x - shapeBounds.origin.x
           let localY = y - shapeBounds.origin.y
-          write(
-            tileStyle.pattern.character(atX: localX, y: localY),
-            style: resolvedTileCellStyle(
-              tileStyle,
-              bounds: shapeBounds,
-              sampleX: x,
-              sampleY: y,
+          guard
+            let tileCellStyle = resolvedTileCellStyle(
+              tileStyle, bounds: shapeBounds, sampleX: x, sampleY: y,
               environment: environment,
               currentBackground: currentCellBackground(cells: cells, x: x, y: y)
-            ),
+            )
+          else {
+            x += 1
+            continue
+          }
+          write(
+            tileStyle.pattern.character(atX: localX, y: localY),
+            style: tileCellStyle,
             atX: x,
             y: y,
             cells: &cells,
@@ -571,15 +574,12 @@ extension Rasterizer {
       return
     }
 
+    let foregroundMode = resolvedColorMode(
+      from: foregroundStyle, environment: environment, bounds: bounds)
     let initialForeground =
       resolveColor(
-        from: foregroundStyle,
-        environment: environment,
-        bounds: bounds,
-        sampleX: bounds.origin.x,
-        sampleY: bounds.origin.y
-      )
-      ?? environment.theme.foreground
+        from: foregroundMode, bounds: bounds,
+        sampleX: bounds.origin.x, sampleY: bounds.origin.y) ?? environment.theme.foreground
 
     var context = CanvasContext(
       canvas: CanvasGridBuffer(
@@ -593,6 +593,13 @@ extension Rasterizer {
       return
     }
     payload.drawing.draw(into: &context)
+
+    func foreground(atX x: Int, y: Int) -> Color {
+      if context.foregroundWasAssigned { return context.foreground }
+      return resolveColor(
+        from: foregroundMode, bounds: bounds,
+        sampleX: bounds.origin.x + x, sampleY: bounds.origin.y + y) ?? environment.theme.foreground
+    }
 
     let originX = bounds.origin.x
     let originY = bounds.origin.y
@@ -613,7 +620,8 @@ extension Rasterizer {
         }
         let cellStyle = accessibilityGraphicStyle(
           ResolvedTextStyle(
-            foregroundColor: cell.foreground?.opacity(payload.opacity),
+            foregroundColor: (cell.foreground ?? foreground(atX: cellX, y: cellY)).opacity(
+              payload.opacity),
             backgroundColor: cell.background?.opacity(payload.opacity)
           ), environment: environment,
           currentBackground: currentCellBackground(
@@ -621,6 +629,7 @@ extension Rasterizer {
           target: environment.accessibilityPreferences.contrast == .increased ? 7 : 4.5)
         write(
           cell.character,
+          width: cellWidth(of: cell.character),
           style: cellStyle.isDefault ? nil : cellStyle,
           atX: originX + cellX,
           y: originY + cellY,
@@ -638,12 +647,6 @@ extension Rasterizer {
     // touched. Styled sample writes carry one style per terminal cell;
     // unstyled cells fall back to the context's final foreground/background
     // values.
-    let finalForeground = context.foreground
-    let finalBackground = context.background
-    let fallbackStyle = ResolvedTextStyle(
-      foregroundColor: finalForeground,
-      backgroundColor: finalBackground
-    )
 
     for cellY in 0..<cellH {
       // Per-row cull (D70).
@@ -654,7 +657,10 @@ extension Rasterizer {
         guard let character = context.canvas.character(x: cellX, y: cellY) else {
           continue
         }
-        var resolvedStyle = context.gridCellStyles[cellY][cellX] ?? fallbackStyle
+        var resolvedStyle =
+          context.gridCellStyles[cellY][cellX]
+          ?? ResolvedTextStyle(
+            foregroundColor: foreground(atX: cellX, y: cellY), backgroundColor: context.background)
         resolvedStyle.foregroundColor = resolvedStyle.foregroundColor?.opacity(payload.opacity)
         resolvedStyle.backgroundColor = resolvedStyle.backgroundColor?.opacity(payload.opacity)
         resolvedStyle = accessibilityGraphicStyle(

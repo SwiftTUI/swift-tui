@@ -61,10 +61,6 @@ internal struct PreparedRadialGradient: Sendable {
   /// multiply would not be bit-exact.
   let denominator: Double
   let hasArea: Bool
-  /// Stop locations are non-decreasing. `Gradient.init(stops:)` sorts them,
-  /// but `stops` is a public `var`, so a mutated gradient can be unsorted;
-  /// the segment search then falls back to the reference's linear scan.
-  let isSorted: Bool
   /// `nil` when the gradient is not eligible for the support walk: fewer
   /// than two stops, empty bounds, duplicate, unsorted or out-of-range locations,
   /// non-finite or non-increasing radii, an opaque last stop (unbounded
@@ -87,7 +83,6 @@ internal struct PreparedRadialGradient: Sendable {
     startRadius = gradient.startRadius
     denominator = max(0.0001, gradient.endRadius - gradient.startRadius)
 
-    var sorted = true
     var strictlySorted = true
     var locationsInRange = true
     for index in stops.indices {
@@ -96,11 +91,7 @@ internal struct PreparedRadialGradient: Sendable {
         locationsInRange = false
       }
       if index > 0, stops[index - 1].location >= location { strictlySorted = false }
-      if index > 0, stops[index - 1].location > location {
-        sorted = false
-      }
     }
-    isSorted = sorted
 
     support = Self.deriveSupport(
       stops: stops,
@@ -164,8 +155,8 @@ internal struct PreparedRadialGradient: Sendable {
   /// segment containing `t`" is exactly the smallest index `j` with
   /// `stops[j + 1].location ≥ t` (the `t ≤ first.location` shortcut has
   /// already excluded `t` below the first stop), and the backward-then-forward
-  /// scan below lands on that index from any starting hint. For unsorted stops
-  /// the search is the reference's linear scan.
+  /// scan below lands on that index from any starting hint. `Gradient` keeps
+  /// stops sorted after mutation as well as construction.
   func color(atCellX x: Int, y: Int, segmentHint: inout Int) -> Color? {
     guard let first = stops.first else {
       return nil
@@ -189,28 +180,11 @@ internal struct PreparedRadialGradient: Sendable {
       return last.color
     }
 
-    if isSorted {
-      var index = min(max(segmentHint, 0), stops.count - 2)
-      while index > 0, stops[index].location >= t {
-        index -= 1
-      }
-      while index < stops.count - 2, stops[index + 1].location < t {
-        index += 1
-      }
-      segmentHint = index
-      return mix(segment: index, t: t)
-    }
-
-    for index in 0..<(stops.count - 1) {
-      let lower = stops[index]
-      let upper = stops[index + 1]
-      guard t >= lower.location, t <= upper.location else {
-        continue
-      }
-      return mix(segment: index, t: t)
-    }
-
-    return stops.last?.color
+    var index = min(max(segmentHint, 0), stops.count - 2)
+    while index > 0, stops[index].location >= t { index -= 1 }
+    while index < stops.count - 2, stops[index + 1].location < t { index += 1 }
+    segmentHint = index
+    return mix(segment: index, t: t)
   }
 
   func color(atCellX x: Int, y: Int) -> Color? {

@@ -14,7 +14,7 @@ struct AdversarialSetAColorPaintBoundaryTests {
     let color = try Color(hex: "#ABCDEF88")
     #expect(color.hexString(format: .rrggbbaa) == "#ABCDEF88")
     #expect(color.hexString(format: .rgba, letterCase: .lowercase) == "#ace8")
-    withKnownIssue("STUI-995: short hex formatting ignores explicit uppercase") {
+    do {
       #expect(color.hexString(format: .rgba, letterCase: .uppercase) == "#ACE8")
     }
   }
@@ -40,7 +40,7 @@ struct AdversarialSetAColorPaintBoundaryTests {
 
   @Test func setA679InvalidDecodedWhitePointThrowsInsteadOfTerminatingTheProcess() async {
     // Hypothesis: a throwing Codable initializer sends malformed external values into a trapping value initializer.
-    await withKnownIssue("STUI-996: invalid decoded white points trap instead of throwing") {
+    do {
       await #expect(processExitsWith: .success) {
         let data = Data(#"{"name":"external","x":0,"y":0.3}"#.utf8)
         do {
@@ -111,7 +111,7 @@ struct AdversarialSetAColorPaintBoundaryTests {
     var style = AnyShapeStyle.semantic(.tint)
     for _ in 0..<10 { style = style.opacity(0.5) }
     let result = sample(style, environment: environment)
-    withKnownIssue("STUI-997: finite opacity wrappers exhaust semantic recursion") {
+    do {
       #expect(result != nil)
     }
     if let result { #expect(abs(result.alpha - 1.0 / 1024) < 1e-12) }
@@ -253,7 +253,7 @@ struct AdversarialSetAColorPaintBoundaryTests {
         Rectangle().fill(TileStyle(.dots, foreground: Color.red, background: Color.blue)).opacity(0)
       }, width: 8, height: 1)
     #expect(zeroOpacity.lines == ["underlay"])
-    withKnownIssue("STUI-998: fully transparent tiles overwrite underlying glyphs") {
+    do {
       #expect(surface.lines == ["underlay"])
     }
   }

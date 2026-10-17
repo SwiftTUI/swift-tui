@@ -76,11 +76,18 @@ public struct ReferenceWhite: Hashable, Sendable, Codable {
 
   public init(from decoder: any Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    self.init(
-      name: try c.decode(String.self, forKey: .name),
-      x: try c.decode(Double.self, forKey: .x),
-      y: try c.decode(Double.self, forKey: .y)
-    )
+    let name = try c.decode(String.self, forKey: .name)
+    let x = try c.decode(Double.self, forKey: .x)
+    let y = try c.decode(Double.self, forKey: .y)
+    guard name.contains(where: { !$0.isWhitespace }), x.isFinite, y.isFinite,
+      x > 0, y > 0, x + y <= 1.0 + 1e-12
+    else {
+      throw DecodingError.dataCorrupted(
+        .init(
+          codingPath: decoder.codingPath,
+          debugDescription: "Invalid reference white name or chromaticity"))
+    }
+    self.init(name: name, x: x, y: y)
   }
 }
 

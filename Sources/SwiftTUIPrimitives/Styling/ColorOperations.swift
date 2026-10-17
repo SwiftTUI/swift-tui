@@ -246,19 +246,14 @@ extension Color {
     -> Color
   {
     let t = _PrismNumeric.clamp(progress, 0.0, 1.0)
+    if t == 0 { return self }
+    if t == 1 { return other.converted(to: profile, gamutMapping: .compressPerceptual) }
     let alpha = _PrismNumeric.lerp(self.alpha, other.alpha, t)
 
     switch method {
     case .perceptual:
-      let a = self.oklab()
-      let b = other.oklab()
-      let mixed = OklabColor(
-        l: _PrismNumeric.lerp(a.l, b.l, t),
-        a: _PrismNumeric.lerp(a.a, b.a, t),
-        b: _PrismNumeric.lerp(a.b, b.b, t)
-      )
-      return Color._fromOklab(mixed, alpha: alpha, profile: self.profile).mapped(
-        to: self.profile, policy: .compressPerceptual)
+      return Self.perceptualMix(
+        PreparedPerceptualMixEndpoint(self), PreparedPerceptualMixEndpoint(other), progress: t)
 
     case .perceptualPolar(let huePath):
       let a = self.oklch()
@@ -327,6 +322,7 @@ extension Color {
 
 extension Color {
   public func lightened(by amount: Double) -> Color {
+    if amount < 0 { return darkened(by: -amount) }
     let t = _PrismNumeric.clamp(amount, 0, 1)
     let lch = oklch()
     let result = OklchColor(l: _PrismNumeric.lerp(lch.l, 1.0, t), c: lch.c, h: lch.h)
@@ -335,6 +331,7 @@ extension Color {
   }
 
   public func darkened(by amount: Double) -> Color {
+    if amount < 0 { return lightened(by: -amount) }
     let t = _PrismNumeric.clamp(amount, 0, 1)
     let lch = oklch()
     let result = OklchColor(l: _PrismNumeric.lerp(lch.l, 0.0, t), c: lch.c, h: lch.h)
@@ -367,7 +364,8 @@ extension Color {
   }
 
   public func withAlpha(_ alpha: Double) -> Color {
-    Color(red: red, green: green, blue: blue, alpha: alpha, profile: profile)
+    Color(
+      red: red, green: green, blue: blue, alpha: _PrismNumeric.clamp(alpha, 0, 1), profile: profile)
   }
 
   public func accessibleTextColor(light: Color = .white, dark: Color = .black) -> Color {

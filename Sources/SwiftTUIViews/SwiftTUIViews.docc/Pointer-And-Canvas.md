@@ -10,6 +10,19 @@ does not mean device pixels. Layout still uses integer `CellSize` and
 `CellRect`, but direct-manipulation APIs carry the fractional point when the
 runtime can obtain it.
 
+## Canvas paint and coverage
+
+Canvas geometry stays in continuous cell coordinates until grid sampling.
+Filled ellipses do not round their center and radii separately; negative radii
+use their magnitude, and rectangles with negative extents are standardized.
+Path fills and clip masks share subpixel coverage, including partially covered
+cells and even-odd holes.
+
+An inherited foreground gradient is sampled at each painted cell. Assigning
+`CanvasContext.foreground` replaces it with the drawing's final color. Direct
+cell glyphs without an explicit foreground inherit that paint and ancestor
+opacity. Wide direct glyphs own their continuation cells like ordinary text.
+
 ## Pointer Input
 
 Use gestures when the interaction has a recognizable shape:

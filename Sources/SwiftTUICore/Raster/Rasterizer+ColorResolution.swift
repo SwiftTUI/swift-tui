@@ -403,20 +403,23 @@ extension Rasterizer {
     bounds: CellRect,
     depth: Int = 0
   ) -> ResolvedShapeColorMode {
-    guard depth < 8 else {
-      return .constant(nil)
-    }
-
+    var authored = resolvedAuthoredColorMode(
+      from: style, environment: environment, bounds: bounds, depth: depth)
+    guard depth == 0 else { return authored }
     let profile = environment.accessibilityPreferences.colorProfile ?? .standard
-    let opaque =
-      environment.accessibilityPreferences.reduceTransparency == true && environment.isEnabled
-    if depth == 0, profile != .standard || opaque {
-      var authored = resolvedColorMode(
-        from: style, environment: environment, bounds: bounds, depth: 1)
-      if opaque { authored = applyingReducedTransparency(to: authored) }
-      return profile == .standard ? authored : applyingColorProfile(profile, to: authored)
+    if environment.accessibilityPreferences.reduceTransparency == true && environment.isEnabled {
+      authored = applyingReducedTransparency(to: authored)
     }
+    return profile == .standard ? authored : applyingColorProfile(profile, to: authored)
+  }
 
+  /// Depth counts only semantic/chrome alias resolution, where cycles can
+  /// occur. Structural paint composition must not exhaust that budget.
+  private func resolvedAuthoredColorMode(
+    from style: AnyShapeStyle, environment: StyleEnvironmentSnapshot,
+    bounds: CellRect, depth: Int
+  ) -> ResolvedShapeColorMode {
+    guard depth < 8 else { return .constant(nil) }
     switch style {
     case .color(let color):
       return .constant(color)
@@ -454,23 +457,23 @@ extension Rasterizer {
       return .tile(
         ResolvedTileColorMode(
           pattern: tile.pattern,
-          foreground: resolvedColorMode(
+          foreground: resolvedAuthoredColorMode(
             from: tile.foreground.style,
             environment: environment,
             bounds: bounds,
-            depth: depth + 1
+            depth: depth
           ),
           background: tile.background.map {
-            resolvedColorMode(
+            resolvedAuthoredColorMode(
               from: $0.style,
               environment: environment,
               bounds: bounds,
-              depth: depth + 1
+              depth: depth
             )
           }
         ))
     case .terminalChrome(let chromeStyle):
-      return resolvedColorMode(
+      return resolvedAuthoredColorMode(
         from: environment.theme.resolvedStyle(
           for: chromeStyle,
           appearance: environment.appearance
@@ -492,97 +495,24 @@ extension Rasterizer {
       guard resolvedStyle != style else {
         return .constant(nil)
       }
-      return resolvedColorMode(
+      return resolvedAuthoredColorMode(
         from: resolvedStyle,
         environment: environment,
         bounds: bounds,
         depth: depth + 1
       )
-    case .opacity(let inner, let amount):
-      guard amount > 0 else {
-        return .constant(nil)
+    case .opacity(let first, let firstAmount):
+      var inner = first
+      var amount = min(1, max(0, firstAmount))
+      while case .opacity(let next, let nextAmount) = inner {
+        amount *= min(1, max(0, nextAmount))
+        inner = next
       }
-      if case .meshGradient(let gradient) = inner {
-        return resolvedColorMode(
-          from: .meshGradient(
-            MeshGradient(
-              width: gradient.width,
-              height: gradient.height,
-              points: gradient.points,
-              colors: gradient.colors.map { $0.opacity(amount) },
-              background: gradient.background.opacity(amount),
-              smoothsColors: gradient.smoothsColors,
-              colorSpace: gradient.colorSpace
-            )
-          ),
-          environment: environment,
-          bounds: bounds,
-          depth: depth + 1
-        )
-      }
-      let innerMode = resolvedColorMode(
-        from: inner,
-        environment: environment,
-        bounds: bounds,
-        depth: depth + 1
-      )
-      switch innerMode {
-      case .opaque(let inner):
-        return .opaque(applyingOpacity(amount, to: inner))
-      case .accessibility(let inner, let profile):
-        return .accessibility(applyingOpacity(amount, to: inner), profile)
-      case .constant(let color):
-        guard let color else { return .constant(nil) }
-        return .constant(color.opacity(amount))
-      case .sampled(let gradient):
-        let faded = LinearGradient(
-          gradient: Gradient(
-            stops: gradient.gradient.stops.map {
-              .init(color: $0.color.opacity(amount), location: $0.location)
-            }),
-          startPoint: gradient.startPoint,
-          endPoint: gradient.endPoint
-        )
-        return .sampled(faded)
-      case .sampledRadial(let prepared):
-        // Fade the authored stops, then prepare again: the faded stop colors
-        // are what the sampler mixes, so the prepared endpoints and the
-        // transparent support must be derived from them.
-        let gradient = prepared.gradient
-        let faded = RadialGradient(
-          gradient: Gradient(
-            stops: gradient.gradient.stops.map {
-              .init(color: $0.color.opacity(amount), location: $0.location)
-            }),
-          center: gradient.center,
-          startRadius: gradient.startRadius,
-          endRadius: gradient.endRadius
-        )
-        return .sampledRadial(
-          PreparedRadialGradient(
-            faded, aspectRatio: prepared.aspectRatio, bounds: prepared.bounds))
-      case .sampledAngular(let gradient, let aspectRatio):
-        return .sampledAngular(
-          AngularGradient(
-            gradient: Gradient(
-              stops: gradient.gradient.stops.map {
-                .init(color: $0.color.opacity(amount), location: $0.location)
-              }),
-            center: gradient.center,
-            startAngle: gradient.startAngle,
-            endAngle: gradient.endAngle
-          ),
-          aspectRatio: aspectRatio)
-      case .sampledMesh(let gradient):
-        return .sampledMesh(gradient.applyingOpacity(amount))
-      case .tile(let tile):
-        return .tile(
-          ResolvedTileColorMode(
-            pattern: tile.pattern,
-            foreground: applyingOpacity(amount, to: tile.foreground),
-            background: tile.background.map { applyingOpacity(amount, to: $0) }
-          ))
-      }
+      guard amount > 0 else { return .constant(nil) }
+      return applyingOpacity(
+        amount,
+        to: resolvedAuthoredColorMode(
+          from: inner, environment: environment, bounds: bounds, depth: depth))
     }
   }
 
@@ -669,6 +599,7 @@ extension Rasterizer {
         sampleY: sampleY
       )
     }
+    guard (fg?.alpha ?? 0) > 0 || (bg?.alpha ?? 0) > 0 else { return nil }
     let resolved = accessibilityGraphicStyle(
       ResolvedTextStyle(
         foregroundColor: fg,

@@ -43,9 +43,7 @@ struct AdversarialSetBCanvasTests {
     let rightClip = cells(Text("x").clipShape(SetBRightHalf()), "rightClip", width: 1, height: 1)
     let fillPaints = mask(right[0][0]) != 0
     let clipKeeps = rightClip[0][0].character == "x"
-    withKnownIssue(
-      "the fill lights the half-cell's subpixels while the clip samples one point in the empty half"
-    ) {
+    do {
       #expect(fillPaints == clipKeeps, "fill paints \(fillPaints), clip keeps \(clipKeeps)")
     }
     let left = cells(SetBLeftHalf().fill(Color.red), "leftFill", width: 1, height: 1)
@@ -61,9 +59,7 @@ struct AdversarialSetBCanvasTests {
       Canvas { context in context.fillCircle(center: Point(x: 0.5, y: 0.5), radius: 0.25) },
       "circle", width: 2, height: 1)
     #expect(mask(grid[0][0]) != 0, "\(grid[0])")
-    withKnownIssue(
-      "the rounded radius spans one sample past the disc, into the neighbouring cell (adjacent to STUI-992)"
-    ) {
+    do {
       #expect(mask(grid[0][1]) == 0, "cell 1 mask \(mask(grid[0][1]))")
     }
     let spanning = cells(
@@ -82,7 +78,7 @@ struct AdversarialSetBCanvasTests {
       }, "wide", width: 2, height: 1)
     let text = cells(Text("界"), "wideText", width: 2, height: 1)
     #expect(text[0][0].spanWidth == 2 && text[0][1].continuationLeadX == 0, "\(text[0])")
-    withKnownIssue("setCell writes with width 1, so the wide glyph has no continuation") {
+    do {
       #expect(canvas[0][0].spanWidth == 2, "\(canvas[0][0])")
       #expect(canvas[0][1].continuationLeadX == 0, "\(canvas[0][1])")
     }
@@ -100,9 +96,7 @@ struct AdversarialSetBCanvasTests {
         context.setCell(at: .zero, character: "x", foreground: nil, background: nil)
       }.opacity(0.5), "direct", width: 1, height: 1)
     #expect(direct[0][0].character == "x", "\(direct[0][0])")
-    withKnownIssue(
-      "a direct cell without colours is written with a nil style and ignores the opacity factor"
-    ) {
+    do {
       let alpha = direct[0][0].style?.foregroundColor?.alpha
       #expect(
         alpha != nil && abs((alpha ?? 1) - 0.5) < 1e-9, "\(String(describing: direct[0][0].style))")
@@ -118,9 +112,7 @@ struct AdversarialSetBCanvasTests {
     let missing = (30...48).filter { x in
       !canvas.cell(x: x / 2, y: row / 4).contains(x: x % 2, y: row % 4)
     }
-    withKnownIssue(
-      "strokeEllipse point-samples 4(rx+ry) angles without joining neighbours (adjacent to STUI-992)"
-    ) {
+    do {
       #expect(missing.isEmpty, "unlit subpixels on row \(row): \(missing)")
     }
     let view = cells(Ellipse().stroke(Color.red), "ellipse", width: 40, height: 2)
@@ -130,9 +122,9 @@ struct AdversarialSetBCanvasTests {
     #expect(litColumns.count > 10, "\(litColumns)")
   }
 
-  // `smoothsColors` selects a different interpolation: a smoothed 2×2 mesh
-  // does not sample identically to the bilinear one.
-  @Test func setB266SmoothedMeshSamplesDifferFromBilinear() {
+  // Hermite interpolation reproduces a bilinear 2×2 patch exactly. A larger
+  // nonlinear lattice exercises its different derivatives and curvature.
+  @Test func setB266SmoothedMeshPreservesBilinearPatchesAndSmoothsNonlinearOnes() {
     func sample(smooth: Bool) -> Color {
       PreparedMeshGradient(
         input: .init(
@@ -146,11 +138,21 @@ struct AdversarialSetBCanvasTests {
     let flat = sample(smooth: false)
     let distance =
       abs(smooth.red - flat.red) + abs(smooth.green - flat.green) + abs(smooth.blue - flat.blue)
-    withKnownIssue(
-      "edge derivatives are one-sided full differences, so a 2×2 Hermite patch is exactly bilinear"
-    ) {
-      #expect(distance > 1e-3, "smooth \(smooth) flat \(flat)")
+    #expect(distance < 1e-6, "smooth \(smooth) flat \(flat)")
+    func nonlinear(smooth: Bool) -> Color {
+      PreparedMeshGradient(
+        input: .init(
+          width: 3, height: 3,
+          points: [
+            [0, 0], [0.5, 0], [1, 0], [0, 0.5], [0.5, 0.5], [1, 0.5], [0, 1], [0.5, 1], [1, 1],
+          ],
+          colors: [.black, .black, .black, .black, .white, .black, .black, .black, .black],
+          background: .clear, smoothsColors: smooth, colorSpace: .device),
+        bounds: .init(origin: .zero, size: .init(width: 8, height: 4))
+      )
+      .color(atCellX: 2, y: 1)
     }
+    #expect(abs(nonlinear(smooth: true).red - nonlinear(smooth: false).red) > 1e-3)
     #expect(smooth.red.isFinite && flat.red.isFinite)
   }
 
@@ -167,7 +169,7 @@ struct AdversarialSetBCanvasTests {
       .foregroundStyle(gradient), "gradient", width: 4, height: 1)
     let first = try #require(row[0][0].style?.foregroundColor, "\(row[0][0])")
     let last = try #require(row[0][3].style?.foregroundColor, "\(row[0][3])")
-    withKnownIssue("the canvas foreground is resolved once at the bounds origin") {
+    do {
       #expect(first != last, "both cells are \(first)")
       #expect(last.blue > first.blue, "first \(first) last \(last)")
     }
@@ -184,8 +186,7 @@ struct AdversarialSetBCanvasTests {
     let circle = cells(
       Canvas { context in context.fillCircle(center: Point(x: 0.5, y: 0.5), radius: -0.5) },
       "negativeRadius", width: 1, height: 1)
-    withKnownIssue("a negative width is rejected and a negative radius becomes a single centre dot")
-    {
+    do {
       #expect(mask(rect[0][0]) == 0xFF, "cell 0 mask \(mask(rect[0][0]))")
       #expect(mask(circle[0][0]).nonzeroBitCount >= 4, "mask \(mask(circle[0][0]))")
     }

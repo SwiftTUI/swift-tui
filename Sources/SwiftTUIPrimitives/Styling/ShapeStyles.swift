@@ -164,6 +164,8 @@ extension ShapeStyle {
         ))
     case .tileStyle(let tile):
       return .tileStyle(tile.applyingOpacity(clamped))
+    case .opacity(let inner, let amount):
+      return .opacity(inner, amount * clamped)
     case let style:
       // Semantic/chrome styles can't carry alpha until resolved -
       // wrap for deferred resolution in the rasterizer.

@@ -326,7 +326,7 @@ struct AdversarialSetAPathStrokeBoundaryTests {
         for dy in [-y, y] {
           let isPainted = pixel(canvas, 10 + dx, 8 + dy)
           if x == 6 {
-            withKnownIssue("STUI-992: ellipse scanline flooring drops exact boundary pixels") {
+            do {
               #expect(isPainted, "Exact ellipse boundary at x=\(10 + dx), y=\(8 + dy)")
             }
           } else {

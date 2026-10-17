@@ -94,11 +94,9 @@ extension Rasterizer {
     }
   }
 
-  /// Whether the cell at local `(cellRelX, cellRelY)` is inside the unit path,
-  /// tested at the cell's visual center using the exact
-  /// `(cellRelX·2 + 0.5, cellRelY·4 + 1.5)` subpixel convention that the
-  /// analytic curved shapes use, so the cell-walk route (tiles/gradients) and
-  /// the subpixel route agree on the silhouette.
+  /// Whether any subpixel of the cell is covered by the same scanline fill
+  /// used to paint the path. A clip or tile must not discard a half-covered
+  /// cell merely because one representative point lies outside the shape.
   internal func pathContainsCell(
     _ unitPath: Path,
     rule: FillRule,
@@ -110,10 +108,15 @@ extension Rasterizer {
     guard subW > 0, subH > 0 else {
       return false
     }
-    let px = Double(cellRelX * 2) + 0.5
-    let py = Double(cellRelY * 4) + 1.5
-    let unit = Point(x: px / Double(subW), y: py / Double(subH))
-    return unitPath.contains(unit, fillRule: rule)
+    guard cellRelX >= 0, cellRelY >= 0, cellRelX < subW / 2, cellRelY < subH / 4 else {
+      return false
+    }
+    let polylines = unitPath.scaledBy(sx: Double(subW), sy: Double(subH)).flattened(tolerance: 0.3)
+    return visitScanlineSpans(polylines, rule: rule, rows: (cellRelY * 4)..<(cellRelY * 4 + 4)) {
+      start, end, _ in
+      let first = max(Double(cellRelX * 2), (start - 0.5).rounded(.up))
+      return first < Double(cellRelX * 2 + 2) && first + 0.5 < end
+    }
   }
 
   // MARK: - Scanline fill
@@ -134,6 +137,19 @@ extension Rasterizer {
     subpixelHeight subH: Int,
     into canvas: inout BrailleCanvas
   ) {
+    _ = visitScanlineSpans(polylines, rule: rule, rows: 0..<subH) { start, end, row in
+      fillSpan(from: start, to: end, row: row, subpixelWidth: subW, into: &canvas)
+      return false
+    }
+  }
+
+  /// A cell is covered when any of its subpixel samples would be painted.
+  /// Fill and clip use the same flattened edges, half-open crossings and
+  /// center sampling, including parity holes and exact boundary ownership.
+  private func visitScanlineSpans(
+    _ polylines: [[Point]], rule: FillRule, rows: Range<Int>,
+    visit: (Double, Double, Int) -> Bool
+  ) -> Bool {
     var edges: [ScanEdge] = []
     for polyline in polylines where polyline.count >= 2 {
       var points = polyline
@@ -144,6 +160,7 @@ extension Rasterizer {
       for index in 0..<(points.count - 1) {
         let a = points[index]
         let b = points[index + 1]
+        guard a.x.isFinite, a.y.isFinite, b.x.isFinite, b.y.isFinite else { continue }
         if a.y == b.y {
           continue  // horizontal edges never cross a scanline
         }
@@ -153,11 +170,9 @@ extension Rasterizer {
             direction: b.y > a.y ? 1 : -1))
       }
     }
-    guard !edges.isEmpty else {
-      return
-    }
+    guard !edges.isEmpty else { return false }
 
-    for sy in 0..<subH {
+    for sy in rows {
       let y = Double(sy) + 0.5
       var crossings: [(x: Double, direction: Int)] = []
       for edge in edges {
@@ -182,14 +197,10 @@ extension Rasterizer {
         guard inside else {
           continue
         }
-        fillSpan(
-          from: crossings[index].x,
-          to: crossings[index + 1].x,
-          row: sy,
-          subpixelWidth: subW,
-          into: &canvas)
+        if visit(crossings[index].x, crossings[index + 1].x, sy) { return true }
       }
     }
+    return false
   }
 
   /// Lights every subpixel in row `row` whose center lies in `[xStart, xEnd)`.
@@ -205,8 +216,8 @@ extension Rasterizer {
     }
     // Subpixel `sx` has center `sx + 0.5`; include it when the center is in
     // `[xStart, xEnd)`.
-    let lo = max(0, Int((xStart - 0.5).rounded(.up)))
-    let hi = min(subW - 1, Int((xEnd - 0.5).rounded(.up)) - 1)
+    let lo = Int(min(Double(subW), max(0, (xStart - 0.5).rounded(.up))))
+    let hi = Int(min(Double(subW), max(0, (xEnd - 0.5).rounded(.up)))) - 1
     guard lo <= hi else {
       return
     }

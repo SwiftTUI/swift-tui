@@ -116,9 +116,7 @@ struct TerminalCellTextRenderer {
   private func styleResolvedForTerminal(
     _ style: ResolvedTextStyle
   ) -> ResolvedTextStyle {
-    guard let terminalBackgroundColor else {
-      return style
-    }
+    let terminalBackgroundColor = terminalBackgroundColor ?? Theme.default.background
 
     let backgroundColor = style.backgroundColor.map {
       colorResolvedForTerminal($0, over: terminalBackgroundColor)

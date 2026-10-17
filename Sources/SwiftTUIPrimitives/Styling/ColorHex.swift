@@ -57,9 +57,7 @@ extension Color {
       body = byte(a) + byte(r) + byte(g) + byte(b)
     }
 
-    if letterCase == .lowercase {
-      body = body.lowercased()
-    }
+    body = letterCase == .lowercase ? body.lowercased() : body.uppercased()
     return (prefix ? "#" : "") + body
   }
 }

@@ -61,16 +61,17 @@ extension TerminalCellTextRenderer {
     }
   }
 
+  // Canonical ANSI palette values. The terminal can theme these slots, but
+  // quantization must account for both normal and bright intensities.
   private static let ansi16Palette: [(Int, Color)] = [
-    (30, .init(hexRGB: 0x000000)),
-    (91, .init(hexRGB: 0xFF5555)),
-    (92, .init(hexRGB: 0x50C878)),
-    (93, .init(hexRGB: 0xFFD700)),
-    (94, .init(hexRGB: 0x6495ED)),
-    (95, .init(hexRGB: 0xDA70D6)),
-    (96, .init(hexRGB: 0x40E0D0)),
-    (97, .init(hexRGB: 0xF5F5F5)),
-    (90, .init(hexRGB: 0x808080)),
+    (30, .init(hexRGB: 0x000000)), (31, .init(hexRGB: 0x800000)),
+    (32, .init(hexRGB: 0x008000)), (33, .init(hexRGB: 0x808000)),
+    (34, .init(hexRGB: 0x000080)), (35, .init(hexRGB: 0x800080)),
+    (36, .init(hexRGB: 0x008080)), (37, .init(hexRGB: 0xC0C0C0)),
+    (90, .init(hexRGB: 0x808080)), (91, .init(hexRGB: 0xFF0000)),
+    (92, .init(hexRGB: 0x00FF00)), (93, .init(hexRGB: 0xFFFF00)),
+    (94, .init(hexRGB: 0x0000FF)), (95, .init(hexRGB: 0xFF00FF)),
+    (96, .init(hexRGB: 0x00FFFF)), (97, .init(hexRGB: 0xFFFFFF)),
   ]
 
   func closestANSI16ForegroundCode(
@@ -92,42 +93,22 @@ extension TerminalCellTextRenderer {
   func ansi256Code(
     for color: Color
   ) -> Int {
-    switch color {
-    case .black:
-      return 16
-    case .red:
-      return 203
-    case .green:
-      return 114
-    case .yellow:
-      return 179
-    case .blue:
-      return 111
-    case .magenta:
-      return 176
-    case .cyan:
-      return 117
-    case .white:
-      return 255
-    case .gray:
-      return 145
-    default:
-      break
+    let color = color.converted(to: .sRGB, gamutMapping: .clip)
+    let levels = [0.0, 95.0, 135.0, 175.0, 215.0, 255.0]
+    let channels = [color.red * 255, color.green * 255, color.blue * 255]
+    let indices = channels.map { value in
+      levels.indices.min { abs(levels[$0] - value) < abs(levels[$1] - value) }!
     }
-
-    let red = cubeIndex(color.red)
-    let green = cubeIndex(color.green)
-    let blue = cubeIndex(color.blue)
-    return 16 + (36 * red) + (6 * green) + blue
-  }
-
-  /// The 0...5 axis index for one component of the ANSI-256 color cube.
-  ///
-  /// Clamped for the same reason as ``colorByte(_:)``: an out-of-gamut
-  /// component would index outside the cube and select an unrelated code.
-  private func cubeIndex(
-    _ component: Double
-  ) -> Int {
-    Int((min(1, max(0, component)) * 5).rounded())
+    let cube = 16 + 36 * indices[0] + 6 * indices[1] + indices[2]
+    let cubeError = zip(channels, indices).reduce(0.0) { total, pair in
+      let delta = pair.0 - levels[pair.1]
+      return total + delta * delta
+    }
+    let mean = channels.reduce(0, +) / 3
+    let gray = min(23, max(0, Int(((mean - 8) / 10).rounded())))
+    let grayLevel = Double(8 + gray * 10)
+    let grayError = channels.reduce(0.0) { $0 + ($1 - grayLevel) * ($1 - grayLevel) }
+    // Exact cube colors keep their own slots; alpha does not select a palette.
+    return grayError < cubeError ? 232 + gray : cube
   }
 }
