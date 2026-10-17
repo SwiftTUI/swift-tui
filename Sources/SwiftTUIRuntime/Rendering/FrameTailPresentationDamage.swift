@@ -177,8 +177,18 @@ enum FrameTailPresentationDamageResolver {
         continue
       }
       if !previous.paintProjectionEquals(current) {
-        damage(current.bounds, into: &textRowRanges)
-        damage(previous.bounds, into: &textRowRanges)
+        // Clip/effect context applies to descendants whose commands may be
+        // unchanged. A changed mask can expose ink beyond the parent's slot.
+        let changesDescendantContext =
+          previous.clipBounds != current.clipBounds
+          || previous.metadata.shapeClips != current.metadata.shapeClips
+          || previous.drawEffects != current.drawEffects
+        damage(
+          changesDescendantContext ? current.subtreeBounds : current.paintBounds,
+          into: &textRowRanges)
+        damage(
+          changesDescendantContext ? previous.subtreeBounds : previous.paintBounds,
+          into: &textRowRanges)
       }
 
       let pairedCount = min(previous.children.count, current.children.count)

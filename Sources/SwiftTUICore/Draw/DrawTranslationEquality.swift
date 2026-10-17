@@ -186,6 +186,9 @@ extension DrawCommand {
             size: CellSize(width: 1, height: bounds.size.height)))
       }
       return rects.isEmpty ? [bounds] : rects
+    case .fill(let bounds, _, let inset, _, _) where inset < 0,
+      .stroke(let bounds, _, let inset, _, _, _, _) where inset < 0:
+      return shapeInsetBounds(bounds, by: inset).map { [$0] } ?? []
     case .group(let bounds, let children):
       let childRects = children.flatMap(\.inkRects)
       return childRects.isEmpty ? [bounds] : childRects
@@ -212,7 +215,8 @@ extension DrawCommand {
     in environment: StyleEnvironmentSnapshot
   ) -> (rect: CellRect, edge: Int)? {
     func edgeZone(_ geometry: ShapeGeometry, insetAmount: Int) -> Int? {
-      switch geometry {
+      guard insetAmount >= 0 else { return nil }
+      return switch geometry {
       case .rectangle:
         max(1, 1 + insetAmount)
       case .roundedRectangle(let cornerRadius):
@@ -321,7 +325,9 @@ extension DrawNode {
   ///
   /// Explicit stack, not recursion: draw trees are as deep as the authored
   /// view hierarchy and the frame tail runs on 512 KiB worker stacks.
-  package func paintsSubtreeTranslated(by dy: Int, as current: DrawNode) -> Bool {
+  package func paintsSubtreeTranslated(
+    by dy: Int, as current: DrawNode, within band: CellRect? = nil
+  ) -> Bool {
     var stack: [(previous: DrawNode, current: DrawNode)] = [(self, current)]
     while let (previous, current) = stack.popLast() {
       guard previous.identity == current.identity,
@@ -341,14 +347,15 @@ extension DrawNode {
       case (nil, nil):
         break
       case (.some(let previousClip), .some(let currentClip))
-      where currentClip == previousClip.offsetBy(dy: dy) || currentClip == previousClip:
-        // A clip that translates with the subtree preserves the projection
-        // wholesale. A *static* clip (a viewport) is also sound for the rows
-        // the walk serves: kept band rows and their sources both sit inside
-        // the band, which is the viewport intersected with the surface, so
-        // the clip cuts neither end of the translation; the clipped edges
-        // outside the band stay on the ordinary damage path.
+      where currentClip == previousClip.offsetBy(dy: dy):
         break
+      case (.some(let previousClip), .some(let currentClip)) where currentClip == previousClip:
+        // A stationary clip is invariant only when it covers every served
+        // source and destination row. Nested clips need their own edge damage.
+        guard let band, currentClip.origin.x <= band.origin.x,
+          currentClip.origin.y <= band.origin.y,
+          currentClip.maxX >= band.maxX, currentClip.maxY >= band.maxY
+        else { return false }
       default:
         return false
       }

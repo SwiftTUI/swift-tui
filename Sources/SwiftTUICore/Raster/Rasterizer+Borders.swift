@@ -20,7 +20,7 @@ extension Rasterizer {
       return
     }
 
-    let shapeBounds = insetBounds(bounds, by: max(0, insetAmount))
+    guard let shapeBounds = shapeInsetBounds(bounds, by: insetAmount) else { return }
     let geometry = geometry.resolved(in: shapeBounds.size)
     guard shapeBounds.size.width > 0, shapeBounds.size.height > 0 else {
       return

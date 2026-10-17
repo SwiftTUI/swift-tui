@@ -280,9 +280,9 @@ extension Rasterizer {
       guard intersect(node.subtreeBounds, clip) != nil else {
         return nil
       }
-      bounds = intersect(node.bounds, clip) ?? CellRect(origin: clip.origin, size: .zero)
+      bounds = intersect(node.paintBounds, clip) ?? CellRect(origin: clip.origin, size: .zero)
     } else {
-      bounds = node.bounds
+      bounds = node.paintBounds
     }
 
     return PaintVisibility(clip: clip, bounds: bounds)

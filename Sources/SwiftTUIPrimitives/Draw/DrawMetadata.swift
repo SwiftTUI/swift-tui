@@ -6,7 +6,7 @@ package struct DrawMetadata: Equatable, Sendable {
 
     package init(geometry: ShapeGeometry, insetAmount: Int) {
       self.geometry = geometry
-      self.insetAmount = max(0, insetAmount)
+      self.insetAmount = insetAmount
     }
   }
   /// List-specific styling preferences carried by draw metadata.

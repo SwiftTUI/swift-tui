@@ -567,7 +567,10 @@ package enum StrokePen: Equatable, Sendable {
       horizontal.east != .none, horizontal.east == horizontal.west,
       horizontal.north == .none, horizontal.south == .none,
       vertical.north != .none, vertical.north == vertical.south,
-      vertical.east == .none, vertical.west == .none
+      vertical.east == .none, vertical.west == .none,
+      borderSet.bottom == borderSet.top, borderSet.right == borderSet.left,
+      borderSet.top.count == 1, borderSet.left.count == 1,
+      Self.cornersMatch(borderSet, horizontal: horizontal.east, vertical: vertical.north)
     {
       self = .line(
         horizontal: horizontal.east,
@@ -598,6 +601,26 @@ package enum StrokePen: Equatable, Sendable {
         bottomLeading: borderSet.bottomLeading.first ?? " ",
         bottomTrailing: borderSet.bottomTrailing.first ?? " "
       ))
+  }
+
+  /// Classification must preserve the complete authored palette. A custom
+  /// edge or corner that a line alphabet cannot reproduce uses the edge pen.
+  private static func cornersMatch(
+    _ set: BorderSet, horizontal: LineWeight, vertical: LineWeight
+  ) -> Bool {
+    let rounded = set.topLeading == "╭"
+    return set.topLeading
+      == LineArms(east: horizontal, south: vertical)
+      .glyph(roundedCorner: rounded).map(String.init)
+      && set.topTrailing
+        == LineArms(south: vertical, west: horizontal)
+        .glyph(roundedCorner: rounded).map(String.init)
+      && set.bottomLeading
+        == LineArms(north: vertical, east: horizontal)
+        .glyph(roundedCorner: rounded).map(String.init)
+      && set.bottomTrailing
+        == LineArms(north: vertical, west: horizontal)
+        .glyph(roundedCorner: rounded).map(String.init)
   }
 
   /// Whether the pen can draw half a cell. Unicode has half-lines for the

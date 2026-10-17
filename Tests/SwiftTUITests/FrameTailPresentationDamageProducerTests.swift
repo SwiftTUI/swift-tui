@@ -158,6 +158,51 @@ struct FrameTailPresentationDamageProducerTests {
     #expect(plan.damage?.dirtyRows == [0, 1, 3, 4, 5])
   }
 
+  @Test(
+    "signed shape insets damage exterior ink when paint or ancestor clipping changes",
+    arguments: [false, true])
+  func negativeInsetDamagesExpandedPaint(clipChanges: Bool) throws {
+    let root = testIdentity("InsetDamage")
+    let wrapper = root.child("Wrapper")
+    let content = wrapper.child("Shape")
+    let placed = placedTree(
+      rootIdentity: root, wrapperIdentity: wrapper,
+      contentIdentity: content, contentRow: 10, contentWidth: 4)
+    func draw(_ color: Color) -> DrawNode {
+      var tree = drawTree(from: placed)
+      let bounds = tree.children[0].children[0].bounds
+      tree.children[0].children[0].commands = [
+        .fill(
+          bounds: bounds, geometry: .rectangle, insetAmount: -3,
+          style: .color(clipChanges ? .red : color), mode: .full)
+      ]
+      if clipChanges {
+        tree.children[0].clipBounds = color == .red ? bounds : shapeInsetBounds(bounds, by: -3)
+      }
+      return tree
+    }
+    let previous = draw(.red)
+    let current = draw(.blue)
+    let plan = FrameTailPresentationDamageResolver.resolve(
+      rootIdentity: root, placed: placed, draw: current,
+      retainedLayout: RetainedLayoutSession(
+        previousFrameIndex: RetainedFrameIndex(frame: frameArtifacts(placed: placed)),
+        invalidatedIdentities: [content]),
+      previousDraw: previous, previousSurfaceTopology: SurfaceTopologySignature(placedRoot: placed))
+    #expect(plan.barriers.isEmpty)
+    let damage = try #require(plan.damage)
+    #expect(damage.dirtyRows.contains(7))
+    #expect(damage.dirtyRows.contains(13))
+    let rasterizer = Rasterizer(incrementalVerificationPolicy: .trustSoundDamage)
+    let size = CellSize(width: 20, height: 20)
+    let old = rasterizer.rasterize(previous, minimumSize: size)
+    let next = rasterizer.rasterizeCollectingVisibleIdentities(
+      current, minimumSize: size, previousSurface: old, damage: damage,
+      verifyIncrementalRasterDamage: false)
+    #expect(next.path == .incremental)
+    #expect(next.surface.cells == Rasterizer().rasterize(current, minimumSize: size).cells)
+  }
+
   private func placedTree(
     rootIdentity: Identity,
     wrapperIdentity: Identity,

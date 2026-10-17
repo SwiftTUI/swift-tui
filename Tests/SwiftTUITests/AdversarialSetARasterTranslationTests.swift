@@ -95,7 +95,7 @@ struct AdversarialSetARasterTranslationTests {
     #expect(surface.cells[1][0].character == "│")
     let bottom = surface.cells[3][2].character
     let trailing = surface.cells[1][5].character
-    withKnownIssue("STUI-1012: line-pen classification discards asymmetric palette edges") {
+    do {
       #expect(bottom == "━")
       #expect(trailing == "║")
     }
@@ -160,7 +160,7 @@ struct AdversarialSetARasterTranslationTests {
     #expect(expected.cells[5][2].character == " ")
     #expect(expected.cells[10][2].character == "H")
     let cellsMatch = result.output.surface.cells == expected.cells
-    withKnownIssue("STUI-1014: nested stationary clip is mistaken for the outer viewport") {
+    do {
       #expect(cellsMatch, "\(firstDifference(result.output.surface, expected))")
     }
   }

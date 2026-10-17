@@ -2,16 +2,15 @@ extension Rasterizer {
   /// Decomposes a cell mask into disjoint rectangles. Equal runs in adjacent
   /// rows share one rectangle, so a rectangular clip paints its subtree once.
   internal func shapeClipRegions(node: DrawNode, clip: CellRect?) -> [CellRect] {
-    guard let bounds = intersect(node.bounds, clip ?? node.bounds), !bounds.isEmpty else {
-      return []
-    }
     let masks = node.metadata.shapeClips.map { mask in
-      let maximumInset = min(node.bounds.size.width, node.bounds.size.height) / 2
-      return (
-        mask.geometry,
-        mask.insetAmount > maximumInset ? nil : insetBounds(node.bounds, by: mask.insetAmount)
-      )
+      (mask.geometry, shapeInsetBounds(node.bounds, by: mask.insetAmount))
     }
+    guard var bounds = intersect(node.subtreeBounds, clip ?? node.subtreeBounds) else { return [] }
+    for (_, maskBounds) in masks {
+      guard let maskBounds, let intersection = intersect(bounds, maskBounds) else { return [] }
+      bounds = intersection
+    }
+    guard !bounds.isEmpty else { return [] }
     var rectangles: [CellRect] = []
     var previousRuns: [CellRect: Int] = [:]
     for y in bounds.origin.y..<bounds.maxY {

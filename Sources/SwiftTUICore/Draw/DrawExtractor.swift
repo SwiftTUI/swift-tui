@@ -524,12 +524,25 @@ extension DrawExtractor {
     // glyph, so a glyph written at zero opacity would still erase the content
     // beneath it.
     let paints = effectiveOpacity > 0
+    // A mask may expand paint beyond the layout slot, but shrinking or empty
+    // masks do not shrink the surface's layout extent. Exact coverage is
+    // evaluated by the raster mask; this is its conservative allocation clip.
+    var clipBounds: CellRect? = drawMetadata.clipsToBounds ? bounds : nil
+    for mask in drawMetadata.shapeClips {
+      let maskBounds =
+        shapeInsetBounds(bounds, by: min(0, mask.insetAmount))
+        ?? bounds
+      clipBounds =
+        clipBounds.map {
+          $0.intersection(maskBounds) ?? CellRect(origin: bounds.origin, size: .zero)
+        } ?? maskBounds
+    }
     return DrawNode(
       viewNodeID: projection.viewNodeID,
       identity: identity,
       environmentSnapshot: environmentSnapshot,
       bounds: bounds,
-      clipBounds: drawMetadata.clipsToBounds ? bounds : nil,
+      clipBounds: clipBounds,
       metadata: drawMetadata,
       drawEffects: drawEffects,
       commands: paints
@@ -743,14 +756,14 @@ extension DrawExtractor {
     let existingReservedWidth =
       switch mode {
       case .full:
-        max(0, insetAmount)
+        insetAmount
       case .interior(let strokeWidth):
-        max(0, insetAmount) + strokeWidth
+        insetAmount + strokeWidth
       }
     let borderReservedWidth =
-      max(0, inheritedBorderMask.insetAmount) + inheritedBorderMask.strokeWidth
+      inheritedBorderMask.insetAmount + inheritedBorderMask.strokeWidth
     let finalReservedWidth = max(existingReservedWidth, borderReservedWidth)
-    let finalInsetAmount = max(max(0, insetAmount), inheritedBorderMask.insetAmount)
+    let finalInsetAmount = max(insetAmount, inheritedBorderMask.insetAmount)
     let additionalInset = max(0, finalReservedWidth - finalInsetAmount)
     let finalMode: ShapeFillMode =
       additionalInset == 0 ? .full : .interior(strokeWidth: additionalInset)

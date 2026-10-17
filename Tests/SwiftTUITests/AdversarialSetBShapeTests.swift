@@ -260,7 +260,7 @@ struct AdversarialSetBShapeTests {
         "setB149-plain", width: 6, height: 4))
     #expect(plain.count == 8, "\(plain.sorted { $0.lexicographicallyPrecedes($1) })")
     #expect(grown.isSuperset(of: plain))
-    withKnownIssue("a negative inset is clamped to zero instead of growing the shape") {
+    do {
       #expect(grown.count > plain.count, "grown \(grown.count) plain \(plain.count)")
     }
 

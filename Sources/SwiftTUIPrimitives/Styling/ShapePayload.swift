@@ -66,7 +66,7 @@ public struct ShapePayload: Equatable, Sendable {
     operation: ShapeOperation
   ) {
     self.geometry = geometry
-    self.insetAmount = max(0, insetAmount)
+    self.insetAmount = insetAmount
     self.operation = operation
   }
 }

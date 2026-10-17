@@ -314,7 +314,7 @@ struct AdversarialSetBLayoutTests {
     #expect(textOrigin == CellPoint(x: 2, y: 0), "vertical \(String(describing: textOrigin))")
     let verticalLines = leadingOnly.rasterSurface.lines
     #expect(verticalLines.count == 1, "vertical \(verticalLines)")
-    withKnownIssue("a wide glyph on a vertical outset edge reserves width but paints blanks") {
+    do {
       #expect(verticalLines.first?.hasPrefix("界") == true, "vertical \(verticalLines)")
     }
     #expect(verticalLines.first?.hasSuffix("hi") == true, "vertical \(verticalLines)")

@@ -40,6 +40,11 @@ also fills with the foreground. `strokeBorder` is available on
 ``InsettableShape`` only, because it insets before stroking so the ring stays
 inside the frame.
 
+Signed insets compose: positive amounts shrink a shape and negative amounts
+expand its paint or clipping geometry beyond its layout frame. The public
+`path(in:)` bridge applies the same inset. Insets do not resize the layout slot;
+expanded paint participates in surface allocation and incremental damage.
+
 ## Custom paths
 
 Build a `Path` from lines and Bézier curves (`move(to:)`,

@@ -189,20 +189,8 @@ extension Rasterizer {
     }
   }
 
-  internal func insetBounds(
-    _ bounds: CellRect,
-    by inset: Int
-  ) -> CellRect {
-    CellRect(
-      origin: CellPoint(
-        x: bounds.origin.x + inset,
-        y: bounds.origin.y + inset
-      ),
-      size: CellSize(
-        width: max(0, bounds.size.width - (inset * 2)),
-        height: max(0, bounds.size.height - (inset * 2))
-      )
-    )
+  internal func insetBounds(_ bounds: CellRect, by inset: Int) -> CellRect {
+    shapeInsetBounds(bounds, by: inset) ?? CellRect(origin: bounds.origin, size: .zero)
   }
 
   /// Returns the background color currently on the raster surface at

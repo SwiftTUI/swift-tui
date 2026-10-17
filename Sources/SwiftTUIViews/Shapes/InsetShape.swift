@@ -22,7 +22,18 @@ public struct InsetShape<Base: InsettableShape>: InsettableShape, ResolvableView
   }
 
   public var insetAmount: Int {
-    base.insetAmount + max(0, amount)
+    let (total, overflow) = base.insetAmount.addingReportingOverflow(amount)
+    return overflow ? (amount > 0 ? Int.max : Int.min) : total
+  }
+
+  public func path(in rect: Rect) -> Path {
+    let inset = Double(amount)
+    return base.path(
+      in: Rect(
+        origin: Point(x: rect.origin.x + inset, y: rect.origin.y + inset),
+        size: Size(
+          width: max(0, rect.size.width - 2 * inset),
+          height: max(0, rect.size.height - 2 * inset))))
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -46,7 +57,7 @@ extension InsettableShape {
   public func inset(by amount: Int) -> some InsettableShape {
     InsetShape(
       base: self,
-      amount: max(0, amount)
+      amount: amount
     )
   }
 }

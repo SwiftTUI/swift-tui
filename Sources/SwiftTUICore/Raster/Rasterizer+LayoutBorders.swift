@@ -94,28 +94,22 @@ extension Rasterizer {
       }
     }
 
-    let track = RectangleStrokeTrack(
-      width: outer.size.width,
-      height: outer.size.height,
-      aspectRatio: environment.cellPixelMetrics.aspectRatio
-    )
-    track.forEachInk(
-      pen: StrokePen(borderSet: set, roundsCorners: stroke.lineJoin == .round),
-      sides: drawnSides,
-      mask: StrokeMask(stroke),
-      // Per-row cull (D70).
-      rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(outer.origin.y + $0) } }
-    ) { ink in
-      let cell = ink.cell
-      let x = outer.origin.x + cell.x
-      let y = outer.origin.y + cell.y
-      let glyph = mergedGlyph(
-        ink, atX: x, y: y, cells: cells, clip: clip, dirtyRows: dirtyRows, lineArms: lineArms)
-      let side = track.paintSide(for: cell, sides: drawnSides)
+    func paintGlyph(_ glyph: Character, side: BorderSide, localX: Int, localY: Int) {
+      var x = outer.origin.x + localX
+      let y = outer.origin.y + localY
+      let glyphWidth = max(1, cellWidth(of: glyph))
+      if side == .right { x -= glyphWidth - 1 }
+      // A horizontal edge tiles whole glyphs; never start inside the prior span.
+      if side == .top || side == .bottom,
+        localX > 0, localX < outer.size.width - 1,
+        (localX - (drawsLeft ? set.leftDisplayWidth : 0)) % glyphWidth != 0
+      {
+        return
+      }
       let cellForeground =
         perimeterColor(
-          atLocalX: cell.x,
-          localY: cell.y,
+          atLocalX: localX,
+          localY: localY,
           width: outer.size.width,
           height: outer.size.height,
           perimeter: perimeterColors
@@ -124,7 +118,7 @@ extension Rasterizer {
         ?? environment.theme.foreground
       writeBorderGlyph(
         glyph,
-        width: 1,
+        width: glyphWidth,
         foreground: cellForeground,
         background: resolvedBorderSideColor(
           mode(backgroundModes, for: side), bounds: outer, x: x, y: y),
@@ -138,6 +132,55 @@ extension Rasterizer {
         presentationRecorder: presentationRecorder,
         presentationEffects: presentationEffects
       )
+    }
+
+    // A rule collapses a one-cell-thick rectangle to an open line. A layout
+    // border still owns its explicitly selected orthogonal end edges. Resolve
+    // those edges as points when neither overlapping long edge is requested.
+    if outer.size.height == 1, !drawsTop, !drawsBottom {
+      let mask = StrokeMask(stroke)
+      if mask.isOn(at: 0, trackLength: Double(outer.size.width)) {
+        if drawsLeft, let glyph = set.left.first {
+          paintGlyph(glyph, side: .left, localX: 0, localY: 0)
+        }
+        if drawsRight, let glyph = set.right.first {
+          paintGlyph(glyph, side: .right, localX: outer.size.width - 1, localY: 0)
+        }
+      }
+      return
+    }
+    if outer.size.width == 1, !drawsLeft, !drawsRight {
+      let mask = StrokeMask(stroke)
+      if mask.isOn(at: 0, trackLength: Double(outer.size.height)) {
+        if drawsTop, let glyph = set.top.first {
+          paintGlyph(glyph, side: .top, localX: 0, localY: 0)
+        }
+        if drawsBottom, let glyph = set.bottom.first {
+          paintGlyph(glyph, side: .bottom, localX: 0, localY: outer.size.height - 1)
+        }
+      }
+      return
+    }
+
+    let track = RectangleStrokeTrack(
+      width: outer.size.width,
+      height: outer.size.height,
+      aspectRatio: environment.cellPixelMetrics.aspectRatio
+    )
+    track.forEachInk(
+      pen: StrokePen(borderSet: set, roundsCorners: stroke.lineJoin == .round),
+      sides: drawnSides,
+      mask: StrokeMask(stroke),
+      rows: dirtyRows.map { dirtyRows in { dirtyRows.contains(outer.origin.y + $0) } }
+    ) { ink in
+      let cell = ink.cell
+      let glyph = mergedGlyph(
+        ink, atX: outer.origin.x + cell.x, y: outer.origin.y + cell.y,
+        cells: cells, clip: clip, dirtyRows: dirtyRows, lineArms: lineArms)
+      paintGlyph(
+        glyph, side: track.paintSide(for: cell, sides: drawnSides),
+        localX: cell.x, localY: cell.y)
+
     }
   }
 

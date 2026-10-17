@@ -67,7 +67,7 @@ extension View {
   /// Clipping leaves layout and hit testing unchanged; use `contentShape`
   /// separately to constrain interaction. Multiple clips intersect.
   public func clipShape<S: Shape>(_ shape: S) -> some View {
-    var metadata = DrawMetadata(clipsToBounds: true)
+    var metadata = DrawMetadata()
     metadata.shapeClips = [.init(geometry: shape.fillGeometry, insetAmount: shape.insetAmount)]
     return drawMetadata(metadata)
   }

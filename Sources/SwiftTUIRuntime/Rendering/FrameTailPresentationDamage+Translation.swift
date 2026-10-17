@@ -53,7 +53,10 @@ extension FrameTailPresentationDamageResolver {
         taintStaticSubtree(previous, taint: &taint)
         continue
       }
-      if previous.paintsSubtreeTranslated(by: dy, as: current) {
+      if let clip = current.clipBounds, previous.clipBounds == clip {
+        taint.addStationaryClipEdges(clip)
+      }
+      if previous.paintsSubtreeTranslated(by: dy, as: current, within: band) {
         continue
       }
       guard previous.identity == current.identity else {
@@ -158,6 +161,17 @@ extension FrameTailPresentationDamageResolver {
       }
       if let currentRect {
         addDilated(currentRect.rows, shiftedBy: 0, columns: currentRect.columns)
+      }
+    }
+
+    /// A stationary clipping edge can expose or erase translated ink even
+    /// when every descendant command translates perfectly.
+    mutating func addStationaryClipEdges(_ clip: CellRect) {
+      guard clip.columns.overlaps(surfaceColumns) else { return }
+      for row in bandRows where clip.rows.contains(row) != clip.rows.contains(row - dy) {
+        for neighbor in (row - 1)...(row + 1) where bandRows.contains(neighbor) {
+          rows.insert(neighbor)
+        }
       }
     }
 

@@ -287,19 +287,25 @@ package struct DrawNode: Equatable, Sendable {
   package var viewNodeID: ViewNodeID?
   package var identity: Identity
   package var environmentSnapshot: EnvironmentSnapshot
-  package var bounds: CellRect
+  package var bounds: CellRect {
+    didSet { recomputeSubtreeAggregates() }
+  }
   package var clipBounds: CellRect?
   package var metadata: DrawMetadata {
     didSet { recomputeSubtreeAggregates() }
   }
   package var drawEffects: DrawEffects
-  package var commands: [DrawCommand]
+  package var commands: [DrawCommand] {
+    didSet { recomputeSubtreeAggregates() }
+  }
   /// Commands that must paint **after** this node's children have been
   /// fully painted.  Used by features that overdraw their children, such
   /// as inset-placement borders whose edge glyphs occupy the outermost
   /// cells of the child's frame and must therefore win the paint order
   /// against the child's own content.  Most nodes leave this empty.
-  package var postCommands: [DrawCommand]
+  package var postCommands: [DrawCommand] {
+    didSet { recomputeSubtreeAggregates() }
+  }
   package var children: [DrawNode] {
     didSet {
       recomputeSubtreeAggregates()
@@ -311,7 +317,7 @@ package struct DrawNode: Equatable, Sendable {
   package var subtreeNodeCount: Int { abs(subtreeNodeSummary) >> 1 }
   package var hasInheritedDrawContext: Bool { abs(subtreeNodeSummary) & 1 != 0 }
   package var subtreeHasShapeClip: Bool { subtreeNodeSummary < 0 }
-  /// The absolute union of this node's `bounds` and every descendant's
+  /// The absolute union of this node's layout and paint bounds and every descendant's
   /// `subtreeBounds`. `.offset`/`.position` bake their translation into the
   /// *child's* absolute bounds (the wrapper keeps its own slot), so a node's own
   /// `bounds` is not a sound basis for the incremental-repaint row cull: a
@@ -349,10 +355,20 @@ package struct DrawNode: Equatable, Sendable {
     recomputeSubtreeAggregates()
   }
 
+  /// Own ink can extend beyond the layout slot (for example a negative
+  /// shape inset). Both surface allocation and damage use this same extent.
+  package var paintBounds: CellRect {
+    var result = bounds
+    for command in commands + postCommands {
+      for ink in command.inkRects { result = result.union(ink) }
+    }
+    return result
+  }
+
   private mutating func recomputeSubtreeAggregates() {
     var count = 1
     var hasShapeClip = !metadata.shapeClips.isEmpty
-    var extent = bounds
+    var extent = paintBounds
     for child in children {
       count += child.subtreeNodeCount
       hasShapeClip = hasShapeClip || child.subtreeHasShapeClip
