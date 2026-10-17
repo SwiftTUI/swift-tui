@@ -15,6 +15,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
   public private(set) var isIndeterminate: Bool
   private var label: Label
   private var currentValueLabel: CurrentValueLabel
+  private var defaultValueLabel: (@MainActor @Sendable (Double, Double) -> CurrentValueLabel)? = nil
   private let authoringScope: AuthoringContext?
   @State private var indeterminatePhase: UInt64 = 0
 
@@ -68,7 +69,8 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     self.barWidth = barWidth
     isIndeterminate = false
     label = EmptyView()
-    currentValueLabel = Text(progressSummaryText(value: value, total: total))
+    currentValueLabel = Text("")
+    defaultValueLabel = { Text(progressSummaryText(value: $0, total: $1)) }
   }
 
   public init<S: StringProtocol>(
@@ -83,7 +85,8 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
     self.barWidth = barWidth
     isIndeterminate = false
     label = Text(String(title))
-    currentValueLabel = Text(progressSummaryText(value: value, total: total))
+    currentValueLabel = Text("")
+    defaultValueLabel = { Text(progressSummaryText(value: $0, total: $1)) }
   }
 
   public init(
@@ -111,6 +114,7 @@ public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
   }
 
   private func resolvedNode(in context: ResolveContext) -> ResolveWork<ResolvedNode> {
+    let currentValueLabel = defaultValueLabel?(value, total) ?? self.currentValueLabel
     let rawFraction = progressFraction(value: value, total: total)
     let fraction = rawFraction.isFinite ? rawFraction : 0
     let animates = isIndeterminate && !context.environmentValues.renderingReduceMotion

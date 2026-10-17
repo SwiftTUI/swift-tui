@@ -1,3 +1,4 @@
+import SwiftTUICore
 import Testing
 
 @testable import SwiftTUIViews
@@ -5,6 +6,44 @@ import Testing
 @MainActor
 @Suite("SwiftTUI control value math stress behavior", .serialized)
 struct FrameworkStressControlValueMathTests {
+  @Test(
+    "finite control formatting round-trips the representable extremes",
+    arguments: [
+      Double.leastNonzeroMagnitude, 1e-300, 1e-14, 1e-7, 1e16, 1e22,
+      Double.greatestFiniteMagnitude,
+    ])
+  func finiteFormattingRoundTrips(value: Double) {
+    for signed in [value, -value] {
+      let formatted = formattedControlValue(signed, bounds: nil, step: value)
+      #expect(Double(formatted) == signed)
+      #expect(!formatted.contains("e"))
+    }
+  }
+
+  @Test("integer track interpolation preserves adjacent large values")
+  func adjacentIntegerTrackValues() {
+    let lower = Int.max - 4
+    let bounds = lower...Int.max
+    for index in 0...4 {
+      #expect(Int.controlValue(at: Double(index) / 4, bounds: bounds, step: 1) == lower + index)
+    }
+    #expect(
+      Double.controlFraction(
+        0, bounds: -Double.greatestFiniteMagnitude...Double.greatestFiniteMagnitude) == 0.5)
+  }
+
+  @Test("pressing a quantized marker preserves every model value", arguments: 2...16)
+  func markerRoundTrip(width: Int) {
+    let track = CellRect(origin: .init(x: -10, y: 0), size: .init(width: width, height: 1))
+    for value in 0...10 {
+      let cell = sliderMarkerPosition(fraction: Double(value) / 10, width: width)
+      #expect(
+        sliderValue(
+          at: Double(cell - 10) + 0.5, in: track, bounds: 0...10,
+          step: 1, currentValue: value) == value)
+    }
+  }
+
   @Test("stress control value math 001 negative integer step uses its magnitude")
   func controlValueMath001NegativeIntegerStepUsesMagnitude() {
     // Hypothesis: a negative authored step can invert the requested delta instead of being sanitized.

@@ -37,13 +37,15 @@ func updateBoundControlValue<Value: AdjustableControlValue>(
   step: Value,
   bounds: ClosedRange<Value>?
 ) -> Bool {
+  let current = binding.wrappedValue
+  guard current.controlDoubleValue.isFinite else { return false }
   let next = steppedControlValue(
-    from: binding.wrappedValue,
+    from: current,
     delta: delta,
     step: step,
     bounds: bounds
   )
-  guard next != binding.wrappedValue else {
+  guard next.controlDoubleValue.isFinite, next != current else {
     return false
   }
   binding.wrappedValue = next
@@ -63,9 +65,10 @@ func accessibilityNumericAction<Value: AdjustableControlValue>(
   case .decrement:
     return adjust(-1) ? .changed : .unchanged
   case .setValue(.number(let number)):
-    guard let next = Value.accessibilityValue(number) else { return .invalidValue }
+    guard let authored = Value.accessibilityValue(number) else { return .invalidValue }
+    let next = clampedControlValue(authored, to: bounds)
     guard next != binding.wrappedValue else { return .unchanged }
-    binding.wrappedValue = clampedControlValue(next, to: bounds)
+    binding.wrappedValue = next
     return .changed
   default: return .unsupported
   }

@@ -138,17 +138,7 @@ extension Slider {
           accessibilityNumericAction(action, binding: binding, bounds: bounds, adjust: adjust)
         }
       ) {
-        let next = steppedControlValue(
-          from: binding.wrappedValue,
-          delta: 1,
-          step: adjustmentStep,
-          bounds: bounds
-        )
-        guard next != binding.wrappedValue else {
-          return false
-        }
-        binding.wrappedValue = next
-        return true
+        adjust(1)
       }
       registerValueAdjustmentInput(intake: intake, identity: context.identity, adjust: adjust)
       let trackRouteID = runtimePrimaryRouteID(
@@ -159,11 +149,14 @@ extension Slider {
       intake.registerPointerHandler(routeID: trackRouteID) { event in
         switch event.kind {
         case .down(.primary), .dragged(.primary), .up(.primary):
+          let preserveMarker: Bool
+          if case .dragged = event.kind { preserveMarker = false } else { preserveMarker = true }
           let next = sliderValue(
             at: event.location.location.x,
             in: event.targetRect,
             bounds: bounds,
-            step: trackStep
+            step: trackStep,
+            currentValue: preserveMarker ? binding.wrappedValue : nil
           )
           if next != binding.wrappedValue { binding.wrappedValue = next }
           return .claimed

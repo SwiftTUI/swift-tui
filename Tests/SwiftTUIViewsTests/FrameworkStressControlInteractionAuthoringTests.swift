@@ -18,16 +18,16 @@ struct FrameworkStressControlInteractionAuthoringTests {
     #expect(value == 3)
   }
 
-  @Test("stress control interaction 015 three-cell slider reserves both border cells")
-  func controlInteraction015ThreeCellSliderReservesBothBorders() {
-    // Hypothesis: the minimum bordered slider can expose a phantom second selectable position.
+  @Test("stress control interaction 015 three-cell slider exposes its complete track")
+  func controlInteraction015ThreeCellSliderUsesEveryCell() {
+    // The protected track slot contains only track cells, without inferred decoration.
     let value = sliderValue(
       at: 12.5,
       in: .init(origin: .init(x: 10, y: 0), size: .init(width: 3, height: 1)),
       bounds: 0...10,
       step: 1
     )
-    #expect(value == 0)
+    #expect(value == 10)
   }
 
   @Test("stress control interaction 016 shifted slider midpoint ignores global origin")

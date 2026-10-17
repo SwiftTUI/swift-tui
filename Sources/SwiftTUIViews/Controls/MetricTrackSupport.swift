@@ -4,31 +4,25 @@ package func progressFraction(
   value: Double,
   total: Double
 ) -> Double {
+  guard !value.isNaN else { return 0 }
   guard total > 0 else {
     return value > 0 ? 1 : 0
   }
 
-  return min(max(value / total, 0), 1)
+  let fraction = value / total
+  return fraction.isNaN ? 0 : min(max(fraction, 0), 1)
 }
 
 package func metricValueString(
   _ value: Double
 ) -> String {
-  if value.isNaN || value.isInfinite {
-    return "0"
-  }
-
-  let rounded = value.rounded()
-  if abs(rounded - value) < 0.000_1 {
-    return String(Int(rounded))
-  }
-
-  let scaled = (value * 10).rounded() / 10
-  let sign = scaled < 0 ? "-" : ""
-  let absolute = abs(scaled)
-  let whole = Int(absolute.rounded(.towardZero))
-  let fractional = Int((absolute * 10).rounded()) % 10
-  return "\(sign)\(whole).\(fractional)"
+  guard value.isFinite else { return "0" }
+  // One decimal is useful for ordinary counts, but a fixed decimal place
+  // cannot describe sub-unit totals. Keep their significant digits.
+  let rounded =
+    abs(value) >= 1 && (value * 10).isFinite
+    ? (value * 10).rounded() / 10 : value
+  return trimmedControlString(rounded)
 }
 
 package func progressSummaryText(
@@ -56,10 +50,11 @@ package func metricTrackString(
   barWidth: Int
 ) -> (filled: String, empty: String) {
   let segmentCount = max(1, barWidth)
-  let filledCount = min(
-    segmentCount,
-    max(0, Int((fraction * Double(segmentCount)).rounded()))
-  )
+  let normalized = fraction.isNaN ? 0 : min(max(fraction, 0), 1)
+  let filledCount =
+    normalized >= 1
+    ? segmentCount
+    : min(segmentCount, max(0, Int((normalized * Double(segmentCount)).rounded())))
   let emptyCount = max(0, segmentCount - filledCount)
   return (
     filled: String(repeating: "█", count: filledCount),

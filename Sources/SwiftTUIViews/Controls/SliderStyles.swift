@@ -168,7 +168,8 @@ public struct SliderStyleConfiguration: Sendable {
   /// It is currently the constant `8`: nothing authored or environmental
   /// changes it. A style may draw any width inside
   /// ``track(content:)``, and the pointer mapping follows the width the style
-  /// actually renders.
+  /// actually renders, from its first cell center to its last. Place any
+  /// decorative caps outside the protected track slot.
   public var trackCellCount: Int
   /// Whether the control is interactive.
   ///
@@ -414,10 +415,7 @@ private struct LinearSliderStyleBody: View {
       isEnabled: configuration.isEnabled, isFocused: configuration.focusActive,
       isPressed: configuration.isPressed)
     let width = max(1, configuration.trackCellCount)
-    let fraction =
-      configuration.fractionCompleted.isFinite
-      ? min(max(configuration.fractionCompleted, 0), 1) : 0
-    let position = min(width - 1, max(0, Int((fraction * Double(width - 1)).rounded())))
+    let position = sliderMarkerPosition(fraction: configuration.fractionCompleted, width: width)
     ControlStyleRow(
       chrome: chrome, focusActive: configuration.focusActive, isHighlighted: active
     ) {

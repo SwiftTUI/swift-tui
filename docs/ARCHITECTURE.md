@@ -362,7 +362,13 @@ Circular indeterminate progress composes the environment-styled `Spinner`.
 `Controls/SliderStyles.swift` and `StepperStyles.swift` own the value-control
 style contracts and built-ins. Numeric normalization, formatting, and typed updates remain in
 `ControlValueMath.swift`, the slider/stepper primitives, and
-`AdjustableControlValueSupport.swift`. The shared `Foundation/StyleRoute.swift`
+`AdjustableControlValueSupport.swift`. Integer normalization subtracts in an
+exact wide integer before converting to a fraction. Decimal labels expand the
+shortest finite representation without a fixed fractional precision or scaled
+integer conversion. Slider styles expose the complete track slot: its endpoint
+cell centers map to the bounds, and pressing the current quantized marker
+preserves its value. Default progress labels derive from the current public
+value and total on each resolve. The shared `Foundation/StyleRoute.swift`
 wrapper forwards optional pointer capture to `Controls/PointerRouteView.swift`.
 
 `Presentation/PaletteStyles.swift` defines data-only command configurations and

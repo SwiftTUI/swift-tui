@@ -10,7 +10,7 @@ import Testing
 struct AdversarialSetAControlBoundaryTests {
   @Test func setA376TinySliderRangeStillFillsItsTrack() {
     // Hypothesis: an absolute epsilon in fraction calculation shrinks valid tiny ranges.
-    withKnownIssue("STUI-973: An absolute span epsilon distorts valid tiny slider ranges") {
+    do {
       #expect(sliderFraction(value: 5e-14, bounds: 0.0...1e-13) == 0.5)
       #expect(sliderFraction(value: 1e-13, bounds: 0.0...1e-13) == 1)
     }
@@ -19,7 +19,7 @@ struct AdversarialSetAControlBoundaryTests {
   @Test func setA377SmallControlValuesRemainDistinguishableFromZero() {
     // Hypothesis: fixed six-place display formatting erases a supported fractional step.
     let rendered = formattedControlValue(1e-7, bounds: 0.0...1e-5, step: 1e-7)
-    withKnownIssue("STUI-974: Six-place display conversion erases supported small values") {
+    do {
       #expect(Double(rendered) == 1e-7)
     }
   }
@@ -45,8 +45,7 @@ struct AdversarialSetAControlBoundaryTests {
   @Test func setA380LargeIntegerSliderPreservesAdjacentPositions() {
     // Hypothesis: conversion before subtraction loses adjacent Int values above Double's exact range.
     let lower = 9_007_199_254_740_992
-    withKnownIssue("STUI-975: Converting Int operands before subtraction loses adjacent positions")
-    {
+    do {
       #expect(sliderFraction(value: lower + 1, bounds: lower...(lower + 4)) == 0.25)
     }
   }
@@ -160,6 +159,9 @@ struct AdversarialSetAControlBoundaryTests {
       }.pickerStyle(.menu)
     }
     defer { h.shutdown() }
+    // Initial automatic focus opens the menu; establish a collapsed trigger
+    // before exercising the pointer-open and Escape-dismiss sequence.
+    try h.pressKey(.init(.escape))
     try h.clickText("Beta")
     try #require(h.frame.contains("Alpha"), "Opening the menu must expose its unselected option")
     try h.pressKey(.init(.escape))
@@ -250,7 +252,7 @@ struct AdversarialSetAControlBoundaryTests {
     let h = try harness(397) { progress }
     defer { h.shutdown() }
     let frame = try h.render()
-    withKnownIssue("STUI-976: Default progress summary retains initializer values") {
+    do {
       #expect(frame.contains("8/10"))
     }
     let node = try #require(

@@ -30,6 +30,8 @@ protocol AdjustableControlValue: Comparable, SignedNumeric, Sendable {
     bounds: ClosedRange<Self>,
     step: Self
   ) -> Self
+  static func controlFraction(_ value: Self, bounds: ClosedRange<Self>) -> Double
+  static func controlValue(at fraction: Double, bounds: ClosedRange<Self>, step: Self) -> Self
   static func formattedControlValue(
     _ value: Self,
     bounds: ClosedRange<Self>?,
@@ -74,14 +76,35 @@ extension Int: AdjustableControlValue {
     bounds: ClosedRange<Int>,
     step: Int
   ) -> Int {
-    let sanitizedStep = sanitizedControlStep(step)
-    let lower = Double(bounds.lowerBound)
-    let upper = Double(bounds.upperBound)
-    let clampedRaw = Swift.min(Swift.max(rawValue, lower), upper)
-    let snapped =
-      lower
-      + ((clampedRaw - lower) / Double(sanitizedStep)).rounded() * Double(sanitizedStep)
-    return clampedControlValue(Int(snapped.rounded()), to: bounds)
+    guard !rawValue.isNaN, rawValue > Double(bounds.lowerBound) else { return bounds.lowerBound }
+    guard rawValue < Double(bounds.upperBound) else { return bounds.upperBound }
+    return snappedTrackValue(Int128(rawValue.rounded()), bounds: bounds, step: step)
+  }
+
+  static func controlFraction(_ value: Int, bounds: ClosedRange<Int>) -> Double {
+    guard bounds.upperBound > bounds.lowerBound else { return 0 }
+    let bounded = clampedControlValue(value, to: bounds)
+    // Subtract exactly before converting: adjacent values above 2^53 remain distinct.
+    return Double(Int128(bounded) - Int128(bounds.lowerBound))
+      / Double(Int128(bounds.upperBound) - Int128(bounds.lowerBound))
+  }
+
+  static func controlValue(at fraction: Double, bounds: ClosedRange<Int>, step: Int) -> Int {
+    guard fraction > 0 else { return bounds.lowerBound }
+    guard fraction < 1 else { return bounds.upperBound }
+    let distance = Int128(bounds.upperBound) - Int128(bounds.lowerBound)
+    let offset = Int128((Double(distance) * fraction).rounded())
+    return snappedTrackValue(Int128(bounds.lowerBound) + offset, bounds: bounds, step: step)
+  }
+
+  private static func snappedTrackValue(_ value: Int128, bounds: ClosedRange<Int>, step: Int) -> Int
+  {
+    let lower = Int128(bounds.lowerBound)
+    let quantum = Int128(sanitizedControlStep(step))
+    let distance = value - lower
+    let count = (distance + quantum / 2) / quantum
+    let snapped = lower + count * quantum
+    return Int(Swift.min(Swift.max(snapped, lower), Int128(bounds.upperBound)))
   }
 
   static func formattedControlValue(
@@ -125,18 +148,40 @@ extension Double: AdjustableControlValue {
     bounds: ClosedRange<Double>,
     step: Double
   ) -> Double {
-    let sanitizedStep = sanitizedControlStep(step)
     let lower = bounds.lowerBound
     let upper = bounds.upperBound
-    let clampedRaw = Swift.min(Swift.max(rawValue, lower), upper)
-    let snapped =
-      lower
-      + ((clampedRaw - lower) / sanitizedStep).rounded() * sanitizedStep
-    return cleanedControlDouble(
-      clampedControlValue(snapped, to: bounds),
-      step: sanitizedStep,
-      bounds: bounds
-    )
+    guard !rawValue.isNaN, rawValue > lower else { return lower }
+    guard rawValue < upper else { return upper }
+    let quantum = sanitizedControlStep(step)
+    let count = ((rawValue - lower) / quantum).rounded()
+    // If the grid is finer than Double can represent, the sample already
+    // has all available precision. Never manufacture infinity from a finite sample.
+    let candidate = lower + count * quantum
+    let snapped = candidate.isFinite ? candidate : rawValue
+    return clampedControlValue(
+      cleanedControlDouble(snapped, step: quantum, bounds: bounds), to: bounds)
+  }
+
+  static func controlFraction(_ value: Double, bounds: ClosedRange<Double>) -> Double {
+    let lower = bounds.lowerBound
+    let upper = bounds.upperBound
+    guard upper > lower, !value.isNaN, value > lower else { return 0 }
+    guard value < upper else { return 1 }
+    let span = upper - lower
+    // Halving all operands avoids overflow for opposite finite extremes.
+    let fraction =
+      span.isFinite
+      ? (value - lower) / span
+      : (value / 2 - lower / 2) / (upper / 2 - lower / 2)
+    return fraction.isFinite ? Swift.min(Swift.max(fraction, 0), 1) : 0
+  }
+
+  static func controlValue(at fraction: Double, bounds: ClosedRange<Double>, step: Double) -> Double
+  {
+    guard fraction > 0 else { return bounds.lowerBound }
+    guard fraction < 1 else { return bounds.upperBound }
+    let raw = (1 - fraction) * bounds.lowerBound + fraction * bounds.upperBound
+    return controlValueFromTrack(raw, bounds: bounds, step: step)
   }
 
   static func formattedControlValue(
@@ -210,12 +255,9 @@ func stepperCanAdjust<Value: AdjustableControlValue>(
   step: Value,
   bounds: ClosedRange<Value>?
 ) -> Bool {
-  steppedControlValue(
-    from: value,
-    delta: delta,
-    step: step,
-    bounds: bounds
-  ) != value
+  guard value.controlDoubleValue.isFinite else { return false }
+  let next = steppedControlValue(from: value, delta: delta, step: step, bounds: bounds)
+  return next.controlDoubleValue.isFinite && next != value
 }
 
 func pointerSelectionDelta(
@@ -248,24 +290,14 @@ func sliderValue<Value: AdjustableControlValue>(
   at locationX: Double,
   in trackRect: CellRect,
   bounds: ClosedRange<Value>,
-  step: Value
+  step: Value,
+  currentValue: Value? = nil
 ) -> Value {
-  let usableRect: CellRect =
-    if trackRect.size.width > 2 {
-      .init(
-        origin: .init(x: trackRect.origin.x + 1, y: trackRect.origin.y),
-        size: .init(width: max(1, trackRect.size.width - 2), height: trackRect.size.height)
-      )
-    } else {
-      trackRect
-    }
-
+  // The style's protected track slot is the complete interaction surface.
+  // Decorative caps belong outside that slot; the primitive cannot infer them.
+  let usableRect = trackRect
   guard usableRect.size.width > 1 else {
-    return Value.controlValueFromTrack(
-      bounds.lowerBound.controlDoubleValue,
-      bounds: bounds,
-      step: step
-    )
+    return bounds.lowerBound
   }
 
   let firstCenter = Double(usableRect.origin.x) + 0.5
@@ -273,17 +305,21 @@ func sliderValue<Value: AdjustableControlValue>(
     Double(usableRect.origin.x + max(0, usableRect.size.width - 1)) + 0.5
   let finiteLocationX = locationX.isFinite ? locationX : firstCenter
   let clampedX = min(max(finiteLocationX, firstCenter), lastCenter)
+  if let currentValue, currentValue.controlDoubleValue.isFinite,
+    bounds.contains(currentValue),
+    Int((clampedX - firstCenter).rounded())
+      == sliderMarkerPosition(
+        fraction: Value.controlFraction(currentValue, bounds: bounds),
+        width: usableRect.size.width)
+  {
+    // Several values can share a terminal cell. Pressing the current marker
+    // preserves the model instead of snapping it to a different value in that cell.
+    return currentValue
+  }
   let normalized =
     (clampedX - firstCenter)
-    / max(leastMeaningfulControlDelta, lastCenter - firstCenter)
-  let rawValue =
-    bounds.lowerBound.controlDoubleValue
-    + normalized * (bounds.upperBound.controlDoubleValue - bounds.lowerBound.controlDoubleValue)
-  return Value.controlValueFromTrack(
-    rawValue,
-    bounds: bounds,
-    step: step
-  )
+    / (lastCenter - firstCenter)
+  return Value.controlValue(at: normalized, bounds: bounds, step: step)
 }
 
 /// Derives the effective steps for a continuous (`step: nil`) slider.
@@ -331,44 +367,23 @@ func sliderFraction<Value: AdjustableControlValue>(
   value: Value,
   bounds: ClosedRange<Value>
 ) -> Double {
-  let lower = bounds.lowerBound.controlDoubleValue
-  let upper = bounds.upperBound.controlDoubleValue
-  let span = max(leastMeaningfulControlDelta, upper - lower)
-  let fraction = (value.controlDoubleValue - lower) / span
-  return fraction.isFinite ? min(max(fraction, 0), 1) : 0
+  Value.controlFraction(value, bounds: bounds)
 }
-
-private let leastMeaningfulControlDelta = 1e-12
-private let maxControlFractionDigits = 6
 
 private func cleanedControlDouble(
   _ value: Double,
   step: Double,
   bounds: ClosedRange<Double>?
 ) -> Double {
-  guard value.isFinite else {
-    return value
+  guard value.isFinite, value != 0 else { return value }
+  let minimumPrecision = controlDisplayPrecision(step: step, bounds: bounds)
+  if trimmedDecimalPlaces(for: value) <= minimumPrecision { return value }
+  // Cleanup removes floating-point operation noise, not meaningful small values.
+  let tolerance = min(abs(step) * 1e-6, max(abs(value) * 1e-14, value.ulp * 4))
+  for precision in minimumPrecision...max(minimumPrecision, 17) {
+    let rounded = roundedControlDouble(value, precision: precision)
+    if rounded.isFinite, abs(rounded - value) <= tolerance { return rounded }
   }
-
-  let minimumPrecision = controlDisplayPrecision(
-    step: step,
-    bounds: bounds
-  )
-  let tolerance = max(
-    leastMeaningfulControlDelta,
-    abs(step) * 1e-6
-  )
-
-  for precision in minimumPrecision...maxControlFractionDigits {
-    let rounded = roundedControlDouble(
-      value,
-      precision: precision
-    )
-    if abs(rounded - value) <= tolerance {
-      return rounded
-    }
-  }
-
   return value
 }
 
@@ -381,10 +396,7 @@ private func controlDisplayPrecision(
     + [bounds?.lowerBound, bounds?.upperBound]
     .compactMap { $0 }
     .map(trimmedDecimalPlaces(for:))
-  return min(
-    max(0, componentPrecisions.max() ?? 0),
-    maxControlFractionDigits
-  )
+  return min(324, max(0, componentPrecisions.max() ?? 0))
 }
 
 private func roundedControlDouble(
@@ -399,6 +411,7 @@ private func roundedControlDouble(
   for _ in 0..<precision {
     scale *= 10
   }
+  guard scale.isFinite, (value * scale).isFinite else { return value }
   return (value * scale).rounded() / scale
 }
 
@@ -429,59 +442,41 @@ private func decimalPlaces(
   return fraction.count
 }
 
-private func trimmedControlString(
-  _ value: Double
-) -> String {
+/// Expands Double's shortest round-trip decimal representation using string
+/// arithmetic. No scaled Int conversion, fixed precision cap, or lost tiny values.
+func trimmedControlString(_ value: Double) -> String {
+  guard value.isFinite else { return "0" }
+  if value == 0 { return "0" }
   var text = String(value)
-  if text.contains("e") || text.contains("E") {
-    text = fixedControlString(
-      value,
-      precision: maxControlFractionDigits
-    )
-  }
-
-  if let decimalIndex = text.firstIndex(of: ".") {
-    var fraction = text[text.index(after: decimalIndex)...]
-    while fraction.last == "0" {
-      fraction.removeLast()
+  if let exponentIndex = text.firstIndex(where: { $0 == "e" || $0 == "E" }),
+    let exponent = Int(text[text.index(after: exponentIndex)...])
+  {
+    let negative = text.first == "-"
+    let mantissa = text[
+      (negative ? text.index(after: text.startIndex) : text.startIndex)..<exponentIndex]
+    let parts = mantissa.split(separator: ".")
+    let digits = parts.joined()
+    let decimalPosition = parts[0].count + exponent
+    if decimalPosition <= 0 {
+      text = "0." + String(repeating: "0", count: -decimalPosition) + digits
+    } else if decimalPosition >= digits.count {
+      text = digits + String(repeating: "0", count: decimalPosition - digits.count)
+    } else {
+      let split = digits.index(digits.startIndex, offsetBy: decimalPosition)
+      text = String(digits[..<split]) + "." + digits[split...]
     }
-
-    text =
-      fraction.isEmpty
-      ? String(text[..<decimalIndex])
-      : "\(text[..<decimalIndex]).\(fraction)"
+    if negative { text = "-" + text }
   }
-
-  return text == "-0" ? "0" : text
+  if text.contains(".") {
+    while text.last == "0" { text.removeLast() }
+    if text.last == "." { text.removeLast() }
+  }
+  return text
 }
 
-private func fixedControlString(
-  _ value: Double,
-  precision: Int
-) -> String {
-  let rounded = roundedControlDouble(
-    value,
-    precision: precision
-  )
-  let isNegative = rounded < 0
-  var scale = 1.0
-  for _ in 0..<precision {
-    scale *= 10
-  }
-
-  let scaledMagnitude = Int64(abs(rounded * scale).rounded())
-  let integerScale = Int64(scale.rounded())
-  let whole = scaledMagnitude / integerScale
-  let fraction = scaledMagnitude % integerScale
-
-  guard precision > 0 else {
-    return "\(isNegative ? "-" : "")\(whole)"
-  }
-
-  let fractionText = String(fraction)
-  let paddedFraction =
-    fractionText.count < precision
-    ? String(repeating: "0", count: precision - fractionText.count) + fractionText
-    : fractionText
-  return "\(isNegative ? "-" : "")\(whole).\(paddedFraction)"
+func sliderMarkerPosition(fraction: Double, width: Int) -> Int {
+  let last = max(0, width - 1)
+  let normalized = fraction.isFinite ? min(max(fraction, 0), 1) : 0
+  if normalized == 1 { return last }
+  return min(last, max(0, Int((normalized * Double(last)).rounded())))
 }

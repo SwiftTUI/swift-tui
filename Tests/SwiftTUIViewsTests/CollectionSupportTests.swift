@@ -244,7 +244,7 @@ struct CollectionSupportTests {
         in: .init(origin: .zero, size: .init(width: 4, height: 1)),
         bounds: 0.0...1.0,
         step: 0.01
-      ) == 0.25
+      ) == 0.42
     )
     #expect(
       sliderValue(
@@ -252,7 +252,7 @@ struct CollectionSupportTests {
         in: .init(origin: .zero, size: .init(width: 4, height: 1)),
         bounds: 0.0...1.0,
         step: 0.01
-      ) == 1.0
+      ) == 0.67
     )
     #expect(formattedControlValue(0.30000000000000004, bounds: 0.0...1.0, step: 0.1) == "0.3")
     #expect(formattedControlValue(0.45, bounds: 0.0...1.0, step: 0.1) == "0.45")

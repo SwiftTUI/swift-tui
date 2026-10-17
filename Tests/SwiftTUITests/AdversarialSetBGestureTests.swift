@@ -283,8 +283,8 @@ struct AdversarialSetBGestureTests {
       })
     #expect(track.rect.size.width > 3)
     let row = Double(track.rect.origin.y)
-    let lowerEnd = Point(x: Double(track.rect.origin.x + 1), y: row)
-    let upperEnd = Point(x: Double(track.rect.origin.x + track.rect.size.width - 2), y: row)
+    let lowerEnd = Point(x: Double(track.rect.origin.x) + 0.5, y: row)
+    let upperEnd = Point(x: Double(track.rect.origin.x + track.rect.size.width - 1) + 0.5, y: row)
 
     // The value is already at the lower bound: pressing, dragging and
     // releasing on that cell resolves to the same value every time.

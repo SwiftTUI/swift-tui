@@ -35,9 +35,7 @@ struct AdversarialSetBControlTests {
     defer { h.shutdown() }
     let marker = try #require(h.point(forText: "●"), "\(h.frame)")
     _ = try h.click(marker)
-    withKnownIssue(
-      "the marker sits at round(f·7) but the pointer map insets the track by one cell, so the marker cell reads a different value"
-    ) {
+    do {
       #expect(probe.value == 2, "\(probe.value)")
       #expect(probe.writes.isEmpty, "\(probe.writes)")
     }
@@ -57,9 +55,7 @@ struct AdversarialSetBControlTests {
     let first = Point(x: track.x - 1, y: track.y)
     _ = try h.click(first)
     let afterFirst = probe.value
-    withKnownIssue(
-      "a three-cell track has a one-cell usable width, which the mapping rejects: every press reads the lower bound"
-    ) {
+    do {
       #expect(afterLast == 10, "last cell → \(afterLast)")
     }
     #expect(afterFirst == 0, "first cell → \(afterFirst)")
