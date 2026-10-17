@@ -870,8 +870,10 @@ struct LocalScrollPositionRegistryTests {
     #expect(offset == .init(x: 0, y: 5))
   }
 
-  @Test("routesWithCurrentOffsets fills the live offset and leaves unregistered routes at zero")
-  func routesWithCurrentOffsetsFillsLiveOffset() {
+  @Test(
+    "routesWithCurrentOffsets clamps published offsets without mutating their owner",
+    arguments: [4, 8])
+  func routesWithCurrentOffsetsFillsLiveOffset(contentWidth: Int) {
     let registry = LocalScrollPositionRegistry()
     let registered = testIdentity("Scroll")
     let unregistered = testIdentity("Other")
@@ -887,18 +889,19 @@ struct LocalScrollPositionRegistryTests {
       ScrollRoute(
         identity: registered,
         viewportRect: .init(origin: .zero, size: .init(width: 4, height: 3)),
-        contentBounds: .init(origin: .zero, size: .init(width: 4, height: 10))
+        contentBounds: .init(origin: .zero, size: .init(width: contentWidth, height: 10))
       ),
       ScrollRoute(
         identity: unregistered,
         viewportRect: .init(origin: .zero, size: .init(width: 4, height: 3)),
-        contentBounds: .init(origin: .zero, size: .init(width: 4, height: 10))
+        contentBounds: .init(origin: .zero, size: .init(width: contentWidth, height: 10))
       ),
     ]
 
     let enriched = registry.routesWithCurrentOffsets(routes)
     #expect(enriched.count == 2)
-    #expect(enriched[0].contentOffset == .init(x: 1, y: 4))
+    #expect(enriched[0].contentOffset == .init(x: contentWidth == 4 ? 0 : 1, y: 4))
+    #expect(offset == .init(x: 1, y: 4))
     #expect(enriched[1].contentOffset == .zero)
   }
 }

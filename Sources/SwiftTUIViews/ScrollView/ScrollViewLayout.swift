@@ -268,16 +268,23 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding, StackExpansionLayo
 
     return .init(
       trailing: indicatorAxes.contains(.vertical) && childSize.height > contentViewportHeight
-        && viewportValue(
-          for: proposal.width, fallback: childSize.width,
-          reserved: contentInsets.horizontal) > 1
+        && canReserveIndicator(in: proposal.width, contentInsets: contentInsets.horizontal)
         ? 1 : 0,
       bottom: indicatorAxes.contains(.horizontal) && childSize.width > contentViewportWidth
-        && viewportValue(
-          for: proposal.height, fallback: childSize.height,
-          reserved: contentInsets.vertical) > 1
+        && canReserveIndicator(in: proposal.height, contentInsets: contentInsets.vertical)
         ? 1 : 0
     )
+  }
+
+  /// Only a finite parent limit can force an indicator to consume the last
+  /// content cell. An unbounded cross axis grows to fit content plus chrome.
+  private func canReserveIndicator(
+    in dimension: ProposedDimension, contentInsets: Int
+  ) -> Bool {
+    switch dimension {
+    case .finite(let value): return max(0, value - contentInsets) > 1
+    case .unspecified, .infinity: return true
+    }
   }
 
   private func viewportValue(

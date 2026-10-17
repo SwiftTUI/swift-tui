@@ -471,6 +471,14 @@ struct DiagnosticsAndCacheTests {
           Text("Row 5")
           Text("Row 6")
           Text("Row 7")
+          Text("Row 8")
+          Text("Row 9")
+          Text("Row 10")
+          Text("Row 11")
+          Text("Row 12")
+          Text("Row 13")
+          Text("Row 14")
+          Text("Row 15")
         }
       }
       .frame(width: 12, height: 3, alignment: .topLeading)
@@ -493,6 +501,14 @@ struct DiagnosticsAndCacheTests {
           Text("Row 5")
           Text("Row 6")
           Text("Row 7")
+          Text("Row 8")
+          Text("Row 9")
+          Text("Row 10")
+          Text("Row 11")
+          Text("Row 12")
+          Text("Row 13")
+          Text("Row 14")
+          Text("Row 15")
         }
       }
       .frame(width: 12, height: 3, alignment: .topLeading)
@@ -520,8 +536,9 @@ struct DiagnosticsAndCacheTests {
     )
 
     #expect(eagerSecond.diagnostics.work.measuredNodesComputed == 0)
-    // Compositional stacks remeasure the current viewport band on scroll.
-    #expect(lazySecond.diagnostics.work.measuredNodesComputed < 8)
+    // Compositional stacks remeasure the viewport and overscan band. Use more
+    // rows than that band so this distinguishes bounded work from a full walk.
+    #expect(lazySecond.diagnostics.work.measuredNodesComputed < 16)
     #expect(lazySecond.diagnostics.work.measuredNodesReused > 0)
     #expect(eagerSecond.diagnostics.work.placedNodesReused > 0)
     #expect(lazySecond.diagnostics.counts.placedNodes < eagerSecond.diagnostics.counts.placedNodes)

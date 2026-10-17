@@ -285,7 +285,9 @@ struct Phase1BenchmarkScenariosTests {
 
     #expect(eagerSecond.presentation.strategy == .incremental)
     #expect(lazySecond.presentation.strategy == .incremental)
-    #expect(lazySecond.diagnostics.work.measuredNodesComputed < 8)
+    // The data set exceeds the viewport plus overscan; remeasuring that band
+    // must remain cheaper than walking every row.
+    #expect(lazySecond.diagnostics.work.measuredNodesComputed < 16)
     #expect(lazySecond.diagnostics.work.measuredNodesReused > 0)
     #expect(lazySecond.diagnostics.counts.placedNodes < eagerSecond.diagnostics.counts.placedNodes)
     #expect(lazySecond.presentation.bytesWritten <= eagerSecond.presentation.bytesWritten)
@@ -632,6 +634,14 @@ private struct ScrollBenchmarkView: View {
         Text("Row 5")
         Text("Row 6")
         Text("Row 7")
+        Text("Row 8")
+        Text("Row 9")
+        Text("Row 10")
+        Text("Row 11")
+        Text("Row 12")
+        Text("Row 13")
+        Text("Row 14")
+        Text("Row 15")
       }
     }
     .id(Phase1BenchmarkIdentity.scrollRegion)
@@ -659,6 +669,14 @@ private struct LazyScrollBenchmarkView: View {
         Text("Row 5")
         Text("Row 6")
         Text("Row 7")
+        Text("Row 8")
+        Text("Row 9")
+        Text("Row 10")
+        Text("Row 11")
+        Text("Row 12")
+        Text("Row 13")
+        Text("Row 14")
+        Text("Row 15")
       }
     }
     .id(Phase1BenchmarkIdentity.scrollRegion)
@@ -678,7 +696,7 @@ private struct LazyForEachScrollBenchmarkView: View {
       )
     ) {
       LazyVStack(alignment: .leading, spacing: 0) {
-        ForEach(0..<5) { index in
+        ForEach(0..<16) { index in
           Text("Row \(index)")
         }
       }
