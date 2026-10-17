@@ -18,7 +18,7 @@ struct SceneManifestTests {
     let app = CollidingTitlesApp()
     let manifest = SceneManifest(for: app)
     #expect(manifest.scenes[0].id == manifest.scenes[1].id)
-    #expect(throws: AppLaunchError.duplicateSceneIdentifier(manifest.defaultSceneID)) {
+    #expect(throws: AppLaunchError.duplicateSceneIdentifier(manifest.scenes[0].id)) {
       _ = try HostedSceneSession(
         for: app, sceneID: manifest.scenes[1].id,
         surface: HostedRasterSurface(

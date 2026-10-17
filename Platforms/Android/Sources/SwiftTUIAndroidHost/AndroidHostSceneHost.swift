@@ -10,11 +10,12 @@ private struct AndroidHostSceneHostState: Sendable {
   var latestFrame: SemanticHostFrame?
   var encodingStyle: AndroidHostStyle?
   // Encode-at-copy scratch: the bytes of the last frame a consumer actually
-  // copied, keyed by that frame's sequence. Frames the host never polls are
+  // copied, keyed by its delivery revision across scene runs. Frames the host never polls are
   // never encoded, and a future delta baseline tracks consumed frames by
   // construction (convergence proposal 2026-07-22-002, Stage C0).
   var encodedFrameBytes: [UInt8]?
-  var encodedUpToSequence: UInt64?
+  var frameDeliveryRevision: UInt64 = 0
+  var encodedUpToRevision: UInt64?
   var encodedFrameCount = 0
   // Delivery-coupled ratchet (plan 2026-07-28-006, S3a): the scratch above is
   // encoded against a *candidate* encoding state that becomes committed only
@@ -97,6 +98,7 @@ private final class AndroidHostSceneHostStateBox: Sendable {
     style: AndroidHostStyle
   ) {
     state.withLock { state in
+      state.frameDeliveryRevision &+= 1
       state.latestFrame = frame
       state.encodingStyle = style
       // Encoding is deferred to the copy path (encode-at-copy): the poll
@@ -110,6 +112,23 @@ private final class AndroidHostSceneHostStateBox: Sendable {
         state.pendingDamage = frame.rasterDamage
         state.hasPendingDamage = true
       }
+    }
+  }
+
+  func beginSceneRun() {
+    state.withLock { state in
+      state.webEncodingState = state.wireCapabilities.negotiatedEncodingState()
+      state.latestFrame = nil
+      state.encodingStyle = nil
+      state.encodedFrameBytes = nil
+      state.encodedUpToRevision = nil
+      state.candidateEncodingState = nil
+      state.candidateDamage = nil
+      state.hasCandidateDamage = false
+      state.pendingDamage = nil
+      state.hasPendingDamage = false
+      state.latestEncodingErrorDescription = nil
+      state.lastErrorDescription = nil
     }
   }
 
@@ -202,7 +221,7 @@ private final class AndroidHostSceneHostStateBox: Sendable {
       }
       let isDeliveryLeg = unsafe outBuffer != nil
       let scratchHoldsLatestFrame =
-        state.encodedFrameBytes != nil && state.encodedUpToSequence == frame.sequence
+        state.encodedFrameBytes != nil && state.encodedUpToRevision == state.frameDeliveryRevision
       if !scratchHoldsLatestFrame, state.encodedFrameBytes == nil || !isDeliveryLeg {
         let style = state.encodingStyle ?? .default
         // The candidate carries every axis of cross-frame state: the
@@ -225,15 +244,15 @@ private final class AndroidHostSceneHostStateBox: Sendable {
           preferredLayoutSize: frame.preferredLayoutSize,
           terminalStyle: style.renderStyle
         )
-        let output = WebSurfaceFrameEncoder.encode(
+        let output = WebSurfaceFrameEncoder.encodeReportingFailure(
           model,
           fallbackBackground: style.renderStyle.appearance.backgroundColor,
           state: &candidate
         )
-        state.encodedFrameBytes = Array(output.utf8)
-        state.encodedUpToSequence = frame.sequence
+        state.encodedFrameBytes = Array(output.record.utf8)
+        state.encodedUpToRevision = state.frameDeliveryRevision
         state.encodedFrameCount += 1
-        state.latestEncodingErrorDescription = nil
+        state.latestEncodingErrorDescription = output.failureDescription
         state.candidateEncodingState = candidate
         state.candidateDamage = consumedDamage.damage
         state.hasCandidateDamage = consumedDamage.hasDamage
@@ -288,7 +307,7 @@ private final class AndroidHostSceneHostStateBox: Sendable {
     state.hasCandidateDamage = false
     state.candidateEncodingState = nil
     state.encodedFrameBytes = nil
-    state.encodedUpToSequence = nil
+    state.encodedUpToRevision = nil
   }
 
   func updateFocusPresentation(
@@ -319,15 +338,14 @@ private final class AndroidHostSceneHostStateBox: Sendable {
 
   func recordClipboardWrite(
     _ text: String
-  ) {
+  ) -> Bool {
     // An empty write carries nothing to deliver; ignore it so a size query can
     // never report a 0-byte payload that looks like "nothing pending".
-    guard !text.isEmpty else {
-      return
-    }
+    guard !text.isEmpty, text.utf8.count <= HostWireBudget.recordBytes else { return false }
     state.withLock { state in
       state.pendingClipboardText = text
     }
+    return true
   }
 
   /// Copies the pending clipboard text as UTF-8 into `outBuffer`, draining it on
@@ -364,6 +382,7 @@ public final class AndroidHostSceneHost {
 
   @MainActor private var runTask: Task<Void, Never>?
   @MainActor private var hasStartedScene = false
+  @MainActor private var acceptsInput = true
   /// The Kotlin host's declared wire capabilities from ``declareCapabilities``.
   /// An absent declaration keeps the defaults and today's bytes.
   /// Every Android host receives converged web-surface frames.
@@ -377,8 +396,10 @@ public final class AndroidHostSceneHost {
     style: AndroidHostStyle = .default
   ) throws {
     let manifest = SceneManifest(for: app)
+    guard !manifest.scenes.isEmpty, let selectedSceneID = sceneID ?? manifest.defaultSceneID else {
+      throw AppLaunchError.noScenes
+    }
     try validateWindowSceneIdentifiers(manifest.scenes)
-    let selectedSceneID = sceneID ?? manifest.defaultSceneID
     guard let descriptor = manifest.scenes.first(where: { $0.id == selectedSceneID }) else {
       throw HostedSceneSessionError.sceneNotFound(selectedSceneID)
     }
@@ -399,7 +420,6 @@ public final class AndroidHostSceneHost {
       },
       onClipboardWrite: { text in
         state.recordClipboardWrite(text)
-        return true
       }
     )
     surface.updateSurfaceCapabilities(
@@ -535,7 +555,9 @@ public final class AndroidHostSceneHost {
     guard runTask == nil else {
       return
     }
+    if hasStartedScene { state.beginSceneRun() }
     hasStartedScene = true
+    acceptsInput = true
 
     #if os(Android)
       runTask = Task.immediate { @MainActor [weak self] in
@@ -544,6 +566,7 @@ public final class AndroidHostSceneHost {
         }
         defer {
           runTask = nil
+          acceptsInput = false
         }
         do {
           _ = try await session.start()
@@ -558,6 +581,7 @@ public final class AndroidHostSceneHost {
         }
         defer {
           runTask = nil
+          acceptsInput = false
         }
         do {
           _ = try await session.start()
@@ -570,6 +594,7 @@ public final class AndroidHostSceneHost {
 
   @MainActor
   public func stop() {
+    acceptsInput = false
     session.stop()
   }
 
@@ -647,14 +672,16 @@ public final class AndroidHostSceneHost {
   public func sendInput(
     _ bytes: [UInt8]
   ) {
+    guard acceptsInput else { return }
     session.sendInput(bytes)
   }
 
   /// Queues one complete RS/newline-framed semantic action record. The return
-  /// value reports ingress validity; the next frame carries runtime acceptance.
+  /// value reports ingress admission; the next frame carries runtime acceptance.
+  /// A stopped run refuses new actions until start opens the next run.
   @MainActor
   package func sendAccessibilityAction(_ bytes: [UInt8]) -> Bool {
-    guard bytes.first == 0x1E, bytes.last == 0x0A,
+    guard acceptsInput, bytes.first == 0x1E, bytes.last == 0x0A,
       let command = String(validating: bytes.dropFirst().dropLast(), as: UTF8.self),
       let request = AccessibilityActionWire.parseCommand(command)
     else { return false }

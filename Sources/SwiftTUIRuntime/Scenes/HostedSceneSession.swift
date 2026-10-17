@@ -29,8 +29,8 @@ public final class HostedSceneSession {
   public private(set) var currentFocusPresentation: FocusPresentation = .none
 
   private let sessionName: String
-  private let inputReader: InjectedTerminalInputReader
-  private let signalReader: InProcessSignalReader
+  private var inputReader: InjectedTerminalInputReader
+  private var signalReader: InProcessSignalReader
   private let scheduler: any FrameScheduling
   private let stateContainer: StateContainer<SceneSessionState>
   private let focusTracker: FocusTracker
@@ -38,8 +38,10 @@ public final class HostedSceneSession {
   private let renderMode: RuntimeRenderMode?
   private let onFocusPresentationChange: (@MainActor @Sendable (FocusPresentation) -> Void)?
   private let runtimeIssueSink: RuntimeIssueSink?
+  private var acceptsFocusPresentation = false
+  private var runGeneration: UInt64 = 0
   private var runTask: Task<RunLoopExitReason, any Error>?
-  private var shutdownWaiter: Task<Void, Never>?
+  private var activeRunGeneration: UInt64?
 
   public convenience init<A: App>(
     for app: A,
@@ -51,6 +53,7 @@ public final class HostedSceneSession {
   ) throws {
     let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
     let selections = collectWindowSceneSelections(from: app.body)
+    guard !selections.isEmpty else { throw AppLaunchError.noScenes }
     try validateWindowSceneIdentifiers(selections.map(\.descriptor))
     guard
       let selection = selections.first(where: {
@@ -91,6 +94,7 @@ public final class HostedSceneSession {
   ) throws {
     let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
     let selections = collectWindowSceneSelections(from: app.body)
+    guard !selections.isEmpty else { throw AppLaunchError.noScenes }
     try validateWindowSceneIdentifiers(selections.map(\.descriptor))
     guard
       let selection = selections.first(where: {
@@ -136,16 +140,7 @@ public final class HostedSceneSession {
     self.renderMode = renderMode
     signalReader = InProcessSignalReader()
     self.surface = surface
-    inputReader = InjectedTerminalInputReader { [signalReader, surface] message in
-      switch message {
-      case .resize(let size):
-        surface.updateSurfaceSize(size)
-        signalReader.send("SIGWINCH")
-      case .style(let style):
-        surface.updateStyle(style)
-        signalReader.send("SIGWINCH")
-      }
-    }
+    inputReader = Self.makeInputReader(signalReader: signalReader, surface: surface)
     scheduler = FrameScheduler()
     stateContainer = StateContainer(
       initialState: SceneSessionState(),
@@ -159,10 +154,15 @@ public final class HostedSceneSession {
   }
 
   public func start() async throws -> RunLoopExitReason {
-    if let runTask {
+    if let runTask, let generation = activeRunGeneration {
+      defer { finishRun(generation: generation) }
       return try await runTask.value
     }
 
+    runGeneration &+= 1
+    let generation = runGeneration
+    activeRunGeneration = generation
+    acceptsFocusPresentation = true
     let resources = SceneSessionResources(
       presentationSurface: surface,
       terminalInputReader: inputReader,
@@ -171,7 +171,10 @@ public final class HostedSceneSession {
       surfaceName: "hosted-\(descriptor.id.rawValue)",
       renderMode: renderMode,
       focusPresentationHandler: { [weak self] presentation in
-        self?.updateCurrentFocusPresentation(presentation)
+        guard let self, self.acceptsFocusPresentation, self.runGeneration == generation else {
+          return
+        }
+        self.updateCurrentFocusPresentation(presentation)
       }
     )
     resources.runtimeIssueSink = runtimeIssueSink
@@ -202,14 +205,10 @@ public final class HostedSceneSession {
 
     do {
       let exitReason = try await task.value
-      runTask = nil
-      shutdownWaiter = nil
-      updateCurrentFocusPresentation(.none)
+      finishRun(generation: generation)
       return exitReason
     } catch {
-      runTask = nil
-      shutdownWaiter = nil
-      updateCurrentFocusPresentation(.none)
+      finishRun(generation: generation)
       throw error
     }
   }
@@ -247,31 +246,56 @@ public final class HostedSceneSession {
   }
 
   public func stopAndWait() async throws -> RunLoopExitReason? {
-    guard let runTask = beginStop() else {
-      return nil
-    }
-    let exitReason = try await runTask.value
-    await shutdownWaiter?.value
-    return exitReason
+    let generation = activeRunGeneration
+    guard let runTask = beginStop() else { return nil }
+    // Every waiter settles the same generation idempotently before returning.
+    // A late waiter from an old run cannot retire a newer run's readers.
+    defer { finishRun(generation: generation) }
+    return try await runTask.value
   }
 }
 
 extension HostedSceneSession {
   private func beginStop() -> Task<RunLoopExitReason, any Error>? {
+    acceptsFocusPresentation = false
     inputReader.finish()
     signalReader.finish()
     updateCurrentFocusPresentation(.none)
     guard let runTask else {
+      finishRun(generation: nil)
       return nil
-    }
-    if shutdownWaiter == nil {
-      shutdownWaiter = Task { _ = await runTask.result }
     }
     return runTask
   }
 }
 
 extension HostedSceneSession {
+  private static func makeInputReader(
+    signalReader: InProcessSignalReader, surface: HostedRasterSurface
+  ) -> InjectedTerminalInputReader {
+    InjectedTerminalInputReader { message in
+      switch message {
+      case .resize(let size): surface.updateSurfaceSize(size)
+      case .style(let style): surface.updateStyle(style)
+      }
+      signalReader.send("SIGWINCH")
+    }
+  }
+
+  /// Readers belong to one run. Finishing them is irreversible; the next
+  /// run gets fresh ingress, which also buffers input sent before start.
+  private func finishRun(generation: UInt64?) {
+    guard activeRunGeneration == generation else { return }
+    activeRunGeneration = nil
+    acceptsFocusPresentation = false
+    inputReader.finish()
+    signalReader.finish()
+    signalReader = InProcessSignalReader()
+    inputReader = Self.makeInputReader(signalReader: signalReader, surface: surface)
+    runTask = nil
+    updateCurrentFocusPresentation(.none)
+  }
+
   private func updateCurrentFocusPresentation(
     _ presentation: FocusPresentation
   ) {

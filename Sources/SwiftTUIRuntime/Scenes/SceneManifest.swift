@@ -17,14 +17,18 @@ public struct SceneDescriptor: Codable, Hashable, Sendable {
 }
 
 public struct SceneManifest: Codable, Sendable {
-  public let defaultSceneID: WindowIdentifier
+  /// The declared default, or nil when the app has no window scenes.
+  public let defaultSceneID: WindowIdentifier?
   public let scenes: [SceneDescriptor]
 
   public init(
-    defaultSceneID: WindowIdentifier,
+    defaultSceneID: WindowIdentifier?,
     scenes: [SceneDescriptor]
   ) {
-    self.defaultSceneID = defaultSceneID
+    self.defaultSceneID =
+      defaultSceneID.flatMap { requested in
+        scenes.first(where: { $0.id == requested })?.id
+      } ?? scenes.first?.id
     self.scenes = scenes
   }
 
@@ -39,7 +43,7 @@ public struct SceneManifest: Codable, Sendable {
 package func sceneManifest(
   from descriptors: [SceneDescriptor]
 ) -> SceneManifest {
-  let defaultSceneID = descriptors.first?.id ?? WindowIdentifier("window")
+  let defaultSceneID = descriptors.first?.id
 
   return SceneManifest(
     defaultSceneID: defaultSceneID,
@@ -50,8 +54,9 @@ package func sceneManifest(
 extension SceneManifest {
   @_spi(Runners) public var jsonString: String {
     let scenesJSON = scenes.map(\.jsonString).joined(separator: ",")
+    let defaultJSON = defaultSceneID.map { "\"" + escapedJSONString($0.rawValue) + "\"" } ?? "null"
     return """
-      {"defaultSceneID":"\(escapedJSONString(defaultSceneID.rawValue))","scenes":[\(scenesJSON)]}
+      {"defaultSceneID":\(defaultJSON),"scenes":[\(scenesJSON)]}
       """
   }
 }

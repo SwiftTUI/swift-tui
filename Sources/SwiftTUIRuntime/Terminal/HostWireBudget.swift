@@ -46,6 +46,13 @@ package enum HostWireBudget {
     {
       return damage
     }
+    // Clipping can repair the wire shape, but cannot certify that the lost
+    // damage was irrelevant to the current frame. Keep the canonical rows for
+    // diagnostics and require a full repaint whenever coverage was discarded.
+    let discardedCoverage = damage.textRows.contains { row in
+      row.row < 0 || row.row >= size.height
+        || row.columnRanges.contains { $0.lowerBound < 0 || $0.upperBound > size.width }
+    }
     var columnsByRow: [Int: [Bool]] = [:]
     for row in damage.textRows where row.row >= 0 && row.row < size.height {
       if columnsByRow[row.row] == nil {
@@ -78,7 +85,7 @@ package enum HostWireBudget {
     }
     return PresentationDamage(
       textRows: rows, graphicsInvalidation: damage.graphicsInvalidation,
-      requiresFullTextRepaint: damage.requiresFullTextRepaint,
+      requiresFullTextRepaint: damage.requiresFullTextRepaint || discardedCoverage,
       requiresFullGraphicsReplay: damage.requiresFullGraphicsReplay
     )
   }

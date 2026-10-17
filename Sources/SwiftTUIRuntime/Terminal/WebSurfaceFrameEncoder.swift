@@ -164,21 +164,36 @@ package enum WebSurfaceFrameEncoder {
     )
   }
 
+  package struct EncodingOutcome {
+    package var record: String
+    package var failureDescription: String?
+  }
+
   package static func encode(
     _ model: HostWireFrameModel,
     fallbackBackground: Color,
     state: inout HostWireEncodingState
   ) -> String {
+    encodeReportingFailure(model, fallbackBackground: fallbackBackground, state: &state).record
+  }
+
+  package static func encodeReportingFailure(
+    _ model: HostWireFrameModel,
+    fallbackBackground: Color,
+    state: inout HostWireEncodingState
+  ) -> EncodingOutcome {
     var candidate = state
     do {
       try HostWireBudget.validate(model)
       let output = try encodeAdmitted(
         model, fallbackBackground: fallbackBackground, state: &candidate)
       state = candidate
-      return output
+      return EncodingOutcome(record: output)
     } catch {
       state.hasBaseline = false
-      return HostWireBudget.rejectionRecord
+      return EncodingOutcome(
+        record: HostWireBudget.rejectionRecord,
+        failureDescription: "Host wire allocation budget exceeded: \(error)")
     }
   }
 

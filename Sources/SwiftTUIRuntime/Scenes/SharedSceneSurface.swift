@@ -39,14 +39,16 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
 
   package func setTerminalAttached(_ attached: Bool) throws {
     guard attached != terminalIsAttached else { return }
+    if rawModeRequested {
+      if attached {
+        try terminalCommands?.enableRawMode()
+      } else {
+        try? terminalCommands?.disableRawMode()
+      }
+    }
+    // Publish the transition only after its fallible preparation succeeds.
     terminalIsAttached = attached
     repaintTerminal = true
-    guard rawModeRequested else { return }
-    if attached {
-      try terminalCommands?.enableRawMode()
-    } else {
-      try? terminalCommands?.disableRawMode()
-    }
   }
 
   private var terminalCommands: (any TerminalCommandPresentationSurface)? {
@@ -56,7 +58,8 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
   package var surfaceSize: CellSize { captureHostLayoutConfiguration().size }
   package var capabilityProfile: TerminalCapabilityProfile {
     terminalIsAttached
-      ? terminal.capabilityProfile : browser?.capabilityProfile ?? terminal.capabilityProfile
+      ? terminal.capabilityProfile
+      : (browserIsConnected() ? browser?.capabilityProfile : nil) ?? terminal.capabilityProfile
   }
   package var appearance: TerminalAppearance { captureHostLayoutConfiguration().appearance }
   package var theme: Theme? { captureHostLayoutConfiguration().theme }
@@ -73,8 +76,8 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
 
   package func captureHostLayoutConfiguration() -> HostLayoutConfiguration {
     let local = terminal.hostLayoutConfiguration()
-    let remote = browser?.hostLayoutConfiguration()
     let connected = browserIsConnected()
+    let remote = connected ? browser?.hostLayoutConfiguration() : nil
     let presentation = connected ? remote ?? local : local
     var size = terminalIsAttached ? local.size : remote?.size ?? local.size
     if terminalIsAttached, connected, let remote {
@@ -104,8 +107,8 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
   }
 
   package func enableRawMode() throws {
-    rawModeRequested = true
     if terminalIsAttached { try terminalCommands?.enableRawMode() }
+    rawModeRequested = true
   }
   package func disableRawMode() throws {
     rawModeRequested = false
@@ -126,9 +129,13 @@ package final class SharedSceneSurface: HostGeometryPresentationSurface,
 
   @discardableResult
   package func present(_ frame: SemanticHostFrame) throws -> PresentationMetrics {
-    var metrics =
-      try browser?.present(frame)
-      ?? .rasterHostMetrics(for: frame.raster, damage: frame.rasterDamage)
+    var metrics = PresentationMetrics.rasterHostMetrics(
+      for: frame.raster, damage: frame.rasterDamage)
+    if browserIsConnected(), let browser {
+      // A companion transport can disconnect between its connection check and
+      // send. Its failure does not own the terminal's frame or scene lifetime.
+      if let remoteMetrics = try? browser.present(frame) { metrics = remoteMetrics }
+    }
     guard terminalIsAttached else {
       if let reader = terminal as? TerminalReaderSurface {
         _ = try reader.present(frame, terminalAttached: false)

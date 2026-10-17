@@ -30,15 +30,12 @@ struct AdversarialSetBSceneTests {
     let manifest = SceneManifest(for: app)
     #expect(manifest.scenes.isEmpty, "\(manifest.scenes)")
     #expect(collectWindowSceneDescriptors(from: app.body).isEmpty)
-    withKnownIssue(
-      "sceneManifest(from:) substitutes \"window\" and HostedSceneSession reports it as missing"
-    ) {
-      #expect(
-        manifest.scenes.contains(where: { $0.id == manifest.defaultSceneID }),
-        "default \(manifest.defaultSceneID) names no declared scene")
+    do {
+      #expect(manifest.defaultSceneID == nil)
+      #expect(manifest.jsonString == #"{"defaultSceneID":null,"scenes":[]}"#)
       #expect(throws: AppLaunchError.noScenes) {
         _ = try HostedSceneSession(
-          for: app, sceneID: manifest.defaultSceneID,
+          for: app, sceneID: "window",
           surface: HostedRasterSurface(
             surfaceSize: .init(width: 8, height: 2), appearance: .fallback, onFrame: { _ in }))
       }
@@ -88,9 +85,7 @@ struct AdversarialSetBSceneTests {
     #expect(session.currentFocusPresentation == .none)
     #expect(semantics.last == .some(.none), "\(semantics)")
     let afterStop = semantics.drop(while: { $0 != .none }).dropFirst()
-    withKnownIssue(
-      "the exit flush frame republishes focus after beginStop() already published .none"
-    ) {
+    do {
       #expect(afterStop.allSatisfy({ $0 == .none }), "\(semantics)")
     }
   }
@@ -159,7 +154,8 @@ struct AdversarialSetBSceneTests {
     await recorder.updates.wait(until: { recorder.latestText.contains("Count 0") })
     try #require(recorder.latestText.contains("Count 0"), "\(recorder.latestText)")
     #expect(try await session.stopAndWait() == .inputEnded)
-    #expect(try await first.value == .inputEnded)
+    // Restart before awaiting the original start caller: its late cleanup
+    // must not close the next run’s readers.
     // Either the restarted run presents the increment or it completes on its
     // own; both pulse the recorder's signal, so one of them decides the wait.
     let done = SetBFlag(notifying: recorder.updates)
@@ -172,12 +168,11 @@ struct AdversarialSetBSceneTests {
       recorder.latestText.contains("Count 1") || done.isSet
     })
     let sawIncrement = recorder.latestText.contains("Count 1")
+    #expect(try await first.value == .inputEnded)
     session.stop()
     let reason = try await second.value
     #expect(reason == .inputEnded)
-    withKnownIssue(
-      "stop() finishes the injected reader for good; a restarted session ends with .inputEnded"
-    ) {
+    do {
       #expect(sawIncrement, "\(recorder.latestText)")
     }
   }
@@ -200,13 +195,16 @@ struct AdversarialSetBSceneTests {
     } catch {
       thrown = error
     }
-    withKnownIssue(
-      "browser?.present(frame) at the top of present is unguarded, even while disconnected"
-    ) {
+    do {
       #expect(thrown == nil, "\(String(describing: thrown))")
       #expect(terminal.frames == ["alpha", "bravo"], "\(terminal.frames)")
     }
     #expect(surface.terminalIsAttached)
+    surface.attachBrowser(failing, isConnected: { true })
+    #expect(throws: Never.self) {
+      _ = try surface.present(SetBFrames.frame(sequence: 3, text: "charlie"))
+    }
+    #expect(terminal.frames == ["alpha", "bravo", "charlie"])
   }
 
   // Re-attaching the terminal is one transition: when raw mode cannot be
@@ -252,9 +250,7 @@ struct AdversarialSetBSceneTests {
     #expect(
       received.keys == [KeyPress(.character("a")), KeyPress(.character("c"))],
       "\(received.events)")
-    withKnownIssue(
-      "terminalIsAttached flips before enableRawMode() throws; the input side never re-attaches"
-    ) {
+    do {
       #expect(!endpoint.surface.terminalIsAttached)
     }
   }

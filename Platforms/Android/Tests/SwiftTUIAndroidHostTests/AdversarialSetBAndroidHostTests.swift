@@ -28,9 +28,7 @@
       let host = try AndroidHostSceneHost(app: SetBStaticApp())
       let big = String(repeating: "a", count: HostWireBudget.recordBytes + 1)
       let accepted = try host.surface.writeClipboard(big)
-      withKnownIssue(
-        "recordClipboardWrite admits any non-empty text unbudgeted (adjacent to STUI-732)"
-      ) {
+      do {
         #expect(!accepted)
         #expect(setBClipboardSize(host) == 0)
       }
@@ -70,9 +68,7 @@
       try await setBStopAndSettle(host)
       let framesAfterStop = await setBFrames(host).count
       let queued = setBAction(handle, "\u{1E}accessibility:9:nope:activate\n")
-      withKnownIssue(
-        "the finished input reader drops the event; the host validates framing only"
-      ) {
+      do {
         #expect(queued == 0)
       }
       let framesLater = await setBFrames(host).count
@@ -121,9 +117,7 @@
       #expect(text.hasPrefix("\u{001E}runtimeIssue:"), "\(text.prefix(80))")
       #expect(text.contains("surface.budgetExceeded"), "\(text.prefix(160))")
       #expect(host.consumedFrameEncodeCount == 2)
-      withKnownIssue(
-        "the encode leg clears latestEncodingErrorDescription and never records the rejection"
-      ) {
+      do {
         #expect(host.latestEncodingErrorDescription != nil)
       }
       try await setBPresent(
@@ -157,9 +151,7 @@
       } else {
         shipped = setBRowText(record)
       }
-      withKnownIssue(
-        "clippedDamage leaves an empty row list, so the delta decision ships zero rows"
-      ) {
+      do {
         #expect(shipped.contains("xy"), "\(record)")
       }
     }
@@ -259,9 +251,7 @@
         frame.semantics.accessibilityActionResponse?.requestID == 2
           || frame.raster.lines.joined().contains("Count 1")
       }
-      withKnownIssue(
-        "stop() finishes the input reader for good; the restarted loop exits on inputEnded"
-      ) {
+      do {
         #expect(
           changed, "exit \(String(describing: exitReason)), frames \(afterRestart.count)")
       }
@@ -295,9 +285,7 @@
         "width \(String(describing: afterRestart["width"])), consumed sequence "
         + "\(consumedSequence), restarted sequence "
         + "\(String(describing: host.latestFrame?.sequence))"
-      withKnownIssue(
-        "the encode scratch is keyed by sequence alone; a restarted loop restarts at 0"
-      ) {
+      do {
         #expect(afterRestart["width"] as? Int == 40, "\(detail)")
       }
     }

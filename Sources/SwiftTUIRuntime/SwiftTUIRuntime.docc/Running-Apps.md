@@ -120,6 +120,14 @@ host product build `SceneManifest` values and retain one or more
 values so host shells receive producer sequence, raster output, semantics,
 focus, and raster damage as one committed frame.
 
+An empty app has an empty manifest and a `nil` `defaultSceneID`; constructing
+its hosted session throws `AppLaunchError.noScenes`. A stopped session can
+start again. Each run owns fresh input and signal readers, and input submitted
+before `start()` is buffered. `stopAndWait()` settles that run before returning;
+callbacks or callers finishing an older run cannot close a newer run. Stopping
+publishes an empty focus presentation and suppresses later focus updates from
+that run.
+
 The in-package `SwiftTUIAndroidHost` product uses this path for Android
 embedding. The external
 [`SwiftUIHost`](https://github.com/SwiftTUI/swift-tui-swiftui) product uses it

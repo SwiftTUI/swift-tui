@@ -322,8 +322,6 @@
       _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
       var damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [1..<2])])
       damage.textRows.append(.init(row: 1, columnRanges: [0..<1]))
-      damage.textRows.append(.init(row: -1))
-      damage.textRows.append(.init(row: 2))
 
       let frame = try Self.decodedSurfaceFrame(
         WebSurfaceFrameEncoder.encode(
@@ -336,6 +334,20 @@
       let deltaRows = try #require(frame["deltaRows"] as? [[Any]])
       #expect(deltaRows.count == 1)
       #expect(deltaRows.first?.first as? Int == 1)
+    }
+
+    @Test("discarded damage coverage requires a full frame", arguments: [-1, 2])
+    func discardedDamageCoverageRequiresFullFrame(row: Int) throws {
+      var state = WebSurfaceFrameEncodingState(deltaEnabled: true)
+      _ = WebSurfaceFrameEncoder.encode(Self.basicSurface(), state: &state)
+      let frame = try Self.decodedSurfaceFrame(
+        WebSurfaceFrameEncoder.encode(
+          Self.changedSurface(), damage: PresentationDamage(textRows: [.init(row: row)]),
+          state: &state
+        )
+      )
+      #expect(frame["deltaRows"] == nil)
+      #expect(frame["rows"] != nil)
     }
 
     @Test("delta-enabled encoder falls back to full frames for full repaint damage")
