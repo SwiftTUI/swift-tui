@@ -238,21 +238,38 @@ struct AdversarialSetAWireTests {
     #expect(try record(surface("xyz"), state: &state)["encoding"] as? String == "delta")
   }
 
-  @Test("A166 stale and duplicate damage rows cannot select outside the current grid")
-  func setA166StaleDamageIsClippedBeforeDeltaTraversal() throws {
+  @Test(
+    "A166 canonical damage stays bounded and discarded coverage requires a keyframe",
+    arguments: [false, true])
+  func setA166StaleDamageIsClippedBeforeDeltaTraversal(discardedCoverage: Bool) throws {
     let raster = RasterSurface(size: .init(width: 3, height: 2), lines: ["abc", "xyz"])
     var state = deltaState(166)
     _ = try record(raster, state: &state)
-    let damage = PresentationDamage(textRows: [
-      .init(row: Int.max), .init(row: -1), .init(row: 1, columnRanges: [-5..<99]),
-      .init(row: 1, columnRanges: [1..<2]),
-    ])
+    var damage = PresentationDamage(textRows: [.init(row: 1, columnRanges: [0..<3])])
+    // Public mutation can bypass the initializer's duplicate normalization.
+    damage.textRows.append(.init(row: 1, columnRanges: [1..<2]))
+    if discardedCoverage {
+      damage.textRows += [
+        .init(row: Int.max), .init(row: -1), .init(row: 1, columnRanges: [-5..<99]),
+      ]
+    }
     let changed = try record(raster, damage: damage, state: &state)
-    let rows = try #require(changed["deltaRows"] as? [[Any]])
-    #expect(rows.count == 1)
-    #expect(rows.first?.first as? Int == 1)
+    if discardedCoverage {
+      // Once invalid coverage is discarded, the hint cannot prove that all
+      // changed cells were named. Ship the full grid instead of an empty or
+      // incomplete delta (the same recovery contract exercised by set B356).
+      let rows = try #require(changed["rows"] as? [[[Any]]])
+      #expect(rows.count == 2)
+      #expect(changed["deltaRows"] == nil)
+    } else {
+      let rows = try #require(changed["deltaRows"] as? [[Any]])
+      #expect(rows.count == 1)
+      #expect(rows.first?.first as? Int == 1)
+    }
     let encodedDamage = try #require(changed["damage"] as? [String: Any])
     let textRows = try #require(encodedDamage["textRows"] as? [[Any]])
+    #expect(textRows.count == 1)
+    #expect(textRows.first?.first as? Int == 1)
     #expect(textRows.first?[1] as? [[Int]] == [[0, 3]])
   }
 

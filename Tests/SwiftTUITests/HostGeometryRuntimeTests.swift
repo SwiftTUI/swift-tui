@@ -703,9 +703,17 @@ extension HostGeometryRuntimeTests {
     browser.revision += 1
     try render()
     #expect(browser.frames.last?.raster.size == browser.size)
+    let browserFramesBeforeDisconnect = browser.frames.count
     connected = false
     try render()
-    #expect(browser.frames.last?.raster.size == terminal.size)
+    #expect(terminal.frames.last?.size == terminal.size)
+    #expect(browser.frames.count == browserFramesBeforeDisconnect)
+    // A reconnect resumes delivery at the current common grid.
+    connected = true
+    try render()
+    #expect(browser.frames.count > browserFramesBeforeDisconnect)
+    #expect(browser.frames.last?.raster.size == browser.size)
+    #expect(terminal.frames.last == browser.frames.last?.raster)
     #expect(activations == 1)
   }
 }
