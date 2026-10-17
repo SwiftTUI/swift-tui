@@ -39,7 +39,7 @@ to activate profiling independently of the environment.
 Three signals are independently available. Name them in the configuration or
 environment variable:
 
-- **frames** emits one record per committed frame, derived from the runtime
+- **frames** emits one record per committed, cancelled, dropped, or elided frame, derived from the runtime
   sample.
 - **memory** takes periodic occupancy snapshots of long-lived stores (caches,
   the view graph, retained frames, the animation controller).
@@ -81,6 +81,19 @@ SWIFTTUI_PROFILE="memory@500ms;summary" ./gallery-demo
 Call ``ProfileActivation/finish()`` at shutdown so buffered sinks (summary)
 emit their reduced report.
 
+### JSONL frame records
+
+Frame JSON retains its summary fields and includes `kind` (`committed`,
+`zeroArtifact`, or `elided`) and a `columns` object containing the complete
+frame diagnostic schema. Column keys match the TSV header; values are strings
+with the same units, precision, and `-` sentinel. JSON preserves authored text
+with escaped control scalars. TSV replaces controls at its field boundary.
+Both formats use the same record-to-column mapping, so new metrics reach both.
+
+Elided totals include head, animation injection, and commit time; nested phase timings are not
+counted twice. Summary counts distinguish committed frames from other outcomes.
+Runner, profiling, and armed trace sinks all receive each runtime sample.
+
 ### `presents.tsv`, the frames file's sibling
 
 The profiler emits a frame row at commit. On a real terminal, the related `write(2)`
@@ -89,7 +102,10 @@ reorders the sink contract and loses rows during teardown. Thus, write
 completion goes to a **separate file**. If the `frames` signal uses a `tsv=`
 sink, activation also opens `presents.tsv` in the same directory. Its fixed
 name does not depend on the frames file. Thus, a reducer can find it without
-the frames file name.
+the frames file name. Every configured TSV destination receives this sidecar;
+several frame files in one directory share one completion stream. If the name
+aliases any configured output file, `.presents.tsv` is appended until the name
+is free. This preserves an authored frames file named `presents.tsv`.
 
 | column | meaning |
 | --- | --- |

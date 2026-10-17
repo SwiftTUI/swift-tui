@@ -15,9 +15,11 @@ package enum FrameRecordDerivation {
       scheduled = committed.scheduledFrame
     case .zeroArtifact(let zero):
       record = zeroArtifactRecord(zero)
+      record.kind = .zeroArtifact
       scheduled = zero.scheduledFrame
     case .elided(let elided):
       record = elidedRecord(elided)
+      record.kind = .elided
       scheduled = elided.scheduledFrame
     }
     record.mergedInvalidationRequestCount = scheduled.mergedInvalidationRequestCount
@@ -390,7 +392,10 @@ package enum FrameRecordDerivation {
       presentationEditOperationLowering: "-",
       presentationEditOperationCount: 0,
       measurementCacheHitRate: nil,
-      totalFrameDuration: .zero,
+      // Head preparation, animation injection, and elided commit are disjoint.
+      // Their nested checkpoint/registration timings must not be counted twice.
+      totalFrameDuration: (sample.timings.headTotal ?? .zero)
+        + (sample.timings.animationTick ?? .zero) + (sample.timings.commit ?? .zero),
       elided: true,
       elidedHeadTotalDuration: sample.timings.headTotal,
       elidedGraphCheckpointCreateDuration: sample.timings.graphCheckpointCreate,

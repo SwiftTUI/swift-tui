@@ -99,15 +99,7 @@ import Synchronization
   /// Milliseconds with two fractional digits, matching `frames.tsv`'s duration
   /// columns so the two files reduce with one parser.
   private func formatMs(_ duration: Duration?) -> String {
-    guard let duration else {
-      return "-"
-    }
-    let totalMicroseconds =
-      duration.components.seconds * 1_000_000
-      + duration.components.attoseconds / 1_000_000_000_000
-    let milliseconds = totalMicroseconds / 1000
-    let fraction = (totalMicroseconds % 1000) / 10
-    return "\(milliseconds).\(fraction < 10 ? "0" : "")\(fraction)"
+    FrameDiagnosticsTSVFormatting.formatMs(duration)
   }
 
   private func writeLine(_ line: String) {

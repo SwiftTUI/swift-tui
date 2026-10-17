@@ -2,6 +2,10 @@ import SwiftTUICore
 
 /// A single diagnostic record capturing one rendered frame's performance data.
 public struct FrameDiagnosticRecord: Sendable {
+  package enum Kind: String, Sendable { case committed, zeroArtifact, elided }
+  /// Preserve the sample discriminator instead of reconstructing it from
+  /// counts, presentation strategy, or optional timing fields.
+  package var kind = Kind.committed
   public var frameNumber: Int
   public var causeSummary: String
   public var focusSyncRerenders: Int

@@ -90,3 +90,27 @@ func hosted_surface_sizing_remembers_confirmed_slack_after_growth_probe() {
 
   #expect(negotiated == HostLengthSize(width: 56, height: 16))
 }
+
+@Test func hosted_surface_size_boundaries_are_finite_without_oversized_probes() {
+  let cells = HostLengthSize(width: 1e-200, height: 2)
+  let negotiator = HostedSurfaceSizeNegotiator(
+    cellSize: cells, preferredGridSize: .init(width: 4, height: 3))
+  let extreme = negotiator.negotiate(proposedWidth: 1e200, proposedHeight: 8)
+  #expect(extreme.size == HostLengthSize(width: 4e-200, height: 6))
+  #expect(extreme.probeGridSize == nil)
+  for proposal in [-Double.greatestFiniteMagnitude, -1, 0] {
+    let minimum = HostedSurfaceSizeNegotiator(cellSize: cells).negotiate(
+      proposedWidth: proposal, proposedHeight: proposal)
+    #expect(minimum.size == cells)
+    #expect(minimum.probeGridSize == nil)
+  }
+  for pitch in [Double.nan, Double.infinity, -1, 0, Double.greatestFiniteMagnitude] {
+    let invalid = HostedSurfaceSizeNegotiator(
+      cellSize: .init(width: pitch, height: pitch), preferredGridSize: .init(width: 4, height: 3))
+    let size = invalid.sizeThatFits(proposedWidth: nil, proposedHeight: nil)
+    #expect(size.width.isFinite && size.width > 0)
+    #expect(size.height.isFinite && size.height > 0)
+    let intrinsic = invalid.intrinsicContentSize(noIntrinsicMetric: -1)
+    #expect(intrinsic.width.isFinite && intrinsic.height.isFinite)
+  }
+}

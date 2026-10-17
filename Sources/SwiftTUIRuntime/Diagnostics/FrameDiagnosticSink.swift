@@ -11,3 +11,12 @@ import SwiftTUICore
 @_spi(Runners) public protocol FrameDiagnosticSink: Sendable {
   @MainActor func record(_ sample: RuntimeFrameSample)
 }
+
+/// Every configured consumer observes the same immutable sample once.
+package struct FrameDiagnosticFanout: FrameDiagnosticSink {
+  package let sinks: [any FrameDiagnosticSink]
+
+  @MainActor package func record(_ sample: RuntimeFrameSample) {
+    for sink in sinks { sink.record(sample) }
+  }
+}

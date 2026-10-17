@@ -68,6 +68,17 @@ import Synchronization
   ///
   /// WASI has no path-based file sink (its capability model makes
   /// arbitrary-path `open` a no-op), so this always returns `nil` there.
+  package static func isArmed(debug: Bool = false) -> Bool {
+    #if canImport(WASILibc)
+      false
+    #else
+      if let path = FeatureFlags.environmentValue(named: "SWIFTTUI_FRAME_TRACE"), !path.isEmpty {
+        return true
+      }
+      return DebugTraceSelection.current.isArmed("frames") || debug
+    #endif
+  }
+
   public static func fromEnvironment(debug: Bool = false) -> EnvFrameTraceSink? {
     #if canImport(WASILibc)
       return nil
@@ -75,7 +86,7 @@ import Synchronization
       if let path = FeatureFlags.environmentValue(named: "SWIFTTUI_FRAME_TRACE"), !path.isEmpty {
         return EnvFrameTraceSink(path: path)
       }
-      guard DebugTraceSelection.current.isArmed("frames") || debug,
+      guard isArmed(debug: debug),
         let bundlePath = DebugLogRouter.resolvedFilePath(
           override: nil, bundleFileName: "frames.tsv"
         )

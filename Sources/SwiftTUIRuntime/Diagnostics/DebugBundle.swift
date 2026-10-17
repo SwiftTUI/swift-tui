@@ -111,6 +111,7 @@ import SwiftTUICore
     lines.append("trace-selection: \(selection.isEmpty ? "(none)" : selection)")
     lines.append(
       "armed: memo-emission=\(MemoSkipTrace.emitsTraceLines)"
+        + " frames=\(EnvFrameTraceSink.isArmed(debug: configuration.debug))"
         + " reuse=\(ReuseDenialTrace.isEnabled)"
         + " inval=\(InvalidationSourceTrace.isEnabled)"
         + " soundness-trace=\(SoundnessProbeConfiguration.isTraceEnabled)"

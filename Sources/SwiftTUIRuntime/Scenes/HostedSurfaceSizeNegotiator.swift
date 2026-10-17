@@ -158,12 +158,14 @@ public struct HostedSurfaceSizeNegotiator: Sendable {
     proposedWidth: Double?,
     proposedHeight: Double?
   ) -> HostedSurfaceSizeNegotiation {
+    let cellWidth = normalizedCellLength(cellSize.width)
+    let cellHeight = normalizedCellLength(cellSize.height)
     let width = resolvedAxis(
       preferred: preferredGridSize?.width,
       rendered: renderedGridSize?.width,
       fallback: fallbackGridSize.width,
       proposedLength: proposedWidth,
-      cellLength: cellSize.width
+      cellLength: cellWidth
     ) { proposed, preferred, rendered in
       confirmedSlack.confirmedPreferredWidth(
         proposed: proposed,
@@ -176,7 +178,7 @@ public struct HostedSurfaceSizeNegotiator: Sendable {
       rendered: renderedGridSize?.height,
       fallback: fallbackGridSize.height,
       proposedLength: proposedHeight,
-      cellLength: cellSize.height
+      cellLength: cellHeight
     ) { proposed, preferred, rendered in
       confirmedSlack.confirmedPreferredHeight(
         proposed: proposed,
@@ -197,8 +199,8 @@ public struct HostedSurfaceSizeNegotiator: Sendable {
 
     return HostedSurfaceSizeNegotiation(
       size: HostLengthSize(
-        width: Double(width.cells) * cellSize.width,
-        height: Double(height.cells) * cellSize.height
+        width: hostLength(cells: width.cells, cellLength: cellWidth),
+        height: hostLength(cells: height.cells, cellLength: cellHeight)
       ),
       probeGridSize: probeGridSize
     )
@@ -212,8 +214,10 @@ public struct HostedSurfaceSizeNegotiator: Sendable {
     }
 
     return HostLengthSize(
-      width: Double(max(1, preferredGridSize.width)) * cellSize.width,
-      height: Double(max(1, preferredGridSize.height)) * cellSize.height
+      width: hostLength(
+        cells: preferredGridSize.width, cellLength: normalizedCellLength(cellSize.width)),
+      height: hostLength(
+        cells: preferredGridSize.height, cellLength: normalizedCellLength(cellSize.height))
     )
   }
 
@@ -232,6 +236,12 @@ public struct HostedSurfaceSizeNegotiator: Sendable {
   ) -> AxisNegotiation {
     let preferred = preferred.map { max(1, $0) }
     let rendered = rendered.map { max(1, $0) }
+
+    // A finite constraint below one cell requests the minimum grid, not a
+    // growth probe or the unconstrained ideal size.
+    if let proposedLength, proposedLength.isFinite, proposedLength <= cellLength {
+      return AxisNegotiation(cells: 1, probeCells: nil)
+    }
 
     if let proposedCells = proposedCells(
       for: proposedLength,
@@ -275,6 +285,20 @@ public struct HostedSurfaceSizeNegotiator: Sendable {
       return nil
     }
 
-    return max(1, Int((proposedLength / cellLength).rounded(.down)))
+    let quotient = (proposedLength / cellLength).rounded(.down)
+    // Individually finite operands can overflow in division. An unrepresentable
+    // capacity has the same meaning as an unbounded proposal; use the known
+    // content/fallback size instead of creating an impossible warmup grid.
+    guard quotient.isFinite, quotient < Double(Int.max) else { return nil }
+    return max(1, Int(quotient))
+  }
+
+  private func normalizedCellLength(_ length: Double) -> Double {
+    length.isFinite && length > 0 ? length : 1
+  }
+
+  private func hostLength(cells: Int, cellLength: Double) -> Double {
+    let result = Double(max(1, cells)) * cellLength
+    return result.isFinite ? result : Double.greatestFiniteMagnitude
   }
 }

@@ -48,9 +48,7 @@ struct AdversarialSetBDiagnosticsTests {
     let report = sink.report()
     #expect(report.hasPrefix("=== SwiftTUI profiling summary ===\n"), "\(report)")
     #expect(report.contains("1 elided"), "\(report)")
-    withKnownIssue(
-      "frameCount increments for every frame record; cancelled and elided frames count as committed"
-    ) {
+    do {
       #expect(report.contains("frames: 1 committed, 1 elided"), "\(report)")
     }
   }
@@ -68,9 +66,7 @@ struct AdversarialSetBDiagnosticsTests {
     #expect(presentMs(.microseconds(5)) == "0.00")
     #expect(presentMs(.milliseconds(1_500)) == "1500.00")
     #expect(presentMs(.milliseconds(-2)) == "-2.00")
-    withKnownIssue(
-      "formatMs splits negative microseconds with truncating division and prints a signed remainder"
-    ) {
+    do {
       #expect(presentMs(.microseconds(-2_500)) == "-2.50", "\(presentMs(.microseconds(-2_500)))")
       #expect(presentMs(.microseconds(-250)) == "-0.25", "\(presentMs(.microseconds(-250)))")
     }
@@ -89,7 +85,7 @@ struct AdversarialSetBDiagnosticsTests {
     #expect(row.count == PresentationWriteTSVSink.headerFields.count, "\(row)")
     #expect(row[1] == "10.00", "\(row)")
     #expect(row[2] == "7.50", "\(row)")
-    withKnownIssue("the presents sink carries a copy of the same formatter") {
+    do {
       #expect(row[3] == "-2.50", "\(row)")
     }
   }
@@ -111,9 +107,7 @@ struct AdversarialSetBDiagnosticsTests {
     #expect(line.contains("\"frameNumber\":1"), "\(line)")
     #expect(line.contains("\"causeSummary\":\"input\""), "\(line)")
     #expect(line.contains("\"presentationStrategy\":\"incremental\""), "\(line)")
-    withKnownIssue(
-      "jsonLine(for:) hand-writes eight fields; timings, elision and damage never reach JSONL"
-    ) {
+    do {
       #expect(line.contains("elided"), "\(line)")
       #expect(line.contains("1234"), "\(line)")
     }
@@ -135,10 +129,8 @@ struct AdversarialSetBDiagnosticsTests {
     summary.emit(.frame(record))
     let report = summary.report()
     let totalMs = Double(row["total_ms"] ?? "") ?? -1
-    withKnownIssue(
-      "elidedRecord hard-codes totalFrameDuration = .zero, so head and commit time skip total_ms"
-    ) {
-      #expect(record.totalFrameDuration >= .milliseconds(5), "\(record.totalFrameDuration)")
+    do {
+      #expect(record.totalFrameDuration == .milliseconds(8), "\(record.totalFrameDuration)")
       #expect(totalMs >= 5, "\(row["total_ms"] ?? "-")")
       #expect(!report.contains("worst total 0ms"), "\(report)")
     }
@@ -167,9 +159,7 @@ struct AdversarialSetBDiagnosticsTests {
     #expect(manifest.contains("debug=true"), "\(manifest)")
     let armed = manifest.split(separator: "\n").first { $0.hasPrefix("armed: ") }.map(String.init)
     let armedLine = try #require(armed, "\(manifest)")
-    withKnownIssue(
-      "the armed line lists graph traces only; the debug-armed frame trace is never recorded"
-    ) {
+    do {
       #expect(armedLine.contains("frames"), "\(manifest)")
     }
   }
@@ -191,9 +181,7 @@ struct AdversarialSetBDiagnosticsTests {
     #expect(result.exitReason == .userExit(exitKey), "\(result.exitReason)")
     #expect(result.renderedFrames >= 1)
     #expect(profilingSink.committedFrames >= 1)
-    withKnownIssue(
-      "SceneSession replaces resources.frameSink with the registry sink instead of fanning out"
-    ) {
+    do {
       #expect(runnerSink.committedFrames >= 1)
     }
   }

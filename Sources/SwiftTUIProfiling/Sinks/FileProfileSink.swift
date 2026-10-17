@@ -85,13 +85,18 @@ package final class FileProfileSink: ProfileSink {
   private func jsonLine(for record: ProfileRecord) -> String {
     switch record {
     case .frame(let frame):
+      let columns = zip(
+        FrameDiagnosticsTSVFormatting.headerFields,
+        FrameDiagnosticsTSVFormatting.recordFields(for: frame)
+      ).map { "\(quoted($0)):\(quoted($1))" }.joined(separator: ",")
       return """
         {"signal":"frame","frameNumber":\(frame.frameNumber),\
         "causeSummary":\(quoted(frame.causeSummary)),\
         "resolvedNodes":\(frame.resolvedNodeCount),"measuredNodes":\(frame.measuredNodeCount),\
         "placedNodes":\(frame.placedNodeCount),"drawNodes":\(frame.drawNodeCount),\
         "presentationStrategy":\(quoted(frame.presentationStrategy)),\
-        "presentationBytesWritten":\(frame.presentationBytesWritten)}
+        "presentationBytesWritten":\(frame.presentationBytesWritten),\
+        "kind":\(quoted(frame.kind.rawValue)),"columns":{\(columns)}}
         """
     case .memory(let snapshots):
       let entries = snapshots.map { snapshot -> String in
@@ -109,22 +114,7 @@ package final class FileProfileSink: ProfileSink {
   }
 
   private func quoted(_ string: String) -> String {
-    var escaped = ""
-    for character in string {
-      switch character {
-      case "\\":
-        escaped += "\\\\"
-      case "\"":
-        escaped += "\\\""
-      case "\n":
-        escaped += "\\n"
-      case "\t":
-        escaped += "\\t"
-      default:
-        escaped.append(character)
-      }
-    }
-    return "\"\(escaped)\""
+    JSONStringEncoding.quoted(string)
   }
 
   private func writeLine(_ line: String) {

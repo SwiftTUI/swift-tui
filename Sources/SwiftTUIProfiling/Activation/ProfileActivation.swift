@@ -1,5 +1,9 @@
 @_spi(Runners) import SwiftTUIRuntime
 
+#if !canImport(WASILibc)
+  import Foundation
+#endif
+
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
@@ -27,7 +31,7 @@ public final class ProfileActivation {
   private var presentsPaths: [String] = []
   /// Retains the installed presentation-write sink for this session; the
   /// registry holds it too, but ownership belongs here alongside `sinks`.
-  private var presentationWriteSink: PresentationWriteTSVSink?
+  private var presentationWriteSink: (any PresentationWriteSink)?
 
   package init() {}
 
@@ -60,11 +64,25 @@ public final class ProfileActivation {
   private func activate(_ config: ProfileConfig) {
     let descriptors = Self.resolvedDescriptors(config.sinks)
     sinks = makeSinks(descriptors)
+    let authoredPaths = Set(
+      descriptors.compactMap { descriptor -> String? in
+        switch descriptor {
+        case .tsv(let path), .jsonl(let path): canonicalPath(path)
+        case .summary: nil
+        }
+      })
+    var seen: Set<String> = []
     presentsPaths = descriptors.compactMap { descriptor in
-      guard case .tsv(let path) = descriptor else {
-        return nil
+      guard case .tsv(let path) = descriptor else { return nil }
+      var candidate = Self.presentsPath(besideFramesPath: path)
+      // Protect every authored destination, including a JSONL file or a second
+      // frames sink. Normalize aliases before comparison and open each sidecar
+      // once when several frame sinks share its directory.
+      while authoredPaths.contains(canonicalPath(candidate)) {
+        candidate += ".presents.tsv"
       }
-      return Self.presentsPath(besideFramesPath: path)
+      guard seen.insert(canonicalPath(candidate)).inserted else { return nil }
+      return candidate
     }
     installSignals(config.signals)
   }
@@ -108,12 +126,10 @@ public final class ProfileActivation {
   /// on other hosts this file is opened and stays empty — which is the honest
   /// outcome. A synchronous host's "write latency" would be a fabricated zero.
   private func installPresentationWriteSinkIfNeeded(_ signals: Set<ProfileConfig.Signal>) {
-    guard signals.contains(.frames), let path = presentsPaths.first else {
-      return
-    }
-    guard let sink = PresentationWriteTSVSink(path: path) else {
-      return
-    }
+    guard signals.contains(.frames) else { return }
+    let destinations = presentsPaths.compactMap { PresentationWriteTSVSink(path: $0) }
+    guard !destinations.isEmpty else { return }
+    let sink = PresentationWriteFanout(sinks: destinations)
     presentationWriteSink = sink
     ProfilingRegistry.shared.presentationWriteSink = sink
   }
@@ -126,6 +142,14 @@ public final class ProfileActivation {
       return "presents.tsv"
     }
     return framesPath[...separatorIndex] + "presents.tsv"
+  }
+
+  private func canonicalPath(_ path: String) -> String {
+    #if canImport(WASILibc)
+      path
+    #else
+      URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+    #endif
   }
 
   private func installSignals(_ signals: Set<ProfileConfig.Signal>) {
@@ -248,5 +272,12 @@ final class ProfileFrameBridge: FrameDiagnosticSink {
     for sink in sinks {
       sink.emit(.frame(record))
     }
+  }
+}
+
+private struct PresentationWriteFanout: PresentationWriteSink {
+  let sinks: [any PresentationWriteSink]
+  func record(_ sample: PresentationWriteSample) {
+    for sink in sinks { sink.record(sample) }
   }
 }

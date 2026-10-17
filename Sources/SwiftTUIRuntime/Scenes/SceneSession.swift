@@ -253,12 +253,15 @@ import SwiftTUIViews
         let spool = FeatureFlags.environmentValue(named: "SWIFTTUI_HOT_RELOAD_SPOOL"),
         !spool.isEmpty
       {
-        let loader = try HotReloadLoader(spoolPath: spool,
+        let loader = try HotReloadLoader(
+          spoolPath: spool,
           logicalModule: FeatureFlags.environmentValue(named: "SWIFTTUI_HOT_RELOAD_MODULE"))
-        let session = HotReloadSession(content: HotReloadGeneration {
-          configuration.makeScopedRootView()
-        })
-        let loop = makeRunLoop(configuration: configuration, sessionName: sessionName,
+        let session = HotReloadSession(
+          content: HotReloadGeneration {
+            configuration.makeScopedRootView()
+          })
+        let loop = makeRunLoop(
+          configuration: configuration, sessionName: sessionName,
           stateContainer: stateContainer, focusTracker: focusTracker, resources: resources
         ) { HotReloadHost(session: session) }
         loop.installHotReloadSession(session)
@@ -266,7 +269,8 @@ import SwiftTUIViews
         return try await loop.run()
       }
     #endif
-    let loop = makeRunLoop(configuration: configuration, sessionName: sessionName,
+    let loop = makeRunLoop(
+      configuration: configuration, sessionName: sessionName,
       stateContainer: stateContainer, focusTracker: focusTracker, resources: resources
     ) { configuration.makeScopedRootView() }
     return try await loop.run()
@@ -314,20 +318,12 @@ import SwiftTUIViews
       }
     )
     DebugBundle.prepareIfNeeded(configuration: resources.runtimeConfiguration)
-    runLoop.frameSink = resources.frameSink
-    if let frameSink = ProfilingRegistry.shared.frameSink {
-      // A profiled build installs a sink via `.profiling()`; it supersedes the
-      // legacy per-session logger.
-      runLoop.frameSink = frameSink
-    } else if let traceSink = EnvFrameTraceSink.fromEnvironment(
-      debug: resources.runtimeConfiguration.debug
-    ) {
-      // Opt-in diagnostic: `SWIFTTUI_FRAME_TRACE=<path>` (or the debug
-      // bundle's `frames.tsv`) traces the frame pipeline to a file for
-      // reproducing timing-sensitive interaction bugs (e.g. a slow /
-      // momentarily blank tab switch) in a real terminal.
-      runLoop.frameSink = traceSink
-    }
+    let frameSinks = [
+      resources.frameSink,
+      ProfilingRegistry.shared.frameSink,
+      EnvFrameTraceSink.fromEnvironment(debug: resources.runtimeConfiguration.debug),
+    ].compactMap { $0 }
+    runLoop.frameSink = frameSinks.isEmpty ? nil : FrameDiagnosticFanout(sinks: frameSinks)
     runLoop.runtimeIssueSink = resources.runtimeIssueSink
     runLoop.progressProbe = resources.progressProbe
     if let renderMode = resources.renderMode {

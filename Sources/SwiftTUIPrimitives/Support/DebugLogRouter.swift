@@ -43,7 +43,6 @@ package enum DebugLogRouter {
   )
 
   private static let installedDefaultDirectory = Mutex<String?>(nil)
-  private static let preparedDirectories = Mutex<Set<String>>([])
 
   /// Installs a session-default bundle directory (the `--debug` umbrella).
   /// A no-op when `SWIFTTUI_DEBUG_DIR` is set — the explicit variable wins —
@@ -200,19 +199,22 @@ package enum DebugLogRouter {
     #endif
   }
 
-  /// Best-effort recursive `mkdir` for the bundle directory, attempted once
-  /// per distinct path. Returns whether the directory exists (or plausibly
-  /// exists) afterwards. Compiled out on WASI (no path-based file sink).
+  /// Best-effort recursive `mkdir` for the bundle directory. Recheck the leaf
+  /// on each resolution: a previously prepared directory can have been removed
+  /// between sessions. Compiled out on WASI (no path-based file sink).
   private static func ensureDirectoryExists(_ path: String) -> Bool {
     #if canImport(WASILibc)
       return false
     #else
-      let alreadyPrepared = preparedDirectories.withLock { prepared in
-        prepared.contains(path)
+      let leafResult = path.withCString { pathPointer in
+        #if canImport(ucrt)
+          unsafe _mkdir(pathPointer)
+        #else
+          unsafe mkdir(pathPointer, 0o755)
+        #endif
       }
-      if alreadyPrepared {
-        return true
-      }
+      if leafResult == 0 || errno == EEXIST { return true }
+      guard errno == ENOENT else { return false }
       var partial = path.hasPrefix("/") ? "/" : ""
       for component in path.split(separator: "/") {
         partial += (partial.isEmpty || partial == "/") ? String(component) : "/" + component
@@ -233,9 +235,6 @@ package enum DebugLogRouter {
         if result != 0, errno != EEXIST {
           return false
         }
-      }
-      preparedDirectories.withLock { prepared in
-        _ = prepared.insert(path)
       }
       return true
     #endif

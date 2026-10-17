@@ -19,7 +19,7 @@ struct AdversarialSetAProfilingBoundaryTests {
     sink.emit(.memory([.init(name: name, count: 3)]))
     let data = try Data(contentsOf: url)
     let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    withKnownIssue("STUI-1002: JSONL escaping leaves control scalars raw") {
+    do {
       #expect(object != nil)
     }
     if let object {
@@ -34,7 +34,7 @@ struct AdversarialSetAProfilingBoundaryTests {
     record.firstCustomLayoutFallbackIdentity = "Root/row\tpart\r\nnext"
     let fields = FrameDiagnosticsTSVFormatting.fields(for: record)
     let encoded = fields.joined(separator: "\t")
-    withKnownIssue("STUI-1003: arbitrary identity fields bypass TSV sanitization") {
+    do {
       #expect(
         encoded.split(separator: "\t", omittingEmptySubsequences: false).count
           == FrameDiagnosticsTSVFormatting.headerFields.count)
@@ -57,9 +57,7 @@ struct AdversarialSetAProfilingBoundaryTests {
       #expect(before.hasPrefix(FrameDiagnosticsTSVFormatting.headerFields.joined(separator: "\t")))
       ProfilingRegistry.shared.presentationWriteSink?.record(presentation(7))
       let after = try String(contentsOfFile: path, encoding: .utf8)
-      withKnownIssue(
-        "STUI-1004: fixed sidecar name aliases and overwrites the authored frames file"
-      ) {
+      do {
         #expect(after.hasPrefix(FrameDiagnosticsTSVFormatting.headerFields.joined(separator: "\t")))
       }
     }
@@ -93,7 +91,7 @@ struct AdversarialSetAProfilingBoundaryTests {
       let first = try String(contentsOf: a.appendingPathComponent("presents.tsv"), encoding: .utf8)
       let second = try? String(
         contentsOf: b.appendingPathComponent("presents.tsv"), encoding: .utf8)
-      withKnownIssue("STUI-1005: presentation completion routing uses only the first TSV sink") {
+      do {
         #expect(second == first)
       }
     }
@@ -291,8 +289,7 @@ struct AdversarialSetAProfilingBoundaryTests {
 
   @Test func setA794FiniteHostDimensionsCannotTrapDuringCellCountConversion() async {
     // Hypothesis: individually finite proposal and cell dimensions produce an infinite quotient that is converted to Int unchecked.
-    await withKnownIssue("STUI-1006: finite host operands overflow before unchecked Int conversion")
-    {
+    do {
       await #expect(processExitsWith: .success) {
         let negotiator = HostedSurfaceSizeNegotiator(
           cellSize: .init(width: 1e-200, height: 2), preferredGridSize: .init(width: 4, height: 3))

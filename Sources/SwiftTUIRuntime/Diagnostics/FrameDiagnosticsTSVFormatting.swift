@@ -272,6 +272,13 @@ package enum FrameDiagnosticsTSVFormatting {
   package static func fields(
     for record: FrameDiagnosticRecord
   ) -> [String] {
+    recordFields(for: record).map(sanitizeField)
+  }
+
+  /// The shared diagnostic column schema before transport-specific escaping.
+  /// JSONL uses the same fields, preserving authored text exactly; TSV replaces
+  /// separators only at its final encoding boundary.
+  package static func recordFields(for record: FrameDiagnosticRecord) -> [String] {
     let timings = record.phaseTimings
     let resolveMs = formatMs(timings?.resolve)
     let measureMs = formatMs(timings?.measure)
@@ -418,12 +425,12 @@ package enum FrameDiagnosticsTSVFormatting {
       record.runtimeDirtyPlanResult,
       selectiveEvaluationDisabledReasons.isEmpty
         ? "-"
-        : sanitizeField(selectiveEvaluationDisabledReasons),
+        : selectiveEvaluationDisabledReasons,
       String(record.runtimePublicationSubtreeRootCount),
       formatOptionalInt(record.runtimePublicationRestoredNodeCount),
       String(record.runtimePublicationInvalidatedIdentityCount),
       String(record.runtimePublicationUnmappedInvalidatedIdentityCount),
-      publicationUnmappedSample.isEmpty ? "-" : sanitizeField(publicationUnmappedSample),
+      publicationUnmappedSample.isEmpty ? "-" : publicationUnmappedSample,
       String(record.runtimePublicationRemappedInvalidatedIdentityCount),
       String(record.runtimePublicationDroppedInvalidatedIdentityCount),
       String(record.runtimePublicationReconciledInvalidatedNodeCount),
@@ -571,16 +578,16 @@ package enum FrameDiagnosticsTSVFormatting {
     "dy=\(committed.dy)@rows\(committed.band.origin.y)..\(committed.band.maxY)"
   }
 
-  private static func formatMs(_ duration: Duration?) -> String {
-    guard let duration else {
-      return "-"
-    }
-    let totalMicroseconds =
-      duration.components.seconds * 1_000_000
-      + duration.components.attoseconds / 1_000_000_000_000
-    let ms = totalMicroseconds / 1000
-    let frac = (totalMicroseconds % 1000) / 10
-    return "\(ms).\(frac < 10 ? "0" : "")\(frac)"
+  package static func formatMs(_ duration: Duration?) -> String {
+    guard let duration else { return "-" }
+    // Duration's seconds span Int64; widening before scaling also handles its
+    // extrema. Truncate once at the displayed precision, then split magnitude.
+    let hundredths =
+      Int128(duration.components.seconds) * 100_000
+      + Int128(duration.components.attoseconds) / 10_000_000_000_000
+    let magnitude = hundredths.magnitude
+    let fraction = magnitude % 100
+    return "\(hundredths < 0 ? "-" : "")\(magnitude / 100).\(fraction < 10 ? "0" : "")\(fraction)"
   }
 
   private static func formatGeneration(_ generation: RenderGeneration?) -> String {
@@ -615,22 +622,21 @@ package enum FrameDiagnosticsTSVFormatting {
     }
     return
       issues
-      .map { sanitizeField($0.description) }
+      .map(\.description)
       .joined(separator: " | ")
   }
 
   private static func sanitizeField(
     _ value: String
   ) -> String {
-    String(
-      value.map { character in
-        switch character {
-        case "\t", "\n", "\r":
-          " "
-        default:
-          character
-        }
+    var result = ""
+    for scalar in value.unicodeScalars {
+      if scalar.value < 32 || (127...159).contains(scalar.value) {
+        result.append(" ")
+      } else {
+        result.unicodeScalars.append(scalar)
       }
-    )
+    }
+    return result
   }
 }

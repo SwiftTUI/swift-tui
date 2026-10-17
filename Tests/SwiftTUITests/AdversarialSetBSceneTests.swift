@@ -112,9 +112,7 @@ struct AdversarialSetBSceneTests {
     let freshZero = fresh.negotiate(proposedWidth: 0, proposedHeight: 0)
     let freshNegative = fresh.negotiate(proposedWidth: -64, proposedHeight: -32)
     let settledZero = settled.sizeThatFits(proposedWidth: 0, proposedHeight: 0)
-    withKnownIssue(
-      "proposedCells(for:) treats lengths <= 0 as unspecified and answers the ideal grid"
-    ) {
+    do {
       #expect(freshZero.size == oneCell, "\(freshZero)")
       #expect(freshNegative.size == oneCell, "\(freshNegative)")
       #expect(settledZero == oneCell, "\(settledZero)")
@@ -125,9 +123,7 @@ struct AdversarialSetBSceneTests {
   // An oversized finite host proposal negotiates a bounded grid instead of
   // trapping in the Double-to-Int cell conversion.
   @Test func setB315OversizedProposalDoesNotTrap() async {
-    await withKnownIssue(
-      "Int((proposedLength / cellLength).rounded(.down)) traps above Int.max cells (STUI-723)"
-    ) {
+    do {
       await #expect(processExitsWith: .success) {
         let negotiator = HostedSurfaceSizeNegotiator(
           cellSize: HostLengthSize(width: 8, height: 16))
