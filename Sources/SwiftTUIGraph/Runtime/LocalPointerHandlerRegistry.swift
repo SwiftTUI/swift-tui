@@ -102,6 +102,11 @@ package final class LocalPointerHandlerRegistry: Equatable {
   package typealias Handler = @MainActor (LocalPointerEvent) -> PointerDispatchOutcome
   package typealias HoverHandler = @MainActor @Sendable (HoverPhase) -> Void
 
+  // Wheel modifiers contribute callbacks independently from the control's
+  // primary handler. Ignoring a notch must leave the body handler available.
+  private var wheelHandlers: [RouteID: [Handler]] = [:]
+  private var wheelHandlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+  private var wheelHandlerRecencies: [RouteID: UInt64] = [:]
   private var handlers: [RouteID: Handler] = [:]
   // Ordered stack per route: stacked `.onPointerHover` levels on one chain
   // node register under the exact same route key back-to-back within one
@@ -242,16 +247,79 @@ package final class LocalPointerHandlerRegistry: Equatable {
     return true
   }
 
+  package func registerWheel(
+    routeID: RouteID,
+    structuralKey: Identity? = nil,
+    handler: @escaping Handler
+  ) {
+    let recency = ViewNodeContext.current?.runtimeRegistrationRecency ?? 0
+    guard evictingCollidingWheelRoutes(for: routeID, recency: recency) else {
+      return
+    }
+    // A strictly fresher stamp starts this pass's stack for the route; an
+    // equal stamp appends — stacked `.onScrollWheel` levels on one chain
+    // register back-to-back within one capture session. Dispatch runs outer
+    // callbacks first; a staler stamp is a shadowed re-feed and is dropped.
+    if let existingRecency = wheelHandlerRecencies[routeID] {
+      if recency > existingRecency {
+        wheelHandlers[routeID] = [handler]
+      } else if recency == existingRecency {
+        wheelHandlers[routeID, default: []].append(handler)
+      } else {
+        return
+      }
+    } else {
+      wheelHandlers[routeID] = [handler]
+    }
+    // Owner under the authored (structural) identity when supplied: a derived
+    // entity route's own identity lives in a re-rooted space that
+    // subtree-removal prefixes never reach.
+    wheelHandlerOwners[routeID] = .current(identity: structuralKey ?? routeID.identity)
+    wheelHandlerRecencies[routeID] = recency
+    ViewNodeContext.current?.recordPointerWheelHandlerRegistration(
+      routeID: routeID,
+      structuralKey: structuralKey,
+      handler: handler
+    )
+  }
+
+  /// Cross-owner collision policy, unchanged from the single-handler model:
+  /// an entry for the same identity+kind under a different owner whose
+  /// contributing node has a strictly older visited stamp is an abandoned
+  /// level's shadowed copy — evict it. A strictly fresher existing entry wins
+  /// instead (the incoming one is the shadowed copy being re-restored) —
+  /// returns `false` so the caller drops the incoming registration. Equal
+  /// recency keeps both owners' entries distinct.
+  private func evictingCollidingWheelRoutes(
+    for routeID: RouteID,
+    recency: UInt64
+  ) -> Bool {
+    let collidingRoutes = wheelHandlers.keys.filter { existing in
+      existing.pairsIgnoringOwner(with: routeID) && existing != routeID
+    }
+    for existing in collidingRoutes {
+      let existingRecency = wheelHandlerRecencies[existing] ?? 0
+      if existingRecency < recency {
+        wheelHandlers.removeValue(forKey: existing)
+        wheelHandlerOwners.removeValue(forKey: existing)
+        wheelHandlerRecencies.removeValue(forKey: existing)
+      } else if existingRecency > recency {
+        return false
+      }
+    }
+    return true
+  }
+
   package func hasHandler(
     routeID: RouteID
   ) -> Bool {
-    handlers[routeID] != nil
+    handlers[routeID] != nil || wheelHandlers[routeID] != nil
   }
 
   package func hasHandler(
     pairingWith routeID: RouteID
   ) -> Bool {
-    handlerRouteID(pairingWith: routeID) != nil
+    handlerRouteID(pairingWith: routeID) != nil || wheelRouteID(pairingWith: routeID) != nil
   }
 
   package func hasHoverHandler(
@@ -287,6 +355,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     return handlers.keys
       .filter { $0.pairsIgnoringOwner(with: routeID) }
       .max { Self.staleOwnerFirst($0.ownerNodeID, $1.ownerNodeID) }
+      ?? wheelRouteID(pairingWith: routeID)
   }
 
   /// Hover counterpart of ``handlerRouteID(pairingWith:)``. Prefers the entry
@@ -304,6 +373,24 @@ package final class LocalPointerHandlerRegistry: Equatable {
       .max { lhs, rhs in
         let lhsRecency = hoverHandlerRecencies[lhs] ?? 0
         let rhsRecency = hoverHandlerRecencies[rhs] ?? 0
+        if lhsRecency != rhsRecency {
+          return lhsRecency < rhsRecency
+        }
+        return Self.staleOwnerFirst(lhs.ownerNodeID, rhs.ownerNodeID)
+      }
+  }
+
+  package func wheelRouteID(
+    pairingWith routeID: RouteID
+  ) -> RouteID? {
+    if wheelHandlers[routeID] != nil {
+      return routeID
+    }
+    return wheelHandlers.keys
+      .filter { $0.pairsIgnoringOwner(with: routeID) }
+      .max { lhs, rhs in
+        let lhsRecency = wheelHandlerRecencies[lhs] ?? 0
+        let rhsRecency = wheelHandlerRecencies[rhs] ?? 0
         if lhsRecency != rhsRecency {
           return lhsRecency < rhsRecency
         }
@@ -330,9 +417,14 @@ package final class LocalPointerHandlerRegistry: Equatable {
     routeID: RouteID,
     event: LocalPointerEvent
   ) -> PointerDispatchOutcome {
-    guard let resolved = handlerRouteID(pairingWith: routeID) else {
-      return .ignored
+    if case .scrolled = event.kind, let wheelRoute = wheelRouteID(pairingWith: routeID) {
+      // Inner bodies resolve first; outer authored handlers get first refusal.
+      for handler in (wheelHandlers[wheelRoute] ?? []).reversed() {
+        let result = handler(event)
+        if result != .ignored && result != .failed { return result }
+      }
     }
+    guard let resolved = handlerRouteID(pairingWith: routeID) else { return .ignored }
     return handlers[resolved]?(event) ?? .ignored
   }
 
@@ -359,6 +451,9 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
   package func reset() {
     handlers.removeAll(keepingCapacity: true)
+    wheelHandlers.removeAll(keepingCapacity: true)
+    wheelHandlerOwners.removeAll(keepingCapacity: true)
+    wheelHandlerRecencies.removeAll(keepingCapacity: true)
     hoverHandlers.removeAll(keepingCapacity: true)
     handlerOwners.removeAll(keepingCapacity: true)
     hoverHandlerOwners.removeAll(keepingCapacity: true)
@@ -378,6 +473,9 @@ package final class LocalPointerHandlerRegistry: Equatable {
       handlers.removeValue(forKey: routeID)
       handlerOwners.removeValue(forKey: routeID)
     }
+    wheelHandlers.removeAll(keepingCapacity: true)
+    wheelHandlerOwners.removeAll(keepingCapacity: true)
+    wheelHandlerRecencies.removeAll(keepingCapacity: true)
     hoverHandlers.removeAll(keepingCapacity: true)
     hoverHandlerOwners.removeAll(keepingCapacity: true)
     hoverHandlerRecencies.removeAll(keepingCapacity: true)
@@ -409,6 +507,14 @@ package final class LocalPointerHandlerRegistry: Equatable {
       hoverHandlers.removeValue(forKey: routeID)
       hoverHandlerOwners.removeValue(forKey: routeID)
       hoverHandlerRecencies.removeValue(forKey: routeID)
+    }
+    for routeID in wheelHandlers.keys.filter({
+      (wheelHandlerOwners[$0] ?? .init(identity: $0.identity)).matchesAnySubtreeRoot(roots)
+        && !preservedIdentities.contains($0.identity)
+    }) {
+      wheelHandlers.removeValue(forKey: routeID)
+      wheelHandlerOwners.removeValue(forKey: routeID)
+      wheelHandlerRecencies.removeValue(forKey: routeID)
     }
   }
 
@@ -452,6 +558,10 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
   package func snapshotHover() -> [RouteID: [HoverHandler]] {
     hoverHandlers
+  }
+
+  package func snapshotWheel() -> [RouteID: [Handler]] {
+    wheelHandlers
   }
 
   package func restore(
@@ -509,6 +619,36 @@ package final class LocalPointerHandlerRegistry: Equatable {
       hoverHandlerOwners[routeID] =
         ownersByRouteID[routeID] ?? .init(identity: routeID.identity)
       hoverHandlerRecencies[routeID] = recency
+    }
+  }
+  package func restoreWheel(
+    _ snapshot: [RouteID: [Handler]],
+    ownersByRouteID: [RouteID: RuntimeRegistrationOwnerKey] = [:],
+    recency: UInt64 = 0
+  ) {
+    guard !snapshot.isEmpty else {
+      return
+    }
+
+    for (routeID, stackedHandlers) in snapshot {
+      guard !stackedHandlers.isEmpty,
+        evictingCollidingWheelRoutes(for: routeID, recency: recency)
+      else {
+        continue
+      }
+      // Whole-stack replace at an equal-or-fresher stamp: the committed
+      // record carries the route's complete stack, and replacing (never
+      // appending) keeps the per-frame double restore idempotent. An older
+      // snapshot must not clobber a live re-registration.
+      if let existingRecency = wheelHandlerRecencies[routeID],
+        recency < existingRecency
+      {
+        continue
+      }
+      wheelHandlers[routeID] = stackedHandlers
+      wheelHandlerOwners[routeID] =
+        ownersByRouteID[routeID] ?? .init(identity: routeID.identity)
+      wheelHandlerRecencies[routeID] = recency
     }
   }
 }

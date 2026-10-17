@@ -134,7 +134,7 @@ extension LocalPointerHandlerRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .pointerHandler }
 
   package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
-    snapshot().isEmpty && snapshotHover().isEmpty
+    snapshot().isEmpty && snapshotHover().isEmpty && snapshotWheel().isEmpty
       ? nil
       : .handlerInstallations
   }
@@ -175,6 +175,11 @@ extension LocalPointerHandlerRegistry: RuntimeRegistry {
       ownersByRouteID: handlers.pointer.hoverOwners,
       recency: context.recency
     )
+    restoreWheel(
+      handlers.pointer.wheelHandlers,
+      ownersByRouteID: handlers.pointer.wheelOwners,
+      recency: context.recency
+    )
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
@@ -183,6 +188,9 @@ extension LocalPointerHandlerRegistry: RuntimeRegistry {
     }
     for routeID in snapshotHover().keys {
       builder.add("hover", String(describing: routeID))
+    }
+    for routeID in snapshotWheel().keys {
+      builder.add("wheel", String(describing: routeID))
     }
   }
 }
@@ -399,6 +407,9 @@ extension LocalScrollPositionRegistry: RuntimeRegistry {
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
     for registration in snapshot() {
       builder.add("scrollPosition", registration.identity.path)
+      builder.add("scrollPositionAxes", "\(registration.axes.rawValue)")
+      builder.add(
+        "scrollPositionResolvedOffset", "\(String(describing: registration.resolvedOffset))")
     }
   }
 }

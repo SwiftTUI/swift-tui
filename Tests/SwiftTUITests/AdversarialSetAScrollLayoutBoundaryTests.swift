@@ -330,7 +330,7 @@ struct AdversarialSetAScrollLayoutBoundaryTests {
     // The primary's authored ten rows in a six-row viewport move four rows.
     // The distant decoration stays offscreen, so it cannot obscure the witness.
     #expect(renderedOffset == 4)
-    withKnownIssue("STUI-999: proxy extent and layout clamp disagree for overflowing overlays") {
+    do {
       #expect(
         Double(s.offset.y) == renderedOffset,
         "Proxy published offset \(s.offset.y), but the document moved \(renderedOffset) rows")

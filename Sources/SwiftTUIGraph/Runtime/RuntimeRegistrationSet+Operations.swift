@@ -123,7 +123,8 @@ extension RuntimeRegistrationSet {
   package func diagnostics() -> RuntimeRegistrationDiagnostics {
     let gestureStateRegistrations = gestureStateRegistry?.snapshot() ?? [:]
     return RuntimeRegistrationDiagnostics(
-      pointerHandlerCount: pointerHandlerRegistry?.snapshot().count ?? 0,
+      pointerHandlerCount: (pointerHandlerRegistry?.snapshot().count ?? 0)
+        + (pointerHandlerRegistry?.snapshotWheel().count ?? 0),
       pointerHoverHandlerCount: pointerHandlerRegistry?.snapshotHover().count ?? 0,
       gestureRecognizerCount: gestureRegistry?.snapshot().count ?? 0,
       gestureStateBindingCount: gestureStateRegistrations.values.reduce(0) { count, bindings in

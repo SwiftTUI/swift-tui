@@ -155,9 +155,11 @@ package func resolvedScrollIndicatorInsets(
     let viewportWidth = max(0, viewportRect.size.width - trailing)
     let viewportHeight = max(0, viewportRect.size.height - bottom)
     let nextTrailing =
-      axes.contains(.vertical) && contentBounds.size.height > viewportHeight ? 1 : 0
+      axes.contains(.vertical) && viewportRect.size.width > 1
+        && contentBounds.size.height > viewportHeight ? 1 : 0
     let nextBottom =
-      axes.contains(.horizontal) && contentBounds.size.width > viewportWidth ? 1 : 0
+      axes.contains(.horizontal) && viewportRect.size.height > 1
+        && contentBounds.size.width > viewportWidth ? 1 : 0
     if nextTrailing == trailing, nextBottom == bottom {
       return .init(trailing: trailing, bottom: bottom)
     }
@@ -191,7 +193,9 @@ package func resolvedScrollIndicatorMetrics(
 
   switch axis {
   case .vertical:
-    guard axes.contains(.vertical), viewportRect.size.width > 0, viewportRect.size.height > 0 else {
+    guard axes.contains(.vertical), viewportRect.size.width > (reservesSpace ? 1 : 0),
+      viewportRect.size.height > 0
+    else {
       return nil
     }
 
@@ -220,7 +224,9 @@ package func resolvedScrollIndicatorMetrics(
       axes.contains(.vertical)
       && contentBounds.size.height > max(0, viewportRect.size.height - insets.bottom)
     let trackWidth = max(0, viewportWidth - (!reservesSpace && hasVerticalTrack ? 1 : 0))
-    guard axes.contains(.horizontal), trackWidth > 0, viewportRect.size.height > 0 else {
+    guard axes.contains(.horizontal), trackWidth > 0,
+      viewportRect.size.height > (reservesSpace ? 1 : 0)
+    else {
       return nil
     }
 

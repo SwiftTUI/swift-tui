@@ -55,6 +55,7 @@ enum RegistrationKindDriver {
       let routeID = RouteID(identity: identity)
       node.recordPointerHandlerRegistration(routeID: routeID) { _ in .ignored }
       node.recordPointerHoverHandlerRegistration(routeID: routeID) { _ in }
+      node.recordPointerWheelHandlerRegistration(routeID: routeID) { _ in .ignored }
     case .gesture:
       node.recordGestureRegistration(
         identity: identity,

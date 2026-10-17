@@ -1770,6 +1770,20 @@ package final class ViewNode {
     refreshCommittedHandlerInventoryOutsideCapture()
   }
 
+  package func recordPointerWheelHandlerRegistration(
+    routeID: RouteID,
+    structuralKey: Identity? = nil,
+    handler: @escaping LocalPointerHandlerRegistry.Handler
+  ) {
+    recordRuntimeRegistrationMutation()
+    registeredHandlers.recordPointerWheelHandler(
+      routeID: routeID,
+      structuralKey: structuralKey,
+      handler: handler
+    )
+    refreshCommittedHandlerInventoryOutsideCapture()
+  }
+
   package func recordGestureRegistration(
     identity: Identity,
     structuralKey: Identity? = nil,

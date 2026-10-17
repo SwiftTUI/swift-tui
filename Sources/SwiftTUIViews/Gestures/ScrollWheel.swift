@@ -68,7 +68,7 @@ public struct ScrollWheelModifier: IterativePrimitiveViewModifier, Sendable {
         context: context,
         preferringSnapshot: authoringContext
       )
-      intake.registerPointerHandler(routeID: routeID, structuralKey: node.identity) { event in
+      intake.registerPointerWheelHandler(routeID: routeID, structuralKey: node.identity) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind else {
           return .ignored
         }

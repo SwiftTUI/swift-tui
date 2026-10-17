@@ -42,7 +42,9 @@ extension LayoutEngine {
       // Publish the same content extent and viewport used by scroll layout.
       // Including the outer inset or indicator track in the viewport would
       // make wheel, key, and pointer clamping stop before the final cells.
-      node.contentBounds = content.contentBoundsForParent
+      // Scroll layout clamps to its measured primary content. Decorative
+      // overflow is painted and clipped, but does not enlarge that extent.
+      node.contentBounds = content.bounds
       if let viewport = content.placementMetadata.parentScrollViewportRect {
         node.scrollViewportRect = viewport
       } else {

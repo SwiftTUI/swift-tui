@@ -104,6 +104,7 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
         )
         intake.registerScrollPosition(
           identity: context.identity,
+          axes: axes,
           currentOffset: {
             let current = binding.wrappedValue
             return ScrollOffset(x: current.x, y: current.y)
@@ -121,11 +122,23 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
               return false
             }
             let event = keyPress.key
-            if let edge = scrollBoundaryEdge(for: event, targetAxis: targetAxis) {
-              return scrollCommandRegistry?.scrollToEdge(
-                edge,
-                scopeIdentity: context.identity
-              ) ?? false
+            if keyPress.key == .home || keyPress.key == .end, let scrollCommandRegistry {
+              let destination = keyPress.key == .home ? 0 : Int.max
+              return scrollCommandRegistry.scrollTo(
+                x: axes.contains(.horizontal) && targetAxis != .vertical ? destination : nil,
+                y: axes.contains(.vertical) && targetAxis != .horizontal ? destination : nil,
+                scopeIdentity: context.identity)
+            }
+            if keyPress.key == .pageUp || keyPress.key == .pageDown,
+              let scrollCommandRegistry
+            {
+              let vertical =
+                targetAxis == .vertical
+                || (targetAxis == nil && axes.contains(.vertical))
+              let command: ScrollAccessibilityCommand =
+                keyPress.key == .pageUp
+                ? (vertical ? .up : .left) : (vertical ? .down : .right)
+              return command.perform(in: scrollCommandRegistry, identity: context.identity)
             }
 
             let current = binding.wrappedValue

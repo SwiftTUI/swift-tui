@@ -4050,6 +4050,9 @@ package final class ViewGraph {
         || node.registeredHandlers.pointer.hoverOwners.values.contains(where: {
           $0.matchesAnySubtreeRoot(roots)
         })
+        || node.registeredHandlers.pointer.wheelOwners.values.contains(where: {
+          $0.matchesAnySubtreeRoot(roots)
+        })
       {
         // A style route wrapper resolves to a synthetic pointer identity
         // whose handlers belong to an ancestor control. Reset-root expansion

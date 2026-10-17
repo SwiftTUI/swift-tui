@@ -161,10 +161,10 @@ struct CompositionalLazyJourneyTests {
     route.scrollAnchorCorrection = .init(
       requestedOffset: .init(x: 0, y: 8),
       correctedOffset: .init(x: 0, y: 11))
-    registry.commitLazyScrollAnchors([route])
+    registry.commitScrollOffsets([route])
     #expect(offset.y == 10)
     offset.y = 8
-    registry.commitLazyScrollAnchors([route])
+    registry.commitScrollOffsets([route])
     #expect(offset.y == 11)
   }
 

@@ -268,8 +268,14 @@ struct ScrollViewLayout: Layout, StackMinimumLayoutProviding, StackExpansionLayo
 
     return .init(
       trailing: indicatorAxes.contains(.vertical) && childSize.height > contentViewportHeight
+        && viewportValue(
+          for: proposal.width, fallback: childSize.width,
+          reserved: contentInsets.horizontal) > 1
         ? 1 : 0,
       bottom: indicatorAxes.contains(.horizontal) && childSize.width > contentViewportWidth
+        && viewportValue(
+          for: proposal.height, fallback: childSize.height,
+          reserved: contentInsets.vertical) > 1
         ? 1 : 0
     )
   }

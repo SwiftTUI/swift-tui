@@ -16,6 +16,9 @@ package struct ScrollOffset: Equatable, Sendable {
 package struct ScrollPositionRegistrationSnapshot {
   package var identity: Identity
   package var ownerViewNodeID: ViewNodeID?
+  package var axes: AxisSet
+  /// Resolve-time value guards commit normalization against a newer input.
+  package var resolvedOffset: ScrollOffset?
   package var currentOffset: @MainActor () -> ScrollOffset
   package var applyOffset: @MainActor (ScrollOffset) -> Void
   /// The logical collection position remains stable while estimated cell
@@ -49,6 +52,8 @@ package struct ScrollPositionRegistrationSnapshot {
   package init(
     identity: Identity,
     ownerViewNodeID: ViewNodeID? = nil,
+    axes: AxisSet = [.horizontal, .vertical],
+    resolvedOffset: ScrollOffset? = nil,
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
@@ -58,6 +63,8 @@ package struct ScrollPositionRegistrationSnapshot {
   ) {
     self.identity = identity
     self.ownerViewNodeID = ownerViewNodeID
+    self.axes = axes
+    self.resolvedOffset = resolvedOffset
     self.currentOffset = currentOffset
     self.applyOffset = applyOffset
     self.currentCollectionAnchor = currentCollectionAnchor
@@ -119,6 +126,7 @@ package final class LocalScrollPositionRegistry: Equatable {
 
   package func register(
     identity: Identity,
+    axes: AxisSet = [.horizontal, .vertical],
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
@@ -129,6 +137,7 @@ package final class LocalScrollPositionRegistry: Equatable {
     let registration = ScrollPositionRegistrationSnapshot(
       identity: identity,
       ownerViewNodeID: ViewNodeContext.current?.viewNodeID,
+      axes: axes, resolvedOffset: currentOffset(),
       currentOffset: currentOffset,
       applyOffset: applyOffset,
       bindingSourceID: bindingSourceID,
@@ -215,17 +224,21 @@ package final class LocalScrollPositionRegistry: Equatable {
       && leadingEnd <= layout.visibleLines.upperBound
   }
 
-  /// Apply geometry refinement only when its owning frame commits. Abandoned
-  /// worker candidates and measurement probes cannot mutate authored bindings.
-  package func commitLazyScrollAnchors(_ routes: [ScrollRoute]) {
+  /// Commit geometry corrections only for the request this frame resolved.
+  /// Measurement and abandoned worker candidates never write authored bindings.
+  package func commitScrollOffsets(_ routes: [ScrollRoute]) {
     for route in routes {
-      guard let correction = route.scrollAnchorCorrection,
-        let registration = registrations[route.identity]
-      else { continue }
-      let requested = ScrollOffset(x: correction.requestedOffset.x, y: correction.requestedOffset.y)
-      let corrected = ScrollOffset(x: correction.correctedOffset.x, y: correction.correctedOffset.y)
-      if registration.currentOffset() == requested && requested != corrected {
-        registration.applyOffset(corrected)
+      guard let registration = registrations[route.identity] else { continue }
+      let current = registration.currentOffset()
+      if let correction = route.scrollAnchorCorrection {
+        let requested = ScrollOffset(
+          x: correction.requestedOffset.x, y: correction.requestedOffset.y)
+        let corrected = ScrollOffset(
+          x: correction.correctedOffset.x, y: correction.correctedOffset.y)
+        if current == requested && requested != corrected { registration.applyOffset(corrected) }
+      } else if registration.revealTarget == nil, registration.resolvedOffset == current {
+        let corrected = clampedOffset(current, in: route)
+        if current != corrected { registration.applyOffset(corrected) }
       }
     }
   }
@@ -244,7 +257,8 @@ package final class LocalScrollPositionRegistry: Equatable {
       guard let registration = registrations[route.identity] else {
         return route
       }
-      let offset = registration.currentOffset()
+      let current = registration.currentOffset()
+      let offset = registration.revealTarget == nil ? clampedOffset(current, in: route) : current
       var enriched = route
       enriched.contentOffset = CellPoint(x: offset.x, y: offset.y)
       if let position = route.collectionScrollPosition {
@@ -672,7 +686,8 @@ package final class LocalScrollPositionRegistry: Equatable {
     // binding cannot leave the requested target outside the viewport.
     var next = preservesProducerOffset ? currentOffset : clampedOffset(currentOffset, in: route)
 
-    if focusRect.origin.x < route.viewportRect.origin.x {
+    let exceedsViewportWidth = focusRect.size.width > route.viewportRect.size.width
+    if focusRect.origin.x < route.viewportRect.origin.x || exceedsViewportWidth {
       next.x += focusRect.origin.x - route.viewportRect.origin.x
     } else if focusRect.maxX > route.viewportRect.maxX {
       next.x += focusRect.maxX - route.viewportRect.maxX
@@ -704,6 +719,9 @@ package final class LocalScrollPositionRegistry: Equatable {
         viewportLength: route.viewportRect.size.height
       )
     }
+    let axes = registrations[route.identity]?.axes ?? [.horizontal, .vertical]
+    if !axes.contains(.horizontal) { next.x = 0 }
+    if !axes.contains(.vertical) { next.y = 0 }
     return next
   }
 
@@ -858,22 +876,19 @@ package final class LocalScrollPositionRegistry: Equatable {
     origin + Int((Double(max(0, length - 1)) * unit).rounded())
   }
 
-  private func clampedOffset(
-    _ offset: ScrollOffset,
-    in route: ScrollRoute
-  ) -> ScrollOffset {
-    ScrollOffset(
-      x: clampedOffset(
-        offset.x,
-        contentLength: route.contentBounds.size.width,
-        viewportLength: route.viewportRect.size.width
-      ),
-      y: clampedOffset(
-        offset.y,
-        contentLength: route.contentBounds.size.height,
-        viewportLength: route.viewportRect.size.height
-      )
-    )
+  private func clampedOffset(_ offset: ScrollOffset, in route: ScrollRoute) -> ScrollOffset {
+    let axes = registrations[route.identity]?.axes ?? [.horizontal, .vertical]
+    return ScrollOffset(
+      x: axes.contains(.horizontal)
+        ? clampedOffset(
+          offset.x,
+          contentLength: route.contentBounds.size.width,
+          viewportLength: route.viewportRect.size.width) : 0,
+      y: axes.contains(.vertical)
+        ? clampedOffset(
+          offset.y,
+          contentLength: route.contentBounds.size.height,
+          viewportLength: route.viewportRect.size.height) : 0)
   }
 
   private func clampedOffset(

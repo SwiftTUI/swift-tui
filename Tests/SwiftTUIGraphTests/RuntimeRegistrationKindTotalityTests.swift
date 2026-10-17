@@ -154,7 +154,7 @@ struct RuntimeRegistrationKindTotalityTests {
     case .termination:
       ["termination"]
     case .pointerHandler:
-      ["pointer", "hover"]
+      ["pointer", "hover", "wheel"]
     case .gesture:
       ["gesture"]
     case .gestureState:
@@ -166,7 +166,7 @@ struct RuntimeRegistrationKindTotalityTests {
     case .focusedValues:
       ["focusedValues"]
     case .scrollPosition:
-      ["scrollPosition"]
+      ["scrollPosition", "scrollPositionAxes", "scrollPositionResolvedOffset"]
     case .lifecycle:
       ["lifecycleAppear", "lifecycleDisappear", "lifecycleChange"]
     case .task:

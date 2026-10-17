@@ -504,3 +504,66 @@ extension ScrollWheelTests {
     #expect(frame.contains("Below 2") == atEdge)
   }
 }
+
+extension ScrollWheelTests {
+  @Test("a wheel callback cannot replace a button's primary pointer handler")
+  func wheelOnButtonPreservesActivation() throws {
+    let events = ScrollWheelEventBox()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ButtonWheelCallback"), size: .init(width: 20, height: 4)
+    ) {
+      Button("Activate") { events.append(.init(deltaX: 99, deltaY: 99)) }
+        .onScrollWheel { event in
+          events.append(event)
+          return .ignored
+        }
+    }
+    defer { h.shutdown() }
+    _ = try h.clickText("Activate")
+    #expect(events.values == [.init(deltaX: 99, deltaY: 99)])
+  }
+
+  @Test(
+    "stacked wheel callbacks preserve order, fallback and primary control handlers across frames")
+  func stackedCallbacksPreserveBodyHandler() throws {
+    let events = ScrollWheelEventBox()
+    let position = WheelPositionBox(y: 0)
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("StackedWheelCallbacks"), size: .init(width: 24, height: 8)
+    ) {
+      ScrollView(.vertical, position: position.binding) {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Reset") { position.value.y = 0 }
+          ForEach(0..<12) { row in Text("Row \(row)") }
+        }
+      }
+      .onScrollWheel { event in
+        events.append(.init(deltaX: 1, deltaY: event.deltaY))
+        return .ignored
+      }
+      .onScrollWheel { event in
+        events.append(.init(deltaX: 2, deltaY: event.deltaY))
+        return event.deltaY == 2 ? .handled : .ignored
+      }
+      .scrollIndicators(.hidden).frame(width: 20, height: 4)
+    }
+    defer { h.shutdown() }
+    for notch in 1...3 {
+      _ = try h.scrollPointer(at: .init(x: 2, y: 1), deltaY: 1)
+      #expect(position.value.y == notch)
+      #expect(events.values.count == notch * 2)
+      #expect(
+        Array(events.values.suffix(2)) == [
+          .init(deltaX: 2, deltaY: 1), .init(deltaX: 1, deltaY: 1),
+        ])
+    }
+    _ = try h.scrollPointer(at: .init(x: 2, y: 1), deltaY: 2)
+    #expect(position.value.y == 3)
+    #expect(events.values.count == 7)
+    #expect(events.values.last == .init(deltaX: 2, deltaY: 2))
+    position.value.y = 0
+    _ = try h.renderAfterExternalMutation()
+    _ = try h.clickText("Reset")
+    #expect(events.values.count == 7)
+  }
+}

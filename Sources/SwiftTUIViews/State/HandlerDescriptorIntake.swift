@@ -247,6 +247,23 @@ package struct HandlerDescriptorIntake {
     )
   }
 
+  package func registerPointerWheelHandler(
+    routeID: RouteID,
+    structuralKey: Identity? = nil,
+    handler: @escaping @MainActor (LocalPointerEvent) -> PointerDispatchOutcome
+  ) {
+    let scope = dispatchScope
+    context.localPointerHandlerRegistry?.registerWheel(
+      routeID: routeID,
+      structuralKey: structuralKey,
+      handler: { event in
+        withImperativeAuthoringContext(scope) {
+          handler(event)
+        }
+      }
+    )
+  }
+
   package func registerPointerHoverHandler(
     routeID: RouteID,
     structuralKey: Identity? = nil,
@@ -328,6 +345,7 @@ package struct HandlerDescriptorIntake {
   /// dispatches under the captured scope.
   package func registerScrollPosition(
     identity: Identity,
+    axes: AxisSet = [.horizontal, .vertical],
     currentOffset: @escaping @MainActor () -> ScrollOffset,
     applyOffset: @escaping @MainActor (ScrollOffset) -> Void,
     bindingSourceID: AnyID? = nil,
@@ -358,6 +376,7 @@ package struct HandlerDescriptorIntake {
     ViewNodeContext.withValue(ownerNode) {
       context.localScrollPositionRegistry?.register(
         identity: identity,
+        axes: axes,
         currentOffset: currentOffset,
         applyOffset: { offset in
           withImperativeAuthoringContext(scope) {

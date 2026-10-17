@@ -195,6 +195,9 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
   // level. The capture-session reset keeps the append idempotent per pass.
   package var hoverHandlers: [RouteID: [LocalPointerHandlerRegistry.HoverHandler]] = [:]
   package var hoverOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+  package var wheelHandlers: [RouteID: [LocalPointerHandlerRegistry.Handler]] = [:]
+  package var wheelOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
+  package var wheelStructuralRoutes: [Identity: RouteID] = [:]
   /// Latest route recorded per authored site (the registering modifier's
   /// structural identity). A derived (entity-keyed) gesture route changes
   /// value when the entity below the site re-mints; out-of-session record
@@ -210,12 +213,14 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
   package init() {}
 
   package var isEmpty: Bool {
-    handlers.isEmpty && hoverHandlers.isEmpty
+    handlers.isEmpty && hoverHandlers.isEmpty && wheelHandlers.isEmpty
   }
 
   package mutating func absorbAdopted(_ departing: PointerNodeRecord) {
     handlers.merge(departing.handlers, uniquingKeysWith: mergeKeepingCurrent)
     handlerOwners.merge(departing.handlerOwners, uniquingKeysWith: mergeKeepingCurrent)
+    wheelHandlers.merge(departing.wheelHandlers) { current, adopted in adopted + current }
+    wheelOwners.merge(departing.wheelOwners, uniquingKeysWith: mergeKeepingCurrent)
     hoverHandlers.merge(departing.hoverHandlers, uniquingKeysWith: mergeKeepingCurrent)
     hoverOwners.merge(departing.hoverOwners, uniquingKeysWith: mergeKeepingCurrent)
     // A departing route superseded by this record's same-site registration
@@ -237,6 +242,16 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
       departing.hoverStructuralRoutes,
       uniquingKeysWith: mergeKeepingCurrent
     )
+    for (site, departingRoute) in departing.wheelStructuralRoutes {
+      if let currentRoute = wheelStructuralRoutes[site], currentRoute != departingRoute {
+        wheelHandlers.removeValue(forKey: departingRoute)
+        wheelOwners.removeValue(forKey: departingRoute)
+      }
+    }
+    wheelStructuralRoutes.merge(
+      departing.wheelStructuralRoutes,
+      uniquingKeysWith: mergeKeepingCurrent
+    )
   }
 
   package mutating func rehomeAdoptedOwners(
@@ -245,6 +260,7 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
   ) {
     rehomeAdoptedOwnerKeys(&handlerOwners, from: departing, to: adopter)
     rehomeAdoptedOwnerKeys(&hoverOwners, from: departing, to: adopter)
+    rehomeAdoptedOwnerKeys(&wheelOwners, from: departing, to: adopter)
   }
 
   @MainActor
@@ -283,6 +299,26 @@ package struct PointerNodeRecord: RuntimeNodeRecord {
     // removable subtree.
     hoverOwners[routeID] = .current(identity: structuralKey ?? routeID.identity)
     hoverHandlers[routeID, default: []].append(handler)
+  }
+  @MainActor
+  package mutating func recordWheel(
+    routeID: RouteID,
+    structuralKey: Identity? = nil,
+    handler: @escaping LocalPointerHandlerRegistry.Handler
+  ) {
+    if let structuralKey {
+      if let previousRoute = wheelStructuralRoutes[structuralKey], previousRoute != routeID {
+        wheelHandlers.removeValue(forKey: previousRoute)
+        wheelOwners.removeValue(forKey: previousRoute)
+      }
+      wheelStructuralRoutes[structuralKey] = routeID
+    }
+    // Owner the record under the authored (structural) identity: a derived
+    // entity route lives in a re-rooted identity space that subtree-removal
+    // prefixes never reach, while the authored site's identity is inside the
+    // removable subtree.
+    wheelOwners[routeID] = .current(identity: structuralKey ?? routeID.identity)
+    wheelHandlers[routeID, default: []].append(handler)
   }
 }
 
@@ -859,6 +895,14 @@ package struct NodeHandlers {
     handler: @escaping LocalPointerHandlerRegistry.HoverHandler
   ) {
     pointer.recordHover(routeID: routeID, structuralKey: structuralKey, handler: handler)
+  }
+
+  package mutating func recordPointerWheelHandler(
+    routeID: RouteID,
+    structuralKey: Identity? = nil,
+    handler: @escaping LocalPointerHandlerRegistry.Handler
+  ) {
+    pointer.recordWheel(routeID: routeID, structuralKey: structuralKey, handler: handler)
   }
 
   package mutating func recordGesture(

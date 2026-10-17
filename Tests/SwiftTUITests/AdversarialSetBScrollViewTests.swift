@@ -74,7 +74,7 @@ struct AdversarialSetBScrollViewTests {
     _ = engine.render(view(), width: 5, height: 3)
     let fromMiddle = engine.keys.dispatch(identity: scrollID, keyPress: KeyPress(.home))
     let afterMiddle = box.value
-    withKnownIssue("the vertical Home case shadows the horizontal one, so x is never reset") {
+    do {
       #expect(fromTop, "Home with y == 0 is still consumed")
       #expect(afterTop == ScrollCellOffset(x: 0, y: 0), "\(afterTop)")
       #expect(afterMiddle == ScrollCellOffset(x: 0, y: 0), "\(afterMiddle)")
@@ -108,9 +108,7 @@ struct AdversarialSetBScrollViewTests {
     _ = try h.focus(scrollID)
     _ = try h.pressKey(KeyPress(.arrowUp))
     let afterFirstUp = h.frame
-    withKnownIssue(
-      "the raw binding is published and the first key only brings it back inside the extent (adjacent to STUI-999)"
-    ) {
+    do {
       #expect(published == 15, "\(String(describing: published))")
       #expect(afterFirstUp.contains("row 14"), "\(afterFirstUp)")
     }
@@ -141,9 +139,7 @@ struct AdversarialSetBScrollViewTests {
       _ = try h.focus(scrollID)
       _ = try h.pressKey(KeyPress(.arrowUp))
       let frame = h.frame
-      withKnownIssue(
-        "neither stack writes the clamp back: the binding keeps the stale offset and the first arrow is absorbed by it (adjacent to STUI-999)"
-      ) {
+      do {
         #expect(afterShrink == 3, "lazy=\(lazy): \(afterShrink)")
         #expect(frame.contains("row 2"), "lazy=\(lazy): \(frame)")
       }
@@ -180,9 +176,7 @@ struct AdversarialSetBScrollViewTests {
     let xAfterTrailing = box.value.x
     _ = engine.actions.dispatch(identity: xID)
     let xResult = result.value
-    withKnownIssue(
-      "edge and offset commands clamp against the content bounds without consulting the view's axes"
-    ) {
+    do {
       #expect(
         trailingResult == false,
         "scrollTo(edge: .trailing) reported \(String(describing: trailingResult))")
@@ -215,10 +209,10 @@ struct AdversarialSetBScrollViewTests {
     _ = engine.render(view(), width: 20, height: 6)
     _ = engine.actions.dispatch(identity: jumpID)
     let after = engine.render(view(), width: 20, height: 6).rasterSurface.lines
-    withKnownIssue("the horizontal reveal has no width guard and aligns the target's trailing end")
-    {
+    do {
       #expect(box.value == ScrollCellOffset(x: 0, y: 3), "\(box.value)")
-      #expect(after.first?.hasPrefix("r5-012") == true, "\(after)")
+      #expect(after.first?.hasPrefix("r3-012") == true, "\(after)")
+      #expect(after.contains { $0.hasPrefix("r5-012") }, "\(after)")
     }
     #expect(box.value.y == 3, "\(box.value)")
   }
@@ -245,9 +239,7 @@ struct AdversarialSetBScrollViewTests {
     defer { h.shutdown() }
     let point = try #require(h.point(forText: "row 1"))
     _ = try h.scrollPointer(at: point, deltaY: 1)
-    withKnownIssue(
-      "the modifier occupies the scroll body's pointer route, so an ignored notch reaches no scroller"
-    ) {
+    do {
       #expect(events.count == 1, "\(events.count)")
       #expect(box.value.y == 1, "\(box.value)")
       #expect(h.frame.contains("row 3"), "\(h.frame)")
@@ -262,9 +254,7 @@ struct AdversarialSetBScrollViewTests {
       ScrollView(.horizontal) { Text("0123456789") }.frame(width: 5, height: 1), width: 5, height: 1
     )
     let line = snapshot.rasterSurface.lines.first ?? ""
-    withKnownIssue(
-      "the horizontal indicator reserves the bottom row, leaving a zero-height content viewport"
-    ) {
+    do {
       #expect(line.contains("01234"), "\(snapshot.rasterSurface.lines)")
     }
     let hidden = engine.render(
@@ -292,7 +282,7 @@ struct AdversarialSetBScrollViewTests {
     _ = engine.render(view(), width: 8, height: 4)
     let up = engine.keys.dispatch(identity: scrollID, keyPress: KeyPress(.pageUp))
     let afterUp = box.value.y
-    withKnownIssue("the key handler has no page cases; Page keys bubble unconsumed") {
+    do {
       #expect(down, "PageDown consumed")
       #expect(afterDown == 3, "\(afterDown)")
       #expect(up, "PageUp consumed")
@@ -301,7 +291,7 @@ struct AdversarialSetBScrollViewTests {
     #expect(
       engine.keys.dispatch(identity: scrollID, keyPress: KeyPress(.arrowUp)),
       "an arrow from the end is consumed")
-    #expect(box.value.y == 7, "\(box.value)")
+    #expect(box.value.y == 4, "\(box.value)")
   }
 
   // Unresolved and no-op proxy commands report false and leave the offset.

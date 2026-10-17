@@ -9,7 +9,8 @@ extension NodeHandlers {
       terminationHandlerRegistrationIdentities: sortedIdentityStrings(
         termination.handlers.keys
       ),
-      pointerHandlerRouteIDs: sortedDescriptions(pointer.handlers.keys),
+      pointerHandlerRouteIDs: sortedDescriptions(
+        Set(pointer.handlers.keys).union(pointer.wheelHandlers.keys)),
       pointerHoverHandlerRouteIDs: sortedDescriptions(pointer.hoverHandlers.keys),
       gestureRegistrationIdentities: sortedIdentityStrings(gesture.recognizers.keys),
       gestureStateRegistrationIdentities: sortedIdentityStrings(gestureState.bindings.keys),
