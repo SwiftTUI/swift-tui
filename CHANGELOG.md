@@ -8,6 +8,48 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-10-17
+
+SwiftTUI 0.18.1 fixes collection navigation, terminal input, state ownership,
+rendering, and host protocol regressions found by expanded adversarial coverage.
+
+### Fixed
+
+- Recover list focus after measured row-height changes, preserve multiline table
+  geometry, and restore native focus in direct outline lists. Thanks to
+  [@echoz](https://github.com/echoz) for
+  [#57](https://github.com/SwiftTUI/swift-tui/pull/57).
+- Preserve precise collection scroll positions, final-row reachability, entity
+  identity and selection eligibility; keep disclosure children, lazy viewport
+  measurements, scroll chrome, and wheel-handler contributions consistent.
+- Keep state, bindings, preferences, gesture state, navigation destinations,
+  command boundaries, and hot-reload state attached to their declared owners.
+- Reconcile accessibility and keyboard focus lifetimes, preserve default-focus
+  intent, and carry presentation enablement independently of background input
+  blocking. Menus and inherited content shapes retain their authored behavior.
+- Unify incremental input decoding and quiet-period completion across terminal,
+  WASI, and Windows readers; replay input consumed by terminal probes and
+  preserve injected-input ordering through handoffs and EOF.
+- Preserve secure text drafts, restrict reader clipboard access, and keep
+  terminal output escaping, environment precedence, process boundaries,
+  diagnostics, and host size negotiation consistent.
+- Correct text and glyph boundaries, numeric-control precision, progress labels,
+  animation arithmetic, path trimming, curve flattening, canvas coverage, and
+  color conversion at boundary values.
+- Preserve image sampling and half-cell coverage, GIF disposal lifetimes, JPEG
+  orientation and decoding errors, signed paint bounds, border glyphs, and
+  clip-aware damage. Deep paint traversal keeps stack-safe extents.
+- Validate web protocol octets and host wire records, preserve wire failures and
+  disconnected-host recovery, isolate hosted runs, and fix custom browser bundle
+  resource paths and CLI option-presence handling.
+
+### Coordinated packages
+
+- The SwiftUI host handles empty scene manifests without assuming a default
+  scene (STUI-1071).
+- Browser packages, Charts, Terminal View, native hosts, examples, the counter
+  demo, and documentation move together to 0.18.1.
+
 ## [0.18.0] - 2026-10-14
 
 SwiftTUI 0.18.0 improves variable-height collection scrolling, fixes composed
@@ -2351,7 +2393,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.18.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.18.1...HEAD
+[0.18.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.1
 [0.18.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.0
 [0.17.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.17.0
 [0.16.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.16.0
