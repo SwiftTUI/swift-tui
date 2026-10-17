@@ -11,11 +11,13 @@ public struct AccessibilityFocusState<Value: Hashable>: DynamicProperty {
 
   public init(line: UInt = #line, column: UInt = #column) where Value == Bool {
     storage = FocusState(line: line, column: column)
+    storage.focusDomain = .accessibility
   }
 
   public init<Wrapped: Hashable>(line: UInt = #line, column: UInt = #column)
   where Value == Wrapped? {
     storage = FocusState(line: line, column: column)
+    storage.focusDomain = .accessibility
   }
 
   public var wrappedValue: Value {
@@ -78,6 +80,10 @@ private struct AccessibilityFocusBindingModifier<Value: Hashable>: IterativePrim
         hasPendingRequest: base.hasPendingRequest,
         isSelected: base.registrationValue == selectedValue,
         domain: .accessibility, requestGeneration: generation,
+        requestsClear: base.registrationValue == clearValue,
+        isCurrentRequest: {
+          base.hasPendingRequest && base.requestGeneration == generation
+        },
         applyRuntimeFocus: { focused in
           if !focused && base.registrationValue != selectedValue { return false }
           return base.applyRuntimeValue(

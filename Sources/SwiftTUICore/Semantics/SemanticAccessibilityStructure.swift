@@ -41,7 +41,12 @@ extension SemanticExtractor {
         // Text-editing/selection widgets retain an independent native interaction surface.
         let retained = Set(
           children.filter {
-            $0.control?.actions.contains(.setValue) == true || $0.control?.opensLink == true
+            guard let control = $0.control else { return false }
+            let adjustable =
+              control.actions.contains(.increment) || control.actions.contains(.decrement)
+            return control.opensLink || control.selection != nil
+              || control.actions.contains(.editText) || control.actions.contains(.selectText)
+              || (control.actions.contains(.setValue) && !adjustable)
           }.map(\.identity))
         var labels: [String] = []
         var values: [String] = []
@@ -51,10 +56,8 @@ extension SemanticExtractor {
         var routes = nodes[index].combinedActions
         for child in children where !retained.contains(child.identity) {
           if let label = child.label, !label.isEmpty { labels.append(label) }
-          if let value = child.properties?.valueDescription, !value.isEmpty { values.append(value) }
-          guard let control = child.control, let identity = child.actionIdentity,
-            let owner = child.viewNodeID
-          else { continue }
+          if let value = child.readableValueDescription, !value.isEmpty { values.append(value) }
+          guard let control = child.control else { continue }
           guard child.isEnabled, child.properties?.readOnly != true else { continue }
           let label = child.label ?? "Control"
           var operations: [(String, AccessibilityAction)] = []
@@ -67,6 +70,17 @@ extension SemanticExtractor {
           }
           operations += control.customActions.map { ($0, .custom($0)) }
           for (title, action) in operations {
+            let route: AccessibilityCombinedAction
+            if case .custom(let nested) = action, let preserved = child.combinedActions[nested] {
+              route = preserved
+            } else if let identity = child.actionIdentity, let owner = child.viewNodeID {
+              route = AccessibilityCombinedAction(
+                identity: identity, owner: owner, action: action,
+                enabled: child.isEnabled, readOnly: child.properties?.readOnly == true)
+            } else {
+              continue
+            }
+            guard route.enabled, !route.readOnly else { continue }
             var name = title
             var duplicate = nextSuffix[title] ?? 2
             while !usedNames.insert(name).inserted {
@@ -75,13 +89,7 @@ extension SemanticExtractor {
             }
             nextSuffix[title] = duplicate
             names.append(name)
-            if case .custom(let nested) = action, let route = child.combinedActions[nested] {
-              routes[name] = route
-            } else {
-              routes[name] = AccessibilityCombinedAction(
-                identity: identity, owner: owner, action: action,
-                enabled: child.isEnabled, readOnly: child.properties?.readOnly == true)
-            }
+            routes[name] = route
           }
         }
         if nodes[index].label == nil { nodes[index].label = labels.joined(separator: ", ") }

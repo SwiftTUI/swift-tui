@@ -142,6 +142,7 @@ private struct FocusStateLocation<Value: Equatable> {
 @MainActor
 private final class FocusStateBox<Value: Equatable> {
   private let slotOrdinal: Int
+  let clearValue: Value
 
   private struct BoundLocation {
     var location: FocusStateLocation<Value>
@@ -162,6 +163,7 @@ private final class FocusStateBox<Value: Equatable> {
     slotOrdinal: Int
   ) {
     self.slotOrdinal = slotOrdinal
+    clearValue = seedValue
     localStorage = FocusStateStorageCell(.init(value: seedValue))
   }
 
@@ -247,6 +249,7 @@ public struct FocusState<Value: Equatable> {
   }
 
   private let box: FocusStateBox<Value>
+  package var focusDomain: FocusBindingDomain = .keyboard
 
   private init(
     seedValue: Value,
@@ -546,15 +549,11 @@ extension FocusState.Binding {
 }
 
 extension FocusState: DynamicProperty {
-  /// Binds the focus slot eagerly under the discovered-property path when
-  /// the update pass reached this wrapper through a composed dynamic
-  /// property (see `State.update(in:)`). Top-level wrappers keep lazy binding
-  /// and their exact `FocusBindingKey`.
+  /// Publishes the storage owner's request independently of mounted targets.
+  /// Composed wrappers use their discovered-property path; top-level wrappers
+  /// keep their existing unqualified FocusBindingKey.
   public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
     let path = DynamicPropertyPathScope.current
-    guard !path.isEmpty else {
-      return .unchanged
-    }
     guard
       ViewNodeContext.current != nil,
       let context = currentAuthoringContext(),
@@ -563,8 +562,25 @@ extension FocusState: DynamicProperty {
       return .unchanged
     }
     let location = makeLocation(for: context, owner: owner, path: path)
-    box.remember(location, for: owner, pathQualified: true)
+    box.remember(location, for: owner, pathQualified: !path.isEmpty)
     location.prime()
+    let snapshot = location.bookkeepingSnapshot()
+    let clearValue = box.clearValue
+    let identity = context.viewIdentity
+    ViewNodeContext.current?.recordFocusBindingSource(
+      .init(
+        identity: identity, bindingKey: location.bindingKey, domain: focusDomain,
+        requestGeneration: snapshot.requestGeneration,
+        hasPendingRequest: snapshot.hasPendingRequest,
+        requestsClear: snapshot.value == clearValue,
+        isCurrentRequest: {
+          let current = location.bookkeepingSnapshot()
+          return current.hasPendingRequest
+            && current.requestGeneration == snapshot.requestGeneration
+        },
+        clearRuntimeValue: {
+          location.applyRuntimeValue(clearValue, snapshot.requestGeneration, nil)
+        }))
     return .unchanged
   }
 }
@@ -607,6 +623,11 @@ public struct BoolFocusBindingModifier: IterativePrimitiveViewModifier {
         bindingID: binding.bindingID,
         hasPendingRequest: binding.hasPendingRequest,
         isSelected: binding.registrationValue,
+        requestGeneration: observedRequestGeneration,
+        requestsClear: !binding.registrationValue,
+        isCurrentRequest: {
+          binding.hasPendingRequest && binding.requestGeneration == observedRequestGeneration
+        },
         applyRuntimeFocus: { isFocused in
           binding.applyRuntimeValue(
             isFocused,
@@ -640,6 +661,11 @@ public struct OptionalFocusBindingModifier<Value: Hashable>: IterativePrimitiveV
         bindingID: binding.bindingID,
         hasPendingRequest: binding.hasPendingRequest,
         isSelected: binding.registrationValue == value,
+        requestGeneration: observedRequestGeneration,
+        requestsClear: binding.registrationValue == nil,
+        isCurrentRequest: {
+          binding.hasPendingRequest && binding.requestGeneration == observedRequestGeneration
+        },
         applyRuntimeFocus: { isFocused in
           if isFocused {
             return binding.applyRuntimeValue(

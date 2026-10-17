@@ -16,7 +16,6 @@ package final class AccessibilityFocusCoordinator {
   private var requestGeneration: UInt64 = 0
   private var consumedRequests: [FocusBindingKey: UInt64] = [:]
   private var preparedRequests: [FocusBindingKey: UInt64] = [:]
-  private var previousBindings: [FocusBindingRegistrationSnapshot] = []
 
   package func accepts(_ node: AccessibilityNode, in snapshot: SemanticSnapshot) -> Bool {
     allowedNodes(in: snapshot).contains { Target($0) == Target(node) }
@@ -38,19 +37,11 @@ package final class AccessibilityFocusCoordinator {
     let allowed = allowedNodes(in: snapshot)
     if let focused, !allowed.contains(where: { Target($0) == focused }) { self.focused = nil }
     let bindings = registry.snapshot().filter { $0.domain == .accessibility }
-    let liveKeys = Set(bindings.map(\.bindingKey))
+    let sources = registry.sourceSnapshot().filter { $0.domain == .accessibility }
+    let liveKeys = Set(bindings.map(\.bindingKey) + sources.map(\.bindingKey))
     consumedRequests = consumedRequests.filter { liveKeys.contains($0.key) }
     preparedRequests = preparedRequests.filter { liveKeys.contains($0.key) }
     var changed = false
-    // Retiring a target clears its still-live binding owner. Generation checks
-    // in the binding protect a newer authored request and replacement owners.
-    for previous in previousBindings
-    where !bindings.contains(where: {
-      $0.bindingKey == previous.bindingKey && $0.identity == previous.identity
-    }) {
-      changed = previous.applyRuntimeFocus(false) || changed
-    }
-    previousBindings = bindings
     var appliedRequest = false
     for binding in bindings
     where binding.hasPendingRequest
@@ -80,13 +71,29 @@ package final class AccessibilityFocusCoordinator {
           continue
         }
         focused = Target(node)
-      } else {
+      } else if group.contains(where: \.requestsClear) {
         focused = nil
+      } else {
+        consumedRequests[binding.bindingKey] = binding.requestGeneration
+        continue
       }
       precondition(
         requestGeneration < UInt64.max, "Accessibility focus request generation exhausted")
       requestGeneration += 1
       consumedRequests[binding.bindingKey] = binding.requestGeneration
+      appliedRequest = true
+    }
+    if !appliedRequest,
+      let clear = sources.first(where: {
+        $0.hasPendingRequest && $0.requestsClear
+          && consumedRequests[$0.bindingKey] != $0.requestGeneration
+      })
+    {
+      focused = nil
+      precondition(
+        requestGeneration < UInt64.max, "Accessibility focus request generation exhausted")
+      requestGeneration += 1
+      consumedRequests[clear.bindingKey] = clear.requestGeneration
       appliedRequest = true
     }
     if appliedRequest {
@@ -96,8 +103,17 @@ package final class AccessibilityFocusCoordinator {
         consumedRequests[binding.bindingKey] = binding.requestGeneration
       }
     }
+    // A request prepared for a lazy row gets one subsequent publication to
+    // resolve; all other unmatched requests are consumed in this commit.
+    let deferred = Set(
+      bindings.filter {
+        $0.hasPendingRequest && preparedRequests[$0.bindingKey] == $0.requestGeneration
+          && consumedRequests[$0.bindingKey] != $0.requestGeneration
+      }.map(\.bindingKey))
     changed =
-      registry.sync(actualFocusedIdentity: focused?.identity, domain: .accessibility) || changed
+      registry.sync(
+        actualFocusedIdentity: focused?.identity, domain: .accessibility,
+        deferredRequests: deferred) || changed
     return changed || appliedRequest || before != focused
   }
 
@@ -115,7 +131,9 @@ package final class AccessibilityFocusCoordinator {
 
   private func allowedNodes(in snapshot: SemanticSnapshot) -> [AccessibilityNode] {
     let regions = snapshot.focusRegions + snapshot.accessibilityActionRegions
-    let activeModal = regions.compactMap(\.modalFocusScopePath).max { $0.count < $1.count }
+    let activeModal =
+      snapshot.activeModalScopePath
+      ?? regions.compactMap(\.modalFocusScopePath).max { $0.count < $1.count }
     return snapshot.accessibilityNodes.filter { node in
       !node.hidden && node.control?.actions.contains(.accessibilityFocus) == true
         && regions.contains { region in

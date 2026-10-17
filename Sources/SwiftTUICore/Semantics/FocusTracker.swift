@@ -14,6 +14,7 @@ public final class FocusTracker {
   private var currentIndex: Int?
   private var prefersNoFocus = false
   private var modalRestorationStack: [ModalRestoration] = []
+  private var activeModalScopePath: [Identity]?
 
   public init(
     focusRegions: [FocusRegion] = [],
@@ -24,6 +25,7 @@ public final class FocusTracker {
     self.focusRegions = focusRegions
     self.invalidationIdentities = invalidationIdentities
     self.currentIndex = focusRegions.isEmpty ? nil : 0
+    activeModalScopePath = Self.inferredModalScopePath(in: focusRegions)
   }
 
   public var currentFocusIdentity: Identity? {
@@ -56,16 +58,21 @@ public final class FocusTracker {
 
   @discardableResult
   public func updateRegions(_ regions: [FocusRegion]) -> Bool {
+    updateRegions(regions, activeModalScopePath: Self.inferredModalScopePath(in: regions))
+  }
+
+  @discardableResult
+  package func updateRegions(
+    _ regions: [FocusRegion], activeModalScopePath nextModal: [Identity]?,
+    mountedModalScopePaths: Set<[Identity]>? = nil
+  ) -> Bool {
     let previousFocus = currentFocusIdentity
     let previousFocusRegion = currentFocusRegion()
-    recordModalRestorationIfNeeded(
-      previousFocusRegion: previousFocusRegion,
-      nextRegions: regions
-    )
-    let modalRestoration = modalRestorationCandidate(
-      previousFocusRegion: previousFocusRegion,
-      nextRegions: regions
-    )
+    let restoration = transitionModalScope(
+      to: nextModal, mountedScopes: mountedModalScopePaths, previousFocus: previousFocusRegion)
+    let restoredIndex = restoration?.focusRegion.flatMap { target in
+      regions.firstIndex { $0.identity == target.identity }
+    }
     focusRegions = regions
 
     if let previousFocus,
@@ -73,9 +80,12 @@ public final class FocusTracker {
     {
       currentIndex = preservedIndex
       prefersNoFocus = false
-    } else if let modalRestoration {
-      currentIndex = modalRestoration.regionIndex
+    } else if let restoredIndex {
+      currentIndex = restoredIndex
       prefersNoFocus = false
+    } else if restoration?.preservesNoFocus == true {
+      currentIndex = nil
+      prefersNoFocus = true
     } else if let previousFocusRegion,
       let replacementIndex = preferredReplacementIndex(
         for: previousFocusRegion,
@@ -89,10 +99,6 @@ public final class FocusTracker {
     } else {
       currentIndex = regions.isEmpty ? nil : 0
     }
-    pruneModalRestorationStack(
-      nextRegions: regions,
-      consumedIndex: modalRestoration?.stackIndex
-    )
 
     // Initial adoption belongs to the caller's region-resolution pass. Report
     // it so focus-dependent content can settle in that pass, without queuing
@@ -244,12 +250,8 @@ public final class FocusTracker {
 extension FocusTracker {
   private struct ModalRestoration {
     var modalScopePath: [Identity]
-    var focusRegion: FocusRegion
-  }
-
-  private struct ModalRestorationCandidate {
-    var stackIndex: Int
-    var regionIndex: Int
+    var focusRegion: FocusRegion?
+    var preservesNoFocus: Bool
   }
 
   private struct DirectionalCandidate {
@@ -275,80 +277,48 @@ extension FocusTracker {
     return focusRegions[currentIndex]
   }
 
-  private func recordModalRestorationIfNeeded(
-    previousFocusRegion: FocusRegion?,
-    nextRegions: [FocusRegion]
-  ) {
-    guard
-      let previousFocusRegion,
-      let nextModalScopePath = activeModalScopePath(in: nextRegions),
-      previousFocusRegion.modalFocusScopePath != nextModalScopePath,
-      !nextRegions.contains(where: { $0.identity == previousFocusRegion.identity })
-    else {
-      return
-    }
-
-    // Returning to an existing modal must preserve its original invoker.
-    // The nested surface's record is consumed after choosing the return target.
-    if modalRestorationStack.contains(where: { $0.modalScopePath == nextModalScopePath }) {
-      return
-    }
-    modalRestorationStack.append(
-      ModalRestoration(
-        modalScopePath: nextModalScopePath,
-        focusRegion: previousFocusRegion
-      )
-    )
-  }
-
-  private func modalRestorationCandidate(
-    previousFocusRegion: FocusRegion?,
-    nextRegions: [FocusRegion]
-  ) -> ModalRestorationCandidate? {
-    guard
-      let previousModalScopePath = previousFocusRegion?.modalFocusScopePath,
-      activeModalScopePath(in: nextRegions) != previousModalScopePath,
-      let stackIndex = modalRestorationStack.lastIndex(where: { restoration in
-        restoration.modalScopePath == previousModalScopePath
-          && nextRegions.contains { $0.identity == restoration.focusRegion.identity }
+  /// Reconcile the modal lifetime separately from the focused control. Closing
+  /// or replacing a surface unwinds its record even if it never had a target.
+  /// A replacement inherits the original invoker; a nested modal records the
+  /// current target in its still-live parent.
+  private func transitionModalScope(
+    to next: [Identity]?, mountedScopes: Set<[Identity]>?, previousFocus: FocusRegion?
+  ) -> ModalRestoration? {
+    guard next != activeModalScopePath else { return nil }
+    activeModalScopePath = next
+    let retainedCount: Int
+    if let next,
+      let returningIndex = modalRestorationStack.firstIndex(where: {
+        $0.modalScopePath == next
       })
-    else {
-      return nil
+    {
+      retainedCount = returningIndex + 1
+    } else {
+      // Portal entries are siblings in the placed tree even when one was
+      // presented from another. The committed census distinguishes suspension
+      // from replacement; scope-path prefixes only serve legacy direct callers.
+      retainedCount =
+        modalRestorationStack.prefix { entry in
+          next != nil
+            && (mountedScopes?.contains(entry.modalScopePath)
+              ?? (next?.starts(with: entry.modalScopePath) == true))
+        }.count
     }
-
-    guard
-      let regionIndex = nextRegions.firstIndex(
-        where: { $0.identity == modalRestorationStack[stackIndex].focusRegion.identity }
-      )
-    else {
-      return nil
+    let departing = modalRestorationStack.dropFirst(retainedCount).first
+    modalRestorationStack.removeSubrange(retainedCount...)
+    if let next, modalRestorationStack.last?.modalScopePath != next {
+      let invoker: FocusRegion?
+      if let departing { invoker = departing.focusRegion } else { invoker = previousFocus }
+      modalRestorationStack.append(
+        .init(
+          modalScopePath: next,
+          focusRegion: invoker,
+          preservesNoFocus: departing?.preservesNoFocus ?? prefersNoFocus))
     }
-
-    return ModalRestorationCandidate(stackIndex: stackIndex, regionIndex: regionIndex)
+    return departing
   }
 
-  private func pruneModalRestorationStack(
-    nextRegions: [FocusRegion],
-    consumedIndex: Int?
-  ) {
-    if let consumedIndex {
-      modalRestorationStack.removeSubrange(consumedIndex...)
-    }
-    guard let nextModalScopePath = activeModalScopePath(in: nextRegions) else {
-      modalRestorationStack.removeAll()
-      return
-    }
-    // Keep suspended ancestors while a nested modal owns input. Once an
-    // ancestor returns, discard the closed descendants, even if their invoker
-    // was removed and no restoration candidate survived.
-    if let index = modalRestorationStack.firstIndex(where: {
-      $0.modalScopePath == nextModalScopePath
-    }) {
-      modalRestorationStack.removeSubrange((index + 1)...)
-    }
-  }
-
-  private func activeModalScopePath(
+  private static func inferredModalScopePath(
     in regions: [FocusRegion]
   ) -> [Identity]? {
     guard

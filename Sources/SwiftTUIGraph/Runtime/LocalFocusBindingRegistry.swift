@@ -341,7 +341,7 @@ package struct DefaultFocusArrivalSnapshot: Sendable {
   }
 }
 
-package enum FocusBindingDomain: Sendable {
+package enum FocusBindingDomain: Hashable, Sendable {
   case keyboard, accessibility
 }
 
@@ -357,6 +357,8 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
   package var bindingKey: FocusBindingKey
   package var bindingID: String
   package var hasPendingRequest: Bool
+  package var requestsClear: Bool
+  package var isCurrentRequest: (@MainActor @Sendable () -> Bool)?
   package var isSelected: Bool
   package var applyRuntimeFocus: @MainActor @Sendable (Bool) -> Bool
   /// See ``DefaultFocusScopeRegistrationSnapshot/ownerIdentity``.
@@ -371,6 +373,8 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     ownerIdentity: Identity? = nil,
     domain: FocusBindingDomain = .keyboard,
     requestGeneration: UInt64 = 0,
+    requestsClear: Bool? = nil,
+    isCurrentRequest: (@MainActor @Sendable () -> Bool)? = nil,
     prepareFocus: (@MainActor @Sendable () -> Bool)? = nil,
     preparationIdentity: Identity? = nil,
     applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
@@ -383,6 +387,8 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
     self.bindingKey = bindingKey
     self.bindingID = bindingID
     self.hasPendingRequest = hasPendingRequest
+    self.requestsClear = requestsClear ?? !isSelected
+    self.isCurrentRequest = isCurrentRequest
     self.isSelected = isSelected
     self.ownerIdentity = ownerIdentity
     self.applyRuntimeFocus = applyRuntimeFocus
@@ -411,7 +417,18 @@ package struct FocusBindingRegistrationSnapshot: Sendable {
 
 @MainActor
 package final class LocalFocusBindingRegistry: Equatable {
+  private struct RegisteredTarget: Hashable {
+    var key: FocusBindingKey
+    var identity: Identity
+    init(_ registration: FocusBindingRegistrationSnapshot) {
+      key = registration.bindingKey
+      identity = registration.identity
+    }
+  }
+
   private var registrations: [FocusBindingRegistrationSnapshot] = []
+  private var sources: [FocusBindingSourceRegistration] = []
+  private var previousBindings: [FocusBindingDomain: [FocusBindingRegistrationSnapshot]] = [:]
   private var pendingArrivalDefaults: [DefaultFocusArrivalSnapshot] = []
   /// Context identities whose owner-less arrival was already recorded. An
   /// owner-less position has no seed slot, so this set is its one-shot:
@@ -437,6 +454,8 @@ package final class LocalFocusBindingRegistry: Equatable {
     isSelected: Bool,
     domain: FocusBindingDomain = .keyboard,
     requestGeneration: UInt64 = 0,
+    requestsClear: Bool? = nil,
+    isCurrentRequest: (@MainActor @Sendable () -> Bool)? = nil,
     prepareFocus: (@MainActor @Sendable () -> Bool)? = nil,
     preparationIdentity: Identity? = nil,
     applyRuntimeFocus: @escaping @MainActor @Sendable (Bool) -> Bool
@@ -449,6 +468,8 @@ package final class LocalFocusBindingRegistry: Equatable {
       isSelected: isSelected,
       domain: domain,
       requestGeneration: requestGeneration,
+      requestsClear: requestsClear,
+      isCurrentRequest: isCurrentRequest,
       prepareFocus: prepareFocus,
       preparationIdentity: preparationIdentity,
       applyRuntimeFocus: applyRuntimeFocus
@@ -482,14 +503,7 @@ package final class LocalFocusBindingRegistry: Equatable {
     domain: FocusBindingDomain = .keyboard
   ) -> FocusBindingRequest {
     let snapshot = self.snapshot().filter { $0.domain == domain }
-    var seenBindingKeys: Set<FocusBindingKey> = []
-
-    for registration in snapshot {
-      guard seenBindingKeys.insert(registration.bindingKey).inserted else {
-        continue
-      }
-
-      let matching = snapshot.filter { $0.bindingKey == registration.bindingKey }
+    for matching in orderedGroups(from: snapshot) {
       guard matching.contains(where: \.hasPendingRequest) else {
         continue
       }
@@ -503,9 +517,14 @@ package final class LocalFocusBindingRegistry: Equatable {
         continue
       }
 
+      if matching.contains(where: \.requestsClear) { return .clear }
+    }
+    // A clear write is meaningful even when its storage has no bound target.
+    if sourceSnapshot().contains(where: {
+      $0.domain == domain && $0.hasPendingRequest && $0.requestsClear
+    }) {
       return .clear
     }
-
     return .none
   }
 
@@ -548,13 +567,21 @@ package final class LocalFocusBindingRegistry: Equatable {
 
   package func sync(
     actualFocusedIdentity: Identity?,
-    domain: FocusBindingDomain = .keyboard
+    domain: FocusBindingDomain = .keyboard,
+    deferredRequests: Set<FocusBindingKey> = []
   ) -> Bool {
     let snapshot = self.snapshot().filter { $0.domain == domain }
     let grouped = orderedGroups(from: snapshot)
     var changed = false
+    let liveTargets = Set(snapshot.map(RegisteredTarget.init))
+    for previous in previousBindings[domain] ?? []
+    where !liveTargets.contains(RegisteredTarget(previous)) {
+      changed = previous.applyRuntimeFocus(false) || changed
+    }
+    previousBindings[domain] = snapshot
 
     for group in grouped {
+      if let key = group.first?.bindingKey, deferredRequests.contains(key) { continue }
       for registration in group where registration.identity != actualFocusedIdentity {
         changed = registration.applyRuntimeFocus(false) || changed
       }
@@ -565,11 +592,20 @@ package final class LocalFocusBindingRegistry: Equatable {
       }
     }
 
+    let focusedKeys = Set(
+      snapshot.filter { $0.identity == actualFocusedIdentity }.map(\.bindingKey))
+    for source in sources
+    where source.domain == domain
+      && !focusedKeys.contains(source.bindingKey) && !deferredRequests.contains(source.bindingKey)
+    {
+      changed = source.clearRuntimeValue() || changed
+    }
     return changed
   }
 
   package func reset() {
     registrations.removeAll(keepingCapacity: true)
+    sources.removeAll(keepingCapacity: true)
     // `pendingArrivalDefaults` deliberately survives: publication resets the
     // live registry between resolve and focus-sync, and an arrival recorded
     // during this frame's resolve must still reach this frame's arbitration.
@@ -583,6 +619,11 @@ package final class LocalFocusBindingRegistry: Equatable {
       return
     }
 
+    sources.removeAll { source in
+      focusRegistrationMatchesAnySubtreeRoot(
+        identity: source.identity, ownerIdentity: source.ownerIdentity, roots: roots)
+
+    }
     registrations.removeAll { registration in
       focusRegistrationMatchesAnySubtreeRoot(
         identity: registration.identity,
@@ -607,7 +648,11 @@ package final class LocalFocusBindingRegistry: Equatable {
   }
 
   package func snapshot() -> [FocusBindingRegistrationSnapshot] {
-    registrations
+    registrations.map { registration in
+      var current = registration
+      current.hasPendingRequest = current.hasPendingRequest && (current.isCurrentRequest?() ?? true)
+      return current
+    }
   }
 
   package func restore(
@@ -620,11 +665,30 @@ package final class LocalFocusBindingRegistry: Equatable {
     registrations.append(contentsOf: snapshot)
   }
 
+  package func sourceSnapshot() -> [FocusBindingSourceRegistration] {
+    sources.map { source in
+      var current = source
+      current.hasPendingRequest = current.hasPendingRequest && current.isCurrentRequest()
+      return current
+    }
+  }
+
+  package func restoreSources(_ sources: [FocusBindingSourceRegistration]) {
+    self.sources.append(contentsOf: sources)
+  }
+
   /// Re-sorts the append-ordered registration list into canonical identity
   /// order (stable within an identity), matching a full rebuild's order after a
   /// scoped `.subtrees` restore. See
   /// ``LocalDefaultFocusRegistry/normalizeOrderByIdentity()``.
   package func normalizeOrderByIdentity() {
+    sources = sources.enumerated().sorted { lhs, rhs in
+      if lhs.element.identity != rhs.element.identity {
+        return lhs.element.identity < rhs.element.identity
+      }
+      return lhs.offset < rhs.offset
+    }.map(\.element)
+
     registrations =
       registrations.enumerated()
       .sorted { lhs, rhs in

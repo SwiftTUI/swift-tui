@@ -270,7 +270,9 @@ extension RunLoop {
 
     let focusIdentityBeforeRegionUpdate = focusTracker.currentFocusIdentity
     var focusChanged = focusTracker.updateRegions(
-      renderedArtifacts.semanticSnapshot.focusRegions)
+      renderedArtifacts.semanticSnapshot.focusRegions,
+      activeModalScopePath: renderedArtifacts.semanticSnapshot.activeModalScopePath,
+      mountedModalScopePaths: renderedArtifacts.semanticSnapshot.mountedModalScopePaths)
     if let pending = pendingKeyFocus {
       pendingKeyFocus = nil
       if renderedArtifacts.semanticSnapshot.focusRegions.contains(where: {

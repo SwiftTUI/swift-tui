@@ -60,8 +60,9 @@ package struct LinearAccessibilityRenderer: Equatable, Sendable {
   ) -> String? {
     let label = textSanitizer.sanitized(node.label)
     let hint = textSanitizer.sanitized(node.hint)
+    let value = textSanitizer.sanitized(node.readableValueDescription)
 
-    if node.role == .group, label == nil, hint == nil {
+    if node.role == .group, label == nil, hint == nil, value == nil {
       return nil
     }
 
@@ -73,6 +74,7 @@ package struct LinearAccessibilityRenderer: Equatable, Sendable {
         role
       }
 
+    if let value, value != label { line += " — \(value)" }
     if let hint {
       line += " - \(hint)"
     }

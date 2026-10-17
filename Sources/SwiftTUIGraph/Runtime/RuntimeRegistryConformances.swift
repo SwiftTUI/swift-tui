@@ -303,7 +303,7 @@ extension LocalFocusBindingRegistry: RuntimeRegistry {
   package static var kind: RuntimeRegistrationKind { .focusBinding }
 
   package var activeFrameDropEligibilityBlocker: FrameDropBlocker? {
-    snapshot().isEmpty ? nil : .focusBindingSync
+    snapshot().isEmpty && sourceSnapshot().isEmpty ? nil : .focusBindingSync
   }
 
   package func reset(context: RuntimeRegistrationLifetimeContext) {
@@ -322,9 +322,14 @@ extension LocalFocusBindingRegistry: RuntimeRegistry {
     context: RuntimeRegistrationRestoreContext
   ) {
     restore(handlers.focusBinding.registrations)
+    restoreSources(handlers.focusBinding.sources)
   }
 
   package func fingerprint(into builder: inout RuntimeRegistrationFingerprintBuilder) {
+    for source in sourceSnapshot() {
+      builder.add(
+        "focusBindingSource", "\(source.domain):\(source.identity.path)#\(source.bindingKey)")
+    }
     for registration in snapshot() {
       builder.add(
         "focusBinding",

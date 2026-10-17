@@ -379,15 +379,19 @@ package struct GestureStateNodeRecord: RuntimeNodeRecord {
 
 package struct FocusBindingNodeRecord: RuntimeNodeRecord {
   package var registrations: [FocusBindingRegistrationSnapshot] = []
+  /// Property-pass records survive the subsequent body-handler capture. A new
+  /// outer property update replaces this census, including on a reuse serve.
+  package var sources: [FocusBindingSourceRegistration] = []
 
   package init() {}
 
   package var isEmpty: Bool {
-    registrations.isEmpty
+    registrations.isEmpty && sources.isEmpty
   }
 
   package mutating func absorbAdopted(_ departing: FocusBindingNodeRecord) {
     registrations.append(contentsOf: departing.registrations)
+    sources.append(contentsOf: departing.sources)
   }
 
   @MainActor

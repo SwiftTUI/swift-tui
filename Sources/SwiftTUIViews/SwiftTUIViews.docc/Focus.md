@@ -169,6 +169,13 @@ Semantics:
 - `.focused($binding, equals: value)` links a view to one case or identifier in a larger focus state.
 - Setting the state moves focus when the runtime can resolve the target.
 - Clearing the state with `nil` or `false` dismisses that local focus relationship.
+- A request naming no mounted target is consumed and the binding resets; existing keyboard
+  focus stays in place. The request cannot claim a target mounted in a later frame.
+- Removing a focused target clears its binding while preserving any newer authored request.
+
+Modal restoration follows the visible presentation's lifetime. A modal without keyboard
+controls still remembers its invoker, and replacing a modal preserves the original return
+target. Nested modals keep a separate return target for each live ancestor.
 
 This is the main tool for:
 

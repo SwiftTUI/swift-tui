@@ -38,9 +38,7 @@ struct AdversarialSetBFocusTests {
       try #require(h.frame.contains("Details only"), "\(kind): \(h.frame)")
       _ = try h.pressKey(KeyPress(.escape))
       try #require(!h.frame.contains("Details only"), "\(kind): \(h.frame)")
-      withKnownIssue(
-        "a modal with no focus regions records no restoration; focus falls to the first control"
-      ) {
+      do {
         #expect(
           h.runLoop.focusTracker.currentFocusIdentity == opener,
           "\(kind): focus went to \(String(describing: h.runLoop.focusTracker.currentFocusIdentity))"
@@ -57,9 +55,7 @@ struct AdversarialSetBFocusTests {
     let jump = try h.focusIdentity(forText: "Jump")
     let other = try h.focusIdentity(forText: "Other")
     _ = try h.clickText("Jump")
-    withKnownIssue(
-      "an unmatched @FocusState request stays pending and clears keyboard focus on every frame"
-    ) {
+    do {
       #expect(h.frame.contains("field: nil"), "\(h.frame)")
       #expect(h.runLoop.focusTracker.currentFocusIdentity == jump, "\(h.frame)")
       _ = try h.pressKey(KeyPress(.tab))
@@ -85,9 +81,7 @@ struct AdversarialSetBFocusTests {
     _ = try h.clickText("Hide B")
     #expect(!h.frame.contains("Toast B"), "\(h.frame)")
     let afterB = probe.events
-    withKnownIssue(
-      "chained toasts re-key when the inner one leaves, so the outer's row disappears and reruns onDismiss"
-    ) {
+    do {
       #expect(afterA == ["A dismissed"], "\(afterA)")
       #expect(afterB == ["A dismissed", "B dismissed"], "\(afterB)")
     }
@@ -108,9 +102,7 @@ struct AdversarialSetBFocusTests {
     #expect(!h.frame.contains("Item 1"), "\(h.frame)")
     _ = try h.pressKey(KeyPress(.escape))
     try #require(!h.frame.contains("Item 2"), "\(h.frame)")
-    withKnownIssue(
-      "the restoration record points into the replaced sheet, so focus falls to the first control (STUI-779 class)"
-    ) {
+    do {
       #expect(
         h.runLoop.focusTracker.currentFocusIdentity == opener,
         "\(String(describing: h.runLoop.focusTracker.currentFocusIdentity))")
@@ -127,7 +119,7 @@ struct AdversarialSetBFocusTests {
     _ = try h.pressKey(KeyPress(.character("r"), modifiers: .ctrl))
     try #require(!h.frame.contains("Name"), "the field is gone: \(h.frame)")
     #expect(h.runLoop.focusTracker.currentFocusIdentity != SetBRemovedFocusFixture.fieldIdentity)
-    withKnownIssue("a departed focused registration never applies false to its binding") {
+    do {
       #expect(h.frame.contains("field: nil"), "\(h.frame)")
     }
   }
@@ -167,9 +159,7 @@ struct AdversarialSetBFocusTests {
     let afterRequest = h.frame
     _ = try h.clickText("Expand")
     try #require(h.frame.contains("Inner") || h.frame.contains("_"), "\(h.frame)")
-    withKnownIssue(
-      "a request with no registration stays pending and claims focus when the field mounts"
-    ) {
+    do {
       #expect(afterRequest.contains("inner: false"), "\(afterRequest)")
       #expect(h.runLoop.focusTracker.currentFocusIdentity == expand, "\(h.frame)")
       #expect(h.frame.contains("inner: false"), "\(h.frame)")

@@ -199,6 +199,9 @@ Text("Quarterly results")
     .accessibilityNavigationCategory("Report sections")
 ```
 
+Requests with no matching target are consumed and reset the binding while leaving current
+assistive focus in place. They cannot claim content mounted in a later frame.
+
 Assign `review = "summary"` to request native browser focus on that committed
 semantic element; assign `nil` to clear it. Static text does not become a
 terminal keyboard stop. Disabled controls remain reviewable but cannot mutate
@@ -310,7 +313,9 @@ description in one declaration; the string overload supplies a description alone
 The default `accessibilityAction(_:)` replaces only
 assistive activation. Other existing primitive actions remain available.
 Named operations compose; an outer operation with the same name replaces the
-inner callback. Empty names are ignored. Disabled, read-only, modal-background
+inner callback. A named operation on static content does not add a keyboard
+stop or infer a button role. Assistive action scope follows the control's
+capabilities even when its role is overridden. Empty names are ignored. Disabled, read-only, modal-background
 and removed controls retain the runtime's committed dispatch guards.
 
 Browsers present an adjustable control as a spinbutton and named operations as
@@ -324,7 +329,10 @@ cursor-following mode does not expose these operations as a semantic reader.
 link, image, heading, static-text and selected semantics. Traits describe meaning;
 adding a button or link trait alone does not register activation. Browser roles
 are mutually exclusive: when several role traits are supplied, static text,
-heading, image, link, then button have descending precedence. Selected state is
+heading, image, link, then button have descending precedence across chained calls.
+Removing a role trait reveals any remaining contribution; an explicit role starts
+a new trait fold, and an explicit heading level survives adding the heading trait.
+Removing an absent selected trait publishes no selected state. Selected state is
 independent. Use `accessibilityRole(_:)` and `accessibilityProperties(_:)` for an
 explicit role, heading level and additional widget state. Device-only SwiftUI
 traits have no implied implementation.
@@ -585,7 +593,11 @@ provide the parent's meaning explicitly. `.combine` joins readable labels and
 values, and promotes descendant activation/adjustment operations to named actions.
 Editing and selection widgets, and default-opening links, keep independent
 native surfaces inside the group. `accessibilitySortPriority(_:)` orders sibling
-subtrees with larger priorities first; equal values keep authored order.
+subtrees with larger priorities first; equal values keep authored order. Infinite
+priorities sort at the ends; NaN is ignored. Combined groups preserve original
+child action owners through further combination. Adjustable controls such as
+steppers contribute their values and increase/decrease operations; editing and
+selection controls retain their independent surfaces.
 
 A representation supplies controls for custom paint without drawing those controls
 or adding them to terminal keyboard/pointer traversal:

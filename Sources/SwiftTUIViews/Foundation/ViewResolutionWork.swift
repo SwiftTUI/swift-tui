@@ -12,8 +12,8 @@ func resolveViewWork<V: View>(
     let context = context.applyingCurrentFrameResolveInputs()
     // The producer owns the iteration's outer resolve. A forwarded exact-ID
     // modifier below it must not redirect a replay onto its inner state owner.
-    // The ambient route remains scope-only, so interior claims retain their
-    // ordinary ownership rules.
+    // Its positional route remains active through transparent modifier
+    // interiors, just as it does during the original iteration resolve.
     let routeIdentity = rebuilding?.entityIdentity ?? entityRouteIdentity(for: view, in: context)
     // The update pass runs `update(in:)` in place (plan 2026-08-30-001), so it
     // needs the copy the body will consume — not the authored `view`. Only the

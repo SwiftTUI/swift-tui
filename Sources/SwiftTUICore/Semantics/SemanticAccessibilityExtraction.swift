@@ -615,6 +615,7 @@ extension SemanticExtractor {
     }
 
     return node.semanticMetadata.accessibilityRole != nil
+      || node.semanticMetadata.accessibilityControl != nil
       || node.semanticMetadata.accessibilityStructure?.children != nil
       || node.semanticMetadata.accessibilityLabel != nil
       || node.semanticMetadata.usesAuthoredAccessibilityLabel
@@ -660,8 +661,7 @@ extension SemanticExtractor {
     // An explicitly named container replaces only automatic descendant text.
     // Existing explicit child names/roles/hints still form independent items.
     let infersTextLabel =
-      textPresentation == .independent
-      || node.semanticMetadata.accessibilityRole != nil
+      textPresentation == .independent || (!suppressingPresentation && selfIsRelevant)
     var result = AccessibilityNode(
       // Static reading items have no retained owner. Allocation IDs differ
       // between fresh and retained graphs; controls and live regions need
@@ -932,7 +932,13 @@ extension SemanticExtractor {
     // A collection's focus route supports scrolling/selection; it does not own
     // the authored content of its rows as control chrome.
     if node.semanticMetadata.hostedCollectionContainer != nil { return false }
-    if node.semanticMetadata.accessibilityControl != nil { return true }
+    if let control = node.semanticMetadata.accessibilityControl,
+      control.actions.contains(where: {
+        [.focus, .activate, .setValue, .editText, .selectText, .increment, .decrement].contains($0)
+      })
+    {
+      return true
+    }
     switch node.semanticMetadata.accessibilityRole {
     case .button, .checkbox, .disclosureGroup, .link, .menuItem, .picker,
       .progressBar, .secureField, .slider, .stepper, .tab, .textEditor, .textField, .toggle:

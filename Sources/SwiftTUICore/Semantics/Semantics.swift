@@ -120,10 +120,13 @@ package struct SemanticExtractor: Sendable {
           }
         }
 
-        // Semantic review may visit disabled controls and static text without
-        // turning either into a keyboard target. Modal pruning still applies.
-        if node.semanticMetadata.accessibilityControl?.actions.contains(.accessibilityFocus)
-          == true,
+        // Assistive operations have their own scope, independent of the role
+        // and keyboard traversal. Runtime dispatch still checks enabled state,
+        // read-only policy, owner currency, and the active modal boundary.
+        if node.semanticMetadata.accessibilityControl?.actions.isEmpty == false,
+          // Ordinary keyboard targets already publish this owner and scope.
+          // Static/custom-role and disabled controls need an assistive route.
+          !participatesInTopLevelFocus || !interactionsEnabled,
           !sealingParentOnChain
         {
           accessibilityActionRegions.append(
@@ -322,6 +325,8 @@ package struct SemanticExtractor: Sendable {
       accessibilityWarnings: accessibilityWarnings,
       activeCommandScopePath: activeCommandScopePath
     )
+    snapshot.activeModalScopePath = activeAccessibilityModal
+    snapshot.mountedModalScopePaths = Set(modalNodes.map(\.scope))
     snapshot.paragraphs = paragraphs
     snapshot.accessibilityActionRegions = accessibilityActionRegions
     return snapshot

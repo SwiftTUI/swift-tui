@@ -52,7 +52,7 @@ extension View {
     modifier(
       AccessibilityAuthoredActionModifier(
         kinds: [.custom], name: name, scope: currentImperativeAuthoringContextSnapshot(),
-        action: { _ in action() }))
+        action: { _ in action() }, includesKeyboardFocus: false))
   }
 
   /// Adds increment and decrement operations. The application owns bounds and mutation.
@@ -111,7 +111,7 @@ private struct AccessibilityAuthoredActionModifier: IterativePrimitiveViewModifi
         customActions: names,
         opensLink: kinds.contains(.activate) ? false : previous?.opensLink ?? false)
       if includesKeyboardFocus { node.semanticMetadata.isFocusable = true }
-      if node.semanticMetadata.accessibilityRole == nil {
+      if includesKeyboardFocus, node.semanticMetadata.accessibilityRole == nil {
         node.semanticMetadata.accessibilityRole = kinds.contains(.increment) ? .stepper : .button
       }
       let intake = HandlerDescriptorIntake(context: context, preferringSnapshot: scope)
@@ -175,22 +175,21 @@ private struct AccessibilityTraitsModifier: IterativePrimitiveViewModifier {
   ) -> ResolveWork<[ResolvedNode]> {
     content.resolveWork(in: context).map { completed in
       var node = completed
-      let roles: [(AccessibilityTraits, AccessibilityRole)] = [
+      let roles: [(AccessibilityTraits, AccessibilityRoleTrait)] = [
         (.isButton, .button), (.isLink, .link), (.isImage, .image),
-        (.isHeader, .heading(level: 1)), (.isStaticText, .group),
+        (.isHeader, .header), (.isStaticText, .staticText),
       ]
-      for (trait, role) in roles where traits.contains(trait) {
-        if !removing {
-          node.semanticMetadata.accessibilityRole = role
-        } else if trait == .isHeader,
-          case .heading = node.semanticMetadata.accessibilityRole
-        {
-          node.semanticMetadata.accessibilityRole = nil
-        } else if node.semanticMetadata.accessibilityRole == role {
-          node.semanticMetadata.accessibilityRole = nil
-        }
+      var structure = node.semanticMetadata.accessibilityStructure ?? .init()
+      var state = structure.roleTraits ?? .init(baseRole: node.semanticMetadata.accessibilityRole)
+      for (flag, trait) in roles where traits.contains(flag) {
+        state.apply(trait, removing: removing)
       }
-      if traits.contains(.isSelected) {
+      structure.roleTraits = state
+      node.semanticMetadata.accessibilityRole = state.role
+      node.semanticMetadata.accessibilityStructure = structure
+      if traits.contains(.isSelected),
+        !removing || node.semanticMetadata.accessibilityProperties?.selected != nil
+      {
         let selected = AccessibilityProperties(selected: !removing)
         node.semanticMetadata.accessibilityProperties =
           node.semanticMetadata.accessibilityProperties?.merging(selected) ?? selected

@@ -114,6 +114,10 @@ package struct AccessibilityWarning: Equatable, Sendable {
 public struct SemanticSnapshot: Equatable, Sendable {
   /// Visible authored text boundaries; hidden accessibility does not remove them.
   package var paragraphs: [ParagraphRegion] = []
+  /// The visible modal exists even when it contains no keyboard targets.
+  package var activeModalScopePath: [Identity]? = nil
+  /// Mounted scopes include suspended portal siblings; structural ancestry is insufficient.
+  package var mountedModalScopePaths: Set<[Identity]> = []
   /// Live virtual controls have committed action scope without keyboard participation.
   package var accessibilityActionRegions: [FocusRegion] = []
   public var interactionRegions: [InteractionRegion]

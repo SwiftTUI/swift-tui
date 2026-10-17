@@ -44,7 +44,7 @@ private struct AccessibilityStructureModifier: IterativePrimitiveViewModifier {
       var node = completed
       var structure = node.semanticMetadata.accessibilityStructure ?? .init()
       if let children { structure.children = children }
-      if let priority, priority.isFinite { structure.sortPriority = priority }
+      if let priority, !priority.isNaN { structure.sortPriority = priority }
       node.semanticMetadata.accessibilityStructure = structure
       return [node]
     }

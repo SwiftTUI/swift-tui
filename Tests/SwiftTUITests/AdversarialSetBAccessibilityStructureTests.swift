@@ -39,9 +39,7 @@ struct AdversarialSetBAccessibilityStructureTests {
     let group = try #require(
       published.first { $0.label?.contains("Volume") == true }, "\(published.map(\.label))")
     let stepper = published.first { $0.role == .stepper }
-    withKnownIssue(
-      "children with a setValue action are retained instead of combined, so the stepper stays separate (adjacent to STUI-968)"
-    ) {
+    do {
       #expect(group.label == "Volume, Level", "\(String(describing: group.label))")
       #expect(
         group.control?.customActions.contains("Increase Level") == true,
@@ -61,9 +59,7 @@ struct AdversarialSetBAccessibilityStructureTests {
       .accessibilityElement(children: .combine), "combineValue")
     let group = try #require(
       published.first { $0.label?.contains("Count") == true }, "\(published.map(\.label))")
-    withKnownIssue(
-      "combine collects valueDescription only; a bare numeric control value is dropped"
-    ) {
+    do {
       #expect(
         group.control?.value == .number(3) || group.properties?.valueDescription == "3", "\(group)")
     }
@@ -87,9 +83,7 @@ struct AdversarialSetBAccessibilityStructureTests {
       Text("T").accessibilityAddTraits(.isHeader).accessibilityAddTraits(.isButton), "chained")
     let levelledNode = try #require(levelled.first { $0.label == "T" }, "\(levelled.map(\.label))")
     let chainedNode = try #require(chained.first { $0.label == "T" }, "\(chained.map(\.label))")
-    withKnownIssue(
-      "isHeader writes heading level 1 unconditionally and the outer trait call wins outright"
-    ) {
+    do {
       #expect(levelledNode.role == .heading(level: 3), "\(levelledNode.role)")
       if case .heading = chainedNode.role {
       } else {
@@ -105,7 +99,7 @@ struct AdversarialSetBAccessibilityStructureTests {
   @Test func setB254RemovingAnAbsentTraitPublishesNothing() throws {
     let published = nodes(Text("Plain").accessibilityRemoveTraits(.isSelected), "removeAbsent")
     let node = published.first { $0.label == "Plain" }
-    withKnownIssue("removeTraits(.isSelected) writes selected = false even when it was never set") {
+    do {
       #expect(node?.properties?.selected == nil, "\(String(describing: node?.properties))")
     }
     let toggled = nodes(
@@ -125,7 +119,7 @@ struct AdversarialSetBAccessibilityStructureTests {
         Text("D").accessibilitySortPriority(-.infinity)
       }, "sort")
     let labels = published.compactMap(\.label).filter { ["A", "B", "C", "D"].contains($0) }
-    withKnownIssue("non-finite priorities are dropped by the modifier and sort as zero") {
+    do {
       #expect(labels == ["B", "C", "A", "D"], "\(labels)")
     }
     let finite = nodes(
@@ -147,8 +141,7 @@ struct AdversarialSetBAccessibilityStructureTests {
       .accessibilityLabel("Card"), "namedContainer")
     let hinted = try #require(
       published.first { $0.hint == "Dollars" }, "\(published.map { ($0.label, $0.hint) })")
-    withKnownIssue("a named ancestor suppresses the child's inferred text while its hint survives")
-    {
+    do {
       #expect(hinted.label == "42", "\(String(describing: hinted.label))")
     }
     let contained = nodes(
@@ -173,7 +166,7 @@ struct AdversarialSetBAccessibilityStructureTests {
       proposal: .init(width: 40, height: 6))
     let row = try #require(snapshot.semanticSnapshot.accessibilityNodes.first { $0.label == "Row" })
     #expect(row.control?.customActions == ["Archive"], "\(String(describing: row.control))")
-    withKnownIssue("a named action marks the text focusable and gives it the button role") {
+    do {
       #expect(
         snapshot.semanticSnapshot.focusRegions.count == 1,
         "\(snapshot.semanticSnapshot.focusRegions.map(\.identity))")
@@ -204,9 +197,7 @@ struct AdversarialSetBAccessibilityStructureTests {
     let afterGhost = h.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.first {
       $0.label == "A"
     }
-    withKnownIssue(
-      "an unmatched AccessibilityFocusState write resolves to nil and clears the assistive focus"
-    ) {
+    do {
       #expect(
         afterGhost?.isAccessibilityFocused == true,
         "\(h.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.map { ($0.label, $0.isAccessibilityFocused) })"
@@ -225,7 +216,7 @@ struct AdversarialSetBAccessibilityStructureTests {
     ).semanticSnapshot
     let output = renderLinearAccessibilityOutput(snapshot)
     #expect(output.contains("Wifi") && output.contains("Rating"), "\(output)")
-    withKnownIssue("the linear line format carries role, label and hint only") {
+    do {
       #expect(output.contains("3 of 5"), "\(output)")
       #expect(output.lowercased().contains("on"), "\(output)")
     }

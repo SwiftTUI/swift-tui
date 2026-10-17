@@ -43,16 +43,16 @@ struct AdversarialSetASemanticsTests {
     let group = try node("Nested operations", in: h)
     // Inner generated groups lack actionIdentity, so the outer combine skips
     // their preserved child routes before checking combinedActions.
-    withKnownIssue("STUI-968: Outer combine drops an inner group's generated operations") {
+    do {
       #expect(group.control?.customActions == ["Run", "Run (2)"])
     }
     let firstResult = try send(.custom("Run"), to: group, in: h)
     #expect(firstResult == .accepted)
-    withKnownIssue("STUI-968: Missing inner route reassigns the first duplicate operation") {
+    do {
       #expect([probe.first, probe.second] == [1, 0])
     }
     let secondResult = try send(.custom("Run (2)"), to: group, in: h)
-    withKnownIssue("STUI-968: Missing inner route removes the second duplicate operation") {
+    do {
       #expect(secondResult == .accepted)
       #expect([probe.first, probe.second] == [1, 1])
     }
@@ -211,7 +211,7 @@ struct AdversarialSetASemanticsTests {
     let result = try send(.setValue(.boolean(true)), to: toggle, in: h)
     // Automatic focus excludes custom roles, leaving no action scope for the
     // primitive's still-advertised setValue operation; dispatch returns outOfScope.
-    withKnownIssue("STUI-969: Custom role removes scope for a primitive's typed assistive action") {
+    do {
       #expect(result == .accepted)
       #expect(probe.flag)
       #expect(probe.writes == 1)

@@ -207,6 +207,13 @@ package final class ViewNode {
     guard evaluationDepth == 0 else {
       return
     }
+    // Storage sources are collected by the property pass, before the body
+    // registration capture. Replace them with this update's census; body
+    // handlers have a separate capture lifetime below.
+    if !registeredHandlers.focusBinding.sources.isEmpty {
+      registeredHandlers.focusBinding.sources.removeAll(keepingCapacity: true)
+      recordRuntimeRegistrationMutation()
+    }
     frameState.dynamicPropertyLeaseKeysSeenThisUpdate.removeAll(keepingCapacity: true)
     frameState.nextDynamicPropertyLeaseOccurrenceOrdinal = 0
     // The duplicate-slot-claim window opens HERE, not only at
@@ -1573,7 +1580,9 @@ package final class ViewNode {
 
   package func beginRegistrationCapture() {
     if registrationCaptureDepth == 0 {
+      let propertySources = registeredHandlers.focusBinding.sources
       registeredHandlers.reset()
+      registeredHandlers.focusBinding.sources = propertySources
       recordRuntimeRegistrationMutation()
     }
     registrationCaptureDepth += 1
@@ -1825,6 +1834,13 @@ package final class ViewNode {
     registration.ownerIdentity = registration.ownerIdentity ?? identity
     recordRuntimeRegistrationMutation()
     registeredHandlers.recordFocusBinding(registration)
+  }
+
+  package func recordFocusBindingSource(_ source: FocusBindingSourceRegistration) {
+    var source = source
+    source.ownerIdentity = source.ownerIdentity ?? identity
+    recordRuntimeRegistrationMutation()
+    registeredHandlers.focusBinding.sources.append(source)
   }
 
   package func recordFocusedValuesRegistration(

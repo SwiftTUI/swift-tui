@@ -58,7 +58,13 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var focusInteractions: FocusInteractions
   public var scrollRole: ScrollRole?
   public var sectionRole: SectionRole?
-  public var accessibilityRole: AccessibilityRole?
+  public var accessibilityRole: AccessibilityRole? {
+    didSet {
+      // Direct role authorship starts a new fold. Trait modifiers restore
+      // their contribution set after assigning its derived role.
+      if accessibilityStructure?.roleTraits != nil { accessibilityStructure?.roleTraits = nil }
+    }
+  }
   private var authoredAccessibility: AuthoredAccessibilityMetadata?
   package var accessibilityControl: AccessibilityControlState? {
     get { authoredAccessibility?.control }
@@ -410,6 +416,10 @@ public struct SemanticMetadata: Equatable, Sendable {
     merged.accessibilityControl = other.accessibilityControl ?? accessibilityControl
     merged.accessibilityValueLabel = other.accessibilityValueLabel ?? accessibilityValueLabel
     merged.accessibilityStructure = other.accessibilityStructure ?? accessibilityStructure
+    if other.accessibilityRole != nil, other.accessibilityStructure?.roleTraits == nil {
+      // An explicit role starts a new trait fold at this modifier boundary.
+      merged.accessibilityStructure?.roleTraits = nil
+    }
     merged.accessibilityProperties =
       if let base = accessibilityProperties,
         let override = other.accessibilityProperties
@@ -686,6 +696,7 @@ public enum AccessibilityChildBehavior: Sendable, Equatable {
 }
 
 package struct AccessibilityStructure: Equatable, Sendable {
+  package var roleTraits: AccessibilityRoleTraitState? = nil
   package var children: AccessibilityChildBehavior? = nil
   package var sortPriority: Double? = nil
   package var isVirtual = false
