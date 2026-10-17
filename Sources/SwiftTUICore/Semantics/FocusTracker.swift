@@ -94,6 +94,12 @@ public final class FocusTracker {
       consumedIndex: modalRestoration?.stackIndex
     )
 
+    // Initial adoption belongs to the caller's region-resolution pass. Report
+    // it so focus-dependent content can settle in that pass, without queuing
+    // an additional frame as if an input event had moved established focus.
+    if previousFocus == nil {
+      return currentFocusIdentity != nil
+    }
     return notifyIfFocusChanged(from: previousFocus)
   }
 

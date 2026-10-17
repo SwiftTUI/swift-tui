@@ -77,7 +77,7 @@ struct InteractiveRuntimeTests {
     ]
 
     let initialChange = tracker.updateRegions(regions)
-    #expect(!initialChange)
+    #expect(initialChange)
     #expect(tracker.currentFocusIdentity == testIdentity("first"))
 
     tracker.focusNext()
@@ -105,7 +105,7 @@ struct InteractiveRuntimeTests {
     let second = focusRegion(testIdentity("second"))
     let third = focusRegion(testIdentity("third"))
 
-    #expect(!tracker.updateRegions([first, second, third]))
+    #expect(tracker.updateRegions([first, second, third]))
     #expect(tracker.currentFocusIdentity == testIdentity("first"))
 
     _ = tracker.focusNext()
@@ -130,7 +130,7 @@ struct InteractiveRuntimeTests {
     tracker.invalidator = invalidator
 
     #expect(
-      !tracker.updateRegions([
+      tracker.updateRegions([
         focusRegion(testIdentity("TopLeft"), x: 0, y: 0),
         focusRegion(testIdentity("BottomLeft"), x: 0, y: 2),
         focusRegion(testIdentity("TopRight"), x: 12, y: 0),
@@ -162,7 +162,7 @@ struct InteractiveRuntimeTests {
     let sectionIdentity = testIdentity("Root", "Scope", "Section")
 
     #expect(
-      !tracker.updateRegions([
+      tracker.updateRegions([
         focusRegion(
           testIdentity("Root", "Scope", "Section", "Current"),
           x: 0,
@@ -193,7 +193,7 @@ struct InteractiveRuntimeTests {
     let tracker = FocusTracker(invalidationIdentities: [testIdentity("RuntimeRoot")])
 
     #expect(
-      !tracker.updateRegions([
+      tracker.updateRegions([
         focusRegion(
           testIdentity("Root", "Scope", "Nested", "Current"),
           x: 0,
