@@ -35,12 +35,12 @@ struct FrameInstantSamplingTests {
     _ = loop.recordSkippedCancellableFrame(
       .init(
         artifacts: nil, runtimeIssues: [], renderGeneration: RenderGeneration(9),
-        newestDesiredGeneration: RenderGeneration(intent.desiredGeneration),
+        newestDesiredGeneration: RenderGeneration(10),
         tailJobState: .cancelledBeforeStart, tailCancelReason: "stale_baseline",
         completedFrameDropDecision: nil),
       scheduledFrame: scheduled, renderIntentDiagnostics: intent, renderedFrames: 1,
       convergence: .init())
-    #expect(sink.sample?.newestDesiredAtTailResult == intent.desiredGeneration)
+    #expect(sink.sample?.newestDesiredAtTailResult == 10)
     #expect(loop.nextRenderIntentGeneration == intent.desiredGeneration + 1)
   }
 

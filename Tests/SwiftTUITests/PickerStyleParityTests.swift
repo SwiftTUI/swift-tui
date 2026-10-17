@@ -47,7 +47,8 @@ struct PickerStyleParityTests {
     defer { harness.shutdown() }
     _ = try harness.focusText("Choice")
     if treatment.isMenu {
-      _ = try harness.clickText("Alpha")
+      // Focus has already expanded the menu before presentation.
+      #expect(harness.frame.contains("Duplicate"))
     }
     _ = try harness.clickText("Duplicate", chooseLast: true)
     #expect(probe.selection == 2)
@@ -68,6 +69,8 @@ struct PickerStyleParityTests {
       )
     }
     defer { harness.shutdown() }
+    #expect(harness.frame.contains("Duplicate"))
+    _ = try harness.pressKey(KeyPress(.escape))
     _ = try harness.clickText("Alpha")
     #expect(harness.frame.contains("Duplicate"))
     var frame = try harness.clickText("Alpha")
@@ -82,6 +85,8 @@ struct PickerStyleParityTests {
     #expect(!frame.contains("Duplicate"))
     frame = try harness.pressKey(KeyPress(.arrowDown))
     #expect(frame.contains("Duplicate"))
+    #expect(probe.selection == 0, "opening the menu leaves the value unchanged")
+    _ = try harness.pressKey(KeyPress(.arrowDown))
     #expect(probe.selection == 1)
   }
 

@@ -115,7 +115,14 @@ struct AdversarialSetAInputTests {
   }
 
   @Test func setA017PrivateCSIAndNULCannotStrandText() {
-    partitions("\u{0}\u{1B}[?1004;2$y\u{0}q\u{1B}[?1;2c", [.key(.init(.character("q")))])
+    // NUL is the legacy Ctrl+Space encoding (also covered by B164). Device
+    // replies remain atomic; neither reply consumes a neighboring key chord.
+    partitions(
+      "\u{0}\u{1B}[?1004;2$y\u{0}q\u{1B}[?1;2c",
+      [
+        .key(.init(.space, modifiers: .ctrl)), .key(.init(.space, modifiers: .ctrl)),
+        .key(.init(.character("q"))),
+      ])
   }
 
   @Test func setA018TruncatedControlStringFlushResetsParser() {

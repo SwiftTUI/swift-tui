@@ -233,9 +233,13 @@ public struct IDModifier<ID: Hashable & Sendable>: IterativePrimitiveViewModifie
     // this boundary have independent state lifetimes. Preserve both nodes,
     // just as an exact-identity boundary does, instead of resetting slots on
     // the enclosing owner every time the inner modifier is re-evaluated.
+    // A different committed occupant alone may be this same boundary's old
+    // ID. Only a live enclosing route proves simultaneous co-residency; a
+    // changed ID at this boundary must retire its previous state and archives.
     if let slotNode = ViewNodeContext.current,
+      let enclosingEntity = ResolveEntityRouteStorage.current?.identity,
       let occupant = context.viewGraph?.entityOccupant(of: slotNode),
-      occupant != entityIdentity
+      occupant == enclosingEntity, occupant != entityIdentity
     {
       return withResolveEntityRoute(route) {
         resolveViewWork(

@@ -19,6 +19,10 @@ struct PickerMenuFocusEffectTests {
       size: .init(width: 40, height: 10)
     ) { MenuPickerSelectionFixture() }
     defer { harness.shutdown() }
+    // The first presented frame already reflects initial focus. Menu pickers
+    // expand on focus, so establish a collapsed baseline before the click.
+    #expect(harness.frame.contains("▴"))
+    _ = try harness.pressKey(KeyPress(.escape))
     #expect(try harness.clickText("Alpha").contains("▴"))
 
     func select(_ label: String) throws {
@@ -53,6 +57,8 @@ struct PickerMenuFocusEffectTests {
     }
     defer { harness.shutdown() }
 
+    #expect(harness.frame.contains("▴"))
+    _ = try harness.pressKey(KeyPress(.escape))
     var frame = try harness.clickText("Alpha")
     #expect(frame.contains("▴"))
     #expect(frame.contains("Beta"))

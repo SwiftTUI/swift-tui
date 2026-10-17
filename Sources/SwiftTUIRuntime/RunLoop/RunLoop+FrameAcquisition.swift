@@ -172,12 +172,8 @@ extension RunLoop {
         ? scheduledFrame.causes.union([.signal]) : scheduledFrame.causes,
       elisionHasExplicitAnimationTransactions: scheduledFrame
         .hasExplicitAnimationTransactions,
-      newestDesiredGeneration: {
-        RenderGeneration(
-          self.scheduler.hasPendingFrame(at: frameInstant)
-            ? self.nextRenderIntentGeneration
-            : renderIntentDiagnostics.desiredGeneration
-        )
+      hasNewerRenderIntent: {
+        self.scheduler.hasPendingFrame(at: frameInstant)
       },
       completedFramePolicy: (renderMode == .asyncNoCancel || renderMode == .asyncNoDrop)
         ? .orderedCommitOnly : nil,

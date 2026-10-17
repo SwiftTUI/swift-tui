@@ -1161,7 +1161,7 @@ extension FrameworkStressFramePipelineTests {
           invalidatedIdentities: [rootIdentity]
         ),
         proposal: proposal,
-        newestDesiredGeneration: { RenderGeneration(10_000) },
+        hasNewerRenderIntent: { true },
         completedFramePolicy: .dropCompletedVisualOnly,
         shouldCancelQueued: { false }
       )

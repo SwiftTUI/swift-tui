@@ -8,7 +8,7 @@ package enum ViewGraphRuntimeRegistrationRestorer {
     // Identity ordering compares joined paths. Materialize each key once,
     // rather than rebuilding both paths for every sort comparison on a
     // large publication frontier. Equal identities retain the node-ID tie
-    // break; distinct identities whose paths compare equal remain equivalent.
+    // break; equal display paths use Identity's component tie-break.
     let nodes = viewNodeIDs.compactMap { nodeID -> (node: ViewNode, path: String)? in
       guard let node = nodesByNodeID[nodeID], node.registeredHandlers.hasRuntimeRegistrations else {
         return nil
@@ -19,7 +19,9 @@ package enum ViewGraphRuntimeRegistrationRestorer {
       if lhs.node.identity == rhs.node.identity {
         return lhs.node.viewNodeID < rhs.node.viewNodeID
       }
-      return lhs.path < rhs.path
+      return lhs.path == rhs.path
+        ? lhs.node.identity.components.lexicographicallyPrecedes(rhs.node.identity.components)
+        : lhs.path < rhs.path
     }) {
       entry.node.restoreOwnRuntimeRegistrations(into: registrations)
     }

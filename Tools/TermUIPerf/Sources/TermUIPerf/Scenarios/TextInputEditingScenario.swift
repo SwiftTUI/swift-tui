@@ -3,7 +3,7 @@
 /// Reconstructs per-keystroke text editing in a focused field embedded in a
 /// larger static form, without depending on `swift-tui-examples`.
 ///
-/// The field is focused by a click, then driven with a sequence of character,
+/// The field receives initial focus, then is driven with a sequence of character,
 /// backspace, and caret-move keystrokes. Each keystroke is an interaction frame
 /// that (a) holds keyboard focus on the field, (b) mutates the bound `@State`
 /// text and re-keys the `TextLayoutCache`, and (c) leaves a large static sibling
@@ -44,10 +44,9 @@ public struct TextInputEditingScenario: PerfScenario {
       let dispatchTime = monotonicSeconds()
       var lastFrame = driver.terminalHost.presentedFrames.last?.frameNumber ?? 0
 
-      // Focus the field by clicking its prompt, then verify focus took by
-      // typing the first character and waiting for the mirror to update.
-      let fieldCell = try driver.cell(containing: "perf-input")
-      driver.sendClick(at: fieldCell)
+      // This field is the only keyboard target. Initial focus has converged
+      // before presentation, so its placeholder is already hidden. The first
+      // typed character verifies focus and editing through the real input path.
 
       var buffer = ""
       @MainActor func type(_ key: KeyEvent, expect: String) async throws {

@@ -155,7 +155,8 @@
         proposal: proposal
       )
 
-      #expect(!tracker.updateRegions(closedArtifacts.semanticSnapshot.focusRegions))
+      #expect(tracker.updateRegions(closedArtifacts.semanticSnapshot.focusRegions))
+      #expect(tracker.currentFocusIdentity == backgroundOne)
       #expect(tracker.setFocus(to: backgroundTwo))
 
       let openArtifacts = DefaultRenderer().render(

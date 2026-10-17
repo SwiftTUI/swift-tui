@@ -2663,7 +2663,8 @@ struct SwiftUISurfaceTests {
         )
       ).wantsPointerStream
     )
-    #expect(box.value == 0.25)
+    // Track centers span 0.5...3.5; protected track slots contain no caps.
+    #expect(box.value == 0.42)
 
     #expect(
       pointerRegistry.dispatch(
@@ -2675,7 +2676,7 @@ struct SwiftUISurfaceTests {
         )
       ).wantsPointerStream
     )
-    #expect(box.value == 1.0)
+    #expect(box.value == 0.67)
   }
 
   @Test("Stepper renders its editing chrome directly from focus")

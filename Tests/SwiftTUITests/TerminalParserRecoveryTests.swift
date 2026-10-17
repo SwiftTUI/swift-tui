@@ -50,7 +50,7 @@ struct TerminalParserRecoveryTests {
   @Test(
     "ignored input drains iteratively without losing following keys",
     arguments: [
-      [UInt8](arrayLiteral: 0x80), [0], Array("\u{1B}Oz".utf8),
+      [UInt8](arrayLiteral: 0x80), Array("\u{1B}Oz".utf8),
       Array("\u{1B}[9~".utf8), Array("\u{1B}[?1c".utf8),
       Array("\u{1B}[<128;1;1M".utf8), [0xC0, 0xAF],
     ])

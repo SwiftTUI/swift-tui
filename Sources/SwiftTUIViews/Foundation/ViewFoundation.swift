@@ -382,7 +382,14 @@ func installViewEvaluator<V: View>(
   // reading the evicted node's state (`CaptureBindingChurnJourneyTests`).
   // The same-frame deferred-descent continuation keeps the full route
   // because it resumes the very resolve that bound it.
-  let capturedEntityRoute = ResolveEntityRouteStorage.current?.scopeOnly
+  // A producer replays the iteration's entire original resolve, including
+  // transparent modifier interiors at that position. Keep its positional
+  // claim live throughout that replay; otherwise an interior public .id can
+  // adopt its own child owner onto the outer ForEach wrapper's identity.
+  let capturedEntityRoute =
+    rebuilding.map {
+      ResolveEntityRoute(identity: $0.entityIdentity, structuralPath: $0.structuralPath)
+    } ?? ResolveEntityRouteStorage.current?.scopeOnly
   let capturedOwnerLifetimeID = graphNode.ownerLifetimeID
   graphNode.setEvaluator {
     withResolveEntityRoute(capturedEntityRoute) {

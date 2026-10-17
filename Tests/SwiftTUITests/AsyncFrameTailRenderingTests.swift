@@ -126,16 +126,10 @@ struct AsyncFrameTailRenderingTests {
   @Test("internal @State mutations during suspended async frame tail survive commit")
   func internalStateMutationDuringSuspendedAsyncTailSurvivesCommit() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailInternalStateRoot")
-    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let gate = AsyncFrameTailBlockingGate()
     let trigger = AsyncFrameTailInternalStateTrigger()
     let renderer = DefaultRenderer()
-    renderer.setFrameTailRenderHooks(
-      .init(beforeRaster: {
-        trigger.record("worker raster entry")
-        gate.beforeRaster()
-        trigger.record("worker raster exit")
-      })
-    )
+
     defer {
       renderer.setFrameTailRenderHooks(nil)
       gate.release()
@@ -176,6 +170,15 @@ struct AsyncFrameTailRenderingTests {
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var initialFrames = 0
     try await renderUntilQuiescent(runLoop, eventPump: eventPump, renderedFrames: &initialFrames)
+    // Hold the mutation's tail, after initial focus/layout convergence. One
+    // presented baseline frame may legitimately perform multiple raster passes.
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        trigger.record("worker raster entry")
+        gate.beforeRaster()
+        trigger.record("worker raster exit")
+      })
+    )
     #expect(terminal.frames.last?.contains("phase 0 count 0") == true)
 
     runLoop.stateContainer.mutate { phase in
@@ -416,13 +419,9 @@ struct AsyncFrameTailRenderingTests {
   @Test("diagnostics count input queued during async render suspension")
   func diagnosticsCountInputQueuedDuringAsyncRenderSuspension() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailDiagnosticsRoot")
-    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let gate = AsyncFrameTailBlockingGate()
     let renderer = DefaultRenderer()
-    renderer.setFrameTailRenderHooks(
-      .init(beforeRaster: {
-        gate.beforeRaster()
-      })
-    )
+
     defer {
       renderer.setFrameTailRenderHooks(nil)
       gate.release()
@@ -479,6 +478,13 @@ struct AsyncFrameTailRenderingTests {
     try await waitUntil {
       terminal.frames.contains { $0.contains("value 0") }
     }
+    // Hold the mutation's tail, after initial focus/layout convergence. One
+    // presented baseline frame may legitimately perform multiple raster passes.
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
 
     inputReader.send(.key(.character("i")))
     await gate.waitUntilBlocked()
@@ -1409,13 +1415,9 @@ struct AsyncFrameTailRenderingTests {
   @Test("computed async frames commit in order even when newer input is queued")
   func computedAsyncFramesCommitInOrderEvenWhenNewerInputIsQueued() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailBacklogRoot")
-    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let gate = AsyncFrameTailBlockingGate()
     let renderer = DefaultRenderer()
-    renderer.setFrameTailRenderHooks(
-      .init(beforeRaster: {
-        gate.beforeRaster()
-      })
-    )
+
     defer {
       renderer.setFrameTailRenderHooks(nil)
       gate.release()
@@ -1467,6 +1469,13 @@ struct AsyncFrameTailRenderingTests {
     try await waitUntil {
       terminal.frames.contains { $0.contains("value 0") }
     }
+    // Hold the mutation's tail, after initial focus/layout convergence. One
+    // presented baseline frame may legitimately perform multiple raster passes.
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
 
     inputReader.send(.key(.character("i")))
     await gate.waitUntilBlocked()
@@ -1784,13 +1793,9 @@ struct AsyncFrameTailRenderingTests {
   @Test("stale completed visual-only frame drops before commit")
   func staleCompletedVisualOnlyFrameDropsBeforeCommit() async throws {
     let rootIdentity = testIdentity("AsyncCompletedVisualOnlyDropRoot")
-    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let gate = AsyncFrameTailBlockingGate()
     let renderer = DefaultRenderer()
-    renderer.setFrameTailRenderHooks(
-      .init(beforeRaster: {
-        gate.beforeRaster()
-      })
-    )
+
     defer {
       renderer.setFrameTailRenderHooks(nil)
       gate.release()
@@ -1839,6 +1844,13 @@ struct AsyncFrameTailRenderingTests {
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var initialFrames = 0
     try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    // Hold the mutation's tail, after initial focus/layout convergence. One
+    // presented baseline frame may legitimately perform multiple raster passes.
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
 
     #expect(terminal.frames.contains { $0.contains("visual 0") })
 
@@ -1899,13 +1911,9 @@ struct AsyncFrameTailRenderingTests {
   @Test("stale completed visual-only frame with stable interaction chrome drops before commit")
   func staleCompletedVisualOnlyFrameWithStableInteractionChromeDropsBeforeCommit() async throws {
     let rootIdentity = testIdentity("AsyncCompletedStableChromeVisualOnlyDropRoot")
-    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let gate = AsyncFrameTailBlockingGate()
     let renderer = DefaultRenderer()
-    renderer.setFrameTailRenderHooks(
-      .init(beforeRaster: {
-        gate.beforeRaster()
-      })
-    )
+
     defer {
       renderer.setFrameTailRenderHooks(nil)
       gate.release()
@@ -1954,6 +1962,13 @@ struct AsyncFrameTailRenderingTests {
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var initialFrames = 0
     try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    // Hold the mutation's tail, after initial focus/layout convergence. One
+    // presented baseline frame may legitimately perform multiple raster passes.
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
 
     #expect(terminal.frames.contains { $0.contains("visual 0") })
 
@@ -2009,13 +2024,9 @@ struct AsyncFrameTailRenderingTests {
   @Test("runtime render mode async-no-drop commits stale visual-only frames")
   func runtimeRenderModeAsyncNoDropCommitsStaleVisualOnlyFrames() async throws {
     let rootIdentity = testIdentity("RuntimeRenderModeAsyncNoDropRoot")
-    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let gate = AsyncFrameTailBlockingGate()
     let renderer = DefaultRenderer()
-    renderer.setFrameTailRenderHooks(
-      .init(beforeRaster: {
-        gate.beforeRaster()
-      })
-    )
+
     defer {
       renderer.setFrameTailRenderHooks(nil)
       gate.release()
@@ -2053,6 +2064,13 @@ struct AsyncFrameTailRenderingTests {
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var initialFrames = 0
     try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    // Hold the mutation's tail, after initial focus/layout convergence. One
+    // presented baseline frame may legitimately perform multiple raster passes.
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
 
     #expect(terminal.frames.contains { $0.contains("visual 0") })
 

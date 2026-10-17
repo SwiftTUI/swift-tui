@@ -149,19 +149,18 @@ struct FrameworkStressTerminalProtocolBoundaryTests {
     #expect(events == [.key(KeyPress(.character("é")))])
   }
 
-  @Test("stress terminal protocol 014 overflowing VT220 modifiers degrade without trapping")
-  func terminalProtocol014OverflowingVT220ModifiersDegradeWithoutTrapping() {
-    // Hypothesis: a valid key paired with an overflowing modifier can trap numeric accumulation.
+  @Test("stress terminal protocol 014 overflowing VT220 modifiers reject the envelope")
+  func terminalProtocol014OverflowingVT220ModifiersRejectEnvelope() {
+    // xterm's PC-style modifier parameter has a defined finite range. An
+    // overflowing value is malformed, not an absent modifier; do not turn it
+    // into an unmodified action. Consume its envelope and retain following input.
+    // https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-PC-Style-Function-Keys
     var parser = TerminalInputParser()
     let overlongModifier = String(repeating: "9", count: 40)
 
     let events = parser.feed(Array("\u{001B}[6;\(overlongModifier)~Z".utf8))
 
-    #expect(
-      events == [
-        .key(KeyPress(.pageDown)),
-        .key(KeyPress(.character("Z"))),
-      ])
+    #expect(events == [.key(KeyPress(.character("Z")))])
   }
 
   @Test("stress terminal protocol 015 extra VT220 parameter groups reject the envelope")

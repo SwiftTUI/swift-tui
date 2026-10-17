@@ -111,8 +111,16 @@ private let directToolbarItemContributionsMetadataKey = ObjectIdentifier(
   DirectToolbarItemContributionsKey.self
 )
 
-private struct DirectToolbarItemContributions: Sendable {
+private struct DirectToolbarItemContributions: Sendable, Equatable {
   var items: [ToolbarItemConfig]
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    // Action callbacks are refreshed by the toolbar's registration publication.
+    // Layout equality compares the full typed item contract, never its title
+    // summary: icons, enablement, hints and declaration owners all matter.
+    lhs.items.count == rhs.items.count
+      && zip(lhs.items, rhs.items).allSatisfy { $0.isEqualForReuse(to: $1) }
+  }
 }
 
 extension ResolvedNode {

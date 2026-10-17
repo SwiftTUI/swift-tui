@@ -24,7 +24,7 @@ struct IdentityValueCurrencyTests {
     #expect(probe.contains(chained))
   }
 
-  @Test("component ordering is total and occurrence delimiters cannot be authored")
+  @Test("identity ordering is total and occurrence delimiters cannot be authored")
   func componentsAndGeneratedSuffixesAreUnambiguous() {
     let paths = [[], ["a"], ["a/b"], ["a", "b"], ["a/", "b"], ["a", "/b"]]
       .map { Identity(components: $0) }
@@ -33,6 +33,7 @@ struct IdentityValueCurrencyTests {
         #expect((lhs < rhs ? 1 : 0) + (rhs < lhs ? 1 : 0) + (lhs == rhs ? 1 : 0) == 1)
       }
     }
+    #expect(Identity(components: ["a-"]) < Identity(components: ["a", "z"]))
     struct ID: Hashable, CustomDebugStringConvertible {
       var debugDescription: String
     }

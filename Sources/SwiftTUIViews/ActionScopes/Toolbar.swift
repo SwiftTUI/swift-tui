@@ -115,9 +115,23 @@ private let toolbarLatePreferenceHostMetadataKey = ObjectIdentifier(
   ToolbarLatePreferenceHostKey.self
 )
 
-private struct ToolbarLatePreferenceHostDescriptor: Sendable {
+private struct ToolbarLatePreferenceHostDescriptor: Sendable, Equatable {
   let debugValue: String
+  let owner: StateOwnerHandle?
+  let identity: Identity
+  let structuralPath: StructuralPath
+  let environment: EnvironmentSnapshot
+  let transaction: TransactionSnapshot
+  let style: AnyToolbarStyle
   let reconcile: @MainActor @Sendable (ResolvedNode, [ToolbarItemConfig]) -> ResolvedNode
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    // The callback is rebuilt from these captures, then rebased to current
+    // frame inputs when invoked. Opaque custom styles still deny reuse.
+    lhs.owner == rhs.owner && lhs.identity == rhs.identity
+      && lhs.structuralPath == rhs.structuralPath && lhs.environment == rhs.environment
+      && lhs.transaction == rhs.transaction && lhs.style.isEqualForReuse(to: rhs.style)
+  }
 }
 
 package struct LatePreferenceReconciliationOutput {
@@ -249,6 +263,12 @@ extension ResolvedNode {
     copy.layoutMetadata = copy.layoutMetadata.settingLayoutValue(
       ToolbarLatePreferenceHostDescriptor(
         debugValue: debugValue,
+        owner: latePreferenceHost?.stateOwnerHandle,
+        identity: context.identity,
+        structuralPath: context.structuralPath,
+        environment: context.environment,
+        transaction: context.transaction,
+        style: style,
         reconcile: { [weak latePreferenceHost] node, items in
           let reconcile = {
             node.reconciledToolbarHost(

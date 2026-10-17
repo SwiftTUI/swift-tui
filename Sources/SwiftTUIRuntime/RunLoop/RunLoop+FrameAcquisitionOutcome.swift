@@ -51,7 +51,7 @@ extension RunLoop {
         tailJobState: renderOutcome.tailJobState,
         tailCancelReason: renderOutcome.tailCancelReason ?? "-",
         newestDesiredGeneration: renderOutcome.newestDesiredGeneration
-          ?? RenderGeneration(nextRenderIntentGeneration),
+          ?? renderOutcome.renderGeneration,
         animationControllerActiveAnimationCount: renderer
           .internalAnimationController.activeAnimationCount,
         animationControllerHasPendingWork: renderer
@@ -79,7 +79,7 @@ extension RunLoop {
         renderIntentDiagnostics: renderIntentDiagnostics,
         renderGeneration: renderOutcome.renderGeneration,
         newestDesiredGeneration: renderOutcome.newestDesiredGeneration
-          ?? RenderGeneration(nextRenderIntentGeneration),
+          ?? renderOutcome.renderGeneration,
         decision: renderOutcome.completedFrameDropDecision,
         runtimeIssues: renderOutcome.runtimeIssues,
         animationControllerActiveAnimationCount: renderer

@@ -1125,7 +1125,8 @@ struct AppRuntimeTests {
 
     let firstFrame = try #require(terminal.frames.first)
     let secondFrame = try #require(terminal.frames.last)
-    #expect(firstFrame.contains("Focus: none"))
+    // Initial focus now converges before the first presentation (STUI-981).
+    #expect(firstFrame.contains("Focus: FirstFocus"))
     #expect(secondFrame.contains("Focus: SecondFocus"))
     #expect(secondFrame.contains("First"))
     #expect(secondFrame.contains("Second"))

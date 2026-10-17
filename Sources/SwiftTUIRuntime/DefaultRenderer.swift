@@ -339,7 +339,7 @@ public struct DefaultRenderer {
     context: ResolveContext,
     proposal: ProposedSize,
     frameInstant: MonotonicInstant = .now(),
-    newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
+    hasNewerRenderIntent: @escaping @MainActor @Sendable () -> Bool = { false },
     completedFramePolicy: CompletedFramePolicy? = nil,
     completedFrameAdditionalBlockers:
       @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = {
@@ -358,7 +358,7 @@ public struct DefaultRenderer {
       frameInstant: frameInstant,
       elisionCauses: [],
       elisionHasExplicitAnimationTransactions: false,
-      newestDesiredGeneration: newestDesiredGeneration,
+      hasNewerRenderIntent: hasNewerRenderIntent,
       completedFramePolicy: completedFramePolicy,
       completedFrameAdditionalBlockers: completedFrameAdditionalBlockers,
       redundantHandlerInstallationsAreVisualOnly: redundantHandlerInstallationsAreVisualOnly,
@@ -386,7 +386,7 @@ public struct DefaultRenderer {
     frameInstant: MonotonicInstant,
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool,
-    newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
+    hasNewerRenderIntent: @escaping @MainActor @Sendable () -> Bool = { false },
     completedFramePolicy: CompletedFramePolicy? = nil,
     completedFrameAdditionalBlockers:
       @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = {
@@ -405,7 +405,7 @@ public struct DefaultRenderer {
       frameInstant: frameInstant,
       elisionCauses: elisionCauses,
       elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
-      newestDesiredGeneration: newestDesiredGeneration,
+      hasNewerRenderIntent: hasNewerRenderIntent,
       completedFramePolicy: completedFramePolicy,
       completedFrameAdditionalBlockers: completedFrameAdditionalBlockers,
       redundantHandlerInstallationsAreVisualOnly: redundantHandlerInstallationsAreVisualOnly,
@@ -422,7 +422,7 @@ public struct DefaultRenderer {
     frameInstant: MonotonicInstant,
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool,
-    newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration?,
+    hasNewerRenderIntent: @escaping @MainActor @Sendable () -> Bool,
     completedFramePolicy: CompletedFramePolicy?,
     completedFrameAdditionalBlockers:
       @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker>,
@@ -486,7 +486,7 @@ public struct DefaultRenderer {
                 artifacts: nil,
                 runtimeIssues: draft.runtimeIssues,
                 renderGeneration: draft.renderGeneration,
-                newestDesiredGeneration: nil,
+                newestDesiredGeneration: RenderGeneration(draft.renderGeneration.rawValue + 1),
                 tailJobState: .cancelledBeforeStart,
                 tailCancelReason: "newer_render_intent",
                 completedFrameDropDecision: nil
@@ -512,7 +512,13 @@ public struct DefaultRenderer {
           )
         },
         commit: { draft, tailOutput in
-          let newestGeneration = newestDesiredGeneration() ?? draft.renderGeneration
+          // The scheduler owns intent ordinals; this renderer owns pass generations.
+          // Focus convergence and abandoned heads can consume several passes per
+          // intent. Only the supersession signal crosses that boundary. Express
+          // an outstanding request as the next pass in this renderer's currency.
+          let newestGeneration = RenderGeneration(
+            draft.renderGeneration.rawValue + (hasNewerRenderIntent() ? 1 : 0)
+          )
           switch renderer.resolveCompletedFrameCandidate(
             draft: draft,
             tailOutput: tailOutput,

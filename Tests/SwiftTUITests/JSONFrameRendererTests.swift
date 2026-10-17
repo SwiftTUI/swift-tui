@@ -54,7 +54,10 @@ struct JSONFrameRendererTests {
     let text = "before\u{7F}\u{85}\u{9B}\u{9C}\u{9D}after界"
     let identity = testIdentity("Controls")
     let output = JSONFrameRenderer().render(
-      surface: RasterSurface(size: .init(width: 80, height: 1), lines: [text]),
+      // Supply literal cells: the lines initializer performs text layout,
+      // where U+0085 is a logical newline. This test isolates JSON escaping.
+      surface: RasterSurface(
+        size: .init(width: 80, height: 1), cells: [text.map { RasterCell(character: $0) }]),
       semanticSnapshot: SemanticSnapshot(
         accessibilityNodes: [
           AccessibilityNode(

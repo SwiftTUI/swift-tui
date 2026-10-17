@@ -795,7 +795,14 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
   }
 
   public static func < (lhs: Self, rhs: Self) -> Bool {
-    lhs.components.lexicographicallyPrecedes(rhs.components)
+    // Keep established display-path ordering for focus/publication precedence.
+    // Slashes inside authored components can produce equal display paths for
+    // unequal identities; their component sequences break only that tie.
+    let left = lhs.path
+    let right = rhs.path
+    return left == right
+      ? lhs.components.lexicographicallyPrecedes(rhs.components)
+      : left < right
   }
 
   private func escapedExplicitIDComponent(_ component: String) -> String {

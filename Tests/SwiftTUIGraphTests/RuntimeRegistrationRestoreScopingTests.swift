@@ -21,6 +21,8 @@ struct RuntimeRegistrationRestoreScopingTests {
       Identity(components: ["root", ""]),
       Identity(components: ["root", "Café"]),
       Identity(components: ["root", "漢字"]),
+      Identity(components: ["root", "a/z"]),
+      Identity(components: ["root/a", "z"]),
     ]
     let graph = ViewGraph()
     graph.beginFrame()
@@ -38,6 +40,7 @@ struct RuntimeRegistrationRestoreScopingTests {
       Set(nodes.keys), into: registrations, nodesByNodeID: nodes)
     // Component-wise ordering would put a/z before a-; joined-path ordering
     // has the opposite result and is observable in focus request precedence.
+    // Equal display paths still use the component tie-break, never Set order.
     #expect(registrations.focusBindingRegistry?.snapshot().map(\.identity) == identities.sorted())
   }
 
