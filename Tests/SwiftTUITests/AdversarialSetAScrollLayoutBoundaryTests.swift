@@ -475,7 +475,7 @@ struct AdversarialSetAScrollLayoutBoundaryTests {
   }
   private func reader<V: View>(
     _ holder: SetAScrollProxyHolder, state: SetAScrollOffsetBox,
-    axes: SwiftTUIViews.Axis.Set = .vertical, @ViewBuilder content: () -> V
+    axes: SwiftTUIViews.Axis.Set = .vertical, @ViewBuilder content: @escaping () -> V
   ) -> some View {
     ScrollViewReader { proxy in
       let _ = holder.capture(proxy)

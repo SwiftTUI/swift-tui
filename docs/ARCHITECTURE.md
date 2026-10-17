@@ -382,7 +382,9 @@ The dropdown portal continues to own placement, focus, Escape, and dismissal.
 `ScrollIndicatorAppearance` metadata carries those choices into core placement,
 semantics, and draw extraction. These phases share the content viewport, while
 the scroll primitive retains offset bindings, indicator dragging, and host-gated
-panning. Reserved tracks are outside the content clip; overlay indicators paint
+panning. `ScrollViewReader` evaluates its content during resolution after
+configuring the scope's proxy. Constructing a candidate that the graph reuses
+cannot publish an unconfigured proxy over the live one. Reserved tracks are outside the content clip; overlay indicators paint
 after content. `Controls/LinkStyles.swift` supplies rich-text appearance to
 `Link.swift`, which merges inherited text, style presentation, and label styling
 before stamping link identity and destination. Existing link action and focus

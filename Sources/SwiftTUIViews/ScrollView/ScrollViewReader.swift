@@ -70,26 +70,33 @@ public struct ScrollViewProxy {
 
 /// Provides imperative scroll control for descendant scroll views.
 public struct ScrollViewReader<Content: View>: PrimitiveView, IterativeResolvableView {
-  private let bridge: ScrollViewProxyBridge
-  private let content: Content
+  private let content: (ScrollViewProxy) -> Content
+  private let contentAuthoringScope: CapturedSubviewScope
 
   @MainActor
   public init(
-    @ViewBuilder content: (ScrollViewProxy) -> Content
+    @ViewBuilder content: @escaping (ScrollViewProxy) -> Content
   ) {
-    bridge = ScrollViewProxyBridge()
-    self.content = content(ScrollViewProxy(bridge: bridge))
+    contentAuthoringScope = makeCapturedSubviewScope()
+    self.content = content
   }
 
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     let contentContext = context.child(component: .named("ScrollViewReaderContent"))
+    let bridge = ScrollViewProxyBridge()
     bridge.configure(
       registry: context.scrollCommandRegistry,
       scopeIdentity: context.identity,
       invalidationIdentity: contentContext.identity,
       invalidator: context.invalidationProxy?.invalidator
     )
-    return content.resolveElementsWork(in: contentContext)
+    // Build only after this reader is actually resolved and its proxy is
+    // configured. A parent may construct a candidate that the graph reuses
+    // without resolving; that must not publish a fresh, unbound proxy.
+    return withAuthoringContext(contentAuthoringScope.authoringContext) {
+      let view = context.trackingObservableAccess { content(ScrollViewProxy(bridge: bridge)) }
+      return view.resolveElementsWork(in: contentContext)
+    }
   }
 }
 
