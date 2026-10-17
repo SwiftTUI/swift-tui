@@ -86,6 +86,7 @@ SwiftTUIRuntime.LifetimeAnchorCounterSnapshot.replaceCalls
 SwiftTUIRuntime.LifetimeAnchorCounterSnapshot.replaceNoops
 SwiftTUIRuntime.PresentationWriteSample
 SwiftTUIRuntime.PresentationWriteSample.Outcome
+SwiftTUIRuntime.PresentationWriteSample.Outcome.failed
 SwiftTUIRuntime.PresentationWriteSample.Outcome.init(rawValue:)
 SwiftTUIRuntime.PresentationWriteSample.Outcome.superseded
 SwiftTUIRuntime.PresentationWriteSample.Outcome.written

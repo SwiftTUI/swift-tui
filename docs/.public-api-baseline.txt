@@ -2042,6 +2042,7 @@ SwiftTUIPrimitives.ShapeGeometry.ellipse
 SwiftTUIPrimitives.ShapeGeometry.path(_:_:)
 SwiftTUIPrimitives.ShapeGeometry.rectangle
 SwiftTUIPrimitives.ShapeGeometry.roundedRectangle(cornerRadius:)
+SwiftTUIPrimitives.ShapeGeometry.trimmed(_:from:to:)
 SwiftTUIPrimitives.ShapeOperation
 SwiftTUIPrimitives.ShapeOperation.fill(style:mode:)
 SwiftTUIPrimitives.ShapeOperation.stroke(style:strokeStyle:strokeBorder:backgroundStyle:)
@@ -4103,6 +4104,7 @@ SwiftTUIViews.InsetShape.geometry
 SwiftTUIViews.InsetShape.init(base:amount:)
 SwiftTUIViews.InsetShape.insetAmount
 SwiftTUIViews.InsetShape.kindName
+SwiftTUIViews.InsetShape.path(in:)
 SwiftTUIViews.InsetTableStyle
 SwiftTUIViews.InsetTableStyle.init()
 SwiftTUIViews.InsetTableStyle.resolvePresentation(for:)
