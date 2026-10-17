@@ -141,9 +141,12 @@
   package func webSurfaceOpenRead(
     _ path: String
   ) -> Int32 {
-    path.withCString { pathPointer in
+    guard !path.utf8.contains(0) else { return -1 }
+    // Windows filesystem paths are UTF-16; the narrow CRT API uses the
+    // active code page and cannot represent every Swift filename.
+    return path.withCString(encodedAs: UTF16.self) { pathPointer in
       var descriptor: CInt = -1
-      _ = unsafe _sopen_s(&descriptor, pathPointer, _O_RDONLY | _O_BINARY, _SH_DENYNO, 0)
+      _ = unsafe _wsopen_s(&descriptor, pathPointer, _O_RDONLY | _O_BINARY, _SH_DENYNO, 0)
       return descriptor
     }
   }

@@ -338,7 +338,7 @@ final class ImageAssetRepository: Sendable {
     switch source {
     case .path(let name):
       guard !name.utf8.contains(0) else { return nil }
-      if name.hasPrefix("/") {
+      if isAbsoluteImagePath(name) {
         return .filePath(name)
       }
       for root in resourceRoots {
@@ -546,6 +546,18 @@ private func joinedPath(
   return root + "/" + component
 }
 
+private func isAbsoluteImagePath(_ path: String) -> Bool {
+  if path.hasPrefix("/") { return true }
+  #if os(Windows)
+    if path.hasPrefix("\\") { return true }
+    let prefix = Array(path.unicodeScalars.prefix(3))
+    return prefix.count == 3 && isASCIILetter(prefix[0]) && prefix[1] == ":"
+      && (prefix[2] == "/" || prefix[2] == "\\")
+  #else
+    return false
+  #endif
+}
+
 private func fileExists(
   at path: String
 ) -> Bool {
@@ -635,23 +647,7 @@ private func openReadOnlyFile(
 ) -> Int32 {
   // Every source form crosses this C boundary, including raw path initializers.
   guard !path.utf8.contains(0) else { return -1 }
-  return path.withCString { cPath in
-    #if canImport(Darwin)
-      unsafe Darwin.open(cPath, O_RDONLY)
-    #elseif canImport(Glibc)
-      unsafe Glibc.open(cPath, O_RDONLY)
-    #elseif canImport(Android)
-      unsafe Android.open(cPath, O_RDONLY)
-    #elseif canImport(WASILibc)
-      unsafe WASILibc.open(cPath, O_RDONLY)
-    #elseif canImport(ucrt)
-      {
-        var descriptor: CInt = -1
-        _ = unsafe _sopen_s(&descriptor, cPath, _O_RDONLY | _O_BINARY, _SH_DENYNO, 0)
-        return descriptor
-      }()
-    #endif
-  }
+  return webSurfaceOpenRead(path)
 }
 
 private func closeFile(

@@ -131,16 +131,22 @@ struct AdversarialSetAImageBoundaryTests {
     // Hypothesis: percent decoding treats '+' as space or decodes a literal '%20' for a second time.
     let directory = try Self.temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let file = directory.appendingPathComponent("plus+literal%20 snow 雪.png")
+    let file = directory.appendingPathComponent("plus+literal%20 snow 雪 🖼.png")
     let bytes = Self.frame([Self.green]).imageData
     try Data(bytes).write(to: file)
     let repository = ImageAssetRepository(contentRepository: ImageContentRepository())
-    let asset = try #require(
-      repository.resolve(
-        .fileURL(file.absoluteString), resourceRoots: [], cellPixelSize: .init(width: 1, height: 1))
-    )
-    #expect(asset.reference == .filePath(file.path))
-    #expect(try #require(repository.decodedImage(for: asset.reference)).encodedBytes == bytes)
+    // Exercise both the content reader and the resource-root existence probe.
+    // Windows must preserve UTF-16 filenames independently of the active code page.
+    for source in [
+      ImageSource.path(file.path), .fileURL(file.absoluteString), .path(file.lastPathComponent),
+    ] {
+      let asset = try #require(
+        repository.resolve(
+          source, resourceRoots: [directory.path], cellPixelSize: .init(width: 1, height: 1))
+      )
+      #expect(asset.reference == .filePath(file.path))
+      #expect(try #require(repository.decodedImage(for: asset.reference)).encodedBytes == bytes)
+    }
   }
 
   @Test func setA335ResolverClosureDoesNotKeepItsRepositoryAlive() throws {

@@ -8,6 +8,14 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-10-17
+
+### Fixed
+
+- Open Unicode image filenames with the Windows UTF-16 filesystem API, and recognize drive-rooted image paths. File URLs, direct paths, and resource-root lookup preserve literal percent signs, spaces, and non-ASCII characters.
+
+Includes the collection, input, state, rendering, and host fixes listed in 0.18.1.
+
 ## [0.18.1] - 2026-10-17
 
 SwiftTUI 0.18.1 fixes collection navigation, terminal input, state ownership,
@@ -2393,7 +2401,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.18.1...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.18.2...HEAD
+[0.18.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.2
 [0.18.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.1
 [0.18.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.0
 [0.17.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.17.0
