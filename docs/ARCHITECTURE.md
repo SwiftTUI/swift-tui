@@ -916,3 +916,19 @@ through the existing scroll registry, independently for nested viewports. Sizing
 wrappers forward a viewport's authored label to that owner. Protected text editor
 surfaces retain their own editing semantics. Authored operations take precedence
 over default scroll commands; no ordinary activation handlers are added.
+
+Paint extents traverse nested draw-command groups and clips with a heap work
+stack, preserving primitive ink and empty-group bounds without consuming a
+worker-stack frame per command. Surface allocation and damage share those
+extents, including negative shape insets.
+
+Presentation enablement is explicit and independent of modal input blocking.
+Prompts and popovers own an interaction domain; attached tips and toasts inherit
+their presenter's enabled state, including tips whose actions block background
+interaction. Every presentation still applies its own authored disabled modifiers.
+
+Default-focus arrivals survive scoped registration republication independently
+of the published binding rows. Arbitration checks the authoring owner's live
+node ID. Modifier positions without a seed owner retain a one-shot only for
+that resolved node's lifetime, so republication cannot replay it and a genuine
+remount can establish a new default.
