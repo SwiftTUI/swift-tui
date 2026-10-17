@@ -147,7 +147,7 @@ struct AdversarialSetAImageBoundaryTests {
     // Hypothesis: the public resolver captures the repository strongly, retaining its decoded assets forever.
     var repository: ImageAssetRepository? = ImageAssetRepository(
       contentRepository: ImageContentRepository())
-    weak var lifetime = repository
+    weak let lifetime = repository
     let resolver = try #require(repository).resolver()
     let bytes = Self.frame([Self.red]).imageData
     #expect(resolver(.data(bytes), [], .init(width: 1, height: 1)) != nil)

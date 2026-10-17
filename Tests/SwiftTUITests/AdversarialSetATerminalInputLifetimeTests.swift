@@ -90,7 +90,7 @@
           probe.cancel()
           release.fire()
         }
-        try await terminalLifetimeWait(entered, label: "suspended handoff entered")
+        try await terminalLifetimeWait(entered)
         try pipe.write(Array("r".utf8))
         #expect(received.snapshot.isEmpty)
         probe.cancel()
@@ -112,7 +112,7 @@
       try await withTerminalLifetimePipe { pipe in
         let received = pipe.observe(pipe.reader.inputEvents())
         try pipe.write(Array("a".utf8))
-        try await terminalLifetimeWait(received.first, label: "first pipe key")
+        try await terminalLifetimeWait(received.first)
         try await pipe.cancelReaders()
         #expect(received.snapshot == [.key(.character("a"))])
         #expect(pipe.reader.liveReadSourceCount == 0)
@@ -129,7 +129,7 @@
       try await withTerminalLifetimePipe { pipe in
         let original = pipe.observe(pipe.reader.inputEvents())
         try pipe.write([0x61, 0xF0, 0x9F])
-        try await terminalLifetimeWait(original.first, label: "original decoder consumed prefix")
+        try await terminalLifetimeWait(original.first)
         try await pipe.cancelReaders()
         let replacement = pipe.observe(pipe.reader.inputEvents())
         try pipe.write(Array("b".utf8))
@@ -146,7 +146,7 @@
       try await withTerminalLifetimePipe { pipe in
         let received = pipe.observe(pipe.reader.inputEvents())
         try pipe.write(Array("a\u{1B}[200~before".utf8))
-        try await terminalLifetimeWait(received.first, label: "paste prefix consumed")
+        try await terminalLifetimeWait(received.first)
         let replay = "\u{1B}]10;rgb:f/f/f\u{7}middle"
         pipe.reader.withInputSuspended {
           pipe.reader.replayProbeInput(Array(replay.utf8))
@@ -202,7 +202,7 @@
       try await withTerminalLifetimePipe { pipe in
         let received = pipe.observe(pipe.reader.inputEvents())
         try pipe.write(Array("\u{1B}]10;rgb:f/f/f\u{7}\u{1B}[?1016;2$y\u{1B}[?5ua".utf8))
-        try await terminalLifetimeWait(received.first, label: "user key after terminal replies")
+        try await terminalLifetimeWait(received.first)
         #expect(received.snapshot == [.key(.character("a"))])
         #expect(pipe.reader.liveReadSourceCount == 1)
         try pipe.write(Array("b".utf8))
@@ -310,7 +310,7 @@
         try await pipe.cancelReaders()
         // A deinit signal from the reader's captured callback is the release
         // witness; the weak reference independently checks the reader itself.
-        try await terminalLifetimeWait(released, label: "reader callback owner released")
+        try await terminalLifetimeWait(released)
         #expect(ownership.reader == nil)
       }
     }
@@ -558,26 +558,22 @@
       first.fire()
     }
     func waitForEnd() async throws {
-      try await terminalLifetimeWait(ended, label: "terminal input EOF")
+      try await terminalLifetimeWait(ended)
     }
   }
 
-  private func terminalLifetimeWait(_ event: AsyncEvent, label: String) async throws {
-    try await valueWithTimeout(label) {
-      await event.wait()
-      try Task.checkCancellation()
-    }
+  private func terminalLifetimeWait(_ event: AsyncEvent) async throws {
+    await event.wait()
+    try Task.checkCancellation()
   }
 
   private func terminalLifetimeCollect(_ stream: AsyncStream<InputEvent>) async throws
     -> [InputEvent]
   {
-    try await valueWithTimeout("finite injected input stream") {
-      var result: [InputEvent] = []
-      for await event in stream { result.append(event) }
-      try Task.checkCancellation()
-      return result
-    }
+    var result: [InputEvent] = []
+    for await event in stream { result.append(event) }
+    try Task.checkCancellation()
+    return result
   }
 
   private func terminalLifetimeMove(_ x: Int) -> InputEvent {
@@ -647,27 +643,54 @@
     }
 
     func cancelReaders() async throws {
+      let inputReaders = [reader] + additionalSourceOwners
+      let drained = inputReaders.map { _ in AsyncEvent() }
+      for (inputReader, signal) in zip(inputReaders, drained) {
+        inputReader.setReadSourcesDrainedHandlerForTesting { signal.fire() }
+      }
+      defer {
+        for inputReader in inputReaders {
+          inputReader.setReadSourcesDrainedHandlerForTesting(nil)
+        }
+      }
       for consumer in consumers { consumer.cancel() }
       for consumer in consumers { await consumer.value }
       consumers.removeAll()
-      let inputReaders = [reader] + additionalSourceOwners
-      try await valueWithTimeout("dispatch source cancellation") {
-        while inputReaders.contains(where: { $0.liveReadSourceCount != 0 }) {
-          try Task.checkCancellation()
-          await Task.yield()
-        }
-      }
+      for signal in drained { try await terminalLifetimeWait(signal) }
       additionalSourceOwners.removeAll()
     }
 
     func closeReaderAfterCancellation() {
-      // Never close a descriptor still registered with libdispatch, even if a
-      // failed teardown assertion takes the error path through this fixture.
-      if reader.liveReadSourceCount == 0
-        && additionalSourceOwners.allSatisfy({ $0.liveReadSourceCount == 0 })
-      {
-        _ = close(readFD)
+      // On suite cancellation the direct waits may return before deregistration.
+      // Keep FD retirement owned by the callbacks instead of leaking it or
+      // closing a descriptor that libdispatch still owns. No task is left to join.
+      let inputReaders = [reader] + additionalSourceOwners
+      let retirement = TerminalLifetimeDescriptorRetirement(
+        descriptor: readFD, owners: inputReaders.count)
+      for inputReader in inputReaders {
+        inputReader.setReadSourcesDrainedHandlerForTesting { retirement.sourceDrained() }
       }
+    }
+  }
+
+  private final class TerminalLifetimeDescriptorRetirement: Sendable {
+    private struct State {
+      var descriptor: Int32
+      var owners: Int
+    }
+    private let state: Mutex<State>
+    init(descriptor: Int32, owners: Int) {
+      state = Mutex(State(descriptor: descriptor, owners: owners))
+    }
+    func sourceDrained() {
+      let descriptor = state.withLock { state -> Int32 in
+        guard state.owners > 0 else { return -1 }
+        state.owners -= 1
+        guard state.owners == 0 else { return -1 }
+        defer { state.descriptor = -1 }
+        return state.descriptor
+      }
+      if descriptor >= 0 { _ = close(descriptor) }
     }
   }
 

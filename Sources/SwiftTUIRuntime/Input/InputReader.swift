@@ -32,6 +32,7 @@ public final class InputReader: InputReading, TerminalInputReading,
     /// descriptor (F42).
     private struct SuspendableSourceRegistry {
       var nextID: UInt64 = 0
+      var drainedHandlerForTesting: (@Sendable () -> Void)?
       var sources:
         [UInt64: (
           source: any DispatchSourceRead, queue: DispatchQueue,
@@ -56,9 +57,13 @@ public final class InputReader: InputReading, TerminalInputReading,
     }
 
     private func unregisterSuspendableSource(_ id: UInt64) {
-      suspendableSources.withLockUnchecked { registry in
+      let drainedHandler = suspendableSources.withLockUnchecked { registry in
         _ = registry.sources.removeValue(forKey: id)
+        guard registry.sources.isEmpty else { return nil as (@Sendable () -> Void)? }
+        defer { registry.drainedHandlerForTesting = nil }
+        return registry.drainedHandlerForTesting
       }
+      drainedHandler?()
     }
 
     /// Read sources still registered on the descriptor. Zero once every
@@ -66,6 +71,22 @@ public final class InputReader: InputReading, TerminalInputReading,
     /// unregistered from its cancel handler before its stream finishes.
     package var liveReadSourceCount: Int {
       suspendableSources.withLockUnchecked { registry in registry.sources.count }
+    }
+
+    /// Installs one one-shot test observer for the live-source registry becoming empty.
+    /// The last source invokes it outside the registry lock, after libdispatch has
+    /// deregistered the descriptor but before the stream completes. An empty registry
+    /// invokes it immediately. Passing `nil` clears a pending observer.
+    package func setReadSourcesDrainedHandlerForTesting(_ handler: (@Sendable () -> Void)?) {
+      let immediate = suspendableSources.withLockUnchecked { registry in
+        if registry.sources.isEmpty {
+          registry.drainedHandlerForTesting = nil
+          return handler
+        }
+        registry.drainedHandlerForTesting = handler
+        return nil
+      }
+      immediate?()
     }
   #endif
 

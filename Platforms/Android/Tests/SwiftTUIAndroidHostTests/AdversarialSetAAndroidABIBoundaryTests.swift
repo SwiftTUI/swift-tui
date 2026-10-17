@@ -182,12 +182,15 @@
 
     @Test func setA973StoppingAStartedHostDoesNotReopenCapabilityNegotiation() async throws {
       // Hypothesis: stopping clears the capability lock along with the run task and permits a mid-lifetime record-shape change.
-      let host = try makeHost()
+      let probe = AndroidABIBoundaryProbe()
+      let host = try AndroidHostSceneHost(app: AndroidABIBoundaryApp(probe: probe))
       let declared = host.declareCapabilities(json: #"{"acceptsDeltaFrames":true}"#)
       #expect(declared)
       host.start()
       do {
-        try await wait("Android initial frame") { host.latestFrame != nil }
+        await probe.appeared.wait()
+        try Task.checkCancellation()
+        try #require(host.latestFrame != nil)
         _ = try await host.session.stopAndWait()
       } catch {
         _ = try? await host.session.stopAndWait()
@@ -206,16 +209,18 @@
       defer { swift_tui_android_destroy(handle) }
       host.start()
       do {
-        try await wait("Android text-field owner") {
-          host.latestFrame?.semantics.accessibilityNodes.contains { $0.role == .textField } == true
-        }
+        await probe.appeared.wait()
+        try Task.checkCancellation()
+        try #require(host.focusPresentation.semantics == .activate)
         let target = try #require(
           host.latestFrame?.semantics.accessibilityNodes.first { $0.role == .textField }?
             .actionTarget)
         host.session.send(.accessibility(.init(target: target, action: .focus, requestID: 974)))
-        try await wait("Android field focus acknowledgement") {
-          host.latestFrame?.semantics.accessibilityActionResponse?.requestID == 974
-        }
+        // The focused field's lifecycle task starts after its frame commits,
+        // so its signal also witnesses the semantic focus acknowledgement.
+        await probe.focusCommitted.wait()
+        try Task.checkCancellation()
+        #expect(host.latestFrame?.semantics.accessibilityActionResponse?.requestID == 974)
         #expect(host.latestFrame?.semantics.accessibilityActionResponse?.result == .accepted)
         #expect(host.focusPresentation.semantics == .edit)
         var borrowed = Array("abc".utf8)
@@ -225,7 +230,8 @@
         // Reuse the caller's storage before yielding to the run loop's input consumer.
         for index in borrowed.indices { borrowed[index] = 0x78 }
         #expect(borrowed == Array("xxx".utf8))
-        try await wait("Android copied input") { probe.inputWrites >= 3 }
+        await probe.inputChanged.wait(until: { probe.inputWrites >= 3 })
+        try Task.checkCancellation()
         _ = try await host.session.stopAndWait()
       } catch {
         _ = try? await host.session.stopAndWait()
@@ -297,17 +303,6 @@
         JSONSerialization.jsonObject(with: Data(string.dropFirst("\u{1E}surface:".count).utf8))
           as? [String: Any])
     }
-
-    private func wait(_ label: String, until condition: @escaping @MainActor @Sendable () -> Bool)
-      async throws
-    {
-      try await valueWithTimeout(label) {
-        while await !condition() {
-          try Task.checkCancellation()
-          await Task.yield()
-        }
-      }
-    }
   }
 
   @MainActor
@@ -316,6 +311,9 @@
     var calls = 0
     var text = ""
     var inputWrites = 0
+    let appeared = AsyncEvent()
+    let focusCommitted = AsyncEvent()
+    let inputChanged = MainActorConditionSignal()
   }
 
   @MainActor
@@ -325,7 +323,10 @@
     init(probe: AndroidABIBoundaryProbe) { self.probe = probe }
     var body: some Scene {
       WindowGroup("ABI boundary") {
-        Button("Activate") { probe?.calls += 1 }.onAppear { probe?.appearances += 1 }
+        Button("Activate") { probe?.calls += 1 }.onAppear {
+          probe?.appearances += 1
+          probe?.appeared.fire()
+        }
       }
     }
   }
@@ -337,6 +338,17 @@
     init(probe: AndroidABIBoundaryProbe) { self.probe = probe }
     var body: some Scene {
       WindowGroup("Borrowed input") {
+        AndroidABIBoundaryInputField(probe: probe)
+      }
+    }
+  }
+
+  private struct AndroidABIBoundaryInputField: View {
+    let probe: AndroidABIBoundaryProbe?
+    @FocusState private var isFocused: Bool
+    var body: some View {
+      VStack {
+        Button("Initial focus") {}
         TextField(
           "ABI input",
           text: Binding(
@@ -344,8 +356,15 @@
             set: {
               probe?.text = $0
               probe?.inputWrites += 1
-            }))
+              probe?.inputChanged.notify()
+            })
+        )
+        .focused($isFocused)
+        .task(id: isFocused) {
+          if isFocused { probe?.focusCommitted.fire() }
+        }
       }
+      .onAppear { probe?.appeared.fire() }
     }
   }
 #endif

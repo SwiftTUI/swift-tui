@@ -1,5 +1,4 @@
 #if canImport(Darwin) || canImport(Glibc)
-  import Dispatch
   import Foundation
   import Synchronization
   import Testing
@@ -13,7 +12,7 @@
   #endif
 
   @MainActor
-  @Suite(.serialized)
+  @Suite(.serialized, .timeLimit(.minutes(1)))
   struct AdversarialSetATerminalPresentationLifetimeTests {
     @Test func setA1026PartialExplicitWriteFailureMakesTheRetainedScreenUnknown() throws {
       // Hypothesis: invalidation after a successful write misses a prefix that
@@ -36,7 +35,7 @@
       }
     }
 
-    @Test func setA1027CursorFocusErrorConsumptionCannotTrustAFailedContentFrame() async throws {
+    @Test func setA1027CursorFocusErrorConsumptionCannotTrustAFailedContentFrame() throws {
       // Hypothesis: the cursor-focus entry point consumes the writer error but
       // omits the baseline invalidation performed by ordinary presentation.
       let controller = SetAPresentationController()
@@ -44,15 +43,10 @@
       try presentAndDrain(surface("AAAA"), host)
       controller.enqueue(.init(failure: .terminal(ENOSPC), prefixCount: 7))
       _ = try host.present(surface("BBBB"))
-      var observed: TerminalHostError?
-      let deadline = ContinuousClock.now + .seconds(2)
-      while observed == nil, ContinuousClock.now < deadline {
-        do { try host.presentAccessibilityCursorFocus(at: .init(x: 0, y: 0)) } catch let error
-          as TerminalHostError
-        { observed = error }
-        if observed == nil { try await Task.sleep(for: .milliseconds(1)) }
+      try drainWriterKeepingError(host)
+      #expect(throws: TerminalHostError.failedToWrite(errno: ENOSPC)) {
+        try host.presentAccessibilityCursorFocus(at: .init(x: 0, y: 0))
       }
-      try #require(observed == .failedToWrite(errno: ENOSPC))
       #expect(controller.writes.last == "\u{1B}[1;1HB")
       let recovered = try host.present(surface("BBBB"), damage: .init(dirtyRows: []))
       try host.drainPendingPresentation()
@@ -64,14 +58,14 @@
       }
     }
 
-    @Test func setA1028ContentCoalescingPreservesQueuedSupplementalCursorBytes() throws {
+    @Test func setA1028ContentCoalescingPreservesQueuedSupplementalCursorBytes() async throws {
       // Hypothesis: replacing a pending content frame also drops independent
       // cursor-hide output, whether attached to that frame or queued alone.
       // The real run loop clears terminalCursorFocusShowsCursor after queuing
       // this hide, so subsequent frames without a caret do not submit it again.
       for attachesToContent in [false, true] {
         let controller = SetAPresentationController()
-        let gate = SetAPresentationGate()
+        let gate = BlockingWriteGate()
         let host = host(controller)
         defer { gate.release() }
         try presentAndDrain(surface("AAAA"), host)
@@ -81,7 +75,7 @@
         let alreadyWritten = controller.writes.count
         controller.enqueue(.init(gate: gate))
         _ = try host.present(surface("BAAA"))
-        try #require(gate.waitUntilStarted())
+        try await waitForBlockedWrite(gate)
         if attachesToContent { _ = try host.present(surface("BBAA")) }
         try host.presentAccessibilityCursorFocus(at: nil)
         _ = try host.present(surface("CAAA"))
@@ -97,16 +91,16 @@
       }
     }
 
-    @Test func setA1029ActiveWriteFailureDiscardsItsDependentPendingFrame() throws {
+    @Test func setA1029ActiveWriteFailureDiscardsItsDependentPendingFrame() async throws {
       // Hypothesis: a queued delta survives the failed baseline it depends on,
       // reaching the terminal before recovery can establish a complete screen.
       let controller = SetAPresentationController()
-      let gate = SetAPresentationGate()
+      let gate = BlockingWriteGate()
       controller.enqueue(.init(gate: gate, failure: .terminal(EIO), prefixCount: 2))
       let host = host(controller)
       defer { gate.release() }
       _ = try host.present(surface("AAAA"))
-      try #require(gate.waitUntilStarted())
+      try await waitForBlockedWrite(gate)
       _ = try host.present(surface("BBBB"))
       gate.release()
       #expect(throws: TerminalHostError.failedToWrite(errno: EIO)) {
@@ -138,18 +132,18 @@
       #expect(writer.lastCommittedSequence() == 2)
     }
 
-    @Test func setA1031FailedActiveSubmissionStillHasAProfilingOutcome() throws {
+    @Test func setA1031FailedActiveSubmissionStillHasAProfilingOutcome() async throws {
       // Hypothesis: failure records the discarded pending frame but silently
       // loses the active ordinal, violating the documented total frame join.
       let controller = SetAPresentationController()
-      let gate = SetAPresentationGate()
+      let gate = BlockingWriteGate()
       controller.enqueue(.init(gate: gate, failure: .terminal(EIO)))
       let sink = SetAPresentationSink()
       let writer = TerminalPresentationWriter(
         controller: controller, outputFileDescriptor: 101, writeSink: sink)
       defer { gate.release() }
       writer.submit(frame(1, "active", ordinal: 701))
-      try #require(gate.waitUntilStarted())
+      try await waitForBlockedWrite(gate)
       writer.submit(frame(2, "pending", ordinal: 702))
       gate.release()
       writer.drain()
@@ -161,16 +155,17 @@
       }
     }
 
-    @Test func setA1032FinishingABlockedWriterJoinsAndDiscardsItsPendingWork() throws {
+    @Test func setA1032FinishingABlockedWriterJoinsAndDiscardsItsPendingWork() async throws {
       // Hypothesis: shutdown expires the active write but returns before its
       // dependent pending frame has been retired from the serial queue.
       let controller = SetAPresentationController()
-      let gate = SetAPresentationGate()
-      controller.enqueue(.init(gate: gate))
+      let backpressure = try SetAPresentationBackpressure()
+      controller.enqueue(.init(backpressure: backpressure))
       let writer = writer(controller)
-      defer { gate.release() }
+      defer { writer.finishWithin(.zero) }
       writer.submit(frame(1, "active"))
-      try #require(gate.waitUntilStarted())
+      await backpressure.started.wait()
+      try Task.checkCancellation()
       writer.submit(frame(2, "pending"))
       let started = ContinuousClock.now
       writer.finishWithin(.milliseconds(25))
@@ -198,22 +193,21 @@
     @Test func setA1034RetiringAHostReleasesItsControllerAfterTheActiveWrite() async throws {
       // Hypothesis: the writer's queue closure either releases output ownership
       // before its write finishes or forms a cycle after completion.
-      var controller: SetAPresentationController? = SetAPresentationController()
+      let retired = AsyncEvent()
+      var controller: SetAPresentationController? = SetAPresentationController(retired: retired)
       weak let weakController = controller
-      let gate = SetAPresentationGate()
+      let gate = BlockingWriteGate()
       defer { gate.release() }
       controller?.enqueue(.init(gate: gate))
       var terminal: TerminalHost? = host(try #require(controller))
       _ = try terminal?.present(surface("owned"))
-      try #require(gate.waitUntilStarted())
+      try await waitForBlockedWrite(gate)
       terminal = nil
       controller = nil
       #expect(weakController != nil)
       gate.release()
-      let deadline = ContinuousClock.now + .seconds(2)
-      while weakController != nil, ContinuousClock.now < deadline {
-        try await Task.sleep(for: .milliseconds(1))
-      }
+      await retired.wait()
+      try Task.checkCancellation()
       #expect(weakController == nil)
     }
 
@@ -231,16 +225,16 @@
       #expect(weakController == nil)
     }
 
-    @Test func setA1036ExplicitHostWritesFollowAllAlreadyQueuedPresentationBytes() throws {
+    @Test func setA1036ExplicitHostWritesFollowAllAlreadyQueuedPresentationBytes() async throws {
       // Hypothesis: a synchronous terminal command bypasses the writer queue
       // and interleaves its bytes ahead of an already submitted content frame.
       let controller = SetAPresentationController()
-      let gate = SetAPresentationGate()
+      let gate = BlockingWriteGate()
       controller.enqueue(.init(gate: gate))
       let host = host(controller)
       defer { gate.release() }
       _ = try host.present(surface("AAAA"))
-      try #require(gate.waitUntilStarted())
+      try await waitForBlockedWrite(gate)
       _ = try host.present(surface("BBBB"))
       gate.release()
       try host.write("DIRECT")
@@ -282,16 +276,16 @@
       #expect(try input.readAvailable().isEmpty)
     }
 
-    @Test func setA1039QueuedResizePlansAgainstTheActuallyDequeuedDimensions() throws {
+    @Test func setA1039QueuedResizePlansAgainstTheActuallyDequeuedDimensions() async throws {
       // Hypothesis: a dropped intermediate size is adopted as the baseline,
       // making the final dimensions look unchanged and skipping a full clear.
       let controller = SetAPresentationController()
-      let gate = SetAPresentationGate()
+      let gate = BlockingWriteGate()
       controller.enqueue(.init(gate: gate))
       let host = host(controller)
       defer { gate.release() }
       _ = try host.present(surface("AAAA"))
-      try #require(gate.waitUntilStarted())
+      try await waitForBlockedWrite(gate)
       _ = try host.present(surface("BB"))
       let metrics = try host.present(surface("CC"))
       gate.release()
@@ -317,16 +311,17 @@
       #expect(controller.sizeDescriptors == [101, 101, 101])
     }
 
-    @Test func setA1041RevertingToTheActiveFrameRetiresPendingContentWithoutWritingIt() throws {
+    @Test func setA1041RevertingToTheActiveFrameRetiresPendingContentWithoutWritingIt() async throws
+    {
       // Hypothesis: a zero-byte recovery frame leaves the obsolete queued
       // content alive, or promotes it to the next delta's baseline.
       let controller = SetAPresentationController()
-      let gate = SetAPresentationGate()
+      let gate = BlockingWriteGate()
       controller.enqueue(.init(gate: gate))
       let host = host(controller)
       defer { gate.release() }
       _ = try host.present(surface("AAAA"))
-      try #require(gate.waitUntilStarted())
+      try await waitForBlockedWrite(gate)
       _ = try host.present(surface("BBBB"))
       let reverted = try host.present(surface("AAAA"))
       #expect(reverted.bytesWritten == 0)
@@ -355,11 +350,11 @@
       #expect(freedIDs(output).contains(firstID))
     }
 
-    @Test func setA1043DroppedSynchronizedFramesCannotLeaveAnUnbalancedModeEnvelope() throws {
+    @Test func setA1043DroppedSynchronizedFramesCannotLeaveAnUnbalancedModeEnvelope() async throws {
       // Hypothesis: synchronization is queued separately from frame payloads,
       // so coalescing drops a closing sequence while retaining its opening.
       let controller = SetAPresentationController()
-      let gate = SetAPresentationGate()
+      let gate = BlockingWriteGate()
       controller.enqueue(.init(gate: gate))
       var profile = TerminalCapabilityProfile.previewUnicode
       profile.supportsSynchronizedOutput = true
@@ -372,7 +367,7 @@
       let latest = RasterSurface(size: .init(width: 4, height: 2), lines: ["CCCC", "cccc"])
       let firstMetrics = try host.present(initial)
       #expect(firstMetrics.usedSynchronizedOutput)
-      try #require(gate.waitUntilStarted())
+      try await waitForBlockedWrite(gate)
       _ = try host.present(pending)
       let latestMetrics = try host.present(latest)
       #expect(latestMetrics.usedSynchronizedOutput)
@@ -388,18 +383,18 @@
       #expect(!controller.writes.joined().contains("BBBB"))
     }
 
-    @Test func setA1044CoalescingKeepsOrdinalAndUTF8MetricsWithTheirOwnSubmission() throws {
+    @Test func setA1044CoalescingKeepsOrdinalAndUTF8MetricsWithTheirOwnSubmission() async throws {
       // Hypothesis: supplemental bytes or replacement frames overwrite the
       // pending frame's ordinal/byte accounting and misattribute latency.
       let controller = SetAPresentationController()
-      let gate = SetAPresentationGate()
+      let gate = BlockingWriteGate()
       controller.enqueue(.init(gate: gate))
       let sink = SetAPresentationSink()
       let writer = TerminalPresentationWriter(
         controller: controller, outputFileDescriptor: 101, writeSink: sink)
       defer { gate.release() }
       writer.submit(frame(1, "one", ordinal: 90))
-      try #require(gate.waitUntilStarted())
+      try await waitForBlockedWrite(gate)
       writer.submit(frame(2, "é", ordinal: 120))
       writer.submitSupplementalOutput("focus")
       writer.submit(frame(3, "界", ordinal: 180))
@@ -483,7 +478,7 @@
       #expect(freedIDs(controller.writes.last ?? "") == [old])
     }
 
-    @Test func setA1049DroppingAnImageDeletionRestoresItsResidentDataBookkeeping() throws {
+    @Test func setA1049DroppingAnImageDeletionRestoresItsResidentDataBookkeeping() async throws {
       // Hypothesis: a queued deletion is treated as having freed data even
       // when coalescing drops it, causing reappearance to retransmit or leak it.
       let controller = SetAPresentationController()
@@ -491,11 +486,11 @@
       let image = try attachment(23)
       try presentAndDrain(imageSurface([image]), host)
       let originalID = try #require(transmittedIDs(controller.writes.last ?? "").first)
-      let gate = SetAPresentationGate()
+      let gate = BlockingWriteGate()
       controller.enqueue(.init(gate: gate))
       defer { gate.release() }
       _ = try host.present(imageSurface([image], text: "A   "))
-      try #require(gate.waitUntilStarted())
+      try await waitForBlockedWrite(gate)
       _ = try host.present(imageSurface([], text: "A   "))
       _ = try host.present(imageSurface([image], text: "B   "))
       gate.release()
@@ -507,24 +502,27 @@
       #expect(freedIDs(controller.writes.last ?? "") == [originalID])
     }
 
-    @Test func setA1050FinishingOneWriterCannotCancelAnIndependentWriter() throws {
+    @Test func setA1050FinishingOneWriterCannotCancelAnIndependentWriter() async throws {
       // Hypothesis: a shared cancellation budget lets shutdown of one terminal
       // expire an unrelated writer that is still accepting presentation work.
       let firstController = SetAPresentationController()
       let secondController = SetAPresentationController()
-      let firstGate = SetAPresentationGate()
-      let secondGate = SetAPresentationGate()
-      firstController.enqueue(.init(gate: firstGate))
+      let firstBackpressure = try SetAPresentationBackpressure()
+      let secondGate = BlockingWriteGate()
+      firstController.enqueue(.init(backpressure: firstBackpressure))
       secondController.enqueue(.init(gate: secondGate))
       let first = writer(firstController)
       let second = writer(secondController)
       defer {
-        firstGate.release()
+        first.finishWithin(.zero)
         secondGate.release()
+        second.drain()
       }
       first.submit(frame(1, "cancel"))
       second.submit(frame(1, "keep"))
-      try #require(firstGate.waitUntilStarted() && secondGate.waitUntilStarted())
+      await firstBackpressure.started.wait()
+      try Task.checkCancellation()
+      try await waitForBlockedWrite(secondGate)
       first.finishWithin(.zero)
       #expect(throws: TerminalHostError.self) { try first.consumePendingError() }
       secondGate.release()
@@ -573,6 +571,26 @@
       try host.drainPendingPresentation()
     }
 
+    private func waitForBlockedWrite(_ gate: BlockingWriteGate) async throws {
+      await withTaskCancellationHandler {
+        await gate.waitUntilBlocked()
+      } onCancel: {
+        gate.release()
+      }
+      try Task.checkCancellation()
+    }
+
+    private func drainWriterKeepingError(_ host: TerminalHost) throws {
+      // Public drain reconciles and consumes the pending error, defeating 1027.
+      // Inspect only the host-owned writer so its actual serial queue provides
+      // the completion barrier without changing the state under investigation.
+      let session = try #require(
+        Mirror(reflecting: host).descendant("presentationSession") as? TerminalPresentationSession,
+        "TerminalHost's private presentationSession fixture lookup changed")
+      let writer = try #require(session.writer, "The initial presentation must create a writer")
+      writer.drain()
+    }
+
     private func imageSurface(_ attachments: [RasterImageAttachment], text: String = "    ")
       -> RasterSurface
     {
@@ -619,30 +637,41 @@
     case foreign
   }
   private enum SetAPresentationFixtureError: Error {
-    case foreign, timedOut
+    case foreign
     case pipeFailure(Int32)
   }
 
-  private final class SetAPresentationGate: Sendable {
-    private let started = DispatchSemaphore(value: 0)
-    private let released = Mutex(false)
-    func release() { released.withLock { $0 = true } }
-    func waitUntilStarted() -> Bool { started.wait(timeout: .now() + 2) == .success }
-    func enter(_ budget: TerminalWriteBudget) throws {
-      started.signal()
-      let deadline = ContinuousClock.now + .seconds(3)
-      while !released.withLock({ $0 }) {
-        try budget.check()
-        guard ContinuousClock.now < deadline else { throw SetAPresentationFixtureError.timedOut }
-        Thread.sleep(forTimeInterval: 0.001)
+  /// Exercises the production write-budget checks against real kernel
+  /// backpressure. Readiness is an event; no test-side loop emulates a deadline.
+  private final class SetAPresentationBackpressure: Sendable {
+    let started = AsyncEvent()
+    private let pipe: SetAPresentationPipe
+
+    init() throws {
+      pipe = try SetAPresentationPipe()
+      try pipe.fillForBackpressure()
+    }
+
+    func write(_ output: String, budget: TerminalWriteBudget) throws {
+      let pipe = self.pipe
+      // If production stops checking its shutdown deadline, relieve the owned
+      // pipe so queue.join cannot hang the suite. This only bounds that failure;
+      // the ordinary timeout/error assertions still fail when the backstop runs.
+      let backstop = Task {
+        await AsyncEvent.firing(after: .seconds(3)).wait()
+        guard !Task.isCancelled else { return }
+        _ = try? pipe.readAvailable()
       }
-      try budget.check()
+      defer { backstop.cancel() }
+      started.fire()
+      try POSIXTerminalController().write(output, to: pipe.writeFD, budget: budget)
     }
   }
 
   private final class SetAPresentationController: TerminalControlling {
     struct Step: Sendable {
-      var gate: SetAPresentationGate? = nil
+      var gate: BlockingWriteGate? = nil
+      var backpressure: SetAPresentationBackpressure? = nil
       var failure: SetAPresentationFailure? = nil
       var prefixCount = 0
     }
@@ -654,6 +683,9 @@
       var sizeDescriptors: [Int32] = []
     }
     private let storage = Mutex(State())
+    private let retired: AsyncEvent?
+    init(retired: AsyncEvent? = nil) { self.retired = retired }
+    deinit { retired?.fire() }
     var writes: [String] { storage.withLock { $0.writes } }
     var attempts: [String] { storage.withLock { $0.attempts } }
     var sizeDescriptors: [Int32] { storage.withLock { $0.sizeDescriptors } }
@@ -682,7 +714,8 @@
         state.attempts.append(output)
         return state.steps.isEmpty ? Step() : state.steps.removeFirst()
       }
-      try step.gate?.enter(budget)
+      step.gate?.enterBlockingSection()
+      try step.backpressure?.write(output, budget: budget)
       try budget.check()
       if let failure = step.failure {
         if step.prefixCount > 0 {
@@ -703,7 +736,7 @@
     func record(_ sample: PresentationWriteSample) { storage.withLock { $0.append(sample) } }
   }
 
-  private final class SetAPresentationPipe {
+  private final class SetAPresentationPipe: Sendable {
     let readFD: Int32
     let writeFD: Int32
     init() throws {
@@ -723,6 +756,22 @@
       _ = close(readFD)
       _ = close(writeFD)
     }
+
+    func fillForBackpressure() throws {
+      let flags = fcntl(writeFD, F_GETFL)
+      guard flags >= 0, fcntl(writeFD, F_SETFL, flags | O_NONBLOCK) == 0 else {
+        throw SetAPresentationFixtureError.pipeFailure(errno)
+      }
+      var buffer = [UInt8](repeating: 0x61, count: 4096)
+      while true {
+        let count = unsafe write(writeFD, &buffer, buffer.count)
+        if count > 0 { continue }
+        if count < 0, errno == EAGAIN || errno == EWOULDBLOCK { return }
+        if count < 0, errno == EINTR { continue }
+        throw SetAPresentationFixtureError.pipeFailure(count == 0 ? EIO : errno)
+      }
+    }
+
     func readAvailable() throws -> String {
       var bytes: [UInt8] = []
       var buffer = [UInt8](repeating: 0, count: 1024)

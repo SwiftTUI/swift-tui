@@ -30,6 +30,7 @@
     private var exitContinuation: CheckedContinuation<ExitStatus, Never>?
     private var exitTask: Task<Void, Never>?
     private var exitStatus: ExitStatus?
+    private var exitWaiterRegistrationHandlerForTesting: (@Sendable () -> Void)?
     private var hasStarted = false
     private var pendingSignal: Int32?
 
@@ -114,7 +115,14 @@
         } else {
           continuation.resume(returning: .unknown)
         }
+        exitWaiterRegistrationHandlerForTesting?()
       }
+    }
+
+    /// Observes the registration decision for an uncached exit query. Tests use
+    /// this barrier while holding the child alive, without scheduler delays.
+    package func setExitWaiterRegistrationHandlerForTesting(_ handler: (@Sendable () -> Void)?) {
+      exitWaiterRegistrationHandlerForTesting = handler
     }
 
     public func sendSignal(_ signal: Int32) throws(PTYError) {

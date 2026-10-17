@@ -118,26 +118,18 @@
       let child = ChildProcessPty(
         executable: "/bin/sh", arguments: ["-c", "printf READY; exec /bin/sleep 10"],
         initialSize: .init(width: 80, height: 24))
-      try await child.start()
-      let guardTask = killAtDeadline(child)
-      defer { guardTask.cancel() }
-      let pair = try #require(await child.pair)
-      do {
+      try await withChild(child) { pair in
         var started: [UInt8] = []
         for await chunk in await pair.read() {
           started += chunk
           if String(decoding: started, as: UTF8.self).contains("READY") { break }
         }
+        try Task.checkCancellation()
         try #require(String(decoding: started, as: UTF8.self).contains("READY"))
         try await pair.write([3])
         let status = await child.waitForExit()
+        try Task.checkCancellation()
         #expect(status == .signalled(signal: SIGINT))
-        await pair.close()
-      } catch {
-        await child.requestSignal(SIGKILL)
-        _ = await child.waitForExit()
-        await pair.close()
-        throw error
       }
     }
 
@@ -155,45 +147,42 @@
       let child = ChildProcessPty(
         executable: "/bin/sh", arguments: ["-c", "read line; exit 23"],
         initialSize: .init(width: 80, height: 24))
-      try await child.start()
-      let pair = try #require(await child.pair)
-      let guardTask = killAtDeadline(child)
-      defer { guardTask.cancel() }
-      let entered = Mutex(0)
-      let completed = Mutex<[ChildProcessPty.ExitStatus]>([])
-      let ready = ConditionSignal()
-      let results = await withTaskGroup(of: ChildProcessPty.ExitStatus.self) { group in
-        for _ in 0..<2 {
-          group.addTask {
-            entered.withLock { $0 += 1 }
-            ready.notify()
-            let result = await child.waitForExit()
-            completed.withLock { $0.append(result) }
-            ready.notify()
-            return result
+      try await withChild(child) { pair in
+        let registered = Mutex(0)
+        let ready = ConditionSignal()
+        await child.setExitWaiterRegistrationHandlerForTesting {
+          registered.withLock { $0 += 1 }
+          ready.notify()
+        }
+        let results = try await withThrowingTaskGroup(of: ChildProcessPty.ExitStatus.self) {
+          group in
+          for _ in 0..<2 {
+            group.addTask { await child.waitForExit() }
+          }
+          do {
+            // The child stays blocked on read until both calls have made their
+            // actual actor-isolated registration decision, including rejection.
+            await ready.wait(until: { registered.withLock { $0 == 2 } })
+            try Task.checkCancellation()
+            await child.setExitWaiterRegistrationHandlerForTesting(nil)
+            try await pair.write(Array("release\n".utf8))
+            var statuses: [ChildProcessPty.ExitStatus] = []
+            for try await status in group { statuses.append(status) }
+            return statuses
+          } catch {
+            // waitForExit does not observe cancellation. Releasing the owned
+            // child must precede joining the group's pending exit observer.
+            await child.requestSignal(SIGKILL)
+            throw error
           }
         }
-        await ready.wait(until: { entered.withLock { $0 == 2 } })
-        // An early result witnesses the current defect while the child is held.
-        // A fixed implementation waits until release. The scheduling bound is
-        // not an oracle: only the actual final statuses are asserted below.
-        await withTaskGroup(of: Void.self) { observation in
-          observation.addTask { await ready.wait(until: { completed.withLock { !$0.isEmpty } }) }
-          observation.addTask { try? await Task.sleep(for: .seconds(1)) }
-          await observation.next()
-          observation.cancelAll()
+        try Task.checkCancellation()
+        #expect(results.count == 2)
+        withKnownIssue("STUI-1039: a second exit observer returns unknown before the child exits") {
+          #expect(results.allSatisfy { $0 == .exited(code: 23) }, "Observed statuses: \(results)")
         }
-        try? await pair.write(Array("release\n".utf8))
-        var statuses: [ChildProcessPty.ExitStatus] = []
-        for await status in group { statuses.append(status) }
-        return statuses
+        #expect(await child.waitForExit() == .exited(code: 23))
       }
-      await pair.close()
-      #expect(results.count == 2)
-      withKnownIssue("STUI-1039: a second exit observer returns unknown before the child exits") {
-        #expect(results.allSatisfy { $0 == .exited(code: 23) }, "Observed statuses: \(results)")
-      }
-      #expect(await child.waitForExit() == .exited(code: 23))
     }
 
     @Test func setA1099ClosingOneTerminalCannotHangUpAnIndependentChild() async throws {
@@ -204,36 +193,23 @@
       let second = ChildProcessPty(
         executable: "/bin/sh", arguments: ["-c", "read line; printf 'survivor:%s' \"$line\""],
         initialSize: .init(width: 80, height: 24))
-      try await first.start()
-      let firstGuard = killAtDeadline(first)
-      defer { firstGuard.cancel() }
-      do { try await second.start() } catch {
-        await first.requestSignal(SIGKILL)
-        _ = await first.waitForExit()
-        await first.pair?.close()
-        throw error
-      }
-      let secondGuard = killAtDeadline(second)
-      defer { secondGuard.cancel() }
-      let a = try #require(await first.pair)
-      let b = try #require(await second.pair)
-      await a.close()
-      // A leaked unrelated descriptor can delay hangup; explicitly reap this owned child as cleanup.
-      await first.requestSignal(SIGTERM)
-      _ = await first.waitForExit()
-      do {
+      try await withChild(second) { b in
+        try await withChild(first) { a in
+          await a.close()
+          // A leaked unrelated descriptor can delay hangup; explicitly reap this owned child as cleanup.
+          await first.requestSignal(SIGTERM)
+          _ = await first.waitForExit()
+          try Task.checkCancellation()
+        }
+        // Retire the first child's cancellation owner before awaiting the
+        // survivor; its already-reaped pid must no longer receive signals.
         try await b.write(Array("ok\n".utf8))
         var bytes: [UInt8] = []
         for await chunk in await b.read() { bytes += chunk }
+        try Task.checkCancellation()
         let status = await second.waitForExit()
-        await b.close()
         #expect(status == .exited(code: 0))
         #expect(String(decoding: bytes, as: UTF8.self).contains("survivor:ok"))
-      } catch {
-        await second.requestSignal(SIGKILL)
-        _ = await second.waitForExit()
-        await b.close()
-        throw error
       }
     }
 
@@ -244,22 +220,21 @@
         let child = ChildProcessPty(
           executable: "/bin/sh", arguments: ["-c", "exit \(code)"],
           initialSize: .init(width: 80, height: 24))
-        try await child.start()
-        let guardTask = killAtDeadline(child)
-        let pid = await child.pid
-        let first = await child.waitForExit()
-        let again = await child.waitForExit()
-        let pair = try #require(await child.pair)
-        for await _ in await pair.read() {}
-        await pair.close()
-        guardTask.cancel()
-        #expect(first == .exited(code: Int32(code)))
-        #expect(again == first)
-        var status: Int32 = 0
-        let reapedAgain = unsafe waitpid(pid, &status, WNOHANG)
-        let failure = errno
-        #expect(reapedAgain == -1 && failure == ECHILD)
-        #expect(await pair.rawMasterFD == -1)
+        try await withChild(child) { pair in
+          let pid = await child.pid
+          let first = await child.waitForExit()
+          let again = await child.waitForExit()
+          for await _ in await pair.read() {}
+          try Task.checkCancellation()
+          await pair.close()
+          #expect(first == .exited(code: Int32(code)))
+          #expect(again == first)
+          var status: Int32 = 0
+          let reapedAgain = unsafe waitpid(pid, &status, WNOHANG)
+          let failure = errno
+          #expect(reapedAgain == -1 && failure == ECHILD)
+          #expect(await pair.rawMasterFD == -1)
+        }
       }
     }
 
@@ -271,23 +246,70 @@
         executable: executable, arguments: arguments,
         environment: environment, workingDirectory: workingDirectory,
         initialSize: .init(width: 80, height: 24))
-      try await child.start()
-      let guardTask = killAtDeadline(child)
-      defer { guardTask.cancel() }
-      let pair = try #require(await child.pair)
-      var bytes: [UInt8] = []
-      for await chunk in await pair.read() { bytes += chunk }
-      let status = await child.waitForExit()
-      await pair.close()
-      return (status, String(decoding: bytes, as: UTF8.self))
+      return try await withChild(child) { pair in
+        var bytes: [UInt8] = []
+        for await chunk in await pair.read() { bytes += chunk }
+        try Task.checkCancellation()
+        let status = await child.waitForExit()
+        return (status, String(decoding: bytes, as: UTF8.self))
+      }
     }
 
-    private func killAtDeadline(_ child: ChildProcessPty) -> Task<Void, Never> {
-      Task {
-        do { try await Task.sleep(for: .seconds(5)) } catch { return }
-        await child.requestSignal(SIGKILL)
-        await child.pair?.close()
+    private struct ChildCancellation {
+      var finished = false
+      var cleanup: Task<Void, Never>?
+    }
+
+    private func withChild<Result: Sendable>(
+      _ child: ChildProcessPty,
+      operation: @Sendable (PTYPair) async throws -> Result
+    ) async throws -> Result {
+      try await child.start()
+      let pair = try #require(await child.pair)
+      let cancellation = Mutex(ChildCancellation())
+      let result = try await withTaskCancellationHandler {
+        do {
+          try Task.checkCancellation()
+          let result = try await operation(pair)
+          let cleanup = cancellation.withLock { state in
+            state.finished = true
+            return state.cleanup
+          }
+          await cleanup?.value
+          await child.setExitWaiterRegistrationHandlerForTesting(nil)
+          _ = await child.waitForExit()
+          await pair.close()
+          return result
+        } catch {
+          let cleanup = cancellation.withLock { state in
+            state.finished = true
+            return state.cleanup
+          }
+          // Join cancellation cleanup before leaving the fixture so a delayed
+          // signal cannot escape this test and target a subsequently reused pid.
+          if let cleanup {
+            await cleanup.value
+          } else {
+            await child.requestSignal(SIGKILL)
+          }
+          await child.setExitWaiterRegistrationHandlerForTesting(nil)
+          _ = await child.waitForExit()
+          await pair.close()
+          throw error
+        }
+      } onCancel: {
+        cancellation.withLock { state in
+          guard !state.finished else { return }
+          state.cleanup = Task {
+            await child.requestSignal(SIGKILL)
+            await pair.close()
+          }
+        }
       }
+      // A late cancellation after successful reaping must not enter the error
+      // path and signal the child's now-retired pid.
+      try Task.checkCancellation()
+      return result
     }
   }
 #endif

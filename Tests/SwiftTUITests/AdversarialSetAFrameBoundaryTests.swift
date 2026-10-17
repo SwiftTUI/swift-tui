@@ -107,11 +107,20 @@ struct AdversarialSetAFrameBoundaryTests {
       await scheduler.waitForPendingFrame(at: now, releasedBy: release)
       finished.fire()
     }
-    defer { waiter.cancel() }
-    try await valueWithTimeout("scheduler release registration") { await release.registered.wait() }
-    #expect(release.token.markStarted())
-    try await valueWithTimeout("released scheduler waiter") { await finished.wait() }
-    await waiter.value
+    do {
+      await release.registered.wait()
+      try Task.checkCancellation()
+      let released = release.token.markStarted()
+      #expect(released)
+      await finished.wait()
+      try Task.checkCancellation()
+      await waiter.value
+    } catch {
+      waiter.cancel()
+      _ = release.token.markStarted()
+      await waiter.value
+      throw error
+    }
     #expect(!scheduler.hasPendingFrame(at: now))
     #expect(scheduler.consumeReadyFrame(at: now) == nil)
     #expect(scheduler.nextWakeInstant(after: now) == due)
@@ -157,7 +166,8 @@ struct AdversarialSetAFrameBoundaryTests {
     h.setState(1)
     try h.render()
     try #require(h.text.contains("Task owner"))
-    try await valueWithTimeout("committed task start") { await probe.started.wait() }
+    await probe.started.wait()
+    try Task.checkCancellation()
     #expect(probe.events == ["task-start"])
     #expect(h.runLoop.lifecycleCoordinator.activeTaskCount == 1)
   }
@@ -444,24 +454,38 @@ struct AdversarialSetAFrameBoundaryTests {
           oldStarted.fire()
           await oldRelease.wait()
         }))
-    try await valueWithTimeout("old task start") { await oldStarted.wait() }
-    let newTask = try #require(
-      runner.start(
-        viewNodeID: node, identity: identity,
-        registration: TaskRegistration(descriptor: descriptor) {
-          newStarted.fire()
-          await newRelease.wait()
-        }))
-    try await valueWithTimeout("replacement task start") { await newStarted.wait() }
-    try #require(oldTask.isCancelled)
-    oldRelease.open()
-    await oldTask.value
-    #expect(runner.activeTaskCount == 1)
-    #expect(!newTask.isCancelled)
-    runner.cancel(viewNodeID: node)
-    await newTask.value
-    #expect(newTask.isCancelled)
-    #expect(runner.activeTaskCount == 0)
+    var replacement: Task<Void, Never>?
+    do {
+      await oldStarted.wait()
+      try Task.checkCancellation()
+      let newTask = try #require(
+        runner.start(
+          viewNodeID: node, identity: identity,
+          registration: TaskRegistration(descriptor: descriptor) {
+            newStarted.fire()
+            await newRelease.wait()
+          }))
+      replacement = newTask
+      await newStarted.wait()
+      try Task.checkCancellation()
+      try #require(oldTask.isCancelled)
+      oldRelease.open()
+      await oldTask.value
+      #expect(runner.activeTaskCount == 1)
+      #expect(!newTask.isCancelled)
+      runner.cancel(viewNodeID: node)
+      await newTask.value
+      #expect(newTask.isCancelled)
+      #expect(runner.activeTaskCount == 0)
+    } catch {
+      oldRelease.open()
+      newRelease.fire()
+      runner.cancelAll()
+      await oldTask.value
+      await replacement?.value
+      throw error
+    }
+
   }
 
   @Test func setA573CooperativeExitPresentsNewContentWithoutStartingItsTask() throws {
@@ -567,22 +591,30 @@ struct AdversarialSetAFrameBoundaryTests {
       defer { exited.fire() }
       return try await loop.run()
     }
-    defer {
+    do {
+      await received[0].wait()
+      try Task.checkCancellation()
+      await Task.detached { model.value = 1 }.value
+      await received[1].wait()
+      try Task.checkCancellation()
+      let first = try #require(frames.byValue[1])
+      await Task.detached { model.value = 2 }.value
+      await received[2].wait()
+      try Task.checkCancellation()
+      let second = try #require(frames.byValue[2])
+      #expect(second.sequence > first.sequence)
+      input.finish()
+      await exited.wait()
+      try Task.checkCancellation()
+      let result = try await running.value
+      #expect(result.exitReason == .inputEnded)
+    } catch {
       input.finish()
       running.cancel()
+      _ = await running.result
+      throw error
     }
-    try await valueWithTimeout("initial observed frame") { await received[0].wait() }
-    await Task.detached { model.value = 1 }.value
-    try await valueWithTimeout("first off-main mutation") { await received[1].wait() }
-    let first = try #require(frames.byValue[1])
-    await Task.detached { model.value = 2 }.value
-    try await valueWithTimeout("rearmed off-main mutation") { await received[2].wait() }
-    let second = try #require(frames.byValue[2])
-    #expect(second.sequence > first.sequence)
-    input.finish()
-    try await valueWithTimeout("observation session exit") { await exited.wait() }
-    let result = try await running.value
-    #expect(result.exitReason == .inputEnded)
+
   }
 }
 

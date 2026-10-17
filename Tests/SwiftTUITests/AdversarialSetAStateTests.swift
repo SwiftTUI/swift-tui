@@ -269,91 +269,96 @@ struct AdversarialSetAStateTests {
   @Test func setA120UnrelatedInputMutationDoesNotRestartStableTasks() async throws {
     let probe = SetATaskProbe()
     let h = try tasks(probe)
-    defer { h.shutdown() }
-    try await awaitEvents(probe, count: 2)
-    try command("u", in: h)
-    #expect(h.frame.contains("unrelated=1"))
-    #expect(h.activeTaskCount == 2)
-    h.shutdown()
-    try await awaitEvents(probe, count: 4)
-    #expect(probe.events.sorted() == ["end:A:0", "end:B:0", "start:A:0", "start:B:0"])
+    try await withTaskCleanup(probes: [probe], shutdown: h.shutdown) {
+      try await awaitEvents(probe, count: 2)
+      try command("u", in: h)
+      #expect(h.frame.contains("unrelated=1"))
+      #expect(h.activeTaskCount == 2)
+      h.shutdown()
+      try await awaitEvents(probe, count: 4)
+      #expect(probe.events.sorted() == ["end:A:0", "end:B:0", "start:A:0", "start:B:0"])
+    }
   }
 
   @Test func setA121TaskIDReplacementCancelsEachOldOwnerAndStartsEachNewOwner() async throws {
     let probe = SetATaskProbe()
     let h = try tasks(probe)
-    defer { h.shutdown() }
-    try await awaitEvents(probe, count: 2)
-    try command("g", in: h)
-    try await awaitEvents(probe, count: 6)
-    #expect(Set(probe.events.suffix(4)) == ["end:A:0", "end:B:0", "start:A:1", "start:B:1"])
-    #expect(h.activeTaskCount == 2)
+    try await withTaskCleanup(probes: [probe], shutdown: h.shutdown) {
+      try await awaitEvents(probe, count: 2)
+      try command("g", in: h)
+      try await awaitEvents(probe, count: 6)
+      #expect(Set(probe.events.suffix(4)) == ["end:A:0", "end:B:0", "start:A:1", "start:B:1"])
+      #expect(h.activeTaskCount == 2)
+    }
   }
 
   @Test func setA122KeyedTaskReorderDoesNotCancelSurvivingTasks() async throws {
     let probe = SetATaskProbe()
     let h = try tasks(probe)
-    defer { h.shutdown() }
-    try await awaitEvents(probe, count: 2)
-    try command("r", in: h)
-    try command("g", in: h)
-    try await awaitEvents(probe, count: 6)
-    #expect(probe.events.filter { $0 == "start:A:0" }.count == 1)
-    #expect(probe.events.filter { $0 == "start:B:0" }.count == 1)
-    #expect(probe.events.filter { $0 == "end:A:0" }.count == 1)
-    #expect(probe.events.filter { $0 == "end:B:0" }.count == 1)
-    #expect(h.activeTaskCount == 2)
+    try await withTaskCleanup(probes: [probe], shutdown: h.shutdown) {
+      try await awaitEvents(probe, count: 2)
+      try command("r", in: h)
+      try command("g", in: h)
+      try await awaitEvents(probe, count: 6)
+      #expect(probe.events.filter { $0 == "start:A:0" }.count == 1)
+      #expect(probe.events.filter { $0 == "start:B:0" }.count == 1)
+      #expect(probe.events.filter { $0 == "end:A:0" }.count == 1)
+      #expect(probe.events.filter { $0 == "end:B:0" }.count == 1)
+      #expect(h.activeTaskCount == 2)
+    }
   }
 
   @Test func setA123RemovingAndRestoringOneTaskOwnerLeavesItsPeerRunning() async throws {
     let probe = SetATaskProbe()
     let h = try tasks(probe)
-    defer { h.shutdown() }
-    try await awaitEvents(probe, count: 2)
-    try command("d", in: h)
-    try await awaitEvents(probe, count: 3)
-    #expect(probe.events.last == "end:A:0")
-    #expect(h.activeTaskCount == 1)
-    try command("d", in: h)
-    try await awaitEvents(probe, count: 4)
-    #expect(probe.events.last == "start:A:0")
-    #expect(!probe.events.contains("end:B:0"))
-    #expect(h.activeTaskCount == 2)
+    try await withTaskCleanup(probes: [probe], shutdown: h.shutdown) {
+      try await awaitEvents(probe, count: 2)
+      try command("d", in: h)
+      try await awaitEvents(probe, count: 3)
+      #expect(probe.events.last == "end:A:0")
+      #expect(h.activeTaskCount == 1)
+      try command("d", in: h)
+      try await awaitEvents(probe, count: 4)
+      #expect(probe.events.last == "start:A:0")
+      #expect(!probe.events.contains("end:B:0"))
+      #expect(h.activeTaskCount == 2)
+    }
   }
 
   @Test func setA124EqualTaskIDsOnOneNodeStillHaveIndependentModifierOwnership() async throws {
     let probe = SetATaskProbe()
     let h = try make("124") { SetATwinTasks(probe: probe) }
-    defer { h.shutdown() }
-    try await awaitEvents(probe, count: 2)
-    #expect(Set(probe.events) == ["start:first:0", "start:second:0"])
-    try command("g", in: h)
-    try await awaitEvents(probe, count: 4)
-    #expect(Set(probe.events.suffix(2)) == ["end:first:0", "start:first:1"])
-    #expect(h.activeTaskCount == 2)
+    try await withTaskCleanup(probes: [probe], shutdown: h.shutdown) {
+      try await awaitEvents(probe, count: 2)
+      #expect(Set(probe.events) == ["start:first:0", "start:second:0"])
+      try command("g", in: h)
+      try await awaitEvents(probe, count: 4)
+      #expect(Set(probe.events.suffix(2)) == ["end:first:0", "start:first:1"])
+      #expect(h.activeTaskCount == 2)
+    }
   }
 
   @Test func setA125ShuttingDownOneGraphCannotCancelAnotherGraphsMatchingTasks() async throws {
     let firstProbe = SetATaskProbe()
     let secondProbe = SetATaskProbe()
     let first = try tasks(firstProbe)
-    let second = try tasks(secondProbe)
-    defer {
-      first.shutdown()
-      second.shutdown()
+    try await withTaskCleanup(probes: [firstProbe], shutdown: first.shutdown) {
+      let second = try tasks(secondProbe)
+      try await withTaskCleanup(probes: [secondProbe], shutdown: second.shutdown) {
+        try await awaitEvents(firstProbe, count: 2)
+        try await awaitEvents(secondProbe, count: 2)
+        first.shutdown()
+        try await awaitEvents(firstProbe, count: 4)
+        try command("g", in: second)
+        try await awaitEvents(secondProbe, count: 6)
+        #expect(first.activeTaskCount == 0)
+        #expect(second.activeTaskCount == 2)
+        #expect(
+          Set(secondProbe.events.suffix(4)) == [
+            "end:A:0", "end:B:0", "start:A:1", "start:B:1",
+          ])
+      }
     }
-    try await awaitEvents(firstProbe, count: 2)
-    try await awaitEvents(secondProbe, count: 2)
-    first.shutdown()
-    try await awaitEvents(firstProbe, count: 4)
-    try command("g", in: second)
-    try await awaitEvents(secondProbe, count: 6)
-    #expect(first.activeTaskCount == 0)
-    #expect(second.activeTaskCount == 2)
-    #expect(
-      Set(secondProbe.events.suffix(4)) == [
-        "end:A:0", "end:B:0", "start:A:1", "start:B:1",
-      ])
   }
 
   private func make<V: View>(_ name: String, @ViewBuilder content: @escaping () -> V) throws
@@ -399,10 +404,36 @@ struct AdversarialSetAStateTests {
     try h.pressKey(.init(.character(key), modifiers: .ctrl))
   }
 
+  private func withTaskCleanup(
+    probes: [SetATaskProbe], shutdown: @MainActor () -> Void,
+    operation: @MainActor () async throws -> Void
+  ) async throws {
+    do {
+      try await operation()
+    } catch {
+      shutdown()
+      for probe in probes { probe.releaseForCleanup() }
+      await joinTaskBodies(probes)
+      throw error
+    }
+    shutdown()
+    for probe in probes { probe.releaseForCleanup() }
+    await joinTaskBodies(probes)
+  }
+
+  private func joinTaskBodies(_ probes: [SetATaskProbe]) async {
+    // Runtime task handles are private. Body-exit notifications join our cooperative
+    // producers, even if the test task was cancelled while waiting for an event.
+    await Task { @MainActor in
+      for probe in probes {
+        await probe.changed.wait(until: { probe.runningBodies == 0 })
+      }
+    }.value
+  }
+
   private func awaitEvents(_ probe: SetATaskProbe, count: Int) async throws {
-    try await waitUntil(
-      "Set A task events", lastObservation: { "\(probe.events)" },
-      condition: { probe.events.count >= count })
+    await probe.changed.wait(until: { probe.events.count >= count })
+    try Task.checkCancellation()
     #expect(probe.events.count == count, "\(probe.events)")
   }
 }
@@ -677,10 +708,21 @@ private struct SetAProjectedDestination: View {
 
 @MainActor
 private final class SetATaskProbe {
-  var events: [String] = []
+  let changed = MainActorConditionSignal()
+  private let cleanupRelease = AsyncEvent()
+  private(set) var runningBodies = 0
+  var events: [String] = [] { didSet { changed.notify() } }
+  func releaseForCleanup() { cleanupRelease.fire() }
   func run(_ key: String, generation: Int) async {
+    runningBodies += 1
+    defer {
+      runningBodies -= 1
+      changed.notify()
+    }
     events.append("start:\(key):\(generation)")
-    await suspendUntilCancelled()
+    // Cancellation is the ordinary producer signal. Only final fixture cleanup
+    // releases this event, so a lost runtime task handle cannot strand the join.
+    await cleanupRelease.wait()
     events.append("end:\(key):\(generation)")
   }
 }

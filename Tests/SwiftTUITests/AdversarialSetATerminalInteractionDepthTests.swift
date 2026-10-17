@@ -531,27 +531,28 @@ struct AdversarialSetATerminalInteractionDepthTests {
         .sheet(isPresented: m.flag) {
           TextField("Task modal", text: m.text(1))
             .task {
+              m.taskStarted()
+              defer { m.taskFinished() }
               m.events.append("started")
-              await suspendUntilCancelled()
-              m.events.append("cancelled")
+              await m.cleanupRelease.wait()
+              if Task.isCancelled { m.events.append("cancelled") }
             }
         }
     }
-    defer { h.shutdown() }
-    try h.focusValue("abcdef")
-    m.show = true
-    try h.refresh()
-    try await waitUntil(
-      "modal task starts", lastObservation: { "\(m.events)" },
-      condition: { m.events == ["started"] })
-    try h.key(.escape)
-    try await waitUntil(
-      "modal task cancels", lastObservation: { "\(m.events)" },
-      condition: { m.events.contains("cancelled") })
-    #expect(h.loop.lifecycleCoordinator.activeTaskCount == 0)
-    try h.paste("X")
-    #expect(m.texts == ["abcdefX", "second"])
-    #expect(m.events == ["started", "cancelled"])
+    try await withTaskCleanup(model: m, shutdown: h.shutdown) {
+      try h.focusValue("abcdef")
+      m.show = true
+      try h.refresh()
+      await m.eventsChanged.wait(until: { m.events == ["started"] })
+      try Task.checkCancellation()
+      try h.key(.escape)
+      await m.eventsChanged.wait(until: { m.events.contains("cancelled") })
+      try Task.checkCancellation()
+      #expect(h.loop.lifecycleCoordinator.activeTaskCount == 0)
+      try h.paste("X")
+      #expect(m.texts == ["abcdefX", "second"])
+      #expect(m.events == ["started", "cancelled"])
+    }
   }
 
   @Test func setA1074RejectedClipboardCopyConsumesExitOnlyWhileASelectionExists() throws {
@@ -582,27 +583,44 @@ struct AdversarialSetATerminalInteractionDepthTests {
   @Test func setA1075TaskOnlySiblingUpdatePreservesTheEditorsPendingSelection() async throws {
     // Hypothesis: a selective frame initiated by a sibling task loses the focused editor's uncommitted selection.
     let m = DepthModel()
-    let gate = DepthGate()
+    let gate = AsyncEvent()
     let h = try make(1075) { DepthTaskSibling(model: m, gate: gate) }
-    defer {
-      gate.open()
-      h.shutdown()
+    try await withTaskCleanup(
+      model: m, shutdown: h.shutdown, gate: gate
+    ) {
+      await m.eventsChanged.wait(until: { m.events.contains("waiting") })
+      try Task.checkCancellation()
+      try h.focusValue("abcdef")
+      try h.key(.arrowLeft, modifiers: .shift)
+      try h.key(.arrowLeft, modifiers: .shift)
+      gate.fire()
+      await m.eventsChanged.wait(until: { m.events.contains("written") })
+      try Task.checkCancellation()
+      try h.render()
+      try #require(h.frame.contains("Async sibling 1"))
+      #expect(try h.editor().textInput?.selection == 4..<6)
+      try h.paste("X")
+      #expect(m.texts[0] == "abcdX")
     }
-    try await waitUntil(
-      "sibling task waits", lastObservation: { "\(m.events)" },
-      condition: { m.events.contains("waiting") })
-    try h.focusValue("abcdef")
-    try h.key(.arrowLeft, modifiers: .shift)
-    try h.key(.arrowLeft, modifiers: .shift)
-    gate.open()
-    try await waitUntil(
-      "sibling task writes", lastObservation: { "\(m.events)" },
-      condition: { m.events.contains("written") })
-    try h.render()
-    try #require(h.frame.contains("Async sibling 1"))
-    #expect(try h.editor().textInput?.selection == 4..<6)
-    try h.paste("X")
-    #expect(m.texts[0] == "abcdX")
+  }
+
+  private func withTaskCleanup(
+    model: DepthModel, shutdown: @MainActor () -> Void, gate: AsyncEvent? = nil,
+    operation: @MainActor () async throws -> Void
+  ) async throws {
+    do {
+      try await operation()
+    } catch {
+      shutdown()
+      gate?.fire()
+      model.releaseForCleanup()
+      await model.joinTaskBodies()
+      throw error
+    }
+    shutdown()
+    gate?.fire()
+    model.releaseForCleanup()
+    await model.joinTaskBodies()
   }
 
   private func make<V: View>(_ id: Int, height: Int = 16, @ViewBuilder content: @escaping () -> V)
@@ -616,7 +634,21 @@ struct AdversarialSetATerminalInteractionDepthTests {
 private final class DepthModel {
   var texts = ["abcdef", "second"]
   var order = [0, 1]
-  var events: [String] = []
+  let eventsChanged = MainActorConditionSignal()
+  let cleanupRelease = AsyncEvent()
+  private(set) var runningTaskBodies = 0
+  var events: [String] = [] { didSet { eventsChanged.notify() } }
+  func releaseForCleanup() { cleanupRelease.fire() }
+  func taskStarted() { runningTaskBodies += 1 }
+  func taskFinished() {
+    runningTaskBodies -= 1
+    eventsChanged.notify()
+  }
+  func joinTaskBodies() async {
+    await Task { @MainActor in
+      await self.eventsChanged.wait(until: { self.runningTaskBodies == 0 })
+    }.value
+  }
   var writes = 0
   var show = false
   var second = false
@@ -663,12 +695,14 @@ private struct DepthSubmitTransfer: View {
 @MainActor
 private struct DepthTaskSibling: View {
   let model: DepthModel
-  let gate: DepthGate
+  let gate: AsyncEvent
   @State private var tick = 0
   var body: some View {
     VStack {
       TextField("Task sibling field", text: model.text(0))
       Text("Async sibling \(tick)").task {
+        model.taskStarted()
+        defer { model.taskFinished() }
         model.events.append("waiting")
         await gate.wait()
         guard !Task.isCancelled else { return }
@@ -676,21 +710,6 @@ private struct DepthTaskSibling: View {
         model.events.append("written")
       }
     }
-  }
-}
-
-@MainActor
-private final class DepthGate {
-  private var opened = false
-  private var continuation: CheckedContinuation<Void, Never>?
-  func wait() async {
-    if opened { return }
-    await withCheckedContinuation { continuation = $0 }
-  }
-  func open() {
-    opened = true
-    continuation?.resume()
-    continuation = nil
   }
 }
 

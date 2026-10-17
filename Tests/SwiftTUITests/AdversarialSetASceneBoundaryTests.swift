@@ -1,3 +1,4 @@
+@_spi(Testing) import SwiftTUITestSupport
 import Testing
 
 @testable import SwiftTUICore
@@ -182,9 +183,10 @@ struct AdversarialSetASceneBoundaryTests {
       terminalInput.finish()
       task.cancel()
     }
-    try await wait { !terminal.frames.isEmpty }
+    await terminal.firstPresentation.wait()
+    try Task.checkCancellation()
     terminalInput.send(.key(.init(.return)))
-    try await wait { probe.first == 1 }
+    try await wait(on: probe.changed) { probe.first == 1 }
     terminalInput.finish()
     #expect(try await task.value.exitReason == .inputEnded)
     #expect(probe.first == 1)
@@ -214,9 +216,9 @@ struct AdversarialSetASceneBoundaryTests {
       first.cancel()
       second.cancel()
     }
-    try await wait { probe.frames.last?.contains("First=0") == true }
+    try await wait(on: probe.changed) { probe.frames.last?.contains("First=0") == true }
     session.send(.key(.init(.return)))
-    try await wait { probe.frames.last?.contains("First=1") == true }
+    try await wait(on: probe.changed) { probe.frames.last?.contains("First=1") == true }
     #expect(probe.appearances == 1)
     #expect(probe.first == 1)
     _ = try await session.stopAndWait()
@@ -239,10 +241,11 @@ struct AdversarialSetASceneBoundaryTests {
       firstTask.cancel()
       secondTask.cancel()
     }
-    try await wait { !left.frames.isEmpty && !right.frames.isEmpty }
+    try await wait(on: left.changed) { !left.frames.isEmpty }
+    try await wait(on: right.changed) { !right.frames.isEmpty }
     _ = try await first.stopAndWait()
     second.send(.key(.init(.return)))
-    try await wait { right.frames.last?.contains("First=1") == true }
+    try await wait(on: right.changed) { right.frames.last?.contains("First=1") == true }
     #expect(left.first == 0 && right.first == 1)
     #expect(first.currentFocusPresentation == .none)
     #expect(second.currentFocusPresentation.semantics == .activate)
@@ -263,7 +266,7 @@ struct AdversarialSetASceneBoundaryTests {
       session.stop()
       task.cancel()
     }
-    try await wait { probe.frames.last?.contains("First=2") == true }
+    try await wait(on: probe.changed) { probe.frames.last?.contains("First=2") == true }
     #expect(probe.first == 2)
     _ = try await session.stopAndWait()
     #expect(try await task.value == .inputEnded)
@@ -297,16 +300,16 @@ struct AdversarialSetASceneBoundaryTests {
       session.stop()
       task.cancel()
     }
-    try await wait { !probe.frames.isEmpty }
+    try await wait(on: probe.changed) { !probe.frames.isEmpty }
     session.send([.key(.init(.tab)), .key(.init(.return))])
-    try await wait { probe.frames.last?.contains("Second=1") == true }
+    try await wait(on: probe.changed) { probe.frames.last?.contains("Second=1") == true }
     let focus = session.currentFocusPresentation.focusedIdentity
     session.surface.updateSurfaceSize(.init(width: 38, height: 12))
     session.requestSurfaceRefresh()
-    try await wait { probe.sizes.last == .init(width: 38, height: 12) }
+    try await wait(on: probe.changed) { probe.sizes.last == .init(width: 38, height: 12) }
     #expect(session.currentFocusPresentation.focusedIdentity == focus)
     session.send(.key(.init(.return)))
-    try await wait { probe.frames.last?.contains("Second=2") == true }
+    try await wait(on: probe.changed) { probe.frames.last?.contains("Second=2") == true }
     #expect(probe.first == 0 && probe.second == 2)
     #expect(probe.appearances == 1)
     _ = try await session.stopAndWait()
@@ -493,13 +496,11 @@ struct AdversarialSetASceneBoundaryTests {
         }))
   }
 
-  private func wait(_ predicate: @MainActor () -> Bool) async throws {
-    let clock = ContinuousClock()
-    let deadline = clock.now.advanced(by: .seconds(5))
-    while !predicate(), clock.now < deadline {
-      try await Task.sleep(for: .milliseconds(1))
-    }
-    try #require(predicate(), "Scene boundary condition did not arrive within five seconds")
+  private func wait(
+    on signal: MainActorConditionSignal, _ predicate: @escaping @MainActor () -> Bool
+  ) async throws {
+    await signal.wait(until: predicate)
+    try Task.checkCancellation()
   }
 
   private func frame(sequence: UInt64) -> SemanticHostFrame {
@@ -511,12 +512,13 @@ struct AdversarialSetASceneBoundaryTests {
 
 @MainActor
 private final class SceneBoundaryProbe {
+  let changed = MainActorConditionSignal()
   var builds = 0
-  var first = 0
+  var first = 0 { didSet { changed.notify() } }
   var second = 0
   var appearances = 0
-  var frames: [String] = []
-  var sizes: [CellSize] = []
+  var frames: [String] = [] { didSet { changed.notify() } }
+  var sizes: [CellSize] = [] { didSet { changed.notify() } }
   var terminations: [TerminationRequest] = []
   var terminationAccepted = false
   var issueCodes: [String] = []
@@ -612,6 +614,7 @@ private enum SceneBoundaryFailure: Error, Equatable { case presentation }
 
 private final class SceneBoundaryTerminal: PresentationSurface, SemanticHostFramePresentationSurface
 {
+  let firstPresentation = AsyncEvent()
   var size = CellSize(width: 40, height: 12)
   var pitch: PixelSize? = nil
   var pointer = PointerInputCapabilities.cellOnly
@@ -640,6 +643,7 @@ private final class SceneBoundaryTerminal: PresentationSurface, SemanticHostFram
     presentationAttempts += 1
     if failsPresentation { throw SceneBoundaryFailure.presentation }
     frames.append(frame)
+    firstPresentation.fire()
     return .rasterHostMetrics(for: frame.raster, damage: frame.rasterDamage)
   }
 }

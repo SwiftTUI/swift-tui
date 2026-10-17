@@ -468,18 +468,12 @@ struct AdversarialSetACollectionBoundaryTests {
     let probe = SetACollectionLifecycleProbe()
     let h = try make("521", height: 10) { SetALazyAppearanceFixture(probe: probe) }
     defer { h.shutdown() }
-    try await waitUntil(
-      "first lazy row appears", lastObservation: { "\(probe.appeared)" },
-      condition: {
-        probe.appeared.contains(0)
-      })
+    await probe.appearancesChanged.wait(until: { probe.appeared.contains(0) })
+    try Task.checkCancellation()
     #expect(!probe.appeared.contains(499))
     try h.clickText("Reveal last lifecycle")
-    try await waitUntil(
-      "last lazy row appears", lastObservation: { "\(probe.appeared)" },
-      condition: {
-        probe.appeared.contains(499)
-      })
+    await probe.appearancesChanged.wait(until: { probe.appeared.contains(499) })
+    try Task.checkCancellation()
     #expect(h.frame.contains("Lifecycle row 499"), "\(h.frame)")
     #expect(probe.appeared.count < 100)
   }
@@ -643,7 +637,8 @@ private struct SetACollectionNode: Identifiable {
 
 @MainActor
 private final class SetACollectionLifecycleProbe {
-  var appeared: Set<Int> = []
+  let appearancesChanged = MainActorConditionSignal()
+  var appeared: Set<Int> = [] { didSet { appearancesChanged.notify() } }
   var actions: [Int] = []
 }
 

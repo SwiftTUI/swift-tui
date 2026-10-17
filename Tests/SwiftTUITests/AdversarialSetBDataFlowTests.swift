@@ -56,7 +56,7 @@ struct AdversarialSetBDataFlowTests {
     _ = try h.clickText("Remove")
     try #require(!h.frame.contains("Count"), "\(h.frame)")
     let read = try #require(probe.read)
-    try withSeedFallbackTraceSuppressed {
+    withSeedFallbackTraceSuppressed {
       _ = ImperativeRuntimeIssueQueue.drain()
       let seedBefore = SoundnessProbeConfiguration.stateSeedFallbackViolationCount
       let value = read()

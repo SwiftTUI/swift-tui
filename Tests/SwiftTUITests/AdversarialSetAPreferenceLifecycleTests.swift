@@ -218,18 +218,17 @@ struct AdversarialSetAPreferenceLifecycleTests {
     // Hypothesis: late-generated decoration tasks escape teardown when their preference source empties.
     let log = SetAPreferenceLog()
     let h = try make("316") { SetAPreferenceTaskOwner(log: log) }
-    defer { h.shutdown() }
-    try await waitUntil(
-      "preference task starts", lastObservation: { "\(log.events)" },
-      condition: { log.events.contains("started") })
-    try #require(h.activeTaskCount == 1)
-    try h.clickText("Hide task source")
-    try await waitUntil(
-      "preference task cancellation", lastObservation: { "\(log.events)" },
-      condition: { log.events.contains("cancelled") })
-    #expect(h.activeTaskCount == 0)
-    #expect(h.activeTaskDescriptorCount == 0)
-    #expect(log.events == ["started", "cancelled"], "\(log.events)")
+    try await withTaskCleanup(log: log, shutdown: h.shutdown) {
+      await log.changed.wait(until: { log.events.contains("started") })
+      try Task.checkCancellation()
+      try #require(h.activeTaskCount == 1)
+      try h.clickText("Hide task source")
+      await log.changed.wait(until: { log.events.contains("cancelled") })
+      try Task.checkCancellation()
+      #expect(h.activeTaskCount == 0)
+      #expect(h.activeTaskDescriptorCount == 0)
+      #expect(log.events == ["started", "cancelled"], "\(log.events)")
+    }
   }
 
   @Test func setA317DisappearUsesTheLastCommittedCallbackCapture() throws {
@@ -353,14 +352,31 @@ struct AdversarialSetAPreferenceLifecycleTests {
     // Hypothesis: a task that returns immediately drops its owner invalidation during descriptor cleanup.
     let log = SetAPreferenceLog()
     let h = try make("325") { SetACompletingTask(log: log) }
-    defer { h.shutdown() }
-    try await waitUntil(
-      "task completes state write", lastObservation: { "\(log.events)" },
-      condition: { log.events.contains("completed") })
-    try h.render()
-    #expect(h.frame.contains("completed-value=17"), "\(h.frame)")
-    try h.clickText("Unrelated task input")
-    #expect(log.events == ["completed"], "\(log.events)")
+    try await withTaskCleanup(log: log, shutdown: h.shutdown) {
+      await log.changed.wait(until: { log.events.contains("completed") })
+      try Task.checkCancellation()
+      try h.render()
+      #expect(h.frame.contains("completed-value=17"), "\(h.frame)")
+      try h.clickText("Unrelated task input")
+      #expect(log.events == ["completed"], "\(log.events)")
+    }
+  }
+
+  private func withTaskCleanup(
+    log: SetAPreferenceLog, shutdown: @MainActor () -> Void,
+    operation: @MainActor () async throws -> Void
+  ) async throws {
+    do {
+      try await operation()
+    } catch {
+      shutdown()
+      log.releaseForCleanup()
+      await log.joinTaskBodies()
+      throw error
+    }
+    shutdown()
+    log.releaseForCleanup()
+    await log.joinTaskBodies()
   }
 
   private func make<V: View>(_ id: String, @ViewBuilder content: @escaping () -> V) throws
@@ -374,7 +390,21 @@ struct AdversarialSetAPreferenceLifecycleTests {
 
 @MainActor
 private final class SetAPreferenceLog {
-  var events: [String] = []
+  let changed = MainActorConditionSignal()
+  let cleanupRelease = AsyncEvent()
+  private(set) var runningBodies = 0
+  var events: [String] = [] { didSet { changed.notify() } }
+  func releaseForCleanup() { cleanupRelease.fire() }
+  func taskStarted() { runningBodies += 1 }
+  func taskFinished() {
+    runningBodies -= 1
+    changed.notify()
+  }
+  func joinTaskBodies() async {
+    await Task { @MainActor in
+      await self.changed.wait(until: { self.runningBodies == 0 })
+    }.value
+  }
   var values: [[String]] = []
   var rects: [String: Rect] = [:]
   var points: [Point] = []
@@ -660,8 +690,12 @@ private struct SetAPreferenceTaskOwner: View {
           if !values.isEmpty {
             Text("derived task")
               .task {
+                log.taskStarted()
+                defer { log.taskFinished() }
                 log.events.append("started")
-                await suspendUntilCancelled()
+                // Cleanup can also release a task whose runtime handle was lost;
+                // only actual cancellation satisfies the cancellation oracle.
+                await log.cleanupRelease.wait()
                 if Task.isCancelled { log.events.append("cancelled") }
               }
           }
@@ -816,6 +850,8 @@ private struct SetACompletingTask: View {
       Text("completed-value=\(value)")
     }
     .task {
+      log.taskStarted()
+      defer { log.taskFinished() }
       value = 17
       log.events.append("completed")
     }
