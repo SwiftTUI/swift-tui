@@ -454,7 +454,7 @@ package struct WebSurfaceInputParser {
     guard let rawValue = Int(text) else {
       return []
     }
-    return EventModifiers(rawValue: UInt8(max(0, min(255, rawValue))))
+    return EventModifiers(rawValue: UInt8(max(0, rawValue) & 0b111))
   }
 
   private func percentDecodedString(

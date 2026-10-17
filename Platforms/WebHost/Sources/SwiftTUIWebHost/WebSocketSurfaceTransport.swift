@@ -31,7 +31,8 @@ package enum WebHostByteSinkError: Error, Equatable, Sendable, CustomStringConve
     case .sendTimedOut:
       return "WebHost byte sink timed out."
     case .outboundBacklogExceeded:
-      return "WebHost outbound backlog exceeded 32 records or 4 MiB; reconnect required."
+      return
+        "WebHost outbound backlog exceeded 32 records or \(WebHostOutboundBudget.byteLimit) bytes; reconnect required."
     }
   }
 }

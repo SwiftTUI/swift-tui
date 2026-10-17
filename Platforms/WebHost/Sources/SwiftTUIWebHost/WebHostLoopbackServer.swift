@@ -684,20 +684,28 @@ struct WebHostRouteTable: Sendable {
   private func webSocketUpgrade(
     _ head: WebHostHTTPRequestHead, sceneID: String
   ) -> RoutedRequest {
+    guard head.version == "HTTP/1.1", !head.hasDuplicateSingletonHeaders,
+      head.headerValue("Host")?.isEmpty == false
+    else { return .plain(.badRequest()) }
     guard isAuthorized(head) else {
       return .plain(.forbidden())
     }
     let originPolicy = WebHostOriginPolicy(bind: bind)
-    guard originPolicy.allows(origin: head.headerValue("Origin"), port: port) else {
+    guard
+      originPolicy.allows(
+        origin: head.headerValue("Origin"), port: port,
+        requestAuthority: head.headerValue("Host"))
+    else {
       return .plain(.forbidden())
     }
 
     guard
-      head.headerValue("Upgrade")?.lowercased().contains("websocket") == true,
-      head.headerValue("Connection")?.lowercased().contains("upgrade") == true,
+      head.containsHeaderToken("Upgrade", token: "websocket"),
+      head.containsHeaderToken("Connection", token: "upgrade"),
       head.headerValue("Sec-WebSocket-Version") == "13",
       let clientKey = head.headerValue("Sec-WebSocket-Key"),
-      !clientKey.isEmpty
+      let nonce = Data(base64Encoded: clientKey), nonce.count == 16,
+      nonce.base64EncodedString() == clientKey
     else {
       return .plain(.badRequest())
     }
@@ -735,6 +743,7 @@ struct WebHostRouteTable: Sendable {
       return .forbidden()
     }
     var response = response()
+    response.headers.append(("Cache-Control", "no-store"))
     if let queryToken = head.query["token"], constantTimeEquals(queryToken, token.rawValue) {
       response.headers.append(
         ("Set-Cookie", "\(Self.cookieName)=\(token.rawValue); Path=/; SameSite=Strict; HttpOnly"))

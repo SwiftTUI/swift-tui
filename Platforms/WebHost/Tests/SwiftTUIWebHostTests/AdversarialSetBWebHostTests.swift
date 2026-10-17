@@ -38,7 +38,7 @@ struct AdversarialSetBWebHostTests {
     #expect(throws: WebHostBrowserBundleError.self) {
       try resources.resource(for: "/.vite/../../outside.txt")
     }
-    withKnownIssue("resource lookup filters only `..` segments; dot segments are served") {
+    do {
       #expect(throws: WebHostBrowserBundleError.self) { try resources.resource(for: "/.env") }
       #expect(throws: WebHostBrowserBundleError.self) {
         try resources.resource(for: "/.vite/manifest.json")
@@ -46,7 +46,7 @@ struct AdversarialSetBWebHostTests {
     }
     let routed = setBRoutes(bundle: resources).route(
       setBHead("/.env", query: ["token": setBToken.rawValue]))
-    withKnownIssue("the route table serves whatever the bundle resolves") {
+    do {
       #expect(setBPlainResponse(routed)?.status == 404, "\(routed)")
     }
   }
@@ -58,18 +58,14 @@ struct AdversarialSetBWebHostTests {
     defer { bundle.remove() }
     try bundle.write("index.html", "<p>index</p>")
     try bundle.write("app.js", "app")
-    let caseInsensitive = FileManager.default.fileExists(
-      atPath: bundle.root.appendingPathComponent("APP.JS").path)
     let resources = WebHostBrowserBundle(directory: bundle.root.path)
     #expect(try resources.assetPaths() == ["app.js", "index.html"])
     #expect(try resources.resource(for: "/app.js").path == "app.js")
-    withKnownIssue("resolution goes through the file system, which folds case on APFS and HFS+") {
+    do {
       #expect(throws: WebHostBrowserBundleError.self) { try resources.resource(for: "/APP.JS") }
       #expect(throws: WebHostBrowserBundleError.self) {
         try resources.resource(for: "/Index.html")
       }
-    } when: {
-      caseInsensitive
     }
   }
 
@@ -82,7 +78,7 @@ struct AdversarialSetBWebHostTests {
     #expect(bundle.contentType(for: "photo.JPEG") == "image/jpeg")
     #expect(bundle.contentType(for: "app.wasm") == "application/wasm")
     #expect(bundle.contentType(for: "LICENSE") == "application/octet-stream")
-    withKnownIssue("the extension table stops at html/js/css/json/wasm/woff2/svg/png/jpg/gif") {
+    do {
       #expect(bundle.contentType(for: "LICENSE.txt").hasPrefix("text/plain"))
       #expect(bundle.contentType(for: "fonts/mono.woff") == "font/woff")
       #expect(bundle.contentType(for: "fonts/mono.ttf") == "font/ttf")
@@ -106,7 +102,7 @@ struct AdversarialSetBWebHostTests {
     let wire = String(decoding: response.serialized(), as: UTF8.self)
     #expect(wire.contains("\r\nContent-Length: \(response.body.count)\r\n"))
     #expect(wire.contains("\r\nConnection: close\r\n"))
-    withKnownIssue("plain responses carry only Content-Type, Content-Length and Connection") {
+    do {
       #expect(setBHeader("Cache-Control", in: response)?.contains("no-store") == true)
     }
   }
@@ -123,9 +119,7 @@ struct AdversarialSetBWebHostTests {
     #expect(loopback.allows(origin: "", port: 9123))
     let network = WebHostOriginPolicy(bind: "0.0.0.0")
     #expect(network.allows(origin: "http://localhost:9123", port: 9123))
-    withKnownIssue(
-      "the allow-list is fixed to bind, 127.0.0.1 and localhost (adjacent to STUI-1020)"
-    ) {
+    do {
       #expect(network.allows(origin: "http://192.168.1.20:9123", port: 9123))
     }
   }
@@ -133,7 +127,7 @@ struct AdversarialSetBWebHostTests {
   // A record at the wire's own ceiling (recordBytes plus the terminating LF)
   // is admitted by the outbound budget instead of closing the connection.
   @Test func setB336RecordAtTheWireCeilingIsAdmittedByTheOutboundBudget() async throws {
-    #expect(WebHostOutboundBudget.byteLimit == HostWireBudget.recordBytes)
+    #expect(WebHostOutboundBudget.byteLimit == HostWireBudget.recordBytes + 1)
     let channel = WebHostSceneChannel()
     let disconnected = SetBFlag()
     let client = AsyncStream<WebHostSocketMessage>.makeStream()
@@ -145,7 +139,7 @@ struct AdversarialSetBWebHostTests {
     var iterator = output.makeAsyncIterator()
     // Payloads are compared by size: a failed `#expect` renders both operands
     // into the issue record, and describing a 4 MiB array costs seconds.
-    let exact = [UInt8](repeating: 0x41, count: WebHostOutboundBudget.byteLimit)
+    let exact = [UInt8](repeating: 0x41, count: HostWireBudget.recordBytes)
     let exactSend = Task { try await channel.send(exact, connectionToken: token) }
     let admitted = await iterator.next()
     #expect(setBDataCount(admitted) == exact.count, "\(setBSummary(admitted))")
@@ -155,9 +149,8 @@ struct AdversarialSetBWebHostTests {
     let ceiling = [UInt8](repeating: 0x42, count: HostWireBudget.recordBytes + 1)
     let ceilingSend = Task { try await channel.send(ceiling, connectionToken: token) }
     let delivered = await iterator.next()
-    await withKnownIssue(
-      "the channel and pump budgets cap at 4 MiB while HostWireRecord allows recordBytes + LF"
-    ) {
+    await channel.completeOutput(token: token, byteCount: ceiling.count, succeeded: true)
+    do {
       #expect(setBDataCount(delivered) == ceiling.count, "\(setBSummary(delivered))")
       #expect(!disconnected.isSet)
       try await ceilingSend.value
@@ -186,7 +179,7 @@ struct AdversarialSetBWebHostTests {
     #expect(presses.dropFirst(2).first == KeyPress(.functionKey(1)))
     let clamped = presses.last
     #expect(clamped?.key == .character("A"))
-    withKnownIssue("parseModifiers clamps the field to 0...255 and keeps every bit") {
+    do {
       #expect((clamped?.modifiers.rawValue ?? 0) & ~0b111 == 0, "\(String(describing: clamped))")
     }
     await client.shutdown()
@@ -243,6 +236,7 @@ struct AdversarialSetBWebHostTests {
     #expect(noDefault["defaultSceneId"] as? String == "only")
     let routes = setBRoutes(scenes: scenes)
     let upgrade: [(name: String, value: String)] = [
+      ("Host", "127.0.0.1:8787"),
       ("Upgrade", "websocket"), ("Connection", "Upgrade"), ("Sec-WebSocket-Version", "13"),
       ("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ=="),
     ]

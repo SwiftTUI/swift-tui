@@ -28,6 +28,9 @@ package struct WebHostBrowserBundle: Sendable {
     for requestPath: String
   ) throws -> WebHostBrowserResource {
     let path = try normalizedResourcePath(for: requestPath)
+    // The inventory is the route authority, including exact spelling on a
+    // case-insensitive file system. Containment is checked again below.
+    guard try assetPaths().contains(path) else { throw WebHostBrowserBundleError.notFound(path) }
     let url = try resourceURL(for: path)
     return WebHostBrowserResource(
       path: path,
@@ -63,6 +66,20 @@ package struct WebHostBrowserBundle: Sendable {
       return "application/json; charset=utf-8"
     case "wasm":
       return "application/wasm"
+    case "txt":
+      return "text/plain; charset=utf-8"
+    case "woff":
+      return "font/woff"
+    case "ttf":
+      return "font/ttf"
+    case "otf":
+      return "font/otf"
+    case "webp":
+      return "image/webp"
+    case "avif":
+      return "image/avif"
+    case "ico":
+      return "image/vnd.microsoft.icon"
     case "woff2":
       return "font/woff2"
     case "svg":
@@ -121,7 +138,9 @@ package struct WebHostBrowserBundle: Sendable {
         path.removeFirst("static/".count)
       }
     }
-    guard !path.split(separator: "/").contains("..") else {
+    guard !path.contains("\\"), !path.utf8.contains(0),
+      !path.split(separator: "/").contains(where: { $0.hasPrefix(".") })
+    else {
       throw WebHostBrowserBundleError.notFound(requestPath)
     }
     return path

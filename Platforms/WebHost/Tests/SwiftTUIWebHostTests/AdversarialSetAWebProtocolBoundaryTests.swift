@@ -11,7 +11,7 @@ struct AdversarialSetAWebProtocolBoundaryTests {
     let encoded = WebHostWebSocketWire.encodeClose(code: 1000, reason: reason)
     #expect(encoded.count <= 127)
     #expect(Array(encoded[2..<4]) == [3, 232])
-    withKnownIssue("STUI-1015: close-reason byte truncation can split a UTF-8 scalar") {
+    do {
       #expect(String(bytes: encoded.dropFirst(4), encoding: .utf8) != nil)
     }
   }
@@ -20,7 +20,7 @@ struct AdversarialSetAWebProtocolBoundaryTests {
     // Hypothesis: a short payload using the extended-length field bypasses RFC 6455's canonical framing check.
     var decoder = WebHostWebSocketWire.FrameDecoder()
     decoder.append([0x82, 0xFE, 0, 1, 0, 0, 0, 0, 65])
-    withKnownIssue("STUI-1016: extended frame lengths bypass minimal-encoding validation") {
+    do {
       #expect(throws: (any Error).self) { try decoder.nextFrame() }
     }
   }
@@ -30,7 +30,7 @@ struct AdversarialSetAWebProtocolBoundaryTests {
     var decoder = WebHostWebSocketWire.FrameDecoder()
     decoder.append(masked(opcode: 8, payload: [3]))
     var assembler = WebHostWebSocketWire.MessageAssembler(maxMessageBytes: 1024)
-    withKnownIssue("STUI-1017: close classification skips payload validation") {
+    do {
       #expect(throws: (any Error).self) {
         if let frame = try decoder.nextFrame() { _ = try assembler.assemble(frame) }
       }
@@ -39,7 +39,7 @@ struct AdversarialSetAWebProtocolBoundaryTests {
 
   @Test func setA979RequestVersionMustBeAnHTTPVersionNotAnArbitraryPrefix() {
     // Hypothesis: prefix-only HTTP version validation accepts an invalid request line as routable input.
-    withKnownIssue("STUI-1018: HTTP version validation accepts an arbitrary suffix") {
+    do {
       #expect(parse("GET / HTTP/1.garbage\r\nHost: localhost\r\n\r\n") == nil)
     }
     #expect(parse("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n") != nil)
@@ -47,7 +47,7 @@ struct AdversarialSetAWebProtocolBoundaryTests {
 
   @Test func setA980WhitespaceBeforeAHeaderColonRejectsTheWholeRequest() {
     // Hypothesis: forbidden field-name whitespace is stored as an ignorable alternate name instead of rejecting the request.
-    withKnownIssue("STUI-1019: header names accept forbidden pre-colon whitespace") {
+    do {
       #expect(parse("GET / HTTP/1.1\r\nHost : localhost\r\n\r\n") == nil)
     }
     #expect(parse("GET / HTTP/1.1\r\nHost:\tlocalhost\r\n\r\n") != nil)
@@ -60,7 +60,7 @@ struct AdversarialSetAWebProtocolBoundaryTests {
     #expect(policy.allows(origin: "https://localhost", port: 443))
     #expect(policy.allows(origin: "http://localhost:9123", port: 9123))
     #expect(!policy.allows(origin: "http://localhost:80", port: 9123))
-    withKnownIssue("STUI-1020: an omitted origin port is treated as a wildcard") {
+    do {
       #expect(!policy.allows(origin: "http://localhost", port: 9123))
     }
   }
@@ -71,7 +71,7 @@ struct AdversarialSetAWebProtocolBoundaryTests {
     for (index, invalid) in [(0, "notwebsocket"), (1, "notupgrade")] {
       var malformed = head
       malformed.headers[index].value = invalid
-      withKnownIssue("STUI-1021: upgrade validation matches substrings instead of whole tokens") {
+      do {
         #expect(status(routes().route(malformed)) == 400)
       }
     }
@@ -84,9 +84,7 @@ struct AdversarialSetAWebProtocolBoundaryTests {
     // Hypothesis: any nonempty nonce is accepted without validating the RFC handshake key's Base64 shape and decoded length.
     var head = upgradeHead()
     head.headers[3].value = "not-base64"
-    withKnownIssue(
-      "STUI-1022: the handshake nonce is not validated as sixteen Base64-encoded bytes"
-    ) {
+    do {
       #expect(status(routes().route(head)) == 400)
     }
   }
@@ -95,7 +93,7 @@ struct AdversarialSetAWebProtocolBoundaryTests {
     // Hypothesis: first-header lookup silently accepts conflicting duplicate Sec-WebSocket-Version fields.
     var head = upgradeHead()
     head.headers.append(("sec-websocket-version", "12"))
-    withKnownIssue("STUI-1023: first-header lookup hides duplicate singleton handshake fields") {
+    do {
       #expect(status(routes().route(head)) == 400)
     }
   }

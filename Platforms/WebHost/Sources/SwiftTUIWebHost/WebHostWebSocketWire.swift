@@ -58,7 +58,12 @@ enum WebHostWebSocketWire {
       UInt8(truncatingIfNeeded: code),
     ]
     // A close payload is capped at 125 bytes; two are the code.
-    payload.append(contentsOf: Array(reason.utf8).prefix(123))
+    // Trim complete scalars, not arbitrary bytes or grapheme clusters.
+    for scalar in reason.unicodeScalars {
+      let bytes = String(scalar).utf8
+      guard bytes.count <= 125 - payload.count else { break }
+      payload.append(contentsOf: bytes)
+    }
     return encodeFrame(opcode: .close, payload: payload)
   }
 
@@ -74,6 +79,7 @@ enum WebHostWebSocketWire {
     case unmaskedClientFrame
     case fragmentedControlFrame
     case oversizedControlFrame
+    case nonMinimalPayloadLength
     case payloadTooLarge(declared: Int)
   }
 
@@ -123,6 +129,7 @@ enum WebHostWebSocketWire {
         }
         payloadLength =
           (Int(buffer[consumedOffset + 2]) << 8) | Int(buffer[consumedOffset + 3])
+        guard payloadLength >= 126 else { throw .nonMinimalPayloadLength }
       } else if payloadLength == 127 {
         headerLength += 8
         guard available >= headerLength else {
@@ -136,6 +143,7 @@ enum WebHostWebSocketWire {
           }
           length = (length << 8) | byte
         }
+        guard length > 0xFFFF else { throw .nonMinimalPayloadLength }
         payloadLength = length
       }
 
@@ -194,6 +202,7 @@ enum WebHostWebSocketWire {
     case continuationWithoutStart
     case newMessageDuringFragmentation
     case invalidTextEncoding
+    case invalidClosePayload
     case messageTooLarge(limit: Int)
   }
 
@@ -219,6 +228,13 @@ enum WebHostWebSocketWire {
       case .pong:
         return .pong
       case .close:
+        if !frame.payload.isEmpty {
+          guard frame.payload.count >= 2 else { throw .invalidClosePayload }
+          let code = UInt16(frame.payload[0]) << 8 | UInt16(frame.payload[1])
+          guard (1000...4999).contains(code), ![1004, 1005, 1006, 1015].contains(code),
+            String(bytes: frame.payload.dropFirst(2), encoding: .utf8) != nil
+          else { throw .invalidClosePayload }
+        }
         return .closeReceived
       case .text, .binary:
         guard fragmentOpcode == nil else {
