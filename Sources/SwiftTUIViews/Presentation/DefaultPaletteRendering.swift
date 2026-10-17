@@ -13,11 +13,12 @@ import SwiftTUICore
 /// filtering while the selected command still matches and otherwise falls back
 /// to the first row.
 ///
-/// At most twelve rows are visible, and the window always contains the
-/// selection. The window scrolls only when selection leaves it, so reversing
-/// direction moves the cursor within the existing rows. Each row is a
-/// pointer-routed button showing the command's
-/// name with its description trailing in the separator paint, marked and filled
+/// At most twelve rows are visible. With the native filter and single-line
+/// command rows, the window shrinks to fit short terminals and contains the
+/// selection when the terminal has at least eight rows. The window scrolls
+/// only when selection leaves it, so reversing direction moves the cursor
+/// within the existing rows. Each row is a pointer-routed button showing the
+/// command's name with its description trailing in the separator paint, marked and filled
 /// with the selection paint when selected, and rendered disabled when the
 /// contribution is. With no commands in scope, or no match for the query, the
 /// body says so in place of the rows.
@@ -45,10 +46,15 @@ extension PaletteStyle where Self == DefaultPaletteStyle {
 extension DefaultPaletteStyle: ReuseTransparentStyle {}
 
 private struct DefaultPaletteStyleBody: View {
-  private static let maximumVisibleRows = 12
-
   let configuration: PaletteStyleConfiguration
   private var commands: [PaletteStyleConfiguration.Command] { configuration.commands }
+  private var maximumVisibleRows: Int {
+    // The native dropdown adds two inset rows. This body adds two padding
+    // rows, the default three-row filter, and a divider. Its twenty-row
+    // viewport therefore fits at most twelve single-line commands.
+    let availableRows = configuration.terminalSize.height - 8
+    return min(12, max(1, availableRows))
+  }
 
   @State private var query = ""
   @State private var selectedCommandKey: AnyID?
@@ -89,6 +95,9 @@ private struct DefaultPaletteStyleBody: View {
     }
     .onChange(of: matchKeys, initial: true) { _, newKeys in
       reconcileSelection(for: newKeys)
+    }
+    .onChange(of: maximumVisibleRows) { _, _ in
+      reconcileSelection(for: matchKeys)
     }
   }
 
@@ -133,19 +142,19 @@ private struct DefaultPaletteStyleBody: View {
     in rows: [DefaultPaletteMatch],
     selectedIndex: Int
   ) -> Range<Int> {
-    guard rows.count > Self.maximumVisibleRows else {
+    guard rows.count > maximumVisibleRows else {
       return 0..<rows.count
     }
 
     let start = windowStart(count: rows.count, selectedIndex: selectedIndex)
-    return start..<(start + Self.maximumVisibleRows)
+    return start..<(start + maximumVisibleRows)
   }
 
   private func windowStart(count: Int, selectedIndex: Int) -> Int {
-    let start = min(max(0, visibleStart), max(0, count - Self.maximumVisibleRows))
+    let start = min(max(0, visibleStart), max(0, count - maximumVisibleRows))
     if selectedIndex < start { return selectedIndex }
-    if selectedIndex >= start + Self.maximumVisibleRows {
-      return selectedIndex - Self.maximumVisibleRows + 1
+    if selectedIndex >= start + maximumVisibleRows {
+      return selectedIndex - maximumVisibleRows + 1
     }
     return start
   }

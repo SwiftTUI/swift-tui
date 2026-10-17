@@ -246,9 +246,14 @@ struct RootView: View {
 
 The automatic ``DefaultPaletteStyle`` supplies a filter field with fuzzy matching,
 Up/Down (or Tab and Shift+Tab) to move the selection, and Return to run
-the selected command. The command snapshot is recomputed as your subtree
-changes, so an open palette stays in sync. The sheet dismisses the way
-any presentation does — by clearing the `isPresented` binding — so
+the selected command. For single-line command rows, its window contains at most
+twelve rows and shrinks to fit the native dropdown in a short terminal. The
+native dropdown needs at least eight terminal rows to show the filter and one
+command. Resizing an open
+palette keeps the selection visible without clearing its filter. Custom field
+styles and wrapped command rows can need more space. The command snapshot is
+recomputed as your subtree changes, so an open palette stays in sync. The sheet
+dismisses the way any presentation does — by clearing the `isPresented` binding — so
 Escape closes it; see <doc:Dismissal-Is-Data>.
 
 Apply `.paletteStyle(MyPaletteStyle())` after the declaration to customize its
