@@ -248,7 +248,13 @@ package struct MeasuredNode: Equatable, Sendable {
       recomputeSubtreeNodeCount()
     }
   }
-  package var containerAllocationSnapshot: ContainerAllocationSnapshot?
+  package var containerAllocationSnapshot: ContainerAllocationSnapshot? {
+    didSet { recomputeSubtreeNodeCount() }
+  }
+  /// A viewport is a measurement input even when only a descendant consumes
+  /// it. Wrappers must not turn windowed allocations into proposal-only cache
+  /// entries, which would replay the old viewport's geometry and anchor correction.
+  package private(set) var containsWindowedMeasurement = false
   package private(set) var subtreeNodeCount: Int
 
   package init(
@@ -294,6 +300,10 @@ package struct MeasuredNode: Equatable, Sendable {
 
   private mutating func recomputeSubtreeNodeCount() {
     subtreeNodeCount = 1 + childMeasurements.reduce(0) { $0 + $1.subtreeNodeCount }
+    containsWindowedMeasurement =
+      containerAllocationSnapshot?.lazyStack?.measuredWindow != nil
+      || containerAllocationSnapshot?.hostedCollection?.measuredWindow != nil
+      || childMeasurements.contains { $0.containsWindowedMeasurement }
   }
 
   /// Explicit, iterative `==`.

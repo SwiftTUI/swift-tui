@@ -143,7 +143,10 @@ package final class MeasurementCache: Sendable {
   ) {
     // Exact-key service is grade-blind, so no approximation or wrapper derived
     // from one may enter this cache, even under the exact same proposal.
-    guard !node.isEstimateDerived else { return }
+    // This cache is keyed by proposal, not by the ambient viewport. Keep
+    // viewport-dependent products (including their wrappers) on the retained
+    // path, where the consuming allocation can validate and claim its hint.
+    guard !node.isEstimateDerived, !node.containsWindowedMeasurement else { return }
     storage.withLock { storage in
       storage.stores += 1
       guard let viewNodeID = node.viewNodeID ?? resolved.viewNodeID else {

@@ -40,6 +40,13 @@ extension LayoutEngine {
       return nil
     }
 
+    // A retained wrapper skips its descendants' hint gates. It must descend
+    // until the consuming allocation can validate the current viewport; its
+    // ordinary rows remain independently reusable.
+    if previousMeasured.childMeasurements.contains(where: { $0.containsWindowedMeasurement }) {
+      return nil
+    }
+
     // A windowed lazy product (Stage 2.2) is valid only for the hint it was
     // built under: the scroll layout's measurement-reuse signature is
     // deliberately position-free, so an offset change alone would otherwise
