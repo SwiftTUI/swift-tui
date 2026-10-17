@@ -86,7 +86,6 @@ extension GIF {
       )
       // For frame 0 we just paint over a transparent canvas.
       // For later frames, replay the chain.
-      var previous = canvas
       for k in 0...i {
         let f = frames[k]
         // Capture pre-frame state for `previous` disposal.
@@ -98,7 +97,7 @@ extension GIF {
           // Apply this frame's disposal before painting the next.
           switch f.disposal {
           case .unspecified, .keep:
-            previous = canvas
+            break
           case .background:
             clearRect(
               into: &canvas,
@@ -107,9 +106,8 @@ extension GIF {
               background: backgroundColor,
               as: type
             )
-            previous = preFrameSnapshot
           case .previous:
-            canvas = previous
+            canvas = preFrameSnapshot
           }
         }
       }

@@ -43,7 +43,7 @@ extension GIF {
     var backgroundIndex: Int = 0
     var hasGlobalColorTable: Bool = false
 
-    // Pending GCE state — applies to the *next* image descriptor.
+    // Pending GCE state — applies to the next graphic rendering block.
     var pendingTransparentIndex: Int? = nil
     var pendingDelay: Int = 0
     var pendingDisposal: Disposal = .unspecified
@@ -172,7 +172,10 @@ extension GIF {
         try parseGraphicsControlExtension()
       case 0xFF:  // Application
         try parseApplicationExtension()
-      case 0xFE, 0x01:  // Comment, Plain Text
+      case 0x01:  // GIF89a §25: Plain Text consumes GCE even when not drawn.
+        try skipSubBlocks(stage: "plain text body")
+        resetGCEState()
+      case 0xFE:  // A comment does not consume graphics control state.
         try skipSubBlocks(stage: "extension body")
       default:
         try skipSubBlocks(stage: "unknown extension body")

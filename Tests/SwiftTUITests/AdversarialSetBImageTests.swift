@@ -213,9 +213,7 @@ struct AdversarialSetBImageTests {
     try #require(sequence.frames.count == 4, "\(sequence.frames.count)")
     let red = sequence.frames[0].pixels[0]
     #expect(sequence.frames[1].pixels[1] != red, "frame 1 draws blue at x = 1")
-    withKnownIssue(
-      "restore-to-previous reinstates the snapshot taken before the background-disposed frame (STUI-1010)"
-    ) {
+    do {
       #expect(sequence.frames[3].pixels[1] != red, "\(sequence.frames[3].pixels)")
     }
   }

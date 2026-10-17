@@ -17,7 +17,7 @@ struct AdversarialSetAAnimatedCodecTests {
     let decoded = try AnimatedGIF.decode(data: bytes)
     try #require(decoded.frames.count == 4)
     #expect(decoded.frames[2].pixels == [black, blue])
-    withKnownIssue("STUI-1010: previous disposal restores a stale pre-background canvas") {
+    do {
       #expect(decoded.frames[3].pixels == [black, red])
     }
   }
@@ -30,7 +30,7 @@ struct AdversarialSetAAnimatedCodecTests {
       data: gif(
         blocks:
           control(delay: 47) + plainText + frame(indices: [1])))
-    withKnownIssue("STUI-1011: Plain Text leaves its graphics-control delay pending") {
+    do {
       #expect(decoded.frameDelays == [.milliseconds(100)])
     }
     #expect(decoded.frames[0].pixels == [red])
