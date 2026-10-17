@@ -17,7 +17,7 @@ struct AdversarialSetAIdentityCurrencyTests {
     #expect(left.path == right.path)
     #expect(left != right)
     #expect(Set([left, right]).count == 2)
-    withKnownIssue("STUI-1000: joined paths collapse ordering of unequal component sequences") {
+    do {
       #expect(left < right || right < left)
     }
   }
@@ -43,7 +43,7 @@ struct AdversarialSetAIdentityCurrencyTests {
     let repeated = root.explicitID(SetACurrencyDebugID(value: "entry#12"), occurrence: 2)
     #expect(authored != root.explicitID(SetACurrencyDebugID(value: "entry")))
     #expect(repeated.strippingEntityOccurrences == authored)
-    withKnownIssue("STUI-1001: authored custom ID suffix is mistaken for an occurrence") {
+    do {
       #expect(authored.strippingEntityOccurrences == authored)
     }
   }

@@ -357,13 +357,10 @@ extension RunLoop {
       for: focusTracker.currentFocusIdentity,
       in: renderedArtifacts.resolvedTree
     )
-    // Main-actor semantic comparison: a focused `Binding` is compared by its
-    // current value, not identity (it has none across renders), so a stable
-    // focused binding converges this loop instead of comparing unequal forever.
+    // Equality decides invalidation; the current publication always replaces
+    // its closures, including equal values re-created by a live publisher.
     let focusedValuesChanged = !resolvedFocusedValues.focusSyncEquals(currentFocusedValues)
-    if focusedValuesChanged {
-      currentFocusedValues = resolvedFocusedValues
-    }
+    currentFocusedValues = resolvedFocusedValues
     let scrollPositionChanged = localScrollPositionRegistry.sync(
       focusedIdentity: focusTracker.currentFocusIdentity,
       focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,

@@ -24,6 +24,28 @@ struct IdentityValueCurrencyTests {
     #expect(probe.contains(chained))
   }
 
+  @Test("component ordering is total and occurrence delimiters cannot be authored")
+  func componentsAndGeneratedSuffixesAreUnambiguous() {
+    let paths = [[], ["a"], ["a/b"], ["a", "b"], ["a/", "b"], ["a", "/b"]]
+      .map { Identity(components: $0) }
+    for lhs in paths {
+      for rhs in paths {
+        #expect((lhs < rhs ? 1 : 0) + (rhs < lhs ? 1 : 0) + (lhs == rhs ? 1 : 0) == 1)
+      }
+    }
+    struct ID: Hashable, CustomDebugStringConvertible {
+      var debugDescription: String
+    }
+    let root = Identity(components: ["root"])
+    let hash = root.explicitID(ID(debugDescription: "x#12"))
+    let percent = root.explicitID(ID(debugDescription: "x%2312"))
+    #expect(hash != percent)
+    #expect(hash.strippingEntityOccurrences == hash)
+    #expect(
+      root.explicitID(ID(debugDescription: "x#12"), occurrence: 3)
+        .strippingEntityOccurrences == hash)
+  }
+
   @Test("prefix-related identities stay unequal in both directions")
   func prefixRelationsStayUnequal() {
     let parent = Identity(components: ["app", "stack[0]"])

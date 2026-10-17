@@ -139,21 +139,15 @@ extension View {
   }
 }
 
-/// A focused-value `Binding` converges the focus-sync loop by its current value.
-///
-/// `Binding` has no stable identity across renders — `$state` yields a fresh
-/// value of `@MainActor` closures on every body evaluation — so the focus-sync
-/// comparison cannot use identity. When the bound `Value` is `Equatable`, the
-/// bound value is the reliable signal: a focused field that keeps publishing a
-/// binding to unchanged state compares equal and the loop converges, while a
-/// real edit compares unequal and triggers exactly one propagation pass.
+/// Focus convergence compares both the storage route and the current value.
+/// Publisher provenance covers closure bindings without a source token.
 extension Binding: MainActorFocusedValueEquatable where Value: Equatable {
   @MainActor
   package func isFocusedValueEqual(to other: Any) -> Bool {
     guard let other = other as? Binding<Value> else {
       return false
     }
-    return wrappedValue == other.wrappedValue
+    return bindingSourceID == other.bindingSourceID && wrappedValue == other.wrappedValue
   }
 }
 

@@ -61,7 +61,11 @@ struct AdversarialSetBDataFlowTests {
       let seedBefore = SoundnessProbeConfiguration.stateSeedFallbackViolationCount
       let value = read()
       let issues = ImperativeRuntimeIssueQueue.drain()
-      withKnownIssue("a removed owner with a prior write hands back its retained value silently") {
+      #expect(
+        probe.binding?.wrappedValue == 2, "a separately retained Binding keeps its own last value")
+      probe.binding?.wrappedValue = 9
+      #expect(probe.binding?.wrappedValue == 9)
+      do {
         #expect(value == 0, "the authored seed is read, got \(value)")
         #expect(
           issues.contains { $0.code == "state.imperativeSeedFallback" }, "\(issues.map(\.code))")
@@ -110,9 +114,7 @@ struct AdversarialSetBDataFlowTests {
     _ = try h.clickText("ns 1")
     #expect(probe.body.count == 2 && probe.action.count == 2, "\(probe.body) \(probe.action)")
     #expect(probe.body[0] != probe.body[1], "rows have distinct namespaces: \(probe.body)")
-    withKnownIssue(
-      "the dispatch-time authoring context has no structural path, so the action allocates a new namespace"
-    ) {
+    do {
       #expect(probe.action[0] == probe.body[0], "row 0: body \(probe.body) action \(probe.action)")
       #expect(probe.action[1] == probe.body[1], "row 1: body \(probe.body) action \(probe.action)")
     }
@@ -122,9 +124,7 @@ struct AdversarialSetBDataFlowTests {
   // and report `state.duplicateSlotClaim`; they do not trap when their value
   // types differ.
   @Test func setB204DuplicateSlotClaimAcrossValueTypesReportsInsteadOfTrapping() async {
-    await withKnownIssue(
-      "the second claim on a slot that stores another Value type hits a fatalError"
-    ) {
+    do {
       await #expect(processExitsWith: .success) {
         await MainActor.run {
           let snapshot = DefaultRenderer().render(
@@ -249,9 +249,7 @@ struct AdversarialSetBDataFlowTests {
     let h = try harness("NamespaceMount") { SetBNamespaceHolder(probe: probe) }
     defer { h.shutdown() }
     try #require(h.frame.contains("holder"), "\(h.frame)")
-    withKnownIssue(
-      "the first namespace read writes state during body and schedules a second evaluation"
-    ) {
+    do {
       #expect(probe.evaluations == 1, "evaluations \(probe.evaluations)")
     }
     let settled = probe.evaluations
@@ -305,6 +303,7 @@ private struct SetBRemovableCounter: View {
 
   var body: some View {
     probe.read = { count }
+    probe.binding = $count
     return VStack(alignment: .leading) {
       Text("Count \(count)")
       Button("Increment") { count += 1 }

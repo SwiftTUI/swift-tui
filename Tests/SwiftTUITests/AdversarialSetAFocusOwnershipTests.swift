@@ -55,7 +55,7 @@ struct AdversarialSetAFocusOwnershipTests {
     try #require(first + second == 1)
     try requireFocus("Binding owner B", in: h)
     #expect(h.frame.contains("ownerA=\(first);ownerB=\(second);"), "\(h.frame)")
-    withKnownIssue("STUI-980: equal values retain the previous focused binding owner") {
+    do {
       #expect(
         first == 0 && second == 1,
         "Focused owner B received projected write: source A=\(first), B=\(second); frame:\n\(h.frame)"

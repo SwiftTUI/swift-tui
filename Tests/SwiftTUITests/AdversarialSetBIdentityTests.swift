@@ -19,7 +19,7 @@ struct AdversarialSetBIdentityTests {
     _ = try h.clickText("row1 Increment")
     _ = try h.clickText("row1 Increment")
     _ = try h.clickText("Double flip")
-    withKnownIssue("a net no-op .id write inside one action resets the row's state") {
+    do {
       #expect(h.frame.contains("row1 Count 2"), "\(h.frame)")
     }
     #expect(h.frame.contains("row0 Count 0"), "\(h.frame)")

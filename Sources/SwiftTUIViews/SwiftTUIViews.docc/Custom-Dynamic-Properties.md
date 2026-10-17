@@ -45,6 +45,10 @@ A plain helper struct that composes `@State` *without* conforming keeps the
 legacy behavior: every instance's inner slot collapses onto the wrapper's
 own declaration site, so instances silently share storage (the runtime
 reports a `state.duplicateSlotClaim` runtime issue when this happens).
+If those declarations have incompatible value types, the first slot stays
+intact: the incompatible declaration reads its seed and its writes are
+ignored with the same diagnostic. Conform the helper to `DynamicProperty`
+to give both declarations their own storage.
 
 ## The update pass
 

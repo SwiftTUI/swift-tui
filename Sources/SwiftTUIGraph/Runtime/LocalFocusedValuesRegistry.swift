@@ -13,7 +13,7 @@ package struct FocusedValuesRegistrationSnapshot: Sendable {
   ) {
     self.identity = identity
     self.descendantIdentities = descendantIdentities
-    self.values = values
+    self.values = values.attributed(to: identity)
     self.ownerIdentity = ownerIdentity
   }
 }

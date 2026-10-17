@@ -229,6 +229,35 @@ public struct IDModifier<ID: Hashable & Sendable>: IterativePrimitiveViewModifie
       identity: entityIdentity,
       structuralPath: context.structuralPath
     )
+    // The enclosing entity (for example a ForEach row or another .id) and
+    // this boundary have independent state lifetimes. Preserve both nodes,
+    // just as an exact-identity boundary does, instead of resetting slots on
+    // the enclosing owner every time the inner modifier is re-evaluated.
+    if let slotNode = ViewNodeContext.current,
+      let occupant = context.viewGraph?.entityOccupant(of: slotNode),
+      occupant != entityIdentity
+    {
+      return withResolveEntityRoute(route) {
+        resolveViewWork(
+          EntityRootedChainContent(
+            content: content,
+            entityIdentity: entityIdentity,
+            entityStructuralPath: context.structuralPath
+          ),
+          in: routedContext
+        )
+      }.map { hosted in
+        [
+          ResolvedNode(
+            identity: context.identity,
+            kind: .view("ExplicitIdentityHost"),
+            children: [hosted],
+            environmentSnapshot: context.environment,
+            transactionSnapshot: context.transaction
+          )
+        ]
+      }
+    }
     context.viewGraph?.prepareEntityRoutedOwner(
       entityIdentity,
       for: ViewNodeContext.current

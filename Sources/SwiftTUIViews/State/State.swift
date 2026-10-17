@@ -132,6 +132,7 @@ private final class StateBox<Value> {
   /// participates in matching a box to its graph slot.
   let declarationFileID: String
   private var seedValue: Value
+  private let graphSeedFactory: (@MainActor () -> Value)?
   private(set) var seedValueIdentity = StateValueIdentity()
   private var boundLocationsByOwner: [StateStorageOwner: DynamicStateLocation<Value>]
   private var retainedValuesByOwner:
@@ -146,8 +147,10 @@ private final class StateBox<Value> {
     seedValue: Value,
     slotOrdinal: Int,
     declarationFileID: String,
-    dormantPolicy: DormantStateSlotPolicy = .owned
+    dormantPolicy: DormantStateSlotPolicy = .owned,
+    graphSeedFactory: (@MainActor () -> Value)? = nil
   ) {
+    self.graphSeedFactory = graphSeedFactory
     self.slotOrdinal = slotOrdinal
     self.declarationFileID = declarationFileID
     self.dormantPolicy = dormantPolicy
@@ -158,6 +161,10 @@ private final class StateBox<Value> {
 
   func currentSeedValue() -> Value {
     seedValue
+  }
+
+  func initialGraphValue() -> Value {
+    graphSeedFactory?() ?? seedValue
   }
 
   func updateSeedValue(_ newValue: Value) {
@@ -306,6 +313,22 @@ public struct State<Value> {
     )
   }
 
+  /// Internal identity storage can allocate a distinct seed for each mounted
+  /// owner. Initializing a graph slot is a read, never a render-time mutation.
+  package init(
+    initialValueFactory: @escaping @MainActor () -> Value,
+    fileID: String = #fileID,
+    line: UInt = #line,
+    column: UInt = #column
+  ) {
+    box = StateBox(
+      seedValue: initialValueFactory(),
+      slotOrdinal: StateSlotOrdinals.authored(line: line, column: column),
+      declarationFileID: fileID,
+      graphSeedFactory: initialValueFactory
+    )
+  }
+
   public var wrappedValue: Value {
     get {
       if let location = activeLocation() {
@@ -343,7 +366,7 @@ public struct State<Value> {
   }
 
   public var projectedValue: Binding<Value> {
-    if let location = activeLocation() {
+    if let location = activeLocation(retainingRemovedOwner: true) {
       return location.binding
     }
     var binding = Binding(
@@ -369,7 +392,7 @@ public struct State<Value> {
     }
   #endif
 
-  private func activeLocation() -> DynamicStateLocation<Value>? {
+  private func activeLocation(retainingRemovedOwner: Bool = false) -> DynamicStateLocation<Value>? {
     if ViewNodeContext.current != nil {
       guard let context = AuthoringContextStorage.current,
         let storageOwner = stateStorageOwner(for: context)
@@ -402,8 +425,10 @@ public struct State<Value> {
     // any ambient dispatch context — so it serves first. Only bind-pass
     // evaluations produce `.bound`, which keeps this rung inert whenever the
     // capture-binding gate is off.
-    if let location = captureLocation() {
-      return location
+    if capture != nil {
+      // A captured owner is authoritative even after removal. Falling through
+      // would let an unrelated dispatch context lend this closure its state.
+      return captureLocation(retainingRemovedOwner: retainingRemovedOwner)
     }
 
     // Dispatch-snapshot tier: an installed imperative context names an exact
@@ -432,10 +457,9 @@ public struct State<Value> {
   /// through its own graph scope's live identity index to the current
   /// occupant node (the ratified focused-values category: dispatch context
   /// is runtime state). The refresh never crosses graph scopes and requires
-  /// a live occupant, so committed removal still falls through to the
-  /// ambient ladder; it re-addresses dispatch, never mints storage on a
-  /// foreign graph.
-  private func captureLocation() -> DynamicStateLocation<Value>? {
+  /// a live occupant. Committed removal cannot fall through to an unrelated
+  /// ambient owner. Only a projected Binding may retain the retired value.
+  private func captureLocation(retainingRemovedOwner: Bool) -> DynamicStateLocation<Value>? {
     guard let binding = capture else {
       return nil
     }
@@ -450,24 +474,16 @@ public struct State<Value> {
       StateCaptureCensus.record(.captureRefreshedOwner)
       return location(for: refreshedOwner, path: binding.path)
     }
-    // Owner dead and no live occupant at the identity (committed removal, or
-    // a dormant-archived subtree whose node is out of the live registry).
-    // Serve the captured owner's own location: its closures degrade to the
-    // per-owner retained value — the separately-retained-`Binding` contract
-    // the pre-capture remembered locations honored — and then to the loud
-    // authored-seed report. The miss is a violation only when no retained
-    // value exists either: a retained-value serve is the documented stale-
-    // binding degrade, not an unserveable access.
     StateCaptureCensus.record(.captureMiss)
-    if StateCaptureBindingConfiguration.isEnabled,
-      box.retainedValue(for: binding.owner) == nil
-    {
+    if retainingRemovedOwner {
+      return location(for: binding.owner, path: binding.path)
+    }
+    if StateCaptureBindingConfiguration.isEnabled {
       SoundnessProbeConfiguration.recordStateCaptureMissViolation(
-        "state-capture-miss: owner dead, refresh failed, no retained value for "
-          + "\(binding.identity)"
+        "state-capture-miss: owner dead, refresh failed for \(binding.identity)"
       )
     }
-    return location(for: binding.owner, path: binding.path)
+    return nil
   }
 
   private func location(
@@ -534,7 +550,7 @@ public struct State<Value> {
     // per-owner value serves only the node-gone read fallback below — seeding
     // a new slot from carried mutation would resurrect state across committed
     // removal and leak writes into replacement identities.
-    let authoredSeed = box.currentSeedValue()
+    let authoredSeed = box.initialGraphValue()
     let authoredSeedIdentity = box.seedValueIdentity
     let slotOrdinal = box.currentOrdinal
     let declarationFileID = box.declarationFileID
@@ -553,6 +569,15 @@ public struct State<Value> {
               reason: "the state's owning node is no longer live and holds no retained value"
             )
           }
+          return authoredSeed
+        }
+        // Invalid composed helpers can claim the same slot with different
+        // types. The claim diagnostic identifies the authoring error; preserve
+        // the first slot and serve this declaration's seed instead of trapping
+        // or corrupting another declaration's storage.
+        if let slot = liveViewNode.stateSlotStorage(slotIdentifier),
+          slot.isInitialized, !slot.stores(Value.self)
+        {
           return authoredSeed
         }
         return withDormantStateSlotPolicy(dormantPolicy) {
@@ -578,6 +603,17 @@ public struct State<Value> {
         // such a write lands in a graph that no longer exists and the next
         // render silently re-seeds from the authored value.
         if let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) {
+          if let slot = liveViewNode.stateSlotStorage(slotIdentifier),
+            slot.isInitialized, !slot.stores(Value.self)
+          {
+            ImperativeRuntimeIssueQueue.record(
+              RuntimeIssue(
+                severity: .warning, code: "state.duplicateSlotClaim",
+                message:
+                  "A write from @State<\(Value.self)> cannot replace the incompatible slot \(slotIdentifier) storing \(slot.storedTypeDescription). Conform the enclosing helper to DynamicProperty.",
+                source: "@State"))
+            return
+          }
           withDormantStateSlotPolicy(dormantPolicy) {
             liveViewNode.setStateSlot(
               slotIdentifier,

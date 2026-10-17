@@ -19,6 +19,8 @@ package protocol MainActorFocusedValueEquatable {
 
 private protocol FocusedValueBox: Sendable {
   var valueTypeDescription: String { get }
+  var publisher: Identity? { get }
+  func attributed(to identity: Identity) -> any FocusedValueBox
 
   func value<Value>(as type: Value.Type) -> Value?
   func isEqual(
@@ -31,6 +33,13 @@ private protocol FocusedValueBox: Sendable {
 
 private struct TypedFocusedValueBox<Value: Sendable>: FocusedValueBox {
   let base: Value
+  var publisher: Identity? = nil
+
+  func attributed(to identity: Identity) -> any FocusedValueBox {
+    var copy = self
+    copy.publisher = identity
+    return copy
+  }
 
   var valueTypeDescription: String {
     String(reflecting: Value.self)
@@ -68,11 +77,8 @@ private struct TypedFocusedValueBox<Value: Sendable>: FocusedValueBox {
       return false
     }
 
-    // Main-actor self-comparison (e.g. a `Binding` compared by current value).
-    // This is what lets a stable focused binding terminate the focus-sync loop:
-    // a `Binding` has no stable identity across renders (it is a fresh value of
-    // `@MainActor` closures each body evaluation), so only its bound value is a
-    // reliable convergence signal.
+    // Stable publishers can re-create closure bindings every frame. Their
+    // provenance and source tokens distinguish equal-valued different owners.
     if let comparable = base as? any MainActorFocusedValueEquatable {
       return comparable.isFocusedValueEqual(to: otherValue)
     }
@@ -112,6 +118,12 @@ public struct FocusedValues: Equatable, Sendable {
         storage.removeValue(forKey: identifier)
       }
     }
+  }
+
+  package func attributed(to identity: Identity) -> Self {
+    var copy = self
+    copy.storage = storage.mapValues { $0.attributed(to: identity) }
+    return copy
   }
 
   package var isEmpty: Bool {
@@ -168,6 +180,7 @@ public struct FocusedValues: Equatable, Sendable {
     for identifier in storage.keys {
       guard let lhsValue = storage[identifier],
         let rhsValue = other.storage[identifier],
+        lhsValue.publisher == rhsValue.publisher,
         lhsValue.isMainActorEqual(to: rhsValue)
       else {
         return false

@@ -199,23 +199,65 @@ public struct Binding<Value> {
   public subscript<Member>(
     dynamicMember keyPath: WritableKeyPath<Value, Member>
   ) -> Binding<Member> {
-    // The member projection carries the stored transaction (SwiftUI
-    // propagates it), so reading `.transaction` off a member binding stays
-    // truthful. The write path would apply it either way: the member setter
-    // funnels through this binding's `wrappedValue` setter. The source
-    // token deliberately does NOT propagate — pre-existing behavior;
-    // consumers key momentum retirement on the *whole-value* binding.
+    // A projection owns a stable route through its source. Include the path
+    // so sibling members remain distinct while re-created projections agree.
     var projected = Binding<Member>(
       mainActorGet: { wrappedValue[keyPath: keyPath] },
       set: { wrappedValue[keyPath: keyPath] = $0 }
     )
     projected.transaction = transaction
+    projected.bindingSourceID = bindingSourceID.map {
+      AnyID(BindingProjectionSource(base: $0, path: .intern(keyPath)))
+    }
     // Computed properties and paths through references may change without a
     // base store. Only an inline stored-value projection inherits currency.
     if !(Value.self is AnyObject.Type), MemoryLayout<Value>.offset(of: keyPath) != nil {
       projected.valueIdentity = valueIdentity
     }
     return projected
+  }
+}
+
+// The source token can cross actors, but key-path comparison stays isolated:
+// arbitrary key paths can capture non-Sendable subscript arguments. Canonical
+// live tokens preserve path equality without transferring those captures.
+private struct BindingProjectionSource: Hashable, Sendable {
+  let base: AnyID
+  let path: BindingProjectionPath
+}
+
+@MainActor
+private final class BindingProjectionPath: Hashable, CustomDebugStringConvertible {
+  private struct WeakToken { weak var value: BindingProjectionPath? }
+  private static var livePaths: [AnyKeyPath: WeakToken] = [:]
+  private static var nextOrdinal: UInt64 = 0
+  nonisolated let ordinal: UInt64
+
+  private init() {
+    precondition(Self.nextOrdinal < .max, "Binding projection identity exhausted")
+    Self.nextOrdinal += 1
+    ordinal = Self.nextOrdinal
+  }
+
+  // Navigation declaration paths encode source identities. An opaque class's
+  // default reflection names only its type and would alias every member path.
+  nonisolated var debugDescription: String { "BindingProjectionPath[\(ordinal)]" }
+
+  static func intern(_ keyPath: AnyKeyPath) -> BindingProjectionPath {
+    if let token = livePaths[keyPath]?.value { return token }
+    // Retired paths must not keep captured subscript arguments alive forever.
+    livePaths = livePaths.filter { $0.value.value != nil }
+    let token = BindingProjectionPath()
+    livePaths[keyPath] = WeakToken(value: token)
+    return token
+  }
+
+  nonisolated static func == (lhs: BindingProjectionPath, rhs: BindingProjectionPath) -> Bool {
+    lhs === rhs
+  }
+
+  nonisolated func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
   }
 }
 
@@ -262,7 +304,8 @@ public struct Bindable<Model> where Model: AnyObject, Model: Observable {
     return Binding(
       mainActorGet: { model[keyPath: keyPath] },
       set: { model[keyPath: keyPath] = $0 }
-    )
+    ).withBindingSource(
+      BindingProjectionSource(base: AnyID(ObjectIdentifier(model)), path: .intern(keyPath)))
   }
 }
 

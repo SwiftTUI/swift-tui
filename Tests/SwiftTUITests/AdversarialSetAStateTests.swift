@@ -60,13 +60,13 @@ struct AdversarialSetAStateTests {
     defer { h.shutdown() }
     try h.clickText("Add A")
     #expect(probe.events == ["A:0->1"], "Pointer action events: \(probe.events)")
-    withKnownIssue("STUI-959: explicit identity loses a dispatched pointer action's state write") {
+    do {
       #expect(counter("A", in: h) == 1, "\(h.frame)")
     }
     try h.focusText("Add B")
     try h.pressKey(.init(.return))
     #expect(probe.events == ["A:0->1", "B:0->1"], "All action events: \(probe.events)")
-    withKnownIssue("STUI-959: explicit identity loses a dispatched keyboard action's state write") {
+    do {
       #expect(counter("B", in: h) == 1, "\(h.frame)")
     }
   }
@@ -207,16 +207,12 @@ struct AdversarialSetAStateTests {
     try h.clickText("Add destination")
     try #require(h.frame.contains("source=A local=1"), "\(h.frame)")
     try h.clickText("Switch source")
-    withKnownIssue(
-      "STUI-956: member-projected Boolean bindings lose navigation declaration identity"
-    ) {
+    do {
       #expect(h.frame.contains("source=B local=0"))
     }
     try h.clickText("Add destination")
     try h.clickText("Switch source")
-    withKnownIssue(
-      "STUI-956: member-projected Boolean bindings reuse the departing destination's state"
-    ) {
+    do {
       #expect(h.frame.contains("source=A local=0"))
     }
   }
@@ -237,15 +233,12 @@ struct AdversarialSetAStateTests {
     try h.clickText("Add destination")
     try #require(h.frame.contains("source=A local=1"), "\(h.frame)")
     try h.clickText("Switch source")
-    withKnownIssue("STUI-956: member-projected item bindings lose navigation declaration identity")
-    {
+    do {
       #expect(h.frame.contains("source=B local=0"))
     }
     try h.clickText("Add destination")
     try h.clickText("Switch source")
-    withKnownIssue(
-      "STUI-956: member-projected item bindings reuse the departing destination's state"
-    ) {
+    do {
       #expect(h.frame.contains("source=A local=0"))
     }
   }

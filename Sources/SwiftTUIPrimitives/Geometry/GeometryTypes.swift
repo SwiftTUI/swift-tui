@@ -760,8 +760,8 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
   /// surfaces (accessibility nodes) report this form so duplicate siblings
   /// compare equal, as authored; runtime isolation rides the
   /// occurrence-qualified node lifetimes, not the reported identity. A `#`
-  /// authored inside a user id is safe: `String(reflecting:)` quotes
-  /// strings, so the trailing characters are never all digits.
+  /// authored inside a user id is percent-escaped before the generated
+  /// suffix is added, including custom debug descriptions without quotes.
   package var strippingEntityOccurrences: Self {
     var changed = false
     let stripped = components.map { component -> String in
@@ -795,7 +795,7 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
   }
 
   public static func < (lhs: Self, rhs: Self) -> Bool {
-    lhs.path < rhs.path
+    lhs.components.lexicographicallyPrecedes(rhs.components)
   }
 
   private func escapedExplicitIDComponent(_ component: String) -> String {
@@ -805,6 +805,8 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
         escaped.append("%25")
       case "/":
         escaped.append("%2F")
+      case "#":
+        escaped.append("%23")
       default:
         escaped.append(character)
       }

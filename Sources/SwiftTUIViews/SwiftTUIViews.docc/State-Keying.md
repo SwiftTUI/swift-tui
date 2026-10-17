@@ -161,6 +161,17 @@ between them through the view value. Only in a snapshot context with no
 running app (a plain renderer pass in a test or preview) can reusing one view
 instance carry imperative writes into a later snapshot of that same instance.
 
+A body-created closure whose owner has been removed reads the authored seed
+and reports `state.imperativeSeedFallback`, even if it wrote state before
+removal. A separately retained `Binding` retains its owner-specific fallback;
+it cannot write into a new mount. Member bindings preserve their source and
+member path, so changing from one equal-valued member to another changes the
+binding's owner route.
+
+`@Namespace` uses one initialized slot per mounted owner. Reading it from a
+body or an action returns the same identifier, and the first read does not
+schedule an extra render.
+
 ## See Also
 
 - <doc:Dormant-Tab-State>

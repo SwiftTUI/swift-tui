@@ -14,11 +14,6 @@ package enum MatchedGeometryNamespaceAllocator {
   }
 }
 
-private enum NamespaceStorageKey: Hashable {
-  case unmounted
-  case mounted(StructuralPath)
-}
-
 /// A property wrapper that allocates a stable, opaque namespace ID
 /// scoped to the enclosing view's identity.
 ///
@@ -30,8 +25,7 @@ private enum NamespaceStorageKey: Hashable {
 /// The namespace ID is stable across renders of the same view
 /// instance (re-uses `@State`-backed storage keyed by the property
 /// wrapper's source location).  A brand-new namespace ID is
-/// allocated the first time the view at a given identity evaluates
-/// its body.
+/// allocated when storage for that mounted owner is initialized.
 @propertyWrapper
 @MainActor
 public struct Namespace: Sendable {
@@ -40,33 +34,23 @@ public struct Namespace: Sendable {
   /// module's matched-geometry machinery.
   public typealias ID = MatchedGeometryNamespace
 
-  private let state: State<[NamespaceStorageKey: ID]>
+  private let state: State<ID>
 
   public init(line: UInt = #line, column: UInt = #column) {
     state = State(
-      wrappedValue: [:],
+      initialValueFactory: { MatchedGeometryNamespaceAllocator.next() },
       line: line,
       column: column
     )
   }
 
   public var wrappedValue: ID {
-    let key =
-      currentAuthoringContext().map { NamespaceStorageKey.mounted($0.structuralPath) }
-      ?? .unmounted
-    if let existing = state.wrappedValue[key] {
-      return existing
-    }
-    let allocated = MatchedGeometryNamespaceAllocator.next()
-    state.wrappedValue[key] = allocated
-    return allocated
+    state.wrappedValue
   }
 }
 
-/// `Namespace` keeps its shipped composition workarounds (structural-path
-/// sub-keying plus forwarded `line:`/`column:` init defaults) rather than
-/// binding through the update pass; folding it onto path-qualified slot
-/// identity is a recorded follow-up.
+// The dynamic-property and capture passes recurse into the nested State,
+// qualifying its slot by this namespace declaration's property path.
 extension Namespace: DynamicProperty {
   public func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult {
     .unchanged
