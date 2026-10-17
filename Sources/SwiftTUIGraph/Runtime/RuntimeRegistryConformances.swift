@@ -322,7 +322,7 @@ extension LocalFocusBindingRegistry: RuntimeRegistry {
     rootedAt roots: [Identity],
     context: RuntimeRegistrationLifetimeContext
   ) {
-    removeSubtrees(rootedAt: roots)
+    removeRegistrationsForRepublication(rootedAt: roots)
   }
 
   package func restore(

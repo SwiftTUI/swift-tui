@@ -230,11 +230,16 @@ private func recordArrivalDefault<Value: Equatable>(
   ownerIdentity: Identity?,
   in context: ResolveContext
 ) {
+  let lifetime = DefaultFocusArrivalLifetime(
+    graph: context.viewGraph,
+    ownerNodeID: currentAuthoringContext()?.viewNode?.viewNodeID,
+    contextIdentity: context.identity)
   context.focusArrivalRegistry?.recordArrivalDefault(
     DefaultFocusArrivalSnapshot(
       bindingKey: binding.bindingKey,
       ownerIdentity: ownerIdentity,
       contextIdentity: context.identity,
+      isLive: { lifetime.isLive() },
       armDefault: {
         guard !binding.hasPendingRequest else {
           return false
@@ -244,4 +249,32 @@ private func recordArrivalDefault<Value: Equatable>(
       }
     )
   )
+}
+
+/// An outermost modifier can run before its resolved owner is minted. Bind its
+/// lifetime after resolve, then compare node IDs so reusing the same identity
+/// after removal creates a fresh arrival. Weak graph storage avoids retaining
+/// a graph through the registry's owner-less one-shot history.
+@MainActor
+private final class DefaultFocusArrivalLifetime {
+  private weak var graph: ViewGraph?
+  private let graphBacked: Bool
+  private var ownerNodeID: ViewNodeID?
+  private let contextIdentity: Identity
+
+  init(graph: ViewGraph?, ownerNodeID: ViewNodeID?, contextIdentity: Identity) {
+    self.graph = graph
+    self.graphBacked = graph != nil
+    self.ownerNodeID = ownerNodeID
+    self.contextIdentity = contextIdentity
+  }
+
+  func isLive() -> Bool {
+    guard graphBacked else { return true }
+    guard let graph else { return false }
+    if let ownerNodeID { return graph.nodeForViewNodeID(ownerNodeID) != nil }
+    guard let owner = graph.nodeForIdentity(contextIdentity) else { return false }
+    ownerNodeID = owner.viewNodeID
+    return true
+  }
 }

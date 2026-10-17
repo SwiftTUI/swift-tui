@@ -510,6 +510,31 @@ extension FrameworkStressStateIdentityTests {
 // MARK: - Attempt 009: Default-focus ordinals under conditional modifier churn
 
 extension FrameworkStressStateIdentityTests {
+  @Test("an outermost default focus does not replay during registration replacement")
+  func outermostDefaultFocusKeepsItsOneShot() throws {
+    let root = testIdentity("OutermostDefaultFocus")
+    let state = FocusState<Bool>()
+    let binding = state.projectedValue
+    let target = testIdentity("OutermostDefaultFocusTarget")
+    let h = try StressRuntimeHarness(rootIdentity: root, size: .init(width: 30, height: 6)) {
+      VStack {
+        Button("Other focus") {}
+        Button("Default focus") {}.id(target).focused(binding)
+      }.defaultFocus(binding)
+    }
+    defer { h.shutdown() }
+    #expect(h.runLoop.focusTracker.currentFocusIdentity == target)
+    _ = try h.clickText("Other focus")
+    let other = try #require(h.runLoop.focusTracker.currentFocusIdentity)
+    #expect(other != target)
+    for _ in 0..<4 {
+      h.runLoop.scheduler.requestInvalidation(of: [root])
+      _ = try h.render()
+      #expect(h.runLoop.focusTracker.currentFocusIdentity == other)
+      #expect(!binding.wrappedValue)
+    }
+  }
+
   @Test("stress state identity 009 default focus follows the arriving modifier shape")
   func stateIdentity009DefaultFocusFollowsArrivingModifierShape() throws {
     // Hypothesis: removing the first of two default-focus modifiers shifts ordinal-backed
