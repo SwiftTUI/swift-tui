@@ -25,13 +25,21 @@ package enum TextInputStringMetrics {
     range: TextRange,
     in text: String,
     with replacement: String
-  ) -> String {
+  ) -> (text: String, caret: TextOffset) {
     let clampedRange = range.clamped(to: TextOffset(text.count))
     let lower = stringIndex(for: clampedRange.lowerBound, in: text)
     let upper = stringIndex(for: clampedRange.upperBound, in: text)
+    let insertionEnd = text[..<lower].utf8.count + replacement.utf8.count
     var copy = text
     copy.replaceSubrange(lower..<upper, with: replacement)
-    return copy
+    var byteOffset = 0
+    var caret = 0
+    for character in copy {
+      guard byteOffset < insertionEnd else { break }
+      byteOffset += character.utf8.count
+      caret += 1
+    }
+    return (copy, TextOffset(caret))
   }
 
   package static func substring(
@@ -110,13 +118,13 @@ package enum TextInputStringMetrics {
     }
 
     index -= 1
-    while index > 0 && !isWordCharacter(characters[index]) {
+    while index > 0 && !isWordCharacter(at: index, in: characters) {
       index -= 1
     }
-    guard isWordCharacter(characters[index]) else {
+    guard isWordCharacter(at: index, in: characters) else {
       return TextOffset(0)
     }
-    while index > 0 && isWordCharacter(characters[index - 1]) {
+    while index > 0 && isWordCharacter(at: index - 1, in: characters) {
       index -= 1
     }
     return TextOffset(index)
@@ -132,15 +140,15 @@ package enum TextInputStringMetrics {
       return TextOffset(characters.count)
     }
 
-    if isWordCharacter(characters[index]) {
-      while index < characters.count && isWordCharacter(characters[index]) {
+    if isWordCharacter(at: index, in: characters) {
+      while index < characters.count && isWordCharacter(at: index, in: characters) {
         index += 1
       }
     } else {
-      while index < characters.count && !isWordCharacter(characters[index]) {
+      while index < characters.count && !isWordCharacter(at: index, in: characters) {
         index += 1
       }
-      while index < characters.count && isWordCharacter(characters[index]) {
+      while index < characters.count && isWordCharacter(at: index, in: characters) {
         index += 1
       }
     }
@@ -149,10 +157,24 @@ package enum TextInputStringMetrics {
 
   private static func lineStarts(in text: String) -> [Int] {
     var starts = [0]
-    for (offset, character) in text.enumerated() where character == "\n" {
+    for (offset, character) in text.enumerated() where character.isNewline {
       starts.append(offset + 1)
     }
     return starts
+  }
+
+  private static func isWordCharacter(at index: Int, in characters: [Character]) -> Bool {
+    let character = characters[index]
+    if isWordCharacter(character) { return true }
+    guard index > 0, index + 1 < characters.count else { return false }
+    switch character {
+    case "'", "’":
+      return isWordCharacter(characters[index - 1]) && isWordCharacter(characters[index + 1])
+    case ".", ",":
+      return characters[index - 1].isNumber && characters[index + 1].isNumber
+    default:
+      return false
+    }
   }
 
   private static func isWordCharacter(_ character: Character) -> Bool {

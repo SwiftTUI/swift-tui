@@ -95,7 +95,8 @@ extension SecureField {
         displayText: presentation.displayText,
         displayRuns: presentation.displayRuns,
         ownerIdentity: context.identity,
-        caretAnchor: presentation.caretAnchor
+        caretAnchor: presentation.caretAnchor,
+        scrollsToCaret: isFocused
       ),
       isShowingPrompt: presentation.isShowingPrompt,
       label: .init(

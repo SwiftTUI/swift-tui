@@ -4,11 +4,11 @@ import Testing
 @Suite
 struct AccessibilityTextInputLayoutTests {
   @Test(arguments: ["\u{85}", "\u{2028}", "\u{2029}", "\u{B}", "\u{C}"])
-  func nonBreakingControlAtEndKeepsCursorOnRenderedLine(_ suffix: String) {
+  func unicodeNewlineAtEndMovesCursorToNextRenderedLine(_ suffix: String) {
     let text = "ABC" + suffix
     #expect(
       wrappedTextCursorAnchor(text, offset: text.count, width: 20)
-        == CellPoint(x: 3 + cellWidth(of: suffix.first!), y: 0))
+        == CellPoint(x: 0, y: 1))
   }
 
   @Test

@@ -182,7 +182,7 @@ struct AdversarialSetAFocusOwnershipTests {
     let h = try make("413") { SetAFocusConeRoot() }
     defer { h.shutdown() }
     try requireFocus("Cone left", in: h)
-    withKnownIssue("STUI-981: initial focus adoption skips environment convergence") {
+    do {
       #expect(
         h.frame.contains("parent=true") && h.frame.contains("left=true"),
         "Initial focused identity=\(String(describing: h.runLoop.focusTracker.currentFocusIdentity)); frame:\n\(h.frame)"

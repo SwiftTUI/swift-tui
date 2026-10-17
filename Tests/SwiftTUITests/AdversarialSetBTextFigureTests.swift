@@ -46,9 +46,7 @@ struct AdversarialSetBTextFigureTests {
     #expect(joined.idealSize.width == 36, "\(joined)")
     let joinedLines = render(TextFigure("AB", font: .font208), "joined").rasterSurface.lines
     let spacedLines = render(TextFigure("A B", font: .font208), "spaced").rasterSurface.lines
-    withKnownIssue(
-      "TheDraw glyph tables start at '!', and the engine skips a scalar without a glyph before it records any width or wrap point"
-    ) {
+    do {
       #expect(spaced.idealSize.width > joined.idealSize.width, "\(spaced) vs \(joined)")
       #expect(spacedLines != joinedLines, "\(spacedLines)")
     }
@@ -72,9 +70,7 @@ struct AdversarialSetBTextFigureTests {
     let drawn = TextFigureSupport.render(
       decomposed, boundsWidth: 80, environment: StyleEnvironmentSnapshot())
     let cached = TextFigureSupport.layoutMetrics(for: decomposed)
-    withKnownIssue(
-      "the payload and the metrics cache key on canonical String equality while the engine looks glyphs up per scalar: the decomposed form inherits Ä's 8-column minimum, its 10-column A no longer fits and the draw falls back to plain text"
-    ) {
+    do {
       #expect(secondLines == firstLines, "\(secondLines)")
       #expect(secondLines.first != "A\u{308}", "plain-text fallback: \(secondLines)")
       #expect(drawn.size.width <= cached.idealSize.width, "\(drawn.size) vs \(cached)")
@@ -103,9 +99,7 @@ struct AdversarialSetBTextFigureTests {
     let snapshot = render(TextFigure("日本"), "zeroWidth", proposal: .init(width: 0, height: 10))
     let rasterIsEmpty = snapshot.rasterSurface.lines.allSatisfy(\.isEmpty)
     #expect(rasterIsEmpty, "\(snapshot.rasterSurface.lines)")
-    withKnownIssue(
-      "measuredSize hands the engine width 0 when the minimum width is 0, the engine throws, and the plain-text fallback size is reported (an assertionFailure outside swift test)"
-    ) {
+    do {
       #expect(zeroWidth == .zero, "\(zeroWidth)")
       #expect(zeroWidthNewline == CellSize(width: 0, height: 6), "\(zeroWidthNewline)")
       #expect(snapshot.measuredTree.measuredSize == .zero, "\(snapshot.measuredTree.measuredSize)")
@@ -126,9 +120,7 @@ struct AdversarialSetBTextFigureTests {
         TextFigure("Big")
       }
       .accessibilityElement(children: .combine), "combined")
-    withKnownIssue(
-      "accessibilityTextLabel(from:) treats .textFigure like an image, so a banner publishes no node and adds nothing to a combined label"
-    ) {
+    do {
       #expect(figure.contains { $0.label == "Hi" }, "\(figure.map(\.label))")
       #expect(
         combined.contains { $0.label?.contains("Big") == true }, "\(combined.map(\.label))")
@@ -140,9 +132,7 @@ struct AdversarialSetBTextFigureTests {
   @Test func setB375NegativeCommentCountsAreRejectedNotTrapped() async throws {
     let overdeclared = FigletFontLibrary(fontData: ["over": "flf2a$ 1 1 1 0 5\n"])
     #expect(throws: FigletError.self) { try overdeclared.font(named: "over") }
-    await withKnownIssue(
-      "the parser iterates 0..<commentLines before validating the count (adjacent to STUI-716)"
-    ) {
+    do {
       await #expect(processExitsWith: .success) {
         let library = FigletFontLibrary(fontData: ["negative": "flf2a$ 1 1 1 0 -1\n"])
         _ = try? library.font(named: "negative")
@@ -223,7 +213,7 @@ struct AdversarialSetBTextFigureTests {
     let after = try snapshot()
     #expect(after.count <= 256, "\(after)")
     let growth = (after.detail?["order"] ?? 0) - (before.detail?["order"] ?? 0)
-    withKnownIssue("every cache hit appends an access record (STUI-876, STUI-1008)") {
+    do {
       #expect(growth < 1000, "order grew by \(growth)")
     }
   }
@@ -235,9 +225,7 @@ struct AdversarialSetBTextFigureTests {
     let font = try #require(try library.font(named: "ragged"))
     let leading = try Figlet(font: font, configuration: .init(width: 80)).render("ba")
     #expect(leading.rawValue.contains("b"), "\(leading.rawValue)")
-    await withKnownIssue(
-      "addGlyphRow reads the incoming row at every smush position without checking its length"
-    ) {
+    do {
       await #expect(processExitsWith: .success) {
         let library = FigletFontLibrary(fontData: ["ragged": SetBFigletFonts.raggedKerningFont])
         guard let font = try? library.font(named: "ragged") else {

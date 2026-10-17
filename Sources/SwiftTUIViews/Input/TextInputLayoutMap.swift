@@ -103,7 +103,11 @@ package struct TextInputLayoutMap: Equatable, Sendable {
     let point = caretPoint(for: offset)
     let currentIndex = lines.firstIndex(where: { $0.origin.y == point.y }) ?? 0
     let preferredColumn = preferredVisualColumn ?? point.x
-    let targetIndex = min(max(0, currentIndex + delta), lines.count - 1)
+    let targetIndex = currentIndex + delta
+    if targetIndex < 0 { return (lines[0].sourceRange.lowerBound, preferredColumn) }
+    if targetIndex >= lines.count {
+      return (lines[lines.count - 1].sourceRange.upperBound, preferredColumn)
+    }
     let target = lines[targetIndex]
     return (
       target.offset(atCellColumn: preferredColumn),

@@ -25,7 +25,7 @@ package func registerTextInputBinding(
       case .editText(let edit), .selectText(let edit):
         guard let selection = textSelection(for: edit),
           traits.isMultiline
-            || !edit.text.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\n" })
+            || !edit.text.contains(where: \.isNewline)
         else { return .invalidValue }
         let current = value.wrappedValue.synchronized(with: binding.wrappedValue)
         if action.kind == .selectText {
@@ -56,6 +56,7 @@ package func registerTextInputBinding(
       default: break
       }
       guard case .setValue(.text(let next)) = action else { return .unsupported }
+      guard traits.isMultiline || !next.contains(where: \.isNewline) else { return .invalidValue }
       guard binding.wrappedValue != next else { return .unchanged }
       var selected = value.wrappedValue.synchronized(with: binding.wrappedValue)
       selected.selection = .init(anchor: .init(0), head: .init(selected.text.count))
@@ -206,14 +207,8 @@ package func textInputCommand(
     }
     return .insertText("\n")
   case .backspace:
-    guard !isSelecting else {
-      return nil
-    }
     return .deleteBackward(granularity: .character)
   case .delete:
-    guard !isSelecting else {
-      return nil
-    }
     return .deleteForward(granularity: .character)
   case .arrowLeft:
     return .move(.left, selecting: isSelecting)
@@ -257,9 +252,6 @@ private func altTextInputCommand(
   case .arrowRight:
     return .move(.wordForward, selecting: isSelecting)
   case .backspace:
-    guard !isSelecting else {
-      return nil
-    }
     return .deleteBackward(granularity: .word)
   default:
     return nil
@@ -293,9 +285,6 @@ private func ctrlTextInputCommand(
   case .arrowRight:
     return .move(.wordForward, selecting: isSelecting)
   case .backspace:
-    guard !isSelecting else {
-      return nil
-    }
     return .deleteBackward(granularity: .word)
   default:
     return nil

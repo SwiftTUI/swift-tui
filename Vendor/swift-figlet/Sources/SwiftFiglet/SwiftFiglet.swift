@@ -532,15 +532,21 @@ struct FigletGlyph: Equatable, Sendable {
   let rows: [[FigletCell]]
 
   init(width: Int, rows: [[FigletCell]]) {
-    self.width = width
-    self.rows = rows
+    let normalizedWidth = max(width, rows.map(\.count).max() ?? 0)
+    self.width = normalizedWidth
+    // A glyph is a rectangle. Normalize ragged font rows here so every
+    // direction and smushing rule consumes the same bounded row geometry.
+    self.rows = rows.map { row in
+      row + Array(repeating: .space, count: normalizedWidth - row.count)
+    }
   }
 
   init(width: Int, plainRows: [String]) {
-    self.width = width
-    self.rows = plainRows.map { row in
-      row.map { FigletCell(character: $0) }
-    }
+    self.init(
+      width: width,
+      rows: plainRows.map { row in
+        row.map { FigletCell(character: $0) }
+      })
   }
 }
 
@@ -557,6 +563,7 @@ public struct FigletFont: Sendable {
 
   let glyphs: [Int: FigletGlyph]
   let widths: [Int: Int]
+  private let characterCodes: [Character: Int]
 
   public init(named name: String) throws {
     self = try Self.load(identifier: name)
@@ -769,7 +776,9 @@ public struct FigletFont: Sendable {
       let baseline = Int(headerParts[2]),
       Int(headerParts[3]) != nil,
       let oldLayout = Int(headerParts[4]),
-      let commentLines = Int(headerParts[5])
+      let commentLines = Int(headerParts[5]),
+      height > 0, height <= lines.count - lineIndex,
+      commentLines >= 0, commentLines <= lines.count - lineIndex
     else {
       throw FigletError.invalidFont("malformed header for \(name)")
     }
@@ -870,6 +879,23 @@ public struct FigletFont: Sendable {
     self.comment = comment
     self.glyphs = glyphs
     self.widths = widths
+    var characterCodes: [Character: Int] = [:]
+    for code in glyphs.keys.sorted() {
+      guard let scalar = Unicode.Scalar(code) else { continue }
+      let character = Character(scalar)
+      if characterCodes[character] == nil { characterCodes[character] = code }
+    }
+    self.characterCodes = characterCodes
+  }
+
+  // Character equality supplies canonical equivalence without a Foundation
+  // dependency. Both measurement and painting consume this same glyph stream.
+  func codes(for text: String) -> [Int] {
+    text.flatMap { character -> [Int] in
+      if character.isNewline { return [10] }
+      if let code = characterCodes[character] { return [code] }
+      return character.unicodeScalars.map { Int($0.value) }
+    }
   }
 
   private static let theDrawMagic = Array("\u{0013}TheDraw FONTS file\u{001A}".utf8)
@@ -917,6 +943,14 @@ public struct FigletFont: Sendable {
       glyphs[codePoint] = glyph
       widths[codePoint] = glyph.width
     }
+
+    // TheDraw stores printable glyphs beginning at '!'. Supply its missing
+    // space as an actual advance so word separation and wrapping agree.
+    let spaceWidth = max(1, spacing)
+    glyphs[32] = FigletGlyph(
+      width: spaceWidth,
+      rows: Array(repeating: Array(repeating: .space, count: spaceWidth), count: fontHeight))
+    widths[32] = spaceWidth
 
     return FigletFont(
       name: name,
@@ -1238,14 +1272,14 @@ public struct Figlet: Sendable {
   }
 
   private func minimumRenderableWidth(for text: String) -> Int {
-    text.unicodeScalars.reduce(into: 0) { currentMaximum, scalar in
-      currentMaximum = max(currentMaximum, font.widths[Int(scalar.value)] ?? 0)
+    font.codes(for: text).reduce(into: 0) { currentMaximum, code in
+      currentMaximum = max(currentMaximum, font.widths[code] ?? 0)
     }
   }
 
   private func nonWrappingWidthUpperBound(for text: String) -> Int {
-    text.unicodeScalars.reduce(into: 0) { total, scalar in
-      total += font.widths[Int(scalar.value)] ?? 0
+    font.codes(for: text).reduce(into: 0) { total, code in
+      total += font.widths[code] ?? 0
     }
   }
 }
@@ -1283,7 +1317,7 @@ private struct FigletLayoutEngine {
     width: Int,
     justification: ResolvedJustification
   ) {
-    self.text = text.unicodeScalars.map { Int($0.value) }
+    self.text = font.codes(for: text)
     self.font = font
     self.direction = direction
     self.width = width

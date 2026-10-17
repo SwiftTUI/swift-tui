@@ -352,6 +352,11 @@ value-control, and menu families. Toggle and disclosure primitives retain activa
 enablement guards, and semantic roles. `Input/TextEditorStyles.swift` surrounds
 the editor's protected content; `TextEditor.swift` owns the binding, selection,
 scroll position, and viewport-width probe used for wrapped caret navigation.
+Single-line text fields keep a clipped, caret-following viewport inside their
+protected `fieldContent` slot, shared by plain, bordered, secure, and custom
+styles. Editing, layout, and caret geometry use Unicode grapheme boundaries and
+`Character.isNewline` for logical lines. Rich text attributes each whole grapheme
+to the run containing its first scalar; a style seam cannot split a glyph.
 Circular indeterminate progress composes the environment-styled `Spinner`.
 
 `Controls/SliderStyles.swift` and `StepperStyles.swift` own the value-control

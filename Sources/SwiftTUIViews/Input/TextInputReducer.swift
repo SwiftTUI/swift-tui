@@ -45,24 +45,24 @@ package struct TextInputReducer: Sendable {
   ) -> TextInputMutation {
     let insertedText = sanitizedInsertion(text, traits: traits)
     let range = value.selection.range
-    let nextText = TextInputStringMetrics.replacing(
+    let replacement = TextInputStringMetrics.replacing(
       range: range,
       in: value.text,
       with: insertedText
     )
-    let caret = TextOffset(range.lowerBound.rawValue + insertedText.count)
+    let caret = replacement.caret
     let nextValue = TextInputValue(
-      text: nextText,
+      text: replacement.text,
       selection: .caret(at: caret)
     )
     return TextInputMutation(
       value: nextValue,
       changedRange: TextRange(
         lowerBound: range.lowerBound,
-        upperBound: TextOffset(range.lowerBound.rawValue + insertedText.count)
+        upperBound: caret
       ),
       insertedText: insertedText,
-      shouldWriteBinding: nextText != value.text,
+      shouldWriteBinding: replacement.text != value.text,
       shouldRequestFrame: true
     )
   }
@@ -147,15 +147,15 @@ package struct TextInputReducer: Sendable {
     range: TextRange,
     in value: TextInputValue
   ) -> TextInputMutation {
-    let nextText = TextInputStringMetrics.replacing(
+    let replacement = TextInputStringMetrics.replacing(
       range: range,
       in: value.text,
       with: ""
     )
     return TextInputMutation(
       value: TextInputValue(
-        text: nextText,
-        selection: .caret(at: range.lowerBound)
+        text: replacement.text,
+        selection: .caret(at: replacement.caret)
       ),
       changedRange: range,
       shouldWriteBinding: true,
@@ -191,15 +191,15 @@ package struct TextInputReducer: Sendable {
       range: range,
       in: value.text
     )
-    let nextText = TextInputStringMetrics.replacing(
+    let replacement = TextInputStringMetrics.replacing(
       range: range,
       in: value.text,
       with: ""
     )
     return TextInputMutation(
       value: TextInputValue(
-        text: nextText,
-        selection: .caret(at: range.lowerBound)
+        text: replacement.text,
+        selection: .caret(at: replacement.caret)
       ),
       changedRange: range,
       clipboardText: clipboardText,
@@ -218,10 +218,16 @@ package struct TextInputReducer: Sendable {
     let preferredVisualColumn: Int?
     switch movement {
     case .left:
-      target = TextOffset(max(0, collapsedMovementStart(value).rawValue - 1))
+      target =
+        !selecting && !value.selection.isCollapsed
+        ? value.selection.range.lowerBound
+        : TextOffset(max(0, value.selection.head.rawValue - 1))
       preferredVisualColumn = nil
     case .right:
-      target = TextOffset(min(value.text.count, collapsedMovementEnd(value).rawValue + 1))
+      target =
+        !selecting && !value.selection.isCollapsed
+        ? value.selection.range.upperBound
+        : TextOffset(min(value.text.count, value.selection.head.rawValue + 1))
       preferredVisualColumn = nil
     case .lineStart:
       target =
@@ -268,14 +274,6 @@ package struct TextInputReducer: Sendable {
     return TextInputMutation(value: next, shouldRequestFrame: next != value)
   }
 
-  private func collapsedMovementStart(_ value: TextInputValue) -> TextOffset {
-    value.selection.isCollapsed ? value.selection.head : value.selection.range.lowerBound
-  }
-
-  private func collapsedMovementEnd(_ value: TextInputValue) -> TextOffset {
-    value.selection.isCollapsed ? value.selection.head : value.selection.range.upperBound
-  }
-
   private func verticalMove(
     delta: Int,
     in value: TextInputValue,
@@ -295,7 +293,9 @@ package struct TextInputReducer: Sendable {
     )
     let preferredColumn = value.preferredVisualColumn ?? metric.column
     let lineCount = TextInputStringMetrics.lineCount(in: value.text)
-    let targetLine = min(max(0, metric.lineIndex + delta), max(0, lineCount - 1))
+    let targetLine = metric.lineIndex + delta
+    if targetLine < 0 { return (TextOffset(0), preferredColumn) }
+    if targetLine >= lineCount { return (TextOffset(value.text.count), preferredColumn) }
     return (
       TextInputStringMetrics.offset(
         lineIndex: targetLine,
@@ -313,13 +313,6 @@ package struct TextInputReducer: Sendable {
     guard !traits.isMultiline else {
       return text
     }
-    // Filter at scalar granularity: a CR+LF pair coalesces into a single
-    // Character ("\r\n") that compares unequal to both "\n" and "\r", so a
-    // Character-level filter would leave the newline scalars embedded in the
-    // single-line field. CR/LF never occur inside a multi-scalar grapheme
-    // (emoji ZWJ/skin-tone/regional-indicator runs), so no glyph is split.
-    var scalars = text.unicodeScalars
-    scalars.removeAll { $0.value == 0x0A || $0.value == 0x0D }
-    return String(scalars)
+    return String(text.filter { !$0.isNewline })
   }
 }

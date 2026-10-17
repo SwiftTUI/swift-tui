@@ -11,7 +11,7 @@ package func wrappedTextCursorAnchors(_ text: String, width: Int) -> [CellPoint]
   var logicalLines: [[SourceIndexedCluster]] = [[]]
   var lineStarts = [0]
   for (index, character) in text.enumerated() {
-    if character.unicodeScalars.allSatisfy({ $0.value == 10 || $0.value == 13 }) {
+    if character.isNewline {
       logicalLines.append([])
       lineStarts.append(index + 1)
     } else {
@@ -55,7 +55,7 @@ package func wrappedTextCursorAnchors(_ text: String, width: Int) -> [CellPoint]
     anchors[nextOffset] = previous
     nextOffset += 1
   }
-  if text.last?.unicodeScalars.allSatisfy({ $0.value == 10 || $0.value == 13 }) == true {
+  if text.last?.isNewline == true {
     anchors[text.count] = CellPoint(x: 0, y: max(0, y - 1))
   }
   return anchors

@@ -28,6 +28,26 @@ struct RichTextLayoutCacheTests {
     )
   }
 
+  @Test("every scalar split preserves graphemes and assigns the leading run")
+  func styleSeamsPreserveGraphemes() {
+    for text in ["e\u{301}X", "👩🏽‍💻X", "🇺🇸X", "\r\nX", "가X"] {
+      let scalars = Array(text.unicodeScalars)
+      for split in 1..<scalars.count {
+        let first = String(String.UnicodeScalarView(scalars[..<split]))
+        let second = String(String.UnicodeScalarView(scalars[split...]))
+        let rich = layoutRichText(
+          for: .init(runs: [.init(text: first), .init(text: ""), .init(text: second)]),
+          options: .init(width: 2))
+        let plain = layoutText(for: text, width: 2)
+        #expect(rich.lines.map(\.text) == plain.lines.map(\.text))
+        #expect(rich.size == plain.size)
+        if !text.first!.isNewline {
+          #expect(rich.lines.first?.clusters.first?.runIndex == 0)
+        }
+      }
+    }
+  }
+
   @Test("repeating a rich layout request hits the cache")
   func repeatedRichRequestsHitTheCache() {
     let cache = TextLayoutCache(capacity: 8)

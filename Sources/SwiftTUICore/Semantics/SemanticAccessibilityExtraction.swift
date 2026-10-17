@@ -874,7 +874,9 @@ extension SemanticExtractor {
       label = value
     case .richText(let payload):
       label = payload.visibleText
-    case .none, .textFigure, .image, .shape, .rule, .list, .table, .canvas,
+    case .textFigure(let payload):
+      label = payload.content
+    case .none, .image, .shape, .rule, .list, .table, .canvas,
       .foreignSurface:
       label = nil
     }

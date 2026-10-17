@@ -5,8 +5,8 @@
 /// map previously re-implemented wrapping at character granularity, so
 /// Up/Down and click-to-caret targeted rows the renderer never drew).
 package protocol TextWrappableCluster {
-  var character: Character { get }
-  var cellWidth: Int { get }
+  var character: Character { get set }
+  var cellWidth: Int { get set }
   /// The marker glyph synthesized when an over-wide word-like token is split
   /// mid-word. Synthesized clusters have no source position; conformers that
   /// carry source indices must mint these index-free.
@@ -39,8 +39,14 @@ internal struct SourceIndexedCluster: TextWrappableCluster {
   var sourceIndex: Int?
   var cluster: TextCluster
 
-  var character: Character { cluster.character }
-  var cellWidth: Int { cluster.cellWidth }
+  var character: Character {
+    get { cluster.character }
+    set { cluster.character = newValue }
+  }
+  var cellWidth: Int {
+    get { cluster.cellWidth }
+    set { cluster.cellWidth = newValue }
+  }
 
   static func continuationMarker(
     character: Character,
@@ -107,7 +113,13 @@ package func wrapTextLineClusters<Cluster: TextWrappableCluster>(
   switch wrappingStrategy {
   case .wordBoundary:
     return wrapTextLineOnWordBoundaries(
-      line,
+      line.map { cluster in
+        guard cluster.cellWidth > width else { return cluster }
+        var replacement = cluster
+        replacement.character = "…"
+        replacement.cellWidth = 1
+        return replacement
+      },
       width: width,
       rowBudget: rowBudget.map { max(1, $0) }
     )
@@ -159,32 +171,13 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
 
   func appendClusters(_ clusters: [Cluster]) {
     for cluster in clusters {
-      if isBudgetExhausted() {
-        return
-      }
-      let clusterWidth = cluster.cellWidth
-
-      if currentClusters.isEmpty {
-        currentClusters.append(cluster)
-        currentWidth = clusterWidth
-        if currentWidth >= width {
-          flushCurrentLine()
-        }
-        continue
-      }
-
-      if currentWidth + clusterWidth > width {
+      guard !isBudgetExhausted() else { return }
+      if !currentClusters.isEmpty, cluster.cellWidth > width - currentWidth {
         flushCurrentLine()
-        currentClusters.append(cluster)
-        currentWidth = clusterWidth
-        if currentWidth >= width {
-          flushCurrentLine()
-        }
-        continue
+        guard !isBudgetExhausted() else { return }
       }
-
       currentClusters.append(cluster)
-      currentWidth += clusterWidth
+      currentWidth += cluster.cellWidth
     }
   }
 
@@ -210,9 +203,6 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
     let lastLine = lines.last!
     currentClusters = lastLine
     currentWidth = lastLine.reduce(0) { $0 + $1.cellWidth }
-    if currentWidth >= width {
-      flushCurrentLine()
-    }
   }
 
   func appendTokenRun(
@@ -246,7 +236,7 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
       // `lineLimit(1)` would be split into thousands of marker-wrapped rows to
       // show two.
       let wordRowBudget = rowBudget.map { budget in
-        max(1, budget - result.count) + 1
+        budget - result.count == Int.max ? Int.max : max(1, budget - result.count) + 1
       }
       adoptWrappedLines(
         wrapWordLikeClusters(clusters, width: width, rowBudget: wordRowBudget)
@@ -287,8 +277,11 @@ private func wrapTextLineOnWordBoundaries<Cluster: TextWrappableCluster>(
     }
   }
 
-  if let pendingSeparator, !isBudgetExhausted() {
-    appendClusters(pendingSeparator)
+  if let pendingSeparator, !isBudgetExhausted(), !currentClusters.isEmpty {
+    // Trailing separators may occupy the remainder of this row, but cannot
+    // manufacture another row (or a truncation indicator) by themselves.
+    let fitting = prefixByCellWidth(pendingSeparator[...], maxWidth: width - currentWidth)
+    appendClusters(fitting)
   }
 
   // The trailing partial row becomes row `result.count`. Under an exhausted
@@ -329,7 +322,9 @@ private func textWrapRuns<Cluster: TextWrappableCluster>(
 
   for cluster in clusters.dropFirst() {
     let isWhitespace = isWhitespaceCluster(cluster)
-    if isWhitespace == currentIsWhitespace {
+    if isWhitespace == currentIsWhitespace,
+      currentClusters.last.map({ !isBreakAfter($0.character) }) ?? true
+    {
       currentClusters.append(cluster)
       continue
     }
@@ -470,32 +465,13 @@ private func clusterWrappedLines<Cluster: TextWrappableCluster>(
   }
 
   for cluster in clusters {
-    if isBudgetExhausted() {
-      break
-    }
-    let clusterWidth = cluster.cellWidth
-
-    if currentClusters.isEmpty {
-      currentClusters.append(cluster)
-      currentWidth = clusterWidth
-      if currentWidth >= width {
-        flushCurrentLine()
-      }
-      continue
-    }
-
-    if currentWidth + clusterWidth > width {
+    if isBudgetExhausted() { break }
+    if !currentClusters.isEmpty, cluster.cellWidth > width - currentWidth {
       flushCurrentLine()
-      currentClusters.append(cluster)
-      currentWidth = clusterWidth
-      if currentWidth >= width {
-        flushCurrentLine()
-      }
-      continue
+      if isBudgetExhausted() { break }
     }
-
     currentClusters.append(cluster)
-    currentWidth += clusterWidth
+    currentWidth += cluster.cellWidth
   }
 
   if !isBudgetExhausted(), !currentClusters.isEmpty || result.isEmpty {
@@ -508,7 +484,13 @@ private func clusterWrappedLines<Cluster: TextWrappableCluster>(
 private func isWhitespaceCluster<Cluster: TextWrappableCluster>(
   _ cluster: Cluster
 ) -> Bool {
-  cluster.character.unicodeScalars.allSatisfy { $0.properties.isWhitespace }
+  cluster.character.unicodeScalars.allSatisfy {
+    $0.properties.isWhitespace && $0.value != 0xA0 && $0.value != 0x2007 && $0.value != 0x202F
+  }
+}
+
+private func isBreakAfter(_ character: Character) -> Bool {
+  character == "-" || character == "–" || character == "—"
 }
 
 private func isWordLikeToken<Cluster: TextWrappableCluster>(

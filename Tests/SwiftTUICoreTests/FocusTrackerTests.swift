@@ -5,6 +5,17 @@ import Testing
 
 @Suite
 struct FocusTrackerTests {
+  @Test("initial automatic adoption reports the same change as explicit focus")
+  func initialAdoptionReportsChange() {
+    let tracker = FocusTracker()
+    let region = FocusRegion(
+      identity: testIdentity("InitialFocus"),
+      rect: .init(origin: .zero, size: .init(width: 1, height: 1)))
+    #expect(tracker.updateRegions([region]))
+    #expect(tracker.currentFocusIdentity == region.identity)
+    #expect(!tracker.updateRegions([region]))
+  }
+
   @Test("initial focus tracker has no focused identity")
   func initialStateHasNoFocus() {
     let tracker = FocusTracker()

@@ -433,7 +433,10 @@ obsolete text, split graphemes and invalid offsets are rejected. Read-only
 controls permit selection review but reject edits. Nonsecure editors publish
 selection/caret for browser and ordinary keyboard handoff. Secure controls omit
 that state and their value from host snapshots. Input normalization remains
-owned by the control (including single-line editing).
+owned by the control. Single-line fields reject assistive replacement values
+containing Unicode newlines as a whole; ordinary typed or pasted insertion
+removes those separators. Multiline editing and rendering recognize the same
+Unicode newlines, including CRLF as one grapheme.
 Repeated focus and value echoes do not write the binding or schedule new work.
 
 See `docs/ACCESSIBILITY.md` in the source repository for the additive host-wire

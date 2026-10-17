@@ -149,6 +149,10 @@ private func uncachedTextLayout(
   sourceLines: [[TextCluster]],
   options: TextLayoutOptions
 ) -> TextLayoutResult {
+  let hasOversizedCluster =
+    options.width.map { width in
+      width > 0 && sourceLines.contains { $0.contains { $0.cellWidth > width } }
+    } ?? false
   guard let rawLineLimit = options.lineLimit else {
     // Unbounded: wrap every source line to full depth, exactly as before.
     let wrappedLines = sourceLines.flatMap { line in
@@ -158,7 +162,7 @@ private func uncachedTextLayout(
         wrappingStrategy: options.wrappingStrategy
       )
     }
-    return TextLayoutResult(lines: wrappedLines)
+    return TextLayoutResult(lines: wrappedLines, wasTruncated: hasOversizedCluster)
   }
 
   let lineLimit = max(1, rawLineLimit)
@@ -168,7 +172,7 @@ private func uncachedTextLayout(
   // truncation is required (D71). Wrapping the whole content first and
   // discarding the tail made an O(lineLimit × width) product cost
   // O(total content).
-  let rowBudget = lineLimit + 1
+  let rowBudget = lineLimit == Int.max ? Int.max : lineLimit + 1
 
   // Rows stay grouped by the source line that produced them: truncation needs
   // to reach past the last visible row into the rest of *its own* logical line,
@@ -191,7 +195,7 @@ private func uncachedTextLayout(
   // limit exists; producing fewer under an unhit budget proves the wrap
   // completed. Identical to the old `allRows.count > lineLimit`.
   guard wrappedLines.count > lineLimit else {
-    return TextLayoutResult(lines: wrappedLines)
+    return TextLayoutResult(lines: wrappedLines, wasTruncated: hasOversizedCluster)
   }
 
   var visibleLines = Array(wrappedLines.prefix(lineLimit))
@@ -269,27 +273,29 @@ private func explicitClusterLines(
   // will wrap is the same O(total content) cost the row budget exists to
   // delete. Stopping here is unobservable: reaching the cap means at least
   // `lineLimit + 1` rows, which is already `wasTruncated`.
-  let maximumLines = options.lineLimit.map { max(1, $0) + 1 }
+  let maximumLines = options.lineLimit.map { $0 == Int.max ? Int.max : max(1, $0) + 1 }
   var lines: [[TextCluster]] = [[]]
 
-  for (runIndex, run) in runs.enumerated() {
-    for character in run.text {
-      if character == "\n" {
-        if let maximumLines, lines.count >= maximumLines {
-          return lines
-        }
-        lines.append([])
-        continue
-      }
-
-      lines[lines.count - 1].append(
-        TextCluster(
-          character: character,
-          cellWidth: cellWidth(of: character),
-          runIndex: runIndex
-        )
-      )
+  // Segment the whole logical text, then attribute each indivisible grapheme
+  // to the run containing its first scalar. Style boundaries are not Unicode
+  // boundaries (a flag, accent, or ZWJ sequence can cross any number of runs).
+  let text = runs.count == 1 ? runs[0].text : runs.map(\.text).joined()
+  var runIndex = 0
+  var runEnd = runs.first?.text.utf8.count ?? 0
+  var byteOffset = 0
+  for character in text {
+    while runIndex + 1 < runs.count && byteOffset >= runEnd {
+      runIndex += 1
+      runEnd += runs[runIndex].text.utf8.count
     }
+    byteOffset += character.utf8.count
+    if character.isNewline {
+      if let maximumLines, lines.count >= maximumLines { return lines }
+      lines.append([])
+      continue
+    }
+    lines[lines.count - 1].append(
+      TextCluster(character: character, cellWidth: cellWidth(of: character), runIndex: runIndex))
   }
 
   return lines.isEmpty ? [[]] : lines

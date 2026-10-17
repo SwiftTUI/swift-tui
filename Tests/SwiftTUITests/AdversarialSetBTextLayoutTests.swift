@@ -34,7 +34,7 @@ struct AdversarialSetBTextLayoutTests {
       ("PS", "a\u{2029}b"),
     ]
     for separator in separators {
-      withKnownIssue("only \\n splits lines; CRLF, CR, NEL, LS and PS are painted as glyphs") {
+      do {
         let layout = layoutText(for: separator.text, width: 10)
         #expect(layout.lines.map(\.text) == ["a", "b"], "\(separator.name): \(layout.lines)")
         #expect(layout.size == CellSize(width: 1, height: 2), "\(separator.name): \(layout.size)")
@@ -59,7 +59,7 @@ struct AdversarialSetBTextLayoutTests {
   @Test func setB112TrailingWhitespaceAtExactWidthDoesNotSpawnARow() {
     let wrapped = layoutText(for: "alpha ", width: 5)
     #expect(wrapped.lines.first?.text.trimmingTrailingSpaces == "alpha", "\(wrapped.lines)")
-    withKnownIssue("a trailing separator at exact width opens a blank row and truncates the fit") {
+    do {
       #expect(wrapped.lines.count == 1, "\(wrapped.lines.map(\.text))")
 
       let limited = layoutText(for: "alpha ", width: 5, lineLimit: 1)
@@ -69,7 +69,8 @@ struct AdversarialSetBTextLayoutTests {
       let snapshot = render(Text("alpha "), "setB112", width: 5, height: 3)
       #expect(
         snapshot.measuredTree.measuredSize.height == 1, "\(snapshot.measuredTree.measuredSize)")
-      #expect(snapshot.rasterSurface.lines == ["alpha"], "\(snapshot.rasterSurface.lines)")
+      #expect(snapshot.rasterSurface.lines.first == "alpha", "\(snapshot.rasterSurface.lines)")
+      #expect(snapshot.rasterSurface.lines.dropFirst().allSatisfy { $0.isEmpty })
     }
 
     let twoWords = layoutText(for: "alpha beta ", width: 5)
@@ -87,7 +88,7 @@ struct AdversarialSetBTextLayoutTests {
     let snapshot = render(
       Text("ab\ncd").lineLimit(1).truncationMode(.middle), "setB113", width: 10, height: 1)
     let line = snapshot.rasterSurface.lines.first ?? ""
-    withKnownIssue("middle truncation of a fitting first line repeats it on both sides: ab…ab") {
+    do {
       #expect(text.filter { $0 == "a" }.count == 1, "\(text)")
       #expect(text.filter { $0 == "b" }.count <= 1, "\(text)")
       #expect(!line.contains("ab…ab"), "\(snapshot.rasterSurface.lines)")
@@ -114,9 +115,7 @@ struct AdversarialSetBTextLayoutTests {
       let cells = snapshot.rasterSurface.cells.flatMap { $0 }.map(\.character)
       #expect(
         cells.contains("a") && cells.contains("b"), "\(name): \(snapshot.rasterSurface.lines)")
-      withKnownIssue(
-        "no-break spaces are White_Space, so the wrapper breaks at them and drops them"
-      ) {
+      do {
         #expect(
           joined.unicodeScalars.contains(glue.unicodeScalars.first!),
           "\(name) was dropped: \(narrow.lines.map(\.text))")
@@ -135,7 +134,7 @@ struct AdversarialSetBTextLayoutTests {
   // A hyphen or dash is a break opportunity: "well-known" breaks after the
   // hyphen, never inside "known".
   @Test func setB115HyphensAndDashesAreBreakOpportunities() {
-    withKnownIssue("a dash is not a break opportunity; the word is split at the cell width") {
+    do {
       let hyphen = layoutText(for: "well-known", width: 7)
       #expect(hyphen.lines.map(\.text) == ["well-", "known"], "\(hyphen.lines.map(\.text))")
 
@@ -191,7 +190,7 @@ struct AdversarialSetBTextLayoutTests {
       let snapshot = render(
         Text(String(entry.cluster)), "setB117-\(entry.name)", width: 4, height: 1)
       // A digit with a text-presentation selector is narrow everywhere.
-      withKnownIssue("an Emoji-property base with a combining mark measures and paints two cells") {
+      do {
         #expect(
           cellWidth(of: entry.cluster) == 1, "\(entry.name): \(cellWidth(of: entry.cluster))")
         #expect(
@@ -199,8 +198,6 @@ struct AdversarialSetBTextLayoutTests {
           "\(entry.name): \(snapshot.measuredTree.measuredSize)")
         #expect(snapshot.rasterSurface.cells[0][0].spanWidth == 1, "\(entry.name)")
         #expect(snapshot.rasterSurface.cells[0][1].continuationLeadX == nil, "\(entry.name)")
-      } when: {
-        entry.name != "digit+VS15"
       }
     }
     // The genuinely wide forms stay wide: keycap and emoji presentation.
@@ -212,12 +209,10 @@ struct AdversarialSetBTextLayoutTests {
   // A line limit just below Int.max must behave like an unbounded limit, not
   // overflow the per-token row budget.
   @Test func setB118NearMaximumLineLimitsDoNotTrap() async {
-    await withKnownIssue(
-      "lineLimit Int.max - 1 overflows the per-token row budget (STUI-785 class)"
-    ) {
+    do {
       await #expect(processExitsWith: .success) {
         let layout = layoutText(for: "abcdefghij", width: 4, lineLimit: Int.max - 1)
-        #expect(layout.lines.count == 3, "\(layout.lines.map(\.text))")
+        #expect(layout.lines == layoutText(for: "abcdefghij", width: 4).lines)
         #expect(!layout.wasTruncated)
       }
     }
@@ -250,9 +245,7 @@ struct AdversarialSetBTextLayoutTests {
     let accent = render(Text("e\(Text("\u{0301}").bold())"), "setB119-accent", width: 10, height: 1)
     let accentLine = accent.rasterSurface.lines.first ?? ""
     #expect(accent.measuredTree.measuredSize.width <= 2, "\(accent.measuredTree.measuredSize)")
-    withKnownIssue(
-      "rich text measures the joined string but clusterizes per run; the run split drops glyphs"
-    ) {
+    do {
       #expect(plain.size.width == rich.size.width, "plain \(plain.size) rich \(rich.size)")
       #expect(scalars.contains(0x1F1FA) && scalars.contains(0x1F1F8), "\(painted)")
       #expect(accentLine.unicodeScalars.contains("\u{0301}"), "\(accentLine)")
@@ -266,9 +259,7 @@ struct AdversarialSetBTextLayoutTests {
     let unlimited = layoutText(for: "漢", width: 1)
     let limited = layoutText(for: "漢", width: 1, lineLimit: 1)
     let snapshot = render(Text("漢").lineLimit(1), "setB120", width: 1, height: 1)
-    withKnownIssue(
-      "a wide glyph in one column reports width 2, is never truncated, and paints nothing"
-    ) {
+    do {
       #expect(unlimited.size.width <= 1, "\(unlimited.size)")
       #expect(limited.lines.first?.text == "…", "\(limited.lines.map(\.text))")
       #expect(limited.wasTruncated)

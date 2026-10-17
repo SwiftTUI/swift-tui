@@ -41,9 +41,7 @@ struct AdversarialSetBTextInputTests {
     let shrinkBack = reduce(backward, .move(.right, selecting: true)).value.selection
     let growBack = reduce(backward, .move(.left, selecting: true)).value.selection
     #expect(growBack == TextSelection(anchor: TextOffset(5), head: TextOffset(1)), "\(growBack)")
-    withKnownIssue(
-      "Shift+Arrow steps from the selection's far edge and flips it instead of moving the head"
-    ) {
+    do {
       #expect(shrink == TextSelection(anchor: TextOffset(2), head: TextOffset(4)), "\(shrink)")
       #expect(
         shrinkBack == TextSelection(anchor: TextOffset(5), head: TextOffset(3)), "\(shrinkBack)")
@@ -62,7 +60,7 @@ struct AdversarialSetBTextInputTests {
     for _ in 0..<3 { _ = try harness.pressKey(KeyPress(.arrowRight, modifiers: .shift)) }
     _ = try harness.pressKey(KeyPress(.arrowLeft, modifiers: .shift))
     _ = try harness.pressKey(KeyPress(.character("X")))
-    withKnownIssue("Shift+Left after Shift+Right×3 collapses the selection, so X is inserted") {
+    do {
       #expect(probe.value == "Xcdefg", "\(probe.value)")
     }
   }
@@ -76,7 +74,7 @@ struct AdversarialSetBTextInputTests {
     let right = reduce(selected, .move(.right, selecting: false)).value.selection
     let reversed = TextInputValue(
       text: "abcdefg", selection: TextSelection(anchor: TextOffset(5), head: TextOffset(2)))
-    withKnownIssue("a plain arrow with a selection steps one cluster past the selection edge") {
+    do {
       #expect(left == .caret(at: TextOffset(2)), "\(left)")
       #expect(right == .caret(at: TextOffset(5)), "\(right)")
       #expect(
@@ -110,7 +108,7 @@ struct AdversarialSetBTextInputTests {
       let renderer = DefaultRenderer()
       defer { withExtendedLifetime(renderer) {} }
       let artifacts = renderer.render(
-        TextEditor(text: box.binding()).id(identity).frame(width: 10, height: 3),
+        TextEditor(text: box.binding()).id(identity).frame(width: 10, height: 4),
         context: .init(
           identity: testIdentity("Root"), environmentValues: environment,
           localKeyHandlerRegistry: registry, applyEnvironmentValues: true))
@@ -124,9 +122,7 @@ struct AdversarialSetBTextInputTests {
       let controlCells = artifacts.rasterSurface.cells.flatMap { $0 }.filter {
         $0.character.unicodeScalars.contains { $0.value == 0x0D || $0.value == 0x0A }
       }
-      withKnownIssue(
-        "the caret map breaks at CR and CRLF but the painted text keeps them as glyphs on one row"
-      ) {
+      do {
         #expect(cdRow != abRow, "\(name): the break puts cd on its own row: \(lines)")
         #expect(
           cdRow == anchor.y,
@@ -148,9 +144,7 @@ struct AdversarialSetBTextInputTests {
     let cr = TextInputValue(text: "a\rb", selection: .caret(at: TextOffset(3)))
     let crFirst = TextInputValue(text: "a\rb", selection: .caret(at: TextOffset(0)))
     let deleted = reduce(crlf, .deleteBackward(granularity: .line)).value.text
-    withKnownIssue(
-      "line metrics split on \\n only, so Home, End and line deletion ignore CR and CRLF"
-    ) {
+    do {
       #expect(lineStart == .caret(at: TextOffset(3)), "\(lineStart)")
       #expect(lineEnd == .caret(at: TextOffset(2)), "\(lineEnd)")
       #expect(
@@ -181,9 +175,7 @@ struct AdversarialSetBTextInputTests {
     let down = reduce(bottom, .move(.down, selecting: false), layout: bottomPresentation.layoutMap)
     // Shift+Up from the first row selects back to the start.
     let selectUp = reduce(top, .move(.up, selecting: true), layout: topPresentation.layoutMap)
-    withKnownIssue(
-      "Up on the first row and Down on the last row stay put instead of reaching the document ends"
-    ) {
+    do {
       #expect(up.value.selection == .caret(at: TextOffset(0)), "\(up.value.selection)")
       #expect(down.value.selection == .caret(at: TextOffset(7)), "\(down.value.selection)")
       #expect(
@@ -211,7 +203,7 @@ struct AdversarialSetBTextInputTests {
     let forward = reduce(fromStart, .move(.wordForward, selecting: false)).value.selection
     let decimal = TextInputValue(text: "3.14 x", selection: .caret(at: TextOffset(4)))
     let decimalBack = reduce(decimal, .move(.wordBackward, selecting: false)).value.selection
-    withKnownIssue("word boundaries stop at an apostrophe or a decimal point inside a word") {
+    do {
       #expect(back == .caret(at: TextOffset(0)), "\(back)")
       #expect(deleted == " stop", "\(deleted)")
       #expect(forward == .caret(at: TextOffset(5)), "\(forward)")
@@ -231,7 +223,7 @@ struct AdversarialSetBTextInputTests {
       for: KeyPress(.backspace, modifiers: .shift), traits: .singleLine)
     let shiftDelete = textInputCommand(
       for: KeyPress(.delete, modifiers: .shift), traits: .multiline)
-    withKnownIssue("a shifted Backspace or Delete maps to no command and is absorbed as a no-op") {
+    do {
       #expect(
         shiftBackspace == .deleteBackward(granularity: .character),
         "\(String(describing: shiftBackspace))")
@@ -254,7 +246,7 @@ struct AdversarialSetBTextInputTests {
     _ = try harness.pressKey(KeyPress(.home))
     _ = try harness.pressKey(KeyPress(.delete, modifiers: .shift))
     let afterDelete = probe.value
-    withKnownIssue("Shift+Backspace and Shift+Delete leave the field unchanged") {
+    do {
       #expect(afterBackspace == "ab", "\(afterBackspace)")
       #expect(afterDelete == "b", "\(afterDelete)")
     }
@@ -277,10 +269,8 @@ struct AdversarialSetBTextInputTests {
           localKeyHandlerRegistry: registry, applyEnvironmentValues: true),
         proposal: .init(width: 20, height: 1))
       let line = artifacts.rasterSurface.lines.first ?? ""
-      withKnownIssue("the prompt is hidden as soon as the empty field takes focus") {
+      do {
         #expect(line.contains("Name"), "focused=\(focused): \(artifacts.rasterSurface.lines)")
-      } when: {
-        focused
       }
     }
   }
@@ -309,9 +299,7 @@ struct AdversarialSetBTextInputTests {
     let barIndex = line.firstIndex(of: "|").map { line.distance(from: line.startIndex, to: $0) }
     #expect(barIndex == 5, "the field occupies five cells: \(line)")
     let field = String(line.prefix(5))
-    withKnownIssue(
-      "a single-line field is fixed-size horizontally and overflows its frame over its siblings"
-    ) {
+    do {
       #expect(field.contains("j") || field.contains("_"), "the caret end is in view: \(line)")
       #expect(!line.contains("abcde"), "the leading content scrolled out of view: \(line)")
     }
@@ -341,9 +329,7 @@ struct AdversarialSetBTextInputTests {
     let writesAfterLF = probe.writes
     let crlf = try send(.setValue(.text("a\r\nb")))
     let writesAfterCRLF = probe.writes
-    withKnownIssue(
-      "setValue strips CR and LF through sanitizedInsertion and reports the write as accepted"
-    ) {
+    do {
       #expect(rejected == .invalidValue, "\(rejected)")
       #expect(writesAfterLF.isEmpty, "\(writesAfterLF)")
       #expect(crlf == .invalidValue, "\(crlf)")

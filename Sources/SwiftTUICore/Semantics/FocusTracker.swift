@@ -58,7 +58,6 @@ public final class FocusTracker {
   public func updateRegions(_ regions: [FocusRegion]) -> Bool {
     let previousFocus = currentFocusIdentity
     let previousFocusRegion = currentFocusRegion()
-    let wasPreservingNoFocus = prefersNoFocus
     recordModalRestorationIfNeeded(
       previousFocusRegion: previousFocusRegion,
       nextRegions: regions
@@ -94,15 +93,6 @@ public final class FocusTracker {
       nextRegions: regions,
       consumedIndex: modalRestoration?.stackIndex
     )
-
-    // Keep the initial automatic focus adoption as runtime state without forcing an
-    // immediate second frame before the user has interacted.
-    if previousFocus == nil,
-      !wasPreservingNoFocus,
-      currentFocusIdentity != nil
-    {
-      return false
-    }
 
     return notifyIfFocusChanged(from: previousFocus)
   }

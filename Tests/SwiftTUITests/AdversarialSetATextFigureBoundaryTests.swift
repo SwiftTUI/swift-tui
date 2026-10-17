@@ -18,7 +18,7 @@ struct AdversarialSetATextFigureBoundaryTests {
     let plain = layoutText(for: text.content, width: nil)
     #expect(plain.size == .init(width: 3, height: 1))
     let composed = layoutRichText(for: payload, options: .init())
-    withKnownIssue("STUI-1007: rich runs independently split a grapheme spanning a style seam") {
+    do {
       #expect(composed.size == plain.size)
     }
   }
@@ -335,7 +335,7 @@ struct AdversarialSetATextFigureBoundaryTests {
     let afterOrder = try #require(after.detail?["order"])
     // A settled 256-entry cache may retain some stale records, but another
     // identical 4096-hit epoch must not add a proportional history forever.
-    withKnownIssue("STUI-1008: fixed metric-cache occupancy retains unbounded hit history") {
+    do {
       #expect(
         afterOrder - beforeOrder <= 1024,
         "Fixed cache occupancy \(after.count); recency records grew \(beforeOrder) → \(afterOrder)")

@@ -160,13 +160,15 @@ public struct TextFieldStyleConfiguration: Sendable {
     package var ownerIdentity: Identity?
     package var caretAnchor: CellPoint?
     package var accessibilityText: TextInputAccessibilityText?
+    package var scrollsToCaret: Bool
 
     nonisolated package init(
       displayText: String,
       displayRuns: [TextInputDisplayRun]? = nil,
       ownerIdentity: Identity? = nil,
       caretAnchor: CellPoint? = nil,
-      accessibilityText: TextInputAccessibilityText? = nil
+      accessibilityText: TextInputAccessibilityText? = nil,
+      scrollsToCaret: Bool = false
     ) {
       self.displayText = displayText
       self.displayRuns =
@@ -176,6 +178,7 @@ public struct TextFieldStyleConfiguration: Sendable {
       self.ownerIdentity = ownerIdentity
       self.caretAnchor = caretAnchor
       self.accessibilityText = accessibilityText
+      self.scrollsToCaret = scrollsToCaret
     }
 
     /// Field content for a fixture-constructed configuration: it shows
@@ -192,13 +195,17 @@ public struct TextFieldStyleConfiguration: Sendable {
 
     /// The captured field content.
     public var body: some View {
-      TextInputContent(
-        displayText: displayText,
-        displayRuns: displayRuns,
-        ownerIdentity: ownerIdentity,
-        caretAnchor: caretAnchor,
-        accessibilityText: accessibilityText
-      )
+      TextFieldViewportLayout(caretColumn: scrollsToCaret ? caretAnchor?.x : nil) {
+        TextInputContent(
+          displayText: displayText,
+          displayRuns: displayRuns,
+          ownerIdentity: ownerIdentity,
+          caretAnchor: caretAnchor,
+          accessibilityText: accessibilityText
+        )
+        .fixedSize(horizontal: true, vertical: false)
+      }
+      .clipped()
     }
   }
 
@@ -555,7 +562,6 @@ package struct PlainTextFieldStyleBody: View {
       : configuration.chrome.foregroundStyle
     let field =
       configuration.fieldContent
-      .fixedSize(horizontal: true, vertical: false)
       .foregroundStyle(textStyle)
       .drawMetadata(.init(opacity: configuration.chrome.opacity))
 
@@ -583,7 +589,6 @@ package struct RoundedBorderTextFieldStyleBody: View {
       : configuration.chrome.foregroundStyle
     let baseField =
       configuration.fieldContent
-      .fixedSize(horizontal: true, vertical: false)
       .foregroundStyle(textStyle)
       .drawMetadata(.init(opacity: configuration.chrome.opacity))
     let field =
@@ -623,5 +628,46 @@ package struct RoundedBorderTextFieldStyleBody: View {
         minimumHeight: (configuration.showsLabel ? 1 : 0) + 3
       )
     )
+  }
+}
+
+// The protected editing slot owns horizontal visibility. A style can decorate
+// it, but cannot accidentally remove caret tracking by choosing its own frame.
+private struct TextFieldViewportLayout: Layout, StackMinimumLayoutProviding {
+  var caretColumn: Int?
+
+  func stackMinimumMainSize(
+    axis: SwiftTUICore.Axis, idealSize: LayoutSize, contentMinimum: Int
+  ) -> Int? {
+    axis == .horizontal ? 0 : nil
+  }
+
+  func sizeThatFits(
+    proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout Void
+  ) -> LayoutSize {
+    guard let child = subviews.first else { return .zero }
+    let ideal = child.sizeThatFits(.unspecified)
+    let idealWidth = max(ideal.width, caretColumn.map { $0 + 1 } ?? 0)
+    let width: Int
+    if case .finite(let proposed) = proposal.width {
+      width = min(idealWidth, max(0, proposed))
+    } else {
+      width = idealWidth
+    }
+    return .init(width: width, height: ideal.height)
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect, proposal: ProposedViewSize,
+    subviews: LayoutSubviews, cache: inout Void
+  ) {
+    guard let child = subviews.first else { return }
+    let ideal = child.sizeThatFits(.unspecified)
+    // Reserve one cell at the caret, including a terminal-native cursor that
+    // follows the final glyph without adding a synthetic underscore.
+    let offset = caretColumn.map { max(0, $0 - max(0, bounds.size.width - 1)) } ?? 0
+    child.place(
+      at: .init(x: bounds.origin.x - offset, y: bounds.origin.y),
+      anchor: .topLeading, proposal: .init(width: ideal.width, height: ideal.height))
   }
 }

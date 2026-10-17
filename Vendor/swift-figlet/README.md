@@ -14,3 +14,8 @@ curated FIGlet font set; individual FIGfonts retain their original headers.
 These targets stay Foundation-free because the Foundation-free `SwiftTUIViews`
 layer re-exports them (enforced by the repo's
 `no-foundation-in-library-products` hook).
+
+Glyph lookup uses Swift `Character` equality so canonically equivalent input
+shares measurement and rendering. Font rows are normalized to rectangular glyphs
+before smushing. TheDraw fonts receive a space advance from their spacing field
+(with a minimum of one column), since their stored glyph table starts at `!`.

@@ -22,7 +22,7 @@ struct AdversarialSetAContentTests {
     let windows = layoutText(for: "north\r\n\r\nsouth\r\n", width: 12)
     let unix = layoutText(for: "north\n\nsouth\n", width: 12)
     #expect(unix.lines.map(\.text) == ["north", "", "south", ""])
-    withKnownIssue("STUI-961: text layout does not recognize a CRLF Character as a line break") {
+    do {
       #expect(windows.lines.map(\.text) == unix.lines.map(\.text))
       #expect(windows.size == unix.size)
     }

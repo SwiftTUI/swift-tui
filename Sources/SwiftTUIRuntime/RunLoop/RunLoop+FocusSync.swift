@@ -269,7 +269,6 @@ extension RunLoop {
     }
 
     let focusIdentityBeforeRegionUpdate = focusTracker.currentFocusIdentity
-    let hadFocusBeforeRegionUpdate = focusIdentityBeforeRegionUpdate != nil
     var focusChanged = focusTracker.updateRegions(
       renderedArtifacts.semanticSnapshot.focusRegions)
     if let pending = pendingKeyFocus {
@@ -332,14 +331,6 @@ extension RunLoop {
         focusChanged = focusTracker.setFocus(to: pending.originIdentity) || focusChanged
       }
     }
-    // Initial focus auto-adoption (nil → a control) is deliberately *not* flagged
-    // as a change by `updateRegions` (it avoids forcing a second frame in the
-    // legacy loop). It is still a focus-location establishment: in single-pass
-    // mode the focused subtree it adopts may publish focused values, so the
-    // committed frame must reflect it. Treat the nil → focused transition as a
-    // location change for the eager re-render below.
-    let focusJustEstablished =
-      !hadFocusBeforeRegionUpdate && focusTracker.currentFocusIdentity != nil
     let appliedFocusRequest = applyDesiredFocusRequest(desiredFocusRequest)
     let appliedDefaultFocusRequest = applyDesiredFocusRequest(defaultFocusRequest)
     // Binding `.defaultFocus` arrivals — fresh subtrees whose default lost
@@ -412,7 +403,7 @@ extension RunLoop {
       // `didEagerFocusLocationRerender` (the termination guarantee); any residual
       // change after it lags a frame.
       let focusLocationChanged =
-        focusChanged || focusJustEstablished || appliedFocusRequest
+        focusChanged || appliedFocusRequest
         || appliedDefaultFocusRequest || armedArrivalDefault || focusStateChanged
         || scrollPositionChanged
         || previousFrameFocusIdentity != focusTracker.currentFocusIdentity

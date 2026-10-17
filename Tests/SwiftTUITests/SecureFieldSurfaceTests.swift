@@ -49,13 +49,20 @@ struct SecureFieldSurfaceTests {
     #expect(
       promptArtifacts.rasterSurface.lines.joined(separator: "\n").contains("Password")
     )
-    #expect(focusedArtifacts.rasterSurface.lines.joined(separator: "\n").contains("_"))
+    #expect(focusedArtifacts.rasterSurface.lines.joined(separator: "\n").contains("Password"))
+    let caretCells = focusedArtifacts.rasterSurface.cells.flatMap { $0 }.filter {
+      $0.style?.emphasis.contains(.reverse) == true
+    }
+    #expect(caretCells.map(\.character) == ["P"])
 
-    #expect(registry.dispatch(identity: testIdentity("SecretField"), keyPress: KeyPress(.character("h"))))
+    #expect(
+      registry.dispatch(identity: testIdentity("SecretField"), keyPress: KeyPress(.character("h"))))
     #expect(box.value == "h")
-    #expect(registry.dispatch(identity: testIdentity("SecretField"), keyPress: KeyPress(.character("u"))))
+    #expect(
+      registry.dispatch(identity: testIdentity("SecretField"), keyPress: KeyPress(.character("u"))))
     #expect(box.value == "hu")
-    #expect(registry.dispatch(identity: testIdentity("SecretField"), keyPress: KeyPress(.backspace)))
+    #expect(
+      registry.dispatch(identity: testIdentity("SecretField"), keyPress: KeyPress(.backspace)))
     #expect(box.value == "h")
 
     let updatedArtifacts = DefaultRenderer().render(

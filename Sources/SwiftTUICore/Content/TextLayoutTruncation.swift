@@ -101,10 +101,11 @@ func truncating(
   case .middle:
     let leadingWidth = availableWidth / 2
     let trailingWidth = availableWidth - leadingWidth
+    let leading = fittingLeadingClusters(in: line.clusters, width: leadingWidth)
+    let remainder = Array(line.clusters.dropFirst(leading.count))
     return .init(
-      clusters: fittingLeadingClusters(in: line.clusters, width: leadingWidth)
-        + [ellipsis]
-        + fittingTrailingClusters(in: line.clusters, width: trailingWidth)
+      clusters: leading + [ellipsis]
+        + fittingTrailingClusters(in: remainder, width: trailingWidth)
     )
   }
 }

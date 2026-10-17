@@ -53,6 +53,11 @@ struct TextLayoutRowBudgetTests {
       ("    indented content here", 6),
       // A trailing separator with nothing after it (the `pendingSeparator` tail).
       ("alpha beta ", 5),
+      // Exact-width and Unicode boundary seams must obey the same prefix rule.
+      ("界\u{200B}", 2),
+      ("a\u{00A0}b c", 2),
+      ("well-known fact", 7),
+      ("界x", 1),
       // Wide (2-cell) clusters.
       ("漢字漢字漢字漢字漢字", 5),
     ]

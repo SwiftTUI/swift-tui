@@ -14,7 +14,6 @@ package func cellWidth(of character: Character) -> Int {
   // Multi-scalar or non-ASCII width is intentionally approximate: it follows
   // the terminal behavior this renderer has historically depended on for
   // emoji, VS16, East Asian wide ranges, and pure zero-width clusters.
-  var scalarCount = 0
   var containsEmojiPresentation = false
   var containsEmoji = false
   var containsTextPresentation = false
@@ -23,7 +22,6 @@ package func cellWidth(of character: Character) -> Int {
   var allZeroWidth = true
 
   for scalar in scalars {
-    scalarCount += 1
     if scalar.properties.isEmojiPresentation {
       containsEmojiPresentation = true
     }
@@ -50,7 +48,7 @@ package func cellWidth(of character: Character) -> Int {
     }
     return allZeroWidth ? 0 : 1
   }
-  if containsEmojiPresentation || (scalarCount > 1 && containsEmoji) {
+  if containsEmojiPresentation {
     return 2
   }
   if containsVS16 && containsEmoji {

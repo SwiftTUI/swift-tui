@@ -73,6 +73,7 @@ package enum TextFigureSupport {
       cached.generation = nextMetricsCacheGeneration(in: &storage)
       storage.entries[payload] = cached
       storage.order.append(.init(payload: payload, generation: cached.generation))
+      evictMetricsCacheIfNeeded(in: &storage)
       return cached.metrics
     }) {
       return cached
@@ -99,6 +100,7 @@ package enum TextFigureSupport {
         cached.generation = nextMetricsCacheGeneration(in: &storage)
         storage.entries[payload] = cached
         storage.order.append(.init(payload: payload, generation: cached.generation))
+        evictMetricsCacheIfNeeded(in: &storage)
         return
       }
 
@@ -119,7 +121,7 @@ package enum TextFigureSupport {
     let renderedWidth: Int? =
       switch proposal.width {
       case .finite(let width):
-        max(metrics.minimumWidth, max(0, width))
+        max(metrics.minimumWidth, max(1, width))
       case .unspecified, .infinity:
         nil
       }
@@ -226,6 +228,14 @@ package enum TextFigureSupport {
         continue
       }
       storage.entries.removeValue(forKey: victim.payload)
+    }
+    // Occupancy and recency history are independently bounded. Hits also
+    // append history, so pruning only on entry eviction cannot bound memory.
+    if storage.order.count > metricsCacheCapacity * 2 {
+      storage.order = Deque(
+        storage.order.filter { record in
+          storage.entries[record.payload]?.generation == record.generation
+        })
     }
   }
   private static func renderedLines(

@@ -30,7 +30,7 @@ package struct TextInputPresentation: Equatable, Sendable {
     cursorFollowsFocus: Bool,
     width: Int?
   ) {
-    let shouldShowPrompt = value.text.isEmpty && !isFocused && prompt != nil
+    let shouldShowPrompt = value.text.isEmpty && prompt != nil
     let shouldDrawSyntheticCaret = isFocused && !cursorFollowsFocus && value.selection.isCollapsed
     let projectedClusters = Self.projectedClusters(
       value: value,
@@ -51,7 +51,9 @@ package struct TextInputPresentation: Equatable, Sendable {
       selectedRange: selectedRange,
       caretOffset: shouldDrawSyntheticCaret ? value.selection.head : nil
     )
-    if shouldDrawSyntheticCaret && value.selection.head.rawValue == value.text.count {
+    if shouldDrawSyntheticCaret && !shouldShowPrompt
+      && value.selection.head.rawValue == value.text.count
+    {
       displayRuns.append(TextInputDisplayRun(text: "_", isSelected: false))
     }
     let displayText = displayRuns.map(\.text).joined()
@@ -99,9 +101,7 @@ package struct TextInputPresentation: Equatable, Sendable {
       return TextInputProjectedCluster(
         textRange: TextRange(TextOffset(offset)..<TextOffset(offset + 1)),
         display: display,
-        isNewline: character.unicodeScalars.allSatisfy {
-          $0.value == 0x0A || $0.value == 0x0D
-        }
+        isNewline: character.isNewline
       )
     }
   }
@@ -113,8 +113,10 @@ package struct TextInputPresentation: Equatable, Sendable {
   ) -> [TextInputDisplayRun] {
     var runs: [TextInputDisplayRun] = []
 
-    for cluster in clusters {
-      let isCaret = caretOffset == cluster.textRange.lowerBound
+    for (index, cluster) in clusters.enumerated() {
+      let isCaret =
+        caretOffset == cluster.textRange.lowerBound
+        && (!cluster.textRange.isEmpty || index == 0)
       // Highlight the existing glyph without shifting later text. At a line
       // break there is no glyph, so supply the empty caret cell before it.
       if isCaret && cluster.isNewline {

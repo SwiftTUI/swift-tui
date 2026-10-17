@@ -207,7 +207,8 @@ extension TextField {
           text: synchronizedValue.text,
           anchor: synchronizedValue.selection.anchor.rawValue,
           head: synchronizedValue.selection.head.rawValue,
-          displayText: presentation.displayText)
+          displayText: presentation.displayText),
+        scrollsToCaret: isFocused
       ),
       isShowingPrompt: presentation.isShowingPrompt,
       label: .init(
