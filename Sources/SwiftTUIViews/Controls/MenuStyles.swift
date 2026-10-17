@@ -205,7 +205,9 @@ public struct MenuStyleConfiguration: Sendable {
 
     private var contentSemantics: SemanticMetadata {
       guard let usageIdentity else { return .init() }
-      var metadata = SemanticMetadata(accessibilityRole: .menu)
+      // This is the command group, not a control with an activation route.
+      // Keyboard traversal enters its authored commands directly.
+      var metadata = SemanticMetadata(isFocusable: false, accessibilityRole: .menu)
       metadata.isAccessibilityContent = true
       metadata.accessibilityProperties = .init(
         labelledBy: [usageIdentity],

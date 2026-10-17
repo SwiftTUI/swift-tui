@@ -307,11 +307,11 @@ public struct ContentShapeModifier: IterativePrimitiveViewModifier, Sendable, Eq
       guard explicitRect != nil || explicitPath != nil else { return [node] }
       node.semanticMetadata = node.semanticMetadata.merging(
         SemanticMetadata(
-          participatesInPointerHitTesting: true,
           explicitInteractionRect: explicitRect,
           explicitInteractionPath: explicitPath
         )
       )
+      node.layoutMetadata = node.layoutMetadata.constrainingDescendantPointerTargets()
       return [node]
 
     }

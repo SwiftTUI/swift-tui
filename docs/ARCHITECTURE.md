@@ -517,8 +517,16 @@ crosses the host boundary. Alert and confirmation share PromptStyle; cover and
 popover have independent presentation-value families. Boolean and item sheet
 declarations both resolve SheetStyle. Coordinators retain focus, modal policy,
 stacking, Escape, action scopes, and committed dismissal observers.
-Painting and Escape share cross-family activation order, and the topmost modal
-suppresses routes in all earlier surfaces. Popover content resolves eagerly;
+Painting and Escape share cross-family visible activation order, and the topmost
+modal suppresses routes in all earlier surfaces. Queued prompts retain FIFO
+admission order; promotion mints a new visible activation ordinal, checkpointed
+with the queue head. Modal content starts with enabled interaction and honors
+its own disabled modifiers independently of its presenter.
+`SwiftTUICore/Semantics/FocusOrderAnchor.swift` places detached nonmodal focus
+groups immediately after their source without changing paint or pointer order.
+`ContentShapeConstraint.swift` distinguishes authored subtree pointer constraints
+from a control's own explicit pointer target. The semantic walk intersects
+ancestor rectangles and retains all enclosing paths; keyboard focus is independent. Popover content resolves eagerly;
 its custom layout reads the source's current rendered frame during placement,
 so nested declarations reach presentation reconciliation before layout.
 

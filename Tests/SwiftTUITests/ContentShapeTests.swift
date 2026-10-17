@@ -8,6 +8,56 @@ import Testing
 @MainActor
 @Suite
 struct ContentShapeTests {
+  @Test("enclosing paths and rects intersect across identity and layout wrappers")
+  func enclosingShapesIntersect() throws {
+    var triangle = Path()
+    triangle.move(to: .init(x: 0, y: 0))
+    triangle.addLine(to: .init(x: 6, y: 0))
+    triangle.addLine(to: .init(x: 0, y: 6))
+    triangle.close()
+    let artifacts = DefaultRenderer().render(
+      VStack {
+        Button("Target") {}
+          .contentShape(CellRect(origin: .zero, size: .init(width: 12, height: 6)))
+          .frame(width: 12, height: 6, alignment: .topLeading).id("re-rooted-child")
+      }
+      .frame(width: 6, height: 6, alignment: .topLeading)
+      .contentShape(triangle)
+      .padding(1)
+      .contentShape(CellRect(origin: .zero, size: .init(width: 5, height: 8))),
+      proposal: .init(width: 20, height: 10))
+    let regions = artifacts.semanticSnapshot.interactionRegions
+    try #require(!regions.isEmpty)
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    func contains(_ x: Double, _ y: Double) -> Bool {
+      regions.contains {
+        $0.contains(
+          .subCell(
+            location: .init(x: x, y: y), source: .nativePixels, metrics: metrics))
+      }
+    }
+    #expect(contains(2, 2))
+    #expect(!contains(4, 5))  // inside both bounding boxes, outside the triangle
+    #expect(!contains(5.5, 1.2))  // inside the triangle, outside the outer rectangle
+    #expect(
+      artifacts.semanticSnapshot.focusRegions.contains {
+        $0.identity.path.contains("re-rooted-child")
+      })
+  }
+
+  @Test("disjoint ancestor content shapes remain empty")
+  func disjointShapesDoNotResetClipping() {
+    let artifacts = DefaultRenderer().render(
+      VStack {
+        Button("Target") {}.contentShape(
+          CellRect(origin: .init(x: 10, y: 0), size: .init(width: 5, height: 2)))
+      }
+      .contentShape(CellRect(origin: .zero, size: .init(width: 5, height: 2))),
+      proposal: .init(width: 20, height: 4))
+    #expect(artifacts.semanticSnapshot.interactionRegions.isEmpty)
+    #expect(!artifacts.semanticSnapshot.focusRegions.isEmpty)
+  }
+
   @Test(".contentShape overrides the hit-test rect")
   func contentShapeOverrides() throws {
     let root = Identity(components: [IdentityComponent(rawValue: "root")])

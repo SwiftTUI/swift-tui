@@ -126,7 +126,7 @@ struct AdversarialSetAInteractionTests {
     log.events.removeAll()
     try h.click(.init(x: 12, y: 0))
     let hitRects = h.runLoop.latestSemanticSnapshot.interactionRegions.map(\.rect)
-    withKnownIssue("STUI-970: descendant control hit regions escape an enclosing content shape") {
+    do {
       #expect(
         log.events.isEmpty,
         "Outside (12,0) must miss explicit (0,0,6,1); published interaction rects: \(hitRects)")

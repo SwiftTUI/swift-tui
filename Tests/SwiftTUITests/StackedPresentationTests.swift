@@ -74,6 +74,29 @@ struct StackedPresentationTests {
     #expect(entries.map { $0.portalEntryID?.token } == ["alert-a"])
   }
 
+  @Test("queue promotion and same-head refresh preserve checkpointed visible ordering")
+  func queuedVisibleActivationCheckpoints() throws {
+    let registry = PresentationCoordinatorRegistry()
+    let first = stackedPromptItem(id: "a", spec: alertPromptPresentationSpec())
+    let second = stackedPromptItem(id: "b", spec: alertPromptPresentationSpec())
+    registry.alert.present(first)
+    registry.alert.present(second)
+    _ = registry.overlayEntries()
+    registry.sheet.present(stackedPromptItem(id: "s", spec: sheetPromptPresentationSpec()))
+    let before = registry.overlayEntries().map(\.ordering)
+    let checkpoint = registry.makeCheckpoint()
+    registry.alert.dismiss(id: first.id)
+    let promoted = registry.overlayEntries()
+    #expect(promoted.last?.portalEntryID?.token == "b")
+    let promotedOrder = promoted.map(\.ordering)
+    registry.alert.present(second)
+    #expect(registry.overlayEntries().map(\.ordering) == promotedOrder)
+    registry.restoreCheckpoint(checkpoint)
+    #expect(registry.overlayEntries().map(\.ordering) == before)
+    registry.alert.dismiss(id: first.id)
+    #expect(registry.overlayEntries().last?.portalEntryID?.token == "b")
+  }
+
   @Test("confirmation coordinator exposes the oldest active item as a FIFO queue head")
   func confirmationCoordinatorExposesOldestActiveItem() {
     let registry = PresentationCoordinatorRegistry()

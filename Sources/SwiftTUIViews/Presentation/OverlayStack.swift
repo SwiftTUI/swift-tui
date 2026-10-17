@@ -199,6 +199,12 @@ private struct OverlayStackEntryHost: PrimitiveView, IterativeResolvableView {
     if let sourceEnvironmentValues = entry.sourceEnvironmentValues {
       bodyContext = bodyContext.replacingEnvironmentValues(sourceEnvironmentValues)
     }
+    if entry.modalPolicy == .disablesBaseInteraction {
+      // A modal owns an independent interaction domain. Preserve styles and
+      // values from its presenter, but let the modal's own disabled modifiers
+      // govern its controls instead of inheriting the presenter's lockout.
+      bodyContext = bodyContext.settingEnvironment(\.isEnabled, to: true)
+    }
     return entry.payload.resolveWork(in: bodyContext).map { bodyNode in
       var entryNode = ResolvedNode(
         identity: context.identity,
@@ -216,6 +222,9 @@ private struct OverlayStackEntryHost: PrimitiveView, IterativeResolvableView {
           interactionAvailability: interactionBlocked ? .disabled(reason: .modalOverlay) : .enabled
         )
       )
+      if entry.modalPolicy == .nonModal, let source = entry.portalEntryID?.sourceIdentity {
+        entryNode.layoutMetadata = entryNode.layoutMetadata.anchoringFocusOrder(after: source)
+      }
       if let onDismiss = entry.onDismiss {
         let ordinal = entryNode.lifecycleMetadata.disappearHandlerIDs.count
         let handlerID =

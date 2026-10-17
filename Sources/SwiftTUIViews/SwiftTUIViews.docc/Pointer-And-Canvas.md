@@ -139,7 +139,10 @@ while views are refactored.
 
 Use `View.contentShape(_:)` when a view's pointer target is not its full
 placed rectangle. Rectangular shapes remain cell-denominated through
-`CellRect`. Path shapes use continuous `Path` values.
+`CellRect`. Path shapes use continuous `Path` values. An enclosing content
+shape constrains descendant pointer targets; nested shapes intersect in their
+placed coordinate spaces, including across explicit identities. Content shapes
+do not restrict keyboard focus.
 
 ## Runtime Capability Display
 

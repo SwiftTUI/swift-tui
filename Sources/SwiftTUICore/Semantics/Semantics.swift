@@ -43,11 +43,28 @@ package struct SemanticExtractor: Sendable {
     var hitTestOrder = 0
     var modalNodes: [(identity: Identity, scope: [Identity])] = []
     var activeAccessibilityModal: [Identity]?
+    var focusAncestors: [Identity?] = []
+    var focusSourceOwners: [Identity: Identity] = [:]
+    var anchoredFocusStarts: [Identity: Int] = [:]
+    var anchoredFocusGroups: [(anchor: Identity, identities: [Identity])] = []
 
     walk(
       placed,
       hitTestOrder: &hitTestOrder,
       preVisit: { node, context, order, nextHitTestOrder in
+        let interactionStart = interactionRegions.count
+        let focusStart = focusRegions.count
+        defer {
+          let owner =
+            focusRegions[focusStart...].first { $0.identity == node.identity }?.identity
+            ?? focusAncestors.last.flatMap { $0 }
+          focusAncestors.append(owner)
+          focusSourceOwners[node.identity] = owner
+          constrainInteractions(&interactionRegions, from: interactionStart, context: context)
+        }
+        if node.layoutMetadata.focusOrderAnchor != nil {
+          anchoredFocusStarts[node.identity] = focusRegions.count
+        }
         let scopePath = context.scopePath
         let sectionIdentity = context.sectionIdentity
         let modalFocusScopePath = context.modalFocusScopePath
@@ -264,6 +281,18 @@ package struct SemanticExtractor: Sendable {
         }
       },
       postVisit: { node, context, nextHitTestOrder in
+        defer { _ = focusAncestors.popLast() }
+        let interactionStart = interactionRegions.count
+        defer {
+          constrainInteractions(&interactionRegions, from: interactionStart, context: context)
+        }
+        defer {
+          if let anchor = node.layoutMetadata.focusOrderAnchor,
+            let start = anchoredFocusStarts.removeValue(forKey: node.identity)
+          {
+            anchoredFocusGroups.append((anchor, focusRegions[start...].map(\.identity)))
+          }
+        }
         guard node.semanticMetadata.accessibilityStructure?.isVirtual != true else { return }
         let scopePath = context.scopePath
         let sectionIdentity = context.sectionIdentity
@@ -297,6 +326,20 @@ package struct SemanticExtractor: Sendable {
       }
     )
 
+    for group in anchoredFocusGroups {
+      let anchor = focusSourceOwners[group.anchor] ?? group.anchor
+      let members = Set(group.identities)
+      let inserted = focusRegions.filter { members.contains($0.identity) }
+      guard !inserted.isEmpty, !members.contains(anchor),
+        focusRegions.contains(where: { $0.identity == anchor || $0.ownerIdentity == anchor })
+      else { continue }
+      focusRegions.removeAll { members.contains($0.identity) }
+      if let index = focusRegions.lastIndex(where: {
+        $0.identity == anchor || $0.ownerIdentity == anchor
+      }) {
+        focusRegions.insert(contentsOf: inserted, at: index + 1)
+      }
+    }
     let activeCommandScopePath = resolveActiveCommandScopePath(from: commandHostScopePaths)
 
     let scrollTargets = scrollTargets(from: placed)
@@ -379,6 +422,8 @@ extension SemanticExtractor {
     let sectionIdentity: Identity?
     let modalFocusScopePath: [Identity]?
     let clipRect: CellRect?
+    var pointerClipRect: CellRect? = nil
+    var pointerClipPaths: [Path] = []
     /// `true` when an ancestor on the current walk chain is marked
     /// `sealsFocusDescendants`. Propagated to descendants so focus
     /// region emission can skip them even though the sealing node
@@ -459,11 +504,28 @@ extension SemanticExtractor {
           inherited: frame.context.clipRect,
           next: frame.node.clipBounds
         )
+        let constrainsChildren = frame.node.layoutMetadata.constrainsDescendantPointerTargets
+        let explicitPath =
+          constrainsChildren
+          ? transformedExplicitInteractionPath(for: frame.node) : nil
+        let ownPointerClip: CellRect? =
+          if !constrainsChildren {
+            nil
+          } else if let explicitPath {
+            interactionRect(for: explicitPath, clippedTo: nodeClipRect)
+              ?? .init(origin: .zero, size: .zero)
+          } else {
+            transformedExplicitInteractionRect(for: frame.node)
+          }
+        let pointerClip = combinedClipRect(
+          inherited: frame.context.pointerClipRect, next: ownPointerClip)
+        let pointerPaths = frame.context.pointerClipPaths + (explicitPath.map { [$0] } ?? [])
         let nodeContext = VisitContext(
           scopePath: nodeScopePath,
           sectionIdentity: nodeSectionIdentity,
           modalFocusScopePath: nodeModalFocusScopePath,
           clipRect: nodeClipRect,
+          pointerClipRect: pointerClip, pointerClipPaths: pointerPaths,
           sealingParentOnChain: frame.context.sealingParentOnChain,
           interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain,
           hitTestingDisabledOnChain: frame.context.hitTestingDisabledOnChain,
@@ -495,6 +557,7 @@ extension SemanticExtractor {
           sectionIdentity: nodeSectionIdentity,
           modalFocusScopePath: nodeModalFocusScopePath,
           clipRect: combinedClipRect(inherited: nodeClipRect, next: contentClip),
+          pointerClipRect: pointerClip, pointerClipPaths: pointerPaths,
           sealingParentOnChain: frame.context.sealingParentOnChain
             || frame.node.semanticMetadata.sealsFocusDescendants,
           interactionsDisabledOnChain: frame.context.interactionsDisabledOnChain
@@ -543,7 +606,28 @@ extension SemanticExtractor {
     case (.none, .some(let next)):
       next
     case (.some(let inherited), .some(let next)):
-      inherited.intersection(next)
+      inherited.intersection(next) ?? .init(origin: .zero, size: .zero)
+    }
+  }
+
+  /// Applies one inherited constraint path to every route a primitive emits,
+  /// including synthetic rows, indicators and gestures. Keyboard focus does
+  /// not use pointer content shapes.
+  private func constrainInteractions(
+    _ regions: inout [InteractionRegion], from start: Int, context: VisitContext
+  ) {
+    guard context.pointerClipRect != nil || !context.pointerClipPaths.isEmpty else { return }
+    var index = start
+    while index < regions.count {
+      if let clip = context.pointerClipRect {
+        guard let rect = regions[index].rect.intersection(clip) else {
+          regions.remove(at: index)
+          continue
+        }
+        regions[index].rect = rect
+      }
+      regions[index].ancestorContentShapes = context.pointerClipPaths
+      index += 1
     }
   }
 

@@ -7,8 +7,12 @@ package final class PresentationCoordinatorBox<C: ManagedPresentationCoordinator
 where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
   package struct Checkpoint: Sendable {
     fileprivate var coordinator: StoredPresentationCoordinatorCheckpoint<C.Item>?
+    fileprivate var visibleQueueHead: String?
+    fileprivate var visibleQueueOrdinal: Int?
   }
 
+  private var visibleQueueHead: String?
+  private var visibleQueueOrdinal: Int?
   private var coordinator: C?
   private weak var configuredInvalidator: (any Invalidating)?
   private var configuredInvalidationIdentity: Identity?
@@ -17,11 +21,14 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
 
   package func makeCheckpoint() -> Checkpoint {
     Checkpoint(
-      coordinator: coordinator?.makeCheckpoint()
+      coordinator: coordinator?.makeCheckpoint(),
+      visibleQueueHead: visibleQueueHead, visibleQueueOrdinal: visibleQueueOrdinal
     )
   }
 
   package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    visibleQueueHead = checkpoint.visibleQueueHead
+    visibleQueueOrdinal = checkpoint.visibleQueueOrdinal
     guard let coordinatorCheckpoint = checkpoint.coordinator else {
       coordinator = nil
       return
@@ -99,6 +106,8 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
 
   package func overlayEntries() -> [OverlayStackEntry] {
     guard let coordinator, coordinator.isActive else {
+      visibleQueueHead = nil
+      visibleQueueOrdinal = nil
       return []
     }
 
@@ -109,6 +118,18 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
       visibleItems = activeItems[...]
     case .oldestActiveItem:
       visibleItems = activeItems.prefix(1)
+      if let head = visibleItems.first {
+        let key = head.item.portalEntryID.ownerStableKey
+        if visibleQueueHead != key {
+          // Queue order is declaration activation; paint/dismiss order is
+          // visible activation. Promotion is a new visible activation, while
+          // same-head refreshes retain their order across all other families.
+          visibleQueueOrdinal =
+            visibleQueueHead == nil
+            ? head.activationOrdinal : PresentationActivationOrdinalMint.next()
+          visibleQueueHead = key
+        }
+      }
     case .aggregateNewestItem:
       visibleItems = activeItems.suffix(1)
     }
@@ -116,7 +137,7 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
     return visibleItems.map { overlayItem in
       makeOverlayEntry(
         item: overlayItem.item,
-        activationOrdinal: overlayItem.activationOrdinal,
+        activationOrdinal: visibleQueueOrdinal ?? overlayItem.activationOrdinal,
         coordinator: coordinator
       )
     }

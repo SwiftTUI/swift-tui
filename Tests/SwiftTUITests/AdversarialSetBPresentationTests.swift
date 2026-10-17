@@ -38,17 +38,15 @@ struct AdversarialSetBPresentationTests {
     #expect(!h.frame.contains("Alert B"), "\(h.frame)")
     _ = try h.clickText("Open sheet")
     try #require(h.frame.contains("S body"), "\(h.frame)")
-    if h.frame.contains("Alert A") {
-      _ = try h.focusText("S body")
-      _ = try h.pressKey(KeyPress(.character("d"), modifiers: .ctrl))
-    }
+    // The sheet may fully cover A; dismiss through the sheet's command
+    // regardless of whether any of A's pixels remain visible.
+    _ = try h.focusText("S body")
+    _ = try h.pressKey(KeyPress(.character("d"), modifiers: .ctrl))
     try #require(!h.frame.contains("Alert A"), "\(h.frame)")
     let surfaced = h.frame
     _ = try h.pressKey(KeyPress(.escape))
     let afterEscape = h.frame
-    withKnownIssue(
-      "the queued prompt never surfaces while the newer sheet is open; Escape reaches the sheet"
-    ) {
+    do {
       #expect(
         surfaced.contains("Alert B") && surfaced.contains("B body"),
         "B surfaces once A is gone: \(surfaced)")
@@ -77,9 +75,7 @@ struct AdversarialSetBPresentationTests {
       })
     _ = try h.clickText("Dismiss L")
     let afterClick = h.frame
-    withKnownIssue(
-      "prompt content resolves under the presenter's environment, so a disabled presenter disables its own alert (menu precedent: stress008)"
-    ) {
+    do {
       #expect(dismiss.isEnabled, "the alert button is enabled although its presenter is not")
       #expect(!afterClick.contains("Alert L"), "\(afterClick)")
       #expect(probe.events == ["L dismissed"], "\(probe.events)")
@@ -164,12 +160,18 @@ struct AdversarialSetBPresentationTests {
     let itemTwo = try h.focusIdentity(forText: "Item two")
     _ = try h.pressKey(KeyPress(.tab))
     let focused = h.runLoop.focusTracker.currentFocusIdentity
-    withKnownIssue(
-      "overlay regions sit after every base region, so Tab from the trigger reaches the next base control first"
-    ) {
-      #expect(focused == itemOne || focused == itemTwo, "\(String(describing: focused))")
-      #expect(focused != next, "Tab skipped the open menu: \(h.frame)")
-    }
+    #expect(focused == itemOne, "\(String(describing: focused))")
+    #expect(focused != next, "Tab skipped the open menu: \(h.frame)")
+    _ = try h.pressKey(KeyPress(.tab))
+    #expect(h.runLoop.focusTracker.currentFocusIdentity == itemTwo)
+    _ = try h.pressKey(KeyPress(.tab))
+    #expect(h.runLoop.focusTracker.currentFocusIdentity == next)
+    _ = try h.pressKey(KeyPress(.tab, modifiers: .shift))
+    #expect(h.runLoop.focusTracker.currentFocusIdentity == itemTwo)
+    _ = try h.pressKey(KeyPress(.escape))
+    #expect(!h.frame.contains("Item one"))
+    _ = try h.pressKey(KeyPress(.tab))
+    #expect(h.runLoop.focusTracker.currentFocusIdentity == next)
   }
 
   // Escape dismisses the most recently activated visible presentation across

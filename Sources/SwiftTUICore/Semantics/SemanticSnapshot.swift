@@ -6,6 +6,8 @@ public struct InteractionRegion: Equatable, Sendable {
   public var hitTestOrder: Int
   public var captureOnPress: Bool
   public var contentShape: Path?
+  /// Exact enclosing path constraints; rects are already intersected into rect.
+  package var ancestorContentShapes: [Path] = []
   package var pointerGesturePriority: PointerGesturePriority
 
   public init(
@@ -47,7 +49,8 @@ public struct InteractionRegion: Equatable, Sendable {
     guard rect.contains(location.location) else {
       return false
     }
-    return contentShape?.contains(location.location) ?? true
+    return (contentShape?.contains(location.location) ?? true)
+      && ancestorContentShapes.allSatisfy { $0.contains(location.location) }
   }
 }
 
