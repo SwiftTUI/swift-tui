@@ -64,7 +64,7 @@ struct AdversarialSetBCollectionTests {
       }, "mixedNestedSections", height: 20)
     let descriptions = snapshot.semanticSnapshot.accessibilityNodes.filter {
       $0.role == .custom("listitem")
-    }.compactMap { $0.properties.description }
+    }.compactMap { $0.properties?.description }
     let outer = outerHeader ? "Outer" : "Section"
     #expect(
       descriptions == [

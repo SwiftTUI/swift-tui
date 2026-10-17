@@ -270,7 +270,11 @@
               try #require(unsafe pthread_sigmask(SIG_BLOCK, &blocked, &original) == 0)
               defer { _ = unsafe pthread_sigmask(SIG_SETMASK, &original, nil) }
               // A caller-owned pending signal must survive our suppression scope.
-              let signalResult = unsafe pthread_kill(pthread_self(), SIGPIPE)
+              #if canImport(Darwin)
+                let signalResult = unsafe pthread_kill(pthread_self(), SIGPIPE)
+              #else
+                let signalResult = pthread_kill(pthread_self(), SIGPIPE)
+              #endif
               try #require(signalResult == 0, "pthread_kill returned \(signalResult)")
               var descriptors: [Int32] = [-1, -1]
               try #require(unsafe pipe(&descriptors) == 0)
