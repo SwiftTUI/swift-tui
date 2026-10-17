@@ -111,10 +111,8 @@ package enum HostWireBudget {
     var links: Set<String> = []
     for row in model.surface.cells {
       guard row.count <= model.gridSize.width else { throw Exceeded.limit }
-      for (x, cell) in row.enumerated() where !cell.isContinuation {
-        guard String(cell.character).utf8.count <= cellTextBytes,
-          max(1, cell.spanWidth) <= model.gridSize.width - x
-        else { throw Exceeded.limit }
+      for cell in row where !cell.isContinuation {
+        guard String(cell.character).utf8.count <= cellTextBytes else { throw Exceeded.limit }
         if let link = cell.hyperlink, links.insert(link).inserted { try charge(link) }
       }
     }
@@ -181,14 +179,7 @@ package enum HostWireBudget {
   package static func jsonStringBytes(_ text: String) throws -> Int {
     var count = 2
     for scalar in text.unicodeScalars {
-      switch scalar.value {
-      case 0x22, 0x5C, 0x08, 0x0C, 0x0A, 0x0D, 0x09: count += 2
-      case 0x00...0x1F: count += 6
-      case 0...0x7F: count += 1
-      case 0...0x7FF: count += 2
-      case 0...0xFFFF: count += 3
-      default: count += 4
-      }
+      count += JSONStringEncoding.byteCount(of: scalar)
       guard count <= recordBytes else { throw Exceeded.limit }
     }
     return count

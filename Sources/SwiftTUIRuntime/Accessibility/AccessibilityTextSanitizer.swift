@@ -21,16 +21,10 @@ package struct AccessibilityTextSanitizer: Equatable, Sendable {
     }
 
     for scalar in value.unicodeScalars {
-      switch scalar.value {
-      case 0x20:
+      if scalar.properties.isWhitespace {
         appendSpaceIfNeeded()
-      case 0x21...0x7E:
-        scalars.append(scalar)
-        previousWasSpace = false
-      case 0x09, 0x0A, 0x0B, 0x0C, 0x0D:
-        appendSpaceIfNeeded()
-      default:
-        scalars.append(Unicode.Scalar(0x3F)!)
+      } else {
+        scalars.append(scalar.isTerminalControlScalar ? Unicode.Scalar(0x3F)! : scalar)
         previousWasSpace = false
       }
     }

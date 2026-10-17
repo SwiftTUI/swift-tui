@@ -36,9 +36,7 @@ struct AdversarialSetBEncodingTests {
     // A full row paints the zero-width cell without displacing its neighbors.
     let full = renderer.render(RasterSurface(size: .init(width: 4, height: 1), cells: [row]))
     let visible = full.unicodeScalars.filter { $0.value != 0x200B }
-    withKnownIssue(
-      "a zero-width cell is counted as one column, so the next glyph lands one column early"
-    ) {
+    do {
       #expect(
         rendered == " \u{1B}[1CX" || rendered == "\u{200B}\u{1B}[2CX" || rendered == "\u{200B} X",
         "\(rendered.debugDescription)")
@@ -60,9 +58,7 @@ struct AdversarialSetBEncodingTests {
     let terminal = TerminalSurfaceRenderer(capabilityProfile: .previewUnicode).render(surface)
     #expect(terminal == "abc漢", "\(terminal.debugDescription)")
     let encoded = WebSurfaceFrameEncoder.encode(surface)
-    withKnownIssue(
-      "HostWireBudget.validate rejects a span wider than the cells left in the row, so the frame is dropped"
-    ) {
+    do {
       #expect(encoded.hasPrefix("\u{1E}surface:"), "\(encoded.prefix(80))")
       #expect(encoded != HostWireBudget.rejectionRecord)
       #expect(encoded.contains("漢"), "\(encoded.prefix(200))")
@@ -76,9 +72,7 @@ struct AdversarialSetBEncodingTests {
     let wire = WebSurfaceFrameEncoder.jsonString(text)
     #expect(wire.hasPrefix("\"a") && wire.hasSuffix("b\""), "\(wire.debugDescription)")
     let transport = styleTransportJSONStringLiteral(text)
-    withKnownIssue(
-      "the wire and transport writers escape 0x00–0x1F only; DEL and C1 ship raw (STUI-868 class)"
-    ) {
+    do {
       #expect(
         !wire.unicodeScalars.contains { (0x7F...0x9F).contains($0.value) },
         "\(wire.debugDescription)")
@@ -103,9 +97,7 @@ struct AdversarialSetBEncodingTests {
           cells: [[RasterCell(character: "X", hyperlink: destination)]]))
     }
     #expect(render(nil) == "X", "\(render(nil).debugDescription)")
-    withKnownIssue(
-      "an empty or fully sanitized destination still opens and closes an OSC 8 envelope"
-    ) {
+    do {
       #expect(render("") == "X", "\(render("").debugDescription)")
       #expect(render("\u{07}") == "X", "\(render("\u{07}").debugDescription)")
       #expect(render("\u{1B}\u{1B}") == "X", "\(render("\u{1B}\u{1B}").debugDescription)")
@@ -135,7 +127,7 @@ struct AdversarialSetBEncodingTests {
     let encoded = try #require(TerminalRenderStyleCodec.encodeBase64(style))
     let decoded = try #require(TerminalRenderStyleCodec.decodeBase64(encoded))
     let selection = try #require(decoded.theme?.selection)
-    withKnownIssue("colors travel as #rrggbb, so a translucent theme color decodes opaque") {
+    do {
       #expect(abs(selection.alpha - 0.5) < 1e-6, "\(selection)")
       #expect(decoded == style)
     }
@@ -145,7 +137,7 @@ struct AdversarialSetBEncodingTests {
   // read out as question marks.
   @Test func setB176AssistiveTextSanitizerKeepsNonASCIILetters() {
     let sanitizer = AccessibilityTextSanitizer()
-    withKnownIssue("the sanitizer keeps printable ASCII only and turns every other scalar into ?") {
+    do {
       #expect(sanitizer.sanitized("Café 日本") == "Café 日本")
       #expect(sanitizer.sanitized("naïve résumé") == "naïve résumé")
     }
@@ -176,9 +168,7 @@ struct AdversarialSetBEncodingTests {
       let rendered = renderer.render(surface)
       #expect(
         rendered.contains("a") && rendered.contains("b"), "\(name): \(rendered.debugDescription)")
-      withKnownIssue(
-        "only C0, DEL and C1 are blanked; bidi and other format controls reach the terminal raw"
-      ) {
+      do {
         #expect(
           !rendered.unicodeScalars.contains(control.unicodeScalars.first!),
           "\(name) reached the terminal: \(rendered.debugDescription)")

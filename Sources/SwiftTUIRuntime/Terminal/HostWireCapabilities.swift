@@ -228,7 +228,10 @@ package struct HostWireResyncRequest: Equatable, Sendable {
         }
         scope = value
       case "ids":
-        guard let value = scanner.consumeStringArray() else {
+        guard
+          let value = scanner.consumeStringArray(
+            maximumCount: HostWireBudget.images, maximumUTF8Bytes: 1024)
+        else {
           return nil
         }
         imageIDs = value
@@ -297,11 +300,25 @@ private struct CapsJSONScanner {
     return true
   }
 
-  mutating func consumeString() -> String? {
+  mutating func consumeString(maximumUTF8Bytes: Int = HostWireBudget.recordBytes) -> String? {
     guard consume("\"") else {
       return nil
     }
     var value = String.UnicodeScalarView()
+    var byteCount = 0
+    func append(_ scalar: Unicode.Scalar) -> Bool {
+      let bytes: Int
+      switch scalar.value {
+      case 0...0x7F: bytes = 1
+      case 0...0x7FF: bytes = 2
+      case 0...0xFFFF: bytes = 3
+      default: bytes = 4
+      }
+      guard bytes <= maximumUTF8Bytes - byteCount else { return false }
+      byteCount += bytes
+      value.append(scalar)
+      return true
+    }
     while index < scalars.count {
       let scalar = scalars[index]
       index += 1
@@ -316,17 +333,17 @@ private struct CapsJSONScanner {
         index += 1
         switch escaped {
         case "\"", "\\", "/":
-          value.append(escaped)
+          guard append(escaped) else { return nil }
         case "b":
-          value.append("\u{0008}")
+          guard append("\u{0008}") else { return nil }
         case "f":
-          value.append("\u{000C}")
+          guard append("\u{000C}") else { return nil }
         case "n":
-          value.append("\n")
+          guard append("\n") else { return nil }
         case "t":
-          value.append("\t")
+          guard append("\t") else { return nil }
         case "r":
-          value.append("\r")
+          guard append("\r") else { return nil }
         case "u":
           guard let firstCodeUnit = consumeHexCodeUnit() else {
             return nil
@@ -352,7 +369,7 @@ private struct CapsJSONScanner {
           guard let decoded = Unicode.Scalar(scalarValue) else {
             return nil
           }
-          value.append(decoded)
+          guard append(decoded) else { return nil }
         default:
           return nil
         }
@@ -361,7 +378,7 @@ private struct CapsJSONScanner {
       guard scalar.value >= 0x20 else {
         return nil
       }
-      value.append(scalar)
+      guard append(scalar) else { return nil }
     }
     return nil
   }
@@ -449,7 +466,7 @@ private struct CapsJSONScanner {
     return nil
   }
 
-  mutating func consumeStringArray() -> [String]? {
+  mutating func consumeStringArray(maximumCount: Int, maximumUTF8Bytes: Int) -> [String]? {
     guard consume("[") else {
       return nil
     }
@@ -461,9 +478,10 @@ private struct CapsJSONScanner {
     var values: [String] = []
     while true {
       skipWhitespace()
-      guard let value = consumeString() else {
-        return nil
-      }
+      guard values.count < maximumCount,
+        let value = consumeString(maximumUTF8Bytes: maximumUTF8Bytes),
+        value.utf8.count <= maximumUTF8Bytes
+      else { return nil }
       values.append(value)
       skipWhitespace()
       if consume(",") {

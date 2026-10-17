@@ -820,35 +820,7 @@ private func sessionURL(
 private func jsonString(
   _ text: String
 ) -> String {
-  var result = "\""
-  for scalar in text.unicodeScalars {
-    switch scalar.value {
-    case 0x22:
-      result += "\\\""
-    case 0x5C:
-      result += "\\\\"
-    case 0x08:
-      result += "\\b"
-    case 0x0C:
-      result += "\\f"
-    case 0x0A:
-      result += "\\n"
-    case 0x0D:
-      result += "\\r"
-    case 0x09:
-      result += "\\t"
-    case 0x00...0x1F:
-      var hex = String(scalar.value, radix: 16, uppercase: true)
-      while hex.count < 4 {
-        hex = "0" + hex
-      }
-      result += "\\u\(hex)"
-    default:
-      result.unicodeScalars.append(scalar)
-    }
-  }
-  result += "\""
-  return result
+  JSONStringEncoding.quoted(text)
 }
 
 extension UInt16 {

@@ -1,3 +1,5 @@
+import SwiftTUICore
+
 enum StyleTransportJSONValue {
   case object([String: Self])
   case string(String)
@@ -250,34 +252,7 @@ struct StyleTransportJSONParser {
 func styleTransportJSONStringLiteral(
   _ string: String
 ) -> String {
-  var result = "\""
-
-  for scalar in string.unicodeScalars {
-    switch scalar.value {
-    case 0x22:
-      result += "\\\""
-    case 0x5C:
-      result += "\\\\"
-    case 0x08:
-      result += "\\b"
-    case 0x0C:
-      result += "\\f"
-    case 0x0A:
-      result += "\\n"
-    case 0x0D:
-      result += "\\r"
-    case 0x09:
-      result += "\\t"
-    case 0x00..<0x20:
-      let hex = String(scalar.value, radix: 16, uppercase: true)
-      result += "\\u" + String(repeating: "0", count: 4 - hex.count) + hex
-    default:
-      result.unicodeScalars.append(scalar)
-    }
-  }
-
-  result += "\""
-  return result
+  JSONStringEncoding.quoted(string)
 }
 
 private func isStyleTransportWhitespace(

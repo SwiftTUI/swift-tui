@@ -17,6 +17,7 @@
   }
 
   import SwiftTUIPlatformIO
+  import SwiftTUIPrimitives
 
   #if canImport(Darwin)
     import Darwin
@@ -57,21 +58,7 @@
     }
 
     private func jsonStringLiteral(_ s: String) -> String {
-      var out = "\""
-      for ch in s.unicodeScalars {
-        switch ch.value {
-        case 0x22: out += "\\\""  // "
-        case 0x5C: out += "\\\\"  // \
-        case 0x08: out += "\\b"
-        case 0x0C: out += "\\f"
-        case 0x0A: out += "\\n"
-        case 0x0D: out += "\\r"
-        case 0x09: out += "\\t"
-        default: out.unicodeScalars.append(ch)
-        }
-      }
-      out += "\""
-      return out
+      JSONStringEncoding.quoted(s)
     }
   }
 

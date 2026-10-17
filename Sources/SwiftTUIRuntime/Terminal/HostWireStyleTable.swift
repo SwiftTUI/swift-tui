@@ -90,8 +90,9 @@ package struct HostWireStyleTable: Sendable {
     if let strikethroughStyle = style.strikethroughStyle {
       fields.append("\"strikethrough\":\(encodeLineStyle(strikethroughStyle))")
     }
-    if style.opacity < 1 {
-      fields.append("\"opacity\":\(style.opacity)")
+    let opacity = style.opacity.isNaN ? 0 : max(0, min(1, style.opacity))
+    if opacity < 1 {
+      fields.append("\"opacity\":\(opacity)")
     }
 
     return "{" + fields.joined(separator: ",") + "}"

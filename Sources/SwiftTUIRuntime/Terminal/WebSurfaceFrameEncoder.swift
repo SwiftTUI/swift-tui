@@ -253,7 +253,7 @@ package enum WebSurfaceFrameEncoder {
     rows.reserveCapacity(model.surface.cells.count)
     var rowBytes = 0
     for row in model.surface.cells {
-      guard let encoded = encodeRow(row, interningInto: &styles) else {
+      guard let encoded = encodeRow(row, width: model.gridSize.width, interningInto: &styles) else {
         preconditionFailure("one full frame exceeded its grid-sized wire-style budget")
       }
       rowBytes += encoded.utf8.count + 1
@@ -348,7 +348,7 @@ package enum WebSurfaceFrameEncoder {
     for rowIndex in model.deltaRowIndexes {
       guard
         let encodedRow = encodeRow(
-          model.surface.cells[rowIndex],
+          model.row(at: rowIndex), width: model.gridSize.width,
           interningInto: &candidate.persistentStyles
         )
       else {
@@ -554,6 +554,7 @@ package enum WebSurfaceFrameEncoder {
   /// table, the delta path into the persistent cross-frame epoch.
   private static func encodeRow(
     _ row: [RasterCell],
+    width: Int,
     interningInto styles: inout HostWireStyleTable
   ) -> String? {
     var encodedCells: [String] = []
@@ -567,7 +568,7 @@ package enum WebSurfaceFrameEncoder {
         return nil
       }
       encodedCells.append(
-        "[\(x),\(jsonString(String(cell.character))),\(max(1, cell.spanWidth)),\(styleIndex)]"
+        "[\(x),\(jsonString(String(cell.character))),\(HostWireFrameModel.visibleSpan(cell, at: x, width: width)),\(styleIndex)]"
       )
     }
 
@@ -836,34 +837,6 @@ package enum WebSurfaceFrameEncoder {
   package static func jsonString(
     _ text: String
   ) -> String {
-    var result = "\""
-    for scalar in text.unicodeScalars {
-      switch scalar.value {
-      case 0x22:
-        result += "\\\""
-      case 0x5C:
-        result += "\\\\"
-      case 0x08:
-        result += "\\b"
-      case 0x0C:
-        result += "\\f"
-      case 0x0A:
-        result += "\\n"
-      case 0x0D:
-        result += "\\r"
-      case 0x09:
-        result += "\\t"
-      case 0x00...0x1F:
-        var hex = String(scalar.value, radix: 16, uppercase: true)
-        while hex.count < 4 {
-          hex = "0" + hex
-        }
-        result += "\\u\(hex)"
-      default:
-        result.unicodeScalars.append(scalar)
-      }
-    }
-    result += "\""
-    return result
+    JSONStringEncoding.quoted(text)
   }
 }

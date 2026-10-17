@@ -161,9 +161,7 @@
         id: "dash", title: "Red\u{1B}[31m\u{01}", ptyPath: nil, isAttached: false)
       let json = styled.jsonString()
       let body = try Data(SocketResponse.sceneList([styled]).encode().dropFirst(3).utf8)
-      withKnownIssue(
-        "jsonStringLiteral escapes only quote, backslash and \\b \\f \\n \\r \\t (adjacent to STUI-864)"
-      ) {
+      do {
         #expect(
           !json.unicodeScalars.contains(where: { $0.value < 0x20 }), "\(json.debugDescription)")
         #expect(throws: Never.self) { try JSONDecoder().decode([SceneInfo].self, from: body) }

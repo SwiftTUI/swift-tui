@@ -13,6 +13,15 @@ host-managed Android path. It does not change the terminal-native protocol.
 The external native `SwiftUIHost` receives committed frames directly and does
 not consume this serialized stream.
 
+## Admitted raster rows
+
+A raster may omit trailing empty rows. A full frame omits those row arrays;
+a delta replacing a missing row sends an explicit empty array, clearing any
+previous contents. A wide lead clipped by the grid retains its glyph and uses
+the remaining grid columns for both the cell tuple and its hyperlink span.
+Style opacity is normalized to `0...1`; NaN becomes zero. Serialized style
+numbers are always finite.
+
 ## Record framing and shapes
 
 Browser host render-style controls and `SWIFTTUI_RENDER_STYLE` accept optional
@@ -25,6 +34,18 @@ Browser media-query changes update this style live. `AnimatedImage` then emits
 its first PNG frame while reduced, and the browser presents the producer's
 selected frames while active. Raw GIF payloads are static first-frame images
 in both browser presenters; they have no independent browser animation clock.
+
+Style color fields retain their existing RGB hex representation. Optional
+`appearance.alpha` and `theme.alpha` objects map color field names to decimal
+alpha strings; `appearance.paletteAlpha` maps palette indexes to alpha strings.
+These additive fields preserve alpha without eight-bit quantization, while
+older readers continue to understand the RGB fields. Opaque colors need no
+extension and keep their existing bytes. Supplied alpha values must be finite
+and in `0...1`. A legacy hex color's alpha is used when no override is present.
+
+Host JSON writers share one string escaping rule and byte counter: C0, DEL,
+and C1 controls are escaped. This applies to surface records, style transport,
+scene manifests, and CLI scene responses. Admission counts the emitted bytes.
 
 Every typed record is UTF-8 and has the same outer framing:
 

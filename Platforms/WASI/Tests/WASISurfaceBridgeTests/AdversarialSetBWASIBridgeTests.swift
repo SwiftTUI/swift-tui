@@ -40,9 +40,7 @@
       let full = try SetBDecoded.surface(WebSurfaceFrameEncoder.encode(SetBSurfaces.short()))
       #expect(full["height"] as? Int == 3, "\(full)")
       #expect((full["rows"] as? [Any])?.count == 2, "\(full)")
-      await withKnownIssue(
-        "encodeDelta indexes surface.cells by a damage row that validate bounded only by height"
-      ) {
+      do {
         await #expect(processExitsWith: .success) {
           var state = HostWireCapabilities(acceptsDeltaFrames: true)
             .negotiatedEncodingState(epochID: 1)
@@ -65,7 +63,7 @@
       let encoded = WebSurfaceFrameEncoder.encode(SetBSurfaces.styled(opacity: -.infinity))
       let parsed = try? JSONSerialization.jsonObject(
         with: Data(SetBDecoded.payload(encoded).utf8))
-      withKnownIssue("HostWireStyleTable interpolates style.opacity verbatim, so -inf is emitted") {
+      do {
         #expect(
           parsed != nil || encoded == HostWireBudget.rejectionRecord, "\(encoded.prefix(160))")
       }

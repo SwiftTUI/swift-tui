@@ -77,6 +77,10 @@ struct TerminalCellTextRenderer {
     state: inout RenderState,
     into result: inout String
   ) {
+    let hyperlink = hyperlink.flatMap { destination -> String? in
+      let sanitized = sanitizedHyperlinkDestination(destination)
+      return sanitized.isEmpty ? nil : sanitized
+    }
     // A run of same-styled cells is the common shape of a span; the raw
     // compare early-outs before `styleResolvedForTerminal` re-derives the
     // terminal style. Equal raw inputs resolve to equal terminal styles (the
@@ -189,21 +193,11 @@ struct TerminalCellTextRenderer {
     _ character: Character
   ) -> Character {
     let scalars = character.unicodeScalars
-    if scalars.allSatisfy(isUnsafeTerminalControlScalar) {
-      return "�"
-    }
+    if scalars.contains(where: \.isTerminalControlScalar) { return "�" }
+    // A raster cell owns columns even when its authored cluster has no width.
+    // Emit a spacing placeholder so full rows and damage batches agree.
+    if cellWidth(of: character) == 0 { return " " }
     return character
-  }
-
-  private func isUnsafeTerminalControlScalar(
-    _ scalar: UnicodeScalar
-  ) -> Bool {
-    switch scalar.value {
-    case 0x00...0x1F, 0x7F...0x9F:
-      return true
-    default:
-      return false
-    }
   }
 
   /// Builds the SGR escape sequence for `style` directly into a String,
@@ -463,7 +457,7 @@ struct TerminalCellTextRenderer {
   private func openHyperlinkSequence(
     for destination: LinkDestination
   ) -> String {
-    "\u{001B}]8;;\(sanitizedHyperlinkDestination(destination.rawValue))\u{001B}\\"
+    "\u{001B}]8;;\(destination.rawValue)\u{001B}\\"
   }
 
   private func sanitizedHyperlinkDestination(
@@ -498,7 +492,11 @@ struct TerminalCellTextRenderer {
 }
 
 extension Unicode.Scalar {
-  fileprivate var isTerminalControlScalar: Bool {
-    value < 0x20 || (value >= 0x7F && value <= 0x9F)
+  var isTerminalControlScalar: Bool {
+    switch value {
+    case 0x00...0x1F, 0x7F...0x9F, 0x061C, 0x200E...0x200F, 0x202A...0x202E, 0x2066...0x2069:
+      return true
+    default: return false
+    }
   }
 }

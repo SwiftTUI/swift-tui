@@ -128,8 +128,8 @@ struct LinearAccessibilityRendererTests {
     #expect(!output.contains("Secret"))
   }
 
-  @Test("renderer normalizes output to plain ASCII")
-  func rendererNormalizesOutputToASCII() {
+  @Test("renderer preserves Unicode and normalizes reading whitespace")
+  func rendererPreservesUnicodeReadingText() {
     let buttonID = testIdentity("Button")
     let snapshot = SemanticSnapshot(
       accessibilityNodes: [
@@ -145,7 +145,7 @@ struct LinearAccessibilityRendererTests {
 
     let output = LinearAccessibilityRenderer().render(snapshot)
 
-    #expect(output == "button: Caf? Save - Uses ?\n")
+    #expect(output == "button: Café Save - Uses ✓\n")
   }
 
   @Test("renderer includes accessibility warnings")

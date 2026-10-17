@@ -37,7 +37,7 @@ struct AdversarialSetAWireTests {
     }
     let rejectsOversizedTable =
       HostWireResyncRequest.fromRequestJSON(request(count: HostWireBudget.images + 1)) == nil
-    withKnownIssue("STUI-958: Image recovery admission does not enforce its 1,024-ID limit") {
+    do {
       #expect(rejectsOversizedTable)
     }
   }
@@ -57,7 +57,7 @@ struct AdversarialSetAWireTests {
     let rejectsOversizedID =
       HostWireResyncRequest.fromRequestJSON(#"{"scope":"images","ids":["\#(oversizedID)"]}"#)
       == nil
-    withKnownIssue("STUI-958: Image recovery admission does not enforce its 1,024-byte ID limit") {
+    do {
       #expect(rejectsOversizedID)
     }
   }

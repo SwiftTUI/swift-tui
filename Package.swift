@@ -271,6 +271,7 @@ let package = Package(
       name: "SwiftTUICLIAttach",
       dependencies: [
         "SwiftTUIPlatformIO",
+        "SwiftTUIPrimitives",
         .target(
           name: "SwiftTUIPTYPrimitives",
           condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .linux, .android])

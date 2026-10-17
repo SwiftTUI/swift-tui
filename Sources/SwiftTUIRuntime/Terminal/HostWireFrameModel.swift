@@ -281,7 +281,7 @@ package struct HostWireFrameModel {
           targetIndices[hyperlink] = target
           linkTargets.append(hyperlink)
         }
-        let span = max(1, cell.spanWidth)
+        let span = Self.visibleSpan(cell, at: x, width: gridSize.width)
         if runSpan > 0, runTarget == target, runStart + runSpan == x {
           runSpan += span
         } else {
@@ -297,6 +297,18 @@ package struct HostWireFrameModel {
       }
     }
     return (linkRows, linkTargets)
+  }
+
+  /// Missing trailing rows are empty, both in keyframes and row replacement deltas.
+  package func row(at index: Int) -> [RasterCell] {
+    surface.cells.indices.contains(index) ? surface.cells[index] : []
+  }
+
+  /// A clipped lead retains its glyph but cannot claim columns outside the grid.
+  /// Text tuples and hyperlink runs must describe the same occupied columns.
+  package static func visibleSpan(_ cell: RasterCell, at column: Int, width: Int) -> Int {
+    guard column >= 0, column < width else { return 0 }
+    return min(max(1, cell.spanWidth), width - column)
   }
 
   /// The damaged row indexes a delta record re-transmits: unique, sorted,

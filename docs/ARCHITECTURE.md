@@ -133,6 +133,7 @@ flowchart TD
     SwiftTUITerminalCLI["SwiftTUITerminalCLI<br/>(portable launch)"] --> SwiftTUIRuntime
     SwiftTUITerminalCLI -.->|POSIX only| SwiftTUICLIAttach
     SwiftTUICLIAttach["SwiftTUICLIAttach<br/>(POSIX-only: PTY + sockets)"] --> SwiftTUIPlatformIO
+    SwiftTUICLIAttach --> SwiftTUIPrimitives
     SwiftTUICLIAttach --> SwiftTUIPTYPrimitives
     SwiftTUIPlatformIO["SwiftTUIPlatformIO<br/>(syscall facade)"]
     SwiftTUICLI["SwiftTUICLI<br/>(compatibility facade)"] --> SwiftTUITerminalCLI

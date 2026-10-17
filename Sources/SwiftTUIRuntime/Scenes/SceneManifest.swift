@@ -1,3 +1,5 @@
+import SwiftTUICore
+
 public struct SceneDescriptor: Codable, Hashable, Sendable {
   public let id: WindowIdentifier
   public let title: String?
@@ -72,34 +74,5 @@ extension SceneDescriptor {
 private func escapedJSONString(
   _ text: String
 ) -> String {
-  var escaped = ""
-  escaped.reserveCapacity(text.count)
-
-  for scalar in text.unicodeScalars {
-    switch scalar.value {
-    case 0x08:
-      escaped += "\\b"
-    case 0x09:
-      escaped += "\\t"
-    case 0x0A:
-      escaped += "\\n"
-    case 0x0C:
-      escaped += "\\f"
-    case 0x0D:
-      escaped += "\\r"
-    case 0x22:
-      escaped += "\\\""
-    case 0x5C:
-      escaped += "\\\\"
-    case 0x00...0x1F:
-      let hex = String(scalar.value, radix: 16, uppercase: true)
-      escaped += "\\u"
-      escaped += String(repeating: "0", count: max(0, 4 - hex.count))
-      escaped += hex
-    default:
-      escaped.unicodeScalars.append(scalar)
-    }
-  }
-
-  return escaped
+  JSONStringEncoding.contents(text)
 }

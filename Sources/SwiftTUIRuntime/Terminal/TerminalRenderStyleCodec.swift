@@ -7,7 +7,7 @@
       return nil
     }
 
-    let json = String(decoding: bytes, as: UTF8.self)
+    guard let json = String(validating: bytes, as: UTF8.self) else { return nil }
     var parser = StyleTransportJSONParser(json)
     guard let value = parser.parse() else {
       return nil
@@ -117,6 +117,7 @@
       return nil
     }
 
+    guard let alphas = decodeAlphas(object["paletteAlpha"]) else { return nil }
     let palette: TerminalPalette
     switch object["palette"] {
     case nil, .some(.null):
@@ -135,7 +136,7 @@
         else {
           return nil
         }
-        decodedPalette[index] = color
+        decodedPalette[index] = alphas[key].map { color.withAlpha($0) } ?? color
       }
       palette = .init(indexedColors: decodedPalette)
     }
@@ -194,10 +195,37 @@
     named key: String,
     from object: [String: StyleTransportJSONValue]
   ) -> Color? {
-    guard let hex = object[key]?.stringValue else {
-      return nil
+    guard let hex = object[key]?.stringValue, let color = try? Color(hex: hex),
+      let alphas = decodeAlphas(object["alpha"])
+    else { return nil }
+    return alphas[key].map { color.withAlpha($0) } ?? color
+  }
+
+  /// Additive string-valued metadata preserves full alpha precision while old
+  /// peers continue reading the established RGB hex color fields.
+  private static func decodeAlphas(_ value: StyleTransportJSONValue?) -> [String: Double]? {
+    guard let value else { return [:] }
+    guard let object = value.objectValue else { return nil }
+    var result: [String: Double] = [:]
+    for (key, value) in object {
+      guard let text = value.stringValue, let alpha = Double(text), alpha.isFinite,
+        (0...1).contains(alpha)
+      else { return nil }
+      result[key] = alpha
     }
-    return try? Color(hex: hex)
+    return result
+  }
+
+  private static func alphaField(_ colors: [(String, Color)], named name: String = "alpha")
+    -> String?
+  {
+    let fields = colors.compactMap { key, color -> String? in
+      guard color.alpha != 1 else { return nil }
+      return
+        "\(styleTransportJSONStringLiteral(key)):\(styleTransportJSONStringLiteral(String(color.alpha)))"
+    }
+    guard !fields.isEmpty else { return nil }
+    return "\(styleTransportJSONStringLiteral(name)):{\(fields.joined(separator: ","))}"
   }
 
   private static func decodeEnum<Value: RawRepresentable>(
@@ -250,7 +278,7 @@
         "\(styleTransportJSONStringLiteral(String(key))):\(encodeColor(color))"
       }
 
-    let fields = [
+    var fields = [
       "\"foregroundColor\":\(encodeColor(appearance.foregroundColor))",
       "\"backgroundColor\":\(encodeColor(appearance.backgroundColor))",
       "\"tintColor\":\(encodeColor(appearance.tintColor))",
@@ -259,29 +287,45 @@
       "\"source\":\(styleTransportJSONStringLiteral(appearance.source.rawValue))",
     ]
 
+    if let alpha = alphaField([
+      ("foregroundColor", appearance.foregroundColor),
+      ("backgroundColor", appearance.backgroundColor),
+      ("tintColor", appearance.tintColor),
+    ]) {
+      fields.append(alpha)
+    }
+    if let alpha = alphaField(
+      appearance.palette.indexedColors.sorted { $0.key < $1.key }.map {
+        (String($0.key), $0.value)
+      },
+      named: "paletteAlpha"
+    ) {
+      fields.append(alpha)
+    }
     return "{\(fields.joined(separator: ","))}"
   }
 
-  private static func encodeTheme(
-    _ theme: Theme
-  ) -> String {
-    let fields = [
-      "\"foreground\":\(encodeColor(theme.foreground))",
-      "\"background\":\(encodeColor(theme.background))",
-      "\"tint\":\(encodeColor(theme.tint))",
-      "\"separator\":\(encodeColor(theme.separator))",
-      "\"selection\":\(encodeColor(theme.selection))",
-      "\"placeholder\":\(encodeColor(theme.placeholder))",
-      "\"link\":\(encodeColor(theme.link))",
-      "\"fill\":\(encodeColor(theme.fill))",
-      "\"windowBackground\":\(encodeColor(theme.windowBackground))",
-      "\"success\":\(encodeColor(theme.success))",
-      "\"warning\":\(encodeColor(theme.warning))",
-      "\"danger\":\(encodeColor(theme.danger))",
-      "\"info\":\(encodeColor(theme.info))",
-      "\"muted\":\(encodeColor(theme.muted))",
+  private static func encodeTheme(_ theme: Theme) -> String {
+    let colors: [(String, Color)] = [
+      ("foreground", theme.foreground),
+      ("background", theme.background),
+      ("tint", theme.tint),
+      ("separator", theme.separator),
+      ("selection", theme.selection),
+      ("placeholder", theme.placeholder),
+      ("link", theme.link),
+      ("fill", theme.fill),
+      ("windowBackground", theme.windowBackground),
+      ("success", theme.success),
+      ("warning", theme.warning),
+      ("danger", theme.danger),
+      ("info", theme.info),
+      ("muted", theme.muted),
     ]
-
+    var fields = colors.map { key, color in
+      "\(styleTransportJSONStringLiteral(key)):\(encodeColor(color))"
+    }
+    if let alpha = alphaField(colors) { fields.append(alpha) }
     return "{\(fields.joined(separator: ","))}"
   }
 
