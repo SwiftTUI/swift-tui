@@ -6,6 +6,7 @@ package struct OverlayStackEntry: Sendable {
   package var ordering: PortalOrdering
   package var kindName: String
   package var modalPolicy: PortalModalPolicy
+  package var enablementPolicy: PresentationEnablementPolicy
   package var acceptsEscape: Bool
   package var dismiss: (@MainActor @Sendable () -> Void)?
   package var onDismiss: (@MainActor @Sendable () -> Void)?
@@ -26,13 +27,15 @@ package struct OverlayStackEntry: Sendable {
     dismiss: (@MainActor @Sendable () -> Void)?,
     onDismiss: (@MainActor @Sendable () -> Void)? = nil,
     payload: PortalAttachmentPayload,
-    sourceEnvironmentValues: EnvironmentValues? = nil
+    sourceEnvironmentValues: EnvironmentValues? = nil,
+    enablementPolicy: PresentationEnablementPolicy = .inheritsPresenter
   ) {
     self.id = id
     self.portalEntryID = portalEntryID
     self.ordering = ordering
     self.kindName = kindName
     self.modalPolicy = modalPolicy
+    self.enablementPolicy = enablementPolicy
     self.acceptsEscape = acceptsEscape
     self.dismiss = dismiss
     self.onDismiss = onDismiss
@@ -199,10 +202,10 @@ private struct OverlayStackEntryHost: PrimitiveView, IterativeResolvableView {
     if let sourceEnvironmentValues = entry.sourceEnvironmentValues {
       bodyContext = bodyContext.replacingEnvironmentValues(sourceEnvironmentValues)
     }
-    if entry.modalPolicy == .disablesBaseInteraction {
-      // A modal owns an independent interaction domain. Preserve styles and
-      // values from its presenter, but let the modal's own disabled modifiers
-      // govern its controls instead of inheriting the presenter's lockout.
+    if entry.enablementPolicy == .independent {
+      // Prompts create an interaction domain; attached tips extend their
+      // source's domain even when their actions block background interaction.
+      // The entry's own disabled modifiers always govern its controls.
       bodyContext = bodyContext.settingEnvironment(\.isEnabled, to: true)
     }
     return entry.payload.resolveWork(in: bodyContext).map { bodyNode in

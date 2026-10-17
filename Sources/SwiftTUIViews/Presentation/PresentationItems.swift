@@ -57,12 +57,25 @@ package struct PortalSurfacePresentation: Sendable {
   }
 }
 
+/// Whether the presentation is a new interaction domain or an extension of
+/// its presenter. This is independent of whether it blocks background input.
+package enum PresentationEnablementPolicy: Sendable {
+  case inheritsPresenter
+  case independent
+}
+
 package protocol PortalPresentationItem: Identifiable, Sendable where ID == String {
   var portalEntryID: PortalEntryID { get }
+  var enablementPolicy: PresentationEnablementPolicy { get }
   var entryDismissObserver: (@MainActor @Sendable () -> Void)? { get }
 }
 
+extension PortalPresentationItem {
+  package var enablementPolicy: PresentationEnablementPolicy { .inheritsPresenter }
+}
+
 package struct PromptPresentationItem: PortalPresentationItem {
+  package var enablementPolicy: PresentationEnablementPolicy { .independent }
   package var id: String
   package var portalEntryID: PortalEntryID
   package var title: String
@@ -118,6 +131,7 @@ package struct PopoverPresentationItem: PortalPresentationItem {
   package var attachmentAnchor: PopoverAttachmentAnchor
   package var arrowEdge: Edge?
   package var modalPolicy: PortalModalPolicy
+  package var enablementPolicy: PresentationEnablementPolicy = .independent
   package var surfaceItem: PromptPresentationItem
 
   package var entryDismissObserver: (@MainActor @Sendable () -> Void)? {

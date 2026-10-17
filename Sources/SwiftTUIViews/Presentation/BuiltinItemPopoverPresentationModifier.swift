@@ -200,6 +200,7 @@ package struct PopoverTipModifier<Tip: PopoverTip>: IterativePrimitiveViewModifi
         dismiss: dismiss,
         onDismiss: onDismiss
       )
+      item.enablementPolicy = .inheritsPresenter
       item.surfaceItem.title = tip.title.semanticMetadata.accessibilityLabel ?? tip.title.content
       return popoverDeclarationValue(item, sourceIdentity: sourceIdentity)
     }

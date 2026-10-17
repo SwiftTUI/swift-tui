@@ -169,7 +169,8 @@ where C.Item: PortalPresentationItem, C.Item.ID: Sendable {
         )
       ) {
         coordinator.makeBody(for: item)
-      }
+      },
+      enablementPolicy: item.enablementPolicy
     )
   }
 
