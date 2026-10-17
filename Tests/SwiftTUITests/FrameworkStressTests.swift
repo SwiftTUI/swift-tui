@@ -5244,7 +5244,8 @@ private final class StressRecordingHost: PresentationSurface {
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     let rendered = TerminalSurfaceRenderer(capabilityProfile: capabilityProfile).render(surface)
-    frames.append(String(rendered.filter { $0 != "\r" }))
+    // CRLF is one Character; strip the carriage-return scalar, not a grapheme.
+    frames.append(String(String.UnicodeScalarView(rendered.unicodeScalars.filter { $0 != "\r" })))
     lastPresentedSurface = surface
     return .init(
       bytesWritten: 0,
@@ -5255,7 +5256,7 @@ private final class StressRecordingHost: PresentationSurface {
   }
 
   func write(_ output: String) throws {
-    frames.append(String(output.filter { $0 != "\r" }))
+    frames.append(String(String.UnicodeScalarView(output.unicodeScalars.filter { $0 != "\r" })))
   }
 
   func centerOfText(_ target: String, chooseLast: Bool = false) -> Point? {

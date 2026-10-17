@@ -127,9 +127,7 @@ struct AdversarialSetBFocusTests {
   // A finite but enormous popover anchor clamps into the host rect instead
   // of overflowing the cell conversion. (Non-finite anchors are STUI-773.)
   @Test func setB126HugeFinitePopoverAnchorsClampInsteadOfTrapping() async {
-    await withKnownIssue(
-      "scaledCellOffset converts extent × unit with Int(_:), which traps past 2^63"
-    ) {
+    do {
       await #expect(processExitsWith: .success) {
         let bounds = CellRect(origin: .zero, size: .init(width: 8, height: 1))
         let rect = PopoverAttachmentAnchor.point(UnitPoint(x: 1e300, y: 0)).attachmentRect(

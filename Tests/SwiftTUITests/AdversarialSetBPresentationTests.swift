@@ -231,9 +231,8 @@ struct AdversarialSetBPresentationTests {
     _ = try h.clickText("Open far")
     #expect(h.frame.contains("Pop body"), "\(h.frame)")
     let lines = h.frame.split(separator: "\n", omittingEmptySubsequences: false)
-    withKnownIssue(
-      "a far point anchor places the popover past the viewport edge and the surface grows to fit it (STUI-796 class)"
-    ) {
+    #expect(lines.count == 8, "the recording host normalizes CRLF to LF")
+    do {
       #expect(lines.allSatisfy { $0.count <= 30 }, "no row exceeds the viewport: \(h.frame)")
     }
     _ = try h.pressKey(KeyPress(.escape))

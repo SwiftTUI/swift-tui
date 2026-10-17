@@ -21,44 +21,46 @@ public enum PopoverAttachmentAnchor: Equatable, Sendable {
 }
 
 extension PopoverAttachmentAnchor {
-  package func attachmentRect(
-    in sourceFrame: CellRect
-  ) -> CellRect {
+  package func attachmentRect(in sourceFrame: CellRect) -> CellRect {
+    let unitOrigin: UnitPoint
+    let unitSize: UnitSize
     switch self {
-    case .rect(let unitRect):
-      let origin = CellPoint(
-        x: sourceFrame.origin.x
-          + scaledCellOffset(unitRect.origin.x, extent: sourceFrame.size.width),
-        y: sourceFrame.origin.y
-          + scaledCellOffset(unitRect.origin.y, extent: sourceFrame.size.height)
-      )
-      let size = CellSize(
-        width: max(0, scaledCellExtent(unitRect.size.width, extent: sourceFrame.size.width)),
-        height: max(0, scaledCellExtent(unitRect.size.height, extent: sourceFrame.size.height))
-      )
-      return CellRect(origin: origin, size: size)
-    case .point(let unitPoint):
-      return CellRect(
-        origin: CellPoint(
-          x: sourceFrame.origin.x + scaledCellOffset(unitPoint.x, extent: sourceFrame.size.width),
-          y: sourceFrame.origin.y + scaledCellOffset(unitPoint.y, extent: sourceFrame.size.height)
-        ),
-        size: .zero
-      )
+    case .rect(let rect):
+      unitOrigin = rect.origin
+      unitSize = rect.size
+    case .point(let point):
+      unitOrigin = point
+      unitSize = .zero
     }
+    let x = scaledCellCoordinate(
+      unitOrigin.x, origin: sourceFrame.origin.x,
+      extent: sourceFrame.size.width)
+    let y = scaledCellCoordinate(
+      unitOrigin.y, origin: sourceFrame.origin.y,
+      extent: sourceFrame.size.height)
+    let width = scaledCellExtent(unitSize.width, origin: x, extent: sourceFrame.size.width)
+    let height = scaledCellExtent(unitSize.height, origin: y, extent: sourceFrame.size.height)
+    return CellRect(origin: .init(x: x, y: y), size: .init(width: width, height: height))
   }
 }
 
-private func scaledCellOffset(
-  _ unit: Double,
-  extent: Int
-) -> Int {
-  Int((Double(extent) * unit).rounded(.down))
+// Preserve representable authored overshoot. When unit scaling or coordinate
+// addition overflows, use the nearest representable edge of the source.
+private func scaledCellCoordinate(_ unit: Double, origin: Int, extent: Int) -> Int {
+  if let offset = Int(exactly: (Double(extent) * unit).rounded(.down)) {
+    let result = origin.addingReportingOverflow(offset)
+    if !result.overflow { return result.partialValue }
+  }
+  guard unit > 0 else { return origin }
+  let edge = origin.addingReportingOverflow(max(0, extent))
+  return edge.overflow ? Int.max : edge.partialValue
 }
 
-private func scaledCellExtent(
-  _ unit: Double,
-  extent: Int
-) -> Int {
-  Int((Double(extent) * unit).rounded())
+private func scaledCellExtent(_ unit: Double, origin: Int, extent: Int) -> Int {
+  let scaled =
+    Int(exactly: (Double(extent) * unit).rounded())
+    ?? (unit > 0 ? max(0, extent) : 0)
+  let positive = max(0, scaled)
+  // CellRect.maxX/maxY must remain representable too.
+  return origin > 0 ? min(positive, Int.max - origin) : positive
 }
