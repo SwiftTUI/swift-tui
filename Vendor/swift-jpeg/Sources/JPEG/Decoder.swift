@@ -32,6 +32,8 @@ extension JPEG {
     // APP14 (Adobe) hints — needed to disambiguate 3-component RGB vs.
     // YCbCr and 4-component CMYK vs. YCCK.
     var adobeColorTransform: Int? = nil
+    var exifOrientation = 1
+    var completedScan = false
     // 0 = unknown / 3-component default to YCbCr, 4-component default to CMYK
     // 1 = YCbCr (3-component)
     // 2 = YCCK (4-component, inverted CMYK after YCbCr)
@@ -53,6 +55,9 @@ extension JPEG {
       try expectSOI()
 
       scan: while true {
+        // EOF is tolerable only after every MCU of a complete scan. A partial
+        // marker/segment or entropy block still throws at its parsing boundary.
+        if completedScan && pos == bytes.count { break }
         let marker = try readMarker()
         switch marker {
         case Marker.SOF0:
@@ -70,6 +75,7 @@ extension JPEG {
           try parseDRI()
         case Marker.SOS:
           try parseSOSAndDecodeScan()
+          completedScan = true
         // Baseline JPEGs typically have a single scan. After it
         // we expect EOI; loop until we find it.
         case Marker.EOI:
@@ -77,7 +83,9 @@ extension JPEG {
         case Marker.COM:
           try skipSegment()
         case let m where (Marker.APP0...Marker.APP15).contains(m):
-          if m == 0xEE {
+          if m == 0xE1 {
+            try parseAPP1Exif()
+          } else if m == 0xEE {
             try parseAPP14Adobe()
           } else {
             try skipSegment()
@@ -94,7 +102,7 @@ extension JPEG {
         }
       }
 
-      guard let frame = self.frame else {
+      guard let frame = self.frame, completedScan else {
         throw .truncated(stage: "frame header missing")
       }
 
@@ -109,7 +117,7 @@ extension JPEG {
         isAdobeYCCK: adobeColorTransform == 2,
         isAdobeRGB: adobeColorTransform == 0 && frame.components.count == 3
           && frame.components.map(\.id) == [82, 71, 66]  // 'R','G','B'
-      )
+      ).oriented(exifOrientation)
     }
 
     // MARK: Marker stream
@@ -180,6 +188,7 @@ extension JPEG {
     // MARK: Segment parsing
 
     mutating func parseSOF() throws(JPEG.DecodingError) {
+      guard frame == nil else { throw .unexpectedMarker(Marker.SOF0, stage: "duplicate frame") }
       let payload = try readSegmentPayload(marker: Marker.SOF0)
       var i = payload.startIndex
       guard payload.count >= 6 else {
@@ -225,7 +234,10 @@ extension JPEG {
           throw .invalidSamplingFactors(componentID: id, h: h, v: v)
         }
         guard (0...3).contains(quant) else {
-          throw .invalidSamplingFactors(componentID: id, h: h, v: v)
+          throw .invalidQuantizationTable(reason: "component \(id) selector \(quant) outside 0...3")
+        }
+        guard !comps.contains(where: { $0.id == id }) else {
+          throw .malformedSegment(marker: Marker.SOF0, reason: "duplicate component id \(id)")
         }
         comps.append(
           FrameComponent(
@@ -246,6 +258,13 @@ extension JPEG {
       // Allocate per-component planes sized to the block grid.
       let hMax = comps.map(\.horizontalSampling).max() ?? 1
       let vMax = comps.map(\.verticalSampling).max() ?? 1
+      for comp in comps {
+        guard hMax % comp.horizontalSampling == 0, vMax % comp.verticalSampling == 0 else {
+          throw .invalidSamplingFactors(
+            componentID: comp.id,
+            h: comp.horizontalSampling, v: comp.verticalSampling)
+        }
+      }
       let mcuW = hMax * 8
       let mcuH = vMax * 8
       let numMCUsX = (width + mcuW - 1) / mcuW
@@ -261,7 +280,9 @@ extension JPEG {
         let by = numMCUsY * c.verticalSampling
         let stride = bx * 8
         let height = by * 8
-        componentPlanes.append([UInt8](repeating: 0, count: stride * height))
+        // A zero coefficient block becomes 128 after the IDCT level shift.
+        // Unscanned components must have the same neutral sample value.
+        componentPlanes.append([UInt8](repeating: 128, count: stride * height))
         blocksPerComponentX.append(bx)
         blocksPerComponentY.append(by)
         componentPlaneStride.append(stride)
@@ -316,7 +337,7 @@ extension JPEG {
       }
       let n = Int(payload[i])
       i += 1
-      guard payload.count == 1 + 2 * n + 3 else {
+      guard (1...frame.components.count).contains(n), payload.count == 1 + 2 * n + 3 else {
         throw .malformedSegment(
           marker: Marker.SOS,
           reason: "wrong header length (n=\(n))"
@@ -341,6 +362,12 @@ extension JPEG {
         guard let frameIndex = frame.components.firstIndex(where: { $0.id == id }) else {
           throw .undefinedTable(kind: "scan component id", id: id)
         }
+        guard !scanIndices.contains(frameIndex) else {
+          throw .malformedSegment(marker: Marker.SOS, reason: "duplicate scan component \(id)")
+        }
+        guard (0...3).contains(dc), (0...3).contains(ac) else {
+          throw .invalidHuffmanTable(reason: "scan selectors DC=\(dc), AC=\(ac) outside 0...3")
+        }
         scanIndices.append(frameIndex)
         dcTableIDs.append(dc)
         acTableIDs.append(ac)
@@ -352,8 +379,7 @@ extension JPEG {
       i += 1
       let ah_al = payload[i]
       i += 1
-      _ = ah_al
-      guard ss == 0, se == 63 else {
+      guard ss == 0, se == 63, ah_al == 0 else {
         throw .unsupportedProcess(marker: Marker.SOS)
       }
 
@@ -517,6 +543,7 @@ extension JPEG {
         pos -= 2
         // Sanity: bytes[pos] should be 0xFF and bytes[pos+1] == m.
       } else {
+        guard !bits.truncatedMarker else { throw .truncated(stage: "marker after scan") }
         pos = bits.pos
       }
     }
@@ -604,11 +631,7 @@ extension JPEG {
         // sample covers.
         let xRatio = hMax / comp.horizontalSampling
         let yRatio = vMax / comp.verticalSampling
-        _ = (hMax % comp.horizontalSampling == 0)
-        _ = (vMax % comp.verticalSampling == 0)
-        // Non-divisible ratios are vanishingly rare and rejected here
-        // implicitly by the integer division (the result is still
-        // correct visually for nearest-neighbor).
+        // Divisibility was validated before plane allocation in parseSOF.
 
         var dst = [UInt8](repeating: 0, count: frame.width * frame.height)
         for y in 0..<frame.height {

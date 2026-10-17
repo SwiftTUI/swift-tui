@@ -150,10 +150,10 @@ struct AdversarialSetAImageBoundaryTests {
     weak let lifetime = repository
     let resolver = try #require(repository).resolver()
     let bytes = Self.frame([Self.red]).imageData
-    #expect(resolver(.data(bytes), [], .init(width: 1, height: 1)) != nil)
+    #expect(try resolver(.data(bytes), [], .init(width: 1, height: 1)) != nil)
     repository = nil
     #expect(lifetime == nil)
-    #expect(resolver(.data(bytes), [], .init(width: 1, height: 1)) == nil)
+    #expect(try resolver(.data(bytes), [], .init(width: 1, height: 1)) == nil)
   }
 
   @Test func setA336FileAndEmbeddedContentHaveTheSameTransportIdentity() throws {

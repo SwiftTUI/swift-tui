@@ -199,7 +199,7 @@ final class ImageAssetRepository: Sendable {
 
   func resolver() -> ImageAssetResolver {
     { [weak self] source, resourceRoots, cellPixelSize in
-      self?.resolve(
+      try self?.resolveThrowing(
         source,
         resourceRoots: resourceRoots,
         cellPixelSize: cellPixelSize
@@ -212,6 +212,12 @@ final class ImageAssetRepository: Sendable {
     resourceRoots: [String],
     cellPixelSize: PixelSize
   ) -> ResolvedImageAsset? {
+    try? resolveThrowing(source, resourceRoots: resourceRoots, cellPixelSize: cellPixelSize)
+  }
+
+  private func resolveThrowing(
+    _ source: ImageSource, resourceRoots: [String], cellPixelSize: PixelSize
+  ) throws -> ResolvedImageAsset? {
     guard let reference = resolvedReference(for: source, resourceRoots: resourceRoots),
       let content = contents.content(for: reference)
     else { return nil }
@@ -226,7 +232,7 @@ final class ImageAssetRepository: Sendable {
       return cached
     }
 
-    guard let image = decodedImage(for: content)
+    guard let image = try decodedImageThrowing(for: content)
     else {
       return nil
     }
@@ -268,12 +274,16 @@ final class ImageAssetRepository: Sendable {
   }
 
   func decodedImage(for content: ImageContent) -> DecodedImage? {
+    try? decodedImageThrowing(for: content)
+  }
+
+  private func decodedImageThrowing(for content: ImageContent) throws -> DecodedImage? {
     let key = DecodedKey.content(content.id)
     if let cached = storage.withLockUnchecked({ $0.decodedImages.recordAccess(key) }) {
       return cached
     }
 
-    guard let decoded = decodeImageBytes(content.bytes) else {
+    guard let decoded = try decodeImageBytes(content.bytes) else {
       return nil
     }
 
@@ -346,15 +356,13 @@ final class ImageAssetRepository: Sendable {
   }
 
   /// Decodes a raster image from its bytes, dispatching by magic bytes
-  /// between PNG (89 50 4E 47…) and JPEG (FF D8 FF…). Returns `nil` if
-  /// the bytes are neither format, or the matching decoder fails.
-  private func decodeImageBytes(_ bytes: [UInt8]) -> DecodedImage? {
+  /// between PNG (89 50 4E 47…) and JPEG (FF D8 FF…). Unknown formats return
+  /// nil; recognized formats retain their decoder's actionable failure.
+  private func decodeImageBytes(_ bytes: [UInt8]) throws -> DecodedImage? {
     if isJPEGBytes(bytes) {
       #if canImport(SwiftTUIVendorJPEG)
         var source = InMemoryJPEGSource(bytes)
-        guard let image = try? JPEG.Image.decompress(stream: &source) else {
-          return nil
-        }
+        let image = try JPEG.Image.decompress(stream: &source)
         let pixels = image.unpack(as: JPEG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
         return DecodedImage(
           encodedBytes: bytes,
@@ -369,9 +377,7 @@ final class ImageAssetRepository: Sendable {
     if isPNGBytes(bytes) {
       #if canImport(SwiftTUIVendorPNG)
         var source = InMemoryPNGSource(bytes)
-        guard let image = try? PNG.Image.decompress(stream: &source) else {
-          return nil
-        }
+        let image = try PNG.Image.decompress(stream: &source)
         let pixels = image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
         return DecodedImage(
           encodedBytes: bytes,

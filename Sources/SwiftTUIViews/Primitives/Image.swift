@@ -58,14 +58,21 @@ public struct Image: PrimitiveView, ResolvableView {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let resolver = context.imageAssetResolver
-    let resolvedAsset = resolver?(
-      source,
-      context.environmentValues.imageResourceRoots,
-      PixelSize(
-        width: context.environmentValues.cellPixelMetrics.width,
-        height: context.environmentValues.cellPixelMetrics.height
+    let resolvedAsset: ResolvedImageAsset?
+    var failureDescription: String?
+    do {
+      resolvedAsset = try resolver?(
+        source,
+        context.environmentValues.imageResourceRoots,
+        PixelSize(
+          width: context.environmentValues.cellPixelMetrics.width,
+          height: context.environmentValues.cellPixelMetrics.height
+        )
       )
-    )
+    } catch {
+      resolvedAsset = nil
+      failureDescription = String(describing: error)
+    }
 
     var node = resolveLeafNode(
       kindName: "Image",
@@ -95,7 +102,8 @@ public struct Image: PrimitiveView, ResolvableView {
             severity: .warning,
             code: "image.unresolvedSource",
             message:
-              "Image source \(sourceDescription) did not resolve to a decodable asset; the image measures zero.",
+              "Image source \(sourceDescription) did not resolve to a decodable asset; the image measures zero."
+              + (failureDescription.map { " Decode failed: " + $0 } ?? ""),
             identity: context.identity,
             source: "Image"
           )

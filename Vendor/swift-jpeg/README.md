@@ -20,7 +20,13 @@ by virtually all cameras, browsers, and editors), specifically:
 - 1-component grayscale, 3-component YCbCr (JFIF), 4-component CMYK / YCCK
 - Common chroma subsamplings (`4:4:4`, `4:2:2`, `4:2:0`, `4:1:1`, `4:4:0`)
 - Restart markers (`DRI` / `RST0–RST7`)
-- Standard `APPn` / `COM` segments (parsed but ignored)
+- Exif IFD0 orientation (all eight transforms, either TIFF byte order)
+- Adobe color hints; other `APPn` / `COM` metadata is skipped
+- Complete scans without an EOI trailer; incomplete entropy or markers still fail
+
+Sampling factors must divide the frame maxima. Malformed component lists and
+scan/table selectors fail before entropy decoding or plane indexing. Unscanned
+components use the neutral sample value corresponding to zero DCT coefficients.
 
 It deliberately does **not** implement progressive (`SOF2`), lossless
 (`SOF3`), arithmetic coding, hierarchical, or 12-bit precision. Files using

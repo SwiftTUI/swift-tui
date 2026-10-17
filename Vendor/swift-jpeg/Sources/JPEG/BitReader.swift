@@ -17,6 +17,7 @@ extension JPEG {
 
     var markerHit: UInt8? = nil
     var hitEOF: Bool = false
+    var truncatedMarker = false
 
     init(bytes: [UInt8], pos: Int, end: Int) {
       self.bytes = bytes
@@ -45,6 +46,7 @@ extension JPEG {
       }
       guard pos < end else {
         hitEOF = true
+        truncatedMarker = true
         return nil
       }
       let next = bytes[pos]

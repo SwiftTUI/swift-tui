@@ -30,9 +30,7 @@ struct AdversarialSetBJPEGTests {
   // A 3:2 horizontal sampling ratio is not divisible; the decoder says such
   // ratios are rejected, so decoding must throw, not trap in the upsampler.
   @Test func setB381NonDivisibleSamplingRatiosThrowInsteadOfTrapping() async {
-    await withKnownIssue(
-      "hMax / H truncates 3 / 2 to 1 and the nearest-neighbour upsampler indexes past the Cb plane"
-    ) {
+    do {
       await #expect(processExitsWith: .success) {
         let bytes = SetBJPEG.file(
           width: 24, height: 8,
@@ -53,9 +51,7 @@ struct AdversarialSetBJPEGTests {
     let bytes = SetBJPEG.file(
       width: 8, height: 8, components: [SetBJPEGComponent(id: 1)],
       scans: [SetBJPEGScan(ids: [], data: [])])
-    withKnownIssue(
-      "parseSOS accepts Ns = 0, walks no blocks and returns the zero-filled planes as a black image"
-    ) {
+    do {
       let first = (try? SetBJPEG.luma(bytes))?.first
       #expect(SetBJPEG.failure(bytes) != nil, "decoded; first sample \(String(describing: first))")
       #expect(ImageAssetRepository().decodedImage(for: .embeddedImage(bytes)) == nil)
@@ -69,7 +65,7 @@ struct AdversarialSetBJPEGTests {
       width: 8, height: 8, components: [SetBJPEGComponent(id: 1, tq: 4)],
       scans: [SetBJPEGScan(ids: [1], data: SetBJPEG.blocks([0]))])
     let error = try #require(SetBJPEG.failure(bytes))
-    withKnownIssue("parseSOF throws invalidSamplingFactors(H = 1, V = 1) for a Tq outside 0...3") {
+    do {
       #expect(error != .invalidSamplingFactors(componentID: 1, h: 1, v: 1), "\(error)")
     }
   }
@@ -83,7 +79,7 @@ struct AdversarialSetBJPEGTests {
     let luma = try SetBJPEG.luma(complete)
     #expect(luma == Array(repeating: 228, count: 64), "\(luma)")
     let noTrailer = Array(complete.dropLast(2))
-    withKnownIssue("the marker walk after the scan reaches end-of-stream and throws truncated") {
+    do {
       #expect(
         SetBJPEG.failure(noTrailer) == nil, "\(String(describing: SetBJPEG.failure(noTrailer)))")
       #expect(ImageAssetRepository().decodedImage(for: .embeddedImage(noTrailer)) != nil)
@@ -101,9 +97,7 @@ struct AdversarialSetBJPEGTests {
     let reds = decoded.pixels.map(\.red)
     #expect(reds.contains(28) && reds.contains(228), "\(Set(reds))")
     #expect(decoded.encodedFormat == .jpeg)
-    withKnownIssue(
-      "APP1 segments are skipped unparsed; the orientation tag never reaches the pixels"
-    ) {
+    do {
       #expect(decoded.pixelSize == PixelSize(width: 8, height: 16), "\(decoded.pixelSize)")
     }
   }
@@ -117,9 +111,7 @@ struct AdversarialSetBJPEGTests {
       scans: [SetBJPEGScan(ids: [1], data: SetBJPEG.blocks([0]))])
     let pixels = try SetBJPEG.pixels(bytes)
     let pixel = try #require(pixels.first)
-    withKnownIssue(
-      "planes hold zero samples, not zero coefficients, so Cb = Cr = 0 converts to (0, 255, 0)"
-    ) {
+    do {
       let spread = max(pixel.r, pixel.g, pixel.b) - min(pixel.r, pixel.g, pixel.b)
       #expect(spread < 16, "\(pixel)")
     }
@@ -139,14 +131,32 @@ struct AdversarialSetBJPEGTests {
     }
     let progressiveIssue = try #require(unresolvedIssue(for: progressive, "progressive"))
     let garbageIssue = try #require(unresolvedIssue(for: garbage, "garbage"))
-    withKnownIssue(
-      "decodeImageBytes drops the decoder error with try?, so every bad source gets one message"
-    ) {
+    do {
       let message = progressiveIssue.message.lowercased()
       let named = ["progressive", "sof2", "unsupported"].contains { message.contains($0) }
       #expect(named, "\(progressiveIssue.message)")
       #expect(progressiveIssue.message != garbageIssue.message, "\(progressiveIssue.message)")
     }
+  }
+
+  @Test func malformedScanSelectorsAndRepeatedComponentsFailBeforeIndexing() {
+    let valid = SetBJPEG.file(
+      width: 8, height: 8, components: [SetBJPEGComponent(id: 1)],
+      scans: [SetBJPEGScan(ids: [1], data: SetBJPEG.blocks([0]))])
+    let sos = valid.indices.dropLast().first { valid[$0] == 0xFF && valid[$0 + 1] == 0xDA }!
+    for selector in [UInt8(0x40), 0x04, 0xFF] {
+      var invalid = valid
+      invalid[sos + 6] = selector
+      #expect(SetBJPEG.failure(invalid) != nil)
+    }
+    let repeated = SetBJPEG.file(
+      width: 8, height: 8, components: SetBJPEG.ycc,
+      scans: [SetBJPEGScan(ids: [1, 1, 3], data: SetBJPEG.blocks([0, 0, 0]))])
+    #expect(SetBJPEG.failure(repeated) != nil)
+    let noScans = SetBJPEG.file(
+      width: 8, height: 8,
+      components: [SetBJPEGComponent(id: 1)], scans: [])
+    #expect(SetBJPEG.failure(noScans) != nil)
   }
 
   // Restart intervals reset the DC predictor and realign the bit reader at
@@ -195,9 +205,8 @@ struct AdversarialSetBJPEGTests {
       "\(String(describing: SetBJPEG.failure(shortTable)))")
   }
 
-  // Every proper prefix of at least two bytes of a valid stream fails with
-  // `.truncated`, whichever length field, payload or entropy byte the cut
-  // lands in; shorter prefixes are `.missingSOI`. Nothing traps.
+  // Every prefix ending inside a header, entropy payload or marker fails.
+  // Only the complete scan with its EOI entirely absent remains decodable.
   @Test func setB390EveryTruncationPointThrowsTruncated() {
     let complete = SetBJPEG.file(
       width: 8, height: 8, components: [SetBJPEGComponent(id: 1)],
@@ -208,7 +217,11 @@ struct AdversarialSetBJPEGTests {
     var offenders: [(Int, String)] = []
     for length in 2..<complete.count {
       let error = SetBJPEG.failure(Array(complete.prefix(length)))
-      if case .truncated? = error { continue }
+      if length == complete.count - 2 {
+        if error == nil { continue }
+      } else if case .truncated? = error {
+        continue
+      }
       offenders.append((length, String(describing: error)))
     }
     #expect(offenders.isEmpty, "\(offenders)")
