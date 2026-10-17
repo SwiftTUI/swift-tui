@@ -94,7 +94,7 @@ import SwiftTUICore
       isEnabled = false
       ownsScreen = false
       mouseCoordinateMode = .cells
-      pointerHoverEnabled = false
+      // Hover is requested configuration, like readerMode, not active state.
       kittyKeyboardPushed = false
     }
 

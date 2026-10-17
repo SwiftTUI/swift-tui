@@ -44,9 +44,7 @@ struct AdversarialSetBTerminalOutputTests {
       damage: PresentationDamage(requiresFullTextRepaint: true))
     try host.drainPendingPresentation()
     let written = controller.writes.dropFirst(before).joined()
-    withKnownIssue(
-      "the planner diffs only dirtyRows; a bare requiresFullTextRepaint hint writes nothing"
-    ) {
+    do {
       #expect(written.contains("ALPHA"), "\(written.debugDescription)")
       #expect(metrics.bytesWritten > 0, "\(metrics)")
     }
@@ -71,9 +69,7 @@ struct AdversarialSetBTerminalOutputTests {
     try host.writeClipboard("x")
     let metrics = try host.present(surface(["alpXa"], width: 8, height: 1))
     try host.drainPendingPresentation()
-    withKnownIssue(
-      "an out-of-band write invalidates the presentation state, forcing a full repaint"
-    ) {
+    do {
       #expect(metrics.strategy == .incremental, "\(metrics.strategy)")
       #expect(
         controller.writes.last?.contains("\u{1B}[2J") == false,
@@ -93,7 +89,7 @@ struct AdversarialSetBTerminalOutputTests {
     try host.setPointerHoverEnabled(true)
     let metrics = try host.present(surface(["alpha", "bEta"], width: 8, height: 2))
     try host.drainPendingPresentation()
-    withKnownIssue("the hover-mode write goes through the invalidating write path") {
+    do {
       #expect(metrics.strategy == .incremental, "\(metrics.strategy)")
     }
     #expect(controller.writes.joined().contains("\u{1B}[?1003h"), "hover reporting was enabled")
@@ -113,9 +109,7 @@ struct AdversarialSetBTerminalOutputTests {
     defer { try? host.disableRawMode() }
     let reenabled = controller.writes.dropFirst(before).joined()
     #expect(reenabled.contains("\u{1B}[?1006h"), "\(reenabled.debugDescription)")
-    withKnownIssue(
-      "the raw-mode session resets pointerHoverEnabled, and the run loop never re-applies it"
-    ) {
+    do {
       #expect(reenabled.contains("\u{1B}[?1003h"), "\(reenabled.debugDescription)")
     }
   }
@@ -125,14 +119,12 @@ struct AdversarialSetBTerminalOutputTests {
   @Test func setB285ZeroWindowSizeFallsBackToTheFallbackSize() throws {
     let zero = SetBRecordingController(windowSize: .zero)
     let host = makeHost(zero)
-    withKnownIssue(
-      "surfaceSize falls back only when windowSize throws, not when it reports 0×0 (adjacent to STUI-1006)"
-    ) {
+    do {
       #expect(host.surfaceSize == CellSize(width: 80, height: 24), "\(host.surfaceSize)")
     }
     let halfZero = SetBRecordingController(windowSize: .init(width: 0, height: 24))
     let halfHost = makeHost(halfZero)
-    withKnownIssue("a zero width is also kept as the surface size") {
+    do {
       #expect(halfHost.surfaceSize.width > 0, "\(halfHost.surfaceSize)")
     }
     // A zero-size first frame still emits only the clear and home sequence.
@@ -152,9 +144,7 @@ struct AdversarialSetBTerminalOutputTests {
     let current = RasterSurface(size: .init(width: 4, height: 1), cells: [row0, row1Changed])
     let planner = TerminalPresentationPlanner(capabilityProfile: .previewUnicode)
     let plan = planner.plan(previousSurface: previous, currentSurface: current)
-    withKnownIssue(
-      "the planner diffs max(cells.count, height) rows and addresses row 2 of a one-row surface"
-    ) {
+    do {
       #expect(plan.rowBatches.allSatisfy { $0.row < 1 }, "\(plan.rowBatches.map(\.row))")
     }
     let steps = fullRepaintWriteSteps(for: current, capabilityProfile: .previewUnicode)

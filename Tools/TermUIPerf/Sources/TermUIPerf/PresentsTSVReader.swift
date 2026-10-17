@@ -14,7 +14,7 @@ public struct PerfPresentRecord: Equatable, Sendable {
   /// never reached the terminal.
   public var writeMs: Double?
   public var bytes: Int
-  /// `written` or `superseded`.
+  /// `written`, `superseded`, or `failed`.
   public var outcome: String
 
   public init(

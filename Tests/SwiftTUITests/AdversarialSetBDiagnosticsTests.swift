@@ -231,9 +231,7 @@ struct AdversarialSetBDiagnosticsTests {
     #expect(firstRow.bytes == first.bytesWritten, "\(firstRow.bytes) vs \(first.bytesWritten)")
     #expect(secondRow.outcome == .written)
     let cursorBytes = TerminalHostEscapeSequences.cursorFocus(to: CellPoint(x: 1, y: 0)).utf8.count
-    withKnownIssue(
-      "cursor output appended to a pending frame is counted in that frame's presents row"
-    ) {
+    do {
       #expect(
         secondRow.bytes == second.bytesWritten,
         "\(secondRow.bytes) vs \(second.bytesWritten) (+\(cursorBytes) cursor bytes)")

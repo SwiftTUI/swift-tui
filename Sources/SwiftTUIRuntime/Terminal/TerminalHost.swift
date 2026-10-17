@@ -51,7 +51,10 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
     TerminalCursorFocusPresentationSurface
   {
     public var surfaceSize: CellSize {
-      (try? controller.windowSize(of: outputFileDescriptor)) ?? fallbackSize
+      guard let size = try? controller.windowSize(of: outputFileDescriptor),
+        size.width > 0, size.height > 0
+      else { return fallbackSize }
+      return size
     }
     public let capabilityProfile: TerminalCapabilityProfile
     public private(set) var appearance: TerminalAppearance
@@ -334,14 +337,28 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
 
     public func write(_ output: String) throws {
       try drainPendingPresentation()
-      try writeSynchronously(output)
+      // Even a throwing controller may already have written a prefix.
       invalidatePresentationState()
+      try writeSynchronously(output)
+    }
+
+    /// Known nonpainting commands preserve the cell baseline only when the
+    /// complete command reaches the terminal. A partial escape sequence makes
+    /// subsequent output, and therefore the retained screen, unknowable.
+    private func writeControl(_ output: String) throws {
+      try drainPendingPresentation()
+      do {
+        try writeSynchronously(output)
+      } catch {
+        invalidatePresentationState()
+        throw error
+      }
     }
 
     @discardableResult
     @MainActor
     public func writeClipboard(_ text: String) throws -> Bool {
-      try write(terminalClipboardSequence(for: text))
+      try writeControl(terminalClipboardSequence(for: text))
       return true
     }
 
@@ -354,31 +371,23 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
     }
 
     public func moveCursor(to point: CellPoint) throws {
-      try write(TerminalHostEscapeSequences.cursor(to: point))
+      try writeControl(TerminalHostEscapeSequences.cursor(to: point))
     }
 
     package func presentAccessibilityCursorFocus(at point: CellPoint?) throws {
       let presentationWriter = presentationWriterIfNeeded()
-      try presentationWriter.consumePendingError()
+      try consumePendingErrorInvalidatingOnFailure(presentationWriter)
       presentationWriter.submitSupplementalOutput(
         TerminalHostEscapeSequences.cursorFocus(to: point)
       )
     }
 
     public func setPointerHoverEnabled(_ enabled: Bool) throws {
-      let reportsMouseInput =
-        rawModeSession.isEnabled
-        ? rawModeSession.mouseCoordinateMode.reportsMouseInput
-        : initialConfigurationAllowsMouseReporting
-      guard reportsMouseInput else {
-        rawModeSession.pointerHoverEnabled = false
-        return
-      }
       guard rawModeSession.pointerHoverEnabled != enabled else {
         return
       }
 
-      if rawModeSession.isEnabled {
+      if rawModeSession.isEnabled, rawModeSession.mouseCoordinateMode.reportsMouseInput {
         let sequence =
           if enabled {
             TerminalHostEscapeSequences.enableMouseReporting(
@@ -392,20 +401,10 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
                 hoverEnabled: false
               )
           }
-        try write(sequence)
+        try writeControl(sequence)
       }
       rawModeSession.pointerHoverEnabled = enabled
       refreshProcessExitCleanupRegistration()
-    }
-
-    private var initialConfigurationAllowsMouseReporting: Bool {
-      guard capabilityProfile.supportsMouseReporting else {
-        return false
-      }
-      if case .preResolved(.disabled) = mouseInputResolution {
-        return false
-      }
-      return true
     }
 
     @discardableResult
@@ -838,9 +837,9 @@ func fullRepaintWriteSteps(
   )
   var writeSteps: [String] = []
 
-  for rowIndex in 0..<surface.size.height {
+  for rowIndex in 0..<max(0, surface.size.height) {
     let row = rowIndex < surface.cells.count ? surface.cells[rowIndex] : []
-    let renderedRow = renderer.renderRow(row)
+    let renderedRow = renderer.renderRow(Array(row.prefix(max(0, surface.size.width))))
     guard !renderedRow.isEmpty else {
       continue
     }

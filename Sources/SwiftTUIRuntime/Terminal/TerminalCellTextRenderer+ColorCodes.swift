@@ -63,7 +63,7 @@ extension TerminalCellTextRenderer {
 
   // Canonical ANSI palette values. The terminal can theme these slots, but
   // quantization must account for both normal and bright intensities.
-  private static let ansi16Palette: [(Int, Color)] = [
+  static let ansi16Palette: [(Int, Color)] = [
     (30, .init(hexRGB: 0x000000)), (31, .init(hexRGB: 0x800000)),
     (32, .init(hexRGB: 0x008000)), (33, .init(hexRGB: 0x808000)),
     (34, .init(hexRGB: 0x000080)), (35, .init(hexRGB: 0x800080)),

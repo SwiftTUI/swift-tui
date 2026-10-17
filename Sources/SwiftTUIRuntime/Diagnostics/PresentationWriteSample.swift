@@ -12,6 +12,9 @@ import SwiftTUICore
   @_spi(Runners) public enum Outcome: String, Sendable {
     /// The submission reached `write(2)`.
     case written
+    /// The controller failed after attempting this submission. A prefix may
+    /// have reached the terminal; there is no successful completion timestamp.
+    case failed
     /// A newer frame superseded it while it was still pending, or a write
     /// failure discarded it. These bytes never reached the terminal. The
     /// record exists so the join stays total and a dropped frame is visible
@@ -24,7 +27,7 @@ import SwiftTUICore
   @_spi(Runners) public var frame: Int
   /// When the frame was handed to the presentation writer, on the main actor.
   @_spi(Runners) public var submittedAt: MonotonicInstant
-  /// When `write(2)` returned, on the writer queue. `nil` when superseded.
+  /// When `write(2)` returned, on the writer queue. `nil` when superseded or failed.
   @_spi(Runners) public var writtenAt: MonotonicInstant?
   /// UTF-8 byte count of the submitted emission.
   @_spi(Runners) public var bytes: Int

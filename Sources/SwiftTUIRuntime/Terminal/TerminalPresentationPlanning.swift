@@ -169,7 +169,8 @@ struct TerminalPresentationPlanner {
     damage: PresentationDamage? = nil,
     translationCandidate: ScrollTranslationCandidate? = nil
   ) -> TerminalPresentationPlan {
-    guard let previousSurface,
+    guard damage?.requiresFullTextRepaint != true,
+      let previousSurface,
       previousSurface.size == currentSurface.size,
       previousSurface.attachments == currentSurface.attachments,
       previousSurface.metadata == currentSurface.metadata
@@ -180,8 +181,14 @@ struct TerminalPresentationPlanner {
     }
 
     let supportsIncrementalGraphicsReplay = graphicsCapabilities.preferredProtocol == .kitty
-    if previousSurface.imageAttachments != currentSurface.imageAttachments,
-      !supportsIncrementalGraphicsReplay
+    let hasGraphics =
+      !previousSurface.imageAttachments.isEmpty || !currentSurface.imageAttachments.isEmpty
+    let graphicsInvalidated =
+      damage?.requiresFullGraphicsReplay == true
+      || !(damage?.graphicsInvalidation.isEmpty ?? true)
+    if !supportsIncrementalGraphicsReplay,
+      previousSurface.imageAttachments != currentSurface.imageAttachments
+        || (hasGraphics && graphicsInvalidated)
     {
       return .fullRepaint(
         surfaceSize: currentSurface.size
@@ -193,10 +200,7 @@ struct TerminalPresentationPlanner {
       terminalBackgroundColor: terminalBackgroundColor
     )
 
-    let rowCount = max(
-      max(previousSurface.cells.count, currentSurface.cells.count),
-      currentSurface.size.height
-    )
+    let rowCount = max(0, currentSurface.size.height)
 
     if let translationCandidate,
       capabilityProfile.supportsScrollRegions,
@@ -226,6 +230,7 @@ struct TerminalPresentationPlanner {
       previousAttachments: previousSurface.imageAttachments,
       currentAttachments: currentSurface.imageAttachments,
       dirtyRows: Set(rowBatches.map(\.row)),
+      damage: damage,
       supportsIncrementalGraphicsReplay: supportsIncrementalGraphicsReplay
     )
 
@@ -263,12 +268,7 @@ struct TerminalPresentationPlanner {
       let rowSpans = renderer.diffSpans(
         previousRow: previousRow,
         currentRow: currentRow,
-        width: max(
-          previousSurface.size.width,
-          currentSurface.size.width,
-          previousRow.count,
-          currentRow.count
-        ),
+        width: max(0, currentSurface.size.width),
         limitingTo: damage?.columnRanges(for: row)
       )
 
@@ -440,12 +440,7 @@ struct TerminalPresentationPlanner {
       let rowSpans = renderer.diffSpans(
         previousRow: previousRow,
         currentRow: currentRow,
-        width: max(
-          previousSurface.size.width,
-          currentSurface.size.width,
-          previousRow.count,
-          currentRow.count
-        ),
+        width: max(0, currentSurface.size.width),
         limitingTo: nil
       )
       if !isExposedRow {
@@ -559,12 +554,7 @@ struct TerminalPresentationPlanner {
       renderer.diffSpans(
         previousRow: previousRow,
         currentRow: currentRow,
-        width: max(
-          previousSurface.size.width,
-          currentSurface.size.width,
-          previousRow.count,
-          currentRow.count
-        ),
+        width: max(0, currentSurface.size.width),
         limitingTo: nil
       ).reduce(0) { partial, span in
         partial + max(0, span.upperBound - span.lowerBound)
@@ -606,6 +596,7 @@ struct TerminalPresentationPlanner {
     previousAttachments: [RasterImageAttachment],
     currentAttachments: [RasterImageAttachment],
     dirtyRows: Set<Int>,
+    damage: PresentationDamage?,
     supportsIncrementalGraphicsReplay: Bool
   ) -> TerminalPresentationPlan.GraphicsReplayPlan {
     guard supportsIncrementalGraphicsReplay else {
@@ -615,7 +606,7 @@ struct TerminalPresentationPlanner {
       return .none
     }
 
-    if previousAttachments != currentAttachments {
+    if previousAttachments != currentAttachments || damage?.requiresFullGraphicsReplay == true {
       return .init(
         scope: .full,
         attachmentsToReplay: currentAttachments
@@ -624,6 +615,7 @@ struct TerminalPresentationPlanner {
 
     let attachmentsToReplay = currentAttachments.filter { attachment in
       attachment.visibleBoundsIntersectsAnyDirtyRow(dirtyRows)
+        || damage?.graphicsInvalidation.contains(attachment.identity) == true
     }
     guard !attachmentsToReplay.isEmpty else {
       return .none

@@ -240,7 +240,9 @@ private func halfBlockOverlay(
 }
 
 private func ansi16Palette() -> [Color] {
-  (0...15).compactMap { TerminalAppearance.defaultPalette[$0] }
+  // Dither into the same colors the text encoder assigns to SGR slots.
+  // Using the appearance theme here quantizes a second time at emission.
+  TerminalCellTextRenderer.ansi16Palette.map { $0.1 }
 }
 
 private func ansi256Palette() -> [Color] {

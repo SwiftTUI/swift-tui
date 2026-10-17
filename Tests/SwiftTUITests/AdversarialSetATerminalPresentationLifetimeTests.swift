@@ -28,8 +28,7 @@
       #expect(controller.writes.last == "\u{1B}[1;1HXXX")
       let recovered = try host.present(original, damage: .init(dirtyRows: []))
       try host.drainPendingPresentation()
-      withKnownIssue("STUI-1031: partial explicit write failure leaves the retained screen trusted")
-      {
+      do {
         #expect(recovered.usedFullRepaint)
         #expect(controller.writes.last == "\u{1B}[2J\u{1B}[1;1HAAAA")
       }
@@ -50,9 +49,7 @@
       #expect(controller.writes.last == "\u{1B}[1;1HB")
       let recovered = try host.present(surface("BBBB"), damage: .init(dirtyRows: []))
       try host.drainPendingPresentation()
-      withKnownIssue(
-        "STUI-1032: cursor focus consumes a writer error without invalidating its baseline"
-      ) {
+      do {
         #expect(recovered.usedFullRepaint)
         #expect(controller.writes.last == "\u{1B}[2J\u{1B}[1;1HBBBB")
       }
@@ -83,7 +80,7 @@
         try host.drainPendingPresentation()
         let output = controller.writes.dropFirst(alreadyWritten).joined()
         #expect(output.contains("\u{1B}[1;1HC"))
-        withKnownIssue("STUI-1033: content coalescing drops queued cursor-hide output") {
+        do {
           #expect(
             output.contains("\u{1B}[?25l"),
             "Queued cursor hide was lost; attached to pending content: \(attachesToContent)")
@@ -150,8 +147,10 @@
       #expect(throws: TerminalHostError.self) { try writer.consumePendingError() }
       #expect(sink.samples.filter { $0.frame == 702 }.count == 1)
       #expect(sink.samples.first { $0.frame == 702 }?.outcome == .superseded)
-      withKnownIssue("STUI-1034: a failed active presentation has no profiling outcome") {
+      do {
         #expect(sink.samples.filter { $0.frame == 701 }.count == 1)
+        #expect(sink.samples.first { $0.frame == 701 }?.outcome == .failed)
+        #expect(sink.samples.first { $0.frame == 701 }?.writtenAt == nil)
       }
     }
 
@@ -403,10 +402,11 @@
       let records = sink.samples
       #expect(records.count == 3)
       #expect(records.first { $0.frame == 120 }?.outcome == .superseded)
-      #expect(records.first { $0.frame == 120 }?.bytes == "éfocus".utf8.count)
+      #expect(records.first { $0.frame == 120 }?.bytes == "é".utf8.count)
       #expect(records.first { $0.frame == 180 }?.bytes == "界".utf8.count)
       #expect(records.first { $0.frame == 180 }?.outcome == .written)
       #expect(Set(records.map(\.frame)) == [90, 120, 180])
+      #expect(controller.writes.joined().contains("focus"))
     }
 
     @Test func setA1045ImageChurnKeepsTerminalResidentPixelDataBounded() throws {

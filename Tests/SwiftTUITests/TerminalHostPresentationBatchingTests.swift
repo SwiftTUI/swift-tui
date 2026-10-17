@@ -613,7 +613,7 @@ struct TerminalHostPresentationBatchingTests {
     try host.drainPendingPresentation()
 
     #expect(metrics.strategy == .incremental)
-    #expect(controller.writes.last == "\u{001B}[1;3HB")
+    #expect(controller.writes.last == "\u{001B}[1;3HB\u{001B}[1;2H\u{001B}[?25h")
   }
 
   @Test("kitty images transmitted only in a dropped frame are retransmitted on recovery")
@@ -748,8 +748,6 @@ private final class PresentationWriteCountingController: TerminalControlling {
     nil
   }
 
-
-
   func write(_ output: String, to _: Int32) throws {
     writesStorage.withLock { $0.append(output) }
   }
@@ -806,8 +804,6 @@ private final class BlockingPresentationWriteController: TerminalControlling {
   func cellPixelSize(of _: Int32) throws -> PixelSize? {
     nil
   }
-
-
 
   func write(_ output: String, to _: Int32) throws {
     let shouldBlockFirstWrite = shouldBlockNextWriteStorage.withLock { state in

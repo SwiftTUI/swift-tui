@@ -95,10 +95,10 @@ the frames file name.
 | --- | --- |
 | `frame` | run-loop frame ordinal; joins `frames.tsv` on its `frame` column |
 | `submitted_ms` | when the frame was handed to the presentation writer |
-| `written_ms` | when `write(2)` returned. `-` means superseded. |
-| `write_ms` | `written_ms − submitted_ms`. `-` means superseded. |
+| `written_ms` | when `write(2)` returned. `-` means superseded or failed. |
+| `write_ms` | `written_ms − submitted_ms`. `-` means superseded or failed. |
 | `bytes` | UTF-8 size of the submitted emission |
-| `outcome` | `written`, or `superseded` when a newer frame displaced it |
+| `outcome` | `written`, `superseded` when displaced before writing, or `failed` when the controller threw |
 
 The join is total: every submission that carries a frame ordinal produces
 exactly one row, whether or not it reached the terminal. Only the terminal host

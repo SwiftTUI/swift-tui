@@ -462,7 +462,7 @@ struct TerminalPresentationTests {
       )
     )
 
-    #expect(rendered == "\u{001B}[1;96mHi\u{001B}[0m")
+    #expect(rendered == "\u{001B}[1;37mHi\u{001B}[0m")
   }
 
   @Test("true-color renderer lowers semantic color tokens to RGB escapes")
@@ -490,8 +490,8 @@ struct TerminalPresentationTests {
     #expect(rendered == "\u{001B}[38;2;86;182;194;48;2;17;34;51mHi\u{001B}[0m")
   }
 
-  @Test("renderer leaves outermost alpha backgrounds unflattened without terminal background")
-  func rendererLeavesOutermostAlphaBackgroundsUnflattenedWithoutTerminalBackground() {
+  @Test("renderer composites outermost alpha backgrounds over the theme fallback")
+  func rendererUsesThemeFallbackForOutermostAlphaBackgrounds() {
     let rendered = TerminalSurfaceRenderer(
       capabilityProfile: .trueColor
     ).render(
@@ -508,7 +508,7 @@ struct TerminalPresentationTests {
       )
     )
 
-    #expect(rendered == "\u{001B}[48;2;0;0;0m \u{001B}[0m")
+    #expect(rendered == "\u{001B}[48;2;24;28;35m \u{001B}[0m")
   }
 
   @Test("renderer composites outermost alpha backgrounds over terminal background")
@@ -700,7 +700,7 @@ struct TerminalPresentationTests {
           row: 0,
           anchorColumn: 0,
           renderedBatch:
-            "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[96mX"
+            "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[37mX"
             + "\u{001B}[1C"
             + "\u{001B}]8;;\u{001B}\\\u{001B}]8;;https://two.example\u{001B}\\"
             + "\u{001B}[0m\u{001B}[95mY\u{001B}]8;;\u{001B}\\\u{001B}[0m",
@@ -708,7 +708,7 @@ struct TerminalPresentationTests {
             .init(
               row: 0,
               column: 0,
-              renderedSpan: "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[96mX",
+              renderedSpan: "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[37mX",
               cellsChanged: 1
             ),
             .init(
@@ -1392,7 +1392,7 @@ struct TerminalPresentationTests {
 
     #expect(
       controller.writes == [
-        "\u{001B}[2J\u{001B}[1;1H\u{001B}[1;38;5;117mdemo\u{001B}[0m"
+        "\u{001B}[2J\u{001B}[1;1H\u{001B}[1;38;5;73mdemo\u{001B}[0m"
       ])
     #expect(metrics.bytesWritten == controller.writes.joined().utf8.count)
     #expect(metrics.linesTouched == 1)

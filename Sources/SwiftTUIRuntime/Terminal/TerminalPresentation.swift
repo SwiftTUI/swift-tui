@@ -31,8 +31,9 @@ public struct TerminalSurfaceRenderer {
 
   /// Renders a full raster surface into terminal text.
   public func render(_ surface: RasterSurface) -> String {
-    let rowStrings = surface.cells.map { row in
-      renderRow(row)
+    let rowStrings = (0..<max(0, surface.size.height)).map { index in
+      let row = index < surface.cells.count ? surface.cells[index] : []
+      return renderRow(Array(row.prefix(max(0, surface.size.width))))
     }
     // Pre-size: each row contributes its character count plus a \r\n separator.
     let estimatedSize = rowStrings.reduce(0) { $0 + $1.utf8.count + 2 }

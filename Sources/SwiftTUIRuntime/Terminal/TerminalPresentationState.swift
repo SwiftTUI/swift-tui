@@ -96,6 +96,8 @@ import Synchronization
   final class TerminalPresentationWriter: Sendable {
     private struct State: Sendable {
       var pending: TerminalPresentationFrame?
+      // Cursor/control bytes are independent of replaceable cell content.
+      var supplementalOutput = ""
       var isWriting = false
       var lastCommittedSequence: UInt64 = 0
       var pendingError: TerminalHostError?
@@ -134,11 +136,11 @@ import Synchronization
       // syscall, and this is the main actor's present path. Instrumentation
       // that stalls the thing it measures is not a measurement.
       var superseded: TerminalPresentationFrame?
-      startWriterIfNeeded { state in
+      let admitted = startWriterIfNeeded { state in
         superseded = state.pending
         state.pending = frame
       }
-      recordSupersessionIfNeeded(of: superseded)
+      recordSupersessionIfNeeded(of: admitted ? superseded : frame)
     }
 
     func submitSupplementalOutput(_ output: String) {
@@ -147,16 +149,7 @@ import Synchronization
       }
 
       startWriterIfNeeded { state in
-        if state.pending != nil {
-          state.pending?.output.append(output)
-        } else {
-          state.pending = .init(
-            sequence: nil,
-            output: output,
-            frameOrdinal: nil,
-            submittedAt: .now()
-          )
-        }
+        state.supplementalOutput.append(output)
       }
     }
 
@@ -205,91 +198,85 @@ import Synchronization
       drain()
     }
 
+    @discardableResult
     private func startWriterIfNeeded(
       updatePendingFrame: (inout State) -> Void
-    ) {
-      let shouldStart = state.withLock { state in
+    ) -> Bool {
+      let (admitted, shouldStart) = state.withLock { state in
         guard state.pendingError == nil else {
-          return false
+          return (false, false)
         }
 
         updatePendingFrame(&state)
 
         guard !state.isWriting else {
-          return false
+          return (true, false)
         }
 
         state.isWriting = true
-        return true
+        return (true, true)
       }
 
-      guard shouldStart else {
-        return
+      if shouldStart {
+        queue.async { [self] in
+          writePendingFrames()
+        }
       }
-
-      queue.async { [self] in
-        writePendingFrames()
-      }
+      return admitted
     }
 
     private func writePendingFrames() {
       while true {
-        let frame: TerminalPresentationFrame? = state.withLock { state in
-          guard let frame = state.pending else {
+        let batch: (frame: TerminalPresentationFrame, output: String)? = state.withLock { state in
+          guard state.pending != nil || !state.supplementalOutput.isEmpty else {
             state.isWriting = false
             return nil
           }
-
+          let frame =
+            state.pending
+            ?? TerminalPresentationFrame(
+              sequence: nil, output: "", frameOrdinal: nil, submittedAt: .now())
+          let output = frame.output + state.supplementalOutput
+          state.supplementalOutput = ""
           state.pending = nil
           if let sequence = frame.sequence {
             state.lastCommittedSequence = sequence
           }
-          return frame
+          return (frame, output)
         }
 
-        guard let frame else {
-          return
-        }
-
+        guard let batch else { return }
+        let frame = batch.frame
         do {
-          try controller.write(frame.output, to: outputFileDescriptor, budget: writeBudget)
+          try controller.write(batch.output, to: outputFileDescriptor, budget: writeBudget)
           recordWriteCompletion(of: frame)
         } catch let error as TerminalHostError {
-          recordWriteFailure(error)
+          recordWriteFailure(error, frame: frame)
           return
         } catch {
-          recordWriteFailure(.failedToWrite(errno: EIO))
+          recordWriteFailure(.failedToWrite(errno: EIO), frame: frame)
           return
         }
       }
     }
 
-    private func recordWriteFailure(_ error: TerminalHostError) {
+    private func recordWriteFailure(_ error: TerminalHostError, frame: TerminalPresentationFrame) {
       var superseded: TerminalPresentationFrame?
       state.withLock { state in
         superseded = state.pending
         state.pending = nil
+        state.supplementalOutput = ""
         state.isWriting = false
         state.pendingError = error
       }
       recordSupersessionIfNeeded(of: superseded)
+      recordOutcome(of: frame, outcome: .failed, writtenAt: nil)
     }
 
     /// Records a completed `write(2)` — called from the writer queue, right
     /// after the bytes are on the wire.
     private func recordWriteCompletion(of frame: TerminalPresentationFrame) {
-      guard let writeSink, let frameOrdinal = frame.frameOrdinal else {
-        return
-      }
-      writeSink.record(
-        PresentationWriteSample(
-          frame: frameOrdinal,
-          submittedAt: frame.submittedAt,
-          writtenAt: .now(),
-          bytes: frame.output.utf8.count,
-          outcome: .written
-        )
-      )
+      recordOutcome(of: frame, outcome: .written, writtenAt: .now())
     }
 
     /// Records a pending submission that will never be written.
@@ -301,19 +288,23 @@ import Synchronization
     /// never neither — and calls this *outside* it, keeping the sink's own
     /// write off the presentation lock.
     private func recordSupersessionIfNeeded(of frame: TerminalPresentationFrame?) {
-      guard let writeSink,
-        let frame,
-        let frameOrdinal = frame.frameOrdinal
-      else {
-        return
-      }
+      guard let frame else { return }
+      recordOutcome(of: frame, outcome: .superseded, writtenAt: nil)
+    }
+
+    private func recordOutcome(
+      of frame: TerminalPresentationFrame,
+      outcome: PresentationWriteSample.Outcome,
+      writtenAt: MonotonicInstant?
+    ) {
+      guard let writeSink, let frameOrdinal = frame.frameOrdinal else { return }
       writeSink.record(
         PresentationWriteSample(
           frame: frameOrdinal,
           submittedAt: frame.submittedAt,
-          writtenAt: nil,
+          writtenAt: writtenAt,
           bytes: frame.output.utf8.count,
-          outcome: .superseded
+          outcome: outcome
         )
       )
     }
@@ -327,7 +318,7 @@ import Synchronization
   /// dropped frame never reached the terminal, so the baseline stays put and
   /// the Kitty bookkeeping rolls back to its pre-submission snapshot. Recovery
   /// after a drop is therefore an ordinary incremental diff — a full repaint
-  /// happens only when no written baseline exists at all.
+  /// happens when the baseline is unknown or explicit damage requires it.
   struct TerminalPresentationSession {
     /// A submitted content frame whose write outcome is not yet known.
     struct InFlightFrame {
@@ -403,7 +394,17 @@ import Synchronization
     func presentationDamage(
       requested damage: PresentationDamage?
     ) -> PresentationDamage? {
-      requestedDamageTrustsBaseline ? damage : nil
+      guard !requestedDamageTrustsBaseline, let damage else { return damage }
+      guard
+        damage.requiresFullTextRepaint || damage.requiresFullGraphicsReplay
+          || !damage.graphicsInvalidation.isEmpty
+      else { return nil }
+      guard let surface = previousSurface else { return damage }
+      return PresentationDamage(
+        dirtyRows: Set(0..<max(0, surface.size.height)),
+        graphicsInvalidation: damage.graphicsInvalidation,
+        requiresFullTextRepaint: damage.requiresFullTextRepaint,
+        requiresFullGraphicsReplay: damage.requiresFullGraphicsReplay)
     }
 
     /// Resolves a run-loop scroll-translation candidate against the trust
