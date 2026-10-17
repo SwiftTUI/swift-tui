@@ -89,8 +89,8 @@ struct AdversarialSetBLayoutTests {
     #expect(outside.rasterSurface.lines == ["L  R"], "outside lines \(outside.rasterSurface.lines)")
   }
 
-  // Declared Spacer minima on both axes survive a proposal that cannot hold them, and the
-  // trailing child is centered within the stack's resolved (not proposed) cross size.
+  // Spacer minima survive a deficit; ordinary text can yield to zero width,
+  // while fixed-size text contributes its own structural minimum.
   @Test func setB013NestedSpacerMinimaSurviveAnImpossibleTwoAxisDeficit() {
     let artifacts = DefaultRenderer().render(
       VStack(spacing: 0) {
@@ -105,17 +105,28 @@ struct AdversarialSetBLayoutTests {
       context: .init(identity: testIdentity("SetBLayout", "setB013")),
       proposal: .init(width: 4, height: 3)
     )
-    withKnownIssue("a nested HStack loses its Spacer minimum and drops its trailing child") {
-      #expect(
-        artifacts.measuredTree.measuredSize == CellSize(width: 5, height: 4),
-        "\(artifacts.measuredTree.measuredSize)")
-      #expect(artifacts.rasterSurface.size == CellSize(width: 5, height: 4))
-      #expect(
-        artifacts.rasterSurface.lines == ["A   B", "", "", "  C"],
-        "\(artifacts.rasterSurface.lines)")
-      let rowWidth = artifacts.placedTree.children.first?.bounds.size.width
-      #expect(rowWidth == 5, "row width \(String(describing: rowWidth))")
-    }
+    // Text's ratified horizontal minimum is zero. The three-cell spacer
+    // survives; the trailing text yields the missing cell under this deficit.
+    #expect(artifacts.measuredTree.measuredSize == CellSize(width: 4, height: 4))
+    #expect(artifacts.rasterSurface.lines == ["A", "", "", "  C"])
+    #expect(
+      artifacts.placedTree.children.first?.children.map { $0.bounds.size.width } == [1, 3, 0])
+
+    // Explicit fixed-size text adds structural minima on both axes.
+    let fixed = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        HStack(spacing: 0) {
+          Text("A").fixedSize()
+          Spacer(minLength: 3)
+          Text("B").fixedSize()
+        }
+        Spacer(minLength: 2)
+        Text("C")
+      }, context: .init(identity: testIdentity("SetBLayout", "setB013-fixed")),
+      proposal: .init(width: 4, height: 3))
+    #expect(fixed.measuredTree.measuredSize == CellSize(width: 5, height: 4))
+    #expect(fixed.rasterSurface.lines == ["A   B", "", "", "  C"])
+
   }
 
   // A zero proposal clamps intrinsic leaves to nothing, but a declared Spacer minimum and a
@@ -180,9 +191,19 @@ struct AdversarialSetBLayoutTests {
       },
       context: .init(identity: testIdentity("SetBLayout", "setB015-clipped"))
     )
-    withKnownIssue(".clipped() re-centers trailing-aligned overflow") {
-      #expect(clipped.rasterSurface.lines == ["|3   |"], "clipped \(clipped.rasterSurface.lines)")
-    }
+    #expect(clipped.rasterSurface.lines == ["| 3  |"], "clipped \(clipped.rasterSurface.lines)")
+    let unclipped = DefaultRenderer().render(
+      HStack(spacing: 0) {
+        Text("|")
+        SetBOversizedBlock().frame(width: 4, height: 1, alignment: .bottomTrailing)
+        Text("|")
+      }, context: .init(identity: testIdentity("SetBLayout", "setB015-unclipped")))
+    #expect(clipped.placedTree.children[1].bounds == unclipped.placedTree.children[1].bounds)
+    #expect(
+      clipped.placedTree.children[1].children[0].bounds
+        == unclipped.placedTree.children[1].children[0].bounds)
+    // The six-cell inner VStack aligns its one-cell label's integer center
+    // guide at x=3; bottomTrailing translates that column into clip column 1.
   }
 
   // Overlays and backgrounds are size-neutral: a wider decoration overflows its primary

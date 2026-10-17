@@ -308,6 +308,7 @@ public struct Spacer: PrimitiveView, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let minLength = max(0, self.minLength)
     let intrinsicSize =
       switch context.environmentValues.stackAxis {
       case .horizontal:

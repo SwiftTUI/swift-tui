@@ -4,7 +4,7 @@ import SwiftTUICore
 /// its own live bound-value adjustment policy.
 @MainActor
 func registerValueAdjustmentInput(
-  intake: HandlerDescriptorIntake, identity: Identity,
+  intake: HandlerDescriptorIntake, identity: Identity, verticalKeys: Bool = false,
   adjust: @escaping @MainActor @Sendable (Int) -> Bool
 ) {
   intake.registerKeyPressHandler(identity: identity) { press in
@@ -12,6 +12,8 @@ func registerValueAdjustmentInput(
     switch press.key {
     case .arrowLeft: return adjust(-1)
     case .arrowRight: return adjust(1)
+    case .arrowUp where verticalKeys: return adjust(1)
+    case .arrowDown where verticalKeys: return adjust(-1)
     default: return false
     }
   }

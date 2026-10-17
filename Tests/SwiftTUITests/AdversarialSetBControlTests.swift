@@ -78,8 +78,7 @@ struct AdversarialSetBControlTests {
     let afterUp = probe.value
     _ = try h.pressKey(KeyPress(.arrowDown))
     let afterDown = probe.value
-    withKnownIssue("value adjustment binds Left/Right only; Up/Down are absorbed by the edit focus")
-    {
+    do {
       #expect(afterUp == 3, "\(afterUp)")
       #expect(afterDown == 2, "\(afterDown)")
     }
@@ -102,15 +101,35 @@ struct AdversarialSetBControlTests {
     log.pressed.removeAll()
     _ = try h.pressKey(KeyPress(.return))
     #expect(probe.value == 1, "\(probe.value)")
-    withKnownIssue(
-      "Return sets a transient pressed identity before dispatch, so the style resolves once with isPressed true"
-    ) {
+    do {
       #expect(!log.pressed.contains(true), "\(log.pressed)")
     }
     log.pressed.removeAll()
     _ = try h.renderAfterExternalMutation()
     #expect(
       !log.pressed.contains(true), "the transient press is cleared after the frame: \(log.pressed)")
+  }
+
+  @Test func keyboardPulsePreservesAHeldPhysicalPress() throws {
+    let log = SetBPressLog()
+    let probe = SetBValueProbe(0)
+    let h = try harness("HeldPress") {
+      Stepper("S", value: probe.binding(), in: 0...10).stepperStyle(
+        SetBPressRecordingStepperStyle(log: log))
+    }
+    defer { h.shutdown() }
+    let point = try #require(h.point(forText: "+"))
+    _ = try h.sendMouse(.down(.primary), at: point)
+    let held = try #require(h.runLoop.pointerPressedIdentity)
+    #expect(log.pressed.last == true)
+    log.pressed.removeAll()
+    _ = try h.pressKey(KeyPress(.return))
+    #expect(h.runLoop.pointerPressedIdentity == held)
+    #expect(h.runLoop.pressedIdentity == held)
+    #expect(!log.pressed.contains(false))
+    _ = try h.sendMouse(.up(.primary), at: point)
+    #expect(h.runLoop.pointerPressedIdentity == nil)
+    #expect(log.pressed.last == false)
   }
 
   // A group box whose authored label is empty reserves no label row.
@@ -140,9 +159,7 @@ struct AdversarialSetBControlTests {
       proposal: .init(width: 10, height: 1))
     let codes = snapshot.diagnostics.runtime.issues.map(\.code)
     let line = snapshot.rasterSurface.lines.first ?? ""
-    withKnownIssue(
-      "frames that are all empty strings pass the width-mixing check and render nothing"
-    ) {
+    do {
       #expect(codes.contains("style.invalidPresentation"), "\(codes)")
       #expect(!line.isEmpty, "\(snapshot.rasterSurface.lines)")
     }
@@ -170,7 +187,7 @@ struct AdversarialSetBControlTests {
     try #require(!h.frame.contains("Two"), "collapsed: \(h.frame)")
     _ = try h.pressKey(KeyPress(.arrowDown))
     #expect(h.frame.contains("Two"), "expanded: \(h.frame)")
-    withKnownIssue("Down expands and steps the selection in the same keystroke") {
+    do {
       #expect(probe.value == 0, "\(probe.value)")
       #expect(probe.writes.isEmpty, "\(probe.writes)")
     }

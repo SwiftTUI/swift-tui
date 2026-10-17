@@ -232,7 +232,10 @@ public struct FrameModifier: IterativePrimitiveViewModifier, Sendable, Equatable
           children: [contentNode],
           environmentSnapshot: context.environment,
           transactionSnapshot: context.transaction,
-          layoutBehavior: .frame(width: width, height: height, alignment: alignment)
+          layoutBehavior: .frame(
+            width: width.flatMap { $0 >= 0 ? $0 : nil },
+            height: height.flatMap { $0 >= 0 ? $0 : nil },
+            alignment: alignment)
         )
       ]
 

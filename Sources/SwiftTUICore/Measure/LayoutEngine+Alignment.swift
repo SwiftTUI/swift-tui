@@ -228,14 +228,17 @@ extension LayoutEngine {
     alignment: Alignment,
     passContext: LayoutPassContext? = nil
   ) -> (leading: Int, trailing: Int, top: Int, bottom: Int) {
-    let dimensions = zip(children, childMeasurements).map { child, measurement in
-      viewDimensions(for: child, measured: measurement, passContext: passContext)
+    let hasContent = children.contains { !isSpacer($0) }
+    let dimensions = zip(children, childMeasurements).compactMap {
+      child, measurement -> ViewDimensions? in
+      if hasContent && isSpacer(child) { return nil }
+      return viewDimensions(for: child, measured: measurement, passContext: passContext)
     }
 
-    let leading = dimensions.map { max(0, $0[alignment.horizontal]) }.max() ?? 0
-    let trailing = dimensions.map { max(0, $0.width - $0[alignment.horizontal]) }.max() ?? 0
-    let top = dimensions.map { max(0, $0[alignment.vertical]) }.max() ?? 0
-    let bottom = dimensions.map { max(0, $0.height - $0[alignment.vertical]) }.max() ?? 0
+    let leading = dimensions.map { $0[alignment.horizontal] }.max() ?? 0
+    let trailing = dimensions.map { $0.width - $0[alignment.horizontal] }.max() ?? 0
+    let top = dimensions.map { $0[alignment.vertical] }.max() ?? 0
+    let bottom = dimensions.map { $0.height - $0[alignment.vertical] }.max() ?? 0
 
     return (leading, trailing, top, bottom)
   }

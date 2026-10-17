@@ -158,6 +158,10 @@ private enum FocusedIdentityKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: Identity? = nil
 }
 
+private enum PointerPressedIdentityKey: EnvironmentKey, FrameworkEnvironmentKey {
+  static let defaultValue: Identity? = nil
+}
+
 private enum PressedIdentityKey: EnvironmentKey, FrameworkEnvironmentKey {
   static let defaultValue: Identity? = nil
 }
@@ -239,6 +243,7 @@ extension EnvironmentValues {
     [
       ObjectIdentifier(FocusedIdentityKey.self),
       ObjectIdentifier(PressedIdentityKey.self),
+      ObjectIdentifier(PointerPressedIdentityKey.self),
     ]
   }
 
@@ -255,6 +260,9 @@ extension EnvironmentValues {
   ) -> ObjectIdentifier? {
     if keyPath == \EnvironmentValues.focusedIdentity {
       return ObjectIdentifier(FocusedIdentityKey.self)
+    }
+    if keyPath == \EnvironmentValues.pointerPressedIdentity {
+      return ObjectIdentifier(PointerPressedIdentityKey.self)
     }
     if keyPath == \EnvironmentValues.pressedIdentity {
       return ObjectIdentifier(PressedIdentityKey.self)
@@ -560,6 +568,15 @@ extension EnvironmentValues {
     set { _focusedIdentity = newValue }
   }
 
+  /// Physical pointer feedback is separate from transient keyboard activation.
+  package var pointerPressedIdentity: Identity? {
+    get {
+      recordRuntimeFocusSideFieldRead()
+      return _pointerPressedIdentity
+    }
+    set { _pointerPressedIdentity = newValue }
+  }
+
   package var pressedIdentity: Identity? {
     get {
       recordRuntimeFocusSideFieldRead()
@@ -610,6 +627,11 @@ extension EnvironmentValues {
   ) -> Identity? {
     recordTargetScopedRuntimeFocusRead(targets)
     return _pressedIdentity
+  }
+
+  package func pointerPressedIdentity(comparedAgainst targets: Set<Identity>) -> Identity? {
+    recordTargetScopedRuntimeFocusRead(targets)
+    return _pointerPressedIdentity
   }
 
   private func recordTargetScopedRuntimeFocusRead(

@@ -356,18 +356,10 @@ are omitted even when SwiftUI exposes a corresponding API.
   question per pass. Built-in stacks report only their plain dimensions and
   modifier guides to *their* parents — they do not aggregate child guides.
 - **`ZStack` is not a stack for its children.** *Ratified (parity).* `ZStack`
-  resolves its children with no stack axis — the same context `ZStackLayout {}`
-  and a custom layout without a declared orientation install — so a `Spacer`
-  directly inside reserves its minimum on both axes and a `Divider` follows
-  the proposal's longer side, whichever stack encloses the `ZStack`. Sizing is
-  unchanged and matches SwiftUI's headline rule, measured against the macOS
-  SDK: a `Spacer` beside other children is layout-neutral and the `ZStack`
-  hugs them. Two residues stay *Provisional*: SwiftUI also ignores such a
-  spacer's `minLength` and lets a spacer-only `ZStack` fill its proposal,
-  where SwiftTUI reserves the minimum and gives a spacer-only `ZStack` no
-  size; and a `Divider` inside a `ZStack` under an `HStack` can draw
-  vertically when the proposal is taller than wide, where SwiftUI always
-  draws a divider outside a stack horizontally.
+  and `ZStackLayout` clear the enclosing stack axis. Direct spacers beside
+  other children are layout-neutral, including their minimum lengths; a
+  spacer-only ZStack fills a finite proposal. A divider outside an oriented
+  stack draws horizontally, independent of the proposal's aspect ratio.
 - **Engine re-entry nesting has a depth budget.** *Ratified.* A nested
   custom layout or hosted-collection (`List`/`Table`) windowing container
   re-enters the engine on the native call stack when measured, so nesting is

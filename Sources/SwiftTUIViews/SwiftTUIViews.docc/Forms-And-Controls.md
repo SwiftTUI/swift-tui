@@ -65,7 +65,7 @@ var body: some View {
 ```
 
 Return or Space flips the focused toggle. Left and Right arrows
-decrement and increment the focused stepper; `in:` is optional and
+decrement and increment the focused stepper, as do Down and Up; `in:` is optional and
 `step:` defaults to 1, with `Int` and `Double` forms of both.
 
 ## Pick one option
@@ -94,7 +94,8 @@ var body: some View {
 
 The default style lists options vertically and changes selection with
 Up and Down; `.segmented` lays them out horizontally and uses Left and
-Right; `.radioGroup` and `.menu` are also available. Terminal option
+Right; `.radioGroup` and `.menu` are also available. An arrow on a collapsed
+menu opens it without changing selection; subsequent arrows navigate. Terminal option
 rows are single-line text, so SwiftTUI scrapes option content to
 labeled text values: an unmodified tagged `Text` is represented
 losslessly. Option-level `disabled` and `accessibilityLabel` modifiers are also
@@ -244,3 +245,9 @@ Closed compact content has no focus targets or active control actions.
 - <doc:Commands-And-Key-Input>
 - <doc:Dismissal-Is-Data>
 - <doc:Divergences-And-Gaps>
+
+Slider and Stepper style configurations report `isPressed` only while a
+physical pointer press is held. Keyboard activation keeps its own transient
+feedback lifetime and does not cancel a held pointer press. Spinner active
+frames must have a positive, uniform terminal-cell width; invalid frames
+report `style.invalidPresentation` and use the automatic presentation.

@@ -33,6 +33,7 @@ extension RunLoop {
     effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
+    effectiveEnvironmentValues.pointerPressedIdentity = pointerPressedIdentity
     effectiveEnvironmentValues.accessibilityPreferences =
       effectiveAccessibilityPreferences(hostConfiguration: hostConfiguration)
     effectiveEnvironmentValues.stableOutput = runtimeConfiguration.stableOutput

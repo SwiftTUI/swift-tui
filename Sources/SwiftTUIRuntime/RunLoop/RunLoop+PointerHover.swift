@@ -171,20 +171,26 @@ extension RunLoop {
     transient: Bool
   ) {
     let previousPressedIdentity = pressedIdentity
-    pressedIdentity = identity
-    transientPressedIdentity = transient ? identity : nil
+    let previousPointerPressedIdentity = pointerPressedIdentity
+    if transient {
+      transientPressedIdentity = identity
+    } else {
+      pointerPressedIdentity = identity
+      transientPressedIdentity = nil
+    }
 
-    guard previousPressedIdentity != identity else {
+    guard
+      previousPressedIdentity != pressedIdentity
+        || previousPointerPressedIdentity != pointerPressedIdentity
+    else {
       return
     }
 
-    var invalidatedIdentities: Set<Identity> = []
-    if let previousPressedIdentity {
-      invalidatedIdentities.insert(previousPressedIdentity)
-    }
-    if let identity {
-      invalidatedIdentities.insert(identity)
-    }
+    let invalidatedIdentities = Set(
+      [
+        previousPressedIdentity, pressedIdentity,
+        previousPointerPressedIdentity, pointerPressedIdentity,
+      ].compactMap { $0 })
     guard !invalidatedIdentities.isEmpty else {
       return
     }

@@ -349,7 +349,9 @@ extension ResolvedNode {
         return diverged("transactionSnapshot")
       }
       if lhs.layoutBehavior != rhs.layoutBehavior { return diverged("layoutBehavior") }
-      if lhs.layoutMetadata != rhs.layoutMetadata { return diverged("layoutMetadata") }
+      if lhs.layoutMetadata.isKnownToDiffer(from: rhs.layoutMetadata) {
+        return diverged("layoutMetadata")
+      }
       if lhs.layoutRealizedContent?.equivalenceSignature
         != rhs.layoutRealizedContent?.equivalenceSignature
       {

@@ -12,7 +12,7 @@ import SwiftTUICore
 /// focus stop or automatic live announcements.
 ///
 /// An invalid presentation (empty active frames, a non-positive cadence,
-/// frames of mixed cell width) renders the automatic presentation instead and
+/// frames of zero or mixed cell width) renders the automatic presentation instead and
 /// reports one `style.invalidPresentation` issue per spinner and issue text:
 /// the fallback keeps animating, and each tick re-validates the same style,
 /// so the report repeats only when the style value changes.
@@ -88,6 +88,9 @@ public struct Spinner: View {
       problems.append("interval is not positive")
     }
     let frameWidths = Set(presentation.activeFrames.map(Self.frameCellWidth(of:)))
+    if frameWidths.contains(0) {
+      problems.append("active frames have zero terminal-cell width")
+    }
     if frameWidths.count > 1 {
       problems.append("active frames mix terminal-cell widths \(frameWidths.sorted())")
     }

@@ -109,8 +109,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   package var currentFocusPresentation: FocusPresentation = .none
   package var currentFocusedValues = FocusedValues()
   package var previousPreferenceObservations: [PreferenceObservationRegistrationSnapshot] = []
-  package var pressedIdentity: Identity?
+  package var pointerPressedIdentity: Identity?
   package var transientPressedIdentity: Identity?
+  package var pressedIdentity: Identity? { transientPressedIdentity ?? pointerPressedIdentity }
   /// Pointer-routing state — the armed/captured route, the custom-handler flag,
   /// and the press origin — owned as one value so every reset moves the whole
   /// tuple coherently and a missed field can't mis-route the next gesture. See
@@ -149,6 +150,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   /// Press identity committed by the previous frame. Tracked for the same
   /// scoped retained-reuse safety gate as focus.
   package var previousFramePressedIdentity: Identity?
+  package var previousFramePointerPressedIdentity: Identity?
   package var nextRenderIntentGeneration: UInt64 = 1
   package var pendingCoalescedEventBatches = 0
   package var pendingCoalescedWakeCauses: Set<WakeCause> = []

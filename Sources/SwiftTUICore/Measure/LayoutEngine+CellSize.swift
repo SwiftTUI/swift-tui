@@ -70,6 +70,13 @@ extension LayoutEngine {
       }
       return overlaySize(from: childMeasurements)
     case .overlay(let alignment):
+      if !resolved.children.isEmpty, resolved.children.allSatisfy(isSpacer) {
+        let intrinsic = overlaySize(from: childMeasurements)
+        return CellSize(
+          width: measuredDimension(proposal.width, fallback: intrinsic.width),
+          height: measuredDimension(proposal.height, fallback: intrinsic.height)
+        )
+      }
       let alignmentMetrics = overlayAlignmentMetrics(
         for: resolved.children,
         childMeasurements: childMeasurements,
@@ -347,6 +354,13 @@ extension LayoutEngine {
     max: ProposedDimension?
   ) -> Int {
     guard hasFlexibleConstraint(min: min, ideal: ideal, max: max) else {
+      return child
+    }
+
+    // A lower bound does not grant permission to absorb surplus. Ideal
+    // dimensions participate only when the proposal is unspecified.
+    if max == nil, case .finite(let offered) = proposal {
+      if let lower = finiteValue(min) { return Swift.max(lower, Swift.min(offered, child)) }
       return child
     }
 

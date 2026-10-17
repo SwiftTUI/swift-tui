@@ -34,9 +34,7 @@ struct AdversarialSetBContainerTests {
         Text("ab").frame(minWidth: 3)
         Text("c")
       }, "cross", width: 10, height: 2)
-    withKnownIssue(
-      "a flexible frame resolves a finite proposal to the proposal itself, ignoring the content size"
-    ) {
+    do {
       #expect(
         minOnly.measuredTree.measuredSize == CellSize(width: 3, height: 1),
         "\(minOnly.measuredTree.measuredSize)")
@@ -70,9 +68,7 @@ struct AdversarialSetBContainerTests {
         HStack(alignment: .top) { Text("A").alignmentGuide(.top) { _ in 5 } }
         Text("B")
       }, "tall", width: 10, height: 8)
-    withKnownIssue(
-      "each cross-axis term is clamped at zero, so a lone guide outside the child inflates the container"
-    ) {
+    do {
       #expect(
         far.measuredTree.measuredSize == CellSize(width: 2, height: 1),
         "\(far.measuredTree.measuredSize)")
@@ -108,8 +104,7 @@ struct AdversarialSetBContainerTests {
           Text("ab").frame(height: -1),
           context: .init(identity: testIdentity("SetBContainer", "negH")),
           proposal: .init(width: 10, height: 1))
-        withKnownIssue("frame(width:) and frame(height:) are stored unclamped and measure negative")
-        {
+        do {
           #expect(
             negativeWidth.measuredTree.measuredSize == CellSize(width: 2, height: 1),
             "\(negativeWidth.measuredTree.measuredSize)")
@@ -139,14 +134,12 @@ struct AdversarialSetBContainerTests {
         Spacer(minLength: -3)
         Text("R")
       }.fixedSize(), "ideal", width: 10, height: 1)
-    withKnownIssue(
-      "the raw negative minimum is summed into the ideal and advances placement backwards"
-    ) {
+    do {
       #expect(
         ideal.measuredTree.measuredSize == CellSize(width: 2, height: 1),
         "\(ideal.measuredTree.measuredSize)")
       #expect(
-        ideal.placedTree.children.first?.children.map(\.bounds.origin.x) == [0, 1, 1],
+        ideal.placedTree.children.map(\.bounds.origin.x) == [0, 1, 1],
         "\(ideal.placedTree)")
       #expect(ideal.rasterSurface.lines == ["LR"], "\(ideal.rasterSurface.lines)")
     }
@@ -168,9 +161,7 @@ struct AdversarialSetBContainerTests {
         Text("ab")
         Spacer(minLength: 5)
       }, "withMinimum", width: 10, height: 3)
-    withKnownIssue(
-      "the register's Provisional residue: a spacer-only ZStack has no size and a minimum is reserved on both axes"
-    ) {
+    do {
       #expect(
         spacerOnly.measuredTree.measuredSize == CellSize(width: 6, height: 3),
         "\(spacerOnly.measuredTree.measuredSize)")
@@ -201,9 +192,7 @@ struct AdversarialSetBContainerTests {
   // aspect (the register's second Provisional residue).
   @Test func setB236DividerInAZStackDrawsHorizontally() {
     let tall = render(ZStack { Divider() }, "tall", width: 3, height: 5)
-    withKnownIssue(
-      "the register's Provisional residue: a divider with no stack axis follows the longer side"
-    ) {
+    do {
       #expect(
         tall.measuredTree.measuredSize == CellSize(width: 3, height: 1),
         "\(tall.measuredTree.measuredSize)")
@@ -250,9 +239,7 @@ struct AdversarialSetBContainerTests {
         Text("cd")
       }, "row", width: 10, height: 1)
     let widths = row.placedTree.children.map { $0.bounds.size.width }
-    withKnownIssue(
-      "the stack caps the position wrapper at its child's ideal width instead of the proposal"
-    ) {
+    do {
       #expect(widths == [8, 2], "\(widths)")
       #expect(
         row.placedTree.children.last?.bounds.origin.x == 8,

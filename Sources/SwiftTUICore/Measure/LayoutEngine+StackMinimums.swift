@@ -58,6 +58,8 @@ extension LayoutEngine {
       }
 
       switch current.layoutBehavior {
+      case .position:
+        return true
       case .custom(let token):
         guard let handle = token as? CustomLayoutHandle else {
           preconditionFailure("LayoutBehavior.custom must carry a CustomLayoutHandle")
@@ -236,8 +238,15 @@ extension LayoutEngine {
         continue
       }
 
+      let ignoresSpacers: Bool
+      if case .overlay = frame.node.layoutBehavior {
+        ignoresSpacers = stackChildren.contains { !isSpacer($0) }
+      } else {
+        ignoresSpacers = false
+      }
       let childMinimums = childPairs.map { child, measurement in
-        max(
+        if ignoresSpacers && isSpacer(child) { return 0 }
+        return max(
           minimumMainDimension(
             for: child.layoutMetadata,
             axis: axis

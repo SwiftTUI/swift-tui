@@ -118,7 +118,7 @@ extension Slider {
       == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isPressed =
-      context.environmentValues.pressedIdentity(comparedAgainst: [context.identity])
+      context.environmentValues.pointerPressedIdentity(comparedAgainst: [context.identity])
       == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let currentValue = clampedControlValue(binding.wrappedValue, to: bounds)

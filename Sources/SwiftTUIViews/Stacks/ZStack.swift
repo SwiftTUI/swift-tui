@@ -16,10 +16,9 @@ public struct ZStack<Content: View>: PrimitiveView, IterativeResolvableView {
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
     // A ZStack is not a stack along either axis, so its children resolve
     // with no stack axis — the same context `ZStackLayout {}` and a custom
-    // layout without a declared orientation install. A `Spacer` directly
-    // inside is then flexible on both axes (its minimum reserves both) and
-    // a `Divider` follows the proposal's longer side, instead of either one
-    // inheriting whichever stack happens to enclose the ZStack.
+    // layout without a declared orientation install. Direct spacers are
+    // neutral beside content (or fill a spacer-only container); dividers
+    // default to horizontal, independent of any enclosing stack.
     let overlayContext = context.settingEnvironment(\.stackAxis, to: nil)
     return resolveDeclaredChildrenWork(
       content,

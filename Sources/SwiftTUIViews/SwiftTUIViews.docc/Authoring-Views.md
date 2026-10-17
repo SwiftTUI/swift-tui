@@ -87,7 +87,11 @@ An `alignmentGuide` modifier also controls placement inside a fixed or flexible
 `frame(alignment:)`. Guides propagate through layout wrappers such as padding,
 offsets, borders, and nested frames. Padding translates a guide by its inset;
 a guide authored on an outer wrapper takes precedence over the same guide
-in its content.
+in its content. A guide outside a child's bounds does not by itself inflate
+its container: the container aligns the guides and takes the union of the
+children's extents. An explicit `layoutPriority(0)` replaces an earlier
+priority. Custom layout values retain typed values, including an explicit
+optional `nil`; an absent key uses its declared default.
 
 ## Style With Modifiers
 
@@ -107,7 +111,11 @@ Swap the first two modifiers and the border draws over the panel's outermost
 cells, with blank padding around it. To reserve extra cells outside the frame
 instead, pass `placement: .outset` to `border`. For flexible sizing, the
 `frame(minWidth:idealWidth:maxWidth:minHeight:idealHeight:maxHeight:alignment:)`
-overload accepts `.infinity` to expand into available space.
+overload accepts `.infinity` to expand into available space. A minimum alone
+keeps content sizing while enforcing its lower bound; ideal dimensions apply
+when that axis is unspecified, as with `fixedSize`. Negative fixed-frame
+dimensions are ignored, and negative spacer minima are treated as zero.
+`position` takes the available proposal inside stacks as well as at the root.
 
 `foregroundStyle(_:)` accepts
 concrete colors such as `.cyan` alongside semantic roles such as `.primary`,

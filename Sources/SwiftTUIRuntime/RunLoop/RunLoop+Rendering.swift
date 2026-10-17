@@ -449,6 +449,7 @@ extension RunLoop {
       // detect a focus move (see ``retainedReuseSuppressionScopeForFrameSafety()``).
       previousFrameFocusIdentity = focusTracker.currentFocusIdentity
       previousFramePressedIdentity = pressedIdentity
+      previousFramePointerPressedIdentity = pointerPressedIdentity
       // The committed frame reflected every pending focus move; endpoints
       // deferred by the narrowing filter are spent. (Superseded frames do not
       // reach here, so their replays keep re-deriving the same contribution.)
@@ -530,8 +531,8 @@ extension RunLoop {
       if let transientPressedIdentity,
         transientPressedIdentity == pressedIdentity
       {
-        self.transientPressedIdentity = nil
-        setPressedIdentity(nil, transient: false)
+        // The keyboard pulse ends; a physical press can still be held.
+        setPressedIdentity(pointerPressedIdentity, transient: false)
       }
     }
     return lifecycle.invalidations
@@ -897,14 +898,18 @@ extension RunLoop {
       )
     }
 
-    if pressedIdentity != previousFramePressedIdentity {
+    if pressedIdentity != previousFramePressedIdentity
+      || pointerPressedIdentity != previousFramePointerPressedIdentity
+    {
       let readers = renderer.runtimeFocusStateDependentIdentities()
       scope.formUnionFocusPresentationMembers(readers)
-      if let previousFramePressedIdentity {
-        insertFocusMoveMember(previousFramePressedIdentity, into: &scope)
-      }
-      if let pressedIdentity {
-        insertFocusMoveMember(pressedIdentity, into: &scope)
+      for identity in Set(
+        [
+          previousFramePressedIdentity, pressedIdentity,
+          previousFramePointerPressedIdentity, pointerPressedIdentity,
+        ].compactMap { $0 })
+      {
+        insertFocusMoveMember(identity, into: &scope)
       }
       recordSuppressionScopeLegIfTracing(
         leg: "press-move",

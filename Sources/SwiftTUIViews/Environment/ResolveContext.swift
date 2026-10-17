@@ -443,6 +443,7 @@ public struct ResolveContext: Equatable, Sendable {
     // read attributable to the evaluating node.
     replaced._focusedIdentity = environmentValues._focusedIdentity
     replaced._pressedIdentity = environmentValues._pressedIdentity
+    replaced._pointerPressedIdentity = environmentValues._pointerPressedIdentity
     replaced._isFocused = environmentValues._isFocused
     replaced.focusedValues = focusedValues
     copy.environmentValues = replaced
@@ -482,6 +483,9 @@ public struct ResolveContext: Equatable, Sendable {
     if copy.environmentValues._focusedIdentity != environmentValues._focusedIdentity {
       overrides.insert(.focusedIdentity)
     }
+    if copy.environmentValues._pointerPressedIdentity != environmentValues._pointerPressedIdentity {
+      overrides.insert(.pointerPressedIdentity)
+    }
     if copy.environmentValues._pressedIdentity != environmentValues._pressedIdentity {
       overrides.insert(.pressedIdentity)
     }
@@ -495,6 +499,9 @@ public struct ResolveContext: Equatable, Sendable {
     let erased: AnyKeyPath = keyPath
     if erased == \EnvironmentValues.focusedIdentity {
       return .focusedIdentity
+    }
+    if erased == \EnvironmentValues.pointerPressedIdentity {
+      return .pointerPressedIdentity
     }
     if erased == \EnvironmentValues.pressedIdentity {
       return .pressedIdentity
@@ -565,6 +572,9 @@ public struct ResolveContext: Equatable, Sendable {
     let authoredOverrides = propagated.authoredFocusPressOverrides
     if !authoredOverrides.contains(.focusedIdentity) {
       environmentValues._focusedIdentity = inputs.environmentValues._focusedIdentity
+    }
+    if !authoredOverrides.contains(.pointerPressedIdentity) {
+      environmentValues._pointerPressedIdentity = inputs.environmentValues._pointerPressedIdentity
     }
     if !authoredOverrides.contains(.pressedIdentity) {
       environmentValues._pressedIdentity = inputs.environmentValues._pressedIdentity
@@ -902,6 +912,7 @@ extension ResolveContext {
 
     package static let focusedIdentity = Self(rawValue: 1 << 0)
     package static let pressedIdentity = Self(rawValue: 1 << 1)
+    package static let pointerPressedIdentity = Self(rawValue: 1 << 2)
   }
 
   package init(

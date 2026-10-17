@@ -1,5 +1,9 @@
 package struct LayoutMetadata: Sendable {
-  package var layoutPriority: Double
+  private var authoredLayoutPriority: Double?
+  package var layoutPriority: Double {
+    get { authoredLayoutPriority ?? 0 }
+    set { authoredLayoutPriority = newValue }
+  }
   package var fixedSizeHorizontal: Bool
   package var fixedSizeVertical: Bool
   package var minimumWidth: Int?
@@ -10,12 +14,12 @@ package struct LayoutMetadata: Sendable {
   package var spacing: Spacing
   package var alignmentKeys: [String]
   package var layoutValues: [String: String]
-  private var layoutValueStorage: [ObjectIdentifier: any Sendable]
+  private var layoutValueStorage: [ObjectIdentifier: LayoutValueBox]
   private var horizontalAlignmentGuideStorage: [ObjectIdentifier: @Sendable (ViewDimensions) -> Int]
   private var verticalAlignmentGuideStorage: [ObjectIdentifier: @Sendable (ViewDimensions) -> Int]
 
   package init(
-    layoutPriority: Double = 0,
+    layoutPriority: Double? = nil,
     fixedSizeHorizontal: Bool = false,
     fixedSizeVertical: Bool = false,
     minimumWidth: Int? = nil,
@@ -30,7 +34,7 @@ package struct LayoutMetadata: Sendable {
     horizontalAlignmentGuideStorage: [ObjectIdentifier: @Sendable (ViewDimensions) -> Int] = [:],
     verticalAlignmentGuideStorage: [ObjectIdentifier: @Sendable (ViewDimensions) -> Int] = [:]
   ) {
-    self.layoutPriority = layoutPriority
+    self.authoredLayoutPriority = layoutPriority
     self.fixedSizeHorizontal = fixedSizeHorizontal
     self.fixedSizeVertical = fixedSizeVertical
     self.minimumWidth = minimumWidth.map { max(0, $0) }
@@ -41,15 +45,15 @@ package struct LayoutMetadata: Sendable {
     self.spacing = spacing
     self.alignmentKeys = alignmentKeys
     self.layoutValues = layoutValues
-    self.layoutValueStorage = layoutValueStorage
+    self.layoutValueStorage = layoutValueStorage.mapValues(LayoutValueBox.init)
     self.horizontalAlignmentGuideStorage = horizontalAlignmentGuideStorage
     self.verticalAlignmentGuideStorage = verticalAlignmentGuideStorage
   }
 
   package func merging(_ other: Self) -> Self {
     var merged = self
-    if other.layoutPriority != 0 {
-      merged.layoutPriority = other.layoutPriority
+    if let priority = other.authoredLayoutPriority {
+      merged.layoutPriority = priority
     }
     merged.fixedSizeHorizontal = fixedSizeHorizontal || other.fixedSizeHorizontal
     merged.fixedSizeVertical = fixedSizeVertical || other.fixedSizeVertical
@@ -80,7 +84,7 @@ package struct LayoutMetadata: Sendable {
   ) -> Self {
     var copy = self
     copy.layoutValues[debugName] = debugValue
-    copy.layoutValueStorage[keyIdentifier] = value
+    copy.layoutValueStorage[keyIdentifier] = LayoutValueBox(value)
     return copy
   }
 
@@ -88,7 +92,8 @@ package struct LayoutMetadata: Sendable {
     for keyIdentifier: ObjectIdentifier,
     as _: Value.Type = Value.self
   ) -> Value? {
-    layoutValueStorage[keyIdentifier] as? Value
+    guard let box = layoutValueStorage[keyIdentifier] else { return nil }
+    return box.value as? Value
   }
 
   package func settingHorizontalAlignmentGuide(
@@ -164,7 +169,25 @@ package struct LayoutMetadata: Sendable {
 
 extension LayoutMetadata: Equatable {
   package static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.layoutPriority == rhs.layoutPriority
+    lhs.hasSameFields(as: rhs) && lhs.layoutValueStorage == rhs.layoutValueStorage
+  }
+
+  /// A cache miss is not proof of changed output: opaque, non-Equatable
+  /// layout values deliberately deny reuse. Soundness diagnostics alarm
+  /// only when a compared field or typed value proves a difference.
+  package func isKnownToDiffer(from other: Self) -> Bool {
+    if !hasSameFields(as: other) || layoutValueStorage.keys != other.layoutValueStorage.keys {
+      return true
+    }
+    return layoutValueStorage.contains { key, box in
+      guard let otherBox = other.layoutValueStorage[key] else { return true }
+      return box.comparison(to: otherBox) == false
+    }
+  }
+
+  private func hasSameFields(as rhs: Self) -> Bool {
+    let lhs = self
+    return lhs.authoredLayoutPriority == rhs.authoredLayoutPriority
       && lhs.fixedSizeHorizontal == rhs.fixedSizeHorizontal
       && lhs.fixedSizeVertical == rhs.fixedSizeVertical
       && lhs.minimumWidth == rhs.minimumWidth
@@ -178,4 +201,26 @@ extension LayoutMetadata: Equatable {
   }
 }
 
-/// The measured size assigned to a child during container layout.
+/// Debug descriptions are diagnostic text, never value identity. Unknown
+/// equality conservatively invalidates a re-authored value; a copied box
+/// remains reflexive and preserves reuse for unchanged metadata.
+private final class LayoutValueBox: Sendable, Equatable {
+  let value: any Sendable
+  init(_ value: any Sendable) { self.value = value }
+
+  static func == (lhs: LayoutValueBox, rhs: LayoutValueBox) -> Bool {
+    lhs.comparison(to: rhs) == true
+  }
+
+  func comparison(to other: LayoutValueBox) -> Bool? {
+    if self === other { return true }
+    if type(of: value) != type(of: other.value) { return false }
+    guard let equatable = value as? any Equatable else { return nil }
+    return Self.equals(equatable, other.value)
+  }
+
+  private static func equals<Value: Equatable>(_ value: Value, _ other: any Sendable) -> Bool {
+    guard let other = other as? Value else { return false }
+    return value == other
+  }
+}

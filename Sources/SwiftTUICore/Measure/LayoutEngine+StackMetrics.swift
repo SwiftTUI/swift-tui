@@ -74,12 +74,12 @@ extension LayoutEngine {
 
     switch axis {
     case .horizontal:
-      let leading = dimensions.map { max(0, $0[verticalAlignment]) }.max() ?? 0
-      let trailing = dimensions.map { max(0, $0.height - $0[verticalAlignment]) }.max() ?? 0
+      let leading = dimensions.map { $0[verticalAlignment] }.max() ?? 0
+      let trailing = dimensions.map { $0.height - $0[verticalAlignment] }.max() ?? 0
       return (leading, trailing)
     case .vertical:
-      let leading = dimensions.map { max(0, $0[horizontalAlignment]) }.max() ?? 0
-      let trailing = dimensions.map { max(0, $0.width - $0[horizontalAlignment]) }.max() ?? 0
+      let leading = dimensions.map { $0[horizontalAlignment] }.max() ?? 0
+      let trailing = dimensions.map { $0.width - $0[horizontalAlignment] }.max() ?? 0
       return (leading, trailing)
     }
   }

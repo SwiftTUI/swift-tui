@@ -158,8 +158,9 @@ extension Picker {
             return false
           }
 
-          if wantsTrigger {
+          if wantsTrigger, !isActiveNavigation {
             setPickerMenuExpanded(true, in: ownerNode, identity: context.identity)
+            return true
           }
           return stepBoundSelection(
             binding,

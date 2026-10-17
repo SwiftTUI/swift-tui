@@ -108,6 +108,7 @@ public struct EnvironmentValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: EnvironmentValueBox]
   package var _focusedIdentity: Identity?
   package var _pressedIdentity: Identity?
+  package var _pointerPressedIdentity: Identity?
   /// Side-field like `_focusedIdentity`: the per-node focus-cone bake
   /// (`ResolveContext.contextualEnvironmentValues`) must not enter the
   /// reuse-compared snapshot, or every focus move env-mismatches the whole
@@ -121,6 +122,7 @@ public struct EnvironmentValues: Equatable, Sendable {
     storage = [:]
     _focusedIdentity = nil
     _pressedIdentity = nil
+    _pointerPressedIdentity = nil
     _isFocused = false
   }
 

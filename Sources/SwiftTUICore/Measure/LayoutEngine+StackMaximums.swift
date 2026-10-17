@@ -173,10 +173,12 @@ extension LayoutEngine {
         // through, so the child decides.
         return nil
       }
-      // min/ideal-only on this axis: the measured response would fill
-      // any finite proposal, but today's allocator never offers such a
-      // frame more than its ideal — keep it rigid so that stays true.
+      // A min/ideal-only frame remains content-sized in surplus.
       return DirectMaximum(value: idealMain)
+    case .position:
+      return DirectMaximum(value: nil)
+    case .overlay where !node.children.isEmpty && node.children.allSatisfy(isSpacer):
+      return DirectMaximum(value: nil)
     case .viewThatFits:
       return DirectMaximum(value: idealMain)
     case .custom:
@@ -185,7 +187,7 @@ extension LayoutEngine {
       }
       return DirectMaximum(value: idealMain)
     case .stack, .lazyStack, .overlay, .padding, .safeAreaIgnoring, .safeAreaInset,
-      .border, .offset, .position, .decoration:
+      .border, .offset, .decoration:
       return nil
     }
   }
@@ -203,8 +205,8 @@ extension LayoutEngine {
     case .intrinsic:
       return boundedMaximum(of: childMaximums) ?? idealMain
     case .overlay:
-      // A ZStack sizes to all its children, while direct Spacers contribute
-      // only their ideal size. Decorations have a separate primary-child rule.
+      // Direct Spacers are neutral beside content in a ZStack.
+      // Decorations have a separate primary-child rule.
       var maximum = idealMain
       for (child, childMaximum) in zip(stackChildren, childMaximums) {
         guard !isSpacer(child) else { continue }

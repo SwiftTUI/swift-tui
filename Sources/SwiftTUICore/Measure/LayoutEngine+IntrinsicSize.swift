@@ -39,29 +39,13 @@ extension LayoutEngine {
     let proposedWidth = finiteDimension(of: proposal.width)
     let proposedHeight = finiteDimension(of: proposal.height)
 
-    if let stackAxis {
-      switch stackAxis {
-      case .vertical:
-        let width = max(0, proposedWidth ?? 1)
-        return CellSize(width: width, height: width > 0 ? 1 : 0)
-      case .horizontal:
-        let height = max(0, proposedHeight ?? 1)
-        return CellSize(width: height > 0 ? 1 : 0, height: height)
-      }
-    }
-
-    switch (proposedWidth, proposedHeight) {
-    case (let width?, nil):
-      return CellSize(width: max(0, width), height: width > 0 ? 1 : 0)
-    case (nil, let height?):
-      return CellSize(width: height > 0 ? 1 : 0, height: max(0, height))
-    case (let width?, let height?):
-      if width >= height {
-        return CellSize(width: max(0, width), height: height > 0 ? 1 : 0)
-      }
-      return CellSize(width: width > 0 ? 1 : 0, height: max(0, height))
-    case (nil, nil):
-      return CellSize(width: 1, height: 1)
+    switch stackAxis ?? .vertical {
+    case .vertical:
+      let width = max(0, proposedWidth ?? 1)
+      return CellSize(width: width, height: width > 0 ? 1 : 0)
+    case .horizontal:
+      let height = max(0, proposedHeight ?? 1)
+      return CellSize(width: height > 0 ? 1 : 0, height: height)
     }
   }
 

@@ -37,7 +37,7 @@ struct AdversarialSetACustomLayoutTests {
     let records = probe.records
     #expect(!records.isEmpty)
     #expect(records.allSatisfy { $0[0] == -1 }, "Authored nil must remain nil: \(records)")
-    withKnownIssue("STUI-982: absent optional layout values bypass their default") {
+    do {
       #expect(records.allSatisfy { $0[1] == 17 }, "Missing key must use default 17: \(records)")
     }
   }
@@ -359,10 +359,6 @@ struct AdversarialSetACustomLayoutTests {
 
   @Test func setA445LayoutValuesWithEqualDescriptionsStillInvalidateGeometry() throws {
     // Hypothesis: metadata equality compares debug strings and hides a changed typed value with the same description.
-    // This fixture reproduces a fatal shadow mismatch (retained x=0, fresh x=6). Suppress
-    // only this synchronous fixture's shadow probe so ordinary geometry assertions report it.
-    let suppression = SoundnessProbeSuppression()
-    defer { suppression.restore() }
     let cold = render(SetAValuePositionLayout()) {
       Text("Mover").layoutValue(key: SetADescribedLayoutKey.self, value: .init(offset: 6))
     }
@@ -372,7 +368,7 @@ struct AdversarialSetACustomLayoutTests {
     let first = try #require(h.point(forText: "Mover"))
     try h.clickText("Change typed value")
     let second = try #require(h.point(forText: "Mover"))
-    withKnownIssue("STUI-983: equal debug descriptions hide changed typed layout values") {
+    do {
       #expect(second.x - first.x == 6, "Retained x=\(second.x), initial x=\(first.x), cold x=6")
     }
     try h.clickText("Change typed value")
@@ -437,7 +433,7 @@ struct AdversarialSetACustomLayoutTests {
     _ = render(layout) { Text("priority").layoutPriority(9).layoutPriority(0) }
     let records = probe.records
     #expect(!records.isEmpty)
-    withKnownIssue("STUI-984: zero priority is mistaken for absent metadata") {
+    do {
       #expect(records.allSatisfy { $0 == [0] }, "Expected [0], got \(records)")
     }
   }
