@@ -23,6 +23,10 @@
     import Darwin
   #elseif canImport(Glibc)
     import Glibc
+  #elseif canImport(Android)
+    import Android
+  #elseif canImport(Musl)
+    import Musl
   #endif
 
   // MARK: - Codable conformance (stdlib Encodable/Decodable — no Foundation import needed)
@@ -79,6 +83,9 @@
 
     static func parse(_ raw: String) throws(SocketProtocolError) -> SocketRequest {
       let line = raw.hasSuffix("\n") ? String(raw.dropLast()) : raw
+      guard !line.unicodeScalars.contains(where: SocketLineFraming.isControl) else {
+        throw .unknownCommand(raw)
+      }
       if line == "COMPANION" { return .companion }
       if line == "LIST" {
         return .list
@@ -105,15 +112,21 @@
     package func encode() throws(SocketProtocolError) -> String {
       switch self {
       case .companionURL(let url):
+        guard !url.unicodeScalars.contains(where: SocketLineFraming.isControl) else {
+          throw .encodingFailed("Companion URL contains a control character")
+        }
         return "OK \(url)\n"
       case .sceneList(let scenes):
         let items = scenes.map { $0.jsonString() }.joined(separator: ",")
         let json = "[\(items)]"
         return "OK \(json)\n"
       case .attachOK(let ptyPath):
+        guard !ptyPath.unicodeScalars.contains(where: SocketLineFraming.isControl) else {
+          throw .encodingFailed("PTY path contains a control character")
+        }
         return "OK \(ptyPath)\n"
       case .error(let message):
-        return "ERR \(message)\n"
+        return "ERR \(SocketLineFraming.escapedMessage(message))\n"
       }
     }
   }
@@ -173,6 +186,9 @@
     ///   client connect would succeed. Lets callers (and tests) `await` server
     ///   readiness directly instead of polling for it.
     package func run(onReady: (@Sendable () -> Void)? = nil) async throws {
+      guard var addr = sceneSocketAddress(for: socketPath) else {
+        throw SceneDiscoveryServerError.failedToBind(path: socketPath, errno: ENAMETOOLONG)
+      }
       // Create directory structure recursively (pure stdlib — no Foundation)
       let parts = socketPath.split(separator: "/" as Character, omittingEmptySubsequences: true)
       let dirParts = parts.dropLast()
@@ -212,8 +228,6 @@
       }
 
       // Bind
-      var addr = sceneSocketAddress(for: socketPath)
-
       let bindResult = sceneBind(serverFD, &addr)
       guard bindResult == 0 else {
         if errno == EADDRINUSE {
@@ -248,27 +262,39 @@
       // worker — invisible on a developer machine, but half the pool on a
       // two-core CI runner, where it starved the run loop before first paint.
       // `Task.sleep` suspends instead of blocking, so the worker stays free.
-      while !Task.isCancelled {
-        var pfd = pollfd(fd: serverFD, events: Int16(POLLIN), revents: 0)
-        let ready = unsafe poll(&pfd, 1, 0)
-        guard ready > 0 else {
-          // A cancelled sleep returns at once; the `while` condition exits.
-          try? await Task.sleep(nanoseconds: 20_000_000)  // 20 ms
-          continue
+      await withTaskGroup(of: Void.self) { clients in
+        var pendingClients = 0
+        while !Task.isCancelled {
+          // Bound both live connections and completed child-task results.
+          if pendingClients == 64 {
+            _ = await clients.next()
+            pendingClients -= 1
+            continue
+          }
+          var pfd = pollfd(fd: serverFD, events: Int16(POLLIN), revents: 0)
+          let ready = unsafe poll(&pfd, 1, 0)
+          guard ready > 0 else {
+            try? await Task.sleep(for: .milliseconds(20))
+            continue
+          }
+          let clientFD = sceneAccept(serverFD)
+          guard clientFD >= 0 else {
+            if errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR { continue }
+            break
+          }
+          let flags = fcntl(clientFD, F_GETFL)
+          guard flags >= 0, fcntl(clientFD, F_SETFL, flags | O_NONBLOCK) == 0 else {
+            sceneClose(clientFD)
+            continue
+          }
+          pendingClients += 1
+          clients.addTask {
+            await Self.handleClient(
+              fd: clientFD, sceneProvider: self.sceneProvider,
+              companionURL: self.companionURL, attachHandler: self.attachHandler)
+          }
         }
-
-        let clientFD = sceneAccept(serverFD)
-        guard clientFD >= 0 else {
-          if errno == EAGAIN || errno == EWOULDBLOCK { continue }
-          break
-        }
-        let provider = sceneProvider
-        let handler = attachHandler
-        let companion = companionURL
-        Task.detached {
-          await SceneDiscoveryServer.handleClient(
-            fd: clientFD, sceneProvider: provider, companionURL: companion, attachHandler: handler)
-        }
+        clients.cancelAll()
       }
     }
 
@@ -292,7 +318,7 @@
       guard fd >= 0 else { return false }
       defer { sceneClose(fd) }
 
-      var addr = sceneSocketAddress(for: path)
+      guard var addr = sceneSocketAddress(for: path) else { return false }
 
       let result = sceneConnect(fd, &addr)
       return result == 0
@@ -307,10 +333,14 @@
     ) async {
       defer { sceneClose(fd) }
 
-      var buffer = [UInt8](repeating: 0, count: 4096)
-      let bytesRead = unsafe sceneRead(fd, &buffer, buffer.count)
-      guard bytesRead > 0 else { return }
-      let raw = String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
+      let raw: String
+      do {
+        guard let line = try await SocketLineFraming.readRequest(fd: fd) else { return }
+        raw = line
+      } catch {
+        await SocketLineFraming.writeResponse("ERR Invalid or incomplete request\n", fd: fd)
+        return
+      }
 
       let response: SocketResponse
       do {
@@ -333,26 +363,10 @@
       do {
         encoded = try response.encode()
       } catch {
-        encoded = "ERR \(error)\n"
+        encoded = "ERR \(SocketLineFraming.escapedMessage(String(describing: error)))\n"
       }
 
-      encoded.withCString { cstr in
-        let byteCount = unsafe strlen(cstr)
-        var offset = 0
-        while offset < byteCount && !Task.isCancelled {
-          let written = unsafe sceneWrite(fd, cstr.advanced(by: offset), byteCount - offset)
-          if written > 0 {
-            offset += written
-            continue
-          }
-          if written < 0 && errno == EINTR { continue }
-          guard written < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) else { return }
-          var descriptor = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
-          let ready = unsafe poll(&descriptor, 1, 500)
-          if ready < 0 && errno == EINTR { continue }
-          guard ready > 0 else { return }
-        }
-      }
+      await SocketLineFraming.writeResponse(encoded, fd: fd)
     }
   }
 #endif

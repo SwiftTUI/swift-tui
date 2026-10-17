@@ -15,8 +15,8 @@ extension SwiftTUIOptions {
     let baseline = RuntimeConfiguration.detect(
       environment: environment, isStdoutTTY: isStdoutTTY)
 
-    // Step 2: Apply CLI flags on top of baseline. CLI flags shadow env vars
-    //         only when they are non-default; default values pass through to baseline.
+    // Step 2: Apply explicit CLI choices over the environment baseline.
+    // Optional parsed values preserve presence even for explicit defaults.
     var color = baseline.color
     var glyphs = baseline.glyphs
     var motion = baseline.motion
@@ -75,15 +75,14 @@ extension SwiftTUIOptions {
 
     // Web: present iff --web or env var set; CLI values override env var values.
     let web: RuntimeConfiguration.WebConfig? = {
-      if self.web {
-        return RuntimeConfiguration.WebConfig(
-          port: port,
-          bind: bind,
-          openBrowser: open,
-          sceneID: scene.map { WindowIdentifier($0) }
-        )
-      }
-      return baseline.web
+      guard self.web || baseline.web != nil else { return nil }
+      let inherited = baseline.web ?? RuntimeConfiguration.WebConfig()
+      return RuntimeConfiguration.WebConfig(
+        port: parsedPort ?? inherited.port,
+        bind: parsedBind ?? inherited.bind,
+        openBrowser: parsedOpen ?? inherited.openBrowser,
+        sceneID: scene.map { $0.isEmpty ? nil : WindowIdentifier($0) } ?? inherited.sceneID
+      )
     }()
 
     // Debug: --debug overrides baseline.

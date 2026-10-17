@@ -43,9 +43,7 @@
       let options = try? SwiftTUIOptions.parse(["--web", "--scene", ""])
       let sceneID = options?.runtimeConfiguration(environment: [:], isStdoutTTY: false).web?
         .sceneID
-      withKnownIssue(
-        "--scene maps straight through WindowIdentifier, which normalizes an empty string to \"window\""
-      ) {
+      do {
         #expect(options == nil || sceneID == nil, "\(String(describing: sceneID))")
       }
     }
@@ -57,9 +55,7 @@
       let configuration = options.runtimeConfiguration(
         environment: ["SWIFTTUI_WEB": "1", "SWIFTTUI_PORT": "8080"], isStdoutTTY: false)
       let web = try #require(configuration.web)
-      withKnownIssue(
-        "the CLI port/bind/open/scene values are read only inside `if self.web`; an env-enabled session keeps the env values"
-      ) {
+      do {
         #expect(web.port == 9000, "\(web)")
         #expect(web.sceneID == WindowIdentifier("details"), "\(web)")
       }
@@ -73,9 +69,7 @@
     @Test func setB363ConflictingInstanceSelectorsAreRejected() {
       let conflicting = ["attach", "dash", "--pid", "1", "--instance", "dev"]
       let mode = CLIMode.parse(["app"] + conflicting)
-      withKnownIssue(
-        "neither Scenes nor Attach validates selector exclusivity; selector(pid:name:) prefers pid"
-      ) {
+      do {
         #expect(throws: (any Error).self, "\(mode)") {
           _ = try RunnerCLI.parseAsRoot(conflicting)
         }
@@ -141,9 +135,7 @@
       let encoded = try registry.attachResponse(for: "dash\nLIST").encode()
       #expect(encoded.hasPrefix("ERR "), "\(encoded.debugDescription)")
       #expect(encoded.hasSuffix("\n"), "\(encoded.debugDescription)")
-      withKnownIssue(
-        "parse drops exactly one trailing LF and keeps interior ones; SocketResponse.encode does not escape the message"
-      ) {
+      do {
         #expect(
           parsed == nil || parsed == .attach(sceneID: "dash"), "\(String(describing: parsed))")
         #expect(!encoded.dropLast().contains("\n"), "\(encoded.debugDescription)")
@@ -183,12 +175,63 @@
       let early = probe.read(timeoutMilliseconds: 500)
       _ = probe.write("T\n")
       let late = probe.read(timeoutMilliseconds: 300)
-      withKnownIssue("handleClient parses the bytes of a single read() as the whole request") {
+      do {
         #expect(early == nil, "\(String(describing: early))")
         #expect(late?.hasPrefix("OK ") == true, "\(String(describing: late))")
       }
       task.cancel()
       _ = try? await task.value
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func discoveryShutdownClosesAnUnfinishedRequest() async throws {
+      let appName = SetBDiscovery.uniqueAppName()
+      let server = SetBDiscovery.makeServer(appName: appName, identifier: "cancel")
+      let task = await SetBDiscovery.start(server)
+      defer { try? FileManager.default.removeItem(atPath: "/tmp/swifttui/\(appName)") }
+      let probe = try SetBSocketProbe(path: server.socketPath)
+      _ = probe.write("ATTACH unfinished")
+      // Complete a second connection to establish that the accept loop has
+      // taken ownership of the earlier connection before cancelling it.
+      _ = try SocketClient.sendRequest(
+        socketPath: server.socketPath, request: "LIST\n", timeoutMilliseconds: 5_000)
+      task.cancel()
+      _ = try? await task.value
+      #expect(probe.read(timeoutMilliseconds: 100) == "")
+      #expect(!FileManager.default.fileExists(atPath: server.socketPath))
+    }
+
+    @Test func discoveryRejectsOversizedRequests() async throws {
+      let appName = SetBDiscovery.uniqueAppName()
+      let server = SetBDiscovery.makeServer(appName: appName, identifier: "limit")
+      let task = await SetBDiscovery.start(server)
+      defer {
+        task.cancel()
+        try? FileManager.default.removeItem(atPath: "/tmp/swifttui/\(appName)")
+      }
+      let probe = try SetBSocketProbe(path: server.socketPath)
+      _ = probe.write(String(repeating: "x", count: 4096))
+      #expect(probe.read(timeoutMilliseconds: 5_000)?.hasPrefix("ERR ") == true)
+      task.cancel()
+      _ = try? await task.value
+    }
+
+    @Test func discoveryRejectsControlCharactersAndUnrepresentableAddresses() throws {
+      for control in ["\u{0}", "\n", "\r", "\t", "\u{1B}", "\u{85}", "\u{2028}"] {
+        #expect(throws: SocketProtocolError.self) {
+          try SocketRequest.parse("ATTACH dash" + control + "board\n")
+        }
+        let encoded = try SocketResponse.error("bad " + control + " identifier").encode()
+        #expect(!encoded.dropLast().unicodeScalars.contains(where: SocketLineFraming.isControl))
+        #expect(throws: SocketProtocolError.self) {
+          try SocketResponse.attachOK(ptyPath: "/dev/pts/" + control).encode()
+        }
+      }
+      #expect(sceneSocketAddress(for: "/tmp/valid\u{0}hidden") == nil)
+      let capacity = MemoryLayout.size(ofValue: sockaddr_un().sun_path)
+      #expect(sceneSocketAddress(for: String(repeating: "x", count: capacity - 1)) != nil)
+      #expect(sceneSocketAddress(for: String(repeating: "x", count: capacity)) == nil)
+      #expect(sceneSocketAddress(for: String(repeating: "é", count: capacity / 2)) == nil)
     }
 
     // A socket path longer than sun_path is refused instead of being bound at
@@ -230,9 +273,7 @@
       let reportedPathExists = FileManager.default.fileExists(atPath: server.socketPath)
       let truncatedPathExists = FileManager.default.fileExists(atPath: truncatedPath)
       let discovered = SocketClient.discoverInstances(appName: appName).map(\.identifier)
-      withKnownIssue(
-        "sceneSocketAddress strncpy-truncates the path to sun_path; the server binds the prefix and reports the full path (adjacent to STUI-860)"
-      ) {
+      do {
         #expect(!bound || reportedPathExists, "\(result) truncated=\(truncatedPathExists)")
         #expect(!bound || discovered == [identifier], "\(discovered)")
       }
@@ -245,9 +286,7 @@
     @Test func setB370InstancesVerbRunsUnderAWebConfiguration() async throws {
       try await TerminalRunner.launch(
         SetBVerbApp(), configuration: .default, arguments: ["app", "instances"])
-      await withKnownIssue(
-        "launch throws webHostNotLinked before CLIMode routes the verb (STUI-870)"
-      ) {
+      do {
         try await TerminalRunner.launch(
           SetBVerbApp(), configuration: .init(web: .init()), arguments: ["app", "instances"])
       }
@@ -300,7 +339,7 @@
     init(path: String) throws {
       let fd = sceneSocket()
       guard fd >= 0 else { throw SetBProbeError.socket(errno) }
-      var address = sceneSocketAddress(for: path)
+      var address = try #require(sceneSocketAddress(for: path))
       guard sceneConnect(fd, &address) == 0 else {
         let code = errno
         sceneClose(fd)

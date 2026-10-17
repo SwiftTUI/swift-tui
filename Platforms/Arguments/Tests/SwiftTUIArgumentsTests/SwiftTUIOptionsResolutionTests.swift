@@ -4,6 +4,32 @@ import Testing
 @testable import SwiftTUIArguments
 
 struct SwiftTUIOptionsResolutionTests {
+  @Test(
+    "web defaults inherit independently and explicit defaults override", arguments: [false, true])
+  func webOptionPresence(explicitWeb: Bool) throws {
+    let prefix = explicitWeb ? ["--web"] : []
+    let environment = [
+      "SWIFTTUI_WEB": "1", "SWIFTTUI_PORT": "9000", "SWIFTTUI_BIND": "::1",
+      "SWIFTTUI_OPEN": "1", "SWIFTTUI_WEB_SCENE": "inherited",
+    ]
+    let inherited = try SwiftTUIOptions.parse(prefix).runtimeConfiguration(
+      environment: environment, isStdoutTTY: false
+    ).web
+    #expect(inherited?.port == 9000)
+    #expect(inherited?.bind == "::1")
+    #expect(inherited?.openBrowser == true)
+    #expect(inherited?.sceneID == WindowIdentifier("inherited"))
+    let explicit = try SwiftTUIOptions.parse(
+      prefix + [
+        "--port", "0", "--bind", "127.0.0.1", "--no-open", "--scene", "",
+      ]
+    ).runtimeConfiguration(environment: environment, isStdoutTTY: false).web
+    #expect(explicit?.port == 0)
+    #expect(explicit?.bind == "127.0.0.1")
+    #expect(explicit?.openBrowser == false)
+    #expect(explicit?.sceneID == nil)
+  }
+
   @Test("reader launch choice is inherited from the environment and explicitly overridable")
   func readerChoice() throws {
     let defaults = try SwiftTUIOptions.parse([])

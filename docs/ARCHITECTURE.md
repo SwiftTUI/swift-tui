@@ -261,6 +261,12 @@ represented.
 
 ### Platform, host, and embedding products
 
+The CLI attach subsystem's `SocketLineFraming` owns one-request-per-connection
+LF framing, UTF-8 validation, byte limits, and nonblocking asynchronous server
+I/O. The discovery server owns its connection tasks and cancels and joins them
+before shutdown returns. `PlatformPOSIX.sceneSocketAddress` refuses paths that
+cannot fit exactly in `sockaddr_un` (including embedded NUL).
+
 Except for the explicitly external SwiftUI host, these live in the **root
 package** (`Package.swift`). The `Platforms/` directory holds their sources but
 contains no nested Swift packages.

@@ -5,6 +5,10 @@
     import Darwin
   #elseif canImport(Glibc)
     import Glibc
+  #elseif canImport(Android)
+    import Android
+  #elseif canImport(Musl)
+    import Musl
   #endif
 
   // MARK: - SocketClientError
@@ -107,42 +111,91 @@
       guard fd >= 0 else { throw .connectionFailed(errno) }
       defer { sceneClose(fd) }
 
-      var addr = sceneSocketAddress(for: socketPath)
-
-      let connectResult = sceneConnect(fd, &addr)
-      guard connectResult == 0 else { throw .connectionFailed(errno) }
-
-      // Send request
-      let sent = request.withCString { ptr in
-        let byteCount = unsafe strlen(ptr)
-        return unsafe sceneWrite(fd, ptr, byteCount)
+      guard var addr = sceneSocketAddress(for: socketPath) else {
+        throw .connectionFailed(ENAMETOOLONG)
       }
-      guard sent > 0 else { throw .sendFailed(errno) }
+
+      let bytes = Array(request.utf8)
+      guard bytes.count <= SocketLineFraming.requestLimit else { throw .sendFailed(EMSGSIZE) }
+      let flags = fcntl(fd, F_GETFL)
+      guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0 else {
+        throw .connectionFailed(errno)
+      }
+      let deadline = ContinuousClock.now.advanced(by: .milliseconds(max(0, timeoutMilliseconds)))
+      if sceneConnect(fd, &addr) != 0 {
+        guard errno == EINPROGRESS else { throw .connectionFailed(errno) }
+        guard waitFor(fd: fd, events: Int16(POLLOUT), until: deadline) > 0 else {
+          throw .connectionFailed(ETIMEDOUT)
+        }
+        var socketError: Int32 = 0
+        var length = socklen_t(MemoryLayout<Int32>.size)
+        guard unsafe getsockopt(fd, SOL_SOCKET, SO_ERROR, &socketError, &length) == 0 else {
+          throw .connectionFailed(errno)
+        }
+        guard socketError == 0 else { throw .connectionFailed(socketError) }
+      }
+
+      var offset = 0
+      while offset < bytes.count {
+        let ready = waitFor(fd: fd, events: Int16(POLLOUT), until: deadline)
+        guard ready > 0 else {
+          if ready == 0 { throw .sendTimedOut }
+          throw .sendFailed(errno)
+        }
+        let sent = bytes.withUnsafeBytes { buffer in
+          unsafe sceneWrite(fd, buffer.baseAddress?.advanced(by: offset), bytes.count - offset)
+        }
+        if sent < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) { continue }
+        guard sent > 0 else { throw .sendFailed(errno) }
+        offset += sent
+      }
 
       var received: [UInt8] = []
       var buffer = [UInt8](repeating: 0, count: 4096)
       while true {
-        var readDescriptor = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
-        let ready = unsafe poll(&readDescriptor, 1, timeoutMilliseconds)
-        if ready < 0 && errno == EINTR { continue }
+        let ready = waitFor(fd: fd, events: Int16(POLLIN), until: deadline)
         guard ready > 0 else {
           if ready == 0 { throw .readTimedOut }
           throw .readFailed(errno)
         }
         let bytesRead = unsafe sceneRead(fd, &buffer, buffer.count)
-        if bytesRead < 0 && errno == EINTR { continue }
+        if bytesRead < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) { continue }
         guard bytesRead >= 0 else { throw .readFailed(errno) }
         guard bytesRead > 0 else {
-          // A closed stream without its line terminator is an incomplete
-          // protocol response, never a successful partial scene list.
           throw .unexpectedResponse(String(decoding: received, as: UTF8.self))
         }
         let chunk = buffer.prefix(bytesRead)
-        if let newline = chunk.firstIndex(of: 10) {
-          received.append(contentsOf: chunk[...newline])
-          return String(decoding: received, as: UTF8.self)
+        let lineBytes = chunk.firstIndex(of: 10).map { chunk[...$0] } ?? chunk
+        guard received.count + lineBytes.count <= SocketLineFraming.responseLimit else {
+          throw .unexpectedResponse("Response exceeds limit")
         }
-        received.append(contentsOf: chunk)
+        received.append(contentsOf: lineBytes)
+        if received.last == 10 {
+          guard let line = String(validating: received, as: UTF8.self) else {
+            throw .unexpectedResponse("Response is not UTF-8")
+          }
+          return line
+        }
+      }
+    }
+
+    /// A single deadline covers connection, every write, and every read; a
+    /// slow peer cannot restart the timeout by delivering another byte.
+    private static func waitFor(
+      fd: Int32, events: Int16, until deadline: ContinuousClock.Instant
+    ) -> Int32 {
+      while true {
+        let now = ContinuousClock.now
+        guard now < deadline else { return 0 }
+        let remaining = now.duration(to: deadline).components
+        let milliseconds = Int32(
+          min(
+            Int64(Int32.max),
+            remaining.seconds * 1000 + remaining.attoseconds / 1_000_000_000_000_000 + 1))
+        var descriptor = pollfd(fd: fd, events: events, revents: 0)
+        let result = unsafe poll(&descriptor, 1, milliseconds)
+        if result < 0 && errno == EINTR { continue }
+        return result
       }
     }
 
@@ -153,7 +206,7 @@
       guard fd >= 0 else { return false }
       defer { sceneClose(fd) }
 
-      var addr = sceneSocketAddress(for: path)
+      guard var addr = sceneSocketAddress(for: path) else { return false }
 
       let result = sceneConnect(fd, &addr)
       return result == 0
@@ -174,7 +227,7 @@
           nanoseconds: Int64(fileStatus.st_mtimespec.tv_nsec),
           identifier: identifier
         )
-      #elseif canImport(Glibc)
+      #else
         return InstanceSortKey(
           seconds: Int64(fileStatus.st_mtim.tv_sec),
           nanoseconds: Int64(fileStatus.st_mtim.tv_nsec),

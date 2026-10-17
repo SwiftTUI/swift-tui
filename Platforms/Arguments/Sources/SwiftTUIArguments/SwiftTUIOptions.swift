@@ -163,19 +163,34 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
       return port
     }
   )
-  public var port: Int = 0
+  var parsedPort: Int?
+
+  public var port: Int {
+    get { parsedPort ?? 0 }
+    set { parsedPort = newValue }
+  }
 
   @Option(
     name: .customLong("bind"),
     help: "Bind address for --web. [env: SWIFTTUI_BIND]"
   )
-  public var bind: String = "127.0.0.1"
+  var parsedBind: String?
+
+  public var bind: String {
+    get { parsedBind ?? "127.0.0.1" }
+    set { parsedBind = newValue }
+  }
 
   @Flag(
-    name: .customLong("open"),
+    name: .customLong("open"), inversion: .prefixedNo,
     help: "Open the browser when serving with --web. [env: SWIFTTUI_OPEN]"
   )
-  public var open: Bool = false
+  var parsedOpen: Bool?
+
+  public var open: Bool {
+    get { parsedOpen ?? false }
+    set { parsedOpen = newValue }
+  }
 
   @Option(
     name: .customLong("scene"),

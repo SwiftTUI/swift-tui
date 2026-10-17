@@ -95,7 +95,7 @@ struct FrameworkStressArgumentResolutionTests {
 
   @Test("stress argument resolution 015 CLI web zero port overrides environment port")
   func argumentResolution015CLIWebZeroPortOverridesEnvironmentPort() throws {
-    let options = try SwiftTUIOptions.parse(["--web"])
+    let options = try SwiftTUIOptions.parse(["--web", "--port", "0"])
     #expect(
       options.runtimeConfiguration(
         environment: ["SWIFTTUI_WEB": "1", "SWIFTTUI_PORT": "9000"], isStdoutTTY: true
@@ -104,7 +104,7 @@ struct FrameworkStressArgumentResolutionTests {
 
   @Test("stress argument resolution 016 CLI web default bind overrides environment bind")
   func argumentResolution016CLIWebDefaultBindOverridesEnvironmentBind() throws {
-    let options = try SwiftTUIOptions.parse(["--web"])
+    let options = try SwiftTUIOptions.parse(["--web", "--bind", "127.0.0.1"])
     #expect(
       options.runtimeConfiguration(
         environment: ["SWIFTTUI_WEB": "1", "SWIFTTUI_BIND": "0.0.0.0"], isStdoutTTY: true

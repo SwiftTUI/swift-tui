@@ -109,7 +109,7 @@
       let staleFD = sceneSocket()
       #expect(staleFD >= 0)
 
-      var addr = sceneSocketAddress(for: server.socketPath)
+      var addr = try #require(sceneSocketAddress(for: server.socketPath))
 
       let bindResult = sceneBind(staleFD, &addr)
       #expect(bindResult == 0)

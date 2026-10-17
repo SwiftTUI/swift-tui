@@ -58,16 +58,13 @@ public enum TerminalRunner {
       try printCompanionURLs(appName: appNameFromType(A.self))
       return
     }
-    if configuration.web != nil {
-      throw TerminalRunnerError.webHostNotLinked
-    }
-
     let sessionName = String(reflecting: A.self)
     let appName = appNameFromType(A.self)
     let mode = CLIMode.parse(arguments)
 
     switch mode {
     case .app(let instanceName):
+      guard configuration.web == nil else { throw TerminalRunnerError.webHostNotLinked }
       let selections = collectWindowSceneSelections(from: app.body)
       try validateWindowSceneIdentifiers(selections.map(\.descriptor))
       guard !selections.isEmpty else {

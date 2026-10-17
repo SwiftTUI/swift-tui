@@ -62,6 +62,10 @@
 
       @Option(help: "Select instance by name.")
       var instance: String?
+
+      mutating func validate() throws {
+        try RunnerCLI.validateSelector(pid: pid, name: instance)
+      }
     }
 
     struct Attach: ParsableCommand {
@@ -78,6 +82,16 @@
 
       @Option(help: "Select instance by name.")
       var instance: String?
+
+      mutating func validate() throws {
+        try RunnerCLI.validateSelector(pid: pid, name: instance)
+      }
+    }
+
+    private static func validateSelector(pid: Int32?, name: String?) throws {
+      guard pid == nil || name == nil else {
+        throw ValidationError("--pid and --instance are alternative selectors; supply only one")
+      }
     }
   }
 #endif

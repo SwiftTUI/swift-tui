@@ -9,11 +9,13 @@
     package import Glibc
   #elseif canImport(Android)
     package import Android
+  #elseif canImport(Musl)
+    package import Musl
   #endif
 
   #if canImport(Darwin) || canImport(Android)
     private let sceneSocketStreamType = SOCK_STREAM
-  #elseif canImport(Glibc)
+  #elseif canImport(Glibc) || canImport(Musl)
     private let sceneSocketStreamType = Int32(SOCK_STREAM.rawValue)
   #endif
 
@@ -106,7 +108,7 @@
     _ buffer: UnsafeRawPointer?,
     _ count: Int
   ) -> Int {
-    #if canImport(Darwin) || canImport(Glibc) || canImport(Android)
+    #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
       let sent = unsafe send(fileDescriptor, buffer, count, Int32(MSG_NOSIGNAL))
       if sent >= 0 || errno != ENOTSOCK {
         return sent
@@ -128,11 +130,12 @@
   @inline(__always)
   package func sceneSocketAddress(
     for path: String
-  ) -> sockaddr_un {
+  ) -> sockaddr_un? {
     var address = sockaddr_un()
     address.sun_family = sa_family_t(AF_UNIX)
 
     let sunPathSize = MemoryLayout.size(ofValue: address.sun_path)
+    guard !path.utf8.contains(0), path.utf8.count < sunPathSize else { return nil }
     withUnsafeMutablePointer(to: &address.sun_path) { pointer in
       path.withCString { cPath in
         _ = unsafe strncpy(
