@@ -291,3 +291,15 @@ configured as an exit key still exits before the editor can insert it.
 - <doc:Focus>
 - <doc:Dismissal-Is-Data>
 - <doc:Coming-From-SwiftUI>
+
+Toolbar contributions retain the disabled state of their declaring subtree.
+An item's explicit `.top` or `.bottom` position chooses its strip; `.automatic`
+follows the toolbar style. Both edges can be populated in one scope. Palette
+keyboard movement skips disabled commands while retaining an existing selection
+if it becomes disabled; Return never invokes or dismisses for a disabled row.
+
+The `keyCommand.requiresEnhancedKeyboard` warning identifies letter bindings
+whose Shift or uppercase Control spelling cannot be delivered by legacy
+terminal input. The registration remains available to enhanced or native
+hosts that deliver explicit modifiers. For a portable binding, use the
+resulting character without Shift, or a lowercase character with Control.

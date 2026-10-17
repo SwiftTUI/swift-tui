@@ -85,6 +85,23 @@ public struct KeyCommandRegistrationModifier: IterativePrimitiveViewModifier, Se
         )
         return [node]
       }
+      if case .character(let character) = binding.key,
+        character.isLetter,
+        binding.modifiers.contains(.shift)
+          || (binding.modifiers.contains(.ctrl) && character.isUppercase)
+      {
+        // Retain the registration: enhanced keyboard and native hosts can
+        // deliver it. Legacy terminal bytes cannot express these combinations.
+        context.viewGraph?.recordFrameRuntimeIssue(
+          RuntimeIssue(
+            severity: .warning, code: "keyCommand.requiresEnhancedKeyboard",
+            message: "The key command \"\(description)\" requires explicit letter modifiers "
+              + "that legacy terminal input cannot deliver. Use the resulting character without "
+              + "Shift, or a lowercase character with Control, for a portable binding.",
+            identity: node.identity, source: ".keyCommand"
+          )
+        )
+      }
       let intake = HandlerDescriptorIntake(
         context: context,
         preferringSnapshot: authoringContext

@@ -37,11 +37,9 @@ struct AdversarialSetBNavigationTests {
     try #require(h.frame.contains("typed 1"), "\(h.frame)")
     _ = try h.clickText("Flag")
     let codes = h.runLoop.renderer.viewGraph.frameRuntimeIssues.map(\.code)
-    withKnownIssue(
-      "the chain reads only the path top's declarations; the root's activation is dropped"
-    ) {
+    do {
       #expect(h.frame.contains("flag dest"), "\(h.frame)")
-      #expect(codes.contains { $0.hasPrefix("navigation.") }, "\(codes)")
+      #expect(!codes.contains("navigation.missingValueDestination"), "\(codes)")
     }
     _ = try h.clickText("Pop")
     #expect(h.frame.contains("flag dest"), "the binding is still true: \(h.frame)")
@@ -61,15 +59,11 @@ struct AdversarialSetBNavigationTests {
       proposal: .init(width: 40, height: 6)
     ).diagnostics.runtime.issues.map(\.code)
     #expect(staticCodes.contains("navigation.depthLimitExceeded"), "\(staticCodes)")
-    withKnownIssue(
-      "the live graph's frame issues drop the depthLimitExceeded warning that a static render of the same stack reports (adjacent to STUI-724)"
-    ) {
+    do {
       #expect(codes.contains("navigation.depthLimitExceeded"), "\(codes)")
     }
     _ = try h.pressKey(KeyPress(.escape))
-    withKnownIssue(
-      "the top pop entry removes every value from its index on (adjacent to STUI-724)"
-    ) {
+    do {
       #expect(h.frame.contains("d 32 of 33"), "\(h.frame)")
     }
     #expect(!h.frame.contains("of 34"), "\(h.frame)")
@@ -90,9 +84,7 @@ struct AdversarialSetBNavigationTests {
     #expect(!titled.contains("RootTitle"), "\(titled)")
     let untitled = lines("TitleUntitled", titled: false)
     #expect(untitled.contains("dest 1"), "\(untitled)")
-    withKnownIssue(
-      "the detached root's accumulated title stays; a nil destination title never reduces it"
-    ) {
+    do {
       #expect(!untitled.contains("RootTitle"), "\(untitled)")
     }
   }
@@ -124,9 +116,7 @@ struct AdversarialSetBNavigationTests {
       proposal: .init(width: 40, height: 6)
     ).rasterSurface.lines.joined(separator: "\n")
     #expect(frame.contains("-dest 2"), "\(frame)")
-    withKnownIssue(
-      "nested declarations are appended after the root's and the last matching declaration wins"
-    ) {
+    do {
       #expect(frame.contains("root-dest 2"), "\(frame)")
     }
   }
@@ -147,11 +137,10 @@ struct AdversarialSetBNavigationTests {
     let codes = snapshot.diagnostics.runtime.issues.map(\.code)
     #expect(frame.contains("Beta"), "\(frame)")
     #expect(frame.contains("beta body"), "\(frame)")
-    withKnownIssue(
-      "peeking sees no Tab through an opaque body, so the child is dropped without a report"
-    ) {
-      #expect(frame.contains("Alpha"), "\(frame)")
-      #expect(codes.contains { $0.hasPrefix("tab.") || $0.hasPrefix("structure.") }, "\(codes)")
+    do {
+      #expect(
+        frame.contains("Alpha")
+          || codes.contains { $0.hasPrefix("tab.") || $0.hasPrefix("structure.") }, "\(codes)")
     }
   }
 
@@ -253,7 +242,10 @@ private struct SetBMixedFormsStack: View {
         }
       }
       .navigationDestination(isPresented: $flag) {
-        Text("flag dest").focusable()
+        VStack {
+          Text("flag dest").focusable()
+          Button("Pop") { path = [] }
+        }
       }
     }
   }

@@ -112,7 +112,8 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Iterative
           preferences[NavigationDestinationDeclarationPreferenceKey.self] = .init()
           preferences[NavigationValueDestinationPreferenceKey.self] = .init()
 
-          let navigationTitle = preferences[NavigationTitlePreferenceKey.self]
+          let navigationTitle = resolution.visibleNode.preferenceValues[
+            NavigationTitlePreferenceKey.self]
           stackNode.semanticMetadata.accessibilityRole = .region
           stackNode.semanticMetadata.accessibilityLabel = navigationTitle ?? "Navigation"
           if let dismiss = resolution.popEntries.last?.dismiss {
@@ -130,15 +131,10 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Iterative
           preferences[NavigationTitlePreferenceKey.self] = nil
           if let navigationTitle {
             var toolbarItems = preferences[ToolbarItemsPreferenceKey.self]
-            toolbarItems.insert(
-              ToolbarItemConfig(
-                title: navigationTitle,
-                position: .top,
-                isEnabled: false,
-                action: {}
-              ),
-              at: 0
-            )
+            let titleItem = ToolbarItemConfig(
+              title: navigationTitle, position: .top, isEnabled: false, action: {})
+            toolbarItems.insert(titleItem, at: 0)
+            stackNode.appendDirectToolbarItemContribution(titleItem)
             preferences[ToolbarItemsPreferenceKey.self] = toolbarItems
           }
 
@@ -147,6 +143,7 @@ public struct NavigationStack<Root: View>: PrimitiveView, ActionScope, Iterative
             runtimeIssues.append(issue)
           }
           preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
+          for issue in runtimeIssues { context.viewGraph?.recordFrameRuntimeIssue(issue) }
 
           var popPreferences = preferences[NavigationDestinationPopPreferenceKey.self]
           popPreferences.entries.append(contentsOf: resolution.popEntries)
@@ -173,7 +170,7 @@ private struct NavigationPathBinding {
   var valueTypeID: ObjectIdentifier
   var valueTypeName: String
   var values: @MainActor @Sendable () -> [AnyHashableSendable]
-  var removeSuffix: @MainActor @Sendable (Int) -> Void
+  var popLast: @MainActor @Sendable () -> Void
 
   init<Element: Hashable & Sendable>(_ binding: Binding<[Element]>) {
     let authoringContext = makeLazySubviewAuthoringContext()
@@ -184,13 +181,11 @@ private struct NavigationPathBinding {
         binding.wrappedValue.map(AnyHashableSendable.init)
       }
     }
-    removeSuffix = { firstRemovedIndex in
+    popLast = {
       withAuthoringContext(authoringContext) {
         var path = binding.wrappedValue
-        guard firstRemovedIndex >= 0, firstRemovedIndex < path.count else {
-          return
-        }
-        path.removeSubrange(firstRemovedIndex...)
+        guard !path.isEmpty else { return }
+        path.removeLast()
         binding.wrappedValue = path
       }
     }
@@ -562,7 +557,7 @@ private func resolveValuePath(
           identity: instanceIdentity,
           payload: payload,
           dismiss: { [pathBinding] in
-            pathBinding.removeSuffix(index)
+            pathBinding.popLast()
           }
         )
         popEntries.append(
@@ -587,7 +582,13 @@ private func resolveValuePath(
             let nestedDeclarations = visibleNode.preferenceValues[
               NavigationValueDestinationPreferenceKey.self
             ].declarations
-            declarations.append(contentsOf: nestedDeclarations)
+            // A nearer-root declaration owns its type for the entire path.
+            // Nested surfaces may add new types, but cannot shadow that owner.
+            let inheritedTypes = Set(declarations.map(\.valueTypeID))
+            declarations.append(
+              contentsOf: nestedDeclarations.filter {
+                !inheritedTypes.contains($0.valueTypeID)
+              })
             visibleNode.preferenceValues[NavigationValueDestinationPreferenceKey.self] = .init()
             return next(index + 1)
           }
@@ -622,14 +623,23 @@ private func resolveActiveDestinationChain(
   var popEntries = initial.popEntries
   var runtimeIssues = initial.runtimeIssues
   var depth = initial.depth
+  // Typed-path resolution keeps root and intermediate declarations alive.
+  // Binding destinations from those surfaces still represent bound data;
+  // present them above the typed path instead of silently discarding them.
+  var inheritedDeclarations = initial.accumulatedPreferences[
+    NavigationDestinationDeclarationPreferenceKey.self
+  ].declarations
   var activeSurfaceContentNodeIDs = initial.activeSurfaceContentNodeIDs
 
   func next() -> ResolveWork<NavigationChainResolution> {
     .deferred {
       if depth < navigationDestinationDepthLimit {
-        let declarations = visibleNode.preferenceValues[
-          NavigationDestinationDeclarationPreferenceKey.self
-        ].declarations
+        let declarations =
+          inheritedDeclarations
+          + visibleNode.preferenceValues[
+            NavigationDestinationDeclarationPreferenceKey.self
+          ].declarations
+        inheritedDeclarations.removeAll()
         let activeInstances = declarations.compactMap(\.instance)
 
         visibleNode.preferenceValues[NavigationDestinationDeclarationPreferenceKey.self] = .init()

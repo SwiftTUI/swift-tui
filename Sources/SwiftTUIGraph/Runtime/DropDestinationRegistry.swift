@@ -110,6 +110,7 @@ package final class DropDestinationRegistry: Equatable {
     context: DropContext = .init(),
     along scopePath: [Identity]
   ) -> Bool {
+    guard !paths.isEmpty else { return false }
     for scope in scopePath.reversed() {
       guard let handler = store[scope] else { continue }
       if handler(paths, context) {

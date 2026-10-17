@@ -213,10 +213,16 @@ private struct DefaultPaletteStyleBody: View {
       return
     }
 
-    let currentIndex = effectiveSelectedIndex(in: rows) ?? 0
-    let nextIndex = min(max(currentIndex + delta, 0), rows.count - 1)
-    selectedCommandKey = rows[nextIndex].key
-    visibleStart = windowStart(count: rows.count, selectedIndex: nextIndex)
+    guard let currentIndex = effectiveSelectedIndex(in: rows) else { return }
+    var nextIndex = currentIndex + delta
+    while rows.indices.contains(nextIndex) {
+      if rows[nextIndex].command.isEnabled {
+        selectedCommandKey = rows[nextIndex].key
+        visibleStart = windowStart(count: rows.count, selectedIndex: nextIndex)
+        return
+      }
+      nextIndex += delta
+    }
   }
 
   private func openSelectedCommand() {
@@ -240,12 +246,14 @@ private struct DefaultPaletteStyleBody: View {
       return
     }
 
-    if let selectedCommandKey, let index = keys.firstIndex(of: selectedCommandKey) {
-      visibleStart = windowStart(count: keys.count, selectedIndex: index)
-      return
+    let rows = matches
+    if let index = effectiveSelectedIndex(in: rows) {
+      selectedCommandKey = rows[index].key
+      visibleStart = windowStart(count: rows.count, selectedIndex: index)
+    } else {
+      selectedCommandKey = nil
+      visibleStart = 0
     }
-    selectedCommandKey = keys.first
-    visibleStart = 0
   }
 }
 

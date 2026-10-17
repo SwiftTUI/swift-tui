@@ -6,8 +6,8 @@ public import SwiftTUICore
 extension ActionScope where Self: View {
   /// Declares that this scope has a toolbar.
   /// This scope absorbs toolbar items that descendant views supply through `.toolbarItem(_:)`.
-  /// It shows them as a horizontal strip above or below the content according to the
-  /// nearest `toolbarStyle(_:)` value's placement.
+  /// Explicit item positions create strips at their requested edge. Automatic
+  /// items follow the nearest `toolbarStyle(_:)` value's placement.
   @MainActor
   public func toolbar() -> some View & ActionScope {
     modifier(ToolbarModifier())
@@ -302,78 +302,61 @@ extension ResolvedNode {
     let context = context.applyingCurrentFrameResolveInputs()
     let content = toolbarHostContent()
 
-    guard !items.isEmpty else {
-      var passthrough = self
-      if !content.hasHostedToolbar {
-        passthrough.children = content.children
-        passthrough.layoutBehavior = content.layoutBehavior
-      }
-      passthrough.preferenceValues[ToolbarItemsPreferenceKey.self] = []
-      return .value(passthrough)
-    }
-
     var absorbedPreferences = preferenceValues
     absorbedPreferences[ToolbarItemsPreferenceKey.self] = []
 
-    let stripContext = context.child(component: .named("toolbar-strip"))
-    return resolvedToolbarItemsStripWork(
-      items: items,
-      style: style,
-      context: stripContext
-    ).flatMap { strip in
-      let stripNode = strip.node
-      // This reconcile runs in the late-preference stage, outside any dirty
-      // plan. When the ITEM SET changes (the content changed under a frontier
-      // that is a sibling of `…/toolbar-strip` beneath this scope) the host's
-      // graph node still applies last frame's strip: the departed item's nodes
-      // stay live (the barrier defers their teardown until the host next
-      // applies), their action registrations stay published, and the
-      // presented strip lags until some later root frame. Ask for a follow-up
-      // frame rooted at the host so it re-applies through the normal dirty
-      // plan; teardown, registrations, and damage then all see the new strip.
-      // The follow-up frame finds the new signature already cached, so this
-      // cannot re-arm itself. A same-frame install was tried and rejected: the
-      // tail's first layout pass has already visited the old strip's
-      // style-body islands, so a cascade from the host spares them as a
-      // decapitated strand the barrier cannot reclaim (the toolbar-strip item
-      // churn strand). And the trigger is the SIGNATURE, never a bare cache
-      // miss: a focused text field moves the environment every frame, so a
-      // miss-based trigger re-armed the follow-up forever.
-      if strip.itemSetChanged {
-        context.invalidationProxy?.invalidator?.requestInvalidation(of: [identity])
+    let topItems = items.filter { item in
+      switch item.position {
+      case .top: true
+      case .bottom: false
+      case .automatic: style.placement == .top
       }
-
-      // Keep the scope boundary on `base` so toolbar-focus inherits the
-      // ActionScope's identity. Install the safe-area reclaiming step on
-      // the scope root, and move the actual toolbar composition into a
-      // real child view so retained snapshot rebuilds recurse through a
-      // committed toolbar subtree instead of a stale injected copy.
-      return ToolbarScopeNode(
-        contentChildren: content.children,
-        contentLayoutBehavior: content.layoutBehavior,
-        stripNode: stripNode,
-        edge: toolbarEdge(for: style),
-        alignment: toolbarAlignment(for: style)
-      ).resolveWork(
-        in: context.child(component: .named("toolbar-scope"))
-      ).map { toolbarNode in
-
-        var scopeWithStrip = self
-        scopeWithStrip.children = [toolbarNode]
-        // `fillsProposal: true` is load-bearing: the strip pins to the far edge
-        // of whatever region this scope claims, so a content-hugging scope would
-        // park a bottom toolbar directly under short content instead of at the
-        // bottom of the terminal.
-        scopeWithStrip.layoutBehavior = .safeAreaIgnoring(
-          context.environmentValues.safeAreaInsets.masked(to: toolbarEdgeSet(for: style)),
-          fillsProposal: true
-        )
-        // Clear the preference at this scope boundary so absorbed items
-        // do not re-bubble to ancestor toolbar hosts while preserving
-        // sibling preferences attached directly to the scope node.
-        scopeWithStrip.preferenceValues = absorbedPreferences
-
-        return scopeWithStrip
+    }
+    let bottomItems = items.filter { item in
+      switch item.position {
+      case .top: false
+      case .bottom: true
+      case .automatic: style.placement == .bottom
+      }
+    }
+    // The style owns item layout and the automatic edge; explicit positions
+    // partition contributions into independent strips with stable identities.
+    let topName: StaticString = style.placement == .top ? "toolbar-strip" : "toolbar-strip-top"
+    let bottomName: StaticString =
+      style.placement == .bottom ? "toolbar-strip" : "toolbar-strip-bottom"
+    return resolvedToolbarItemsStripWork(
+      items: topItems, style: style, context: context.child(component: .named(topName))
+    ).flatMap { top in
+      resolvedToolbarItemsStripWork(
+        items: bottomItems, style: style, context: context.child(component: .named(bottomName))
+      ).flatMap { bottom in
+        // Late reconciliation cannot retire the previous graph subtree until
+        // the host re-applies. A signature change schedules that one follow-up;
+        // empty-strip signatures also track removal, without re-arming it.
+        if top.itemSetChanged || bottom.itemSetChanged {
+          context.invalidationProxy?.invalidator?.requestInvalidation(of: [identity])
+        }
+        guard top.node != nil || bottom.node != nil else {
+          var passthrough = self
+          passthrough.children = content.children
+          passthrough.layoutBehavior = content.layoutBehavior
+          passthrough.preferenceValues = absorbedPreferences
+          return .value(passthrough)
+        }
+        return ToolbarScopeNode(
+          contentChildren: content.children, contentLayoutBehavior: content.layoutBehavior,
+          topStrip: top.node, bottomStrip: bottom.node
+        ).resolveWork(in: context.child(component: .named("toolbar-scope"))).map { toolbarNode in
+          var scopeWithStrips = self
+          scopeWithStrips.children = [toolbarNode]
+          var edges: Edge.Set = []
+          if top.node != nil { edges.insert(.top) }
+          if bottom.node != nil { edges.insert(.bottom) }
+          scopeWithStrips.layoutBehavior = .safeAreaIgnoring(
+            context.environmentValues.safeAreaInsets.masked(to: edges), fillsProposal: true)
+          scopeWithStrips.preferenceValues = absorbedPreferences
+          return scopeWithStrips
+        }
       }
     }
   }
@@ -390,51 +373,22 @@ extension ResolvedNode {
     layoutBehavior: LayoutBehavior,
     hasHostedToolbar: Bool
   ) {
-    guard
-      children.count == 1,
-      isKind(children[0].kind, named: "ToolbarScope"),
-      let contentNode = children[0].children.first,
-      isKind(contentNode.kind, named: "ToolbarContent")
-    else {
+    guard children.count == 1, isKind(children[0].kind, named: "ToolbarScope") else {
       return (children, layoutBehavior, false)
     }
-
-    return (contentNode.children, contentNode.layoutBehavior, true)
-  }
-
-}
-
-private func toolbarEdge(
-  for style: AnyToolbarStyle
-) -> Edge {
-  switch style.placement {
-  case .top: .top
-  case .bottom: .bottom
+    var node = children[0]
+    while isKind(node.kind, named: "ToolbarScope") || isKind(node.kind, named: "ToolbarInset") {
+      guard let child = node.children.first else { return (children, layoutBehavior, false) }
+      node = child
+    }
+    guard isKind(node.kind, named: "ToolbarContent") else {
+      return (children, layoutBehavior, false)
+    }
+    return (node.children, node.layoutBehavior, true)
   }
 }
 
-private func toolbarAlignment(
-  for style: AnyToolbarStyle
-) -> Alignment {
-  switch style.placement {
-  case .top: .top
-  case .bottom: .bottom
-  }
-}
-
-private func toolbarEdgeSet(
-  for style: AnyToolbarStyle
-) -> Edge.Set {
-  switch style.placement {
-  case .top: .top
-  case .bottom: .bottom
-  }
-}
-
-private func isKind(
-  _ kind: NodeKind,
-  named name: String
-) -> Bool {
+private func isKind(_ kind: NodeKind, named name: String) -> Bool {
   if case .view(let n) = kind, n == name { return true }
   return false
 }
@@ -447,7 +401,7 @@ private let toolbarStripReuseCacheNamespace = "SwiftTUI.toolbar-strip"
 /// frame, environment or transaction drift, a suppressed-reuse frame) is not
 /// a replacement and must not re-arm the host follow-up frame.
 private struct ResolvedToolbarStrip {
-  var node: ResolvedNode
+  var node: ResolvedNode?
   var itemSetChanged: Bool
 }
 
@@ -457,6 +411,20 @@ private func resolvedToolbarItemsStripWork(
   style: AnyToolbarStyle,
   context: ResolveContext
 ) -> ResolveWork<ResolvedToolbarStrip> {
+  if items.isEmpty {
+    let previous = context.viewGraph?.resolvedNodeReuseCacheSignature(
+      namespace: toolbarStripReuseCacheNamespace, owner: context.identity)
+    let emptySignature = "empty-toolbar-strip"
+    // Store only the absence signature. No view, handlers or paint is mounted
+    // for an empty edge; the marker is never restored as a resolved subtree.
+    context.viewGraph?.storeResolvedNodeReuseCache(
+      namespace: toolbarStripReuseCacheNamespace, owner: context.identity,
+      signature: emptySignature,
+      node: ResolvedNode(identity: context.identity, kind: .view("EmptyToolbarStrip")))
+    return .value(
+      ResolvedToolbarStrip(
+        node: nil, itemSetChanged: previous != nil && previous != emptySignature))
+  }
   guard let signature = ToolbarStripSignature(items: items, style: style) else {
     // No reuse signature (a custom layout without measurement/placement
     // signatures): the strip resolves fresh every frame and carries no
@@ -639,38 +607,54 @@ private func toolbarItemPositionSignature(
 private struct ToolbarScopeNode: PrimitiveView, ResolvableView {
   let contentChildren: [ResolvedNode]
   let contentLayoutBehavior: LayoutBehavior
-  let stripNode: ResolvedNode
-  let edge: Edge
-  let alignment: Alignment
+  let topStrip: ResolvedNode?
+  let bottomStrip: ResolvedNode?
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     makeResolveWork(in: context).run()
   }
 
   func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
-    return ToolbarContentNode(
-      children: contentChildren,
-      layoutBehavior: contentLayoutBehavior
-    ).resolveWork(
-      in: context.child(component: .named("content"))
-    ).map { contentNode in
+    ToolbarContentNode(children: contentChildren, layoutBehavior: contentLayoutBehavior)
+      .resolveWork(in: context.child(component: .named("content"))).flatMap { content in
+        let inner: ResolveWork<ResolvedNode>
+        if let topStrip, bottomStrip != nil {
+          inner = ToolbarInsetNode(content: content, strip: topStrip, edge: .top)
+            .resolveWork(in: context.child(component: .named("top-inset")))
+        } else {
+          inner = .value(content)
+        }
+        return inner.map { content in
+          let edge: Edge = bottomStrip == nil ? .top : .bottom
+          let strip = bottomStrip ?? topStrip
+          return [
+            ResolvedNode(
+              identity: context.identity, kind: .view("ToolbarScope"),
+              children: [content] + (strip.map { [$0] } ?? []),
+              environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
+              layoutBehavior: .safeAreaInset(
+                edge: edge, alignment: edge == .top ? .top : .bottom, spacing: 0, safeArea: .zero)
+            )
+          ]
+        }
+      }
+  }
+}
 
-      return [
-        ResolvedNode(
-          identity: context.identity,
-          kind: .view("ToolbarScope"),
-          children: [contentNode, stripNode],
-          environmentSnapshot: context.environment,
-          transactionSnapshot: context.transaction,
-          layoutBehavior: .safeAreaInset(
-            edge: edge,
-            alignment: alignment,
-            spacing: 0,
-            safeArea: .zero
-          )
-        )
-      ]
-    }
+private struct ToolbarInsetNode: PrimitiveView, ResolvableView {
+  let content: ResolvedNode
+  let strip: ResolvedNode
+  let edge: Edge
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    [
+      ResolvedNode(
+        identity: context.identity, kind: .view("ToolbarInset"), children: [content, strip],
+        environmentSnapshot: context.environment, transactionSnapshot: context.transaction,
+        layoutBehavior: .safeAreaInset(
+          edge: edge, alignment: edge == .top ? .top : .bottom, spacing: 0, safeArea: .zero)
+      )
+    ]
   }
 }
 

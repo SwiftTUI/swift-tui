@@ -183,6 +183,7 @@ public struct ToolbarItemContributionModifier: IterativePrimitiveViewModifier, S
       )
       var wrappedConfig = config
       wrappedConfig.sourceIdentity = node.identity
+      wrappedConfig.isEnabled = config.isEnabled && context.environmentValues.isEnabled
       // Nested wrap: the config's own construction-time capture (if any) stays
       // innermost and wins at dispatch; this attachment-scope wrap is the
       // fallback for configs constructed outside any authoring context. The

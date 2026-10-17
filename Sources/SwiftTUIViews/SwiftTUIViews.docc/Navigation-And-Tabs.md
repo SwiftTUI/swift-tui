@@ -120,6 +120,14 @@ source active at a time per view: when several activate in the same frame,
 one destination is kept, the losing bindings are written back to inactive,
 and the `navigation.multipleActiveDestinations` runtime issue is reported.
 
+Binding-driven destinations also work on a stack with a typed path. Active
+Boolean or item declarations on the root or resolved path surfaces appear
+above that path; clearing the path does not clear those independent bindings.
+Typed destination builders closest to the stack root retain precedence over
+registrations for the same type in a pushed destination. Resolution stops at
+32 destinations and reports `navigation.depthLimitExceeded`; Escape still
+removes exactly one bound path value, including values beyond that limit.
+
 ## Title the visible surface
 
 ``NavigationStack`` renders no chrome of its own.
@@ -219,3 +227,8 @@ runtime issue reported when a state value is not archivable.
 - <doc:Dismissal-Is-Data>
 - <doc:Dormant-Tab-State>
 - <doc:Coming-From-SwiftUI>
+
+A child excluded from `TabView` because its tag is hidden inside an opaque
+custom body reports `tab.missingStructuralTag`. Declare `Tab` directly in the
+builder or attach a selection tag to the outer child; metadata discovery does
+not evaluate inactive bodies to inspect their contents.

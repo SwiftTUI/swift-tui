@@ -181,7 +181,8 @@ public final class FocusTracker {
 
   @discardableResult
   package func moveFocus(
-    _ direction: FocusDirection
+    _ direction: FocusDirection,
+    excluding excludedIdentities: Set<Identity> = []
   ) -> Identity? {
     guard !focusRegions.isEmpty else {
       return nil
@@ -203,7 +204,8 @@ public final class FocusTracker {
       let nextIndex = directionalCandidateIndex(
         from: currentRegion,
         currentIndex: currentIndex,
-        direction: direction
+        direction: direction,
+        excluding: excludedIdentities
       )
     else {
       return currentFocusIdentity
@@ -336,12 +338,13 @@ extension FocusTracker {
   private func directionalCandidateIndex(
     from currentRegion: FocusRegion,
     currentIndex: Int,
-    direction: FocusDirection
+    direction: FocusDirection,
+    excluding excludedIdentities: Set<Identity>
   ) -> Int? {
     let candidates = focusRegions.enumerated().compactMap {
       index,
       candidateRegion -> DirectionalCandidate? in
-      guard index != currentIndex else {
+      guard index != currentIndex, !excludedIdentities.contains(candidateRegion.identity) else {
         return nil
       }
       guard

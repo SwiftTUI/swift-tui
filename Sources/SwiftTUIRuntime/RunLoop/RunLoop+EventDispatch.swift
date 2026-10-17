@@ -139,7 +139,10 @@ extension RunLoop {
     let path = renderer.viewGraph.keyEventHostingPath(
       from: focusedIdentity,
       ownerNodeID: pendingKeyFocus?.ownerNodeID ?? focusTracker.currentFocusOwnerNodeID,
-      ownerIdentity: pendingKeyFocus?.ownerIdentity ?? focusTracker.currentFocusOwnerIdentity
+      ownerIdentity: pendingKeyFocus?.ownerIdentity ?? focusTracker.currentFocusOwnerIdentity,
+      stoppingAt: latestSemanticSnapshot.focusRegions.first(where: {
+        $0.identity == focusedIdentity
+      })?.modalFocusScopePath?.last
     )
     for phase in [LocalKeyHandlerRegistry.KeyPressPhase.interception, .control]
     where phase == .interception || allowsControlHandling {
@@ -280,6 +283,19 @@ extension RunLoop {
       }
     }
 
+    if keyPress == KeyPress(.escape, modifiers: []) {
+      if let pop = renderer.topmostNavigationDestinationPopAction(
+        along: currentFocusScopePath()
+      ) {
+        let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
+        pop()
+        requestDispatchBackstopInvalidation(
+          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
+        )
+        return nil
+      }
+    }
+
     if focusedInteractions == .edit {
       switch keyPress {
       case KeyPress(.tab, modifiers: .shift):
@@ -306,19 +322,6 @@ extension RunLoop {
       }
     }
 
-    if keyPress == KeyPress(.escape, modifiers: []) {
-      if let pop = renderer.topmostNavigationDestinationPopAction(
-        along: currentFocusScopePath()
-      ) {
-        let invalidationGenerationBeforeDispatch = schedulerInvalidationRequestGeneration()
-        pop()
-        requestDispatchBackstopInvalidation(
-          schedulerInvalidationGenerationBeforeDispatch: invalidationGenerationBeforeDispatch
-        )
-        return nil
-      }
-    }
-
     switch keyPress {
     case KeyPress(.tab, modifiers: .shift):
       performFocusTraversal(step: -1) { focusTracker.focusPrevious() }
@@ -327,16 +330,24 @@ extension RunLoop {
       performFocusTraversal(step: 1) { focusTracker.focusNext() }
       return nil
     case KeyPress(.arrowRight, modifiers: []):
-      performFocusTraversal(step: 1) { focusTracker.moveFocus(.right) }
+      performFocusTraversal(step: 1) {
+        focusTracker.moveFocus(.right, excluding: focusedHostingAncestors())
+      }
       return nil
     case KeyPress(.arrowDown, modifiers: []):
-      performFocusTraversal(step: 1) { focusTracker.moveFocus(.down) }
+      performFocusTraversal(step: 1) {
+        focusTracker.moveFocus(.down, excluding: focusedHostingAncestors())
+      }
       return nil
     case KeyPress(.arrowLeft, modifiers: []):
-      performFocusTraversal(step: -1) { focusTracker.moveFocus(.left) }
+      performFocusTraversal(step: -1) {
+        focusTracker.moveFocus(.left, excluding: focusedHostingAncestors())
+      }
       return nil
     case KeyPress(.arrowUp, modifiers: []):
-      performFocusTraversal(step: -1) { focusTracker.moveFocus(.up) }
+      performFocusTraversal(step: -1) {
+        focusTracker.moveFocus(.up, excluding: focusedHostingAncestors())
+      }
       return nil
     case KeyPress(.return, modifiers: []), KeyPress(.space, modifiers: []):
       setPressedIdentity(focusedIdentity, transient: true)
@@ -430,6 +441,16 @@ extension RunLoop {
     }
   }
 
+  /// An enclosing focusable container is not a directional sibling of its
+  /// own focused child, even when its larger rect has a closer center.
+  private func focusedHostingAncestors() -> Set<Identity> {
+    guard let identity = focusTracker.currentFocusIdentity else { return [] }
+    return Set(
+      renderer.viewGraph.keyEventHostingPath(
+        from: identity, ownerNodeID: focusTracker.currentFocusOwnerNodeID,
+        ownerIdentity: focusTracker.currentFocusOwnerIdentity))
+  }
+
   /// Whether the current focus can consume synthesized paste characters as
   /// text: the focused region declares editing interactions, or an identity
   /// on its key-event bubble path has a key handler (REPL-style consumers).
@@ -439,7 +460,10 @@ extension RunLoop {
     }
     for identity in renderer.viewGraph.keyEventHostingPath(
       from: focusedIdentity, ownerNodeID: focusTracker.currentFocusOwnerNodeID,
-      ownerIdentity: focusTracker.currentFocusOwnerIdentity
+      ownerIdentity: focusTracker.currentFocusOwnerIdentity,
+      stoppingAt: latestSemanticSnapshot.focusRegions.first(where: {
+        $0.identity == focusedIdentity
+      })?.modalFocusScopePath?.last
     )
     where localKeyHandlerRegistry.hasHandler(identity: identity, phase: .interception) {
       return true

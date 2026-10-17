@@ -39,10 +39,11 @@ struct AdversarialSetBCommandTests {
     _ = try h.focus(SetBEditPopFixture.fieldIdentity)
     _ = try h.pressKey(KeyPress(.escape))
     #expect(log.events == ["exit"], "\(log.events)")
-    withKnownIssue("edit absorption swallows a bare Escape before the navigation pop runs") {
+    do {
       #expect(!h.frame.contains("Name"), "\(h.frame)")
       #expect(h.frame.contains("Push"), "\(h.frame)")
     }
+    _ = try h.clickText("Push")
     _ = try h.focusText("Dest")
     _ = try h.pressKey(KeyPress(.escape))
     #expect(h.frame.contains("Push") && !h.frame.contains("Dest"), "\(h.frame)")
@@ -61,9 +62,7 @@ struct AdversarialSetBCommandTests {
     let b = try h.focusIdentity(forText: "B")
     _ = try h.focus(try #require(a))
     _ = try h.pressKey(KeyPress(.arrowDown))
-    withKnownIssue(
-      "the hosting path bridges the sheet's capture seam into the presenter's enclosing handler"
-    ) {
+    do {
       #expect(log.events.isEmpty, "\(log.events)")
       #expect(
         h.runLoop.focusTracker.currentFocusIdentity == b,
@@ -84,9 +83,28 @@ struct AdversarialSetBCommandTests {
     let lines = snapshot.rasterSurface.lines
     let up = try #require(lines.firstIndex { $0.contains("Up") }, "\(lines)")
     let body = try #require(lines.firstIndex { $0.contains("body") }, "\(lines)")
-    withKnownIssue("position feeds only the strip signature; the edge comes from the style alone") {
+    do {
       #expect(up < body, "Up at \(up), body at \(body): \(lines)")
     }
+  }
+
+  @Test(arguments: [false, true])
+  func mixedToolbarEdgesRetireAndRestoreTheirActions(bottomStyle: Bool) throws {
+    let log = SetBCommandLog()
+    let h = try harness("BothEdges") { SetBToolbarEdges(log: log, bottomStyle: bottomStyle) }
+    defer { h.shutdown() }
+    for _ in 0..<3 {
+      let top = try #require(h.point(forText: "TopItem"))
+      let body = try #require(h.point(forText: "BodyMarker"))
+      let bottom = try #require(h.point(forText: "BottomItem"))
+      #expect(top.y < body.y && body.y < bottom.y, "\(h.frame)")
+      _ = try h.clickText("TopItem")
+      _ = try h.pressKey(.init(.character("h"), modifiers: .ctrl))
+      #expect(!h.frame.contains("TopItem") && h.frame.contains("BottomItem"), "\(h.frame)")
+      _ = try h.clickText("BottomItem")
+      _ = try h.pressKey(.init(.character("h"), modifiers: .ctrl))
+    }
+    #expect(log.events == ["top", "bottom", "top", "bottom", "top", "bottom"])
   }
 
   // A palette command declared inside a disabled subtree is disabled too.
@@ -103,9 +121,7 @@ struct AdversarialSetBCommandTests {
     defer { h.shutdown() }
     try #require(h.frame.contains("Delete"), "\(h.frame)")
     _ = try h.pressKey(KeyPress(.return))
-    withKnownIssue(
-      "paletteCommand copies only its explicit isEnabled; the environment's disabled state is ignored"
-    ) {
+    do {
       #expect(log.events.isEmpty, "\(log.events)")
     }
   }
@@ -119,9 +135,7 @@ struct AdversarialSetBCommandTests {
     let node = h.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.first {
       $0.label == "Bump"
     }
-    withKnownIssue(
-      "the item config is value metadata composed in the host's environment, not the contributor's"
-    ) {
+    do {
       #expect(h.frame.contains("count:0"), "\(h.frame)")
       #expect(node?.isEnabled == false, "\(String(describing: node))")
     }
@@ -166,7 +180,7 @@ struct AdversarialSetBCommandTests {
     #expect(
       log.events.isEmpty, "the parser's keys never match the declared bindings: \(log.events)")
     let issues = h.runLoop.renderer.viewGraph.frameRuntimeIssues.map(\.code)
-    withKnownIssue("a binding with a modifier the parser never emits registers silently") {
+    do {
       #expect(issues.contains { $0.hasPrefix("keyCommand.") }, "\(issues)")
     }
   }
@@ -187,7 +201,7 @@ struct AdversarialSetBCommandTests {
     defer { h.shutdown() }
     _ = try h.focusText("x")
     _ = try h.drop(paths: [], context: .init())
-    withKnownIssue("the drop path has no empty-paths guard, unlike the paste path") {
+    do {
       #expect(log.drops.isEmpty, "\(log.drops)")
     }
     log.drops.removeAll()
@@ -211,9 +225,7 @@ struct AdversarialSetBCommandTests {
     _ = try h.pressKey(KeyPress(.arrowDown))
     let afterDown = h.frame
     _ = try h.pressKey(KeyPress(.return))
-    withKnownIssue(
-      "moveSelection clamps over every row, including disabled ones, and Return on it is a silent no-op"
-    ) {
+    do {
       #expect(afterDown.contains("> Charlie"), "\(afterDown)")
       #expect(log.events == ["Charlie"], "\(log.events)")
     }
@@ -326,5 +338,30 @@ private struct SetBDisabledToolbarFixture: View {
       }
     }
     .toolbar().toolbarStyle(.defaultBottom)
+  }
+}
+
+@MainActor
+private struct SetBToolbarEdges: View {
+  let log: SetBCommandLog
+  let bottomStyle: Bool
+  @State private var showsTop = true
+
+  var body: some View {
+    Panel(id: "edges") {
+      VStack {
+        if showsTop {
+          Text("BodyMarker").toolbarItem(
+            .init(title: "TopItem", position: .top) {
+              log.events.append("top")
+            })
+        } else {
+          Text("BodyMarker")
+        }
+      }
+      .toolbarItem(.init(title: "BottomItem", position: .bottom) { log.events.append("bottom") })
+    }
+    .keyCommand("Toggle top", key: .character("h"), modifiers: .ctrl) { showsTop.toggle() }
+    .toolbar().toolbarStyle(bottomStyle ? .defaultBottom : .defaultTop)
   }
 }

@@ -1125,6 +1125,7 @@ package final class ViewGraph {
     from identity: Identity,
     ownerNodeID: ViewNodeID? = nil,
     ownerIdentity: Identity? = nil,
+    stoppingAt boundaryIdentity: Identity? = nil,
     limit: Int = 64
   ) -> [Identity] {
     var path = [identity]
@@ -1144,6 +1145,12 @@ package final class ViewGraph {
       }
       if visited.insert(current.identity).inserted {
         path.append(current.identity)
+      }
+      if let boundaryIdentity,
+        current.identity == boundaryIdentity || current.resolvedIdentity == boundaryIdentity
+          || current.committed.semanticMetadata.focusScopeIdentity == boundaryIdentity
+      {
+        break
       }
       node = current.parent ?? current.evaluationHost
     }

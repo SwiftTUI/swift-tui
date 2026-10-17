@@ -75,9 +75,11 @@ extension TabView {
     let isEnabled = context.environmentValues.isEnabled
     let ownerNode = ViewNodeContext.current ?? context.viewGraph?.nodeForIdentity(context.identity)
     var optionTraversalDivergence: DeclaredChildTraversalDivergence?
+    var excludedOptionIssues: [RuntimeIssue] = []
     let options = resolvedOptions(
       in: context.child(component: .named("TabOptions")),
-      divergence: &optionTraversalDivergence
+      divergence: &optionTraversalDivergence,
+      excludedIssues: &excludedOptionIssues
     )
     let optionsChurned = TabSelectionState.updateOptions(
       in: ownerNode, tags: options.map(\.tag), labels: options.map(\.label))
@@ -486,11 +488,13 @@ extension TabView {
           source: "TabView"
         )
       }
-      if !duplicateTagIssues.isEmpty {
+      let optionIssues = duplicateTagIssues + excludedOptionIssues
+      if !optionIssues.isEmpty {
         var preferences = node.preferenceValues
         var runtimeIssues = preferences[RuntimeIssuePreferenceKey.self]
-        for issue in duplicateTagIssues where !runtimeIssues.contains(issue) {
+        for issue in optionIssues where !runtimeIssues.contains(issue) {
           runtimeIssues.append(issue)
+          context.viewGraph?.recordFrameRuntimeIssue(issue)
         }
         preferences[RuntimeIssuePreferenceKey.self] = runtimeIssues
         node.preferenceValues = preferences
@@ -615,7 +619,8 @@ extension TabView {
 
   private func resolvedOptions(
     in context: ResolveContext,
-    divergence: inout DeclaredChildTraversalDivergence?
+    divergence: inout DeclaredChildTraversalDivergence?,
+    excludedIssues: inout [RuntimeIssue]
   ) -> [TabOption] {
     // Peek each declared child's metadata (tab label + tag) without resolving
     // it, and carry the deferred payload that will resolve it if selected.
@@ -638,6 +643,13 @@ extension TabView {
     for (index, child) in declared.children.enumerated() {
       let entry = peekTabChildMetadata(from: child.view)
       guard let tag = entry.tag else {
+        excludedIssues.append(
+          RuntimeIssue(
+            severity: .warning, code: "tab.missingStructuralTag",
+            message:
+              "TabView excluded child \(index): its selection tag is not structurally visible. "
+              + "Declare Tab directly in the builder, or attach .tag to the child wrapper.",
+            identity: context.identity, source: "TabView"))
         continue
       }
 

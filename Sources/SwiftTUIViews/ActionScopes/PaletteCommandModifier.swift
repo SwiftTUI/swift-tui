@@ -103,7 +103,7 @@ public struct PaletteCommandRegistrationModifier: IterativePrimitiveViewModifier
         identity: context.identity,
         name: name,
         description: description,
-        isEnabled: isEnabled,
+        isEnabled: isEnabled && context.environmentValues.isEnabled,
         action: intake.wrappingSendable(action)
       )
       node.preferenceValues.merge(
