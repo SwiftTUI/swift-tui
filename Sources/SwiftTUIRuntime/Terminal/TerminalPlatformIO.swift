@@ -16,7 +16,11 @@
     _ buffer: UnsafeRawPointer?,
     _ count: Int
   ) -> Int {
-    unsafe Darwin.write(fileDescriptor, buffer, count)
+    // Darwin sends a pipe's SIGPIPE to the process, so a thread-local mask
+    // cannot protect other threads. Adopt the descriptor's no-SIGPIPE policy
+    // before writing; it also covers sockets without changing signal handlers.
+    guard fcntl(fileDescriptor, F_SETNOSIGPIPE, 1) == 0 else { return -1 }
+    return unsafe Darwin.write(fileDescriptor, buffer, count)
   }
 
   func terminalPlatformRead(
@@ -40,7 +44,9 @@
     _ buffer: UnsafeRawPointer?,
     _ count: Int
   ) -> Int {
-    unsafe Glibc.write(fileDescriptor, buffer, count)
+    terminalWriteSuppressingSIGPIPE {
+      unsafe Glibc.write(fileDescriptor, buffer, count)
+    }
   }
 
   func terminalPlatformRead(
@@ -64,7 +70,9 @@
     _ buffer: UnsafeRawPointer?,
     _ count: Int
   ) -> Int {
-    unsafe Android.write(fileDescriptor, buffer, count)
+    terminalWriteSuppressingSIGPIPE {
+      unsafe Android.write(fileDescriptor, buffer, count)
+    }
   }
 
   func terminalPlatformRead(
@@ -107,5 +115,35 @@
     _ count: Int
   ) -> Int {
     Int(unsafe _read(fileDescriptor, buffer, UInt32(count)))
+  }
+#endif
+
+#if canImport(Glibc) || canImport(Android)
+  /// POSIX write directs SIGPIPE to the calling thread. Block it only for this
+  /// synchronous syscall, consume only a newly generated signal on EPIPE, and
+  /// restore the caller's mask and errno. No process-wide disposition changes.
+  /// https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
+  private func terminalWriteSuppressingSIGPIPE(_ operation: () -> Int) -> Int {
+    var blocked = sigset_t()
+    var original = sigset_t()
+    var pending = sigset_t()
+    _ = unsafe sigemptyset(&blocked)
+    _ = unsafe sigaddset(&blocked, SIGPIPE)
+    let maskError = unsafe pthread_sigmask(SIG_BLOCK, &blocked, &original)
+    guard maskError == 0 else {
+      errno = maskError
+      return -1
+    }
+    _ = unsafe sigpending(&pending)
+    let wasPending = unsafe sigismember(&pending, SIGPIPE) == 1
+    let result = operation()
+    let writeError = errno
+    if result < 0, writeError == EPIPE, !wasPending {
+      var timeout = timespec(tv_sec: 0, tv_nsec: 0)
+      while unsafe sigtimedwait(&blocked, nil, &timeout) < 0 && errno == EINTR {}
+    }
+    _ = unsafe pthread_sigmask(SIG_SETMASK, &original, nil)
+    errno = writeError
+    return result
   }
 #endif

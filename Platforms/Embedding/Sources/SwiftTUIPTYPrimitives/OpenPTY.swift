@@ -36,8 +36,15 @@
       throw .allocationFailed(errno: allocationErrno)
     }
 
-    configureNoSigPipe(masterFD)
-    configureNoSigPipe(slaveFD)
+    for descriptor in [masterFD, slaveFD] {
+      guard fcntl(descriptor, F_SETFD, FD_CLOEXEC) == 0 else {
+        let failure = errno
+        closeFD(masterFD)
+        closeFD(slaveFD)
+        throw .allocationFailed(errno: failure)
+      }
+      configureNoSigPipe(descriptor)
+    }
 
     guard let slavePath = slavePath(masterFD: masterFD, slaveFD: slaveFD) else {
       closeFD(masterFD)
@@ -49,9 +56,12 @@
   }
 
   public func ptyResize(masterFD: Int32, cols: Int, rows: Int) throws(PTYError) {
+    guard let rows = UInt16(exactly: rows), let columns = UInt16(exactly: cols),
+      rows > 0, columns > 0
+    else { throw .resizeFailed(errno: EINVAL) }
     var windowSize = winsize(
-      ws_row: UInt16(rows),
-      ws_col: UInt16(cols),
+      ws_row: rows,
+      ws_col: columns,
       ws_xpixel: 0,
       ws_ypixel: 0
     )

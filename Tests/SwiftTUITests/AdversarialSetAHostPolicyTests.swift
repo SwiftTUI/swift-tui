@@ -13,10 +13,31 @@ struct AdversarialSetAHostPolicyTests {
         "TERM": "xterm", "LC_ALL": "C", "LC_CTYPE": "en_US.UTF-8", "LANG": "en_US.UTF-8",
       ],
       isTTY: true)
-    withKnownIssue("STUI-962: locale detection ignores LC_ALL precedence") {
+    do {
       #expect(profile.glyphLevel == .ascii)
     }
     #expect(profile.supportsMouseReporting)
+  }
+
+  @Test func localePrecedenceSkipsEmptyOverridesOnly() {
+    for (environment, expected) in [
+      (
+        ["LC_ALL": "", "LC_CTYPE": "C", "LANG": "en_US.UTF-8"],
+        TerminalCapabilityProfile.GlyphLevel.ascii
+      ),
+      (
+        ["LC_ALL": "", "LC_CTYPE": "", "LANG": "en_US.UTF-8"],
+        TerminalCapabilityProfile.GlyphLevel.unicode
+      ),
+      (
+        ["LC_ALL": "C.UTF-8", "LC_CTYPE": "C", "LANG": "C"],
+        TerminalCapabilityProfile.GlyphLevel.unicode
+      ),
+    ] {
+      let profile = TerminalCapabilityProfile.detectPOSIXTerminal(
+        environment: environment, isTTY: true)
+      #expect(profile.glyphLevel == expected)
+    }
   }
 
   // Hypothesis: forcing color on a pipe accidentally re-enables terminal input/output protocols.

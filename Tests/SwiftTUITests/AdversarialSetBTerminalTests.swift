@@ -58,7 +58,7 @@ struct AdversarialSetBTerminalTests {
     // xterm-direct is xterm's own true-color terminfo entry, not an intervening terminal, so the
     // documented "refine generic xterm entries" rule applies to it as well.
     let direct = Self.posix(["TERM": "xterm-direct", "TERM_PROGRAM": "WezTerm"])
-    withKnownIssue("emulator refinement applies only to exact xterm and xterm-256color") {
+    do {
       #expect(direct.supportsHyperlinks)
       #expect(direct.supportsSynchronizedOutput)
     }
@@ -71,7 +71,7 @@ struct AdversarialSetBTerminalTests {
     // as a non-multiplexer while the host still treats it as one.
     let dotted = Self.posix(["TERM": "screen.xterm-256color"])
     let dashed = Self.posix(["TERM": "screen-256color"])
-    withKnownIssue("the family matcher does not accept GNU screen's dotted TERM spelling") {
+    do {
       #expect(dotted.supportsMouseReporting == dashed.supportsMouseReporting)
       #expect(dotted.supportsMouseReporting)
     }

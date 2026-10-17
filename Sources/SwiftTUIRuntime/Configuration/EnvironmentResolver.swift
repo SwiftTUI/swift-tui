@@ -9,7 +9,7 @@ extension RuntimeConfiguration {
   ///
   /// Precedence within env-var resolution:
   /// 1. Nonempty `NO_COLOR` always wins over `FORCE_COLOR`; an empty value is ignored
-  /// 2. `CLICOLOR=0` disables color. `CLICOLOR_FORCE` forces it.
+  /// 2. Enabled force variables override `CLICOLOR=0`; otherwise it disables color.
   /// 3. `SWIFTTUI_ACCESSIBLE=1` is shorthand for `SWIFTTUI_REDUCE_MOTION=1`
   ///    plus `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`, and wins over explicit `0`
   ///    values on those two variables
@@ -20,12 +20,14 @@ extension RuntimeConfiguration {
   ) -> RuntimeConfiguration {
     let profile = TerminalCapabilityProfile.detect(environment: environment, isTTY: isStdoutTTY)
 
-    // Color resolution. NO_COLOR > CLICOLOR=0 > FORCE_COLOR/CLICOLOR_FORCE > TTY auto.
+    // Color resolution. NO_COLOR > FORCE_COLOR/CLICOLOR_FORCE > CLICOLOR=0 > TTY auto.
     let color: ColorMode = {
       if let noColor = environment["NO_COLOR"], !noColor.isEmpty { return .never }
+      let forcesColor = [environment["FORCE_COLOR"], environment["CLICOLOR_FORCE"]]
+        .compactMap { $0?.lowercased() }
+        .contains { !$0.isEmpty && $0 != "0" && $0 != "false" }
+      if forcesColor { return .always }
       if environment["CLICOLOR"] == "0" { return .never }
-      if let force = environment["FORCE_COLOR"], !force.isEmpty, force != "0" { return .always }
-      if let force = environment["CLICOLOR_FORCE"], !force.isEmpty, force != "0" { return .always }
       // Honor TerminalCapabilityProfile's TTY-derived decision:
       return profile.colorLevel == .none ? .never : .auto
     }()

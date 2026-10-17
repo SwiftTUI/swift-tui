@@ -27,7 +27,7 @@
     private let environment: [String: String]?
     private let workingDirectory: String?
     private let initialSize: CellSize
-    private var exitContinuation: CheckedContinuation<ExitStatus, Never>?
+    private var exitContinuations: [CheckedContinuation<ExitStatus, Never>] = []
     private var exitTask: Task<Void, Never>?
     private var exitStatus: ExitStatus?
     private var exitWaiterRegistrationHandlerForTesting: (@Sendable () -> Void)?
@@ -53,11 +53,17 @@
         throw .alreadyStarted
       }
       hasStarted = true
+      var didStart = false
+      defer { if !didStart { hasStarted = false } }
+      guard !executable.isEmpty else { throw .spawnFailed(errno: EINVAL) }
 
       var argv = try unsafe CStringVector([executable] + arguments)
       defer { unsafe argv.deallocate() }
 
       let childEnvironment = environment ?? ProcessInfo.processInfo.environment
+      guard childEnvironment.keys.allSatisfy({ !$0.isEmpty && !$0.contains("=") }) else {
+        throw .spawnFailed(errno: EINVAL)
+      }
       var envp = try unsafe CStringVector(Self.environmentStrings(from: childEnvironment))
       defer { unsafe envp.deallocate() }
 
@@ -65,9 +71,15 @@
       defer { unsafe childWorkingDirectory.deallocate() }
 
       let handles = try openPTY()
+      do {
+        try ptyResize(masterFD: handles.masterFD, cols: initialSize.width, rows: initialSize.height)
+      } catch {
+        closeFD(handles.masterFD)
+        closeFD(handles.slaveFD)
+        throw error
+      }
       let childPair = PTYPair(handles: handles, retainSlaveFD: true)
       pair = childPair
-      try? await childPair.resize(initialSize)
       // Start draining before the child can fill or close its terminal. The
       // pair buffers at most 64 KiB until the caller begins consuming read().
       await childPair.startReading()
@@ -93,6 +105,7 @@
       }
 
       pid = Int32(forkedPID)
+      didStart = true
       installExitWatcher(pid: forkedPID)
       await Self.waitUntilProcessGroupExists(pid: forkedPID)
       if let pendingSignal {
@@ -110,10 +123,8 @@
       return await withCheckedContinuation { continuation in
         if let exitStatus {
           continuation.resume(returning: exitStatus)
-        } else if exitContinuation == nil {
-          exitContinuation = continuation
         } else {
-          continuation.resume(returning: .unknown)
+          exitContinuations.append(continuation)
         }
         exitWaiterRegistrationHandlerForTesting?()
       }
@@ -147,6 +158,8 @@
     }
 
     private func sendSignalToStartedProcess(_ signal: Int32) throws(PTYError) {
+      // Once reaped, this numeric pid may belong to another process.
+      guard exitStatus == nil else { return }
       let processGroupResult = kill(-pid, signal)
       let processGroupErrno = errno
       let processResult = kill(pid, signal)
@@ -181,13 +194,15 @@
         return
       }
 
-      await pair?.finishChildOutput()
+      // Publish retirement before the suspension so late signal requests and
+      // exit observers cannot act on a reaped pid while output is draining.
       exitStatus = status
+      await pair?.finishChildOutput()
       exitTask?.cancel()
       exitTask = nil
-      let continuation = exitContinuation
-      exitContinuation = nil
-      continuation?.resume(returning: status)
+      let continuations = exitContinuations
+      exitContinuations.removeAll()
+      for continuation in continuations { continuation.resume(returning: status) }
     }
 
     private static func environmentStrings(from environment: [String: String]) -> [String] {
@@ -220,10 +235,16 @@
     private var storage: [UnsafeMutablePointer<CChar>?]
 
     init(_ strings: [String]) throws(PTYError) {
+      guard strings.allSatisfy({ !$0.utf8.contains(0) }) else {
+        throw .spawnFailed(errno: EINVAL)
+      }
       var storage: [UnsafeMutablePointer<CChar>?] = unsafe []
       unsafe storage.reserveCapacity(strings.count + 1)
       for string in strings {
         guard let pointer = unsafe duplicateCString(string) else {
+          unsafe storage.forEach { pointer in
+            if let pointer = unsafe pointer { unsafe freeCString(pointer) }
+          }
           throw .spawnFailed(errno: ENOMEM)
         }
         unsafe storage.append(pointer)
@@ -260,6 +281,7 @@
         return
       }
 
+      guard !string.utf8.contains(0) else { throw .spawnFailed(errno: EINVAL) }
       guard let pointer = unsafe duplicateCString(string) else {
         throw .spawnFailed(errno: ENOMEM)
       }

@@ -20,7 +20,7 @@
   struct AdversarialSetATerminalProcessBoundaryTests {
     @Test func setA1091OutOfRangePTYDimensionsFailSafelyInsteadOfTrapping() async {
       // Hypothesis: unchecked UInt16 conversion traps before a throwing PTY resize can reject an external terminal size.
-      await withKnownIssue("STUI-1036: unchecked PTY dimensions trap during UInt16 conversion") {
+      do {
         await #expect(processExitsWith: .success) {
           let handles = try openPTY()
           defer {
@@ -54,7 +54,7 @@
       } catch is PTYError {
         rejected = true
       }
-      withKnownIssue("STUI-1037: embedded NUL is silently truncated by argv construction") {
+      do {
         #expect(rejected)
       }
     }
@@ -73,7 +73,7 @@
         "probe", String(other.slaveFD), other.slavePath,
       ])
       #expect(result.status == .exited(code: 0))
-      withKnownIssue("STUI-1038: unrelated PTY descriptors lack close-on-exec isolation") {
+      do {
         #expect(result.text.isEmpty)
       }
       #expect(fcntl(other.masterFD, F_GETFD) >= 0)
@@ -178,7 +178,7 @@
         }
         try Task.checkCancellation()
         #expect(results.count == 2)
-        withKnownIssue("STUI-1039: a second exit observer returns unknown before the child exits") {
+        do {
           #expect(results.allSatisfy { $0 == .exited(code: 23) }, "Observed statuses: \(results)")
         }
         #expect(await child.waitForExit() == .exited(code: 23))
@@ -235,6 +235,50 @@
           #expect(reapedAgain == -1 && failure == ECHILD)
           #expect(await pair.rawMasterFD == -1)
         }
+      }
+    }
+
+    @Test func processInputsAreValidatedBeforeAllocatingAChild() async {
+      let invalidChildren = [
+        ChildProcessPty(executable: "/bin/sh\0ignored", initialSize: .init(width: 80, height: 24)),
+        ChildProcessPty(
+          executable: "/bin/sh", environment: ["bad=key": "value"],
+          initialSize: .init(width: 80, height: 24)),
+        ChildProcessPty(
+          executable: "/bin/sh", environment: ["key": "value\0tail"],
+          initialSize: .init(width: 80, height: 24)),
+        ChildProcessPty(
+          executable: "/bin/sh", workingDirectory: "/tmp\0tail",
+          initialSize: .init(width: 80, height: 24)),
+        ChildProcessPty(executable: "/bin/sh", initialSize: .init(width: Int.max, height: 24)),
+      ]
+      for child in invalidChildren {
+        // An admission failure must leave no child/PTY and must release the
+        // startup latch, so a retry reports the original failure again.
+        for _ in 0..<2 {
+          do {
+            try await child.start()
+            Issue.record("invalid process configuration started")
+            await child.requestSignal(SIGKILL)
+            _ = await child.waitForExit()
+            await child.pair?.close()
+          } catch {
+            #expect(error != .alreadyStarted)
+          }
+          #expect(await child.pid == 0)
+          #expect(await child.pair == nil)
+        }
+      }
+    }
+
+    @Test func bothPTYDescriptorsAreCloseOnExec() throws {
+      let handles = try openPTY()
+      defer {
+        closeFD(handles.masterFD)
+        closeFD(handles.slaveFD)
+      }
+      for descriptor in [handles.masterFD, handles.slaveFD] {
+        #expect(fcntl(descriptor, F_GETFD) & FD_CLOEXEC != 0)
       }
     }
 

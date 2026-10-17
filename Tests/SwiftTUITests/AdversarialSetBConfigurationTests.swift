@@ -18,7 +18,7 @@ struct AdversarialSetBConfigurationTests {
     #expect(color(["NO_COLOR": " "]) == .never)
     #expect(color(["NO_COLOR": "false"]) == .never)
     #expect(color(["NO_COLOR": "\t"], tty: false) == .never)
-    withKnownIssue("CLICOLOR=0 beats the force variables and FORCE_COLOR=false forces color") {
+    do {
       #expect(color(["CLICOLOR": "0", "CLICOLOR_FORCE": "1"], tty: false) == .always)
       #expect(color(["CLICOLOR": "0", "FORCE_COLOR": "1"], tty: false) == .always)
       #expect(color(["FORCE_COLOR": "false"], tty: false) == .never)

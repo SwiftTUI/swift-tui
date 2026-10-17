@@ -1,4 +1,5 @@
 #if canImport(Darwin) || canImport(Glibc)
+  import Foundation
   import Testing
   @_spi(Testing) import SwiftTUITestSupport
   @testable import SwiftTUIRuntime
@@ -232,9 +233,7 @@
 
     @Test func setA1089DisconnectedOutputCannotTerminateTheProcessWithSIGPIPE() async {
       // Hypothesis: the clean-EPIPE branch is unreachable because writing the disconnected pipe first raises SIGPIPE.
-      await withKnownIssue(
-        "STUI-1035: disconnected output raises SIGPIPE before clean EPIPE handling"
-      ) {
+      do {
         await #expect(processExitsWith: .success) {
           _ = signal(SIGPIPE, SIG_DFL)
           var descriptors: [Int32] = [-1, -1]
@@ -251,6 +250,43 @@
               capabilityProfile: .previewUnicode, environment: [:])
             try host.write("peer gone")
           }
+        }
+      }
+    }
+
+    @Test func disconnectedWritePreservesCallerSignalMaskAndPendingSignal() async {
+      await #expect(processExitsWith: .success) {
+        // Darwin workqueue threads reject pthread_kill with ENOTSUP. Use a
+        // dedicated pthread-backed Thread for this pending-signal contract.
+        await withCheckedContinuation { (finished: CheckedContinuation<Void, Never>) in
+          Thread {
+            defer { finished.resume() }
+            do {
+              _ = signal(SIGPIPE, SIG_DFL)
+              var blocked = sigset_t()
+              var original = sigset_t()
+              _ = unsafe sigemptyset(&blocked)
+              _ = unsafe sigaddset(&blocked, SIGPIPE)
+              try #require(unsafe pthread_sigmask(SIG_BLOCK, &blocked, &original) == 0)
+              defer { _ = unsafe pthread_sigmask(SIG_SETMASK, &original, nil) }
+              // A caller-owned pending signal must survive our suppression scope.
+              let signalResult = unsafe pthread_kill(pthread_self(), SIGPIPE)
+              try #require(signalResult == 0, "pthread_kill returned \(signalResult)")
+              var descriptors: [Int32] = [-1, -1]
+              try #require(unsafe pipe(&descriptors) == 0)
+              _ = close(descriptors[0])
+              defer { _ = close(descriptors[1]) }
+              try POSIXTerminalController().write("closed", to: descriptors[1])
+              var current = sigset_t()
+              _ = unsafe pthread_sigmask(SIG_BLOCK, nil, &current)
+              #expect(unsafe sigismember(&current, SIGPIPE) == 1)
+              _ = unsafe sigpending(&current)
+              #expect(unsafe sigismember(&current, SIGPIPE) == 1)
+              var received: Int32 = 0
+              try #require(unsafe sigwait(&blocked, &received) == 0)
+              #expect(received == SIGPIPE)
+            } catch { Issue.record(error) }
+          }.start()
         }
       }
     }

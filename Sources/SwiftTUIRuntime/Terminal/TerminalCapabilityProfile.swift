@@ -124,12 +124,9 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       environment["LANG"],
     ]
 
-    let supportsUnicode =
-      localeValues
-      .compactMap { $0?.lowercased() }
-      .contains { value in
-        value.contains("utf-8") || value.contains("utf8")
-      }
+    // Locale categories are overrides, not independent positive hints.
+    let locale = localeValues.compactMap { $0 }.first { !$0.isEmpty }?.lowercased() ?? ""
+    let supportsUnicode = locale.contains("utf-8") || locale.contains("utf8")
 
     let glyphLevel: GlyphLevel = supportsUnicode ? .unicode : .ascii
 
@@ -225,7 +222,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
 
     let isWindowsTerminal =
       environment["WT_SESSION"] != nil
-      && (term.isEmpty || term == "xterm" || term == "xterm-256color")
+      && (term.isEmpty || isGenericXterm(term))
     var profile = Self(
       glyphLevel: glyphLevel,
       colorLevel: colorLevel,
@@ -248,13 +245,18 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   // SGR mouse support does not imply OSC 8 or synchronized output, and rxvt's
   // mouse protocol is not SGR. Match terminal families, never arbitrary substrings.
   private static func matches(_ term: String, families: [String]) -> Bool {
-    families.contains { term == $0 || term.hasPrefix($0 + "-") }
+    families.contains { term == $0 || term.hasPrefix($0 + "-") || term.hasPrefix($0 + ".") }
+  }
+
+  private static func isGenericXterm(_ term: String) -> Bool {
+    ["xterm", "xterm-color", "xterm-16color", "xterm-88color", "xterm-256color", "xterm-direct"]
+      .contains(term)
   }
 
   private static func identifiedTerminal(term: String, environment: [String: String]) -> String {
     // TERM_PROGRAM can survive inside a multiplexer. Only refine generic xterm
     // entries; an intervening terminal's explicit TERM remains authoritative.
-    guard term == "xterm" || term == "xterm-256color" else { return term }
+    guard isGenericXterm(term) else { return term }
     switch environment["TERM_PROGRAM"]?.lowercased() {
     case "wezterm": return "wezterm"
     case "ghostty": return "ghostty"
