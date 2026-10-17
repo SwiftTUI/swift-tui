@@ -138,7 +138,7 @@ struct AdversarialSetARuntimeTests {
     try navigate(1, in: h)
     try key("r", in: h)
     try h.pressKey(.init(.arrowDown))
-    try activate(0, in: h, retargets: true)
+    try activate(0, in: h)
   }
 
   @Test func setA092ListInsertionBeforeFocusDoesNotRetargetAction() throws {
@@ -147,7 +147,7 @@ struct AdversarialSetARuntimeTests {
     try navigate(1, in: h)
     try key("i", in: h)
     try h.pressKey(.init(.arrowDown))
-    try activate(2, in: h, retargets: true)
+    try activate(2, in: h)
   }
 
   @Test func setA093ListRemovalNeverActivatesDepartedRow() throws {
@@ -268,17 +268,14 @@ struct AdversarialSetARuntimeTests {
   }
 
   private func activate(
-    _ row: Int, in h: StressRuntimeHarness<SetACollection>, count: Int = 1,
-    retargets: Bool = false
+    _ row: Int, in h: StressRuntimeHarness<SetACollection>, count: Int = 1
   ) throws {
     try #require(
       h.frame.contains("row<\(row)>"), "Target must be visible before activation:\n\(h.frame)")
     try h.pressKey(.init(.return))
-    withKnownIssue("List derives its active row from the old position after membership changes") {
+    do {
       #expect(h.frame.contains("activated=\(row) calls=\(count)"), "\(h.frame)")
       #expect(h.frame.contains("selection=\(row)"), "\(h.frame)")
-    } when: {
-      retargets
     }
   }
 

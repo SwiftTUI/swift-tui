@@ -7,6 +7,15 @@ package enum CollectionScrollAnchor: Equatable, Sendable {
   case position(row: Int, lineOffset: Int)
   case end
 
+  /// Cell positioning is necessary for an end that lies inside a tall row
+  /// or footer. Whole-row navigation still uses row anchors between edges.
+  package var requiresCellWindow: Bool {
+    switch self {
+    case .position, .end: true
+    case .start, .row: false
+    }
+  }
+
   package func rowIndex(rowCount: Int) -> Int {
     let last = max(0, rowCount - 1)
     switch self {

@@ -212,6 +212,17 @@ extension List {
 
       if isEnabled {
         let policy = selectionPolicy
+        let interactionSource = resolvedContent.indexedSource
+        let rowIsEnabled: @MainActor (Int) -> Bool = { index in
+          guard rows.indices.contains(index), rows[index].isEnabled else { return false }
+          guard let interactionSource else { return true }
+          // Eligibility is authored row content, not a property of an ID.
+          // Realize only a navigation candidate on demand, never the dataset
+          // on each frame. The source owns/caches its detached row lifetime.
+          let row = interactionSource.child(at: index)
+          return row.environmentSnapshot.style.isEnabled
+            && row.semanticMetadata.interactionAvailability.isEnabled
+        }
         let intake = HandlerDescriptorIntake(
           context: context,
           fallbackAuthoringScope: nil
@@ -307,7 +318,9 @@ extension List {
           case .arrowDown:
             delta = 1
           case .return:
-            guard let activeRowIndex, rows.indices.contains(activeRowIndex) else {
+            guard let activeRowIndex, rows.indices.contains(activeRowIndex),
+              rowIsEnabled(activeRowIndex)
+            else {
               return false
             }
             guard let tag = rows[activeRowIndex].tag else {
@@ -316,6 +329,7 @@ extension List {
             return activate(tag)
           case .space:
             guard let activeRowIndex, rows.indices.contains(activeRowIndex),
+              rowIsEnabled(activeRowIndex),
               let tag = rows[activeRowIndex].tag
             else {
               return false
@@ -329,9 +343,19 @@ extension List {
             return false
           }
 
-          guard policy.step(orderedTags: rows.compactMap(\.tag), delta: delta) else {
-            return false
+          guard !policy.isMultiple else { return false }
+          let current =
+            rows.firstIndex { $0.tag.map(policy.contains) == true }
+            ?? (delta > 0 ? -1 : rows.count)
+          var candidate = current + delta
+          while rows.indices.contains(candidate) {
+            if rowIsEnabled(candidate), let tag = rows[candidate].tag, !policy.contains(tag) {
+              _ = policy.select(tag)
+              break
+            }
+            candidate += delta
           }
+          guard rows.indices.contains(candidate) else { return false }
           if let scrollCurrency {
             scrollCurrency.pinCurrentAnchor()
             if let selectedRow = rows.firstIndex(where: { row in
@@ -358,7 +382,7 @@ extension List {
             case .arrowUp: delta = -1
             case .arrowDown: delta = 1
             case .return, .space:
-              guard let tag = rows[rowIndex].tag else { return .ignored }
+              guard rowIsEnabled(rowIndex), let tag = rows[rowIndex].tag else { return .ignored }
               let handled = policy.isMultiple ? policy.toggle(tag) : activate(tag)
               return handled ? .handled : .ignored
             default: return .ignored
@@ -366,13 +390,15 @@ extension List {
             var targetIndex = rowIndex
             var candidate = rowIndex + delta
             while rows.indices.contains(candidate) {
-              if rows[candidate].tag != nil {
+              if rows[candidate].tag != nil, rowIsEnabled(candidate) {
                 targetIndex = candidate
                 break
               }
               candidate += delta
             }
-            guard let targetTag = rows[targetIndex].tag else { return .ignored }
+            guard rowIsEnabled(targetIndex), let targetTag = rows[targetIndex].tag else {
+              return .ignored
+            }
             if !policy.isMultiple { _ = policy.select(targetTag) }
             if let scrollCurrency {
               scrollCurrency.pinCurrentAnchor()
@@ -405,13 +431,14 @@ extension List {
             intake.registerAction(
               identity: rowIdentity,
               accessibilityHandler: { action in
-                guard action == .activate else { return .unsupported }
+                guard action == .activate, rowIsEnabled(rowIndex) else { return .unsupported }
                 let previous = policy.contains(tag)
                 _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
                 return previous == policy.contains(tag) ? .unchanged : .changed
               }
             ) {
-              policy.isMultiple ? policy.toggle(tag) : activate(tag)
+              guard rowIsEnabled(rowIndex) else { return false }
+              return policy.isMultiple ? policy.toggle(tag) : activate(tag)
             }
           }
         }
@@ -544,8 +571,11 @@ extension List {
       )
       node.semanticMetadata.hostedCollectionItem = .init(
         role: .listRow(rowIndex: index),
-        isSelectable: compatibleTag != nil
+        isSelectable: compatibleTag != nil && row.isEnabled
       )
+      if !row.isEnabled {
+        node.semanticMetadata.interactionAvailability = .disabled(reason: .authorRequested)
+      }
       if let compatibleTag {
         node.semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: policy.isMultiple ? policy.contains(compatibleTag) : selectedIndex == index,
@@ -628,7 +658,9 @@ extension List {
         }
       default:
         for var row in child.children {
-          if containsHostedCollectionRowBoundary(row) {
+          if row.semanticMetadata.sectionRole == .section {
+            collectSection(row, into: &result)
+          } else if containsHostedCollectionRowBoundary(row) {
             collectItems(from: [row], into: &result)
           } else {
             appendRow(node: &row, to: &result)
@@ -637,16 +669,20 @@ extension List {
       }
     }
     let sectionChildren = result.children[start...]
-    let header = sectionChildren.first {
-      $0.semanticMetadata.hostedCollectionItem?.role == .listHeader
+    let header = node.children.first {
+      $0.semanticMetadata.sectionRole == .header && !resolvedNodeLabelText(from: $0).isEmpty
     }
     let count = sectionChildren.filter {
-      if case .listRow = $0.semanticMetadata.hostedCollectionItem?.role { return true }
+      if case .listRow = $0.semanticMetadata.hostedCollectionItem?.role {
+        return $0.semanticMetadata.hostedCollectionItem?.section == nil
+      }
       return false
     }.count
     var position = 0
     for index in start..<result.children.count {
-      if case .listRow = result.children[index].semanticMetadata.hostedCollectionItem?.role {
+      if case .listRow = result.children[index].semanticMetadata.hostedCollectionItem?.role,
+        result.children[index].semanticMetadata.hostedCollectionItem?.section == nil
+      {
         position += 1
         result.children[index].semanticMetadata.hostedCollectionItem?.section = .init(
           title: header.map { resolvedNodeLabelText(from: $0) }, position: position, count: count)
@@ -677,6 +713,10 @@ extension List {
   ) {
     var work = Array(nodes.reversed())
     while var node = work.popLast() {
+      if node.semanticMetadata.sectionRole == .section {
+        collectSection(node, into: &result)
+        continue
+      }
       if node.semanticMetadata.isHostedCollectionRowBoundary {
         appendRow(node: &node, to: &result)
         continue
@@ -720,15 +760,18 @@ extension List {
       selectionPolicy.value(from: tag) == nil ? nil : tag
     }
     result.items.append(listItemPayload(from: row))
-    result.rows.append(.init(tag: compatibleTag, identity: node.identity))
+    result.rows.append(.init(tag: compatibleTag, identity: node.identity, isEnabled: row.isEnabled))
     node = applyingHostedRowForegroundStyle(
       row.drawMetadata.listStyle?.rowForegroundStyle,
       to: node
     )
     node.semanticMetadata.hostedCollectionItem = .init(
       role: .listRow(rowIndex: rowIndex),
-      isSelectable: compatibleTag != nil
+      isSelectable: compatibleTag != nil && row.isEnabled
     )
+    if !row.isEnabled {
+      node.semanticMetadata.interactionAvailability = .disabled(reason: .authorRequested)
+    }
     result.children.append(node)
 
     let issue: RuntimeIssue?

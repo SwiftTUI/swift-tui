@@ -299,7 +299,7 @@ extension DrawExtractor {
         columns: payload.columns,
         rows: payload.isViewportBacked ? [] : payload.rows
       )
-    if case .position = payload.scrollAnchor,
+    if payload.scrollAnchor?.requiresCellWindow == true,
       bounds.size.height > tableChromeLineCounts(for: payload).top + 1,
       !payload.isViewportBacked
         || geometry.displayLineCount > bounds.size.height - tableChromeLineCounts(for: payload).top
@@ -508,7 +508,7 @@ extension DrawExtractor {
           offset = maximum
         }
       } else {
-        let selected = selectedTableLineIndex(in: body) ?? 0
+        let selected = selectedTableLineIndex(in: body, rowIndex: payload.selectedRowIndex) ?? 0
         let startCell = max(0, body[selected].yOffset - capacity / 2)
         let centred = body.lastIndex { $0.yOffset <= startCell } ?? 0
         let selectedEnd = body[selected].yOffset + min(capacity, body[selected].height)
@@ -666,7 +666,7 @@ extension DrawExtractor {
 
     if !showsIndicators {
       let window = visibleTableBodyWindow(
-        from: bodyLines,
+        from: bodyLines, selectedRowIndex: payload.selectedRowIndex,
         lineCapacity: bodyCapacity,
         anchorLine: anchorLine
       )
@@ -678,7 +678,8 @@ extension DrawExtractor {
     }
 
     let anchoredOffset = visibleTableBodyWindow(
-      from: bodyLines, lineCapacity: bodyCapacity, anchorLine: anchorLine
+      from: bodyLines, selectedRowIndex: payload.selectedRowIndex, lineCapacity: bodyCapacity,
+      anchorLine: anchorLine
     ).offset
     let anchoredEnd = min(bodyLines.count, anchoredOffset + bodyCapacity)
     let initialHiddenAbove = anchoredOffset > 0
@@ -688,7 +689,7 @@ extension DrawExtractor {
       + (initialHiddenBelow ? 1 : 0)
     let bodyWindowCapacity = max(1, bodyCapacity - reservedIndicators)
     let window = visibleTableBodyWindow(
-      from: bodyLines,
+      from: bodyLines, selectedRowIndex: payload.selectedRowIndex,
       lineCapacity: bodyWindowCapacity,
       anchorLine: anchorLine
     )
@@ -946,7 +947,7 @@ extension DrawExtractor {
       let row =
         payload.rows.indices.contains(rowIndex)
         ? payload.rows[rowIndex] : TableRowPayload(cells: [])
-      let isSelected = rowIndex == payload.selectedRowIndex
+      let isSelected = payload.isRowSelected(rowIndex)
       let rowTextStyle = resolvedTableRowTextStyle(
         row: row,
         payload: payload,
@@ -1061,7 +1062,7 @@ extension DrawExtractor {
     }
 
     for (index, row) in payload.rows.enumerated() {
-      let isSelected = index == payload.selectedRowIndex
+      let isSelected = payload.isRowSelected(index)
       let rowTextStyle = resolvedTableRowTextStyle(
         row: row,
         payload: payload,
@@ -1150,6 +1151,7 @@ extension DrawExtractor {
 
   private func visibleTableBodyWindow(
     from bodyLines: [TableDisplayLine],
+    selectedRowIndex: Int?,
     lineCapacity: Int,
     anchorLine: Int? = nil
   ) -> (offset: Int, lines: [TableDisplayLine]) {
@@ -1157,7 +1159,8 @@ extension DrawExtractor {
       return (0, [])
     }
 
-    let selectedIndex = selectedTableLineIndex(in: bodyLines) ?? 0
+    let selectedIndex =
+      selectedTableLineIndex(in: bodyLines, rowIndex: selectedRowIndex) ?? 0
     let offset = min(
       max(0, anchorLine ?? (selectedIndex - (lineCapacity / 2))),
       max(0, bodyLines.count - lineCapacity)
@@ -1180,8 +1183,9 @@ extension DrawExtractor {
   }
 
   private func selectedTableLineIndex(
-    in lines: [TableDisplayLine]
+    in lines: [TableDisplayLine], rowIndex: Int?
   ) -> Int? {
-    lines.firstIndex(where: \.isSelectedRow)
+    guard let rowIndex else { return nil }
+    return lines.firstIndex { $0.rowIndex == rowIndex }
   }
 }

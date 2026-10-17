@@ -122,7 +122,11 @@ extension Table {
     )
     let rowContext = context.child(component: .named("TableRows"))
     let resolvedContentWork: ResolveWork<ResolvedRows>
-    if usesIndexedDataSource, let source = makeIndexedChildSource(from: rows, in: rowContext) {
+    if resolvedColumns.isEmpty {
+      // With no column schema there are no hosted cells or row lifetimes.
+      resolvedContentWork = .value(ResolvedRows())
+    } else if usesIndexedDataSource, let source = makeIndexedChildSource(from: rows, in: rowContext)
+    {
       resolvedContentWork = .value(
         resolvedIndexedRows(
           from: source,
@@ -445,7 +449,12 @@ extension Table {
         selectedRowIndex: selectionPolicy.isMultiple ? activeRowIndex : selectedIndex,
         style: tableStyle,
         foregroundStyle: chrome.foregroundStyle,
-        backgroundStyle: chrome.backgroundStyle,
+        // Container focus decorates the border; membership decorates rows.
+        // Tinting the whole body with focused control chrome makes an
+        // unselected row indistinguishable from a selected row.
+        backgroundStyle: styleEnvironment.controlChrome(
+          isEnabled: isEnabled, isFocused: false
+        ).backgroundStyle,
         borderStyle: chrome.borderStyle,
         selectedRowForegroundStyle: isFocused && showsFocusEffect ? rowChrome.foregroundStyle : nil,
         selectedRowBackgroundStyle: isFocused && showsFocusEffect ? rowChrome.backgroundStyle : nil,
@@ -455,6 +464,16 @@ extension Table {
         showsIndicators: showsIndicators,
         opacity: chrome.opacity
       )
+      if selectionPolicy.isMultiple {
+        payload.selectedRowIndices =
+          resolvedContent.indexedSource.map {
+            selectionPolicy.selectedIndices(in: $0)
+          }
+          ?? Set(
+            resolvedRows.indices.filter {
+              resolvedRows[$0].tag.map(selectionPolicy.contains) == true
+            })
+      }
       payload.isViewportBacked = resolvedContent.indexedSource != nil
       if resolvedContent.indexedSource != nil { payload.virtualRowCount = resolvedRows.count }
       payload.scrollAnchor = scrollCurrency?.storedAnchor
@@ -520,7 +539,7 @@ extension Table {
 
     return rows.map { row in
       var row = row
-      row.children = row.children.enumerated().map { index, cell in
+      row.children = row.children.prefix(columns.count).enumerated().map { index, cell in
         // Retained rows already carry this parent's presentation wrapper.
         // Rebuild its geometry around the authored cell, never around itself.
         let identity = row.identity.child(.indexed("HostedTableCell", index: index))

@@ -38,6 +38,7 @@ extension LayoutEngine {
     retainedTallRowHeights: [Int: Int] = [:],
     proposal: ProposedSize
   ) -> CellSize {
+    guard !payload.columns.isEmpty else { return .zero }
     guard !childMeasurements.isEmpty else {
       return measuredTableSize(for: payload, proposal: proposal)
     }
@@ -73,6 +74,7 @@ extension LayoutEngine {
     for payload: TablePayload,
     proposal: ProposedSize
   ) -> CellSize {
+    guard !payload.columns.isEmpty else { return .zero }
     let idealSize = measuredTableIdealSize(for: payload)
 
     return CellSize(
@@ -84,6 +86,7 @@ extension LayoutEngine {
   package func measuredTableIdealSize(
     for payload: TablePayload
   ) -> CellSize {
+    guard !payload.columns.isEmpty else { return .zero }
     let widths = measureTableColumnWidths(
       columns: payload.columns,
       rows: payload.isViewportBacked ? [] : payload.rows

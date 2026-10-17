@@ -469,9 +469,18 @@ extension LayoutEngine {
 
     switch node.layoutBehavior {
     case .intrinsic, .overlay, .offset, .position:
+      // Collections constrain their viewport, not the vertical extent of
+      // authored rows and section chrome. Measuring eager children against
+      // that viewport loses overflow before scroll geometry can account for it.
+      var childProposal = effectiveProposal
+      if case .intrinsic = node.layoutBehavior,
+        node.semanticMetadata.hostedCollectionContainer != nil
+      {
+        childProposal.height = .unspecified
+      }
       scheduleChildren(
         node.children,
-        proposal: effectiveProposal,
+        proposal: childProposal,
         grade: grade,
         finish: .finishNode(
           node,

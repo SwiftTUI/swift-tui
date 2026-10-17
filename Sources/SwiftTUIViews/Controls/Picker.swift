@@ -131,7 +131,7 @@ extension Picker {
       tokens.assign(&options)
       ownerNode?.setStateSlotSilently(
         ordinal: StateSlotOrdinals.pickerSelectionTokens, value: tokens)
-      let enabledTags = options.filter(\.isEnabled).map(\.tag)
+      let orderedTags = options.map(\.tag)
       let selectedIndex = options.firstIndex { option in
         pickerSelectionMatches(
           option.tag,
@@ -164,8 +164,9 @@ extension Picker {
           }
           return stepBoundSelection(
             binding,
-            orderedTags: enabledTags,
-            delta: delta
+            orderedTags: orderedTags,
+            delta: delta,
+            isEnabled: { options[$0].isEnabled }
           )
         }
 
@@ -179,8 +180,9 @@ extension Picker {
 
           let handled = stepBoundSelection(
             binding,
-            orderedTags: enabledTags,
-            delta: delta
+            orderedTags: orderedTags,
+            delta: delta,
+            isEnabled: { options[$0].isEnabled }
           )
           return handled ? .claimed : .ignored
         }

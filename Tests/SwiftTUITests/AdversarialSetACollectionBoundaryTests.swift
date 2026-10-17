@@ -287,12 +287,14 @@ struct AdversarialSetACollectionBoundaryTests {
     let initialResult = h.runLoop.handleAccessibilityAction(
       .init(target: initialTarget, action: .activate))
     try h.render()
-    withKnownIssue("STUI-993: eager Table presentation loses the published button registration") {
+    do {
       #expect(
         initialResult == .accepted && events == ["temporary"],
         "Initial button result=\(initialResult), events=\(events), identity=\(initialIdentity.path), activationRegistered=\(registered), registryCount=\(registrations.count), registryPrefix=\(registrationPaths)"
       )
     }
+    try send(.activate, to: "Retained cell", role: .button, in: h)
+    #expect(events == ["temporary", "retained"])
   }
 
   @Test func setA513OutlineCollapseUsesTheFullAncestralPath() throws {

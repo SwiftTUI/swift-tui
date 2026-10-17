@@ -28,7 +28,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
   @State private var collapsed: Set<[ID]> = []
   private let elements: [Data.Element]
   private let id: (Data.Element) -> ID
-  private let children: (Data.Element) -> [Data.Element]
+  private let children: (Data.Element) -> [Data.Element]?
   private let rowContent: (Data.Element) -> RowContent
   private let authoringScope: AuthoringContext?
   private let hasListProvidedRowContentTag: Bool
@@ -41,7 +41,7 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
   ) {
     elements = Array(data)
     self.id = { $0[keyPath: id] }
-    self.children = { $0[keyPath: children] ?? [] }
+    self.children = { $0[keyPath: children] }
     self.rowContent = rowContent
     authoringScope = currentAuthoringContext()
     hasListProvidedRowContentTag = false
@@ -55,7 +55,10 @@ where Data: RandomAccessCollection, ID: Hashable & Sendable, RowContent: View {
   ) {
     elements = Array(data)
     self.id = { $0[keyPath: id] }
-    self.children = { $0[keyPath: children] }
+    self.children = {
+      let descendants = $0[keyPath: children]
+      return descendants.isEmpty ? nil : descendants
+    }
     self.rowContent = rowContent
     authoringScope = currentAuthoringContext()
     hasListProvidedRowContentTag = false
@@ -171,7 +174,8 @@ private struct OutlineEntry<Element, ID: Hashable & Sendable> {
 /// Only logical data and IDs are enumerated. Row producers run in the viewport.
 @MainActor
 private func outlineEntries<Element, ID: Hashable & Sendable>(
-  _ elements: [Element], id: (Element) -> ID, children: (Element) -> [Element], collapsed: Set<[ID]>
+  _ elements: [Element], id: (Element) -> ID, children: (Element) -> [Element]?,
+  collapsed: Set<[ID]>
 ) -> [OutlineEntry<Element, ID>] {
   var result: [OutlineEntry<Element, ID>] = []
   var stack: [(elements: [Element], offset: Int, ancestry: [Bool], path: [ID])] = [
@@ -187,10 +191,10 @@ private func outlineEntries<Element, ID: Hashable & Sendable>(
     result.append(
       .init(
         path: path, identifier: identifier, element: element,
-        hasChildren: !descendants.isEmpty, ancestry: frame.ancestry, position: frame.offset + 1,
+        hasChildren: descendants != nil, ancestry: frame.ancestry, position: frame.offset + 1,
         count: frame.elements.count, isLast: isLast))
     stack.append((frame.elements, frame.offset + 1, frame.ancestry, frame.path))
-    if !collapsed.contains(path), !descendants.isEmpty {
+    if !collapsed.contains(path), let descendants, !descendants.isEmpty {
       stack.append((descendants, 0, frame.ancestry + [!isLast], path))
     }
   }

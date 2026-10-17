@@ -82,6 +82,13 @@ public struct TablePayload: Equatable, Sendable {
   public var columns: [TableColumnPayload]
   public var rows: [TableRowPayload]
   public var selectedRowIndex: Int?
+  /// Multi-selection membership is independent of the active keyboard row.
+  package var selectedRowIndices: Set<Int>?
+
+  package func isRowSelected(_ index: Int) -> Bool {
+    selectedRowIndices?.contains(index) ?? (selectedRowIndex == index)
+  }
+
   public var style: TableStylePresentation
   public var foregroundStyle: AnyShapeStyle?
   public var backgroundStyle: AnyShapeStyle?

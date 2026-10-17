@@ -78,7 +78,7 @@ struct AdversarialSetBScrollTests {
       try #require(!harness.frame.contains("«\(row - 1)»"), "row=\(row)\n\(harness.frame)")
     }
     try harness.pressKey(KeyPress(.pageDown))
-    withKnownIssue("paging moves by whole rows and never reveals a tall last row's tail") {
+    do {
       #expect(harness.frame.contains("«11»:2"), "the end shows the final line:\n\(harness.frame)")
 
       try harness.pressKey(KeyPress(.pageUp))
@@ -119,7 +119,7 @@ struct AdversarialSetBScrollTests {
     try harness.scrollPointer(at: point, deltaY: 1)
     #expect(
       harness.frame == endFrame, "one notch down returns to the End window:\n\(harness.frame)")
-    withKnownIssue("the End window is republished as .row(19) after a wheel round trip") {
+    do {
       #expect(registry.collectionScrollLayout(scopeIdentity: identity)?.anchor == .end)
     }
   }
@@ -233,7 +233,7 @@ struct AdversarialSetBScrollTests {
       try setBTick(harness, fling.clock)
     }
     #expect(harness.frame.contains("sel=1"), "\(harness.frame)")
-    withKnownIssue("keyboard reveal does not cancel momentum; the selection scrolls away") {
+    do {
       #expect(
         harness.frame.contains("«1»"),
         "the selected row stays visible after the key press:\n\(harness.frame)")
@@ -314,7 +314,7 @@ struct AdversarialSetBScrollTests {
       steps += 1
     }
     #expect(steps < 600, "the fling settles")
-    withKnownIssue("momentum stops one line short of the footer-only end") {
+    do {
       #expect(
         harness.frame.contains("footer:4"), "the fling reaches the footer end:\n\(harness.frame)")
       #expect(!harness.frame.contains("«19»"), "the end window is footer-only:\n\(harness.frame)")
@@ -358,7 +358,7 @@ struct AdversarialSetBScrollTests {
     #expect(extent >= 50, "ten four-line rows and ten one-line rows were measured: \(extent)")
 
     try harness.pressKey(KeyPress(.character("h"), modifiers: .ctrl))
-    withKnownIssue("shrinking the viewport at the end drops the end anchor to row 18") {
+    do {
       #expect(harness.frame.contains("«19»:3"), "the end survives the shrink:\n\(harness.frame)")
       let shrunkExtent = try route().contentBounds.size.height
       #expect(shrunkExtent == extent, "no snap-back on shrink: \(shrunkExtent) vs \(extent)")

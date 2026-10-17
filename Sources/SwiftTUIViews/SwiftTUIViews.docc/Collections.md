@@ -36,6 +36,18 @@ Table(columns: [TableColumn("Service"), TableColumn("Status")]) {
 
 ## Optional And Multiple Selection
 
+Selection membership and the keyboard cursor are separate in multi-selection
+lists and tables. Every selected member receives selection paint. Keyboard row
+focus follows the authored item when data is inserted or reordered. Disabled
+rows remain visible and may remain selected after an external binding write,
+but selection navigation skips them and activation does not run their action.
+
+Nested sections preserve their individual rows and innermost section metadata.
+For an outline with optional children, `nil` denotes a leaf; an empty array
+still denotes an expandable branch. A nonoptional empty children array denotes
+a leaf. Table columns define which cells are hosted: surplus cells are omitted,
+and a table with no columns has no row content or intrinsic size.
+
 Optional single selection starts with no selected row and uses the value from
 the row's `tag`:
 
@@ -161,6 +173,12 @@ homogeneous collections.
 
 ## Scrolling And Selection
 
+An explicit end position stays attached to the actual last content cell through
+resize and measurement changes, including the tail of an oversized final row or
+footer. Whole-row navigation still visits row starts; reversing from an end
+inside a tall row visits that row before its predecessor. Keyboard navigation
+stops momentum in its scroll domain.
+
 A collection's visible window is owned separately from its selection. Scrolling
 moves the window. Selection moves within it.
 
@@ -192,3 +210,8 @@ moves the window. Selection moves within it.
 - ``TableColumn``
 - ``ForEach``
 - <doc:Focus>
+
+Eager rows and section chrome are measured without a vertical viewport limit,
+so tall footers retain their complete scrollable extent. Row reveal preserves
+the target row's start; explicit end navigation and wheel movement to the end
+use the exact final cell window.

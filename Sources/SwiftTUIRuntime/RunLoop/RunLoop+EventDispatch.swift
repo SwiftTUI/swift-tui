@@ -197,6 +197,17 @@ extension RunLoop {
     }
 
     let focusedIdentity = pendingKeyFocus?.identity ?? focusTracker.currentFocusIdentity
+    if let focusedIdentity,
+      keyPress.modifiers.isEmpty || keyPress == KeyPress(.tab, modifiers: .shift)
+    {
+      switch keyPress.key {
+      case .arrowUp, .arrowDown, .arrowLeft, .arrowRight, .pageUp, .pageDown, .home, .end, .tab:
+        // Keyboard navigation owns the focused scroll domain from this point,
+        // even when its first step leaves the already-visible window unchanged.
+        cancelScrollMomentum(containing: focusedIdentity)
+      default: break
+      }
+    }
     let focusedActivationIdentity = focusedIdentity.flatMap {
       activationIdentity(for: $0)
     }

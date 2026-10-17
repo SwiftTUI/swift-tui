@@ -105,8 +105,7 @@ package struct CollectionScrollCurrency {
   package func pinCurrentAnchor() -> Bool {
     guard storedAnchor == nil else { return false }
     let offset = currentOffset().y
-    let anchor: CollectionScrollAnchor = offset == 0 ? .start : .row(effectiveAnchorRow)
-    return setAnchor(anchor)
+    return setAnchorLine(offset)
   }
 
   package func currentOffset() -> ScrollOffset {
@@ -146,11 +145,15 @@ package struct CollectionScrollCurrency {
 
   @discardableResult
   package func setAnchorRow(_ rowIndex: Int) -> Bool {
-    setAnchor(.row(min(max(0, rowIndex), geometry.lastRowIndex)))
+    let row = min(max(0, rowIndex), geometry.lastRowIndex)
+    return setAnchor(.row(row))
   }
 
   private func setAnchorLine(_ line: Int) -> Bool {
     if line <= 0 { return setAnchor(.start) }
+    if visibleLineCount > 0, line >= geometry.displayLineCount - visibleLineCount {
+      return setAnchor(.end)
+    }
     let row = geometry.row(atOrBeforeLine: line)
     let offset = line - geometry.line(forRow: row)
     return offset == 0
@@ -176,6 +179,11 @@ package struct CollectionScrollCurrency {
     let destination = current + rows + (rows < 0 && startsAfterLastRow ? 1 : 0)
     if destination < 0 { return setAnchor(.start) }
     if destination > maxAnchorRow { return setAnchor(.end) }
+    if visibleLineCount > 0, geometry.displayLineCount > visibleLineCount,
+      geometry.line(forRow: destination) >= geometry.displayLineCount - visibleLineCount
+    {
+      return setAnchor(.end)
+    }
     return setAnchorRow(destination)
   }
 
@@ -196,6 +204,11 @@ package struct CollectionScrollCurrency {
     let offset = currentOffset().y
     let startsAfterLastRow =
       offset >= geometry.lineRange(forRow: geometry.lastRowIndex).upperBound
+    if pages < 0, !startsAfterLastRow, offset > geometry.line(forRow: current) {
+      // An exact end can begin inside the final row. Visit that row's start
+      // before the preceding row, just as a footer-only window does.
+      return setAnchorRow(current)
+    }
     let currentLine = startsAfterLastRow ? offset : geometry.line(forRow: current)
     let destination = currentLine + pages * max(1, visible - 1)
     let target =

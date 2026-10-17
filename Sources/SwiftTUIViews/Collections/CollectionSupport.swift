@@ -327,6 +327,7 @@ func collectedNodeTextParts(
 package struct ResolvedListRow {
   var tag: SelectionTag?
   var tagCount: Int
+  var isEnabled: Bool
   var labelNode: ResolvedNode
   var drawMetadata: DrawMetadata
 }
@@ -347,6 +348,8 @@ func resolvedHostedListRow(
   return .init(
     tag: taggedNode?.semanticMetadata.selectionTag,
     tagCount: taggedNodes.count,
+    isEnabled: node.environmentSnapshot.style.isEnabled
+      && (taggedNode?.environmentSnapshot.style.isEnabled ?? true),
     labelNode: node,
     drawMetadata: taggedNode.map { node.drawMetadata.merging($0.drawMetadata) }
       ?? node.drawMetadata

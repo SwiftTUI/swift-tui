@@ -75,7 +75,16 @@ public final class FocusTracker {
     }
     focusRegions = regions
 
-    if let previousFocus,
+    if let previousFocusRegion,
+      let target = previousFocusRegion.collectionFocusTarget,
+      let entityIndex = regions.firstIndex(where: {
+        $0.ownerIdentity == previousFocusRegion.ownerIdentity
+          && $0.collectionFocusTarget?.itemIdentity == target.itemIdentity
+      })
+    {
+      currentIndex = entityIndex
+      prefersNoFocus = false
+    } else if let previousFocus,
       let preservedIndex = regions.firstIndex(where: { $0.identity == previousFocus })
     {
       currentIndex = preservedIndex

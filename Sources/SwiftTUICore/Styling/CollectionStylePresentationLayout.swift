@@ -163,7 +163,7 @@ extension ListStylePresentation {
     let contentBounds = listContentBounds(in: bounds)
     let geometry = CollectionScrollGeometry(
       rowCount: payload.rowCount, rowSpan: listRowDisplaySpan, rowHeights: rowHeights ?? [:])
-    if case .position = payload.scrollAnchor, contentBounds.size.height > 0,
+    if payload.scrollAnchor?.requiresCellWindow == true, contentBounds.size.height > 0,
       !payload.isViewportBacked || geometry.displayLineCount > contentBounds.size.height
     {
       return positionedListLayout(
@@ -624,6 +624,14 @@ extension ListStylePresentation {
       // An oversized row still places its first cells inside the viewport.
       cells = displayLines[offset].height
       end = offset + 1
+    } else if end < displayLines.count, cells < capacity,
+      displayLines[end].rowIndex == nil, displayLines[end].height > capacity
+    {
+      // Section chrome taller than a viewport can never fit as a whole.
+      // Show its leading cells after the final row rather than leaving an
+      // artificial blank gap before the end-positioned footer window.
+      cells += displayLines[end].height
+      end += 1
     }
     var visible = Array(displayLines[offset..<end])
     let cellOffset = displayLines[offset].yOffset

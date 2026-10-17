@@ -112,10 +112,12 @@ package func integerRangeIDWitness<Data: RandomAccessCollection, ID: Hashable & 
 package struct HostedCollectionRowSelection: Sendable {
   package var tag: SelectionTag?
   package var identity: Identity
+  package var isEnabled: Bool
 
-  package init(tag: SelectionTag?, identity: Identity) {
+  package init(tag: SelectionTag?, identity: Identity, isEnabled: Bool = true) {
     self.tag = tag
     self.identity = identity
+    self.isEnabled = isEnabled
   }
 }
 

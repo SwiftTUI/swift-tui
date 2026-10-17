@@ -266,6 +266,20 @@ extension RunLoop {
       return containingIdentity
     }
 
+    // Editing controls own Return/Space semantics. If their key handler
+    // declines (for example, a List has a disabled selected row), an
+    // unrelated descendant action is not a substitute activation target.
+    // A ScrollView is a navigation container, so it can still forward
+    // activation into its content (including a sheet's default action).
+    if latestSemanticSnapshot.focusRegions.first(where: { $0.identity == identity })?
+      .focusInteractions == .edit,
+      !latestSemanticSnapshot.selectionRoutes.contains(where: {
+        $0.identity == identity && $0.role == .scrollView
+      })
+    {
+      return nil
+    }
+
     return localActionRegistry.snapshot().keys
       .filter { candidate in
         candidate.isDescendant(of: identity)

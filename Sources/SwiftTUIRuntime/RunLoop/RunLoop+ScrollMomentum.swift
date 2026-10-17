@@ -112,6 +112,16 @@ extension RunLoop {
       return
     }
     scrollMomentum.cancel(forDescendant: identity)
+    // Explicit IDs can re-root a focused control outside the scroll route's
+    // lexical identity. The committed semantic target records its real host.
+    if let target = latestSemanticSnapshot.scrollTargets.first(where: { $0.identity == identity }) {
+      scrollMomentum.cancel(forDescendant: target.scrollIdentity)
+    }
+    if let owner = latestSemanticSnapshot.focusRegions.first(where: { $0.identity == identity })?
+      .ownerIdentity
+    {
+      scrollMomentum.cancel(forDescendant: owner)
+    }
   }
 
   /// Advances active scroll momentum on a deadline-driven frame, writing the

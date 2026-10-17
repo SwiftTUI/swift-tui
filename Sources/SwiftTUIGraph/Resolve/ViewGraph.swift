@@ -4585,7 +4585,7 @@ package final class ViewGraph {
     resolved: ResolvedNode
   ) {
     let previousSnapshot = node.snapshot()
-    let retainedChildNodeIDs = Set(resolved.children.compactMap(\.viewNodeID))
+    var retainedChildNodeIDs = Set(resolved.children.compactMap(\.viewNodeID))
     let plan = ViewGraphStructuralReconciler.removalPlan(
       oldChildDescriptors: previousSnapshot.children.map(ChildDescriptor.init),
       currentChildCount: node.children.count,
@@ -4593,6 +4593,17 @@ package final class ViewGraph {
       newChildren: resolved.children
     )
 
+    if !plan.removedChildren.isEmpty {
+      // Parent-authored presentation can move an immediate child below a new
+      // wrapper. Preserve every live owner reachable through the arriving
+      // structure, not only owners still at the same depth. The unchanged
+      // topology fast path does not walk descendants.
+      var work = resolved.children
+      while let child = work.popLast() {
+        if let id = child.viewNodeID { retainedChildNodeIDs.insert(id) }
+        work.append(contentsOf: child.children)
+      }
+    }
     for removal in plan.removedChildren {
       guard node.children.indices.contains(removal.oldIndex)
       else {

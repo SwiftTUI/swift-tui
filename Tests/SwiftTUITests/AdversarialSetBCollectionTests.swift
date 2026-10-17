@@ -40,13 +40,37 @@ struct AdversarialSetBCollectionTests {
     }
     let lines = snapshot.rasterSurface.lines
     #expect(lines.contains { $0.contains("Two") && !$0.contains("One") }, "\(lines)")
-    withKnownIssue(
-      "an inner Section has no row boundary: its header and rows flatten into one listitem"
-    ) {
+    do {
       #expect(items.count == 2, "\(items.map(\.label))")
       #expect(lines.contains { $0.contains("One") && !$0.contains("Two") }, "\(lines)")
       #expect(lines.contains { $0.contains("Inner") }, "\(lines)")
     }
+  }
+
+  @Test(arguments: [false, true])
+  func nestedSectionsKeepDirectRowsInTheirOwnSection(outerHeader: Bool) {
+    let snapshot = render(
+      List {
+        Section {
+          Text("Before")
+          Section("Inner") {
+            Text("One")
+            Text("Two")
+          }
+          Text("After")
+        } header: {
+          if outerHeader { Text("Outer") }
+        }
+      }, "mixedNestedSections", height: 20)
+    let descriptions = snapshot.semanticSnapshot.accessibilityNodes.filter {
+      $0.role == .custom("listitem")
+    }.compactMap { $0.properties.description }
+    let outer = outerHeader ? "Outer" : "Section"
+    #expect(
+      descriptions == [
+        "\(outer), item 1 of 2", "Inner, item 1 of 2",
+        "Inner, item 2 of 2", "\(outer), item 2 of 2",
+      ])
   }
 
   // Every member of a multi-selection table is painted selected, not only
@@ -88,11 +112,13 @@ struct AdversarialSetBCollectionTests {
     let second = try style(ofRow: 2)
     let third = try style(ofRow: 3)
     #expect(first == third, "both members share the selected paint")
-    withKnownIssue(
-      "TablePayload carries one selectedRowIndex (the cursor), so members carry no selected paint"
-    ) {
-      #expect(first != second, "member row 1 is painted differently from non-member row 2")
-      #expect(third != second, "member row 3 is painted differently from non-member row 2")
+    do {
+      #expect(
+        first != second,
+        "member row 1 is painted differently from non-member row 2")
+      #expect(
+        third != second,
+        "member row 3 is painted differently from non-member row 2")
     }
     let selectors = snapshot.semanticSnapshot.accessibilityNodes.filter {
       $0.label?.hasPrefix("Select row") == true
@@ -127,9 +153,7 @@ struct AdversarialSetBCollectionTests {
     selection.value = 1
     #expect(registry.dispatch(identity: pickerIdentity, keyPress: KeyPress(.arrowUp)))
     let afterUp = selection.value
-    withKnownIssue(
-      "a disabled current option is absent from the enabled list, so stepping restarts at the far end"
-    ) {
+    do {
       #expect(afterDown == 2, "Down from B lands on C, got \(afterDown)")
       #expect(afterUp == 0, "Up from B lands on A, got \(afterUp)")
     }
@@ -159,21 +183,20 @@ struct AdversarialSetBCollectionTests {
     if selection.value == 1 {
       _ = registry.dispatch(identity: pickerIdentity, keyPress: KeyPress(.arrowDown))
     }
-    withKnownIssue(
-      "stepping from a duplicated tag re-selects the first occurrence and never advances"
-    ) {
+    do {
       #expect(selection.value == 2, "two Downs from the duplicate reach C, got \(selection.value)")
     }
   }
 
   // Keyboard selection skips a disabled row and Return never activates one.
-  @Test func setB185DisabledListRowsAreNeitherSelectedNorActivated() throws {
+  @Test(arguments: [false, true])
+  func setB185DisabledListRowsAreNeitherSelectedNorActivated(indexed: Bool) throws {
     let probe = SetBActivationProbe()
     let h = try StressRuntimeHarness(
       rootIdentity: testIdentity("SetBCollections", "disabledRows"),
       size: .init(width: 40, height: 10)
     ) {
-      SetBDisabledRowList(probe: probe)
+      SetBDisabledRowList(probe: probe, indexed: indexed)
     }
     defer { h.shutdown() }
     _ = try h.focusText("A")
@@ -181,11 +204,13 @@ struct AdversarialSetBCollectionTests {
     let afterDown = h.frame
     _ = try h.clickText("Select B")
     try #require(h.frame.contains("sel=2"), "\(h.frame)")
-    _ = try h.focusText("B")
+    // B has no interactive row target. Its frame focuses the explicitly
+    // focusable list, whose selected value is still B after an external write.
+    let listIdentity = try #require(h.runLoop.latestSemanticSnapshot.scrollRoutes.first?.identity)
+    _ = try h.focus(listIdentity)
+    #expect(h.frame.contains("sel=2"), "focus preserves disabled selection: \(h.frame)")
     _ = try h.pressKey(KeyPress(.return))
-    withKnownIssue(
-      "row tags are stepped and activated regardless of the row's disabled environment"
-    ) {
+    do {
       #expect(afterDown.contains("sel=3"), "Down from A skips disabled B: \(afterDown)")
       #expect(probe.activated.isEmpty, "Return on a disabled row activated \(probe.activated)")
     }
@@ -207,9 +232,7 @@ struct AdversarialSetBCollectionTests {
     let one = lines.first { $0.contains("n1") } ?? ""
     let two = lines.first { $0.contains("n2") } ?? ""
     #expect(lines.contains { $0.contains("n2") }, "\(lines)")
-    withKnownIssue(
-      "empty children are coalesced with nil, so the node is a leaf with no disclosure"
-    ) {
+    do {
       #expect(expandable.count == 1, "\(nodes.map { ($0.label, $0.properties?.expanded) })")
       #expect(expandable.first?.label?.contains("1") == true, "\(expandable.map(\.label))")
       #expect(
@@ -233,9 +256,7 @@ struct AdversarialSetBCollectionTests {
     let joined = snapshot.rasterSurface.lines.joined(separator: "\n")
     #expect(!joined.contains("EX"), "\(snapshot.rasterSurface.lines)")
     #expect(joined.contains("a1"), "\(snapshot.rasterSurface.lines)")
-    withKnownIssue(
-      "a surplus cell is hosted one cell wide and published past the table's column count"
-    ) {
+    do {
       #expect(columnIndices.allSatisfy { $0 <= 1 }, "\(columnIndices)")
     }
   }
@@ -248,9 +269,7 @@ struct AdversarialSetBCollectionTests {
       }, "zeroColumns", width: 20, height: 6)
     let joined = snapshot.rasterSurface.lines.joined(separator: "\n")
     let cells = snapshot.semanticSnapshot.accessibilityNodes.filter { $0.role == .cell }
-    withKnownIssue(
-      "a zero-column table still hosts and paints its row cells one cell wide beside a stray border"
-    ) {
+    do {
       #expect(!joined.contains("x"), "\(snapshot.rasterSurface.lines)")
       #expect(
         snapshot.measuredTree.measuredSize.width <= 2, "\(snapshot.measuredTree.measuredSize)")
@@ -334,16 +353,26 @@ private struct SetBNode: Identifiable, Sendable {
 
 private struct SetBDisabledRowList: View {
   let probe: SetBActivationProbe
+  let indexed: Bool
   @State private var selection: Int? = 1
 
   var body: some View {
     VStack(alignment: .leading) {
-      List(selection: $selection, onActivate: { probe.activated.append($0) }) {
-        Text("A").tag(1)
-        Text("B").tag(2).disabled(true)
-        Text("C").tag(3)
+      if indexed {
+        List(
+          [1, 2, 3], id: \.self, selection: $selection, onActivate: { probe.activated.append($0) }
+        ) { row in
+          Text(row == 1 ? "A" : row == 2 ? "B" : "C").disabled(row == 2)
+        }
+        .focusable().frame(height: 5)
+      } else {
+        List(selection: $selection, onActivate: { probe.activated.append($0) }) {
+          Text("A").tag(1)
+          Text("B").tag(2).disabled(true)
+          Text("C").tag(3)
+        }
+        .focusable().frame(height: 5)
       }
-      .frame(height: 5)
       Button("Select B") { selection = 2 }
       Text("sel=\(selection.map(String.init) ?? "nil")")
     }

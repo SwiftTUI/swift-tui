@@ -116,8 +116,13 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
   }
 
   package func positionedOffset(for anchor: CollectionScrollAnchor?, capacity: Int) -> Int? {
-    guard case .position(let row, let offset) = anchor else { return nil }
-    return min(max(0, line(forRow: row) + offset), max(0, displayLineCount - capacity))
+    let maximum = max(0, displayLineCount - capacity)
+    switch anchor {
+    case .end: return maximum
+    case .position(let row, let offset):
+      return min(max(0, line(forRow: row) + offset), maximum)
+    default: return nil
+    }
   }
 
   private func firstMeasuredRow(atOrAfter index: Int, in measured: [MeasuredRow]) -> Int {

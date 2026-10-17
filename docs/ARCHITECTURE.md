@@ -85,11 +85,20 @@ geometry through `LocalScrollPositionRegistry`. Indexed collections retain
 sparse measurements and estimate unrealized rows without evaluating the dataset.
 Hosted collection measurement hints and list/table layout use the same sparse
 row extents as input handlers; separator fitting remains a layout policy.
+Focus reconciliation matches a collection region's authored item and owner
+before its positional route, preserving the entity across row membership changes.
+Selection navigation keeps logical order separate from interaction admission;
+indexed lists evaluate only a candidate row's enablement on input. List and Table
+payloads carry multi-selection membership independently of the active row.
+Structural reconciliation preserves owners anywhere in the arriving subtree,
+including authored controls reparented below new presentation wrappers.
 Eager hosted tables retain measured row heights in their allocation snapshot.
 Placement, border layout, and navigation use those heights together; flattened
 payload-only tables retain their single-line representation.
 The primitive `CollectionScrollAnchor` distinguishes a requested row from the
-start and end, which can include section headers and footers. Programmatic targets
+start and end, which can include section headers and footers. End and explicit
+cell positions use the same clipped cell window; row navigation canonicalizes
+requests that reach the end so resizing retains edge intent. Programmatic targets
 receive one correction after their requested window is measured, only while
 the requested anchor remains current.
 Scroll registrations and their replay records belong to the graph node for the
