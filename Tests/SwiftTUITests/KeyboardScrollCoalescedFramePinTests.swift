@@ -1,7 +1,6 @@
 import SwiftTUIGraph
-import Testing
-
 @_spi(Testing) import SwiftTUITestSupport
+import Testing
 
 @testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUIRuntime
@@ -16,7 +15,7 @@ import Testing
 //
 // Diagnosed mechanism (Stage 0): the fixture's `.frame`-wrapped, `.id`-carrying
 // ScrollView is a single-child flattening: the wrapper's apply absorbs the
-// authored scroll node's identity entry, and `flattenedStateOwnerNodeIDByIdentity`
+// authored scroll node's identity entry, and `flattenedAuthoredOwnerNodeIDByIdentity`
 // keeps authoring-host resolution landing the scroll's `@State` on the AUTHORED
 // node. The flag-off dispatch backstop root-sweeps the frame (a set-equality
 // accident — the offset-write's reader is already pending from the raw focus

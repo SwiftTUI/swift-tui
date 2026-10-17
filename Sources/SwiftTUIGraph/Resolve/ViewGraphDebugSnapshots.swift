@@ -16,7 +16,7 @@ extension ViewGraph {
     package var entityRoutingTable: EntityRoutingTable
     package var lifetimeAnchors: LifetimeAnchorIndex
     package var nextViewNodeIDRawValue: UInt64
-    package var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID]
+    package var flattenedAuthoredOwnerNodeIDByIdentity: [Identity: ViewNodeID]
     package var effectRegistrationOwnerNodeIDs: Set<ViewNodeID>
     package var rootEvaluator: Bool
     package var evaluationRootIdentity: Identity?

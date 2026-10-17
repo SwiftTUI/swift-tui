@@ -85,19 +85,22 @@ struct AdversarialSetAPreferenceLifecycleTests {
 
   @Test func setA307BackgroundPreferencePrecedesItsTransformedBaseInParentReduction() {
     // Hypothesis: decoration primary-child indexing reverses noncommutative background reduction.
-    let node = Resolver().resolve(
-      Text("base")
-        .preference(key: SetAStringPreferenceKey.self, value: ["base"])
-        .transformPreference(SetAStringPreferenceKey.self) { $0.append("transformed") }
-        .backgroundPreferenceValue(SetAStringPreferenceKey.self) { input in
-          Text(input.joined(separator: ","))
-            .preference(key: SetAStringPreferenceKey.self, value: ["background"])
-        }
-        .preference(key: SetAStringPreferenceKey.self, value: ["outer"]),
-      in: .init(identity: testIdentity("SetA307")))
+    let decorated = Text("base")
+      .preference(key: SetAStringPreferenceKey.self, value: ["base"])
+      .transformPreference(SetAStringPreferenceKey.self) { $0.append("transformed") }
+      .backgroundPreferenceValue(SetAStringPreferenceKey.self) { input in
+        Text(input.joined(separator: ","))
+          .preference(key: SetAStringPreferenceKey.self, value: ["background"])
+      }
+    let node = Resolver().resolve(decorated, in: .init(identity: testIdentity("SetA307")))
     #expect(
-      node.preferenceValues[SetAStringPreferenceKey.self]
-        == ["background", "base", "transformed", "outer"])
+      node.preferenceValues[SetAStringPreferenceKey.self] == ["background", "base", "transformed"])
+    // A declaration above the decoration replaces its complete fold (native
+    // SwiftUI probe, 2026-10-17); it does not append a sibling contribution.
+    let overridden = Resolver().resolve(
+      decorated.preference(key: SetAStringPreferenceKey.self, value: ["outer"]),
+      in: .init(identity: testIdentity("SetA307Override")))
+    #expect(overridden.preferenceValues[SetAStringPreferenceKey.self] == ["outer"])
   }
 
   @Test func setA308ClearingPreferenceAboveObserverDoesNotEraseItsLocalValue() throws {
@@ -289,7 +292,7 @@ struct AdversarialSetAPreferenceLifecycleTests {
     model.value = 7
     try #require(model.value == 7)
     try h.render()
-    withKnownIssue("STUI-978: Observable preference transforms do not register reactive reads") {
+    do {
       #expect(
         log.values.last == ["base", "observed7"],
         "After an observed write, model=\(model.value), delivered preferences=\(log.values)")
@@ -299,6 +302,41 @@ struct AdversarialSetAPreferenceLifecycleTests {
     // transform's value semantics after preserving the missing-notification assertion above.
     try h.renderAfterExternalMutation()
     #expect(log.values == [["base", "observed0"], ["base", "observed7"]], "\(log.values)")
+  }
+
+  @Test(arguments: [0, 1, 2])
+  func preferenceClosuresTrackAndRearmAcrossConditionalFlattening(_ kind: Int) throws {
+    let model = SetAPreferenceObservable()
+    let log = SetAPreferenceLog()
+    let h = try make("ObservedPreference\(kind)") {
+      SetAObservedAnchorPreference(model: model, log: log, kind: kind)
+    }
+    defer { h.shutdown() }
+    let prefix = kind == 0 ? [] : ["base"]
+    #expect(log.values.last == prefix + ["observed0"])
+    let mountedNodeCount = h.runLoop.renderer.liveNodeIDSnapshot().count
+    for value in [7, 13] {
+      model.value = value
+      try h.render()
+      #expect(
+        log.values.last == prefix + ["observed\(value)"],
+        "Delivered preferences: \(log.values)"
+      )
+    }
+    for value in [17, 23] {
+      model.isMounted = false
+      try h.render()
+      #expect(log.values.last == [])
+      let unmountedNodeCount = h.runLoop.renderer.liveNodeIDSnapshot().count
+      #expect(unmountedNodeCount < mountedNodeCount)
+      model.value = value
+      try h.render()
+      #expect(log.values.last == [], "A retired subscription cannot republish its preference")
+      model.isMounted = true
+      try h.render()
+      #expect(log.values.last == prefix + ["observed\(value)"])
+      #expect(h.runLoop.renderer.liveNodeIDSnapshot().count == mountedNodeCount)
+    }
   }
 
   @Test func setA322ObservableReadInsidePreferenceOverlayRearmsAfterEachMutation() throws {
@@ -775,6 +813,7 @@ private struct SetAAppearInsertion: View {
 @MainActor
 @Observable
 private final class SetAPreferenceObservable {
+  var isMounted = true
   var value = 0
 }
 
@@ -855,5 +894,37 @@ private struct SetACompletingTask: View {
       value = 17
       log.events.append("completed")
     }
+  }
+}
+
+@MainActor
+private struct SetAObservedAnchorPreference: View {
+  let model: SetAPreferenceObservable
+  let log: SetAPreferenceLog
+  let kind: Int
+  var body: some View {
+    Group {
+      if !model.isMounted {
+        Text("unmounted")
+      } else if kind == 1 {
+        Text("anchor")
+          .preference(key: SetAStringPreferenceKey.self, value: ["base"])
+          .transformAnchorPreference(SetAStringPreferenceKey.self, value: .bounds) { value, _ in
+            value.append("observed\(model.value)")
+          }
+      } else if kind == 2 {
+        Text("ordinary")
+          .preference(key: SetAStringPreferenceKey.self, value: ["base"])
+          .transformPreference(SetAStringPreferenceKey.self) { value in
+            value.append("observed\(model.value)")
+          }
+      } else {
+        Text("anchor")
+          .anchorPreference(key: SetAStringPreferenceKey.self, value: .bounds) { _ in
+            return ["observed\(model.value)"]
+          }
+      }
+    }
+    .onPreferenceChange(SetAStringPreferenceKey.self) { log.values.append($0) }
   }
 }

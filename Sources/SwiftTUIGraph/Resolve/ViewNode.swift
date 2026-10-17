@@ -1437,6 +1437,12 @@ package final class ViewNode {
       && dependencies.environmentReads.isEmpty
   }
 
+  /// A collapsed value does not subsume the evaluator that owns its reads.
+  /// Retain that authored owner just as we retain an owner with state slots.
+  package var hasAuthoredDependencies: Bool {
+    !hasNoRecordedDependencies || !dependencies.observationCertificates.isEmpty
+  }
+
   /// Whether the node's recorded dependencies are all *covered by the memo
   /// gate's other conjuncts* or current read certificates. State versions and
   /// observation registration currency must still match; environment reads

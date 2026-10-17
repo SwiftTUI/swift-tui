@@ -973,7 +973,7 @@ extension FrameworkStressObservationEffectsTests {
       let expected =
         generation.isMultiple(of: 2)
         ? "[\(generation), \(100 + generation)]"
-        : "[\(100 + generation), \(generation)]"
+        : "[\(generation)]"
       #expect(frame.contains("017 values \(expected)"))
     }
   }

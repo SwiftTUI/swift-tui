@@ -5,10 +5,16 @@ part of the view tree resolves after layout.
 
 ## Overview
 
-Ordinary preferences reduce during view resolution. Anchor preferences follow
-that same reduction path, but the value they carry is an opaque geometry token
-rather than a concrete rectangle or point. Resolve the token inside
-``GeometryReader`` after placement has assigned real bounds.
+Sibling preferences reduce in view-tree order during resolution. A
+`preference(key:value:)` or `anchorPreference` declaration on a view replaces
+the value reduced from its subtree; a transform modifies that value in place.
+Consequently, an outer write replaces an inner write or transform. Observable
+reads inside ordinary and anchor preference transforms register dependencies
+and update their consumers when those observed values change.
+
+Anchor preferences carry opaque geometry tokens rather than concrete
+rectangles or points. Resolve a token inside ``GeometryReader`` after
+placement has assigned real bounds.
 
 ```swift
 private enum BoundsKey: PreferenceKey {

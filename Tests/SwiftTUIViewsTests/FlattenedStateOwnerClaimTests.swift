@@ -5,7 +5,7 @@ import Testing
 @testable import SwiftTUIViews
 
 /// Pins the single-child flattening state-owner tiebreak
-/// (`ViewGraph.flattenedStateOwnerNodeIDByIdentity`) for a composite whose
+/// (`ViewGraph.flattenedAuthoredOwnerNodeIDByIdentity`) for a composite whose
 /// `@State` the update pass CLAIMS but whose body never READS: the slot is
 /// unmaterialized when the enclosing chain absorbs the child's element, and
 /// the authored node must still be registered as the identity's state owner

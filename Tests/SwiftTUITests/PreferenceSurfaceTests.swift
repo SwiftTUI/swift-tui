@@ -82,10 +82,7 @@ struct PreferenceSurfaceTests {
       ]
     )
     #expect(
-      transformThenWrite.preferenceValues[StringListPreferenceKey.self] == [
-        "transform",
-        "write",
-      ]
+      transformThenWrite.preferenceValues[StringListPreferenceKey.self] == ["write"]
     )
   }
 

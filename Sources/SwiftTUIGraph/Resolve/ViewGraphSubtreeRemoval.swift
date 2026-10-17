@@ -500,8 +500,8 @@ extension ViewGraph {
       nodeIDsByStructuralPath.removeValue(forKey: node.committed.structuralPath)
     }
     removeTaskDescriptorSlots(ownedBy: node.viewNodeID)
-    if flattenedStateOwnerNodeIDByIdentity[node.identity] == node.viewNodeID {
-      flattenedStateOwnerNodeIDByIdentity.removeValue(forKey: node.identity)
+    if flattenedAuthoredOwnerNodeIDByIdentity[node.identity] == node.viewNodeID {
+      flattenedAuthoredOwnerNodeIDByIdentity.removeValue(forKey: node.identity)
     }
     if nodeIDByIdentity[node.identity] == node.viewNodeID {
       nodeIDByIdentity.removeValue(forKey: node.identity)

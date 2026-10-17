@@ -264,10 +264,10 @@ package final class ViewGraph {
     set { index.nextViewNodeIDRawValue = newValue }
     _modify { yield &index.nextViewNodeIDRawValue }
   }
-  var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] {
-    get { index.flattenedStateOwnerNodeIDByIdentity }
-    set { index.flattenedStateOwnerNodeIDByIdentity = newValue }
-    _modify { yield &index.flattenedStateOwnerNodeIDByIdentity }
+  var flattenedAuthoredOwnerNodeIDByIdentity: [Identity: ViewNodeID] {
+    get { index.flattenedAuthoredOwnerNodeIDByIdentity }
+    set { index.flattenedAuthoredOwnerNodeIDByIdentity = newValue }
+    _modify { yield &index.flattenedAuthoredOwnerNodeIDByIdentity }
   }
   var effectRegistrationOwnerNodeIDs: Set<ViewNodeID> {
     get { index.effectRegistrationOwnerNodeIDs }
@@ -733,8 +733,8 @@ package final class ViewGraph {
       // re-homed controls).
       recordDetachedHostedNode(shadowedNodeID, hostedByNodeID: node.viewNodeID)
       // A shadowed node AUTHORED at the claimed identity that hosts state
-      // slots is a single-child flattening's state owner, not a chain
-      // interior: the child resolved onto its own node, then this wrapper's
+      // slots or reads reactive inputs is a single-child flattening's authored
+      // owner, not a chain interior: the child resolved onto its own node, then this wrapper's
       // one-element body normalized to that child element and claimed its
       // identity. Register the authored node so authoring-host resolution
       // keeps hosting the child's `@State`/`@FocusState` there instead of
@@ -751,11 +751,14 @@ package final class ViewGraph {
       // registered closure then read a dead owner (the
       // `state.imperativeSeedFallback` warning at present time) and the
       // re-hosted slot re-seeded from the authored default.
+      // Observation subscriptions and other read dependencies likewise belong
+      // to the authored evaluator, not merely its flattened output. Retaining
+      // that owner preserves subscription currency, re-arming, and teardown.
       if let shadowed = nodesByNodeID[shadowedNodeID],
         shadowed.identity == node.resolvedIdentity,
-        shadowed.hostsAuthoredStateSlots
+        shadowed.hostsAuthoredStateSlots || shadowed.hasAuthoredDependencies
       {
-        flattenedStateOwnerNodeIDByIdentity[node.resolvedIdentity] = shadowedNodeID
+        flattenedAuthoredOwnerNodeIDByIdentity[node.resolvedIdentity] = shadowedNodeID
       }
     }
     nodeIDByIdentity[node.resolvedIdentity] = node.viewNodeID
@@ -845,7 +848,7 @@ package final class ViewGraph {
       entityRoutingTable: entityRoutingTable,
       lifetimeAnchors: lifetimeAnchors,
       nextViewNodeIDRawValue: nextViewNodeIDRawValue,
-      flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity,
+      flattenedAuthoredOwnerNodeIDByIdentity: flattenedAuthoredOwnerNodeIDByIdentity,
       effectRegistrationOwnerNodeIDs: effectRegistrationOwnerNodeIDs,
       rootEvaluator: rootEvaluator != nil,
       evaluationRootIdentity: evaluationRootIdentity,
@@ -1828,7 +1831,7 @@ package final class ViewGraph {
         graphLocalDirtyNodeIDs: graphLocalDirtyNodeIDs,
         nodesByNodeID: nodesByNodeID,
         lifecycleEvaluationOwnersByNodeID: lifecycleEvaluationOwnersByNodeID,
-        flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
+        flattenedAuthoredOwnerNodeIDByIdentity: flattenedAuthoredOwnerNodeIDByIdentity
       )
     )
     guard planning.droppedTargetlessNodeCount == 0 else {

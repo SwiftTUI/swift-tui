@@ -66,7 +66,7 @@ struct AdversarialSetBEnvironmentTests {
     let chained = fold(
       Text("a").preference(key: SetBListKey.self, value: ["first"])
         .preference(key: SetBListKey.self, value: ["second"]), "chained")
-    withKnownIssue("a preference write is reduced into the subtree fold instead of replacing it") {
+    do {
       #expect(container == ["outer"], "\(container)")
       #expect(chained == ["second"], "\(chained)")
     }

@@ -49,13 +49,14 @@ extension ViewGraph {
       else {
         continue
       }
-      // A flatten-shadowed state owner is reachable by construction —
+      // A flatten-shadowed authored owner is reachable by construction —
       // authoring-host resolution prefers it over its absorber — and its
       // lifetime anchors to the absorber's hosted-detached edge. Reclaiming
       // it here (the creation frame leaves it parentless: the absorber's
       // apply absorbed its output) would drop the live `@State`/`@FocusState`
-      // slots it hosts and re-seed them on the absorber next pass.
-      if flattenedStateOwnerNodeIDByIdentity[node.identity] == node.viewNodeID {
+      // slots or dependency registrations it hosts and re-seed or lose them
+      // on the absorber next pass.
+      if flattenedAuthoredOwnerNodeIDByIdentity[node.identity] == node.viewNodeID {
         continue
       }
       if let context = lifetimeReachabilityContext(activeEntities: activeEntities),

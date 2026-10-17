@@ -184,7 +184,7 @@ struct EntityRoutedOwnerPreparationTests {
         )
         .dropFirst()
         .first?
-        .components(separatedBy: "func flattenedStateOwnerNode")
+        .components(separatedBy: "func flattenedAuthoredOwnerNode")
         .first
     )
 

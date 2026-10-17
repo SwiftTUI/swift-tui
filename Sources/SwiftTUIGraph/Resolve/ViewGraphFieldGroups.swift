@@ -24,7 +24,7 @@ extension ViewGraph {
     package var entityRoutingTable: EntityRoutingTable = .init()
     package var lifetimeAnchors: LifetimeAnchorIndex = .init()
     package var nextViewNodeIDRawValue: UInt64 = 0
-    // Authored state-owner nodes whose identity index entry a single-child
+    // Authored evaluation-owner nodes whose identity index entry a single-child
     // flattening absorber claimed: `normalizeResolvedElements(count == 1)`
     // lets a wrapper commit a snapshot whose root identity is its only
     // child's, so the wrapper owns `nodeIDByIdentity[childIdentity]` —
@@ -35,10 +35,11 @@ extension ViewGraph {
     // this map — otherwise every post-commit
     // pass re-hosts the slots on the absorber, re-seeded from authored
     // defaults. Recorded by `reindexIdentity` when the shadowed occupant is
-    // authored at the claimed identity and holds state slots; removed when
+    // authored at the claimed identity and holds state slots or dependency
+    // registrations; removed when
     // that node leaves the graph. See `pruneAbsorbedShadowedNodes` (the
     // owner's lifetime anchors to the absorber's hosted-detached edge).
-    package var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] = [:]
+    package var flattenedAuthoredOwnerNodeIDByIdentity: [Identity: ViewNodeID] = [:]
     // Node IDs that recorded (or adopted) an effect-family registration
     // (lifecycle/task/preference observation) at least once while resident in
     // `nodesByNodeID`. A SUPERSET of the current effect owners: capture

@@ -112,12 +112,11 @@ public struct AnchorPreferenceWritingModifier<Key: PreferenceKey, Value: Sendabl
         identity: node.identity,
         kind: source.kind
       )
-      node.preferenceValues.merge(
-        Key.self,
-        value: content.withAuthoredClosureScope {
+      node.preferenceValues[Key.self] = content.withAuthoredClosureScope {
+        context.trackingObservableAccess {
           transform(anchor)
         }
-      )
+      }
       return [node]
 
     }
@@ -143,7 +142,9 @@ public struct AnchorPreferenceTransformModifier<Key: PreferenceKey, Value: Senda
       )
       node.preferenceValues.transform(Key.self) { value in
         content.withAuthoredClosureScope {
-          transform(&value, anchor)
+          context.trackingObservableAccess {
+            transform(&value, anchor)
+          }
         }
       }
       return [node]
@@ -161,7 +162,9 @@ public struct PreferenceWritingModifier<Key: PreferenceKey>: IterativePrimitiveV
   ) -> ResolveWork<[ResolvedNode]> {
     return content.resolveWork(in: context).map { completed in
       var node = completed
-      node.preferenceValues.merge(Key.self, value: value)
+      // A declaration replaces this subtree's fold. Reduction belongs only
+      // to sibling composition; chained declarations therefore obey order.
+      node.preferenceValues[Key.self] = value
       return [node]
 
     }
@@ -179,7 +182,9 @@ public struct PreferenceTransformModifier<Key: PreferenceKey>: IterativePrimitiv
       var node = completed
       node.preferenceValues.transform(Key.self) { value in
         content.withAuthoredClosureScope {
-          transform(&value)
+          context.trackingObservableAccess {
+            transform(&value)
+          }
         }
       }
       return [node]

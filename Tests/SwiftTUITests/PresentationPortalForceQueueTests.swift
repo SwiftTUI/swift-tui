@@ -324,7 +324,7 @@ struct PresentationPortalForceQueueTests {
     // committed snapshot claim the child's identity
     // (`normalizeResolvedElements` count==1 returns the child element as
     // the wrapper's resolved root); the flatten-shadowed state-owner
-    // tiebreak (`ViewGraph.flattenedStateOwnerNodeIDByIdentity`) keeps the
+    // tiebreak (`ViewGraph.flattenedAuthoredOwnerNodeIDByIdentity`) keeps the
     // authored child node hosting the slots across every later pass.
     // DEBUG-only: the probe's increment compiles out of release (F118), so
     // the release soundness lane sees a permanent 0 — the flip-count oracle

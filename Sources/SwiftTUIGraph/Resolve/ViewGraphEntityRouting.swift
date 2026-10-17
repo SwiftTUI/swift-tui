@@ -91,7 +91,7 @@ extension ViewGraph {
         // element node when it survived, and on a fresh node otherwise; the
         // container keeps the index entry for planning and value stitching.
         if entityIdentity.isForEachScoped, existing.identity != identity {
-          if let stateOwner = flattenedStateOwnerNode(for: identity),
+          if let stateOwner = flattenedAuthoredOwnerNode(for: identity),
             stateOwner !== existing,
             stateOwner.committed.entityIdentity
               ?? entityRoutingTable.entityByNodeID[stateOwner.viewNodeID]
@@ -146,7 +146,7 @@ extension ViewGraph {
         // superseded pass's host silently orphaned). Planning and value
         // stitching keep resolving the identity index to the absorber.
         if existing.identity != identity,
-          let stateOwner = flattenedStateOwnerNode(for: identity),
+          let stateOwner = flattenedAuthoredOwnerNode(for: identity),
           stateOwner !== existing
         {
           return stateOwner
@@ -160,7 +160,7 @@ extension ViewGraph {
     // entry it claimed). Re-adopt the live owner rather than minting a fresh
     // node over its state.
     if entityIdentity == nil,
-      let stateOwner = flattenedStateOwnerNode(for: identity)
+      let stateOwner = flattenedAuthoredOwnerNode(for: identity)
     {
       nodeIDByIdentity[identity] = stateOwner.viewNodeID
       return stateOwner
@@ -228,14 +228,14 @@ extension ViewGraph {
     return node
   }
 
-  /// The live authored node registered as the state owner for `identity`
+  /// The live authored node registered as the evaluation owner for `identity`
   /// while a single-child flattening absorber claims its identity index
-  /// entry — see `GraphIndex.flattenedStateOwnerNodeIDByIdentity`.
-  func flattenedStateOwnerNode(
+  /// entry — see `GraphIndex.flattenedAuthoredOwnerNodeIDByIdentity`.
+  func flattenedAuthoredOwnerNode(
     for identity: Identity
   ) -> ViewNode? {
-    guard !flattenedStateOwnerNodeIDByIdentity.isEmpty,
-      let nodeID = flattenedStateOwnerNodeIDByIdentity[identity]
+    guard !flattenedAuthoredOwnerNodeIDByIdentity.isEmpty,
+      let nodeID = flattenedAuthoredOwnerNodeIDByIdentity[identity]
     else {
       return nil
     }

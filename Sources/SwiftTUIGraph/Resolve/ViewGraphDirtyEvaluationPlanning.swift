@@ -6,7 +6,7 @@ struct ViewGraphDirtyEvaluationPlanningInput {
   /// The flattening-absorbed authored state owners (see `reindexIdentity`) —
   /// the target walk's hazard registry for collapse-boundary lifting.
   /// Defaults empty (no lifting) for fixtures without flattenings.
-  var flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID] = [:]
+  var flattenedAuthoredOwnerNodeIDByIdentity: [Identity: ViewNodeID] = [:]
 }
 
 struct ViewGraphDirtyEvaluationTargetPlan {
@@ -50,7 +50,7 @@ enum ViewGraphDirtyEvaluationPlanner {
         for: node,
         nodesByNodeID: input.nodesByNodeID,
         lifecycleEvaluationOwnersByNodeID: input.lifecycleEvaluationOwnersByNodeID,
-        flattenedStateOwnerNodeIDByIdentity: input.flattenedStateOwnerNodeIDByIdentity
+        flattenedAuthoredOwnerNodeIDByIdentity: input.flattenedAuthoredOwnerNodeIDByIdentity
       )
       guard let target else {
         // No stitchable evaluator anywhere on this node's chain. Count it
@@ -173,12 +173,12 @@ enum ViewGraphDirtyEvaluationPlanner {
   /// candidate is the first evaluator above the last seam.
   private static func stitchableEvaluatorTarget(
     startingAt node: ViewNode,
-    flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID]
+    flattenedAuthoredOwnerNodeIDByIdentity: [Identity: ViewNodeID]
   ) -> ViewNode? {
     var candidate: ViewNode? =
       isStitchable(
         node,
-        flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
+        flattenedAuthoredOwnerNodeIDByIdentity: flattenedAuthoredOwnerNodeIDByIdentity
       ) ? node : nil
     var child = node
     var visited: Set<ObjectIdentifier> = []
@@ -196,7 +196,7 @@ enum ViewGraphDirtyEvaluationPlanner {
       if candidate == nil,
         isStitchable(
           ancestor,
-          flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
+          flattenedAuthoredOwnerNodeIDByIdentity: flattenedAuthoredOwnerNodeIDByIdentity
         )
       {
         candidate = ancestor
@@ -224,7 +224,7 @@ enum ViewGraphDirtyEvaluationPlanner {
   /// 2026-08-12-004 Stage 1).
   private static func isStitchable(
     _ node: ViewNode,
-    flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID]
+    flattenedAuthoredOwnerNodeIDByIdentity: [Identity: ViewNodeID]
   ) -> Bool {
     guard node.hasEvaluator else {
       return false
@@ -266,7 +266,7 @@ enum ViewGraphDirtyEvaluationPlanner {
     for dirtyNode: ViewNode,
     nodesByNodeID: [ViewNodeID: ViewNode],
     lifecycleEvaluationOwnersByNodeID: [ViewNodeID: ViewNodeID],
-    flattenedStateOwnerNodeIDByIdentity: [Identity: ViewNodeID]
+    flattenedAuthoredOwnerNodeIDByIdentity: [Identity: ViewNodeID]
   ) -> ViewNode? {
     if let lifecycleOwner = lifecycleEvaluationOwnerAncestor(
       of: dirtyNode,
@@ -275,12 +275,12 @@ enum ViewGraphDirtyEvaluationPlanner {
     ) {
       return stitchableEvaluatorTarget(
         startingAt: lifecycleOwner,
-        flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
+        flattenedAuthoredOwnerNodeIDByIdentity: flattenedAuthoredOwnerNodeIDByIdentity
       )
     }
     return stitchableEvaluatorTarget(
       startingAt: dirtyNode,
-      flattenedStateOwnerNodeIDByIdentity: flattenedStateOwnerNodeIDByIdentity
+      flattenedAuthoredOwnerNodeIDByIdentity: flattenedAuthoredOwnerNodeIDByIdentity
     )
   }
 }
