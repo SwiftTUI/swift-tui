@@ -418,6 +418,7 @@ private func stackedPromptItem(
 ) -> PromptPresentationItem {
   PromptPresentationItem(
     id: id,
+    enablementPolicy: spec.enablementPolicy,
     title: id,
     surface: spec.prepareSurface(.init(identity: testIdentity("StackedImperative", id))),
     actionPayloads: [],

@@ -923,9 +923,12 @@ worker-stack frame per command. Surface allocation and damage share those
 extents, including negative shape insets.
 
 Presentation enablement is explicit and independent of modal input blocking.
-Prompts and popovers own an interaction domain; attached tips and toasts inherit
-their presenter's enabled state, including tips whose actions block background
-interaction. Every presentation still applies its own authored disabled modifiers.
+Alert, dialog, sheet, palette, and popover declarations own an interaction
+domain; menus, attached tips, and toasts inherit their presenter's enabled state,
+including tips whose actions block background interaction. Declaration specs
+carry this policy through the shared prompt payload; its storage type does not
+determine enablement. Every presentation still applies its own authored disabled
+modifiers.
 
 Default-focus arrivals survive scoped registration republication independently
 of the published binding rows. Arbitration checks the authoring owner's live

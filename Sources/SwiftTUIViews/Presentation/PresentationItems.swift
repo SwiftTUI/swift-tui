@@ -75,7 +75,7 @@ extension PortalPresentationItem {
 }
 
 package struct PromptPresentationItem: PortalPresentationItem {
-  package var enablementPolicy: PresentationEnablementPolicy { .independent }
+  package var enablementPolicy: PresentationEnablementPolicy
   package var id: String
   package var portalEntryID: PortalEntryID
   package var title: String
@@ -100,6 +100,7 @@ package struct PromptPresentationItem: PortalPresentationItem {
   package init(
     id: String,
     portalEntryID: PortalEntryID? = nil,
+    enablementPolicy: PresentationEnablementPolicy = .inheritsPresenter,
     title: String,
     surface: PreparedPortalSurface,
     actionPayloads: [PortalAttachmentPayload],
@@ -112,6 +113,7 @@ package struct PromptPresentationItem: PortalPresentationItem {
     let edge = PortalAttachmentEdge(portalEntryID: portalEntryID)
     self.id = id
     self.portalEntryID = portalEntryID
+    self.enablementPolicy = enablementPolicy
     self.title = title
     self.surface = surface.make(
       messagePayloads.contains { $0.hasDeclaredContent },

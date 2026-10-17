@@ -358,6 +358,9 @@ extension FrameworkStressPresentationSemanticsTests {
     _ = try harness.clickText("Disabled overlay action")
 
     #expect(probe.markers.isEmpty)
+    _ = try harness.clickText("Enable menu")
+    _ = try harness.clickText("Disabled overlay action")
+    #expect(probe.markers == ["fired"])
   }
 }
 
@@ -375,8 +378,8 @@ private struct StressPS008Fixture: View {
       }
       .disabled(isDisabled)
       Spacer().frame(width: 24)
-      Button("Disable menu") {
-        isDisabled = true
+      Button(isDisabled ? "Enable menu" : "Disable menu") {
+        isDisabled.toggle()
       }
     }
     .frame(width: 70, height: 14, alignment: .topLeading)

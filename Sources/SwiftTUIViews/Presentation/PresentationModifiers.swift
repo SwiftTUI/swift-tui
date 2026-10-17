@@ -35,6 +35,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
       let item = PromptPresentationItem(
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
+        enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,
         actionPayloads: withAuthoringContext(actionsAuthoringContext) {
@@ -108,6 +109,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: IterativePri
       let item = PromptPresentationItem(
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
+        enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,
         actionPayloads: [],
@@ -185,6 +187,7 @@ package struct BuiltinItemPromptPresentationModifier<
       let presentationItem = PromptPresentationItem(
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
+        enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,
         actionPayloads: withAuthoringContext(actionsAuthoringContext) {
@@ -260,6 +263,7 @@ package struct BuiltinItemSheetPresentationModifier<
       let presentationItem = PromptPresentationItem(
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
+        enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,
         actionPayloads: [],
@@ -317,6 +321,7 @@ package struct MenuStylePresentationModifier<MenuContent: View>: IterativePrimit
       let item = PromptPresentationItem(
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
+        enablementPolicy: spec.enablementPolicy,
         title: "",
         surface: surface,
         actionPayloads: [],
@@ -425,6 +430,7 @@ public struct BuiltinPaletteSheetPresentationModifier: IterativePrimitiveViewMod
       let item = PromptPresentationItem(
         id: portalEntryID.description,
         portalEntryID: portalEntryID,
+        enablementPolicy: spec.enablementPolicy,
         title: title,
         surface: surface,
         actionPayloads: [],

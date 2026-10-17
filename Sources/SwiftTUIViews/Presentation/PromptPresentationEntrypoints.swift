@@ -3,6 +3,7 @@ import SwiftTUICore
 package struct PromptPresentationSpec: Sendable {
   package var token: String
   package var defaultDismissTitle: String
+  package var enablementPolicy: PresentationEnablementPolicy
   package var prepareSurface: @MainActor @Sendable (ResolveContext) -> PreparedPortalSurface
   package var reconcile:
     @MainActor @Sendable (PresentationCoordinatorRegistry, Identity, PromptPresentationItem) -> Void
@@ -42,6 +43,7 @@ private func promptPresentationSpec(
 ) -> PromptPresentationSpec {
   .init(
     token: token, defaultDismissTitle: defaultDismissTitle,
+    enablementPolicy: .independent,
     prepareSurface: { context in
       let style = context.environmentValues.promptStyle
       let inputs = PortalStyleResolveInputs(context)
@@ -63,6 +65,7 @@ package func menuPromptPresentationSpec(
 ) -> PromptPresentationSpec {
   .init(
     token: "menu", defaultDismissTitle: "Close",
+    enablementPolicy: .inheritsPresenter,
     prepareSurface: { _ in
       PreparedPortalSurface { _, _ in
         anchoredSurfacePresentation(
@@ -84,6 +87,7 @@ package func sheetPromptPresentationSpec(
     minimumWidth: container == .dropdown ? 0 : 20)
   return .init(
     token: "sheet", defaultDismissTitle: "Close",
+    enablementPolicy: .independent,
     prepareSurface: { context in
       let style = context.environmentValues.sheetStyle
       let inputs = PortalStyleResolveInputs(context)
@@ -101,6 +105,7 @@ package func sheetPromptPresentationSpec(
 package func palettePromptPresentationSpec() -> PromptPresentationSpec {
   .init(
     token: "sheet", defaultDismissTitle: "Close",
+    enablementPolicy: .independent,
     prepareSurface: { _ in
       PreparedPortalSurface { _, _ in
         PortalSurfacePresentation(alignment: .topLeading, accessibilityRole: .sheet) { item in
@@ -135,6 +140,7 @@ private func sheetSurfacePresentation(_ presentation: SheetSurfaceStylePresentat
 package func fullScreenCoverPromptPresentationSpec() -> PromptPresentationSpec {
   .init(
     token: "fullScreenCover", defaultDismissTitle: "Close",
+    enablementPolicy: .independent,
     prepareSurface: { context in
       let style = context.environmentValues.fullScreenCoverStyle
       let inputs = PortalStyleResolveInputs(context)
