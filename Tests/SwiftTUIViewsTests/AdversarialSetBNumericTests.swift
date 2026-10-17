@@ -108,7 +108,7 @@ struct AdversarialSetBNumericTests {
   }
 
   @Test func setB037ProgressSummariesAgreeWithTheClampedFraction() async {
-    #expect(progressSummaryText(value: 1, total: .nan) == "100%")
+    #expect(progressSummaryText(value: 1, total: .nan) == "0%")
     #expect(progressSummaryText(value: 0.5, total: -0.0) == "100%")
     #expect(progressSummaryText(value: 2.55, total: 10) == "2.6/10")
     let tinyTotal = metricValueString(1e-300)

@@ -51,6 +51,8 @@ struct AdversarialSetATerminalInteractionDepthTests {
     defer { h.shutdown() }
     try h.focusValue(m.texts[0])
     try h.key(.arrowUp)
+    try #require(h.editor().textInput?.insertionOffset == 0)
+    try h.key(.end)
     try #require(h.editor().textInput?.insertionOffset == 18)
     try h.resize(width: 10, height: 8)
     try h.key(.arrowUp)

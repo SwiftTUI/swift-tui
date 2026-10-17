@@ -5,7 +5,9 @@ import SwiftTUICore
 /// Publishes one read-only progress indicator, independent of its style. The
 /// authored label names the task, the current-value label describes its value,
 /// and determinate progress supplies a clamped fraction. Indeterminate progress
-/// has no numeric value. Updates do not create live announcements by default.
+/// has no numeric value. NaN values or totals publish zero progress. A
+/// nonpositive total reports completion only when the value is positive.
+/// Updates do not create live announcements by default.
 public struct ProgressView<Label: View, CurrentValueLabel: View>: PrimitiveView,
   IterativeResolvableView
 {

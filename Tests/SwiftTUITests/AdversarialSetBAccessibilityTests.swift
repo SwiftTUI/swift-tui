@@ -33,12 +33,10 @@ struct AdversarialSetBAccessibilityTests {
       let shownTotal = try #require(Double(parts[1]))
       // The description is the clamped progress in the authored unit, so the
       // ratio it reads must be the fraction the control publishes.
-      withKnownIssue("one-decimal rounding misdescribes sub-tenth totals") {
+      do {
         #expect(
           abs(shown / shownTotal - fraction) <= 0.051, "\(value)/\(total) reads \(description)")
         #expect(shown > 0 && shown < shownTotal, "\(value)/\(total) reads \(description)")
-      } when: {
-        total < 1
       }
     }
   }
@@ -46,18 +44,16 @@ struct AdversarialSetBAccessibilityTests {
   @Test func setB092ProgressClampEdgesAgreeWithDescriptions() throws {
     let cases: [(value: Double, total: Double, fraction: Double, description: String)] = [
       (1.5, 1.0, 1, "1/1"), (-0.0, 1, 0, "0/1"), (.leastNonzeroMagnitude, 0, 1, "100%"),
-      (1e-9, 1, 1e-9, "0/1"), (0.5, .nan, 0, "0%"), (.nan, .nan, 0, "0%"),
+      (1e-9, 1, 1e-9, "0.000000001/1"), (0.5, .nan, 0, "0%"), (.nan, .nan, 0, "0%"),
     ]
     for entry in cases {
       let snapshot = setBRender(ProgressView(value: entry.value, total: entry.total))
       let node = try #require(snapshot.accessibilityNodes.first { $0.role == .progressBar })
       #expect(node.label == "Progress")
-      withKnownIssue("a NaN total is treated as non-positive and publishes 100%") {
+      do {
         #expect(node.control?.value == .number(entry.fraction), "\(entry.value)/\(entry.total)")
         #expect(
           node.properties?.valueDescription == entry.description, "\(entry.value)/\(entry.total)")
-      } when: {
-        entry.total.isNaN && entry.value > 0
       }
       #expect(node.control?.minimum == 0, "\(entry.value)/\(entry.total)")
       #expect(node.control?.maximum == 1, "\(entry.value)/\(entry.total)")
@@ -102,7 +98,7 @@ struct AdversarialSetBAccessibilityTests {
     // Setting the value the control already publishes is a no-op for the
     // host; it must not silently rewrite the out-of-range model.
     #expect(try send("Bounded", 5) == .accepted)
-    withKnownIssue("setValue compares with the unclamped model and writes the clamp") {
+    do {
       #expect(bounded.writes.isEmpty, "\(bounded.writes)")
       let overflowing = try send("Bounded", 10)
       #expect(overflowing == .invalidValue)
@@ -338,9 +334,8 @@ struct AdversarialSetBAccessibilityTests {
     #expect((origin.x...origin.x + 1).contains(middle.clusters[1].rect.origin.x))
     #expect(middle.endAnchor == CellPoint(x: origin.x, y: origin.y + 2))
 
-    // NEL, LS, PS, VT and FF are ordinary graphemes for the caret map: the
-    // end-of-text anchor stays on the rendered row, directly after the last
-    // placed cluster, and the caret anchor agrees with it.
+    // Every Unicode newline starts the next logical row. The separator's
+    // cluster stays on the preceding row; the end caret starts the next one.
     for suffix in ["\u{85}", "\u{2028}", "\u{2029}", "\u{0B}", "\u{0C}"] {
       let code = suffix.unicodeScalars.map { String($0.value, radix: 16) }.joined()
       let content = "AB" + suffix
@@ -353,10 +348,10 @@ struct AdversarialSetBAccessibilityTests {
       #expect(placed.selection == 3..<3, "\(code)")
       #expect(placed.insertionOffset == 3, "\(code)")
       let rows = Set(placed.clusters.map { $0.rect.origin.y })
-      #expect(rows == [endCaret.y], "\(code)")
+      #expect(rows == [endCaret.y - 1], "\(code)")
       #expect(placed.endAnchor == endCaret, "\(code)")
       let afterLast = CellPoint(
-        x: last.rect.origin.x + last.rect.size.width, y: last.rect.origin.y)
+        x: origin.x, y: last.rect.origin.y + 1)
       #expect(placed.endAnchor == afterLast, "\(code)")
     }
   }

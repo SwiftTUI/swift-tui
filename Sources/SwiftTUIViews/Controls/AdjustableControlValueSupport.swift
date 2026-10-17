@@ -66,9 +66,13 @@ func accessibilityNumericAction<Value: AdjustableControlValue>(
     return adjust(-1) ? .changed : .unchanged
   case .setValue(.number(let number)):
     guard let authored = Value.accessibilityValue(number) else { return .invalidValue }
-    let next = clampedControlValue(authored, to: bounds)
-    guard next != binding.wrappedValue else { return .unchanged }
-    binding.wrappedValue = next
+    guard bounds?.contains(authored) != false else { return .invalidValue }
+    // Compare against the published value. An assistive no-op must not
+    // normalize an out-of-range model behind the author's back.
+    guard authored != clampedControlValue(binding.wrappedValue, to: bounds) else {
+      return .unchanged
+    }
+    binding.wrappedValue = authored
     return .changed
   default: return .unsupported
   }

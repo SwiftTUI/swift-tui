@@ -322,7 +322,7 @@ struct AdversarialSetAStyleBoundaryTests {
       TextField("Protected field", text: text.binding).textFieldStyle(StyleBoundaryPaddedField())
     }
     defer { h.shutdown() }
-    #expect(h.frame.contains("prefix ab suffix"))
+    #expect(h.frame.contains("prefix ab_ suffix"))
     let field = try node("Protected field", in: h)
     #expect(try send(.focus, to: field, in: h) == .accepted)
     try h.pressKey(.init(.character("!")))

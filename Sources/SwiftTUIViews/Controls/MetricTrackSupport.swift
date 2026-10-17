@@ -4,7 +4,7 @@ package func progressFraction(
   value: Double,
   total: Double
 ) -> Double {
-  guard !value.isNaN else { return 0 }
+  guard !value.isNaN, !total.isNaN else { return 0 }
   guard total > 0 else {
     return value > 0 ? 1 : 0
   }
