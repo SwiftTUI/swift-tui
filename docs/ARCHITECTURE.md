@@ -104,6 +104,13 @@ it only when it was previously visible. Keyboard table reveals receive one measu
 window correction, including changes in overflow-indicator capacity. These paths
 use the existing single eager focus-sync rerender and yield to explicit focus or
 scroll requests.
+Ordinary scroll views preserve a previously visible focused target through viewport
+and content geometry changes using the same bounded focus-sync rerender. Lazy row
+allocation targets distinguish an unrealized surviving row from an arbitrary
+placed ancestor; recovery never makes all offscreen rows focus targets. The scroll
+registry retains synchronized offsets, binding source tokens and pending command
+intent so deliberate scroll input takes precedence over recovery for unchanged focus. Nested reveal
+follows the existing scroll-target containment links through enclosing viewports.
 
 `SwiftTUI/swift-tui` is one SwiftPM package. Browser TypeScript source,
 examples, and the public website can live in sibling organization repositories.
