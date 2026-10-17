@@ -318,8 +318,8 @@ extension InputReader {
             await Task.yield()
             continue
           case .wouldBlock:
-            // An idle poll is the WASI escape-disambiguation timeout: commit a
-            // lone buffered ESC to a bare Escape (no-op unless one is pending).
+            // A poll only commits pending input after the shared quiet
+            // interval; read boundaries never truncate fragmented envelopes.
             for event in decoder.flushEscapeIfIdle() {
               continuation.yield(event)
             }

@@ -40,10 +40,10 @@ struct TerminalInputEventDecoder<Event: Sendable> {
   }
 
   mutating func decode(
-    _ bytes: [UInt8]
+    _ bytes: [UInt8], at now: ContinuousClock.Instant = .now
   ) -> TerminalInputDecodedBatch<Event> {
     refreshMouseCoordinateMode()
-    if !bytes.isEmpty { lastInputAt = .now }
+    if !bytes.isEmpty { lastInputAt = now }
     guard controlChannelEnabled else {
       return TerminalInputDecodedBatch(
         controlMessages: [],
@@ -58,12 +58,22 @@ struct TerminalInputEventDecoder<Event: Sendable> {
   }
 
   /// Drains a lingering lone ESC as an Escape event, mapped through the same
-  /// projection as ``decode(_:)`` so keyboard-only and full input streams both
+  /// projection as ``decode(_:at:)`` so keyboard-only and full input streams both
   /// receive it. Returns an empty array when no lone ESC is pending.
   mutating func flushEscape() -> [Event] {
     refreshMouseCoordinateMode()
     controlParser.endPendingPaste()
     return flushTransform(&parser)
+  }
+
+  /// Polling transports use the same quiet interval as dispatch-backed
+  /// readers. An empty read or a fragmented input chunk is not a timeout.
+  mutating func flushEscapeIfIdle(at now: ContinuousClock.Instant = .now) -> [Event] {
+    guard let lastInputAt,
+      lastInputAt.duration(to: now)
+        >= .milliseconds(InputReaderTiming.escapeDisambiguationDelayMilliseconds)
+    else { return [] }
+    return flushEscape()
   }
 
   private mutating func refreshMouseCoordinateMode() {

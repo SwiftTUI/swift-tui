@@ -49,6 +49,23 @@ struct ControlChannelGateTests {
     #expect(messages == [.resize(.init(width: 80, height: 24))])
   }
 
+  @Test("polling escape timeouts require a full quiet interval after the latest bytes")
+  func pollingEscapeTimeoutUsesLatestInput() {
+    var decoder = makeDecoder(controlChannelEnabled: false)
+    let start = ContinuousClock.now
+    let delay = Duration.milliseconds(InputReaderTiming.escapeDisambiguationDelayMilliseconds)
+    #expect(decoder.decode([0x1B], at: start).events.isEmpty)
+    #expect(decoder.flushEscapeIfIdle(at: start + delay / 2).isEmpty)
+    #expect(decoder.decode([0x5B], at: start + delay / 2).events.isEmpty)
+    #expect(decoder.flushEscapeIfIdle(at: start + delay).isEmpty)
+    #expect(decoder.decode([0x41], at: start + delay).events == [.key(.arrowUp)])
+    #expect(decoder.flushEscapeIfIdle(at: start + delay * 2).isEmpty)
+    #expect(decoder.decode([0x1B], at: start + delay * 3).events.isEmpty)
+    #expect(decoder.decode([], at: start + delay * 4).events.isEmpty)
+    #expect(decoder.flushEscapeIfIdle(at: start + delay * 4) == [.key(.escape)])
+    #expect(decoder.flushEscapeIfIdle(at: start + delay * 5).isEmpty)
+  }
+
   private func makeDecoder(
     controlChannelEnabled: Bool
   ) -> TerminalInputEventDecoder<InputEvent> {
