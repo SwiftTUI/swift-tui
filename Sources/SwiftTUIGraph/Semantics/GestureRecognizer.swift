@@ -81,9 +81,14 @@ package protocol GestureRecognizer: AnyObject {
   /// Delivers an event. Returns whether the event was consumed.
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition
 
+  /// Reconstructs a fallback from input withheld by an exclusive predecessor.
+  /// Multi-tap recognizers need the complete history; single-press recognizers
+  /// select the latest press. Decorators observe the resulting recognition.
+  func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition
+
   /// Invoked by the runtime when a deadline the recognizer scheduled
-  /// has arrived. Returns `true` if the recognizer transitioned to a
-  /// terminal phase as a result.
+  /// has arrived. Returns `true` if recognition advanced as a result,
+  /// including a sequence's transition to its next stage. A stale wake is false.
   func handleDeadline(at instant: MonotonicInstant) -> Bool
 
   /// Reads the recognizer's current value, if any. Called after
@@ -121,6 +126,29 @@ extension GestureRecognizer {
     phase != .possible && !phase.isTerminal
   }
 
+  package func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    var disposition: GestureRecognizerEventDisposition = .ignored
+    for event in events {
+      guard !phase.isTerminal else { break }
+      disposition = handle(event: event)
+    }
+    return disposition
+  }
+
+  /// Replays only the most recent press, including its release if it has one.
+  /// A completed earlier click is not evidence for a later drag or hold.
+  package func replayLatestPress(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    guard let start = events.lastIndex(where: { $0.kind == .down(.primary) }) else {
+      return .ignored
+    }
+    var disposition: GestureRecognizerEventDisposition = .ignored
+    for event in events[start...] {
+      guard !phase.isTerminal else { break }
+      disposition = handle(event: event)
+    }
+    return disposition
+  }
+
   package func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
     // Callback-free recognizers (the primitive state machines) adopt
     // successfully from any same-type replacement: their interaction state
@@ -140,6 +168,7 @@ public final class AnyGestureRecognizer {
   private let _phase: () -> GestureRecognizerPhase
   private let _isActive: () -> Bool
   private let _handleEvent: (LocalPointerEvent) -> GestureRecognizerEventDisposition
+  private let _replay: ([LocalPointerEvent]) -> GestureRecognizerEventDisposition
   private let _handleDeadline: (MonotonicInstant) -> Bool
   private let _tearDown: () -> Void
   /// Boxes the recognizer's currentValue() — callers cast to their
@@ -170,6 +199,7 @@ public final class AnyGestureRecognizer {
     self._phase = { recognizer.phase }
     self._isActive = { recognizer.isActive }
     self._handleEvent = { recognizer.handle(event: $0) }
+    self._replay = { recognizer.replay(events: $0) }
     self._handleDeadline = { recognizer.handleDeadline(at: $0) }
     self._tearDown = { recognizer.tearDown() }
     self._currentValue = { recognizer.currentValue() }
@@ -198,6 +228,10 @@ public final class AnyGestureRecognizer {
 
   package func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     _handleEvent(event)
+  }
+
+  package func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    _replay(events)
   }
 
   package func handleClassified(event: LocalPointerEvent) -> PointerDispatchOutcome {

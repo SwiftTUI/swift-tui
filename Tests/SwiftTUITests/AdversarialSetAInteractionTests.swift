@@ -360,9 +360,7 @@ struct AdversarialSetAInteractionTests {
     try h.sendMouse(.down(.primary), at: start)
     try h.sendMouse(.dragged(.primary), at: .init(x: start.x + 3, y: start.y))
     try #require(log.gestureUpdates.contains(3), "The updater must receive the actual drag")
-    withKnownIssue(
-      "STUI-971: a child gesture updates fallback storage instead of its owning GestureState"
-    ) {
+    do {
       #expect(
         h.frame.contains("drag=3"),
         "Updater values: \(log.gestureUpdates); stored: \(String(describing: log.gestureOwnerValue?())); frame:\n\(h.frame)"

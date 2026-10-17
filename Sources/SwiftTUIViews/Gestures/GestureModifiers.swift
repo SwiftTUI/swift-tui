@@ -176,13 +176,13 @@ public struct GestureStateGesture<Child: Gesture, State>: Gesture {
     // reset on subtree teardown.
     context.gestureStateRegistry?.register(
       identity: context.attachingIdentity,
-      binding: state.box.eraseToAnyBinding()
+      binding: state.eraseToAnyBinding()
     )
 
     return AnyGestureRecognizer(
       UpdatingDecorator<Child.Value, State>(
         inner: inner,
-        box: state.box,
+        binding: state,
         authoringContext: authoringContext,
         updater: updater
       )

@@ -50,6 +50,12 @@ final class OnEndedDecorator<V>: GestureRecognizer {
     return disposition
   }
 
+  func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    let disposition = inner.replay(events: events)
+    fireIfNeeded()
+    return disposition
+  }
+
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     let didTerminate = inner.handleDeadline(at: instant)
     fireIfNeeded()
@@ -117,6 +123,12 @@ final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
     return disposition
   }
 
+  func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    let disposition = inner.replay(events: events)
+    fireIfNeeded()
+    return disposition
+  }
+
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     let didTerminate = inner.handleDeadline(at: instant)
     fireIfNeeded()
@@ -178,6 +190,10 @@ final class MapDecorator<From, To>: GestureRecognizer {
     inner.handle(event: event)
   }
 
+  func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    inner.replay(events: events)
+  }
+
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     inner.handleDeadline(at: instant)
   }
@@ -210,12 +226,12 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   typealias Value = V
 
   let inner: AnyGestureRecognizer
-  let box: GestureStateBox<S>
+  private(set) var binding: GestureStateBinding<S>
   private(set) var authoringContext: ImperativeAuthoringContextSnapshot?
   private(set) var updater: @MainActor (V, inout S, inout Transaction) -> Void
 
   /// Tracks whether this decorator's updater has actually written to
-  /// `box` during the gesture's lifetime. Guards `box.resetToSeed()`:
+  /// `binding` during the gesture's lifetime. Guards `binding.resetToSeed()`:
   /// resetting an already-seed box is surprisingly consequential
   /// because `.gesture(_:)` rebuilds its recognizer tree on every
   /// resolve, and `LocalGestureRegistry.register` tears down the
@@ -233,12 +249,12 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
 
   init(
     inner: AnyGestureRecognizer,
-    box: GestureStateBox<S>,
+    binding: GestureStateBinding<S>,
     authoringContext: ImperativeAuthoringContextSnapshot?,
     updater: @escaping @MainActor (V, inout S, inout Transaction) -> Void
   ) {
     self.inner = inner
-    self.box = box
+    self.binding = binding
     self.authoringContext = authoringContext
     self.updater = updater
   }
@@ -251,6 +267,13 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
     if disposition == .handled {
       updateCurrentValue()
     }
+    resetIfTerminal()
+    return disposition
+  }
+
+  func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    let disposition = inner.replay(events: events)
+    if disposition == .handled { updateCurrentValue() }
     resetIfTerminal()
     return disposition
   }
@@ -272,13 +295,13 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
     // separately authored reset transaction governs the terminal reset.
     var transaction = Transaction()
     let nextState = withImperativeAuthoringContext(authoringContext) { () -> S in
-      var state = box.currentValue()
+      var state = binding.currentValue()
       updater(value, &state, &transaction)
       return state
     }
     withImperativeAuthoringContext(authoringContext) {
       withTransaction(transaction) {
-        box.setValue(nextState)
+        binding.setValue(nextState)
       }
     }
     didFire = true
@@ -287,7 +310,7 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   private func resetIfTerminal() {
     guard inner.phase.isTerminal, didFire else { return }
     withImperativeAuthoringContext(authoringContext) {
-      box.resetToSeedApplyingResetTransaction()
+      binding.resetToSeedApplyingResetTransaction()
     }
     didFire = false
   }
@@ -300,7 +323,7 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
       // Resolve-time recognizer replacement must not animate: tearDown
       // runs whenever `.gesture(_:)` swaps recognizers during a resolve,
       // so this reset stays outside the authored reset transaction.
-      box.resetToSeed()
+      binding.resetToSeed()
       didFire = false
     }
   }
@@ -311,6 +334,11 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
     else {
       return false
     }
+    if !binding.hasSameStorage(as: other.binding), didFire {
+      binding.resetToSeed()
+      didFire = false
+    }
+    binding = other.binding
     authoringContext = other.authoringContext
     updater = other.updater
     return true

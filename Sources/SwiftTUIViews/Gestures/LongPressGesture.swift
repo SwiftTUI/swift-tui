@@ -77,6 +77,10 @@ final class LongPressGestureRecognizer: GestureRecognizer {
     pressStart != nil && !phase.isTerminal
   }
 
+  func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    replayLatestPress(events: events)
+  }
+
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
     let location = event.location.location

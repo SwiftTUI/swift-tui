@@ -58,6 +58,7 @@ final class SequenceGestureRecognizer<First: Gesture, Second: Gesture>: GestureR
 
   let first: AnyGestureRecognizer
   let second: AnyGestureRecognizer
+  private var heldPress: LocalPointerEvent?
 
   init(first: AnyGestureRecognizer, second: AnyGestureRecognizer) {
     self.first = first
@@ -68,6 +69,7 @@ final class SequenceGestureRecognizer<First: Gesture, Second: Gesture>: GestureR
     guard phase.isTerminal else { return }
     first.reArm()
     second.reArm()
+    heldPress = nil
   }
 
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
@@ -104,21 +106,41 @@ final class SequenceGestureRecognizer<First: Gesture, Second: Gesture>: GestureR
     return first.isActive
   }
 
+  /// A hold can recognize while the button remains down. The second stage
+  /// inherits that press so its first release/motion has a matching origin.
+  private func handOffHeldPress(at instant: MonotonicInstant) {
+    guard first.phase == .ended, var press = heldPress else { return }
+    heldPress = nil
+    press.timestamp = instant
+    _ = second.handle(event: press)
+  }
+
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     if !first.phase.isTerminal {
+      // Honor due recognition before the incoming release, even if the host
+      // has not drained its scheduled deadline yet.
+      if heldPress != nil, first.handleDeadline(at: event.timestamp), first.phase == .ended {
+        handOffHeldPress(at: event.timestamp)
+        return second.handle(event: event)
+      }
+      switch event.kind {
+      case .down(.primary): heldPress = event
+      case .up(.primary), .cancelled: heldPress = nil
+      default: break
+      }
       let disposition = first.handle(event: event)
-      // The event that COMPLETES `first` belongs to stage one; `second`
-      // starts with the next event.
+      handOffHeldPress(at: event.timestamp)
       return disposition
     }
-    guard first.phase == .ended else { return .ignored }
-    guard !second.phase.isTerminal else { return .ignored }
+    guard first.phase == .ended, !second.phase.isTerminal else { return .ignored }
     return second.handle(event: event)
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     if !first.phase.isTerminal {
-      return first.handleDeadline(at: instant)
+      let changed = first.handleDeadline(at: instant)
+      handOffHeldPress(at: instant)
+      return changed
     }
     guard first.phase == .ended, !second.phase.isTerminal else { return false }
     return second.handleDeadline(at: instant)
@@ -140,5 +162,6 @@ final class SequenceGestureRecognizer<First: Gesture, Second: Gesture>: GestureR
   func tearDown() {
     first.tearDown()
     second.tearDown()
+    heldPress = nil
   }
 }

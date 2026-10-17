@@ -83,6 +83,22 @@ or scroll view consume the event. Regular finite content should continue to use
 ``ScrollView``, which already provides wheel, drag, keyboard, and indicator
 behavior.
 
+## Gesture Composition And State
+
+A projected `GestureState` binding retains the storage owner where it was
+created. Passing it to a gesture on a descendant preserves that owner for
+updates, cancellation, and the authored reset transaction.
+
+A sequence carries a still-held press into its second stage. For example,
+a long press followed by a drag can end on the original pointer release,
+even when a scheduled hold deadline drains late. A first-stage tap that has
+already released waits for a new press in the second stage.
+
+An exclusive fallback receives the evidence its recognizer needs: taps can
+consume earlier completed clicks, while drags and holds start from the latest
+press. Ordinary and spatial taps use the same on-target press/release checks,
+sub-cell motion tolerance, and multi-tap timeout.
+
 ## Gesture Precedence
 
 Use ``View/gesture(_:including:)`` for ordinary recognition and

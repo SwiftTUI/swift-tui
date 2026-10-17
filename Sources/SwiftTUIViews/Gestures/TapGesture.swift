@@ -115,6 +115,10 @@ final class TapGestureRecognizer: GestureRecognizer {
 
     switch event.kind {
     case .down(.primary):
+      guard event.targetRect.contains(event.location.cell) else {
+        phase = .failed
+        return .failed
+      }
       // Deadline wakes are scheduler-driven, so the next tap's `.down` can
       // arrive before the pending deadline frame drains. Honor the event
       // timestamp (the LongPress release pattern): a down outside the

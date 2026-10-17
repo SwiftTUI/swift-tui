@@ -125,6 +125,15 @@ final class SimultaneousGestureRecognizer<First: Gesture, Second: Gesture>: Gest
     return .ignored
   }
 
+  func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    let a = first.replay(events: events)
+    let b = second.replay(events: events)
+    captureTerminalValue()
+    if a == .handled || b == .handled { return .handled }
+    if a == .failed && b == .failed { return .failed }
+    return .ignored
+  }
+
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     let alreadyTerminal = phase.isTerminal
     let a = first.handleDeadline(at: instant)

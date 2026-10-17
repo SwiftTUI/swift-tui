@@ -43,7 +43,8 @@ public struct SpatialTapGesture: Gesture {
     AnyGestureRecognizer(
       SpatialTapGestureRecognizer(
         count: count,
-        coordinateSpace: coordinateSpace
+        coordinateSpace: coordinateSpace,
+        requestDeadline: context.requestDeadline
       )
     )
   }
@@ -53,84 +54,56 @@ public struct SpatialTapGesture: Gesture {
 final class SpatialTapGestureRecognizer: GestureRecognizer {
   typealias Value = SpatialTapGesture.Value
 
-  private(set) var requiredCount: Int
+  private let tap: TapGestureRecognizer
+  var requiredCount: Int { tap.requiredCount }
   private(set) var coordinateSpace: CoordinateSpace
-  private(set) var phase: GestureRecognizerPhase = .possible
-  private var completedTaps = 0
-  private var pressStart: Point?
+  var phase: GestureRecognizerPhase { tap.phase }
+  var isActive: Bool { tap.isActive }
   private var lastTerminalLocation: Point?
   private var lastPointer: PointerLocation?
   private var lastTargetRect: CellRect = CellRect(origin: .zero, size: .zero)
   private var lastNamedCoordinateSpaces: [NamedCoordinateSpace: CellRect] = [:]
 
-  init(count: Int, coordinateSpace: CoordinateSpace) {
-    self.requiredCount = count
+  init(
+    count: Int,
+    coordinateSpace: CoordinateSpace,
+    requestDeadline: @escaping @MainActor @Sendable (MonotonicInstant) -> Void = { _ in }
+  ) {
+    tap = TapGestureRecognizer(
+      count: count,
+      interTapWindow: TapGesture.effectiveInterTapWindow,
+      requestDeadline: requestDeadline
+    )
     self.coordinateSpace = coordinateSpace
-  }
-
-  // `completedTaps > 0` keeps a partial multi-tap sequence active between taps
-  // (after `.up` clears `pressStart`), so a re-resolve between taps does not
-  // reset the count and drop a `count > 1` gesture. See `TapGesture`.
-  var isActive: Bool {
-    (pressStart != nil || completedTaps > 0) && !phase.isTerminal
   }
 
   func reArm() {
     guard phase.isTerminal else { return }
-    phase = .possible
-    completedTaps = 0
-    pressStart = nil
+    tap.reArm()
     lastTerminalLocation = nil
+    lastPointer = nil
   }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
-    let location = event.location.location
-    switch event.kind {
-    case .down(.primary):
-      pressStart = location
+    let disposition = tap.handle(event: event)
+    if phase == .ended {
+      lastTerminalLocation = event.location.location
+      lastPointer = event.location
       lastTargetRect = event.targetRect
       lastNamedCoordinateSpaces = event.namedCoordinateSpaces
-      return .handled
-    case .up(.primary):
-      guard pressStart != nil else { return .ignored }
-      if event.targetRect.contains(event.location.cell) {
-        completedTaps += 1
-        pressStart = nil
-        if completedTaps >= requiredCount {
-          phase = .ended
-          lastTerminalLocation = location
-          lastPointer = event.location
-          lastTargetRect = event.targetRect
-          lastNamedCoordinateSpaces = event.namedCoordinateSpaces
-        }
-        return .handled
-      } else {
-        phase = .failed
-        return .failed
-      }
-    case .dragged(.primary):
-      if let start = pressStart,
-        location.x != start.x || location.y != start.y
-      {
-        phase = .failed
-        return .failed
-      }
-      return .handled
-    default:
-      return .ignored
     }
+    return disposition
   }
 
-  func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
+  func handleDeadline(at instant: MonotonicInstant) -> Bool {
+    tap.handleDeadline(at: instant)
+  }
 
-  /// Adopts re-authored value parameters alongside the preserved partial
-  /// sequence — `TapGesture`/`DragGesture` parity.
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
-    guard let other = replacement as? SpatialTapGestureRecognizer else {
-      return false
-    }
-    requiredCount = other.requiredCount
+    guard let other = replacement as? SpatialTapGestureRecognizer,
+      tap.adoptAuthoredCallbacks(from: other.tap)
+    else { return false }
     coordinateSpace = other.coordinateSpace
     return true
   }
@@ -150,6 +123,6 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
   }
 
   func tearDown() {
-    if !phase.isTerminal { phase = .cancelled }
+    tap.tearDown()
   }
 }

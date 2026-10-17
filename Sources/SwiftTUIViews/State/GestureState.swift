@@ -5,6 +5,8 @@ public import SwiftTUICore
 /// the private `FocusStateLocation` in FocusState.swift.
 @MainActor
 private struct GestureStateLocation<Value> {
+  var owner: StateStorageOwner? = nil
+  var slot: StateSlotIdentifier? = nil
   var getValue: @MainActor () -> Value
   var setValue: @MainActor (Value) -> Void
   var resetToSeed: @MainActor () -> Void
@@ -32,7 +34,7 @@ public final class GestureStateBox<Value> {
   /// the value being reset. Nil for the plain initializers — their resets
   /// snap. Resolve-time resets (recognizer teardown, registry drain) never
   /// consult it; see ``resetToSeedApplyingResetTransaction()``.
-  private let resetTransactionProvider: (@MainActor (Value) -> Transaction)?
+  fileprivate let resetTransactionProvider: (@MainActor (Value) -> Transaction)?
 
   public init(seed: Value, slotOrdinal: Int) {
     self.seed = seed
@@ -135,7 +137,7 @@ public final class GestureStateBox<Value> {
     return bound.location
   }
 
-  private func scopedLocation() -> GestureStateLocation<Value>? {
+  fileprivate func scopedLocation() -> GestureStateLocation<Value>? {
     guard let context = AuthoringContextStorage.current else {
       return nil
     }
@@ -150,11 +152,7 @@ public final class GestureStateBox<Value> {
 
   /// Produces a type-erased binding for registration with the runtime.
   public func eraseToAnyBinding() -> AnyGestureStateBinding {
-    AnyGestureStateBinding(
-      valueType: Value.self,
-      setValue: { value in self.setValue(value) },
-      reset: { self.resetToSeed() }
-    )
+    GestureStateBinding(box: self).eraseToAnyBinding()
   }
 
 }
@@ -163,13 +161,57 @@ public final class GestureStateBox<Value> {
 ///
 /// Authors never construct this directly; `$state` on a `@GestureState`
 /// produces it. The `updating` modifier captures it and hands it to the
-/// recognizer, which writes through it during gesture events.
+/// recognizer, which writes through it during gesture events. The binding
+/// captures its exact graph-owner location when projected; an attachment on
+/// a child or a callback in another authoring scope cannot redirect it.
 @MainActor
 public struct GestureStateBinding<Value> {
   public let box: GestureStateBox<Value>
+  private let location: GestureStateLocation<Value>?
 
   public init(box: GestureStateBox<Value>) {
     self.box = box
+    location = box.scopedLocation()
+  }
+
+  fileprivate init(box: GestureStateBox<Value>, location: GestureStateLocation<Value>?) {
+    self.box = box
+    self.location = location
+  }
+
+  package func currentValue() -> Value {
+    location?.getValue() ?? box.localFallbackValue()
+  }
+
+  package func setValue(_ value: Value) {
+    if let location { location.setValue(value) } else { box.setLocalFallbackValue(value) }
+  }
+
+  package func resetToSeed() {
+    if let location { location.resetToSeed() } else { box.setLocalFallbackValue(box.seedValue) }
+  }
+
+  package func resetToSeedApplyingResetTransaction() {
+    guard let provider = box.resetTransactionProvider else {
+      resetToSeed()
+      return
+    }
+    withTransaction(provider(currentValue())) { resetToSeed() }
+  }
+
+  package func hasSameStorage(as other: Self) -> Bool {
+    if let location, let otherLocation = other.location {
+      return location.owner == otherLocation.owner && location.slot == otherLocation.slot
+    }
+    return location == nil && other.location == nil && box === other.box
+  }
+
+  package func eraseToAnyBinding() -> AnyGestureStateBinding {
+    AnyGestureStateBinding(
+      valueType: Value.self,
+      setValue: { setValue($0) },
+      reset: { resetToSeed() }
+    )
   }
 }
 
@@ -285,8 +327,7 @@ public struct GestureState<Value> {
   }
 
   public var projectedValue: GestureStateBinding<Value> {
-    _ = activeLocation()  // lazy-bind side effect
-    return GestureStateBinding(box: box)
+    GestureStateBinding(box: box, location: activeLocation())
   }
 
   /// Mirrors `@State.activeLocation()` -- lazy-binds the box to the
@@ -362,6 +403,8 @@ public struct GestureState<Value> {
     }
 
     return GestureStateLocation(
+      owner: storageOwner,
+      slot: slotIdentifier,
       getValue: { [weak box] in
         guard let liveViewNode = LiveViewGraphRegistry.node(for: storageOwner) else {
           return box?.localFallbackValue() ?? trueSeed

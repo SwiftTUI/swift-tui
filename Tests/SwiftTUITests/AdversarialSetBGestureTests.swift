@@ -54,7 +54,7 @@ struct AdversarialSetBGestureTests {
     #expect(rec.isActive)
     _ = rec.handle(event: setBEvent(.up(.primary), at: origin, timestamp: at(350)))
     // Contract: the release ends the pointer stream; nothing stays active.
-    withKnownIssue("a motionless release leaves the sequence active in its drag stage") {
+    do {
       #expect(!rec.isActive, "stage two must settle when the pointer lifts")
       #expect(rec.phase.isTerminal)
       let endsAfterRelease = ends.count
@@ -94,7 +94,7 @@ struct AdversarialSetBGestureTests {
     _ = rec.handle(
       event: setBEvent(
         .dragged(.primary), at: moved, timestamp: t0.advanced(by: .milliseconds(150))))
-    withKnownIssue("the exclusive fallback replays the first tap's stale release into the drag") {
+    do {
       #expect(!rec.phase.isTerminal, "the fallback drag is still following the pointer")
       #expect(changes.last == 2, "the drag reports the live translation")
       _ = rec.handle(
@@ -133,7 +133,7 @@ struct AdversarialSetBGestureTests {
     _ = probe.handle(event: setBEvent(.up(.primary), at: inside, timestamp: t0))
     _ = probe.handle(event: setBEvent(.down(.primary), at: outside, timestamp: later))
     _ = probe.handle(event: setBEvent(.up(.primary), at: inside, timestamp: release))
-    withKnownIssue("TapGesture checks the target only on release, not on press") {
+    do {
       #expect(probe.phase != .ended, "a press that begins off-target is not a tap")
       #expect(firedInsideUp == 0)
     }
@@ -164,7 +164,7 @@ struct AdversarialSetBGestureTests {
     // The scheduler wake for that same window then drains with nothing left
     // to transition: `handleDeadline` reports a transition only when one
     // happened as a result of the call.
-    withKnownIssue("the exclusive deadline reports a stale .ended as a transition") {
+    do {
       #expect(!rec.handleDeadline(at: window), "no transition happened on this deadline")
     }
     #expect(fired == 1)

@@ -73,14 +73,18 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
 
   /// Hands the buffered prefix to `second` exactly once, at the moment
   /// `first` gives up.
-  private func replayPrefixIntoSecond() {
-    guard !didReplay else { return }
+  @discardableResult
+  private func replayPrefixIntoSecond(endingWith event: LocalPointerEvent? = nil)
+    -> GestureRecognizerEventDisposition
+  {
+    guard !didReplay else {
+      return event.map { second.handle(event: $0) } ?? .ignored
+    }
     didReplay = true
+    if let event { bufferedPrefix.append(event) }
     let prefix = bufferedPrefix
     bufferedPrefix.removeAll(keepingCapacity: true)
-    for buffered in prefix where !second.phase.isTerminal {
-      _ = second.handle(event: buffered)
-    }
+    return second.replay(events: prefix)
   }
 
   func adoptAuthoredCallbacks(from replacement: AnyObject) -> Bool {
@@ -107,6 +111,11 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
   var isActive: Bool { first.isActive || second.isActive }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
+    if first.phase == .ended {
+      // A simultaneous winner can still have a live child after publishing
+      // its terminal value. Finish that stream without admitting a fallback.
+      return first.isActive ? first.handle(event: event) : .ignored
+    }
     // Deliver to first unless it's already terminal.
     if !first.phase.isTerminal {
       let d = first.handle(event: event)
@@ -117,8 +126,7 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
       case .failed, .cancelled:
         // First gave up on this event — replay everything it consumed,
         // then feed the same event to second.
-        replayPrefixIntoSecond()
-        return second.handle(event: event)
+        return replayPrefixIntoSecond(endingWith: event)
       case .possible, .began, .changed:
         bufferedPrefix.append(event)
         return d
@@ -126,11 +134,20 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
     }
     // First already terminal (typically .failed from a prior event):
     // deliver to second.
-    replayPrefixIntoSecond()
-    return second.handle(event: event)
+    return replayPrefixIntoSecond(endingWith: event)
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
+    let previousPhase = phase
+    if previousPhase.isTerminal {
+      if first.phase == .ended, first.isActive {
+        return first.handleDeadline(at: instant)
+      }
+      if first.phase != .ended, second.isActive {
+        return second.handleDeadline(at: instant)
+      }
+      return false
+    }
     let a = first.handleDeadline(at: instant)
     // Only forward to second if first has failed/cancelled — second is the
     // fallback that only runs when first gives up.
@@ -140,7 +157,7 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
     // NO event — the replayed prefix is the fallback's whole input.
     replayPrefixIntoSecond()
     let b = second.handleDeadline(at: instant)
-    return a || b || second.phase == .ended
+    return a || b || phase != previousPhase
   }
 
   func currentValue() -> V? {
@@ -155,5 +172,6 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
   func tearDown() {
     first.tearDown()
     second.tearDown()
+    bufferedPrefix.removeAll(keepingCapacity: false)
   }
 }
