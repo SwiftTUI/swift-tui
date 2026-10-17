@@ -6,6 +6,25 @@ import Testing
 
 @Suite("Animation solvers")
 struct AnimationSolverTests {
+  @Test(
+    "spring completion bounds position and velocity for every release",
+    arguments: [0.0, 0.3, -0.2, -100.0])
+  func completionEnvelope(bounce: Double) throws {
+    for velocity in [-100.0, 0, 100] {
+      let solver = SpringSolver(duration: 0.5, bounce: bounce, initialVelocity: velocity)
+      let end = try #require(solver.completionDuration)
+      for factor in [1.0, 1.01, 1.5, 2, 10] {
+        #expect(solver.value(at: end * factor) == nil)
+      }
+    }
+  }
+
+  @Test("repetition does not narrow a wide duration quotient to Int")
+  func wideDurationRepeatIndex() throws {
+    let animation = Animation.linear(duration: .nanoseconds(1)).repeatForever(autoreverses: true)
+    #expect(try #require(animation.evaluate(elapsed: .seconds(Int64.max))) == 0)
+  }
+
   // MARK: - Spring solver
 
   @Test("critically damped spring settles without overshoot")

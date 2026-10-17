@@ -17,6 +17,40 @@ struct ScaleTransitionTests {
     size: CellSize(width: 8, height: 4)
   )
 
+  @Test("composed moves retain both axes through insertion registration and sampling")
+  func combinedMoveInsertion() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .seconds(1))
+    controller.register(animation)
+    let start = MonotonicInstant(offset: .seconds(500))
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    controller.processResolvedTree(
+      ResolvedNode(identity: Self.rootIdentity, kind: .view("Root")),
+      transaction: .init(), timestamp: start)
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: Self.leafIdentity, viewNodeID: Self.leafNodeID,
+      transition: AnyTransition.move(edge: .leading).combined(with: .move(edge: .top)))
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      ResolvedNode(
+        identity: Self.rootIdentity, kind: .view("Root"),
+        children: [
+          ResolvedNode(
+            viewNodeID: Self.leafNodeID, identity: Self.leafIdentity, kind: .view("Leaf"))
+        ]), transaction: transaction, timestamp: start)
+    let tree = Self.placedTree(includingLeaf: true)
+    let sampled = controller.placedAnimationOverlaySnapshot(for: tree, at: start)
+    var shifted = tree
+    applyPlacedAnimationOverlaySnapshot(sampled, to: &shifted)
+    let leaf = try #require(Self.node(Self.leafIdentity, in: shifted))
+    #expect(leaf.bounds.origin.x == Self.leafBounds.origin.x - Self.leafBounds.size.width)
+    #expect(leaf.bounds.origin.y == Self.leafBounds.origin.y - Self.leafBounds.size.height)
+  }
+
   @Test("T240: toggling a scaling view through RunLoop does not flash full size")
   func interruptedScaleThroughInput() throws {
     let harness = try AnimatorRuntimeHarness(size: .init(width: 20, height: 8)) {

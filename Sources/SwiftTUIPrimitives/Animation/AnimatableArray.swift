@@ -1,10 +1,10 @@
 /// Variable-length animatable storage for compound values that have no fixed size at the type level.
 /// An array of ``Gradient`` stops is one example.
 ///
-/// Arithmetic operations require both operands to have the same
-/// element count. With mismatched counts, `+`, `-`, `+=`, `-=`
-/// return a zero-element result (which propagates through subsequent
-/// arithmetic as zero). The animation controller calls ``isInterpolable(to:)`` before it composes arithmetic.
+/// The empty array is the dimension-independent additive identity, so
+/// generic zero tangents preserve the shape of nonempty vectors. Arithmetic
+/// between two nonempty operands requires equal element counts; mismatched
+/// counts return the empty zero. The animation controller calls ``isInterpolable(to:)`` before it composes arithmetic.
 /// If the counts do not match, the controller changes directly to the target value.
 /// This behavior matches SwiftUI gradient animations when the stop count changes between frames.
 public struct AnimatableArray<Element: VectorArithmetic & Sendable>:
@@ -25,6 +25,8 @@ public struct AnimatableArray<Element: VectorArithmetic & Sendable>:
   }
 
   public static func + (lhs: Self, rhs: Self) -> Self {
+    if lhs.elements.isEmpty { return rhs }
+    if rhs.elements.isEmpty { return lhs }
     guard lhs.elements.count == rhs.elements.count else {
       return .init([])
     }
@@ -37,6 +39,8 @@ public struct AnimatableArray<Element: VectorArithmetic & Sendable>:
   }
 
   public static func - (lhs: Self, rhs: Self) -> Self {
+    if rhs.elements.isEmpty { return lhs }
+    if lhs.elements.isEmpty { return .init(rhs.elements.map { .zero - $0 }) }
     guard lhs.elements.count == rhs.elements.count else {
       return .init([])
     }

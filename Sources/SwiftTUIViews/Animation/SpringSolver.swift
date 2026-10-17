@@ -40,7 +40,7 @@ package struct SpringSolver: Sendable {
     // bounce 0 -> z = 1 (critically damped)
     // bounce > 0 -> z < 1 (underdamped)
     // bounce < 0 -> z > 1 (overdamped)
-    dampingRatio = 1.0 - bounce
+    dampingRatio = max(0, 1.0 - bounce)
     // Natural frequency from duration: w = 2pi / duration
     naturalFrequency = 2.0 * .pi / max(duration, 0.001)
     self.initialVelocity = initialVelocity
@@ -125,8 +125,7 @@ package struct SpringSolver: Sendable {
       // Overdamped — solution is x(t) = a·e^(s1·t) + b·e^(s2·t)
       // with x(0)=1 and x'(0)=v0, so a+b=1 and a·s1+b·s2=v0.
       // Solving: a = (v0-s2)/(s1-s2), b = 1-a.
-      let s1 = -naturalFrequency * (dampingRatio - sqrt(dampingRatio * dampingRatio - 1.0))
-      let s2 = -naturalFrequency * (dampingRatio + sqrt(dampingRatio * dampingRatio - 1.0))
+      let (s1, s2) = overdampedRoots
       let denom = s1 - s2
       let a = (v0 - s2) / denom
       let b = 1.0 - a
@@ -153,8 +152,7 @@ package struct SpringSolver: Sendable {
         * ((-dampingRatio * naturalFrequency) * (A * cosComponent + B * sinComponent)
           + dampedFrequency * (-A * sinComponent + B * cosComponent))
     } else if dampingRatio > 1.0 {
-      let s1 = -naturalFrequency * (dampingRatio - sqrt(dampingRatio * dampingRatio - 1.0))
-      let s2 = -naturalFrequency * (dampingRatio + sqrt(dampingRatio * dampingRatio - 1.0))
+      let (s1, s2) = overdampedRoots
       let denom = s1 - s2
       let a = (v0 - s2) / denom
       let b = 1.0 - a
@@ -179,8 +177,7 @@ package struct SpringSolver: Sendable {
       let dampedFrequency = naturalFrequency * sqrt(1.0 - dampingRatio * dampingRatio)
       return decay * sin(dampedFrequency * t) / dampedFrequency
     } else if dampingRatio > 1.0 {
-      let s1 = -naturalFrequency * (dampingRatio - sqrt(dampingRatio * dampingRatio - 1.0))
-      let s2 = -naturalFrequency * (dampingRatio + sqrt(dampingRatio * dampingRatio - 1.0))
+      let (s1, s2) = overdampedRoots
       return (exp(s1 * t) - exp(s2 * t)) / (s1 - s2)
     } else {
       return t * decay
@@ -197,56 +194,74 @@ package struct SpringSolver: Sendable {
         * (cos(dampedFrequency * t)
           - (dampingRatio * naturalFrequency / dampedFrequency) * sin(dampedFrequency * t))
     } else if dampingRatio > 1.0 {
-      let s1 = -naturalFrequency * (dampingRatio - sqrt(dampingRatio * dampingRatio - 1.0))
-      let s2 = -naturalFrequency * (dampingRatio + sqrt(dampingRatio * dampingRatio - 1.0))
+      let (s1, s2) = overdampedRoots
       return (s1 * exp(s1 * t) - s2 * exp(s2 * t)) / (s1 - s2)
     } else {
       return decay * (1.0 - naturalFrequency * t)
     }
   }
 
+  /// Rationalizing the slow root avoids subtracting nearly equal numbers.
+  /// The scaled square root also avoids overflowing z² for heavy damping.
+  private var overdampedRoots: (Double, Double) {
+    let radical = sqrt(1 - 1 / dampingRatio) * sqrt(1 + 1 / dampingRatio)
+    let reciprocalSum = (1 / dampingRatio) / (1 + radical)
+    return (-naturalFrequency * reciprocalSum, -naturalFrequency / reciprocalSum)
+  }
+
   // MARK: - Settling
 
-  /// Seconds after which a spring released from rest (unit displacement,
-  /// zero velocity) stays inside ``settlingThreshold`` for good — the same
-  /// criterion ``value(at:)`` uses to report completion, applied to the
-  /// decay envelope rather than to one sample, so an underdamped spring's
-  /// zero crossings never count as settled.
-  ///
-  /// Capped at 60 seconds: an undamped spring (damping ratio zero) never
-  /// settles, and the cap keeps a keyframe segment sized by this value
-  /// finite.
-  package var settlingDuration: Double {
-    let floor = 0.05 + 1e-6
-    let cap = 60.0
-    // Aim slightly inside the threshold so the instant reported here is
-    // strictly settled by `value(at:)`'s `<` comparison.
+  /// Bounds both displacement and velocity for this release. For critical
+  /// damping the polynomial envelopes decrease after one natural time unit;
+  /// other envelopes are sums of decaying exponentials.
+  private func settlingEnvelope(at t: Double) -> Double {
+    let w = naturalFrequency
+    let velocityUnit = max(w, 1)
+    if dampingRatio < 1 {
+      let wd = w * sqrt(1 - dampingRatio * dampingRatio)
+      let b = (v0 + dampingRatio * w) / wd
+      let positionAmplitude = hypot(1, b)
+      let velocityAmplitude = hypot(v0, -dampingRatio * w * b - wd)
+      return exp(-dampingRatio * w * t)
+        * max(positionAmplitude, velocityAmplitude / velocityUnit)
+    } else if dampingRatio > 1 {
+      let (s1, s2) = overdampedRoots
+      let a = (v0 - s2) / (s1 - s2)
+      let b = 1 - a
+      let slow = abs(a) * exp(s1 * t)
+      let fast = abs(b) * exp(s2 * t)
+      return max(slow + fast, (slow * abs(s1) + fast * abs(s2)) / velocityUnit)
+    } else {
+      let c = v0 + w
+      let decay = exp(-w * t)
+      return max(
+        decay * (1 + abs(c) * t),
+        decay * (abs(v0) + abs(w * c) * t) / velocityUnit)
+    }
+  }
+
+  /// A conservative completion time for this release, using the same
+  /// position/velocity thresholds as evaluation. Undamped motion has no end.
+  package var completionDuration: Double? {
+    guard dampingRatio > 0, naturalFrequency > 0 else { return nil }
+    let floor = max(0.05 + 1e-6, dampingRatio == 1 ? 1 / naturalFrequency : 0)
     let target = settlingThreshold * 0.999
-    let timeConstant = dampingRatio * naturalFrequency
-    guard timeConstant > 0 else { return cap }
-
-    if dampingRatio < 1.0 {
-      // |x(t)| <= e^(-z·w·t) / sqrt(1 - z²) for the rest release.
-      let amplitude = 1.0 / sqrt(1.0 - dampingRatio * dampingRatio)
-      let settle = log(amplitude / target) / timeConstant
-      return min(max(settle, floor), cap)
+    var lo = floor
+    var hi = floor
+    while settlingEnvelope(at: hi) >= target {
+      hi *= 2
+      guard hi.isFinite else { return nil }
     }
-
-    // Critically damped and overdamped rest releases decay monotonically:
-    // bisect the raw solution for the threshold crossing.
-    let rest = with(initialVelocity: 0)
-    var lo = 0.0
-    var hi = cap
-    guard abs(rest.displacement(at: hi)) < target else { return cap }
-    for _ in 0..<80 {
-      let mid = (lo + hi) / 2
-      if abs(rest.displacement(at: mid)) < target {
-        hi = mid
-      } else {
-        lo = mid
-      }
-      if hi - lo < 1e-9 { break }
+    for _ in 0..<64 {
+      let mid = lo + (hi - lo) / 2
+      if settlingEnvelope(at: mid) < target { hi = mid } else { lo = mid }
     }
-    return min(max(hi, floor), cap)
+    return hi
+  }
+
+  /// Finite segment duration for keyframes. An undamped or very slow spring
+  /// is capped at 60 seconds; Animation reports its uncapped completion time.
+  package var settlingDuration: Double {
+    min(completionDuration ?? 60, 60)
   }
 }

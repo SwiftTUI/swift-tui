@@ -293,8 +293,8 @@ package enum PlacedAnimationOverlaySampling {
       result.offsets.append(
         .init(
           identity: key.identity,
-          dx: Int(Double(start.x) * (1.0 - progress)),
-          dy: Int(Double(start.y) * (1.0 - progress))
+          dx: Int((Double(start.x) * (1.0 - progress)).rounded()),
+          dy: Int((Double(start.y) * (1.0 - progress)).rounded())
         )
       )
     }

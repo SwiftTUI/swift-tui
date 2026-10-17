@@ -241,11 +241,10 @@ public struct Animation: Equatable, Hashable, Sendable {
       return evaluateSingleIteration(elapsed: adjustedElapsed, state: &state)
     }
 
-    let totalSecs = Self.durationSeconds(adjustedElapsed)
-    let rawIndex = totalSecs / iterationSecs
-    let iterationIndex = Int(rawIndex.rounded(.down))
-    let localTimeSecs = totalSecs - Double(iterationIndex) * iterationSecs
-    let localElapsed = Self.duration(seconds: localTimeSecs)
+    let iteration = Self.duration(seconds: iterationSecs).attosecondCount
+    guard iteration > 0 else { return nil }
+    let iterationIndex = adjustedElapsed.attosecondCount / iteration
+    let localElapsed = Duration(attosecondCount: adjustedElapsed.attosecondCount % iteration)
 
     let autoreverses: Bool
     let terminalIndex: Int?
@@ -258,7 +257,7 @@ public struct Animation: Equatable, Hashable, Sendable {
       terminalIndex = nil
     }
 
-    if let terminalIndex, iterationIndex >= terminalIndex {
+    if let terminalIndex, iterationIndex >= Int128(terminalIndex) {
       return nil
     }
 
@@ -335,7 +334,7 @@ public struct Animation: Equatable, Hashable, Sendable {
   /// ``delayDuration``, ``speedMultiplier``, and any bounded repeat
   /// count.
   ///
-  /// Returns `nil` for animations that repeat forever: an infinite
+  /// Returns `nil` for undamped, frozen, or forever-repeating animations: an infinite
   /// animation has no logical completion time, and the animation
   /// controller uses `nil` as a sentinel to skip stranded-batch
   /// drains for those animations (matching SwiftUI's behavior of
@@ -351,21 +350,25 @@ public struct Animation: Equatable, Hashable, Sendable {
     case nil:
       iterationCount = 1
     }
+    guard speedMultiplier > 0 else { return nil }
+    if case .spring(let solver) = curve, repeatBehavior == nil,
+      solver.completionDuration == nil
+    {
+      return nil
+    }
     let singleSecs = iterationDurationSeconds
     let adjustedSingleSecs =
       speedMultiplier > 0 ? singleSecs / speedMultiplier : singleSecs
     let totalSecs = adjustedSingleSecs * Double(iterationCount)
-    let totalNanos = Int64((totalSecs * 1_000_000_000).rounded())
-    return delayDuration + .nanoseconds(totalNanos)
+    return delayDuration + Self.duration(seconds: totalSecs)
   }
 
   /// The nominal duration of one full iteration, used by the repeat
   /// bookkeeping in ``evaluate(elapsed:)``.
   ///
   /// - Bezier: the explicit duration parameter.
-  /// - Spring: an estimated settle time — amplitude decay of `e^(-6.9)`
-  ///   ≈ 0.1% — with a floor of one natural oscillation period so very
-  ///   lightly damped springs still produce a meaningful cycle.
+  /// - Spring: the solver's position-and-velocity completion envelope.
+  ///   Undamped repeated springs use one natural period per iteration.
   /// - Custom: 2 seconds, matching the linear fallback's completion
   ///   time in ``evaluateSingleIteration``.
   private var iterationDurationSeconds: Double {
@@ -373,24 +376,20 @@ public struct Animation: Equatable, Hashable, Sendable {
     case .bezier(_, let duration):
       return Self.durationSeconds(duration)
     case .spring(let solver):
-      let timeConstant = solver.dampingRatio * solver.naturalFrequency
-      let settle = timeConstant > 0 ? 6.9 / timeConstant : 1.0
-      let period = 2.0 * .pi / max(solver.naturalFrequency, 0.001)
-      return max(settle, period)
+      return solver.completionDuration ?? (2.0 * .pi / solver.naturalFrequency)
     case .custom:
       return 2.0
     }
   }
 
   private static func duration(seconds: Double) -> Duration {
-    .milliseconds(Int64((seconds * 1000.0).rounded()))
+    .seconds(seconds)
   }
 
   private func adjustedTime(_ elapsed: Duration) -> Duration {
     let delayed = elapsed - delayDuration
     guard speedMultiplier != 1.0 else { return delayed }
-    let seconds = Self.durationSeconds(delayed) * speedMultiplier
-    return .milliseconds(Int64(seconds * 1000))
+    return delayed * speedMultiplier
   }
 
   static func durationSeconds(_ duration: Duration) -> Double {
@@ -442,7 +441,9 @@ public struct Animation: Equatable, Hashable, Sendable {
     initialVelocity: Double? = nil
   ) -> Double? {
     if case .custom(let box) = curve {
-      return box.velocity(adjustedTime(elapsed), state)
+      let adjusted = adjustedTime(elapsed)
+      guard adjusted >= .zero else { return 0 }
+      return box.velocity(adjusted, state).map { $0 * speedMultiplier }
     }
     let step = Duration.milliseconds(1)
     let before = elapsed > step ? elapsed - step : .zero

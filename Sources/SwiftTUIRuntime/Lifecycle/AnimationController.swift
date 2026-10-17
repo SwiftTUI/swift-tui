@@ -1845,11 +1845,9 @@ package final class AnimationController: Sendable {
     // path walks the post-layout tree and translates matching
     // bounds directly.
     if modifiers.hasOffsetEffect {
-      let offsetModifiers = TransitionModifiers(
-        offsetX: modifiers.offsetX,
-        offsetY: modifiers.offsetY,
-        moveEdge: modifiers.moveEdge
-      )
+      var offsetModifiers = modifiers
+      offsetModifiers.opacity = nil
+      offsetModifiers.scale = nil
       let offsetKey = AnimationKey(identity: identity, scope: .insertionOffset)
       if let existing = activeAnimations[offsetKey] {
         releaseBatch(existing.batchID, logicalAlreadyReleased: existing.isLogicallyReleased)

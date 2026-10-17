@@ -40,7 +40,7 @@ struct AdversarialSetAAnimationValueTests {
       let time = 0.5 + 4 * cube
       let expected = 0.5 + 1.5 * offset - 2 * cube
       let actual = curve.value(at: time)
-      withKnownIssue("STUI-963: the Bézier inverse stops on x error near a stationary tangent") {
+      do {
         #expect(
           abs(actual - expected) < 0.00001,
           "time \(time): expected \(expected), actual \(actual)")
@@ -56,10 +56,10 @@ struct AdversarialSetAAnimationValueTests {
     let repeated = try #require(
       base.repeatCount(3, autoreverses: false).evaluate(elapsed: .microseconds(1_250)))
     let unmodified = try #require(base.evaluate(elapsed: .microseconds(250)))
-    withKnownIssue("STUI-964: playback speed truncates adjusted time to integer milliseconds") {
+    do {
       #expect(abs(dilated - 0.25) < 0.000001, "sped-up progress: expected 0.25, actual \(dilated)")
     }
-    withKnownIssue("STUI-964: repetition rounds local time to integer milliseconds") {
+    do {
       #expect(
         abs(repeated - 0.25) < 0.000001, "repeated progress: expected 0.25, actual \(repeated)")
     }
@@ -88,7 +88,7 @@ struct AdversarialSetAAnimationValueTests {
     let velocity = try #require(animation.velocity(elapsed: .milliseconds(400), state: .init()))
     let before = try #require(animation.evaluate(elapsed: .milliseconds(390)))
     let after = try #require(animation.evaluate(elapsed: .milliseconds(410)))
-    withKnownIssue("STUI-965: custom velocity omits the playback-speed multiplier") {
+    do {
       #expect(
         abs(velocity - 0.75) < 0.000001,
         "elapsed-time velocity: expected 0.75, actual \(velocity)")
@@ -192,7 +192,7 @@ struct AdversarialSetAAnimationValueTests {
       fromValue: 0.0, toValue: 1, initialVelocity: 0, time: .seconds(100_000_000))
     // The slow root is -4e-9 to far beyond this tolerance; progress is 1 - exp(-0.4).
     #expect(value.isFinite)
-    withKnownIssue("STUI-966: overdamped root subtraction eliminates the slow restoring mode") {
+    do {
       #expect(
         abs(value - 0.3296799539643607) < 0.000001,
         "slow-mode progress: expected 0.3296799539643607, actual \(value)")
@@ -307,7 +307,7 @@ struct AdversarialSetAAnimationValueTests {
       LinearKeyframe(target, duration: .seconds(1))
     }
     #expect(linear.value(time: .milliseconds(500)).values == [5, 1])
-    withKnownIssue("STUI-967: empty default cubic tangents erase array-backed coordinates") {
+    do {
       #expect(cubic.value(time: .milliseconds(500)).values == [5, 1])
     }
     #expect(cubic.value(time: .seconds(1)) == target)
@@ -326,8 +326,7 @@ struct AdversarialSetAAnimationValueTests {
     }
     let locations = gradient.value(time: .milliseconds(500)).stops.map(\.location)
     #expect(locations.count == 2)
-    withKnownIssue("STUI-967: a gradient rejects the empty cubic result and keeps its target stops")
-    {
+    do {
       #expect(
         locations.elementsEqual([0.2, 0.8], by: { abs($0 - $1) < 0.000001 }),
         "gradient midpoint locations: expected [0.2, 0.8], actual \(locations)")

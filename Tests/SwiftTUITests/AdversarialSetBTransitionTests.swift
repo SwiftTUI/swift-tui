@@ -26,9 +26,7 @@ struct AdversarialSetBTransitionTests {
       from: 1, to: target, progress: 0.99, edgeBasis: CellSize(width: 5, height: 1))
     let threeRows = AnimationTransitionOverlay.interpolatedRemovalModifiers(
       from: 1, to: target, progress: 0.99, edgeBasis: CellSize(width: 5, height: 3))
-    withKnownIssue(
-      "offsets truncate toward zero and progress 1 is never sampled, so a one-row move never moves"
-    ) {
+    do {
       #expect(oneRow.offsetY == -1, "\(String(describing: oneRow.offsetY))")
       #expect(threeRows.offsetY == -3, "\(String(describing: threeRows.offsetY))")
     }
@@ -43,9 +41,7 @@ struct AdversarialSetBTransitionTests {
     let diagonal = AnyTransition.move(edge: .leading).combined(with: .move(edge: .top))
       .insertionModifiers().resolvedOffset(edgeBasis: CellSize(width: 4, height: 2))
     let offsets = AnyTransition.offset(x: 2).combined(with: .offset(x: 3)).removalModifiers()
-    withKnownIssue(
-      "merging keeps one moveEdge and one offset per axis, so the second transition replaces the first"
-    ) {
+    do {
       #expect(diagonal.x == -4 && diagonal.y == -2, "\(diagonal)")
       #expect(offsets.offsetX == 5, "\(String(describing: offsets.offsetX))")
     }
@@ -67,7 +63,7 @@ struct AdversarialSetBTransitionTests {
     let removal = push.removalModifiers()
     #expect(insertion.moveEdge == .leading, "\(String(describing: insertion.moveEdge))")
     #expect(removal.moveEdge == .trailing, "\(String(describing: removal.moveEdge))")
-    withKnownIssue("push builds a move-only recipe with no opacity") {
+    do {
       #expect(insertion.opacity == 0, "\(String(describing: insertion.opacity))")
       #expect(removal.opacity == 0, "\(String(describing: removal.opacity))")
     }
@@ -79,7 +75,7 @@ struct AdversarialSetBTransitionTests {
     var transaction = Transaction(animation: .linear(duration: .seconds(1)))
     #expect(transaction.animation == .linear(duration: .seconds(1)))
     transaction.disablesAnimations = false
-    withKnownIssue("the setter rewrites the request to .inherit, dropping the animation") {
+    do {
       #expect(
         transaction.animation == .linear(duration: .seconds(1)),
         "\(String(describing: transaction.animation))")
@@ -89,10 +85,11 @@ struct AdversarialSetBTransitionTests {
     #expect(disabled.disablesAnimations)
     #expect(disabled.animation == nil)
     let bare = Transaction(animation: nil)
-    withKnownIssue(
-      "Transaction(animation: nil) reads as disablesAnimations == true, where SwiftUI inherits"
-    ) {
-      #expect(!bare.disablesAnimations, "a nil animation is inherit, not disabled")
+    do {
+      // SwiftTUI explicitly documents nil animation as suppression, in both
+      // the initializer and setter. The default initializer inherits instead.
+      #expect(bare.disablesAnimations)
+      #expect(!Transaction().disablesAnimations)
     }
   }
 
@@ -103,9 +100,7 @@ struct AdversarialSetBTransitionTests {
       startControlPoint: UnitPoint(x: 2, y: 0), endControlPoint: UnitPoint(x: -1, y: 1))
     let samples = stride(from: 0.0, through: 1.0, by: 0.05).map { curve.value(at: $0) }
     let monotone = zip(samples, samples.dropFirst()).allSatisfy { $0 <= $1 + 1e-9 }
-    withKnownIssue(
-      "the solver takes raw control points and picks a non-monotone root for x(t) (adjacent to STUI-963)"
-    ) {
+    do {
       #expect(monotone, "\(samples.map { ($0 * 1000).rounded() / 1000 })")
     }
     #expect(abs(curve.value(at: 0) - 0) < 1e-9)
@@ -127,9 +122,7 @@ struct AdversarialSetBTransitionTests {
     .makeIterator()
     let firstEntry = entries.next()
     let first = try #require(firstEntry)
-    withKnownIssue(
-      "the grid index is computed in Double seconds, so 2.1/0.7 rounds up to the next tick"
-    ) {
+    do {
       #expect(first == MonotonicInstant(offset: .milliseconds(2100)), "\(first)")
     }
     var aligned = schedule.entries(
@@ -157,14 +150,12 @@ struct AdversarialSetBTransitionTests {
     let ratio = Spring(duration: .milliseconds(500), bounce: 2.5).dampingRatio
     let nan: Double = Spring(duration: .milliseconds(500), bounce: 2.5)
       .value(target: 1.0, initialVelocity: 0.0, time: .milliseconds(100))
-    withKnownIssue(
-      "dampingRatio = 1 - bounce is not clamped: motion diverges and turns NaN past bounce 2 (adjacent to STUI-966)"
-    ) {
+    do {
       #expect(overshoot >= -1 && overshoot <= 2, "\(overshoot)")
       #expect(ratio >= 0, "\(ratio)")
       #expect(nan.isFinite, "\(nan)")
     }
-    await withKnownIssue("an Int spring value scales by NaN and traps") {
+    do {
       await #expect(processExitsWith: .success) {
         let value: Int = Spring(duration: .milliseconds(500), bounce: 2.5)
           .value(target: 10, initialVelocity: 0, time: .milliseconds(100))
@@ -182,7 +173,7 @@ struct AdversarialSetBTransitionTests {
     let animation = Animation.spring(duration: .milliseconds(500), bounce: 1)
     let total = animation.totalDuration
     let stillRunning = animation.evaluate(elapsed: .seconds(30)) != nil
-    withKnownIssue("a zero-damping spring reports a one second total but never settles") {
+    do {
       if let total {
         #expect(!stillRunning, "reported total \(total) but still running at 30 s")
       }
@@ -191,9 +182,7 @@ struct AdversarialSetBTransitionTests {
     #expect(settling <= .seconds(60), "\(settling)")
     let damped = Animation.spring(duration: .milliseconds(500), bounce: 0.2)
     let dampedTotal = try #require(damped.totalDuration)
-    withKnownIssue(
-      "a damped spring's reported total duration ends before its evaluation settles (adjacent to STUI-966)"
-    ) {
+    do {
       #expect(damped.evaluate(elapsed: dampedTotal + .milliseconds(1)) == nil)
     }
     #expect(damped.evaluate(elapsed: dampedTotal + .seconds(5)) == nil, "it settles eventually")

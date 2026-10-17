@@ -110,3 +110,13 @@ func animatableArrayMismatchedSubtractionSnap() {
   let diff = a - b
   #expect(diff.elements.isEmpty)
 }
+
+@Test("dimension-independent array zero preserves vector arithmetic")
+func animatableArrayZeroPreservesCoordinates() {
+  let vector = AnimatableArray<Double>([2, -3])
+  #expect((vector + .zero).elements == vector.elements)
+  #expect((.zero + vector).elements == vector.elements)
+  #expect((vector - .zero).elements == vector.elements)
+  #expect((.zero - vector).elements == [-2, 3])
+  #expect((vector + (vector - vector)).elements == vector.elements)
+}

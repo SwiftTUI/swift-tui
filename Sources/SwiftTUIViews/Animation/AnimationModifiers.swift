@@ -70,7 +70,7 @@ public struct Transaction: Sendable {
     set {
       if newValue {
         request = .disabled
-      } else {
+      } else if request == .disabled {
         request = .inherit
       }
     }

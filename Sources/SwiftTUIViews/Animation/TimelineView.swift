@@ -94,16 +94,17 @@ public struct PeriodicTimelineSchedule: TimelineSchedule, Hashable, Sendable {
 
     // Snap the first emission to the schedule's own grid so callers
     // that share a startInstant also share emission moments.
-    let elapsedSeconds = self.startInstant.duration(to: startInstant)
-      .totalSeconds
-    let intervalSeconds = effectiveInterval.totalSeconds
-    let stepsBehind =
-      elapsedSeconds <= 0
-      ? 0
-      : Int((elapsedSeconds / intervalSeconds).rounded(.up))
-    let first = self.startInstant.advanced(
-      by: effectiveInterval * stepsBehind
-    )
+    let elapsed = self.startInstant.duration(to: startInstant)
+    let first: MonotonicInstant
+    if elapsed <= .zero {
+      first = self.startInstant
+    } else {
+      let remainder = elapsed.attosecondCount % effectiveInterval.attosecondCount
+      first = startInstant.advanced(
+        by: remainder == 0
+          ? .zero
+          : Duration(attosecondCount: effectiveInterval.attosecondCount - remainder))
+    }
     return Entries(next: first, interval: effectiveInterval)
   }
 
@@ -445,10 +446,25 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View {
 extension Duration {
   /// Total elapsed time expressed as a Double number of seconds.
   /// Useful for animation-phase math where Double trig/modulo is
-  /// natural.  Loses sub-attosecond precision but is exact for any
-  /// duration shorter than ~285 years.
+  /// natural. Conversion rounds to the precision available in `Double`;
+  /// use Duration arithmetic for exact grid alignment.
   public var totalSeconds: Double {
     Double(components.seconds)
       + Double(components.attoseconds) / 1_000_000_000_000_000_000
+  }
+}
+
+extension Duration {
+  /// Int64 seconds plus fractional attoseconds fit exactly in Int128.
+  package var attosecondCount: Int128 {
+    Int128(components.seconds) * 1_000_000_000_000_000_000
+      + Int128(components.attoseconds)
+  }
+
+  package init(attosecondCount: Int128) {
+    let unit: Int128 = 1_000_000_000_000_000_000
+    self.init(
+      secondsComponent: Int64(attosecondCount / unit),
+      attosecondsComponent: Int64(attosecondCount % unit))
   }
 }

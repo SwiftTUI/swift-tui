@@ -17,7 +17,10 @@ package struct TransitionModifiers: Sendable, Equatable {
   package var opacity: Double?
   package var offsetX: Int?
   package var offsetY: Int?
-  package var moveEdge: Edge?
+  package var moveEdges: [Edge]
+  package var moveEdge: Edge? {
+    moveEdges.count == 1 ? moveEdges[0] : nil
+  }
   package var scale: TransitionScaleEffect?
 
   package init(
@@ -30,14 +33,14 @@ package struct TransitionModifiers: Sendable, Equatable {
     self.opacity = opacity
     self.offsetX = offsetX
     self.offsetY = offsetY
-    self.moveEdge = moveEdge
+    self.moveEdges = moveEdge.map { [$0] } ?? []
     self.scale = scale
   }
 
   package static let identity = TransitionModifiers()
 
   package var hasOffsetEffect: Bool {
-    offsetX != nil || offsetY != nil || moveEdge != nil
+    offsetX != nil || offsetY != nil || !moveEdges.isEmpty
   }
 
   /// Resolves an edge-relative `move` into a concrete cell delta.
@@ -55,7 +58,8 @@ package struct TransitionModifiers: Sendable, Equatable {
     var x = offsetX ?? 0
     var y = offsetY ?? 0
 
-    if let moveEdge, let edgeBasis {
+    for moveEdge in edgeBasis == nil ? [] : moveEdges {
+      guard let edgeBasis else { continue }
       switch moveEdge {
       case .top:
         y -= edgeBasis.height
@@ -82,17 +86,25 @@ package struct TransitionModifiers: Sendable, Equatable {
     )
   }
 
-  /// Merges `other` on top of `self`, with non-nil values from `other`
-  /// taking precedence.
+  /// Composes opacity and translations. Retain every edge-relative term
+  /// until placement provides the size, including repeated and opposite edges.
   package func merging(_ other: TransitionModifiers) -> TransitionModifiers {
-    TransitionModifiers(
-      opacity: other.opacity ?? opacity,
-      offsetX: other.offsetX ?? offsetX,
-      offsetY: other.offsetY ?? offsetY,
-      moveEdge: other.moveEdge ?? moveEdge,
+    var result = TransitionModifiers(
+      opacity: opacity == nil && other.opacity == nil
+        ? nil
+        : (opacity ?? 1) * (other.opacity ?? 1),
+      offsetX: offsetX == nil && other.offsetX == nil
+        ? nil
+        : (offsetX ?? 0) + (other.offsetX ?? 0),
+      offsetY: offsetY == nil && other.offsetY == nil
+        ? nil
+        : (offsetY ?? 0) + (other.offsetY ?? 0),
       scale: other.scale ?? scale
     )
+    result.moveEdges = moveEdges + other.moveEdges
+    return result
   }
+
 }
 
 /// A type-erased transition wrapper.
@@ -183,12 +195,12 @@ public struct AnyTransition: Sendable {
     )
   }
 
-  /// Push: inserted content slides in from `edge`, removed content
-  /// slides out the opposite side.
+  /// Push: inserted content fades and slides in from `edge`; removed
+  /// content fades and slides out the opposite side.
   public static func push(from edge: Edge) -> AnyTransition {
     return AnyTransition(
-      insertion: { TransitionModifiers(moveEdge: edge) },
-      removal: { TransitionModifiers(moveEdge: oppositeEdge(edge)) }
+      insertion: { TransitionModifiers(opacity: 0, moveEdge: edge) },
+      removal: { TransitionModifiers(opacity: 0, moveEdge: oppositeEdge(edge)) }
     )
   }
 

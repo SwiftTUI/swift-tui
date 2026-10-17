@@ -37,7 +37,7 @@ public struct Spring: Hashable, Sendable {
     let solver = SpringSolver(duration: seconds, bounce: bounce)
     self.solver = solver
     self.duration = duration
-    self.bounce = bounce
+    self.bounce = min(bounce, 1)
     mass = 1
     stiffness = solver.naturalFrequency * solver.naturalFrequency
     damping = 2 * solver.dampingRatio * solver.naturalFrequency
@@ -52,7 +52,7 @@ public struct Spring: Hashable, Sendable {
     self.damping = damping
     bounce = 1 - solver.dampingRatio
     let seconds = 2 * Double.pi / max(solver.naturalFrequency, 1e-9)
-    duration = .microseconds(Int64((seconds * 1_000_000).rounded()))
+    duration = .seconds(seconds)
   }
 
   /// A smooth spring with no bounce.
@@ -86,7 +86,7 @@ public struct Spring: Hashable, Sendable {
   /// zero velocity, by the same criterion ``Animation/spring(duration:bounce:)``
   /// completes on.
   public var settlingDuration: Duration {
-    .microseconds(Int64((solver.settlingDuration * 1_000_000).rounded()))
+    .seconds(solver.settlingDuration)
   }
 
   // MARK: - Evaluation

@@ -25,8 +25,8 @@ enum AnimationTransitionOverlay {
     }
     if target.hasOffsetEffect {
       let targetOffset = target.resolvedOffset(edgeBasis: edgeBasis)
-      result.offsetX = Int(Double(targetOffset.x) * progress)
-      result.offsetY = Int(Double(targetOffset.y) * progress)
+      result.offsetX = Int((Double(targetOffset.x) * progress).rounded())
+      result.offsetY = Int((Double(targetOffset.y) * progress).rounded())
     }
     if let targetScale = target.scale
       ?? startScale.map({

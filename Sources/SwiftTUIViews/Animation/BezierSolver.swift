@@ -9,9 +9,9 @@ package struct BezierSolver: Sendable {
   let c1y: Double
 
   package init(_ c0x: Double, _ c0y: Double, _ c1x: Double, _ c1y: Double) {
-    self.c0x = c0x
+    self.c0x = min(max(c0x, 0), 1)
     self.c0y = c0y
-    self.c1x = c1x
+    self.c1x = min(max(c1x, 0), 1)
     self.c1y = c1y
   }
 
@@ -75,33 +75,19 @@ package struct BezierSolver: Sendable {
   }
 
   private func solveTForX(_ x: Double) -> Double {
-    // Newton-Raphson with fallback to bisection
-    var t = x  // Initial guess
-
-    // Newton-Raphson iterations
-    for _ in 0..<8 {
-      let currentX = evaluateX(at: t) - x
-      let dx = derivativeX(at: t)
-      guard abs(dx) > 1e-12 else { break }
-      let nextT = t - currentX / dx
-      if abs(nextT - t) < 1e-7 { return nextT }
-      t = nextT
-    }
-
-    // Bisection fallback
+    // The x curve is monotone after clamping its control points. Keep a
+    // parameter-space bracket: a small x residual says nothing about the
+    // accuracy of t near a stationary tangent (for example x = 1/2 + 4u³).
+    if x <= 0 { return 0 }
+    if x >= 1 { return 1 }
     var lo = 0.0
     var hi = 1.0
-    t = x
-    for _ in 0..<20 {
-      let currentX = evaluateX(at: t)
-      if abs(currentX - x) < 1e-7 { return t }
-      if currentX < x {
-        lo = t
-      } else {
-        hi = t
-      }
-      t = (lo + hi) / 2.0
+    for _ in 0..<48 {
+      let t = (lo + hi) / 2
+      let sample = evaluateX(at: t)
+      if sample == x { return t }
+      if sample < x { lo = t } else { hi = t }
     }
-    return t
+    return (lo + hi) / 2
   }
 }
