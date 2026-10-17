@@ -5,21 +5,21 @@ import Testing
 
 // STUI-688, STUI-930, STUI-937 and the indexed-measurement worker-snapshot
 // fix motivate comparing a reused engine with a cold engine after A/B/A changes.
-@Suite("Monthly adversarial measurement reuse")
-struct MonthlyAdversarialMeasurementTests {
-  @Test func audit061NestedIntrinsicSizeChangesAndReturns() {
+@Suite("Adversarial set A: measurement reuse")
+struct AdversarialSetAMeasurementTests {
+  @Test func setA061NestedIntrinsicSizeChangesAndReturns() {
     var changed = tree()
     changed.children[0].children[0].intrinsicSize = .init(width: 17, height: 5)
     compare([tree(), changed, tree()])
   }
 
-  @Test func audit062ReorderedUnequalChildrenKeepTheirMeasurements() {
+  @Test func setA062ReorderedUnequalChildrenKeepTheirMeasurements() {
     var changed = tree()
     changed.children.reverse()
     compare([tree(), changed, tree()])
   }
 
-  @Test func audit063RemovedAndReinsertedChildDoesNotBorrowSiblingSize() {
+  @Test func setA063RemovedAndReinsertedChildDoesNotBorrowSiblingSize() {
     var removed = tree()
     removed.children.removeFirst()
     var inserted = removed
@@ -27,7 +27,7 @@ struct MonthlyAdversarialMeasurementTests {
     compare([tree(), removed, inserted, tree()])
   }
 
-  @Test func audit064StackAxisRoundTripRetiresAllocation() {
+  @Test func setA064StackAxisRoundTripRetiresAllocation() {
     var changed = tree()
     changed.layoutBehavior = .stack(
       axis: .horizontal, spacing: 2,
@@ -35,13 +35,13 @@ struct MonthlyAdversarialMeasurementTests {
     compare([tree(), changed, tree()])
   }
 
-  @Test func audit065AsymmetricPaddingChangesAtStableIdentity() {
+  @Test func setA065AsymmetricPaddingChangesAtStableIdentity() {
     var changed = tree()
     changed.children[0].layoutBehavior = .padding(.init(top: 2, leading: 5, bottom: 1, trailing: 0))
     compare([tree(), changed, tree()])
   }
 
-  @Test func audit066FrameAlignmentChangeRefreshesPlacementOnCacheHit() {
+  @Test func setA066FrameAlignmentChangeRefreshesPlacementOnCacheHit() {
     var original = tree()
     original.layoutBehavior = .frame(width: 8, height: 8, alignment: .topLeading)
     original.children = [original.children[0]]
@@ -50,7 +50,7 @@ struct MonthlyAdversarialMeasurementTests {
     compare([original, changed, original])
   }
 
-  @Test func audit067OffsetChangeRefreshesPlacementWithoutChangingSize() {
+  @Test func setA067OffsetChangeRefreshesPlacementWithoutChangingSize() {
     var original = tree()
     original.layoutBehavior = .offset(x: 1, y: 2)
     original.children = [original.children[0]]
@@ -59,13 +59,13 @@ struct MonthlyAdversarialMeasurementTests {
     compare([original, changed, original])
   }
 
-  @Test func audit068MinimumMetadataChangesAfterProbe() {
+  @Test func setA068MinimumMetadataChangesAfterProbe() {
     var changed = tree()
     changed.children[0].children[0].layoutMetadata = .init(minimumWidth: 12, minimumHeight: 4)
     compare([tree(), changed, tree()])
   }
 
-  @Test func audit069WildcardWitnessCannotHideLaterNestedTypeAndSizeChange() {
+  @Test func setA069WildcardWitnessCannotHideLaterNestedTypeAndSizeChange() {
     var original = tree()
     original.children[0].children[0].typeDiscriminator = ObjectIdentifier(Int.self)
     var wildcard = original
@@ -76,7 +76,7 @@ struct MonthlyAdversarialMeasurementTests {
     compare([original, wildcard, changed, original])
   }
 
-  @Test func audit070NestedEmptyBranchCanRepopulateAfterProposalChurn() {
+  @Test func setA070NestedEmptyBranchCanRepopulateAfterProposalChurn() {
     var empty = tree()
     empty.children[0].children = []
     var changed = tree()
@@ -86,12 +86,12 @@ struct MonthlyAdversarialMeasurementTests {
 
   private func tree() -> ResolvedNode {
     let wrapper = ResolvedNode(
-      viewNodeID: .init(rawValue: 2), identity: testIdentity("Audit", "wrapper"),
+      viewNodeID: .init(rawValue: 2), identity: testIdentity("SetA", "wrapper"),
       kind: .view("Padding"),
       children: [leaf(3, width: 3, height: 2)],
       layoutBehavior: .padding(.init(top: 1, leading: 1, bottom: 0, trailing: 2)))
     return ResolvedNode(
-      viewNodeID: .init(rawValue: 1), identity: testIdentity("Audit"), kind: .view("Stack"),
+      viewNodeID: .init(rawValue: 1), identity: testIdentity("SetA"), kind: .view("Stack"),
       children: [wrapper, leaf(4, width: 5, height: 1)],
       layoutBehavior: .stack(
         axis: .vertical, spacing: 1,
@@ -100,7 +100,7 @@ struct MonthlyAdversarialMeasurementTests {
 
   private func leaf(_ id: UInt64, width: Int, height: Int) -> ResolvedNode {
     .init(
-      viewNodeID: .init(rawValue: id), identity: testIdentity("Audit", "leaf-\(id)"),
+      viewNodeID: .init(rawValue: id), identity: testIdentity("SetA", "leaf-\(id)"),
       kind: .view("Leaf"), intrinsicSize: .init(width: width, height: height))
   }
 

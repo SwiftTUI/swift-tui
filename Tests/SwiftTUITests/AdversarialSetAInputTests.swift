@@ -6,29 +6,29 @@ import Testing
 // September–October 2026 audit: STUI-510, STUI-607, STUI-700, STUI-826,
 // STUI-892, STUI-893 and STUI-949. Each envelope must recover independently
 // of transport chunking; expected events are specified independently of the parser.
-@Suite("Monthly adversarial terminal input")
-struct MonthlyAdversarialInputTests {
-  @Test func audit001OSCWithEmbeddedEscape() {
+@Suite("Adversarial set A: terminal input")
+struct AdversarialSetAInputTests {
+  @Test func setA001OSCWithEmbeddedEscape() {
     partitions("\u{1B}]11;rgb:aa\u{1B}X/bb/cc\u{1B}\\q", [.key(.init(.character("q")))])
   }
 
-  @Test func audit002DCSDoesNotEndAtBEL() {
+  @Test func setA002DCSDoesNotEndAtBEL() {
     partitions("\u{1B}Ppayload\u{7}still-payload\u{1B}\\q", [.key(.init(.character("q")))])
   }
 
-  @Test func audit003APCWithFalseTerminator() {
+  @Test func setA003APCWithFalseTerminator() {
     partitions("\u{1B}_Gid=2;\u{1B}/OK\u{1B}\\q", [.key(.init(.character("q")))])
   }
 
-  @Test func audit004PMWithEightBitTerminator() {
+  @Test func setA004PMWithEightBitTerminator() {
     partitions(Array("\u{1B}^private".utf8) + [0x9C, 0x71], [.key(.init(.character("q")))])
   }
 
-  @Test func audit005EightBitOSCWithBEL() {
+  @Test func setA005EightBitOSCWithBEL() {
     partitions([0x9D] + Array("11;rgb:aa/bb/cc".utf8) + [7, 0x71], [.key(.init(.character("q")))])
   }
 
-  @Test func audit006UnknownEnvelopesBetweenKeys() {
+  @Test func setA006UnknownEnvelopesBetweenKeys() {
     partitions(
       "a\u{1B}[99~\u{1B}OZ\u{1B}[?999;1$yb",
       [
@@ -36,7 +36,7 @@ struct MonthlyAdversarialInputTests {
       ])
   }
 
-  @Test func audit007KittyReleaseCannotConsumeFollowingArrow() {
+  @Test func setA007KittyReleaseCannotConsumeFollowingArrow() {
     partitions(
       "\u{1B}[97;1:3u\u{1B}[Dq",
       [
@@ -44,7 +44,7 @@ struct MonthlyAdversarialInputTests {
       ])
   }
 
-  @Test func audit008OverflowEnvelopesDrainInOneRead() {
+  @Test func setA008OverflowEnvelopesDrainInOneRead() {
     let huge = String(repeating: "9", count: 40)
     partitions(
       "\u{1B}[\(huge)~\u{1B}[<0;\(huge);2M\u{1B}[\(huge)uq",
@@ -53,11 +53,11 @@ struct MonthlyAdversarialInputTests {
       ])
   }
 
-  @Test func audit009BrokenUTF8CannotEatASCII() {
+  @Test func setA009BrokenUTF8CannotEatASCII() {
     partitions([0xF0, 0x41, 0x42, 0x43, 0x44], "ABCD".map { .key(.init(.character($0))) })
   }
 
-  @Test func audit010SurrogateUTF8RecoversBeforeValidEmoji() {
+  @Test func setA010SurrogateUTF8RecoversBeforeValidEmoji() {
     partitions(
       [0xED, 0xA0, 0x80] + Array("😀q".utf8),
       [
@@ -65,11 +65,11 @@ struct MonthlyAdversarialInputTests {
       ])
   }
 
-  @Test func audit011OverlongUTF8CannotBecomeEscape() {
+  @Test func setA011OverlongUTF8CannotBecomeEscape() {
     partitions([0xE0, 0x80, 0x9B] + Array("q".utf8), [.key(.init(.character("q")))])
   }
 
-  @Test func audit012AboveUnicodeMaximumRecovers() {
+  @Test func setA012AboveUnicodeMaximumRecovers() {
     partitions(
       [0xF4, 0x90, 0x80, 0x80] + Array("界q".utf8),
       [
@@ -77,7 +77,7 @@ struct MonthlyAdversarialInputTests {
       ])
   }
 
-  @Test func audit013MousePressReleaseAndTextRemainOrdered() {
+  @Test func setA013MousePressReleaseAndTextRemainOrdered() {
     let location = PointerLocation.cellFallback(CellPoint(x: 3, y: 6))
     partitions(
       "\u{1B}[<0;4;7M\u{1B}[<0;4;7mq",
@@ -88,7 +88,7 @@ struct MonthlyAdversarialInputTests {
       ])
   }
 
-  @Test func audit014PasteContainsLiteralControlEnvelopes() {
+  @Test func setA014PasteContainsLiteralControlEnvelopes() {
     let payload = "before\u{1B}[A\u{1B}]11;x\u{7}after"
     partitions(
       "\u{1B}[200~\(payload)\u{1B}[201~q",
@@ -97,7 +97,7 @@ struct MonthlyAdversarialInputTests {
       ])
   }
 
-  @Test func audit015PasteFalseEndPrefixIsPreserved() {
+  @Test func setA015PasteFalseEndPrefixIsPreserved() {
     let payload = "a\u{1B}[20\u{1B}[201xb"
     partitions(
       "\u{1B}[200~\(payload)\u{1B}[201~q",
@@ -106,7 +106,7 @@ struct MonthlyAdversarialInputTests {
       ])
   }
 
-  @Test func audit016AdjacentPastesDoNotSharePayload() {
+  @Test func setA016AdjacentPastesDoNotSharePayload() {
     partitions(
       "\u{1B}[200~first\u{1B}[201~\u{1B}[200~👩🏽‍💻\r\nlast\u{1B}[201~",
       [
@@ -114,11 +114,11 @@ struct MonthlyAdversarialInputTests {
       ])
   }
 
-  @Test func audit017PrivateCSIAndNULCannotStrandText() {
+  @Test func setA017PrivateCSIAndNULCannotStrandText() {
     partitions("\u{0}\u{1B}[?1004;2$y\u{0}q\u{1B}[?1;2c", [.key(.init(.character("q")))])
   }
 
-  @Test func audit018TruncatedControlStringFlushResetsParser() {
+  @Test func setA018TruncatedControlStringFlushResetsParser() {
     for prefix in [
       "\u{1B}]unfinished", "\u{1B}Punfinished", "\u{1B}_unfinished", "\u{1B}^unfinished",
     ] {
@@ -133,7 +133,7 @@ struct MonthlyAdversarialInputTests {
     }
   }
 
-  @Test func audit019EscapeTimeoutDoesNotPoisonNextSequence() {
+  @Test func setA019EscapeTimeoutDoesNotPoisonNextSequence() {
     var parser = TerminalInputParser()
     for _ in 0..<4 {
       #expect(parser.feed([0x1B]).isEmpty)
@@ -143,7 +143,7 @@ struct MonthlyAdversarialInputTests {
     }
   }
 
-  @Test func audit020UnknownSS3BeforeMultibyteInput() {
+  @Test func setA020UnknownSS3BeforeMultibyteInput() {
     partitions("\u{1B}Ox界\u{1B}OQ", [.key(.init(.character("界"))), .key(.init(.functionKey(2)))])
   }
 
