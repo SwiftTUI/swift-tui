@@ -122,4 +122,7 @@ jobs:
           SWIFTTUI_PERF_SMOKE_SKIP: "example-app-shell-workflow"
         run: |
           set -euo pipefail
-          swiftly run swift test --package-path Tools/TermUIPerf
+          # Cold renders and live scenarios share the main actor. Keep unrelated
+          # tests out of each scenario's watchdog window (STUI-1080); sync/async
+          # rendering and all workload assertions remain exercised within tests.
+          swiftly run swift test --no-parallel --package-path Tools/TermUIPerf

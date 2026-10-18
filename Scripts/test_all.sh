@@ -1199,10 +1199,13 @@ if lane_runs_core; then
       "Run Tools/TermUIPerf tests" \
       "covered by the separate TermUIPerf workflow"
   else
+    # Cold renders and live scenarios share the main actor. Run one test at a
+    # time so unrelated workloads cannot consume a scenario's watchdog window
+    # (STUI-1080); each scenario still exercises its own sync/async runtime.
     run_function_step \
       "Run Tools/TermUIPerf tests" \
-      "$(swift_command_text test --package-path Tools/TermUIPerf)" \
-      run_swift test --package-path Tools/TermUIPerf
+      "$(swift_command_text test --no-parallel --package-path Tools/TermUIPerf)" \
+      run_swift test --no-parallel --package-path Tools/TermUIPerf
   fi
 fi
 
