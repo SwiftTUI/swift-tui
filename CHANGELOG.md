@@ -8,6 +8,17 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-10-17
+
+### Fixed
+
+- Cancel every spinner task when reduced motion is enabled, including untouched
+  `ForEach` siblings after other rows tick independently. Preserve lifecycle
+  ownership when a modifier reuses flattened content (STUI-1081).
+
+Includes the collection, input, state, rendering, host, and Windows image-loading
+fixes listed in 0.18.1 and 0.18.2.
+
 ## [0.18.2] - 2026-10-17
 
 ### Fixed
@@ -2401,7 +2412,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.18.2...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.18.3...HEAD
+[0.18.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.3
 [0.18.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.2
 [0.18.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.1
 [0.18.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.0

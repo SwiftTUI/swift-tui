@@ -1736,9 +1736,26 @@ package final class ViewGraph {
   ) {
     guard
       let targetNodeID = viewNodeID(for: targetIdentity),
-      let ownerNodeID = viewNodeID(for: ownerIdentity)
+      let authoredOwnerNodeID = viewNodeID(for: ownerIdentity)
     else {
       return
+    }
+    // A modifier can reuse its content after an outer view has absorbed the
+    // content's resolved identity. Its finished interior still has an authored
+    // node, but only the indexed absorber carries the modifier's lifecycle
+    // metadata. Delegating back to that interior suppresses the absorber's
+    // task cancellation on a later environment change or removal (STUI-1081).
+    // An owner still evaluating has not published its result yet and remains
+    // authoritative for the ordinary child-to-enclosing-owner case.
+    let ownerNodeID: ViewNodeID
+    if authoredOwnerNodeID != targetNodeID,
+      let authoredOwner = nodesByNodeID[authoredOwnerNodeID],
+      !authoredOwner.isEvaluating,
+      authoredOwner.resolvedIdentity == targetIdentity
+    {
+      ownerNodeID = targetNodeID
+    } else {
+      ownerNodeID = authoredOwnerNodeID
     }
     if let previousOwner = lifecycleEvaluationOwnersByNodeID[targetNodeID],
       previousOwner != ownerNodeID
