@@ -1198,6 +1198,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/ChangeLifecycleAuthoringOwnerTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises deferred onChange dispatch and authored focus ownership through a hosted scene."
+    },
     "Tests/SwiftTUITests/CircleAspectFixtureTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."

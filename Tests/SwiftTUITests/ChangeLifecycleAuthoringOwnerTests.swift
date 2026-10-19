@@ -124,13 +124,13 @@ private struct ChangeOwnerView: View {
       if usesValueArguments {
         observingOtherChanges(
           contents.onChange(of: focus) { _, current in
-            probe.readings.append(.init(newValue: current, focus: focus))
+            probe.readings.append(ChangeOwnerProbe.Reading(newValue: current, focus: focus))
             observation = "Callback \(probe.readings.count)"
           })
       } else {
         observingOtherChanges(
           contents.onChange(of: focus) {
-            probe.readings.append(.init(newValue: nil, focus: focus))
+            probe.readings.append(ChangeOwnerProbe.Reading(newValue: nil, focus: focus))
             observation = "Callback \(probe.readings.count)"
           })
       }
