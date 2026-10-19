@@ -234,16 +234,10 @@ extension DefaultRenderer {
     baselinePlacedTree: PlacedNode,
     overlayHasTransientDecoration: Bool
   ) {
-    draft.resolveContext.localScrollPositionRegistry?.updateGeometry(
+    draft.graphDraft.commitScrollGeometry(
       scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
-      scrollTargets: artifacts.semanticSnapshot.scrollTargets
-    )
-    draft.resolveContext.localScrollPositionRegistry?.commitScrollOffsets(
-      artifacts.semanticSnapshot.scrollRoutes
-    )
-    draft.graphDraft.updateCommittedScrollGeometry(
-      scrollRoutes: artifacts.semanticSnapshot.scrollRoutes,
-      scrollTargets: artifacts.semanticSnapshot.scrollTargets
+      scrollTargets: artifacts.semanticSnapshot.scrollTargets,
+      resolvedScrollPositionRegistry: draft.resolveContext.localScrollPositionRegistry
     )
     frameTailRenderer.storeCommittedFrame(
       artifacts,

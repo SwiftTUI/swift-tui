@@ -689,7 +689,8 @@ extension SemanticExtractor {
             ScrollTarget(
               identity: estimate.identity,
               scrollIdentity: childScrollIdentity,
-              rect: estimate.rect
+              rect: estimate.rect,
+              role: .lazyElement
             )
           )
           targets[targets.count - 1].isEstimated = estimate.isEstimated

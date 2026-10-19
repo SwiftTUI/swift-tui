@@ -7,6 +7,76 @@ import Testing
 @Suite
 struct LocalScrollPositionRegistryTests {
   @Test(
+    "nonmatching and unrelated-route commands do not suppress focus relocation",
+    arguments: [false, true]
+  )
+  func commandsOnlySuppressTheirOwnRoute(targetsOtherRoute: Bool) {
+    let registry = LocalScrollPositionRegistry()
+    let scroll = testIdentity("CommandScope", "Scroll")
+    let other = testIdentity("CommandScope", "Other")
+    let focus = scroll.child(.named("Button"))
+    let owner = ViewNodeID(rawValue: 1)
+    var offset = ScrollOffset.zero
+    registry.restore([
+      ScrollPositionRegistrationSnapshot(
+        identity: scroll, ownerViewNodeID: owner,
+        currentOffset: { offset }, applyOffset: { offset = $0 })
+    ])
+    registry.register(identity: other, currentOffset: { .zero }, applyOffset: { _ in })
+    let viewport = CellRect(origin: .zero, size: CellSize(width: 20, height: 5))
+    let route = ScrollRoute(
+      identity: scroll, viewNodeID: owner, viewportRect: viewport,
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 30)))
+    let otherRoute = ScrollRoute(
+      identity: other, viewportRect: viewport,
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 30)))
+    let region = FocusRegion(
+      identity: focus, rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)))
+    _ = registry.sync(
+      focusedIdentity: focus, focusRegions: [region], scrollRoutes: [route, otherRoute],
+      scrollTargets: [ScrollTarget(identity: focus, scrollIdentity: scroll, rect: region.rect)])
+    if targetsOtherRoute {
+      #expect(!registry.scrollTo(y: 0, scopeIdentity: other))
+    } else {
+      #expect(
+        !registry.scrollToTarget(
+          ScrollTargetQuery(identity: testIdentity("Missing")), anchor: nil, scopeIdentity: scroll))
+    }
+    let moved = CellRect(origin: CellPoint(x: 0, y: 12), size: CellSize(width: 4, height: 1))
+    #expect(
+      registry.revealFocusAfterGeometryChange(
+        region, previousRoutes: [route, otherRoute],
+        previousTargets: [ScrollTarget(identity: focus, scrollIdentity: scroll, rect: region.rect)],
+        scrollRoutes: [route, otherRoute],
+        scrollTargets: [ScrollTarget(identity: focus, scrollIdentity: scroll, rect: moved)],
+        focusRegions: [region]))
+    #expect(offset == ScrollOffset(x: 0, y: 8))
+  }
+
+  @Test("new focus retains priority over an equal-offset command")
+  func newFocusRevealsAfterEqualOffsetCommand() {
+    let registry = LocalScrollPositionRegistry()
+    let scroll = testIdentity("NewFocusCommand")
+    let first = scroll.child(.named("First"))
+    let next = scroll.child(.named("Next"))
+    var offset = ScrollOffset.zero
+    registry.register(identity: scroll, currentOffset: { offset }, applyOffset: { offset = $0 })
+    let route = ScrollRoute(
+      identity: scroll,
+      viewportRect: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
+      contentBounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 30)))
+    let firstRegion = FocusRegion(
+      identity: first, rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)))
+    let nextRegion = FocusRegion(
+      identity: next,
+      rect: CellRect(origin: CellPoint(x: 0, y: 12), size: CellSize(width: 4, height: 1)))
+    _ = registry.sync(focusedIdentity: first, focusRegions: [firstRegion], scrollRoutes: [route])
+    #expect(!registry.scrollTo(y: 0, scopeIdentity: scroll))
+    #expect(registry.sync(focusedIdentity: next, focusRegions: [nextRegion], scrollRoutes: [route]))
+    #expect(offset == ScrollOffset(x: 0, y: 8))
+  }
+
+  @Test(
     "same-anchor collection commands refine the latest target once and yield to newer input",
     arguments: [false, true], [false, true]
   )
@@ -534,6 +604,58 @@ struct LocalScrollPositionRegistryTests {
     #expect(offset == (horizontal ? ScrollOffset(x: expected) : ScrollOffset(y: expected)))
   }
 
+  @Test(
+    "committed offset corrections preserve focus without overriding new scroll input",
+    arguments: ScrollNormalizationInput.allCases)
+  private func focusRevealDistinguishesOffsetCorrections(input: ScrollNormalizationInput) {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("NormalizedScroll")
+    let focusedIdentity = testIdentity("NormalizedScroll", "Target")
+    let owner = ViewNodeID(rawValue: 1)
+    var offset = ScrollOffset(y: 16)
+    func register(source: String = "original") {
+      registry.restore([
+        ScrollPositionRegistrationSnapshot(
+          identity: scrollIdentity, ownerViewNodeID: owner, resolvedOffset: offset,
+          currentOffset: { offset }, applyOffset: { offset = $0 }, bindingSourceID: AnyID(source))
+      ])
+    }
+    func route(height: Int, offset: Int) -> ScrollRoute {
+      ScrollRoute(
+        identity: scrollIdentity, viewNodeID: owner,
+        viewportRect: .init(origin: .zero, size: .init(width: 8, height: height)),
+        contentBounds: .init(origin: .init(x: 0, y: -offset), size: .init(width: 8, height: 20)))
+    }
+    func target(row: Int) -> ScrollTarget {
+      ScrollTarget(
+        identity: focusedIdentity, scrollIdentity: scrollIdentity,
+        rect: .init(origin: .init(x: 0, y: row), size: .init(width: 1, height: 1)))
+    }
+    register()
+    let previousRoute = route(height: 4, offset: 16)
+    let previousTarget = target(row: 2)
+    let region = FocusRegion(identity: focusedIdentity, rect: previousTarget.rect)
+    #expect(
+      !registry.sync(
+        focusedIdentity: focusedIdentity, focusRegions: [region], scrollRoutes: [previousRoute],
+        scrollTargets: [previousTarget]))
+
+    if input == .beforeResolve { offset = ScrollOffset(y: 50) }
+    register(source: input == .replacedBinding ? "replacement" : "original")
+    if input == .afterResolve { offset = ScrollOffset(y: 12) }
+    if input == .sameOffsetCommand { _ = registry.scrollTo(y: 16, scopeIdentity: scrollIdentity) }
+    let resizedRoute = route(height: 8, offset: 12)
+    registry.commitScrollOffsets([resizedRoute])
+    #expect(offset == ScrollOffset(y: 12))
+    if input == .republishedRegistration { register() }
+
+    let changed = registry.revealFocusAfterGeometryChange(
+      region, previousRoutes: [previousRoute], previousTargets: [previousTarget],
+      scrollRoutes: [resizedRoute], scrollTargets: [target(row: -1)], focusRegions: [region])
+    #expect(changed == (input == .none))
+    #expect(offset == ScrollOffset(y: input == .none ? 11 : 12))
+  }
+
   /// Regression for "wheel scroll stalls partway down, must click to continue":
   /// once a control is focused, focus-reveal must NOT re-assert itself every
   /// frame and drag the offset back when the user scrolls that control out of
@@ -904,6 +1026,11 @@ struct LocalScrollPositionRegistryTests {
     #expect(offset == .init(x: 1, y: 4))
     #expect(enriched[1].contentOffset == .zero)
   }
+}
+
+private enum ScrollNormalizationInput: CaseIterable {
+  case none, beforeResolve, afterResolve, sameOffsetCommand, replacedBinding,
+    republishedRegistration
 }
 
 private enum CollectionRecoveryChange: String, CaseIterable {

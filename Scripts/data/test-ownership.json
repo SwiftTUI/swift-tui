@@ -2410,6 +2410,22 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/ScrollFocusEditorTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises nested TextEditor cursor reveal and deliberate ancestor scroll priority."
+    },
+    "Tests/SwiftTUITests/ScrollFocusLifetimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises composed RunLoop focus fallback and authored scroll binding replacement."
+    },
+    "Tests/SwiftTUITests/ScrollFocusPriorityTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises composed RunLoop focus, scroll geometry recovery, and control activation."
+    },
+    "Tests/SwiftTUITests/ScrollFocusRecoveryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises composed RunLoop focus, scroll geometry recovery, and control activation."
+    },
     "Tests/SwiftTUITests/ScrollHostedControlActivationTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."

@@ -163,6 +163,7 @@ public struct ScrollRoute: Equatable, Sendable {
 
 package enum ScrollTargetRole: Equatable, Sendable {
   case view
+  case lazyElement
 }
 
 package struct ScrollTarget: Equatable, Sendable {

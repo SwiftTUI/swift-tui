@@ -210,11 +210,22 @@ vertical axis, trailing for a horizontal-only one. Each visible indicator is
 separately focusable and drives just its own axis; a pointer press or drag on
 an indicator track scrubs the offset directly.
 
-Focus and scrolling stay independent, with one deliberate bridge: when focus
+Focus and scrolling stay independent, with deliberate reveal behavior: when focus
 moves to a control inside the content — Tab onto a button below the fold —
-the viewport scrolls just enough to reveal it. The reveal fires only when
-focus changes, so scrolling away afterward does not snap back to the focused
-control.
+the viewport scrolls just enough to reveal it. Returning focus to a control
+reveals it again, including when focus left the scroll view in between.
+A viewport change or measured content relocation can also reveal a previously
+visible focused control. Lazy stacks use their existing allocation estimate
+to realize its former row during the runtime's bounded focus-sync rerender.
+Focus remains only if the same control is present afterward; removed or
+unavailable controls use normal fallback. Other offscreen controls remain
+outside Tab traversal. Explicit scroll input or a replaced offset binding
+takes precedence over geometry recovery for unchanged focus. A proxy command
+retains this priority even when its requested offset is already current.
+Scrolling away afterward therefore does not snap back to the focused control.
+Later content changes also leave that deliberately hidden control out of view.
+Nested scroll views reveal a newly focused descendant through each containing
+viewport; scrolling an inner viewport does not relocate its ancestor viewport.
 
 ## The Mouse Wheel
 
