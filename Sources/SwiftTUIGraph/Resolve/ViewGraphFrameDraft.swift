@@ -368,7 +368,7 @@ package final class ViewGraphFrameDraft {
     return diagnostics
   }
 
-  package func updateCommittedScrollGeometry(
+  package func commitScrollGeometry(
     scrollRoutes: [ScrollRoute],
     scrollTargets: [ScrollTarget]
   ) {
@@ -376,6 +376,7 @@ package final class ViewGraphFrameDraft {
       scrollRoutes: scrollRoutes,
       scrollTargets: scrollTargets
     )
+    liveRegistrations.scrollPositionRegistry?.commitScrollOffsets(scrollRoutes)
   }
 
   package func discard(

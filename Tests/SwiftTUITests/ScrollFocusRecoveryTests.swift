@@ -95,6 +95,27 @@ struct ScrollFocusRecoveryTests {
     #expect(!ledger.evaluatedRows.contains(999))
   }
 
+  @Test(arguments: [RecoveryScrollContainer.eagerVertical, .eagerHorizontal])
+  func activeControlSurvivesOffsetClamping(container: RecoveryScrollContainer) throws {
+    let ledger = RecoveryActivationLedger()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("ClampedOffsetFocusRecovery", container.rawValue),
+      size: CellSize(width: 48, height: 12)
+    ) {
+      RecoveryClampedOffsetFixture(isHorizontal: container.isHorizontal, ledger: ledger)
+    }
+    defer { harness.shutdown() }
+    _ = try harness.focusText("X")
+    let originalFocus = try #require(harness.runLoop.focusTracker.currentFocusIdentity)
+    try #require(harness.frame.contains("X"))
+    _ = try harness.pressKey(KeyPress(.character("g"), modifiers: .ctrl))
+    #expect(harness.runLoop.focusTracker.currentFocusIdentity == originalFocus)
+    #expect(
+      harness.frame.contains("X"), "Clamping must not hide the active control:\n\(harness.frame)")
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(ledger.activated == [1])
+  }
+
 }
 
 enum RecoveryScrollContainer: String, CaseIterable, Sendable {
@@ -190,6 +211,47 @@ private struct RecoveryLabelButtonStyle: ButtonStyle {
   @MainActor
   func makeBody(configuration: ButtonStyleConfiguration) -> some View {
     configuration.label
+  }
+}
+
+@MainActor
+private struct RecoveryClampedOffsetFixture: View {
+  let isHorizontal: Bool
+  let ledger: RecoveryActivationLedger
+  @State private var expanded = false
+  @State private var position = ScrollCellOffset(x: 16, y: 16)
+
+  var body: some View {
+    ScrollView(isHorizontal ? .horizontal : .vertical, position: $position) {
+      if isHorizontal {
+        HStack(alignment: .top, spacing: 0) { rows }
+      } else {
+        VStack(alignment: .leading, spacing: 0) { rows }
+      }
+    }
+    .scrollIndicators(.hidden)
+    .frame(
+      width: isHorizontal ? (expanded ? 8 : 4) : 32,
+      height: isHorizontal ? 3 : (expanded ? 8 : 4), alignment: .topLeading
+    )
+    .buttonStyle(RecoveryLabelButtonStyle())
+    .onKeyPress(.character("g"), modifiers: .ctrl) { _ in
+      expanded = true
+      return .handled
+    }
+  }
+
+  @ViewBuilder
+  private var rows: some View {
+    Text("Before")
+      .frame(
+        width: isHorizontal ? (expanded ? 11 : 18) : 12,
+        height: isHorizontal ? 1 : (expanded ? 11 : 18))
+    Button("X") { ledger.activated.append(1) }
+    Text("After")
+      .frame(
+        width: isHorizontal ? (expanded ? 8 : 1) : 12,
+        height: isHorizontal ? 1 : (expanded ? 8 : 1))
   }
 }
 

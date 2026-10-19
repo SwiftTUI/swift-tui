@@ -19,6 +19,8 @@ package struct ScrollPositionRegistrationSnapshot {
   package var axes: AxisSet
   /// Resolve-time value guards commit normalization against a newer input.
   package var resolvedOffset: ScrollOffset?
+  /// An offset correction applied by this registration's committed frame, not authored input.
+  package var committedOffsetCorrection: (requested: ScrollOffset, corrected: ScrollOffset)? = nil
   package var currentOffset: @MainActor () -> ScrollOffset
   package var applyOffset: @MainActor (ScrollOffset) -> Void
   /// The logical collection position remains stable while estimated cell
@@ -363,17 +365,23 @@ package final class LocalScrollPositionRegistry: Equatable {
   package func commitScrollOffsets(_ routes: [ScrollRoute]) {
     for route in routes {
       guard let registration = registrations[route.identity] else { continue }
+      registrations[route.identity]?.committedOffsetCorrection = nil
       let current = registration.currentOffset()
+      let corrected: ScrollOffset
       if let correction = route.scrollAnchorCorrection {
         let requested = ScrollOffset(
           x: correction.requestedOffset.x, y: correction.requestedOffset.y)
-        let corrected = ScrollOffset(
+        guard current == requested else { continue }
+        corrected = ScrollOffset(
           x: correction.correctedOffset.x, y: correction.correctedOffset.y)
-        if current == requested && requested != corrected { registration.applyOffset(corrected) }
       } else if registration.revealTarget == nil, registration.resolvedOffset == current {
-        let corrected = clampedOffset(current, in: route)
-        if current != corrected { registration.applyOffset(corrected) }
+        corrected = clampedOffset(current, in: route)
+      } else {
+        continue
       }
+      guard current != corrected else { continue }
+      registrations[route.identity]?.committedOffsetCorrection = (current, corrected)
+      registration.applyOffset(corrected)
     }
   }
 
@@ -913,13 +921,11 @@ package final class LocalScrollPositionRegistry: Equatable {
     guard previous.bindingSourceID == registration.bindingSourceID else { return true }
     let current = registration.currentOffset()
     if current == previous.offset { return false }
-    // Committed lazy measurement can refine an offset without new input.
-    if let correction = route.scrollAnchorCorrection {
-      let requested = ScrollOffset(
-        x: correction.requestedOffset.x, y: correction.requestedOffset.y)
-      let corrected = ScrollOffset(
-        x: correction.correctedOffset.x, y: correction.correctedOffset.y)
-      if previous.offset == requested && current == corrected { return false }
+    // Only a correction actually applied at commit can explain a changed offset.
+    if let correction = registration.committedOffsetCorrection,
+      previous.offset == correction.requested, current == correction.corrected
+    {
+      return false
     }
     return true
   }

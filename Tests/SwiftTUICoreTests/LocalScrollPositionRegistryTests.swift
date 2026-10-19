@@ -596,6 +596,54 @@ struct LocalScrollPositionRegistryTests {
     #expect(offset == (horizontal ? ScrollOffset(x: expected) : ScrollOffset(y: expected)))
   }
 
+  @Test(
+    "committed offset corrections preserve focus without overriding new scroll input",
+    arguments: ScrollNormalizationInput.allCases)
+  private func focusRevealDistinguishesOffsetCorrections(input: ScrollNormalizationInput) {
+    let registry = LocalScrollPositionRegistry()
+    let scrollIdentity = testIdentity("NormalizedScroll")
+    let focusedIdentity = testIdentity("NormalizedScroll", "Target")
+    var offset = ScrollOffset(y: 16)
+    func register(source: String = "original") {
+      registry.register(
+        identity: scrollIdentity, currentOffset: { offset }, applyOffset: { offset = $0 },
+        bindingSourceID: AnyID(source))
+    }
+    func route(height: Int, offset: Int) -> ScrollRoute {
+      ScrollRoute(
+        identity: scrollIdentity,
+        viewportRect: .init(origin: .zero, size: .init(width: 8, height: height)),
+        contentBounds: .init(origin: .init(x: 0, y: -offset), size: .init(width: 8, height: 20)))
+    }
+    func sync(_ route: ScrollRoute, targetRow: Int) -> Bool {
+      let rect = CellRect(origin: .init(x: 0, y: targetRow), size: .init(width: 1, height: 1))
+      return registry.sync(
+        focusedIdentity: focusedIdentity,
+        focusRegions: [FocusRegion(identity: focusedIdentity, rect: rect)],
+        scrollRoutes: [route],
+        scrollTargets: [
+          ScrollTarget(
+            identity: focusedIdentity, scrollIdentity: scrollIdentity,
+            rect: rect)
+        ])
+    }
+    register()
+    #expect(!sync(route(height: 4, offset: 16), targetRow: 2))
+
+    if input == .beforeResolve { offset = ScrollOffset(y: 50) }
+    register(source: input == .replacedBinding ? "replacement" : "original")
+    if input == .afterResolve { offset = ScrollOffset(y: 12) }
+    if input == .sameOffsetCommand { _ = registry.scrollTo(y: 16, scopeIdentity: scrollIdentity) }
+    let resizedRoute = route(height: 8, offset: 12)
+    registry.commitScrollOffsets([resizedRoute])
+    #expect(offset == ScrollOffset(y: 12))
+    if input == .republishedRegistration { register() }
+
+    let changed = sync(resizedRoute, targetRow: -1)
+    #expect(changed == (input == .none))
+    #expect(offset == ScrollOffset(y: input == .none ? 11 : 12))
+  }
+
   /// Regression for "wheel scroll stalls partway down, must click to continue":
   /// once a control is focused, focus-reveal must NOT re-assert itself every
   /// frame and drag the offset back when the user scrolls that control out of
@@ -966,6 +1014,11 @@ struct LocalScrollPositionRegistryTests {
     #expect(offset == .init(x: 1, y: 4))
     #expect(enriched[1].contentOffset == .zero)
   }
+}
+
+private enum ScrollNormalizationInput: CaseIterable {
+  case none, beforeResolve, afterResolve, sameOffsetCommand, replacedBinding,
+    republishedRegistration
 }
 
 private enum CollectionRecoveryChange: String, CaseIterable {
