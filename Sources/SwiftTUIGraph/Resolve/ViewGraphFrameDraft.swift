@@ -370,13 +370,16 @@ package final class ViewGraphFrameDraft {
 
   package func commitScrollGeometry(
     scrollRoutes: [ScrollRoute],
-    scrollTargets: [ScrollTarget]
+    scrollTargets: [ScrollTarget],
+    resolvedScrollPositionRegistry: LocalScrollPositionRegistry?
   ) {
-    liveRegistrations.scrollPositionRegistry?.updateGeometry(
+    // Standalone rendering has no host registry; its resolved registrations own the offsets.
+    let registry = liveRegistrations.scrollPositionRegistry ?? resolvedScrollPositionRegistry
+    registry?.updateGeometry(
       scrollRoutes: scrollRoutes,
       scrollTargets: scrollTargets
     )
-    liveRegistrations.scrollPositionRegistry?.commitScrollOffsets(scrollRoutes)
+    registry?.commitScrollOffsets(scrollRoutes)
   }
 
   package func discard(

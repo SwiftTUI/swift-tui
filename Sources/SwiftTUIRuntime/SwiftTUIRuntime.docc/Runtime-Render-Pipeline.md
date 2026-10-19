@@ -337,6 +337,8 @@ only in the visible range. Hosts and tests can observe these results:
   offset corrections and records them for focus synchronization. Automatic
   clamping therefore does not count as new scroll input; explicit commands and
   binding changes still take precedence.
+  Standalone rendering applies corrections through its resolved registry when
+  there is no live host registry.
 - Default (`nil`) spacing is exact between realized neighboring fragments.
   Exhaustive layout remains for sources without an enclosing scroll-declared
   viewport and for observed negative spacing; a single element whose body
