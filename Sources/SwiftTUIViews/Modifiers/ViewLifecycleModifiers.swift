@@ -30,6 +30,7 @@ extension View {
   ) -> some View {
     modifier(
       ChangeLifecycleModifier(
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
         value: value,
         initial: initial,
         action: { _, _ in action() }
@@ -44,6 +45,7 @@ extension View {
   ) -> some View {
     modifier(
       ChangeLifecycleModifier(
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
         value: value,
         initial: initial,
         action: action
@@ -167,6 +169,7 @@ public struct DisappearLifecycleModifier: IterativePrimitiveViewModifier {
 }
 
 public struct ChangeLifecycleModifier<Value: Equatable>: IterativePrimitiveViewModifier {
+  let authoringContext: ImperativeAuthoringContextSnapshot?
   var value: Value
   var initial: Bool
   let action: (Value, Value) -> Void
@@ -175,7 +178,10 @@ public struct ChangeLifecycleModifier<Value: Equatable>: IterativePrimitiveViewM
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
-    let intake = HandlerDescriptorIntake(context: context)
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      preferringSnapshot: authoringContext
+    )
     return content.resolveWork(in: context).map { completed in
       let node = completed
       let viewGraph = context.viewGraph
