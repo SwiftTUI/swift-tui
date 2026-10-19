@@ -116,6 +116,21 @@ struct ScrollFocusRecoveryTests {
     #expect(ledger.activated == [1])
   }
 
+  @Test
+  func contentRelocationDoesNotRevealAControlScrolledOutOfView() throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("HiddenFocusRelocation"), size: CellSize(width: 48, height: 12)
+    ) { RecoveryHiddenFocusFixture() }
+    defer { harness.shutdown() }
+    _ = try harness.focusText("TARGET")
+    _ = try harness.pressKey(KeyPress(.character("w"), modifiers: .ctrl))
+    try #require(!harness.frame.contains("TARGET"))
+    try #require(harness.frame.contains("Offset: 10"))
+    _ = try harness.pressKey(KeyPress(.character("g"), modifiers: .ctrl))
+    #expect(!harness.frame.contains("TARGET"))
+    #expect(harness.frame.contains("Offset: 10"))
+  }
+
 }
 
 enum RecoveryScrollContainer: String, CaseIterable, Sendable {
@@ -211,6 +226,36 @@ private struct RecoveryLabelButtonStyle: ButtonStyle {
   @MainActor
   func makeBody(configuration: ButtonStyleConfiguration) -> some View {
     configuration.label
+  }
+}
+
+@MainActor
+private struct RecoveryHiddenFocusFixture: View {
+  @State private var expanded = false
+  @State private var position = ScrollCellOffset.zero
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ScrollView(.vertical, position: $position) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Before").frame(height: expanded ? 5 : 1)
+          Button("TARGET") {}
+          ForEach(0..<30, id: \.self) { row in Text("Tail \(row)") }
+        }
+      }
+      .scrollIndicators(.hidden)
+      .frame(width: 32, height: 4, alignment: .topLeading)
+      Text("Offset: \(position.y)")
+    }
+    .buttonStyle(RecoveryLabelButtonStyle())
+    .onKeyPress(.character("w"), modifiers: .ctrl) { _ in
+      position = ScrollCellOffset(x: 0, y: 10)
+      return .handled
+    }
+    .onKeyPress(.character("g"), modifiers: .ctrl) { _ in
+      expanded = true
+      return .handled
+    }
   }
 }
 

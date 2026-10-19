@@ -223,6 +223,7 @@ outside Tab traversal. Explicit scroll input or a replaced offset binding
 takes precedence over geometry recovery for unchanged focus. A proxy command
 retains this priority even when its requested offset is already current.
 Scrolling away afterward therefore does not snap back to the focused control.
+Later content changes also leave that deliberately hidden control out of view.
 Nested scroll views reveal a newly focused descendant through each containing
 viewport; scrolling an inner viewport does not relocate its ancestor viewport.
 

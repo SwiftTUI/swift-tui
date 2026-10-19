@@ -95,8 +95,8 @@ package final class LocalScrollPositionRegistry: Equatable {
   }
   private var pendingCollectionTargets: [Identity: PendingCollectionTarget] = [:]
   /// What each scroll route last auto-revealed (focused element + text cursor),
-  /// keyed by the route identity. Lets `sync` reveal changed focus, cursor, or
-  /// content geometry instead of enforcing a standing per-frame constraint
+  /// keyed by the route identity. Lets `sync` reveal changed focus or cursor
+  /// instead of enforcing a standing per-frame constraint
   /// that would fight user-initiated wheel/drag scrolling.
   ///
   /// This is interaction session state, deliberately decoupled from the
@@ -712,15 +712,15 @@ package final class LocalScrollPositionRegistry: Equatable {
     // the focused control's position (the "scroll stalls partway, click a
     // surface to continue" bug).
     //
-    // Ancestor routes reveal new focus and content relocation, while deliberate
+    // Ancestor routes reveal new focus, while deliberate
     // scroll input for unchanged focus takes precedence. Descendant routes inside
-    // a focused editor also follow its text cursor. Content-relative target
-    // positions distinguish relocation from ordinary scrolling; clipped focus
-    // region positions cannot. Carry corrected rectangles only through recorded
-    // scroll containment links so nested viewports reveal in the same eager pass.
+    // a focused editor also follow its text cursor. Geometry recovery runs before
+    // focus regions are replaced and requires previous visibility. Carry corrected
+    // rectangles through recorded scroll containment links so nested viewports
+    // reveal in the same eager pass.
 
     var changed = false
-    var containingScrollTargets: [Identity: (rect: CellRect, descendantOffset: ScrollOffset)] = [:]
+    var containingScrollTargets: [Identity: CellRect] = [:]
     for route in scrollRoutes.reversed() {
       // An explicit `.id` re-roots identity, making the focused control an
       // identity SIBLING of its spatially enclosing scroll view — the
@@ -734,8 +734,7 @@ package final class LocalScrollPositionRegistry: Equatable {
       let containingTarget = latestScrollTargets.first { target in
         target.scrollIdentity == route.identity && containingScrollTargets[target.identity] != nil
       }
-      let inheritedTarget = containingTarget.flatMap { containingScrollTargets[$0.identity] }
-      let inheritedRect = inheritedTarget?.rect
+      let inheritedRect = containingTarget.flatMap { containingScrollTargets[$0.identity] }
       let followsCursor =
         focusedCursorRect != nil && route.identity.isDescendant(of: focusedIdentity)
       guard
@@ -746,34 +745,11 @@ package final class LocalScrollPositionRegistry: Equatable {
         continue
       }
 
-      // The focused REGION rect is viewport-clamped, so a relocation that
-      // pushed the still-focused control offscreen both (a) leaves the
-      // identity-only anchor unchanged and (b) reports a rect that already
-      // reads as visible. The target rect is the unclamped placed frame:
-      // key the anchor by its content-relative origin (scroll-invariant,
-      // relocation-sensitive) and reveal against it.
+      // Focus regions are viewport-clamped; reveal the unclamped target frame.
       let targetRect = focusedTarget?.rect ?? inheritedRect ?? revealRect
-      let descendantOffset: ScrollOffset
-      if focusedTarget == nil {
-        descendantOffset = inheritedTarget?.descendantOffset ?? .zero
-      } else {
-        descendantOffset = .zero
-      }
-      let contentAnchor: CellPoint?
-      if focusedTarget != nil || inheritedRect != nil {
-        // Inner scrolling changes viewport coordinates, not content geometry.
-        // Normalize it out of the ancestor's one-shot reveal key.
-        contentAnchor =
-          contentRect(
-            targetRect, in: route, descendantOffset: descendantOffset
-          ).origin
-      } else {
-        contentAnchor = nil
-      }
       let revealKey = ScrollRevealAnchor(
         focusedIdentity: focusedIdentity,
-        cursorAnchor: followsCursor ? focusedCursorAnchor : nil,
-        contentAnchor: followsCursor ? nil : contentAnchor
+        cursorAnchor: followsCursor ? focusedCursorAnchor : nil
       )
       let previousReveal = lastRevealAnchors[route.identity]
       let isFreshReveal = previousReveal != revealKey
@@ -781,12 +757,7 @@ package final class LocalScrollPositionRegistry: Equatable {
       let currentOffset = registration.currentOffset()
       let placedOffset = layoutOffset(
         currentOffset, in: route, preservesProducerOffset: registration.revealTarget != nil)
-      containingScrollTargets[route.identity] = (
-        targetRect,
-        ScrollOffset(
-          x: placedOffset.x + descendantOffset.x,
-          y: placedOffset.y + descendantOffset.y)
-      )
+      containingScrollTargets[route.identity] = targetRect
       let hasNewInput =
         explicitScrollRoutes.contains(route.identity)
         || hasNewScrollInput(in: route, registration: registration)
@@ -811,12 +782,7 @@ package final class LocalScrollPositionRegistry: Equatable {
           x: targetRect.origin.x - (adjustedOffset.x - placedOffset.x),
           y: targetRect.origin.y - (adjustedOffset.y - placedOffset.y)),
         size: targetRect.size)
-      containingScrollTargets[route.identity] = (
-        correctedRect,
-        ScrollOffset(
-          x: adjustedOffset.x + descendantOffset.x,
-          y: adjustedOffset.y + descendantOffset.y)
-      )
+      containingScrollTargets[route.identity] = correctedRect
       changed = true
     }
 
@@ -1159,14 +1125,9 @@ package final class LocalScrollPositionRegistry: Equatable {
 
 /// Identifies what a scroll route last auto-revealed: the focused element and,
 /// for a focused text input, its cursor anchor. `sync` re-reveals only when this
-/// changes (focus moved, a cursor advanced, or content relocated), while deliberate
+/// changes (focus moved or a cursor advanced), while deliberate
 /// scrolling of an unchanged focused control retains priority. See `sync`.
 private struct ScrollRevealAnchor: Equatable {
   var focusedIdentity: Identity
   var cursorAnchor: CellPoint?
-  /// The focused target's content-relative origin (target rect against the
-  /// route's content bounds). Invariant under user scrolling — placement
-  /// shifts both uniformly — but changed by a structural relocation of the
-  /// still-focused identity, which must re-reveal.
-  var contentAnchor: CellPoint?
 }
