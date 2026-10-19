@@ -109,7 +109,7 @@ struct GalleryStyleDispatchTests {
 
   @Test("Palette commands do not duplicate across partial-invalidation re-resolves")
   func paletteCommandsDoNotAccumulate() throws {
-    let runLoop = makeRunLoopLocal {
+    let runLoop = makeRunLoopLocal(terminalSize: CellSize(width: 40, height: 12)) {
       PaletteDupProbeRoot()
     }
     try renderInitial(runLoop)
