@@ -143,17 +143,6 @@ jobs:
           set -euo pipefail
           sh ./Scripts/test_gate.sh --skip-bun-install
 
-      - name: Public semantic differential fixtures
-        shell: bash
-        run: python3 Scripts/run_public_semantics.py
-
-      - name: Upload public semantic observations
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: public-semantics-macos
-          path: .build/public-semantics
-
       - name: Source structure observations
         if: always()
         shell: bash
@@ -168,13 +157,66 @@ jobs:
           name: source-observations-macos
           path: .build/source-observations
 
+  public-semantics:
+    name: macOS public semantic fixtures
+    runs-on: macos-26
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
+    # The adapter uses an uninstrumented build, so it cannot reuse the repo
+    # gate's module-trace build. Running it after the ~61-minute gate exhausted
+    # that job's 75-minute cap (39304126780). Give the comparison its own budget;
+    # the adapter retains its 120s compiler, 30s oracle and 900s SwiftTUI bounds.
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+          ~/.swiftly/bin/swiftly init --skip-install --quiet-shell-followup --assume-yes
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          hash -r
+          swift_version="$(tr -d '[:space:]' < .swift-version)"
+          swiftly install --use --assume-yes "$swift_version"
+          swiftly run swift --version
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-gate-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-gate-
+            ${{ runner.os }}-swiftpm-
+
+      - name: Public semantic differential fixtures
+        shell: bash
+        run: python3 Scripts/run_public_semantics.py
+
+      - name: Upload public semantic observations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-semantics-macos
+          path: .build/public-semantics
+
   record:
     name: Record green verdict
     runs-on: ubuntu-24.04
     needs:
       - changes
       - macos-gate
-    if: needs.changes.outputs.changed == 'true' && needs.macos-gate.result == 'success'
+      - public-semantics
+    if: needs.changes.outputs.changed == 'true' && needs.macos-gate.result == 'success' && needs.public-semantics.result == 'success'
     timeout-minutes: 5
     steps:
       - name: Checkout

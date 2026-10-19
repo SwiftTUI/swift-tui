@@ -2,7 +2,9 @@
 
 Run `python3 Scripts/run_public_semantics.py` on native macOS. Results, compiler
 logs and a behavioral diff are written to `.build/public-semantics/`. The macOS
-gate executes the comparison and uploads its artifacts. Linux records six
+workflow executes the comparison in a separate 25-minute job alongside the
+75-minute repo gate and uploads its artifacts. Both jobs must pass before the
+workflow records a green verdict. Linux records six
 named unsupported skips for the Apple adapter; these are never counted as
 passing parity. The SwiftTUI fixture itself also runs in the normal native tests.
 
