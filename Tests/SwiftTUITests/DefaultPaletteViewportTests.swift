@@ -85,13 +85,56 @@ struct DefaultPaletteViewportTests {
     host.size = CellSize(width: 72, height: 30)
     loop.scheduler.requestSignal(named: "SIGWINCH")
     try loop.renderPendingFrames(renderedFrames: &rendered)
-    #expect(host.frame.contains("Command 1"))
-    #expect(!host.frame.contains("Command 00"))
+    // A cleared query with Command 19 still selected would show commands 08
+    // and 09 too. Check the complete result window, not text shared by the
+    // filter field and command labels. Command 01 is also a fuzzy match.
+    let visibleCommands = (0..<20).filter { host.frame.contains(commandName($0)) }
+    #expect(visibleCommands == [1] + Array(10..<20), "\(host.frame)")
     #expect(host.frame.contains("> Command 19"))
     #expect(loop.handleKeyPress(KeyPress(.return)) == nil)
     try loop.renderPendingFrames(renderedFrames: &rendered)
     #expect(probe.activated == [19])
     #expect(!host.frame.contains("Command "))
+  }
+
+  @Test("native palette keeps no-match feedback visible", arguments: [8, 9, 10, 11, 12, 20, 30])
+  func noMatchesStaysVisible(height: Int) throws {
+    let probe = PaletteViewportProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PaletteNoMatches", String(height)),
+      size: CellSize(width: 72, height: height)
+    ) { PaletteViewportFixture(probe: probe) }
+    defer { harness.shutdown() }
+
+    _ = try harness.paste("zzz")
+    #expect(harness.frame.contains("No matches."), "\(harness.frame)")
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(probe.activated.isEmpty)
+    #expect(harness.frame.contains("No matches."))
+
+    for _ in 0..<3 { _ = try harness.pressKey(KeyPress(.backspace)) }
+    #expect(harness.frame.contains("> Command 00"), "\(harness.frame)")
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(probe.activated == [0])
+    #expect(!harness.frame.contains("Command "))
+  }
+
+  @Test(
+    "native palette keeps an empty command scope visible", arguments: [8, 9, 10, 11, 12, 20, 30])
+  func emptyScopeStaysVisible(height: Int) throws {
+    let probe = PaletteViewportProbe()
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PaletteEmptyScope", String(height)),
+      size: CellSize(width: 72, height: height)
+    ) { PaletteViewportFixture(probe: probe, commandCount: 0) }
+    defer { harness.shutdown() }
+
+    #expect(harness.frame.contains("No commands in the current scope."), "\(harness.frame)")
+    _ = try harness.pressKey(KeyPress(.return))
+    #expect(probe.activated.isEmpty)
+    #expect(harness.frame.contains("No commands in the current scope."))
+    _ = try harness.pressKey(KeyPress(.escape))
+    #expect(!harness.frame.contains("No commands in the current scope."))
   }
 }
 
@@ -107,11 +150,12 @@ private final class PaletteViewportProbe {
 @MainActor
 private struct PaletteViewportFixture: View {
   let probe: PaletteViewportProbe
+  var commandCount = 20
   @State private var isPresented = true
 
   var body: some View {
     Panel(id: "commands") {
-      ForEach(0..<20, id: \.self) { index in
+      ForEach(0..<commandCount, id: \.self) { index in
         Panel(id: index) { EmptyView() }
           .paletteCommand(name: commandName(index), action: { probe.activated.append(index) })
       }

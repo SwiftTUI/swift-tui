@@ -112,7 +112,8 @@ private struct DefaultPaletteStyleBody: View {
     if rows.isEmpty {
       Text(commands.isEmpty ? "No commands in the current scope." : "No matches.")
         .foregroundStyle(.separator)
-        .padding(.vertical, 1)
+        // Reserve decorative padding only when it fits alongside the message.
+        .padding(.vertical, maximumVisibleRows >= 3 ? 1 : 0)
     } else {
       let selected = effectiveSelectedIndex(in: rows)
       let visibleRange = visibleRange(in: rows, selectedIndex: selected ?? 0)
