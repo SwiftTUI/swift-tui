@@ -1504,9 +1504,16 @@ package final class ViewNode {
 
   package var hasCurrentMemoReadCertificates: Bool {
     guard !dependencies.hasUncertifiedObservableReads,
-      dependencies.observableReads.isEmpty || !dependencies.observationCertificates.isEmpty,
-      dependencies.observationCertificates.allSatisfy(\.isCurrent)
+      dependencies.observableReads.isEmpty || !dependencies.observationCertificates.isEmpty
     else { return false }
+    guard dependencies.observationCertificates.allSatisfy(\.isCurrent) else {
+      #if DEBUG
+        // A fired certificate can deny reuse before mailbox delivery. The
+        // certificate is lifetime-scoped; no property name is available.
+        ownerGraph?.debugBodyChanges.note(.observation, owner: ownerLifetimeID)
+      #endif
+      return false
+    }
     for key in dependencies.stateSlotReads {
       guard let version = dependencies.stateReadCertificates[key]?.version,
         let owner = ownerGraph?.nodeForOwnerLifetimeID(key.owner),

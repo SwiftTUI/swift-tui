@@ -795,3 +795,32 @@ extension View {
     }
   }
 }
+
+#if DEBUG
+  extension State: BodyDebugStateDeclaring {
+    package func bodyDebugStateSlot(path: StateSlotPath) -> StateSlotKey? {
+      guard let owner = capture?.owner ?? currentAuthoringContext()?.stateOwnerHandle else {
+        return nil
+      }
+      return StateSlotKey(
+        owner: owner.ownerLifetime,
+        slot: .init(ordinal: box.currentOrdinal, path: capture?.path ?? path))
+    }
+  }
+
+  extension Binding: BodyDebugStateDeclaring {
+    package func bodyDebugStateSlot(path: StateSlotPath) -> StateSlotKey? {
+      guard let source = bindingSourceID, let scope = BodyChangeScope.current else { return nil }
+      let candidates = (scope.prior?.states ?? []).union(
+        ViewNodeContext.current?.dependencies.stateSlotReads ?? [])
+      return candidates.first { key in
+        source
+          == AnyID(
+            StateBindingSource(
+              owner: StateOwnerHandle(
+                graphScope: .init(rawValue: scope.graph), ownerLifetime: key.owner),
+              slot: key.slot))
+      }
+    }
+  }
+#endif

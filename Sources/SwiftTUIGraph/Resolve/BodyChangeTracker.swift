@@ -12,6 +12,7 @@
       case environment(ObjectIdentifier)
       case observation
       case explicit
+      case input(ObjectIdentifier)
       case dynamicProperty
     }
 
@@ -31,6 +32,7 @@
     package struct Pending {
       package var reasons: [Reason: UInt64] = [:]
       package var omitted = 0
+      package var lastOverflow: UInt64 = 0
     }
 
     package struct Entry {
@@ -64,6 +66,7 @@
         pending.reasons[reason] = sequence
       } else {
         pending.omitted = min(Int.max - 1, pending.omitted) + 1
+        pending.lastOverflow = sequence
       }
       snapshot.pending[owner] = pending
     }
@@ -84,7 +87,8 @@
       pending.reasons = pending.reasons.filter { $0.value > entry.sequence }
       // An overflow cannot be attributed to an individual write. Keep the
       // uncertainty if any write arrived after the entry snapshot.
-      if pending.reasons.isEmpty {
+      if pending.lastOverflow <= entry.sequence { pending.omitted = 0 }
+      if pending.reasons.isEmpty && pending.omitted == 0 {
         snapshot.pending.removeValue(forKey: owner)
       } else {
         snapshot.pending[owner] = pending
@@ -143,6 +147,7 @@
     package var reads: BodyChangeTracker.History
     private var readBeforeEnrollment = false
     package var names: (() -> [StateSlotKey: String])?
+    private var cachedNames: [StateSlotKey: String]?
 
     package init(
       tracker: BodyChangeTracker, key: BodyChangeTracker.Key, type: Any.Type,
@@ -198,7 +203,8 @@
     package func record() -> BodyChangeRecord {
       if !enrolled { reads.complete = !readBeforeEnrollment }
       enrolled = true
-      let propertyNames = names?() ?? [:]
+      if cachedNames == nil { cachedNames = names?() ?? [:] }
+      let propertyNames = cachedNames ?? [:]
       var causes: Set<BodyChangeRecord.Cause> = []
       if entry?.initial == true {
         causes.insert(.init("identity", precision: "exact", property: "@identity"))
@@ -221,6 +227,10 @@
           }
         case .observation: causes.insert(.init("observation"))
         case .explicit: causes.insert(.init("explicit"))
+        case .input(let type):
+          if type == key.type {
+            causes.insert(.init("input", precision: "exact", property: "@self"))
+          }
         case .dynamicProperty: causes.insert(.init("dynamic-property", precision: "unavailable"))
         }
       }

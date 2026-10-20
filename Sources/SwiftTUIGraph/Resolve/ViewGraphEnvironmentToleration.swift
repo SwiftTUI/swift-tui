@@ -62,6 +62,19 @@ extension ViewGraph {
       return .equal
     }
     let diff = environment.typedDiff(from: committed)
+    #if DEBUG
+      // Reuse already computed this diff. Record only actual readers, and
+      // never run additional value equality just to explain a body.
+      for key in diff.changedTypedKeys {
+        for id in environmentDependents[key] ?? [] {
+          if let reader = nodesByNodeID[id],
+            reader === node || reader.isDescendantBridgingIslandSeams(of: node)
+          {
+            debugBodyChanges.note(.environment(key), owner: reader.ownerLifetimeID)
+          }
+        }
+      }
+    #endif
     // A key present on one side only, an untyped-value difference, a style
     // difference, or a signature difference: none of these are
     // reader-attributed, so none can be argued away by a reader set.
