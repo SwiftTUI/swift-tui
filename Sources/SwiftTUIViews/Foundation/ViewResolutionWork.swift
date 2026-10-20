@@ -262,7 +262,13 @@ package func resolveViewElementsWork<V: View>(
     let bound = bindingBodyDynamicPropertyCaptures(view, in: context)
     let authoring = currentAuthoringContext() ?? makeAuthoringContext(for: context)
     return withAuthoringContext(authoring) {
-      let body = context.trackingObservableAccess { bound.body }
+      #if DEBUG
+        let body = withBodyChangeScope(bound, kind: "view") {
+          context.trackingObservableAccess { bound.body }
+        }
+      #else
+        let body = context.trackingObservableAccess { bound.body }
+      #endif
       return resolveViewElementsWork(body, in: context)
     }
   }

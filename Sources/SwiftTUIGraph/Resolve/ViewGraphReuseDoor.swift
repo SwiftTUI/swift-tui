@@ -110,9 +110,19 @@ extension ViewGraph {
     case .unchanged:
       break
     case .changed:
+      #if DEBUG
+        if let node = nodeIfExists(for: inputs.identity) {
+          debugBodyChanges.note(.dynamicProperty, owner: node.ownerLifetimeID)
+        }
+      #endif
       ReuseDenialTrace.record("dynamic-property-changed")
       return nil
     case .uncertified:
+      #if DEBUG
+        if let node = nodeIfExists(for: inputs.identity) {
+          debugBodyChanges.note(.dynamicProperty, owner: node.ownerLifetimeID)
+        }
+      #endif
       ReuseDenialTrace.record("dynamic-property-uncertified")
       return nil
     }

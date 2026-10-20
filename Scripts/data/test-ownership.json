@@ -658,6 +658,10 @@
       "category": "graph",
       "reason": "Graph state, identity and reconciliation; existing ownership retained."
     },
+    "Tests/SwiftTUIGraphTests/BodyChangeTrackerTests.swift": {
+      "category": "target-contract",
+      "reason": "Graph-owned diagnostic history, lifetime and checkpoint contracts."
+    },
     "Tests/SwiftTUIGraphTests/ChangeObservationPassStabilityTests.swift": {
       "category": "graph",
       "reason": "Graph state, identity and reconciliation; existing ownership retained."
@@ -1121,6 +1125,10 @@
     "Tests/SwiftTUITests/BindingProjectionRuntimeTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/BodyChangeDebuggingTests.swift": {
+      "category": "integration",
+      "reason": "Composed runtime behavior of authored view and modifier diagnostics."
     },
     "Tests/SwiftTUITests/BorderGradientTests.swift": {
       "category": "runtime-integration",

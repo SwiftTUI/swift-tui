@@ -3135,7 +3135,18 @@ package final class ViewGraph {
     // compare without reflection, and an unplannable value is skipped rather
     // than reflected over — the reflective path costs more than the body
     // re-run it saves (the 06-17 A/B), so it stays diagnostic-only.
-    guard MemoValueComparator.compareForReuse(priorViewValue, viewValue) == .equal else {
+    let inputComparison = MemoValueComparator.compareForReuse(priorViewValue, viewValue)
+    guard inputComparison == .equal else {
+      #if DEBUG
+        // Reuse's existing Equatable witness is evidence; byte inequality and
+        // opaque/blocked comparisons are not. Never invoke equality again.
+        if inputComparison == .changed, type(of: priorViewValue) == type(of: viewValue),
+          priorViewValue is any Equatable
+        {
+          debugBodyChanges.note(
+            .input(ObjectIdentifier(type(of: viewValue))), owner: node.ownerLifetimeID)
+        }
+      #endif
       return nil
     }
     guard memoSubtreeHasCurrentReadCertificates(node) else { return nil }

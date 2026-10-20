@@ -355,12 +355,14 @@ extension ModifiedContent: View where Content: View, Modifier: ViewModifier {
     // a nested field of this wrapper would append a field path the update
     // pass never claims (the outer walk excludes fields 0/1 for the same
     // reason).
-    return bindingForwardedDynamicPropertyCaptures(modifier).body(
-      content: ViewModifierContent(
-        base: content,
-        authoringScope: authoringScope
-      )
-    )
+    let bound = bindingForwardedDynamicPropertyCaptures(modifier)
+    #if DEBUG
+      return withBodyChangeScope(bound, kind: "modifier") {
+        bound.body(content: ViewModifierContent(base: content, authoringScope: authoringScope))
+      }
+    #else
+      return bound.body(content: ViewModifierContent(base: content, authoringScope: authoringScope))
+    #endif
   }
 }
 

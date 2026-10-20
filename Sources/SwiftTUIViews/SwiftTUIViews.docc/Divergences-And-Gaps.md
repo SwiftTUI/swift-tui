@@ -40,6 +40,20 @@ are omitted even when SwiftUI exposes a corresponding API.
   Browser roles are exclusive; selected state composes independently.
   Device-only traits are not accepted as no-op declarations.
 
+## Body change diagnostics
+
+- **`View` and `ViewModifier` expose `_printChanges()` and `_logChanges()`.**
+  *Ratified.* These are supported SwiftTUI debugging methods inspired by
+  SwiftUI's underscored helpers, not a promise of identical output. Place them
+  at the beginning of the authored body. They describe evaluation attempts;
+  reused bodies are silent and an attempt may be discarded before presentation.
+  Both compile in release and do nothing when the framework is built without
+  `DEBUG`. Output is bounded, value-free, and best-effort: state and environment
+  read evidence can be exact, observation is owner-only, and incomplete history
+  or opaque inputs are marked unavailable. `@self` requires an existing trusted
+  input comparison. The log format is diagnostic, not a public event schema.
+  See the runtime's **Logging and Diagnostics** guide for destinations.
+
 ## Omissions
 
 - **No value-based `NavigationLink` yet.** *Provisional.* A push currently
