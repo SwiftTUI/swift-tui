@@ -1,3 +1,5 @@
+import Synchronization
+
 package enum BodyChangeFormat: Sendable {
   case text
   case json
@@ -23,13 +25,38 @@ package enum BodyChangeOutput {
       if let sink {
         sink.emit(record, format)
       } else {
-        DebugLogRouter.emit(
-          record.formatted(format),
-          toFileAt: DebugLogRouter.resolvedFilePath(
-            override: nil, bundleFileName: format == .text ? "changes.log" : "changes.jsonl"))
+        emitPortable(record, format: format)
       }
     #endif
   }
+  private static let suppressed = Mutex<Int>(0)
+
+  package static func emitPortable(
+    _ record: BodyChangeRecord, format: BodyChangeFormat, descriptor: Int32 = 2
+  ) {
+    let written = DebugLogRouter.emit(
+      record.formatted(format),
+      toFileAt: DebugLogRouter.resolvedFilePath(
+        override: nil, bundleFileName: format == .text ? "changes.log" : "changes.jsonl"),
+      fallback: .safeStandardError, standardErrorDescriptor: descriptor)
+    if !written { suppressed.withLock { $0 = min($0, Int.max - 1) + 1 } }
+  }
+
+  /// No record payload is buffered. Report a bounded count after all owned
+  /// terminals are restored. If stderr is still disconnected, retain the count.
+  package static func flushSuppressed(to descriptor: Int32 = 2) {
+    guard !DiagnosticScreenOwnership.isScreenOwned else { return }
+    suppressed.withLock { count in
+      guard count > 0 else { return }
+      if DebugLogRouter.writeDiagnostic(
+        "\nSwiftTUI body diagnostics: \(count) record(s) suppressed; use a debug bundle or redirect stderr to another terminal.\n",
+        to: descriptor)
+      {
+        count = 0
+      }
+    }
+  }
+
 }
 
 extension BodyChangeRecord {

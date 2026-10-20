@@ -117,6 +117,10 @@ import SwiftTUICore
         + " soundness-trace=\(SoundnessProbeConfiguration.isTraceEnabled)"
         + " publication=\(RuntimeRegistrationPublicationDiagnosticsConfiguration.isEnabled)"
     )
+    lines.append(
+      "body-changes: opt-in per body; changes.log (text), changes.jsonl (schema 1); DEBUG builds only"
+    )
+    lines.append("runtime-issues: runtime-issues.log; bundle precedes redirected stderr")
     return lines.joined(separator: "\n") + "\n"
   }
 
