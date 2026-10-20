@@ -93,6 +93,9 @@ extension ViewGraph {
   // unconditionally (whole-group COW assignments), so the checkpoint carries no
   // graph-level mutation state.
   package struct Checkpoint {
+    #if DEBUG
+      package var debugBodyChanges = BodyChangeTracker.Snapshot()
+    #endif
     package var root: ViewNode?
     package var index: GraphIndex
     package var rootEvaluation: RootEvaluation
@@ -111,8 +114,7 @@ extension ViewGraph {
     package var invalidatedOwnerLifetimeIDs: Set<NodeOwnerLifetimeID>
     package var graphLocalDirtyOwnerLifetimeIDs: Set<NodeOwnerLifetimeID>
     package var stateMutationKeys: Set<StateSlotKey>
-    package var stateMutationOwnerLifetimeIDsByKey:
-      [StateSlotKey: Set<NodeOwnerLifetimeID>]
+    package var stateMutationOwnerLifetimeIDsByKey: [StateSlotKey: Set<NodeOwnerLifetimeID>]
 
     package var isEmpty: Bool {
       stateSlots.isEmpty && invalidatedOwnerLifetimeIDs.isEmpty

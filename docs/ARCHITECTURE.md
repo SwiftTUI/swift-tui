@@ -188,6 +188,12 @@ the owning module remains unchanged.
   `SwiftTUIVendorFigletEmbeddedFonts` for the figlet payload value. It builds on
   its own.
 - **`SwiftTUIGraph`** — the reconciliation engine (the AttributeGraph analog).
+  Debug builds also maintain `Resolve/BodyChangeTracker.swift`: bounded,
+  owner-lifetime-scoped body provenance with independent checkpoint history.
+  It observes state/environment/observation invalidations without changing
+  production dependencies. Synchronous getter scopes cannot escape into tasks;
+  diagnostic attempt IDs never rewind when a frame is discarded. The inert
+  record vocabulary lives in `SwiftTUIPrimitives/Support/BodyChangeRecord.swift`.
   It owns the retained `ViewGraph`/`ViewNode`/`ResolvedNode` graph, state slots,
   dependency tracking, invalidation planning, dirty-evaluation planning, reuse
   gates, checkpoints, entity routing, and lifecycle planning. It also owns the

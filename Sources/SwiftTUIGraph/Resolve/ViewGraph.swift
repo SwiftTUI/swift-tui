@@ -1,6 +1,6 @@
 extension ViewGraph {
   package func makeCheckpoint() -> Checkpoint {
-    let checkpoint = GraphCheckpointStore.makeCheckpoint(
+    var checkpoint = GraphCheckpointStore.makeCheckpoint(
       root: root,
       index: index,
       rootEvaluation: rootEvaluation,
@@ -13,6 +13,9 @@ extension ViewGraph {
       frameCommit: frameCommit,
       nodeCheckpoints: nodeCheckpointImageStore.currentImages(of: nodesByNodeID)
     )
+    #if DEBUG
+      checkpoint.debugBodyChanges = debugBodyChanges.snapshot
+    #endif
     // Verify the store-built checkpoint on sampled frames when the soundness
     // probe is opted in. Off-sample captures keep the fast path: no restore,
     // no snapshots.
@@ -122,6 +125,9 @@ extension ViewGraph {
   }
 
   private func restoreCheckpointGraphFields(_ checkpoint: Checkpoint) {
+    #if DEBUG
+      debugBodyChanges.snapshot = checkpoint.debugBodyChanges
+    #endif
     root = checkpoint.root
     index = checkpoint.index
     rootEvaluation = checkpoint.rootEvaluation
@@ -155,6 +161,9 @@ package final class ViewGraph {
   package let resolveDiagnostics = ViewGraphResolveDiagnostics()
 
   #if DEBUG
+    /// Separate diagnostic history; checkpointed without changing production dependencies.
+    package let debugBodyChanges = BodyChangeTracker()
+
     /// Test-only observability for reachability-context construction cost.
     ///
     /// This is diagnostic instrumentation rather than graph state: checkpoint
@@ -1063,6 +1072,13 @@ package final class ViewGraph {
   }
 
   package func invalidate(_ identities: Set<Identity>) {
+    #if DEBUG
+      for id in nodeIDsForInvalidation(identities) {
+        if let owner = nodesByNodeID[id]?.ownerLifetimeID {
+          debugBodyChanges.note(.explicit, owner: owner)
+        }
+      }
+    #endif
     ViewGraphInvalidationPlanner.invalidate(
       nodeIDsForInvalidation(identities),
       invalidatedNodeIDs: &invalidatedNodeIDs,
@@ -1558,6 +1574,11 @@ package final class ViewGraph {
   package func recordStateMutation(
     _ key: StateSlotKey
   ) {
+    #if DEBUG
+      for owner in (stateSlotDependents[key] ?? []).union([key.owner]) {
+        debugBodyChanges.note(.state(key), owner: owner)
+      }
+    #endif
     stateMutationKeys.insert(key)
     stateMutationOwnerLifetimeIDsByKey[key, default: []].insert(key.owner)
   }
@@ -1663,6 +1684,13 @@ package final class ViewGraph {
       graphLocalDirtyNodeIDs: &graphLocalDirtyNodeIDs,
       nodesByNodeID: nodesByNodeID
     )
+    #if DEBUG
+      for key in overlay.stateMutationKeys {
+        for owner in (stateSlotDependents[key] ?? []).union([key.owner]) {
+          debugBodyChanges.note(.state(key), owner: owner)
+        }
+      }
+    #endif
     stateMutationKeys.formUnion(overlay.stateMutationKeys)
     for (key, ownerLifetimeIDs) in overlay.stateMutationOwnerLifetimeIDsByKey {
       stateMutationOwnerLifetimeIDsByKey[key, default: []].formUnion(ownerLifetimeIDs)
@@ -1675,6 +1703,11 @@ package final class ViewGraph {
     guard let viewNodeID = viewNodeID(for: identity) else {
       return
     }
+    #if DEBUG
+      if let owner = nodesByNodeID[viewNodeID]?.ownerLifetimeID {
+        debugBodyChanges.note(.observation, owner: owner)
+      }
+    #endif
     ViewGraphInvalidationPlanner.queueDirty(
       ViewGraphInvalidationPlanner.observationChangeDirtyNodeIDs(
         observedBy: viewNodeID
@@ -1699,6 +1732,13 @@ package final class ViewGraph {
       return
     }
 
+    #if DEBUG
+      for id in dirtyNodeIDs {
+        if let owner = nodesByNodeID[id]?.ownerLifetimeID {
+          for key in changedKeys { debugBodyChanges.note(.environment(key), owner: owner) }
+        }
+      }
+    #endif
     invalidatedNodeIDs.formUnion(dirtyNodeIDs)
     ViewGraphInvalidationPlanner.queueDirty(
       dirtyNodeIDs,
@@ -2121,6 +2161,11 @@ package final class ViewGraph {
     // ancestor's evaluation first, so the drift is gone before the boundary's
     // own (now current) context is built. Free unless something is owing.
     clearEnvironmentDriftAtAndBelow(node)
+    #if DEBUG
+      if !node.isEvaluating {
+        debugBodyChanges.beginOwner(node.ownerLifetimeID, initial: !node.wasPresentAtFrameStart)
+      }
+    #endif
     node.beginEvaluation(
       frameID: currentFrameID,
       invalidator: invalidator,
@@ -2255,6 +2300,9 @@ package final class ViewGraph {
       return nil
     }
 
+    #if DEBUG
+      debugBodyChanges.finishOwner(node.ownerLifetimeID)
+    #endif
     let resolved = resolvedPreservingLayoutRealizedChildren(
       resolved,
       for: node
@@ -2721,6 +2769,17 @@ package final class ViewGraph {
     memoExemption: Bool = false
   ) {
     let node = nodeForResolvedNode(subtree)
+    #if DEBUG
+      // Only inspect pending diagnostic owners, never walk a retained subtree.
+      for owner in debugBodyChanges.snapshot.pending.keys {
+        if let pendingNode = nodesByOwnerLifetimeID[owner],
+          pendingNode.identity == node.identity
+            || pendingNode.identity.isDescendant(of: node.identity)
+        {
+          debugBodyChanges.reused(owner)
+        }
+      }
+    #endif
     node.prepareForFrame(currentFrameID)
 
     if node.wasVisitedThisFrame {

@@ -517,6 +517,9 @@ extension ViewGraph {
     // A sanctioned successor may already serve this immutable owner lifetime.
     // Retiring an older representation must not erase the successor's route.
     if nodesByOwnerLifetimeID[node.ownerLifetimeID] === node {
+      #if DEBUG
+        debugBodyChanges.remove(node.ownerLifetimeID)
+      #endif
       nodesByOwnerLifetimeID.removeValue(forKey: node.ownerLifetimeID)
     }
     // The effect-owner index mirrors `nodesByNodeID` membership exactly (its

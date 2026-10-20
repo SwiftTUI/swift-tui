@@ -712,6 +712,11 @@ package final class ViewNode {
   ) {
     recordDependencyTrackerMutation()
     dependencyTracker.recordStateRead(key, version: version)
+    #if DEBUG
+      if BodyChangeScope.current?.tracker === ownerGraph?.debugBodyChanges {
+        BodyChangeScope.current?.stateRead(key)
+      }
+    #endif
   }
 
   package func recordObservationCertificate(_ certificate: MemoObservationCertificate) {
@@ -961,6 +966,11 @@ package final class ViewNode {
   ) {
     recordDependencyTrackerMutation()
     dependencyTracker.recordEnvironmentRead(key)
+    #if DEBUG
+      if BodyChangeScope.current?.tracker === ownerGraph?.debugBodyChanges {
+        BodyChangeScope.current?.environmentRead(key)
+      }
+    #endif
   }
 
   package func recordEnvironmentWrite(

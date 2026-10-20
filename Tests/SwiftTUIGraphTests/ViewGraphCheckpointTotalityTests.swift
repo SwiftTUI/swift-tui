@@ -166,7 +166,7 @@ struct ViewGraphCheckpointTotalityTests {
           "nextAnimationInputMutationToken",
           "debugReachabilityContextBuildCount",
           "debugReuseCacheEvictionFlushCount",
-          "resolveDiagnostics",
+          "resolveDiagnostics", "debugBodyChanges",
           "preferenceDeltaEscalationRequested",
           "preferenceDeltaNotesThisFrame",
           "declaredChildRecompositionOwners",
@@ -175,7 +175,7 @@ struct ViewGraphCheckpointTotalityTests {
     // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.
     #expect(
       Set(viewGraphCheckpointGroupFields)
-        == groupPropertyNames.union(["root", "nodeCheckpoints"])
+        == groupPropertyNames.union(["root", "nodeCheckpoints", "debugBodyChanges"])
     )
     // Every per-field name across all groups, plus the standalone `root`, is
     // mirrored by the flat debug snapshot — the checkpoint-totality contract
