@@ -20,10 +20,12 @@
 # whitespace. A shard whose regex claims nothing fails the coverage check
 # (`swift test --filter` that matches nothing exits 0 silently).
 #
-# Split from the measured 2026-08-25 lane profile (plan §2 item 3, §5 1a):
-# A ≈ 330 s, B ≈ 320 s, C ≈ 420 s serialized on amd64.
-A|^SwiftTUITests\.FrameworkStress(PopoverTipLifecycle|NavigationPresentation|StateIdentity|ObservationEffects|LayoutLifecycle|LayoutProposal)
-B|^SwiftTUITests\.FrameworkStress
+# The 2026-10-20 amd64 run finished A in 267 s and B in 384 s, while C
+# reached its 1500 s cap with tests still progressing. Share the collection,
+# accessibility and presentation journeys across A/B; keep C as the catch-all.
+# Test selection within each suite, serialization and watchdog bounds stay intact.
+A|^SwiftTUITests\.(FrameworkStress(PopoverTipLifecycle|NavigationPresentation|StateIdentity|ObservationEffects|LayoutLifecycle|LayoutProposal)|Accessibility|Collection|CompositionalLazy|HostedCollection|OffscreenAccessibility|Scroll)
+B|^SwiftTUITests\.(FrameworkStress|InteractiveRuntime|DefaultPalette|Palette|Portal|NestedPresentation)
 C|^SwiftTUITests\.
 isolated|AsyncLifecycleGenerationTests
 isolated|AsyncFrameTailRenderingTests
