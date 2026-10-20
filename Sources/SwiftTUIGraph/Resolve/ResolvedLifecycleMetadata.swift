@@ -6,6 +6,9 @@ public struct LifecycleMetadata: Equatable, Sendable {
   public var appearHandlerIDs: [String]
   public var disappearHandlerIDs: [String]
   public var tasks: [TaskDescriptor]
+  /// Observers accumulated on this resolved element, in inner-first order.
+  /// Graph identity aliases can change while a modifier chain unwinds.
+  package var changeObservationCount: Int = 0
 
   public init(
     appearHandlerIDs: [String] = [],
@@ -24,10 +27,12 @@ public struct LifecycleMetadata: Equatable, Sendable {
   }
 
   public func merging(_ other: Self) -> Self {
-    Self(
+    var merged = Self(
       appearHandlerIDs: appearHandlerIDs + other.appearHandlerIDs,
       disappearHandlerIDs: disappearHandlerIDs + other.disappearHandlerIDs,
       tasks: tasks + other.tasks
     )
+    merged.changeObservationCount = changeObservationCount + other.changeObservationCount
+    return merged
   }
 }
