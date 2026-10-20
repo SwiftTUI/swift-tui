@@ -97,13 +97,35 @@ package enum DebugLogRouter {
 
   /// Emits `message` to the file at `filePath` (created if missing) when one
   /// is configured and writable, otherwise to stderr.
+  package enum FallbackPolicy { case legacyStandardError, safeStandardError }
+
   package static func emit(_ message: String, toFileAt filePath: String?) {
+    _ = emit(message, toFileAt: filePath, fallback: .legacyStandardError)
+  }
+
+  /// Safe callers opt in to terminal protection and bounded nonblocking writes.
+  /// Legacy trace destinations keep their established fallback behavior.
+  @discardableResult
+  package static func emit(
+    _ message: String, toFileAt filePath: String?,
+    fallback: FallbackPolicy,
+    standardErrorDescriptor: Int32 = 2
+  ) -> Bool {
     #if !canImport(WASILibc)
-      if let filePath, !filePath.isEmpty, appendToFile(message, at: filePath) {
-        return
+      if let filePath, !filePath.isEmpty,
+        appendToFile(message, at: filePath, nonblocking: fallback == .safeStandardError)
+      {
+        return true
       }
     #endif
+    if fallback == .safeStandardError {
+      guard DiagnosticScreenOwnership.allowsDiagnosticWrite(to: standardErrorDescriptor) else {
+        return false
+      }
+      return writeDiagnostic(message, to: standardErrorDescriptor)
+    }
     writeToStandardError(message)
+    return true
   }
 
   /// Appends `message` to `path`, returning `false` on any open/write
@@ -111,6 +133,11 @@ package enum DebugLogRouter {
   /// `open` a no-op (see `Standard.File`).
   @discardableResult
   package static func appendToFile(_ message: String, at path: String) -> Bool {
+    appendToFile(message, at: path, nonblocking: false)
+  }
+
+  @discardableResult
+  private static func appendToFile(_ message: String, at path: String, nonblocking: Bool) -> Bool {
     #if canImport(WASILibc)
       return false
     #elseif canImport(ucrt)
@@ -152,12 +179,21 @@ package enum DebugLogRouter {
       }
     #else
       let descriptor = path.withCString { pathPointer in
-        unsafe open(pathPointer, O_WRONLY | O_CREAT | O_APPEND, 0o644)
+        unsafe open(
+          pathPointer, O_WRONLY | O_CREAT | O_APPEND | (nonblocking ? O_NONBLOCK : 0), 0o644)
       }
       guard descriptor >= 0 else {
         return false
       }
       defer { _ = close(descriptor) }
+      if nonblocking {
+        if isatty(descriptor) == 1,
+          !DiagnosticScreenOwnership.allowsDiagnosticWrite(to: descriptor)
+        {
+          return false
+        }
+        return writeDiagnostic(message, to: descriptor)
+      }
       var message = message
       return message.withUTF8 { buffer in
         guard let base = buffer.baseAddress, buffer.count > 0 else {
@@ -181,6 +217,86 @@ package enum DebugLogRouter {
         return true
       }
     #endif
+  }
+
+  private static let diagnosticWriteLock = Mutex<Void>(())
+
+  /// Best-effort delivery without waiting for a slow/disconnected viewer.
+  /// Temporarily uses O_NONBLOCK, restoring the descriptor's flags; no change
+  /// to process-wide signal dispositions. Callers retain/count failed output.
+  package static func writeDiagnostic(_ message: String, to descriptor: Int32) -> Bool {
+    diagnosticWriteLock.withLock { _ in
+      #if canImport(Darwin) || canImport(Glibc) || canImport(Android) || canImport(Musl)
+        var info = stat()
+        guard unsafe fstat(descriptor, &info) == 0 else { return false }
+        if (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFIFO) {
+          // A nonblocking pipe write at most PIPE_BUF bytes is all-or-none.
+          // Drop oversized diagnostics instead of leaving a JSONL fragment.
+          let atomicBytes = fpathconf(descriptor, _PC_PIPE_BUF)
+          guard atomicBytes > 0, message.utf8.count <= atomicBytes else { return false }
+        }
+        let flags = fcntl(descriptor, F_GETFL)
+        guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else { return false }
+        defer { _ = fcntl(descriptor, F_SETFL, flags) }
+        #if canImport(Darwin)
+          let noPipe = fcntl(descriptor, F_GETNOSIGPIPE)
+          guard noPipe >= 0, fcntl(descriptor, F_SETNOSIGPIPE, 1) == 0 else { return false }
+          defer { _ = fcntl(descriptor, F_SETNOSIGPIPE, noPipe) }
+        #else
+          var blocked = sigset_t()
+          var original = sigset_t()
+          var pending = sigset_t()
+          _ = unsafe sigemptyset(&blocked)
+          _ = unsafe sigaddset(&blocked, SIGPIPE)
+          guard unsafe pthread_sigmask(SIG_BLOCK, &blocked, &original) == 0 else { return false }
+          _ = unsafe sigpending(&pending)
+          let wasPending = unsafe sigismember(&pending, SIGPIPE) == 1
+          defer {
+            // Consume a newly generated SIGPIPE before restoring the mask.
+            if !wasPending {
+              _ = unsafe sigpending(&pending)
+              if unsafe sigismember(&pending, SIGPIPE) == 1 {
+                var timeout = timespec(tv_sec: 0, tv_nsec: 0)
+                _ = unsafe sigtimedwait(&blocked, nil, &timeout)
+              }
+            }
+            _ = unsafe pthread_sigmask(SIG_SETMASK, &original, nil)
+          }
+        #endif
+        var message = message
+        return message.withUTF8 { bytes in
+          guard let base = bytes.baseAddress else { return true }
+          var offset = 0
+          var interruptions = 0
+          while offset < bytes.count {
+            let count = unsafe write(descriptor, base.advanced(by: offset), bytes.count - offset)
+            if count > 0 {
+              offset += count
+            } else if count == -1, errno == EINTR, interruptions < 3 {
+              interruptions += 1
+            } else {
+              return false
+            }
+          }
+          return true
+        }
+      #elseif canImport(WASILibc)
+        // WASI fd_write is the host's stderr bridge, never frame stdout.
+        var message = message
+        return message.withUTF8 { bytes in
+          guard let base = bytes.baseAddress else { return true }
+          return unsafe WASILibc.write(descriptor, base, bytes.count) == bytes.count
+        }
+      #elseif canImport(ucrt)
+        var message = message
+        return message.withUTF8 { bytes in
+          guard let base = bytes.baseAddress else { return true }
+          return unsafe _write(descriptor, base, UInt32(bytes.count)) == bytes.count
+        }
+      #else
+        return false
+      #endif
+    }
   }
 
   package static func writeToStandardError(_ message: String) {

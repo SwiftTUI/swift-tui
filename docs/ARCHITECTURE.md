@@ -948,3 +948,17 @@ of the published binding rows. Arbitration checks the authoring owner's live
 node ID. Modifier positions without a seed owner retain a one-shot only for
 that resolved node's lifetime, so republication cannot replay it and a genuine
 remount can establish a new default.
+
+### Body diagnostic destinations
+
+`BodyChangeOutput` in Primitives selects an injected task-local sink or the
+portable router. `DiagnosticScreenOwnership` holds balanced terminal-session
+registrations, capturing device identities rather than assuming stderr reaches
+stdout. `DebugLogRouter` keeps legacy fallback behavior by default; body records
+and runtime issues opt into destination checks and bounded nonblocking writes.
+Body records retain only a suppressed count, while runtime issues retain their
+bounded deferral buffer. Teardown reports losses after all screens are restored.
+`DefaultRenderer` installs its native adapter for each invocation, preserving
+injected sinks and routing Apple structured records through unified logging.
+Graph/authoring products acquire no Apple logging dependency. WASI uses fd 2,
+which the existing browser host delivers through its stderr bridge.

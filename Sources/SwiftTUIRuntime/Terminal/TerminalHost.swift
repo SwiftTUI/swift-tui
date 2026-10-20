@@ -237,7 +237,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       defer {
         if shouldRestoreOnFailure {
           if rawModeSession.ownsScreen {
-            TerminalScreenOwnership.release()
+            TerminalScreenOwnership.release(outputFileDescriptor)
             rawModeSession.ownsScreen = false
           }
           let restorePlan = rawModeSession.restorePlan
@@ -263,7 +263,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       }
       refreshAppearanceIfNeeded()
       try write(TerminalHostEscapeSequences.enterAlternateScreen)
-      TerminalScreenOwnership.acquire()
+      TerminalScreenOwnership.acquire(outputFileDescriptor)
       rawModeSession.ownsScreen = true
       try write(TerminalHostEscapeSequences.clearScreen)
       try write(TerminalHostEscapeSequences.cursor(to: .zero))
@@ -330,7 +330,7 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
           savedSnapshot,
           input: inputFileDescriptor, output: outputFileDescriptor)
       }
-      if rawModeSession.ownsScreen { TerminalScreenOwnership.release() }
+      if rawModeSession.ownsScreen { TerminalScreenOwnership.release(outputFileDescriptor) }
       _ = rawModeSession.deactivate()
       if let outputError { throw outputError }
     }

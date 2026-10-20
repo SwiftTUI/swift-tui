@@ -3,28 +3,20 @@ import SwiftTUIViews
 import Synchronization
 
 extension RuntimeIssueSink {
-  /// Reports runtime issues to standard error, deferring while a terminal
-  /// host owns the screen.
-  ///
-  /// With no owned screen, issues write to stderr immediately, as they always
-  /// have. While a terminal host owns an alternate-screen session, fd 2 is
-  /// the same tty as the frame the issue describes, so a raw write would
-  /// corrupt the screen: instead the issue appends to `runtime-issues.log`
-  /// in the active debug bundle when one is armed, and otherwise lands in a
-  /// bounded deferral buffer that the CLI runner flushes to stderr after
-  /// teardown restores the primary screen — including for sessions that end
-  /// by throwing, which is when the warnings matter most.
-  public static var standardError: RuntimeIssueSink {
+  /// Reports to the active bundle first, then stderr if it is not an owned
+  /// presentation terminal. A separate TTY, file or pipe streams live. Unsafe
+  /// or failed destinations use a bounded buffer, flushed after teardown.
+  public static var standardError: RuntimeIssueSink { standardError(to: 2) }
+
+  package static func standardError(to descriptor: Int32) -> RuntimeIssueSink {
     RuntimeIssueSink { issue in
       let line = issue.description + "\n"
-      guard TerminalScreenOwnership.isScreenOwned else {
-        Standard.Error().write(line)
-        return
-      }
-      if let filePath = DebugLogRouter.resolvedFilePath(
-        override: nil,
-        bundleFileName: "runtime-issues.log"
-      ), DebugLogRouter.appendToFile(line, at: filePath) {
+      if DebugLogRouter.emit(
+        line,
+        toFileAt: DebugLogRouter.resolvedFilePath(
+          override: nil, bundleFileName: "runtime-issues.log"),
+        fallback: .safeStandardError, standardErrorDescriptor: descriptor)
+      {
         return
       }
       DeferredRuntimeIssueBuffer.append(line)
@@ -37,11 +29,16 @@ extension RuntimeIssueSink {
   /// screen is restored and stderr is safe to write again. A no-op when
   /// nothing was deferred.
   package static func flushDeferredStandardErrorIssues() {
+    guard !TerminalScreenOwnership.isScreenOwned else { return }
+    BodyChangeOutput.flushSuppressed()
     let lines = DeferredRuntimeIssueBuffer.drain()
     guard !lines.isEmpty else {
       return
     }
-    Standard.Error().write(lines.joined())
+    if !DebugLogRouter.writeDiagnostic(lines.joined(), to: 2) {
+      // Keep bounded evidence for a later successful flush; no silent loss.
+      for line in lines { DeferredRuntimeIssueBuffer.append(line) }
+    }
   }
 }
 

@@ -1338,6 +1338,10 @@
       "category": "source-policy",
       "reason": "Reads repository sources or manifests to check a structural contract."
     },
+    "Tests/SwiftTUITests/DebugDestinationTests.swift": {
+      "category": "integration",
+      "reason": "Real PTYs and pipes qualify terminal-session diagnostic routing."
+    },
     "Tests/SwiftTUITests/DefaultPaletteViewportTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises native palette selection, activation and host resize through the run loop."

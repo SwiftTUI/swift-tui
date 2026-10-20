@@ -3,11 +3,8 @@ import Testing
 
 @_spi(Runners) @testable import SwiftTUIRuntime
 
-/// Units for the screen-aware `.standardError` runtime-issue sink: while a
-/// terminal host owns an alternate-screen session, issues must not write to
-/// fd 2 (the same tty as the owned screen) — they route to the debug bundle's
-/// `runtime-issues.log` when one is armed, and otherwise into a bounded
-/// deferral buffer the CLI runner flushes after teardown.
+/// Unknown presentation destinations conservatively defer. Concrete PTY,
+/// alias, pipe, bundle and failure paths are covered in DebugDestinationTests.
 @MainActor
 @Suite("Runtime issue screen-aware routing", .serialized)
 struct RuntimeIssueScreenRoutingTests {

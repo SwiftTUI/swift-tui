@@ -432,6 +432,22 @@ public struct DefaultRenderer {
       @escaping @MainActor @Sendable (any PendingFrameWaitReleasing) async -> Void,
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderExecutionResult {
+    #if DEBUG
+      if BodyChangeOutput.sink == nil {
+        return await BodyChangeOutput.$sink.withValue(.nativeRuntime) {
+          await renderCancellableExecution(
+            root, context: context, proposal: proposal, frameInstant: frameInstant,
+            elisionCauses: elisionCauses,
+            elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions,
+            hasNewerRenderIntent: hasNewerRenderIntent,
+            completedFramePolicy: completedFramePolicy,
+            completedFrameAdditionalBlockers: completedFrameAdditionalBlockers,
+            redundantHandlerInstallationsAreVisualOnly: redundantHandlerInstallationsAreVisualOnly,
+            awaitQueuedCancellationSignal: awaitQueuedCancellationSignal,
+            shouldCancelQueued: shouldCancelQueued)
+        }
+      }
+    #endif
     let renderer = self
     // Sampled before computeFrameHead latches the proposal into the selector
     // memory; both elision gates refuse to elide while a changed proposal is
@@ -672,6 +688,16 @@ public struct DefaultRenderer {
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool
   ) -> RenderExecutionResult {
+    #if DEBUG
+      if BodyChangeOutput.sink == nil {
+        return BodyChangeOutput.$sink.withValue(.nativeRuntime) {
+          renderView(
+            root, context: context, proposal: proposal, frameInstant: frameInstant,
+            elisionCauses: elisionCauses,
+            elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions)
+        }
+      }
+    #endif
     let renderer = self
     // Sampled before computeFrameHead latches the proposal (see
     // makeCommitElidedFrameIfOffscreen).
@@ -774,6 +800,16 @@ public struct DefaultRenderer {
     elisionCauses: Set<WakeCause>,
     elisionHasExplicitAnimationTransactions: Bool
   ) async -> RenderExecutionResult {
+    #if DEBUG
+      if BodyChangeOutput.sink == nil {
+        return await BodyChangeOutput.$sink.withValue(.nativeRuntime) {
+          await renderViewAsync(
+            root, context: context, proposal: proposal, frameInstant: frameInstant,
+            elisionCauses: elisionCauses,
+            elisionHasExplicitAnimationTransactions: elisionHasExplicitAnimationTransactions)
+        }
+      }
+    #endif
     let renderer = self
     // Sampled before computeFrameHead latches the proposal (see
     // makeCommitElidedFrameIfOffscreen).
