@@ -35,3 +35,17 @@ package struct BodyChangeRecord: Sendable, Equatable {
     self.omitted = omitted
   }
 }
+
+extension BodyChangeRecord {
+  /// Swift's reflected private type contexts can embed an address. Preserve
+  /// the qualified declaration name without publishing that runtime address.
+  package static func name(of type: Any.Type) -> String {
+    var name = String(reflecting: type)
+    while let start = name.firstRange(of: "(unknown context at $"),
+      let end = name[start.upperBound...].firstIndex(of: ")")
+    {
+      name.replaceSubrange(start.lowerBound...end, with: "(private)")
+    }
+    return name
+  }
+}

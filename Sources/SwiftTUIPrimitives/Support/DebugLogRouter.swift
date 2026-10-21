@@ -232,7 +232,7 @@ package enum DebugLogRouter {
         if (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFIFO) {
           // A nonblocking pipe write at most PIPE_BUF bytes is all-or-none.
           // Drop oversized diagnostics instead of leaving a JSONL fragment.
-          let atomicBytes = fpathconf(descriptor, _PC_PIPE_BUF)
+          let atomicBytes = fpathconf(descriptor, Int32(_PC_PIPE_BUF))
           guard atomicBytes > 0, message.utf8.count <= atomicBytes else { return false }
         }
         let flags = fcntl(descriptor, F_GETFL)

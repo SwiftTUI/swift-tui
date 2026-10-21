@@ -47,17 +47,22 @@
       self.options = options
       let manager = FileManager.default
       spool = manager.temporaryDirectory.appendingPathComponent("swifttui-dev-\(UUID().uuidString)")
-      let bin = ProcessInfo.processInfo.environment["SWIFTLY_BIN_DIR"]
+      let bin =
+        ProcessInfo.processInfo.environment["SWIFTLY_BIN_DIR"]
         ?? manager.homeDirectoryForCurrentUser.appendingPathComponent(".swiftly/bin").path
       swiftly = URL(fileURLWithPath: bin).appendingPathComponent("swiftly")
       guard manager.isExecutableFile(atPath: swiftly.path) else {
         throw DevError("Swiftly is required; set SWIFTLY_BIN_DIR to its installation directory")
       }
-      try manager.createDirectory(at: spool, withIntermediateDirectories: false,
+      try manager.createDirectory(
+        at: spool, withIntermediateDirectories: false,
         attributes: [.posixPermissions: 0o700])
       var initialized = false
       defer { if !initialized { try? manager.removeItem(at: spool) } }
-      guard manager.createFile(atPath: spool.appendingPathComponent("diagnostics.log").path, contents: nil) else {
+      guard
+        manager.createFile(
+          atPath: spool.appendingPathComponent("diagnostics.log").path, contents: nil)
+      else {
         throw DevError("Cannot create compiler diagnostics log")
       }
       if let log = options.eventLog {
@@ -78,8 +83,7 @@
         try? eventHandle?.close()
         try? FileManager.default.removeItem(at: spool)
       }
-      do { return try await runSession() }
-      catch {
+      do { return try await runSession() } catch {
         if let child, child.isRunning {
           child.terminate()
           let deadline = ProcessInfo.processInfo.systemUptime + 2
@@ -102,13 +106,15 @@
       let scalarSource = spool.appendingPathComponent("Contract.swift")
       let scalarObject = spool.appendingPathComponent("Contract.o")
       try """
-        @_cdecl("swifttui_hot_reload_abi")
-        public func abi() -> UInt64 { \(HotReloadABI.version) }
-        @_cdecl("swifttui_hot_reload_toolchain")
-        public func toolchain() -> UInt64 { \(token) }
-        """.write(to: scalarSource, atomically: true, encoding: .utf8)
-      _ = try await command(["run", "swiftc", "-parse-as-library", "-emit-object",
-        scalarSource.path, "-o", scalarObject.path])
+      @_cdecl("swifttui_hot_reload_abi")
+      public func abi() -> UInt64 { \(HotReloadABI.version) }
+      @_cdecl("swifttui_hot_reload_toolchain")
+      public func toolchain() -> UInt64 { \(token) }
+      """.write(to: scalarSource, atomically: true, encoding: .utf8)
+      _ = try await command([
+        "run", "swiftc", "-parse-as-library", "-emit-object",
+        scalarSource.path, "-o", scalarObject.path,
+      ])
       #if os(macOS)
         let exportFlag = "-export_dynamic"
       #else
@@ -118,10 +124,14 @@
       observed = try sourceSnapshot()
       contract = try contractSnapshot()
       dependencies = try dependencySnapshot()
-      message("Building \(options.product). During the session, follow compiler diagnostics at \(spool.path)/diagnostics.log")
-      _ = try await swift(["build", "--build-system", "native", "-c", "debug", "--product", options.product,
+      message(
+        "Building \(options.product). During the session, follow compiler diagnostics at \(spool.path)/diagnostics.log"
+      )
+      _ = try await swift([
+        "build", "--build-system", "native", "-c", "debug", "--product", options.product,
         "-Xswiftc", "-DSWIFTTUI_HOT_RELOAD",
-        "-Xlinker", scalarObject.path, "-Xlinker", exportFlag])
+        "-Xlinker", scalarObject.path, "-Xlinker", exportFlag,
+      ])
       try validateBuildInputs()
       try loadApplicationCommand()
       let executable = binaryDirectory.appendingPathComponent(options.product)
@@ -151,7 +161,8 @@
         }
       }
       let ready = try await awaitStatus { $0.first == "ready" }
-      guard ready.count == 4, UInt64(ready[2]) == HotReloadABI.version, UInt64(ready[3]) == token else {
+      guard ready.count == 4, UInt64(ready[2]) == HotReloadABI.version, UInt64(ready[3]) == token
+      else {
         throw DevError("Running app and driver have different ABI/toolchain contracts")
       }
       record("ready", fields: ["pid": process.processIdentifier])
@@ -162,8 +173,10 @@
           do {
             try self?.observeSources()
             try await Task.sleep(for: .milliseconds(50))
-          } catch is CancellationError { return }
-          catch { self?.observationError = error; return }
+          } catch is CancellationError { return } catch {
+            self?.observationError = error
+            return
+          }
         }
       }
       defer { observer.cancel() }
@@ -172,14 +185,17 @@
         try observeSources()
         guard try contractSnapshot() == contract else {
           record("restart_required")
-          throw DevError("Package.swift, Package.resolved or .swift-version changed; restart swifttui-dev")
+          throw DevError(
+            "Package.swift, Package.resolved or .swift-version changed; restart swifttui-dev")
         }
         if ProcessInfo.processInfo.systemUptime - lastDependencyCheck >= 1 {
           try validateBuildInputs()
           lastDependencyCheck = ProcessInfo.processInfo.systemUptime
         }
         if let candidate = pending,
-          ProcessInfo.processInfo.systemUptime - changedAt >= Double(options.debounceMilliseconds) / 1000 {
+          ProcessInfo.processInfo.systemUptime - changedAt >= Double(options.debounceMilliseconds)
+            / 1000
+        {
           if sequence >= options.maximumReloads {
             message("Image limit reached; restart swifttui-dev to release loaded code")
             record("restart_required")
@@ -213,7 +229,8 @@
           try validateBuildInputs()
           guard try await swift(["--version"]) == toolchainText else {
             try? FileManager.default.removeItem(at: image)
-            throw DevError("Dependency or toolchain changed during compilation; restart swifttui-dev")
+            throw DevError(
+              "Dependency or toolchain changed during compilation; restart swifttui-dev")
           }
           // Version probing is asynchronous too; reject edits that arrived
           // after relinking, immediately before publication.
@@ -232,19 +249,23 @@
             throw DevError("The app exited before reload delivery")
           }
           let status = try await awaitStatus {
-            ($0.first == "committed" || $0.first == "error") && $0.count >= 2 && UInt64($0[1]) == self.sequence
+            ($0.first == "committed" || $0.first == "error") && $0.count >= 2
+              && UInt64($0[1]) == self.sequence
           }
           if status.first == "error" {
             record("load_failed", fields: ["detail": status.dropFirst(2).joined(separator: " ")])
             message("Reload refused: \(status.dropFirst(2).joined(separator: " "))")
           } else {
             pendingDiagnostic = nil
-            record("committed", fields: [
-              "buildToFrameMilliseconds": (ProcessInfo.processInfo.systemUptime - began) * 1000,
-              "observedEditToFrameMilliseconds": (ProcessInfo.processInfo.systemUptime - candidateEditedAt) * 1000,
-              "droppedSlots": status.count > 2 ? Int(status[2]) ?? 0 : 0,
-              "loadedImages": status.count > 3 ? Int(status[3]) ?? 0 : 0,
-            ])
+            record(
+              "committed",
+              fields: [
+                "buildToFrameMilliseconds": (ProcessInfo.processInfo.systemUptime - began) * 1000,
+                "observedEditToFrameMilliseconds":
+                  (ProcessInfo.processInfo.systemUptime - candidateEditedAt) * 1000,
+                "droppedSlots": status.count > 2 ? Int(status[2]) ?? 0 : 0,
+                "loadedImages": status.count > 3 ? Int(status[3]) ?? 0 : 0,
+              ])
           }
         }
         try await Task.sleep(for: .milliseconds(50))
@@ -266,12 +287,17 @@
       let stdout = spool.appendingPathComponent("stdout.log")
       let stderr = spool.appendingPathComponent("stderr.log")
       guard FileManager.default.createFile(atPath: stdout.path, contents: nil),
-        FileManager.default.createFile(atPath: stderr.path, contents: nil) else {
+        FileManager.default.createFile(atPath: stderr.path, contents: nil)
+      else {
         throw DevError("Cannot create compiler output files")
       }
       let out = try FileHandle(forWritingTo: stdout)
       let err = try FileHandle(forWritingTo: stderr)
-      defer { try? out.close(); try? err.close(); commandProcess = nil }
+      defer {
+        try? out.close()
+        try? err.close()
+        commandProcess = nil
+      }
       process.standardOutput = out
       process.standardError = err
       process.standardInput = FileHandle.nullDevice
@@ -281,17 +307,37 @@
         do { try process.run() } catch { continuation.resume(throwing: error) }
       }
       guard status == 0 else {
-        let diagnostics = ((try? String(contentsOf: stdout, encoding: .utf8)) ?? "")
+        let diagnostics =
+          ((try? String(contentsOf: stdout, encoding: .utf8)) ?? "")
           + ((try? String(contentsOf: stderr, encoding: .utf8)) ?? "")
-        throw DevError("Command exited \(status): \(diagnostics.suffix(6000))")
+        // Swiftly appends process/environment metadata after compiler output.
+        // Taking only the tail can discard the actual source error entirely.
+        let lines = diagnostics.split(separator: "\n", omittingEmptySubsequences: false)
+        let firstError = lines.firstIndex { $0.contains(": error:") || $0.hasPrefix("error:") }
+        let summary: String
+        if let firstError {
+          summary = String(lines[max(0, firstError - 1)...].joined(separator: "\n").prefix(6000))
+        } else if diagnostics.count > 6000 {
+          summary = String(diagnostics.prefix(3000)) + "\n…\n" + String(diagnostics.suffix(3000))
+        } else {
+          summary = diagnostics
+        }
+        throw DevError("Command exited \(status): \(summary)")
       }
       return try String(contentsOf: stdout, encoding: .utf8)
     }
 
     private func discoverTarget() async throws {
       struct Description: Decodable {
-        struct Product: Decodable { let name: String; let targets: [String] }
-        struct Target: Decodable { let name: String; let type: String; let path: String }
+        struct Product: Decodable {
+          let name: String
+          let targets: [String]
+        }
+        struct Target: Decodable {
+          let name: String
+          let type: String
+          let path: String
+        }
         let products: [Product]
         let targets: [Target]
       }
@@ -299,7 +345,8 @@
       let description = try JSONDecoder().decode(Description.self, from: data)
       guard let product = description.products.first(where: { $0.name == options.product }),
         let name = options.target ?? (product.targets.count == 1 ? product.targets.first : nil),
-        product.targets.contains(name), let target = description.targets.first(where: { $0.name == name }),
+        product.targets.contains(name),
+        let target = description.targets.first(where: { $0.name == name }),
         target.type == "executable"
       else { throw DevError("Select one Swift executable target with --target") }
       targetName = name
@@ -311,25 +358,30 @@
         let path: String
         let dependencies: [Dependency]
       }
-      let dependencyData = Data(try await swift(["package", "show-dependencies", "--format", "json"]).utf8)
+      let dependencyData = Data(
+        try await swift(["package", "show-dependencies", "--format", "json"]).utf8)
       let root = try JSONDecoder().decode(Dependency.self, from: dependencyData)
       func paths(_ node: Dependency) -> [URL] {
         node.dependencies.flatMap { [URL(fileURLWithPath: $0.path)] + paths($0) }
       }
       dependencyDirectories = Array(Set(paths(root))).sorted { $0.path < $1.path }
-      let path = try await swift(["build", "--build-system", "native", "-c", "debug", "--show-bin-path"])
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+      let path = try await swift([
+        "build", "--build-system", "native", "-c", "debug", "--show-bin-path",
+      ])
+      .trimmingCharacters(in: .whitespacesAndNewlines)
       binaryDirectory = URL(fileURLWithPath: path)
     }
 
     private func loadApplicationCommand() throws {
       struct Plan: Decodable { let swiftCommands: [String: ApplicationCommand] }
-      let plan = try JSONDecoder().decode(Plan.self,
+      let plan = try JSONDecoder().decode(
+        Plan.self,
         from: Data(contentsOf: binaryDirectory.appendingPathComponent("description.json")))
       let candidates = plan.swiftCommands.values.filter { command in
         !command.isLibrary && !command.sources.isEmpty
           && command.sources.allSatisfy {
-            URL(fileURLWithPath: $0).resolvingSymlinksInPath().path.hasPrefix(targetDirectory.path + "/")
+            URL(fileURLWithPath: $0).resolvingSymlinksInPath().path.hasPrefix(
+              targetDirectory.path + "/")
           }
       }
       guard candidates.count == 1, let command = candidates.first,
@@ -340,8 +392,13 @@
         command.moduleName.unicodeScalars.allSatisfy({
           CharacterSet.alphanumerics.contains($0) && $0.isASCII || $0 == "_"
         })
-      else { throw DevError("Unsupported SwiftPM executable command; generated sources and compiler plugins are not supported") }
-      applicationCommand = ApplicationCommand(moduleName: command.moduleName, importPath: command.importPath,
+      else {
+        throw DevError(
+          "Unsupported SwiftPM executable command; generated sources and compiler plugins are not supported"
+        )
+      }
+      applicationCommand = ApplicationCommand(
+        moduleName: command.moduleName, importPath: command.importPath,
         sources: command.sources.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path },
         otherArguments: command.otherArguments, isLibrary: command.isLibrary)
     }
@@ -349,14 +406,18 @@
     private func compileApplicationImage(_ image: URL, scalarObject: URL) async throws {
       guard let applicationCommand else { throw DevError("No SwiftPM application compile command") }
       let current = try sourceSnapshot()
-      let swiftFiles = Set(current.keys.filter { $0.hasPrefix(targetDirectory.path + "/") && $0.hasSuffix(".swift") })
+      let swiftFiles = Set(
+        current.keys.filter { $0.hasPrefix(targetDirectory.path + "/") && $0.hasSuffix(".swift") })
       guard swiftFiles == Set(applicationCommand.sources) else {
-        throw DevError("The target's source-file set changed; restart swifttui-dev to refresh its build plan")
+        throw DevError(
+          "The target's source-file set changed; restart swifttui-dev to refresh its build plan")
       }
       for source in applicationCommand.sources {
         if let text = String(data: current[source] ?? Data(), encoding: .utf8),
-          text.range(of: #"@objc\s*\("#, options: .regularExpression) != nil {
-          throw DevError("Explicit Objective-C names are process-global; this target requires a restart")
+          text.range(of: #"@objc\s*\("#, options: .regularExpression) != nil
+        {
+          throw DevError(
+            "Explicit Objective-C names are process-global; this target requires a restart")
         }
       }
       var flags: [String] = []
@@ -365,11 +426,19 @@
       while index < original.count {
         let flag = original[index]
         index += 1
-        if ["-incremental", "-enable-batch-mode", "-serialize-diagnostics", "-parseable-output"].contains(flag)
-          || flag.hasPrefix("-j") { continue }
-        if flag == "-index-store-path" { index += 1; continue }
+        if ["-incremental", "-enable-batch-mode", "-serialize-diagnostics", "-parseable-output"]
+          .contains(flag)
+          || flag.hasPrefix("-j")
+        {
+          continue
+        }
+        if flag == "-index-store-path" {
+          index += 1
+          continue
+        }
         if flag == "-Xfrontend", index + 2 < original.count,
-          original[index] == "-entry-point-function-name", original[index + 1] == "-Xfrontend" {
+          original[index] == "-entry-point-function-name", original[index + 1] == "-Xfrontend"
+        {
           index += 3
           continue
         }
@@ -379,9 +448,12 @@
       // source module name for qualified references, and change only its ABI
       // name. The graph compares declared logical type aliases, never objects.
       let abiName = "\(applicationCommand.moduleName)_SwiftTUIReload_\(sequence + 1)"
-      var arguments = ["run", "swiftc", "-emit-library", "-module-name", applicationCommand.moduleName,
-        "-Xfrontend", "-module-abi-name", "-Xfrontend", abiName,
-        "-I", applicationCommand.importPath] + flags + applicationCommand.sources
+      var arguments =
+        [
+          "run", "swiftc", "-emit-library", "-module-name", applicationCommand.moduleName,
+          "-Xfrontend", "-module-abi-name", "-Xfrontend", abiName,
+          "-I", applicationCommand.importPath,
+        ] + flags + applicationCommand.sources
         + [scalarObject.path, "-o", image.path]
       #if os(macOS)
         arguments += ["-Xlinker", "-undefined", "-Xlinker", "dynamic_lookup"]
@@ -394,10 +466,15 @@
     private func sourceSnapshot() throws -> [String: Data] {
       var result: [String: Data] = [:]
       for directory in sourceDirectories {
-        guard let files = FileManager.default.enumerator(at: directory,
-          includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
+        guard
+          let files = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])
+        else { continue }
         for case let file as URL in files {
-          guard try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { continue }
+          guard try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
+            continue
+          }
           result[file.standardizedFileURL.path] = try Data(contentsOf: file)
         }
       }
@@ -407,8 +484,12 @@
     private func dependencySnapshot() throws -> [String: Data] {
       var result: [String: Data] = [:]
       for directory in dependencyDirectories {
-        guard let files = FileManager.default.enumerator(at: directory,
-          includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey], options: [.skipsHiddenFiles]) else {
+        guard
+          let files = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
+            options: [.skipsHiddenFiles])
+        else {
           throw DevError("Cannot inspect dependency: \(directory.path)")
         }
         for case let file as URL in files {
@@ -451,18 +532,24 @@
         .filter { $0.hasPrefix("Package@swift-") && $0.hasSuffix(".swift") }
       for name in ["Package.swift", "Package.resolved", ".swift-version"] + variants {
         let file = options.packagePath.appendingPathComponent(name)
-        result[name] = FileManager.default.fileExists(atPath: file.path) ? try Data(contentsOf: file) : Data()
+        result[name] =
+          FileManager.default.fileExists(atPath: file.path) ? try Data(contentsOf: file) : Data()
       }
       return result
     }
 
-    private func validateChangedSources(from before: [String: Data], to after: [String: Data]) throws {
+    private func validateChangedSources(from before: [String: Data], to after: [String: Data])
+      throws
+    {
       guard Set(before.keys) == Set(after.keys) else {
         record("restart_required")
-        throw DevError("The source-file set changed; restart swifttui-dev to refresh its build plan")
+        throw DevError(
+          "The source-file set changed; restart swifttui-dev to refresh its build plan")
       }
       let changed = Set(before.keys).union(after.keys).filter { before[$0] != after[$0] }
-      guard changed.allSatisfy({ $0.hasPrefix(targetDirectory.path + "/") && $0.hasSuffix(".swift") }) else {
+      guard
+        changed.allSatisfy({ $0.hasPrefix(targetDirectory.path + "/") && $0.hasSuffix(".swift") })
+      else {
         record("restart_required")
         throw DevError("A source dependency changed during the build; restart swifttui-dev")
       }
@@ -470,9 +557,14 @@
 
     private func awaitStatus(_ accepts: ([Substring]) -> Bool) async throws -> [Substring] {
       let deadline = ProcessInfo.processInfo.systemUptime + 15
-      while child?.isRunning == true, !stopRequested, ProcessInfo.processInfo.systemUptime < deadline {
-        if let text = try? String(contentsOf: spool.appendingPathComponent("status"), encoding: .utf8) {
-          let fields = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "\t", omittingEmptySubsequences: false)
+      while child?.isRunning == true, !stopRequested,
+        ProcessInfo.processInfo.systemUptime < deadline
+      {
+        if let text = try? String(
+          contentsOf: spool.appendingPathComponent("status"), encoding: .utf8)
+        {
+          let fields = text.trimmingCharacters(in: .whitespacesAndNewlines).split(
+            separator: "\t", omittingEmptySubsequences: false)
           if accepts(fields) { return fields }
         }
         try await Task.sleep(for: .milliseconds(10))
@@ -534,7 +626,7 @@
     }
 
     private static func fingerprint(_ data: Data) -> UInt64 {
-      data.reduce(UInt64(0xcbf29ce484222325)) { ($0 ^ UInt64($1)) &* 0x100000001b3 }
+      data.reduce(UInt64(0xcbf2_9ce4_8422_2325)) { ($0 ^ UInt64($1)) &* 0x100_0000_01b3 }
     }
   }
 #endif

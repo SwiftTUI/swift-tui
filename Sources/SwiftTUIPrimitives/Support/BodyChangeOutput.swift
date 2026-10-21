@@ -72,7 +72,8 @@ extension BodyChangeRecord {
         $1.category, $1.property ?? "", $1.precision
       )
     }
-    record.omitted += max(0, sorted.count - 64)
+    let excessCauses = max(0, sorted.count - 64)
+    record.omitted = min(record.omitted, Int.max - excessCauses) + excessCauses
     record.causes = sorted.prefix(64).map { cause in
       Cause(
         Self.bounded(cause.category, bytes: 64),
@@ -82,14 +83,14 @@ extension BodyChangeRecord {
     if record.typeName != typeName || record.kind != kind
       || zip(record.causes, sorted).contains(where: { $0 != $1 })
     {
-      record.omitted += 1
+      record.omitted = min(record.omitted, Int.max - 1) + 1
     }
     while true {
       let line = record.encode(format)
       if line.utf8.count <= Self.maximumEncodedBytes { return line }
       guard !record.causes.isEmpty else { return "{\"schema\":1,\"omitted\":1}\n" }
       record.causes.removeLast()
-      record.omitted += 1
+      record.omitted = min(record.omitted, Int.max - 1) + 1
     }
   }
 

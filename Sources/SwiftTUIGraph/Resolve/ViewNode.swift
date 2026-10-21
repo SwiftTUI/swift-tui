@@ -1510,7 +1510,11 @@ package final class ViewNode {
       #if DEBUG
         // A fired certificate can deny reuse before mailbox delivery. The
         // certificate is lifetime-scoped; no property name is available.
-        ownerGraph?.debugBodyChanges.note(.observation, owner: ownerLifetimeID)
+        if dependencies.observationCertificates.contains(where: {
+          $0.observedChangeWhileRegistered?() == true
+        }) {
+          ownerGraph?.debugBodyChanges.note(.observation, owner: ownerLifetimeID)
+        }
       #endif
       return false
     }

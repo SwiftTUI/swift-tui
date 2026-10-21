@@ -5443,6 +5443,8 @@ SwiftTUIViews.VerticalEdge
 SwiftTUIViews.VerticalEdge.Set
 SwiftTUIViews.View
 SwiftTUIViews.View.Body
+SwiftTUIViews.View._logChanges()
+SwiftTUIViews.View._printChanges()
 SwiftTUIViews.View.accessibilityAction(_:)
 SwiftTUIViews.View.accessibilityAction(named:_:)
 SwiftTUIViews.View.accessibilityAddTraits(_:)
@@ -5681,6 +5683,8 @@ SwiftTUIViews.ViewBuilder.buildOptional(_:)
 SwiftTUIViews.ViewModifier
 SwiftTUIViews.ViewModifier.Body
 SwiftTUIViews.ViewModifier.Content
+SwiftTUIViews.ViewModifier._logChanges()
+SwiftTUIViews.ViewModifier._printChanges()
 SwiftTUIViews.ViewModifier.body(content:)
 SwiftTUIViews.ViewModifier.body(content:)
 SwiftTUIViews.ViewModifier.concat(_:)

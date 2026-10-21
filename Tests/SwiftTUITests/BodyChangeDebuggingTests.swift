@@ -85,6 +85,13 @@ struct BodyChangeDebuggingTests {
       #expect(!line.contains("\u{0}"))
       #expect(line == record.formatted(format))
     }
+    var saturated = record
+    saturated.omitted = .max
+    let saturatedJSON = saturated.formatted(.json)
+    let saturatedRecord = try #require(
+      JSONSerialization.jsonObject(with: Data(saturatedJSON.utf8)) as? [String: Any])
+    #expect(saturatedRecord["omitted"] as? Int == Int.max)
+    #expect(saturated.formatted(.text).contains("omitted=\(Int.max)"))
   }
 
   @Test("multiple owners and graphs do not share a body's history")

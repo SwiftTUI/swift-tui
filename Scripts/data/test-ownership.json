@@ -1126,9 +1126,17 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/BodyChangeCostTests.swift": {
+      "category": "integration",
+      "reason": "Opt-in diagnostic cost measurement and runtime neutrality."
+    },
     "Tests/SwiftTUITests/BodyChangeDebuggingTests.swift": {
       "category": "integration",
       "reason": "Composed runtime behavior of authored view and modifier diagnostics."
+    },
+    "Tests/SwiftTUITests/BodyChangeIntegrationTests.swift": {
+      "category": "integration",
+      "reason": "Cross-layer attribution and neutrality for state, bindings, inputs, environment and observation."
     },
     "Tests/SwiftTUITests/BorderGradientTests.swift": {
       "category": "runtime-integration",

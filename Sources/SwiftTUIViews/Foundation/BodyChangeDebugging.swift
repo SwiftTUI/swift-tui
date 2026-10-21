@@ -7,6 +7,7 @@ extension View {
   /// silent. Output describes an evaluation attempt, not a displayed frame.
   /// Debug bundles receive `changes.log`; otherwise the host selects a safe
   /// diagnostic destination. Available in all builds; inert without `DEBUG`.
+  @_documentation(visibility: public)
   public static func _printChanges() {
     #if DEBUG
       emitBodyChanges(Self.self, kind: "view", format: .text)
@@ -16,6 +17,7 @@ extension View {
   /// Logs the same body explanation as ``_printChanges()`` as a structured
   /// diagnostic record. Bundles receive `changes.jsonl`; host adapters may
   /// use the system log. The diagnostic schema is not a public data API.
+  @_documentation(visibility: public)
   public static func _logChanges() {
     #if DEBUG
       emitBodyChanges(Self.self, kind: "view", format: .json)
@@ -26,6 +28,7 @@ extension View {
 extension ViewModifier {
   /// Prints why this custom modifier's `body(content:)` is being evaluated.
   /// Call `let _ = Self._printChanges()` inside that method. Inert in release.
+  @_documentation(visibility: public)
   public static func _printChanges() {
     #if DEBUG
       emitBodyChanges(Self.self, kind: "modifier", format: .text)
@@ -34,6 +37,7 @@ extension ViewModifier {
 
   /// Logs a structured explanation of this custom modifier's evaluation.
   /// Causes match ``_printChanges()``; no application values are included.
+  @_documentation(visibility: public)
   public static func _logChanges() {
     #if DEBUG
       emitBodyChanges(Self.self, kind: "modifier", format: .json)
@@ -51,7 +55,7 @@ extension ViewModifier {
       record = scope.record()
     } else {
       record = BodyChangeRecord(
-        typeName: String(reflecting: type), kind: kind,
+        typeName: BodyChangeRecord.name(of: type), kind: kind,
         causes: [.init("context-unavailable", precision: "unavailable")])
     }
     BodyChangeOutput.emit(record, format: format)
