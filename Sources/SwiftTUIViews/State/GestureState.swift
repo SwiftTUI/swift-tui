@@ -16,20 +16,24 @@ private struct GestureStateLocation<Value> {
 /// A slot-ordinal-keyed store contains a seed.
 /// It remembers a ViewNode-scoped or graph-scoped location when bound.
 /// A local fallback value supports tests and reads during construction.
+/// Direct box operations use the explicitly installed authoring scope. Use
+/// the wrapper's projected binding for callbacks that must retain an owner;
+/// a box shared by multiple wrapper copies has no single implicit owner.
 @MainActor
 public final class GestureStateBox<Value> {
   /// A remembered location plus how it was bound; a path-qualified binding
   /// (made by the dynamic-property update pass) wins over access-time
   /// re-binding, which has no ambient path (see `StateBox.BoundLocation`).
-  private struct BoundLocation {
-    var location: GestureStateLocation<Value>
-    var isPathQualified: Bool
+  private struct LocationKey: Hashable {
+    var owner: StateStorageOwner
+    var slot: StateSlotIdentifier
   }
 
   public let slotOrdinal: Int
   private let seed: Value
   private var localValue: Value
-  private var boundLocationsByOwner: [StateStorageOwner: BoundLocation] = [:]
+  private var locations: [LocationKey: GestureStateLocation<Value>] = [:]
+  private var selectedSlots: [StateStorageOwner: StateSlotIdentifier] = [:]
   /// Builds the transaction governing a genuine end-of-gesture reset from
   /// the value being reset. Nil for the plain initializers — their resets
   /// snap. Resolve-time resets (recognizer teardown, registry drain) never
@@ -114,28 +118,40 @@ public final class GestureStateBox<Value> {
   fileprivate func remember(
     _ location: GestureStateLocation<Value>,
     for owner: StateStorageOwner,
-    pathQualified: Bool = false
+    path: StateSlotPath = .root
   ) {
-    boundLocationsByOwner[owner] = BoundLocation(
-      location: location,
-      isPathQualified: pathQualified
-    )
+    let retired = selectedSlots.keys.filter { LiveViewGraphRegistry.node(for: $0) == nil }
+    if !retired.isEmpty {
+      let retired = Set(retired)
+      selectedSlots = selectedSlots.filter { !retired.contains($0.key) }
+      locations = locations.filter { !retired.contains($0.key.owner) }
+    }
+    let slot = StateSlotIdentifier(ordinal: slotOrdinal, path: path)
+    locations[LocationKey(owner: owner, slot: slot)] = location
+    selectedSlots[owner] = slot
   }
 
   fileprivate func rememberedLocation(
     for owner: StateStorageOwner
   ) -> GestureStateLocation<Value>? {
-    boundLocationsByOwner[owner]?.location
+    guard let slot = selectedSlots[owner] else { return nil }
+    return locations[LocationKey(owner: owner, slot: slot)]
+  }
+
+  fileprivate func rememberedLocation(
+    for owner: StateStorageOwner, path: StateSlotPath
+  ) -> GestureStateLocation<Value>? {
+    locations[LocationKey(owner: owner, slot: .init(ordinal: slotOrdinal, path: path))]
   }
 
   fileprivate func rememberedPathQualifiedLocation(
     for owner: StateStorageOwner
   ) -> GestureStateLocation<Value>? {
-    guard let bound = boundLocationsByOwner[owner], bound.isPathQualified else {
-      return nil
-    }
-    return bound.location
+    guard let slot = selectedSlots[owner], !slot.path.isEmpty else { return nil }
+    return locations[LocationKey(owner: owner, slot: slot)]
   }
+
+  fileprivate var rememberedLocationCount: Int { locations.count }
 
   fileprivate func scopedLocation() -> GestureStateLocation<Value>? {
     guard let context = AuthoringContextStorage.current else {
@@ -230,6 +246,11 @@ public struct GestureStateBinding<Value> {
 @MainActor
 public struct GestureState<Value> {
   private let box: GestureStateBox<Value>
+  private var capturedLocation: GestureStateLocation<Value>?
+
+  #if DEBUG
+    package var rememberedLocationCountForTesting: Int { box.rememberedLocationCount }
+  #endif
 
   public init(
     wrappedValue: Value,
@@ -330,19 +351,11 @@ public struct GestureState<Value> {
     GestureStateBinding(box: box, location: activeLocation())
   }
 
-  /// Mirrors `@State.activeLocation()` -- lazy-binds the box to the
-  /// current ViewNode so reads/writes flow through the slot machinery.
-  /// Returns `nil` when outside a resolve pass (e.g. unit tests).
-  ///
-  /// Key parity with @State.activeLocation():
-  ///   1. Checks AuthoringContextStorage.current (same task-local)
-  ///   2. When ViewNodeContext.current != nil (resolve pass), builds and
-  ///      remembers a fresh location via makeLocation(for:) and triggers
-  ///      dependency tracking via location.getValue().
-  ///   3. Falls back to the most-recently remembered location (bound-but-
-  ///      not-in-resolve-pass) or nil.
+  /// Prepared copies carry an exact location. Unprepared app-held values
+  /// retain the explicit ambient-owner lookup used by direct box clients.
   @discardableResult
   private func activeLocation() -> GestureStateLocation<Value>? {
+    if let capturedLocation { return capturedLocation }
     guard let context = AuthoringContextStorage.current else {
       return nil
     }
@@ -357,7 +370,7 @@ public struct GestureState<Value> {
         _ = qualified.getValue()  // triggers dependency tracking
         return qualified
       }
-      let location = makeLocation(for: context)
+      let location = makeLocation(owner: storageOwner)
       box.remember(
         location,
         for: storageOwner
@@ -373,23 +386,13 @@ public struct GestureState<Value> {
   }
 
   private func makeLocation(
-    for context: AuthoringContext,
+    owner storageOwner: StateStorageOwner,
     path: StateSlotPath = .root
   ) -> GestureStateLocation<Value> {
     let slotIdentifier = StateSlotIdentifier(ordinal: box.slotOrdinal, path: path)
     // Capture the true initial seed, not the current runtime value,
     // so resetToSeed always targets the construction-time value.
     let trueSeed = box.seedValue
-
-    guard let storageOwner = stateStorageOwner(for: context) else {
-      // No ViewNode -- fallback local-only location (degraded path,
-      // e.g. body called outside a full resolve pipeline).
-      return GestureStateLocation(
-        getValue: { [weak box] in box?.currentValue() ?? trueSeed },
-        setValue: { [weak box] newValue in box?.setValue(newValue) },
-        resetToSeed: { [weak box] in box?.setValue(trueSeed) }
-      )
-    }
 
     if ViewNodeContext.current != nil,
       let viewNode = LiveViewGraphRegistry.node(for: storageOwner)
@@ -443,6 +446,22 @@ public struct GestureState<Value> {
   }
 }
 
+extension GestureState: CaptureBindableDynamicProperty {
+  package mutating func bindCapture(_ context: DynamicPropertyCaptureContext) {
+    guard let slot = context.ownedSlot else {
+      capturedLocation = nil
+      return
+    }
+    if let existing = box.rememberedLocation(for: slot.owner, path: slot.path) {
+      capturedLocation = existing
+    } else {
+      let location = makeLocation(owner: slot.owner, path: slot.path)
+      box.remember(location, for: slot.owner, path: slot.path)
+      capturedLocation = location
+    }
+  }
+}
+
 extension GestureState: DynamicProperty {
   /// Binds the gesture-state slot eagerly under the discovered-property
   /// path when the update pass reached this wrapper through a composed
@@ -460,11 +479,11 @@ extension GestureState: DynamicProperty {
     else {
       return .unchanged
     }
-    let location = makeLocation(for: context, path: path)
+    let location = makeLocation(owner: storageOwner, path: path)
     box.remember(
       location,
       for: storageOwner,
-      pathQualified: true
+      path: path
     )
     return .unchanged
   }

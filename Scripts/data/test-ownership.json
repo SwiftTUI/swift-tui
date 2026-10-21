@@ -3102,6 +3102,10 @@
       "category": "view-authoring",
       "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
     },
+    "Tests/SwiftTUIViewsTests/GesturePropertyCaptureBindingTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
     "Tests/SwiftTUIViewsTests/GestureProtocolTests.swift": {
       "category": "view-authoring",
       "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
