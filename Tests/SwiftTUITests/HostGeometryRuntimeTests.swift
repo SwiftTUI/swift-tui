@@ -6,6 +6,55 @@ import Testing
 
 @MainActor
 @Suite struct HostGeometryRuntimeTests {
+  @Test(arguments: [false, true])
+  func paragraphSpacingReflowsBeforeAccessibilityFocus(asyncDriver: Bool) async throws {
+    let host = GeometryTestSurface()
+    let root = testIdentity("NarrowFormFocusRecovery")
+    let loop = SwiftTUIRuntime.RunLoop(
+      rootIdentity: root, presentationSurface: host, terminalInputReader: GeometryTestInput(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+      focusTracker: FocusTracker(invalidationIdentities: [root])
+    ) { _, _ in GeometryReflowForm() }
+    defer { loop.lifecycleCoordinator.shutdown() }
+    loop.renderMode = asyncDriver ? .async : .sync
+    var frames = 0
+    func render() async throws {
+      if asyncDriver {
+        try await loop.renderPendingFramesAsync(renderedFrames: &frames)
+      } else {
+        try loop.renderPendingFrames(renderedFrames: &frames)
+      }
+    }
+    loop.scheduler.requestSignal(named: "SIGWINCH")
+    try await render()
+    loop.renderer.enableSelectiveEvaluation()
+    host.size = .init(width: 9, height: 16)
+    host.pitch = .init(width: 29, height: 48)
+    host.revision += 1
+    loop.scheduler.requestSignal(named: "SIGWINCH")
+    try await render()
+    let previousSave = try #require(
+      loop.publishedAccessibilitySnapshot.accessibilityNodes.first { $0.label == "Save" })
+    // Browser text-spacing overrides can arrive after the grid resize.
+    // This same-grid change must reflow before a subsequent focus request.
+    host.paragraphSpacing = 2
+    host.revision += 1
+    loop.scheduler.requestSignal(named: "SIGWINCH")
+    try await render()
+    let node = try #require(
+      loop.publishedAccessibilitySnapshot.accessibilityNodes.first { $0.label == "Save" })
+    #expect(node.rect.origin.y == previousSave.rect.origin.y + 2)
+    let target = try #require(node.actionTarget)
+    #expect(loop.handleAccessibilityAction(.init(target: target, action: .focus)) == .accepted)
+    try await render()
+    let focused = try #require(
+      loop.publishedAccessibilitySnapshot.accessibilityNodes.first { $0.label == "Save" })
+    let frame = try #require(host.frames.last).raster.lines.joined(separator: "\n")
+    #expect(focused.rect.origin.y >= 0)
+    #expect(focused.rect.origin.y + focused.rect.size.height <= 16)
+    #expect(frame.contains("Save"), "\(frame)")
+  }
+
   @Test func paragraphSpacingIsCapturedAndClearedWithGeometry() throws {
     let host = GeometryTestSurface()
     host.size = .init(width: 32, height: 16)
@@ -744,5 +793,48 @@ private final class SharedTerminalTestSurface: PresentationSurface,
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     frames.append(surface)
     return .rasterHostMetrics(for: surface, damage: nil)
+  }
+}
+
+private struct GeometryReflowForm: View {
+  @State private var name = ""
+  @State private var count = 1
+  @State private var enabled = false
+  @State private var saved = 0
+  @State private var viewingData = false
+  @State private var record = 1
+  @State private var error = ""
+  var body: some View {
+    ScrollView(.vertical) {
+      VStack(alignment: .leading, spacing: 1) {
+        Text(viewingData ? "Data review" : "Request form").accessibilityRole(.heading(level: 1))
+        if viewingData {
+          Text("Each record has a name and a score. Compare two records before returning.")
+            .paragraph()
+          Stepper("Record", value: $record, in: 1...3)
+          Text("Name: \(["Ada", "Bo", "Cai"][record - 1])")
+          Text("Score: \([12, 18, 15][record - 1])")
+          Button("Back to form") { viewingData = false }
+        } else {
+          Text("Enter a name, choose a count, enable delivery, then save.").paragraph()
+          TextField("Name", text: $name)
+          Stepper("Count", value: $count, in: 1...3)
+          Toggle("Delivery", isOn: $enabled)
+          Button("Save") {
+            if name.isEmpty {
+              error = "Name required"
+            } else {
+              error = ""
+              saved += 1
+            }
+          }
+          Text(error).accessibilityLiveRegion(.polite)
+          Text("Saved \(saved)")
+          Text("Count \(count)")
+          Text(enabled ? "Delivery on" : "Delivery off")
+          Button("Review data") { viewingData = true }
+        }
+      }
+    }
   }
 }
