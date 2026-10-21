@@ -120,3 +120,13 @@ copy into your own site.
 For the full host and platform matrix, including how the WASI presentation
 compares to the localhost WebHost and the native hosts, see
 [Hosts and Platforms](https://swifttui.sh/docs/documentation/swifttuiruntime/hosts-and-platforms).
+
+## Debug body evaluations
+
+For `_printChanges()` and `_logChanges()`, package with `--configuration debug`
+and use a debug framework build. The helpers write through the WASI stderr
+bridge; they never enter the stdout frame protocol. The standard browser host
+shows this output in its bounded scene diagnostic panel, inspectable through
+browser developer tools. The runtime's **Logging and Diagnostics** article
+covers call placement, cause precision, destinations and release silence.
+Compiled terminal hot reload is available only on macOS/Linux, not in WASI.

@@ -52,6 +52,11 @@ app stops. This keeps compiler text out of the application's raster. A newer
 edit discards an in-flight candidate. The driver restarts neither
 the app nor its input stream for an accepted reload.
 
+For live diagnostics in another TTY, bundle following, and the complete
+failure/recovery workflow, see <doc:Logging-And-Diagnostics>. The app inherits
+the driver's stderr redirection and environment across accepted generations;
+compiler diagnostics remain in the announced spool.
+
 ## State and effects
 
 Compatible initialized `@State` and focus values replay through Codable value

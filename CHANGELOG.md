@@ -8,6 +8,23 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- SwiftUI-style `_printChanges()` and `_logChanges()` on `View` and
+  `ViewModifier`, with bounded per-body evaluation explanations, safe native
+  destinations and compiled-browser stderr delivery. Debug helpers are inert
+  in release builds (STUI-1084–STUI-1087).
+- A two-terminal and compiled-hot-reload walkthrough in Logging and Diagnostics,
+  including bundle following and browser inspection (STUI-1090).
+
+### Fixed
+
+- Stream framework runtime issues to redirected stderr while protecting every
+  active presentation terminal. Disconnected or stalled diagnostic viewers no
+  longer block writes or raise SIGPIPE; bundles take precedence (STUI-1089).
+- Preserve the compiler error in the reload driver's bounded diagnostic summary
+  when Swiftly appends verbose process metadata (STUI-1089).
+
 ## [0.18.3] - 2026-10-17
 
 ### Fixed
