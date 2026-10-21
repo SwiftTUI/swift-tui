@@ -94,6 +94,55 @@ import Testing
       #expect(tracker.snapshot.entries.isEmpty)
     }
 
+    @Test("recycled raw node IDs never inherit a discarded body's history")
+    func recycledOwner() {
+      let graph = ViewGraph()
+      graph.beginFrame()
+      let checkpoint = graph.makeCheckpoint()
+      let identity = testIdentity("DebugRecycled")
+      let old = graph.prepareDynamicPropertyUpdate(identity: identity)
+      let tracker = graph.debugBodyChanges
+      tracker.beginOwner(old.ownerLifetimeID, initial: true)
+      let scope = tracker.makeScope(type: Body.self, kind: "view", node: old)
+      scope.run { _ = scope.record() }
+      tracker.note(.observation, owner: old.ownerLifetimeID)
+      graph.restoreCheckpoint(checkpoint)
+      let new = graph.prepareDynamicPropertyUpdate(identity: identity)
+      #expect(new.viewNodeID == old.viewNodeID)
+      #expect(new.ownerLifetimeID != old.ownerLifetimeID)
+      tracker.beginOwner(new.ownerLifetimeID, initial: true)
+      let replacement = tracker.makeScope(type: Body.self, kind: "view", node: new)
+      #expect(replacement.prior == nil)
+      #expect(!replacement.record().causes.contains { $0.category == "observation" })
+      #expect(replacement.attempt > scope.attempt)
+    }
+
+    @Test("history churn and over-capacity writes remain bounded and uncertain")
+    func churnAndOverflow() {
+      let graph = ViewGraph()
+      let node = graph.prepareDynamicPropertyUpdate(identity: testIdentity("DebugChurn"))
+      let tracker = graph.debugBodyChanges
+      tracker.beginOwner(node.ownerLifetimeID, initial: false)
+      for _ in 0..<(BodyChangeTracker.maximumBodies + 10) {
+        let scope = tracker.makeScope(type: Body.self, kind: "view", node: node)
+        scope.run { _ = scope.record() }
+        #expect(tracker.snapshot.histories.count <= BodyChangeTracker.maximumBodies)
+      }
+      #expect(tracker.snapshot.overflow)
+      tracker.remove(node.ownerLifetimeID)
+      #expect(tracker.snapshot.histories.isEmpty)
+      for ordinal in 0..<64 {
+        tracker.note(
+          .state(.init(owner: node.ownerLifetimeID, ordinal: ordinal)), owner: node.ownerLifetimeID)
+      }
+      tracker.beginOwner(node.ownerLifetimeID, initial: false)
+      tracker.note(.observation, owner: node.ownerLifetimeID)
+      tracker.finishOwner(node.ownerLifetimeID)
+      #expect(
+        tracker.snapshot.pending[node.ownerLifetimeID]?.omitted == 1,
+        "a dropped late write must survive entry consumption")
+    }
+
     @Test("pending evidence stays bounded and reports omitted causes")
     func boundedCauses() {
       let tracker = BodyChangeTracker()

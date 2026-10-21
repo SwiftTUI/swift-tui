@@ -111,6 +111,19 @@ package final class ObservationBridge: Equatable {
         mailbox.published[identity] == record || mailbox.drafts[pass]?.records[identity] == record
       }
     }
+    #if DEBUG
+      certificate.observedChangeWhileRegistered = { [weak self] in
+        guard !currency.isCurrent, let self else { return false }
+        if let owner,
+          self.viewGraph?.nodeForOwnerLifetimeID(owner)?.viewNodeID != record.viewNodeID
+        {
+          return false
+        }
+        return self.mailbox.withLock { mailbox in
+          mailbox.published[identity] == record || mailbox.drafts[pass]?.records[identity] == record
+        }
+      }
+    #endif
     if draft != nil {
       mailbox.withLock { mailbox in
         precondition(mailbox.drafts[pass] != nil)

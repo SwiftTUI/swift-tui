@@ -2163,6 +2163,11 @@ package final class ViewGraph {
     clearEnvironmentDriftAtAndBelow(node)
     #if DEBUG
       if !node.isEvaluating {
+        if node.wasPresentAtFrameStart, node.parent?.isEvaluating == true,
+          debugBodyChanges.snapshot.pending[node.ownerLifetimeID] == nil
+        {
+          debugBodyChanges.note(.ancestor, owner: node.ownerLifetimeID)
+        }
         debugBodyChanges.beginOwner(node.ownerLifetimeID, initial: !node.wasPresentAtFrameStart)
       }
     #endif

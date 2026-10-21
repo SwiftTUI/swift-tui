@@ -172,7 +172,10 @@ struct ViewGraphCheckpointTotalityTests {
           "declaredChildRecompositionOwners",
         ])
     )
-    // The checkpoint stores the same groups plus `root` and `nodeCheckpoints`.
+    // Diagnostic history is a separately checkpointed DEBUG-only sidecar;
+    // it is intentionally absent from the production total-state projection.
+    // The parser sees conditional declarations in both build configurations.
+    // The checkpoint stores the same groups plus root, nodes and that sidecar.
     #expect(
       Set(viewGraphCheckpointGroupFields)
         == groupPropertyNames.union(["root", "nodeCheckpoints", "debugBodyChanges"])

@@ -25,5 +25,14 @@ struct MemoObservationDraftTests {
     draft.suspendRecording()
     draft.discard()
     #expect(!reader.hasCurrentMemoReadCertificates)
+    #if DEBUG
+      #expect(graph.debugBodyChanges.snapshot.pending[reader.ownerLifetimeID] == nil)
+      model.value += 1
+      bridge.drainPendingChanges()
+      #expect(!reader.hasCurrentMemoReadCertificates)
+      #expect(
+        graph.debugBodyChanges.snapshot.pending[reader.ownerLifetimeID] == nil,
+        "a fire from a discarded pass cannot become a body-change cause")
+    #endif
   }
 }

@@ -19,6 +19,12 @@ package final class MemoObservationCertificate: Equatable {
   package init(isCurrent: @escaping @MainActor () -> Bool) { check = isCurrent }
   package var isCurrent: Bool { check() }
 
+  #if DEBUG
+    // A retired registration is not evidence of a model mutation. The
+    // framework's bridge supplies a separate diagnostic-only witness.
+    package var observedChangeWhileRegistered: (@MainActor () -> Bool)?
+  #endif
+
   nonisolated package static func == (
     lhs: MemoObservationCertificate, rhs: MemoObservationCertificate
   )

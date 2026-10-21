@@ -12,6 +12,7 @@
       case environment(ObjectIdentifier)
       case observation
       case explicit
+      case ancestor
       case input(ObjectIdentifier)
       case dynamicProperty
     }
@@ -227,6 +228,7 @@
           }
         case .observation: causes.insert(.init("observation"))
         case .explicit: causes.insert(.init("explicit"))
+        case .ancestor: causes.insert(.init("ancestor"))
         case .input(let type):
           if type == key.type {
             causes.insert(.init("input", precision: "exact", property: "@self"))
@@ -237,9 +239,10 @@
       if causes.isEmpty { causes.insert(.init("input-unverified", precision: "unavailable")) }
       if overflow { causes.insert(.init("provenance-unavailable", precision: "unavailable")) }
       return BodyChangeRecord(
-        typeName: String(reflecting: type), kind: key.kind, graph: graph,
+        typeName: BodyChangeRecord.name(of: type), kind: key.kind, graph: graph,
         owner: key.owner.rawValue, body: key.ordinal, attempt: attempt,
-        causes: Array(causes), omitted: (entry?.pending.omitted ?? 0) + (overflow ? 1 : 0))
+        causes: Array(causes),
+        omitted: min(entry?.pending.omitted ?? 0, Int.max - 1) + (overflow ? 1 : 0))
     }
   }
 #endif
