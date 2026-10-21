@@ -13,6 +13,65 @@ import Testing
 @MainActor
 @Suite
 struct ImplicitMemoReuseTests {
+  private final class CaptureLog {
+    var passes = 0
+    var read: (() -> Bool)?
+    var write: (() -> Void)?
+  }
+
+  private struct CaptureProbe: DynamicProperty, CaptureBindableDynamicProperty {
+    let log: CaptureLog
+    mutating func bindCapture(_ context: DynamicPropertyCaptureContext) {
+      log.passes += 1
+    }
+    func update(in context: DynamicPropertyContext) -> DynamicPropertyUpdateResult { .unchanged }
+  }
+
+  private struct CaptureBoundary: View, @MainActor Equatable {
+    var probe: CaptureProbe
+    @FocusState var focus: Bool
+    @Environment(\.isEnabled) var enabled
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.probe.log === rhs.probe.log }
+
+    var body: some View {
+      probe.log.read = { focus }
+      probe.log.write = { focus = true }
+      return Text(enabled ? "capture enabled" : "capture disabled")
+    }
+  }
+
+  @Test("a retained dynamic-property boundary adds zero capture passes and keeps its closures")
+  func retainedBoundaryDoesNotCaptureAgain() throws {
+    struct Root: View {
+      let phase: Int
+      let log: CaptureLog
+      var body: some View {
+        VStack {
+          CaptureBoundary(probe: CaptureProbe(log: log)).equatable()
+          Text("phase \(phase)")
+        }
+      }
+    }
+    let log = CaptureLog()
+    let renderer = DefaultRenderer()
+    let identity = testIdentity("capture-reuse")
+    _ = renderer.render(Root(phase: 0, log: log), context: .init(identity: identity))
+    let passes = log.passes
+    #expect(passes > 0)
+    let read = try #require(log.read)
+    let write = try #require(log.write)
+    let retained = renderer.render(
+      Root(phase: 1, log: log),
+      context: .init(identity: identity, invalidatedIdentities: [identity]))
+    #expect(retained.diagnostics.work.resolvedNodesReused > 0)
+    #expect(log.passes == passes)
+    #expect(retained.rasterSurface.lines.joined().contains("phase 1"))
+    #expect(!read())
+    write()
+    #expect(read())
+  }
+
   /// Field-tier boundary: a `String` field keeps the type non-POD, and it
   /// deliberately does NOT conform to `Equatable`.
   private struct FieldChrome: View {
