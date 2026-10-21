@@ -42,18 +42,42 @@ package struct StateCaptureBinding: Sendable {
   }
 }
 
-/// Framework-internal in-place capture binding. Deliberately package-scoped:
-/// third parties cannot conform, so `DynamicProperty.update`'s nonmutating
-/// contract ("a plain value mutation cannot be silently applied to an
-/// extracted copy") stays intact for them — the bind pass is the only
-/// mutator, and it writes through the container instance body evaluation
-/// actually consumes.
+/// Independent routes carried by a prepared private working copy. Owned slots
+/// are optional: graphless rendering still captures environment and services.
+package struct DynamicPropertyCaptureContext: Sendable {
+  package var ownedSlot: StateCaptureBinding?
+  package var environment: EnvironmentValues
+  package var focusedValues: CapturedFocusedValuesRoute
+
+  package func appending(_ index: Int) -> Self {
+    var copy = self
+    if let ownedSlot {
+      copy.ownedSlot = StateCaptureBinding(
+        owner: ownedSlot.owner, identity: ownedSlot.identity,
+        graphScope: ownedSlot.graphScope, path: ownedSlot.path.appending(index))
+    }
+    return copy
+  }
+}
+
+/// The graph route is live; only the no-provider fallback is a snapshot.
+package struct CapturedFocusedValuesRoute: Sendable {
+  package var graphScope: StateGraphScopeID?
+  package var snapshot: FocusedValues
+
+  @MainActor
+  package var current: FocusedValues {
+    graphScope.flatMap { LiveFocusedValuesRegistry.currentFocusedValues(for: $0) } ?? snapshot
+  }
+}
+
+/// Framework-internal capture preparation, separate from the public mutating
+/// update pass and its reuse certificate. Typed custom wrappers inherit this
+/// preparation through their stored built-ins without a public owner protocol.
 @MainActor
 package protocol CaptureBindableDynamicProperty {
-  /// Overwrites this copy's capture. Always correct: the container is a
-  /// value type, so the copy the pass writes through is private to one
-  /// mount and one evaluation (plan 2026-08-29-001).
-  mutating func bindCapture(_ binding: StateCaptureBinding)
+  /// Overwrites the private copy immediately before authored code consumes it.
+  mutating func bindCapture(_ context: DynamicPropertyCaptureContext)
 }
 
 /// Census over capture binding and imperative-state resolution: which bind

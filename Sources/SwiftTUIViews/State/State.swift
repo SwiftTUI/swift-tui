@@ -723,6 +723,11 @@ extension State: CaptureBindableDynamicProperty {
   /// overwrite: copies are private to their mount, because authored
   /// containers are value types (plan 2026-08-29-001). Every fresh
   /// evaluation rebinds, and no two mounts can reach the same slot.
+  package mutating func bindCapture(_ context: DynamicPropertyCaptureContext) {
+    capture = context.ownedSlot
+  }
+
+  // Direct adapter used by the State lifetime contract tests.
   package mutating func bindCapture(_ binding: StateCaptureBinding) {
     capture = binding
   }

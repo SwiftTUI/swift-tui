@@ -8,7 +8,7 @@ import SwiftTUIGraph
 // (every `body` evaluation, transparent forwarding containers included), and
 // the forwarding seams where a composed `ViewModifier` or style struct runs
 // its body (`bindingForwardedDynamicPropertyCaptures`). It writes each
-// `@State` (and future `CaptureBindableDynamicProperty`) field's owner into
+// `CaptureBindableDynamicProperty` field's owner or service route into
 // the exact container copy that code consumes, so closures it creates carry
 // their state owner instead of re-deriving it from ambient dispatch scope at
 // fire time.
@@ -39,11 +39,11 @@ import SwiftTUIGraph
   /// them here under an appended path would name a different slot than the
   /// forwarded update claims).
   package let index: Int
-  package let apply: @MainActor (UnsafeMutableRawPointer, StateCaptureBinding) -> Void
+  package let apply: @MainActor (UnsafeMutableRawPointer, DynamicPropertyCaptureContext) -> Void
 
   package init(
     index: Int,
-    apply: @escaping @MainActor (UnsafeMutableRawPointer, StateCaptureBinding) -> Void
+    apply: @escaping @MainActor (UnsafeMutableRawPointer, DynamicPropertyCaptureContext) -> Void
   ) {
     unsafe self.index = index
     unsafe self.apply = apply
@@ -166,7 +166,7 @@ package func bindingResolvableDynamicPropertyCaptures<V>(
       current: currentAuthoringContext(),
       viewNode: ViewNodeContext.current
     )
-    return rootCaptureBinding(for: scope)
+    return rootCaptureBinding(for: scope, environment: context.environmentValues)
   }
 }
 
@@ -176,18 +176,17 @@ package func bindingResolvableDynamicPropertyCaptures<V>(
 /// root-relative paths under the scope active at the forwarding seam. Used
 /// for a composed `ViewModifier` value before its `body(content:)` runs and
 /// for a style struct before its `makeBody(configuration:)` runs; both are
-/// evaluated under an installed ambient scope, so a nil ambient here means
-/// no owner is nameable and the value stays unbound (counted).
+/// evaluated under an installed ambient scope. Without a slot owner, scoped
+/// services still receive their environment and focused-value fallback.
 @MainActor
 package func bindingForwardedDynamicPropertyCaptures<V>(_ value: V) -> V {
   guard StateCaptureBindingConfiguration.isEnabled else {
     return value
   }
   return boundCopy(value) {
-    guard let scope = currentAuthoringContext() else {
-      return nil
-    }
-    return rootCaptureBinding(for: scope)
+    rootCaptureBinding(
+      for: currentAuthoringContext(),
+      environment: EnvironmentValuesStorage.current ?? EnvironmentValues())
   }
 }
 
@@ -214,7 +213,7 @@ package func bindingBodyDynamicPropertyCaptures<V: View>(
         for: context,
         viewNode: ViewNodeContext.current
       )
-    return rootCaptureBinding(for: scope)
+    return rootCaptureBinding(for: scope, environment: context.environmentValues)
   }
 }
 
@@ -225,16 +224,21 @@ package func bindingBodyDynamicPropertyCaptures<V: View>(
 /// node's), not the local resolve identity, so a capture bound through a
 /// reinstalled ambient scope refreshes toward its true author.
 @MainActor
-private func rootCaptureBinding(for scope: AuthoringContext) -> StateCaptureBinding? {
-  guard let owner = stateStorageOwner(for: scope) else {
-    return nil
+private func rootCaptureBinding(
+  for scope: AuthoringContext?, environment: EnvironmentValues
+) -> DynamicPropertyCaptureContext {
+  let slot = scope.flatMap { scope -> StateCaptureBinding? in
+    guard let owner = stateStorageOwner(for: scope) else { return nil }
+    return StateCaptureBinding(
+      owner: owner, identity: scope.viewIdentity,
+      graphScope: graphScopeID(for: scope) ?? owner.graphScope, path: .root)
   }
-  return StateCaptureBinding(
-    owner: owner,
-    identity: scope.viewIdentity,
-    graphScope: graphScopeID(for: scope) ?? owner.graphScope,
-    path: .root
-  )
+  return DynamicPropertyCaptureContext(
+    ownedSlot: slot,
+    environment: environment,
+    focusedValues: CapturedFocusedValuesRoute(
+      graphScope: scope.flatMap { graphScopeID(for: $0) },
+      snapshot: scope?.focusedValues ?? environment.focusedValues))
 }
 
 /// Plan-dispatched core: a struct container binds a private copy — the only
@@ -244,7 +248,7 @@ private func rootCaptureBinding(for scope: AuthoringContext) -> StateCaptureBind
 @MainActor
 private func boundCopy<V>(
   _ view: V,
-  makeBinding: () -> StateCaptureBinding?
+  makeBinding: () -> DynamicPropertyCaptureContext
 ) -> V {
   let concreteType = type(of: view)
   let plan = unsafe DynamicPropertyCaptureBindPlanCache.plan(for: concreteType)
@@ -271,9 +275,9 @@ private func boundCopy<V>(
       StateCaptureCensus.record(.bindSkippedTier)
       return view
     }
-    guard let binding = makeBinding() else {
+    let binding = makeBinding()
+    if binding.ownedSlot == nil {
       StateCaptureCensus.record(.bindNoOwner)
-      return view
     }
     var copy = view
     withUnsafeMutablePointer(to: &copy) { base in
@@ -293,7 +297,7 @@ private func boundCopy<V>(
 private func applyCaptureBinders(
   _ binders: [DynamicPropertyCaptureFieldBinder],
   atBase base: UnsafeMutableRawPointer,
-  binding: StateCaptureBinding,
+  binding: DynamicPropertyCaptureContext,
   excludingFieldsOwnedBy owner: (any AdditionalDynamicPropertyUpdating)? = nil
 ) {
   // Index loop on purpose: `for unsafe x in` is mangled by swift-format
@@ -314,7 +318,7 @@ private func applyCaptureBinders(
 @MainActor
 private func bindNestedCaptures<T>(
   at pointer: UnsafeMutablePointer<T>,
-  binding: StateCaptureBinding
+  binding: DynamicPropertyCaptureContext
 ) {
   let plan = unsafe DynamicPropertyCaptureBindPlanCache.plan(for: T.self)
   let traversalOwner = unsafe pointer.pointee as? any AdditionalDynamicPropertyUpdating
@@ -369,12 +373,7 @@ extension CaptureBinderFieldShim: CaptureRecursableFieldBinding where T: Dynamic
       // A nested wrapper's own fields bind under the container's field path —
       // the same qualification `updateDynamicProperty` gives the nested
       // update walk — so composed-wrapper instances keep distinct slots.
-      let nested = StateCaptureBinding(
-        owner: binding.owner,
-        identity: binding.identity,
-        graphScope: binding.graphScope,
-        path: binding.path.appending(index)
-      )
+      let nested = binding.appending(index)
       unsafe bindNestedCaptures(
         at: (base + offset).assumingMemoryBound(to: T.self),
         binding: nested
