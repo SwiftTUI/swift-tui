@@ -91,6 +91,10 @@ package enum StateCaptureCensus {
     case bindBound = "state.captureBind.bound"
     case bindSkippedTier = "state.captureBind.skippedTier"
     case bindNoOwner = "state.captureBind.noOwner"
+    case focusUnprepared = "focus.capture.unprepared"
+    case focusRetired = "focus.capture.retiredOwner"
+    case gestureUnprepared = "gesture.capture.unprepared"
+    case gestureRetired = "gesture.capture.retiredOwner"
     // Imperative read-path rungs (plan Stage 0 ladder census + capture rungs).
     case captureHit = "state.capture.hit"
     case captureRefreshedOwner = "state.capture.refreshedOwner"
@@ -119,7 +123,7 @@ package enum StateCaptureCensus {
       case .captureHit, .captureRefreshedOwner, .bindBound:
         return
       case .bindSkippedTier, .bindNoOwner, .captureMiss, .ladderExactOwner,
-        .seedFallback:
+        .seedFallback, .focusUnprepared, .focusRetired, .gestureUnprepared, .gestureRetired:
         DebugLogRouter.emit(
           "[STATE-CENSUS] \(event.rawValue)\n",
           toFileAt: censusFilePath

@@ -99,9 +99,38 @@ for reuse comparison.
 
 A non-mutating implementation still satisfies the requirement, so reference
 storage and composed built-in wrappers (`@State`'s box, `@Environment`'s
-ambient lookup, a `Binding`'s closures) keep working unchanged — and remain
+scoped reader, a `Binding`'s closures) keep working — and remain
 the right choice for anything that must outlive one evaluation, or that an
 asynchronous callback writes.
+
+### Captures created by a prepared body
+
+A separate preparation pass binds built-in wrapper copies immediately before
+the body, modifier body, or style body consumes them. Typed nested
+`DynamicProperty` fields inherit preparation with distinct qualified slots.
+Reused subtrees retain their prepared closures without another capture pass.
+
+`State` retains its existing refresh policy; `Namespace` inherits it through
+its nested State. `FocusState`, `AccessibilityFocusState`, and `GestureState`
+keep their exact owner lifetime in captured reads and projections. They never
+follow a removed owner into a new mount. Retired authored focus access uses
+that owner's fallback; stale native focus registrations cannot write it.
+Gesture storage remains transient and recognizer resets keep their existing
+transaction rules. Direct `GestureStateBox` calls still require explicit
+authoring scope; use `$state` for callbacks that must retain an owner.
+
+`FocusedValue` and `FocusedBinding` retain a graph route and read its live
+focused-value provider on each access. A missing provider uses the captured
+snapshot. `Environment` uses the current evaluation environment in a body,
+an explicitly registered handler's environment during invocation, and its
+declaration snapshot in a context-free captured closure. An old closure's
+snapshot does not automatically follow later ancestor changes.
+
+`Binding` and `Bindable` retain their explicit source closures or model;
+preparation never transfers their ownership to the consuming view. Values the
+framework has never prepared retain their ambient/default contracts. Capture
+preparation does not infer ownership inside arbitrary user closures or opaque
+reference storage, and does not expand the enum/existential guarantees below.
 
 ### Where the in-place guarantee stops
 

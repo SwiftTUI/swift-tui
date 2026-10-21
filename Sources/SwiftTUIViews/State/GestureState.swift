@@ -355,7 +355,15 @@ public struct GestureState<Value> {
   /// retain the explicit ambient-owner lookup used by direct box clients.
   @discardableResult
   private func activeLocation() -> GestureStateLocation<Value>? {
-    if let capturedLocation { return capturedLocation }
+    if let capturedLocation {
+      #if DEBUG
+        if let owner = capturedLocation.owner, LiveViewGraphRegistry.node(for: owner) == nil {
+          StateCaptureCensus.record(.gestureRetired)
+        }
+      #endif
+      return capturedLocation
+    }
+    StateCaptureCensus.record(.gestureUnprepared)
     guard let context = AuthoringContextStorage.current else {
       return nil
     }

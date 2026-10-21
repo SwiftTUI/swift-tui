@@ -122,6 +122,23 @@ struct FocusPropertyCaptureBindingTests {
   }
 
   #if DEBUG
+    @Test("unprepared access and retired captures have distinct diagnostic events")
+    func captureDiagnostics() throws {
+      let unprepared = StateCaptureCensus.count(of: .focusUnprepared)
+      _ = FocusState<Bool>().wrappedValue
+      #expect(StateCaptureCensus.count(of: .focusUnprepared) > unprepared)
+      let graph = ViewGraph()
+      let log = Log()
+      resolve(Host(log: log), graph: graph)
+      let read = try #require(log.read)
+      graph.beginFrame()
+      graph.removeSubtree(
+        rootedAt: try #require(graph.nodeForIdentity(testIdentity("focus-capture"))))
+      let retired = StateCaptureCensus.count(of: .focusRetired)
+      _ = read()
+      #expect(StateCaptureCensus.count(of: .focusRetired) > retired)
+    }
+
     @Test("a reused authored box retains only live owner locations")
     func boundedOwnerCache() throws {
       let graph = ViewGraph()

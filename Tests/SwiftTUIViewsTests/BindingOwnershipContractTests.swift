@@ -44,6 +44,31 @@ struct BindingOwnershipContractTests {
     #expect(route.bindingSourceID != Bindable(second).first.bindingSourceID)
   }
 
+  @MainActor
+  private struct ExplicitSources {
+    var binding: Binding<Int>
+    var bindable: Bindable<Model>
+  }
+
+  @Test func capturePreparationPreservesExplicitSources() {
+    let state = State(wrappedValue: 0)
+    let model = Model()
+    let sources = ExplicitSources(binding: state.projectedValue, bindable: Bindable(model))
+    let graph = ViewGraph()
+    let node = graph.prepareDynamicPropertyUpdate(identity: testIdentity("consumer"))
+    let scope = AuthoringContext(
+      viewIdentity: node.identity, focusedValues: .init(), viewNode: node)
+    let prepared = withAuthoringContext(scope) {
+      bindingForwardedDynamicPropertyCaptures(sources)
+    }
+    #expect(prepared.binding.bindingSourceID == sources.binding.bindingSourceID)
+    #expect(prepared.bindable.first.bindingSourceID == sources.bindable.first.bindingSourceID)
+    prepared.binding.wrappedValue = 7
+    prepared.bindable.first.wrappedValue = 9
+    #expect(state.wrappedValue == 7)
+    #expect(model.first == 9)
+  }
+
   @Test func focusedClosureBindingsCarryTheirPublisher() {
     enum Key: FocusedValueKey { typealias Value = Binding<Int> }
     let first = State(wrappedValue: 0)

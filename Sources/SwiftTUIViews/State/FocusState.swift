@@ -331,7 +331,17 @@ public struct FocusState<Value: Equatable> {
     // A prepared copy is authoritative even in a callback nested inside a
     // different evaluation. The location attributes reads to the actual
     // evaluating reader while resolving storage through this exact owner.
-    if let capturedLocation { return capturedLocation }
+    if let capturedLocation {
+      #if DEBUG
+        if let owner = capturedLocation.bindingKey.owner,
+          LiveViewGraphRegistry.node(for: owner) == nil
+        {
+          StateCaptureCensus.record(.focusRetired)
+        }
+      #endif
+      return capturedLocation
+    }
+    StateCaptureCensus.record(.focusUnprepared)
     if let context = currentAuthoringContext(),
       let owner = stateStorageOwner(for: context)
     {

@@ -238,14 +238,19 @@ the owning module remains unchanged.
   `DynamicProperty` — are value types: each protocol carries a defaulted
   witness whose `Self: AnyObject` overload is unavailable, so a class
   conformance fails to compile (plan 2026-08-29-001). Lowering to
-  primitives is package-internal. `@State` ownership is bound at capture
+  primitives is package-internal. Dynamic-property access is bound at capture
   time: a pass at the body-evaluation seams (`resolveViewElements`' two
   branches, plus the composed-modifier and style-body forwarding seams)
-  writes each evaluation's state owner into the exact container copy the
-  body consumes, so closures created in bodies carry their owner. Imperative
-  access resolves resolve-ambient → carried capture (with a fire-time
-  identity refresh for re-minted nodes) → loud authored seed; there is no
-  ambient owner-guessing ladder (plan 2026-08-20-001).
+  writes owner or service routes into the exact container copy the body
+  consumes. State keeps its same-graph identity refresh adapter; focus and
+  gesture locations use exact lifetimes and re-resolve graph storage on access.
+  Focused-value readers consult their declaring graph's live provider, with a
+  captured snapshot fallback. Environment readers distinguish evaluation,
+  explicit handler invocation, and declaration snapshots. The task-local
+  invocation scope restores across nested and async dispatch; nested resolver
+  work establishes evaluation again. Binding and Bindable keep explicit sources.
+  Updates and reuse certificates remain separate from capture preparation;
+  stored evaluators and memo comparisons retain authored inputs.
 - **`SwiftTUIRuntime`** — the run loop, the renderer, scenes (`App`, `Scene`,
   `WindowGroup`), terminal hosting, and the host-frame contracts.
 

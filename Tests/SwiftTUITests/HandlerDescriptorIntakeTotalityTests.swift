@@ -22,6 +22,38 @@ import Testing
 
 @Suite
 struct HandlerDescriptorIntakeTotalityTests {
+  @Test("every built-in wrapper has a capture classification and behavioral test owner")
+  func builtInCaptureClassifications() throws {
+    let classifications: [String: (String, String)] = [
+      "State": ("owned-slot-refresh", "StateCaptureBindingTests"),
+      "Namespace": ("recursive", "DynamicPropertyCaptureContextTests"),
+      "FocusState": ("exact-owned-slot", "FocusPropertyCaptureBindingTests"),
+      "AccessibilityFocusState": ("recursive", "FocusPropertyCaptureBindingTests"),
+      "GestureState": ("exact-owned-slot", "GesturePropertyCaptureBindingTests"),
+      "FocusedValue": ("scoped-service", "ScopedPropertyCaptureBindingTests"),
+      "FocusedBinding": ("scoped-service", "ScopedPropertyCaptureBindingTests"),
+      "Environment": ("scoped-service", "ScopedPropertyCaptureBindingTests"),
+      "Binding": ("explicit-source", "BindingOwnershipContractTests"),
+      "Bindable": ("explicit-source", "BindingOwnershipContractTests"),
+    ]
+    let declaration = try Regex(
+      #"(?s)@propertyWrapper(?:(?!public (?:struct|class)).)*?public (?:struct|class) (\w+)"#)
+    var wrappers: Set<String> = []
+    for source in try viewsSourceFiles() {
+      for match in source.contents.matches(of: declaration) {
+        wrappers.insert(String(source.contents[match.output[1].range!]))
+      }
+    }
+    #expect(wrappers == Set(classifications.keys))
+    let root = try repositoryRoot()
+    for (_, test) in classifications.values {
+      let contents = try String(
+        contentsOf: root.appendingPathComponent("Tests/SwiftTUIViewsTests/\(test).swift"),
+        encoding: .utf8)
+      #expect(contents.contains("@Test"))
+    }
+  }
+
   /// Dispatch/construction seams that legitimately re-establish an
   /// imperative authoring context outside the intake:
   /// - `State/AuthoringContext.swift` — defines the machinery.

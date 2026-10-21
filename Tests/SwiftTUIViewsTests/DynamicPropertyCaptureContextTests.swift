@@ -52,4 +52,36 @@ struct DynamicPropertyCaptureContextTests {
     #expect(graphless.nested.probe.capture?.ownedSlot == nil)
     #expect(prepared.direct.capture?.ownedSlot == nil)
   }
+
+  private final class NamespaceLog {
+    var read: (() -> Namespace.ID)?
+  }
+
+  private struct NamespaceHost: View {
+    @Namespace var namespace
+    let log: NamespaceLog
+
+    var body: some View {
+      log.read = { namespace }
+      return Text("namespace")
+    }
+  }
+
+  @Test("Namespace recursively captures its State separately for each mount")
+  func namespaceComposition() throws {
+    let log = NamespaceLog()
+    let host = NamespaceHost(log: log)
+    let first = ViewGraph()
+    let second = ViewGraph()
+    var context = ResolveContext(identity: testIdentity("namespace-capture"))
+    context.viewGraph = first
+    _ = Resolver().resolve(host, in: context)
+    let firstRead = try #require(log.read)
+    let firstID = firstRead()
+    context.viewGraph = second
+    _ = Resolver().resolve(host, in: context)
+    let secondRead = try #require(log.read)
+    #expect(secondRead() != firstID)
+    #expect(firstRead() == firstID)
+  }
 }
