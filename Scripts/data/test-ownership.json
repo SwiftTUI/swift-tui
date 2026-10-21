@@ -2090,6 +2090,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/PR60PreferenceOwnerTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
     "Tests/SwiftTUITests/PaletteCloseFramePinTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
@@ -3041,6 +3045,10 @@
     "Tests/SwiftTUIViewsTests/FlattenedStateOwnerClaimTests.swift": {
       "category": "view-authoring",
       "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUIViewsTests/FocusPropertyCaptureBindingTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
     },
     "Tests/SwiftTUIViewsTests/FocusStateOwnerLifetimeTests.swift": {
       "category": "view-authoring",

@@ -144,18 +144,14 @@ private final class FocusStateBox<Value: Equatable> {
   private let slotOrdinal: Int
   let clearValue: Value
 
-  private struct BoundLocation {
-    var location: FocusStateLocation<Value>
-    var isPathQualified: Bool
-  }
-
   private struct FallbackKey: Hashable {
     var owner: StateOwnerHandle
     var slot: StateSlotIdentifier
   }
 
   private let localStorage: FocusStateStorageCell<Value>
-  private var boundLocationsByOwner: [StateOwnerHandle: BoundLocation] = [:]
+  private var locations: [FallbackKey: FocusStateLocation<Value>] = [:]
+  private var selectedSlots: [StateOwnerHandle: StateSlotIdentifier] = [:]
   private var fallbackStorageByOwnerAndSlot: [FallbackKey: FocusStateStorageCell<Value>] = [:]
 
   init(
@@ -182,26 +178,41 @@ private final class FocusStateBox<Value: Equatable> {
   func remember(
     _ location: FocusStateLocation<Value>,
     for owner: StateOwnerHandle,
-    pathQualified: Bool = false
+    path: StateSlotPath = .root
   ) {
-    boundLocationsByOwner[owner] = BoundLocation(
-      location: location,
-      isPathQualified: pathQualified
-    )
+    // Prepared copies and retained Bindings own their resolver locations.
+    // The shared box caches only live owners, never retired graph nodes.
+    let retired = selectedSlots.keys.filter { LiveViewGraphRegistry.node(for: $0) == nil }
+    if !retired.isEmpty {
+      let retired = Set(retired)
+      selectedSlots = selectedSlots.filter { !retired.contains($0.key) }
+      locations = locations.filter { !retired.contains($0.key.owner) }
+      fallbackStorageByOwnerAndSlot = fallbackStorageByOwnerAndSlot.filter {
+        !retired.contains($0.key.owner)
+      }
+    }
+    let slot = StateSlotIdentifier(ordinal: slotOrdinal, path: path)
+    locations[FallbackKey(owner: owner, slot: slot)] = location
+    selectedSlots[owner] = slot
   }
 
   func currentLocation(for owner: StateOwnerHandle) -> FocusStateLocation<Value>? {
-    boundLocationsByOwner[owner]?.location
+    guard let slot = selectedSlots[owner] else { return nil }
+    return locations[FallbackKey(owner: owner, slot: slot)]
+  }
+
+  func location(for owner: StateOwnerHandle, path: StateSlotPath) -> FocusStateLocation<Value>? {
+    locations[FallbackKey(owner: owner, slot: .init(ordinal: slotOrdinal, path: path))]
   }
 
   func currentPathQualifiedLocation(
     for owner: StateOwnerHandle
   ) -> FocusStateLocation<Value>? {
-    guard let bound = boundLocationsByOwner[owner], bound.isPathQualified else {
-      return nil
-    }
-    return bound.location
+    guard let slot = selectedSlots[owner], !slot.path.isEmpty else { return nil }
+    return locations[FallbackKey(owner: owner, slot: slot)]
   }
+
+  var rememberedLocationCount: Int { locations.count }
 
   func fallbackStorageCell(
     for owner: StateOwnerHandle,
@@ -249,6 +260,8 @@ public struct FocusState<Value: Equatable> {
   }
 
   private let box: FocusStateBox<Value>
+  // An indirect resolver, never a graph node or mutable graph-slot cell.
+  private var capturedLocation: FocusStateLocation<Value>?
   package var focusDomain: FocusBindingDomain = .keyboard
 
   private init(
@@ -307,12 +320,18 @@ public struct FocusState<Value: Equatable> {
   }
 
   #if DEBUG
+    package var rememberedLocationCountForTesting: Int { box.rememberedLocationCount }
+
     package var debugStorageObject: AnyObject {
       box
     }
   #endif
 
   private func activeLocation() -> FocusStateLocation<Value>? {
+    // A prepared copy is authoritative even in a callback nested inside a
+    // different evaluation. The location attributes reads to the actual
+    // evaluating reader while resolving storage through this exact owner.
+    if let capturedLocation { return capturedLocation }
     if let context = currentAuthoringContext(),
       let owner = stateStorageOwner(for: context)
     {
@@ -329,7 +348,7 @@ public struct FocusState<Value: Equatable> {
       {
         return remembered
       }
-      let location = makeLocation(for: context, owner: owner)
+      let location = makeLocation(owner: owner)
       box.remember(location, for: owner)
       // Materialize the backing slot (seeded from the local box) without
       // recording a read: mentioning `$focus` hosts the storage, it does not
@@ -342,7 +361,6 @@ public struct FocusState<Value: Equatable> {
   }
 
   private func makeLocation(
-    for context: AuthoringContext,
     owner: StateOwnerHandle,
     path: StateSlotPath = .root
   ) -> FocusStateLocation<Value> {
@@ -548,6 +566,22 @@ extension FocusState.Binding {
   }
 }
 
+extension FocusState: CaptureBindableDynamicProperty {
+  package mutating func bindCapture(_ context: DynamicPropertyCaptureContext) {
+    guard let slot = context.ownedSlot else {
+      capturedLocation = nil
+      return
+    }
+    if let existing = box.location(for: slot.owner, path: slot.path) {
+      capturedLocation = existing
+    } else {
+      let location = makeLocation(owner: slot.owner, path: slot.path)
+      box.remember(location, for: slot.owner, path: slot.path)
+      capturedLocation = location
+    }
+  }
+}
+
 extension FocusState: DynamicProperty {
   /// Publishes the storage owner's request independently of mounted targets.
   /// Composed wrappers use their discovered-property path; top-level wrappers
@@ -561,8 +595,8 @@ extension FocusState: DynamicProperty {
     else {
       return .unchanged
     }
-    let location = makeLocation(for: context, owner: owner, path: path)
-    box.remember(location, for: owner, pathQualified: !path.isEmpty)
+    let location = makeLocation(owner: owner, path: path)
+    box.remember(location, for: owner, path: path)
     location.prime()
     let snapshot = location.bookkeepingSnapshot()
     let clearValue = box.clearValue
