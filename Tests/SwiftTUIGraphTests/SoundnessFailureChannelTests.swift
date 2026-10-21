@@ -246,8 +246,9 @@ struct SoundnessFailureChannelTests {
     process.standardOutput = output
     process.standardError = output
     try process.run()
-    process.waitUntilExit()
+    // Drain while the scanner runs so a full pipe cannot block its exit.
     let data = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
     return ScannerResult(
       status: process.terminationStatus,
       output: String(decoding: data, as: UTF8.self)
