@@ -71,7 +71,6 @@ extension ViewNode {
     package var suppressesStructuralLifecycle: Bool
     package var focusPresentationInertSlotIdentities: Set<Identity>
     package var focusPresentationValueVerifiedSlotIdentities: Set<Identity>
-    package var nextChangeModifierOrdinal: Int
     package var nextNavigationDestinationModifierOrdinal: Int
     package var nextTaskModifierOrdinal: Int
     package var nextValueAnimationModifierOrdinal: Int

@@ -30,6 +30,7 @@ extension View {
   ) -> some View {
     modifier(
       ChangeLifecycleModifier(
+        callbackScope: currentImperativeAuthoringContextSnapshot(),
         value: value,
         initial: initial,
         action: { _, _ in action() }
@@ -44,6 +45,7 @@ extension View {
   ) -> some View {
     modifier(
       ChangeLifecycleModifier(
+        callbackScope: currentImperativeAuthoringContextSnapshot(),
         value: value,
         initial: initial,
         action: action
@@ -167,6 +169,7 @@ public struct DisappearLifecycleModifier: IterativePrimitiveViewModifier {
 }
 
 public struct ChangeLifecycleModifier<Value: Equatable>: IterativePrimitiveViewModifier {
+  let callbackScope: ImperativeAuthoringContextSnapshot?
   var value: Value
   var initial: Bool
   let action: (Value, Value) -> Void
@@ -175,9 +178,12 @@ public struct ChangeLifecycleModifier<Value: Equatable>: IterativePrimitiveViewM
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> ResolveWork<[ResolvedNode]> {
-    let intake = HandlerDescriptorIntake(context: context)
+    let intake = HandlerDescriptorIntake(
+      context: context,
+      preferringSnapshot: callbackScope
+    )
     return content.resolveWork(in: context).map { completed in
-      let node = completed
+      var node = completed
       let viewGraph = context.viewGraph
       // The package-only exact `.id(Identity)` replaces the resolved path
       // wholesale. Its scoped entity is therefore the lifecycle owner: it stays
@@ -194,14 +200,18 @@ public struct ChangeLifecycleModifier<Value: Equatable>: IterativePrimitiveViewM
         ?? viewGraph?.nodeForIdentity(node.identity)
       // A content-first `.id(...).onChange(...)` can expose a freshly routed
       // node before its resolved identity has entered the graph index. Keep the
-      // established identity owner for baseline/ordinal semantics, but queue the
-      // event on the concrete resolved node (or its route) so `initial: true` is
+      // established identity for observation baselines, but queue the event on
+      // the concrete resolved node (or its route) so `initial: true` is
       // not swallowed on that first lifetime pass.
       let eventOwnerNode =
         ownerNode
         ?? node.viewNodeID.flatMap { viewGraph?.nodeForViewNodeID($0) }
         ?? routedEntityIdentity.flatMap { viewGraph?.nodeForEntityIdentity($0) }
-      let modifierOrdinal = ownerNode?.claimChangeModifierOrdinal() ?? 0
+      // Flattened wrappers can index different graph nodes at this same resolved
+      // identity as content completes. Count the observers on the element itself
+      // so every modifier shares one inner-first baseline sequence.
+      let modifierOrdinal = node.lifecycleMetadata.changeObservationCount
+      node.lifecycleMetadata.changeObservationCount += 1
 
       // The graph store can read the owner's prior value before commit. Exact-ID
       // entries follow the scoped entity above; ordinary entries keep their

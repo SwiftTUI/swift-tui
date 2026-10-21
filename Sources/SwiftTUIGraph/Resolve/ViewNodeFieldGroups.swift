@@ -36,7 +36,6 @@ extension ViewNode {
     // Modifier-ordinal minting for the current body pass; reset alongside the
     // counts above in prepareForFrame/beginEvaluation, so same frame-local
     // lifecycle.
-    package var nextChangeModifierOrdinal: Int = 0
     package var nextNavigationDestinationModifierOrdinal: Int = 0
     package var nextTaskModifierOrdinal: Int = 0
     package var nextValueAnimationModifierOrdinal: Int = 0

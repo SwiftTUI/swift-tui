@@ -278,10 +278,6 @@ package final class ViewNode {
   package var focusPresentationValueVerifiedSlotIdentities: Set<Identity> {
     evaluationState.focusPresentationValueVerifiedSlotIdentities
   }
-  private var nextChangeModifierOrdinal: Int {
-    get { frameState.nextChangeModifierOrdinal }
-    set { frameState.nextChangeModifierOrdinal = newValue }
-  }
   private var nextNavigationDestinationModifierOrdinal: Int {
     get { frameState.nextNavigationDestinationModifierOrdinal }
     set { frameState.nextNavigationDestinationModifierOrdinal = newValue }
@@ -417,7 +413,6 @@ package final class ViewNode {
     previousLifecycleMetadata = lifecycleMetadata
     currentBodyStateSlotCount = 0
     pendingChangeHandlerIDs.removeAll(keepingCapacity: true)
-    nextChangeModifierOrdinal = 0
     nextNavigationDestinationModifierOrdinal = 0
     nextTaskModifierOrdinal = 0
     nextValueAnimationModifierOrdinal = 0
@@ -440,7 +435,6 @@ package final class ViewNode {
       visitedFrameID = frameID
       isDirty = false
       currentBodyStateSlotCount = 0
-      nextChangeModifierOrdinal = 0
       nextNavigationDestinationModifierOrdinal = 0
       nextTaskModifierOrdinal = 0
       nextValueAnimationModifierOrdinal = 0
@@ -1065,13 +1059,6 @@ package final class ViewNode {
     _ lifecycleState: NodeLifecycleState
   ) {
     self.lifecycleState = lifecycleState
-  }
-
-  package func claimChangeModifierOrdinal() -> Int {
-    defer {
-      nextChangeModifierOrdinal += 1
-    }
-    return nextChangeModifierOrdinal
   }
 
   package func claimNavigationDestinationModifierOrdinal() -> Int {
@@ -2552,7 +2539,6 @@ extension ViewNode {
       suppressesStructuralLifecycle: suppressesStructuralLifecycle,
       focusPresentationInertSlotIdentities: focusPresentationInertSlotIdentities,
       focusPresentationValueVerifiedSlotIdentities: focusPresentationValueVerifiedSlotIdentities,
-      nextChangeModifierOrdinal: nextChangeModifierOrdinal,
       nextNavigationDestinationModifierOrdinal: nextNavigationDestinationModifierOrdinal,
       // nextTaskModifierOrdinal was checkpointed but historically omitted from
       // this debug mirror; grouping it into FrameState surfaced the gap and the
