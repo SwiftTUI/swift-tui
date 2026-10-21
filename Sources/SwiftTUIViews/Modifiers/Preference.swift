@@ -61,6 +61,7 @@ extension View {
   ) -> some View where Key.Value: Equatable {
     modifier(
       PreferenceChangeModifier<Key>(
+        callbackScope: currentImperativeAuthoringContextSnapshot(),
         action: action
       )
     )
@@ -197,6 +198,7 @@ public struct PreferenceChangeModifier<Key: PreferenceKey>: IterativePrimitiveVi
 where
   Key.Value: Equatable
 {
+  let callbackScope: ImperativeAuthoringContextSnapshot?
   let action: @MainActor (Key.Value) -> Void
 
   package func makeResolveWork<Base: View>(
@@ -205,7 +207,7 @@ where
   ) -> ResolveWork<[ResolvedNode]> {
     return content.resolveWork(in: context).map { completed in
       let node = completed
-      let intake = HandlerDescriptorIntake(context: context)
+      let intake = HandlerDescriptorIntake(context: context, preferringSnapshot: callbackScope)
       intake.registerPreferenceObservation(
         identity: node.identity,
         key: Key.self,

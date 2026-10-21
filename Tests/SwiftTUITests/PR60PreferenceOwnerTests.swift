@@ -1,7 +1,8 @@
 import SwiftTUIRuntime
 @_spi(Testing) import SwiftTUITestSupport
-import SwiftTUIViews
 import Testing
+
+@testable import SwiftTUIViews
 
 @MainActor
 @Suite(.serialized, .timeLimit(.minutes(1)))
@@ -31,6 +32,9 @@ struct PR60PreferenceOwnerTests {
       let reading = try #require(probe.readings.last)
       #expect(reading.newValue == "Interval")
       #expect(reading.focus == "Interval")
+      #expect(
+        reading.ownerMatches,
+        "registration must preserve the declaration owner independently of wrapper capture")
       session.stop()
       #expect(try await run.value == .inputEnded)
     } catch {
@@ -124,12 +128,17 @@ private struct PR60PreferenceOwnerView: View {
   }
 
   var body: some View {
-    ScrollViewReader { _ in
+    let declarationOwner = currentAuthoringContext()?.stateOwnerHandle
+    return ScrollViewReader { _ in
       observingOtherChanges(
         contents
           .preference(key: PR60FocusPreferenceKey.self, value: focus)
           .onPreferenceChange(PR60FocusPreferenceKey.self) { current in
-            probe.readings.append(PR60PreferenceOwnerProbe.Reading(newValue: current, focus: focus))
+            probe.readings.append(
+              PR60PreferenceOwnerProbe.Reading(
+                newValue: current, focus: focus,
+                ownerMatches: declarationOwner != nil
+                  && currentAuthoringContext()?.stateOwnerHandle == declarationOwner))
             observation = "Callback \(probe.readings.count)"
           })
     }
@@ -162,6 +171,7 @@ private final class PR60PreferenceOwnerProbe {
   struct Reading {
     let newValue: String?
     let focus: String?
+    let ownerMatches: Bool
   }
   var readings: [Reading] = []
   nonisolated init() {}
