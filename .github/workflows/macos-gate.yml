@@ -164,9 +164,10 @@ jobs:
     if: needs.changes.outputs.changed == 'true'
     # The adapter uses an uninstrumented build, so it cannot reuse the repo
     # gate's module-trace build. Running it after the ~61-minute gate exhausted
-    # that job's 75-minute cap (39304126780). Give the comparison its own budget;
-    # the adapter retains its 120s compiler, 30s oracle and 900s SwiftTUI bounds.
-    timeout-minutes: 25
+    # that job's 75-minute cap (39304126780). Give the comparison its own budget:
+    # 120s oracle compiler, 30s oracle, 1800s cold SwiftTUI build and 900s
+    # SwiftTUI execution, plus toolchain setup and artifact upload.
+    timeout-minutes: 55
 
     steps:
       - name: Checkout

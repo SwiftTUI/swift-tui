@@ -65,7 +65,11 @@ def main():
              "Tools/PublicSemanticOracle.swift", str(fixture), "-o", str(executable)], "swiftui-build.log", 120)
         apple_text = run([str(executable)], "swiftui.log", 30)
         apple = json.loads(apple_text.splitlines()[-1])
-        tui_text = run(["swiftly", "run", "swift", "test", "--build-system", "native", "--no-parallel",
+        # Cold compilation can exceed the execution budget on hosted runners.
+        # Bound it separately so the observation run retains its own deadline.
+        run(["swiftly", "run", "swift", "build", "--build-system", "native", "--build-tests"],
+            "swifttui-build.log", 1800)
+        tui_text = run(["swiftly", "run", "swift", "test", "--build-system", "native", "--skip-build", "--no-parallel",
                         "--filter", "SwiftTUITests.PublicSemanticDifferentialTests"], "swifttui.log", 900)
         records = [line.removeprefix("[public-semantics] ") for line in tui_text.splitlines() if line.startswith("[public-semantics] ")]
         if len(records) != 1:
