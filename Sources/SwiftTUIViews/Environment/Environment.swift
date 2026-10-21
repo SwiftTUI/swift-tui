@@ -307,6 +307,7 @@ public struct Environment<Value: Sendable> {
   /// indices are not `Hashable`).
   private let keyPath: KeyPath<EnvironmentValues, Value>?
   private let read: (EnvironmentValues) -> Value
+  private var capture: EnvironmentValues?
 
   /// Creates an environment-value reader for `keyPath`.
   public init(
@@ -327,7 +328,12 @@ public struct Environment<Value: Sendable> {
     if let keyPath {
       EnvironmentValues.recordRuntimeFocusStateDependencyRead(for: keyPath)
     }
-    guard let current = EnvironmentValuesStorage.current else {
+    let source =
+      HandlerInvocationScope.current?.environment
+      ?? (ViewNodeContext.current != nil
+        ? EnvironmentValuesStorage.current
+        : capture ?? EnvironmentValuesStorage.current)
+    guard let current = source else {
       // The silent-default class (F136): inside an authoring/dispatch scope
       // the registration-time environment should have been established
       // around this read (`HandlerDescriptorIntake` stamps it over every
@@ -343,6 +349,12 @@ public struct Environment<Value: Sendable> {
       return read(EnvironmentValues())
     }
     return read(current)
+  }
+}
+
+extension Environment: CaptureBindableDynamicProperty {
+  package mutating func bindCapture(_ context: DynamicPropertyCaptureContext) {
+    capture = context.environment
   }
 }
 

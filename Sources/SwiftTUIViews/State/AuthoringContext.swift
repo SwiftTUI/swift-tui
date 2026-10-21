@@ -411,6 +411,24 @@ package func currentImperativeAuthoringContextSnapshot() -> ImperativeAuthoringC
   ImperativeAuthoringContextSnapshot()
 }
 
+/// Explicit handler operation context. Ambient environment alone is not proof
+/// of invocation. Task-local storage survives suspension without leaking into
+/// another main-actor job; nested nil snapshots preserve the enclosing scope.
+package enum HandlerInvocationScope {
+  package struct Context: Sendable {
+    package var environment: EnvironmentValues?
+  }
+
+  @TaskLocal package static var current: Context?
+
+  /// Resolve work nested inside a handler establishes a new evaluation.
+  @MainActor
+  package static func evaluating<Result>(_ body: () -> Result) -> Result {
+    guard current != nil else { return body() }
+    return $current.withValue(nil) { body() }
+  }
+}
+
 @MainActor
 package func withImperativeAuthoringContext<Result>(
   _ snapshot: ImperativeAuthoringContextSnapshot?,
@@ -424,9 +442,13 @@ package func withImperativeAuthoringContext<Result>(
   guard let snapshot else {
     return apply()
   }
-  return withAuthoringContext(snapshot.authoringContext) {
-    withRegistrationEnvironment(snapshot.environmentValues) {
-      apply()
+  let invocation = HandlerInvocationScope.Context(
+    environment: snapshot.environmentValues ?? HandlerInvocationScope.current?.environment)
+  return HandlerInvocationScope.$current.withValue(invocation) {
+    withAuthoringContext(snapshot.authoringContext) {
+      withRegistrationEnvironment(snapshot.environmentValues) {
+        apply()
+      }
     }
   }
 }
@@ -439,9 +461,13 @@ package func withImperativeAuthoringContext<Result>(
   guard let snapshot else {
     return await apply()
   }
-  return await withAuthoringContext(snapshot.authoringContext) {
-    await withRegistrationEnvironment(snapshot.environmentValues) {
-      await apply()
+  let invocation = HandlerInvocationScope.Context(
+    environment: snapshot.environmentValues ?? HandlerInvocationScope.current?.environment)
+  return await HandlerInvocationScope.$current.withValue(invocation) {
+    await withAuthoringContext(snapshot.authoringContext) {
+      await withRegistrationEnvironment(snapshot.environmentValues) {
+        await apply()
+      }
     }
   }
 }

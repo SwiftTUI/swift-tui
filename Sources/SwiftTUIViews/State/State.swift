@@ -393,7 +393,7 @@ public struct State<Value> {
   #endif
 
   private func activeLocation(retainingRemovedOwner: Bool = false) -> DynamicStateLocation<Value>? {
-    if ViewNodeContext.current != nil {
+    if ViewNodeContext.current != nil, HandlerInvocationScope.current == nil {
       guard let context = AuthoringContextStorage.current,
         let storageOwner = stateStorageOwner(for: context)
       else {

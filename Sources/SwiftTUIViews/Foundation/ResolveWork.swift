@@ -113,6 +113,10 @@ private final class ResolveContinuationScope {
   let dormantPolicy = DormantStateSlotPolicyScope.current
 
   func run(_ body: () -> Void) {
+    HandlerInvocationScope.evaluating { runEvaluation(body) }
+  }
+
+  private func runEvaluation(_ body: () -> Void) {
     let priorForks = StyleRouteInstallationLedgerStorage.forksPerDeclaredChild
     StyleRouteInstallationLedgerStorage.forksPerDeclaredChild = forksStyles
     defer { StyleRouteInstallationLedgerStorage.forksPerDeclaredChild = priorForks }

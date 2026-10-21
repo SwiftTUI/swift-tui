@@ -17,6 +17,8 @@ private enum FocusedValuesDependencyKey: EnvironmentKey, FrameworkEnvironmentKey
 }
 
 extension EnvironmentValues {
+  package var capturedFocusedValues: FocusedValues { self[untracked: FocusedValuesKey.self] }
+
   package var focusedValues: FocusedValues {
     get { self[FocusedValuesKey.self] }
     set { self[FocusedValuesKey.self] = newValue }
@@ -52,6 +54,7 @@ extension EnvironmentValues {
 /// Reads a value exported by the currently focused subtree.
 public struct FocusedValue<Value: Sendable> {
   private let keyPath: KeyPath<FocusedValues, Value?>
+  private var capture: CapturedFocusedValuesRoute?
 
   /// Creates a focused-value reader for `keyPath`.
   public init(
@@ -62,7 +65,7 @@ public struct FocusedValue<Value: Sendable> {
 
   public var wrappedValue: Value? {
     EnvironmentValues.recordFocusedValuesDependencyRead()
-    return currentAuthoringContext()?.focusedValues[keyPath: keyPath]
+    return focusedValuesForAccess(capture)[keyPath: keyPath]
   }
 }
 
@@ -71,6 +74,7 @@ public struct FocusedValue<Value: Sendable> {
 /// Reads and writes a binding exported by the currently focused subtree.
 public struct FocusedBinding<Value: Sendable> {
   private let keyPath: KeyPath<FocusedValues, Binding<Value>?>
+  private var capture: CapturedFocusedValuesRoute?
 
   /// Creates a focused-binding reader for `keyPath`.
   public init(
@@ -81,7 +85,7 @@ public struct FocusedBinding<Value: Sendable> {
 
   private var currentBinding: Binding<Value>? {
     EnvironmentValues.recordFocusedValuesDependencyRead()
-    return currentAuthoringContext()?.focusedValues[keyPath: keyPath]
+    return focusedValuesForAccess(capture)[keyPath: keyPath]
   }
 
   public var wrappedValue: Value? {
@@ -96,6 +100,28 @@ public struct FocusedBinding<Value: Sendable> {
 
   public var projectedValue: Binding<Value>? {
     currentBinding
+  }
+}
+
+/// Body reads retain evaluation attribution. Imperative readers select the
+/// captured graph's live provider on every access, including fresh projections.
+@MainActor
+private func focusedValuesForAccess(_ capture: CapturedFocusedValuesRoute?) -> FocusedValues {
+  if ViewNodeContext.current != nil, HandlerInvocationScope.current == nil {
+    return currentAuthoringContext()?.focusedValues ?? capture?.snapshot ?? FocusedValues()
+  }
+  return capture?.current ?? currentAuthoringContext()?.focusedValues ?? FocusedValues()
+}
+
+extension FocusedValue: CaptureBindableDynamicProperty {
+  package mutating func bindCapture(_ context: DynamicPropertyCaptureContext) {
+    capture = context.focusedValues
+  }
+}
+
+extension FocusedBinding: CaptureBindableDynamicProperty {
+  package mutating func bindCapture(_ context: DynamicPropertyCaptureContext) {
+    capture = context.focusedValues
   }
 }
 

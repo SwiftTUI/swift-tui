@@ -238,7 +238,7 @@ private func rootCaptureBinding(
     environment: environment,
     focusedValues: CapturedFocusedValuesRoute(
       graphScope: scope.flatMap { graphScopeID(for: $0) },
-      snapshot: scope?.focusedValues ?? environment.focusedValues))
+      snapshot: scope?.focusedValues ?? environment.capturedFocusedValues))
 }
 
 /// Plan-dispatched core: a struct container binds a private copy — the only
@@ -267,6 +267,13 @@ private func boundCopy<V>(
   let traversalOwner = view as? any AdditionalDynamicPropertyUpdating
   switch unsafe plan {
   case .none:
+    #if DEBUG
+      if RuntimeFieldReflection.metadataKind(of: concreteType)
+        != RuntimeFieldReflection.structureKind
+      {
+        StateCaptureCensus.record(.bindSkippedTier)
+      }
+    #endif
     return view
   case .structFields(let binders):
     guard V.self == concreteType else {
