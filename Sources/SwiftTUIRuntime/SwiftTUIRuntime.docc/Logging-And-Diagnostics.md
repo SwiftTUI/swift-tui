@@ -6,8 +6,8 @@ ways to log, capture diagnostics, and observe runtime issues instead.
 ## Overview
 
 Live routing of runtime issues to a separate TTY and the body helpers below
-were added after 0.18.3. They require a framework checkout or release containing
-those APIs. Older releases can capture runtime issues in a debug bundle.
+are available starting in 0.19.0. Older releases can capture runtime issues in
+a debug bundle.
 
 An interactive SwiftTUI session takes over the terminal. The terminal host
 puts the tty into raw mode and switches it to the alternate screen, and the

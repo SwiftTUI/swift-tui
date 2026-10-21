@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-21
+
 ### Added
 
 - SwiftUI-style `_printChanges()` and `_logChanges()` on `View` and
@@ -24,6 +26,24 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   longer block writes or raise SIGPIPE; bundles take precedence (STUI-1089).
 - Preserve the compiler error in the reload driver's bounded diagnostic summary
   when Swiftly appends verbose process metadata (STUI-1089).
+- Keep the active command visible in short terminal palettes and preserve focus
+  through scroll viewport and content geometry changes. Thanks to
+  [@echoz](https://github.com/echoz) for
+  [#58](https://github.com/SwiftTUI/swift-tui/pull/58) and
+  [#59](https://github.com/SwiftTUI/swift-tui/pull/59).
+- Preserve `onChange` callback scope and independent observation baselines in
+  deferred readers and stacked modifiers. Thanks to
+  [@echoz](https://github.com/echoz) for
+  [#60](https://github.com/SwiftTUI/swift-tui/pull/60).
+- Bind captured focus and gesture properties to their exact owner lifetimes;
+  retain live focused services, handler environment precedence, and preference
+  callback declaration ownership (STUI-1093–STUI-1098).
+
+### Changed
+
+- Generalize dynamic-property capture routes and enforce wrapper capture
+  classifications. Retained subtrees perform no new capture work
+  (STUI-1093, STUI-1099, STUI-1100).
 
 ## [0.18.3] - 2026-10-17
 
@@ -2429,7 +2449,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.18.3...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.0...HEAD
+[0.19.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.0
 [0.18.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.3
 [0.18.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.2
 [0.18.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.1
