@@ -269,8 +269,8 @@ extension RunLoop {
     passStartedAt: MonotonicInstant?,
     appliesWorkBudget: Bool
   ) -> Bool {
-    // An accepted exit has no later input turn. Late input must not strand
-    // the owed frame's callbacks or prevent a skipped acquisition retry.
+    // Startup and accepted exits must finish their required synchronous
+    // follow-ups. Late input must not strand callbacks or skipped-frame retries.
     guard appliesWorkBudget, let eventPump else {
       return false
     }
@@ -540,7 +540,7 @@ extension RunLoop {
       .merging(pressedCleanup.invalidations)
   }
 
-  /// Only cooperative exits sample the scheduler around synchronous callbacks.
+  /// Startup and cooperative exits sample the scheduler around synchronous callbacks.
   /// Off-main writes racing a callback conservatively earn a follow-up; the
   /// acquisition cap still bounds repeated races. Normal rendering reads nothing.
   private func observeCallbackInvalidations<Value>(

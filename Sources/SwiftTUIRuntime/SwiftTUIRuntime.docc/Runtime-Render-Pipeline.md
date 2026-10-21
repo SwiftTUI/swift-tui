@@ -470,6 +470,14 @@ and dropped frames, before returning to input and termination handling. Pending
 work stays in the scheduler for the next pass. The deadline-arm cut also defers
 deadlines armed during the pass. Both bounds are needed: periodic state writes
 can keep invalidating faster than frames render, without consuming a deadline.
+
+Startup establishes the first converged presentation without cancellable
+acquisition. It settles synchronous appearance, focus and callback follow-ups,
+then returns to input before draining unrelated producer writes. The optional
+follow-up pass pulls and checks pending input before acquiring another frame.
+Schedulers without callback attribution conservatively retain the normal
+sixteen-acquisition bound for startup settlement.
+
 Cooperative exit is resolved before any exit work. A pending programmatic request
 is considered first, followed by the event's termination handlers. A veto requests
 an ordinary root invalidation and continues the event batch without flushing or
@@ -487,10 +495,11 @@ after an accepted exit does not interrupt that owed work. Signal exits
 retain their one-acquisition flush, including when only a pending frame preceded
 the signal. Full lifecycle shutdown runs when the session returns.
 
-The drain policy selects normal rendering, cooperative exit or signal exit;
-frame application reports callback invalidations independently of that policy.
-Only cooperative exits compare the scheduler's invalidation-request generation
-before and after synchronous callback phases. SwiftTUIGraph and state writes need
+The drain policy selects initial presentation, normal rendering, cooperative exit
+or signal exit; frame application reports callback invalidations independently
+of that policy. Initial presentation and cooperative exits compare the
+scheduler's invalidation-request generation before and after synchronous
+callback phases. SwiftTUIGraph and state writes need
 no additional instrumentation. Normal rendering and signal drains take no such
 snapshots. Custom schedulers with unavailable generation observations retain the
 original bounded drain without a new protocol requirement.

@@ -566,12 +566,15 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     var renderedFrames = 0
     #if os(Android)
       if renderMode == .sync {
-        try renderPendingFrames(renderedFrames: &renderedFrames)
+        try renderPendingFrames(
+          renderedFrames: &renderedFrames, drainPolicy: .initialPresentation)
       } else {
-        try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+        _ = try await renderPendingFramesAsync(
+          renderedFrames: &renderedFrames, eventPump: nil, drainPolicy: .initialPresentation)
       }
     #else
-      try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      _ = try await renderPendingFramesAsync(
+        renderedFrames: &renderedFrames, eventPump: nil, drainPolicy: .initialPresentation)
     #endif
 
     // After the initial render establishes the view tree and evaluator
@@ -589,7 +592,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
       )
     }
 
-    if scheduler.hasPendingFrame(at: .now()) {
+    // Startup has established the tree. Serve waiting input before unrelated
+    // producer work can start another drain pass.
+    _ = eventPump.pullInput()
+    if !eventPump.hasPendingEvents(), scheduler.hasPendingFrame(at: .now()) {
       if let exitReason = try await renderPendingFramesAsync(
         renderedFrames: &renderedFrames,
         eventPump: eventPump

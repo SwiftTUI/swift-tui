@@ -10,7 +10,68 @@ import Testing
 @MainActor
 @Suite(.serialized, .timeLimit(.minutes(1)))
 struct RunLoopDrainFairnessTests {
-  @Test("only cooperative callback observation reads the invalidation generation")
+  @Test(
+    "startup and follow-up frames serve waiting input before more producer work", arguments: [1, 3])
+  func startupInputService(injectedAtCommit: Int) async throws {
+    let root = testIdentity("StartupInputService")
+    let scheduler = FrameScheduler()
+    let input = CooperativeExitInputReader()
+    let surface = CooperativeExitSurface()
+    let state = StateContainer(initialState: 0, invalidationIdentities: [root])
+    let producer = StartupInputProducer(
+      scheduler: scheduler, root: root, input: input, state: state,
+      injectedAtCommit: injectedAtCommit)
+    let runLoop = RunLoop(
+      rootIdentity: root, presentationSurface: surface, terminalInputReader: input,
+      scheduler: scheduler, stateContainer: state,
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      viewBuilder: { value, _ in
+        Text("input \(value)")
+          .focusable()
+          .onKeyPress(.character("b"), modifiers: .ctrl) { _ in
+            producer.handleInput()
+            return .handled
+          }
+      })
+    runLoop.renderMode = .sync
+    runLoop.frameSink = producer
+
+    let result = try await runLoop.run()
+
+    #expect(producer.handledAtCommits == [injectedAtCommit])
+    #expect(result.finalState == 1)
+    #expect(surface.lastFrameContainsLine("input 1"))
+    #expect(result.exitReason == .inputEnded)
+  }
+
+  @Test("startup input waits for synchronous appearance and focus follow-ups")
+  func startupInputFocusSettlement() async throws {
+    let root = testIdentity("StartupInputFocusSettlement")
+    let scheduler = FrameScheduler()
+    let input = CooperativeExitInputReader()
+    let surface = CooperativeExitSurface()
+    let state = StateContainer(initialState: 0, invalidationIdentities: [root])
+    let producer = StartupInputProducer(
+      scheduler: scheduler, root: root, input: input, state: state, injectedAtCommit: 1)
+    let runLoop = RunLoop(
+      rootIdentity: root, presentationSurface: surface, terminalInputReader: input,
+      scheduler: scheduler, stateContainer: state,
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      viewBuilder: { value, _ in StartupFocusedFixture(value: value, producer: producer) })
+    runLoop.renderMode = .sync
+    runLoop.frameSink = producer
+
+    let result = try await runLoop.run()
+
+    #expect(producer.handledAtCommits.count == 1)
+    #expect(producer.handledAtCommits.allSatisfy { $0 > 1 })
+    #expect(result.finalState == 1)
+    #expect(surface.lastFrameContainsLine("ready"))
+    #expect(surface.lastFrameContainsLine("input 1"))
+    #expect(result.exitReason == .inputEnded)
+  }
+
+  @Test("startup and cooperative callback observation read the invalidation generation")
   func callbackGenerationReads() {
     typealias Loop = RunLoop<Int, Text>
     var reads = 0
@@ -26,21 +87,22 @@ struct RunLoopDrainFairnessTests {
       #expect(result.invalidations == .none)
     }
     #expect(reads == 0)
-    let changed = Loop.FrameCallbackInvalidations.observe(under: .cooperativeExit, generation: read)
-    {
-      generation += 1
+    for policy: Loop.FrameDrainPolicy in [.initialPresentation, .cooperativeExit] {
+      let readsBefore = reads
+      let changed = Loop.FrameCallbackInvalidations.observe(under: policy, generation: read) {
+        generation += 1
+      }
+      #expect(changed.invalidations == .observed)
+      #expect(reads == readsBefore + 2)
+      let unchanged = Loop.FrameCallbackInvalidations.observe(under: policy, generation: read) {}
+      #expect(unchanged.invalidations == .none)
+      #expect(reads == readsBefore + 4)
+      let unavailable = Loop.FrameCallbackInvalidations.observe(
+        under: policy, generation: { nil }
+      ) {}
+      #expect(unavailable.invalidations == .unavailable)
+      #expect(policy.shouldContinue(after: unavailable.invalidations))
     }
-    #expect(changed.invalidations == .observed)
-    #expect(reads == 2)
-    let unchanged = Loop.FrameCallbackInvalidations.observe(
-      under: .cooperativeExit, generation: read
-    ) {}
-    #expect(unchanged.invalidations == .none)
-    #expect(reads == 4)
-    let unavailable = Loop.FrameCallbackInvalidations.observe(
-      under: .cooperativeExit, generation: { nil }
-    ) {}
-    #expect(unavailable.invalidations == .unavailable)
   }
 
   @Test(
@@ -1172,6 +1234,77 @@ private final class PeriodicInvalidationSink: FrameDiagnosticSink {
     nextTick = clock.now.advanced(by: tickInterval)
     if tickCount < Self.safetyLimit {
       scheduler.requestInvalidation(of: [identity])
+    }
+  }
+}
+
+/// Every commit encounters more producer work; source input must interrupt it.
+@MainActor
+private final class StartupInputProducer: FrameDiagnosticSink {
+  private let scheduler: FrameScheduler
+  private let root: Identity
+  private let input: CooperativeExitInputReader
+  private let state: StateContainer<Int>
+  private let injectedAtCommit: Int
+  private var committedFrames = 0
+  private(set) var handledAtCommits: [Int] = []
+
+  init(
+    scheduler: FrameScheduler, root: Identity, input: CooperativeExitInputReader,
+    state: StateContainer<Int>, injectedAtCommit: Int
+  ) {
+    self.scheduler = scheduler
+    self.root = root
+    self.input = input
+    self.state = state
+    self.injectedAtCommit = injectedAtCommit
+  }
+
+  func record(_ sample: RuntimeFrameSample) {
+    guard case .committed = sample else { return }
+    committedFrames += 1
+    guard handledAtCommits.isEmpty else { return }
+    if committedFrames == injectedAtCommit {
+      input.send(.key(.character("b"), modifiers: .ctrl))
+    }
+    if committedFrames < PeriodicInvalidationSink.safetyLimit {
+      scheduler.requestInvalidation(of: [root])
+    } else {
+      // An ordering regression must fail an assertion rather than hang the suite.
+      input.finish()
+      scheduler.requestInput()
+    }
+  }
+
+  func handleInput() {
+    handledAtCommits.append(committedFrames)
+    state.mutate { $0 += 1 }
+    input.finish()
+  }
+}
+
+private struct StartupFocusedFixture: View {
+  let value: Int
+  let producer: StartupInputProducer
+  @State private var hasAppeared = false
+  @FocusState private var isTargetFocused: Bool
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Text("input \(value)")
+      Text("first").focusable()
+      Text(hasAppeared ? "ready" : "waiting")
+        .focusable()
+        .focused($isTargetFocused)
+        .onKeyPress(.character("b"), modifiers: .ctrl) { _ in
+          #expect(hasAppeared)
+          producer.handleInput()
+          return .handled
+        }
+    }
+    .onAppear {
+      hasAppeared = true
+      isTargetFocused = true
     }
   }
 }

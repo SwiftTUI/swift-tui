@@ -3,6 +3,7 @@ import SwiftTUICore
 extension RunLoop {
   /// Owns acquisition bounds and continuation decisions for one drain pass.
   package enum FrameDrainPolicy {
+    case initialPresentation
     case normal
     case cooperativeExit
     case signalExit
@@ -18,7 +19,7 @@ extension RunLoop {
 
     var acquisitionLimit: Int {
       switch self {
-      case .normal, .cooperativeExit:
+      case .initialPresentation, .normal, .cooperativeExit:
         return RunLoop.maxFramesPerDrainPass
       case .signalExit:
         return 1
@@ -26,15 +27,19 @@ extension RunLoop {
     }
 
     var observesCallbackInvalidations: Bool {
-      if case .cooperativeExit = self { return true }
-      return false
+      switch self {
+      case .initialPresentation, .cooperativeExit:
+        return true
+      case .normal, .signalExit:
+        return false
+      }
     }
 
     var appliesWorkBudget: Bool {
       switch self {
       case .normal:
         return true
-      case .cooperativeExit, .signalExit:
+      case .initialPresentation, .cooperativeExit, .signalExit:
         return false
       }
     }
@@ -45,7 +50,7 @@ extension RunLoop {
         return true
       case .signalExit:
         return false
-      case .cooperativeExit:
+      case .initialPresentation, .cooperativeExit:
         switch invalidations {
         case .none:
           return false
