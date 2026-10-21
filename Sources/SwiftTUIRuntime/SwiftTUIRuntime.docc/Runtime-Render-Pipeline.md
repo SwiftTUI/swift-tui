@@ -478,6 +478,11 @@ follow-up pass pulls and checks pending input before acquiring another frame.
 Schedulers without callback attribution conservatively retain the normal
 sixteen-acquisition bound for startup settlement.
 
+A programmatic termination accepted after startup begins task shutdown before
+flushing its pending wake and termination-handler writes under the cooperative
+exit policy. Synchronous callbacks from that final presentation can request
+follow-up frames before the session returns.
+
 Cooperative exit is resolved before any exit work. A pending programmatic request
 is considered first, followed by the event's termination handlers. A veto requests
 an ordinary root invalidation and continues the event batch without flushing or

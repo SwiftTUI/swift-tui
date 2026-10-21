@@ -585,10 +585,29 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     scheduleNextWakeIfNeeded(using: eventPump)
 
     if let exitReason = consumeProgrammaticTerminationRequest() {
+      // Startup callbacks can request termination without invalidating the
+      // tree. Their external wake still owes a presentation, including any
+      // state written by the termination handler and its final callbacks.
+      lifecycleCoordinator.beginShutdown()
+      #if os(Android)
+        if renderMode == .sync {
+          try renderPendingFrames(
+            renderedFrames: &renderedFrames, eventPump: eventPump,
+            drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+        } else {
+          _ = try await renderPendingFramesAsync(
+            renderedFrames: &renderedFrames, eventPump: eventPump,
+            drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+        }
+      #else
+        _ = try await renderPendingFramesAsync(
+          renderedFrames: &renderedFrames, eventPump: eventPump,
+          drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+      #endif
       return RunLoopResult(
         finalState: stateContainer.state,
         renderedFrames: renderedFrames,
-        exitReason: exitReason
+        exitReason: consumeProgrammaticTerminationRequest() ?? exitReason
       )
     }
 
