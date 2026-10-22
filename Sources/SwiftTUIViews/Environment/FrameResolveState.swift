@@ -129,6 +129,7 @@ package struct RuntimeRootEnvironmentSignature: Equatable, Sendable {
   package var terminalAppearance: TerminalAppearance
   package var theme: Theme?
   package var cellPixelMetrics: CellPixelMetrics
+  package var hostParagraphSpacing: Int
   package var pointerInputCapabilities: PointerInputCapabilities
   package var renderingReduceMotion: Bool
   package var accessibilityPreferences: AccessibilityPreferences
@@ -138,6 +139,7 @@ package struct RuntimeRootEnvironmentSignature: Equatable, Sendable {
     terminalAppearance = environmentValues.terminalAppearance
     theme = environmentValues.theme
     cellPixelMetrics = environmentValues.cellPixelMetrics
+    hostParagraphSpacing = environmentValues.hostParagraphSpacing
     pointerInputCapabilities = environmentValues.pointerInputCapabilities
     renderingReduceMotion = environmentValues.renderingReduceMotion
     accessibilityPreferences = environmentValues.accessibilityPreferences

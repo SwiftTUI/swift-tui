@@ -31,6 +31,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   [@echoz](https://github.com/echoz) for
   [#58](https://github.com/SwiftTUI/swift-tui/pull/58) and
   [#59](https://github.com/SwiftTUI/swift-tui/pull/59).
+- Apply live browser paragraph-spacing changes before focus scrolling, keeping
+  controls visible after narrow-layout reflow (STUI-1104).
 - Preserve `onChange` callback scope and independent observation baselines in
   deferred readers and stacked modifiers. Thanks to
   [@echoz](https://github.com/echoz) for
