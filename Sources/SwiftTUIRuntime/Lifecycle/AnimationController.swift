@@ -2786,20 +2786,12 @@ package final class AnimationController: Sendable {
     var injectionsByParent: [Identity: [(childIndex: Int, snapshot: ResolvedNode)]] = [:]
 
     for (viewNodeID, entry) in removingNodes {
-      // A placed-level removal (a captured `placedSnapshot`) whose curve is
-      // registered is evaluated, custom-state-advanced, overlaid, and purged
-      // solely by the placed overlay pass (`sampleRemovalOverlays`). Evaluating
-      // the curve here too double-samples a stateful `CustomAnimation` once per
-      // frame — the resolved tick and the placed overlay would each call
-      // `evaluate` (016). Mirror the insertion-offset / insertion-scale /
-      // matched-geometry placed scopes handled in the active-animation loop
-      // above: keep the frame
-      // ticking so the scheduler reaches the placed pass, but do not evaluate,
-      // advance custom state, build modifiers, or purge here — the placed pass
-      // owns the single evaluation and the completion/purge. The condition
-      // mirrors `sampleRemovalOverlays`' ownership guards exactly, so removals
-      // it does not own (no placed snapshot, no parent, or no registered curve)
-      // still fall through to the resolved handling below.
+      // The placed overlay pass alone samples a removal with a placed snapshot,
+      // a parent, and a registered curve. Sampling here too would advance a
+      // stateful CustomAnimation twice per frame. Keep ticking until that pass
+      // latches logical completion, then purge on the following head tick.
+      // Mirror `sampleRemovalOverlays`' ownership guards so removals without a
+      // snapshot, parent, or registered curve drain through the fallback below.
       if entry.placedSnapshot != nil,
         entry.parentIdentity != nil,
         let box = entry.animationBox,
@@ -2860,16 +2852,9 @@ package final class AnimationController: Sendable {
       }
 
       if animationComplete {
-        // A cached placed snapshot is still a live exit overlay. Its sampling
-        // pass owns both the logical endpoint and the later removal barrier;
-        // resolving must not advance the same entry first and collapse the two
-        // criteria inside one committed frame.
-        if entry.placedSnapshot != nil {
-          redrawIdentities.insert(entry.identity)
-          latestDeadline = timestamp.advanced(by: frameInterval)
-          hasPendingWork = true
-          continue
-        }
+        // Placed-pass-owned removals already continued above. A snapshot alone
+        // must not hold an instantaneous exit (including withAnimation(nil)):
+        // no registered curve will advance it, so release its barriers here.
         if entry.completionBatchID == nil || entry.isLogicallyComplete {
           removalsToPurge.append(viewNodeID)
         } else {

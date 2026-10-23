@@ -102,13 +102,19 @@ struct AnimationCompletionBarrierTests {
 
   @Test(
     "a removal transition's .removed completion schedules its own firing turn",
-    arguments: [false, true])
-  func removalTransitionRemovedCompletionSchedulesItsTurn(hostedInOverlay: Bool) throws {
+    arguments: [false, true], [false, true])
+  func removalTransitionRemovedCompletionSchedulesItsTurn(
+    hostedInOverlay: Bool,
+    animationDisabled: Bool
+  ) throws {
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("RemovalCompletionProbeRoot"),
       size: .init(width: 60, height: 8)
     ) {
-      RemovalCompletionFixture(hostedInOverlay: hostedInOverlay)
+      RemovalCompletionFixture(
+        hostedInOverlay: hostedInOverlay,
+        animation: animationDisabled ? nil : .linear(duration: .milliseconds(300))
+      )
     }
     defer { harness.shutdown() }
     let controller = harness.runLoop.renderer.internalAnimationController
@@ -119,7 +125,9 @@ struct AnimationCompletionBarrierTests {
       try harness.clickText("hide")
       _ = try harness.renderAfterExternalMutation()
     }
-    #expect(harness.frame.contains("removed=0"), "frame:\n\(harness.frame)")
+    if !animationDisabled {
+      #expect(harness.frame.contains("removed=0"), "frame:\n\(harness.frame)")
+    }
 
     // Render every armed turn through the 300 ms curve and the one-turn
     // final-visual hold: the head tick after the hold purges the overlay and
@@ -132,6 +140,11 @@ struct AnimationCompletionBarrierTests {
       "the loop went idle (no armed turn) before .removed fired; frame:\n\(harness.frame)"
     )
     #expect(!harness.frame.contains("gone"))
+    let state = controller.debugStateSnapshot()
+    #expect(state.removingNodeIDs.isEmpty)
+    #expect(state.completionClosureBatchIDs.isEmpty)
+    #expect(!controller.requiresContinuedAnimationFrames)
+    #expect(harness.runLoop.scheduler.nextWakeInstant(after: clock.now) == nil)
   }
 }
 
@@ -170,13 +183,14 @@ private final class DeadlineDrivenFrameClock<Content: View> {
 @MainActor
 private struct RemovalCompletionFixture: View {
   let hostedInOverlay: Bool
+  let animation: Animation?
   @State private var shown = true
   @State private var removed = 0
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Button("hide") {
-        withAnimation(.linear(duration: .milliseconds(300)), completionCriteria: .removed) {
+        withAnimation(animation, completionCriteria: .removed) {
           shown = false
         } completion: {
           removed += 1

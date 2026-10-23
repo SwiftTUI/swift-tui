@@ -16,8 +16,11 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct AnimationRemovedCompletionAsyncTests {
-  @Test(arguments: [false, true])
-  func removedCompletionFiresWithoutInput(hostedInOverlay: Bool) async throws {
+  @Test(arguments: [false, true], [false, true])
+  func removedCompletionFiresWithoutInput(
+    hostedInOverlay: Bool,
+    animationDisabled: Bool
+  ) async throws {
     let size = CellSize(width: 40, height: 6)
     let host = RemovedCompletionHost(size: size)
     let rootIdentity = testIdentity("RemovedCompletionAsync")
@@ -31,7 +34,12 @@ struct AnimationRemovedCompletionAsyncTests {
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
       focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
       proposal: .init(width: size.width, height: size.height),
-      viewBuilder: { _, _ in RemovedCompletionFixture(hostedInOverlay: hostedInOverlay) }
+      viewBuilder: { _, _ in
+        RemovedCompletionFixture(
+          hostedInOverlay: hostedInOverlay,
+          animation: animationDisabled ? nil : .linear(duration: .milliseconds(120))
+        )
+      }
     )
     let result = try await runLoop.run()
     #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
@@ -51,13 +59,14 @@ struct AnimationRemovedCompletionAsyncTests {
 @MainActor
 private struct RemovedCompletionFixture: View {
   let hostedInOverlay: Bool
+  let animation: Animation?
   @State private var shown = true
   @State private var removed = 0
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Button("hide") {
-        withAnimation(.linear(duration: .milliseconds(120)), completionCriteria: .removed) {
+        withAnimation(animation, completionCriteria: .removed) {
           shown = false
         } completion: {
           removed += 1
