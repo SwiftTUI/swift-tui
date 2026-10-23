@@ -29,8 +29,7 @@ extension DefaultRenderer {
     let preview = previewCompletedFrameCommit(
       draft: draft,
       tailOutput: tailOutput,
-      canonicalResolved: tailOutput.frameTailInput.canonicalResolved,
-      resolved: resolved
+      canonicalResolved: tailOutput.frameTailInput.canonicalResolved
     )
     let artifacts = CommittedFrameArtifactBuilder.makeCompletedFrameArtifacts(
       draft: draft,
@@ -125,7 +124,6 @@ extension DefaultRenderer {
     let effects = commitFrameEffects(
       draft: candidate.draft,
       canonicalResolved: candidate.tailOutput.frameTailInput.canonicalResolved,
-      resolved: candidate.resolved,
       placed: tail.placed,
       semantics: tail.semantics,
       workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates,
@@ -170,7 +168,6 @@ extension DefaultRenderer {
   func commitFrameEffects(
     draft: FrameHeadDraft,
     canonicalResolved: ResolvedNode,
-    resolved: ResolvedNode,
     placed: PlacedNode,
     semantics: SemanticSnapshot,
     workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate],
@@ -200,8 +197,6 @@ extension DefaultRenderer {
         return preview.commitPlan
       }
       return commitPlanner.plan(
-        resolved: resolved,
-        placed: placed,
         semantics: semantics,
         transaction: draft.frameContext.transaction,
         lifecycleEvents: lifecycleEvents
@@ -285,8 +280,7 @@ extension DefaultRenderer {
   func previewCompletedFrameCommit(
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
-    canonicalResolved: ResolvedNode,
-    resolved: ResolvedNode
+    canonicalResolved: ResolvedNode
   ) -> (
     commit: CommitPlan, lifecyclePlan: ViewGraphFrameLifecycleEventPlan, duration: Duration
   ) {
@@ -302,8 +296,6 @@ extension DefaultRenderer {
         placed: tail.placed.viewportVisibilitySummary
       )
       let commit = commitPlanner.plan(
-        resolved: resolved,
-        placed: tail.placed,
         semantics: tail.semantics,
         transaction: draft.frameContext.transaction,
         lifecycleEvents: lifecyclePlan.events

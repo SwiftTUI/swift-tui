@@ -721,8 +721,6 @@ private func framePipelinePlan(
     placed: placed?.viewportVisibilitySummary
   )
   return CommitPlanner().plan(
-    resolved: resolved,
-    placed: placed,
     semantics: .init(),
     lifecycleEvents: lifecycleEvents
   )

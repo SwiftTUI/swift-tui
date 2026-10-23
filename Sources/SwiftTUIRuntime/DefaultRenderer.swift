@@ -760,7 +760,6 @@ public struct DefaultRenderer {
     tail: FrameTailOutput
   ) -> FrameArtifacts {
     let layout = reconciledTailLayout.layout
-    let resolved = reconciledTailLayout.resolved
     let workerTimings = CommittedFrameArtifactBuilder.workerTimings(
       draft: draft,
       tail: tail
@@ -768,7 +767,6 @@ public struct DefaultRenderer {
     let effects = commitFrameEffects(
       draft: draft,
       canonicalResolved: reconciledTailLayout.input.canonicalResolved,
-      resolved: resolved,
       placed: tail.placed,
       semantics: tail.semantics,
       workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
