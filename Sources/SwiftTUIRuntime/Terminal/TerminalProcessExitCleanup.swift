@@ -24,7 +24,7 @@ import Synchronization
       // Exit cleanup must not wait on an output peer that stopped reading.
       // If nonblocking mode cannot be installed, skip reset bytes and still
       // restore input attributes. No asynchronous writer survives this action.
-      #if canImport(ucrt)
+      #if canImport(Darwin) || canImport(ucrt)
         let canWriteReset = true
       #else
         let outputFlags = fcntl(outputFileDescriptor, F_GETFL)
@@ -40,11 +40,14 @@ import Synchronization
 
           var offset = 0
           while offset < bytes.count {
-            let written = unsafe terminalPlatformWrite(
-              outputFileDescriptor,
-              unsafe baseAddress.advanced(by: offset),
-              bytes.count - offset
-            )
+            #if canImport(Darwin)
+              let written = unsafe terminalPlatformWrite(
+                outputFileDescriptor, unsafe baseAddress.advanced(by: offset),
+                bytes.count - offset, nonBlocking: true)
+            #else
+              let written = unsafe terminalPlatformWrite(
+                outputFileDescriptor, unsafe baseAddress.advanced(by: offset), bytes.count - offset)
+            #endif
             guard written > 0 else {
               break
             }
@@ -53,7 +56,7 @@ import Synchronization
         }
       }
 
-      #if !canImport(ucrt)
+      #if !canImport(Darwin) && !canImport(ucrt)
         if canWriteReset { _ = fcntl(outputFileDescriptor, F_SETFL, outputFlags) }
       #endif
 

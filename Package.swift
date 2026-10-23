@@ -74,6 +74,7 @@ let swiftTUIRuntimeDependencies: [Target.Dependency] = [
   .product(name: "DequeModule", package: "swift-collections"),
   "SwiftTUICore",
   "SwiftTUIViews",
+  "SwiftTUIPlatformIO",
   "SwiftTUIVendorFigletEmbeddedFonts",
   "SwiftTUIVendorJPEG",
   "SwiftTUIVendorPNG",
@@ -141,7 +142,8 @@ let package = Package(
     .target(
       name: "SwiftTUIPrimitives",
       dependencies: [
-        "SwiftTUIVendorFigletEmbeddedFonts"
+        "SwiftTUIPlatformIO",
+        "SwiftTUIVendorFigletEmbeddedFonts",
       ],
       swiftSettings: swiftSettings()
     ),
