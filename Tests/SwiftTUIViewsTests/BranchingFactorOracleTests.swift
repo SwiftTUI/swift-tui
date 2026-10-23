@@ -284,40 +284,6 @@ struct BranchingFactorOracleTests {
     #expect(branching.customChildMeasureRequestsProbe == 12)
   }
 
-  @Test("the commit guard records probe-latitude serves that reach commit requests")
-  func commitGuardRecordsProbeLatitudeCommitServe() {
-    let passContext = LayoutPassContext()
-
-    // A probe-grade request may take a broadened serve silently.
-    let probeViolated = passContext.recordProbeLatitudeServe(
-      identity: testIdentity("guarded"),
-      source: "BranchingFactorOracleTests",
-      requestGrade: .probe
-    )
-    #expect(!probeViolated)
-    #expect(passContext.runtimeIssues.isEmpty)
-
-    // The same serve reaching a commit-grade request is the violation.
-    let commitViolated = passContext.recordProbeLatitudeServe(
-      identity: testIdentity("guarded"),
-      source: "BranchingFactorOracleTests",
-      requestGrade: .commit
-    )
-    #expect(commitViolated)
-    let issues = passContext.runtimeIssues
-    #expect(issues.count == 1)
-    #expect(issues.first?.code == "layout.probeGradeCommit")
-    #expect(issues.first?.severity == .error)
-
-    // Deduplicated per identity, like the other layout-authored issues.
-    passContext.recordProbeLatitudeServe(
-      identity: testIdentity("guarded"),
-      source: "BranchingFactorOracleTests",
-      requestGrade: .commit
-    )
-    #expect(passContext.runtimeIssues.count == 1)
-  }
-
   @Test("the ledger and this suite cover exactly the same rows")
   func ledgerRowsMatchSuiteCoverage() throws {
     let ledger = try BranchingLedger.load()

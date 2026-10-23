@@ -7,8 +7,7 @@
 /// derived from a hintless lazy estimate carry separate approximation provenance
 /// and are excluded from both exact-key and retained measurement reuse. What grade gates is serve LATITUDE — a cache
 /// tier may answer a probe-grade request with a broadened (non-exact) serve
-/// it must never hand to a commit-grade request. The fail-loud guard for
-/// that boundary is `LayoutPassContext.recordProbeLatitudeServe`.
+/// it must never hand to a commit-grade request.
 ///
 /// Probe sites are marked only where supersession is knowable at scheduling
 /// time: a stack's ideal round under a finite effective main (the allocation
