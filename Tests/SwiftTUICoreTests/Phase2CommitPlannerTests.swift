@@ -53,7 +53,6 @@ struct Phase2CommitPlannerTests {
     _ = graph.applySnapshot(tree)
     let lifecycleEvents = graph.applySnapshot(tree)
     let plan = CommitPlanner().plan(
-      resolved: tree,
       semantics: .init(),
       lifecycleEvents: lifecycleEvents
     )
@@ -289,8 +288,6 @@ struct Phase2CommitPlannerTests {
       placed: placed.viewportVisibilitySummary
     )
     let plan = CommitPlanner().plan(
-      resolved: resolved,
-      placed: placed,
       semantics: .init(),
       lifecycleEvents: lifecycleEvents
     )
@@ -332,8 +329,6 @@ struct Phase2CommitPlannerTests {
       placed: placed?.viewportVisibilitySummary
     )
     return CommitPlanner().plan(
-      resolved: next,
-      placed: placed,
       semantics: .init(),
       lifecycleEvents: lifecycleEvents
     )

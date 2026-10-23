@@ -4,8 +4,6 @@ package struct CommitPlanner {
 
   /// Plans lifecycle and handler-installation work for a frame.
   package func plan(
-    resolved: ResolvedNode,
-    placed: PlacedNode? = nil,
     semantics: SemanticSnapshot,
     transaction: TransactionSnapshot = .init(),
     lifecycleEvents: [LifecycleEvent] = []

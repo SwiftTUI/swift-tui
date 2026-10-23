@@ -29,7 +29,6 @@ struct LifecycleDiffFixture: Sendable {
     let lifecycleEvents = graph.applySnapshot(next)
 
     return planner.plan(
-      resolved: next,
       semantics: semantics,
       transaction: transaction,
       lifecycleEvents: lifecycleEvents
