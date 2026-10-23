@@ -173,13 +173,16 @@ import Synchronization
     }
 
     func write(_ output: String, to fileDescriptor: Int32, budget: TerminalWriteBudget) throws {
-      // poll alone cannot bound a blocking write, even after POLLOUT. Restore
-      // the original flags before the caller restores its raw-mode snapshot.
       let flags = fcntl(fileDescriptor, F_GETFL)
-      guard flags >= 0, fcntl(fileDescriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
-        throw TerminalHostError.failedToWrite(errno: errno)
-      }
-      defer { _ = fcntl(fileDescriptor, F_SETFL, flags) }
+      guard flags >= 0 else { throw TerminalHostError.failedToWrite(errno: errno) }
+      #if !canImport(Darwin)
+        // poll alone cannot bound a blocking write, even after POLLOUT.
+        // Darwin scopes this change with SIGPIPE suppression for each syscall.
+        guard fcntl(fileDescriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+          throw TerminalHostError.failedToWrite(errno: errno)
+        }
+        defer { _ = fcntl(fileDescriptor, F_SETFL, flags) }
+      #endif
       let bytes = Array(output.utf8)
       let totalBytes = bytes.count
 
@@ -192,11 +195,13 @@ import Synchronization
         while bytesWritten < totalBytes {
           try budget.check()
           let pointer = unsafe baseAddress.advanced(by: bytesWritten)
-          let result = unsafe terminalPlatformWrite(
-            fileDescriptor,
-            pointer,
-            min(16_384, totalBytes - bytesWritten)
-          )
+          #if canImport(Darwin)
+            let result = unsafe terminalPlatformWrite(
+              fileDescriptor, pointer, min(16_384, totalBytes - bytesWritten), nonBlocking: true)
+          #else
+            let result = unsafe terminalPlatformWrite(
+              fileDescriptor, pointer, min(16_384, totalBytes - bytesWritten))
+          #endif
 
           if result > 0 {
             bytesWritten += result

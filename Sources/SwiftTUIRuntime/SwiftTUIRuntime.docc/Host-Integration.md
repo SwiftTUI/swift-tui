@@ -51,6 +51,24 @@ Non-terminal hosts can instead compose narrower roles, such as
 ``PresentationSurfaceMetricsProvider`` plus semantic or raster presentation.
 These hosts do not need terminal raw-mode or byte-writing methods.
 
+## Borrowed Terminal Output
+
+Terminal hosts borrow file descriptors from the application. Keep them open until
+output and shutdown finish. On Darwin, runtime writes, diagnostics, and exit reset
+writes preserve the descriptor's original no-SIGPIPE policy and file status flags.
+Socket writes suppress SIGPIPE per send. Terminal writes do not change the
+no-SIGPIPE policy. Neither path changes process-wide signal dispositions.
+
+Darwin pipes require temporary no-SIGPIPE suppression. SwiftTUI serializes that
+change across its writers, including duplicated descriptors, and restores it after
+one nonblocking syscall. Blocking hosts wait for readiness outside that protection;
+budgeted writes retain their existing deadline and cancellation checks.
+
+A pipe's temporary settings are visible through duplicated or inherited
+references. Applications must coordinate other writers and flag changes on the
+same pipe while SwiftTUI writes. SwiftTUI cannot isolate an unrelated writer's
+signal policy or protect a descriptor that the application closes concurrently.
+
 ## See Also
 
 - <doc:Hosts-And-Platforms>

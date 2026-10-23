@@ -1,5 +1,6 @@
 #if canImport(Darwin)
   import Darwin
+  import SwiftTUIPlatformIO
 #elseif canImport(Glibc)
   import Glibc
 #elseif canImport(Android)
@@ -14,13 +15,10 @@
   func terminalPlatformWrite(
     _ fileDescriptor: Int32,
     _ buffer: UnsafeRawPointer?,
-    _ count: Int
+    _ count: Int,
+    nonBlocking: Bool = false
   ) -> Int {
-    // Darwin sends a pipe's SIGPIPE to the process, so a thread-local mask
-    // cannot protect other threads. Adopt the descriptor's no-SIGPIPE policy
-    // before writing; it also covers sockets without changing signal handlers.
-    guard fcntl(fileDescriptor, F_SETNOSIGPIPE, 1) == 0 else { return -1 }
-    return unsafe Darwin.write(fileDescriptor, buffer, count)
+    unsafe DarwinOutput.write(fileDescriptor, buffer, count, nonBlocking: nonBlocking)
   }
 
   func terminalPlatformRead(

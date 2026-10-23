@@ -152,6 +152,8 @@ flowchart TD
     SwiftTUICLIAttach --> SwiftTUIPrimitives
     SwiftTUICLIAttach --> SwiftTUIPTYPrimitives
     SwiftTUIPlatformIO["SwiftTUIPlatformIO<br/>(syscall facade)"]
+    SwiftTUIPrimitives --> SwiftTUIPlatformIO
+    SwiftTUIRuntime --> SwiftTUIPlatformIO
     SwiftTUICLI["SwiftTUICLI<br/>(compatibility facade)"] --> SwiftTUITerminalCLI
     SwiftTUICLI -.->|POSIX only| SwiftTUICLIAttach
     SwiftTUI["SwiftTUI<br/>(convenience re-export)"]
@@ -184,9 +186,10 @@ the owning module remains unchanged.
   color-science values, and draw/layout metadata (`DrawPayload` and its payload
   cluster, `LayoutBehavior`, `LayoutMetadata`). They also include pointer and
   semantic values and the `Animatable` math stack. It does not use
-  Foundation. It depends only on the standard library, plus
-  `SwiftTUIVendorFigletEmbeddedFonts` for the figlet payload value. It builds on
-  its own.
+  Foundation. Its diagnostics support uses the Foundation-free
+  `SwiftTUIPlatformIO` syscall facade. Its other dependency is
+  `SwiftTUIVendorFigletEmbeddedFonts` for the figlet payload value.
+  It builds without the graph, render, view, or runtime targets.
 - **`SwiftTUIGraph`** — the reconciliation engine (the AttributeGraph analog).
   Debug builds also maintain `Resolve/BodyChangeTracker.swift`: bounded,
   owner-lifetime-scoped body provenance with independent checkpoint history.
@@ -312,7 +315,12 @@ contains no nested Swift packages.
   `SwiftTUITerminalCLI`, `SwiftTUICLIAttach`, and `SwiftTUIPlatformIO` are
   non-product support targets. External packages select `SwiftTUICLI` or another
   published host product and use the surface it exposes; those support target
-  names are not supported direct imports.
+  names are not supported direct imports. On Darwin, package-internal
+  `SwiftTUIPlatformIO/DarwinOutput.swift` coordinates borrowed descriptor writes
+  for runtime output and diagnostics. Socket sends suppress SIGPIPE per call.
+  Pipe writes save and restore shared flags around one nonblocking syscall;
+  readiness waits occur outside the lock. Owned scene descriptors retain their
+  separate lifecycle policy.
 - **External host** — the `SwiftUIHost` product for embedding SwiftTUI inside
   SwiftUI on macOS/iOS lives in the separate
   [`swift-tui-swiftui`](https://github.com/SwiftTUI/swift-tui-swiftui)

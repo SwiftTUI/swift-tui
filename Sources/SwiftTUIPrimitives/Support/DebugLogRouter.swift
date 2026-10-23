@@ -2,6 +2,7 @@ import Synchronization
 
 #if canImport(Darwin)
   import Darwin
+  import SwiftTUIPlatformIO
 #elseif canImport(Glibc)
   import Glibc
 #elseif canImport(Android)
@@ -235,14 +236,12 @@ package enum DebugLogRouter {
           let atomicBytes = fpathconf(descriptor, Int32(_PC_PIPE_BUF))
           guard atomicBytes > 0, message.utf8.count <= atomicBytes else { return false }
         }
-        let flags = fcntl(descriptor, F_GETFL)
-        guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else { return false }
-        defer { _ = fcntl(descriptor, F_SETFL, flags) }
-        #if canImport(Darwin)
-          let noPipe = fcntl(descriptor, F_GETNOSIGPIPE)
-          guard noPipe >= 0, fcntl(descriptor, F_SETNOSIGPIPE, 1) == 0 else { return false }
-          defer { _ = fcntl(descriptor, F_SETNOSIGPIPE, noPipe) }
-        #else
+        #if !canImport(Darwin)
+          let flags = fcntl(descriptor, F_GETFL)
+          guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+            return false
+          }
+          defer { _ = fcntl(descriptor, F_SETFL, flags) }
           var blocked = sigset_t()
           var original = sigset_t()
           var pending = sigset_t()
@@ -269,7 +268,12 @@ package enum DebugLogRouter {
           var offset = 0
           var interruptions = 0
           while offset < bytes.count {
-            let count = unsafe write(descriptor, base.advanced(by: offset), bytes.count - offset)
+            #if canImport(Darwin)
+              let count = unsafe DarwinOutput.write(
+                descriptor, base.advanced(by: offset), bytes.count - offset, nonBlocking: true)
+            #else
+              let count = unsafe write(descriptor, base.advanced(by: offset), bytes.count - offset)
+            #endif
             if count > 0 {
               offset += count
             } else if count == -1, errno == EINTR, interruptions < 3 {
