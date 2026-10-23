@@ -8,8 +8,20 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-10-23
+
 ### Fixed
 
+- Complete `.removed` callbacks for `withAnimation(nil)` transition removals
+  and stop scheduling animation frames once the removal drains (STUI-1111).
+- Keep stream input arriving while main-actor rendering is busy (STUI-1124),
+  and serve queued input after the initial presentation and its required
+  callbacks settle. Thanks to [@echoz](https://github.com/echoz) for
+  [#62](https://github.com/SwiftTUI/swift-tui/pull/62).
+- Preserve borrowed Darwin output descriptors' SIGPIPE policy across runtime,
+  diagnostic, and exit-reset writes. Thanks to
+  [@echoz](https://github.com/echoz) for
+  [#63](https://github.com/SwiftTUI/swift-tui/pull/63).
 - Read live Picker expansion state during input batches, stop gesture-state
   updates after composite completion, and prefer fresh pointer registrations
   after node replacement (STUI-1108, STUI-1117, STUI-1122).
@@ -2470,7 +2482,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.0...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.1...HEAD
+[0.19.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.1
 [0.19.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.0
 [0.18.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.3
 [0.18.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.2
