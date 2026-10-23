@@ -22,17 +22,10 @@
       var information = stat()
       guard unsafe fstat(descriptor, &information) == 0 else { return -1 }
       let kind = information.st_mode & mode_t(S_IFMT)
-      if kind == mode_t(S_IFSOCK) {
-        // Socket options cannot be changed after shutdown. Per-send suppression
-        // also leaves other users of the socket's open description untouched.
-        var flags = MSG_NOSIGNAL
-        if nonBlocking { flags |= MSG_DONTWAIT }
-        return unsafe send(descriptor, buffer, count, flags)
-      }
-
+      let isSocket = kind == mode_t(S_IFSOCK)
       let isPipe = kind == mode_t(S_IFIFO)
       let isTerminal = kind == mode_t(S_IFCHR) && isatty(descriptor) == 1
-      guard isPipe || isTerminal else {
+      guard isSocket || isPipe || isTerminal else {
         // O_NONBLOCK cannot bound ordinary file I/O. Do not serialize it with
         // terminal output or change a policy that this write does not need.
         return unsafe Darwin.write(descriptor, buffer, count)
@@ -41,7 +34,8 @@
       while true {
         let attempt = descriptorLock.withLock { _ in
           unsafe writeNonBlocking(
-            descriptor, buffer, count, suppressSIGPIPE: isPipe, nonBlocking: nonBlocking)
+            descriptor, buffer, count, isSocket: isSocket,
+            suppressSIGPIPE: isPipe, nonBlocking: nonBlocking)
         }
         switch attempt {
         case .completed(let count, let error):
@@ -63,6 +57,7 @@
       _ descriptor: Int32,
       _ buffer: UnsafeRawPointer?,
       _ count: Int,
+      isSocket: Bool,
       suppressSIGPIPE: Bool,
       nonBlocking: Bool
     ) -> WriteAttempt {
@@ -80,7 +75,15 @@
         return .completed(count: -1, error: restoreError == 0 ? setupError : restoreError)
       }
 
-      let written = unsafe Darwin.write(descriptor, buffer, count)
+      // Darwin's MSG_DONTWAIT avoids socket-buffer lock waits, but O_NONBLOCK
+      // is still required to avoid waiting for send-buffer space. Keep socket
+      // signal policy unchanged, including after shutdown, with MSG_NOSIGNAL.
+      let written =
+        if isSocket {
+          unsafe send(descriptor, buffer, count, MSG_NOSIGNAL | MSG_DONTWAIT)
+        } else {
+          unsafe Darwin.write(descriptor, buffer, count)
+        }
       let writeError = errno
       var policyError: Int32 = 0
       if suppressSIGPIPE {

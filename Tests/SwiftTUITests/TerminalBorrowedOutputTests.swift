@@ -1,6 +1,7 @@
 #if canImport(Darwin)
   import Darwin
   import Dispatch
+  import Synchronization
   import Testing
 
   @testable import SwiftTUIRuntime
@@ -176,6 +177,7 @@
         try #require(duplicate >= 0)
         defer { _ = Darwin.close(duplicate) }
         let originalFlags = fcntl(transport.output, F_GETFL)
+        let acceptedDiagnostics = Mutex(0)
         let group = DispatchGroup()
         group.enter()
         DispatchQueue.global().async {
@@ -190,11 +192,21 @@
         DispatchQueue.global().async {
           defer { group.leave() }
           for _ in 0..<64 {
-            #expect(DebugLogRouter.writeDiagnostic("x", to: duplicate))
+            if DebugLogRouter.writeDiagnostic("x", to: duplicate) {
+              acceptedDiagnostics.withLock { $0 += 1 }
+            } else {
+              let writeError = errno
+              #expect(writeError == EAGAIN || writeError == EWOULDBLOCK || writeError == EINTR)
+            }
           }
         }
         try #require(waitForBorrowedOutputWriters(group) == .success)
-        #expect(try transport.read(count: 128) == Array(repeating: UInt8(ascii: "x"), count: 128))
+        // Diagnostics are best-effort: transient contention may reject a write.
+        // Every accepted byte, and every runtime byte, must still arrive.
+        let expectedCount = 64 + acceptedDiagnostics.withLock { $0 }
+        #expect(
+          try transport.read(count: expectedCount)
+            == Array(repeating: UInt8(ascii: "x"), count: expectedCount))
         #expect(fcntl(transport.output, F_GETNOSIGPIPE) == initialPolicy)
         #expect(fcntl(duplicate, F_GETNOSIGPIPE) == initialPolicy)
         #expect(fcntl(transport.output, F_GETFL) == originalFlags)
@@ -241,11 +253,13 @@
       }
     }
 
-    @Test("a full borrowed pipe does not block independent output")
-    func independentOutputDuringBackpressure() async {
-      await #expect(processExitsWith: .success) {
+    @Test(
+      "full borrowed output does not block independent output",
+      arguments: [BorrowedOutputKind.pipe, .socket])
+    func independentOutputDuringBackpressure(kind: BorrowedOutputKind) async {
+      await #expect(processExitsWith: .success) { [kind] in
         prepareBorrowedOutputChild()
-        let stalled = try BorrowedOutputTransport(kind: .pipe)
+        let stalled = try BorrowedOutputTransport(kind: kind)
         let independent = try BorrowedOutputTransport(kind: .pipe)
         let started = try BorrowedOutputTransport(kind: .pipe)
         defer {
@@ -283,6 +297,59 @@
         #expect(drained == Array(repeating: UInt8(ascii: "x"), count: capacity + 1))
         #expect(fcntl(stalled.output, F_GETNOSIGPIPE) == 0)
         #expect(fcntl(independent.output, F_GETNOSIGPIPE) == 0)
+      }
+    }
+
+    @Test(
+      "saturated sockets preserve bounded writes and borrowed descriptor policy",
+      arguments: BorrowedSocketWrite.allCases, [Int32(0), Int32(1)])
+    func saturatedSocket(operation: BorrowedSocketWrite, initialPolicy: Int32) async {
+      await #expect(processExitsWith: .success) { [operation, initialPolicy] in
+        prepareBorrowedOutputChild()
+        for initiallyNonBlocking in [false, true] {
+          let transport = try BorrowedOutputTransport(kind: .socket)
+          defer { transport.close() }
+          try transport.setPolicy(initialPolicy)
+          if initiallyNonBlocking {
+            let flags = fcntl(transport.output, F_GETFL)
+            try #require(fcntl(transport.output, F_SETFL, flags | O_NONBLOCK) == 0)
+          }
+          _ = try transport.fill()
+          let originalFlags = fcntl(transport.output, F_GETFL)
+          let duplicate = dup(transport.output)
+          try #require(duplicate >= 0)
+          defer { _ = Darwin.close(duplicate) }
+          switch operation {
+          case .runtime:
+            #expect(throws: TerminalHostError.failedToWrite(errno: ETIMEDOUT)) {
+              try POSIXTerminalController().write(
+                "x", to: duplicate,
+                budget: TerminalWriteBudget(deadline: .now + .milliseconds(100)))
+            }
+          case .diagnostic:
+            #expect(!DebugLogRouter.writeDiagnostic("x", to: duplicate))
+          case .exitReset:
+            let input = try BorrowedOutputTransport(kind: .pty)
+            defer { input.close() }
+            let controller = POSIXTerminalController()
+            let snapshot = try controller.enterRawMode(input: input.output, output: duplicate)
+            defer { try? controller.restore(snapshot, input: input.output, output: duplicate) }
+            TerminalProcessExitResetAction(
+              inputFileDescriptor: input.output, outputFileDescriptor: duplicate,
+              savedSnapshot: snapshot, resetBytes: [UInt8(ascii: "x")]
+            ).perform()
+            var attributes = termios()
+            try #require(unsafe tcgetattr(input.output, &attributes) == 0)
+            #expect(
+              attributes.c_lflag & ~tcflag_t(PENDIN)
+                == snapshot.attributes.c_lflag & ~tcflag_t(PENDIN))
+            #expect(fcntl(input.output, F_GETFL) == snapshot.inputFileStatusFlags)
+          }
+          #expect(fcntl(transport.output, F_GETNOSIGPIPE) == initialPolicy)
+          #expect(fcntl(duplicate, F_GETNOSIGPIPE) == initialPolicy)
+          #expect(fcntl(transport.output, F_GETFL) == originalFlags)
+          #expect(fcntl(duplicate, F_GETFL) == originalFlags)
+        }
       }
     }
 
@@ -384,7 +451,7 @@
       var count = 0
       let deadline = ContinuousClock.now + .seconds(5)
       while true {
-        try #require(ContinuousClock.now < deadline, "pipe did not fill")
+        try #require(ContinuousClock.now < deadline, "output did not fill")
         let result = plainBorrowedOutputWrite(to: output)
         let writeError = errno
         if result == 1 {
@@ -431,6 +498,12 @@
     case pipe
     case socket
     case pty
+  }
+
+  private enum BorrowedSocketWrite: CaseIterable, Codable, Sendable {
+    case runtime
+    case diagnostic
+    case exitReset
   }
 
   private func waitForBorrowedOutputWriters(_ group: DispatchGroup) -> DispatchTimeoutResult {

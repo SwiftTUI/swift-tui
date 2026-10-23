@@ -59,15 +59,17 @@ writes preserve the descriptor's original no-SIGPIPE policy and file status flag
 Socket writes suppress SIGPIPE per send. Terminal writes do not change the
 no-SIGPIPE policy. Neither path changes process-wide signal dispositions.
 
-Darwin pipes require temporary no-SIGPIPE suppression. SwiftTUI serializes that
-change across its writers, including duplicated descriptors, and restores it after
-one nonblocking syscall. Blocking hosts wait for readiness outside that protection;
+Socket, pipe, and terminal writes temporarily enable nonblocking I/O. Darwin pipes
+also require temporary no-SIGPIPE suppression. SwiftTUI serializes these changes
+across its writers, including duplicated descriptors, and restores them after one
+nonblocking syscall. Blocking hosts wait for readiness outside that protection;
 budgeted writes retain their existing deadline and cancellation checks.
 
-A pipe's temporary settings are visible through duplicated or inherited
-references. Applications must coordinate other writers and flag changes on the
-same pipe while SwiftTUI writes. SwiftTUI cannot isolate an unrelated writer's
-signal policy or protect a descriptor that the application closes concurrently.
+Temporary file status flags, and a pipe's temporary signal policy, are visible
+through duplicated or inherited references. Applications must coordinate other I/O
+and flag changes on the same open file description while SwiftTUI writes. SwiftTUI
+cannot isolate an unrelated pipe writer's signal policy or protect a descriptor
+that the application closes concurrently.
 
 ## See Also
 

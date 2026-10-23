@@ -318,8 +318,9 @@ contains no nested Swift packages.
   names are not supported direct imports. On Darwin, package-internal
   `SwiftTUIPlatformIO/DarwinOutput.swift` coordinates borrowed descriptor writes
   for runtime output and diagnostics. Socket sends suppress SIGPIPE per call.
-  Pipe writes save and restore shared flags around one nonblocking syscall;
-  readiness waits occur outside the lock. Owned scene descriptors retain their
+  Socket, pipe, and terminal writes save and restore shared file status flags
+  around one nonblocking syscall; pipes also scope their no-SIGPIPE policy.
+  Readiness waits occur outside the lock. Owned scene descriptors retain their
   separate lifecycle policy.
 - **External host** — the `SwiftUIHost` product for embedding SwiftTUI inside
   SwiftUI on macOS/iOS lives in the separate
