@@ -50,9 +50,14 @@ extension RunLoop {
     let stream = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
       deadlineState.setContinuation(continuation)
 
+      // Stream copying must not inherit MainActor: synchronous rendering can
+      // otherwise keep already-buffered input out of the pump for a whole
+      // drain. These owned tasks only touch Sendable streams and locked pump
+      // state; dispatch and UI callbacks still run on MainActor. `cancel`
+      // below retains responsibility for ending the copy tasks.
       if let scopedReader = terminalInputReader as? any ScopedInputReading {
         let inputEvents = scopedReader.scopedInputEvents()
-        inputTask = Task {
+        inputTask = Task.detached {
           for await event in inputEvents {
             renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
             if buffer.enqueue(.scopedInput(event)) { continuation.yield() }
@@ -102,7 +107,7 @@ extension RunLoop {
             }
           } else {
             let inputEvents = terminalInputReader.inputEvents()
-            inputTask = Task.immediate { @MainActor in
+            inputTask = Task.detached {
               for await event in inputEvents {
                 renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
                 if buffer.enqueue(.input(event)) {
@@ -118,7 +123,7 @@ extension RunLoop {
           }
         #else
           let inputEvents = terminalInputReader.inputEvents()
-          inputTask = Task {
+          inputTask = Task.detached {
             for await event in inputEvents {
               renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
               if buffer.enqueue(.input(event)) {

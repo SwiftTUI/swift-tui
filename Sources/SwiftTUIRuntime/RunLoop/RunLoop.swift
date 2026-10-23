@@ -67,9 +67,10 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
   ///
   /// Off by default because the per-acquisition pull and pending-input check
   /// already give a pulling reader its service opportunity at every frame
-  /// boundary, and a stream-adapter reader's copy task runs only on a real
-  /// suspension, which a bare pass return does not provide; the plan reserves
-  /// this bound for "where measurement still shows a gap". Setting it splits
+  /// boundary. Native stream copy tasks run independently of MainActor; on
+  /// a single-threaded cooperative executor they still need a suspension,
+  /// which a bare pass return does not provide. The plan reserves this bound
+  /// for "where measurement still shows a gap". Setting it splits
   /// a short follow-up chain across passes on a slow machine, which the
   /// outer loop re-enters at once. The cooperative exit flush ignores it.
   package var drainPassWorkBudget: Duration?

@@ -11,18 +11,21 @@ import Testing
 @Suite(.serialized, .timeLimit(.minutes(1)))
 struct RunLoopDrainFairnessTests {
   @Test(
-    "startup and follow-up frames serve waiting input before more producer work", arguments: [1, 3])
-  func startupInputService(injectedAtCommit: Int) async throws {
+    "startup and follow-up frames serve waiting input before more producer work",
+    arguments: [1, 3], StartupInputConfiguration.all)
+  private func startupInputService(
+    injectedAtCommit: Int, configuration: StartupInputConfiguration
+  ) async throws {
     let root = testIdentity("StartupInputService")
     let scheduler = FrameScheduler()
-    let input = CooperativeExitInputReader()
+    let input = StartupInputSource(kind: configuration.kind)
     let surface = CooperativeExitSurface()
     let state = StateContainer(initialState: 0, invalidationIdentities: [root])
     let producer = StartupInputProducer(
       scheduler: scheduler, root: root, input: input, state: state,
       injectedAtCommit: injectedAtCommit)
     let runLoop = RunLoop(
-      rootIdentity: root, presentationSurface: surface, terminalInputReader: input,
+      rootIdentity: root, presentationSurface: surface, terminalInputReader: input.reader,
       scheduler: scheduler, stateContainer: state,
       focusTracker: FocusTracker(invalidationIdentities: [root]),
       viewBuilder: { value, _ in
@@ -33,7 +36,7 @@ struct RunLoopDrainFairnessTests {
             return .handled
           }
       })
-    runLoop.renderMode = .sync
+    runLoop.renderMode = configuration.mode
     runLoop.frameSink = producer
 
     let result = try await runLoop.run()
@@ -44,21 +47,23 @@ struct RunLoopDrainFairnessTests {
     #expect(result.exitReason == .inputEnded)
   }
 
-  @Test("startup input waits for synchronous appearance and focus follow-ups")
-  func startupInputFocusSettlement() async throws {
+  @Test(
+    "startup input waits for synchronous appearance and focus follow-ups",
+    arguments: StartupInputConfiguration.all)
+  private func startupInputFocusSettlement(configuration: StartupInputConfiguration) async throws {
     let root = testIdentity("StartupInputFocusSettlement")
     let scheduler = FrameScheduler()
-    let input = CooperativeExitInputReader()
+    let input = StartupInputSource(kind: configuration.kind)
     let surface = CooperativeExitSurface()
     let state = StateContainer(initialState: 0, invalidationIdentities: [root])
     let producer = StartupInputProducer(
       scheduler: scheduler, root: root, input: input, state: state, injectedAtCommit: 1)
     let runLoop = RunLoop(
-      rootIdentity: root, presentationSurface: surface, terminalInputReader: input,
+      rootIdentity: root, presentationSurface: surface, terminalInputReader: input.reader,
       scheduler: scheduler, stateContainer: state,
       focusTracker: FocusTracker(invalidationIdentities: [root]),
       viewBuilder: { value, _ in StartupFocusedFixture(value: value, producer: producer) })
-    runLoop.renderMode = .sync
+    runLoop.renderMode = configuration.mode
     runLoop.frameSink = producer
 
     let result = try await runLoop.run()
@@ -1238,19 +1243,104 @@ private final class PeriodicInvalidationSink: FrameDiagnosticSink {
   }
 }
 
+private struct StartupInputConfiguration: Sendable {
+  enum Kind: Sendable { case pulling, stream, scopedStream }
+  let kind: Kind
+  let mode: RuntimeRenderMode
+
+  static var all: [Self] {
+    [Kind.pulling, .stream, .scopedStream].flatMap { kind in
+      [RuntimeRenderMode.sync, .async].map { Self(kind: kind, mode: $0) }
+    }
+  }
+}
+
+@MainActor
+private final class StartupInputSource {
+  let reader: any TerminalInputReading
+  private let sendEvent: (InputEvent) -> Void
+  private let finishInput: () -> Void
+
+  init(kind: StartupInputConfiguration.Kind) {
+    switch kind {
+    case .pulling:
+      let input = CooperativeExitInputReader()
+      reader = input
+      sendEvent = { input.send($0) }
+      finishInput = { input.finish() }
+    case .stream, .scopedStream:
+      let input = AcknowledgedStartupInputReader()
+      reader = kind == .stream ? input : ScopedStartupInputReader(input: input)
+      sendEvent = { event in
+        input.source.send(event)
+        // Hold the main actor until the copier asks for its next event: that
+        // proves it enqueued this one. A main-actor copier times out here.
+        // No frame-count assertion depends on which task the executor picks.
+        #expect(
+          input.copied.wait(), "stream input must enter the pump while rendering holds MainActor")
+      }
+      finishInput = { input.source.finish() }
+    }
+  }
+
+  func send(_ event: InputEvent) { sendEvent(event) }
+  func finish() { finishInput() }
+}
+
+/// Observes the stream consumer's progress, without a runtime-only test hook.
+private final class AcknowledgedStartupInputReader: TerminalInputReading, Sendable {
+  let source = InjectedTerminalInputReader()
+  let copied = BlockingTestSignal()
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    let stream = source.inputEvents()
+    let reads = Mutex(0)
+    let copied = copied
+    return AsyncStream(unfolding: {
+      let followsFirstEvent = reads.withLock { reads in
+        defer { reads += 1 }
+        return reads == 1
+      }
+      if followsFirstEvent { copied.signal() }
+      var iterator = stream.makeAsyncIterator()
+      return await iterator.next()
+    })
+  }
+}
+
+private final class ScopedStartupInputReader: ScopedInputReading, Sendable {
+  let input: AcknowledgedStartupInputReader
+
+  init(input: AcknowledgedStartupInputReader) { self.input = input }
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    Issue.record("the scoped reader must use its provenance-preserving stream")
+    return AsyncStream { $0.finish() }
+  }
+
+  func scopedInputEvents() -> AsyncStream<ScopedInputEvent> {
+    let stream = input.inputEvents()
+    return AsyncStream(unfolding: {
+      var iterator = stream.makeAsyncIterator()
+      guard let event = await iterator.next() else { return nil }
+      return ScopedInputEvent(event, origin: .terminal)
+    })
+  }
+}
+
 /// Every commit encounters more producer work; source input must interrupt it.
 @MainActor
 private final class StartupInputProducer: FrameDiagnosticSink {
   private let scheduler: FrameScheduler
   private let root: Identity
-  private let input: CooperativeExitInputReader
+  private let input: StartupInputSource
   private let state: StateContainer<Int>
   private let injectedAtCommit: Int
   private var committedFrames = 0
   private(set) var handledAtCommits: [Int] = []
 
   init(
-    scheduler: FrameScheduler, root: Identity, input: CooperativeExitInputReader,
+    scheduler: FrameScheduler, root: Identity, input: StartupInputSource,
     state: StateContainer<Int>, injectedAtCommit: Int
   ) {
     self.scheduler = scheduler

@@ -36,7 +36,8 @@ package struct InputPullDeliverySink: Sendable {
 ///
 /// The stream adapter (``TerminalInputReading/inputEvents()``) suits blocking
 /// readers: a detached task reads, yields to an `AsyncStream`, and the pump's
-/// copy task moves each event into the buffer. On a cooperative
+/// detached copy task moves each event into the buffer independently of
+/// MainActor rendering on native threaded hosts. On a cooperative
 /// single-threaded executor those two hops run only while the run-loop task
 /// is suspended, and under sustained rendering the one dependable suspension
 /// per frame admits about one event per frame however many are queued (plan

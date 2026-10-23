@@ -478,6 +478,16 @@ follow-up pass pulls and checks pending input before acquiring another frame.
 Schedulers without callback attribution conservatively retain the normal
 sixteen-acquisition bound for startup settlement.
 
+Pulling readers synchronously transfer their source queue into the pump at
+each service boundary. Plain and scoped stream readers use an owned detached
+copy task, so native synchronous rendering cannot hold that task behind the
+main actor. Input already enqueued in the pump interrupts the optional drain
+before its next acquisition; stream copying does not dispatch application
+callbacks off the main actor. This is a pump-service bound, not a fixed frame
+count from an arbitrary stream producer's `yield`: source production and
+copy-task scheduling still precede enqueue. Single-threaded cooperative hosts
+use the pulling path when source input must be visible without suspension.
+
 A programmatic termination accepted after startup begins task shutdown before
 flushing its pending wake and termination-handler writes under the cooperative
 exit policy. Synchronous callbacks from that final presentation can request

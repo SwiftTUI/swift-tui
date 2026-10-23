@@ -67,6 +67,16 @@ To do a unit test of budget logic, drive a ``ManualStageClock`` by hand. Or use
 ``ExhaustedStageClock`` to exercise the budget-exceeded path deterministically
 without racing a real clock past its deadline.
 
+## Testing Synchronous Executor Independence
+
+The package-only `BlockingTestSignal` serves tests that must hold a synchronous
+callback's thread while another executor makes progress. For example, a render
+callback can send input and wait for the stream copier's next read to prove
+that enqueue does not require a main-actor turn. Suspending the callback would
+hide that dependency. The signal releases immediately on acknowledgement; its
+scaled timeout bounds a broken dependency when runtime stages cannot advance.
+Use the asynchronous primitives above whenever the waiter may suspend.
+
 ## The Legacy Polling Helpers
 
 The `AsyncTestSupport.swift` file still provides the older `waitUntil(...)`

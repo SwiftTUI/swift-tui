@@ -248,8 +248,8 @@ extension RunLoop {
   ///
   /// Two triggers, checked in this order:
   /// - **Input is waiting.** A turn-boundary pull runs first so the check
-  ///   sees fresh input from a pulling reader, not only what a stream copy
-  ///   task happened to move while the loop was suspended. Interactive
+  ///   sees fresh input from a pulling reader, alongside what a stream copy
+  ///   task has already enqueued. Interactive
   ///   rendering may enqueue more frames while a key or pointer event is
   ///   already buffered; yielding here keeps task/animation invalidations
   ///   from running ahead of user input. This used to run only after a
