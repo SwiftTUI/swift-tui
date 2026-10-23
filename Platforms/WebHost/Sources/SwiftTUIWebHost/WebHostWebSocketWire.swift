@@ -10,6 +10,8 @@ enum WebHostWebSocketWire {
   /// single frame larger than the largest acceptable message can never
   /// complete one, so it is refused at the header instead of buffered.
   static let maxPayloadBytes = 8 * 1024 * 1024
+  // Server frames are unmasked; a 64-bit payload length adds ten header bytes.
+  static let maxOutboundFrameHeaderBytes = 10
 
   enum Opcode: UInt8, Equatable, Sendable {
     case continuation = 0x0

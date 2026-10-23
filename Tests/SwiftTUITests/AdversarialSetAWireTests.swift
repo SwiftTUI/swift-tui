@@ -342,9 +342,8 @@ struct AdversarialSetAWireTests {
         actions: [.setValue], value: .number(value), minimum: -.infinity,
         maximum: 100, step: .nan)
       let entry = try firstNode(record(surface(), nodes: [node], state: &state))
-      let encodedValue = try #require(entry["value"] as? [String: Any])
-      #expect(encodedValue["type"] as? String == "number")
-      #expect(encodedValue["value"] is NSNull)
+      // A typed number with a null payload is invalid in every browser host.
+      #expect(entry["value"] == nil)
       #expect(entry["valueMin"] == nil)
       #expect(entry["valueStep"] == nil)
       #expect(entry["valueMax"] as? Int == 100)

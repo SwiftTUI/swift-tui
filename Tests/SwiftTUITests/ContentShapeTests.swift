@@ -8,6 +8,19 @@ import Testing
 @MainActor
 @Suite
 struct ContentShapeTests {
+  @Test(
+    "invalid path bounds cannot trap semantic extraction",
+    arguments: [Double.nan, .infinity, 1e200])
+  func invalidPathBounds(value: Double) {
+    let path = Path([.move(to: .init(x: value, y: 0)), .line(to: .init(x: 10, y: 10))])
+    let frame = DefaultRenderer().render(
+      Button("Target") {}.contentShape(path), proposal: .init(width: 20, height: 4))
+    #expect(
+      !frame.semanticSnapshot.interactionRegions.contains {
+        $0.contains(.cellFallback(.init(x: 2, y: 0)))
+      })
+  }
+
   @Test("enclosing paths and rects intersect across identity and layout wrappers")
   func enclosingShapesIntersect() throws {
     var triangle = Path()

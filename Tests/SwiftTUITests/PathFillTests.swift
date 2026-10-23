@@ -57,6 +57,26 @@ private func unitPentagram() -> Path {
 @MainActor
 @Suite("Custom path fill rasterization")
 struct PathFillTests {
+  @Test("trimmed fills and clips use physical outline fractions", arguments: [false, true])
+  func physicalTrim(clipping: Bool) {
+    let expectedPath = Path(ellipseIn: .init(origin: .zero, size: .init(width: 40, height: 40)))
+      .trimmedPath(from: 0.4, to: 0.6).scaledBy(sx: 1 / 40, sy: 1 / 40)
+    let expectedShape = UnitPathShape(pathValue: expectedPath)
+    let actualShape = Circle().trim(from: 0.4, to: 0.6)
+    let actual: RenderSnapshot
+    let expected: RenderSnapshot
+    if clipping {
+      actual = DefaultRenderer().render(
+        Rectangle().fill(Color.white).frame(width: 40, height: 20).clipShape(actualShape))
+      expected = DefaultRenderer().render(
+        Rectangle().fill(Color.white).frame(width: 40, height: 20).clipShape(expectedShape))
+    } else {
+      actual = DefaultRenderer().render(actualShape.fill(Color.white).frame(width: 40, height: 20))
+      expected = DefaultRenderer().render(
+        expectedShape.fill(Color.white).frame(width: 40, height: 20))
+    }
+    #expect(actual.rasterSurface.cells == expected.rasterSurface.cells)
+  }
 
   // MARK: - Route A (Braille subpixel scanline fill)
 

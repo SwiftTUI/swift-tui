@@ -60,7 +60,12 @@ final class WebSocketTestClient {
       let bytes = try readBytes(count: 2)
       length = (Int(bytes[0]) << 8) | Int(bytes[1])
     } else if length == 127 {
-      throw WebSocketTestClientError.unsupportedLength
+      let bytes = try readBytes(count: 8)
+      let declared = bytes.reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+      guard let count = Int(exactly: declared), count <= WebHostWebSocketWire.maxPayloadBytes else {
+        throw WebSocketTestClientError.unsupportedLength
+      }
+      length = count
     }
 
     return Data(try readBytes(count: length))

@@ -36,7 +36,10 @@ extension Rasterizer {
       targetBounds = insetRect
     }
 
-    switch geometry.resolved(in: targetBounds.size) {
+    switch geometry.resolved(
+      in: targetBounds.size,
+      trimAspectRatio: RectangleStrokeTrack.snappedAspectRatio(metrics.aspectRatio))
+    {
     case .rectangle:
       return x >= targetBounds.origin.x
         && x < targetBounds.origin.x + targetBounds.size.width

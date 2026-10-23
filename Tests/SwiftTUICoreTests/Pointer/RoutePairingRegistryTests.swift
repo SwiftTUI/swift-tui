@@ -5,6 +5,52 @@ import Testing
 
 @Suite("Route pairing and registration ordering")
 struct RoutePairingRegistryTests {
+  @MainActor
+  @Test("paired pointer handlers prefer registration recency over node allocation")
+  func pairedPointerRecency() {
+    let identity = testIdentity("PointerRecency")
+    let stale = RouteID(identity: identity, ownerNodeID: ViewNodeID(rawValue: 9))
+    let live = RouteID(identity: identity, ownerNodeID: ViewNodeID(rawValue: 5))
+    let probe = RouteID(identity: identity, ownerNodeID: ViewNodeID(rawValue: 12))
+    let registry = LocalPointerHandlerRegistry()
+    var received: [String] = []
+    registry.restore(
+      [
+        live: { _ in
+          received.append("live")
+          return .claimed
+        }
+      ], recency: 2)
+    registry.restore(
+      [
+        stale: { _ in
+          received.append("stale")
+          return .claimed
+        }
+      ], recency: 1)
+    registry.restore(
+      [
+        live: { _ in
+          received.append("old snapshot")
+          return .claimed
+        }
+      ], recency: 1)
+    #expect(registry.handlerRouteID(pairingWith: probe) == live)
+    registry.dispatch(
+      routeID: probe,
+      event: .init(
+        kind: .down(.primary), location: Point.zero, targetRect: .zero))
+    #expect(received == ["live"])
+    registry.reset(preservingRouteHandlersFor: [identity])
+    #expect(registry.handlerRouteID(pairingWith: probe) == live)
+    registry.removeSubtrees(rootedAt: [identity])
+    #expect(registry.handlerRouteID(pairingWith: probe) == nil)
+    registry.restore([stale: { _ in .claimed }], recency: 0)
+    #expect(registry.handlerRouteID(pairingWith: probe) == stale)
+    registry.reset()
+    #expect(registry.handlerRouteID(pairingWith: probe) == nil)
+  }
+
   // MARK: - RouteID equality vs pairing
 
   @Test("RouteID equality is strict across owners; pairing ignores them")

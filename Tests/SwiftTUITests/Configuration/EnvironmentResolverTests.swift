@@ -3,6 +3,14 @@ import Testing
 @testable import SwiftTUIRuntime
 
 struct EnvironmentResolverTests {
+  @Test("web sessions override terminal JSON output")
+  func webOverridesJSON() {
+    let configuration = RuntimeConfiguration.detect(
+      environment: ["SWIFTTUI_WEB": "1", "SWIFTTUI_JSON": "1"], isStdoutTTY: false)
+    #expect(configuration.web != nil)
+    #expect(configuration.output == .tui)
+  }
+
   @Test(
     "Invalid environment ports fall back to automatic allocation",
     arguments: ["", "invalid", "-1", "65536", "70000", "99999", "999999999999999999999999"])

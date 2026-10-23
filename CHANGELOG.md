@@ -8,6 +8,25 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Read live Picker expansion state during input batches, stop gesture-state
+  updates after composite completion, and prefer fresh pointer registrations
+  after node replacement (STUI-1108, STUI-1117, STUI-1122).
+- Keep Stepper and Slider label clicks from activating keyboard actions, and
+  preserve keyboard-only action vetoes beneath content shapes (STUI-1113, STUI-1123).
+- Align painted scroll indicators with the scrollable extent, measure trimmed
+  fills and clips in physical units, and preserve blended sixel image detail
+  under partial occlusion (STUI-1110, STUI-1112, STUI-1114).
+- Reject nonfinite path geometry during hit testing and safely handle invalid
+  path bounds during semantic extraction (STUI-1119).
+- Tolerate delayed pixel-mouse capability replies, wake idle terminals for
+  accessibility preference changes, and restore terminal output modes when
+  raw-mode entry fails (STUI-1109, STUI-1115, STUI-1121).
+- Let web presentation override terminal JSON mode, admit maximum-size wire
+  records with WebSocket framing overhead, and omit nonfinite accessibility
+  number values from surface frames (STUI-1116, STUI-1118, STUI-1120).
+
 ## [0.19.0] - 2026-10-21
 
 ### Added

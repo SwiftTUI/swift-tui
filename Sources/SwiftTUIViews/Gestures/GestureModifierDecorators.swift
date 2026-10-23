@@ -263,8 +263,9 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   var isActive: Bool { inner.isActive }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
+    let wasTerminal = inner.phase.isTerminal
     let disposition = inner.handle(event: event)
-    if disposition == .handled {
+    if disposition == .handled, !wasTerminal {
       updateCurrentValue()
     }
     resetIfTerminal()
@@ -272,15 +273,17 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   }
 
   func replay(events: [LocalPointerEvent]) -> GestureRecognizerEventDisposition {
+    let wasTerminal = inner.phase.isTerminal
     let disposition = inner.replay(events: events)
-    if disposition == .handled { updateCurrentValue() }
+    if disposition == .handled, !wasTerminal { updateCurrentValue() }
     resetIfTerminal()
     return disposition
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
+    let wasTerminal = inner.phase.isTerminal
     let didAdvance = inner.handleDeadline(at: instant)
-    if didAdvance {
+    if didAdvance, !wasTerminal {
       updateCurrentValue()
     }
     // A sequence may finish its first stage on this deadline while the

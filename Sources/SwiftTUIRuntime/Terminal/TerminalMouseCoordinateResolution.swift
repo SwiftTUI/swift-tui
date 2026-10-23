@@ -189,15 +189,23 @@ import SwiftTUICore
     ) throws -> [UInt8] {
       try controller.write(query.request, to: outputFileDescriptor)
       var buffer: [UInt8] = []
+      let waitsForLateReply: Bool
+      switch query {
+      case .decPrivateMode: waitsForLateReply = true
+      case .kittyKeyboardFlags: waitsForLateReply = false
+      }
 
       for iteration in 0..<4 {
-        let timeoutMilliseconds = iteration == 0 ? 40 : 20
+        // Remote terminals need a realistic first-byte window. Keep a bounded
+        // 310ms budget and allow empty polls before a DEC mode reply arrives.
+        let timeoutMilliseconds = iteration == 0 ? (waitsForLateReply ? 250 : 40) : 20
         let bytes = try controller.read(
           from: inputFileDescriptor,
           maxBytes: 512,
           timeoutMilliseconds: timeoutMilliseconds
         )
         if bytes.isEmpty {
+          if waitsForLateReply { continue }
           break
         }
         inputSuspensionGate?.replayProbeInput(bytes)

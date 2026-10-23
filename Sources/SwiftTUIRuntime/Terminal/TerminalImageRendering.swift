@@ -438,7 +438,9 @@ final class TerminalImageRenderer: Sendable {
 
       case .sixel:
         let outputSize = sixelOutputSize(
-          for: attachment.effectiveVisibleBounds,
+          // The compositor covers visibleBounds. Occlusion is cropped later;
+          // shrinking this budget first would discard visible pixel detail.
+          for: attachment.visibleBounds,
           graphicsCapabilities: graphicsCapabilities
         )
         let presentation = presentationVariant(

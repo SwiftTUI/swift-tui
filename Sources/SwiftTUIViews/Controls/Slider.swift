@@ -192,16 +192,20 @@ extension Slider {
         in: child, slot: configuration.label, required: !(label is Text), context: context)
     }.map { child in
 
+      // Keep the body hittable for wheel input while reserving click activation
+      // for the style's explicit affordance routes.
+      var child = child
+      child.semanticMetadata.participatesInPointerHitTesting = true
+      var metadata = focusableControlMetadata(
+        focusInteractions: .edit, accessibilityRole: .slider)
+      metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
       return ResolvedNode(
         identity: context.identity,
         kind: .view("Slider"),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
-        semanticMetadata: focusableControlMetadata(
-          focusInteractions: .edit,
-          accessibilityRole: .slider
-        ).namingControl(with: label).accessibilityControl(
+        semanticMetadata: metadata.namingControl(with: label).accessibilityControl(
           .init(
             actions: [.focus, .increment, .decrement, .setValue],
             value: .number(currentValue.controlDoubleValue),

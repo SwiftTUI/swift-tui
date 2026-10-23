@@ -54,7 +54,7 @@ start.
 | Variable | Values | Effect |
 | --- | --- | --- |
 | `SWIFTTUI_ACCESSIBLE` | boolean | Shorthand for `SWIFTTUI_REDUCE_MOTION=1` plus `SWIFTTUI_CURSOR_FOLLOWS_FOCUS=1`. Wins over explicit `0` values on those two variables. |
-| `SWIFTTUI_JSON` | boolean | Selects JSON output. |
+| `SWIFTTUI_JSON` | boolean | Selects JSON output for terminal sessions; ignored when web presentation is enabled. |
 | `SWIFTTUI_ASCII` | boolean | Forces ASCII glyphs in place of Unicode box drawing and symbols. |
 | `SWIFTTUI_REDUCE_MOTION` | boolean | Sets the app-visible reduce-motion choice; `0`, `false`, `no` and `off` explicitly disable it. |
 | `SWIFTTUI_INCREASE_CONTRAST` | boolean | Chooses increased or standard contrast; absence inherits the host preference. |

@@ -14,6 +14,18 @@ import Testing
 @MainActor
 @Suite("Adversarial set B: terminal capabilities", .serialized)
 struct AdversarialSetBTerminalTests {
+  @Test("DEC pixel mouse probing tolerates empty polls and fragmented delayed replies")
+  func latePixelMouseReply() throws {
+    let gate = SetBSpyInputSuspensionGate()
+    let controller = SetBMockTerminalController(
+      isTTY: true, readResponses: [[], Array("\u{1B}[?1016;".utf8), [], Array("2$y".utf8)])
+    let host = makeSetBHost(controller: controller, gate: gate, environment: ["TERM": "xterm"])
+    let response = try host.performInputCapabilityQuery(.decPrivateMode(mode: 1016))
+    #expect(parseDECPrivateModeReport(from: response, mode: 1016) != nil)
+    #expect(gate.replayed == response)
+    #expect(gate.engagements == 1)
+  }
+
   private static let locale = ["LANG": "en_US.UTF-8"]
 
   private static func posix(_ environment: [String: String], isTTY: Bool = true)
@@ -200,7 +212,7 @@ struct AdversarialSetBTerminalTests {
     // reopen a probe that already recorded its answer for the session.
     let gate = SetBSpyInputSuspensionGate()
     let controller = SetBMockTerminalController(
-      isTTY: true, readResponses: [[], Array("\u{1B}[?62;22c".utf8)])
+      isTTY: true, readResponses: [[], [], [], [], Array("\u{1B}[?62;22c".utf8)])
     let reads = LockedBox(0)
     controller.onRead = { reads.withLock { $0 += 1 } }
     let host = makeSetBHost(controller: controller, gate: gate, environment: ["TERM": "xterm"])
@@ -208,7 +220,7 @@ struct AdversarialSetBTerminalTests {
     let timedOut = try host.performInputCapabilityQuery(.decPrivateMode(mode: 1016))
     #expect(timedOut.isEmpty)
     #expect(gate.replayed.isEmpty)
-    #expect(reads.value == 1)
+    #expect(reads.value == 4)
     #expect(gate.engagements == 1)
 
     let first = host.resolvedGraphicsCapabilities(probingProtocols: true)

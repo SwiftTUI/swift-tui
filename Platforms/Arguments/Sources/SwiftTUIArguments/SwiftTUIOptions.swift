@@ -119,7 +119,8 @@ public struct SwiftTUIOptions: ParsableArguments, Sendable {
 
   @Flag(
     name: .customLong("json"),
-    help: "Output JSON instead of rendering a TUI (where supported). [env: SWIFTTUI_JSON]"
+    help:
+      "Output JSON instead of rendering a TUI (where supported). Ignored in web sessions. [env: SWIFTTUI_JSON]"
   )
   public var json: Bool = false
 

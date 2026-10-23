@@ -188,6 +188,7 @@ public struct Path: Equatable, Sendable {
   /// Like a fill, the test closes each open subpath with a straight edge back
   /// to its start.
   public func contains(_ point: Point, fillRule: FillRule = .nonZero) -> Bool {
+    guard point.x.isFinite, point.y.isFinite else { return false }
     var crossings = 0
     var winding = 0
     for segment in closedSegments() {
@@ -211,6 +212,7 @@ public struct Path: Equatable, Sendable {
   /// The axis-aligned bounding rect over all anchor and control points
   /// (a conservative superset of the curve hull), or `nil` when empty.
   public var boundingRect: Rect? {
+    guard hasFiniteCoordinates else { return nil }
     var minX: Double?
     var minY: Double?
     var maxX: Double?
@@ -349,6 +351,7 @@ public struct Path: Equatable, Sendable {
   /// the final point. Open subpaths do not repeat the start point.
   /// Fill operations close each subpath. Stroke operations keep the authored open or closed state.
   public func flattened(tolerance: Double = 0.1) -> [[Point]] {
+    guard hasFiniteCoordinates else { return [] }
     let tol = max(0.000_1, tolerance)
     var subpaths: [[Point]] = []
     var current: [Point] = []
@@ -462,6 +465,21 @@ public struct Path: Equatable, Sendable {
   /// The cubic-Bézier control-point offset that best approximates a quarter
   /// circle (the classic kappa constant).
   private static let kappa = 0.552_284_749_830_793_4
+
+  // Invalid control points cannot define a finite outline. Reject the whole
+  // path consistently for rendering, bounds and hit testing, before subdivision.
+  private var hasFiniteCoordinates: Bool {
+    func finite(_ point: Point) -> Bool { point.x.isFinite && point.y.isFinite }
+    return elements.allSatisfy { element in
+      switch element {
+      case .move(let point), .line(let point): finite(point)
+      case .quadCurve(let to, let control): finite(to) && finite(control)
+      case .curve(let to, let control1, let control2):
+        finite(to) && finite(control1) && finite(control2)
+      case .close: true
+      }
+    }
+  }
 }
 
 extension Path {
@@ -574,6 +592,7 @@ extension Path {
   }
 
   private static func norm(_ x: Double, _ y: Double) -> Double {
+    guard x.isFinite, y.isFinite else { return .infinity }
     let scale = max(abs(x), abs(y))
     guard scale > 0 else { return 0 }
     guard scale.isFinite else { return .infinity }
@@ -583,6 +602,9 @@ extension Path {
   }
 
   private static func distance(_ point: Point, toSegmentFrom a: Point, to b: Point) -> Double {
+    guard [point.x, point.y, a.x, a.y, b.x, b.y].allSatisfy({ $0.isFinite }) else {
+      return .infinity
+    }
     let dx = b.x - a.x
     let dy = b.y - a.y
     let px = point.x - a.x
@@ -590,9 +612,6 @@ extension Path {
     let scale = max(abs(dx), abs(dy), abs(px), abs(py))
     guard scale > 0 else { return 0 }
     if !scale.isFinite {
-      guard [point.x, point.y, a.x, a.y, b.x, b.y].allSatisfy({ $0.isFinite }) else {
-        return .infinity
-      }
       // Opposite finite endpoints can have an unrepresentable difference.
       // Divide first in that case; scale the resulting distance back once.
       let divisor = Double(sign: .plus, exponent: 1023, significand: 1)

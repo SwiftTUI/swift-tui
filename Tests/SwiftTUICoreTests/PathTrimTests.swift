@@ -4,6 +4,24 @@ import Testing
 
 @Suite
 struct PathTrimTests {
+  @Test("placed trims measure physical distance while preserving the placed outline")
+  func placedTrimUsesPhysicalLength() throws {
+    let geometry = ShapeGeometry.trimmed(.circle, from: 0.4, to: 0.6)
+      .resolved(in: .init(width: 40, height: 20), trimAspectRatio: 2)
+    guard case .path(let path, _) = geometry else {
+      Issue.record("Expected resolved trim path")
+      return
+    }
+    let points = path.path.flattened().flatMap { $0 }
+    let first = try #require(points.first)
+    let last = try #require(points.last)
+    // A physical circle: 40% and 60% of its circumference are 144° and 216°.
+    #expect(abs(first.x - 0.09549) < 0.002)
+    #expect(abs(first.y - 0.79389) < 0.002)
+    #expect(abs(last.x - 0.09549) < 0.002)
+    #expect(abs(last.y - 0.20611) < 0.002)
+  }
+
   @Test("trimming normalizes overflowing lengths and preserves finite coordinates")
   func extremeLengths() throws {
     let crossing = Path([.move(to: .init(x: -1e308, y: 0)), .line(to: .init(x: 1e308, y: 0))])

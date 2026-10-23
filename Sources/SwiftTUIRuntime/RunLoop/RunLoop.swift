@@ -313,7 +313,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     registerMemoryMetricProviders()
     nativePreferenceObserver = NativeAccessibilityPreferenceObserver(surface: presentationSurface) {
       [weak self] in
-      self?.scheduler.requestSignal(named: "accessibilityPreferences")
+      self?.scheduler.requestExternalWake(reason: "accessibilityPreferences")
     }
   }
 

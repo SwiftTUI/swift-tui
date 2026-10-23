@@ -112,6 +112,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
   // node register under the exact same route key back-to-back within one
   // capture session, and every level must receive balanced phases.
   private var hoverHandlers: [RouteID: [HoverHandler]] = [:]
+  private var handlerRecencies: [RouteID: UInt64] = [:]
   private var handlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
   private var hoverHandlerOwners: [RouteID: RuntimeRegistrationOwnerKey] = [:]
   // Recency (the contributing node's visited-frame stamp) per hover route.
@@ -146,6 +147,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
       }
     }
     handlers[routeID] = handler
+    handlerRecencies[routeID] = ViewNodeContext.current?.runtimeRegistrationRecency ?? 0
     handlerOwners[routeID] = .current(identity: routeID.identity)
     ViewNodeContext.current?.recordPointerHandlerRegistration(
       routeID: routeID,
@@ -178,6 +180,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
       }
       handlers.removeValue(forKey: existing)
       handlerOwners.removeValue(forKey: existing)
+      handlerRecencies.removeValue(forKey: existing)
       gestureRouteRecencies.removeValue(forKey: existing)
     }
     gestureRouteRecencies[routeID] = max(recency, gestureRouteRecencies[routeID] ?? 0)
@@ -338,14 +341,9 @@ package final class LocalPointerHandlerRegistry: Equatable {
     !hoverHandlers.isEmpty
   }
 
-  /// Resolves the registered key that pairs with `routeID`: the exact key when
-  /// present, else — after a re-mint changed the route's `ownerNodeID` — the
-  /// paired key (same identity + kind) whose owner is freshest. Among several
-  /// paired entries (a stale shadowed copy next to a live re-registration) the
-  /// highest `ownerNodeID` wins, `nil`-owner entries last: node IDs allocate
-  /// monotonically, so the freshest registration is the live one. The pick is
-  /// a total order, so delivery is deterministic where the old wildcard
-  /// `RouteID.==` dictionary probe was hash-seeded.
+  /// Resolves an exact key first, then the freshest paired registration.
+  /// Node allocation order only breaks ties: an older node can re-register
+  /// after a newer, abandoned node when modifier chains collapse.
   package func handlerRouteID(
     pairingWith routeID: RouteID
   ) -> RouteID? {
@@ -354,7 +352,12 @@ package final class LocalPointerHandlerRegistry: Equatable {
     }
     return handlers.keys
       .filter { $0.pairsIgnoringOwner(with: routeID) }
-      .max { Self.staleOwnerFirst($0.ownerNodeID, $1.ownerNodeID) }
+      .max { lhs, rhs in
+        let lhsRecency = handlerRecencies[lhs] ?? 0
+        let rhsRecency = handlerRecencies[rhs] ?? 0
+        if lhsRecency != rhsRecency { return lhsRecency < rhsRecency }
+        return Self.staleOwnerFirst(lhs.ownerNodeID, rhs.ownerNodeID)
+      }
       ?? wheelRouteID(pairingWith: routeID)
   }
 
@@ -456,6 +459,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     wheelHandlerRecencies.removeAll(keepingCapacity: true)
     hoverHandlers.removeAll(keepingCapacity: true)
     handlerOwners.removeAll(keepingCapacity: true)
+    handlerRecencies.removeAll(keepingCapacity: true)
     hoverHandlerOwners.removeAll(keepingCapacity: true)
     hoverHandlerRecencies.removeAll(keepingCapacity: true)
     gestureRouteRecencies.removeAll(keepingCapacity: true)
@@ -472,6 +476,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     for routeID in handlers.keys.filter({ !preservedIdentities.contains($0.identity) }) {
       handlers.removeValue(forKey: routeID)
       handlerOwners.removeValue(forKey: routeID)
+      handlerRecencies.removeValue(forKey: routeID)
     }
     wheelHandlers.removeAll(keepingCapacity: true)
     wheelHandlerOwners.removeAll(keepingCapacity: true)
@@ -498,6 +503,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     }) {
       handlers.removeValue(forKey: routeID)
       handlerOwners.removeValue(forKey: routeID)
+      handlerRecencies.removeValue(forKey: routeID)
       gestureRouteRecencies.removeValue(forKey: routeID)
     }
     for routeID in hoverHandlers.keys.filter({
@@ -548,6 +554,7 @@ package final class LocalPointerHandlerRegistry: Equatable {
     }) {
       handlers.removeValue(forKey: routeID)
       handlerOwners.removeValue(forKey: routeID)
+      handlerRecencies.removeValue(forKey: routeID)
       gestureRouteRecencies.removeValue(forKey: routeID)
     }
   }
@@ -586,7 +593,11 @@ package final class LocalPointerHandlerRegistry: Equatable {
           continue
         }
       }
+      if let existingRecency = handlerRecencies[routeID], recency < existingRecency {
+        continue
+      }
       handlers[routeID] = handler
+      handlerRecencies[routeID] = recency
       handlerOwners[routeID] = ownersByRouteID[routeID] ?? .init(identity: routeID.identity)
     }
   }
