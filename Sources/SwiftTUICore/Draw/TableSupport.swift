@@ -16,17 +16,6 @@ package func measureTableColumnWidths(
   }
 }
 
-package func formattedTableLineWidth(
-  widths: [Int],
-  prefixWidth: Int = 0
-) -> Int {
-  let _ = prefixWidth
-  guard !widths.isEmpty else {
-    return 0
-  }
-  return widths.reduce(0, +) + widths.count + 1
-}
-
 package func borderedTableLineWidth(
   widths: [Int],
   glyphs: TableBorderGlyphs
@@ -132,17 +121,4 @@ private func borderedTableLineWidth(
   let rightWidth = layoutText(for: right, width: nil).size.width
   let joinWidth = layoutText(for: join, width: nil).size.width * max(0, widths.count - 1)
   return cellsWidth + leftWidth + joinWidth + rightWidth
-}
-
-package func showsTableRowSeparator(
-  current: TableRowPayload,
-  next: TableRowPayload?
-) -> Bool {
-  guard let next else {
-    return false
-  }
-  if current.rowSeparators.bottom == .hidden || next.rowSeparators.top == .hidden {
-    return false
-  }
-  return true
 }
