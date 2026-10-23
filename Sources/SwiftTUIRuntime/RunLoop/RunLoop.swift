@@ -566,12 +566,15 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     var renderedFrames = 0
     #if os(Android)
       if renderMode == .sync {
-        try renderPendingFrames(renderedFrames: &renderedFrames)
+        try renderPendingFrames(
+          renderedFrames: &renderedFrames, drainPolicy: .initialPresentation)
       } else {
-        try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+        _ = try await renderPendingFramesAsync(
+          renderedFrames: &renderedFrames, eventPump: nil, drainPolicy: .initialPresentation)
       }
     #else
-      try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      _ = try await renderPendingFramesAsync(
+        renderedFrames: &renderedFrames, eventPump: nil, drainPolicy: .initialPresentation)
     #endif
 
     // After the initial render establishes the view tree and evaluator
@@ -582,14 +585,36 @@ public final class RunLoop<State: Equatable & Sendable, Content: View>:
     scheduleNextWakeIfNeeded(using: eventPump)
 
     if let exitReason = consumeProgrammaticTerminationRequest() {
+      // Startup callbacks can request termination without invalidating the
+      // tree. Their external wake still owes a presentation, including any
+      // state written by the termination handler and its final callbacks.
+      lifecycleCoordinator.beginShutdown()
+      #if os(Android)
+        if renderMode == .sync {
+          try renderPendingFrames(
+            renderedFrames: &renderedFrames, eventPump: eventPump,
+            drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+        } else {
+          _ = try await renderPendingFramesAsync(
+            renderedFrames: &renderedFrames, eventPump: eventPump,
+            drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+        }
+      #else
+        _ = try await renderPendingFramesAsync(
+          renderedFrames: &renderedFrames, eventPump: eventPump,
+          drainPolicy: FrameDrainPolicy(exitReason: exitReason))
+      #endif
       return RunLoopResult(
         finalState: stateContainer.state,
         renderedFrames: renderedFrames,
-        exitReason: exitReason
+        exitReason: consumeProgrammaticTerminationRequest() ?? exitReason
       )
     }
 
-    if scheduler.hasPendingFrame(at: .now()) {
+    // Startup has established the tree. Serve waiting input before unrelated
+    // producer work can start another drain pass.
+    _ = eventPump.pullInput()
+    if !eventPump.hasPendingEvents(), scheduler.hasPendingFrame(at: .now()) {
       if let exitReason = try await renderPendingFramesAsync(
         renderedFrames: &renderedFrames,
         eventPump: eventPump

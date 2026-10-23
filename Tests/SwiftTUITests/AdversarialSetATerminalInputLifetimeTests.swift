@@ -24,7 +24,9 @@
       // Hypothesis: the first 256-byte read causes EOF handling to finish before
       // subsequent chunks, including the final multi-byte character, are delivered.
       try await withTerminalLifetimePipe { pipe in
-        let text = String(repeating: "ab", count: 700) + "😀z"
+        // Preload 259 bytes, below the 512-byte capacity observed on this host.
+        // The four-byte scalar straddles the reader's 256-byte chunk boundary.
+        let text = String(repeating: "ab", count: 127) + "😀z"
         try pipe.write(Array(text.utf8))
         pipe.closeWriter()
         let received = pipe.observe(pipe.reader.inputEvents())

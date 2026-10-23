@@ -288,6 +288,42 @@ struct TerminationRequestTests {
     #expect(recorder.requests == [.signal("SIGTERM")])
   }
 
+  @Test(
+    "startup termination presents final callbacks after stopping owned work",
+    arguments: [false, true])
+  func startupTerminationPresentsFinalCallbacks(synchronous: Bool) async throws {
+    let recorder = TerminationRecorder()
+    let root = testIdentity("StartupTermination")
+    let surface = TerminationTestTerminalHost()
+    let state = StateContainer(initialState: 0, invalidationIdentities: [root])
+    let runLoop = RunLoop(
+      rootIdentity: root, presentationSurface: surface,
+      terminalInputReader: TerminationTestInputReader(events: [], finishAfterEvents: false),
+      scheduler: FrameScheduler(), stateContainer: state,
+      focusTracker: FocusTracker(invalidationIdentities: [root]),
+      viewBuilder: { value, _ in
+        StartupTerminationFixture(value: value, recorder: recorder)
+          .onTerminationRequest { request in
+            recorder.requests.append(request)
+            state.mutate { $0 = 1 }
+            return .allow
+          }
+      })
+    runLoop.renderMode = synchronous ? .sync : .async
+
+    let result = try await runLoop.run()
+
+    #expect(result.exitReason == .programmatic)
+    #expect(result.finalState == 1)
+    #expect(surface.frames.last?.contains("value 1") == true)
+    #expect(surface.frames.last?.contains("settled") == true)
+    #expect(recorder.requests == [.programmatic])
+    #expect(!recorder.finalTaskStarted)
+    #expect(runLoop.lifecycleCoordinator.refusedStartsAfterShutdownCount == 1)
+    #expect(runLoop.lifecycleCoordinator.taskStartSkipCount == 0)
+    #expect(runLoop.lifecycleCoordinator.activeTaskCount == 0)
+  }
+
   @Test("environment action requests programmatic termination")
   func environmentActionRequestsTermination() async throws {
     let recorder = TerminationRecorder()
@@ -408,6 +444,26 @@ private final class TerminationRecorder {
   var requests: [TerminationRequest] = []
   var activeTasks: (@MainActor () -> Int)?
   var checkedVeto = false
+  var finalTaskStarted = false
+}
+
+private struct StartupTerminationFixture: View {
+  let value: Int
+  let recorder: TerminationRecorder
+  @Environment(\.requestTermination) private var requestTermination
+  @State private var settled = false
+
+  var body: some View {
+    VStack {
+      Text("value \(value)")
+      if value > 0 {
+        Text(settled ? "settled" : "settling")
+          .onAppear { settled = true }
+          .task { recorder.finalTaskStarted = true }
+      }
+    }
+    .onAppear { _ = requestTermination() }
+  }
 }
 
 private struct ProgrammaticTerminationFixture: View {

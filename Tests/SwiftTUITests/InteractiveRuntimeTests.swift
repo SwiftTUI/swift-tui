@@ -444,9 +444,18 @@ struct InteractiveRuntimeTests {
     let scrollSequence: [UInt8] = [
       0x1B, 0x5B, 0x3C, 0x36, 0x35, 0x3B, 0x35, 0x3B, 0x37, 0x4D,
     ]
+    #if os(Windows)
+      let burstCount = 52
+      let expectedDeltaY = 52
+    #else
+      // Fit the portable 512-byte pipe capacity while crossing the POSIX
+      // reader's 256-byte boundary inside an SGR sequence.
+      let burstCount = 51
+      let expectedDeltaY = 51
+    #endif
     let burstBytes = Array(
       repeating: scrollSequence,
-      count: 52
+      count: burstCount
     ).flatMap { $0 }
 
     try writeAllBytes(burstBytes, to: writeDescriptor)
@@ -469,7 +478,7 @@ struct InteractiveRuntimeTests {
       receivedEvents == [
         .mouse(
           .init(
-            kind: .scrolled(deltaX: 0, deltaY: 52),
+            kind: .scrolled(deltaX: 0, deltaY: expectedDeltaY),
             location: .cellFallback(CellPoint(x: 4, y: 6))
           )
         )
