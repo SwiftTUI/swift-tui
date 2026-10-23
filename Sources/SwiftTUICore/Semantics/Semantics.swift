@@ -619,7 +619,9 @@ extension SemanticExtractor {
     guard context.pointerClipRect != nil || !context.pointerClipPaths.isEmpty else { return }
     var index = start
     while index < regions.count {
-      if let clip = context.pointerClipRect {
+      // Empty regions veto ancestor-action fallback for keyboard-only actions.
+      // Their presence remains meaningful even though they cannot be clicked.
+      if let clip = context.pointerClipRect, !regions[index].rect.isEmpty {
         guard let rect = regions[index].rect.intersection(clip) else {
           regions.remove(at: index)
           continue
@@ -783,13 +785,17 @@ extension SemanticExtractor {
       return nil
     }
 
-    let minX = Int(bounds.origin.x.rounded(.down))
-    let minY = Int(bounds.origin.y.rounded(.down))
-    let maxX = Int(bounds.maxX.rounded(.up))
-    let maxY = Int(bounds.maxY.rounded(.up))
+    guard let minX = Int(exactly: bounds.origin.x.rounded(.down)),
+      let minY = Int(exactly: bounds.origin.y.rounded(.down)),
+      let maxX = Int(exactly: bounds.maxX.rounded(.up)),
+      let maxY = Int(exactly: bounds.maxY.rounded(.up))
+    else { return nil }
+    let (width, widthOverflow) = maxX.subtractingReportingOverflow(minX)
+    let (height, heightOverflow) = maxY.subtractingReportingOverflow(minY)
+    guard !widthOverflow, !heightOverflow else { return nil }
     let rect = CellRect(
       origin: CellPoint(x: minX, y: minY),
-      size: CellSize(width: maxX - minX, height: maxY - minY)
+      size: CellSize(width: width, height: height)
     )
     guard !rect.isEmpty else {
       return nil

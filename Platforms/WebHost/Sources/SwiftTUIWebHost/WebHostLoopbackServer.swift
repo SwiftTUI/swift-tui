@@ -240,7 +240,8 @@ final class WebHostLoopbackConnection: Sendable {
 
   private struct State {
     var outbox: [OutboundRecord] = []
-    var budget = WebHostOutboundBudget()
+    var budget = WebHostOutboundBudget(
+      byteLimit: WebHostOutboundBudget.byteLimit + WebHostWebSocketWire.maxOutboundFrameHeaderBytes)
     var outboxFinished = false
     var readerDone = false
     var writerDone = false

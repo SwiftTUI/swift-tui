@@ -96,7 +96,8 @@ extension RuntimeConfiguration {
       glyphs: glyphsResolved,
       motion: motion,
       stableOutput: stableOutput,
-      output: output,
+      // A hosted session presents surface frames; JSON is a terminal output mode.
+      output: web == nil ? output : .tui,
       web: web,
       debug: debug,
       cursorFollowsFocus: cursorFollowsFocus

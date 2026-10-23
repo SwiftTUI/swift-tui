@@ -5,6 +5,33 @@ import Testing
 
 @Suite("Scroll indicator support")
 struct ScrollIndicatorSupportTests {
+  @Test(
+    "decorative overflow does not change the painted scroll thumb",
+    arguments: [Axis.vertical, .horizontal])
+  func decorativeOverflow(axis: Axis) throws {
+    let vertical = axis == .vertical
+    let viewport = CellRect(origin: .zero, size: .init(width: 10, height: 10))
+    let bounds = CellRect(
+      origin: .init(x: vertical ? 0 : -10, y: vertical ? -10 : 0),
+      size: .init(width: vertical ? 9 : 20, height: vertical ? 20 : 9))
+    var content = PlacedNode(identity: testIdentity("content"), bounds: bounds)
+    var metadata = DrawMetadata()
+    metadata.scrollIndicatorAxes = vertical ? .vertical : .horizontal
+    let extractor = DrawExtractor()
+    let clean = extractor.scrollIndicatorCommands(
+      bounds: viewport, drawMetadata: metadata, children: [content])
+    #expect(!clean.isEmpty)
+    content.contentBounds.size = .init(width: vertical ? 9 : 23, height: vertical ? 23 : 9)
+    let overflow = extractor.scrollIndicatorCommands(
+      bounds: viewport, drawMetadata: metadata, children: [content])
+    #expect(overflow == clean)
+    let metrics = try #require(
+      resolvedScrollIndicatorMetrics(
+        viewportRect: viewport, contentBounds: bounds,
+        axes: vertical ? .vertical : .horizontal, axis: vertical ? .vertical : .horizontal))
+    #expect(metrics.thumbRange(for: metrics.maxOffset)?.upperBound == 10)
+  }
+
   @Test("a converged layout viewport wins over a cold indicator fixed point")
   func convergedViewport() throws {
     let bounds = CellRect(origin: .zero, size: .init(width: 8, height: 6))

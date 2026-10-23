@@ -7,6 +7,35 @@ import Testing
 
 @Suite(.serialized)
 struct ImageBlendCompositorTests {
+  @Test("occluded blended sixels preserve the visible source pixel density")
+  func occludedSixelMatchesCroppedSource() throws {
+    let pixels = (0..<32).map { index in
+      rgbaPixel(red: UInt8((index / 4) * 30), green: UInt8((index % 4) * 70), blue: 0)
+    }
+    func attachment(rows: Int, pixels: [PNG.RGBA<UInt8>]) throws -> RasterImageAttachment {
+      let bounds = CellRect(origin: .zero, size: .init(width: 1, height: rows / 4))
+      return blendedAttachment(
+        pngBytes: try makePNGBytes(width: 4, height: rows, pixels: pixels),
+        compositing: imageCompositing(
+          blendMode: .normal, destination: .black, bounds: bounds,
+          cellPixelSize: .init(width: 4, height: 4)), bounds: bounds, opacity: 0.5)
+    }
+    var occluded = try attachment(rows: 8, pixels: pixels)
+    occluded.unoccludedVisibleBounds = .init(origin: .zero, size: .init(width: 1, height: 1))
+    let cropped = try attachment(rows: 4, pixels: Array(pixels.prefix(16)))
+    func payload(_ attachment: RasterImageAttachment) throws -> String {
+      var transmitted = Set<UInt32>()
+      let steps = TerminalImageRenderer(repository: ImageAssetRepository()).graphicsWriteSteps(
+        for: [attachment], capabilityProfile: .trueColor,
+        graphicsCapabilities: .init(
+          supportedProtocols: [.sixel], preferredProtocol: .sixel,
+          cellPixelSize: .init(width: 4, height: 4)),
+        fallbackBackground: .black, transmittedKittyImages: &transmitted)
+      return try #require(steps.first { $0.hasPrefix("\u{001B}P") })
+    }
+    #expect(try payload(occluded) == payload(cropped))
+  }
+
   @Test("direct image blend precomposes source pixels over destination backdrop")
   func directImageBlendPrecomposesSourcePixelsOverDestinationBackdrop() throws {
     let source = Color(red: 1, green: 0, blue: 0)

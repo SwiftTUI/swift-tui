@@ -5,6 +5,20 @@ import Testing
 
 struct SwiftTUIOptionsResolutionTests {
   @Test(
+    "web presentation wins over JSON from flags or environment", arguments: [false, true],
+    [false, true])
+  func webOverridesJSON(webFlag: Bool, jsonFlag: Bool) throws {
+    var environment: [String: String] = [:]
+    var flags: [String] = []
+    if webFlag { flags.append("--web") } else { environment["SWIFTTUI_WEB"] = "1" }
+    if jsonFlag { flags.append("--json") } else { environment["SWIFTTUI_JSON"] = "1" }
+    let configuration = try SwiftTUIOptions.parse(flags).runtimeConfiguration(
+      environment: environment, isStdoutTTY: false)
+    #expect(configuration.web != nil)
+    #expect(configuration.output == .tui)
+  }
+
+  @Test(
     "web defaults inherit independently and explicit defaults override", arguments: [false, true])
   func webOptionPresence(explicitWeb: Bool) throws {
     let prefix = explicitWeb ? ["--web"] : []

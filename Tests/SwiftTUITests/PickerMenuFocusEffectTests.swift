@@ -12,6 +12,49 @@ import Testing
 @MainActor
 @Suite
 struct PickerMenuFocusEffectTests {
+  @Test("batched trigger clicks toggle an initially unfocused menu twice")
+  func batchedTriggerClicks() throws {
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("PickerDoubleClick"), size: .init(width: 40, height: 10)
+    ) {
+      VStack {
+        Button("First focus") {}
+        MenuPickerSelectionFixture()
+      }
+    }
+    defer { h.shutdown() }
+    #expect(h.frame.contains("▾"))
+    let region = try #require(
+      h.runLoop.publishedAccessibilitySnapshot.interactionRegions.first {
+        $0.identity.path.contains("PickerTrigger")
+      })
+    let point = Point(x: Double(region.rect.origin.x), y: Double(region.rect.origin.y))
+    for _ in 0..<2 {
+      _ = h.runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: point))))
+      _ = h.runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: point))))
+    }
+    var frames = 0
+    try h.runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(h.frame.contains("▾"))
+  }
+
+  @Test("batched keys observe menu expansion writes", arguments: [false, true])
+  func batchedExpansion(initiallyCollapsed: Bool) throws {
+    let harness = try StressRuntimeHarness(
+      rootIdentity: testIdentity("BatchedPicker"), size: .init(width: 40, height: 10)
+    ) { MenuPickerSelectionFixture() }
+    defer { harness.shutdown() }
+    if initiallyCollapsed { try harness.pressKey(KeyPress(.escape)) }
+    let keys: [KeyPress] =
+      initiallyCollapsed
+      ? [KeyPress(.arrowDown), KeyPress(.arrowDown)] : [KeyPress(.escape), KeyPress(.arrowDown)]
+    for key in keys { _ = harness.runLoop.handleKeyPress(key) }
+    var frames = 0
+    try harness.runLoop.renderPendingFrames(renderedFrames: &frames)
+    #expect(harness.frame.contains("▴"))
+    #expect(harness.frame.contains(initiallyCollapsed ? "selected 1" : "selected 0"))
+  }
+
   @Test("accessibility selection closes a menu picker only when the selection changes")
   func accessibilitySelectionClosesMenu() throws {
     let harness = try StressRuntimeHarness(

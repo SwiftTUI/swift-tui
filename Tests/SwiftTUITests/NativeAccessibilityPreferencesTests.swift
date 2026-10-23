@@ -4,9 +4,38 @@
   @_spi(Testing) import SwiftTUITestSupport
   @testable import SwiftTUICore
   @testable import SwiftTUIRuntime
+  @testable import SwiftTUIViews
 
   @MainActor
   @Suite struct NativeAccessibilityPreferencesTests {
+    @Test func nativeNotificationWakesTheRuntimeScheduler() async throws {
+      let scheduler = FrameScheduler()
+      let root = testIdentity("NativePreferenceWake")
+      let loop = SwiftTUIRuntime.RunLoop(
+        rootIdentity: root, presentationSurface: host(),
+        terminalInputReader: PreferenceEmptyInput(),
+        scheduler: scheduler,
+        stateContainer: StateContainer(initialState: 0, invalidationIdentities: [root]),
+        focusTracker: FocusTracker(invalidationIdentities: [root]),
+        viewBuilder: { _, _ in Text("Idle") })
+      defer { loop.lifecycleCoordinator.shutdown() }
+      let signal = MainActorConditionSignal()
+      let wakes = LockedBox(0)
+      scheduler.setWakeHandler {
+        wakes.withLock { $0 += 1 }
+        Task { @MainActor in signal.notify() }
+      }
+      NSWorkspace.shared.notificationCenter.post(
+        name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
+      try await withStageBudget(
+        "native preference wake", within: .init(stages: 1), on: ManualStageClock()
+      ) {
+        await signal.wait { wakes.value > 0 }
+      }
+      #expect(wakes.value > 0)
+      withExtendedLifetime(loop) {}
+    }
+
     private func host(environment: [String: String] = [:], tty: Bool = true) -> TerminalHost {
       TerminalHost(
         inputFileDescriptor: 0, outputFileDescriptor: 1,
@@ -41,6 +70,10 @@
       await signal.wait { updates == 1 }
       withExtendedLifetime(observer) { #expect(updates == 1) }
     }
+  }
+
+  private final class PreferenceEmptyInput: TerminalInputReading {
+    func inputEvents() -> AsyncStream<InputEvent> { AsyncStream { $0.finish() } }
   }
 
   private final class PreferenceTestController: TerminalControlling {

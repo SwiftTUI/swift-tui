@@ -771,19 +771,21 @@ package enum WebSurfaceFrameEncoder {
           }
           if let value = control.value, node.roleToken != "secureField" {
             let kind: String
-            let encoded: String
+            let encoded: String?
             switch value {
             case .boolean(let flag):
               kind = "boolean"
               encoded = flag ? "true" : "false"
             case .number(let number):
               kind = "number"
-              encoded = number.isFinite ? String(number) : "null"
+              encoded = number.isFinite ? String(number) : nil
             case .text(let text):
               kind = "text"
               encoded = jsonString(text)
             }
-            fields.append("\"value\":{\"type\":\(jsonString(kind)),\"value\":\(encoded)}")
+            if let encoded {
+              fields.append("\"value\":{\"type\":\(jsonString(kind)),\"value\":\(encoded)}")
+            }
           }
           for (key, value) in [
             ("valueMin", control.minimum), ("valueMax", control.maximum),

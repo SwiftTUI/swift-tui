@@ -21,7 +21,10 @@ extension Rasterizer {
     }
 
     guard let shapeBounds = shapeInsetBounds(bounds, by: insetAmount) else { return }
-    let geometry = geometry.resolved(in: shapeBounds.size)
+    let geometry = geometry.resolved(
+      in: shapeBounds.size,
+      trimAspectRatio: RectangleStrokeTrack.snappedAspectRatio(
+        environment.cellPixelMetrics.aspectRatio))
     guard shapeBounds.size.width > 0, shapeBounds.size.height > 0 else {
       return
     }

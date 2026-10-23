@@ -242,12 +242,21 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
           }
           let restorePlan = rawModeSession.restorePlan
           presentationSession.reset()
+          var restoredOutput = false
+          do {
+            try controller.write(
+              restorePlan.resetOutput, to: outputFileDescriptor,
+              budget: TerminalWriteBudget(deadline: ContinuousClock.now + .milliseconds(250)))
+            restoredOutput = true
+          } catch {
+            // Retain the process-exit fallback if escape cleanup also fails.
+          }
           if let savedSnapshot = restorePlan.savedSnapshot {
             do {
               try controller.restore(
                 savedSnapshot,
                 input: inputFileDescriptor, output: outputFileDescriptor)
-              _ = rawModeSession.deactivate()
+              if restoredOutput { _ = rawModeSession.deactivate() }
             } catch {
               // The process-exit fallback retains the snapshot.
             }
@@ -282,12 +291,12 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
       // leave the user's shell in enhanced mode) and refresh the
       // process-exit cleanup so crash-path reset bytes include the pop.
       if probeKittyKeyboardSupportIfNeeded() {
-        try write(TerminalHostEscapeSequences.pushKittyKeyboardEnhancements)
         rawModeSession.kittyKeyboardPushed = true
         rawModeSession.refreshProcessExitCleanupRegistration(
           inputFileDescriptor: inputFileDescriptor,
           outputFileDescriptor: outputFileDescriptor
         )
+        try write(TerminalHostEscapeSequences.pushKittyKeyboardEnhancements)
       }
       shouldRestoreOnFailure = false
     }
@@ -308,18 +317,13 @@ public enum TerminalHostError: Error, Equatable, Sendable, CustomStringConvertib
         try presentationWriter?.consumePendingError()
       } catch { outputError = error }
       do {
-        let reset =
+        let clear =
           restorePlan.readerMode
-          ? TerminalHostEscapeSequences.disableBracketedPaste
-            + TerminalHostEscapeSequences.showCursor + TerminalHostEscapeSequences.resetStyle
+          ? ""
           : TerminalHostEscapeSequences.clearScreen
             + TerminalHostEscapeSequences.cursor(to: .zero)
-            + TerminalHostEscapeSequences.processExitReset(
-              mouseCoordinateMode: restorePlan.mouseCoordinateMode,
-              hoverEnabled: restorePlan.pointerHoverEnabled,
-              kittyKeyboardPushed: restorePlan.kittyKeyboardPushed)
         try controller.write(
-          reset, to: outputFileDescriptor,
+          clear + restorePlan.resetOutput, to: outputFileDescriptor,
           budget: TerminalWriteBudget(deadline: deadline))
       } catch { if outputError == nil { outputError = error } }
 

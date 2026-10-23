@@ -8,6 +8,29 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct AdversarialSetAControlBoundaryTests {
+  @Test("numeric control labels do not perform keyboard activation", arguments: [false, true])
+  func labelClicksDoNotAdjust(slider: Bool) throws {
+    let box = ControlBoundaryBox(5)
+    let h = try harness(1113) {
+      if slider {
+        Slider("Level", value: box.binding, in: 0...10, step: 1)
+      } else {
+        Stepper("Count", value: box.binding, in: 0...10)
+      }
+    }
+    defer { h.shutdown() }
+    try h.clickText(slider ? "Level" : "Count")
+    #expect(box.value == 5)
+    #expect(box.writes == 0)
+    try h.focusText(slider ? "Level" : "Count")
+    try h.pressKey(KeyPress(.arrowRight))
+    #expect(box.value == 6)
+    let point = try #require(h.point(forText: slider ? "Level" : "Count"))
+    try h.scrollPointer(at: point, deltaY: -1)
+    #expect(box.value == 7)
+    #expect(box.writes == 2)
+  }
+
   @Test func setA376TinySliderRangeStillFillsItsTrack() {
     // Hypothesis: an absolute epsilon in fraction calculation shrinks valid tiny ranges.
     do {

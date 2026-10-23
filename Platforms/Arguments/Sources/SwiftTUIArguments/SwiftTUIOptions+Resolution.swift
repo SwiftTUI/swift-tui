@@ -7,6 +7,7 @@ extension SwiftTUIOptions {
   /// Precedence: explicit CLI flag > env var > TTY auto-detect > framework default.
   /// `--no-color` always wins over `--force-color`. `--accessible` implies
   /// `--reduce-motion --cursor-follows-focus`.
+  /// Web sessions always use surface presentation, overriding JSON output.
   public func runtimeConfiguration(
     environment: [String: String] = ProcessInfo.processInfo.environment,
     isStdoutTTY: Bool = standardOutputIsATTY()
@@ -93,7 +94,7 @@ extension SwiftTUIOptions {
       glyphs: glyphs,
       motion: motion,
       stableOutput: stableOutput,
-      output: output,
+      output: web == nil ? output : .tui,
       web: web,
       debug: debug,
       cursorFollowsFocus: cursorFollowsFocus

@@ -27,8 +27,8 @@ private final class DisclosureExpansionProbe {
 struct DisclosureGroupPointerActivationTests {
   @Test(
     "clicking the expanded content of a DisclosureGroup does not collapse it",
-    arguments: [0, 1, 2])
-  func disclosureGroupContentClickKeepsExpansion(_ index: Int) throws {
+    arguments: [0, 1, 2], [false, true])
+  func disclosureGroupContentClickKeepsExpansion(_ index: Int, contentShape: Bool) throws {
     let styles: [AnyDisclosureGroupStyle] = [
       .automatic, .compact, .init(ConsumerDisclosureGroupStyle()),
     ]
@@ -36,13 +36,16 @@ struct DisclosureGroupPointerActivationTests {
     let harness = try StressRuntimeHarness(
       rootIdentity: testIdentity("DisclosureContentClick"), size: .init(width: 32, height: 8)
     ) {
-      DisclosureGroup("Details", isExpanded: probe.binding) {
-        VStack(alignment: .leading, spacing: 0) {
-          Text("Body copy")
-          Button("Inner") { probe.innerActivations += 1 }
+      VStack(alignment: .leading, spacing: 0) {
+        DisclosureGroup("Details", isExpanded: probe.binding) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("Body copy")
+            Button("Inner") { probe.innerActivations += 1 }
+          }
         }
+        .disclosureGroupStyle(styles[index])
       }
-      .disclosureGroupStyle(styles[index])
+      .contentShape(contentShape ? CellRect(origin: .zero, size: .init(width: 32, height: 8)) : nil)
     }
     defer { harness.shutdown() }
     #expect(harness.frame.contains("Body copy"))

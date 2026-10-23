@@ -17,6 +17,46 @@
   @MainActor
   @Suite
   struct TerminalHostProcessExitCleanupTests {
+    @Test(
+      "failed raw-mode entry restores output modes or retains exit cleanup",
+      arguments: [false, true], [false, true])
+    func failedEnableCleanup(reader: Bool, failCleanup: Bool) throws {
+      var inputPipe = try makePipe()
+      var outputPipe = try makePipe()
+      defer {
+        TerminalProcessExitCleanupRegistry.runForTesting()
+        closePipe(&inputPipe)
+        closePipe(&outputPipe)
+      }
+      let controller = ProcessExitCleanupController(failOnPaste: true, failCleanup: failCleanup)
+      let host = TerminalHost(
+        inputFileDescriptor: inputPipe.readEnd, outputFileDescriptor: outputPipe.writeEnd,
+        fallbackSize: .init(width: 80, height: 24), controller: controller,
+        capabilityProfile: .trueColor)
+      host.readerMode = reader
+      #expect(throws: CleanupWriteError.self) { try host.enableRawMode() }
+      #expect(controller.restores.value == 1)
+      let immediate = controller.writes.value.joined()
+      if !failCleanup {
+        // Failure cleanup must not clear the primary screen if alternate-screen
+        // entry itself failed. Clearing belongs only to normal shutdown.
+        #expect(
+          controller.writes.value.last?.contains(TerminalHostEscapeSequences.clearScreen) == false)
+        #expect(immediate.contains(TerminalHostEscapeSequences.disableBracketedPaste))
+        #expect(immediate.contains(TerminalHostEscapeSequences.showCursor))
+        #expect(immediate.contains(TerminalHostEscapeSequences.exitAlternateScreen) == !reader)
+      }
+      TerminalProcessExitCleanupRegistry.runForTesting()
+      closeFileDescriptor(&outputPipe.writeEnd)
+      let fallback = try readUTF8(from: outputPipe.readEnd)
+      #expect(fallback.isEmpty == !failCleanup)
+      if failCleanup {
+        #expect(fallback.contains(TerminalHostEscapeSequences.disableBracketedPaste))
+        #expect(fallback.contains(TerminalHostEscapeSequences.showCursor))
+        #expect(fallback.contains(TerminalHostEscapeSequences.exitAlternateScreen) == !reader)
+      }
+    }
+
     @Test("reader process-exit cleanup retains scrollback and resets raw input protocols")
     func readerProcessExitCleanup() throws {
       var inputPipe = try makePipe()
@@ -168,9 +208,15 @@
 
   private final class ProcessExitCleanupController: TerminalControlling {
     private let cellPixelSizeValue: PixelSize?
+    let writes = LockedBox<[String]>([])
+    let restores = LockedBox(0)
+    let failOnPaste: Bool
+    let failCleanup: Bool
 
-    init(cellPixelSize: PixelSize? = nil) {
+    init(cellPixelSize: PixelSize? = nil, failOnPaste: Bool = false, failCleanup: Bool = false) {
       cellPixelSizeValue = cellPixelSize
+      self.failOnPaste = failOnPaste
+      self.failCleanup = failCleanup
     }
 
     func isATTY(_: Int32) -> Bool {
@@ -181,7 +227,9 @@
       TerminalModeSnapshot()
     }
 
-    func restore(_: TerminalModeSnapshot, input _: Int32, output _: Int32) throws {}
+    func restore(_: TerminalModeSnapshot, input _: Int32, output _: Int32) throws {
+      restores.withLock { $0 += 1 }
+    }
 
     func windowSize(of _: Int32) throws -> CellSize {
       .init(width: 80, height: 24)
@@ -191,7 +239,15 @@
       cellPixelSizeValue
     }
 
-    func write(_: String, to _: Int32) throws {}
+    func write(_ output: String, to _: Int32) throws {
+      if failOnPaste && output == TerminalHostEscapeSequences.enableBracketedPaste {
+        throw CleanupWriteError.failed
+      }
+      if failCleanup && output.contains(TerminalHostEscapeSequences.disableBracketedPaste) {
+        throw CleanupWriteError.failed
+      }
+      writes.withLock { $0.append(output) }
+    }
 
     func read(
       from _: Int32,
@@ -201,6 +257,8 @@
       []
     }
   }
+
+  private enum CleanupWriteError: Error { case failed }
 
   private func makePipe() throws -> PipeEnds {
     var fileDescriptors: [Int32] = [0, 0]

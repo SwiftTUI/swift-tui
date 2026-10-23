@@ -190,6 +190,26 @@ struct WebHostWebSocketWireTests {
 /// behaviors the retired server backend provided and the previous suite
 /// could not see.
 struct WebHostLoopbackServerProtocolTests {
+  @Test("the largest legal wire record survives WebSocket framing")
+  func maximumOutboundRecord() async throws {
+    try await withServer { session in
+      var events = session.channel.inboundEvents().makeAsyncIterator()
+      let client = try WebSocketTestClient.connect(to: session.webSocketURL)
+      defer { client.close() }
+      guard case .connectionOpened = try #require(await events.next()) else {
+        Issue.record("expected socket attach")
+        return
+      }
+      let bytes = [UInt8](repeating: 65, count: WebHostOutboundBudget.byteLimit)
+      let sending = Task { try await session.channel.send(bytes) }
+      #expect(try client.receiveMessage() == Data(bytes))
+      try await sending.value
+      let followUp = Task { try await session.channel.send([66]) }
+      #expect(try client.receiveMessage() == Data([66]))
+      try await followUp.value
+    }
+  }
+
   @Test("ping frames are answered with matching pongs")
   func pingFramesAreAnsweredWithMatchingPongs() async throws {
     try await withServer { session in

@@ -115,6 +115,14 @@ struct GestureModifiersTests {
     #expect(box.currentValue() == false)
     #expect(!recognizer.handleDeadline(at: deadline))
     #expect(values == [true])
+    // STUI-1117: a live sibling can handle pointer events after the composite
+    // ended. Neither ordinary dispatch nor replay may update/reset again.
+    _ = recognizer.handle(event: event(.dragged(.primary)))
+    #expect(values == [true])
+    #expect(box.currentValue() == false)
+    _ = recognizer.replay(events: [event(.dragged(.primary))])
+    #expect(values == [true])
+    #expect(box.currentValue() == false)
     // STUI-483: drain the second long press after the composite has ended.
     let lastDeadline = try #require(deadlines.max())
     #expect(!recognizer.handleDeadline(at: lastDeadline))

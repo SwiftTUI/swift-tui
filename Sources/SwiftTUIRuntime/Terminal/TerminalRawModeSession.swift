@@ -18,6 +18,15 @@ import SwiftTUICore
     var mouseCoordinateMode: MouseCoordinateMode
     var pointerHoverEnabled: Bool
     var kittyKeyboardPushed: Bool
+
+    var resetOutput: String {
+      readerMode
+        ? TerminalHostEscapeSequences.disableBracketedPaste
+          + TerminalHostEscapeSequences.showCursor + TerminalHostEscapeSequences.resetStyle
+        : TerminalHostEscapeSequences.processExitReset(
+          mouseCoordinateMode: mouseCoordinateMode,
+          hoverEnabled: pointerHoverEnabled, kittyKeyboardPushed: kittyKeyboardPushed)
+    }
   }
 
   struct TerminalRawModeSession {

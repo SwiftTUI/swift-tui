@@ -120,6 +120,14 @@ extension Picker {
     }
     // Until explicitly toggled, preserve the menu's expanded-on-focus default.
     let isActiveNavigation = isFocused && isEnabled && (!wantsTrigger || (expansion ?? true))
+    // Dispatch may drain several inputs before the next resolve. Every event
+    // must observe the synchronous expansion write from the preceding event.
+    let activeNavigation: @MainActor () -> Bool = {
+      let expanded =
+        ownerNode?.stateSlot(
+          ordinal: StateSlotOrdinals.pickerMenuExpansion, seed: nil as Bool?) ?? nil
+      return isEnabled && (!wantsTrigger || (expanded ?? isFocused))
+    }
     return resolvedOptions(
       in: context.child(component: .named("PickerOptions"))
     ).flatMap { resolvedOptions in
@@ -149,7 +157,7 @@ extension Picker {
           guard keyPress.modifiers.isEmpty else {
             return false
           }
-          if wantsTrigger, keyPress.key == .escape, isActiveNavigation {
+          if wantsTrigger, keyPress.key == .escape, activeNavigation() {
             setPickerMenuExpanded(false, in: ownerNode, identity: context.identity)
             return true
           }
@@ -158,7 +166,7 @@ extension Picker {
             return false
           }
 
-          if wantsTrigger, !isActiveNavigation {
+          if wantsTrigger, !activeNavigation() {
             setPickerMenuExpanded(true, in: ownerNode, identity: context.identity)
             return true
           }
@@ -228,7 +236,7 @@ extension Picker {
           }
         ) {
           guard wantsTrigger else { return false }
-          setPickerMenuExpanded(!isActiveNavigation, in: ownerNode, identity: context.identity)
+          setPickerMenuExpanded(!activeNavigation(), in: ownerNode, identity: context.identity)
           return true
         }
         if wantsTrigger {
@@ -238,7 +246,7 @@ extension Picker {
           intake.registerPointerHandler(routeID: triggerRouteID) { event in
             switch event.kind {
             case .down(.primary):
-              setPickerMenuExpanded(!isActiveNavigation, in: ownerNode, identity: context.identity)
+              setPickerMenuExpanded(!activeNavigation(), in: ownerNode, identity: context.identity)
               return .claimed
             case .up(.primary):
               return .claimed

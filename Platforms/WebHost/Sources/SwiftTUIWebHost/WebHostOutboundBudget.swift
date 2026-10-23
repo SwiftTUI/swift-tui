@@ -10,9 +10,14 @@ package struct WebHostOutboundBudget: Sendable {
 
   package private(set) var records = 0
   package private(set) var bytes = 0
+  private let capacity: Int
+
+  package init(byteLimit: Int = Self.byteLimit) {
+    capacity = byteLimit
+  }
 
   package mutating func admit(_ byteCount: Int) -> Bool {
-    guard byteCount >= 0, records < Self.recordLimit, byteCount <= Self.byteLimit - bytes else {
+    guard byteCount >= 0, records < Self.recordLimit, byteCount <= capacity - bytes else {
       return false
     }
     records += 1

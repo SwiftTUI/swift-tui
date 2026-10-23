@@ -210,16 +210,20 @@ extension Stepper {
         in: child, slot: configuration.label, required: !(label is Text), context: context)
     }.map { child in
 
+      // Keep the body hittable for wheel input while reserving click activation
+      // for the style's explicit affordance routes.
+      var child = child
+      child.semanticMetadata.participatesInPointerHitTesting = true
+      var metadata = focusableControlMetadata(
+        focusInteractions: .edit, accessibilityRole: .stepper)
+      metadata.explicitInteractionRect = CellRect(origin: .zero, size: .zero)
       return ResolvedNode(
         identity: context.identity,
         kind: .view("Stepper"),
         children: [child],
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
-        semanticMetadata: focusableControlMetadata(
-          focusInteractions: .edit,
-          accessibilityRole: .stepper
-        ).namingControl(with: label).accessibilityControl(
+        semanticMetadata: metadata.namingControl(with: label).accessibilityControl(
           .init(
             actions: [.focus, .increment, .decrement, .setValue],
             value: .number(currentValue.controlDoubleValue),

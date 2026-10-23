@@ -5,6 +5,29 @@ import Testing
 
 @Suite
 struct PathTests {
+  @Test(
+    "nonfinite paths and probes never contain a point",
+    arguments: [Double.nan, .infinity, -.infinity])
+  func nonfiniteGeometry(value: Double) {
+    let invalid = Point(x: value, y: 0)
+    for elements: [Path.Element] in [
+      [.move(to: invalid), .line(to: .init(x: 10, y: 10))],
+      [.move(to: .zero), .line(to: invalid)],
+      [.move(to: .zero), .quadCurve(to: .init(x: 10, y: 10), control: invalid)],
+      [.move(to: .zero), .curve(to: .init(x: 10, y: 10), control1: invalid, control2: .zero)],
+    ] {
+      let path = Path(elements)
+      #expect(path.boundingRect == nil)
+      for rule: FillRule in [.nonZero, .evenOdd] {
+        #expect(!path.contains(.init(x: 1000, y: -999), fillRule: rule))
+        #expect(!path.contains(.zero, fillRule: rule))
+      }
+    }
+    let rectangle = Path(Rect(origin: .zero, size: .init(width: 10, height: 10)))
+    #expect(!rectangle.contains(invalid))
+    #expect(!rectangle.contains(Point(x: 0, y: value)))
+  }
+
   @Test("leading segments translate and animate their implicit origin", arguments: [0, 1, 2])
   func leadingSegmentTransforms(kind: Int) throws {
     let end = Point(x: 4, y: 0)
