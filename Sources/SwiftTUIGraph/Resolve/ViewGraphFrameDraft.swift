@@ -557,7 +557,7 @@ package final class ViewGraphFrameDraft {
   /// beyond a node-record rebuild: entries keyed by a currently-ACTIVE
   /// recognizer's identity, exactly the families the publication teardowns
   /// spare through `preservedGestureIdentities` (the recognizer itself, its
-  /// paired pointer/hover routes, and its gesture-state bindings). Built
+  /// paired pointer/hover/wheel routes, and its gesture-state bindings). Built
   /// from the LIVE registries so only keys that actually survived a spare
   /// can be excused — and only in the live-extra direction (the caller
   /// additionally requires the rebuilt side to lack the key entirely).
@@ -586,6 +586,10 @@ package final class ViewGraphFrameDraft {
       for routeID in pointerRegistry.snapshotHover().keys
       where activeIdentities.contains(routeID.identity) {
         keys.insert("hover|\(routeID)")
+      }
+      for routeID in pointerRegistry.snapshotWheel().keys
+      where activeIdentities.contains(routeID.identity) {
+        keys.insert("wheel|\(routeID)")
       }
     }
     return keys

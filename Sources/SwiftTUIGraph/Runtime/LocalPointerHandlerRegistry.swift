@@ -524,38 +524,46 @@ package final class LocalPointerHandlerRegistry: Equatable {
     }
   }
 
-  /// The node-liveness leg for gesture-family routes (the F04 retention
-  /// class). A mid-interaction teardown spares an ACTIVE recognizer's paired
-  /// pointer routes (`preservedGestureIdentities`), and when the interaction
-  /// site genuinely departs, the gesture registry's `prune`/departed-region
-  /// passes release the recognizer — but nothing released the spared paired
-  /// route, so its stale handler (closing over the departed node) survived
-  /// every scoped publication until the next full reset. Removes
-  /// gesture-family routes (`gestureRouteRecencies` membership) whose paired
-  /// recognizer no longer exists AND whose owner node has provably departed.
-  /// Requiring all three keeps every legitimate resident: plain pointer
-  /// routes never enter `gestureRouteRecencies`; a re-minted control's fresh
-  /// publication re-owns its route (live owner); an adopted record's route
-  /// (owner key naming the absorbed node — see `NodeHandlers.absorbAdopted`)
-  /// republishes its recognizer under the same identity, so it stays paired.
-  /// Owner keys without a node ID are kept: departure cannot be proven.
+  /// Releases pointer callbacks spared during an active interaction once
+  /// both the recognizer and the owning node have departed. Wheel and hover
+  /// callbacks have independent storage and participate in the same sweep.
+  /// Primary handlers require a gesture-family stamp; plain control handlers
+  /// keep their separate structural lifetime. Live owners, paired identities,
+  /// and owners without a node ID remain. Adoption rehomes owner keys to the
+  /// adopting node, so its callbacks remain live even with an older route ID.
   package func removeUnpairedGestureFamilyRoutes(
     pairedIdentities: Set<Identity>,
     keeping liveNodeIDs: Set<ViewNodeID>
   ) {
-    for routeID in handlers.keys.filter({ routeID in
-      guard gestureRouteRecencies[routeID] != nil,
-        !pairedIdentities.contains(routeID.identity),
-        let ownerNodeID = handlerOwners[routeID]?.viewNodeID
+    func ownerHasDeparted(_ routeID: RouteID, owner: RuntimeRegistrationOwnerKey?) -> Bool {
+      guard !pairedIdentities.contains(routeID.identity),
+        let ownerNodeID = owner?.viewNodeID
       else {
         return false
       }
       return !liveNodeIDs.contains(ownerNodeID)
+    }
+    for routeID in handlers.keys.filter({
+      gestureRouteRecencies[$0] != nil && ownerHasDeparted($0, owner: handlerOwners[$0])
     }) {
       handlers.removeValue(forKey: routeID)
       handlerOwners.removeValue(forKey: routeID)
       handlerRecencies.removeValue(forKey: routeID)
       gestureRouteRecencies.removeValue(forKey: routeID)
+    }
+    for routeID in wheelHandlers.keys.filter({
+      ownerHasDeparted($0, owner: wheelHandlerOwners[$0])
+    }) {
+      wheelHandlers.removeValue(forKey: routeID)
+      wheelHandlerOwners.removeValue(forKey: routeID)
+      wheelHandlerRecencies.removeValue(forKey: routeID)
+    }
+    for routeID in hoverHandlers.keys.filter({
+      ownerHasDeparted($0, owner: hoverHandlerOwners[$0])
+    }) {
+      hoverHandlers.removeValue(forKey: routeID)
+      hoverHandlerOwners.removeValue(forKey: routeID)
+      hoverHandlerRecencies.removeValue(forKey: routeID)
     }
   }
 

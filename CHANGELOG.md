@@ -8,6 +8,11 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Release wheel and hover callbacks after their view and active gesture depart,
+  while preserving callbacks needed by a live interaction (STUI-1128).
+
 ## [0.19.1] - 2026-10-23
 
 ### Fixed

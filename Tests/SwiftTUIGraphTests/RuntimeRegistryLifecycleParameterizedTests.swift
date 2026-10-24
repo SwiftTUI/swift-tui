@@ -125,7 +125,9 @@ struct RuntimeRegistryLifecycleParameterizedTests {
     // fan-out. Key handlers are stateless dispatch closures with no
     // interaction state to strand, so evicting a departed owner's bucket
     // cannot release a live capture. The pointer registry still deliberately
-    // abstains.
+    // abstains from the prune fan-out. The subsequent paired cleanup in
+    // pruneOrphanedGestures retires departed wheel and hover owners while
+    // preserving plain primary handlers.
     let set = populatedSet(kind, identity: testIdentity("Root", "Leaf"))
     let before = set.publicationOracleFingerprint()
     #expect(!before.isEmpty)
@@ -138,6 +140,11 @@ struct RuntimeRegistryLifecycleParameterizedTests {
         after != before,
         "\(kind): state owned by a departed node must be dropped by prune"
       )
+    } else if kind == .pointerHandler {
+      #expect(before.keys.contains { $0.hasPrefix("hover|") })
+      #expect(before.keys.contains { $0.hasPrefix("wheel|") })
+      #expect(!after.isEmpty)
+      #expect(after == before.filter { $0.key.hasPrefix("pointer|") })
     } else {
       #expect(
         after == before,

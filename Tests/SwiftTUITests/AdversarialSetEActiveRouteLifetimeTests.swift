@@ -9,47 +9,26 @@ import Testing
 struct AdversarialSetEActiveRouteLifetimeTests {
   @Test(arguments: Array(91...95))
   func activeRouteLifetime(id: Int) throws {
-    // STUI-1128 also reaches the publication oracle. Attribute its exact
-    // diagnostics locally, like setC006, without a repository-wide allowance.
-    // Every other violation counter and detail must remain unchanged.
-    let expectedDiagnostics = [91: 5, 92: 2, 95: 5][id] ?? 0
+    // Active preservation and departed-owner cleanup must agree with the
+    // independent full-publication oracle, without a diagnostic allowance.
     let before = SoundnessCounterSnapshot.current()
-    let savedTrace = SoundnessProbeConfiguration.isTraceEnabled
     let savedEnabled = SoundnessProbeConfiguration.isEnabled
     let savedSample = SoundnessProbeConfiguration.sampleEveryNFrames
     let savedSampledFrame = SoundnessProbeConfiguration.isSampledFrame
-    let savedDetail = SoundnessProbeConfiguration.lastViolationDetail
     SoundnessProbeConfiguration.isEnabled = true
     SoundnessProbeConfiguration.sampleEveryNFrames = 1
-    if expectedDiagnostics > 0 { SoundnessProbeConfiguration.isTraceEnabled = false }
     defer {
       var after = SoundnessCounterSnapshot.current()
       let observed =
         after.registrationPublicationViolationCount
         - before.registrationPublicationViolationCount
-      #expect(observed == expectedDiagnostics)
-      if expectedDiagnostics > 0 {
-        let family = id == 92 ? "hover" : "wheel"
-        let detail = after.lastViolationDetailByKind["registration-publication"] ?? ""
-        #expect(detail.contains("\(family)|setE/\(id)/"))
-        #expect(detail.contains("live=1 rebuilt=0"))
-        print("F3_LOCAL_SOUNDNESS setE\(id) registration-publication=\(observed) STUI-1128")
-        after.registrationPublicationViolationCount = before.registrationPublicationViolationCount
-        after.lastViolationDetailByKind["registration-publication"] =
-          before.lastViolationDetailByKind["registration-publication"]
-        SoundnessProbeConfiguration.registrationPublicationViolationCount =
-          before.registrationPublicationViolationCount
-        SoundnessProbeConfiguration.lastViolationDetailByKind["registration-publication"] =
-          before.lastViolationDetailByKind["registration-publication"]
-        SoundnessProbeConfiguration.lastViolationDetail = savedDetail
-      }
+      #expect(observed == 0)
       // These are documented informational/census currencies, not violations.
       after.automaticLifetimeAnchorCount = before.automaticLifetimeAnchorCount
       after.layoutShadowWindowedExclusionCount = before.layoutShadowWindowedExclusionCount
       after.layoutShadowDepthExclusionCount = before.layoutShadowDepthExclusionCount
       after.lastTeardownLeakUnreachableCount = before.lastTeardownLeakUnreachableCount
       #expect(after == before)
-      SoundnessProbeConfiguration.isTraceEnabled = savedTrace
       SoundnessProbeConfiguration.isEnabled = savedEnabled
       SoundnessProbeConfiguration.sampleEveryNFrames = savedSample
       SoundnessProbeConfiguration.isSampledFrame = savedSampledFrame
@@ -77,19 +56,7 @@ struct AdversarialSetEActiveRouteLifetimeTests {
       try #require(probe.rootBodies == rootBodies)
       try #require(h.gestureRecognizerCount == 0)
       try #require(h.runLoop.localGestureRegistry.activeIdentitySnapshot().isEmpty)
-      var actual = setECensus(h)
-      var expected = baseline
-      if [91, 92, 95].contains(id) {
-        let family = id == 92 ? "hover" : "wheel"
-        setEKnown(
-          "STUI-1128: the paired cleanup sweep must retire ownerless wheel and hover routes"
-        ) {
-          #expect(actual[family, default: 0] == expected[family, default: 0])
-        }
-        actual.removeValue(forKey: family)
-        expected.removeValue(forKey: family)
-      }
-      #expect(actual == expected)
+      #expect(setECensus(h) == baseline)
       let callbacks = probe.changes + probe.wheels + probe.hovers
       _ = try h.scrollPointer(at: point, deltaY: 1)
       _ = try h.movePointer(to: point)
