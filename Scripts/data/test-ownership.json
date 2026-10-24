@@ -3337,6 +3337,34 @@
     "Tests/SwiftTUIViewsTests/WithAnimationCompletionIsolationTests.swift": {
       "category": "view-authoring",
       "reason": "Authored views, modifiers, styles and recognizers resolved against Core without a runtime host."
+    },
+    "Tests/SwiftTUITests/AdversarialSetFScopedPumpTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetFPumpBarrierTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetFQueueObserverTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetFJobCancellationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetFSignalCompletionTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetFDrainPolicyTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetFSignalPhaseTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     }
   }
 }
