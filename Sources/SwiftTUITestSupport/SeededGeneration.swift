@@ -8,7 +8,7 @@ import Foundation
 // a seeded SplitMix64 stream, treats the first body failure as a
 // counterexample, shrinks it greedily, and returns a result the test asserts
 // on with its own message. The TypeScript twin in swift-tui-web
-// (`packages/web/src/SeededGenerator.ts`) shares the SplitMix64 stream, so a
+// (`packages/web/test-support/SeededGenerator.ts`) shares the SplitMix64 stream, so a
 // seed reproduces the same integer sequence on both sides.
 //
 // No Foundation randomness and no third-party dependency: public children
