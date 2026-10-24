@@ -994,6 +994,54 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/AdversarialSetCAnimationTests.swift": {
+      "category": "target-contract",
+      "reason": "Adversarial set C pass 2: animation arithmetic and transition composition contracts (STUI-1043 neighbors) in pure Views code."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCCaptureClassificationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: capture classification census and retained-subtree capture contracts (STUI-1099/1100 neighbors) through the stress run loop."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCControlGeometryTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: numeric-control click vetoes, scroll indicator extents, physical trims and nonfinite path geometry (STUI-1110-1123 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCDebugRoutingTests.swift": {
+      "category": "target-contract",
+      "reason": "Adversarial set C pass 2: diagnostic screen ownership and debug log routing over pipes, ptys and FIFOs (STUI-1086/1089 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCElidedPublicationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: scroll geometry after an elided deadline frame driven through the async acquisition (STUI-1130 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCNumericTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: numeric-control value math, labels and slider/stepper journeys (STUI-1044 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCPaletteTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: default palette viewport, selection and pointer rows through the run loop (PR #58 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCPickerGestureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: batched Picker expansion dispatch and gesture decorators after composite completion (STUI-1108/1117 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCPointerDepartureTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: hover and wheel callback release after view departure through the run loop (STUI-1128 repair neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCRootEnvironmentTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: runtime root environment signature changes through a host-geometry presentation surface (STUI-1104 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCTableTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: table column budgets, separators and high-water widths (dead-code removal #66 neighbors)."
+    },
+    "Tests/SwiftTUITests/AdversarialSetCTrimMorphTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Adversarial set C pass 2: trimmed-fill morphing slots and physical versus cell-unit trim paths (STUI-1129/1112 neighbors)."
+    },
     "Tests/SwiftTUITests/AmbientCollectionAttributeTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
