@@ -2494,6 +2494,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/SeededGenerationTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises SwiftTUITestSupport's seeded generation and shrinking through the runtime target's test dependencies."
+    },
     "Tests/SwiftTUITests/SegmentedButtonRowCompositionStressTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
