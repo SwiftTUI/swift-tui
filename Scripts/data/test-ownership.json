@@ -502,6 +502,10 @@
       "category": "core-rendering",
       "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
     },
+    "Tests/SwiftTUICoreTests/Pointer/PointerCallbackRepairRegressionTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
     "Tests/SwiftTUICoreTests/Pointer/PointerLocationTests.swift": {
       "category": "core-rendering",
       "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
