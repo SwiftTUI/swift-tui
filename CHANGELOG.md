@@ -8,6 +8,13 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-10-24
+
+### Added
+
+- Seeded generation and bounded shrinking helpers in the `SwiftTUITestSupport`
+  testing SPI, alongside expanded contract and regression coverage.
+
 ### Fixed
 
 - Release wheel and hover callbacks after their view and active gesture depart,
@@ -2487,7 +2494,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.1...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.2...HEAD
+[0.19.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.2
 [0.19.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.1
 [0.19.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.0
 [0.18.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.18.3
