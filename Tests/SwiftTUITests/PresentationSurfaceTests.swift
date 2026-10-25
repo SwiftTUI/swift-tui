@@ -495,6 +495,94 @@ struct PresentationSurfaceTests {
     #expect(!surface.contains("Illegal mutation"))
   }
 
+  // SwiftUI reports "Modifying state during view update" as a runtime
+  // warning, not a trap. The shipped path installs no onInvalidMutation hook.
+  // STUI-1226.
+  @Test("render-time coordinator mutation is a runtime warning in every configuration")
+  func renderTimeCoordinatorMutationWarnsWithoutTrapping() async {
+    await expectRenderTimeMutationWarnsWithoutTrapping()
+  }
+
+  @Test("a presentation refused during a view update never surfaces in a later frame")
+  func refusedRenderTimeMutationStaysRefused() {
+    var messages: [String] = []
+    PresentationMutationGuard.onInvalidMutation = { messages.append($0) }
+    defer { PresentationMutationGuard.onInvalidMutation = nil }
+    _ = ImperativeRuntimeIssueQueue.drain()
+
+    let renderer = DefaultRenderer()
+    let trigger = RenderTimePresentationTrigger()
+    let first = renderer.render(
+      OnceRenderTimePresentationProbe(trigger: trigger),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 40, height: 8)
+    )
+    let second = renderer.render(
+      OnceRenderTimePresentationProbe(trigger: trigger),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 40, height: 8)
+    )
+
+    #expect(trigger.presentations == 1)
+    #expect(
+      messages == [
+        "AlertPresentationCoordinator.present(_:) must not be called during view update."
+      ]
+    )
+    #expect(
+      first.diagnostics.runtime.issues.map(\.code) == ["presentation.mutationDuringViewUpdate"])
+    #expect(second.diagnostics.runtime.issues.isEmpty)
+    let firstSurface = first.rasterSurface.lines.joined(separator: "\n")
+    let secondSurface = second.rasterSurface.lines.joined(separator: "\n")
+    #expect(firstSurface.contains("Workspace"))
+    #expect(!firstSurface.contains("Refused prompt"))
+    #expect(secondSurface.contains("Workspace"))
+    #expect(
+      !secondSurface.contains("Refused prompt"), "refused mutation surfaced:\n\(secondSurface)")
+    #expect(ImperativeRuntimeIssueQueue.drain().isEmpty)
+  }
+
+  @Test("an imperative presentation outside a view update applies without a warning")
+  func imperativePresentationOutsideViewUpdateApplies() throws {
+    _ = ImperativeRuntimeIssueQueue.drain()
+    let renderer = DefaultRenderer()
+    let capture = PresentationHandleCapture()
+    let first = renderer.render(
+      PresentationHandleCapturingProbe(capture: capture),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 40, height: 8)
+    )
+    let handle = try #require(capture.handle)
+    let item = try #require(capture.item)
+    handle.present(item)
+    #expect(ImperativeRuntimeIssueQueue.pending.isEmpty)
+    let second = renderer.render(
+      PresentationHandleCapturingProbe(capture: capture),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 40, height: 8)
+    )
+
+    #expect(!first.rasterSurface.lines.joined(separator: "\n").contains("Deferred prompt"))
+    let secondSurface = second.rasterSurface.lines.joined(separator: "\n")
+    #expect(
+      secondSurface.contains("Deferred prompt"), "imperative prompt missing:\n\(secondSurface)")
+    #expect(first.diagnostics.runtime.issues.isEmpty)
+    #expect(second.diagnostics.runtime.issues.isEmpty)
+  }
+
+  @Test("declarative presentation reports no mutation warning")
+  func declarativePresentationReportsNoMutationWarning() {
+    _ = ImperativeRuntimeIssueQueue.drain()
+    let artifacts = DefaultRenderer().render(
+      ConditionalAlertPresentationView(showAlertSource: true),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 40, height: 8)
+    )
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Delete project"))
+    #expect(
+      artifacts.diagnostics.runtime.issues.filter { $0.code.hasPrefix("presentation.") }.isEmpty)
+  }
+
   @Test("toast renders in the bottom-left corner by default")
   func toastRendersInBottomLeftCorner() {
     let artifacts = DefaultRenderer().render(
@@ -587,31 +675,106 @@ private struct ConditionalAlertPresentationView: View {
 
 private struct RenderTimePresentationMutationProbe: PrimitiveView, IterativeResolvableView {
   package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
-    let spec = alertPromptPresentationSpec()
-    let sourceIdentity = context.identity
-
     context.environmentValues.alertPresentationCoordinator.present(
-      PromptPresentationItem(
-        id: presentationAttachmentID(
-          for: sourceIdentity,
-          token: spec.token
-        ),
-        title: "Illegal mutation",
-        surface: spec.prepareSurface(context),
-        actionPayloads: portalAttachmentDeclaredBuilderChildren(
-          from: Button("Dismiss") {},
-          edge: nil
-        ),
-        messagePayloads: portalAttachmentDeclaredBuilderChildren(
-          from: Text("Should never render."),
-          edge: nil
-        ),
-        contentPayloads: [],
-        dismiss: {}
-      )
+      renderTimeAlertItem(title: "Illegal mutation", in: context)
     )
 
     return Text("Workspace").resolveElementsWork(in: context)
+  }
+}
+
+@MainActor
+private final class RenderTimePresentationTrigger {
+  var presentations = 0
+}
+
+/// Presents during its first resolve only, so a later frame shows whether the
+/// refused mutation was applied after the update pass.
+private struct OnceRenderTimePresentationProbe: PrimitiveView, IterativeResolvableView {
+  let trigger: RenderTimePresentationTrigger
+
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    if trigger.presentations == 0 {
+      trigger.presentations += 1
+      context.environmentValues.alertPresentationCoordinator.present(
+        renderTimeAlertItem(title: "Refused prompt", in: context)
+      )
+    }
+    return Text("Workspace").resolveElementsWork(in: context)
+  }
+}
+
+@MainActor
+private final class PresentationHandleCapture {
+  var handle: PresentationCoordinatorHandle<PromptPresentationItem>?
+  var item: PromptPresentationItem?
+}
+
+/// Captures the live alert handle and an item during resolve without
+/// presenting, so the test can present from outside any view update.
+private struct PresentationHandleCapturingProbe: PrimitiveView, IterativeResolvableView {
+  let capture: PresentationHandleCapture
+
+  package func makeResolveWork(in context: ResolveContext) -> ResolveWork<[ResolvedNode]> {
+    capture.handle = context.environmentValues.alertPresentationCoordinator
+    if capture.item == nil {
+      capture.item = renderTimeAlertItem(title: "Deferred prompt", in: context)
+    }
+    return Text("Workspace").resolveElementsWork(in: context)
+  }
+}
+
+@MainActor
+private func renderTimeAlertItem(
+  title: String,
+  in context: ResolveContext
+) -> PromptPresentationItem {
+  let spec = alertPromptPresentationSpec()
+  return PromptPresentationItem(
+    id: presentationAttachmentID(
+      for: context.identity,
+      token: spec.token
+    ),
+    title: title,
+    surface: spec.prepareSurface(context),
+    actionPayloads: portalAttachmentDeclaredBuilderChildren(
+      from: Button("Dismiss") {},
+      edge: nil
+    ),
+    messagePayloads: portalAttachmentDeclaredBuilderChildren(
+      from: Text("Should never render."),
+      edge: nil
+    ),
+    contentPayloads: [],
+    dismiss: {}
+  )
+}
+
+/// The shipped path installs no onInvalidMutation hook. The child process
+/// turns a trap into an exit status instead of ending the test run.
+private func expectRenderTimeMutationWarnsWithoutTrapping() async {
+  await #expect(processExitsWith: .success) {
+    await MainActor.run {
+      PresentationMutationGuard.onInvalidMutation = nil
+      _ = ImperativeRuntimeIssueQueue.drain()
+      let artifacts = DefaultRenderer().render(
+        RenderTimePresentationMutationProbe(),
+        context: .init(identity: testIdentity("Root")),
+        proposal: .init(width: 40, height: 8)
+      )
+      let warnings = artifacts.diagnostics.runtime.issues.filter {
+        $0.code == "presentation.mutationDuringViewUpdate"
+      }
+      #expect(warnings.count == 1)
+      #expect(warnings.first?.severity == .warning)
+      #expect(
+        warnings.first?.message.hasPrefix(
+          "AlertPresentationCoordinator.present(_:) must not be called during view update.")
+          == true)
+      let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+      #expect(surface.contains("Workspace"))
+      #expect(!surface.contains("Illegal mutation"))
+    }
   }
 }
 

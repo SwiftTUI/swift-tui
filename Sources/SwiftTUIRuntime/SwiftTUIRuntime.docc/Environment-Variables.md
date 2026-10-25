@@ -32,16 +32,25 @@ overrides `CLICOLOR=0`; empty, `0`, and case-insensitive `false` force values do
 not force color. Without a force override, TTY detection remains authoritative.
 Unicode detection uses the first nonempty locale setting in `LC_ALL`,
 `LC_CTYPE`, `LANG` order, so an explicit `C` locale overrides inherited UTF-8.
+A terminfo direct-color `TERM` (`xterm-direct`, `foot-direct`,
+`xterm-direct256`, and the other `*-direct` entries) selects 24-bit color
+without `COLORTERM`; nonempty `NO_COLOR` still wins.
 Generic xterm color/direct entries may be refined by the known emulator name;
 explicit terminal and multiplexer families, including dotted screen entries,
-retain their own capabilities.
+retain their own capabilities. On a generic xterm, `VTE_VERSION` 5000 or later
+(VTE 0.50, such as GNOME Terminal), `TERM_PROGRAM=vscode` and `WT_SESSION`
+(Windows Terminal, including WSL) enable OSC 8 hyperlinks only. A nonempty
+`TERM_PROGRAM` names the emulator and outranks a `VTE_VERSION` or `WT_SESSION`
+inherited from an outer terminal.
 
 Beyond that family, the framework consults these standard variables:
 
 | Variable | Effect |
 | --- | --- |
 | `COLORFGBG` | Selects the light/dark terminal appearance when the terminal reports its palette this way, which changes the resolved theme. |
-| `TERM_PROGRAM` | Drives the sub-cell pointer-precision compatibility matrix (`xterm.js`, `foot`, `kitty`, `wezterm`, `iTerm.app`, …). |
+| `TERM_PROGRAM` | Drives the sub-cell pointer-precision compatibility matrix (`xterm.js`, `foot`, `kitty`, `wezterm`, `iTerm.app`, …), and refines a generic xterm `TERM` (WezTerm, Ghostty, iTerm2; `vscode` for hyperlinks only). |
+| `VTE_VERSION` | VTE's version number (`7600` is 0.76.0). 5000 or later on a generic xterm `TERM` enables OSC 8 hyperlinks. |
+| `WT_SESSION` | Windows Terminal's session marker. It enables OSC 8 hyperlinks on a generic xterm `TERM` (WSL) and, on Windows, hyperlinks and synchronized output for the console. |
 | `LC_TERMINAL` | iTerm2's terminal identifier; consulted alongside `TERM_PROGRAM` for pointer precision. |
 | `TMUX` | Suppresses pixel-mouse probing inside tmux (the kitty-keyboard probe is also skipped there). |
 | `HOME` | The install location for `SwiftTUIArguments` completion scripts; installation fails when it is empty. |

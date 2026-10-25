@@ -15,15 +15,11 @@ struct AdversarialSetHCapabilityProfileTests {
   }
 
   // terminfo's *-direct entries declare the RGB capability (24-bit colour);
-  // the ladder only knows COLORTERM and the 256color suffix.
+  // the ladder reads the name without COLORTERM (STUI-1224).
   @Test func setH020DirectColorTerminalsAreTrueColor() {
     for term in ["xterm-direct", "foot-direct", "tmux-direct"] {
       let detected = profile(["TERM": term, "LANG": "C.UTF-8"])
-      setHKnown(
-        "STUI-1224: setH020: TERM=xterm-direct/foot-direct/tmux-direct detects ansi16; the colour ladder knows only COLORTERM and the 256color suffix (TerminalCapabilityProfile.swift:143-152); contract: terminfo(5) *-direct entries declare RGB 24-bit colour; adjacent: none"
-      ) {
-        #expect(detected.colorLevel == .trueColor, "\(term)")
-      }
+      #expect(detected.colorLevel == .trueColor, "\(term)")
     }
   }
 
@@ -77,32 +73,22 @@ struct AdversarialSetHCapabilityProfileTests {
     #expect(!rxvt.supportsHyperlinks)
   }
 
-  // GNOME Terminal exports VTE_VERSION; VTE renders OSC 8 since 0.50.
+  // GNOME Terminal exports VTE_VERSION; VTE renders OSC 8 since 0.50 (STUI-1225).
   @Test func setH045VTEHyperlinksUnderGenericXterm() {
     let gnome = profile(["TERM": "xterm-256color", "VTE_VERSION": "7600", "LANG": "C.UTF-8"])
-    setHKnown(
-      "STUI-1225: setH045: GNOME Terminal (VTE_VERSION=7600, TERM=xterm-256color) gets no OSC 8 hyperlinks; identifiedTerminal refines a generic xterm only through TERM_PROGRAM wezterm/ghostty/iTerm.app (TerminalCapabilityProfile.swift:256-275); contract: VTE >= 0.50 renders OSC 8; adjacent: none"
-    ) {
-      #expect(gnome.supportsHyperlinks)
-    }
+    #expect(gnome.supportsHyperlinks)
   }
 
+  // xterm.js renders OSC 8 since 5.0 (VS Code 1.72); Windows Terminal since
+  // 1.4, and it forwards WT_SESSION into WSL (STUI-1225).
   @Test func setH046VSCodeAndWindowsTerminalHyperlinks() {
     let vscode = profile(["TERM": "xterm-256color", "TERM_PROGRAM": "vscode", "LANG": "C.UTF-8"])
-    setHKnown(
-      "STUI-1225: setH046: VS Code (TERM_PROGRAM=vscode) gets no OSC 8 hyperlinks; same identifiedTerminal mechanism as setH045 (TerminalCapabilityProfile.swift:256-275); contract: xterm.js renders OSC 8; adjacent: none"
-    ) {
-      #expect(vscode.supportsHyperlinks)
-    }
+    #expect(vscode.supportsHyperlinks)
     let wsl = profile([
       "TERM": "xterm-256color", "WT_SESSION": "4f8a6e7a-0000-4000-8000-000000000000",
       "LANG": "C.UTF-8",
     ])
-    setHKnown(
-      "STUI-1225: setH046: Windows Terminal under WSL (WT_SESSION, TERM=xterm-256color) gets no OSC 8 hyperlinks on the POSIX arm; same identifiedTerminal mechanism as setH045 (TerminalCapabilityProfile.swift:256-275); contract: Windows Terminal >= 1.4 renders OSC 8; adjacent: none"
-    ) {
-      #expect(wsl.supportsHyperlinks)
-    }
+    #expect(wsl.supportsHyperlinks)
   }
 
   @Test func setH047ScreenProfile() {

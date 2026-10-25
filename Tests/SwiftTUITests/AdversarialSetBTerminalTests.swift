@@ -134,8 +134,10 @@ struct AdversarialSetBTerminalTests {
   @Test func setB083WindowsTerminalAndKonsoleMarkersNeverLeakAcrossArms() throws {
     // Hypothesis: WT_SESSION can upgrade the POSIX arm, a foreign TERM under Windows Terminal can
     // still collect the Windows Terminal upgrades, or KONSOLE_VERSION can stand in for TERM.
+    // Windows Terminal forwards WT_SESSION into WSL through WSLENV, so on a generic xterm the POSIX
+    // arm reads it as the OSC 8 marker it is (STUI-1225); it upgrades nothing else.
     let posixWindowsTerminal = Self.posix(["TERM": "xterm-256color", "WT_SESSION": "abc"])
-    #expect(!posixWindowsTerminal.supportsHyperlinks)
+    #expect(posixWindowsTerminal.supportsHyperlinks)
     #expect(!posixWindowsTerminal.supportsSynchronizedOutput)
     #expect(posixWindowsTerminal.supportsMouseReporting)
 

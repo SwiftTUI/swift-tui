@@ -135,6 +135,12 @@ package final class PresentationPortalState {
   ) {
     retargetImperativeInvalidation()
     operation(registry)
+    // During a view update `PresentationMutationGuard` refused the operation
+    // and reported it. Replaying it at `publish` would apply it after the
+    // update, so the refusal is final and the operation is not recorded.
+    guard !ViewUpdateGuard.isUpdating else {
+      return
+    }
     pendingImperativeOperations.append(operation)
   }
 

@@ -34,23 +34,22 @@ struct AdversarialSetHReleaseContractTests {
   }
 
   // Mutating presentation state during an update is a runtime warning in
-  // SwiftUI. The guard here calls assertionFailure, so a debug build traps
-  // where a release build silently refuses the mutation.
-  @Test func setH070PresentationMutationGuardTrapsOnlyInDebug() async {
-    if !_isDebugAssertConfiguration() {
-      let allowed = await MainActor.run {
-        ViewUpdateGuard.withViewUpdate { PresentationMutationGuard.allowMutation("setH070") }
+  // SwiftUI. Every configuration refuses the mutation and records one
+  // warning; nothing traps (STUI-1226).
+  @Test func setH070PresentationMutationGuardWarnsWithoutTrapping() async {
+    let (allowed, issues) = await MainActor.run {
+      _ = ImperativeRuntimeIssueQueue.drain()
+      let allowed = ViewUpdateGuard.withViewUpdate {
+        PresentationMutationGuard.allowMutation("setH070")
       }
-      #expect(!allowed)
+      return (allowed, ImperativeRuntimeIssueQueue.drain())
     }
-    await withKnownIssue(
-      "STUI-1226: setH070: PresentationMutationGuard.allowMutation during a view update traps in debug builds (release refuses silently); assertionFailure when no onInvalidMutation hook is installed (PresentationCoordinator.swift:31-37); contract: SwiftUI reports mutation during an update as a runtime warning, never a trap; adjacent: none"
-    ) {
-      await setH070RefusesWithoutTrapping()
-    } when: {
-      _isDebugAssertConfiguration()
-        && ProcessInfo.processInfo.environment["SWIFTTUI_SETH_UNMARKED"] != "1"
-    }
+    #expect(!allowed)
+    #expect(issues.map(\.code) == ["presentation.mutationDuringViewUpdate"])
+    #expect(issues.map(\.severity) == [.warning])
+    #expect(issues.map(\.source) == ["PresentationCoordinator"])
+    #expect(issues.first?.message.hasPrefix("setH070") == true)
+    await setH070RefusesWithoutTrapping()
   }
 
   @Test func setH071PrintChangesOutsideBodyNeverTraps() async {
@@ -185,6 +184,8 @@ private func setH070RefusesWithoutTrapping() async {
       ViewUpdateGuard.withViewUpdate { PresentationMutationGuard.allowMutation("setH070") }
     }
     #expect(!allowed)
+    let pending = await MainActor.run { ImperativeRuntimeIssueQueue.drain() }
+    #expect(pending.map(\.code) == ["presentation.mutationDuringViewUpdate"])
   }
 }
 

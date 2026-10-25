@@ -367,6 +367,184 @@ struct TerminalPresentationTests {
     #expect(!redirected.supportsScrollRegions)
   }
 
+  // In the ncurses terminfo database (6.6), exactly the entries named
+  // `*-direct` or `*-direct<N>` declare direct colour (`RGB`,
+  // `colors#0x1000000`). The name alone carries 24-bit colour; COLORTERM is
+  // not required. STUI-1224.
+  @Test(
+    "direct-colour TERM entries detect true color without COLORTERM",
+    arguments: [
+      "xterm-direct", "xterm-direct2", "xterm-direct16", "xterm-direct256", "foot-direct",
+      "tmux-direct", "kitty-direct", "vte-direct", "vscode-direct", "ms-terminal-direct",
+      "iterm2-direct", "alacritty-direct", "konsole-direct", "mintty-direct", "st-direct",
+      "contour-direct", "mlterm-direct", "nsterm-direct", "pangoterm-direct", "rio-direct",
+      "sun-direct", "XTERM-DIRECT",
+    ])
+  func directColorTerminfoEntriesAreTrueColor(term: String) {
+    let posix = TerminalCapabilityProfile.detectPOSIXTerminal(
+      environment: ["TERM": term, "LANG": "C.UTF-8"], isTTY: true)
+    let windows = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: ["TERM": term], isTTY: true)
+    #expect(posix.colorLevel == .trueColor)
+    #expect(posix.emitsStyleEscapeSequences)
+    #expect(windows.colorLevel == .trueColor)
+    #expect(windows.emitsStyleEscapeSequences)
+  }
+
+  @Test("the direct-colour rung leaves the rest of the colour ladder unchanged")
+  func directColorRungLeavesTheLadderUnchanged() {
+    func posix(_ environment: [String: String], isTTY: Bool = true)
+      -> TerminalCapabilityProfile.ColorLevel
+    {
+      TerminalCapabilityProfile.detectPOSIXTerminal(environment: environment, isTTY: isTTY)
+        .colorLevel
+    }
+    func windows(_ environment: [String: String]) -> TerminalCapabilityProfile.ColorLevel {
+      TerminalCapabilityProfile.detectWindowsConsole(environment: environment, isTTY: true)
+        .colorLevel
+    }
+
+    // NO_COLOR, dumb and redirected output still win over a direct entry.
+    #expect(posix(["TERM": "xterm-direct", "NO_COLOR": "1"]) == .none)
+    #expect(posix(["TERM": "xterm-direct", "NO_COLOR": ""]) == .trueColor)
+    #expect(posix(["TERM": "xterm-direct"], isTTY: false) == .none)
+    #expect(posix(["TERM": "dumb", "COLORTERM": "truecolor"]) == .none)
+    #expect(windows(["TERM": "xterm-direct", "NO_COLOR": "1"]) == .none)
+    #expect(windows(["TERM": "dumb"]) == .none)
+
+    // Names that only resemble a direct entry stay on their existing rung.
+    let unchanged: [(String, TerminalCapabilityProfile.ColorLevel)] = [
+      ("direct", .ansi16), ("xterm-directx", .ansi16), ("xterm-indirect", .ansi16),
+      ("not-direct-color", .ansi16), ("xterm+direct", .ansi16), ("xterm", .ansi16),
+      ("linux", .ansi16), ("vt100", .ansi16), ("", .ansi16), ("xterm-256color", .ansi256),
+      ("screen.xterm-256color", .ansi256), ("rxvt-unicode-256color", .ansi256),
+    ]
+    for (term, level) in unchanged {
+      #expect(posix(["TERM": term]) == level, "\(term)")
+    }
+    #expect(posix(["TERM": "xterm", "COLORTERM": "truecolor"]) == .trueColor)
+    #expect(posix(["TERM": "xterm-256color", "COLORTERM": "24bit"]) == .trueColor)
+
+    // The Windows console-host floor and foreign TERM rungs are unchanged.
+    #expect(windows([:]) == .trueColor)
+    #expect(windows(["TERM": "vt100"]) == .ansi16)
+    #expect(windows(["TERM": "xterm-directx"]) == .ansi16)
+    #expect(windows(["TERM": "xterm-256color"]) == .ansi256)
+
+    // Only the colour rung moves: the other features keep their family answer.
+    let xtermDirect = TerminalCapabilityProfile.detectPOSIXTerminal(
+      environment: ["TERM": "xterm-direct"], isTTY: true)
+    #expect(!xtermDirect.supportsHyperlinks)
+    #expect(xtermDirect.supportsMouseReporting)
+    #expect(!xtermDirect.supportsSynchronizedOutput)
+    #expect(xtermDirect.supportsScrollRegions)
+    for term in ["foot-direct", "tmux-direct"] {
+      let family = TerminalCapabilityProfile.detectPOSIXTerminal(
+        environment: ["TERM": term], isTTY: true)
+      #expect(family.supportsHyperlinks, "\(term)")
+      #expect(family.supportsMouseReporting, "\(term)")
+      #expect(family.supportsSynchronizedOutput, "\(term)")
+    }
+  }
+
+  // GNOME Terminal and other VTE terminals export VTE_VERSION (VTE renders
+  // OSC 8 since 0.50, VTE_VERSION 5000); VS Code exports TERM_PROGRAM=vscode
+  // (xterm.js 5.0, VS Code 1.72); Windows Terminal forwards WT_SESSION into
+  // WSL through WSLENV (OSC 8 since 1.4). Each keeps a generic xterm TERM, and
+  // each marker refines only the hyperlink answer. STUI-1225.
+  @Test("VTE, VS Code and Windows Terminal markers add OSC 8 to a generic xterm")
+  func emulatorMarkersAddHyperlinksToGenericXterm() {
+    let markers: [[String: String]] = [
+      ["VTE_VERSION": "7600"], ["VTE_VERSION": "5000"], ["VTE_VERSION": "07600"],
+      ["TERM_PROGRAM": "vscode"], ["TERM_PROGRAM": "VSCode"],
+      ["WT_SESSION": "4f8a6e7a-0000-4000-8000-000000000000"],
+    ]
+    for marker in markers {
+      for term in ["xterm-256color", "xterm", "xterm-direct"] {
+        let profile = TerminalCapabilityProfile.detectPOSIXTerminal(
+          environment: marker.merging(["TERM": term]) { $1 }, isTTY: true)
+        #expect(profile.supportsHyperlinks, "\(term) \(marker)")
+        #expect(profile.supportsMouseReporting, "\(term) \(marker)")
+        #expect(!profile.supportsSynchronizedOutput, "\(term) \(marker)")
+      }
+    }
+  }
+
+  @Test("emulator markers never outrank a multiplexer, a named emulator or an old VTE")
+  func emulatorMarkersRespectMultiplexersAndNamedEmulators() {
+    func posix(_ environment: [String: String], isTTY: Bool = true)
+      -> TerminalCapabilityProfile
+    {
+      TerminalCapabilityProfile.detectPOSIXTerminal(environment: environment, isTTY: isTTY)
+    }
+    let markers: [[String: String]] = [
+      ["VTE_VERSION": "7600"], ["TERM_PROGRAM": "vscode"], ["WT_SESSION": "abc"],
+    ]
+    for marker in markers {
+      // The TERM_PROGRAM rule: a multiplexer's own TERM stays authoritative.
+      for term in ["screen", "screen-256color", "screen.xterm-256color"] {
+        let profile = posix(marker.merging(["TERM": term]) { $1 })
+        #expect(!profile.supportsHyperlinks, "\(term) \(marker)")
+        #expect(!profile.supportsSynchronizedOutput, "\(term) \(marker)")
+        #expect(profile.supportsMouseReporting, "\(term) \(marker)")
+      }
+      let tmux = posix(marker.merging(["TERM": "tmux-256color"]) { $1 })
+      #expect(tmux.supportsHyperlinks, "\(marker)")
+      #expect(tmux.supportsSynchronizedOutput, "\(marker)")
+      // Other explicit TERM values, dumb and redirected output are unchanged.
+      for term in ["linux", "vt100", "rxvt-unicode-256color", "mystery", "dumb"] {
+        #expect(!posix(marker.merging(["TERM": term]) { $1 }).supportsHyperlinks, "\(term)")
+      }
+      #expect(
+        !posix(marker.merging(["TERM": "xterm-256color"]) { $1 }, isTTY: false)
+          .supportsHyperlinks)
+    }
+
+    // tmux 3.2+ exports TERM_PROGRAM=tmux into its panes. A named emulator
+    // outranks markers inherited from an outer terminal.
+    for program in ["tmux", "Apple_Terminal"] {
+      let named = posix([
+        "TERM": "xterm-256color", "TERM_PROGRAM": program, "VTE_VERSION": "7600",
+        "WT_SESSION": "abc",
+      ])
+      #expect(!named.supportsHyperlinks, "\(program)")
+      #expect(!named.supportsSynchronizedOutput, "\(program)")
+    }
+    // Known emulators keep their full refinement when a marker leaked in.
+    for program in ["WezTerm", "ghostty", "iTerm.app"] {
+      let known = posix([
+        "TERM": "xterm-256color", "TERM_PROGRAM": program, "VTE_VERSION": "7600",
+      ])
+      #expect(known.supportsHyperlinks, "\(program)")
+      #expect(known.supportsSynchronizedOutput, "\(program)")
+    }
+
+    // VTE before 0.50, or an unreadable VTE_VERSION, does not identify OSC 8.
+    for version in ["4999", "3803", "", " 7600", "0.76.0", "abc", "-7600"] {
+      let old = posix(["TERM": "xterm-256color", "VTE_VERSION": version])
+      #expect(!old.supportsHyperlinks, "\(version)")
+    }
+    // Konsole ships OSC 8 disabled by default, so KONSOLE_VERSION is no marker.
+    #expect(!posix(["TERM": "xterm-256color", "KONSOLE_VERSION": "230804"]).supportsHyperlinks)
+    #expect(!posix(["TERM": "xterm-256color", "TERM_PROGRAM": ""]).supportsHyperlinks)
+  }
+
+  @Test("windows console hyperlinks share the generic-xterm marker rule")
+  func windowsConsoleHyperlinksShareTheMarkerRule() {
+    func windows(_ environment: [String: String]) -> TerminalCapabilityProfile {
+      TerminalCapabilityProfile.detectWindowsConsole(environment: environment, isTTY: true)
+    }
+    #expect(windows(["WT_SESSION": "abc"]).supportsHyperlinks)
+    #expect(windows(["TERM": "xterm-256color", "WT_SESSION": "abc"]).supportsHyperlinks)
+    #expect(!windows(["TERM": "screen-256color", "WT_SESSION": "abc"]).supportsHyperlinks)
+    #expect(!windows(["TERM": "vt100", "WT_SESSION": "abc"]).supportsHyperlinks)
+    #expect(!windows([:]).supportsHyperlinks)
+    // An explicit generic xterm TERM reads the way the POSIX arm reads it.
+    let vscode = windows(["TERM": "xterm-256color", "TERM_PROGRAM": "vscode"])
+    #expect(vscode.supportsHyperlinks)
+    #expect(!vscode.supportsSynchronizedOutput)
+  }
+
   @Test("capability detection dispatches to the platform arm")
   func capabilityDetectionDispatchesToPlatformArm() {
     // An environment the two arms disagree on (no locale: the POSIX arm

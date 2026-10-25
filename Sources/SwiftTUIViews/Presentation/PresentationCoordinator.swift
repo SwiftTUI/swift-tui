@@ -21,19 +21,39 @@ package enum ViewUpdateGuard {
   }
 }
 
+/// Refuses imperative presentation mutations issued while a view body is
+/// being evaluated.
+///
+/// SwiftUI reports "Modifying state during view update" as a runtime warning
+/// and leaves the outcome undefined. SwiftTUI warns the same way in every
+/// build configuration and defines the outcome: the mutation is refused, in
+/// this frame and in every later one (`PresentationPortalState` does not
+/// replay it at commit). Each refusal records one
+/// `presentation.mutationDuringViewUpdate` warning through
+/// `ImperativeRuntimeIssueQueue`, which surfaces it on the frame being
+/// resolved and through the host's `RuntimeIssueSink`. Present or dismiss
+/// from an action, a task, or a binding instead.
 @MainActor
 package enum PresentationMutationGuard {
+  package static let mutationDuringViewUpdateCode = "presentation.mutationDuringViewUpdate"
+
+  /// Test observer, called with the coordinator's message after each refusal
+  /// is reported.
   package static var onInvalidMutation: (@MainActor (String) -> Void)?
 
   package static func allowMutation(
     _ message: String
   ) -> Bool {
     guard !ViewUpdateGuard.isUpdating else {
-      if let onInvalidMutation {
-        onInvalidMutation(message)
-        return false
-      }
-      assertionFailure(message)
+      ImperativeRuntimeIssueQueue.record(
+        RuntimeIssue(
+          severity: .warning,
+          code: mutationDuringViewUpdateCode,
+          message: message + " The mutation was refused.",
+          source: "PresentationCoordinator"
+        )
+      )
+      onInvalidMutation?(message)
       return false
     }
     return true
@@ -64,6 +84,8 @@ where Item.ID: Sendable {
     activeItemHandler = activeItem
   }
 
+  /// Presents `item`. During a view update the call is refused with a runtime
+  /// warning (see `PresentationMutationGuard`).
   @MainActor
   package func present(
     _ item: Item
@@ -71,6 +93,8 @@ where Item.ID: Sendable {
     presentHandler(item)
   }
 
+  /// Dismisses the item with `id`. During a view update the call is refused
+  /// with a runtime warning (see `PresentationMutationGuard`).
   @MainActor
   package func dismiss(
     id: Item.ID

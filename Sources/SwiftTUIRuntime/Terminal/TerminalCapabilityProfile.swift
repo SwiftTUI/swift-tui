@@ -91,7 +91,9 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   ///
   /// On POSIX platforms the terminal emulator sits at the far end of a pty
   /// and can only be known through the environment it exports, so detection
-  /// reads `TERM`, `COLORTERM`, `NO_COLOR`, and the locale
+  /// reads `TERM`, `COLORTERM`, `NO_COLOR`, the locale, and the emulator
+  /// markers that refine a generic xterm `TERM` (`TERM_PROGRAM`, plus
+  /// `VTE_VERSION` and `WT_SESSION` for hyperlinks)
   /// (`detectPOSIXTerminal(environment:isTTY:)`). On Windows the process
   /// talks to a console host the framework configures itself, so the
   /// platform carries the defaults and the environment only refines them
@@ -144,6 +146,8 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     if let noColor = environment["NO_COLOR"], !noColor.isEmpty {
       colorLevel = .none
     } else if colorTerm.contains("truecolor") || colorTerm.contains("24bit") {
+      colorLevel = .trueColor
+    } else if namesDirectColor(term) {
       colorLevel = .trueColor
     } else if term.contains("256color") {
       colorLevel = .ansi256
@@ -209,6 +213,8 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       colorLevel = .none
     } else if colorTerm.contains("truecolor") || colorTerm.contains("24bit") {
       colorLevel = .trueColor
+    } else if namesDirectColor(term) {
+      colorLevel = .trueColor
     } else if term.contains("256color") {
       colorLevel = .ansi256
     } else if !term.isEmpty {
@@ -253,6 +259,20 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       .contains(term)
   }
 
+  /// terminfo's direct-color entries (`RGB`, `colors#0x1000000`) are named
+  /// `<family>-direct` or `<family>-direct<N>` (`foot-direct`,
+  /// `xterm-direct256`). No other ncurses entry declares 24-bit color, so the
+  /// name alone carries it and `COLORTERM` is not required.
+  private static func namesDirectColor(_ term: String) -> Bool {
+    let components = term.split(separator: "-", omittingEmptySubsequences: false)
+    guard components.count > 1, components[0].isEmpty == false,
+      let last = components.last, last.hasPrefix("direct")
+    else {
+      return false
+    }
+    return last.dropFirst("direct".count).allSatisfy { ("0"..."9").contains($0) }
+  }
+
   private static func identifiedTerminal(term: String, environment: [String: String]) -> String {
     // TERM_PROGRAM can survive inside a multiplexer. Only refine generic xterm
     // entries; an intervening terminal's explicit TERM remains authoritative.
@@ -271,7 +291,33 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       families: [
         "wezterm", "kitty", "xterm-kitty", "ghostty", "xterm-ghostty", "alacritty",
         "foot", "konsole", "mintty", "tmux", "iterm2",
-      ])
+      ]) || identifiesHyperlinkEmulator(term: term, environment: environment)
+  }
+
+  /// Emulators that keep a generic xterm `TERM`, announce themselves through
+  /// their own variable, and render OSC 8: VS Code (`TERM_PROGRAM=vscode`;
+  /// xterm.js 5.0, VS Code 1.72), Windows Terminal (`WT_SESSION`, which it
+  /// forwards into WSL through `WSLENV`; since 1.4) and VTE terminals such as
+  /// GNOME Terminal (`VTE_VERSION` 5000 and later, VTE 0.50). They refine the
+  /// hyperlink answer only. Like `TERM_PROGRAM` in `identifiedTerminal`, the
+  /// markers survive inside a multiplexer, so only a generic xterm is refined;
+  /// a non-empty `TERM_PROGRAM` names the emulator (tmux 3.2 and later export
+  /// `tmux`) and outranks markers inherited from an outer terminal.
+  private static func identifiesHyperlinkEmulator(
+    term: String,
+    environment: [String: String]
+  ) -> Bool {
+    guard isGenericXterm(term) else { return false }
+    if let program = environment["TERM_PROGRAM"], !program.isEmpty {
+      return program.lowercased() == "vscode"
+    }
+    if environment["WT_SESSION"] != nil {
+      return true
+    }
+    guard let vteVersion = environment["VTE_VERSION"].flatMap({ Int($0) }) else {
+      return false
+    }
+    return vteVersion >= 5000
   }
 
   private static func supportsMouseReporting(term: String) -> Bool {
