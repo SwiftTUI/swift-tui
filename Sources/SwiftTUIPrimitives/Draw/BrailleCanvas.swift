@@ -122,73 +122,55 @@ public struct BrailleCanvas: Equatable, Sendable {
 
   /// Draws a line from `(x0, y0)` to `(x1, y1)` using Bresenham's algorithm.
   /// Subpixel coordinates. Out-of-range dots are clipped.
+  ///
+  /// Any `Int` endpoints are accepted: only the steps inside the canvas are
+  /// visited, and they light the same dots the unclipped walk would.
   public mutating func line(from: (x: Int, y: Int), to: (x: Int, y: Int)) {
-    // Bresenham's line algorithm. Standard implementation.
-    var x0 = from.x
-    var y0 = from.y
-    let x1 = to.x
-    let y1 = to.y
-    let dx = abs(x1 - x0)
-    let sx = x0 < x1 ? 1 : -1
-    let dy = -abs(y1 - y0)
-    let sy = y0 < y1 ? 1 : -1
-    var error = dx + dy
-
-    while true {
-      setPixel(x: x0, y: y0)
-      if x0 == x1, y0 == y1 { break }
-      let e2 = 2 * error
-      if e2 >= dy {
-        if x0 == x1 { break }
-        error += dy
-        x0 += sx
-      }
-      if e2 <= dx {
-        if y0 == y1 { break }
-        error += dx
-        y0 += sy
-      }
+    ClippedRaster.line(from: from, to: to, width: subpixelWidth, height: subpixelHeight) {
+      setPixel(x: $0, y: $1)
     }
   }
 
   /// Draws the outline of a rectangle with top-left at `(x, y)` and size
-  /// `(w, h)` in subpixels.
+  /// `(w, h)` in subpixels. Out-of-range dots are clipped.
   public mutating func strokeRect(x: Int, y: Int, width w: Int, height h: Int) {
-    guard w > 0, h > 0 else { return }
-    // Top and bottom
-    for dx in 0..<w {
-      setPixel(x: x + dx, y: y)
-      if h > 1 {
-        setPixel(x: x + dx, y: y + h - 1)
-      }
-    }
-    // Left and right (skip corners already drawn)
-    if h > 2 {
-      for dy in 1..<(h - 1) {
-        setPixel(x: x, y: y + dy)
-        if w > 1 {
-          setPixel(x: x + w - 1, y: y + dy)
-        }
-      }
-    }
+    ClippedRaster.strokeRect(
+      x: x, y: y, width: w, height: h, bufferWidth: subpixelWidth, bufferHeight: subpixelHeight
+    ) { setPixel(x: $0, y: $1) }
   }
 
-  /// Fills a rectangle in subpixels.
+  /// Fills a rectangle in subpixels. Out-of-range dots are clipped.
   public mutating func fillRect(x: Int, y: Int, width w: Int, height h: Int) {
-    guard w > 0, h > 0 else { return }
-    for dy in 0..<h {
-      for dx in 0..<w {
-        setPixel(x: x + dx, y: y + dy)
-      }
-    }
+    ClippedRaster.fillRect(
+      x: x, y: y, width: w, height: h, bufferWidth: subpixelWidth, bufferHeight: subpixelHeight
+    ) { setPixel(x: $0, y: $1) }
   }
 
   /// Draws the outline of a circle centered at `(cx, cy)` with the given
   /// radius, in subpixels. Uses the midpoint circle algorithm.
+  ///
+  /// Out-of-range dots are clipped. A circle too large for the midpoint walk
+  /// to be bounded by the canvas draws the visible part of its outline
+  /// column by column and row by row instead.
   public mutating func strokeCircle(centerX cx: Int, centerY cy: Int, radius: Int) {
     guard radius >= 0 else { return }
     if radius == 0 {
       setPixel(x: cx, y: cy)
+      return
+    }
+    let width = subpixelWidth
+    let height = subpixelHeight
+    guard
+      ClippedRaster.boundingBoxMeetsBuffer(
+        centerX: cx, centerY: cy, radiusX: radius, radiusY: radius, width: width, height: height)
+    else { return }
+    guard
+      ClippedRaster.usesExactOutline(
+        radiusX: radius, radiusY: radius, width: width, height: height)
+    else {
+      ClippedRaster.ellipseOutline(
+        centerX: cx, centerY: cy, radiusX: radius, radiusY: radius, width: width, height: height
+      ) { setPixel(x: $0, y: $1) }
       return
     }
     var x = radius
@@ -214,56 +196,31 @@ public struct BrailleCanvas: Equatable, Sendable {
   }
 
   /// Fills a disc centered at `(cx, cy)` with the given radius.
+  ///
+  /// A scanline fill: each row `cy + dy` spans `cx ± floor(sqrt(r² - dy²))`.
+  /// Only canvas rows are visited, and out-of-range dots are clipped.
   public mutating func fillCircle(centerX cx: Int, centerY cy: Int, radius: Int) {
-    guard radius >= 0 else { return }
-    // Simple scanline fill: for each row in [cy-radius, cy+radius], fill
-    // the horizontal span from cx - Δx to cx + Δx where Δx = sqrt(r² - dy²).
-    let r2 = radius * radius
-    for dy in -radius...radius {
-      let dx = Int(Double(r2 - dy * dy).squareRoot().rounded(.down))
-      let y = cy + dy
-      for x in (cx - dx)...(cx + dx) {
-        setPixel(x: x, y: y)
-      }
-    }
+    ClippedRaster.fillCircle(
+      centerX: cx, centerY: cy, radius: radius, width: subpixelWidth, height: subpixelHeight
+    ) { setPixel(x: $0, y: $1) }
   }
 
   /// Fills an ellipse centered at `(cx, cy)` with x-radius `rx` and
   /// y-radius `ry`, in subpixels.
   ///
   /// Uses a scanline fill driven by the parametric ellipse equation
-  /// `(x/rx)² + (y/ry)² ≤ 1`. Out-of-range dots are clipped by the
-  /// underlying `setPixel` call.
+  /// `(x/rx)² + (y/ry)² ≤ 1`. Only canvas rows are visited, and out-of-range
+  /// dots are clipped.
   public mutating func fillEllipse(
     centerX cx: Int,
     centerY cy: Int,
     radiusX rx: Int,
     radiusY ry: Int
   ) {
-    guard rx >= 0, ry >= 0 else { return }
-    if rx == 0 && ry == 0 {
-      setPixel(x: cx, y: cy)
-      return
-    }
-    if rx == 0 {
-      for dy in -ry...ry {
-        setPixel(x: cx, y: cy + dy)
-      }
-      return
-    }
-    if ry == 0 {
-      for dx in -rx...rx {
-        setPixel(x: cx + dx, y: cy)
-      }
-      return
-    }
-    for dy in -ry...ry {
-      let dxMax = EllipseRasterization.halfSpan(radiusX: rx, radiusY: ry, offsetY: dy)
-      let y = cy + dy
-      for dx in -dxMax...dxMax {
-        setPixel(x: cx + dx, y: y)
-      }
-    }
+    ClippedRaster.fillEllipse(
+      centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, width: subpixelWidth,
+      height: subpixelHeight
+    ) { setPixel(x: $0, y: $1) }
   }
 
   /// Draws the outline of an ellipse centered at `(cx, cy)` with
@@ -271,6 +228,9 @@ public struct BrailleCanvas: Equatable, Sendable {
   ///
   /// Samples the parametric form `(cx + rx·cos θ, cy + ry·sin θ)` with
   /// enough steps that adjacent samples are at most one pixel apart.
+  /// Out-of-range dots are clipped. An ellipse too large for that walk to be
+  /// bounded by the canvas draws the visible part of its outline column by
+  /// column and row by row instead.
   public mutating func strokeEllipse(
     centerX cx: Int,
     centerY cy: Int,
@@ -278,20 +238,24 @@ public struct BrailleCanvas: Equatable, Sendable {
     radiusY ry: Int
   ) {
     guard rx >= 0, ry >= 0 else { return }
-    if rx == 0 && ry == 0 {
-      setPixel(x: cx, y: cy)
+    let width = subpixelWidth
+    let height = subpixelHeight
+    if rx == 0 || ry == 0 {
+      // A point, or the axis segment between the two extremes.
+      ClippedRaster.fillEllipse(
+        centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, width: width, height: height
+      ) { setPixel(x: $0, y: $1) }
       return
     }
-    if rx == 0 {
-      for dy in -ry...ry {
-        setPixel(x: cx, y: cy + dy)
-      }
-      return
-    }
-    if ry == 0 {
-      for dx in -rx...rx {
-        setPixel(x: cx + dx, y: cy)
-      }
+    guard
+      ClippedRaster.boundingBoxMeetsBuffer(
+        centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, width: width, height: height)
+    else { return }
+    guard ClippedRaster.usesExactOutline(radiusX: rx, radiusY: ry, width: width, height: height)
+    else {
+      ClippedRaster.ellipseOutline(
+        centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, width: width, height: height
+      ) { setPixel(x: $0, y: $1) }
       return
     }
     // 4 · (rx + ry) samples is enough for a smooth closed curve on any

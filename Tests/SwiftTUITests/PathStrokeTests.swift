@@ -97,4 +97,71 @@ struct PathStrokeTests {
     #expect(bordered.rasterSurface.size.width == 20)
     #expect(bordered.rasterSurface.size.height == 10)
   }
+
+  // STUI-741: a public custom Shape whose path holds one far, finite point
+  // trapped the renderer (`Rasterizer.roundToInt`) before any stroke work.
+  @Test(
+    "a custom path with one far finite point strokes, dashes, trims and insets its visible part")
+  func farFinitePathPointStrokesVisiblePart() async {
+    await #expect(processExitsWith: .success) {
+      await MainActor.run { checkFarFinitePathPointStrokes() }
+    }
+  }
+}
+
+/// Renders a 4 x 2 cell frame and returns the Braille dot count of each cell.
+@MainActor
+private func farPointDotRows(_ view: some View, _ name: String) -> [[Int]] {
+  let snapshot = DefaultRenderer().render(
+    view.frame(width: 4, height: 2), context: .init(identity: testIdentity("FarPoint", name)))
+  return snapshot.rasterSurface.cells.map { $0.map(brailleDotCount) }
+}
+
+@MainActor
+private func checkFarFinitePathPointStrokes() {
+  var line = Path()
+  line.move(to: Point(x: 0, y: 0.5))
+  line.addLine(to: Point(x: 1e300, y: 0.5))
+  let shape = UnitPathShape(pathValue: line)
+  // Subpixel row 4 (0.5 of the inclusive 0...7 range, rounded) is the top
+  // dot row of the second cell row: two dots per cell.
+  let solid = farPointDotRows(shape.stroke(Color.white), "Solid")
+  #expect(solid == [[0, 0, 0, 0], [2, 2, 2, 2]])
+  // Dash runs of 1.2 cells, measured from the path start: no run boundary
+  // falls on a subpixel's track position (multiples of half a cell). The
+  // visible part dashes exactly as a path that ends at the frame edge.
+  let dash = StrokeStyle(dash: [1.2, 1.2])
+  let dashed = farPointDotRows(shape.stroke(Color.white, style: dash), "Dash")
+  #expect(dashed == [[0, 0, 0, 0], [2, 1, 1, 2]])
+  var near = Path()
+  near.move(to: Point(x: 0, y: 0.5))
+  near.addLine(to: Point(x: 1, y: 0.5))
+  #expect(
+    dashed
+      == farPointDotRows(UnitPathShape(pathValue: near).stroke(Color.white, style: dash), "Near"))
+  let trimmed = farPointDotRows(shape.trim(from: 0, to: 0.5).stroke(Color.white), "Trim")
+  #expect(trimmed == solid)
+  var wedge = Path()
+  wedge.move(to: .zero)
+  wedge.addLine(to: Point(x: 1e300, y: 0))
+  wedge.addLine(to: Point(x: 0, y: 1))
+  wedge.close()
+  let inset = farPointDotRows(UnitPathShape(pathValue: wedge).strokeBorder(Color.white), "Inset")
+  #expect(inset.joined().reduce(0, +) > 0)
+  let filled = farPointDotRows(UnitPathShape(pathValue: wedge).fill(Color.white), "Fill")
+  #expect(filled.joined().reduce(0, +) > inset.joined().reduce(0, +))
+  // Non-finite paths are unusable and draw nothing, stroked, dashed or filled.
+  for (index, bad) in [Double.nan, .infinity].enumerated() {
+    var path = Path()
+    path.move(to: Point(x: 0, y: 0.5))
+    path.addLine(to: Point(x: bad, y: 0.5))
+    let shape = UnitPathShape(pathValue: path)
+    #expect(
+      farPointDotRows(shape.stroke(Color.white), "Bad\(index)").joined().allSatisfy { $0 == 0 })
+    #expect(
+      farPointDotRows(shape.stroke(Color.white, style: dash), "BadDash\(index)").joined()
+        .allSatisfy { $0 == 0 })
+    #expect(
+      farPointDotRows(shape.fill(Color.white), "BadFill\(index)").joined().allSatisfy { $0 == 0 })
+  }
 }

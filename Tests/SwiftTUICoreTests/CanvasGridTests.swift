@@ -119,4 +119,121 @@ struct CanvasGridTests {
     #expect(context.gridSample(for: Point(x: 1.75, y: 0.25)) == GridSample(x: 3, y: 0))
     #expect(context.gridSample(for: pointer) == GridSample(x: 3, y: 0))
   }
+
+  // MARK: - Bounded continuous and grid primitives (STUI-753)
+
+  @Test("CanvasContext draws nothing for non-finite geometry, without trapping")
+  func contextNonFiniteGeometryDrawsNothing() async {
+    await #expect(processExitsWith: .success) {
+      var context = brailleGridContext()
+      context.strokeEllipse(center: Point(x: 1, y: 1), radiusX: .infinity, radiusY: 1)
+      context.strokeCircle(center: Point(x: 1, y: 1), radius: -.infinity)
+      context.line(from: Point(x: .nan, y: 0), to: Point(x: 1, y: 1))
+      context.line(from: Point(x: 0, y: 0), to: Point(x: .infinity, y: 1))
+      context.fillEllipse(center: Point(x: 1, y: 1), radiusX: .nan, radiusY: 1)
+      #expect(litGridSamples(context.canvas).isEmpty)
+    }
+  }
+
+  @Test("CanvasContext treats a NaN radius as unusable instead of a one-sample dot")
+  func contextNaNRadiusDrawsNothing() {
+    var context = brailleGridContext()
+    context.strokeCircle(center: Point(x: 1, y: 1), radius: .nan)
+    context.strokeEllipse(center: Point(x: 1, y: 1), radiusX: .nan, radiusY: 1)
+    #expect(litGridSamples(context.canvas).isEmpty)
+  }
+
+  @Test("CanvasContext huge finite geometry costs the buffer and keeps its direction")
+  func contextHugeFiniteGeometryIsBounded() {
+    var line = brailleGridContext()
+    line.line(from: Point(x: 0, y: 0.1), to: Point(x: 1e300, y: 0.1))
+    #expect(litGridSamples(line.canvas) == clippedRasterPixels((0..<8).map { ($0, 0) }))
+    var vertical = brailleGridContext()
+    vertical.line(from: Point(x: 1.25, y: -1e300), to: Point(x: 1.25, y: 1e300))
+    #expect(litGridSamples(vertical.canvas) == clippedRasterPixels((0..<8).map { (2, $0) }))
+    let everything = Rect(
+      origin: Point(x: -1e300, y: -1e300), size: Size(width: 2e300, height: 2e300))
+    var stroked = brailleGridContext()
+    stroked.strokeRect(everything)
+    #expect(litGridSamples(stroked.canvas).isEmpty)
+    var filled = brailleGridContext()
+    filled.fillRect(everything)
+    #expect(litGridSamples(filled.canvas).count == 64)
+    var flat = brailleGridContext()
+    flat.fillEllipse(center: .zero, radiusX: 1e300, radiusY: 0)
+    #expect(litGridSamples(flat.canvas) == clippedRasterPixels((0..<8).map { ($0, 0) }))
+  }
+
+  @Test("CanvasGridBuffer primitives that overhang the buffer match the unclipped walks")
+  func gridPrimitivesMatchReference() {
+    var random = ClippedRasterReference.Random(state: 0xC0FF_EE11)
+    func fresh() -> CanvasGridBuffer {
+      CanvasGridBuffer(size: CellSize(width: 3, height: 2), grid: .braille2x4)
+    }
+    for index in 0..<800 {
+      let span = index < 50 ? -1_000...1_000 : -14...22
+      let start = (x: random.next(span), y: random.next(span))
+      let end = (x: random.next(span), y: random.next(span))
+      var buffer = fresh()
+      var reference = ClippedRasterReference.Buffer(width: 6, height: 8)
+      buffer.line(from: start, to: end)
+      reference.line(from: start, to: end)
+      #expect(litGridSamples(buffer) == reference.pixels, "line \(start) \(end)")
+    }
+    for _ in 0..<300 {
+      let x = random.next(-14...20)
+      let y = random.next(-14...22)
+      let width = random.next(-2...24)
+      let height = random.next(-2...24)
+      var buffer = fresh()
+      var reference = ClippedRasterReference.Buffer(width: 6, height: 8)
+      buffer.strokeRect(x: x, y: y, width: width, height: height)
+      reference.strokeRect(x: x, y: y, width: width, height: height)
+      #expect(litGridSamples(buffer) == reference.pixels, "strokeRect \(x) \(y) \(width) \(height)")
+      buffer = fresh()
+      reference = ClippedRasterReference.Buffer(width: 6, height: 8)
+      buffer.fillRect(x: x, y: y, width: width, height: height)
+      reference.fillRect(x: x, y: y, width: width, height: height)
+      #expect(litGridSamples(buffer) == reference.pixels, "fillRect \(x) \(y) \(width) \(height)")
+    }
+    for _ in 0..<300 {
+      let cx = random.next(-14...20)
+      let cy = random.next(-14...22)
+      let rx = random.next(-1...16)
+      let ry = random.next(-1...16)
+      var buffer = fresh()
+      var reference = ClippedRasterReference.Buffer(width: 6, height: 8)
+      buffer.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+      reference.gridStrokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+      #expect(litGridSamples(buffer) == reference.pixels, "strokeEllipse \(cx) \(cy) \(rx) \(ry)")
+      buffer = fresh()
+      reference = ClippedRasterReference.Buffer(width: 6, height: 8)
+      buffer.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+      reference.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+      #expect(litGridSamples(buffer) == reference.pixels, "fillEllipse \(cx) \(cy) \(rx) \(ry)")
+    }
+  }
+}
+
+/// A 4 x 2 cell Braille context: 8 x 8 grid samples.
+private func brailleGridContext() -> CanvasContext {
+  CanvasContext(
+    canvas: CanvasGridBuffer(size: CellSize(width: 4, height: 2), grid: .braille2x4),
+    foreground: .white,
+    background: nil
+  )
+}
+
+/// The lit samples of a Braille-grid buffer.
+private func litGridSamples(_ buffer: CanvasGridBuffer) -> Set<ClippedRasterPixel> {
+  var lit: Set<ClippedRasterPixel> = []
+  for y in 0..<buffer.pixelHeight {
+    for x in 0..<buffer.pixelWidth {
+      let bit = UInt16(BrailleCell.bitMask(x: x % 2, y: y % 4) ?? 0)
+      if buffer.mask(x: x / 2, y: y / 4) & bit != 0 {
+        lit.insert(ClippedRasterPixel(x: x, y: y))
+      }
+    }
+  }
+  return lit
 }

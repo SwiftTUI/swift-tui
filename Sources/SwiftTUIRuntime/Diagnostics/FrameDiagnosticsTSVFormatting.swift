@@ -327,9 +327,13 @@ package enum FrameDiagnosticsTSVFormatting {
     )
     let elidedAnimationCommitMs = formatMs(record.elidedAnimationCommitDuration)
     let elidedCommitMs = formatMs(record.elidedCommitDuration)
+    // A non-finite rate has no percentage: it formats as "-", like no rate.
+    // Finite rates keep `Int(rate * 1000)`'s truncation, saturating only
+    // where that conversion would trap.
     let cacheHit =
-      record.measurementCacheHitRate.map { rate in
-        let pct = Int(rate * 1000)
+      record.measurementCacheHitRate.flatMap { rate -> String? in
+        guard rate.isFinite else { return nil }
+        let pct = SaturatingConversion.int(rate * 1000, rounding: .towardZero)
         return "\(pct / 10).\(pct % 10)%"
       } ?? "-"
     // Nil means unbounded damage only when the frame actually presented.

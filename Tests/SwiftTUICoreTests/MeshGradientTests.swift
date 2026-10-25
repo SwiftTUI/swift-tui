@@ -135,3 +135,19 @@ private func testMeshGradient() -> MeshGradient {
 private func identityMeshPoints() -> [SIMD2<Float>] {
   [.init(0, 0), .init(1, 0), .init(0, 1), .init(1, 1)]
 }
+
+@Test("MeshGradient animatable points keep MeshGradient.init's finite-point rule")
+func meshGradientAnimatablePointsStayFinite() {
+  var mesh = testMeshGradient()
+  let original = mesh.points
+  var data = mesh.animatableData
+  data.first.first.elements[1] = .init(.nan, 0.5)
+  data.first.first.elements[2] = .init(0.25, 1e300)
+  data.first.first.elements[3] = .init(0.75, 0.625)
+  mesh.animatableData = data
+  #expect(mesh.points.allSatisfy { $0.x.isFinite && $0.y.isFinite })
+  #expect(mesh.points[0] == original[0])
+  #expect(mesh.points[1] == original[1])
+  #expect(mesh.points[2] == original[2])
+  #expect(mesh.points[3] == SIMD2<Float>(0.75, 0.625))
+}

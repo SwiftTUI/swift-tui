@@ -151,4 +151,33 @@ struct FrameworkStressControlValueMathTests {
     #expect(steppedControlValue(from: Int.min, delta: 2, step: Int.max, bounds: nil) == Int.max - 1)
     #expect(steppedControlValue(from: Int.max, delta: -2, step: Int.max, bounds: nil) == -Int.max)
   }
+
+  // STUI-863: host-wire wheel deltas reach these helpers unbounded.
+  @Test("wheel value deltas and scroll offsets saturate at Int's edges instead of trapping")
+  func wheelDeltasAndScrollOffsetsSaturate() async {
+    await #expect(processExitsWith: .success) {
+      #expect(pointerValueDelta(deltaX: 0, deltaY: Int.min) == Int.max)
+      #expect(pointerValueDelta(deltaX: 0, deltaY: Int.max) == -Int.max)
+      #expect(pointerValueDelta(deltaX: Int.min, deltaY: 1) == Int.min)
+      #expect(
+        ScrollCellOffset(x: Int.max - 1, y: Int.min + 1).scrolledBy(x: 5, y: -5)
+          == ScrollCellOffset(x: Int.max, y: Int.min))
+      var offset = ScrollCellOffset(x: 3, y: -3)
+      offset.scrollBy(x: Int.max, y: Int.min)
+      #expect(offset == ScrollCellOffset(x: Int.max, y: Int.min))
+      offset.scrollBy(x: Int.min, y: Int.max)
+      #expect(offset == ScrollCellOffset(x: -1, y: -1))
+    }
+  }
+
+  @Test("selection steps by Int's edge deltas move to the first or last tag")
+  func selectionStepsTolerateIntEdgeDeltas() {
+    var selection = "B"
+    let binding = Binding(get: { selection }, set: { selection = $0 })
+    let tags = ["A", "B", "C"].map { SelectionTag(value: $0) }
+    #expect(stepBoundSelection(binding, orderedTags: tags, delta: Int.max))
+    #expect(selection == "C")
+    #expect(stepBoundSelection(binding, orderedTags: tags, delta: Int.min))
+    #expect(selection == "A")
+  }
 }

@@ -254,6 +254,23 @@ struct MeshGradientAnimationIntegrationTests {
       )
     )
   }
+
+  // STUI-745: a finite mesh point far outside the unit square trapped row
+  // binning through the public fill.
+  @Test("a public mesh fill with a far finite point renders without trapping")
+  func farFiniteMeshPointRenders() async {
+    await #expect(processExitsWith: .success) {
+      await MainActor.run {
+        let gradient = MeshGradient(
+          width: 2, height: 2, points: [[0, 0], [1, 0], [0, 1], [1e30, 1e30]],
+          colors: [.red, .green, .blue, .white])
+        let snapshot = DefaultRenderer().render(
+          Rectangle().fill(gradient).frame(width: 8, height: 4),
+          context: .init(identity: testIdentity("FarMeshPoint")))
+        #expect(snapshot.rasterSurface.size == CellSize(width: 8, height: 4))
+      }
+    }
+  }
 }
 
 private enum MeshGradientAnimationTestError: Error {

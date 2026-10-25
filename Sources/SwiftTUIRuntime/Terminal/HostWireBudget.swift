@@ -11,6 +11,10 @@ package enum HostWireBudget {
   package static let styleBytes = 1024
   package static let rasterDimension = 8192
   package static let rasterPixels = 16 * 1024 * 1024
+  /// The largest magnitude of a pointer coordinate (in cells) or wheel delta
+  /// on the wire. Far beyond any real pointer, and small enough that the cell
+  /// arithmetic that follows stays inside a 32-bit `Int` (wasm32).
+  package static let pointerMagnitude = 1 << 24
 
   package enum Exceeded: Error { case limit }
 

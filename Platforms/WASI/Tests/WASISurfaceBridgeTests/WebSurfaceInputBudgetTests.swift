@@ -124,3 +124,74 @@ extension WebSurfaceInputBudgetTests {
     }
   }
 }
+
+// MARK: - Pointer number grammar and bounds (STUI-823, STUI-863, STUI-1229)
+
+extension WebSurfaceInputBudgetTests {
+  private func pointerEvent(_ command: String) -> MouseEvent? {
+    var parser = WebSurfaceInputParser()
+    guard case .mouse(let event)? = parser.feed(Array("\u{1E}\(command)\n".utf8)).events.first
+    else { return nil }
+    return event
+  }
+
+  private func scrollDeltas(_ command: String) -> [Int]? {
+    guard case .scrolled(let deltaX, let deltaY)? = pointerEvent(command)?.kind else { return nil }
+    return [deltaX, deltaY]
+  }
+
+  @Test func pointerCoordinatesUseTheDecimalWireGrammar() {
+    // Every spelling JavaScript's String(number) produces, plus the decimal
+    // forms the parser has always accepted.
+    let accepted: [(String, Double)] = [
+      ("1.25", 1.25), ("-0.25", -0.25), ("3", 3), ("1e-7", 1e-7), ("1.5e+3", 1_500),
+      ("2E2", 200), ("+1.5", 1.5), ("5.", 5), (".5", 0.5), ("-0", 0),
+    ]
+    for (spelling, value) in accepted {
+      #expect(
+        pointerEvent("mouse:moved:\(spelling):2:none:0:0:0")?.location.location
+          == Point(x: value, y: 2), "\(spelling)")
+    }
+    let refused = [
+      "0x1p3", "0x10", "0X1P3", "inf", "-infinity", "nan", "NaN", "1_0", " 1", "1 ", "",
+      "+", ".", "e5", "1e", "1e+", "1.2.3", "\u{FF11}",
+    ]
+    for spelling in refused {
+      #expect(pointerEvent("mouse:moved:\(spelling):2:none:0:0:0") == nil, "x \(spelling)")
+      #expect(pointerEvent("mouse:moved:2:\(spelling):none:0:0:0") == nil, "y \(spelling)")
+    }
+    #expect(pointerEvent("mouseGeometry:2:moved:0x1p3:1:none:0:0:0") == nil)
+    #expect(pointerEvent("mouseViewport:0:4:moved:1:0x1p3:none:0:0:0") == nil)
+  }
+
+  @Test func pointerCoordinatesAndDeltasOutsideTheWireBoundAreRefused() {
+    #expect(
+      pointerEvent("mouse:moved:16777216:-16777216:none:0:0:0")?.location.location
+        == Point(x: 16_777_216, y: -16_777_216))
+    for spelling in ["16777216.5", "-16777217", "3000000000", "3e9"] {
+      #expect(pointerEvent("mouse:moved:\(spelling):0:none:0:0:0") == nil, "x \(spelling)")
+      #expect(pointerEvent("mouse:moved:0:\(spelling):none:0:0:0") == nil, "y \(spelling)")
+    }
+    #expect(
+      scrollDeltas("mouse:scrolled:1:1:none:-16777216:16777216:0") == [-16_777_216, 16_777_216])
+    #expect(scrollDeltas("mouse:scrolled:1:1:none:+3:-1:0") == [3, -1])
+    for delta in [
+      "16777217", "-16777217", "9223372036854775807", "-9223372036854775808", "0x10", "1.0",
+    ] {
+      #expect(scrollDeltas("mouse:scrolled:1:1:none:\(delta):0:0") == nil, "dx \(delta)")
+      #expect(scrollDeltas("mouse:scrolled:1:1:none:0:\(delta):0") == nil, "dy \(delta)")
+    }
+    #expect(pointerEvent("mouseViewport:0:4:scrolled:1:2:none:0:16777217:0") == nil)
+  }
+
+  @Test func coordinatesBeyondIntRangeAreRefusedWithoutTrapping() async {
+    await #expect(processExitsWith: .success) {
+      for spelling in ["1e300", "-1e300", "1.7976931348623157e308", "9223372036854775808"] {
+        var parser = WebSurfaceInputParser()
+        let x = parser.feed(Array("\u{1E}mouse:down:\(spelling):0:primary:0:0:0\n".utf8))
+        let y = parser.feed(Array("\u{1E}mouse:up:0:\(spelling):primary:0:0:0\n".utf8))
+        #expect(x.events.isEmpty && y.events.isEmpty, "\(spelling)")
+      }
+    }
+  }
+}

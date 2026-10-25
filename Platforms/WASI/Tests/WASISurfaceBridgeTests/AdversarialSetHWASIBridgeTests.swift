@@ -1,8 +1,7 @@
 // Adversarial set H, pass 1 (F6 platform edges): the WASI surface bridge's
-// numeric grammar and budget boundaries (setH083–setH094). Swift's
-// Double(String) and Int(String) grammars are the parser's number grammar;
-// the host-wire contract speaks decimal. Pure parser calls; no descriptors.
-import Foundation
+// numeric grammar and budget boundaries (setH083–setH094). The host-wire
+// contract speaks decimal: pointer coordinates use its decimal grammar and
+// integers Swift's Int(String). Pure parser calls; no descriptors.
 @_spi(Runners) import SwiftTUI
 @_spi(Runners) import SwiftTUIRuntime
 import Testing
@@ -19,24 +18,6 @@ import Testing
   import CRT
 #endif
 
-/// Keeps an unmarked reproduction path (`SWIFTTUI_SETH_UNMARKED=1`) while
-/// limiting each guard to its exact reproduced assertion.
-private func setHKnown(_ comment: Comment, _ body: () throws -> Void) rethrows {
-  if ProcessInfo.processInfo.environment["SWIFTTUI_SETH_UNMARKED"] == "1" {
-    try body()
-  } else {
-    withKnownIssue(comment) { try body() }
-  }
-}
-
-private func setHKnown(_ comment: Comment, _ body: () async throws -> Void) async rethrows {
-  if ProcessInfo.processInfo.environment["SWIFTTUI_SETH_UNMARKED"] == "1" {
-    try await body()
-  } else {
-    await withKnownIssue(comment) { try await body() }
-  }
-}
-
 @Suite("Adversarial set H: WASI bridge grammar")
 struct AdversarialSetHWASIBridgeTests {
   private func record(_ command: String) -> [UInt8] {
@@ -50,27 +31,22 @@ struct AdversarialSetHWASIBridgeTests {
     return parser.feed(record(command))
   }
 
-  // The parser checks only isFinite; PointerLocation.subCell then computes
-  // Point.containingCell with an unchecked Int conversion.
+  // Before the repair the parser checked only isFinite, and
+  // PointerLocation.subCell then computed Point.containingCell with an
+  // unchecked Int conversion.
   @Test func setH083HugeFiniteMouseCoordinateTraps() async {
-    await setHKnown(
-      "STUI-823: setH083: mouse:moved:1e300 traps the WASI bridge host (3e9 already traps on wasm32 under Bun and wasmkit); the parser admits any finite Double (WebSurfaceInputParser.swift:343-344) and PointerLocation.subCell calls Point.containingCell (setH055 mechanism, PointerLocation.swift:79); contract: host-wire input never traps the host; adjacent STUI-1145"
-    ) {
-      await #expect(processExitsWith: .success) {
-        var parser = WebSurfaceInputParser()
-        let result = parser.feed([0x1E] + Array("mouse:moved:1e300:0:none:0:0:0".utf8) + [0x0A])
-        #expect(result.events.isEmpty)
-      }
+    // STUI-823 regression (setH083), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      var parser = WebSurfaceInputParser()
+      let result = parser.feed([0x1E] + Array("mouse:moved:1e300:0:none:0:0:0".utf8) + [0x0A])
+      #expect(result.events.isEmpty)
     }
   }
 
   @Test func setH084HexFloatMouseCoordinateAccepted() {
     let hex = feed("mouse:moved:0x1p3:0:none:0:0:0")
-    setHKnown(
-      "STUI-1229: setH084: mouse:moved:0x1p3 is accepted with x == 8; Swift Double(String) accepts hexadecimal floats (WebSurfaceInputParser.swift:343-344); contract: HOST-WIRE-CONTRACT numbers are decimal (docs/HOST-WIRE-CONTRACT.md:39, 107); adjacent STUI-1145"
-    ) {
-      #expect(hex.events.isEmpty, "\(hex.events)")
-    }
+    // STUI-1229 regression (setH084), formerly a known issue.
+    #expect(hex.events.isEmpty, "\(hex.events)")
     #expect(feed("mouse:moved:inf:0:none:0:0:0").events.isEmpty)
     #expect(feed("mouse:moved:nan:0:none:0:0:0").events.isEmpty)
   }

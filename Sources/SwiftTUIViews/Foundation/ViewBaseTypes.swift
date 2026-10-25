@@ -343,17 +343,21 @@ public struct ScrollCellOffset: Equatable, Sendable, Codable {
   public static let zero = Self()
 
   /// Returns a copy offset by the supplied deltas.
+  ///
+  /// Each coordinate saturates at `Int.min` and `Int.max` instead of
+  /// overflowing.
   public func scrolledBy(
     x deltaX: Int = 0,
     y deltaY: Int = 0
   ) -> Self {
     .init(
-      x: x + deltaX,
-      y: y + deltaY
+      x: SaturatingConversion.adding(x, deltaX),
+      y: SaturatingConversion.adding(y, deltaY)
     )
   }
 
-  /// Mutates this position by the supplied deltas.
+  /// Mutates this position by the supplied deltas, saturating as
+  /// ``scrolledBy(x:y:)`` does.
   public mutating func scrollBy(
     x deltaX: Int = 0,
     y deltaY: Int = 0

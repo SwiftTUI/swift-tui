@@ -10,6 +10,8 @@ public struct ScrollViewProxy {
   }
 
   /// Scrolls the first target matching `identity` into view.
+  ///
+  /// An `anchor` with a non-finite coordinate is ignored, as if it were `nil`.
   @discardableResult
   @MainActor
   public func scrollTo(
@@ -26,6 +28,8 @@ public struct ScrollViewProxy {
   }
 
   /// Scrolls the first target matching an authored collection or explicit ID into view.
+  ///
+  /// An `anchor` with a non-finite coordinate is ignored, as if it were `nil`.
   @discardableResult
   @MainActor
   public func scrollTo<ID: Hashable & Sendable>(

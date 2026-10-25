@@ -186,12 +186,18 @@ public struct CanvasContext: Sendable {
   }
 
   /// Draws a line between two continuous cell-space points.
+  ///
+  /// A line with a non-finite endpoint draws nothing. Only the part of the
+  /// line inside the canvas is rasterized, so its cost is bounded by the
+  /// canvas however far the endpoints lie.
   public mutating func line(
     from start: Point,
     to end: Point
   ) {
-    let startPoint = gridSample(for: start)
-    let endPoint = gridSample(for: end)
+    guard let segment = SegmentClipping.clipped(from: start, to: end, within: Self.lineLimit)
+    else { return }
+    let startPoint = gridSample(for: segment.start)
+    let endPoint = gridSample(for: segment.end)
     canvas.line(
       from: (x: startPoint.x, y: startPoint.y),
       to: (x: endPoint.x, y: endPoint.y)
@@ -215,10 +221,13 @@ public struct CanvasContext: Sendable {
   }
 
   /// Draws the outline of a circle in continuous cell space.
+  ///
+  /// A non-finite center or radius draws nothing.
   public mutating func strokeCircle(
     center: Point,
     radius: Double
   ) {
+    guard center.x.isFinite, center.y.isFinite, radius.isFinite else { return }
     let centerPoint = gridSample(for: center)
     canvas.strokeEllipse(
       centerX: centerPoint.x,
@@ -237,11 +246,16 @@ public struct CanvasContext: Sendable {
   }
 
   /// Draws the outline of an ellipse in continuous cell space.
+  ///
+  /// A non-finite center or radius draws nothing.
   public mutating func strokeEllipse(
     center: Point,
     radiusX: Double,
     radiusY: Double
   ) {
+    guard center.x.isFinite, center.y.isFinite, radiusX.isFinite, radiusY.isFinite else {
+      return
+    }
     let centerPoint = gridSample(for: center)
     canvas.strokeEllipse(
       centerX: centerPoint.x,
@@ -252,6 +266,8 @@ public struct CanvasContext: Sendable {
   }
 
   /// Fills an ellipse in continuous cell space.
+  ///
+  /// A non-finite center or radius draws nothing.
   public mutating func fillEllipse(
     center: Point,
     radiusX: Double,
@@ -430,27 +446,17 @@ public struct CanvasContext: Sendable {
     )
   }
 
+  /// Lines are clipped to this many cells from the origin before sampling,
+  /// so their grid samples never saturate and keep the line's direction.
+  private static let lineLimit = Double(Int.max / 16)
+
+  /// Scales a cell coordinate to grid samples. NaN and values outside
+  /// `±(Int.max / 2)` saturate (`SaturatingConversion`).
   private static func gridCoordinate(
     _ value: Double,
     subdivisions: Int,
     rounding: FloatingPointRoundingRule
   ) -> Int {
-    let scaled = value * Double(subdivisions)
-    guard scaled.isFinite else {
-      if scaled.isNaN {
-        return Int.min / 2
-      }
-      return scaled.sign == .minus ? Int.min / 2 : Int.max / 2
-    }
-    let rounded = scaled.rounded(rounding)
-    let lower = Double(Int.min / 2)
-    let upper = Double(Int.max / 2)
-    if rounded <= lower {
-      return Int.min / 2
-    }
-    if rounded >= upper {
-      return Int.max / 2
-    }
-    return Int(rounded)
+    SaturatingConversion.int(value * Double(subdivisions), rounding: rounding)
   }
 }

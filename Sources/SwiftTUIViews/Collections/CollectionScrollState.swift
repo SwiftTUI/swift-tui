@@ -176,7 +176,9 @@ package struct CollectionScrollCurrency {
     let current = effectiveAnchorRow
     let startsAfterLastRow =
       currentOffset().y >= geometry.lineRange(forRow: geometry.lastRowIndex).upperBound
-    let destination = current + rows + (rows < 0 && startsAfterLastRow ? 1 : 0)
+    // Wheel deltas come from hosts unbounded; saturate instead of trapping.
+    let destination = SaturatingConversion.adding(
+      SaturatingConversion.adding(current, rows), rows < 0 && startsAfterLastRow ? 1 : 0)
     if destination < 0 { return setAnchor(.start) }
     if destination > maxAnchorRow { return setAnchor(.end) }
     if visibleLineCount > 0, geometry.displayLineCount > visibleLineCount,
@@ -290,7 +292,8 @@ package struct CollectionScrollCurrency {
     guard let rowIndex = resolvingRow(query) else {
       return nil
     }
-    guard let anchor else {
+    // A non-finite anchor is ignored, as if no anchor were given.
+    guard let anchor, anchor.x.isFinite, anchor.y.isFinite else {
       return reveal(row: rowIndex)
     }
     // An explicit unit anchor positions the row rather than merely revealing
@@ -300,7 +303,8 @@ package struct CollectionScrollCurrency {
       return setAnchorRow(rowIndex)
     }
     let targetLines = geometry.lineRange(forRow: rowIndex)
-    let offsetLines = Int((Double(max(0, visible - targetLines.count)) * anchor.y).rounded())
+    let offsetLines = SaturatingConversion.int(
+      Double(max(0, visible - targetLines.count)) * anchor.y, rounding: .toNearestOrAwayFromZero)
     return setAnchorLine(max(0, targetLines.lowerBound - offsetLines))
   }
 }

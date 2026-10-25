@@ -69,6 +69,18 @@ newline. Malformed or unknown controls are dropped. They are not terminal
 input. The `accessibility` record format is documented in
 [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
+A pointer record is
+`mouse:<kind>:<x>:<y>:<button>:<deltaX>:<deltaY>:<modifiers>`; the
+`mouseGeometry` and `mouseViewport` forms below prefix revisions to the same
+fields. `x` and `y` are decimal cell coordinates,
+`[+-]digits[.digits][(e|E)[+-]digits]` with at least one mantissa digit, so
+every spelling JavaScript's `String(number)` produces for a finite number is
+valid; hexadecimal, infinity and NaN spellings are not. `deltaX` and `deltaY`
+are decimal integers. Coordinates and deltas have a magnitude of at most
+16,777,216 (2^24, `HostWireBudget.pointerMagnitude`) on every platform,
+including wasm32's 32-bit `Int`. A record outside this grammar or bound is
+dropped.
+
 `pointer` is the only control record whose payload is `key=value` tokens
 rather than positional fields:
 
@@ -483,7 +495,8 @@ mouseGeometry:<revision>:<kind>:<x>:<y>:<button>:<deltaX>:<deltaY>:<modifiers>
 Positive revisions are strictly increasing JavaScript-safe integers
 (1…9,007,199,254,740,991), parsed as `UInt64` on wasm32. Grid dimensions use
 `HostWireBudget`; cell pitches are integral CSS pixels in 1…8192. Coordinates
-are finite fractional cell coordinates. The transport atomically captures grid,
+are finite fractional cell coordinates in the pointer-record grammar above.
+The transport atomically captures grid,
 cell metrics, appearance, theme, pointer capabilities and revision before each
 layout acquisition. Full and delta frames echo that captured revision, including
 same-grid metric changes and empty damage. Revisions do not replace delivery

@@ -21,10 +21,14 @@ extension Point {
   }
 
   /// The integer cell containing this continuous point.
+  ///
+  /// Each coordinate is rounded down. A cell beyond `±(Int.max / 2)`
+  /// saturates at that bound, and a NaN coordinate maps to `Int.min / 2`, a
+  /// cell outside every finite region. The conversion never traps.
   public var containingCell: CellPoint {
     CellPoint(
-      x: Int(x.rounded(.down)),
-      y: Int(y.rounded(.down))
+      x: SaturatingConversion.int(x, rounding: .down),
+      y: SaturatingConversion.int(y, rounding: .down)
     )
   }
 
@@ -36,10 +40,12 @@ extension Point {
   }
 
   /// Snaps this point to an integer cell using `rule`.
+  ///
+  /// Saturates and treats NaN as ``containingCell`` does.
   public func snapped(_ rule: FloatingPointRoundingRule) -> CellPoint {
     CellPoint(
-      x: Int(x.rounded(rule)),
-      y: Int(y.rounded(rule))
+      x: SaturatingConversion.int(x, rounding: rule),
+      y: SaturatingConversion.int(y, rounding: rule)
     )
   }
 }

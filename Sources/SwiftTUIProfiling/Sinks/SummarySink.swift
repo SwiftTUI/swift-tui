@@ -49,7 +49,11 @@ package final class SummarySink: ProfileSink {
         memoryByName[snapshot.name] = entry
       }
     case .cpu(let sample):
-      cpuPeakPercent = max(cpuPeakPercent, sample.estimatedCPUPercent)
+      // A non-finite estimate is no measurement. `max` already drops NaN;
+      // drop infinities too instead of reporting them as the peak.
+      if sample.estimatedCPUPercent.isFinite {
+        cpuPeakPercent = max(cpuPeakPercent, sample.estimatedCPUPercent)
+      }
       cpuPeakResidentBytes = max(cpuPeakResidentBytes, sample.maxResidentBytes)
     }
   }
@@ -76,8 +80,8 @@ package final class SummarySink: ProfileSink {
       }
     }
     if cpuPeakPercent > 0 || cpuPeakResidentBytes > 0 {
-      lines.append(
-        "cpu: peak \(Int(cpuPeakPercent.rounded()))%, rss peak \(humanBytes(cpuPeakResidentBytes))")
+      let peak = SaturatingConversion.int(cpuPeakPercent, rounding: .toNearestOrAwayFromZero)
+      lines.append("cpu: peak \(peak)%, rss peak \(humanBytes(cpuPeakResidentBytes))")
     }
     return lines.joined(separator: "\n") + "\n"
   }
@@ -88,7 +92,7 @@ package final class SummarySink: ProfileSink {
   }
 
   private func milliseconds(_ seconds: Double) -> String {
-    "\(Int((seconds * 1000).rounded()))ms"
+    "\(SaturatingConversion.int(seconds * 1000, rounding: .toNearestOrAwayFromZero))ms"
   }
 
   private func humanBytes(_ bytes: Int) -> String {

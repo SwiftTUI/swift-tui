@@ -140,6 +140,105 @@ struct CollectionScrollBoundaryTests {
         "table=\(table) height=\(height) anchor=\(String(describing: anchor))\n\(harness.frame)")
     }
   }
+
+  // MARK: - Numeric anchors and deltas (STUI-768, STUI-863)
+
+  @Test("non-finite scroll anchors are ignored as if no anchor were given")
+  func nonFiniteScrollAnchorsAreIgnored() async {
+    await #expect(processExitsWith: .success) {
+      try await MainActor.run {
+        for list in [false, true] {
+          let revealed = try numericScrollFrame(list: list, anchor: nil, name: "Reveal")
+          let anchors = [
+            UnitPoint(x: 0, y: .infinity), UnitPoint(x: .nan, y: 1),
+            UnitPoint(x: 0, y: -.infinity), UnitPoint(x: .nan, y: .nan),
+          ]
+          for (index, anchor) in anchors.enumerated() {
+            let frame = try numericScrollFrame(list: list, anchor: anchor, name: "Anchor\(index)")
+            #expect(frame == revealed, "list=\(list) anchor=\(anchor)\n\(frame)")
+          }
+        }
+      }
+    }
+  }
+
+  @Test("huge finite scroll anchors clamp to the content edges")
+  func hugeFiniteScrollAnchorsClamp() async {
+    await #expect(processExitsWith: .success) {
+      try await MainActor.run {
+        for list in [false, true] {
+          let below = try numericScrollFrame(
+            list: list, anchor: UnitPoint(x: 0, y: 1e300), name: "Below")
+          #expect(below.contains("«0»"), "list=\(list)\n\(below)")
+          let above = try numericScrollFrame(
+            list: list, anchor: UnitPoint(x: 0, y: -1e300), name: "Above")
+          #expect(above.contains("«29»"), "list=\(list)\n\(above)")
+        }
+      }
+    }
+  }
+
+  @Test("wheel and proxy scrolls by Int's edge deltas clamp to the content edges")
+  func intEdgeScrollDeltasClamp() async {
+    await #expect(processExitsWith: .success) {
+      try await MainActor.run {
+        for list in [false, true] {
+          let harness = try StressRuntimeHarness(
+            rootIdentity: testIdentity("CollectionBoundaryIntEdgeDelta", "\(list)"),
+            size: .init(width: 32, height: 12)
+          ) { NumericScrollFixture(list: list, anchor: nil) }
+          defer { harness.shutdown() }
+          let point = try #require(harness.point(forText: "«1»"))
+          _ = try harness.scrollPointer(at: point, deltaY: 2)
+          let wheeledDown = try harness.scrollPointer(at: point, deltaY: Int.max)
+          #expect(wheeledDown.contains("«29»"), "list=\(list)\n\(wheeledDown)")
+          let wheeledUp = try harness.scrollPointer(at: point, deltaY: Int.min)
+          #expect(wheeledUp.contains("«0»"), "list=\(list)\n\(wheeledUp)")
+          _ = try harness.clickText("Down")
+          let far = try harness.clickText("Far")
+          #expect(far.contains("«29»"), "list=\(list)\n\(far)")
+        }
+      }
+    }
+  }
+}
+
+/// Renders a numeric-anchor fixture, presses Jump and returns the frame.
+@MainActor
+private func numericScrollFrame(list: Bool, anchor: UnitPoint?, name: String) throws -> String {
+  let harness = try StressRuntimeHarness(
+    rootIdentity: testIdentity("CollectionBoundaryNumericAnchor", "\(list)", name),
+    size: .init(width: 32, height: 12)
+  ) { NumericScrollFixture(list: list, anchor: anchor) }
+  defer { harness.shutdown() }
+  return try harness.clickText("Jump")
+}
+
+@MainActor
+private struct NumericScrollFixture: View {
+  let list: Bool
+  let anchor: UnitPoint?
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Jump") { _ = proxy.scrollTo(9, anchor: anchor) }
+        Button("Down") { _ = proxy.scrollBy(y: 2) }
+        Button("Far") { _ = proxy.scrollBy(y: Int.max) }
+        if list {
+          List(0..<30, id: \.self) { row in Text("«\(row)»") }
+            .listStyle(BoundaryCurrencyListStyle()).scrollIndicators(.hidden).frame(height: 5)
+        } else {
+          ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<30, id: \.self) { row in Text("«\(row)»").id(row) }
+            }
+          }
+          .scrollIndicators(.hidden).frame(height: 5)
+        }
+      }
+    }
+  }
 }
 
 @MainActor

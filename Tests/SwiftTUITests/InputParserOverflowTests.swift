@@ -83,4 +83,51 @@ struct InputParserOverflowTests {
         )
       ])
   }
+
+  // STUI-823: a representable but enormous SGR-Pixels coordinate divided by a
+  // one-pixel cell reached Point.containingCell's unchecked Int conversion.
+  @Test("SGR pixel coordinates beyond the terminal bound are clamped before cell conversion")
+  func sgrPixelCoordinateIsClampedBeforeConversion() async {
+    await #expect(processExitsWith: .success) {
+      let metrics = CellPixelMetrics(width: 1, height: 1, source: .reported)
+      var parser = TerminalInputParser(
+        mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels))
+      let events = parser.feed(
+        Array("\u{001B}[<0;9223372036854775807;-9223372036854775807M".utf8))
+      guard case .mouse(let event)? = events.first else {
+        Issue.record("no pointer event: \(events)")
+        return
+      }
+      #expect(event.location.location == Point(x: 16_777_215, y: -16_777_217))
+      #expect(event.location.cell == CellPoint(x: 16_777_215, y: -16_777_217))
+      #expect(event.location.rawPixel == PixelPoint(x: 16_777_215, y: -16_777_217))
+    }
+  }
+
+  @Test("SGR cell coordinates beyond the terminal bound are clamped")
+  func sgrCellCoordinateIsClamped() {
+    var parser = TerminalInputParser()
+    let events = parser.feed(Array("\u{001B}[<0;9223372036854775807;3M".utf8))
+    #expect(
+      events == [
+        .mouse(
+          MouseEvent(
+            kind: .down(.primary), location: .cellFallback(CellPoint(x: 16_777_215, y: 2))))
+      ])
+  }
+
+  @Test("SGR pixel coordinates at the bound, including negative ones, convert unchanged")
+  func sgrPixelCoordinatesAtTheBoundConvertUnchanged() {
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    var parser = TerminalInputParser(
+      mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels))
+    let events = parser.feed(Array("\u{001B}[<0;-5;16777216M".utf8))
+    guard case .mouse(let event)? = events.first else {
+      Issue.record("no pointer event: \(events)")
+      return
+    }
+    #expect(event.location.location == Point(x: -0.75, y: 1_048_575.9375))
+    #expect(event.location.cell == CellPoint(x: -1, y: 1_048_575))
+    #expect(event.location.rawPixel == PixelPoint(x: -6, y: 16_777_215))
+  }
 }

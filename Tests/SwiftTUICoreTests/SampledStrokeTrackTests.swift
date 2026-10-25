@@ -149,4 +149,42 @@ struct SampledStrokeTrackTests {
       #expect(abs(run - 4) <= 1, "run of \(run)")
     }
   }
+
+  // MARK: - Bounded sampling (STUI-741)
+
+  @Test("a far finite path point samples only the part of its segment near the canvas")
+  func farPathPointSamplesNearTheCanvas() async {
+    await #expect(processExitsWith: .success) {
+      let path = Path([.move(to: Point(x: 0, y: 0.5)), .line(to: Point(x: 1e300, y: 0.5))])
+      let track = SampledStrokeTrack.path(
+        path, subpixelWidth: 8, subpixelHeight: 8, aspectRatio: 2)
+      #expect(track.points.count < 64, "\(track.points.count) samples")
+      #expect(track.points.allSatisfy { $0.x <= 16 })
+      #expect(track.length == 3.5e300)
+      #expect(abs(track.position(nearestToX: 4, y: 4) - 2) <= 0.25)
+    }
+  }
+
+  @Test("direct tracks of huge segments and arcs stay bounded")
+  func hugeSegmentsAndArcsStayBounded() async {
+    await #expect(processExitsWith: .success) {
+      let segment = SampledStrokeTrack(
+        polylines: [[Point(x: 0, y: 0), Point(x: 1e300, y: 0)]], aspectRatio: 2)
+      #expect(segment.points.count == 2)
+      #expect(segment.length == 5e299)
+      let arc = SampledStrokeTrack.ellipse(
+        centerX: 0, centerY: 0, radiusX: Int.max / 2, radiusY: 1, aspectRatio: 2)
+      #expect(arc.points.count <= 65_538)
+      #expect(arc.length.isFinite)
+    }
+  }
+
+  @Test("segments under the sampling cap keep every half-subpixel sample")
+  func segmentsUnderTheCapKeepEverySample() {
+    let track = SampledStrokeTrack(
+      polylines: [[Point(x: 0, y: 0), Point(x: 20_000, y: 0)]], aspectRatio: 2)
+    #expect(track.points.count == 40_001)
+    #expect(track.points.last == Point(x: 20_000, y: 0))
+    #expect(track.positions.last == 10_000)
+  }
 }

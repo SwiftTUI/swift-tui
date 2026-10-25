@@ -582,7 +582,9 @@ package final class LocalScrollPositionRegistry: Equatable {
     pendingExplicitScrollRoutes.insert(route.identity)
     let currentOffset = registration.currentOffset()
     let next = clampedOffset(
-      ScrollOffset(x: currentOffset.x + deltaX, y: currentOffset.y + deltaY),
+      ScrollOffset(
+        x: SaturatingConversion.adding(currentOffset.x, deltaX),
+        y: SaturatingConversion.adding(currentOffset.y, deltaY)),
       in: route
     )
     guard next != currentOffset else {
@@ -1003,7 +1005,8 @@ package final class LocalScrollPositionRegistry: Equatable {
     in route: ScrollRoute,
     preservesProducerOffset: Bool
   ) -> ScrollOffset {
-    guard let anchor else {
+    // A non-finite anchor is ignored, as if no anchor were given.
+    guard let anchor, anchor.x.isFinite, anchor.y.isFinite else {
       return adjustedOffset(
         currentOffset,
         revealing: targetRect,
@@ -1144,7 +1147,10 @@ package final class LocalScrollPositionRegistry: Equatable {
     length: Int,
     _ unit: Double
   ) -> Int {
-    origin + Int((Double(max(0, length - 1)) * unit).rounded())
+    // A huge finite anchor saturates here; `clampedOffset` then bounds it.
+    origin
+      + SaturatingConversion.int(
+        Double(max(0, length - 1)) * unit, rounding: .toNearestOrAwayFromZero)
   }
 
   private func clampedOffset(_ offset: ScrollOffset, in route: ScrollRoute) -> ScrollOffset {

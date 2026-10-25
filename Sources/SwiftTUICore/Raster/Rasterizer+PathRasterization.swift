@@ -51,14 +51,25 @@ extension Rasterizer {
       .flattened(tolerance: 0.3)
     for polyline in polylines where polyline.count >= 2 {
       for index in 0..<(polyline.count - 1) {
-        let a = polyline[index]
-        let b = polyline[index + 1]
+        // A finite path point can lie far outside the frame. Clip the segment
+        // far beyond the canvas (segments inside the limit pass unchanged), so
+        // rounding cannot trap and the line keeps its direction; the canvas
+        // walks only its own subpixels.
+        guard
+          let segment = SegmentClipping.clipped(
+            from: polyline[index], to: polyline[index + 1], within: Self.strokeCoordinateLimit)
+        else {
+          continue
+        }
         canvas.line(
-          from: (x: roundToInt(a.x), y: roundToInt(a.y)),
-          to: (x: roundToInt(b.x), y: roundToInt(b.y)))
+          from: (x: roundToInt(segment.start.x), y: roundToInt(segment.start.y)),
+          to: (x: roundToInt(segment.end.x), y: roundToInt(segment.end.y)))
       }
     }
   }
+
+  /// Stroke segments are clipped to this many subpixels from the origin.
+  private static let strokeCoordinateLimit = Double(Int.max / 8)
 
   /// Strokes a border that stays inside the shape: the stroked outline
   /// intersected with the filled interior, so no part of the stroke spills
@@ -227,6 +238,6 @@ extension Rasterizer {
   }
 
   private func roundToInt(_ value: Double) -> Int {
-    Int(value.rounded())
+    SaturatingConversion.int(value, rounding: .toNearestOrAwayFromZero)
   }
 }

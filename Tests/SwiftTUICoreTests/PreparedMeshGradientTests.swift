@@ -402,3 +402,41 @@ private func identityPoints(width: Int, height: Int) -> [SIMD2<Float>] {
 private func meshBounds(width: Int, height: Int) -> CellRect {
   CellRect(origin: .zero, size: CellSize(width: width, height: height))
 }
+
+// MARK: - Unusable triangle extents (STUI-745)
+
+@Test("a finite mesh point beyond Float's cell range prepares without trapping")
+func preparedMeshPointBeyondFloatRangeIsSkipped() async {
+  await #expect(processExitsWith: .success) {
+    let mesh = preparedMesh(
+      width: 2,
+      height: 2,
+      points: [[0, 0], [1, 0], [0, 1], [1e38, 1e38]],
+      colors: [.red, .green, .blue, .white],
+      background: .black,
+      bounds: meshBounds(width: 8, height: 4)
+    )
+    #expect(mesh.diagnostics.coveredRowCount <= 4)
+    for y in 0..<4 {
+      for x in 0..<8 { _ = mesh.color(atCellX: x, y: y) }
+    }
+  }
+}
+
+@Test("a huge finite mesh point bins only the rows inside the bounds")
+func preparedMeshHugeFinitePointBinsInsideBounds() async {
+  await #expect(processExitsWith: .success) {
+    let mesh = preparedMesh(
+      width: 2,
+      height: 2,
+      points: [[0, 0], [1, 0], [0, 1], [1e30, 1e30]],
+      colors: [.red, .green, .blue, .white],
+      background: .black,
+      bounds: CellRect(origin: CellPoint(x: 3, y: 5), size: CellSize(width: 8, height: 4))
+    )
+    #expect(mesh.diagnostics.coveredRowCount <= 4)
+    for y in 5..<9 {
+      for x in 3..<11 { _ = mesh.color(atCellX: x, y: y) }
+    }
+  }
+}

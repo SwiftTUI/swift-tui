@@ -158,7 +158,12 @@ extension MeshGradient: Animatable {
       var newBackground = background
       for index in newPoints.indices {
         let point = newValue.first.first.elements[index]
-        newPoints[index] = SIMD2<Float>(Float(point.first), Float(point.second))
+        let converted = SIMD2<Float>(Float(point.first), Float(point.second))
+        // `MeshGradient.init` requires finite points. A NaN or a value beyond
+        // `Float`'s range keeps the point's previous value.
+        if converted.x.isFinite, converted.y.isFinite {
+          newPoints[index] = converted
+        }
       }
       for index in newColors.indices {
         newColors[index].animatableData = newValue.first.second.elements[index]

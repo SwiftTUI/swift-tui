@@ -264,4 +264,29 @@ struct TSVFileSinkTests {
       )
     )
   }
+
+  // STUI-1228: the cache-hit column converted Int(rate * 1000) unchecked.
+  @Test("TSV cache-hit rates keep finite spellings and format non-finite rates as absent")
+  func cacheHitRateTotality() async throws {
+    let column = try #require(
+      FrameDiagnosticsTSVFormatting.headerFields.firstIndex(of: "cache_hit"))
+    for (rate, text) in [(0.5, "50.0%"), (0.123, "12.3%"), (1.0, "100.0%"), (0.0, "0.0%")] {
+      var record = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "finite")
+      record.measurementCacheHitRate = rate
+      #expect(FrameDiagnosticsTSVFormatting.recordFields(for: record)[column] == text)
+    }
+    let absent = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "absent")
+    #expect(FrameDiagnosticsTSVFormatting.recordFields(for: absent)[column] == "-")
+    await #expect(processExitsWith: .success) {
+      let column = FrameDiagnosticsTSVFormatting.headerFields.firstIndex(of: "cache_hit") ?? -1
+      for rate in [Double.nan, .infinity, -.infinity] {
+        var record = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "nonfinite")
+        record.measurementCacheHitRate = rate
+        #expect(FrameDiagnosticsTSVFormatting.recordFields(for: record)[column] == "-")
+      }
+      var huge = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "huge")
+      huge.measurementCacheHitRate = 1e300
+      #expect(FrameDiagnosticsTSVFormatting.recordFields(for: huge)[column].hasSuffix("%"))
+    }
+  }
 }

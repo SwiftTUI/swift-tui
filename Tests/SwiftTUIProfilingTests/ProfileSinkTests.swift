@@ -48,6 +48,49 @@ struct ProfileSinkTests {
     sink.emit(.memory([MemoryMetricSnapshot(name: "Cache", count: 20)]))
     #expect(sink.report().contains("Cache: 20 / 50"))
   }
+
+  // STUI-1228: the report converted an infinite CPU peak and an unbounded
+  // frame duration with unchecked Int(_:).
+  @Test("SummarySink ignores non-finite CPU samples and saturates huge values")
+  func summaryNonFiniteAndHugeValues() async {
+    await #expect(processExitsWith: .success) {
+      await MainActor.run {
+        func sample(_ percent: Double) -> CPUSample {
+          CPUSample(
+            timestampSeconds: 1, userCPUSeconds: 0, systemCPUSeconds: 0, totalCPUSeconds: 0,
+            wallDeltaSeconds: 1, estimatedCPUPercent: percent, maxResidentBytes: 0)
+        }
+        let mixed = SummarySink()
+        mixed.emit(.cpu(sample(.infinity)))
+        mixed.emit(.cpu(sample(150)))
+        #expect(mixed.report().contains("cpu: peak 150%"), "\(mixed.report())")
+        let infinite = SummarySink()
+        infinite.emit(.cpu(sample(.infinity)))
+        infinite.emit(.cpu(sample(-.infinity)))
+        #expect(!infinite.report().contains("cpu:"), "\(infinite.report())")
+        let huge = SummarySink()
+        huge.emit(.cpu(sample(1e300)))
+        #expect(huge.report().contains("cpu: peak "), "\(huge.report())")
+        var record = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "long")
+        record.totalFrameDuration = .seconds(Int64.max)
+        let long = SummarySink()
+        long.emit(.frame(record))
+        #expect(long.report().contains("worst total "), "\(long.report())")
+      }
+    }
+  }
+
+  @Test("SummarySink finite values keep their exact spelling")
+  func summaryFiniteSpellingsAreUnchanged() {
+    let sink = SummarySink()
+    sink.emit(.cpu(cpuSample(percent: 99.5, residentBytes: 0)))
+    var record = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "finite")
+    record.totalFrameDuration = .milliseconds(12) + .microseconds(600)
+    sink.emit(.frame(record))
+    let report = sink.report()
+    #expect(report.contains("cpu: peak 100%"), "\(report)")
+    #expect(report.contains("worst total 13ms"), "\(report)")
+  }
 }
 
 @MainActor

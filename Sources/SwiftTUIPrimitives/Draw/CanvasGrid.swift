@@ -117,63 +117,27 @@ package struct CanvasGridBuffer: Equatable, Sendable {
     masks[index.cellY][index.cellX] &= ~bit(localX: index.localX, localY: index.localY)
   }
 
+  /// The primitives below accept any `Int` geometry: they visit only
+  /// samples inside the buffer (see `ClippedRaster`) and light the same
+  /// samples the unclipped walks would.
   package mutating func line(from: (x: Int, y: Int), to: (x: Int, y: Int)) {
-    var x0 = from.x
-    var y0 = from.y
-    let x1 = to.x
-    let y1 = to.y
-    let dx = abs(x1 - x0)
-    let sx = x0 < x1 ? 1 : -1
-    let dy = -abs(y1 - y0)
-    let sy = y0 < y1 ? 1 : -1
-    var error = dx + dy
-
-    while true {
-      setPixel(x: x0, y: y0)
-      if x0 == x1, y0 == y1 { break }
-      let e2 = 2 * error
-      if e2 >= dy {
-        if x0 == x1 { break }
-        error += dy
-        x0 += sx
-      }
-      if e2 <= dx {
-        if y0 == y1 { break }
-        error += dx
-        y0 += sy
-      }
+    ClippedRaster.line(from: from, to: to, width: pixelWidth, height: pixelHeight) {
+      setPixel(x: $0, y: $1)
     }
   }
 
   package mutating func strokeRect(x: Int, y: Int, width: Int, height: Int) {
-    guard width > 0, height > 0 else {
-      return
-    }
-    for dx in 0..<width {
-      setPixel(x: x + dx, y: y)
-      if height > 1 {
-        setPixel(x: x + dx, y: y + height - 1)
-      }
-    }
-    if height > 2 {
-      for dy in 1..<(height - 1) {
-        setPixel(x: x, y: y + dy)
-        if width > 1 {
-          setPixel(x: x + width - 1, y: y + dy)
-        }
-      }
-    }
+    ClippedRaster.strokeRect(
+      x: x, y: y, width: width, height: height, bufferWidth: pixelWidth,
+      bufferHeight: pixelHeight
+    ) { setPixel(x: $0, y: $1) }
   }
 
   package mutating func fillRect(x: Int, y: Int, width: Int, height: Int) {
-    guard width > 0, height > 0 else {
-      return
-    }
-    for dy in 0..<height {
-      for dx in 0..<width {
-        setPixel(x: x + dx, y: y + dy)
-      }
-    }
+    ClippedRaster.fillRect(
+      x: x, y: y, width: width, height: height, bufferWidth: pixelWidth,
+      bufferHeight: pixelHeight
+    ) { setPixel(x: $0, y: $1) }
   }
 
   package mutating func strokeEllipse(
@@ -185,6 +149,23 @@ package struct CanvasGridBuffer: Equatable, Sendable {
     guard radiusX >= 0, radiusY >= 0 else { return }
     if radiusX == 0 && radiusY == 0 {
       setPixel(x: centerX, y: centerY)
+      return
+    }
+    let width = pixelWidth
+    let height = pixelHeight
+    guard
+      ClippedRaster.boundingBoxMeetsBuffer(
+        centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY, width: width,
+        height: height)
+    else { return }
+    guard
+      ClippedRaster.usesExactOutline(
+        radiusX: radiusX, radiusY: radiusY, width: width, height: height)
+    else {
+      ClippedRaster.ellipseOutline(
+        centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY, width: width,
+        height: height
+      ) { setPixel(x: $0, y: $1) }
       return
     }
     let steps = max(12, (radiusX + radiusY) * 4)
@@ -210,30 +191,10 @@ package struct CanvasGridBuffer: Equatable, Sendable {
     radiusX: Int,
     radiusY: Int
   ) {
-    guard radiusX >= 0, radiusY >= 0 else { return }
-    if radiusX == 0 && radiusY == 0 {
-      setPixel(x: centerX, y: centerY)
-      return
-    }
-    if radiusX == 0 {
-      for dy in -radiusY...radiusY {
-        setPixel(x: centerX, y: centerY + dy)
-      }
-      return
-    }
-    if radiusY == 0 {
-      for dx in -radiusX...radiusX {
-        setPixel(x: centerX + dx, y: centerY)
-      }
-      return
-    }
-    for dy in -radiusY...radiusY {
-      let dxMax = EllipseRasterization.halfSpan(radiusX: radiusX, radiusY: radiusY, offsetY: dy)
-      let y = centerY + dy
-      for dx in -dxMax...dxMax {
-        setPixel(x: centerX + dx, y: y)
-      }
-    }
+    ClippedRaster.fillEllipse(
+      centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY,
+      width: pixelWidth, height: pixelHeight
+    ) { setPixel(x: $0, y: $1) }
   }
 
   package func mask(x: Int, y: Int) -> UInt16 {

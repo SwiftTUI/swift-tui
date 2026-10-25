@@ -281,7 +281,8 @@ func pointerValueDelta(
     return deltaX
   }
   if deltaY != 0 {
-    return -deltaY
+    // `Int.min` has no negation; the wheel moves as far as it can.
+    return deltaY == .min ? .max : -deltaY
   }
   return nil
 }

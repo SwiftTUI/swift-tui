@@ -855,10 +855,18 @@ extension TerminalInputParser {
     return isNegative ? -value : value
   }
 
+  /// No terminal reports a pointer coordinate this large, in pixels or cells.
+  /// Clamping before any conversion keeps the pixel division and the cell
+  /// arithmetic that follows far inside a 32-bit `Int` (wasm32).
+  private static let maximumEncodedCoordinate = 1 << 24
+
   private func pointerLocation(
     encodedX: Int,
     encodedY: Int
   ) -> PointerLocation {
+    let bound = Self.maximumEncodedCoordinate
+    let encodedX = min(max(encodedX, -bound), bound)
+    let encodedY = min(max(encodedY, -bound), bound)
     switch mouseCoordinateMode {
     case .disabled, .cells:
       return .cellFallback(

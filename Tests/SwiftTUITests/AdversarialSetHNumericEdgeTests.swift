@@ -20,25 +20,19 @@ struct AdversarialSetHNumericEdgeTests {
     let control = SampledStrokeTrack(
       polylines: [[Point(x: 0, y: 0), Point(x: 8, y: 0)]], aspectRatio: 2)
     _ = control
-    await setHKnown(
-      "STUI-741: setH051: SampledStrokeTrack traps for a finite 1e300 segment; Int((raw / 0.5).rounded(.up)) is unchecked (SampledStrokeTrack.swift:63); a public custom Shape path with that point also traps the renderer (attribution probe); contract: finite path coordinates are drawable (Path.swift:73-80, 293); adjacent STUI-723"
-    ) {
-      await #expect(processExitsWith: .success) {
-        _ = SampledStrokeTrack(
-          polylines: [[Point(x: 0, y: 0), Point(x: 1e300, y: 0)]], aspectRatio: 2)
-      }
+    // STUI-741 regression (setH051), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      _ = SampledStrokeTrack(
+        polylines: [[Point(x: 0, y: 0), Point(x: 1e300, y: 0)]], aspectRatio: 2)
     }
   }
 
   @Test func setH052StrokeTrackHugeEllipseTraps() async {
     _ = SampledStrokeTrack.ellipse(centerX: 4, centerY: 4, radiusX: 4, radiusY: 2, aspectRatio: 2)
-    await setHKnown(
-      "STUI-741: setH052: SampledStrokeTrack.ellipse traps for an Int.max / 2 radius; the arc step count Int(...rounded(.up)) is unchecked (SampledStrokeTrack.swift:128); contract: finite radii are drawable; adjacent STUI-723"
-    ) {
-      await #expect(processExitsWith: .success) {
-        _ = SampledStrokeTrack.ellipse(
-          centerX: 0, centerY: 0, radiusX: Int.max / 2, radiusY: 1, aspectRatio: 2)
-      }
+    // STUI-741 regression (setH052), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      _ = SampledStrokeTrack.ellipse(
+        centerX: 0, centerY: 0, radiusX: Int.max / 2, radiusY: 1, aspectRatio: 2)
     }
   }
 
@@ -46,13 +40,10 @@ struct AdversarialSetHNumericEdgeTests {
   @Test func setH053BrailleStrokeEllipseOverflowTraps() async {
     var control = BrailleCanvas(width: 2, height: 2)
     control.strokeEllipse(centerX: 1, centerY: 1, radiusX: 40, radiusY: 40)
-    await setHKnown(
-      "STUI-753: setH053: BrailleCanvas.strokeEllipse traps for Int.max / 2 radii; 4 * (rx + ry) overflows (BrailleCanvas.swift:301); contract: out-of-range dots are clipped by setPixel (BrailleCanvas.swift:235-236); adjacent: none"
-    ) {
-      await #expect(processExitsWith: .success) {
-        var canvas = BrailleCanvas(width: 2, height: 2)
-        canvas.strokeEllipse(centerX: 0, centerY: 0, radiusX: Int.max / 2, radiusY: Int.max / 2)
-      }
+    // STUI-753 regression (setH053), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      var canvas = BrailleCanvas(width: 2, height: 2)
+      canvas.strokeEllipse(centerX: 0, centerY: 0, radiusX: Int.max / 2, radiusY: Int.max / 2)
     }
   }
 
@@ -61,38 +52,26 @@ struct AdversarialSetHNumericEdgeTests {
   @Test func setH054CanvasDrawingHugeRadiusTraps() async {
     var control = setHCanvasContext()
     control.strokeEllipse(center: Point(x: 1, y: 1), radiusX: 30, radiusY: 30)
-    await setHKnown(
-      "STUI-753: setH054: CanvasContext.strokeEllipse(radiusX: 1e300, radiusY: 1e300) traps; gridRadius saturates to Int.max / 2 and CanvasGridBuffer.strokeEllipse computes (radiusX + radiusY) * 4 (CanvasDrawing.swift:416-455, CanvasGrid.swift:190); contract: public continuous drawing tolerates finite radii; adjacent: none"
-    ) {
-      await #expect(processExitsWith: .success) {
-        var context = setHCanvasContext()
-        context.strokeEllipse(center: .zero, radiusX: 1e300, radiusY: 1e300)
-      }
+    // STUI-753 regression (setH054), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      var context = setHCanvasContext()
+      context.strokeEllipse(center: .zero, radiusX: 1e300, radiusY: 1e300)
     }
   }
 
   @Test func setH055PointContainingCellHugeAndNaNTrap() async {
     #expect(Point(x: 3.5, y: -1.5).containingCell == CellPoint(x: 3, y: -2))
-    await setHKnown(
-      "STUI-823: setH055: Point(x: 1e300).containingCell traps; Int(x.rounded(.down)) is unchecked (Point.swift:26-27); contract: public geometry query with no documented precondition; adjacent STUI-723"
-    ) {
-      await #expect(processExitsWith: .success) {
-        _ = Point(x: 1e300, y: 0).containingCell
-      }
+    // STUI-823 regression (setH055), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      _ = Point(x: 1e300, y: 0).containingCell
     }
-    await setHKnown(
-      "STUI-823: setH055: Point(x: .nan).containingCell traps; Int(x.rounded(.down)) is unchecked (Point.swift:26-27); contract: public geometry query with no documented precondition; adjacent STUI-723"
-    ) {
-      await #expect(processExitsWith: .success) {
-        _ = Point(x: .nan, y: 0).containingCell
-      }
+    // STUI-823 regression (setH055), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      _ = Point(x: .nan, y: 0).containingCell
     }
-    await setHKnown(
-      "STUI-823: setH055: Point(x: -1e300).snapped(.toNearestOrEven) traps; Int(x.rounded(rule)) is unchecked (Point.swift:41-42); contract: public geometry query with no documented precondition; adjacent STUI-723"
-    ) {
-      await #expect(processExitsWith: .success) {
-        _ = Point(x: -1e300, y: 0).snapped(.toNearestOrEven)
-      }
+    // STUI-823 regression (setH055), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      _ = Point(x: -1e300, y: 0).snapped(.toNearestOrEven)
     }
   }
 
@@ -115,20 +94,17 @@ struct AdversarialSetHNumericEdgeTests {
       let frame = try harness.clickText("Jump")
       #expect(frame.contains("«9»"), "\(frame)")
     }
-    await setHKnown(
-      "STUI-768: setH057: ScrollViewProxy.scrollTo(_:anchor:) with UnitPoint(y: .nan) traps on a List; Int((free lines) * anchor.y) is unchecked (CollectionScrollState.swift:303); contract: SwiftUI ScrollViewProxy/UnitPoint have no finiteness precondition (GeometryTypes.swift:160); adjacent STUI-1170, STUI-1171"
-    ) {
-      await #expect(processExitsWith: .success) {
-        try await MainActor.run {
-          let harness = try StressRuntimeHarness(
-            rootIdentity: testIdentity("SetHNumeric", "ListAnchorNaN"),
-            size: .init(width: 32, height: 10)
-          ) {
-            SetHAnchoredList(anchor: UnitPoint(x: 0, y: .nan))
-          }
-          defer { harness.shutdown() }
-          _ = try harness.clickText("Jump")
+    // STUI-768 regression (setH057), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      try await MainActor.run {
+        let harness = try StressRuntimeHarness(
+          rootIdentity: testIdentity("SetHNumeric", "ListAnchorNaN"),
+          size: .init(width: 32, height: 10)
+        ) {
+          SetHAnchoredList(anchor: UnitPoint(x: 0, y: .nan))
         }
+        defer { harness.shutdown() }
+        _ = try harness.clickText("Jump")
       }
     }
   }
@@ -145,20 +121,17 @@ struct AdversarialSetHNumericEdgeTests {
       let frame = try harness.clickText("Jump")
       #expect(frame.contains("row 9"), "\(frame)")
     }
-    await setHKnown(
-      "STUI-768: setH058: ScrollViewProxy.scrollTo(_:anchor:) with a NaN UnitPoint traps on a ScrollView; anchoredCoordinate converts (length - 1) * unit unchecked (LocalScrollPositionRegistry.swift:969-974, 1094-1100); contract: SwiftUI ScrollViewProxy/UnitPoint have no finiteness precondition; adjacent STUI-1170, STUI-1130"
-    ) {
-      await #expect(processExitsWith: .success) {
-        try await MainActor.run {
-          let harness = try StressRuntimeHarness(
-            rootIdentity: testIdentity("SetHNumeric", "ScrollAnchorNaN"),
-            size: .init(width: 32, height: 10)
-          ) {
-            SetHAnchoredScrollView(anchor: UnitPoint(x: .nan, y: .nan))
-          }
-          defer { harness.shutdown() }
-          _ = try harness.clickText("Jump")
+    // STUI-768 regression (setH058), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      try await MainActor.run {
+        let harness = try StressRuntimeHarness(
+          rootIdentity: testIdentity("SetHNumeric", "ScrollAnchorNaN"),
+          size: .init(width: 32, height: 10)
+        ) {
+          SetHAnchoredScrollView(anchor: UnitPoint(x: .nan, y: .nan))
         }
+        defer { harness.shutdown() }
+        _ = try harness.clickText("Jump")
       }
     }
   }
@@ -185,12 +158,9 @@ struct AdversarialSetHNumericEdgeTests {
   // triangle extents with Int(_).
   @Test func setH061MeshGradientHugeFinitePointTraps() async {
     _ = setHPreparedMesh(corner: SIMD2<Float>(1, 1))
-    await setHKnown(
-      "STUI-745: setH061: PreparedMeshGradient traps for a finite mesh point (1e30, 1e30), also through a public MeshGradient fill (attribution probe); row binning converts Float extents with Int(_) unchecked (PreparedMeshGradient.swift:336-343); contract: MeshGradient requires only finite points (GradientStyles.swift:275-277); adjacent: none"
-    ) {
-      await #expect(processExitsWith: .success) {
-        _ = setHPreparedMesh(corner: SIMD2<Float>(1e30, 1e30))
-      }
+    // STUI-745 regression (setH061), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      _ = setHPreparedMesh(corner: SIMD2<Float>(1e30, 1e30))
     }
   }
 
@@ -200,14 +170,11 @@ struct AdversarialSetHNumericEdgeTests {
     var control = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "setH062")
     control.measurementCacheHitRate = 0.5
     #expect(FrameDiagnosticsTSVFormatting.recordFields(for: control).contains("50.0%"))
-    await setHKnown(
-      "STUI-1228: setH062: FrameDiagnosticsTSVFormatting.recordFields traps for measurementCacheHitRate = .nan; Int(rate * 1000) is unchecked (FrameDiagnosticsTSVFormatting.swift:330-334); contract: the formatter is total over its public record field (FrameDiagnosticRecord.swift:184); adjacent: setB321-330 diagnostics sinks, no STUI"
-    ) {
-      await #expect(processExitsWith: .success) {
-        var record = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "setH062")
-        record.measurementCacheHitRate = .nan
-        _ = FrameDiagnosticsTSVFormatting.recordFields(for: record)
-      }
+    // STUI-1228 regression (setH062), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      var record = FrameDiagnosticRecord(frameNumber: 1, causeSummary: "setH062")
+      record.measurementCacheHitRate = .nan
+      _ = FrameDiagnosticsTSVFormatting.recordFields(for: record)
     }
   }
 
@@ -221,15 +188,12 @@ struct AdversarialSetHNumericEdgeTests {
     }
     #expect(reports.0.contains("cpu: peak 150%"), "\(reports.0)")
     #expect(!reports.1.lowercased().contains("nan"), "\(reports.1)")
-    await setHKnown(
-      "STUI-1228: setH063: SummarySink.report traps after an infinite estimatedCPUPercent sample; max keeps +inf and Int(cpuPeakPercent.rounded()) is unchecked (SummarySink.swift:52, 80); contract: profiling sinks are total over the public CPUSample (CPUSampler.swift:62-78); adjacent: none"
-    ) {
-      await #expect(processExitsWith: .success) {
-        await MainActor.run {
-          let sink = SummarySink()
-          sink.emit(.cpu(setHCPUSample(percent: .infinity)))
-          _ = sink.report()
-        }
+    // STUI-1228 regression (setH063), formerly a known issue.
+    await #expect(processExitsWith: .success) {
+      await MainActor.run {
+        let sink = SummarySink()
+        sink.emit(.cpu(setHCPUSample(percent: .infinity)))
+        _ = sink.report()
       }
     }
   }
@@ -262,16 +226,15 @@ struct AdversarialSetHNumericEdgeTests {
     context.strokeEllipse(center: Point(x: .nan, y: .nan), radiusX: 1, radiusY: 1)
   }
 
-  // Not executed: fillEllipse with radiusX 1e300 and radiusY 0 runs the
-  // single-row branch over -(Int.max / 2)...(Int.max / 2) — an unbounded
-  // loop no 10 s test can bound. Recorded from code reading in the brief.
-  @Test(
-    .disabled(
-      "setH068: hang by code reading (BrailleCanvas.swift:254-258); not executable within the 10 s budget"
-    ))
-  func setH068FillEllipseHugeRadiusHangs() {
+  // STUI-753 regression (setH068): fillEllipse with radiusX 1e300 and
+  // radiusY 0 ran its single-row branch over -(Int.max / 2)...(Int.max / 2),
+  // a hang. The row is now clipped to the canvas before it is walked.
+  @Test func setH068FillEllipseHugeRadiusHangs() {
     var context = setHCanvasContext()
     context.fillEllipse(center: .zero, radiusX: 1e300, radiusY: 0)
+    // The top dot row of every cell of the 4 x 2 Braille canvas, nothing else.
+    #expect((0..<4).allSatisfy { context.canvas.mask(x: $0, y: 0) == 0x09 })
+    #expect((0..<4).allSatisfy { context.canvas.mask(x: $0, y: 1) == 0 })
   }
 }
 

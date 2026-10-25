@@ -340,10 +340,10 @@ package struct WebSurfaceInputParser {
     }
     guard components.count == 8,
       components[0] == "mouse",
-      let x = Double(components[2]),
-      let y = Double(components[3]), x.isFinite, y.isFinite,
-      let deltaX = Int(components[5]),
-      let deltaY = Int(components[6])
+      let x = pointerCoordinate(components[2]),
+      let y = pointerCoordinate(components[3]),
+      let deltaX = wheelDelta(components[5]),
+      let deltaY = wheelDelta(components[6])
     else {
       return nil
     }
@@ -376,6 +376,61 @@ package struct WebSurfaceInputParser {
     )
     event.hostGeometryStamp = stamp
     return .mouse(event)
+  }
+
+  /// A wire coordinate: a decimal number (`[+-]digits[.digits][(e|E)[+-]digits]`,
+  /// no hexadecimal, infinity or NaN spelling) of magnitude at most
+  /// `HostWireBudget.pointerMagnitude` cells. Anything else drops the record.
+  private func pointerCoordinate(_ text: String) -> Double? {
+    guard Self.isDecimalNumber(text.utf8), let value = Double(text), value.isFinite,
+      value.magnitude <= Double(HostWireBudget.pointerMagnitude)
+    else {
+      return nil
+    }
+    return value
+  }
+
+  /// A wire wheel delta: a decimal integer of magnitude at most
+  /// `HostWireBudget.pointerMagnitude`, on every platform's `Int` width.
+  private func wheelDelta(_ text: String) -> Int? {
+    guard let value = Int(text), value.magnitude <= UInt(HostWireBudget.pointerMagnitude) else {
+      return nil
+    }
+    return value
+  }
+
+  private static func isDecimalNumber(_ bytes: String.UTF8View) -> Bool {
+    var index = bytes.startIndex
+    func skipDigits() -> Int {
+      var count = 0
+      while index < bytes.endIndex, (0x30...0x39).contains(bytes[index]) {
+        count += 1
+        index = bytes.index(after: index)
+      }
+      return count
+    }
+    func skipSign() {
+      if index < bytes.endIndex, bytes[index] == 0x2B || bytes[index] == 0x2D {
+        index = bytes.index(after: index)
+      }
+    }
+    skipSign()
+    var mantissaDigits = skipDigits()
+    if index < bytes.endIndex, bytes[index] == 0x2E {
+      index = bytes.index(after: index)
+      mantissaDigits += skipDigits()
+    }
+    guard mantissaDigits > 0 else {
+      return false
+    }
+    if index < bytes.endIndex, bytes[index] == 0x45 || bytes[index] == 0x65 {
+      index = bytes.index(after: index)
+      skipSign()
+      guard skipDigits() > 0 else {
+        return false
+      }
+    }
+    return index == bytes.endIndex
   }
 
   private func pointerLocation(

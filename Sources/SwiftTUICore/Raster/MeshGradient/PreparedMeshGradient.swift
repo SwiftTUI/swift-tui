@@ -331,15 +331,22 @@ package struct PreparedMeshGradient: Sendable {
     var bins = Array(repeating: [Int](), count: max(0, bounds.size.height))
     for triangleIndex in preparedTriangles.indices {
       let triangle = preparedTriangles[triangleIndex]
+      // A finite control point times the bounds can leave `Float` range, and
+      // its derivatives can then be NaN. Such a triangle covers no cell.
+      guard
+        triangle.a.position.x.isFinite, triangle.a.position.y.isFinite,
+        triangle.b.position.x.isFinite, triangle.b.position.y.isFinite,
+        triangle.c.position.x.isFinite, triangle.c.position.y.isFinite
+      else { continue }
       let minY = min(triangle.a.position.y, min(triangle.b.position.y, triangle.c.position.y))
       let maxY = max(triangle.a.position.y, max(triangle.b.position.y, triangle.c.position.y))
       let first = max(
         bounds.origin.y,
-        Int((minY - 0.5).rounded(.up))
+        SaturatingConversion.int(Double((minY - 0.5).rounded(.up)), rounding: .up)
       )
       let last = min(
         bounds.origin.y + bounds.size.height - 1,
-        Int((maxY - 0.5).rounded(.down))
+        SaturatingConversion.int(Double((maxY - 0.5).rounded(.down)), rounding: .down)
       )
       guard first <= last else { continue }
       for y in first...last {

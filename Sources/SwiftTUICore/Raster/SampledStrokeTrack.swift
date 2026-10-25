@@ -43,29 +43,88 @@ package struct SampledStrokeTrack: Equatable, Sendable {
   /// nearest sample to a lit subpixel is a good estimate of its position.
   private static let maximumStep = 0.5
 
-  /// - Parameter polylines: Ordered outlines in subpixel coordinates. Positions
-  ///   continue from one polyline to the next, as SwiftUI measures a trim across
-  ///   every subpath of a path.
-  package init(polylines: [[Point]], aspectRatio: Double) {
+  /// The most samples one segment or arc contributes. A segment needing more
+  /// is longer than 32,768 subpixels: far outside any canvas, so only its part
+  /// inside the sampling window is sampled.
+  private static let maximumSegmentSamples = 1 << 16
+
+  /// Step indices below this are exact in `Double` and fit `Int` on every
+  /// platform, including wasm32's 32-bit `Int`.
+  private static let maximumExactStep = min(0x1p53, Double(Int.max / 2))
+
+  /// - Parameters:
+  ///   - polylines: Ordered outlines in subpixel coordinates. Positions
+  ///     continue from one polyline to the next, as SwiftUI measures a trim
+  ///     across every subpath of a path.
+  ///   - samplingWindow: The subpixel region whose lit subpixels the track
+  ///     will be asked about. A segment longer than the sampling cap is
+  ///     sampled only near this window; without one it contributes just its
+  ///     end point. Shorter segments are sampled in full either way.
+  package init(polylines: [[Point]], aspectRatio: Double, samplingWindow: Rect? = nil) {
     unitX = 0.5
     unitY = RectangleStrokeTrack.snappedAspectRatio(aspectRatio) / 4
+    // Pad the window so that no sample outside it can be the nearest one to a
+    // subpixel inside it, whatever the aspect ratio.
+    let margin = 2 + 4 * max(unitX, unitY) / min(unitX, unitY)
+    let window = samplingWindow.map {
+      (
+        minX: $0.origin.x - margin, minY: $0.origin.y - margin,
+        maxX: $0.maxX + margin, maxY: $0.maxY + margin
+      )
+    }
     var travelled = 0.0
     for polyline in polylines where polyline.count >= 2 {
       append(polyline[0], at: travelled)
       for index in polyline.indices.dropFirst() {
         let a = polyline[index - 1]
         let b = polyline[index]
-        let raw = ((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)).squareRoot()
-        guard raw > 0 else {
+        let raw = Self.length(dx: b.x - a.x, dy: b.y - a.y)
+        // A segment whose length is not a finite positive number is unusable.
+        guard raw > 0, raw.isFinite else {
           continue
         }
         let segment = trackDistance(from: a, to: b)
-        let steps = max(1, Int((raw / Self.maximumStep).rounded(.up)))
-        for step in 1...steps {
-          let t = Double(step) / Double(steps)
+        guard segment.isFinite else {
+          continue
+        }
+        func sample(at t: Double) {
           append(
             Point(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t),
             at: travelled + segment * t)
+        }
+        let stepCount = (raw / Self.maximumStep).rounded(.up)
+        if stepCount <= Double(Self.maximumSegmentSamples) {
+          let steps = max(1, Int(stepCount))
+          for step in 1...steps {
+            sample(at: Double(step) / Double(steps))
+          }
+        } else if let window,
+          let interval = SegmentClipping.parameterInterval(
+            from: a, to: b, minX: window.minX, minY: window.minY, maxX: window.maxX,
+            maxY: window.maxY)
+        {
+          // The same `step / steps` grid as a short segment, restricted to the
+          // steps near the window: one sample per half subpixel.
+          let first = max(1, (interval.lower * stepCount).rounded(.down))
+          let last = min(stepCount, (interval.upper * stepCount).rounded(.up))
+          if first <= last, last - first <= Double(Self.maximumSegmentSamples),
+            last < Self.maximumExactStep
+          {
+            for step in Int(first)...Int(last) {
+              sample(at: Double(step) / stepCount)
+            }
+          } else {
+            // Both ends are far beyond the window, where `Double` cannot
+            // index the grid: sample the visible interval evenly instead.
+            let span = interval.upper - interval.lower
+            let samples = max(
+              1, Int(min(Double(Self.maximumSegmentSamples), (span * stepCount).rounded(.up))))
+            for index in 0...samples {
+              sample(at: interval.lower + span * Double(index) / Double(samples))
+            }
+          }
+        } else if window == nil {
+          sample(at: 1)
         }
         travelled += segment
       }
@@ -78,10 +137,21 @@ package struct SampledStrokeTrack: Equatable, Sendable {
     positions.append(position)
   }
 
+  /// `sqrt(dx² + dy²)`, rescaled only when the squares overflow, so finite
+  /// in-range lengths are computed exactly as before.
+  private static func length(dx: Double, dy: Double) -> Double {
+    let plain = (dx * dx + dy * dy).squareRoot()
+    guard plain.isInfinite, dx.isFinite, dy.isFinite else {
+      return plain
+    }
+    let scale = max(abs(dx), abs(dy))
+    let x = dx / scale
+    let y = dy / scale
+    return scale * (x * x + y * y).squareRoot()
+  }
+
   private func trackDistance(from a: Point, to b: Point) -> Double {
-    let dx = (b.x - a.x) * unitX
-    let dy = (b.y - a.y) * unitY
-    return (dx * dx + dy * dy).squareRoot()
+    Self.length(dx: (b.x - a.x) * unitX, dy: (b.y - a.y) * unitY)
   }
 
   /// The track position of the outline sample nearest a subpixel.
@@ -125,7 +195,8 @@ extension SampledStrokeTrack {
     // Angles increase toward +y, which is down, so they run clockwise on
     // screen, as SwiftUI's shapes do.
     let sweep = abs(endAngle - startAngle)
-    let steps = max(4, Int((sweep * max(radiusX, radiusY, 1) / maximumStep).rounded(.up)))
+    let stepCount = (sweep * max(radiusX, radiusY, 1) / maximumStep).rounded(.up)
+    let steps = max(4, Int(min(stepCount, Double(maximumSegmentSamples))))
     return (0...steps).map { step in
       let angle = startAngle + (endAngle - startAngle) * Double(step) / Double(steps)
       return Point(x: centerX + radiusX * cos(angle), y: centerY + radiusY * sin(angle))
@@ -195,6 +266,10 @@ extension SampledStrokeTrack {
           sx: Double(max(1, subpixelWidth - 1)), sy: Double(max(1, subpixelHeight - 1))
         )
         .flattened(tolerance: 0.3),
-      aspectRatio: aspectRatio)
+      aspectRatio: aspectRatio,
+      samplingWindow: Rect(
+        origin: .zero,
+        size: Size(
+          width: Double(max(0, subpixelWidth - 1)), height: Double(max(0, subpixelHeight - 1)))))
   }
 }
