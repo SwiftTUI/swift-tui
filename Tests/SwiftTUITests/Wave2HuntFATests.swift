@@ -11,17 +11,8 @@ import Testing
 // neighbours of the wave-2 repairs FW-A (92dc2e5a), FW-B (9f203f8b), FW-D
 // (8236b3f2) and the STUI-1211 SPI (2fde3a6f). Contracts, inputs and
 // predictions: docs/reports/evidence/2026-10-25-campaign-two-wave-2-hunt/fa/
-// in the coordination root. Reproduced expectations are wrapped in
-// `w2faKnown`; `SWIFTTUI_W2HUNT_UNMARKED=1` runs them as plain assertions.
-
-@MainActor
-func w2faKnown(_ comment: Comment, _ body: () -> Void) {
-  if ProcessInfo.processInfo.environment["SWIFTTUI_W2HUNT_UNMARKED"] == "1" {
-    body()
-  } else {
-    withKnownIssue(comment) { body() }
-  }
-}
+// in the coordination root. Every expectation is an ordinary assertion; the
+// findings it reproduced were repaired as STUI-1239 to STUI-1243.
 
 // MARK: - FW-A: scroll edges, table eligibility, editor keys, hidden separators
 
