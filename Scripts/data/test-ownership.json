@@ -2954,6 +2954,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/Wave3HuntFATests.swift": {
+      "category": "runtime-integration",
+      "reason": "Campaign two wave-3 regression hunt part FA: POSIX read edges and redirected diagnostics, scroll-hosted table widths, clip-mask morphs, projected-binding names, wholly offscreen lazy stacks, invalidation summaries and departure ordering (STUI-1167) through the stress run loop and one-shot renderer."
+    },
     "Tests/SwiftTUITests/WindowedLineGenerationTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
@@ -3433,6 +3437,10 @@
     "Platforms/CLI/Tests/SwiftTUICLITests/AdversarialSetHPlatformFacadeTests.swift": {
       "category": "target-contract",
       "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/Wave3HuntFACLITests.swift": {
+      "category": "target-contract",
+      "reason": "Campaign two wave-3 regression hunt part FA: attach discovery of non-socket *.sock entries and the non-Darwin facade SIGPIPE mask (STUI-1167)."
     },
     "Platforms/WASI/Tests/WASISurfaceBridgeTests/AdversarialSetHWASIBridgeTests.swift": {
       "category": "target-contract",
