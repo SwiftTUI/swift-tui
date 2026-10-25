@@ -26,17 +26,26 @@ struct AdversarialSetCCaptureClassificationTests {
     // Focus returns to the re-minted field (same identity), so the live
     // successor reads true while the retired capture reads its own fallback.
     try #require(successor() == true, "focus is restored to the remounted field")
-    StateCaptureCensus.resetForTesting()
+    // The capture census is debug-only (StateCaptureBinding.swift:143-151).
+    #if DEBUG
+      StateCaptureCensus.resetForTesting()
+    #endif
     #expect(retired() == false, "retired fallback, not the successor's value")
-    #expect(StateCaptureCensus.count(of: .focusRetired) >= 1)
+    #if DEBUG
+      #expect(StateCaptureCensus.count(of: .focusRetired) >= 1)
+    #endif
   }
 
   @Test func setC167UnpreparedGestureStateIsInert() {
     let state = GestureState(initialValue: 3)
-    StateCaptureCensus.resetForTesting()
+    #if DEBUG
+      StateCaptureCensus.resetForTesting()
+    #endif
     #expect(state.wrappedValue == 3)
-    #expect(StateCaptureCensus.count(of: .gestureUnprepared) >= 1)
-    #expect(StateCaptureCensus.count(of: .gestureRetired) == 0)
+    #if DEBUG
+      #expect(StateCaptureCensus.count(of: .gestureUnprepared) >= 1)
+      #expect(StateCaptureCensus.count(of: .gestureRetired) == 0)
+    #endif
   }
 
   @Test func setC168RetainedSubtreeAddsNoBindEvents() throws {
