@@ -547,6 +547,40 @@ package final class LocalScrollPositionRegistry: Equatable {
     return true
   }
 
+  /// Refines every pending far edge whose route this frame published, and
+  /// reports whether any offset moved. Pending edges of departed routes,
+  /// superseded commands and exhausted or settled refinements are dropped.
+  private func refineFarEdges(in scrollRoutes: [ScrollRoute]) -> Bool {
+    guard !pendingFarEdges.isEmpty else { return false }
+    var unvisited = Set(pendingFarEdges.keys)
+    var refined = false
+    for route in scrollRoutes where unvisited.remove(route.identity) != nil {
+      let identity = route.identity
+      guard let pending = pendingFarEdges[identity],
+        let registration = registrations[identity],
+        registration.currentOffset() == pending.requestedOffset,
+        pending.remainingRefinements > 0
+      else {
+        pendingFarEdges.removeValue(forKey: identity)
+        continue
+      }
+      let next = edgeOffset(pending.edge, from: pending.requestedOffset, in: route)
+      guard next != pending.requestedOffset else {
+        pendingFarEdges.removeValue(forKey: identity)
+        continue
+      }
+      pendingFarEdges[identity] = .init(
+        edge: pending.edge, requestedOffset: next,
+        remainingRefinements: pending.remainingRefinements - 1)
+      registration.applyOffset(next)
+      refined = true
+    }
+    for identity in unvisited {
+      pendingFarEdges.removeValue(forKey: identity)
+    }
+    return refined
+  }
+
   private func edgeOffset(
     _ edge: Edge, from currentOffset: ScrollOffset, in route: ScrollRoute
   ) -> ScrollOffset {
@@ -695,27 +729,12 @@ package final class LocalScrollPositionRegistry: Equatable {
       }
     }
 
-    // Re-resolve a far-edge command against the extent this frame measured.
-    // Only while the route still holds the offset the command wrote: any
-    // other input (or a commit-time clamp) supersedes the command.
-    for (identity, pending) in pendingFarEdges {
-      guard let route = scrollRoutes.first(where: { $0.identity == identity }),
-        let registration = registrations[identity],
-        registration.currentOffset() == pending.requestedOffset,
-        pending.remainingRefinements > 0
-      else {
-        pendingFarEdges.removeValue(forKey: identity)
-        continue
-      }
-      let next = edgeOffset(pending.edge, from: pending.requestedOffset, in: route)
-      guard next != pending.requestedOffset else {
-        pendingFarEdges.removeValue(forKey: identity)
-        continue
-      }
-      pendingFarEdges[identity] = .init(
-        edge: pending.edge, requestedOffset: next,
-        remainingRefinements: pending.remainingRefinements - 1)
-      registration.applyOffset(next)
+    // Re-resolve every far-edge command against the extent this frame
+    // measured, so the commands of one action share the eager rerender
+    // (STUI-1243). Routes are visited in frame order. Only while the route
+    // still holds the offset the command wrote: any other input (or a
+    // commit-time clamp) supersedes the command.
+    if refineFarEdges(in: scrollRoutes) {
       return true
     }
 

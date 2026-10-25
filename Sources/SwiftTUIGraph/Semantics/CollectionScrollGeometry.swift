@@ -57,7 +57,10 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
     }
   }
 
-  /// The minimum stride used to bound an interaction band before measurement.
+  /// The estimated stride of a row this geometry has not measured: two for a
+  /// table (a row line and a separator line), one or two for a list. A table
+  /// row whose following separator is hidden packs one line closer, so the
+  /// stride is not a lower bound on a table row's lines.
   package var rowSpan: Int {
     switch rows {
     case .indexed(_, let span, _): span

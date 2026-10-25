@@ -80,7 +80,12 @@ extension SemanticExtractor {
     button.control = .init(actions: [.activate], value: .boolean(selection.isSelected))
     button.properties = .init(
       readOnly: readOnly ?? node.semanticMetadata.accessibilityProperties?.readOnly)
-    button.isEnabled = node.environmentSnapshot.style.isEnabled
+    // The collection records row eligibility as interaction availability: a
+    // row whose cells or tagged content are disabled keeps an enabled wrapper
+    // environment, but its selector is as disabled as its row action.
+    button.isEnabled =
+      node.environmentSnapshot.style.isEnabled
+      && node.semanticMetadata.interactionAvailability.isEnabled
     button.actionIdentity = selection.actionIdentity
     if let owner = selection.ownerNodeID {
       button.actionTarget = "\(owner.rawValue):\(identity.path)"

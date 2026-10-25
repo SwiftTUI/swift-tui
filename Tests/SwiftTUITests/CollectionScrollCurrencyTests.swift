@@ -542,7 +542,7 @@ struct CollectionScrollCurrencyTests {
       geometry: CollectionScrollGeometry(rowCount: 10, rowSpan: 2),
       ownerNode: ownerNode,
       registry: registry,
-      windowMetrics: { _ in (offset: 0, visibleLineCount: 1) }
+      windowMetrics: { _, _ in (offset: 0, visibleLineCount: 1) }
     )
 
     #expect(currency.effectiveAnchorRow == 0, "starts at the selection-centred fallback")

@@ -1,3 +1,4 @@
+import Foundation
 @_spi(Testing) import SwiftTUITestSupport
 import Testing
 
@@ -360,6 +361,102 @@ struct AdversarialSetCScrollCollectionTests {
     #expect(enabled == .accepted)
     #expect(box.selection == 3)
   }
+
+  // Wave 3 (FW3-E, STUI-1240): an ineligible row's assistive selector is
+  // published disabled in every collection shape, as the List row's is
+  // (Collections.md:39-43; Accessibility.md:117-123). The browser projection
+  // serializes the framework node's enabled state.
+  @Test(arguments: SetCDisabledRowShape.allCases)
+  func wave3e10DisabledRowSelectorIsPublishedDisabled(_ shape: SetCDisabledRowShape) throws {
+    let box = SetCScrollBox()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave3e10", shape.description), size: .init(width: 24, height: 10)
+    ) {
+      SetCDisabledRowHost(shape: shape, selection: box.selectionBinding)
+    }
+    defer { h.shutdown() }
+    func selector(_ row: Int) throws -> AccessibilityNode {
+      try #require(
+        h.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.first {
+          $0.label == "Select row \(row)"
+        }, "\(shape): \(h.frame)")
+    }
+    #expect(try selector(1).isEnabled, "\(shape)")
+    #expect(try selector(3).isEnabled, "\(shape)")
+    let disabled = try selector(2)
+    #expect(!disabled.isEnabled, "\(shape)")
+    let wire = try SetCWire.accessibilityEntries(h.runLoop.publishedAccessibilitySnapshot, h.frame)
+    let entry = try #require(wire.first { $0["label"] as? String == "Select row 2" }, "\(shape)")
+    #expect(entry["isEnabled"] as? Bool == false, "\(shape): \(entry)")
+    let target = try #require(disabled.actionTarget)
+    let result = h.runLoop.handleAccessibilityAction(.init(target: target, action: .activate))
+    _ = try h.render()
+    #expect(result == .disabled, "\(shape): \(String(describing: result))")
+    #expect(box.selection == 1, "\(shape)")
+  }
+
+  // Wave 3 (FW3-E, STUI-1243): every far-edge command of one action
+  // refines, whichever view the registry visits first. The registry visits
+  // routes in frame order, so swapping the views pins both orders
+  // (Scrolling.md:206-209; Divergences-And-Gaps.md:398-405: explicit scroll
+  // commands take precedence over anchor preservation).
+  @Test(arguments: [false, true])
+  func wave3e20TwoTrailingEdgesInOneActionBothRefine(swapped: Bool) throws {
+    let proxies = SetCProxies()
+    let names = swapped ? ["Y", "Z"] : ["Z", "Y"]
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave3e20", swapped ? "swapped" : "ordered"),
+      size: .init(width: 24, height: 9)
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        ScrollViewReader { proxy in
+          let _ = proxies.store(proxy, first: true)
+          SetCVariableLazy.horizontal(last: names[0])
+        }
+        ScrollViewReader { proxy in
+          let _ = proxies.store(proxy, first: false)
+          SetCVariableLazy.horizontal(last: names[1])
+        }
+        Button("jump") {
+          for proxy in proxies.ordered(reversed: swapped) { _ = proxy.scrollTo(edge: .trailing) }
+        }
+      }
+    }
+    defer { h.shutdown() }
+    try #require(!h.frame.contains("Z") && !h.frame.contains("Y"), "\(h.frame)")
+    _ = try h.clickText("jump")
+    #expect(h.frame.contains("Z") && h.frame.contains("Y"), "\(h.frame)")
+  }
+
+  // Two assistive "Scroll to bottom" commands before one frame both refine.
+  @Test(arguments: [false, true])
+  func wave3e21TwoAssistiveBottomEdgesBeforeOneFrameBothRefine(swapped: Bool) throws {
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave3e21", swapped ? "swapped" : "ordered"),
+      size: .init(width: 30, height: 9)
+    ) {
+      HStack(alignment: .top, spacing: 1) {
+        SetCVariableLazy.vertical(prefix: "a", label: "Left rows")
+        SetCVariableLazy.vertical(prefix: "b", label: "Right rows")
+      }
+    }
+    defer { h.shutdown() }
+    try #require(h.frame.contains("a0") && h.frame.contains("b0"), "\(h.frame)")
+    let labels = swapped ? ["Right rows", "Left rows"] : ["Left rows", "Right rows"]
+    let targets = try labels.map { label in
+      try #require(
+        h.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.first {
+          $0.label == label
+        }?.actionTarget)
+    }
+    for target in targets {
+      #expect(
+        h.runLoop.handleAccessibilityAction(
+          .init(target: target, action: .custom("Scroll to bottom"))) == .accepted)
+    }
+    _ = try h.render()
+    #expect(h.frame.contains("a119") && h.frame.contains("b119"), "\(h.frame)")
+  }
 }
 
 @MainActor
@@ -383,6 +480,139 @@ private enum SetCVariableLazy {
   static func maximumOffset<V: View>(_ h: StressRuntimeHarness<V>) throws -> Int {
     let route = try #require(h.runLoop.latestSemanticSnapshot.scrollRoutes.first)
     return max(0, route.contentBounds.size.height - route.viewportRect.size.height)
+  }
+}
+
+extension SetCVariableLazy {
+  /// 120 items: 0-39 one cell wide, 40-119 three; the last reads `last`.
+  @ViewBuilder
+  static func horizontal(last: String) -> some View {
+    ScrollView(.horizontal) {
+      LazyHStack(spacing: 0) {
+        ForEach(0..<120, id: \.self) { i in
+          Text(i == 119 ? last : ".").frame(width: i < 40 ? 1 : 3)
+        }
+      }
+    }.scrollIndicators(.hidden).frame(width: 20, height: 3)
+  }
+
+  /// 120 rows `<prefix>0`…`<prefix>119`: 0-39 one cell tall, 40-119 three.
+  @ViewBuilder
+  static func vertical(prefix: String, label: String) -> some View {
+    ScrollView {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<120, id: \.self) { i in
+          Text("\(prefix)\(i)").frame(height: i < 40 ? 1 : 3)
+        }
+      }
+    }.scrollIndicators(.hidden).accessibilityLabel(label).frame(width: 8, height: 8)
+  }
+}
+
+@MainActor
+private final class SetCProxies {
+  var first: ScrollViewProxy?
+  var second: ScrollViewProxy?
+  func store(_ proxy: ScrollViewProxy, first isFirst: Bool) {
+    if isFirst { first = proxy } else { second = proxy }
+  }
+  func ordered(reversed: Bool) -> [ScrollViewProxy] {
+    let proxies = [first, second].compactMap { $0 }
+    return reversed ? proxies.reversed() : proxies
+  }
+}
+
+/// Collection shapes whose second row is ineligible for selection.
+enum SetCDisabledRowShape: String, CaseIterable, Sendable, CustomStringConvertible {
+  case list, listTaggedChild, outline, staticTableRow, staticTableCells, dataTable
+  var description: String { rawValue }
+}
+
+private struct SetCOutlineRecord: Identifiable, Hashable, Sendable {
+  let id: Int
+  var children: [SetCOutlineRecord]?
+}
+
+private struct SetCDisabledRowHost: View {
+  let shape: SetCDisabledRowShape
+  let selection: Binding<Int?>
+
+  var body: some View {
+    switch shape {
+    case .list:
+      List([1, 2, 3], id: \.self, selection: selection) { i in
+        Text("row\(i)").disabled(i == 2)
+      }
+    case .listTaggedChild:
+      // The row wrapper stays enabled; its tagged content is disabled.
+      List(selection: selection) {
+        ForEach([1, 2, 3], id: \.self) { i in
+          HStack(spacing: 1) {
+            Text("row\(i)").tag(i).disabled(i == 2)
+            Text("·")
+          }
+        }
+      }
+    case .outline:
+      List(
+        [SetCOutlineRecord(id: 1, children: [.init(id: 2), .init(id: 3)])], id: \.id,
+        selection: selection, children: \.children
+      ) { record in
+        Text("row\(record.id)").disabled(record.id == 2)
+      }
+    case .staticTableRow:
+      Table(selection: selection, columns: [TableColumn("Name", width: 12)]) {
+        TableRow { Text("row1") }.tag(1)
+        TableRow { Text("row2") }.tag(2).disabled(true)
+        TableRow { Text("row3") }.tag(3)
+      }.tableHeaders(.hidden)
+    case .staticTableCells:
+      Table(
+        selection: selection, columns: [TableColumn("A", width: 6), TableColumn("B", width: 6)]
+      ) {
+        TableRow {
+          Text("row1")
+          Text("b1")
+        }.tag(1)
+        TableRow {
+          Text("row2").disabled(true)
+          Text("b2").disabled(true)
+        }.tag(2)
+        TableRow {
+          Text("row3")
+          Text("b3")
+        }.tag(3)
+      }.tableHeaders(.hidden)
+    case .dataTable:
+      Table(
+        [1, 2, 3], id: \.self, selection: selection, columns: [TableColumn("Name", width: 12)]
+      ) { i in
+        Text("row\(i)").disabled(i == 2)
+      }.tableHeaders(.hidden)
+    }
+  }
+}
+
+@MainActor
+private enum SetCWire {
+  /// The browser projection's accessibility records for a published snapshot.
+  static func accessibilityEntries(
+    _ snapshot: SemanticSnapshot, _ frame: String
+  ) throws -> [[String: Any]] {
+    let lines = frame.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    let width = lines.map { layoutText(for: $0, width: nil).size.width }.max() ?? 1
+    var state = HostWireCapabilities(acceptsDeltaFrames: true, styleAppend: true)
+      .negotiatedEncodingState(epochID: 1)
+    let encoded = WebSurfaceFrameEncoder.encode(
+      RasterSurface(size: .init(width: max(1, width), height: lines.count), lines: lines),
+      sequence: 1, semanticSnapshot: snapshot, focusedIdentity: nil,
+      damage: .init(textRows: [.init(row: 0)]), state: &state)
+    let prefix = "\u{1E}surface:"
+    try #require(encoded.hasPrefix(prefix))
+    let object = try #require(
+      JSONSerialization.jsonObject(with: Data(encoded.dropFirst(prefix.count).utf8))
+        as? [String: Any])
+    return try #require(object["accessibilityTree"] as? [[String: Any]])
   }
 }
 

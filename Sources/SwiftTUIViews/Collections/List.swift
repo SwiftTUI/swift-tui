@@ -175,7 +175,7 @@ extension List {
           ),
           ownerNode: ownerNode,
           registry: context.scrollCommandRegistry,
-          windowMetrics: { viewportLineCount in
+          windowMetrics: { viewportLineCount, _ in
             let window = listStyle.viewportBackedListWindow(
               itemCount: rowCount,
               selectedRowIndex: activeRowIndex,
@@ -414,9 +414,7 @@ extension List {
                 count: rows.count,
                 scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
                 selectionAnchor: activeRowIndex,
-                visibleRowCount: scrollCurrency.map { currency in
-                  currency.visibleLineCount / currency.geometry.rowSpan
-                }
+                visibleRowCount: scrollCurrency?.visibleRowCount
               )
             }
           for rowIndex in interactionIndices {

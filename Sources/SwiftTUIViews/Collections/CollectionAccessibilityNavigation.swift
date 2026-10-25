@@ -110,9 +110,9 @@ package struct CollectionAccessibilityNavigation {
       case .custom("First item"): destination = 0
       case .custom("Last item"): destination = source.count - 1
       case .custom("Next page"):
-        destination += max(1, currency.visibleLineCount / currency.geometry.rowSpan - 1)
+        destination += max(1, currency.visibleRowCount - 1)
       case .custom("Previous page"):
-        destination -= max(1, currency.visibleLineCount / currency.geometry.rowSpan - 1)
+        destination -= max(1, currency.visibleRowCount - 1)
       case .custom("Read item"): readItem = true
       case .custom("Return to previous item"):
         guard let previous = next.previous else { return .unsupported }

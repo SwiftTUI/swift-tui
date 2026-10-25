@@ -21,20 +21,33 @@ package struct CollectionScrollCurrency {
   /// fixed chrome take their share. The offset is consulted while no anchor is
   /// stored, so the first gesture continues from where the user is actually
   /// looking instead of snapping to the top; the line count is what `reveal`
-  /// measures "already visible" against.
-  private let windowMetrics: @MainActor (Int) -> (offset: Int, visibleLineCount: Int)
+  /// measures "already visible" against. It receives the viewport height and
+  /// the row geometry in use, so a fallback offset maps to display lines the
+  /// way the layout does.
+  private let windowMetrics:
+    @MainActor (Int, CollectionScrollGeometry) -> (offset: Int, visibleLineCount: Int)
+  /// The fewest display lines one row can take. A table row whose following
+  /// separator is hidden takes a single line, although the estimated stride
+  /// of an unmeasured table row is two.
+  private let minimumRowLineSpan: Int
 
+  /// `minimumRowLineSpan` defaults to the estimated geometry's stride.
   package init(
     identity: Identity,
     geometry: CollectionScrollGeometry,
     ownerNode: SwiftTUICore.ViewNode?,
     registry: LocalScrollPositionRegistry?,
-    windowMetrics: @escaping @MainActor (Int) -> (offset: Int, visibleLineCount: Int)
+    minimumRowLineSpan: Int? = nil,
+    windowMetrics:
+      @escaping @MainActor (Int, CollectionScrollGeometry) -> (
+        offset: Int, visibleLineCount: Int
+      )
   ) {
     self.identity = identity
     estimatedGeometry = geometry
     self.ownerNode = ownerNode
     self.registry = registry
+    self.minimumRowLineSpan = max(1, minimumRowLineSpan ?? geometry.rowSpan)
     self.windowMetrics = windowMetrics
   }
 
@@ -70,7 +83,7 @@ package struct CollectionScrollCurrency {
       }
       return min(storedAnchor.rowIndex(rowCount: geometry.rowCount), maxAnchorRow)
     }
-    return geometry.row(atOrBeforeLine: windowMetrics(viewportLineCount).offset)
+    return geometry.row(atOrBeforeLine: windowMetrics(viewportLineCount, geometry).offset)
   }
 
   /// The viewport height published for this collection's scroll route, or 0
@@ -97,7 +110,28 @@ package struct CollectionScrollCurrency {
     guard viewport > 0 else {
       return 0
     }
-    return max(1, windowMetrics(viewport).visibleLineCount)
+    return max(1, windowMetrics(viewport, geometry).visibleLineCount)
+  }
+
+  /// The rows the window shows, by each row's real line span: tall rows and
+  /// hidden table separators included. Interaction bands and review pages
+  /// size from this. `visibleLineCount / rowSpan` halves the rows of a table
+  /// that hides its separators (STUI-1239).
+  ///
+  /// When the published layout measured the window that the stored anchor
+  /// still selects, its geometry is exact. Otherwise this frame places a
+  /// window over rows the layout has not measured, which the geometry only
+  /// estimates. The count then bounds what such a window can show: one row
+  /// per `minimumRowLineSpan` lines.
+  package var visibleRowCount: Int {
+    let lines = visibleLineCount
+    guard lines > 0, geometry.rowCount > 0 else { return 0 }
+    if let layout, layout.anchor == storedAnchor, !layout.visibleLines.isEmpty {
+      let first = layout.geometry.row(atOrBeforeLine: layout.visibleLines.lowerBound)
+      let last = layout.geometry.row(atOrBeforeLine: layout.visibleLines.upperBound - 1)
+      return max(1, last - first + 1)
+    }
+    return min(geometry.rowCount, (lines + minimumRowLineSpan - 1) / minimumRowLineSpan)
   }
 
   /// Capture the initial window before selection starts following it.
@@ -119,7 +153,7 @@ package struct CollectionScrollCurrency {
     case .row(let index): offset = geometry.line(forRow: min(index, maxAnchorRow))
     case .position:
       offset = geometry.positionedOffset(for: storedAnchor, capacity: visibleLineCount) ?? 0
-    case nil: offset = windowMetrics(viewportLineCount).offset
+    case nil: offset = windowMetrics(viewportLineCount, geometry).offset
     }
     return ScrollOffset(y: offset)
   }

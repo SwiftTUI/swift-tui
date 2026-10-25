@@ -219,30 +219,39 @@ extension Table {
       }
       var scrollCurrency: CollectionScrollCurrency?
       if !resolvedRows.isEmpty {
-        // A table body always alternates row/separator lines, so the row span is
-        // 2 and no chrome precedes row 0 *within the body* — the header and
-        // footer rules are fixed lines outside the scrolling window.
+        // A table body alternates row and separator positions, two per row,
+        // and no chrome precedes row 0 *within the body* — the header and
+        // footer rules are fixed lines outside the scrolling window. A hidden
+        // separator keeps its position but takes no line, so an unmeasured
+        // row is estimated at two lines yet can take one (STUI-1239).
         let rowCount = resolvedRows.count
-        let bodyLineCount = rowCount * 2 - 1
+        let bodyPositionCount = rowCount * 2 - 1
         let anchorRow = selectedIndex
         scrollCurrency = CollectionScrollCurrency(
           identity: context.identity,
           geometry: CollectionScrollGeometry(rowCount: rowCount, rowSpan: 2),
           ownerNode: ownerNode,
           registry: context.scrollCommandRegistry,
-          windowMetrics: { viewportLineCount in
+          minimumRowLineSpan: 1,
+          windowMetrics: { viewportLineCount, geometry in
             // Fixed chrome (header block + closing rule) sits outside the
             // scrolling body, and overflow indicators claim up to two more
             // lines. Under-counting here only makes `reveal` slightly eager,
             // which is the safe direction.
             let fixedLines = (showsHeaders ? 3 : 1) + 1 + 2
             let bodyCapacity = max(1, viewportLineCount - fixedLines)
-            let selectedLine = min(max(0, (anchorRow ?? 0) * 2), max(0, bodyLineCount - 1))
-            let offset = min(
-              max(0, selectedLine - bodyCapacity / 2),
-              max(0, bodyLineCount - bodyCapacity)
+            // The layout centres the selection among positions, then maps the
+            // first position to its display line through the row geometry:
+            // a row's first line, or the line after it for a separator.
+            let selectedPosition = min(
+              max(0, (anchorRow ?? 0) * 2), max(0, bodyPositionCount - 1))
+            let firstPosition = min(
+              max(0, selectedPosition - bodyCapacity / 2),
+              max(0, bodyPositionCount - bodyCapacity)
             )
-            return (offset, bodyCapacity)
+            let row = geometry.lineRange(forRow: firstPosition / 2)
+            let line = firstPosition.isMultiple(of: 2) ? row.lowerBound : row.upperBound
+            return (min(line, max(0, geometry.displayLineCount - bodyCapacity)), bodyCapacity)
           }
         )
       }
@@ -429,9 +438,7 @@ extension Table {
                 count: resolvedRows.count,
                 scrollAnchorRow: scrollCurrency?.effectiveAnchorRow,
                 selectionAnchor: selectedIndex,
-                visibleRowCount: scrollCurrency.map { currency in
-                  currency.visibleLineCount / currency.geometry.rowSpan
-                }
+                visibleRowCount: scrollCurrency?.visibleRowCount
               )
             }
           for rowIndex in interactionIndices {

@@ -48,12 +48,9 @@ struct Wave2HuntFAScrollTableTests {
     try #require(visible.first != "r000", "the window must sit away from the dataset start")
     let target = visible[visible.count - 2]
     _ = try h.clickText(target)
-    w2faKnown(
-      "NEW-1: a visible data-driven Table row with hidden separators ignores clicks; Table.swift:428-434 sizes the interaction band as visibleLineCount / rowSpan (2) while STUI-1209 shows one row per line, so rows past anchor + V/2 + 16 have no pointer handler; contract: Collections.md:39-43, StyleModifiers.swift:1616-1622; adjacent STUI-1209"
-    ) {
-      #expect(
-        box.selected == target, "clicked \(target); visible \(visible.first!)…\(visible.last!)")
-    }
+    // STUI-1239: the band counts the rows the window shows by their line span.
+    #expect(
+      box.selected == target, "clicked \(target); visible \(visible.first!)…\(visible.last!)")
     // Control: a row near the top of the same window is clickable.
     _ = try h.clickText(visible[3])
     #expect(box.selected == visible[3])
@@ -77,12 +74,9 @@ struct Wave2HuntFAScrollTableTests {
     let result = h.runLoop.handleAccessibilityAction(
       .init(target: actionTarget, action: .activate))
     _ = try h.render()
-    w2faKnown(
-      "NEW-1: the assistive 'Select row N' of a visible hidden-separator data Table row is unsupported; the row action is registered only inside the rowSpan-2 interaction band (Table.swift:428-458); contract: Collections.md:39-43; adjacent STUI-1209"
-    ) {
-      #expect(result == .accepted, "\(String(describing: result))")
-      #expect(box.selected == target)
-    }
+    // STUI-1239: the row action is registered for every visible row.
+    #expect(result == .accepted, "\(String(describing: result))")
+    #expect(box.selected == target)
   }
 
   // w2fa003: edge-specific hiding matches the static table on data-driven rows.
@@ -196,11 +190,8 @@ struct Wave2HuntFAScrollTableTests {
     #expect(try button(list, "Select row 2").isEnabled == false, "List control")
     #expect(try button(table, "Select row 1").isEnabled == true)
     let disabledRow = try button(table, "Select row 2")
-    w2faKnown(
-      "NEW-2: a disabled data-driven Table row's 'Select row N' button is published enabled; SemanticCollectionAccessibility.swift:83 reads the row wrapper's environment isEnabled, while STUI-1172 marks only the row's interactionAvailability and the .disabled sits on the cells; contract: Collections.md:39-43, commit 92dc2e5a, List parity; adjacent STUI-1172"
-    ) {
-      #expect(disabledRow.isEnabled == false)
-    }
+    // STUI-1240: the selector follows the row's interaction availability.
+    #expect(disabledRow.isEnabled == false)
   }
 
   // w2fa007: multi-select arrows skip the disabled row; Space toggles the cursor row.
@@ -346,36 +337,37 @@ struct Wave2HuntFAScrollTableTests {
     #expect(h.frame.contains("vrow 119"), "\(h.frame)")
   }
 
-  // w2fa013: two pending far edges from one action both refine.
-  @Test func w2fa013TwoProxyBottomEdgesInOneActionBothRefine() throws {
+  // w2fa013: two pending far edges from one action both refine. The outcome
+  // must not depend on which view the registry visits first: it visits
+  // routes in frame order, so swapping the views (and the command order)
+  // pins both orders.
+  @Test(arguments: [false, true])
+  func w2fa013TwoProxyBottomEdgesInOneActionBothRefine(swapped: Bool) throws {
     let proxies = W2FAProxies()
     let h = try StressRuntimeHarness(
-      rootIdentity: testIdentity("w2fa013"),
+      rootIdentity: testIdentity("w2fa013", swapped ? "swapped" : "ordered"),
       size: .init(width: 30, height: 9)
     ) {
       HStack(alignment: .top, spacing: 1) {
         ScrollViewReader { proxy in
           let _ = proxies.store(proxy, left: true)
-          W2FA.variableLazy(prefix: "a")
+          W2FA.variableLazy(prefix: swapped ? "b" : "a")
         }
         ScrollViewReader { proxy in
           let _ = proxies.store(proxy, left: false)
-          W2FA.variableLazy(prefix: "b")
+          W2FA.variableLazy(prefix: swapped ? "a" : "b")
         }
         Button("jump") {
-          _ = proxies.left?.scrollTo(edge: .bottom)
-          _ = proxies.right?.scrollTo(edge: .bottom)
+          let order = swapped ? [proxies.right, proxies.left] : [proxies.left, proxies.right]
+          for proxy in order { _ = proxy?.scrollTo(edge: .bottom) }
         }
       }
     }
     defer { h.shutdown() }
     try #require(h.frame.contains("a0") && h.frame.contains("b0"), "\(h.frame)")
     _ = try h.clickText("jump")
-    w2faKnown(
-      "NEW-5: one action that sends two ScrollViews to their bottom edge leaves one of them short of its last variable-height lazy row; LocalScrollPositionRegistry.sync refines one pending far edge and returns (:701-719), and by the next pass the other view's offset was corrected by lazy anchor preservation, so its pending edge is dropped as superseded; contract: Scrolling.md:206-209, Divergences-And-Gaps.md:398-405; adjacent STUI-1171"
-    ) {
-      #expect(h.frame.contains("a119") && h.frame.contains("b119"), "\(h.frame)")
-    }
+    // STUI-1243: sync refines every pending far edge in the same eager pass.
+    #expect(h.frame.contains("a119") && h.frame.contains("b119"), "\(h.frame)")
   }
 
   // w2fa014: a focused field in a scroll-backed List owns a no-op End.

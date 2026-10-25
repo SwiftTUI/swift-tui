@@ -284,6 +284,89 @@ struct AdversarialSetCTableTests {
     #expect(h.frame.contains("row20x"), "\(h.frame)")
   }
 
+  // Wave 3 (FW3-E, STUI-1239): a data-driven table's interaction band counts
+  // the rows its window shows by each row's real line span. A row whose
+  // separator is hidden takes one line, so a band sized at visible lines / 2
+  // left the lower visible rows without a pointer route or row action
+  // (Collections.md:39-43, StyleModifiers.swift:1616-1622).
+  @Test(arguments: SetCBandSeparators.allCases)
+  func wave3e01LowestVisibleRowSelectsAtEveryRowSpan(_ separators: SetCBandSeparators) throws {
+    let box = SetCTableBox()
+    box.selected = "r100"
+    let h = try SetCTable.bandHarness(
+      "wave3e01-\(separators)", box: box, separators: separators, height: 120)
+    defer { h.shutdown() }
+    let visible = SetCTable.bandRows(h.frame)
+    try #require(visible.count >= 40 && visible.first != "r000", "\(h.frame)")
+    let target = visible[visible.count - 1]
+    _ = try h.clickText(target)
+    #expect(
+      box.selected == target, "\(separators): clicked \(target); visible \(visible[0])…\(target)")
+  }
+
+  // The band of the frame after End covers the window that frame places,
+  // although its rows were not measured when the band was sized. `paged`
+  // reaches End from a window two pages down from the top.
+  @Test(arguments: [false, true])
+  func wave3e02LastRowSelectsAfterEndInHiddenSeparatorTable(paged: Bool) throws {
+    let box = SetCTableBox()
+    box.selected = "r100"
+    let h = try SetCTable.bandHarness(
+      "wave3e02-\(paged)", box: box, separators: .hidden, height: 64)
+    defer { h.shutdown() }
+    _ = try h.pressKey(.init(.tab))
+    if paged {
+      for key in [KeyEvent.home, .pageDown, .pageDown] { _ = try h.pressKey(.init(key)) }
+    }
+    _ = try h.pressKey(.init(.end))
+    let visible = SetCTable.bandRows(h.frame)
+    try #require(visible.last == "r199" && visible.count >= 40, "\(h.frame)")
+    _ = try h.clickText("r199")
+    #expect(box.selected == "r199", "visible \(visible[0])…r199")
+  }
+
+  // Paging into rows no frame has measured yet: the page's lowest row selects.
+  @Test func wave3e03LowestRowSelectsAfterPagingIntoUnmeasuredRows() throws {
+    let box = SetCTableBox()
+    box.selected = "r000"
+    let h = try SetCTable.bandHarness("wave3e03", box: box, separators: .hidden, height: 64)
+    defer { h.shutdown() }
+    _ = try h.pressKey(.init(.tab))
+    _ = try h.pressKey(.init(.pageDown))
+    let visible = SetCTable.bandRows(h.frame)
+    try #require(visible.count >= 40 && visible.first != "r000", "\(h.frame)")
+    let target = visible[visible.count - 1]
+    _ = try h.clickText(target)
+    #expect(box.selected == target, "clicked \(target); visible \(visible[0])…\(target)")
+  }
+
+  // The assistive review page moves by the rows the window shows, less one
+  // row of overlap, as the keyboard page does (w2fa005).
+  @Test(arguments: SetCBandSeparators.allCases)
+  func wave3e04ReviewPageMovesByTheVisibleRows(_ separators: SetCBandSeparators) throws {
+    let box = SetCTableBox()
+    box.selected = "r000"
+    let h = try SetCTable.bandHarness(
+      "wave3e04-\(separators)", box: box, separators: separators, height: 24)
+    defer { h.shutdown() }
+    let visible = SetCTable.bandRows(h.frame)
+    try #require(visible.first == "r000" && visible.count >= 8, "\(h.frame)")
+    func review() throws -> AccessibilityNode {
+      try #require(
+        h.runLoop.publishedAccessibilitySnapshot.accessibilityNodes.first {
+          $0.label == "Review items"
+        })
+    }
+    let target = try #require(try review().actionTarget)
+    #expect(
+      h.runLoop.handleAccessibilityAction(.init(target: target, action: .custom("Next page")))
+        == .accepted)
+    _ = try h.render()
+    #expect(
+      try review().control?.value == .number(Double(visible.count)),
+      "\(separators): \(visible.count) visible rows")
+  }
+
   @Test func setC129NoColumnsRendersNothing() {
     let lines = SetCTable.lines(
       Table(columns: []) {
@@ -302,6 +385,36 @@ private final class SetCTableBox {
   var selected: String?
   var selection: Binding<String?> {
     .init(get: { self.selected }, set: { self.selected = $0 })
+  }
+}
+
+/// Row separators of the FW3-E band fixtures: drawn, hidden on every row, or
+/// hidden below every other row (mixed per-row `listRowSeparator`).
+enum SetCBandSeparators: String, CaseIterable, Sendable, CustomStringConvertible {
+  case drawn, hidden, alternating
+  var description: String { rawValue }
+}
+
+private struct SetCBandTable: View {
+  let rows: [SetCTableRow]
+  let selection: Binding<String?>
+  let separators: SetCBandSeparators
+
+  var body: some View {
+    Table(rows, selection: selection, columns: [TableColumn("Name")]) { row in
+      switch separators {
+      case .drawn:
+        Text(row.id)
+      case .hidden:
+        Text(row.id).listRowSeparator(.hidden)
+      case .alternating:
+        if row.id.last.flatMap(\.wholeNumberValue).map({ $0.isMultiple(of: 2) }) == true {
+          Text(row.id).listRowSeparator(.hidden, edges: .bottom)
+        } else {
+          Text(row.id)
+        }
+      }
+    }.tableHeaders(.hidden).scrollIndicators(.hidden)
   }
 }
 
@@ -390,6 +503,37 @@ private enum SetCTable {
         rows: rows, selection: box.selection, column: column, hosting: hosting,
         hidesSeparators: hidesSeparators)
     }
+  }
+
+  /// Two hundred rows `r000`…`r199` at 30 columns.
+  static func bandHarness(
+    _ name: String, box: SetCTableBox, separators: SetCBandSeparators, height: Int
+  ) throws -> StressRuntimeHarness<SetCBandTable> {
+    let rows = (0..<200).map { (index: Int) -> SetCTableRow in
+      let digits = String(index)
+      let padding = String(repeating: "0", count: 3 - digits.count)
+      return SetCTableRow(id: "r\(padding)\(digits)")
+    }
+    return try StressRuntimeHarness(
+      rootIdentity: testIdentity(name),
+      size: .init(width: 30, height: height)
+    ) {
+      SetCBandTable(rows: rows, selection: box.selection, separators: separators)
+    }
+  }
+
+  /// The band fixture's row ids in frame order.
+  static func bandRows(_ frame: String) -> [String] {
+    var ids: [String] = []
+    for line in frame.split(separator: "\n") {
+      let tokens = line.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+      if let token = tokens.first(where: isBandRowID) { ids.append(String(token)) }
+    }
+    return ids
+  }
+
+  private static func isBandRowID(_ token: Substring) -> Bool {
+    token.count == 4 && token.first == "r" && token.dropFirst().allSatisfy(\.isNumber)
   }
 
   /// Scrolls one wheel notch at a time over the table body (cell 2, 5 lies
