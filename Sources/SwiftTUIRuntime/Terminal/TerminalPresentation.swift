@@ -55,13 +55,14 @@ public struct TerminalSurfaceRenderer {
   ) -> String {
     var end = row.count
     if !preservingTrailingWhitespace {
+      let textRenderer = cellTextRenderer
       while end > 0 {
         let cell = row[end - 1]
         if cell.isContinuation {
           end -= 1
           continue
         }
-        if cell.character == " ", cell.style == nil {
+        if textRenderer.isTrimmableTrailingBlank(cell) {
           end -= 1
           continue
         }
@@ -86,6 +87,13 @@ extension TerminalSurfaceRenderer {
     )
   }
 
+  private var cellTextRenderer: TerminalCellTextRenderer {
+    TerminalCellTextRenderer(
+      capabilityProfile: capabilityProfile,
+      terminalBackgroundColor: terminalBackgroundColor
+    )
+  }
+
   private func renderCells(
     in row: [RasterCell],
     from start: Int,
@@ -94,6 +102,7 @@ extension TerminalSurfaceRenderer {
     preservingTrailingWhitespace: Bool = false
   ) -> String {
     if !preservingTrailingWhitespace {
+      let textRenderer = cellTextRenderer
       var trimmedEnd = max(start, min(end, row.count))
       while trimmedEnd > start {
         let cell = TerminalSurfaceDamageRenderer.cell(at: trimmedEnd - 1, in: row)
@@ -101,7 +110,7 @@ extension TerminalSurfaceRenderer {
           trimmedEnd -= 1
           continue
         }
-        if cell.character == " ", cell.style == nil {
+        if textRenderer.isTrimmableTrailingBlank(cell) {
           trimmedEnd -= 1
           continue
         }
@@ -122,10 +131,7 @@ extension TerminalSurfaceRenderer {
     let cellCount = max(0, end - start)
     var result = ""
     result.reserveCapacity(cellCount * 3)
-    let textRenderer = TerminalCellTextRenderer(
-      capabilityProfile: capabilityProfile,
-      terminalBackgroundColor: terminalBackgroundColor
-    )
+    let textRenderer = cellTextRenderer
     var state = TerminalCellTextRenderer.RenderState()
     let renderedWidth = textRenderer.appendRenderedCells(
       in: row,

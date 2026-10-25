@@ -16,13 +16,8 @@ struct AdversarialSetCGradientTests {
     var actual = id == 81 ? early : late
     let target = id == 81 ? late : early
     actual.animatableData = target.animatableData
-    if id == 81 {
-      setCKnown("STUI-1127: per-element sorting changes later gradient stop indices") {
-        #expect((actual.animatableData - target.animatableData).magnitudeSquared < 0.000_000_01)
-      }
-    } else {
-      #expect((actual.animatableData - target.animatableData).magnitudeSquared < 0.000_000_01)
-    }
+    // STUI-1127 (repaired for 81): the assignment sorts the stops once.
+    #expect((actual.animatableData - target.animatableData).magnitudeSquared < 0.000_000_01)
   }
 
   @Test func setC083StopDataClampsLocationsWithoutChangingColor() {

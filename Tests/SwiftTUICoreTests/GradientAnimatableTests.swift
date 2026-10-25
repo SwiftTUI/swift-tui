@@ -123,3 +123,48 @@ func radialGradientInterpolation() {
   #expect(abs(result.startRadius - 2.5) < 0.001)
   #expect(abs(result.endRadius - 15) < 0.001)
 }
+
+@Test("STUI-1127: one assignment keeps every stop's color with its own location")
+func gradientCrossingStopsKeepTheirColors() {
+  func close(_ actual: [Gradient.Stop], _ expected: [Gradient.Stop]) -> Bool {
+    actual.count == expected.count
+      && zip(actual, expected).allSatisfy { lhs, rhs in
+        lhs.location == rhs.location
+          && (lhs.color.animatableData - rhs.color.animatableData).magnitudeSquared < 1e-12
+      }
+  }
+  // An in-flight sample whose first stop has moved past the second.
+  var crossing = Gradient(stops: [
+    .init(color: .red, location: 0), .init(color: .green, location: 0.5),
+    .init(color: .blue, location: 1),
+  ])
+  var data = crossing.animatableData
+  data.elements[0].second = 0.6
+  crossing.animatableData = data
+  #expect(
+    close(
+      crossing.stops,
+      [
+        .init(color: .green, location: 0.5), .init(color: .red, location: 0.6),
+        .init(color: .blue, location: 1),
+      ]), "\(crossing.stops)")
+
+  // The gradient styles delegate to the same assignment.
+  let early = Gradient(stops: [.init(color: .red, location: 0), .init(color: .blue, location: 0.2)])
+  let late = Gradient(stops: [
+    .init(color: .green, location: 0.8), .init(color: .white, location: 1),
+  ])
+  var linear = LinearGradient(gradient: early, startPoint: .leading, endPoint: .trailing)
+  let target = LinearGradient(gradient: late, startPoint: .leading, endPoint: .trailing)
+  linear.animatableData = target.animatableData
+  #expect(close(linear.gradient.stops, late.stops), "\(linear.gradient.stops)")
+
+  // A public element write still re-sorts the stops.
+  var authored = Gradient(stops: [
+    .init(color: .red, location: 0), .init(color: .blue, location: 1),
+  ])
+  authored.stops[0].location = 0.9
+  authored.stops[1].location = 0.1
+  #expect(authored.stops.map(\.location) == [0.1, 0.9])
+  #expect(authored.stops.map(\.color) == [.blue, .red])
+}

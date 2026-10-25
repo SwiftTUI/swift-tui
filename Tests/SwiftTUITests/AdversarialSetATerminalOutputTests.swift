@@ -104,7 +104,9 @@ import Testing
       // Hypothesis: sanitization handles seven-bit ESC/ST but passes C1 OSC/ST,
       // letting an authored link terminate the OSC envelope before its label.
       let dirty = "https://example.test/é\u{9D}part\u{9C}\u{85}\u{7F}終"
-      let clean = "https://example.test/épart終"
+      // The C1 and DEL controls are removed; the remaining non-ASCII bytes are
+      // percent-encoded, as OSC 8 requires (STUI-1152).
+      let clean = "https://example.test/%C3%A9part%E7%B5%82"
       #expect(render([.init(character: "L", hyperlink: dirty)]) == open(clean) + "L" + close)
     }
 

@@ -62,6 +62,18 @@ struct TerminalCellTextRenderer {
     }
   }
 
+  /// Whether a cell at the end of a row writes nothing a full repaint must
+  /// send: an unstyled space with no hyperlink this profile emits. A linked
+  /// blank is written, or the terminal never receives its link and a later
+  /// diff never repaints the unchanged cell.
+  func isTrimmableTrailingBlank(_ cell: RasterCell) -> Bool {
+    guard cell.character == " ", cell.style == nil else { return false }
+    guard capabilityProfile.supportsHyperlinks, let destination = cell.hyperlink else {
+      return true
+    }
+    return sanitizedHyperlinkDestination(destination).isEmpty
+  }
+
   func cursorForwardSequence(
     _ count: Int
   ) -> String {
@@ -460,11 +472,16 @@ struct TerminalCellTextRenderer {
     "\u{001B}]8;;\(destination.rawValue)\u{001B}\\"
   }
 
+  /// Removes terminal controls and `ESC \` pairs from a destination, then
+  /// URI-encodes it for OSC 8: every remaining byte outside 32...126 becomes
+  /// `%XX` (RFC 3986 percent-encoding, uppercase). Bytes inside the range,
+  /// `%` included, pass unchanged, so an encoded destination is not encoded
+  /// again.
   private func sanitizedHyperlinkDestination(
     _ destination: String
   ) -> String {
     var sanitized = String()
-    sanitized.reserveCapacity(destination.count)
+    sanitized.reserveCapacity(destination.utf8.count)
 
     var shouldDropStringTerminator = false
     for scalar in destination.unicodeScalars {
@@ -481,10 +498,20 @@ struct TerminalCellTextRenderer {
       }
 
       shouldDropStringTerminator = false
-      sanitized.unicodeScalars.append(scalar)
+      if (0x20...0x7E).contains(scalar.value) {
+        sanitized.unicodeScalars.append(scalar)
+      } else {
+        for byte in scalar.utf8 {
+          sanitized.unicodeScalars.append("%")
+          sanitized.unicodeScalars.append(Self.uppercaseHexDigits[Int(byte >> 4)])
+          sanitized.unicodeScalars.append(Self.uppercaseHexDigits[Int(byte & 0x0F)])
+        }
+      }
     }
     return sanitized
   }
+
+  private static let uppercaseHexDigits: [Unicode.Scalar] = Array("0123456789ABCDEF".unicodeScalars)
 
   private func closeHyperlinkSequence() -> String {
     "\u{001B}]8;;\u{001B}\\"

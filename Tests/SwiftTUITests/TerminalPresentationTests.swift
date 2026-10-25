@@ -767,6 +767,71 @@ struct TerminalPresentationTests {
     #expect(renderer.render(surface) == "Link")
   }
 
+  @Test("STUI-1150: full repaint writes linked trailing blanks so the terminal receives the link")
+  func fullRepaintKeepsLinkedTrailingBlanks() throws {
+    let link = "https://example.com/a"
+    let open = "\u{001B}]8;;\(link)\u{001B}\\"
+    let close = "\u{001B}]8;;\u{001B}\\"
+    var surface = RasterSurface(size: .init(width: 12, height: 1), lines: ["go"])
+    surface.cells[0][10].hyperlink = link
+    surface.cells[0][11].hyperlink = link
+    let trueColor = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+
+    #expect(
+      trueColor.render(surface) == "go" + String(repeating: " ", count: 8) + open + "  " + close)
+
+    let controller = PresentationMockTerminalController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+    let metrics = try host.present(surface)
+    try host.drainPendingPresentation()
+    #expect(metrics.strategy == .fullRepaint)
+    #expect(controller.writes.joined().contains(open + "  " + close))
+
+    // Without link support, and without links, trailing blanks stay trimmed.
+    #expect(TerminalSurfaceRenderer(capabilityProfile: .previewUnicode).render(surface) == "go")
+    var unlinked = surface
+    unlinked.cells[0][10].hyperlink = nil
+    unlinked.cells[0][11].hyperlink = nil
+    #expect(trueColor.render(unlinked) == "go")
+    // A styled trailing space is still written with its style.
+    var styled = unlinked
+    styled.cells[0][11].style = .init(backgroundColor: .blue)
+    let styledRow = trueColor.render(styled)
+    #expect(styledRow.hasPrefix("go" + String(repeating: " ", count: 9) + "\u{001B}[48;"))
+    #expect(styledRow.hasSuffix(" \u{001B}[0m"))
+  }
+
+  @Test("STUI-1152: OSC 8 destinations percent-encode bytes outside printable ASCII")
+  func hyperlinkDestinationsArePercentEncoded() {
+    let renderer = TerminalSurfaceRenderer(capabilityProfile: .trueColor)
+    func emitted(_ destination: String) -> String {
+      renderer.render(
+        RasterSurface(
+          size: .init(width: 1, height: 1),
+          cells: [[RasterCell(character: "X", hyperlink: destination)]]))
+    }
+    func linked(_ destination: String) -> String {
+      "\u{001B}]8;;\(destination)\u{001B}\\X\u{001B}]8;;\u{001B}\\"
+    }
+
+    #expect(emitted("https://example.com/café") == linked("https://example.com/caf%C3%A9"))
+    #expect(
+      emitted("https://例え.jp/😀")
+        == linked("https://%E4%BE%8B%E3%81%88.jp/%F0%9F%98%80"))
+    // Control and bidi scalars are removed, not encoded.
+    #expect(emitted("https://e.x/\u{202E}é\u{009C}z") == linked("https://e.x/%C3%A9z"))
+    // Bytes 32 through 126 pass unchanged, so an encoded destination is not
+    // encoded again.
+    let ascii = "https://example.com/caf%C3%A9?q=a b;c\\d"
+    #expect(emitted(ascii) == linked(ascii))
+  }
+
   @Test("presentation planner falls back to full repaint when size attachments or metadata differ")
   func presentationPlannerFallsBackOnSurfaceMismatch() {
     let planner = TerminalPresentationPlanner(

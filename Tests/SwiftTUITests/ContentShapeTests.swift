@@ -226,6 +226,46 @@ struct ContentShapeTests {
     #expect(rectRegion.rect == pathRegion.rect)
   }
 
+  @Test("STUI-1208: a content shape from a trimmed path follows the outline its fill paints")
+  func trimmedContentShapeFollowsPaintedOutline() throws {
+    let root = Identity(components: [IdentityComponent(rawValue: "trimmed-content-shape")])
+    var env = EnvironmentValues()
+    env.terminalSize = CellSize(width: 10, height: 10)
+    var ctx = ResolveContext(identity: root, environmentValues: env)
+    ctx.localPointerHandlerRegistry = LocalPointerHandlerRegistry()
+    ctx.localGestureRegistry = LocalGestureRegistry()
+    ctx.localGestureStateRegistry = LocalGestureStateRegistry()
+
+    let rect = Rect(origin: .zero, size: .init(width: 10, height: 10))
+    let painted = ShapeGeometry.trimmed(.rectangle, from: 0, to: 0.25).path(
+      in: rect,
+      trimAspectRatio: RectangleStrokeTrack.snappedAspectRatio(
+        CellPixelMetrics.estimated.aspectRatio))
+    let artifacts = DefaultRenderer().render(
+      Rectangle().trim(from: 0, to: 0.25).fill()
+        .contentShape(Rectangle().trim(from: 0, to: 0.25).path(in: rect))
+        .gesture(TapGesture().onEnded {}),
+      context: ctx,
+      proposal: .init(width: 10, height: 10)
+    )
+    let region = try #require(artifacts.semanticSnapshot.interactionRegions.first)
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    func hits(_ point: Point) -> Bool {
+      region.contains(.subCell(location: point, source: .nativePixels, metrics: metrics))
+    }
+    var disagreements: [CellPoint] = []
+    for y in 0..<10 {
+      for x in 0..<10 {
+        let center = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
+        if hits(center) != painted.contains(center) {
+          disagreements.append(CellPoint(x: x, y: y))
+        }
+      }
+    }
+    #expect(disagreements.isEmpty, "cells where hit testing and paint disagree: \(disagreements)")
+    #expect(!hits(Point(x: 2.5, y: 8.5)))
+  }
+
   @Test("content-shape nil falls back to the default interaction rect")
   func contentShapeNilRestoresDefault() throws {
     let root = Identity(components: [IdentityComponent(rawValue: "root")])

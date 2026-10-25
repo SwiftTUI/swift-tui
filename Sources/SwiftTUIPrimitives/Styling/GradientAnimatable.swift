@@ -22,9 +22,14 @@ extension Gradient: Animatable {
       // first.  If they didn't, clamp to the current stop count so
       // we never produce a half-rebuilt gradient.
       guard newValue.elements.count == stops.count else { return }
-      for i in stops.indices {
-        stops[i].animatableData = newValue.elements[i]
+      // Assign once: `stops` sorts on every write, so writing element by
+      // element would reorder the array mid-loop when locations cross and
+      // later indices would overwrite the wrong stop.
+      var updated = stops
+      for i in updated.indices {
+        updated[i].animatableData = newValue.elements[i]
       }
+      stops = updated
     }
   }
 }

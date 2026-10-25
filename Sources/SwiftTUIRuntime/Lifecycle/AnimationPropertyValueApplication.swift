@@ -294,9 +294,9 @@ package enum AnimationPropertyValueApplication {
     case .shapePath:
       guard let path = value.unwrap(as: Path.self),
         case .shape(var payload) = node.drawPayload,
-        case .path(_, let fillRule) = payload.geometry
+        let geometry = payload.geometry.replacingMorphablePath(with: path)
       else { return }
-      payload.geometry = .path(BoxedPath(path), fillRule)
+      payload.geometry = geometry
       node.drawPayload = .shape(payload)
 
     case .shapeFillStyle:

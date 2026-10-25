@@ -272,9 +272,9 @@ public struct Path: Equatable, Sendable {
   /// Curves are flattened first, so the result is made of
   /// straight segments, and a closed subpath that is cut comes back open.
   ///
-  /// Lengths are in this path's own coordinate units. A stroke that is trimmed
-  /// on screen is measured in cell widths instead, so that a fraction is the
-  /// same physical share of the outline; see `Shape.trim(from:to:)`.
+  /// Lengths are in this path's own coordinate units. A trimmed shape is
+  /// measured in cell widths instead, so that a fraction is the same physical
+  /// share of the outline; see `Shape.trim(from:to:)`.
   public func trimmedPath(from: Double, to: Double, tolerance: Double = 0.01) -> Path {
     var result = Path()
     let trim = StrokeTrim(from: from, to: to)

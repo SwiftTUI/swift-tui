@@ -109,9 +109,7 @@ extension ShapeGeometry {
       return base.path(
         in: rect, stretchingCircle: stretchingCircle, trimAspectRatio: trimAspectRatio
       )
-      .scaledBy(sx: 1, sy: trimAspectRatio)
-      .trimmedPath(from: from, to: to)
-      .scaledBy(sx: 1, sy: 1 / trimAspectRatio)
+      .physicallyTrimmedPath(from: from, to: to, aspectRatio: trimAspectRatio)
     }
   }
 
@@ -126,5 +124,17 @@ extension ShapeGeometry {
       in: Rect(origin: .zero, size: Size(width: width, height: height)),
       stretchingCircle: true, trimAspectRatio: trimAspectRatio)
     return .path(BoxedPath(placed.scaledBy(sx: 1 / width, sy: 1 / height)), fillRule)
+  }
+}
+
+extension Path {
+  /// Trims a cell-space outline by fractions of its physical length: a
+  /// vertical cell counts `aspectRatio` cell widths. The raster's placed trims
+  /// and the public `TrimmedShape.path(in:)` share this measure, so a path
+  /// built from a trimmed shape describes the outline its fill paints.
+  package func physicallyTrimmedPath(from: Double, to: Double, aspectRatio: Double) -> Path {
+    scaledBy(sx: 1, sy: aspectRatio)
+      .trimmedPath(from: from, to: to)
+      .scaledBy(sx: 1, sy: 1 / aspectRatio)
   }
 }

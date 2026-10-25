@@ -16,12 +16,9 @@ struct AdversarialSetCTrimMorphTests {
       Issue.record("expected a trimmed shape payload")
       return
     }
-    let snapshot = AnimatableSnapshot.extract(from: node)
-    setCKnown(
-      "STUI-1129: a trimmed fill exposes no shapePath slot, so compatible path coordinates cannot morph; AnimatableSnapshot.extract captures .shapePath only for a bare .path geometry (AnimatableSnapshot.swift:75-78); contract: Shapes.md:127-132 with :254-258"
-    ) {
-      #expect(snapshot[.shapePath] != nil)
-    }
+    // STUI-1129 (repaired): extraction looks through the fill trim.
+    // Contract: Shapes.md:127-132 with :254-258.
+    #expect(AnimatableSnapshot.extract(from: node)[.shapePath] != nil)
   }
 
   @Test func setC102WholeTrimKeepsShapePathSlot() throws {
@@ -39,11 +36,8 @@ struct AdversarialSetCTrimMorphTests {
     let whole = try SetCTrim.midAnimationExtent(trimEnd: 1, name: "setC103-whole")
     #expect(whole > 4 && whole < 19, "control: a bare path morphs (max painted x \(whole))")
     let trimmed = try SetCTrim.midAnimationExtent(trimEnd: 0.75, name: "setC103-trimmed")
-    setCKnown(
-      "STUI-1129: in flight, a trimmed fill snaps to its destination geometry; the trimmed payload has no shapePath slot to interpolate and AnimationPropertyValueApplication applies .shapePath only to a bare .path (AnimationPropertyValueApplication.swift:294-302); contract: Shapes.md:127-132"
-    ) {
-      #expect(trimmed > 4 && trimmed < 19, "trimmed fill max painted x at 500 ms: \(trimmed)")
-    }
+    // STUI-1129 (repaired): the interpolated path is applied inside the trim.
+    #expect(trimmed > 4 && trimmed < 19, "trimmed fill max painted x at 500 ms: \(trimmed)")
   }
 
   @Test func setC104TrimmedFillStyleSlotPresent() throws {
@@ -70,11 +64,9 @@ struct AdversarialSetCTrimMorphTests {
         .path(in: rect, trimAspectRatio: aspect).boundingRect)
     try #require(painted.size.height > 2 && painted.size.height < 3, "\(painted)")
     let authored = try #require(Rectangle().trim(from: 0, to: 0.25).path(in: rect).boundingRect)
-    setCKnown(
-      "STUI-1208: TrimmedShape.path(in:) measures the outline in cell units while the raster measures physical units; TrimmedShape.swift:30-35 trims base.path(in:) without the aspect scaling ShapePayload.swift:108-115 applies (STUI-1112); contract: TrimmedShape.swift:9-10 'a share of the outline's physical length'"
-    ) {
-      #expect(abs(authored.size.height - painted.size.height) < 0.01, "\(authored)")
-    }
+    // STUI-1208 (repaired): the public path measures physical units, as the
+    // raster does. Contract: TrimmedShape.swift:9-10.
+    #expect(abs(authored.size.height - painted.size.height) < 0.01, "\(authored)")
   }
 
   @Test func setC107TrimmedContentShapeMissesPaintedCells() throws {
@@ -98,11 +90,9 @@ struct AdversarialSetCTrimMorphTests {
     let painted = row1.count >= 10 && row1[9] != Character(" ")
     try #require(painted, "cell (9, 1) must be painted: \(h.frame)")
     _ = try h.click(Point(x: 9.5, y: 1.5))
-    setCKnown(
-      "STUI-1208: a contentShape built from a trimmed shape does not cover the cells the trimmed fill paints; GestureViewModifier.swift:310 takes the cell-unit TrimmedShape.path(in:) while the raster trims in physical units (ShapePayload.swift:108-115); contract: Pointer-And-Canvas.md:140-143, TrimmedShape.swift:9-10"
-    ) {
-      #expect(box.taps == 1)
-    }
+    // STUI-1208 (repaired): the content shape covers the painted cell.
+    // Contract: Pointer-And-Canvas.md:140-143, TrimmedShape.swift:9-10.
+    #expect(box.taps == 1)
   }
 }
 

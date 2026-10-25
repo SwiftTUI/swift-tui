@@ -27,11 +27,20 @@ public struct TrimmedShape<Base: Shape>: Shape, ResolvableView {
     base.geometry
   }
 
+  /// The trimmed outline in `rect`, measured as the raster measures it.
+  ///
+  /// A vertical cell counts as the estimated cell aspect ratio
+  /// (`CellPixelMetrics.estimated`, snapped to the nearest half). A path has
+  /// no terminal metrics, so a terminal that reports another ratio paints
+  /// its trim with that ratio, while this path keeps the estimate.
   public func path(in rect: Rect) -> Path {
     // The base's path already carries the base's own trim, so this trims it by
     // this wrapper's fractions alone. `trimStart` and `trimEnd` are the composed
     // fractions of the untrimmed outline, which a stroke uses.
-    base.path(in: rect).trimmedPath(from: from, to: to)
+    base.path(in: rect).physicallyTrimmedPath(
+      from: from, to: to,
+      aspectRatio: RectangleStrokeTrack.snappedAspectRatio(
+        CellPixelMetrics.estimated.aspectRatio))
   }
 
   public var kindName: String {

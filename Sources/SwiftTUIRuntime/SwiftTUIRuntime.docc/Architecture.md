@@ -176,8 +176,9 @@ convenience product.
 - Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or
   true-color output.
 - Presentation sanitizes authored text and OSC 8 hyperlink destinations before
-  it emits terminal bytes. Layout, semantics, and raster artifacts do not
-  encode terminal-control safety rules.
+  it emits terminal bytes, and percent-encodes destination bytes outside
+  printable ASCII. Layout, semantics, and raster artifacts do not encode
+  terminal-control safety rules.
 - Terminal capability affects presentation, not layout semantics.
 
 ## See Also

@@ -73,8 +73,8 @@ package struct AnimatableSnapshot: Sendable {
     // paint time — in that case the .foregroundShapeStyle extraction
     // above already covers it.
     if case .shape(let shapePayload) = node.drawPayload {
-      if case .path(let path, _) = shapePayload.geometry {
-        snapshot[.shapePath] = AnyAnimatable(path.path)
+      if let path = shapePayload.geometry.morphablePath {
+        snapshot[.shapePath] = AnyAnimatable(path)
       }
       switch shapePayload.operation {
       case .fill(let style, _):
@@ -298,5 +298,31 @@ package struct AnimatableSnapshot: Sendable {
       }
     }
     return nil
+  }
+}
+
+extension ShapeGeometry {
+  /// The custom path that a `.shapePath` animation morphs, looking through
+  /// fill trims. A trimmed fill keeps its fractions while its path morphs; only
+  /// the trim interval does not animate (Shapes.md, trimmed fills).
+  var morphablePath: Path? {
+    switch self {
+    case .path(let boxed, _): return boxed.path
+    case .trimmed(let base, _, _): return base.morphablePath
+    default: return nil
+    }
+  }
+
+  /// This geometry with its morphable path replaced, keeping every trim
+  /// fraction and the fill rule; `nil` when it carries no custom path.
+  func replacingMorphablePath(with path: Path) -> ShapeGeometry? {
+    switch self {
+    case .path(_, let fillRule):
+      return .path(BoxedPath(path), fillRule)
+    case .trimmed(let base, let from, let to):
+      return base.replacingMorphablePath(with: path).map { .trimmed($0, from: from, to: to) }
+    default:
+      return nil
+    }
   }
 }

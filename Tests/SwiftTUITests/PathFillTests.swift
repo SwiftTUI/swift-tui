@@ -78,6 +78,20 @@ struct PathFillTests {
     #expect(actual.rasterSurface.cells == expected.rasterSurface.cells)
   }
 
+  @Test("STUI-1208: a trimmed shape's public path measures the outline the raster trims")
+  func trimmedPathMatchesRasterRoute() {
+    let rect = Rect(origin: .zero, size: .init(width: 10, height: 10))
+    let aspect = RectangleStrokeTrack.snappedAspectRatio(CellPixelMetrics.estimated.aspectRatio)
+    let square = UnitPathShape(
+      pathValue: Path(Rect(origin: .zero, size: .init(width: 1, height: 1))))
+    let painted = ShapeGeometry.trimmed(square.geometry, from: 0, to: 0.25)
+      .path(in: rect, trimAspectRatio: aspect)
+    #expect(square.trim(from: 0, to: 0.25).path(in: rect) == painted)
+    // The whole outline is the same polyline in either unit.
+    #expect(
+      Rectangle().trim(from: 0, to: 1).path(in: rect) == Path(rect).trimmedPath(from: 0, to: 1))
+  }
+
   // MARK: - Route A (Braille subpixel scanline fill)
 
   @Test("a filled triangle lights interior cells and leaves exterior corners empty")
