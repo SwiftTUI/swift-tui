@@ -45,7 +45,10 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: CellPoint(
-              x: bounds.origin.x + crossMetrics.leading - dimensions[horizontalAlignment],
+              x: bounds.origin.x
+                + crossMetrics.offset(
+                  guideValue: dimensions[horizontalAlignment],
+                  length: childMeasurement.measuredSize.width),
               y: nextY
             ),
             size: childMeasurement.measuredSize
@@ -72,7 +75,10 @@ extension LayoutEngine {
           bounds: CellRect(
             origin: CellPoint(
               x: nextX,
-              y: bounds.origin.y + crossMetrics.leading - dimensions[verticalAlignment]
+              y: bounds.origin.y
+                + crossMetrics.offset(
+                  guideValue: dimensions[verticalAlignment],
+                  length: childMeasurement.measuredSize.height)
             ),
             size: childMeasurement.measuredSize
           )
@@ -156,14 +162,19 @@ extension LayoutEngine {
           let dimensions = viewDimensions(
             for: child, measured: fragment.measurement,
             passContext: passContext)
+          let size = fragment.measurement.measuredSize
           let origin =
             axis == .vertical
             ? CellPoint(
-              x: bounds.origin.x + snapshot.crossLeading - dimensions[horizontalAlignment],
+              x: bounds.origin.x
+                + snapshot.crossLine.offset(
+                  guideValue: dimensions[horizontalAlignment], length: size.width),
               y: bounds.origin.y + fragment.mainOffset)
             : CellPoint(
               x: bounds.origin.x + fragment.mainOffset,
-              y: bounds.origin.y + snapshot.crossLeading - dimensions[verticalAlignment])
+              y: bounds.origin.y
+                + snapshot.crossLine.offset(
+                  guideValue: dimensions[verticalAlignment], length: size.height))
           return PlacementRequest(
             resolved: child, measured: fragment.measurement,
             bounds: CellRect(origin: origin, size: fragment.measurement.measuredSize))
@@ -255,7 +266,10 @@ extension LayoutEngine {
           measured: childMeasurement,
           bounds: CellRect(
             origin: CellPoint(
-              x: bounds.origin.x + crossMetrics.leading - dimensions[horizontalAlignment],
+              x: bounds.origin.x
+                + crossMetrics.offset(
+                  guideValue: dimensions[horizontalAlignment],
+                  length: childMeasurement.measuredSize.width),
               y: bounds.origin.y + snapshot.childMainOffsets[index]
             ),
             size: childMeasurement.measuredSize
@@ -276,7 +290,10 @@ extension LayoutEngine {
           bounds: CellRect(
             origin: CellPoint(
               x: bounds.origin.x + snapshot.childMainOffsets[index],
-              y: bounds.origin.y + crossMetrics.leading - dimensions[verticalAlignment]
+              y: bounds.origin.y
+                + crossMetrics.offset(
+                  guideValue: dimensions[verticalAlignment],
+                  length: childMeasurement.measuredSize.height)
             ),
             size: childMeasurement.measuredSize
           )
@@ -315,11 +332,17 @@ extension LayoutEngine {
       let origin =
         axis == .vertical
         ? CellPoint(
-          x: bounds.origin.x + snapshot.crossLeading - dimensions[horizontalAlignment],
+          x: bounds.origin.x
+            + snapshot.crossLine.offset(
+              guideValue: dimensions[horizontalAlignment],
+              length: measurement.measuredSize.width),
           y: bounds.origin.y + snapshot.childMainOffsets[index])
         : CellPoint(
           x: bounds.origin.x + snapshot.childMainOffsets[index],
-          y: bounds.origin.y + snapshot.crossLeading - dimensions[verticalAlignment])
+          y: bounds.origin.y
+            + snapshot.crossLine.offset(
+              guideValue: dimensions[verticalAlignment],
+              length: measurement.measuredSize.height))
       return PlacementRequest(
         resolved: child, measured: measurement,
         bounds: CellRect(origin: origin, size: measurement.measuredSize))

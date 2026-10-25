@@ -67,20 +67,22 @@ extension LayoutEngine {
     horizontalAlignment: HorizontalAlignment,
     verticalAlignment: VerticalAlignment,
     passContext: LayoutPassContext? = nil
-  ) -> (leading: Int, trailing: Int) {
+  ) -> AlignmentLine {
     let dimensions = zip(children, childMeasurements).map { child, measurement in
       viewDimensions(for: child, measured: measurement, passContext: passContext)
     }
 
     switch axis {
     case .horizontal:
-      let leading = dimensions.map { $0[verticalAlignment] }.max() ?? 0
-      let trailing = dimensions.map { $0.height - $0[verticalAlignment] }.max() ?? 0
-      return (leading, trailing)
+      return AlignmentLine(
+        leading: dimensions.map { $0[verticalAlignment] }.max() ?? 0,
+        trailing: dimensions.map { $0.height - $0[verticalAlignment] }.max() ?? 0,
+        centresByExtent: centresByExtent(dimensions, guide: verticalAlignment))
     case .vertical:
-      let leading = dimensions.map { $0[horizontalAlignment] }.max() ?? 0
-      let trailing = dimensions.map { $0.width - $0[horizontalAlignment] }.max() ?? 0
-      return (leading, trailing)
+      return AlignmentLine(
+        leading: dimensions.map { $0[horizontalAlignment] }.max() ?? 0,
+        trailing: dimensions.map { $0.width - $0[horizontalAlignment] }.max() ?? 0,
+        centresByExtent: centresByExtent(dimensions, guide: horizontalAlignment))
     }
   }
 }

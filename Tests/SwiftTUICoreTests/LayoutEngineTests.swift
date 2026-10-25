@@ -1927,6 +1927,122 @@ struct LayoutEngineTests {
     #expect(placed.children.map(\.bounds.origin.x) == [0, 1])
   }
 
+  @Test(
+    "STUI-1212: every stack and ZStack placement path centres a child as a frame does",
+    arguments: [Axis.horizontal, .vertical])
+  func stackPlacementPathsCentreLikeFrames(axis: Axis) throws {
+    // A frame two cells across centres a one-cell child at (2 - 1) / 2 = 0,
+    // leaving the odd cell after it. Every stack path must agree with it and
+    // keep the two-cell cross extent.
+    func size(cross: Int) -> CellSize {
+      axis == .vertical ? .init(width: cross, height: 1) : .init(width: 1, height: cross)
+    }
+    func cross(_ point: CellPoint) -> Int { axis == .vertical ? point.x : point.y }
+    func cross(_ size: CellSize) -> Int { axis == .vertical ? size.width : size.height }
+    let children = [leaf("wide", size: size(cross: 2)), leaf("narrow", size: size(cross: 1))]
+    let engine = LayoutEngine()
+
+    let frame = ResolvedNode(
+      identity: testIdentity("frame"), kind: .view("Frame"), children: [children[1]],
+      layoutBehavior: .frame(
+        width: axis == .vertical ? 2 : nil, height: axis == .horizontal ? 2 : nil,
+        alignment: .center))
+    let framed = engine.place(frame, measured: engine.measure(frame), origin: .zero)
+    #expect(framed.children.map { cross($0.bounds.origin) } == [0])
+
+    let viewport = ScrollViewportContext(
+      axes: axis == .vertical ? [.vertical] : [.horizontal],
+      viewportRect: .init(origin: .zero, size: .init(width: 8, height: 8)),
+      contentOffset: .zero)
+    let centred = LayoutBehavior.lazyStack(
+      axis: axis, spacing: 0, horizontalAlignment: .center, verticalAlignment: .center)
+    let eager = ResolvedNode(
+      identity: testIdentity("eager"), kind: .view("Stack"), children: children,
+      layoutBehavior: .stack(
+        axis: axis, spacing: 0, horizontalAlignment: .center, verticalAlignment: .center))
+    let lazy = ResolvedNode(
+      identity: testIdentity("lazy"), kind: .view("Lazy"), children: children,
+      layoutBehavior: centred)
+    let indexed = indexedLazyStack(
+      "indexed", axis: axis, children: children,
+      horizontalAlignment: .center, verticalAlignment: .center)
+    let cases: [(String, ResolvedNode, ScrollViewportContext?)] = [
+      ("eager stack", eager, nil),
+      ("lazy fallback", lazy, nil),
+      ("lazy visible range", lazy, viewport),
+      ("indexed exhaustive", indexed, viewport),
+    ]
+    for (name, node, viewportContext) in cases {
+      let measured = engine.measure(node, proposal: .init(width: 8, height: 8))
+      #expect(cross(measured.measuredSize) == 2, "\(name)")
+      let placed = engine.place(
+        node, measured: measured, in: .init(origin: .zero, size: measured.measuredSize),
+        viewportContext: viewportContext, passContext: LayoutPassContext(retainedLayout: nil))
+      #expect(placed.children.map { cross($0.bounds.origin) } == [0, 0], "\(name)")
+    }
+
+    // The windowed product stores its cross line in the allocation snapshot.
+    let passContext = LayoutPassContext(retainedLayout: nil)
+    passContext.pushMeasureViewportHint(
+      .init(axes: viewport.axes, contentOffset: .zero, viewportSize: .init(width: 8, height: 8)))
+    let windowedMeasurement = engine.measure(
+      indexed, proposal: .init(width: 8, height: 8), passContext: passContext)
+    passContext.popMeasureViewportHint()
+    _ = try #require(windowedMeasurement.containerAllocationSnapshot?.lazyStack?.fragments)
+    #expect(cross(windowedMeasurement.measuredSize) == 2)
+    let windowed = engine.place(
+      indexed, measured: windowedMeasurement,
+      in: .init(origin: .zero, size: windowedMeasurement.measuredSize),
+      viewportContext: viewport, passContext: passContext)
+    #expect(windowed.children.map { cross($0.bounds.origin) } == [0, 0])
+
+    // A ZStack centres on both axes at once.
+    let overlay = ResolvedNode(
+      identity: testIdentity("zstack"), kind: .view("ZStack"),
+      children: [
+        leaf("square", size: .init(width: 2, height: 2)),
+        leaf("dot", size: .init(width: 1, height: 1)),
+      ],
+      layoutBehavior: .overlay(alignment: .center))
+    let overlayMeasured = engine.measure(overlay)
+    #expect(overlayMeasured.measuredSize == .init(width: 2, height: 2))
+    let overlaid = engine.place(overlay, measured: overlayMeasured, origin: .zero)
+    #expect(overlaid.children.map(\.bounds.origin) == [.zero, .zero])
+  }
+
+  @Test(
+    "STUI-1212: an explicit centre guide keeps guide arithmetic in stacks and frames",
+    arguments: [Axis.horizontal, .vertical])
+  func explicitCentreGuideKeepsStackGuideArithmetic(axis: Axis) {
+    // The guide is 0, the integer value a one-cell child reports, but it is
+    // explicit: frames and stacks both subtract guides, 2 / 2 - 0 = 1.
+    let metadata =
+      axis == .vertical
+      ? LayoutMetadata().settingHorizontalAlignmentGuide(
+        .center, debugName: "center", computeValue: { _ in 0 })
+      : LayoutMetadata().settingVerticalAlignmentGuide(
+        .center, debugName: "center", computeValue: { _ in 0 })
+    func cross(_ point: CellPoint) -> Int { axis == .vertical ? point.x : point.y }
+    let wide = leaf(
+      "wide", size: axis == .vertical ? .init(width: 2, height: 1) : .init(width: 1, height: 2))
+    let guided = leaf("guided", size: .init(width: 1, height: 1), layoutMetadata: metadata)
+    let engine = LayoutEngine()
+    let frame = ResolvedNode(
+      identity: testIdentity("frame"), kind: .view("Frame"), children: [guided],
+      layoutBehavior: .frame(
+        width: axis == .vertical ? 2 : nil, height: axis == .horizontal ? 2 : nil,
+        alignment: .center))
+    let framed = engine.place(frame, measured: engine.measure(frame), origin: .zero)
+    #expect(framed.children.map { cross($0.bounds.origin) } == [1])
+    let node = ResolvedNode(
+      identity: testIdentity("stack"), kind: .view("Stack"), children: [wide, guided],
+      layoutBehavior: .stack(
+        axis: axis, spacing: 0, horizontalAlignment: .center, verticalAlignment: .center))
+    let measured = engine.measure(node)
+    let placed = engine.place(node, measured: measured, origin: .zero)
+    #expect(placed.children.map { cross($0.bounds.origin) } == [0, 1])
+  }
+
   @Test("ViewThatFits selects the first child that fits the proposal")
   func viewThatFitsSelectsFirstFittingChild() {
     let engine = LayoutEngine()
@@ -2478,7 +2594,9 @@ private func indexedLazyStack(
   axis: Axis,
   children: [ResolvedNode],
   realizationCounter: RealizationCounter? = nil,
-  elementIdentities: [Identity]? = nil
+  elementIdentities: [Identity]? = nil,
+  horizontalAlignment: HorizontalAlignment = .leading,
+  verticalAlignment: VerticalAlignment = .top
 ) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
@@ -2486,8 +2604,8 @@ private func indexedLazyStack(
     layoutBehavior: .lazyStack(
       axis: axis,
       spacing: 0,
-      horizontalAlignment: .leading,
-      verticalAlignment: .top
+      horizontalAlignment: horizontalAlignment,
+      verticalAlignment: verticalAlignment
     ),
     indexedChildSource: TestIndexedChildSource(
       identityRoot: testIdentity(name),

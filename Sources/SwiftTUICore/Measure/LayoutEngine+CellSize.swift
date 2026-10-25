@@ -84,8 +84,8 @@ extension LayoutEngine {
         passContext: passContext
       )
       return CellSize(
-        width: alignmentMetrics.leading + alignmentMetrics.trailing,
-        height: alignmentMetrics.top + alignmentMetrics.bottom
+        width: alignmentMetrics.horizontal.extent,
+        height: alignmentMetrics.vertical.extent
       )
     case .stack(
       axis: .vertical, let spacing, let horizontalAlignment,

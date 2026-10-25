@@ -39,6 +39,31 @@ struct ValueControlStyleTests {
     #expect(decrement.rect.origin.x + decrement.rect.size.width <= increment.rect.origin.x)
   }
 
+  @Test(
+    "STUI-1212: browser stepper arrows share the row of their label and value",
+    arguments: [false, true])
+  func browserStepperArrowsShareLabelRow(compact: Bool) {
+    // 8x16 CSS-pixel cells grow each arrow route to a 3x2 frame. Its glyph
+    // and the one-row label and value centre the same way: on the frame's
+    // top row, with the odd row below them.
+    var environment = EnvironmentValues()
+    environment.pointerInputCapabilities = .init(
+      precision: .subCell(
+        source: .webPixels, metrics: CellPixelMetrics(width: 8, height: 16, source: .reported)))
+    let lines = DefaultRenderer().render(
+      Stepper("Count", value: .constant(1), in: 0...2)
+        .stepperStyle(compact ? .compact : .automatic),
+      context: .init(identity: testIdentity("WebStepperRow"), environmentValues: environment),
+      proposal: .init(width: 40, height: 8)
+    ).rasterSurface.lines
+    let row = { (token: String) in lines.firstIndex { $0.contains(token) } }
+    let label = row("Count")
+    #expect(label != nil)
+    #expect(row(compact ? "\u{2212}" : "\u{25C0}") == label)
+    #expect(row("1") == label)
+    #expect(row(compact ? "+" : "\u{25B6}") == label)
+  }
+
   @Test("slider no-op press, held drag, and release do not call a custom setter")
   func sliderNoOpPointerDoesNotWrite() throws {
     final class Box {

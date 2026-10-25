@@ -107,8 +107,10 @@ struct AdversarialSetBLayoutTests {
     )
     // Text's ratified horizontal minimum is zero. The three-cell spacer
     // survives; the trailing text yields the missing cell under this deficit.
+    // C centres in the four-cell column with the odd cell after it, as a
+    // frame would centre it (STUI-1212).
     #expect(artifacts.measuredTree.measuredSize == CellSize(width: 4, height: 4))
-    #expect(artifacts.rasterSurface.lines == ["A", "", "", "  C"])
+    #expect(artifacts.rasterSurface.lines == ["A", "", "", " C"])
     #expect(
       artifacts.placedTree.children.first?.children.map { $0.bounds.size.width } == [1, 3, 0])
 
@@ -191,7 +193,7 @@ struct AdversarialSetBLayoutTests {
       },
       context: .init(identity: testIdentity("SetBLayout", "setB015-clipped"))
     )
-    #expect(clipped.rasterSurface.lines == ["| 3  |"], "clipped \(clipped.rasterSurface.lines)")
+    #expect(clipped.rasterSurface.lines == ["|3   |"], "clipped \(clipped.rasterSurface.lines)")
     let unclipped = DefaultRenderer().render(
       HStack(spacing: 0) {
         Text("|")
@@ -202,8 +204,9 @@ struct AdversarialSetBLayoutTests {
     #expect(
       clipped.placedTree.children[1].children[0].bounds
         == unclipped.placedTree.children[1].children[0].bounds)
-    // The six-cell inner VStack aligns its one-cell label's integer center
-    // guide at x=3; bottomTrailing translates that column into clip column 1.
+    // The six-cell inner VStack centres its one-cell label at x=2, with the
+    // odd cell after it as a frame leaves it (STUI-1212); bottomTrailing
+    // translates that column into clip column 0.
   }
 
   // Overlays and backgrounds are size-neutral: a wider decoration overflows its primary

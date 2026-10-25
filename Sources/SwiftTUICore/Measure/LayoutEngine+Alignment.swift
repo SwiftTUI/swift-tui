@@ -1,6 +1,65 @@
 @_spi(Testing) import SwiftTUIPrimitives
 
+/// Where a stack's or ZStack's children align on one axis.
+///
+/// `leading` is the greatest child guide value and `trailing` the greatest
+/// remainder of a child past its guide, so the container spans
+/// `leading + trailing` cells.
+package struct AlignmentLine: Equatable, Sendable {
+  package var leading: Int
+  package var trailing: Int
+  /// Whether the line is the built-in centre guide and no child declares an
+  /// explicit value for it. Children then centre by extent, exactly as a
+  /// frame centres its content, instead of meeting at their floored guides.
+  package var centresByExtent: Bool
+
+  package init(leading: Int, trailing: Int, centresByExtent: Bool) {
+    self.leading = leading
+    self.trailing = trailing
+    self.centresByExtent = centresByExtent
+  }
+
+  package var extent: Int { leading + trailing }
+
+  /// The offset of a child from the container's leading or top edge.
+  package func offset(guideValue: Int, length: Int) -> Int {
+    centresByExtent
+      ? LayoutEngine.centredOffset(length: length, in: extent)
+      : leading - guideValue
+  }
+}
+
 extension LayoutEngine {
+  /// The one centring rule (STUI-591, STUI-1212). Frames, decorations,
+  /// safe-area insets, stacks and ZStacks place a child that is centred by
+  /// default — neither it nor the container declares an explicit centre
+  /// guide — at `(extent - length) / 2`. Content larger than its container
+  /// overflows both edges, as in SwiftUI, so the offset can go negative.
+  /// Integer division truncates toward zero, so an odd cell falls on the
+  /// container's trailing (or bottom) side whether it is a gap or an
+  /// overflow. Explicit guides keep guide arithmetic.
+  package static func centredOffset(length: Int, in extent: Int) -> Int {
+    (extent - length) / 2
+  }
+
+  /// Whether children aligned on `guide` centre by extent: the guide is the
+  /// built-in centre and no child declares an explicit value for it.
+  package func centresByExtent(
+    _ dimensions: [ViewDimensions],
+    guide: HorizontalAlignment
+  ) -> Bool {
+    guide == .center && dimensions.allSatisfy { $0.explicitValue(for: guide) == nil }
+  }
+
+  /// Whether children aligned on `guide` centre by extent: the guide is the
+  /// built-in centre and no child declares an explicit value for it.
+  package func centresByExtent(
+    _ dimensions: [ViewDimensions],
+    guide: VerticalAlignment
+  ) -> Bool {
+    guide == .center && dimensions.allSatisfy { $0.explicitValue(for: guide) == nil }
+  }
+
   package func alignedOrigin(
     for childDimensions: ViewDimensions,
     in bounds: CellRect,
@@ -21,15 +80,15 @@ extension LayoutEngine {
     alignment: Alignment
   ) -> CellPoint {
     // Content larger than its container overflows both edges, as in SwiftUI,
-    // so centred and trailing offsets go negative. Integer division truncates
-    // toward zero, so an odd cell falls on the container's trailing (or
-    // bottom) side whether it is a gap or an overflow.
+    // so centred and trailing offsets go negative. Default centring follows
+    // `centredOffset`, the rule stacks and ZStacks share.
     let x =
       if alignment.horizontal == .center,
         referenceDimensions.explicitValue(for: HorizontalAlignment.center) == nil,
         childDimensions.explicitValue(for: HorizontalAlignment.center) == nil
       {
-        bounds.origin.x + (referenceDimensions.width - childDimensions.width) / 2
+        bounds.origin.x
+          + Self.centredOffset(length: childDimensions.width, in: referenceDimensions.width)
       } else {
         bounds.origin.x
           + referenceDimensions[alignment.horizontal]
@@ -41,7 +100,8 @@ extension LayoutEngine {
         referenceDimensions.explicitValue(for: VerticalAlignment.center) == nil,
         childDimensions.explicitValue(for: VerticalAlignment.center) == nil
       {
-        bounds.origin.y + (referenceDimensions.height - childDimensions.height) / 2
+        bounds.origin.y
+          + Self.centredOffset(length: childDimensions.height, in: referenceDimensions.height)
       } else {
         bounds.origin.y
           + referenceDimensions[alignment.vertical]
@@ -191,7 +251,7 @@ extension LayoutEngine {
     case .leading:
       return origin
     case .center:
-      return origin + (availableSize - childSize) / 2
+      return origin + Self.centredOffset(length: childSize, in: availableSize)
     case .trailing:
       return origin + availableSize - childSize
     default:
@@ -214,7 +274,7 @@ extension LayoutEngine {
     case .top:
       return origin
     case .center:
-      return origin + (availableSize - childSize) / 2
+      return origin + Self.centredOffset(length: childSize, in: availableSize)
     case .bottom:
       return origin + availableSize - childSize
     default:
@@ -227,7 +287,7 @@ extension LayoutEngine {
     childMeasurements: [MeasuredNode],
     alignment: Alignment,
     passContext: LayoutPassContext? = nil
-  ) -> (leading: Int, trailing: Int, top: Int, bottom: Int) {
+  ) -> (horizontal: AlignmentLine, vertical: AlignmentLine) {
     let hasContent = children.contains { !isSpacer($0) }
     let dimensions = zip(children, childMeasurements).compactMap {
       child, measurement -> ViewDimensions? in
@@ -235,12 +295,15 @@ extension LayoutEngine {
       return viewDimensions(for: child, measured: measurement, passContext: passContext)
     }
 
-    let leading = dimensions.map { $0[alignment.horizontal] }.max() ?? 0
-    let trailing = dimensions.map { $0.width - $0[alignment.horizontal] }.max() ?? 0
-    let top = dimensions.map { $0[alignment.vertical] }.max() ?? 0
-    let bottom = dimensions.map { $0.height - $0[alignment.vertical] }.max() ?? 0
-
-    return (leading, trailing, top, bottom)
+    let horizontal = AlignmentLine(
+      leading: dimensions.map { $0[alignment.horizontal] }.max() ?? 0,
+      trailing: dimensions.map { $0.width - $0[alignment.horizontal] }.max() ?? 0,
+      centresByExtent: centresByExtent(dimensions, guide: alignment.horizontal))
+    let vertical = AlignmentLine(
+      leading: dimensions.map { $0[alignment.vertical] }.max() ?? 0,
+      trailing: dimensions.map { $0.height - $0[alignment.vertical] }.max() ?? 0,
+      centresByExtent: centresByExtent(dimensions, guide: alignment.vertical))
+    return (horizontal, vertical)
   }
 
   /// The child whose guides a wrapper propagates. Both alignment paths must

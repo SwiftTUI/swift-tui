@@ -216,6 +216,8 @@ extension LayoutEngine {
     var localOffsets: [Int: [Int]] = [:]
     var crossLeading = 0
     var crossTrailing = 0
+    // Children centre by extent only when every measured run does.
+    var crossCentresByExtent = true
     for (index, run) in context.known {
       let spacings = run.children.map { effectiveSpacing(for: $0, passContext: passContext) }
       var cursor = 0
@@ -245,6 +247,7 @@ extension LayoutEngine {
         verticalAlignment: context.verticalAlignment, passContext: passContext)
       crossLeading = max(crossLeading, cross.leading)
       crossTrailing = max(crossTrailing, cross.trailing)
+      crossCentresByExtent = crossCentresByExtent && cross.centresByExtent
     }
     var oldLengths: [Identity: Int] = [:]
     if let old = context.retainedSnapshot {
@@ -303,6 +306,7 @@ extension LayoutEngine {
       axis: axis, childMainOffsets: offsets,
       childMainLengths: lengths, childIdentities: context.identities, contentMainLength: cursor,
       crossLeading: crossLeading, crossTrailing: crossTrailing,
+      crossCentresByExtent: crossCentresByExtent,
       measuredWindow: (context.known.keys.min() ?? 0)..<((context.known.keys.max() ?? -1) + 1),
       estimatedRowStride: max(
         1, (cursor + context.identities.count / 2) / max(1, context.identities.count)),

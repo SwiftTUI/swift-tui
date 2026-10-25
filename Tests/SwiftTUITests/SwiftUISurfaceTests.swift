@@ -6810,6 +6810,110 @@ struct SwiftUISurfaceTests {
     #expect(clipped.rasterSurface.lines == ["|DEFG|"])
   }
 
+  // STUI-1212: centre alignment has one rounding rule. A child without an
+  // explicit centre guide sits (extent - length) / 2 cells in, whichever
+  // container centres it, so the odd cell of an uneven split falls after it.
+
+  @Test(
+    "STUI-1212: a frame-centred glyph shares its row and column with stack-centred siblings"
+  )
+  func frameCentredGlyphAlignsWithStackCentredSibling() {
+    let row = DefaultRenderer().render(
+      HStack(alignment: .center, spacing: 1) {
+        Text("A").frame(width: 3, height: 2)
+        Text("B")
+      },
+      context: .init(identity: testIdentity("Row"))
+    )
+    #expect(row.rasterSurface.lines == [" A  B", ""])
+
+    let column = DefaultRenderer().render(
+      VStack(alignment: .center, spacing: 0) {
+        Text("A").frame(width: 2, height: 1)
+        Text("B")
+      },
+      context: .init(identity: testIdentity("Column"))
+    )
+    #expect(column.rasterSurface.lines == ["A", "B"])
+  }
+
+  @Test(
+    "STUI-1212: every centring container leaves the odd cell after the child",
+    arguments: [(2, 1), (4, 1), (4, 3), (1, 1), (3, 1), (3, 2), (4, 2), (5, 2)]
+  )
+  func centringContainersShareOneRoundingRule(extent: Int, length: Int) {
+    let offset = (extent - length) / 2
+    for axis: SwiftTUIViews.Axis in [.vertical, .horizontal] {
+      for container in CentringContainer.allCases {
+        let artifacts = DefaultRenderer().render(
+          container.view(axis: axis, extent: extent, length: length, explicitGuide: false),
+          context: .init(identity: testIdentity("Centre"))
+        )
+        #expect(
+          centringMarkerOffsets(in: artifacts.rasterSurface.lines, axis: axis)
+            == Array(offset..<(offset + length)),
+          "\(container) on the \(axis) axis, extent \(extent), length \(length)")
+      }
+    }
+  }
+
+  @Test(
+    "STUI-1212: an explicit centre guide keeps integer guide arithmetic in every container",
+    arguments: [(2, 1), (4, 1), (4, 3), (3, 1), (3, 2), (5, 2)]
+  )
+  func explicitCentreGuideKeepsGuideArithmetic(extent: Int, length: Int) {
+    // The guide closure returns the integer value `ViewDimensions` reports,
+    // length / 2, so every container subtracts guides: extent / 2 - length / 2.
+    let offset = extent / 2 - length / 2
+    for axis: SwiftTUIViews.Axis in [.vertical, .horizontal] {
+      for container in CentringContainer.allCases {
+        let artifacts = DefaultRenderer().render(
+          container.view(axis: axis, extent: extent, length: length, explicitGuide: true),
+          context: .init(identity: testIdentity("Guided"))
+        )
+        #expect(
+          centringMarkerOffsets(in: artifacts.rasterSurface.lines, axis: axis)
+            == Array(offset..<(offset + length)),
+          "\(container) on the \(axis) axis, extent \(extent), length \(length)")
+      }
+    }
+  }
+
+  @Test("STUI-1212: edge-aligned stacks keep their edge placement")
+  func edgeAlignedStacksKeepTheirPlacement() {
+    let filler = Rectangle().fill(Color.clear).frame(width: 1, height: 2)
+    let top = DefaultRenderer().render(
+      HStack(alignment: .top, spacing: 0) {
+        filler
+        Text("b")
+      },
+      context: .init(identity: testIdentity("Top")))
+    let bottom = DefaultRenderer().render(
+      HStack(alignment: .bottom, spacing: 0) {
+        filler
+        Text("b")
+      },
+      context: .init(identity: testIdentity("Bottom")))
+    #expect(top.rasterSurface.lines == [" b", ""])
+    #expect(bottom.rasterSurface.lines == ["", " b"])
+
+    let wide = Rectangle().fill(Color.clear).frame(width: 2, height: 1)
+    let leading = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        wide
+        Text("b")
+      },
+      context: .init(identity: testIdentity("Leading")))
+    let trailing = DefaultRenderer().render(
+      VStack(alignment: .trailing, spacing: 0) {
+        wide
+        Text("b")
+      },
+      context: .init(identity: testIdentity("Trailing")))
+    #expect(leading.rasterSurface.lines == ["", "b"])
+    #expect(trailing.rasterSurface.lines == ["", " b"])
+  }
+
   @Test("ZStack supports arbitrary combined alignment guides")
   func zStackSupportsCombinedAlignmentGuides() {
     let alignment = Alignment(horizontal: .trailing, vertical: .firstTextBaseline)
@@ -7353,6 +7457,108 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(recorder.placedValues == [1, 4])
+  }
+}
+
+/// The containers that centre a child (STUI-1212). Each centres a marker of
+/// `length` cells within `extent` cells on one axis.
+private enum CentringContainer: CaseIterable, CustomStringConvertible {
+  case frame, overlay, background, zStack, stack, lazyStack
+
+  var description: String {
+    switch self {
+    case .frame: "frame"
+    case .overlay: "overlay"
+    case .background: "background"
+    case .zStack: "ZStack"
+    case .stack: "stack"
+    case .lazyStack: "lazy stack"
+    }
+  }
+
+  @MainActor
+  @ViewBuilder
+  func view(axis: SwiftTUIViews.Axis, extent: Int, length: Int, explicitGuide: Bool) -> some View {
+    let marker = CentringMarker(axis: axis, length: length, explicitGuide: explicitGuide)
+    let filler = Rectangle().fill(Color.clear).frame(
+      width: axis == .horizontal ? extent : 1, height: axis == .vertical ? extent : 1)
+    switch self {
+    case .frame:
+      marker.frame(
+        width: axis == .horizontal ? extent : nil, height: axis == .vertical ? extent : nil)
+    case .overlay:
+      filler.overlay { marker }
+    case .background:
+      filler.background { marker }
+    case .zStack:
+      ZStack {
+        filler
+        marker
+      }
+    case .stack:
+      if axis == .vertical {
+        HStack(alignment: .center, spacing: 0) {
+          filler
+          marker
+        }
+      } else {
+        VStack(alignment: .center, spacing: 0) {
+          filler
+          marker
+        }
+      }
+    case .lazyStack:
+      if axis == .vertical {
+        LazyHStack(alignment: .center, spacing: 0) {
+          filler
+          marker
+        }
+      } else {
+        LazyVStack(alignment: .center, spacing: 0) {
+          filler
+          marker
+        }
+      }
+    }
+  }
+}
+
+/// `length` cells of "b" along `axis`, optionally declaring explicit centre
+/// guides equal to the integer values `ViewDimensions` reports.
+private struct CentringMarker: View {
+  let axis: SwiftTUIViews.Axis
+  let length: Int
+  let explicitGuide: Bool
+
+  var body: some View {
+    let content = Group {
+      if axis == .vertical {
+        VStack(spacing: 0) {
+          ForEach(0..<length, id: \.self) { _ in Text("b") }
+        }
+      } else {
+        Text(String(repeating: "b", count: length))
+      }
+    }
+    if explicitGuide {
+      content
+        .alignmentGuide(HorizontalAlignment.center) { $0[HorizontalAlignment.center] }
+        .alignmentGuide(VerticalAlignment.center) { $0[VerticalAlignment.center] }
+    } else {
+      content
+    }
+  }
+}
+
+/// The rows (vertical) or columns (horizontal) the centring marker occupies.
+private func centringMarkerOffsets(in lines: [String], axis: SwiftTUIViews.Axis) -> [Int] {
+  switch axis {
+  case .vertical:
+    lines.indices.filter { lines[$0].contains("b") }
+  case .horizontal:
+    lines.flatMap { line in
+      Array(line).enumerated().filter { $0.element == "b" }.map(\.offset)
+    }
   }
 }
 

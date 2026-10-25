@@ -64,7 +64,8 @@ extension LayoutEngine {
       childIdentities: children.map(\.identity),
       contentMainLength: nextOffset,
       crossLeading: crossMetrics.leading,
-      crossTrailing: crossMetrics.trailing
+      crossTrailing: crossMetrics.trailing,
+      crossCentresByExtent: crossMetrics.centresByExtent
     )
   }
 
