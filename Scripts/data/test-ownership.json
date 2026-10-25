@@ -3413,6 +3413,34 @@
     "Tests/SwiftTUITests/AdversarialSetFSignalPhaseTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Platforms/CLI/Tests/SwiftTUICLITests/AdversarialSetHPlatformFacadeTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Platforms/WASI/Tests/WASISurfaceBridgeTests/AdversarialSetHWASIBridgeTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
+    "Tests/SwiftTUITests/AdversarialSetHCapabilityProfileTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetHNumericEdgeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetHProcessHelperTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetHReleaseContractTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
+    },
+    "Tests/SwiftTUITests/AdversarialSetHTerminalPOSIXTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     }
   }
 }
