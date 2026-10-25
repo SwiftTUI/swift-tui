@@ -2938,6 +2938,10 @@
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
+    "Tests/SwiftTUITests/Wave2HuntFATests.swift": {
+      "category": "runtime-integration",
+      "reason": "Campaign two wave-2 regression hunt part FA: scroll edges, table eligibility and separators, state lifetime, initial change events, signal reader end, centre rounding and runtime focus identity (STUI-1165) through the stress run loop and one-shot renderer."
+    },
     "Tests/SwiftTUITests/WindowedLineGenerationTests.swift": {
       "category": "runtime-integration",
       "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
