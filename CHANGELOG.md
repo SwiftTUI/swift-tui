@@ -8,6 +8,62 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Changed
+
+- `path(in:)` of a trimmed analytic shape returns the outline its fill paints:
+  a trimmed `Circle` path stretches to a non-square rect, so a
+  `contentShape(_:)` built from it covers the painted cells, and nested or
+  inset trims measure like their fills (STUI-1244).
+- Centre alignment rounds once for every guide. An identity centre guide, a
+  guide computed from the centre and a custom `AlignmentID` whose default is
+  `context[.center]` place like the built-in centre, and windowed lazy rows no
+  longer shift when a guided row is measured (STUI-1242).
+- `docs/HOST-WIRE-CONTRACT.md` states that wheel deltas are signed whole-cell
+  counts, how hosts convert pixels, points, lines and pages to cells, and that
+  first-party hosts bound each axis of one record to 16 cells (STUI-1191,
+  STUI-1216).
+
+### Fixed
+
+- End a run-loop session whose terminal raw-mode entry fails, refusing later
+  termination requests and any accepted during the entry (STUI-1182).
+- Align terminal platform edges with POSIX: Linux raw mode sets VMIN and VTIME
+  at the platform's own `c_cc` indices, read timeouts above `Int32.max`
+  milliseconds clamp instead of trapping, writes to a closed pipe on non-Darwin
+  hosts return EPIPE instead of raising SIGPIPE, attach discovery removes only
+  stale sockets, and a zero-byte input read is not end of file (STUI-1227).
+- Deliver runtime issues to a redirected stderr pipe or file while a
+  presentation writes to a pipe or file (STUI-1210).
+- Widen an automatic column of a scroll-hosted data-driven `Table` when a
+  wider row scrolls into view (STUI-1230), give every visible row of a
+  hidden-separator data-driven `Table` its click and assistive row action
+  (STUI-1239), and publish a disabled row's assistive "Select row" control as
+  disabled in every collection shape (STUI-1240).
+- Bring every lazy stack to its last row when one action sends several
+  `ScrollView`s to their far edge (STUI-1243).
+- Morph `clipShape` masks of an animatable custom shape the way its fill
+  morphs (STUI-1218).
+- Name the property of a member-projected binding such as `$model.count` in
+  `_printChanges()` and `_logChanges()` (STUI-1131).
+- Place no rows for a lazy stack wholly outside its scroll viewport
+  (STUI-1231), and stop rebuilding the frame's invalidation summary on every
+  resolve, which made deep presentation stacks take seconds per frame
+  (STUI-1232).
+- Cancel a departing view's tasks at the commit that removes it, and let its
+  timer and task wakes reach live state while an arriving tab is laid out
+  (STUI-1233); run a palette's appear and change handlers when the frame that
+  opened it is superseded (STUI-1234).
+- Keep an action dispatched between two one-shot `DefaultRenderer` snapshots
+  after the first renderer is released (STUI-1241).
+- Keep a trimmed shape's outline when a finite point lies far enough out to
+  overflow its aspect weighting (STUI-1248), draw the in-canvas part of
+  `Canvas` lines and `Shape` strokes whose endpoints span the `Double` range
+  (STUI-1245), and light the same dots for ellipse outlines far larger than
+  the canvas as the walk they extend (STUI-1246).
+- Refine `xterm-direct2`, `xterm-direct16` and `xterm-direct256` like
+  `xterm-direct`, including OSC 8 hyperlink detection under VTE, VS Code and
+  Windows Terminal (STUI-1247).
+
 ## [0.19.3] - 2026-10-25
 
 ### Added
