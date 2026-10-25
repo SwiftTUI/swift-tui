@@ -82,7 +82,8 @@
         try POSIXTerminalController().write("x", to: duplicate)
         try #require(try transport.read(count: 1) == [UInt8(ascii: "x")])
         try #require(Darwin.close(transport.peer) == 0)
-        _ = plainBorrowedOutputWrite(to: transport.output)
+        let writeError = plainBorrowedOutputWriteAwaitingSIGPIPE(to: transport.output)
+        Issue.record("the plain write returned without EPIPE (errno \(writeError))")
       }
     }
 
@@ -525,6 +526,33 @@
     return bytes.withUnsafeBytes { rawBuffer in
       unsafe terminalPlatformWrite(descriptor, rawBuffer.baseAddress, rawBuffer.count)
     }
+  }
+
+  /// Darwin posts a write's SIGPIPE to the process (`psignal`), pending it on
+  /// the first eligible non-workqueue thread (xnu `get_signalthread`), which
+  /// is usually not the exit-test body's workqueue thread. Returning after
+  /// the write let the child exit 0 before that thread took the signal
+  /// (STUI-1193). The write therefore runs on its own pthread, which waits in
+  /// `pause()` after EPIPE so only the pending signal can end the child.
+  /// Returns the write's errno if it did not fail with EPIPE.
+  private func plainBorrowedOutputWriteAwaitingSIGPIPE(to descriptor: Int32) -> Int32 {
+    var thread: pthread_t?
+    let context = unsafe UnsafeMutableRawPointer(bitPattern: Int(descriptor) + 1)
+    let created = unsafe pthread_create(
+      &thread, nil,
+      { context in
+        let descriptor = Int32(truncatingIfNeeded: Int(bitPattern: context) - 1)
+        let result = plainBorrowedOutputWrite(to: descriptor)
+        let writeError = errno
+        if result == -1, writeError == EPIPE {
+          while true { _ = pause() }
+        }
+        return unsafe UnsafeMutableRawPointer(bitPattern: Int(writeError) + 1)
+      }, context)
+    guard created == 0, let thread = unsafe thread else { return created }
+    var value: UnsafeMutableRawPointer?
+    _ = unsafe pthread_join(thread, &value)
+    return Int32(truncatingIfNeeded: Int(bitPattern: value) - 1)
   }
 
   private func plainBorrowedOutputWrite(to descriptor: Int32) -> Int {
