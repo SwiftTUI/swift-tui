@@ -27,20 +27,51 @@ public struct TrimmedShape<Base: Shape>: Shape, ResolvableView {
     base.geometry
   }
 
-  /// The trimmed outline in `rect`, measured as the raster measures it.
+  /// The trimmed outline in `rect`: the outline a fill of this shape paints,
+  /// measured as the raster measures it.
+  ///
+  /// The outline is the one the fill trims, so a content shape built from it
+  /// covers the painted cells. A trimmed `Circle` stretches to `rect` as its
+  /// fill does. In a non-square `rect` this path is therefore not the trim of
+  /// `Circle().path(in:)`, which is inscribed. A custom base trims its own
+  /// `path(in:)`, and a trim that keeps the whole outline returns the base's
+  /// outline.
   ///
   /// A vertical cell counts as the estimated cell aspect ratio
   /// (`CellPixelMetrics.estimated`, snapped to the nearest half). A path has
   /// no terminal metrics, so a terminal that reports another ratio paints
   /// its trim with that ratio, while this path keeps the estimate.
   public func path(in rect: Rect) -> Path {
+    let aspectRatio = RectangleStrokeTrack.snappedAspectRatio(
+      CellPixelMetrics.estimated.aspectRatio)
+    switch geometry {
+    case .path:
+      break
+    default:
+      // An analytic base: trace the route the fill takes
+      // (`ShapeGeometry.resolved(in:trimAspectRatio:)`), the composed fractions
+      // of the untrimmed outline in the inset frame, with a `Circle` stretched
+      // to that frame.
+      if strokeTrim != nil {
+        return fillGeometry.path(
+          in: insetFrame(rect), stretchingCircle: true, trimAspectRatio: aspectRatio)
+      }
+    }
     // The base's path already carries the base's own trim, so this trims it by
-    // this wrapper's fractions alone. `trimStart` and `trimEnd` are the composed
-    // fractions of the untrimmed outline, which a stroke uses.
-    base.path(in: rect).physicallyTrimmedPath(
-      from: from, to: to,
-      aspectRatio: RectangleStrokeTrack.snappedAspectRatio(
-        CellPixelMetrics.estimated.aspectRatio))
+    // this wrapper's fractions alone. A custom base's fill scales this same
+    // `path(in:)` from the unit rect.
+    return base.path(in: rect).physicallyTrimmedPath(
+      from: from, to: to, aspectRatio: aspectRatio)
+  }
+
+  /// `rect` inset by `insetAmount`, as `InsetShape.path(in:)` insets it.
+  private func insetFrame(_ rect: Rect) -> Rect {
+    guard insetAmount != 0 else { return rect }
+    let inset = Double(insetAmount)
+    return Rect(
+      origin: Point(x: rect.origin.x + inset, y: rect.origin.y + inset),
+      size: Size(
+        width: max(0, rect.size.width - 2 * inset), height: max(0, rect.size.height - 2 * inset)))
   }
 
   public var kindName: String {

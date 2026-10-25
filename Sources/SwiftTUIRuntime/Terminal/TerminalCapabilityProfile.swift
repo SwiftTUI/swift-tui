@@ -254,9 +254,16 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     families.contains { term == $0 || term.hasPrefix($0 + "-") || term.hasPrefix($0 + ".") }
   }
 
+  /// xterm's own color and direct-color entries, which name no emulator. The
+  /// direct entries are `xterm-direct` and its numbered variants
+  /// (`xterm-direct2`, `xterm-direct16`, `xterm-direct256`), numbered as
+  /// `namesDirectColor` reads them.
   private static func isGenericXterm(_ term: String) -> Bool {
-    ["xterm", "xterm-color", "xterm-16color", "xterm-88color", "xterm-256color", "xterm-direct"]
-      .contains(term)
+    if ["xterm", "xterm-color", "xterm-16color", "xterm-88color", "xterm-256color"].contains(term) {
+      return true
+    }
+    guard term.hasPrefix("xterm-direct") else { return false }
+    return term.dropFirst("xterm-direct".count).allSatisfy { ("0"..."9").contains($0) }
   }
 
   /// terminfo's direct-color entries (`RGB`, `colors#0x1000000`) are named

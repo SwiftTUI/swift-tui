@@ -119,7 +119,10 @@ package struct CanvasGridBuffer: Equatable, Sendable {
 
   /// The primitives below accept any `Int` geometry: they visit only
   /// samples inside the buffer (see `ClippedRaster`) and light the same
-  /// samples the unclipped walks would.
+  /// samples the unclipped walks would. The exception is an ellipse outline
+  /// whose walk near the buffer is not bounded by it
+  /// (`ClippedRaster.parametricOutline`). That outline lights the sample
+  /// nearest each column and row crossing instead.
   package mutating func line(from: (x: Int, y: Int), to: (x: Int, y: Int)) {
     ClippedRaster.line(from: from, to: to, width: pixelWidth, height: pixelHeight) {
       setPixel(x: $0, y: $1)
@@ -162,10 +165,16 @@ package struct CanvasGridBuffer: Equatable, Sendable {
       ClippedRaster.usesExactOutline(
         radiusX: radiusX, radiusY: radiusY, width: width, height: height)
     else {
-      ClippedRaster.ellipseOutline(
-        centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY, width: width,
-        height: height
+      let walked = ClippedRaster.parametricOutline(
+        centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY, minimumSteps: 12,
+        width: width, height: height
       ) { setPixel(x: $0, y: $1) }
+      if !walked {
+        ClippedRaster.ellipseOutline(
+          centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY, width: width,
+          height: height
+        ) { setPixel(x: $0, y: $1) }
+      }
       return
     }
     let steps = max(12, (radiusX + radiusY) * 4)

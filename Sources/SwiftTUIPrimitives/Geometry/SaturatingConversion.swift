@@ -59,15 +59,32 @@ package enum SegmentClipping {
   /// is interpolated from whichever endpoint is nearer that boundary, so the
   /// clipped segment keeps its position even when the segment is vastly longer
   /// than the square.
+  ///
+  /// Finite endpoints of opposite sign beyond half the `Double` range have no
+  /// representable difference. Such a segment is clipped at half scale: halving
+  /// changes only exponents, so the halved segment has the same outcodes
+  /// against the halved square and the same crossing fractions, and its clipped
+  /// endpoints double back exactly.
   package static func clipped(
     from start: Point,
     to end: Point,
     within limit: Double
   ) -> (start: Point, end: Point)? {
-    guard start.x.isFinite, start.y.isFinite, end.x.isFinite, end.y.isFinite,
-      (end.x - start.x).isFinite, (end.y - start.y).isFinite
-    else {
+    guard start.x.isFinite, start.y.isFinite, end.x.isFinite, end.y.isFinite else {
       return nil
+    }
+    guard (end.x - start.x).isFinite, (end.y - start.y).isFinite else {
+      func scaled(_ point: Point, by factor: Double) -> Point {
+        Point(x: point.x * factor, y: point.y * factor)
+      }
+      // Halved differences are at most `greatestFiniteMagnitude`.
+      guard
+        let halved = clipped(
+          from: scaled(start, by: 0.5), to: scaled(end, by: 0.5), within: limit / 2)
+      else {
+        return nil
+      }
+      return (scaled(halved.start, by: 2), scaled(halved.end, by: 2))
     }
     func outcode(_ point: Point) -> Int {
       (point.x < -limit ? 1 : 0) | (point.x > limit ? 2 : 0)

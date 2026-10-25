@@ -132,9 +132,38 @@ extension Path {
   /// vertical cell counts `aspectRatio` cell widths. The raster's placed trims
   /// and the public `TrimmedShape.path(in:)` share this measure, so a path
   /// built from a trimmed shape describes the outline its fill paints.
+  ///
+  /// Scaling y by the aspect ratio can take a far, finite point past the
+  /// `Double` range, and the trim of a non-finite outline is empty. Such an
+  /// outline is first scaled down by a power of two that keeps it finite. A
+  /// power-of-two scale changes only exponents, so with the flattening
+  /// tolerance scaled alike the trim cuts the scaled outline at the scaled
+  /// points, which scale back exactly. Every other outline takes the plain
+  /// scale, bit for bit.
   package func physicallyTrimmedPath(from: Double, to: Double, aspectRatio: Double) -> Path {
-    scaledBy(sx: 1, sy: aspectRatio)
-      .trimmedPath(from: from, to: to)
-      .scaledBy(sx: 1, sy: 1 / aspectRatio)
+    let shrink =
+      overflowsVerticalScale(aspectRatio)
+      ? Double(sign: .plus, exponent: -(aspectRatio.exponent + 1), significand: 1) : 1
+    return scaledBy(sx: shrink, sy: shrink * aspectRatio)
+      .trimmedPath(from: from, to: to, tolerance: 0.01 * shrink)
+      .scaledBy(sx: 1 / shrink, sy: 1 / (shrink * aspectRatio))
+  }
+
+  /// Whether a finite y coordinate of this path leaves the `Double` range
+  /// when multiplied by `scale`.
+  private func overflowsVerticalScale(_ scale: Double) -> Bool {
+    guard scale.isFinite, scale > 1 else { return false }
+    func overflows(_ point: Point) -> Bool {
+      point.y.isFinite && !(point.y * scale).isFinite
+    }
+    return elements.contains { element in
+      switch element {
+      case .move(let point), .line(let point): overflows(point)
+      case .quadCurve(let to, let control): overflows(to) || overflows(control)
+      case .curve(let to, let control1, let control2):
+        overflows(to) || overflows(control1) || overflows(control2)
+      case .close: false
+      }
+    }
   }
 }

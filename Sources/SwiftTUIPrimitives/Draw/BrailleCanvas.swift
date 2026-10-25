@@ -228,9 +228,17 @@ public struct BrailleCanvas: Equatable, Sendable {
   ///
   /// Samples the parametric form `(cx + rx·cos θ, cy + ry·sin θ)` with
   /// enough steps that adjacent samples are at most one pixel apart.
-  /// Out-of-range dots are clipped. An ellipse too large for that walk to be
-  /// bounded by the canvas draws the visible part of its outline column by
-  /// column and row by row instead.
+  /// Out-of-range dots are clipped. An ellipse too large to walk whole
+  /// computes only the samples near the canvas, so it lights the same dots.
+  ///
+  /// Two outlines are approximated instead:
+  /// - the sharp end of a very flat ellipse, where more samples would reach
+  ///   the canvas than the largest whole walk takes;
+  /// - radii that sum past `Int.max / 4`.
+  ///
+  /// These light, in each column and row the outline crosses, the dot
+  /// nearest the crossing. That can differ from the walk by a dot near each
+  /// crossing.
   public mutating func strokeEllipse(
     centerX cx: Int,
     centerY cy: Int,
@@ -253,9 +261,15 @@ public struct BrailleCanvas: Equatable, Sendable {
     else { return }
     guard ClippedRaster.usesExactOutline(radiusX: rx, radiusY: ry, width: width, height: height)
     else {
-      ClippedRaster.ellipseOutline(
-        centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, width: width, height: height
+      let walked = ClippedRaster.parametricOutline(
+        centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, minimumSteps: 32, width: width,
+        height: height
       ) { setPixel(x: $0, y: $1) }
+      if !walked {
+        ClippedRaster.ellipseOutline(
+          centerX: cx, centerY: cy, radiusX: rx, radiusY: ry, width: width, height: height
+        ) { setPixel(x: $0, y: $1) }
+      }
       return
     }
     // 4 · (rx + ry) samples is enough for a smooth closed curve on any

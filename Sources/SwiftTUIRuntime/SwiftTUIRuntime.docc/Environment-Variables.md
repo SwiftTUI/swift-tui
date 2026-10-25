@@ -35,7 +35,8 @@ Unicode detection uses the first nonempty locale setting in `LC_ALL`,
 A terminfo direct-color `TERM` (`xterm-direct`, `foot-direct`,
 `xterm-direct256`, and the other `*-direct` entries) selects 24-bit color
 without `COLORTERM`; nonempty `NO_COLOR` still wins.
-Generic xterm color/direct entries may be refined by the known emulator name;
+Generic xterm color/direct entries (`xterm-direct` and its numbered variants
+included) may be refined by the known emulator name;
 explicit terminal and multiplexer families, including dotted screen entries,
 retain their own capabilities. On a generic xterm, `VTE_VERSION` 5000 or later
 (VTE 0.50, such as GNOME Terminal), `TERM_PROGRAM=vscode` and `WT_SESSION`

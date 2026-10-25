@@ -247,7 +247,14 @@ public struct CanvasContext: Sendable {
 
   /// Draws the outline of an ellipse in continuous cell space.
   ///
-  /// A non-finite center or radius draws nothing.
+  /// A non-finite center or radius draws nothing. An outline far larger than
+  /// the canvas computes only the samples near it. It approximates two
+  /// outlines instead:
+  /// - the sharp end of a very flat ellipse, where more samples would reach
+  ///   the canvas than a whole walk of a few thousand samples takes;
+  /// - radii near the integer limits.
+  ///
+  /// These light the sample nearest each column and row crossing.
   public mutating func strokeEllipse(
     center: Point,
     radiusX: Double,

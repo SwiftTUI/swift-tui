@@ -709,7 +709,9 @@ are omitted even when SwiftUI exposes a corresponding API.
   the snapped cell aspect ratio, so a quarter is a quarter of the way round on
   screen. A stroke is trimmed at raster time, so the analytic primitives keep
   their cell-aspect correction. A trimmed fill takes the custom-path route: it
-  stretches to its frame and its interval does not animate smoothly.
+  stretches to its frame and its interval does not animate smoothly. A trimmed
+  shape's `path(in:)` is that filled outline, so a trimmed `Circle`'s path
+  stretches to a non-square rect where SwiftUI's stays inscribed.
 - **No path/vector transform adapters yet.** *Provisional.*
   `offset`, `rotation`, `scale`, and `transform` shape
   adapters are absent. SwiftTUI's continuous cell-space paths can support

@@ -4,6 +4,9 @@
 // 018, 019, 026 and 028; the brief and hypotheses live in the org root's
 // docs/reports/evidence/2026-10-25-campaign-two-wave-2-hunt/fb/. The
 // pre-repair walks are `ClippedRasterReference` (BrailleCanvasTests.swift).
+// Wave 3 FW3-G (STUI-1245, STUI-1246) promoted this file's guards and added
+// neighbours wave3g06-08, 10 and 11; its evidence is in the org root's
+// docs/reports/evidence/2026-10-24-campaign-two-wave-3/fw3-g/.
 import Foundation
 import Testing
 
@@ -21,16 +24,6 @@ import Testing
 #elseif canImport(ucrt)
   import ucrt
 #endif
-
-/// Keeps an unmarked reproduction path (`SWIFTTUI_W2HUNT_UNMARKED=1`) while
-/// limiting each guard to its exact reproduced assertion.
-private func w2fbKnown(_ comment: Comment, _ body: () throws -> Void) rethrows {
-  if ProcessInfo.processInfo.environment["SWIFTTUI_W2HUNT_UNMARKED"] == "1" {
-    try body()
-  } else {
-    withKnownIssue(comment) { try body() }
-  }
-}
 
 /// A 4 x 2 cell Braille context: 8 x 8 grid samples.
 private func w2fbBrailleContext() -> CanvasContext {
@@ -79,6 +72,81 @@ private func w2fbCompare(
       label: label,
       onlyRepaired: repaired.subtracting(reference),
       onlyReference: reference.subtracting(repaired)))
+}
+
+/// `SegmentClipping.clipped` as written in ef4ce264, before FW3-G (STUI-1245),
+/// for the bit-for-bit comparison of segments whose differences are finite.
+private enum W3GPreFixSegmentClipping {
+  static func clipped(
+    from start: Point,
+    to end: Point,
+    within limit: Double
+  ) -> (start: Point, end: Point)? {
+    guard start.x.isFinite, start.y.isFinite, end.x.isFinite, end.y.isFinite,
+      (end.x - start.x).isFinite, (end.y - start.y).isFinite
+    else {
+      return nil
+    }
+    func outcode(_ point: Point) -> Int {
+      (point.x < -limit ? 1 : 0) | (point.x > limit ? 2 : 0)
+        | (point.y < -limit ? 4 : 0) | (point.y > limit ? 8 : 0)
+    }
+    func crossing(x: Double, _ a: Point, _ b: Point) -> Point {
+      let (near, far) = abs(a.x - x) <= abs(b.x - x) ? (a, b) : (b, a)
+      return Point(x: x, y: near.y + (far.y - near.y) * ((x - near.x) / (far.x - near.x)))
+    }
+    func crossing(y: Double, _ a: Point, _ b: Point) -> Point {
+      let (near, far) = abs(a.y - y) <= abs(b.y - y) ? (a, b) : (b, a)
+      return Point(x: near.x + (far.x - near.x) * ((y - near.y) / (far.y - near.y)), y: y)
+    }
+    var a = start
+    var b = end
+    var codeA = outcode(a)
+    var codeB = outcode(b)
+    for _ in 0..<8 {
+      if codeA | codeB == 0 {
+        return (a, b)
+      }
+      if codeA & codeB != 0 {
+        return nil
+      }
+      let outside = codeA != 0 ? codeA : codeB
+      let point: Point
+      if outside & 8 != 0 {
+        point = crossing(y: limit, a, b)
+      } else if outside & 4 != 0 {
+        point = crossing(y: -limit, a, b)
+      } else if outside & 2 != 0 {
+        point = crossing(x: limit, a, b)
+      } else {
+        point = crossing(x: -limit, a, b)
+      }
+      if outside == codeA {
+        a = point
+        codeA = outcode(a)
+      } else {
+        b = point
+        codeB = outcode(b)
+      }
+    }
+    func clamped(_ point: Point) -> Point {
+      Point(x: min(max(point.x, -limit), limit), y: min(max(point.y, -limit), limit))
+    }
+    return (clamped(a), clamped(b))
+  }
+}
+
+/// The in-buffer pixels `ClippedRaster.ellipseOutline` lights, the crossing
+/// outline kept beyond the walk's budget and domain.
+private func w3gCrossingOutline(
+  centerX: Int, centerY: Int, radiusX: Int, radiusY: Int, width: Int, height: Int
+) -> Set<ClippedRasterPixel> {
+  var pixels: Set<ClippedRasterPixel> = []
+  ClippedRaster.ellipseOutline(
+    centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY, width: width,
+    height: height
+  ) { pixels.insert(ClippedRasterPixel(x: $0, y: $1)) }
+  return pixels
 }
 
 @Suite("Wave-2 hunt FB: clipped raster and canvas neighbours")
@@ -135,11 +203,9 @@ struct Wave2HuntFBRasterTests {
     var far = w2fbBrailleContext()
     far.line(from: Point(x: -1e308, y: 0.5), to: Point(x: 1e308, y: 0.5))
     let lit = w2fbLitGridSamples(far.canvas)
-    w2fbKnown(
-      "NEW-1: w2fb011: CanvasContext.line((-1e308, 0.5), (1e308, 0.5)) lights no sample; SegmentClipping.clipped rejects a segment whose finite endpoints have a non-finite difference (SaturatingConversion.swift:67-68), so the visible part is skipped; contract: CanvasDrawing.swift:188-191 (only a non-finite endpoint draws nothing; the part inside the canvas is rasterized); adjacent STUI-753"
-    ) {
-      #expect(lit == expected, "lit \(lit.count) samples")
-    }
+    // STUI-1245 (repaired): the segment is clipped in a halved coordinate
+    // space. Contract: CanvasDrawing.swift:188-191.
+    #expect(lit == expected, "lit \(lit.count) samples")
   }
 
   @Test("w2fb013: canvas lines at and beyond the Int.max / 16 clip limit match the in-range line")
@@ -231,11 +297,9 @@ struct Wave2HuntFBRasterTests {
       }
     }
     #expect(compared == 24)
-    w2fbKnown(
-      "NEW-2: w2fb017: just above the 4,096 + 4(w+h) switch-over, BrailleCanvas.strokeEllipse lights a different in-buffer pixel set from the parametric walk it replaces for 13 of 24 flat ellipses (the dot at the row change moves or disappears); ClippedRaster.ellipseOutline rounds each column's and row's crossing (ClippedRaster.swift:322-374) where the walk rounds its samples and joins them with lines; contract: ClippedRaster.swift:8-9, CanvasGrid.swift:120-122 (in-buffer output equals the unclipped walk); adjacent STUI-753"
-    ) {
-      #expect(mismatches.isEmpty, "\(mismatches.count) of \(compared): \(mismatches.prefix(4))")
-    }
+    // STUI-1246 (repaired): the outline walks the walk's own samples near the
+    // buffer. Contract: ClippedRaster.swift:8-9, CanvasGrid.swift:120-122.
+    #expect(mismatches.isEmpty, "\(mismatches.count) of \(compared): \(mismatches.prefix(4))")
   }
 
   @Test(
@@ -281,12 +345,9 @@ struct Wave2HuntFBRasterTests {
     let above = try mismatches(radius: 2_081)
     // The midpoint circle and the crossing outline agree at every placement.
     #expect(above.circles.isEmpty, "\(above.circles.count) of 48: \(above.circles.prefix(4))")
-    w2fbKnown(
-      "NEW-2: w2fb018: just above the switch-over, strokeEllipse(r, r) with r = 2081 lights a different in-buffer pixel set from the parametric walk at 44 of 48 crossing angles (at 45 degrees the walk lights (4, 4) and the outline lights only (4, 5) and (5, 4)); ClippedRaster.ellipseOutline rounds each column's and row's crossing (ClippedRaster.swift:322-374) where the walk rounds its samples and joins them with lines; contract: ClippedRaster.swift:8-9; adjacent STUI-753"
-    ) {
-      #expect(
-        above.ellipses.isEmpty, "\(above.ellipses.count) of 48: \(above.ellipses.prefix(4))")
-    }
+    // STUI-1246 (repaired). Contract: ClippedRaster.swift:8-9.
+    #expect(
+      above.ellipses.isEmpty, "\(above.ellipses.count) of 48: \(above.ellipses.prefix(4))")
   }
 
   @Test(
@@ -323,10 +384,161 @@ struct Wave2HuntFBRasterTests {
         entry.label, repaired: w2fbLitGridSamples(buffer), reference: reference.pixels,
         into: &mismatches)
     }
-    w2fbKnown(
-      "NEW-2: w2fb028: CanvasGridBuffer.strokeEllipse just above the switch-over lights a different in-buffer pixel set from its parametric walk for 9 of 16 flat and round placements; ClippedRaster.ellipseOutline (ClippedRaster.swift:322-374); contract: CanvasGrid.swift:120-122; adjacent STUI-753"
-    ) {
-      #expect(mismatches.isEmpty, "\(mismatches.count) of \(cases.count): \(mismatches.prefix(4))")
+    // STUI-1246 (repaired). Contract: CanvasGrid.swift:120-122.
+    #expect(mismatches.isEmpty, "\(mismatches.count) of \(cases.count): \(mismatches.prefix(4))")
+  }
+
+  // MARK: - Wave 3 FW3-G neighbours (STUI-1245, STUI-1246)
+
+  @Test(
+    "wave3g06: canvas lines whose finite endpoints span the Double range draw their visible part")
+  func wave3g06CanvasLinesSpanningTheDoubleRangeDrawTheirVisiblePart() {
+    func lit(_ start: Point, _ end: Point) -> Set<ClippedRasterPixel> {
+      var context = w2fbBrailleContext()
+      context.line(from: start, to: end)
+      return w2fbLitGridSamples(context.canvas)
+    }
+    let column = lit(Point(x: 0.5, y: -1), Point(x: 0.5, y: 3))
+    #expect(column == clippedRasterPixels((0..<8).map { (1, $0) }))
+    #expect(lit(Point(x: 0.5, y: -1e308), Point(x: 0.5, y: 1e308)) == column)
+    let row = lit(Point(x: -1, y: 0.5), Point(x: 5, y: 0.5))
+    #expect(lit(Point(x: 1e308, y: 0.5), Point(x: -1e308, y: 0.5)) == row)
+    let max = Double.greatestFiniteMagnitude
+    #expect(
+      lit(Point(x: -max, y: 1.25), Point(x: max, y: 1.25))
+        == clippedRasterPixels((0..<8).map { ($0, 5) }))
+    // Controls: rows off the canvas draw nothing, beyond and inside the limit.
+    #expect(lit(Point(x: -1e308, y: 1e18), Point(x: 1e308, y: 1e18)).isEmpty)
+    #expect(lit(Point(x: -1e308, y: 50), Point(x: 1e308, y: 50)).isEmpty)
+  }
+
+  @Test("wave3g07: segment clipping halves differences that leave the Double range")
+  func wave3g07SegmentClippingHalvesOverflowingDifferences() {
+    let limit = Double(Int.max / 16)
+    func clip(_ start: Point, _ end: Point) -> [Point]? {
+      SegmentClipping.clipped(from: start, to: end, within: limit).map { [$0.start, $0.end] }
+    }
+    #expect(
+      clip(Point(x: -1e308, y: 0.5), Point(x: 1e308, y: 0.5))
+        == [Point(x: -limit, y: 0.5), Point(x: limit, y: 0.5)])
+    #expect(
+      clip(Point(x: 1e308, y: 0.5), Point(x: -1e308, y: 0.5))
+        == [Point(x: limit, y: 0.5), Point(x: -limit, y: 0.5)])
+    #expect(
+      clip(Point(x: 3, y: -1e308), Point(x: 3, y: 1e308))
+        == [Point(x: 3, y: -limit), Point(x: 3, y: limit)])
+    let max = Double.greatestFiniteMagnitude
+    #expect(
+      clip(Point(x: -max, y: 3), Point(x: max, y: 3))
+        == [Point(x: -limit, y: 3), Point(x: limit, y: 3)])
+    // Outside the square on one side, and a non-finite endpoint: nothing.
+    #expect(clip(Point(x: -1e308, y: 2 * limit), Point(x: 1e308, y: 2 * limit)) == nil)
+    #expect(clip(Point(x: -.infinity, y: 0.5), Point(x: 1e308, y: 0.5)) == nil)
+    #expect(clip(Point(x: -1e308, y: .nan), Point(x: 1e308, y: 0.5)) == nil)
+  }
+
+  @Test("wave3g08: segments whose differences are finite clip exactly as before")
+  func wave3g08SegmentClippingIsUnchangedForFiniteDifferences() {
+    var random = ClippedRasterReference.Random(state: 0x3_6E0D_F00D)
+    let scales = [1.0, 30, 1e6, 1e18, 1e150, 1e300]
+    let limits = [Double(Int.max / 16), Double(Int.max / 8), 10]
+    var differing: [String] = []
+    for index in 0..<4_000 {
+      func coordinate() -> Double {
+        let scale = scales[random.next(0...(scales.count - 1))]
+        return Double(random.next(-1_000_000...1_000_000)) / 1_000_000 * scale
+      }
+      let start = Point(x: coordinate(), y: coordinate())
+      let end = Point(x: coordinate(), y: coordinate())
+      let limit = limits[index % limits.count]
+      let repaired = SegmentClipping.clipped(from: start, to: end, within: limit)
+      let reference = W3GPreFixSegmentClipping.clipped(from: start, to: end, within: limit)
+      let same =
+        repaired.map { [$0.start, $0.end] } == reference.map { [$0.start, $0.end] }
+      if !same { differing.append("\(start) \(end) \(limit)") }
+    }
+    #expect(differing.isEmpty, "\(differing.count): \(differing.prefix(4))")
+  }
+
+  @Test("wave3g10: ellipses above the switch-over light the walks' in-buffer pixels")
+  func wave3g10EllipsesAboveTheSwitchOverMatchTheWalks() throws {
+    var random = ClippedRasterReference.Random(state: 0xE11_1953)
+    var cases: [(cx: Int, cy: Int, rx: Int, ry: Int)] = []
+    func place(rx: Int, ry: Int, phi: Double) -> (cx: Int, cy: Int, rx: Int, ry: Int) {
+      let px = random.next(0...7)
+      let py = random.next(0...7)
+      return (
+        px - Int((Double(rx) * cos(phi)).rounded()), py - Int((Double(ry) * sin(phi)).rounded()),
+        rx, ry
+      )
+    }
+    for _ in 0..<90 {
+      let sum = random.next(4_161...9_000)
+      let rx = random.next(1...(sum - 1))
+      let phi = Double(random.next(0...3_599)) / 3_600 * 2 * Double.pi
+      cases.append(place(rx: rx, ry: sum - rx, phi: phi))
+    }
+    // Larger round outlines, and the sharp ends of a flat one.
+    for k in 0..<4 { cases.append(place(rx: 60_000, ry: 59_993, phi: Double(k) * 1.1 + 0.2)) }
+    for phi in [0.0, Double.pi, 0.004] { cases.append(place(rx: 100_000, ry: 7, phi: phi)) }
+
+    var braille: [W2FBMismatch] = []
+    var grid: [W2FBMismatch] = []
+    var crossing = 0
+    for entry in cases {
+      let label = "cx \(entry.cx) cy \(entry.cy) rx \(entry.rx) ry \(entry.ry)"
+      #expect(
+        !ClippedRaster.usesExactOutline(radiusX: entry.rx, radiusY: entry.ry, width: 8, height: 8))
+      var canvas = BrailleCanvas(width: 4, height: 2)
+      canvas.strokeEllipse(
+        centerX: entry.cx, centerY: entry.cy, radiusX: entry.rx, radiusY: entry.ry)
+      var reference = ClippedRasterReference.Buffer(width: 8, height: 8)
+      reference.brailleStrokeEllipse(
+        centerX: entry.cx, centerY: entry.cy, radiusX: entry.rx, radiusY: entry.ry)
+      if !reference.pixels.isEmpty { crossing += 1 }
+      w2fbCompare(
+        label, repaired: litBraillePixels(canvas), reference: reference.pixels, into: &braille)
+      var buffer = CanvasGridBuffer(size: CellSize(width: 4, height: 2), grid: .braille2x4)
+      buffer.strokeEllipse(
+        centerX: entry.cx, centerY: entry.cy, radiusX: entry.rx, radiusY: entry.ry)
+      var gridReference = ClippedRasterReference.Buffer(width: 8, height: 8)
+      gridReference.gridStrokeEllipse(
+        centerX: entry.cx, centerY: entry.cy, radiusX: entry.rx, radiusY: entry.ry)
+      w2fbCompare(
+        label, repaired: w2fbLitGridSamples(buffer), reference: gridReference.pixels, into: &grid)
+    }
+    try #require(crossing > cases.count * 3 / 4, "\(crossing) of \(cases.count) cross the buffer")
+    #expect(braille.isEmpty, "\(braille.count) of \(cases.count): \(braille.prefix(3))")
+    #expect(grid.isEmpty, "\(grid.count) of \(cases.count): \(grid.prefix(3))")
+  }
+
+  @Test("wave3g11: outlines beyond the walk's budget and domain keep the crossing outline")
+  func wave3g11OutlinesBeyondTheWalkBudgetKeepTheCrossingOutline() {
+    let flat = 1 << 40
+    let round = 1 << 59
+    let overflowing = Int.max / 8 + 1
+    let cases: [(cx: Int, cy: Int, rx: Int, ry: Int)] = [
+      // The sharp end of a flat ellipse: the walk takes about 2^40 samples per
+      // pixel of arc there.
+      (4 - flat, 4, flat, 1),
+      // A radius whose angle margin alone exceeds the budget.
+      (2 - round, 4, round, round),
+      // 4 * (rx + ry) overflows Int: the unclipped walk would trap.
+      (2 - overflowing, 4, overflowing, overflowing),
+    ]
+    for entry in cases {
+      let expected = w3gCrossingOutline(
+        centerX: entry.cx, centerY: entry.cy, radiusX: entry.rx, radiusY: entry.ry, width: 8,
+        height: 8)
+      #expect(!expected.isEmpty, "rx \(entry.rx)")
+      var canvas = BrailleCanvas(width: 4, height: 2)
+      canvas.strokeEllipse(
+        centerX: entry.cx, centerY: entry.cy, radiusX: entry.rx, radiusY: entry.ry)
+      #expect(litBraillePixels(canvas) == expected, "braille rx \(entry.rx)")
+      var buffer = CanvasGridBuffer(size: CellSize(width: 4, height: 2), grid: .braille2x4)
+      buffer.strokeEllipse(
+        centerX: entry.cx, centerY: entry.cy, radiusX: entry.rx, radiusY: entry.ry)
+      #expect(w2fbLitGridSamples(buffer) == expected, "grid rx \(entry.rx)")
     }
   }
 }

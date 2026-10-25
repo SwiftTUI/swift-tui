@@ -4,7 +4,10 @@
 // blanks and OSC 8 encoding, custom path strokes at the clip and sampling
 // limits, SGR clamps, wheel deltas at value controls, capability detection and
 // presentation refusals. The brief and hypotheses live in the org root's
-// docs/reports/evidence/2026-10-25-campaign-two-wave-2-hunt/fb/.
+// docs/reports/evidence/2026-10-25-campaign-two-wave-2-hunt/fb/. Wave 3
+// FW3-G (STUI-1244, STUI-1245, STUI-1247, STUI-1248) promoted this file's
+// guards and added neighbours wave3g01-05, 09, 12 and 13; its evidence is in
+// docs/reports/evidence/2026-10-24-campaign-two-wave-3/fw3-g/.
 import Foundation
 @_spi(Testing) import SwiftTUITestSupport
 import SwiftTUIViews
@@ -14,16 +17,6 @@ import Testing
 @_spi(Runners) @testable import SwiftTUIRuntime
 @testable import SwiftTUIViews
 
-/// Keeps an unmarked reproduction path (`SWIFTTUI_W2HUNT_UNMARKED=1`) while
-/// limiting each guard to its exact reproduced assertion.
-private func w2fbKnown(_ comment: Comment, _ body: () throws -> Void) rethrows {
-  if ProcessInfo.processInfo.environment["SWIFTTUI_W2HUNT_UNMARKED"] == "1" {
-    try body()
-  } else {
-    withKnownIssue(comment) { try body() }
-  }
-}
-
 private let w2fbAspect = RectangleStrokeTrack.snappedAspectRatio(
   CellPixelMetrics.estimated.aspectRatio)
 
@@ -31,6 +24,26 @@ private let w2fbAspect = RectangleStrokeTrack.snappedAspectRatio(
 private struct W2FBPathShape: InsettableShape {
   var pathValue: Path
   var geometry: ShapeGeometry { .path(BoxedPath(pathValue), .nonZero) }
+}
+
+/// A custom shape whose `path(in:)` is a fixed 4 x 4 square, whatever the rect.
+private struct W3GFixedSquareShape: Shape {
+  func path(in rect: Rect) -> Path {
+    Path(Rect(origin: rect.origin, size: Size(width: 4, height: 4)))
+  }
+}
+
+/// `W2FBFarPointShape` with the far point at any `y`.
+private struct W3GFarPointShape: Shape {
+  var farY: Double
+
+  func path(in rect: Rect) -> Path {
+    var path = Path()
+    path.move(to: Point(x: rect.origin.x, y: rect.origin.y))
+    path.addLine(to: Point(x: rect.origin.x + 10, y: rect.origin.y))
+    path.addLine(to: Point(x: rect.origin.x + 10, y: farY))
+    return path
+  }
 }
 
 /// A custom shape whose own `path(in:)` holds one far, finite point.
@@ -66,6 +79,23 @@ private func w2fbDotRows(_ view: some View, _ name: String) -> [[Int]] {
   let snapshot = DefaultRenderer().render(
     view.frame(width: 4, height: 2), context: .init(identity: testIdentity("W2FB", name)))
   return snapshot.rasterSurface.cells.map { $0.map(w2fbBrailleDotCount) }
+}
+
+/// Renders a 4 x 2 cell frame and returns each cell's Braille dot mask.
+@MainActor
+private func w2fbDotMasks(_ view: some View, _ name: String) -> [[UInt32]] {
+  let snapshot = DefaultRenderer().render(
+    view.frame(width: 4, height: 2), context: .init(identity: testIdentity("W2FB", name)))
+  return snapshot.rasterSurface.cells.map { row in
+    row.map { cell in
+      guard let scalar = cell.character.unicodeScalars.first?.value, scalar >= 0x2800,
+        scalar <= 0x28FF
+      else {
+        return 0
+      }
+      return scalar - 0x2800
+    }
+  }
 }
 
 private func w2fbOpen(_ destination: String) -> String {
@@ -189,14 +219,12 @@ struct Wave2HuntFBRuntimeTests {
     let paintedBox = try #require(painted.boundingRect)
     try #require(abs(paintedBox.size.width - 20) < 0.01, "\(paintedBox)")
     let authored = try #require(Circle().trim(from: 0, to: 0.5).path(in: rect).boundingRect)
-    w2fbKnown(
-      "NEW-3: w2fb001: in a 20x10 frame Circle().trim(from: 0, to: 0.5).path(in:) trims the inscribed 10x10 circle (bounding rect x 5...15) while the painted trimmed fill trims the frame-stretched ellipse (x 0...20); TrimmedShape.path(in:) starts from Circle.path(in:) = geometry.path(in:) with stretchingCircle false (Shape.swift:57-59, ShapePayload.swift:93-100) and the fill resolves with stretchingCircle true (ShapePayload.swift:119-128); contract: ShapePayload.swift:131-134 and 6d877a7d (a path built from a trimmed shape describes the outline its fill paints), TrimmedShape.swift:12-14; adjacent STUI-1208"
-    ) {
-      #expect(
-        abs(authored.origin.x - paintedBox.origin.x) < 0.01
-          && abs(authored.size.width - paintedBox.size.width) < 0.01,
-        "authored \(authored) painted \(paintedBox)")
-    }
+    // STUI-1244 (repaired): the public path traces the painted fill's
+    // stretched outline. Contract: ShapePayload.swift:131-134 and 6d877a7d.
+    #expect(
+      abs(authored.origin.x - paintedBox.origin.x) < 0.01
+        && abs(authored.size.width - paintedBox.size.width) < 0.01,
+      "authored \(authored) painted \(paintedBox)")
   }
 
   @Test("w2fb002: a content shape from a trimmed Circle's path covers the cells its fill paints")
@@ -256,13 +284,11 @@ struct Wave2HuntFBRuntimeTests {
     try #require(taps.count == 1, "a click inside both outlines is delivered")
     _ = try h.click(probe)
     let deliveredOnPaintedCell = taps.count == 2
-    w2fbKnown(
-      "NEW-3: w2fb002: a contentShape built from Circle().trim(from: 0, to: 0.5).path(in: 20x10) misses painted cells outside the central ten columns, so a tap on painted cell (2, 6) is not delivered; the public trimmed path inscribes the short axis while the fill stretches (Shape.swift:57-59, ShapePayload.swift:93-100, 119-128); contract: 6d877a7d (a contentShape built from a trimmed path covers the cells the trimmed fill paints), Pointer-And-Canvas.md:140-145; adjacent STUI-1208"
-    ) {
-      #expect(disagreements.isEmpty, "\(disagreements.count) cells disagree: \(disagreements)")
-      #expect(probeHit)
-      #expect(deliveredOnPaintedCell, "taps \(taps.count)")
-    }
+    // STUI-1244 (repaired): the content shape covers the painted cells.
+    // Contract: 6d877a7d, Pointer-And-Canvas.md:140-145.
+    #expect(disagreements.isEmpty, "\(disagreements.count) cells disagree: \(disagreements)")
+    #expect(probeHit)
+    #expect(deliveredOnPaintedCell, "taps \(taps.count)")
   }
 
   @Test("w2fb003: in a square frame a trimmed Circle's public path equals the painted route")
@@ -424,17 +450,25 @@ struct Wave2HuntFBRuntimeTests {
     let nearSolid = w2fbDotRows(near.stroke(Color.white), "w2fb012-near")
     let nearDashed = w2fbDotRows(near.stroke(Color.white, style: dash), "w2fb012-near-dash")
     try #require(nearSolid == [[0, 0, 0, 0], [2, 2, 2, 2]], "\(nearSolid)")
+    try #require(nearDashed == [[0, 0, 0, 0], [2, 1, 1, 2]], "\(nearDashed)")
     // Unit x -2e307...2e307 is +-1.4e308 subpixels: finite endpoints whose
     // difference is not.
     let far = W2FBPathShape(pathValue: w2fbLine(Point(x: -2e307, y: 0.5), Point(x: 2e307, y: 0.5)))
     let farSolid = w2fbDotRows(far.stroke(Color.white), "w2fb012-far")
     let farDashed = w2fbDotRows(far.stroke(Color.white, style: dash), "w2fb012-far-dash")
-    w2fbKnown(
-      "NEW-1: w2fb012: a custom path stroke from unit x -2e307 to 2e307 (subpixel +-1.4e308) draws no dot, solid or dashed; Rasterizer.strokePath skips the segment because SegmentClipping.clipped rejects a non-finite end - start (SaturatingConversion.swift:67-68, Rasterizer+PathRasterization.swift:58-63); contract: Path.swift:73-80 with the FW-E brief (a stroke draws the visible part of any finite path); adjacent STUI-741"
-    ) {
-      #expect(farSolid == nearSolid, "\(farSolid)")
-      #expect(farDashed == nearDashed, "\(farDashed)")
-    }
+    // STUI-1245 (repaired): the segment is clipped in a halved coordinate
+    // space instead of being skipped. Contract: Path.swift:72-80.
+    #expect(farSolid == nearSolid, "\(farSolid)")
+    // Corrected oracle (FW3-G oracle-notes.md): the visible part lies 7e307
+    // cell widths into the 2.4-unit dash pattern, far below Double's
+    // resolution there, so the contract implies no dash phase. It implies
+    // that the visible part is stroked and that the dash only removes dots.
+    let farDashedMasks = w2fbDotMasks(far.stroke(Color.white, style: dash), "w2fb012-far-dash-mask")
+    let farSolidMasks = w2fbDotMasks(far.stroke(Color.white), "w2fb012-far-mask")
+    #expect(farDashed.joined().reduce(0, +) > 0, "\(farDashed)")
+    #expect(
+      zip(farDashedMasks.joined(), farSolidMasks.joined()).allSatisfy { $0 & ~$1 == 0 },
+      "dashed \(farDashedMasks) solid \(farSolidMasks)")
   }
 
   @Test(
@@ -593,11 +627,9 @@ struct Wave2HuntFBRuntimeTests {
         if !profile.supportsHyperlinks { refused.append("\(term) \(marker)") }
       }
     }
-    w2fbKnown(
-      "NEW-4: w2fb029: TERM=xterm-direct2, xterm-direct16 and xterm-direct256 with VTE_VERSION=7600, TERM_PROGRAM=vscode or WT_SESSION get no OSC 8 hyperlinks while xterm-direct does; identifiesHyperlinkEmulator refines only isGenericXterm, which lists xterm-direct but not its numbered direct variants (TerminalCapabilityProfile.swift:257-260, 306-321); contract: Environment-Variables.md:35-44 (xterm-direct256 is a direct entry; generic xterm color/direct entries may be refined; on a generic xterm the markers enable OSC 8); adjacent STUI-1225"
-    ) {
-      #expect(refused.isEmpty, "\(refused)")
-    }
+    // STUI-1247 (repaired): the numbered direct entries are generic xterm
+    // entries. Contract: Environment-Variables.md:35-44.
+    #expect(refused.isEmpty, "\(refused)")
   }
 
   @Test("w2fb030: a direct-colour xterm keeps WezTerm's refinement")
@@ -798,11 +830,158 @@ struct Wave2HuntFBRuntimeTests {
       "\(String(describing: cellUnit))")
     let trimmed = W2FBFarPointShape().trim(from: 0, to: 0.5).path(in: rect)
     let box = trimmed.boundingRect
-    w2fbKnown(
-      "NEW-5: w2fb040: TrimmedShape.path(in:) of a finite custom path with a point at y = 1e308 returns an empty path; physicallyTrimmedPath scales y by the aspect ratio 2 before trimming (ShapePayload.swift:135-139), the scaled path is non-finite and Path.trimmedPath flattens it to nothing (Path.swift:353-354); the cell-unit trim before 6d877a7d kept the outline; contract: TrimmedShape.swift:5-10, Path.swift:73-80; adjacent STUI-1208, STUI-741"
-    ) {
-      #expect(box != nil, "trimmed bounding rect \(String(describing: box))")
-      #expect(box.map { $0.origin == .zero && $0.size.width == 10 } == true)
+    // STUI-1248 (repaired): the trim shrinks the outline by a power of two
+    // when scaling y would overflow. Contract: TrimmedShape.swift:5-10.
+    #expect(box != nil, "trimmed bounding rect \(String(describing: box))")
+    #expect(box.map { $0.origin == .zero && $0.size.width == 10 } == true)
+  }
+
+  // MARK: - Wave 3 FW3-G neighbours (STUI-1244, STUI-1245, STUI-1247, STUI-1248)
+
+  @Test("wave3g01: a trimmed Circle's public path is the painted route in every frame")
+  func wave3g01TrimmedCirclePathsMatchThePaintedRouteInEveryFrame() {
+    let frames = [
+      Rect(origin: .zero, size: .init(width: 20, height: 10)),
+      Rect(origin: .zero, size: .init(width: 6, height: 14)),
+      Rect(origin: .zero, size: .init(width: 10, height: 10)),
+      Rect(origin: Point(x: 3, y: 2), size: .init(width: 20, height: 10)),
+    ]
+    var differing: [String] = []
+    for rect in frames {
+      for (from, to) in [(0.0, 0.5), (0.125, 0.625), (0.3, 0.95)] {
+        let painted = ShapeGeometry.trimmed(.circle, from: from, to: to)
+          .path(in: rect, stretchingCircle: true, trimAspectRatio: w2fbAspect)
+        if Circle().trim(from: from, to: to).path(in: rect) != painted {
+          differing.append("\(rect) \(from)...\(to)")
+        }
+      }
     }
+    #expect(differing.isEmpty, "\(differing.count) of 12 differ: \(differing)")
+  }
+
+  @Test("wave3g02: nested and inset trimmed Circles trace the outline their fill paints")
+  func wave3g02NestedAndInsetTrimmedCirclesMatchThePaintedRoute() {
+    let rect = Rect(origin: .zero, size: .init(width: 20, height: 10))
+    // The fill paints the composed fractions of the untrimmed outline
+    // (Shape.swift:89-94): 0 + 0.5 * 0.25 and 0 + 0.5 * 1.
+    let nested = Circle().trim(from: 0, to: 0.5).trim(from: 0.25, to: 1)
+    #expect(nested.trimStart == 0.125 && nested.trimEnd == 0.5)
+    #expect(
+      nested.path(in: rect)
+        == ShapeGeometry.trimmed(.circle, from: 0.125, to: 0.5)
+        .path(in: rect, stretchingCircle: true, trimAspectRatio: w2fbAspect))
+    // The fill paints in the inset frame (Rasterizer+PaintCommands.swift:20-24).
+    let insetFrame = Rect(origin: Point(x: 2, y: 2), size: .init(width: 16, height: 6))
+    #expect(
+      Circle().inset(by: 2).trim(from: 0, to: 0.5).path(in: rect)
+        == ShapeGeometry.trimmed(.circle, from: 0, to: 0.5)
+        .path(in: insetFrame, stretchingCircle: true, trimAspectRatio: w2fbAspect))
+  }
+
+  @Test("wave3g03: whole trims and custom bases keep their own outline")
+  func wave3g03WholeTrimsAndCustomBasesKeepTheirOwnOutline() throws {
+    let rect = Rect(origin: .zero, size: .init(width: 20, height: 10))
+    // A whole trim fills the untrimmed analytic Circle, so its path stays the
+    // trim of the inscribed `Circle().path(in:)`.
+    let inscribed = Circle().path(in: rect)
+    let inscribedBox = try #require(inscribed.boundingRect)
+    #expect(abs(inscribedBox.origin.x - 5) < 0.01 && abs(inscribedBox.size.width - 10) < 0.01)
+    let whole = inscribed.physicallyTrimmedPath(from: 0, to: 1, aspectRatio: w2fbAspect)
+    #expect(Circle().trim(from: 0, to: 1).path(in: rect) == whole)
+    #expect(Circle().trim(from: -1, to: 2).path(in: rect) == whole)
+    // A custom shape is its own path; a trim measures it as authored.
+    let fixed = W3GFixedSquareShape()
+    #expect(
+      fixed.trim(from: 0, to: 0.5).path(in: rect)
+        == fixed.path(in: rect).physicallyTrimmedPath(from: 0, to: 0.5, aspectRatio: w2fbAspect))
+  }
+
+  @Test("wave3g04: the physical trim of a far finite path keeps the outline in either direction")
+  func wave3g04PhysicalTrimOfFarFinitePathsKeepsTheirOutline() throws {
+    let rect = Rect(origin: .zero, size: .init(width: 10, height: 10))
+    for far in [1e308, -1e308] {
+      let trimmed = W3GFarPointShape(farY: far).trim(from: 0, to: 0.5).path(in: rect)
+      let box = try #require(trimmed.boundingRect, "far y \(far)")
+      #expect(box.origin.x == 0 && box.size.width == 10, "far y \(far): \(box)")
+      // Half of the physical length 10 + 2 * 1e308 lies 5e307 - 2.5 cells along y.
+      #expect(abs(box.size.height - 5e307) / 5e307 < 1e-12, "far y \(far): \(box)")
+      #expect(far > 0 ? box.origin.y == 0 : box.origin.y < -1e307, "far y \(far): \(box)")
+    }
+  }
+
+  @Test("wave3g05: the physical trim is unchanged wherever the scaled outline is finite")
+  func wave3g05PhysicalTrimIsUnchangedWhereTheScaledOutlineIsFinite() {
+    let rect = Rect(origin: .zero, size: .init(width: 20, height: 10))
+    var curve = Path()
+    curve.move(to: Point(x: 1, y: 9))
+    curve.addCurve(
+      to: Point(x: 19, y: 1), control1: Point(x: 4, y: -3), control2: Point(x: 12, y: 14))
+    curve.addQuadCurve(to: Point(x: 2, y: 2), control: Point(x: 9, y: 30))
+    let paths = [
+      ShapeGeometry.circle.path(in: rect, stretchingCircle: true),
+      ShapeGeometry.circle.path(in: rect),
+      Path(roundedRect: rect, cornerRadius: 2),
+      ShapeGeometry.capsule.path(in: rect),
+      curve,
+      W3GFarPointShape(farY: 4e307).path(in: rect),
+    ]
+    var differing: [String] = []
+    for (index, path) in paths.enumerated() {
+      for aspect in [0.5, 2, 2.5] {
+        for (from, to) in [(0.0, 0.5), (0.1, 0.6), (0.3, 0.95)] {
+          // The 6d877a7d expression.
+          let reference = path.scaledBy(sx: 1, sy: aspect).trimmedPath(from: from, to: to)
+            .scaledBy(sx: 1, sy: 1 / aspect)
+          if path.physicallyTrimmedPath(from: from, to: to, aspectRatio: aspect) != reference {
+            differing.append("path \(index) aspect \(aspect) \(from)...\(to)")
+          }
+        }
+      }
+    }
+    #expect(differing.isEmpty, "\(differing)")
+  }
+
+  @Test("wave3g09: a vertical custom path stroke spanning the Double range draws its visible part")
+  func wave3g09VerticalPathStrokeSpanningTheDoubleRange() throws {
+    let near = W2FBPathShape(pathValue: w2fbLine(Point(x: 0.5, y: 0), Point(x: 0.5, y: 1)))
+    let nearColumn = w2fbDotRows(near.stroke(Color.white), "wave3g09-near")
+    try #require(nearColumn.joined().reduce(0, +) > 0, "\(nearColumn)")
+    // Unit y -2e307...2e307 is +-1.4e308 subpixels: the difference overflows.
+    let far = W2FBPathShape(pathValue: w2fbLine(Point(x: 0.5, y: -2e307), Point(x: 0.5, y: 2e307)))
+    #expect(w2fbDotRows(far.stroke(Color.white), "wave3g09-far") == nearColumn)
+  }
+
+  @Test("wave3g12: numbered direct xterms take every generic xterm refinement")
+  func wave3g12NumberedDirectXtermsTakeEveryGenericXtermRefinement() {
+    let wezTerm = TerminalCapabilityProfile.detectPOSIXTerminal(
+      environment: ["TERM": "xterm-direct256", "TERM_PROGRAM": "WezTerm"], isTTY: true)
+    #expect(wezTerm.colorLevel == .trueColor)
+    #expect(wezTerm.supportsHyperlinks && wezTerm.supportsSynchronizedOutput)
+    let ghostty = TerminalCapabilityProfile.detectPOSIXTerminal(
+      environment: ["TERM": "xterm-direct16", "TERM_PROGRAM": "ghostty"], isTTY: true)
+    #expect(ghostty.supportsHyperlinks && ghostty.supportsSynchronizedOutput)
+    let windowsTerminal = TerminalCapabilityProfile.detectWindowsConsole(
+      environment: ["TERM": "xterm-direct2", "WT_SESSION": "abc"], isTTY: true)
+    #expect(windowsTerminal.colorLevel == .trueColor)
+    #expect(windowsTerminal.supportsHyperlinks && windowsTerminal.supportsSynchronizedOutput)
+  }
+
+  @Test("wave3g13: other direct and malformed names keep their own capabilities")
+  func wave3g13OtherDirectNamesStayUnrefined() {
+    for term in ["xterm-directx", "xterm-direct-256", "st-direct", "screen-direct256"] {
+      for marker in [["VTE_VERSION": "7600"], ["WT_SESSION": "abc"]] {
+        let profile = TerminalCapabilityProfile.detectPOSIXTerminal(
+          environment: marker.merging(["TERM": term]) { $1 }, isTTY: true)
+        #expect(!profile.supportsHyperlinks, "\(term) \(marker)")
+      }
+    }
+    func color(_ term: String) -> TerminalCapabilityProfile.ColorLevel {
+      TerminalCapabilityProfile.detectPOSIXTerminal(environment: ["TERM": term], isTTY: true)
+        .colorLevel
+    }
+    #expect(color("xterm-directx") == .ansi16)
+    #expect(color("xterm-direct-256") == .ansi16)
+    #expect(color("st-direct") == .trueColor)
+    #expect(color("xterm-direct256") == .trueColor)
   }
 }

@@ -1,3 +1,17 @@
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#elseif canImport(Android)
+  import Android
+#elseif canImport(Musl)
+  import Musl
+#elseif canImport(WASILibc)
+  import WASILibc
+#elseif canImport(ucrt)
+  import ucrt
+#endif
+
 /// The integer drawing primitives shared by `BrailleCanvas` and the canvas
 /// grid buffer, clipped to a `width` x `height` sample buffer before they
 /// iterate.
@@ -6,7 +20,8 @@
 /// by the shape, no caller value takes part in trapping arithmetic (spans and
 /// offsets are formed in `Int128`), and every sample `plot` receives lies in
 /// the buffer. Inside the buffer each primitive lights exactly the samples its
-/// unclipped walk lit.
+/// unclipped walk lit. The exception is an ellipse outline that
+/// `parametricOutline` declines, which `ellipseOutline` approximates instead.
 package enum ClippedRaster {
   // MARK: - Lines
 
@@ -215,8 +230,11 @@ package enum ClippedRaster {
   // MARK: - Circles and ellipses
 
   /// Radii whose sum is at most this keep the original parametric or
-  /// midpoint outline, whose work is proportional to the radius. Larger
-  /// outlines use `ellipseOutline`.
+  /// midpoint outline, whose work is proportional to the radius. A larger
+  /// ellipse walks only its samples near the buffer (`parametricOutline`) and
+  /// falls back to `ellipseOutline` where that is not bounded by the buffer. A
+  /// larger circle uses `ellipseOutline`, which lights the midpoint circle's
+  /// samples.
   package static func usesExactOutline(
     radiusX: Int,
     radiusY: Int,
@@ -319,10 +337,159 @@ package enum ClippedRaster {
     }
   }
 
+  /// Visits the in-buffer samples of the parametric ellipse walk that
+  /// `BrailleCanvas.strokeEllipse` and `CanvasGridBuffer.strokeEllipse` take
+  /// below the switch-over, for an outline too large to walk whole. Returns
+  /// `false`, having visited nothing, when that walk is not bounded by the
+  /// buffer.
+  ///
+  /// The walk rounds `steps + 1` samples `(cx + round(rx * cos θᵢ), cy +
+  /// round(ry * sin θᵢ))`, `θᵢ = 2π * i / steps` with
+  /// `steps = max(minimumSteps, 4 * (rx + ry))`, and joins each sample to the
+  /// one before it with `line`. Each sample lies within `1 + 1e-14 * r`
+  /// (`r = max(rx, ry)`) of its true point: half a sample of rounding, plus a
+  /// few units in the last place of the angle, `cos` and `sin`, the radius and
+  /// the product. Consecutive true points are at most `π / 2` apart. A segment
+  /// lights only samples in its endpoints' bounding box. So both true
+  /// endpoints of a segment that lights a buffer sample lie within the margin
+  /// `8 + 1e-13 * r` of the buffer. The indices whose true point lies there
+  /// come from the angles where the curve meets the grown buffer, padded for
+  /// the angle arithmetic. This evaluates the walk's own expressions for just
+  /// those indices, so it lights exactly the samples the whole walk lights.
+  ///
+  /// Near the sharp ends of a flat ellipse the walk takes about
+  /// `(rx + ry) / ry` samples per sample of arc, so the indices near the buffer
+  /// can outnumber any bound on the buffer. When more than
+  /// `16,384 + 16 * (width + height)` of them (the step count of the largest
+  /// walk the switch-over admits) would be visited, or when `4 * (rx + ry)`
+  /// overflows `Int`, where the whole walk traps, this returns `false`.
+  package static func parametricOutline(
+    centerX: Int,
+    centerY: Int,
+    radiusX: Int,
+    radiusY: Int,
+    minimumSteps: Int,
+    width: Int,
+    height: Int,
+    plot: (Int, Int) -> Void
+  ) -> Bool {
+    guard width > 0, height > 0, radiusX > 0, radiusY > 0 else {
+      return false
+    }
+    let (sum, sumOverflow) = radiusX.addingReportingOverflow(radiusY)
+    let (walkSteps, stepsOverflow) = sum.multipliedReportingOverflow(by: 4)
+    guard !sumOverflow, !stepsOverflow else {
+      return false
+    }
+    guard
+      boundingBoxMeetsBuffer(
+        centerX: centerX, centerY: centerY, radiusX: radiusX, radiusY: radiusY, width: width,
+        height: height)
+    else {
+      return true
+    }
+    let steps = max(minimumSteps, walkSteps)
+    let radius = Double(max(radiusX, radiusY))
+    let margin = Int128(8 + (radius * 1e-13).rounded(.up))
+    // The buffer grown by the margin, relative to the center.
+    let a = Int128(radiusX)
+    let b = Int128(radiusY)
+    let xLow = max(-margin - Int128(centerX), -a)
+    let xHigh = min(Int128(width) - 1 + margin - Int128(centerX), a)
+    let yLow = max(-margin - Int128(centerY), -b)
+    let yHigh = min(Int128(height) - 1 + margin - Int128(centerY), b)
+    guard xLow <= xHigh, yLow <= yHigh else {
+      return true
+    }
+    // `acos(v / r)`, from the exact distances to both poles.
+    func arccos(_ v: Int128, radius r: Int128) -> Double {
+      2 * atan2(Double(r - v).squareRoot(), Double(r + v).squareRoot())
+    }
+    let twoPi = 2.0 * .pi
+    let halfPi = Double.pi / 2
+    // `rx * cos θ` in `xLow...xHigh`.
+    let nearX = arccos(xHigh, radius: a)
+    let farX = arccos(xLow, radius: a)
+    let xArcs = [(nearX, farX), (twoPi - farX, twoPi - nearX)]
+    // `ry * sin θ` in `yLow...yHigh`: `θ = π / 2 ± acos(sin θ)`.
+    let nearY = arccos(yHigh, radius: b)
+    let farY = arccos(yLow, radius: b)
+    var yArcs = [(halfPi + nearY, halfPi + farY)]
+    let lower = halfPi - farY
+    let upper = halfPi - nearY
+    if lower >= 0 {
+      yArcs.append((lower, upper))
+    } else if upper >= 0 {
+      yArcs += [(0, upper), (lower + twoPi, twoPi)]
+    } else {
+      yArcs.append((lower + twoPi, upper + twoPi))
+    }
+    let indicesPerRadian = Double(steps) / twoPi
+    let pad = 4 + Double(steps) * 1e-14
+    var ranges: [(lower: Int128, upper: Int128)] = []
+    for x in xArcs {
+      for y in yArcs {
+        let first = max(0, (max(x.0, y.0) * indicesPerRadian - pad).rounded(.down))
+        let last = min(Double(steps), (min(x.1, y.1) * indicesPerRadian + pad).rounded(.up))
+        if first <= last {
+          ranges.append((Int128(first), min(Int128(last), Int128(steps))))
+        }
+      }
+    }
+    ranges.sort { $0.lower < $1.lower }
+    var merged: [(lower: Int128, upper: Int128)] = []
+    for range in ranges {
+      if let last = merged.last, range.lower <= last.upper + 1 {
+        merged[merged.count - 1].upper = max(last.upper, range.upper)
+      } else {
+        merged.append(range)
+      }
+    }
+    let budget = 16_384 + 16 * (Int128(width) + Int128(height))
+    guard merged.reduce(Int128(0), { $0 + $1.upper - $1.lower + 1 }) <= budget else {
+      return false
+    }
+    // The walk's own expressions. Its samples fit `Int`: the radii sum to at
+    // most `Int.max / 4` and the bounding box meets the buffer.
+    let rx = Double(radiusX)
+    let ry = Double(radiusY)
+    let stepCount = Double(steps)
+    func sample(_ i: Int) -> (x: Int, y: Int) {
+      let angle = twoPi * Double(i) / stepCount
+      return (
+        centerX + Int((rx * cos(angle)).rounded()), centerY + Int((ry * sin(angle)).rounded())
+      )
+    }
+    for range in merged {
+      let first = Int(range.lower)
+      var previous: (x: Int, y: Int)? = first > 0 ? sample(first - 1) : nil
+      for i in first...Int(range.upper) {
+        let point = sample(i)
+        if let previous {
+          line(from: previous, to: point, width: width, height: height, plot: plot)
+        } else if point.x >= 0, point.x < width, point.y >= 0, point.y < height {
+          plot(point.x, point.y)
+        }
+        previous = point
+      }
+    }
+    return true
+  }
+
   /// The outline of an ellipse too large for the parametric walk: in every
   /// buffer column and row the curve crosses, the crossing rounded to the
-  /// nearest sample, as the parametric outline rounds its samples. Work is
-  /// proportional to `width + height`. A zero radius draws the axis segment.
+  /// nearest sample. Work is proportional to `width + height`. A zero radius
+  /// draws the axis segment.
+  ///
+  /// With equal radii these are the midpoint circle's samples. The midpoint
+  /// test picks `round(sqrt(r² - y²))` in each row of a steep octant and the
+  /// column crossings in a flat octant. A crossing in the other direction lies
+  /// within half a sample of one of those, so it repeats a sample already lit.
+  /// This holds while each crossing rounds to its nearest sample, which
+  /// `Double` guarantees below a radius of about 1.9e7 (no crossing lies
+  /// exactly half-way). An ellipse's parametric walk rounds its samples along
+  /// the curve instead and joins them with lines, so for an ellipse this
+  /// outline can differ from that walk by a sample near each crossing.
   ///
   /// Each crossing is measured from the nearer pole, `r * t² / (1 + sqrt(1 -
   /// t²))`, which keeps its precision where the curve crosses the buffer.

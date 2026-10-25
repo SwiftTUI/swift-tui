@@ -259,6 +259,11 @@ so corner radii and authored winding rules survive. It takes the custom-path rou
 frame: a trimmed `Circle` fill is not aspect-corrected the way a `Circle` fill
 is, and its interval does not animate smoothly.
 
+`path(in:)` of a trimmed shape returns the outline that fill paints, so a
+`contentShape(_:)` built from it covers the painted cells. For a trimmed
+`Circle` in a non-square rect, that outline stretches to the rect, unlike
+`Circle().path(in:)`, which stays inscribed.
+
 ## Differences from SwiftUI
 
 SwiftTUI shapes target a cell grid rasterized to Braille subpixels, not a
