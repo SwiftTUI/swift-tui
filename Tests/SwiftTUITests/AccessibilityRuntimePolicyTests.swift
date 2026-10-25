@@ -29,6 +29,31 @@ struct AccessibilityRuntimePolicyTests {
     #expect(point == CellPoint(x: 6, y: 3))
   }
 
+  @Test("runtime focus identity is the action identity when present (STUI-1211)")
+  func runtimeFocusIdentityPrefersActionIdentity() {
+    let rowID = testIdentity("Row")
+    let selectionID = testIdentity("SelectRow")
+    var selectionButton = AccessibilityNode(
+      identity: selectionID,
+      rect: rect(x: 1, y: 1, width: 10, height: 1),
+      role: .button
+    )
+    selectionButton.actionIdentity = rowID
+    let plainNode = AccessibilityNode(
+      identity: rowID,
+      rect: rect(x: 1, y: 1, width: 10, height: 1),
+      role: .tableRow
+    )
+
+    #expect(selectionButton.runtimeFocusIdentity == rowID)
+    #expect(plainNode.runtimeFocusIdentity == rowID)
+    #expect(
+      AccessibilityNode(
+        identity: selectionID, rect: rect(x: 0, y: 0, width: 1, height: 1), role: .button
+      )
+      .runtimeFocusIdentity == selectionID)
+  }
+
   @Test("focused node without cursorAnchor falls back to rect origin")
   func focusedNodeWithoutCursorAnchorFallsBackToOrigin() {
     let focusedID = testIdentity("Focused")

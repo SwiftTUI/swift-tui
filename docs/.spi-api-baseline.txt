@@ -26,6 +26,7 @@ SwiftTUIProfiling.ProfiledMemorySnapshot.name
 SwiftTUIProfiling.TSVFileSink
 SwiftTUIProfiling.TSVFileSink.init(path:)
 SwiftTUIProfiling.TSVFileSink.record(_:)
+SwiftTUIRuntime.AccessibilityNode.runtimeFocusIdentity
 SwiftTUIRuntime.BlendedImageEncodedPayload
 SwiftTUIRuntime.BlendedImageEncodedPayload.bytes
 SwiftTUIRuntime.BlendedImageEncodedPayload.id

@@ -21,3 +21,13 @@ package struct AccessibilityRuntimePolicy: Equatable, Sendable {
     return node.cursorAnchor ?? node.rect.origin
   }
 }
+
+extension AccessibilityNode {
+  /// The identity runtime keyboard focus uses for this node: its action
+  /// identity when it has one (a collection row's selection control),
+  /// otherwise its own identity. Native host adapters compare this with
+  /// `SemanticHostFrame.focusedIdentity`, the rule the host wire applies.
+  @_spi(Runners) public var runtimeFocusIdentity: Identity {
+    actionIdentity ?? identity
+  }
+}
