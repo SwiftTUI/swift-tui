@@ -48,12 +48,17 @@ public struct ResolveContext: Equatable, Sendable {
   package var focusedValues: FocusedValues
   public var transaction: TransactionSnapshot
   public var invalidatedIdentities: Set<Identity> {
-    didSet {
-      invalidationSummary = .init(
-        invalidatedIdentities: invalidatedIdentities
-      )
+    get { storedInvalidatedIdentities }
+    set {
+      storedInvalidatedIdentities = newValue
+      invalidationSummary = .init(invalidatedIdentities: newValue)
     }
   }
+  /// Backing storage for ``invalidatedIdentities``. A public write rebuilds
+  /// `invalidationSummary`; ``adoptInvalidation(_:summary:)`` stores a pair
+  /// whose summary is already built, so the per-resolve frame-input refresh
+  /// never constructs a summary only to overwrite it (STUI-1232).
+  private var storedInvalidatedIdentities: Set<Identity>
   package var invalidationSummary: InvalidationSummary
   package var forceRootEvaluation: Bool
   /// True exactly while a non-transparent host (an `AnyView` payload, a
@@ -560,8 +565,10 @@ public struct ResolveContext: Equatable, Sendable {
     guard let inputs = refreshed.effectiveFrameResolveInputs else {
       return refreshed
     }
-    refreshed.invalidatedIdentities = inputs.invalidatedIdentities
-    refreshed.invalidationSummary = inputs.invalidationSummary
+    refreshed.adoptInvalidation(
+      inputs.invalidatedIdentities,
+      summary: inputs.invalidationSummary
+    )
     // Focus/press refresh keeps re-run evaluator closures — whose captured
     // context predates the current frame — in sync with the frame-level focus
     // and press state, which is what lets finite suppression scopes replace
@@ -596,6 +603,20 @@ public struct ResolveContext: Equatable, Sendable {
     }
     refreshed.resolveWorkTracker = inputs.resolveWorkTracker
     return refreshed
+  }
+
+  /// Stores an invalidation set together with the summary already built from
+  /// it, without the rebuild a public ``invalidatedIdentities`` write performs.
+  /// Building a summary walks every ancestor of every invalidated identity, and
+  /// the frame-input refresh runs on every resolve, so the frame's single
+  /// precomputed pair is adopted as-is. The caller guarantees `summary` was
+  /// built from `identities`.
+  package mutating func adoptInvalidation(
+    _ identities: Set<Identity>,
+    summary: InvalidationSummary
+  ) {
+    storedInvalidatedIdentities = identities
+    invalidationSummary = summary
   }
 
   /// Returns the effective per-frame invalidation set, preferring renderer-owned
@@ -977,7 +998,7 @@ extension ResolveContext {
       ? resolvedEnvironmentValues.applying(to: environment)
       : environment
     self.transaction = transaction
-    self.invalidatedIdentities = invalidatedIdentities
+    self.storedInvalidatedIdentities = invalidatedIdentities
     self.invalidationSummary =
       invalidationSummary
       ?? .init(invalidatedIdentities: invalidatedIdentities)

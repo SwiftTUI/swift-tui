@@ -1,3 +1,42 @@
+import Synchronization
+
+/// DEBUG-only construction census for ``InvalidationSummary``.
+///
+/// Building a summary walks every structural ancestor of every invalidated
+/// identity, so a redundant construction on a per-resolve path costs
+/// O(invalidated × depth) for every resolved view — the 2026-10-25 gallery
+/// census frame stall (STUI-1232) was a discarded rebuild on every refreshed
+/// resolve. A test installs a ``Counter`` for one synchronous scope with
+/// `InvalidationSummaryConstructionCensus.$counter.withValue(_:_:)`;
+/// constructions on other tasks (parallel suites) are never counted. Release
+/// builds compile the increment out; the vocabulary exists in every
+/// configuration so call sites need no conditional compilation.
+package enum InvalidationSummaryConstructionCensus {
+  package final class Counter: Sendable {
+    private let storage = Atomic<Int>(0)
+
+    package init() {}
+
+    /// Summaries constructed while this counter was installed.
+    package var count: Int {
+      storage.load(ordering: .relaxed)
+    }
+
+    fileprivate func increment() {
+      _ = storage.wrappingAdd(1, ordering: .relaxed)
+    }
+  }
+
+  @TaskLocal package static var counter: Counter?
+
+  @inline(__always)
+  fileprivate static func recordConstruction() {
+    #if DEBUG
+      counter?.increment()
+    #endif
+  }
+}
+
 package struct InvalidationSummary: Equatable, Sendable {
   package let directlyInvalidated: Set<Identity>
   package let identitiesWithInvalidatedDescendants: Set<Identity>
@@ -9,6 +48,7 @@ package struct InvalidationSummary: Equatable, Sendable {
   package init(
     invalidatedIdentities: Set<Identity>
   ) {
+    InvalidationSummaryConstructionCensus.recordConstruction()
     directlyInvalidated = invalidatedIdentities
     directlyInvalidatedComponents = invalidatedIdentities.map(\.components)
 

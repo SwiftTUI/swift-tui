@@ -89,10 +89,12 @@ struct ResolveContextStorageTotalityTests {
         + "builder and by the frame-input refresh; environmentValues equality subsumes it"
     ),
     "transaction": equated(),
-    "invalidatedIdentities": equated(),
+    // Backing storage of the public `invalidatedIdentities` accessor, which
+    // `==` and the builders read (see `sourceMember(for:)`).
+    "storedInvalidatedIdentities": equated(),
     "invalidationSummary": notEquated(
-      "didSet-maintained projection of invalidatedIdentities; comparing the source "
-        + "set subsumes it"
+      "setter-maintained projection of invalidatedIdentities (the frame-input "
+        + "refresh adopts the frame's prebuilt pair); comparing the source set subsumes it"
     ),
     "forceRootEvaluation": equated(),
     "entityHosting": notEquated(
@@ -266,7 +268,7 @@ struct ResolveContextStorageTotalityTests {
     #expect(!body.isEmpty, "could not locate ResolveContext.== in the source")
 
     for (name, classification) in Self.directFields.sorted(by: { $0.key < $1.key }) {
-      let compared = mentionsMember(body, "lhs.\(name)")
+      let compared = mentionsMember(body, "lhs.\(Self.sourceMember(for: name))")
       #expect(
         compared == classification.equated,
         "== \(compared ? "compares" : "omits") \(name) but the manifest classifies it as \(classification.equated ? "equated" : "not equated") — reconcile the manifest with the ==."
@@ -283,6 +285,12 @@ struct ResolveContextStorageTotalityTests {
 
   private static func comparisonMember(for storedMember: String) -> String {
     storedMember == "graphReference" ? "viewGraph" : storedMember
+  }
+
+  /// The source spelling of a direct stored field: private backing storage is
+  /// read and carried through its accessor (STUI-1232).
+  private static func sourceMember(for storedField: String) -> String {
+    storedField == "storedInvalidatedIdentities" ? "invalidatedIdentities" : storedField
   }
 
   @Test("the graph binding classification covers its forwarding getter")
@@ -304,7 +312,7 @@ struct ResolveContextStorageTotalityTests {
     #expect(!body.isEmpty, "could not locate ResolveContext.\(builder) in the source")
 
     for (name, classification) in Self.directFields.sorted(by: { $0.key < $1.key }) {
-      let mentioned = mentionsMember(body, name)
+      let mentioned = mentionsMember(body, Self.sourceMember(for: name))
       #expect(
         mentioned == classification.carriedByBuilders,
         "\(builder) \(mentioned ? "mentions" : "drops") \(name) but the manifest classifies it as \(classification.carriedByBuilders ? "carried" : "deliberately dropped") — a silently dropped field is the F168-class hazard; reconcile."

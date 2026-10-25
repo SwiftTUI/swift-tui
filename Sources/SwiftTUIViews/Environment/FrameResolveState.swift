@@ -250,10 +250,15 @@ package struct FrameResolveInputs {
       in: animationSegments,
       transform
     )
-    invalidatedIdentities = transform(unsegmentedIdentities).union(
+    let rewritten = transform(unsegmentedIdentities).union(
       AnimationInvalidationSegments.identityUnion(animationSegments)
     )
-    invalidationSummary = .init(invalidatedIdentities: invalidatedIdentities)
+    // The summary walks every ancestor of every identity; an identity-preserving
+    // rewrite (the common portal translation) keeps the one already built.
+    if rewritten != invalidatedIdentities {
+      invalidatedIdentities = rewritten
+      invalidationSummary = .init(invalidatedIdentities: rewritten)
+    }
     let liveBatchIDs = AnimationInvalidationSegments.liveBatchIDs(in: animationSegments)
     return originalBatchIDs.filter { !liveBatchIDs.contains($0) }
   }

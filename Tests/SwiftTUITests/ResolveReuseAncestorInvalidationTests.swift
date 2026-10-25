@@ -425,4 +425,62 @@ struct ResolveReuseAncestorInvalidationTests {
     )
     #expect(!dependencies.contains(buttonID))
   }
+
+  /// STUI-1232: every resolve that reaches the frame-input refresh used to
+  /// construct, and immediately discard, an `InvalidationSummary` — an
+  /// ancestor walk over every invalidated identity, per resolved view. The
+  /// gallery census stalled a frame for seconds on it. Summary construction
+  /// is per frame, so a root re-resolve of 4 rows and of 40 rows must
+  /// construct the same number of summaries.
+  @Test("a root re-resolve constructs invalidation summaries independent of view count")
+  func rootReResolveSummaryConstructionsAreIndependentOfViewCount() {
+    #if DEBUG
+      struct SummaryRow: View {
+        let index: Int
+
+        var body: some View {
+          Text("row \(index)")
+        }
+      }
+
+      struct SummaryRows: View {
+        let count: Int
+
+        var body: some View {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<count, id: \.self) { index in
+              SummaryRow(index: index)
+            }
+          }
+        }
+      }
+
+      func constructionsDuringRootReResolve(rows: Int) -> (count: Int, rendered: String) {
+        let renderer = DefaultRenderer()
+        let rootIdentity = testIdentity("SummaryRows", "\(rows)")
+        _ = renderer.render(SummaryRows(count: rows), context: .init(identity: rootIdentity))
+        let census = InvalidationSummaryConstructionCensus.Counter()
+        let snapshot = InvalidationSummaryConstructionCensus.$counter.withValue(census) {
+          renderer.render(
+            SummaryRows(count: rows),
+            context: .init(identity: rootIdentity, invalidatedIdentities: [rootIdentity])
+          )
+        }
+        return (census.count, snapshot.rasterSurface.lines.joined(separator: "\n"))
+      }
+
+      let few = constructionsDuringRootReResolve(rows: 4)
+      let many = constructionsDuringRootReResolve(rows: 40)
+      print(
+        "STUI1232 summary constructions per root re-resolve: 4 rows=\(few.count) 40 rows=\(many.count)"
+      )
+      #expect(few.rendered.contains("row 3"))
+      #expect(many.rendered.contains("row 39") || many.rendered.contains("row 1"))
+      #expect(
+        few.count == many.count,
+        "summary constructions scaled with resolved views: \(few.count) for 4 rows, \(many.count) for 40"
+      )
+      #expect(many.count <= 4, "a root re-resolve built \(many.count) summaries")
+    #endif
+  }
 }

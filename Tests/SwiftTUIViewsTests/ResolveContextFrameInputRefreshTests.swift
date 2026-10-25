@@ -249,6 +249,120 @@ struct ResolveContextFrameInputRefreshTests {
     #expect(inputs.animationSegments.first?.animationBatchID == secondBatchID)
     #expect(displacedBatchIDs == [firstBatchID])
   }
+
+  // STUI-1232: the refresh runs on every resolve that reaches
+  // `resolveViewWork` while renderer inputs are installed, so it must adopt
+  // the frame's precomputed summary without constructing (and discarding) a
+  // fresh one — the construction walks every ancestor of every invalidated
+  // identity, which made a deep-palette gallery frame stall for seconds.
+  #if DEBUG
+    @Test("the frame-input refresh adopts the precomputed summary without rebuilding one")
+    func refreshAdoptsPrecomputedSummaryWithoutRebuilding() {
+      let invalidated: Set<Identity> = [
+        testIdentity("Root", "Palette", "Body", "Row"),
+        testIdentity("Root", "Tab", "Content"),
+      ]
+      let box = FrameResolveInputBox()
+      box.store(frameInputs(invalidatedIdentities: invalidated, animationSegments: []))
+      var context = ResolveContext(identity: testIdentity("Root", "Tab"))
+      context.frameInputs = box
+
+      let census = InvalidationSummaryConstructionCensus.Counter()
+      let refreshed = InvalidationSummaryConstructionCensus.$counter.withValue(census) {
+        context.applyingCurrentFrameResolveInputs()
+      }
+
+      #expect(census.count == 0)
+      #expect(refreshed.invalidatedIdentities == invalidated)
+      #expect(refreshed.invalidationSummary == box.inputs?.invalidationSummary)
+    }
+
+    @Test("a public invalidation-set write still rebuilds exactly one consistent summary")
+    func publicInvalidationWriteRebuildsOneSummary() {
+      let branch = testIdentity("Root", "Branch")
+      let leaf = branch.child(.named("Leaf"))
+      var context = ResolveContext(identity: testIdentity("Root"))
+
+      let census = InvalidationSummaryConstructionCensus.Counter()
+      InvalidationSummaryConstructionCensus.$counter.withValue(census) {
+        context.invalidatedIdentities = [leaf]
+      }
+
+      #expect(census.count == 1)
+      #expect(context.invalidationSummary == InvalidationSummary(invalidatedIdentities: [leaf]))
+      #expect(context.invalidationAffectsSubtree(at: branch))
+      #expect(context.invalidationAffectsSubtree(at: leaf.child(.named("Below"))))
+      #expect(!context.invalidationAffectsSubtree(at: testIdentity("Root", "Sibling")))
+    }
+  #endif
+
+  @Test("in-place invalidation-set mutation keeps the summary consistent")
+  func inPlaceInvalidationMutationKeepsSummaryConsistent() {
+    let first = testIdentity("Root", "First")
+    let second = testIdentity("Root", "Second", "Leaf")
+    var context = ResolveContext(identity: testIdentity("Root"), invalidatedIdentities: [first])
+
+    context.invalidatedIdentities.insert(second)
+
+    #expect(context.invalidatedIdentities == [first, second])
+    #expect(
+      context.invalidationSummary == InvalidationSummary(invalidatedIdentities: [first, second]))
+    #expect(context.isInvalidated(second))
+    #expect(context.invalidationAffectsSubtree(at: testIdentity("Root", "Second")))
+  }
+
+  @Test("refreshed invalidation queries match a summary built from the frame's identities")
+  func refreshedInvalidationQueriesMatchFrameSummary() {
+    let leaf = testIdentity("Root", "Branch", "Leaf")
+    let box = FrameResolveInputBox()
+    box.store(frameInputs(invalidatedIdentities: [leaf], animationSegments: []))
+    // The captured context predates the frame: its own set is stale.
+    var context = ResolveContext(
+      identity: testIdentity("Root", "Branch"),
+      invalidatedIdentities: [testIdentity("Root", "Stale")]
+    )
+    context.frameInputs = box
+
+    let refreshed = context.applyingCurrentFrameResolveInputs()
+    let reference = InvalidationSummary(invalidatedIdentities: [leaf])
+
+    #expect(refreshed.invalidationSummary == reference)
+    #expect(refreshed.isInvalidated(leaf))
+    #expect(!refreshed.isInvalidated(testIdentity("Root", "Stale")))
+    for probe in [
+      testIdentity("Root"), testIdentity("Root", "Branch"), leaf,
+      leaf.child(.named("Below")), testIdentity("Root", "Stale"),
+      testIdentity("Root", "Other"),
+    ] {
+      #expect(
+        refreshed.invalidationAffectsSubtree(at: probe) == reference.intersectsSubtree(at: probe),
+        "intersection for \(probe.path) diverged from the frame summary"
+      )
+    }
+  }
+
+  @Test("context equality is unchanged by the refresh's summary adoption")
+  func contextEqualityUnchangedByRefresh() {
+    let leaf = testIdentity("Root", "Leaf")
+    let box = FrameResolveInputBox()
+    box.store(frameInputs(invalidatedIdentities: [leaf], animationSegments: []))
+    var context = ResolveContext(identity: testIdentity("Root"))
+    context.frameInputs = box
+
+    let refreshed = context.applyingCurrentFrameResolveInputs()
+    var written = context
+    written.invalidatedIdentities = [leaf]
+    var rewritten = context
+    rewritten.invalidatedIdentities = [testIdentity("Root", "Other")]
+    rewritten.invalidatedIdentities = [leaf]
+    var other = context
+    other.invalidatedIdentities = [testIdentity("Root", "Other")]
+
+    #expect(written == rewritten)
+    #expect(written != other)
+    #expect(refreshed.invalidatedIdentities == written.invalidatedIdentities)
+    #expect(refreshed.invalidationSummary == written.invalidationSummary)
+  }
 }
 
 private func resolveContext(

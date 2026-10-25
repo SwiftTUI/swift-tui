@@ -69,6 +69,17 @@ extension LayoutEngine {
     )
   }
 
+  /// The children of a lazy stack that intersect the scroll viewport, widened
+  /// by `overscan`.
+  ///
+  /// `nil` means the viewport does not window this stack — it scrolls the
+  /// other axis, it has no main-axis length, or the stack has no content —
+  /// and the caller places every child. An empty range means the viewport
+  /// applies and no child intersects it: the stack lies wholly outside the
+  /// viewport (or the visible band falls between children), so it realizes no
+  /// rows, exactly as the windowed fragment path does. Conflating the two let
+  /// a wholly offscreen exhaustive stack place every row while the same stack
+  /// one row higher placed only its visible ones (STUI-1231).
   package func lazyStackVisibleChildRange(
     for snapshot: LazyStackAllocationSnapshot,
     in bounds: CellRect,
@@ -88,7 +99,8 @@ extension LayoutEngine {
 
     let viewportLength =
       mainDimension(of: viewportContext.viewportRect.size, for: snapshot.axis)
-    guard viewportLength > 0, snapshot.contentMainLength > 0 else {
+    let childCount = min(snapshot.childMainOffsets.count, snapshot.childMainLengths.count)
+    guard viewportLength > 0, snapshot.contentMainLength > 0, childCount > 0 else {
       return nil
     }
 
@@ -112,12 +124,7 @@ extension LayoutEngine {
       viewportStart + viewportLength - stackStart
     )
     guard visibleStart < visibleEnd else {
-      return nil
-    }
-
-    let childCount = min(snapshot.childMainOffsets.count, snapshot.childMainLengths.count)
-    guard childCount > 0 else {
-      return nil
+      return 0..<0
     }
 
     // Overlapping layouts need exact interval traversal. Binary search is
@@ -140,14 +147,12 @@ extension LayoutEngine {
       childCount: childCount
     )
 
-    guard firstVisible < lastVisibleExclusive else {
-      return nil
-    }
-
+    // A band between two children intersects none; overscan may still
+    // realize its neighbours.
     let overscannedLower = max(0, firstVisible - max(0, overscan))
     let overscannedUpper = min(childCount, lastVisibleExclusive + max(0, overscan))
     guard overscannedLower < overscannedUpper else {
-      return nil
+      return 0..<0
     }
 
     return overscannedLower..<overscannedUpper

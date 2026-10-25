@@ -184,6 +184,8 @@ extension LayoutEngine {
       // Exhaustive product: a multi-view element contributes one cell per
       // spliced child, so the allocation arrays index the flattened list —
       // verify against the realized flattened count exactly as before.
+      // Only an unwindowed stack (`nil` range) places every row; a stack
+      // wholly outside its viewport gets an empty range and places none.
       let flattenedChildren = stackChildren(for: resolved)
       if snapshot.measuredWindow == nil, allocation.childSizes.count == flattenedChildren.count {
         let visibleRange =
