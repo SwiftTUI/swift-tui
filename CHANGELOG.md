@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.19.3] - 2026-10-25
+
 ### Added
 
 - `AccessibilityNode.runtimeFocusIdentity` in the `Runners` SPI, the identity
@@ -2543,7 +2545,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.2...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.3...HEAD
+[0.19.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.3
 [0.19.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.2
 [0.19.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.1
 [0.19.0]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.0

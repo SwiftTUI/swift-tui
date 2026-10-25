@@ -5116,7 +5116,7 @@ var WebHostSceneRuntime = class {
         this.terminalMount.style.cursor = this.linkTarget(location) !== void 0 ? "pointer" : "";
       this.onInput(this.inputEncoder.encodePointerMove(location, this.activePointerButton, event, this.pointerRevision, this.pointerViewportRevision));
     }, handleWheel = (event) => {
-      if (this.wheelMode === "passive" || this.rendererKind === "dom" && (event.ctrlKey || event.metaKey))
+      if (this.wheelMode === "passive" || event.ctrlKey || event.metaKey)
         return;
       let location = this.cellLocation(event);
       if (!location)
@@ -5777,15 +5777,17 @@ var StdIOPipe = class {
   write(chunk) {
     if (this.closed)
       return !1;
-    let bytes = typeof chunk === "string" ? (/* @__PURE__ */ new TextEncoder()).encode(chunk) : new Uint8Array(chunk), waiter = this.waiters.shift();
+    let bytes = typeof chunk === "string" ? (/* @__PURE__ */ new TextEncoder()).encode(chunk) : new Uint8Array(chunk), accepted = !0, waiter = this.waiters.shift();
     if (waiter)
-      return waiter({
+      waiter({
         done: !1,
         value: bytes
-      }), !0;
-    if (!this.consumer)
-      this.chunks.push(bytes);
-    let accepted = this.consumer?.(bytes) !== !1;
+      });
+    else {
+      if (!this.consumer)
+        this.chunks.push(bytes);
+      accepted = this.consumer?.(bytes) !== !1;
+    }
     for (let listener of this.listeners)
       if (listener(bytes) === !1)
         accepted = !1;
