@@ -148,18 +148,21 @@ package struct LayoutMetadata: Sendable {
     let horizontalGuideStorage = horizontalAlignmentGuideStorage
     let verticalGuideStorage = verticalAlignmentGuideStorage
 
+    // A guide closure reads its base in the centre-rounding mode of the
+    // dimensions the guide is read from, so a guide computed from the centre
+    // (`{ $0[.center] }`) keeps the centre's half cell.
     return
       base
-      .overridingHorizontalGuides { alignment in
+      .overridingHorizontalGuides(modeAware: { alignment, roundsUp in
         horizontalGuideStorage[alignment.key].map { computeValue in
-          computeValue(base)
+          computeValue(base.roundingDefaultCentreUp(roundsUp))
         }
-      }
-      .overridingVerticalGuides { alignment in
+      })
+      .overridingVerticalGuides(modeAware: { alignment, roundsUp in
         verticalGuideStorage[alignment.key].map { computeValue in
-          computeValue(base)
+          computeValue(base.roundingDefaultCentreUp(roundsUp))
         }
-      }
+      })
   }
 
   package func viewDimensions(for size: CellSize) -> ViewDimensions {

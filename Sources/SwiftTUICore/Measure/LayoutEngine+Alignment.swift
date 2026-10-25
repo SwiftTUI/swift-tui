@@ -4,60 +4,99 @@
 ///
 /// `leading` is the greatest child guide value and `trailing` the greatest
 /// remainder of a child past its guide, so the container spans
-/// `leading + trailing` cells.
+/// `leading + trailing` cells. A guide's exact position can sit half a cell
+/// past its integer value (`ViewDimensions.halfCellPosition(of:)`): the
+/// default centre of an odd length, and any guide computed from it. The line
+/// is the greatest exact position, so it sits half a cell past `leading` when
+/// a child whose value is `leading` is half a cell past it.
 package struct AlignmentLine: Equatable, Sendable {
   package var leading: Int
   package var trailing: Int
-  /// Whether the line is the built-in centre guide and no child declares an
-  /// explicit value for it. Children then centre by extent, exactly as a
-  /// frame centres its content, instead of meeting at their floored guides.
-  package var centresByExtent: Bool
+  /// Whether the line's exact position is half a cell past `leading`.
+  package var isHalfCell: Bool
 
-  package init(leading: Int, trailing: Int, centresByExtent: Bool) {
+  package init(leading: Int, trailing: Int, isHalfCell: Bool) {
     self.leading = leading
     self.trailing = trailing
-    self.centresByExtent = centresByExtent
+    self.isHalfCell = isHalfCell
+  }
+
+  /// The line through children with these guide positions and lengths.
+  package init(guides: [(value: Int, isHalfCell: Bool, length: Int)]) {
+    let leading = guides.map(\.value).max() ?? 0
+    self.init(
+      leading: leading,
+      trailing: guides.map { $0.length - $0.value }.max() ?? 0,
+      isHalfCell: guides.contains { $0.value == leading && $0.isHalfCell })
   }
 
   package var extent: Int { leading + trailing }
 
-  /// The offset of a child from the container's leading or top edge.
-  package func offset(guideValue: Int, length: Int) -> Int {
-    centresByExtent
-      ? LayoutEngine.centredOffset(length: length, in: extent)
-      : leading - guideValue
+  /// The line through the union of the children behind `self` and `other`,
+  /// as a windowed product accumulates measured runs.
+  package func merged(with other: AlignmentLine) -> AlignmentLine {
+    let leading = max(leading, other.leading)
+    return AlignmentLine(
+      leading: leading,
+      trailing: max(trailing, other.trailing),
+      isHalfCell: (self.leading == leading && isHalfCell)
+        || (other.leading == leading && other.isHalfCell))
+  }
+
+  /// The offset from the container's leading or top edge of a child whose
+  /// guide has this position: the child's exact guide sits on the exact line,
+  /// and a child that would start half a cell in moves toward the leading or
+  /// top edge, so the odd cell falls after it (`LayoutEngine.centredOffset`).
+  /// The offset is never negative: a half-cell child whose value is `leading`
+  /// makes the line half-cell too.
+  package func offset(guideValue: Int, isHalfCell childIsHalfCell: Bool) -> Int {
+    leading - guideValue - (childIsHalfCell && !isHalfCell ? 1 : 0)
+  }
+
+  package func offset(of dimensions: ViewDimensions, on guide: HorizontalAlignment) -> Int {
+    let position = dimensions.halfCellPosition(of: guide)
+    return offset(guideValue: position.value, isHalfCell: position.isHalfCell)
+  }
+
+  package func offset(of dimensions: ViewDimensions, on guide: VerticalAlignment) -> Int {
+    let position = dimensions.halfCellPosition(of: guide)
+    return offset(guideValue: position.value, isHalfCell: position.isHalfCell)
   }
 }
 
 extension LayoutEngine {
-  /// The one centring rule (STUI-591, STUI-1212). Frames, decorations,
-  /// safe-area insets, stacks and ZStacks place a child that is centred by
-  /// default — neither it nor the container declares an explicit centre
-  /// guide — at `(extent - length) / 2`. Content larger than its container
-  /// overflows both edges, as in SwiftUI, so the offset can go negative.
-  /// Integer division truncates toward zero, so an odd cell falls on the
-  /// container's trailing (or bottom) side whether it is a gap or an
-  /// overflow. Explicit guides keep guide arithmetic.
+  /// The one centring rule (STUI-591, STUI-1212, STUI-1242). A child placed
+  /// with its exact guide on an exact line that would start half a cell in
+  /// moves toward the leading or top edge, so the odd cell falls after it.
+  /// Frames, decorations, safe-area insets, stacks and ZStacks place a child
+  /// whose guide and container both sit exactly at their centres at
+  /// `(extent - length) / 2`. Content larger than its container overflows both
+  /// edges, as in SwiftUI, so the offset can go negative; integer division
+  /// truncates toward zero, so the odd cell falls on the container's trailing
+  /// (or bottom) side whether it is a gap or an overflow.
   package static func centredOffset(length: Int, in extent: Int) -> Int {
     (extent - length) / 2
   }
 
-  /// Whether children aligned on `guide` centre by extent: the guide is the
-  /// built-in centre and no child declares an explicit value for it.
-  package func centresByExtent(
-    _ dimensions: [ViewDimensions],
-    guide: HorizontalAlignment
-  ) -> Bool {
-    guide == .center && dimensions.allSatisfy { $0.explicitValue(for: guide) == nil }
-  }
-
-  /// Whether children aligned on `guide` centre by extent: the guide is the
-  /// built-in centre and no child declares an explicit value for it.
-  package func centresByExtent(
-    _ dimensions: [ViewDimensions],
-    guide: VerticalAlignment
-  ) -> Bool {
-    guide == .center && dimensions.allSatisfy { $0.explicitValue(for: guide) == nil }
+  /// The offset of a child in a frame, decoration or inset reference, each
+  /// guide given as a position (`ViewDimensions.halfCellPosition(of:)`) and
+  /// its participant's length. Two exact centres use `centredOffset`; any
+  /// other pair subtracts integer guides, and a half-cell child on an integer
+  /// guide moves toward the leading or top edge as on a stack line.
+  package static func alignedOffset(
+    child: (value: Int, isHalfCell: Bool), length: Int,
+    reference: (value: Int, isHalfCell: Bool), referenceLength: Int
+  ) -> Int {
+    if 2 * child.value + (child.isHalfCell ? 1 : 0) == length,
+      2 * reference.value + (reference.isHalfCell ? 1 : 0) == referenceLength
+    {
+      return centredOffset(length: length, in: referenceLength)
+    }
+    // Only a gap moves: an overflowing half-cell child keeps the integer
+    // difference, the truncation toward zero `centredOffset` applies.
+    let startsHalfCellIn =
+      child.isHalfCell && !reference.isHalfCell && reference.value > child.value
+    return reference.value - child.value - (startsHalfCellIn ? 1 : 0)
   }
 
   package func alignedOrigin(
@@ -80,33 +119,22 @@ extension LayoutEngine {
     alignment: Alignment
   ) -> CellPoint {
     // Content larger than its container overflows both edges, as in SwiftUI,
-    // so centred and trailing offsets go negative. Default centring follows
-    // `centredOffset`, the rule stacks and ZStacks share.
+    // so centred and trailing offsets go negative. Centring follows
+    // `alignedOffset`, the rule stacks and ZStacks share.
     let x =
-      if alignment.horizontal == .center,
-        referenceDimensions.explicitValue(for: HorizontalAlignment.center) == nil,
-        childDimensions.explicitValue(for: HorizontalAlignment.center) == nil
-      {
-        bounds.origin.x
-          + Self.centredOffset(length: childDimensions.width, in: referenceDimensions.width)
-      } else {
-        bounds.origin.x
-          + referenceDimensions[alignment.horizontal]
-          - childDimensions[alignment.horizontal]
-      }
-
+      bounds.origin.x
+      + Self.alignedOffset(
+        child: childDimensions.halfCellPosition(of: alignment.horizontal),
+        length: childDimensions.width,
+        reference: referenceDimensions.halfCellPosition(of: alignment.horizontal),
+        referenceLength: referenceDimensions.width)
     let y =
-      if alignment.vertical == .center,
-        referenceDimensions.explicitValue(for: VerticalAlignment.center) == nil,
-        childDimensions.explicitValue(for: VerticalAlignment.center) == nil
-      {
-        bounds.origin.y
-          + Self.centredOffset(length: childDimensions.height, in: referenceDimensions.height)
-      } else {
-        bounds.origin.y
-          + referenceDimensions[alignment.vertical]
-          - childDimensions[alignment.vertical]
-      }
+      bounds.origin.y
+      + Self.alignedOffset(
+        child: childDimensions.halfCellPosition(of: alignment.vertical),
+        length: childDimensions.height,
+        reference: referenceDimensions.halfCellPosition(of: alignment.vertical),
+        referenceLength: referenceDimensions.height)
 
     return CellPoint(
       x: x,
@@ -296,13 +324,15 @@ extension LayoutEngine {
     }
 
     let horizontal = AlignmentLine(
-      leading: dimensions.map { $0[alignment.horizontal] }.max() ?? 0,
-      trailing: dimensions.map { $0.width - $0[alignment.horizontal] }.max() ?? 0,
-      centresByExtent: centresByExtent(dimensions, guide: alignment.horizontal))
+      guides: dimensions.map {
+        let position = $0.halfCellPosition(of: alignment.horizontal)
+        return (position.value, position.isHalfCell, $0.width)
+      })
     let vertical = AlignmentLine(
-      leading: dimensions.map { $0[alignment.vertical] }.max() ?? 0,
-      trailing: dimensions.map { $0.height - $0[alignment.vertical] }.max() ?? 0,
-      centresByExtent: centresByExtent(dimensions, guide: alignment.vertical))
+      guides: dimensions.map {
+        let position = $0.halfCellPosition(of: alignment.vertical)
+        return (position.value, position.isHalfCell, $0.height)
+      })
     return (horizontal, vertical)
   }
 
@@ -472,12 +502,16 @@ extension LayoutEngine {
     offsetX: Int,
     offsetY: Int
   ) -> ViewDimensions {
+    // The child's guides are read in the centre-rounding mode the wrapper's
+    // guide is read in, so a propagated guide keeps its half cell.
     ViewDimensions(width: size.width, height: size.height)
-      .overridingHorizontalGuides { alignment in
-        childDimensions.explicitValue(for: alignment).map { $0 + offsetX }
-      }
-      .overridingVerticalGuides { alignment in
-        childDimensions.explicitValue(for: alignment).map { $0 + offsetY }
-      }
+      .overridingHorizontalGuides(modeAware: { alignment, roundsUp in
+        childDimensions.roundingDefaultCentreUp(roundsUp).explicitValue(for: alignment)
+          .map { $0 + offsetX }
+      })
+      .overridingVerticalGuides(modeAware: { alignment, roundsUp in
+        childDimensions.roundingDefaultCentreUp(roundsUp).explicitValue(for: alignment)
+          .map { $0 + offsetY }
+      })
   }
 }

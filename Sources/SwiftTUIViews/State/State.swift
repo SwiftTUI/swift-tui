@@ -241,6 +241,9 @@ private final class StateBox<Value> {
 /// Construction-time, graphless accesses retain the wrapper's local seed.
 /// Once graph-backed, mutations remain scoped to the exact graph-owner lifetime;
 /// a later snapshot or mount never inherits a retired owner's fallback value.
+/// A no-invalidator `DefaultRenderer` snapshot is not a mount lifetime: an
+/// imperative write to one of its owners reaches a later snapshot of the same
+/// view value, also after the first renderer is released.
 public struct State<Value> {
   private let box: StateBox<Value>
   /// The owner this copy was bound to by the capture-bind pass (plan
@@ -349,10 +352,14 @@ public struct State<Value> {
         return
       }
       // A carried capture that missed names an owner whose committed removal
-      // left no occupant. The write belongs to that retired lifetime, so it is
+      // left no occupant. When that owner was a mount lifetime (its graph had
+      // an invalidator), the write belongs to the retired lifetime and is
       // discarded: the box seed is shared by every copy of the authored value,
-      // and a later mount's fresh slot seeds from it (STUI-1173).
-      let discardsRetiredWrite = resolvesThroughCapture
+      // and a later mount's fresh slot seeds from it (STUI-1173). A snapshot
+      // owner's graph was never a mount lifetime, so its write keeps the
+      // seed mirror below, the same-instance continuity of the graph-slot
+      // setter (STUI-1241).
+      let discardsRetiredWrite = resolvesThroughCapture && capture?.isSnapshotOwner != true
       // Pre-mount seeding is the legitimate use of the seed arm. A write on a
       // box that once had a live slot does not reach that slot — the
       // silent-no-op-write half of the corruption class — so it is as loud as

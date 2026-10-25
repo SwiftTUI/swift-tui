@@ -249,6 +249,39 @@ struct StateCaptureBindingTests {
     }
   }
 
+  @Test("a snapshot owner's missed write keeps the seed mirror")
+  func snapshotCaptureWriteKeepsTheSeedMirror() throws {
+    try withCaptureBinding(enabled: false) {
+      let graph = ViewGraph()
+      defer { withExtendedLifetime(graph) {} }
+      graph.beginFrame()
+      let (deadOwner, deadScope) = try makeDeadOwner()
+
+      // The owner lived in a no-invalidator snapshot graph that is gone. That
+      // graph was never a mount lifetime, so the write reaches the seed a
+      // later snapshot of this authored value starts from (STUI-1241).
+      var snapshot = State(wrappedValue: "seed")
+      snapshot.bindCapture(
+        StateCaptureBinding(
+          owner: deadOwner, identity: testIdentity("SnapshotOwner"), graphScope: deadScope,
+          path: .root, isSnapshotOwner: true)
+      )
+      snapshot.wrappedValue = "mirrored"
+      #expect(snapshot.wrappedValue == "mirrored")
+
+      // The same miss for an invalidator-backed owner is still discarded.
+      var removed = State(wrappedValue: "seed")
+      removed.bindCapture(
+        binding(owner: deadOwner, identity: testIdentity("SnapshotOwner"), scope: deadScope)
+      )
+      removed.wrappedValue = "retired"
+      #expect(removed.wrappedValue == "seed")
+      #if DEBUG
+        #expect(StateCaptureCensus.count(of: .captureMiss) == 4)
+      #endif
+    }
+  }
+
   @Test("the bind plan builder traps on a class container")
   func classContainerTrapsOnBindPlanBuild() async {
     // The capture-bind pass's half of the value-type invariant's runtime

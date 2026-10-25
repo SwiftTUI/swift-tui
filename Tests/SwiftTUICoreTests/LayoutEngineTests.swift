@@ -2043,6 +2043,51 @@ struct LayoutEngineTests {
     #expect(placed.children.map { cross($0.bounds.origin) } == [0, 1])
   }
 
+  @Test(
+    "STUI-1242: a guide computed from the centre keeps its half cell in stacks and frames",
+    arguments: [Axis.horizontal, .vertical])
+  func centreDerivedGuideKeepsItsHalfCell(axis: Axis) {
+    // A one-cell child's exact centre is half a cell, so `d[.center] + 1` sits
+    // at 1.5. On a line at 2 (a four-cell frame, or a four-cell sibling's
+    // centre) its origin is 0.5, and the odd half cell falls after it: 0. The
+    // constant 1 is an integer guide: 2 - 1 = 1.
+    func cross(_ point: CellPoint) -> Int { axis == .vertical ? point.x : point.y }
+    func guided(_ name: String, _ value: @escaping @Sendable (ViewDimensions) -> Int)
+      -> ResolvedNode
+    {
+      let metadata =
+        axis == .vertical
+        ? LayoutMetadata().settingHorizontalAlignmentGuide(
+          .center, debugName: "center", computeValue: value)
+        : LayoutMetadata().settingVerticalAlignmentGuide(
+          .center, debugName: "center", computeValue: value)
+      return leaf(name, size: .init(width: 1, height: 1), layoutMetadata: metadata)
+    }
+    let derived = guided("derived") {
+      axis == .vertical ? $0[HorizontalAlignment.center] + 1 : $0[VerticalAlignment.center] + 1
+    }
+    let constant = guided("constant") { _ in 1 }
+    let wide = leaf(
+      "wide", size: axis == .vertical ? .init(width: 4, height: 1) : .init(width: 1, height: 4))
+    let engine = LayoutEngine()
+    for (child, expected) in [(derived, 0), (constant, 1)] {
+      let frame = ResolvedNode(
+        identity: testIdentity("frame"), kind: .view("Frame"), children: [child],
+        layoutBehavior: .frame(
+          width: axis == .vertical ? 4 : nil, height: axis == .horizontal ? 4 : nil,
+          alignment: .center))
+      let framed = engine.place(frame, measured: engine.measure(frame), origin: .zero)
+      #expect(framed.children.map { cross($0.bounds.origin) } == [expected], "\(child.identity)")
+      let node = ResolvedNode(
+        identity: testIdentity("stack"), kind: .view("Stack"), children: [wide, child],
+        layoutBehavior: .stack(
+          axis: axis, spacing: 0, horizontalAlignment: .center, verticalAlignment: .center))
+      let placed = engine.place(node, measured: engine.measure(node), origin: .zero)
+      #expect(
+        placed.children.map { cross($0.bounds.origin) } == [0, expected], "\(child.identity)")
+    }
+  }
+
   @Test("ViewThatFits selects the first child that fits the proposal")
   func viewThatFitsSelectsFirstFittingChild() {
     let engine = LayoutEngine()

@@ -396,6 +396,43 @@ private struct BodyBasedStatefulCounter: View {
   }
 }
 
+@MainActor
+private final class SnapshotCounterVisibility {
+  var isShown = true
+}
+
+/// Holds one counter instance, so every snapshot of this value reuses the same
+/// `@State` box, and shows it only while `visibility` says so.
+private struct RemovableSnapshotCounter: View {
+  let visibility: SnapshotCounterVisibility
+  let counter = BodyBasedStatefulCounter()
+
+  var body: some View {
+    if visibility.isShown {
+      counter
+    } else {
+      Text("Hidden")
+    }
+  }
+}
+
+/// A dispatch whose snapshot owner is gone reports its seed-fallback
+/// diagnostics deliberately; keep them out of the soundness gate.
+@MainActor
+private func withSnapshotDispatchDiagnostics(_ body: () -> Void) {
+  let savedTrace = SoundnessProbeConfiguration.isTraceEnabled
+  let savedSeed = SoundnessProbeConfiguration.stateSeedFallbackViolationCount
+  let savedMiss = SoundnessProbeConfiguration.stateCaptureMissViolationCount
+  SoundnessProbeConfiguration.isTraceEnabled = false
+  defer {
+    SoundnessProbeConfiguration.isTraceEnabled = savedTrace
+    SoundnessProbeConfiguration.stateSeedFallbackViolationCount = savedSeed
+    SoundnessProbeConfiguration.stateCaptureMissViolationCount = savedMiss
+  }
+  body()
+  _ = ImperativeRuntimeIssueQueue.drain()
+}
+
 private struct BodyBasedStatefulField: View {
   @State private var value = ""
 
@@ -1118,6 +1155,45 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Root"))
     )
 
+    #expect(updatedArtifacts.rasterSurface.lines.contains("Count 1"))
+  }
+
+  // STUI-1241: a snapshot graph is not a mount lifetime (State.swift's
+  // snapshot mirror), so a dispatch to an owner a later snapshot removed still
+  // reaches the next snapshot of the same view value.
+  @Test("a snapshot dispatch to a removed owner reaches a later snapshot of the same instance")
+  func snapshotDispatchToRemovedOwnerReachesLaterSnapshot() throws {
+    let localActionRegistry = LocalActionRegistry()
+    let visibility = SnapshotCounterVisibility()
+    let view = RemovableSnapshotCounter(visibility: visibility)
+
+    let renderer = DefaultRenderer()
+    defer { withExtendedLifetime(renderer) {} }
+    let initialArtifacts = renderer.render(
+      view,
+      context: .init(
+        identity: testIdentity("Root"),
+        localActionRegistry: localActionRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+    #expect(initialArtifacts.rasterSurface.lines.contains("Count 0"))
+    let actionIdentity = try #require(
+      initialArtifacts.semanticSnapshot.focusRegions.first?.identity)
+
+    visibility.isShown = false
+    let hidden = renderer.render(view, context: .init(identity: testIdentity("Root")))
+    #expect(hidden.rasterSurface.lines.contains("Hidden"))
+
+    withSnapshotDispatchDiagnostics {
+      #expect(localActionRegistry.dispatch(identity: actionIdentity))
+    }
+
+    visibility.isShown = true
+    let updatedArtifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("Root"))
+    )
     #expect(updatedArtifacts.rasterSurface.lines.contains("Count 1"))
   }
 
@@ -6846,7 +6922,7 @@ struct SwiftUISurfaceTests {
     for axis: SwiftTUIViews.Axis in [.vertical, .horizontal] {
       for container in CentringContainer.allCases {
         let artifacts = DefaultRenderer().render(
-          container.view(axis: axis, extent: extent, length: length, explicitGuide: false),
+          container.view(axis: axis, extent: extent, length: length, guide: .none),
           context: .init(identity: testIdentity("Centre"))
         )
         #expect(
@@ -6858,17 +6934,18 @@ struct SwiftUISurfaceTests {
   }
 
   @Test(
-    "STUI-1212: an explicit centre guide keeps integer guide arithmetic in every container",
+    "STUI-1242: an identity centre guide places like the default in every container",
     arguments: [(2, 1), (4, 1), (4, 3), (3, 1), (3, 2), (5, 2)]
   )
-  func explicitCentreGuideKeepsGuideArithmetic(extent: Int, length: Int) {
-    // The guide closure returns the integer value `ViewDimensions` reports,
-    // length / 2, so every container subtracts guides: extent / 2 - length / 2.
-    let offset = extent / 2 - length / 2
+  func identityCentreGuidePlacesLikeTheDefault(extent: Int, length: Int) {
+    // `{ $0[.center] }` is the default guide (SwiftUI `alignmentGuide`). For an
+    // odd length its integer value is the floor of the exact centre, and the
+    // guide keeps that half cell, so it centres by extent like the default.
+    let offset = (extent - length) / 2
     for axis: SwiftTUIViews.Axis in [.vertical, .horizontal] {
       for container in CentringContainer.allCases {
         let artifacts = DefaultRenderer().render(
-          container.view(axis: axis, extent: extent, length: length, explicitGuide: true),
+          container.view(axis: axis, extent: extent, length: length, guide: .identity),
           context: .init(identity: testIdentity("Guided"))
         )
         #expect(
@@ -6877,6 +6954,140 @@ struct SwiftUISurfaceTests {
           "\(container) on the \(axis) axis, extent \(extent), length \(length)")
       }
     }
+  }
+
+  @Test(
+    "STUI-1242: a centre guide other than the default keeps integer guide arithmetic",
+    arguments: [(4, 2), (5, 2), (6, 3)]
+  )
+  func nonDefaultCentreGuideKeepsGuideArithmetic(extent: Int, length: Int) {
+    // The marker's centre guide is its leading or top edge, 0, which is not
+    // its centre for these lengths. Every container subtracts guides:
+    // extent / 2 - 0.
+    let offset = extent / 2
+    for axis: SwiftTUIViews.Axis in [.vertical, .horizontal] {
+      for container in CentringContainer.allCases {
+        let artifacts = DefaultRenderer().render(
+          container.view(axis: axis, extent: extent, length: length, guide: .constant(0)),
+          context: .init(identity: testIdentity("Constant"))
+        )
+        #expect(
+          centringMarkerOffsets(in: artifacts.rasterSurface.lines, axis: axis)
+            == Array(offset..<(offset + length)),
+          "\(container) on the \(axis) axis, extent \(extent), length \(length)")
+      }
+    }
+  }
+
+  @Test("STUI-1242: an identity guide on the odd child of an x3s049 pair keeps the shared row")
+  func identityCentreGuideOnOddChildPlacesLikeTheDefault() {
+    let row = DefaultRenderer().render(
+      HStack(alignment: .center, spacing: 1) {
+        Text("A").frame(width: 3, height: 2)
+        Text("B").alignmentGuide(VerticalAlignment.center) { $0[VerticalAlignment.center] }
+      },
+      context: .init(identity: testIdentity("Row"))
+    )
+    #expect(row.rasterSurface.lines == [" A  B", ""])
+
+    let column = DefaultRenderer().render(
+      VStack(alignment: .center, spacing: 0) {
+        Text("A").frame(width: 2, height: 1)
+        Text("B").alignmentGuide(HorizontalAlignment.center) { $0[HorizontalAlignment.center] }
+      },
+      context: .init(identity: testIdentity("Column"))
+    )
+    #expect(column.rasterSurface.lines == ["A", "B"])
+  }
+
+  @Test("STUI-1242: a default child centres on an explicit guide's line by the one rounding rule")
+  func defaultChildCentresOnExplicitLineByTheOneRoundingRule() {
+    // The filler's centre guide is its bottom edge, 2. Text "b" is one row, so
+    // its exact centre is half a row down; on line 2 its top would be 1.5,
+    // and the odd half row falls after it: row 1, in every container.
+    let filler = Rectangle().fill(Color.clear).frame(width: 1, height: 2)
+      .alignmentGuide(VerticalAlignment.center) { _ in 2 }
+    let shapes: [(String, AnyView)] = [
+      (
+        "HStack",
+        AnyView(
+          HStack(alignment: .center, spacing: 0) {
+            filler
+            Text("b")
+          })
+      ),
+      (
+        "ZStack",
+        AnyView(
+          ZStack {
+            filler
+            Text("b")
+          })
+      ),
+      ("overlay", AnyView(filler.overlay { Text("b") })),
+    ]
+    for (name, shape) in shapes {
+      let lines = DefaultRenderer().render(
+        shape.frame(width: 3, height: 4, alignment: .topLeading),
+        context: .init(identity: testIdentity("ExplicitLine", name))
+      ).rasterSurface.lines
+      #expect(lines.firstIndex { $0.contains("b") } == 1, "\(name): \(lines)")
+    }
+  }
+
+  @Test("STUI-1242: a windowed lazy stack with a guided row centres rows like the eager stack")
+  func windowedLazyStackWithGuidedRowCentresLikeEagerStack() throws {
+    // Row 197 declares an integer centre guide that leaves the line where the
+    // other rows put it. The default "x" rows must keep one column whether or
+    // not the guided row is measured, and match the eager stack's column.
+    @ViewBuilder
+    func row(_ index: Int) -> some View {
+      if index == 197 {
+        Text("x").alignmentGuide(HorizontalAlignment.center) { _ in 1 }
+      } else {
+        Text(index.isMultiple(of: 2) ? "abcd" : "x")
+      }
+    }
+    func column(of frame: String) -> Int? {
+      for line in frame.split(separator: "\n", omittingEmptySubsequences: false) {
+        if let index = line.firstIndex(of: "x") {
+          return line.distance(from: line.startIndex, to: index)
+        }
+      }
+      return nil
+    }
+    let lazy = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GuidedWindow", "lazy"),
+      size: .init(width: 10, height: 8)
+    ) {
+      ScrollView {
+        LazyVStack(alignment: .center, spacing: 0) {
+          ForEach(0..<200, id: \.self) { row($0) }
+        }
+      }.scrollIndicators(.hidden)
+    }
+    defer { lazy.shutdown() }
+    let top = column(of: lazy.frame)
+    _ = try lazy.pressKey(.init(.end))
+    try #require(lazy.frame.contains("x"), "\(lazy.frame)")
+    let bottom = column(of: lazy.frame)
+
+    let eager = try StressRuntimeHarness(
+      rootIdentity: testIdentity("GuidedWindow", "eager"),
+      size: .init(width: 10, height: 8)
+    ) {
+      ScrollView {
+        VStack(alignment: .center, spacing: 0) {
+          ForEach(0..<200, id: \.self) { row($0) }
+        }
+      }.scrollIndicators(.hidden)
+    }
+    defer { eager.shutdown() }
+    let eagerColumn = column(of: eager.frame)
+
+    #expect(eagerColumn == 1, "\(eager.frame)")
+    #expect(top == eagerColumn, "\(lazy.frame)")
+    #expect(bottom == eagerColumn, "\(lazy.frame)")
   }
 
   @Test("STUI-1212: edge-aligned stacks keep their edge placement")
@@ -7478,8 +7689,10 @@ private enum CentringContainer: CaseIterable, CustomStringConvertible {
 
   @MainActor
   @ViewBuilder
-  func view(axis: SwiftTUIViews.Axis, extent: Int, length: Int, explicitGuide: Bool) -> some View {
-    let marker = CentringMarker(axis: axis, length: length, explicitGuide: explicitGuide)
+  func view(
+    axis: SwiftTUIViews.Axis, extent: Int, length: Int, guide: CentringMarker.Guide
+  ) -> some View {
+    let marker = CentringMarker(axis: axis, length: length, guide: guide)
     let filler = Rectangle().fill(Color.clear).frame(
       width: axis == .horizontal ? extent : 1, height: axis == .vertical ? extent : 1)
     switch self {
@@ -7524,11 +7737,17 @@ private enum CentringContainer: CaseIterable, CustomStringConvertible {
 }
 
 /// `length` cells of "b" along `axis`, optionally declaring explicit centre
-/// guides equal to the integer values `ViewDimensions` reports.
+/// guides: the identity guide `d[.center]`, or a constant.
 private struct CentringMarker: View {
+  enum Guide {
+    case none
+    case identity
+    case constant(Int)
+  }
+
   let axis: SwiftTUIViews.Axis
   let length: Int
-  let explicitGuide: Bool
+  let guide: Guide
 
   var body: some View {
     let content = Group {
@@ -7540,12 +7759,17 @@ private struct CentringMarker: View {
         Text(String(repeating: "b", count: length))
       }
     }
-    if explicitGuide {
+    switch guide {
+    case .none:
+      content
+    case .identity:
       content
         .alignmentGuide(HorizontalAlignment.center) { $0[HorizontalAlignment.center] }
         .alignmentGuide(VerticalAlignment.center) { $0[VerticalAlignment.center] }
-    } else {
+    case .constant(let value):
       content
+        .alignmentGuide(HorizontalAlignment.center) { _ in value }
+        .alignmentGuide(VerticalAlignment.center) { _ in value }
     }
   }
 }

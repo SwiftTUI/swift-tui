@@ -89,7 +89,14 @@ offsets, borders, and nested frames. Padding translates a guide by its inset;
 a guide authored on an outer wrapper takes precedence over the same guide
 in its content. A guide outside a child's bounds does not by itself inflate
 its container: the container aligns the guides and takes the union of the
-children's extents. An explicit `layoutPriority(0)` replaces an earlier
+children's extents. Centre alignment rounds once: a centred child that would
+start half a cell in moves toward the leading or top edge, so the odd cell of
+an uneven split falls after it, in frames, overlays, stacks, lazy stacks and
+`ZStack` alike. A guide computed from the centre keeps the centre's half
+cell, so `.alignmentGuide(.center) { $0[.center] }` and a custom
+`AlignmentID` whose default returns `context[.center]` place exactly like
+the built-in centre. An integer guide value, such as `{ _ in 0 }`, names its
+cell boundary exactly. An explicit `layoutPriority(0)` replaces an earlier
 priority. Custom layout values retain typed values, including an explicit
 optional `nil`; an absent key uses its declared default.
 

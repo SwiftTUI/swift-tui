@@ -432,13 +432,11 @@ struct Wave2HuntFAStateEventTests {
     }
     let second = DefaultRenderer().render(
       released, context: .init(identity: testIdentity("w2fa015")))
-    w2faKnown(
-      "NEW-3: an imperative dispatch between two one-shot DefaultRenderer snapshots is discarded once the first renderer is released; State.swift:355,371-373 (STUI-1173) discards every capture miss, including a discarded snapshot graph whose same-instance continuity State.swift:617-627 promises; contract: State.swift:612-650, SwiftUISurfaceTests same-instance continuity; adjacent STUI-1173"
-    ) {
-      #expect(
-        second.rasterSurface.lines.contains { $0.contains("Count 1") },
-        "\(second.rasterSurface.lines)")
-    }
+    // STUI-1241: the capture records that its owner was a snapshot owner, so
+    // the missed write keeps the seed mirror instead of being discarded.
+    #expect(
+      second.rasterSurface.lines.contains { $0.contains("Count 1") },
+      "\(second.rasterSurface.lines)")
   }
 
   // w2fa016: a retired write after an `.id` change never seeds a later mount.
@@ -665,11 +663,8 @@ struct Wave2HuntFACentringTests {
           .alignmentGuide(VerticalAlignment.center) { $0[VerticalAlignment.center] }
         Text("B")
       }, "w2fa025")
-    w2faKnown(
-      "NEW-4: an explicit centre guide equal to the default on one HStack child moves its default-centred sibling a row down (the x3s049 shape returns); LayoutEngine+Alignment.swift:45-61 centres by extent only when no child declares a centre value, so every child falls back to floored line - guide; contract: STUI-1212 contract 1 (one centre guide), SwiftUI alignmentGuide; adjacent STUI-1212"
-    ) {
-      #expect(guided == [" A  B", ""], "\(guided)")
-    }
+    // STUI-1242: the identity guide names the default centre.
+    #expect(guided == [" A  B", ""], "\(guided)")
   }
 
   // w2fa026: a custom alignment whose default is the centre places like `.center`.
@@ -679,11 +674,8 @@ struct Wave2HuntFACentringTests {
         Text("A").frame(width: 3, height: 2)
         Text("B")
       }, "w2fa026")
-    w2faKnown(
-      "NEW-4: a custom VerticalAlignment whose default is d[.center] places the x3s049 sibling a row below the built-in .center; centresByExtent is limited to the built-in guide (LayoutEngine+Alignment.swift:56-61); contract: STUI-1212 contract 1, SwiftUI AlignmentID; adjacent STUI-1212"
-    ) {
-      #expect(custom == [" A  B", ""], "\(custom)")
-    }
+    // STUI-1242: a default computed from the centre keeps the centre's half cell.
+    #expect(custom == [" A  B", ""], "\(custom)")
   }
 
   // w2fa027: a Spacer child does not disturb centring by extent.
@@ -796,11 +788,8 @@ struct Wave2HuntFACentringTests {
     let lines = W2FA.frameLines(h.frame)
     try #require(h.frame.contains("x"), "\(h.frame)")
     let bottom = W2FA.position(of: "x", in: lines)?.column
-    w2faKnown(
-      "NEW-4: odd rows of a windowed LazyVStack move one column once a row with an explicit centre guide (equal to the default) enters the measured window; LayoutEngine+StackWindowedMeasurement.swift:220,250 ANDs centresByExtent over measured runs; contract: STUI-1212 contract 1; adjacent STUI-1212"
-    ) {
-      #expect(bottom == top, "\(h.frame)")
-    }
+    // STUI-1242: each row places against the measured line alone.
+    #expect(bottom == top, "\(h.frame)")
   }
 
   // w2fa032: nested frame and stack centring compose.

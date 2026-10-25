@@ -181,6 +181,56 @@ struct AdversarialSetCCaptureTests {
     #expect(h.frame.contains("0:100"))
   }
 
+  // STUI-1241 neighbor of STUI-1173: a live runtime that has been torn down
+  // leaves its graph gone, exactly like a released snapshot renderer, but its
+  // owners were invalidator-backed mount lifetimes. Their retired writes are
+  // still discarded, so a later runtime mounting the same view value starts
+  // from the authored seed.
+  @Test func retiredWriteFromReleasedRuntimeDoesNotSeedNewRuntime() throws {
+    let log = SetCCaptureLog()
+    defer { log.entries.removeAll() }
+    let leaf = SetCCaptureLeaf(log: log)
+    func mountOnce() throws {
+      let h = try StressRuntimeHarness(
+        rootIdentity: testIdentity("setC006-released"),
+        size: .init(width: 30, height: 4)
+      ) { leaf }
+      defer { h.shutdown() }
+      try #require(h.frame.contains("0:100"))
+    }
+    try mountOnce()
+    let retired = try #require(log.entries.last)
+    #if DEBUG
+      let capture = try #require(retired.capture)
+      try #require(
+        LiveViewGraphRegistry.graph(for: capture.graphScope) == nil,
+        "fixture must release the first runtime's graph")
+    #endif
+    do {
+      let savedTrace = SoundnessProbeConfiguration.isTraceEnabled
+      let savedSeed = SoundnessProbeConfiguration.stateSeedFallbackViolationCount
+      let savedMiss = SoundnessProbeConfiguration.stateCaptureMissViolationCount
+      SoundnessProbeConfiguration.isTraceEnabled = false
+      defer {
+        SoundnessProbeConfiguration.isTraceEnabled = savedTrace
+        SoundnessProbeConfiguration.stateSeedFallbackViolationCount = savedSeed
+        SoundnessProbeConfiguration.stateCaptureMissViolationCount = savedMiss
+      }
+      _ = ImperativeRuntimeIssueQueue.drain()
+      retired.write(7)
+      let issues = ImperativeRuntimeIssueQueue.drain()
+      #expect(issues.map(\.code) == ["state.imperativeSeedFallback"])
+      #expect(issues.first?.message.contains("discarded") == true)
+    }
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setC006-released"),
+      size: .init(width: 30, height: 4)
+    ) { leaf }
+    defer { h.shutdown() }
+    #expect(h.frame.contains("0:100"), "\(h.frame)")
+    #expect(try #require(log.entries.last).read() == 0)
+  }
+
   // Wave-2 neighbor of STUI-1173: a construction-time write on a copy that was
   // never graph-bound is the legitimate seed write, and the first mount
   // starts from it without a seed-fallback diagnostic (State.swift, the

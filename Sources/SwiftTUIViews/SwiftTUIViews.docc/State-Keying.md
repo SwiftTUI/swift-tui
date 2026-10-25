@@ -160,10 +160,14 @@ value, and each still gets its own independent storage — writes never leak
 between them through the view value. Only in a snapshot context with no
 running app (a plain renderer pass in a test or preview) can reusing one view
 instance carry imperative writes into a later snapshot of that same instance.
+That continuity holds after the renderer that drew the earlier snapshot is
+released, and after a later snapshot removed the view.
 
 A body-created closure whose owner has been removed reads the authored seed
 and reports `state.imperativeSeedFallback`, even if it wrote state before
-removal. A separately retained `Binding` retains its owner-specific fallback;
+removal. In a running app its later writes are discarded, so they never seed
+a new mount; in a snapshot context they reach the seed, as above. A
+separately retained `Binding` retains its owner-specific fallback;
 it cannot write into a new mount. Member bindings preserve their source and
 member path, so changing from one equal-valued member to another changes the
 binding's owner route.

@@ -28,17 +28,27 @@ package struct StateCaptureBinding: Sendable {
   /// `update(in:)` — so a capture-minted location names the identical
   /// path-qualified slot.
   package let path: StateSlotPath
+  /// Whether the owner's node had no invalidator when the bind pass ran: the
+  /// one-shot `DefaultRenderer` snapshot path, whose graph is not a mount
+  /// lifetime. Its writes mirror into the authored seed (`State`'s graph-slot
+  /// setter), and a write whose capture later misses keeps that mirror, since
+  /// a later snapshot of the same view value is its only reader. A capture of
+  /// an invalidator-backed owner that misses names a retired mount lifetime,
+  /// and its write is discarded (STUI-1173, STUI-1241).
+  package let isSnapshotOwner: Bool
 
   package init(
     owner: StateOwnerHandle,
     identity: Identity,
     graphScope: StateGraphScopeID,
-    path: StateSlotPath
+    path: StateSlotPath,
+    isSnapshotOwner: Bool = false
   ) {
     self.owner = owner
     self.identity = identity
     self.graphScope = graphScope
     self.path = path
+    self.isSnapshotOwner = isSnapshotOwner
   }
 }
 
@@ -54,7 +64,8 @@ package struct DynamicPropertyCaptureContext: Sendable {
     if let ownedSlot {
       copy.ownedSlot = StateCaptureBinding(
         owner: ownedSlot.owner, identity: ownedSlot.identity,
-        graphScope: ownedSlot.graphScope, path: ownedSlot.path.appending(index))
+        graphScope: ownedSlot.graphScope, path: ownedSlot.path.appending(index),
+        isSnapshotOwner: ownedSlot.isSnapshotOwner)
     }
     return copy
   }

@@ -65,7 +65,7 @@ extension LayoutEngine {
       contentMainLength: nextOffset,
       crossLeading: crossMetrics.leading,
       crossTrailing: crossMetrics.trailing,
-      crossCentresByExtent: crossMetrics.centresByExtent
+      crossLineIsHalfCell: crossMetrics.isHalfCell
     )
   }
 

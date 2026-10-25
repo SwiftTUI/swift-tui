@@ -222,16 +222,21 @@ package func bindingBodyDynamicPropertyCaptures<V: View>(
 /// derived from the exact authoring scope the caller's wrappers bind under.
 /// The refresh identity is the scope's authored view identity (the owner
 /// node's), not the local resolve identity, so a capture bound through a
-/// reinstalled ambient scope refreshes toward its true author.
+/// reinstalled ambient scope refreshes toward its true author. Whether the
+/// owner is a snapshot owner is the predicate the graph-slot setter's seed
+/// mirror applies at write time — the live owner node has no invalidator —
+/// recorded now, because a write after the snapshot graph is gone cannot ask.
 @MainActor
 private func rootCaptureBinding(
   for scope: AuthoringContext?, environment: EnvironmentValues
 ) -> DynamicPropertyCaptureContext {
   let slot = scope.flatMap { scope -> StateCaptureBinding? in
     guard let owner = stateStorageOwner(for: scope) else { return nil }
+    let ownerNode = LiveViewGraphRegistry.node(for: owner)
     return StateCaptureBinding(
       owner: owner, identity: scope.viewIdentity,
-      graphScope: graphScopeID(for: scope) ?? owner.graphScope, path: .root)
+      graphScope: graphScopeID(for: scope) ?? owner.graphScope, path: .root,
+      isSnapshotOwner: ownerNode != nil && ownerNode?.invalidator == nil)
   }
   return DynamicPropertyCaptureContext(
     ownedSlot: slot,

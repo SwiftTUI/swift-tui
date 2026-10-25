@@ -214,10 +214,10 @@ extension LayoutEngine {
     var summaries: [Int: (extent: Int, first: Spacing?, last: Spacing?)] = [:]
     var samples: [Identity: (sum: Int, count: Int)] = [:]
     var localOffsets: [Int: [Int]] = [:]
-    var crossLeading = 0
-    var crossTrailing = 0
-    // Children centre by extent only when every measured run does.
-    var crossCentresByExtent = true
+    // The cross line through every measured run. Each child places against
+    // this line alone, so a run measured later can move the line, as a wider
+    // row does, but cannot change how the other rows round.
+    var crossLine = AlignmentLine(leading: 0, trailing: 0, isHalfCell: false)
     for (index, run) in context.known {
       let spacings = run.children.map { effectiveSpacing(for: $0, passContext: passContext) }
       var cursor = 0
@@ -245,9 +245,7 @@ extension LayoutEngine {
         for: run.children, childMeasurements: run.measurements,
         axis: axis, horizontalAlignment: context.horizontalAlignment,
         verticalAlignment: context.verticalAlignment, passContext: passContext)
-      crossLeading = max(crossLeading, cross.leading)
-      crossTrailing = max(crossTrailing, cross.trailing)
-      crossCentresByExtent = crossCentresByExtent && cross.centresByExtent
+      crossLine = crossLine.merged(with: cross)
     }
     var oldLengths: [Identity: Int] = [:]
     if let old = context.retainedSnapshot {
@@ -305,8 +303,8 @@ extension LayoutEngine {
     var snapshot = LazyStackAllocationSnapshot(
       axis: axis, childMainOffsets: offsets,
       childMainLengths: lengths, childIdentities: context.identities, contentMainLength: cursor,
-      crossLeading: crossLeading, crossTrailing: crossTrailing,
-      crossCentresByExtent: crossCentresByExtent,
+      crossLeading: crossLine.leading, crossTrailing: crossLine.trailing,
+      crossLineIsHalfCell: crossLine.isHalfCell,
       measuredWindow: (context.known.keys.min() ?? 0)..<((context.known.keys.max() ?? -1) + 1),
       estimatedRowStride: max(
         1, (cursor + context.identities.count / 2) / max(1, context.identities.count)),

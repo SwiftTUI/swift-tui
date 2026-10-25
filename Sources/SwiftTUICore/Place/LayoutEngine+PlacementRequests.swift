@@ -86,13 +86,9 @@ extension LayoutEngine {
           bounds: CellRect(
             origin: CellPoint(
               x: bounds.origin.x
-                + alignmentMetrics.horizontal.offset(
-                  guideValue: childDimensions[alignment.horizontal],
-                  length: childMeasurement.measuredSize.width),
+                + alignmentMetrics.horizontal.offset(of: childDimensions, on: alignment.horizontal),
               y: bounds.origin.y
-                + alignmentMetrics.vertical.offset(
-                  guideValue: childDimensions[alignment.vertical],
-                  length: childMeasurement.measuredSize.height)
+                + alignmentMetrics.vertical.offset(of: childDimensions, on: alignment.vertical)
             ),
             size: childMeasurement.measuredSize
           )

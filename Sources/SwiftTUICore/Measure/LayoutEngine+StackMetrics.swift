@@ -75,14 +75,16 @@ extension LayoutEngine {
     switch axis {
     case .horizontal:
       return AlignmentLine(
-        leading: dimensions.map { $0[verticalAlignment] }.max() ?? 0,
-        trailing: dimensions.map { $0.height - $0[verticalAlignment] }.max() ?? 0,
-        centresByExtent: centresByExtent(dimensions, guide: verticalAlignment))
+        guides: dimensions.map {
+          let position = $0.halfCellPosition(of: verticalAlignment)
+          return (position.value, position.isHalfCell, $0.height)
+        })
     case .vertical:
       return AlignmentLine(
-        leading: dimensions.map { $0[horizontalAlignment] }.max() ?? 0,
-        trailing: dimensions.map { $0.width - $0[horizontalAlignment] }.max() ?? 0,
-        centresByExtent: centresByExtent(dimensions, guide: horizontalAlignment))
+        guides: dimensions.map {
+          let position = $0.halfCellPosition(of: horizontalAlignment)
+          return (position.value, position.isHalfCell, $0.width)
+        })
     }
   }
 }

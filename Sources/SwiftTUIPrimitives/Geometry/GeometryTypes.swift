@@ -379,70 +379,157 @@ extension VerticalAlignment: Hashable {
 public struct ViewDimensions: Sendable {
   public let width: Int
   public let height: Int
-  private let explicitHorizontalGuideProvider: @Sendable (HorizontalAlignment) -> Int?
-  private let explicitVerticalGuideProvider: @Sendable (VerticalAlignment) -> Int?
+  /// The evaluation mode of the built-in centre guides' defaults. Off, they
+  /// are `length / 2` truncated, the public values. On, they round up, so an
+  /// odd length's centre is the cell past its truncated value. Layout
+  /// evaluates a guide in both modes to find its exact position: a guide
+  /// computed from the centre default moves with it, an integer does not
+  /// (`halfCellPosition(of:)`). Explicit guides receive the
+  /// mode of the dimensions they are read from, so it reaches their bases.
+  private let roundsDefaultCentreUp: Bool
+  private let explicitHorizontalGuideProvider: @Sendable (HorizontalAlignment, Bool) -> Int?
+  private let explicitVerticalGuideProvider: @Sendable (VerticalAlignment, Bool) -> Int?
 
   public init(width: Int, height: Int) {
     self.init(
       width: width,
       height: height,
-      explicitHorizontalGuideProvider: { _ in nil },
-      explicitVerticalGuideProvider: { _ in nil }
+      roundsDefaultCentreUp: false,
+      explicitHorizontalGuideProvider: { _, _ in nil },
+      explicitVerticalGuideProvider: { _, _ in nil }
     )
   }
 
   public subscript(guide: HorizontalAlignment) -> Int {
-    explicitHorizontalGuideProvider(guide) ?? guide.defaultValue(in: self)
+    explicitHorizontalGuideProvider(guide, roundsDefaultCentreUp) ?? guide.defaultValue(in: self)
   }
 
   public subscript(guide: VerticalAlignment) -> Int {
-    explicitVerticalGuideProvider(guide) ?? guide.defaultValue(in: self)
+    explicitVerticalGuideProvider(guide, roundsDefaultCentreUp) ?? guide.defaultValue(in: self)
   }
 
   package func explicitValue(for guide: HorizontalAlignment) -> Int? {
-    explicitHorizontalGuideProvider(guide)
+    explicitHorizontalGuideProvider(guide, roundsDefaultCentreUp)
   }
 
   package func explicitValue(for guide: VerticalAlignment) -> Int? {
-    explicitVerticalGuideProvider(guide)
+    explicitVerticalGuideProvider(guide, roundsDefaultCentreUp)
   }
 
+  /// These dimensions with the built-in centre defaults evaluated in `roundsUp`
+  /// mode (see `roundsDefaultCentreUp`).
+  package func roundingDefaultCentreUp(_ roundsUp: Bool = true) -> Self {
+    Self(
+      width: width,
+      height: height,
+      roundsDefaultCentreUp: roundsUp,
+      explicitHorizontalGuideProvider: explicitHorizontalGuideProvider,
+      explicitVerticalGuideProvider: explicitVerticalGuideProvider
+    )
+  }
+
+  /// The guide's integer value and whether its exact position is half a cell
+  /// past it. A guide is half a cell past its value when it moves by exactly
+  /// one cell between the two centre-rounding modes: the built-in centre
+  /// default of an odd width, an identity guide on it, `d[.center] + k`, or a
+  /// custom alignment whose default reads the centre. Any other guide is an
+  /// integer.
+  ///
+  /// Only an explicit guide or a custom alignment's default is evaluated a
+  /// second time; the built-in defaults answer directly.
+  package func halfCellPosition(of guide: HorizontalAlignment) -> (value: Int, isHalfCell: Bool) {
+    if let value = explicitHorizontalGuideProvider(guide, false) {
+      return (value, explicitHorizontalGuideProvider(guide, true) == value + 1)
+    }
+    if guide == .center {
+      return (width / 2, width % 2 != 0)
+    }
+    let value = guide.defaultValue(in: roundingDefaultCentreUp(false))
+    if guide == .leading || guide == .trailing {
+      return (value, false)
+    }
+    return (value, guide.defaultValue(in: roundingDefaultCentreUp()) == value + 1)
+  }
+
+  /// The vertical counterpart of `halfCellPosition(of:)`.
+  package func halfCellPosition(of guide: VerticalAlignment) -> (value: Int, isHalfCell: Bool) {
+    if let value = explicitVerticalGuideProvider(guide, false) {
+      return (value, explicitVerticalGuideProvider(guide, true) == value + 1)
+    }
+    if guide == .center {
+      return (height / 2, height % 2 != 0)
+    }
+    let value = guide.defaultValue(in: roundingDefaultCentreUp(false))
+    if guide == .top || guide == .bottom || guide == .firstTextBaseline
+      || guide == .lastTextBaseline
+    {
+      return (value, false)
+    }
+    return (value, guide.defaultValue(in: roundingDefaultCentreUp()) == value + 1)
+  }
+
+  /// Overrides guides with an integer provider. It does not depend on the
+  /// centre-rounding mode; guides it does not answer keep theirs.
   package func overridingHorizontalGuides(
     with provider: @escaping @Sendable (HorizontalAlignment) -> Int?
+  ) -> Self {
+    overridingHorizontalGuides(modeAware: { alignment, _ in provider(alignment) })
+  }
+
+  package func overridingVerticalGuides(
+    with provider: @escaping @Sendable (VerticalAlignment) -> Int?
+  ) -> Self {
+    overridingVerticalGuides(modeAware: { alignment, _ in provider(alignment) })
+  }
+
+  /// Overrides guides with a provider that receives the centre-rounding mode
+  /// of the dimensions it is read from, for guides computed from other
+  /// dimensions (modifier guides, wrapper propagation).
+  package func overridingHorizontalGuides(
+    modeAware provider: @escaping @Sendable (HorizontalAlignment, Bool) -> Int?
   ) -> Self {
     let currentHorizontalProvider = explicitHorizontalGuideProvider
     return Self(
       width: width,
       height: height,
-      explicitHorizontalGuideProvider: { alignment in
-        provider(alignment) ?? currentHorizontalProvider(alignment)
+      roundsDefaultCentreUp: roundsDefaultCentreUp,
+      explicitHorizontalGuideProvider: { alignment, roundsUp in
+        provider(alignment, roundsUp) ?? currentHorizontalProvider(alignment, roundsUp)
       },
       explicitVerticalGuideProvider: explicitVerticalGuideProvider
     )
   }
 
   package func overridingVerticalGuides(
-    with provider: @escaping @Sendable (VerticalAlignment) -> Int?
+    modeAware provider: @escaping @Sendable (VerticalAlignment, Bool) -> Int?
   ) -> Self {
     let currentVerticalProvider = explicitVerticalGuideProvider
     return Self(
       width: width,
       height: height,
+      roundsDefaultCentreUp: roundsDefaultCentreUp,
       explicitHorizontalGuideProvider: explicitHorizontalGuideProvider,
-      explicitVerticalGuideProvider: { alignment in
-        provider(alignment) ?? currentVerticalProvider(alignment)
+      explicitVerticalGuideProvider: { alignment, roundsUp in
+        provider(alignment, roundsUp) ?? currentVerticalProvider(alignment, roundsUp)
       }
     )
+  }
+
+  /// The built-in centre default along a length in the current mode.
+  fileprivate func defaultCentre(of length: Int) -> Int {
+    roundsDefaultCentreUp ? (length + 1) / 2 : length / 2
   }
 
   fileprivate init(
     width: Int,
     height: Int,
-    explicitHorizontalGuideProvider: @escaping @Sendable (HorizontalAlignment) -> Int?,
-    explicitVerticalGuideProvider: @escaping @Sendable (VerticalAlignment) -> Int?
+    roundsDefaultCentreUp: Bool,
+    explicitHorizontalGuideProvider: @escaping @Sendable (HorizontalAlignment, Bool) -> Int?,
+    explicitVerticalGuideProvider: @escaping @Sendable (VerticalAlignment, Bool) -> Int?
   ) {
     self.width = width
     self.height = height
+    self.roundsDefaultCentreUp = roundsDefaultCentreUp
     self.explicitHorizontalGuideProvider = explicitHorizontalGuideProvider
     self.explicitVerticalGuideProvider = explicitVerticalGuideProvider
   }
@@ -489,7 +576,7 @@ extension HorizontalAlignment {
   public static let center = Self(
     key: ObjectIdentifier(HorizontalCenterAlignmentID.self),
     debugName: "center",
-    defaultValueProvider: { context in context.width / 2 }
+    defaultValueProvider: { context in context.defaultCentre(of: context.width) }
   )
   public static let trailing = Self(
     key: ObjectIdentifier(TrailingAlignmentID.self),
@@ -507,7 +594,7 @@ extension VerticalAlignment {
   public static let center = Self(
     key: ObjectIdentifier(VerticalCenterAlignmentID.self),
     debugName: "center",
-    defaultValueProvider: { context in context.height / 2 }
+    defaultValueProvider: { context in context.defaultCentre(of: context.height) }
   )
   public static let bottom = Self(
     key: ObjectIdentifier(BottomAlignmentID.self),

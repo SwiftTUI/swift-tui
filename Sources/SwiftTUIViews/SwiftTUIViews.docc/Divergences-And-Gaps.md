@@ -398,7 +398,10 @@ are omitted even when SwiftUI exposes a corresponding API.
 - **Lazy stacks estimate unseen content.** *Provisional.* Under a scroll viewport,
   `LazyVStack` and `LazyHStack` compose static content, groups, conditionals and
   multiple `ForEach` sources. Default spacing negotiates exact gaps between
-  realized neighboring fragments; unseen extents remain estimates. Logical
+  realized neighboring fragments; unseen extents remain estimates. The
+  cross-axis alignment line comes from measured rows: an unseen row with a
+  larger guide or cross extent moves it once measured, while each row places
+  against that line alone. Logical
   elements can contribute zero or multiple fragments. A surviving visible
   fragment keeps its viewport offset through membership and estimate changes,
   subject to endpoint clamping; explicit scroll commands take precedence.

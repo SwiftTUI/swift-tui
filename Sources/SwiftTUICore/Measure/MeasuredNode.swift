@@ -207,13 +207,13 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
   package var contentMainLength: Int
   package var crossLeading: Int
   package var crossTrailing: Int
-  /// Whether the measured children centre by extent on the cross axis
-  /// (``AlignmentLine/centresByExtent``).
-  package var crossCentresByExtent: Bool
+  /// Whether the measured cross-axis line sits half a cell past
+  /// `crossLeading` (``AlignmentLine/isHalfCell``).
+  package var crossLineIsHalfCell: Bool
   /// The cross-axis alignment line the allocation measured.
   package var crossLine: AlignmentLine {
     AlignmentLine(
-      leading: crossLeading, trailing: crossTrailing, centresByExtent: crossCentresByExtent)
+      leading: crossLeading, trailing: crossTrailing, isHalfCell: crossLineIsHalfCell)
   }
   /// The envelope of measured logical elements when this snapshot was built under
   /// a measure-viewport hint (proposal 2026-07-13-002 Stage 2.2); `nil`
@@ -248,7 +248,7 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     contentMainLength: Int = 0,
     crossLeading: Int = 0,
     crossTrailing: Int = 0,
-    crossCentresByExtent: Bool = false,
+    crossLineIsHalfCell: Bool = false,
     measuredWindow: Range<Int>? = nil,
     estimatedRowStride: Int? = nil,
     windowHint: MeasureViewportHint? = nil
@@ -260,7 +260,7 @@ package struct LazyStackAllocationSnapshot: Equatable, Sendable {
     self.contentMainLength = contentMainLength
     self.crossLeading = crossLeading
     self.crossTrailing = crossTrailing
-    self.crossCentresByExtent = crossCentresByExtent
+    self.crossLineIsHalfCell = crossLineIsHalfCell
     self.measuredWindow = measuredWindow
     self.estimatedRowStride = estimatedRowStride
     self.windowHint = windowHint
