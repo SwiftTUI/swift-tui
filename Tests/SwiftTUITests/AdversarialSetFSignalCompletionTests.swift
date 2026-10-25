@@ -27,11 +27,10 @@ struct AdversarialSetFSignalCompletionTests {
         : [["A", "B", "end"], ["A", "B", "C", "end"]]
       let observed = trace.withLock { $0 }
       print("F4_PROBE setF0\(id) \(observed)")
-      withKnownIssue(
-        "setF0\(id): a buffered signal is delivered after the end notification (observed \(observed)); InProcessSignalReader.installDirectHandler flushes a local copy of the pending signals outside the lock and never re-checks isFinished between deliveries, so a handler that calls finish() still receives the remaining buffered signals; contract: RunLoopSessionTypes.swift:148-190 — the direct end notification occurs once and no value callback may follow it; STUI-1192; adjacent STUI-1030 (same trace fixed in InjectedTerminalInputReader)"
-      ) {
-        #expect(allowed.contains(observed))
-      }
+      // STUI-1192: the direct end notification occurs once and no value
+      // callback may follow it (RunLoopSessionTypes.swift, installDirectHandler).
+      // A drain or a discard of the remaining buffered signals both satisfy it.
+      #expect(allowed.contains(observed), "setF0\(id) observed \(observed)")
     case 63:
       reader.send("A")
       reader.send("B")
@@ -44,11 +43,10 @@ struct AdversarialSetFSignalCompletionTests {
       }
       let observed = trace.withLock { $0 }
       print("F4_PROBE setF063 \(observed)")
-      withKnownIssue(
-        "setF063: a buffered signal is delivered after the end notification a reentrant send triggered (observed \(observed)); InProcessSignalReader.installDirectHandler flushes a local copy of the pending signals outside the lock and never re-checks isFinished between deliveries, so a reentrant finish() during the flush still leaves the remaining buffered signal delivered; contract: RunLoopSessionTypes.swift:148-190 — the direct end notification occurs once and no value callback may follow it; STUI-1192; adjacent STUI-1030 (same trace fixed in InjectedTerminalInputReader)"
-      ) {
-        #expect([["A", "N", "end"], ["A", "N", "B", "end"]].contains(observed))
-      }
+      // STUI-1192: an end reached through a reentrant send is still terminal.
+      #expect(
+        [["A", "N", "end"], ["A", "N", "B", "end"]].contains(observed),
+        "setF063 observed \(observed)")
     case 64:
       reader.send("A")
       reader.send("B")

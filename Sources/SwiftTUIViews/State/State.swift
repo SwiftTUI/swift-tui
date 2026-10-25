@@ -346,22 +346,32 @@ public struct State<Value> {
     nonmutating set {
       if let location = activeLocation() {
         location.setValue(newValue)
-      } else {
-        // Pre-mount seeding is the legitimate use of this arm. A write on a
-        // box that once had a live slot lands only in the authored seed —
-        // the silent-no-op-write half of the corruption class — so it is as
-        // loud as the read-side fallback (plan 2026-08-20-001 Stage 5).
-        if box.hasEverBeenGraphBound, ViewNodeContext.current == nil {
-          reportImperativeSeedFallback(
-            slotOrdinal: box.currentOrdinal,
-            declarationFileID: box.declarationFileID,
-            reason:
-              "no live state owner could be resolved from the dispatch context; "
-              + "the write reached only the authored seed"
-          )
-        }
-        box.updateSeedValue(newValue)
+        return
       }
+      // A carried capture that missed names an owner whose committed removal
+      // left no occupant. The write belongs to that retired lifetime, so it is
+      // discarded: the box seed is shared by every copy of the authored value,
+      // and a later mount's fresh slot seeds from it (STUI-1173).
+      let discardsRetiredWrite = resolvesThroughCapture
+      // Pre-mount seeding is the legitimate use of the seed arm. A write on a
+      // box that once had a live slot does not reach that slot — the
+      // silent-no-op-write half of the corruption class — so it is as loud as
+      // the read-side fallback (plan 2026-08-20-001 Stage 5).
+      if box.hasEverBeenGraphBound, ViewNodeContext.current == nil {
+        reportImperativeSeedFallback(
+          slotOrdinal: box.currentOrdinal,
+          declarationFileID: box.declarationFileID,
+          reason:
+            "no live state owner could be resolved from the dispatch context; "
+            + (discardsRetiredWrite
+              ? "the write to the removed owner was discarded"
+              : "the write reached only the authored seed")
+        )
+      }
+      guard !discardsRetiredWrite else {
+        return
+      }
+      box.updateSeedValue(newValue)
     }
   }
 
@@ -392,8 +402,18 @@ public struct State<Value> {
     }
   #endif
 
+  /// In-body accesses resolve through the ambient resolve scope; every other
+  /// access resolves through the carried capture when this copy has one.
+  private var resolvesInBodyScope: Bool {
+    ViewNodeContext.current != nil && HandlerInvocationScope.current == nil
+  }
+
+  private var resolvesThroughCapture: Bool {
+    capture != nil && !resolvesInBodyScope
+  }
+
   private func activeLocation(retainingRemovedOwner: Bool = false) -> DynamicStateLocation<Value>? {
-    if ViewNodeContext.current != nil, HandlerInvocationScope.current == nil {
+    if resolvesInBodyScope {
       guard let context = AuthoringContextStorage.current,
         let storageOwner = stateStorageOwner(for: context)
       else {
@@ -425,7 +445,7 @@ public struct State<Value> {
     // any ambient dispatch context — so it serves first. Only bind-pass
     // evaluations produce `.bound`, which keeps this rung inert whenever the
     // capture-binding gate is off.
-    if capture != nil {
+    if resolvesThroughCapture {
       // A captured owner is authoritative even after removal. Falling through
       // would let an unrelated dispatch context lend this closure its state.
       return captureLocation(retainingRemovedOwner: retainingRemovedOwner)

@@ -217,6 +217,38 @@ struct StateCaptureBindingTests {
     }
   }
 
+  @Test("a removed captured owner's write is discarded instead of seeding later mounts")
+  func removedCaptureWriteNeverReachesTheSeed() throws {
+    try withCaptureBinding(enabled: false) {
+      let graph = ViewGraph()
+      defer { withExtendedLifetime(graph) {} }
+      graph.beginFrame()
+      let (deadOwner, _) = try makeDeadOwner()
+
+      // Committed removal in a live scope: no node occupies the identity. The
+      // write has no owner and must not reach the box-global seed that every
+      // later mount of this authored value starts from (STUI-1173).
+      var removed = State(wrappedValue: "seed")
+      removed.bindCapture(
+        binding(
+          owner: deadOwner,
+          identity: testIdentity("NeverResolvedWrite"),
+          scope: graph.stateGraphScopeID
+        )
+      )
+      removed.wrappedValue = "retired"
+      #expect(removed.wrappedValue == "seed")
+      #if DEBUG
+        #expect(StateCaptureCensus.count(of: .captureMiss) == 2)
+      #endif
+
+      // A copy that was never bound keeps the construction-time seed write.
+      let unbound = State(wrappedValue: "seed")
+      unbound.wrappedValue = "pre-mount"
+      #expect(unbound.wrappedValue == "pre-mount")
+    }
+  }
+
   @Test("the bind plan builder traps on a class container")
   func classContainerTrapsOnBindPlanBuild() async {
     // The capture-bind pass's half of the value-type invariant's runtime

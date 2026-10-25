@@ -1,8 +1,9 @@
 // Chain-collapse pruning, extracted from ViewGraph.swift (F115): the
 // finalize-barrier reclaim of nodes stranded when a transparent chain
 // collapse absorbs an interior mint's output (see `reindexIdentity`'s
-// shadowing record). Registration/task-slot re-homing to the absorber
-// happens here before the reclaim so the F43 start-skip cannot recur.
+// shadowing record). Registration/task-slot and queued change-event
+// re-homing to the absorber happens here before the reclaim so the F43
+// start-skip and the lost initial change event (STUI-1174) cannot recur.
 
 extension ViewGraph {
   /// Reclaims nodes stranded by a transparent chain collapse this frame. A
@@ -86,6 +87,7 @@ extension ViewGraph {
       // dropped and its committed tasks never start ("no task registration at
       // commit", the F43 start-skip).
       adoptAbsorbedRuntimeRegistrations(from: node)
+      adoptAbsorbedPendingChangeHandlers(from: node)
       adoptAbsorbedDetachedHostedRoots(from: node)
       removeSubtree(
         rootedAt: node,
@@ -142,6 +144,27 @@ extension ViewGraph {
       }
       recordDetachedHostedNode(targetNodeID, hostedByNodeID: hostNodeID)
     }
+  }
+
+  /// Re-homes the change events the interior queued this frame onto the
+  /// absorber. A cold-resolve mint is the node `onChange` finds for its
+  /// element, so an `initial: true` event (or a first change) is queued there;
+  /// the lifecycle plan collects pending events from live nodes after this
+  /// barrier, so an event left on the reclaimed interior is never planned and
+  /// the initial action of a view inside a conditional branch is silently lost
+  /// (STUI-1174). Only queues prepared for the current frame move — a node's
+  /// queue is reset at frame preparation, so an older queue is stale.
+  func adoptAbsorbedPendingChangeHandlers(from node: ViewNode) {
+    guard !node.pendingChangeHandlerIDs.isEmpty,
+      node.isPrepared(for: currentFrameID),
+      let absorberID = nodeIDByIdentity[node.identity],
+      absorberID != node.viewNodeID,
+      let absorber = nodesByNodeID[absorberID],
+      absorber.isPrepared(for: currentFrameID)
+    else {
+      return
+    }
+    absorber.adoptPendingChangeHandlers(from: node)
   }
 
   func adoptAbsorbedRuntimeRegistrations(from node: ViewNode) {

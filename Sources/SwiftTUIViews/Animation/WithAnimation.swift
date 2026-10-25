@@ -225,7 +225,9 @@ private func withTransactionRequestScope<Result>(
 /// never changes, which is indistinguishable from the write not
 /// happening. The snapshot stores identity instead of the `ViewNode`.
 /// If a completion fires after its owner is gone, it does not recover a location.
-/// Thus, it is inert and does not restore a dead node.
+/// Thus, it is inert and does not restore a dead node. A write from a
+/// body-created closure whose owner was removed is discarded, not seeded, so
+/// it never reaches a later mount.
 @MainActor
 @discardableResult
 public func withAnimation<Result>(

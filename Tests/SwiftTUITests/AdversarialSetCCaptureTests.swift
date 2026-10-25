@@ -144,12 +144,63 @@ struct AdversarialSetCCaptureTests {
     log.visible = true
     _ = try h.renderAfterExternalMutation()
     let successor = try #require(log.entries.last)
-    setCKnown("STUI-1173: retired callback changes the authored seed") {
-      #expect(successor.read() == 0)
+    // STUI-1173: the retired write is discarded; it never reaches the
+    // box-global seed the remount's slot starts from.
+    #expect(successor.read() == 0)
+    #expect(h.frame.contains("0:100"))
+  }
+
+  // Wave-2 neighbor of STUI-1173: a separately retained projected Binding keeps
+  // its owner-specific fallback after removal, and still cannot write into a
+  // new mount (State-Keying.md, "Live runtimes versus snapshots").
+  @Test func retiredBindingWriteDoesNotSeedRemount() throws {
+    let log = SetCCaptureLog()
+    defer { log.entries.removeAll() }
+    let leaf = SetCCaptureLeaf(log: log)
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setC006-binding"),
+      size: .init(width: 30, height: 4)
+    ) {
+      if log.visible { leaf } else { Text("absent") }
     }
-    setCKnown("STUI-1173: successor renders the retired callback's value") {
-      #expect(h.frame.contains("0:100"))
-    }
+    defer { h.shutdown() }
+    let retired = try #require(log.entries.first)
+    retired.binding.wrappedValue = 5
+    _ = try h.render()
+    log.visible = false
+    _ = try h.renderAfterExternalMutation()
+    try #require(h.frame.contains("absent"))
+    retired.binding.wrappedValue = 77
+    #expect(retired.binding.wrappedValue == 77)
+    #expect(
+      !ImperativeRuntimeIssueQueue.drain().contains { $0.code == "state.imperativeSeedFallback" })
+    log.visible = true
+    _ = try h.renderAfterExternalMutation()
+    let successor = try #require(log.entries.last)
+    #expect(successor.read() == 0)
+    #expect(h.frame.contains("0:100"))
+  }
+
+  // Wave-2 neighbor of STUI-1173: a construction-time write on a copy that was
+  // never graph-bound is the legitimate seed write, and the first mount
+  // starts from it without a seed-fallback diagnostic (State.swift, the
+  // wrapper's ownership contract).
+  @Test func preMountWriteSeedsFirstMount() throws {
+    let log = SetCCaptureLog()
+    defer { log.entries.removeAll() }
+    let leaf = SetCCaptureLeaf(log: log)
+    _ = ImperativeRuntimeIssueQueue.drain()
+    leaf.preset(7)
+    #expect(
+      !ImperativeRuntimeIssueQueue.drain().contains { $0.code == "state.imperativeSeedFallback" })
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("setC006-premount"),
+      size: .init(width: 30, height: 4)
+    ) { leaf }
+    defer { h.shutdown() }
+    let mounted = try #require(log.entries.last)
+    #expect(mounted.read() == 7)
+    #expect(h.frame.contains("7:100"))
   }
 
   @Test(arguments: [7, 8])
@@ -218,4 +269,7 @@ private struct SetCCaptureLeaf: View {
         capture: capture))
     return Text("\(value):\(sibling)")
   }
+
+  /// A write through an app-held copy before it is ever mounted.
+  func preset(_ newValue: Int) { value = newValue }
 }

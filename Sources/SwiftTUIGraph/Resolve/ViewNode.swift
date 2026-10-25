@@ -1091,6 +1091,19 @@ package final class ViewNode {
     pendingChangeHandlerIDs.append(handlerID)
   }
 
+  /// Takes over the change events a reclaimed chain-collapse interior queued
+  /// for the element this node absorbed (see
+  /// `ViewGraph.adoptAbsorbedPendingChangeHandlers`). The interior's events
+  /// were queued while its own content resolved, before this absorber's outer
+  /// modifiers, so they go first; duplicates keep their earlier position.
+  package func adoptPendingChangeHandlers(from departing: ViewNode) {
+    var adopted = departing.pendingChangeHandlerIDs
+    for handlerID in pendingChangeHandlerIDs where !adopted.contains(handlerID) {
+      adopted.append(handlerID)
+    }
+    pendingChangeHandlerIDs = adopted
+  }
+
   package func apply(
     resolved: ResolvedNode,
     children: [ViewNode]

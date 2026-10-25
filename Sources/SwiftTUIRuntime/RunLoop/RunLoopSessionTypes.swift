@@ -80,6 +80,9 @@ public final class InProcessSignalReader: SignalReading, Sendable {
     var continuationGeneration: UInt64 = 0
     var directHandler: (@Sendable (String) -> Void)?
     var directFinishHandler: (@Sendable () -> Void)?
+    /// Advances on every install and clear, so a pending flush can tell that
+    /// the handler it started for is no longer the installed one.
+    var directHandlerGeneration: UInt64 = 0
     // Hosted transports can publish their initial resize while the run loop
     // is still installing its event streams. Preserve that wake instead of
     // leaving the first frame at the fallback grid until unrelated input.
@@ -164,33 +167,50 @@ public final class InProcessSignalReader: SignalReading, Sendable {
   /// reports the reader's end to `onFinish` exactly once: from ``finish()``,
   /// or right away when the reader has already finished. This is the direct
   /// path's counterpart of the stream finishing. ``clearDirectHandler()``
-  /// detaches both.
+  /// detaches both. Signals buffered before the install reach `handler`
+  /// first, and their flush stops once the handler is finished, cleared or
+  /// replaced, so no buffered signal follows the end notification.
   package func installDirectHandler(
     _ handler: @escaping @Sendable (String) -> Void,
     onFinish: @escaping @Sendable () -> Void
   ) {
-    // Flush outside the lock for the same re-entrancy reason as send(): a
-    // buffered signal's synchronous handling can send follow-up signals.
-    let (pendingSignals, isFinished) = state.withLock { state -> ([String], Bool) in
+    let generation = state.withLock { state -> UInt64? in
       guard !state.isFinished else {
-        return ([], true)
+        return nil
       }
+      state.directHandlerGeneration &+= 1
       state.directHandler = handler
       state.directFinishHandler = onFinish
-      let pending = state.pendingSignals
-      state.pendingSignals.removeAll(keepingCapacity: true)
-      return (pending, false)
+      return state.directHandlerGeneration
     }
-    for signalName in pendingSignals {
-      handler(signalName)
-    }
-    if isFinished {
+    guard let generation else {
       onFinish()
+      return
+    }
+    // Flush outside the lock for the same re-entrancy reason as send(): a
+    // buffered signal's synchronous handling can send follow-up signals, or
+    // finish, clear or replace this handler. The buffer stays in reader state
+    // and each signal is taken under the lock, so the flush stops as soon as
+    // this install is no longer current: finish() discards the remainder
+    // before reporting end, so no buffered signal follows the end
+    // notification; a clear keeps the remainder for the next consumer; a
+    // replacement's own install flushes it (the STUI-1054 ordering shape).
+    while let signalName = state.withLock({ state -> String? in
+      guard !state.isFinished,
+        state.directHandlerGeneration == generation,
+        !state.pendingSignals.isEmpty
+      else {
+        return nil
+      }
+      return state.pendingSignals.removeFirst()
+    }) {
+      handler(signalName)
     }
   }
 
   package func clearDirectHandler() {
     state.withLock { state in
+      state.directHandlerGeneration &+= 1
       state.directHandler = nil
       state.directFinishHandler = nil
     }
