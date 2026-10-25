@@ -299,6 +299,12 @@ package enum AnimationPropertyValueApplication {
       payload.geometry = geometry
       node.drawPayload = .shape(payload)
 
+    case .clipShapePaths:
+      guard let paths = value.unwrap(as: ClipMaskPaths.self) else { return }
+      var drawMetadata = node.drawMetadata
+      drawMetadata.shapeClips = paths.applied(to: drawMetadata.shapeClips)
+      node.drawMetadata = drawMetadata
+
     case .shapeFillStyle:
       guard let style = unwrapShapeStyle(value) else { return }
       guard case .shape(let shapePayload) = node.drawPayload,

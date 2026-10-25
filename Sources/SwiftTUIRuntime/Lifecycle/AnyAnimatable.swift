@@ -142,6 +142,10 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
     if let source = value as? Path, let target = other.value as? Path {
       return AnyAnimatable(source.interpolated(to: target, progress: t))
     }
+    // Clip masks morph path by path with the same rule (STUI-1218).
+    if let source = value as? ClipMaskPaths, let target = other.value as? ClipMaskPaths {
+      return AnyAnimatable(source.interpolated(to: target, progress: t))
+    }
 
     // Special case: ``TileStyle`` is variant-based (color vs
     // linear vs radial vs tile pattern).  Cross-variant values have no

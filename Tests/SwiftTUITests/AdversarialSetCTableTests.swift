@@ -227,6 +227,63 @@ struct AdversarialSetCTableTests {
     #expect(h.frame.contains("row12"), "\(h.frame)")
   }
 
+  // Wave 3 (STUI-1230): source-backed automatic columns keep a monotonic
+  // high-water width as rows are realized, in every hosting shape
+  // (Collections.md:135-138, Divergences-And-Gaps.md:455-458).
+  @Test(arguments: [SetCTableHosting.scrollView, .unhosted, .scrollViewStack])
+  func wave3b01LaterWideRowWidensItsColumn(hosting: SetCTableHosting) throws {
+    let h = try SetCTable.wideRowHarness("wave3b01-\(hosting)", hosting: hosting)
+    defer { h.shutdown() }
+    #expect(!h.frame.contains("row20"), "\(h.frame)")
+    try #require(try SetCTable.wheel(h, until: { $0.contains("row21") }), "\(h.frame)")
+    #expect(h.frame.contains("row20x"), "\(hosting): \(h.frame)")
+    #expect(!h.frame.contains("row2…"), "\(hosting): \(h.frame)")
+    #expect(SetCTable.tableWidths(h.frame).count == 1, "\(hosting): \(h.frame)")
+    let rerendered = try h.render()
+    #expect(rerendered.contains("row20x"), "\(hosting) after re-render: \(rerendered)")
+  }
+
+  @Test func wave3b02NarrowerLaterRowsNeverShrinkAColumn() throws {
+    var rows = (0..<30).map { SetCTableRow(id: $0 < 10 ? "row0\($0)" : "row\($0)") }
+    rows[0] = SetCTableRow(id: "row00-wide")
+    let h = try SetCTable.harness("wave3b02", rows: rows, hosting: .scrollView)
+    defer { h.shutdown() }
+    let initial = SetCTable.tableWidths(h.frame)
+    try #require(initial.count == 1 && h.frame.contains("row00-wide"), "\(h.frame)")
+    try #require(try SetCTable.wheel(h, until: { $0.contains("row24") }), "\(h.frame)")
+    #expect(!h.frame.contains("row00"), "\(h.frame)")
+    #expect(SetCTable.tableWidths(h.frame) == initial, "\(h.frame)")
+    try #require(
+      try SetCTable.wheel(h, deltaY: -1, until: { $0.contains("row00") }), "\(h.frame)")
+    #expect(SetCTable.tableWidths(h.frame) == initial, "\(h.frame)")
+  }
+
+  @Test func wave3b03FixedColumnWidthIgnoresLaterWideRow() throws {
+    var rows = (0..<30).map { SetCTableRow(id: $0 < 10 ? "row0\($0)" : "row\($0)") }
+    rows[20] = SetCTableRow(id: "row20x")
+    let h = try SetCTable.harness(
+      "wave3b03", rows: rows, hosting: .scrollView, column: TableColumn("Name", width: 5))
+    defer { h.shutdown() }
+    let initial = SetCTable.tableWidths(h.frame)
+    try #require(try SetCTable.wheel(h, until: { $0.contains("row21") }), "\(h.frame)")
+    #expect(h.frame.contains("row2…") && !h.frame.contains("row20x"), "\(h.frame)")
+    #expect(SetCTable.tableWidths(h.frame) == initial, "\(h.frame)")
+  }
+
+  @Test func wave3b04WideRowAndHiddenSeparatorsAgree() throws {
+    var rows = (0..<30).map { SetCTableRow(id: $0 < 10 ? "row0\($0)" : "row\($0)") }
+    rows[20] = SetCTableRow(id: "row20x")
+    let h = try SetCTable.harness(
+      "wave3b04", rows: rows, hosting: .scrollView, hidesSeparators: true)
+    defer { h.shutdown() }
+    try #require(try SetCTable.wheel(h, until: { $0.contains("row22") }), "\(h.frame)")
+    let visible = SetCTable.contentRows(
+      h.frame.split(separator: "\n").map(String.init), rows.map(\.id))
+    #expect(visible.count >= 6, "\(h.frame)")
+    #expect(zip(visible.dropFirst(), visible).allSatisfy { $0 - $1 == 1 }, "\(h.frame)")
+    #expect(h.frame.contains("row20x"), "\(h.frame)")
+  }
+
   @Test func setC129NoColumnsRendersNothing() {
     let lines = SetCTable.lines(
       Table(columns: []) {
@@ -252,6 +309,51 @@ private enum SetCSeparatorHiding {
   case none, row, cell
 }
 
+enum SetCTableHosting: Sendable, CustomStringConvertible {
+  case unhosted, scrollView, scrollViewStack
+  var description: String {
+    switch self {
+    case .unhosted: "unhosted"
+    case .scrollView: "scrollView"
+    case .scrollViewStack: "scrollViewStack"
+    }
+  }
+}
+
+private struct SetCTableHost: View {
+  let rows: [SetCTableRow]
+  let selection: Binding<String?>
+  let column: TableColumn
+  let hosting: SetCTableHosting
+  let hidesSeparators: Bool
+
+  var body: some View {
+    switch hosting {
+    case .unhosted:
+      table.scrollIndicators(.hidden)
+    case .scrollView:
+      ScrollView { table }.scrollIndicators(.hidden)
+    case .scrollViewStack:
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Header")
+          table
+        }
+      }.scrollIndicators(.hidden)
+    }
+  }
+
+  private var table: some View {
+    Table(rows, selection: selection, columns: [column]) { row in
+      if hidesSeparators {
+        Text(row.id).listRowSeparator(.hidden)
+      } else {
+        Text(row.id)
+      }
+    }
+  }
+}
+
 @MainActor
 private enum SetCTable {
   static func lines<V: View>(_ view: V, name: String, width: Int = 24, height: Int = 12)
@@ -261,6 +363,53 @@ private enum SetCTable {
       view, context: .init(identity: testIdentity("SetCTable", name)),
       proposal: .init(width: width, height: height)
     ).rasterSurface.lines
+  }
+
+  /// Thirty five-character rows with one six-character row at index 20.
+  static func wideRowHarness(_ name: String, hosting: SetCTableHosting) throws
+    -> StressRuntimeHarness<SetCTableHost>
+  {
+    var rows = (0..<30).map { SetCTableRow(id: $0 < 10 ? "row0\($0)" : "row\($0)") }
+    rows[20] = SetCTableRow(id: "row20x")
+    return try harness(name, rows: rows, hosting: hosting)
+  }
+
+  static func harness(
+    _ name: String,
+    rows: [SetCTableRow],
+    hosting: SetCTableHosting,
+    column: TableColumn = TableColumn("Name"),
+    hidesSeparators: Bool = false
+  ) throws -> StressRuntimeHarness<SetCTableHost> {
+    let box = SetCTableBox()
+    return try StressRuntimeHarness(
+      rootIdentity: testIdentity(name),
+      size: .init(width: 24, height: 10)
+    ) {
+      SetCTableHost(
+        rows: rows, selection: box.selection, column: column, hosting: hosting,
+        hidesSeparators: hidesSeparators)
+    }
+  }
+
+  /// Scrolls one wheel notch at a time over the table body (cell 2, 5 lies
+  /// inside the table in every hosting shape) until `done` holds for the
+  /// frame; `false` when it never does within `limit` notches.
+  static func wheel<Content: View>(
+    _ h: StressRuntimeHarness<Content>, deltaY: Int = 1, limit: Int = 48,
+    until done: (String) -> Bool
+  ) throws -> Bool {
+    let point = Point(x: 2, y: 5)
+    for _ in 0..<limit {
+      if done(h.frame) { return true }
+      _ = try h.scrollPointer(at: point, deltaY: deltaY)
+    }
+    return done(h.frame)
+  }
+
+  /// Distinct widths of the table's own lines (those carrying a vertical rule).
+  static func tableWidths(_ frame: String) -> Set<Int> {
+    widths(frame.split(separator: "\n").map(String.init).filter { $0.contains("│") })
   }
 
   @ViewBuilder

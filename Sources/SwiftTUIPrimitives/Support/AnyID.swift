@@ -29,9 +29,30 @@ public struct AnyID: Hashable, Sendable {
   }
 }
 
+/// An identity derived from another identity, such as a binding's member
+/// projection of its source. ``AnyID/derivationRoot`` peels these layers.
+package protocol AnyIDDerivation: Hashable, Sendable {
+  /// The identity this one was derived from.
+  var derivationBase: AnyID { get }
+}
+
+extension AnyID {
+  /// The identity this one derives from through every ``AnyIDDerivation``
+  /// layer, or `self` when it is not derived. The root is itself an opaque
+  /// tag: this exposes no wrapped value.
+  package var derivationRoot: AnyID {
+    var current = self
+    while let base = current.box.derivationBase {
+      current = base
+    }
+    return current
+  }
+}
+
 private protocol AnyIDBox: Sendable {
   func hash(into hasher: inout Hasher)
   func isEqual(to other: any AnyIDBox) -> Bool
+  var derivationBase: AnyID? { get }
 }
 
 private struct AnyIDConcreteBox<Value: Hashable & Sendable>: AnyIDBox {
@@ -50,5 +71,9 @@ private struct AnyIDConcreteBox<Value: Hashable & Sendable>: AnyIDBox {
       return false
     }
     return value == other.value
+  }
+
+  var derivationBase: AnyID? {
+    (value as? any AnyIDDerivation)?.derivationBase
   }
 }

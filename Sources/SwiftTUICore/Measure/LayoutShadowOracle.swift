@@ -19,8 +19,10 @@ package struct LayoutShadowComparisonSummary: Sendable, Equatable {
   /// `lazyChildScrollEstimates` (an estimated lazy extent propagating into an
   /// ancestor's bounds — the same running-refinement class, reached through a
   /// custom scroll layout's subview measure where no `measuredWindow` node is
-  /// visible to the measured walk). T-info currency: it keeps the size of the
-  /// oracle's blind spot measured.
+  /// visible to the measured walk), plus measured hosted tables whose applied
+  /// high-water column widths advanced between production and shadow (the
+  /// same class across a pass's windows). T-info currency: it keeps the size
+  /// of the oracle's blind spot measured.
   package var windowedExclusionCount = 0
   /// Whole sampled frames skipped because the SHADOW pass hit the engine
   /// re-entry depth budget (`layout.customLayoutDepthLimitExceeded`). The
@@ -177,6 +179,17 @@ package enum LayoutShadowOracle {
         summary.windowedExclusionCount += 1
         continue
       }
+      // The same running-refinement class at a hosted table: source-backed
+      // automatic column widths are a high-water mark that every measurement
+      // of the pass advances as its window realizes rows (Collections.md,
+      // STUI-1230). A product recorded before a later window widened the mark
+      // applies the older widths, while the shadow re-reads the advanced mark.
+      // Skip that measured subtree and count it; equal widths still compare,
+      // and the placed walk still compares the table.
+      if appliesDifferentTableColumnWidths(production, shadow) {
+        summary.windowedExclusionCount += 1
+        continue
+      }
       guard
         production.identity == shadow.identity,
         production.measuredSize == shadow.measuredSize,
@@ -301,6 +314,21 @@ package enum LayoutShadowOracle {
       pending.append(contentsOf: node.children)
     }
     return false
+  }
+
+  /// `true` when both products are the same hosted table and applied
+  /// different column widths: a high-water mark advanced between them.
+  private static func appliesDifferentTableColumnWidths(
+    _ production: MeasuredNode,
+    _ shadow: MeasuredNode
+  ) -> Bool {
+    guard production.identity == shadow.identity,
+      let applied = production.containerAllocationSnapshot?.hostedCollection?.tableColumnWidths,
+      let fresh = shadow.containerAllocationSnapshot?.hostedCollection?.tableColumnWidths
+    else {
+      return false
+    }
+    return applied != fresh
   }
 
   private static func carriesMeasuredWindow(_ node: MeasuredNode) -> Bool {

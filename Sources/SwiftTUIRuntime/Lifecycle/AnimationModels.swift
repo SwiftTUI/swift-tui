@@ -52,6 +52,9 @@ package enum AnimatableSlot: Hashable, Sendable {
   case shapeFillStyle
   case shapeStrokeStyle
   case shapePath
+  /// The custom paths of a node's `clipShape` masks (``ClipMaskPaths``),
+  /// which morph as fills of the same shapes do.
+  case clipShapePaths
   /// A `Text` node's content-transition roll (`TextRollValue`).
   case textRoll
 }

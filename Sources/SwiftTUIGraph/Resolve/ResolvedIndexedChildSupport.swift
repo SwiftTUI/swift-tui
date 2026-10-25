@@ -132,6 +132,13 @@ package protocol IndexedChildSource: Sendable {
     discovered: [Int]
   ) -> [Int]
 
+  /// Starts a table column-width discovery pass. Until the next
+  /// ``applyHostedTableColumnWidths(_:)``, rows come back framed at their own
+  /// widths, not at an earlier application's: a `.frame(width:)` cell
+  /// measures exactly its frame, so a row realized after an application
+  /// could otherwise never widen its column (STUI-1230).
+  func beginHostedTableColumnDiscovery()
+
   /// Applies the allocation's common table widths to cached hosted rows.
   func applyHostedTableColumnWidths(_ widths: [Int])
 }
@@ -183,6 +190,8 @@ extension IndexedChildSource {
   ) -> [Int] {
     discovered
   }
+
+  package func beginHostedTableColumnDiscovery() {}
 
   package func applyHostedTableColumnWidths(_ widths: [Int]) {}
 }

@@ -133,16 +133,138 @@ struct PathAnimationIntegrationTests {
     #expect(sample.drawPayload == end.drawPayload)
   }
 
-  /// Qualifies STUI-1129's clip-shape claim: `clipShape` stores the same fill
-  /// geometry, but no animatable slot carries a clip mask, so a bare custom
-  /// path clip snaps exactly as a trimmed one does. The snap is not the
-  /// trimmed-fill mechanism; this pins that the two agree.
-  @Test("STUI-1129 qualification: clip masks snap whether trimmed or not")
-  func clipMasksSnapWhetherTrimmedOrNot() throws {
+  /// STUI-1218: a `clipShape` mask morphs like a fill of the same shape
+  /// (`Shapes.md`, animate compatible paths), bare or trimmed. Mid-animation,
+  /// the mask paints exactly what a static clip at the interpolated fraction
+  /// paints (0.25 -> 1 at 500 of 1000 ms is 0.625).
+  @Test("STUI-1218: clip masks morph whether trimmed or not")
+  func clipMasksMorphWhetherTrimmedOrNot() throws {
     let bare = try Self.midAnimationClipExtent(trimmed: false)
     let trimmed = try Self.midAnimationClipExtent(trimmed: true)
-    #expect(trimmed == bare)
-    #expect(bare == 19, "a bare clip mask has no slot and snaps to its destination")
+    let midway = Self.staticClipExtent(fraction: 0.625, trimmed: false)
+    #expect(midway > 4 && midway < 19, "the midway mask is neither endpoint: \(midway)")
+    #expect(bare == midway, "a bare clip mask morphs: \(bare) vs \(midway)")
+    #expect(trimmed == Self.staticClipExtent(fraction: 0.625, trimmed: true))
+  }
+
+  @Test("STUI-1218: clip mask paths morph inside fixed trims, keeping fractions and fill rule")
+  func clipMaskPathsMorphUnderFixedTrims() throws {
+    let from = Path(Rect(origin: .zero, size: .init(width: 0.2, height: 1)))
+    let to = Path(Rect(origin: .zero, size: .init(width: 1, height: 1)))
+    let wrappers: [(name: String, wrap: (ShapeGeometry) -> ShapeGeometry)] = [
+      ("bare", { $0 }),
+      ("single", { .trimmed($0, from: 0, to: 0.75) }),
+      ("nested", { .trimmed(.trimmed($0, from: 0.1, to: 0.9), from: 0, to: 0.5) }),
+    ]
+    for (name, wrap) in wrappers {
+      let controller = AnimationController()
+      let animation = Animation.linear(duration: .milliseconds(200))
+      _ = controller.register(animation)
+      let time = MonotonicInstant.now()
+      func node(_ path: Path) -> ResolvedNode {
+        Self.clipNode([.init(geometry: wrap(.path(BoxedPath(path), .evenOdd)), insetAmount: 1)])
+      }
+      controller.processResolvedTree(node(from), transaction: .init(), timestamp: time)
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      controller.processResolvedTree(node(to), transaction: transaction, timestamp: time)
+      #expect(controller.activeAnimationCount == 1, "\(name)")
+      #expect(!controller.hasLayoutAffectingPropertyAnimation, "\(name): a mask is drawing only")
+      var sample = node(to)
+      _ = controller.applyInterpolations(to: &sample, at: time.advanced(by: .milliseconds(100)))
+      let clips = sample.drawMetadata.shapeClips
+      try #require(clips.count == 1, "\(name)")
+      #expect(clips[0].insetAmount == 1, "\(name)")
+      #expect(
+        Self.trims(of: clips[0].geometry) == Self.trims(of: wrap(.path(BoxedPath(to), .evenOdd))),
+        "\(name)")
+      let inner = try #require(Self.innerPath(of: clips[0].geometry), "\(name)")
+      #expect(inner.rule == .evenOdd, "\(name)")
+      let width = try #require(inner.path.boundingRect?.size.width, "\(name)")
+      #expect(abs(width - 0.6) < 1e-9, "\(name): sampled width \(width) at 100 of 200 ms")
+      var end = node(to)
+      _ = controller.applyInterpolations(to: &end, at: time.advanced(by: .milliseconds(200)))
+      #expect(end.drawMetadata.shapeClips == node(to).drawMetadata.shapeClips, "\(name)")
+    }
+  }
+
+  @Test("STUI-1218: nested clips morph independently; analytic clips have no path to morph")
+  func nestedClipMasksMorphIndependently() throws {
+    let narrow = Path(Rect(origin: .zero, size: .init(width: 0.2, height: 1)))
+    let wide = Path(Rect(origin: .zero, size: .init(width: 1, height: 1)))
+    let tall = Path(Rect(origin: .zero, size: .init(width: 1, height: 0.2)))
+    func node(_ first: Path, _ second: Path) -> ResolvedNode {
+      Self.clipNode([
+        .init(geometry: .path(BoxedPath(first), .nonZero), insetAmount: 0),
+        .init(geometry: .rectangle, insetAmount: 0),
+        .init(geometry: .path(BoxedPath(second), .nonZero), insetAmount: 0),
+      ])
+    }
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    _ = controller.register(animation)
+    let time = MonotonicInstant.now()
+    controller.processResolvedTree(node(narrow, wide), transaction: .init(), timestamp: time)
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(node(wide, tall), transaction: transaction, timestamp: time)
+    var sample = node(wide, tall)
+    _ = controller.applyInterpolations(to: &sample, at: time.advanced(by: .milliseconds(100)))
+    let clips = sample.drawMetadata.shapeClips
+    try #require(clips.count == 3)
+    #expect(clips[1].geometry == .rectangle)
+    let first = try #require(Self.innerPath(of: clips[0].geometry)?.path.boundingRect)
+    let third = try #require(Self.innerPath(of: clips[2].geometry)?.path.boundingRect)
+    #expect(abs(first.size.width - 0.6) < 1e-9 && abs(first.size.height - 1) < 1e-9)
+    #expect(abs(third.size.width - 1) < 1e-9 && abs(third.size.height - 0.6) < 1e-9)
+
+    let analytic = Self.clipNode([
+      .init(geometry: .trimmed(.rectangle, from: 0, to: 0.5), insetAmount: 0)
+    ])
+    #expect(AnimatableSnapshot.extract(from: analytic).values.isEmpty)
+    #expect(AnimatableSnapshot.extract(from: Self.clipNode([])).values.isEmpty)
+  }
+
+  @Test("STUI-1218: mismatched clip topology, clip count and trim interval changes snap")
+  func clipMaskStructuralChangesSnap() throws {
+    let rect = Path(Rect(origin: .zero, size: .init(width: 0.2, height: 1)))
+    let curved = Path([
+      .move(to: .zero), .quadCurve(to: .init(x: 1, y: 1), control: .init(x: 0, y: 1)), .close,
+    ])
+    let clip = { (geometry: ShapeGeometry) in
+      DrawMetadata.ShapeClip(geometry: geometry, insetAmount: 0)
+    }
+    let cases: [(name: String, from: [DrawMetadata.ShapeClip], to: [DrawMetadata.ShapeClip])] = [
+      (
+        "topology", [clip(.path(BoxedPath(rect), .nonZero))],
+        [clip(.path(BoxedPath(curved), .nonZero))]
+      ),
+      (
+        "count", [clip(.path(BoxedPath(rect), .nonZero))],
+        [clip(.path(BoxedPath(rect), .nonZero)), clip(.path(BoxedPath(rect), .nonZero))]
+      ),
+      (
+        "kind", [clip(.path(BoxedPath(rect), .nonZero)), clip(.rectangle)],
+        [clip(.rectangle), clip(.path(BoxedPath(rect), .nonZero))]
+      ),
+      (
+        "trim interval", [clip(.trimmed(.path(BoxedPath(rect), .nonZero), from: 0, to: 0.25))],
+        [clip(.trimmed(.path(BoxedPath(rect), .nonZero), from: 0, to: 0.75))]
+      ),
+    ]
+    for (name, from, to) in cases {
+      let controller = AnimationController()
+      let animation = Animation.linear(duration: .milliseconds(200))
+      _ = controller.register(animation)
+      let time = MonotonicInstant.now()
+      controller.processResolvedTree(Self.clipNode(from), transaction: .init(), timestamp: time)
+      var transaction = TransactionSnapshot()
+      transaction.animationRequest = .animate(animation.animationBox)
+      controller.processResolvedTree(Self.clipNode(to), transaction: transaction, timestamp: time)
+      var sample = Self.clipNode(to)
+      _ = controller.applyInterpolations(to: &sample, at: time.advanced(by: .milliseconds(100)))
+      #expect(sample.drawMetadata.shapeClips == to, "\(name) snaps to the destination")
+    }
   }
 
   private func render(_ path: Path) -> RasterSurface {
@@ -154,6 +276,38 @@ struct PathAnimationIntegrationTests {
     ResolvedNode(
       identity: Identity(components: ["morph"]), kind: .view("Path"),
       drawPayload: .shape(.init(geometry: geometry, operation: .fill(style: .color(.white)))))
+  }
+
+  private static func clipNode(_ clips: [DrawMetadata.ShapeClip]) -> ResolvedNode {
+    var node = ResolvedNode(
+      identity: Identity(components: ["clip"]), kind: .view("VStack"),
+      children: [
+        ResolvedNode(
+          identity: Identity(components: ["clip", "text"]), kind: .view("Text"),
+          drawPayload: .text("####"))
+      ])
+    var metadata = node.drawMetadata
+    metadata.shapeClips = clips
+    node.drawMetadata = metadata
+    return node
+  }
+
+  /// The last painted column of the top row of the clip fixture at a fixed
+  /// fraction, rendered without animation.
+  private static func staticClipExtent(fraction: Double, trimmed: Bool) -> Int {
+    let rows = VStack(spacing: 0) {
+      ForEach(0..<4, id: \.self) { _ in Text(String(repeating: "#", count: 20)) }
+    }
+    let surface =
+      trimmed
+      ? DefaultRenderer().render(
+        rows.clipShape(ClipMorphShape(fraction: fraction).trim(from: 0, to: 0.75)),
+        proposal: .init(width: 20, height: 4)
+      ).rasterSurface
+      : DefaultRenderer().render(
+        rows.clipShape(ClipMorphShape(fraction: fraction)), proposal: .init(width: 20, height: 4)
+      ).rasterSurface
+    return maxPaintedX(in: surface.lines.joined(separator: "\n"))
   }
 
   private static func trims(of geometry: ShapeGeometry) -> [[Double]] {

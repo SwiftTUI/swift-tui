@@ -636,7 +636,12 @@ extension ForEachIndexedChildSource: RowSelectionCachingIndexedChildSource {
 package final class HostedCollectionIndexedChildSource: IndexedChildSource {
   private let base: any IndexedChildSource
   private let transform: @MainActor (ResolvedNode, Int) -> ResolvedNode
+  /// Realized rows as the transform built them: each hosted cell framed at
+  /// its own width. Width applications never rewrite these, so a discovery
+  /// pass can read any realized row's own width again (STUI-1230).
   private var cache: [Int: ResolvedNode] = [:]
+  /// `cache` rows re-framed at `tableColumnWidths`, built on demand.
+  private var widenedCache: [Int: ResolvedNode] = [:]
   private var tableColumnWidths: [Int]?
 
   package init(
@@ -655,15 +660,22 @@ package final class HostedCollectionIndexedChildSource: IndexedChildSource {
 
   nonisolated package func child(at index: Int) -> ResolvedNode {
     withCheckedMainActorAccess("HostedCollectionIndexedChildSource.child(at:)") {
+      let node: ResolvedNode
       if let cached = cache[index] {
-        return cached
+        node = cached
+      } else {
+        node = transform(base.child(at: index), index)
+        cache[index] = node
       }
-      var node = transform(base.child(at: index), index)
-      if let tableColumnWidths {
-        node = applyingHostedTableColumnWidths(tableColumnWidths, to: node)
+      guard let tableColumnWidths else {
+        return node
       }
-      cache[index] = node
-      return node
+      if let widened = widenedCache[index] {
+        return widened
+      }
+      let widened = applyingHostedTableColumnWidths(tableColumnWidths, to: node)
+      widenedCache[index] = widened
+      return widened
     }
   }
 
@@ -690,10 +702,17 @@ package final class HostedCollectionIndexedChildSource: IndexedChildSource {
     base.retainedTableColumnWidths(columns: columns, discovered: discovered)
   }
 
+  nonisolated package func beginHostedTableColumnDiscovery() {
+    withCheckedMainActorAccess("HostedCollectionIndexedChildSource.beginTableDiscovery") {
+      tableColumnWidths = nil
+      widenedCache.removeAll(keepingCapacity: true)
+    }
+  }
+
   nonisolated package func applyHostedTableColumnWidths(_ widths: [Int]) {
     withCheckedMainActorAccess("HostedCollectionIndexedChildSource.applyTableWidths") {
       tableColumnWidths = widths
-      cache = cache.mapValues { applyingHostedTableColumnWidths(widths, to: $0) }
+      widenedCache.removeAll(keepingCapacity: true)
     }
   }
 }

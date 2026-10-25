@@ -638,6 +638,7 @@ package final class AnimationController: Sendable {
         .borderBlendPhase, .borderForegroundStyle, .strokeDashPhase, .shapeTrim, .shapeFillStyle,
         .shapeStrokeStyle,
         .shapePath,
+        .clipShapePaths,
         .textRoll,
         .tintShapeStyle:
         return false

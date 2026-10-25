@@ -835,7 +835,10 @@ extension View {
 
   extension Binding: BodyDebugStateDeclaring {
     package func bodyDebugStateSlot(path: StateSlotPath) -> StateSlotKey? {
-      guard let source = bindingSourceID, let scope = BodyChangeScope.current else { return nil }
+      // A member projection (`$model.count`) boxes its base's source, once per
+      // member; the state slot is named by the root (STUI-1131).
+      guard let source = bindingSourceID?.derivationRoot, let scope = BodyChangeScope.current
+      else { return nil }
       let candidates = (scope.prior?.states ?? []).union(
         ViewNodeContext.current?.dependencies.stateSlotReads ?? [])
       return candidates.first { key in

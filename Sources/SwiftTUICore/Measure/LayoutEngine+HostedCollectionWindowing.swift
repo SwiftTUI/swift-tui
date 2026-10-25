@@ -179,6 +179,14 @@ extension LayoutEngine {
       width: proposedChildWidth,
       height: .unspecified
     )
+    if collection.kind == .table {
+      // Discovery must see every row at its own width. An earlier
+      // measurement of this source in the same frame (a scroll view measures
+      // the viewport, then re-measures against its content height) applied
+      // its widths, and a row framed at them reports nothing wider
+      // (STUI-1230). The second pass below re-applies the retained widths.
+      source.beginHostedTableColumnDiscovery()
+    }
     for index in sourceIndices {
       let child = source.child(at: index)
       children.append(child)
@@ -262,8 +270,8 @@ extension LayoutEngine {
       // `TableColumnWidthPassTests` pins both halves of that.
       //
       // The cost is one extra measure of the WINDOW — not a re-realization:
-      // `applyHostedTableColumnWidths` re-maps the realization cache in place,
-      // so `child(at:)` below hits it (D21-a).
+      // `applyHostedTableColumnWidths` re-frames the realization cache's rows
+      // on demand, so `child(at:)` below hits it (D21-a).
       if let tableColumnWidths {
         source.applyHostedTableColumnWidths(tableColumnWidths)
         children.removeAll(keepingCapacity: true)

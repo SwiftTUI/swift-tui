@@ -88,6 +88,12 @@ package struct AnimatableSnapshot: Sendable {
       }
     }
 
+    // `clipShape` masks carry the same geometry as fills (STUI-1218), so a
+    // custom-path mask morphs exactly as the fill of that shape does.
+    if let clips = ClipMaskPaths(node.drawMetadata.shapeClips) {
+      snapshot[.clipShapePaths] = AnyAnimatable(clips)
+    }
+
     // A dashed stroke animates its phase, which is how a marching-ants border
     // moves. A solid stroke has no slot: its phase draws nothing, and a static
     // zero would create a phantom diff on a stroke that later gains a dash.
@@ -324,5 +330,77 @@ extension ShapeGeometry {
     default:
       return nil
     }
+  }
+}
+
+/// The custom paths of a node's `clipShape` masks, in clip order: the value of
+/// the ``AnimatableSlot/clipShapePaths`` slot. A mask morphs as a fill of the
+/// same shape does. Each path looks through fill trims
+/// (``ShapeGeometry/morphablePath``) and interpolates with
+/// `Path.interpolated(to:progress:)`, so compatible topology morphs and a
+/// mismatched topology snaps that path. A clip without a custom path (an
+/// analytic primitive) holds `nil` to keep the positions aligned. A change in
+/// the clip count, or in which clips carry a path, snaps the whole value.
+package struct ClipMaskPaths: Animatable, Equatable, Sendable {
+  package var paths: [Path?]
+
+  /// `nil` when no clip carries a custom path, so a node without one has no
+  /// slot.
+  package init?(_ clips: [DrawMetadata.ShapeClip]) {
+    let paths = clips.map(\.geometry.morphablePath)
+    guard paths.contains(where: { $0 != nil }) else { return nil }
+    self.paths = paths
+  }
+
+  /// Every path's anchor and control points, in clip order. Assignment keeps
+  /// each path's topology; a mismatched point count leaves the value unchanged.
+  package var animatableData: AnimatableArray<AnimatablePair<Double, Double>> {
+    get { .init(paths.flatMap { $0?.animatableData.elements ?? [] }) }
+    set {
+      guard newValue.elements.count == animatableData.elements.count else { return }
+      var start = 0
+      for index in paths.indices {
+        guard var path = paths[index] else { continue }
+        let end = start + path.animatableData.elements.count
+        path.animatableData = .init(Array(newValue.elements[start..<end]))
+        paths[index] = path
+        start = end
+      }
+    }
+  }
+
+  package func interpolated(to other: ClipMaskPaths, progress: Double) -> ClipMaskPaths {
+    guard paths.count == other.paths.count else { return other }
+    var result = other
+    for index in paths.indices {
+      switch (paths[index], other.paths[index]) {
+      case (let from?, let to?):
+        result.paths[index] = from.interpolated(to: to, progress: progress)
+      case (nil, nil):
+        continue
+      default:
+        return other
+      }
+    }
+    return result
+  }
+
+  /// `clips` with each custom path replaced by this value's path at the same
+  /// position, keeping every trim fraction, fill rule and inset; `clips`
+  /// unchanged when the structure no longer matches.
+  package func applied(to clips: [DrawMetadata.ShapeClip]) -> [DrawMetadata.ShapeClip] {
+    guard clips.count == paths.count else { return clips }
+    var result = clips
+    for index in clips.indices {
+      guard let path = paths[index] else {
+        guard clips[index].geometry.morphablePath == nil else { return clips }
+        continue
+      }
+      guard let geometry = clips[index].geometry.replacingMorphablePath(with: path) else {
+        return clips
+      }
+      result[index].geometry = geometry
+    }
+    return result
   }
 }

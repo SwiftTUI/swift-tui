@@ -122,7 +122,9 @@ The mask samples coverage at cell centers. A wide glyph appears only when its
 entire cell span is covered, and nested clips intersect. This is a drawing
 operation: it does not change layout or hit testing. Apply `contentShape(_:)`
 separately when interaction should follow a shape. Image content uses the same
-clip coverage across terminal, browser, and native hosts.
+clip coverage across terminal, browser, and native hosts. In an animated
+update, a mask of a custom shape morphs exactly as a fill of that shape does,
+trimmed or not (see the next section).
 
 ## Animate compatible paths
 

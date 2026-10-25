@@ -9,7 +9,7 @@ import Testing
 /// and what it buys, because the root plan
 /// `docs/plans/2026-07-28-007-collection-scroll-currency-plan.md` describes
 /// both incorrectly: it calls the second pass a re-realization (it is not — the
-/// width application re-maps the realization cache in place), and it proposes
+/// width application re-frames cached rows without realizing them), and it proposes
 /// replacing it with a pre-loop width application (which would freeze column
 /// discovery, because a `.frame(width:)` cell reports exactly that width).
 @MainActor
@@ -27,9 +27,9 @@ struct TableColumnWidthPassTests {
     )
     let realized = IndexedChildRealizationProbe.realizedChildCount
 
-    // The width pass loops the window a second time, but `child(at:)` hits the
-    // cache `applyHostedTableColumnWidths` just re-mapped, so realization is
-    // paid once per windowed row. A viewport of 14 lines holds ~5 body rows
+    // The width pass loops the window a second time, but `child(at:)` re-frames
+    // rows from the realization cache after `applyHostedTableColumnWidths`, so
+    // realization is paid once per windowed row. A viewport of 14 lines holds ~5 body rows
     // plus overscan; the ceiling is deliberately loose, the point is that it is
     // bounded by the window rather than doubled.
     #expect(

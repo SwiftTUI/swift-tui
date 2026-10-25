@@ -256,6 +256,63 @@ struct LayoutShadowOracleTests {
     #expect(summary.windowedExclusionCount == 1)
   }
 
+  // STUI-1230: a scroll-hosted table is measured several times per pass, and
+  // a later window can widen the source's retained high-water column widths
+  // after an earlier product was recorded. The shadow re-reads the advanced
+  // mark, so a product with different applied widths is the same running
+  // refinement as a window stride. Equal widths still compare.
+  @Test("hosted table products with advanced high-water widths are excluded and counted")
+  func advancedTableColumnWidthsAreExcluded() {
+    let rootIdentity = testIdentity("root")
+    let tableIdentity = testIdentity("root", "table")
+    func tree(widths: [Int], rowWidth: Int) -> MeasuredNode {
+      MeasuredNode(
+        identity: rootIdentity,
+        proposal: .unspecified,
+        measuredSize: .init(width: 24, height: 10),
+        childMeasurements: [
+          MeasuredNode(
+            identity: tableIdentity,
+            proposal: .unspecified,
+            measuredSize: .init(width: 24, height: 10),
+            childMeasurements: [
+              MeasuredNode(
+                identity: testIdentity("root", "table", "row-0"),
+                proposal: .unspecified,
+                measuredSize: .init(width: rowWidth, height: 1)
+              )
+            ],
+            containerAllocationSnapshot: .init(
+              hostedCollection: .init(sourceIndices: [0], tableColumnWidths: widths)
+            )
+          )
+        ]
+      )
+    }
+    let placed = PlacedNode(
+      identity: rootIdentity,
+      bounds: .init(origin: .zero, size: .init(width: 24, height: 10))
+    )
+
+    let advanced = LayoutShadowOracle.compare(
+      productionMeasured: tree(widths: [5], rowWidth: 5),
+      productionPlaced: placed,
+      shadowMeasured: tree(widths: [6], rowWidth: 6),
+      shadowPlaced: placed
+    )
+    #expect(!advanced.hasDivergence)
+    #expect(advanced.windowedExclusionCount == 1)
+
+    let unexplained = LayoutShadowOracle.compare(
+      productionMeasured: tree(widths: [6], rowWidth: 5),
+      productionPlaced: placed,
+      shadowMeasured: tree(widths: [6], rowWidth: 6),
+      shadowPlaced: placed
+    )
+    #expect(unexplained.measureDivergenceCount == 1)
+    #expect(unexplained.windowedExclusionCount == 0)
+  }
+
   // The 2026-08-11 mrkdwn `ScrollContent` false-alarm class: a lazy
   // container measured inside a custom scroll layout's subview walk keeps
   // never-placed children (`lazyChildScrollEstimates`), so its estimated

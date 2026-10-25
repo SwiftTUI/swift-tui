@@ -221,9 +221,14 @@ public struct Binding<Value> {
 // The source token can cross actors, but key-path comparison stays isolated:
 // arbitrary key paths can capture non-Sendable subscript arguments. Canonical
 // live tokens preserve path equality without transferring those captures.
-private struct BindingProjectionSource: Hashable, Sendable {
+//
+// A projection derives from its base, so body-change diagnostics can peel
+// `$state.a.b` back to the state's own source (STUI-1131).
+private struct BindingProjectionSource: AnyIDDerivation {
   let base: AnyID
   let path: BindingProjectionPath
+
+  var derivationBase: AnyID { base }
 }
 
 @MainActor

@@ -50,15 +50,6 @@ struct AdversarialSetCDiagnosticTests {
         #expect(records.first == records.last)
       } else if id == 99 {
         #expect(records.allSatisfy { !$0.formatted(.json).contains("fixture-visible-value-49") })
-      } else if id == 91 || id == 92 {
-        setCKnown("STUI-1131: member-projected Binding loses its diagnostic property name") {
-          #expect(
-            records.contains { record in
-              record.causes.contains {
-                $0.category == "state" && $0.precision == "exact" && $0.property == "_value"
-              }
-            })
-        }
       } else {
         #expect(
           records.contains { record in
@@ -67,6 +58,33 @@ struct AdversarialSetCDiagnosticTests {
             }
           })
       }
+    #else
+      #expect(log.records.isEmpty)
+    #endif
+  }
+
+  // Wave 3 (STUI-1131) neighbour: a projection is attributed to its own root
+  // slot only. A sibling binding to an unchanged state is not named.
+  @Test func wave3b21ProjectedBindingNamesOnlyItsOwnSource() throws {
+    let log = SetCDiagnosticLog()
+    let h = try BodyChangeOutput.$sink.withValue(log.sink) {
+      try StressRuntimeHarness(
+        rootIdentity: testIdentity("wave3b21"),
+        size: .init(width: 45, height: 5)
+      ) { SetCPairedDiagnosticRoot(log: log) }
+    }
+    defer { h.shutdown() }
+    let model = try #require(log.model)
+    log.records.removeAll()
+    try BodyChangeOutput.$sink.withValue(log.sink) {
+      model.nested.count.wrappedValue = 7
+      _ = try h.render()
+    }
+    #expect(h.frame.contains("7 1"), "\(h.frame)")
+    #if DEBUG
+      let causes = log.records.filter { $0.typeName.contains("SetCPairedDiagnosticReader") }
+        .flatMap(\.causes).filter { $0.category == "state" && $0.precision == "exact" }
+      #expect(causes.map(\.property) == ["_projected"], "\(causes)")
     #else
       #expect(log.records.isEmpty)
     #endif
@@ -169,6 +187,26 @@ private struct SetCDiagnosticRoot: View {
     log.direct = $direct
     log.unread = $unread
     log.text = $text
+  }
+}
+
+private struct SetCPairedDiagnosticRoot: View {
+  @State private var model = SetCDiagnosticModel()
+  @State private var other = 1
+  let log: SetCDiagnosticLog
+  var body: some View {
+    let _ = capture()
+    SetCPairedDiagnosticReader(projected: $model.nested.count, other: $other)
+  }
+  private func capture() { log.model = $model }
+}
+
+private struct SetCPairedDiagnosticReader: View {
+  @Binding var projected: Int
+  @Binding var other: Int
+  var body: some View {
+    Self._printChanges()
+    return Text("\(projected) \(other)")
   }
 }
 
