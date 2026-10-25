@@ -1,0 +1,12 @@
+{"formatVersion":1,"manifestSHA256":"e1ac17fef5cabd16955c6866dca041e457437b55ce5b2cd5593f1b53a804d9a6","bodySHA256":"7552a2675e277e2be4d8656f4f26fbaa0cf10e623e8646bb65d803d119fa460b"}
+{"emit":"\u001esurface:{\"version\":2,\"epoch\":701,\"gen\":1,\"sequence\":1,\"width\":4,\"height\":1,\"styles\":[null],\"rows\":[[[0,\"A\",1,0]]],\"images\":[]}\n"}
+{"emit":"\u001esurface:{\"version\":3,\"encoding\":\"delta\",\"epoch\":701,\"gen\":2,\"baselineGen\":1,\"sequence\":2,\"width\":4,\"height\":1,\"styles\":[null],\"deltaRows\":[[0,[[0,\"L\",1,0]]]],\"images\":[],\"damage\":{\"textRows\":[[0,[[0,1]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
+{"drop":1}
+{"emit":"\u001esurface:{\"version\":3,\"encoding\":\"delta\",\"epoch\":701,\"gen\":3,\"baselineGen\":2,\"sequence\":3,\"width\":4,\"height\":1,\"styles\":[null],\"deltaRows\":[[0,[[0,\"S\",1,0]]]],\"images\":[],\"damage\":{\"textRows\":[[0,[[0,1]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
+{"expect":{"imagesVisible":[],"resyncRequests":[{"scope":"keyframe"}],"rows":[{"cells":[{"column":0,"span":1,"text":"A"}],"row":0}]}}
+{"emit":"\u001esurface:{\"version\":2,\"epoch\":701,\"gen\":4,\"sequence\":4,\"width\":4,\"height\":1,\"styles\":[null,{\"fg\":\"#FFFFFFFF\",\"opacity\":NaN}],\"rows\":[[[0,\"B\",1,1]]],\"images\":[],\"damage\":{\"textRows\":[[0,[[0,1]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
+{"expect":{"imagesVisible":[],"resyncRequests":[],"rows":[{"cells":[{"column":0,"span":1,"text":"A"}],"row":0}]}}
+{"emit":"\u001esurface:{\"version\":2,\"epoch\":701,\"gen\":4,\"sequence\":4,\"width\":4,\"height\":1,\"styles\":[null,{\"fg\":\"#FFFFFFFF\",\"opacity\":Infinity}],\"rows\":[[[0,\"B\",1,1]]],\"images\":[],\"damage\":{\"textRows\":[[0,[[0,1]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
+{"expect":{"imagesVisible":[],"resyncRequests":[],"rows":[{"cells":[{"column":0,"span":1,"text":"A"}],"row":0}]}}
+{"emit":"\u001esurface:{\"version\":2,\"epoch\":701,\"gen\":4,\"sequence\":4,\"width\":4,\"height\":1,\"styles\":[null,{\"fg\":\"#FFFFFFFF\",\"opacity\":0.5}],\"rows\":[[[0,\"B\",1,1]]],\"images\":[],\"damage\":{\"textRows\":[[0,[[0,1]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
+{"expect":{"imagesVisible":[],"resyncRequests":[],"rows":[{"cells":[{"column":0,"span":1,"text":"B"}],"row":0}],"styleRuns":[{"resolvedStyle":{"fg":"#FFFFFFFF","opacity":0.5},"row":0,"span":1,"startColumn":0,"text":"B"}]}}

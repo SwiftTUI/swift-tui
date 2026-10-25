@@ -6,9 +6,15 @@
   import Foundation
 
   extension HostWireConformanceCorpus {
+    /// `allowsNonJSONPayload` is the `non-json-number` relaxation. That class's
+    /// mutation is a `surface` payload outside RFC 8259, which every decoder
+    /// must refuse, so its emits keep the framing checks but a payload that
+    /// fails JSON parsing is admitted. A payload that parses must still be an
+    /// object.
     static func validateEmittedRecord(
       _ record: String,
       allowsNonSurface: Bool,
+      allowsNonJSONPayload: Bool = false,
       context: String
     ) throws {
       guard record.first == "\u{001E}", record.last == "\n",
@@ -29,6 +35,11 @@
         let prefixCount = "\u{001E}surface:".utf8.count
         let bytes = Array(record.utf8)
         let json = Data(bytes[prefixCount..<(bytes.count - 1)])
+        if allowsNonJSONPayload,
+          (try? JSONSerialization.jsonObject(with: json, options: [.fragmentsAllowed])) == nil
+        {
+          return
+        }
         let decoded = try HostWireConformanceJSON.parse(json, context: "\(context).emit.surface")
         guard case .object = decoded else {
           throw HostWireConformanceError.invalid("\(context): surface payload must be an object")

@@ -89,6 +89,34 @@
       "scenario" : "web-painter-image-forget-requests-and-reapplies"
     },
     {
+      "bodySHA256" : "7552a2675e277e2be4d8656f4f26fbaa0cf10e623e8646bb65d803d119fa460b",
+      "file" : "conformance-non-json-number.jsonl",
+      "kind" : "record",
+      "mutationClass" : "non-json-number",
+      "requiresStage" : "s1",
+      "runners" : [
+        "swift-reference",
+        "web-canvas",
+        "web-dom",
+        "android"
+      ],
+      "scenario" : "non-json-style-number-refused-before-clean-keyframe"
+    },
+    {
+      "bodySHA256" : "e92690d9d503c40bc032a3a7fbf45b811fc5bee00a7bbadb3a22b7ba5a4a8c17",
+      "file" : "conformance-omitted-trailing-row.jsonl",
+      "kind" : "record",
+      "mutationClass" : "control",
+      "requiresStage" : "s1",
+      "runners" : [
+        "swift-reference",
+        "web-canvas",
+        "web-dom",
+        "android"
+      ],
+      "scenario" : "delta-populates-and-clears-omitted-trailing-row"
+    },
+    {
       "bodySHA256" : "001b288299ac902fae18831a234cf6e40c2a6728b96ed30c816fa8d278fc32a2",
       "file" : "conformance-style-append.jsonl",
       "kind" : "record",

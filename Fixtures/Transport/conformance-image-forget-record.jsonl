@@ -1,4 +1,4 @@
-{"formatVersion":1,"manifestSHA256":"c53abc525b57dde37166b118c471e34010ce51330293fb92963b6fc7b8fbd285","bodySHA256":"add8ed90be5951c2191d4bb004c784103fdd259f37da0165c6833c7749f8a64d"}
+{"formatVersion":1,"manifestSHA256":"e1ac17fef5cabd16955c6866dca041e457437b55ce5b2cd5593f1b53a804d9a6","bodySHA256":"add8ed90be5951c2191d4bb004c784103fdd259f37da0165c6833c7749f8a64d"}
 {"emit":"\u001esurface:{\"version\":2,\"epoch\":105,\"gen\":1,\"sequence\":1,\"width\":1,\"height\":1,\"styles\":[null],\"rows\":[[[0,\" \",1,0]]],\"images\":[{\"id\":\"png:bcec09977defadd4:86\",\"format\":\"png\",\"bounds\":[0,0,1,1],\"visibleBounds\":[0,0,1,1],\"scalingMode\":\"stretch\",\"opacity\":1.0,\"pixelSize\":[2,2],\"dataBase64\":\"iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AP8AAP//AAD/AP8AAP//AAD/R8oH+YOsvdsAAAAASUVORK5CYII=\"}]}\n"}
 {"expect":{"imagesVisible":["png:bcec09977defadd4:86"],"resyncRequests":[],"rows":[{"cells":[{"column":0,"span":1,"text":" "}],"row":0}]}}
 {"evictImages":["png:bcec09977defadd4:86"]}

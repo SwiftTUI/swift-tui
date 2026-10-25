@@ -807,6 +807,38 @@ different evidence establishes a separate bound problem.
 The measurement is recorded in the coordination root's
 `docs/reports/2026-07-28-006-delivery-coupled-wire-epochs-sv-evidence.md`.
 
+## Conformance corpus
+
+`Fixtures/Transport/conformance-manifest.json` and its `conformance-*.jsonl`
+bodies form the cross-host conformance corpus. The recorder test
+(`Scripts/record_host_wire_conformance_fixtures.sh`) writes them from the
+production encoder. The web and Android repositories mirror them byte for
+byte, and the coordination fixture-sync gate compares the three copies. A
+`record` fixture replays its emits through each runner it lists: the Swift
+reference applier, the browser Canvas and DOM painters, and the Android
+decoder. Each expectation compares retained explicit cells, visible images,
+resync requests and, when present, resolved style runs. The loaders bind each
+mutation class to the fixture kinds, stage and runners it may use.
+
+- `conformance-omitted-trailing-row.jsonl` (`control`) covers
+  [Admitted raster rows](#admitted-raster-rows). A full frame omits its empty
+  second row, and a delta then populates that row. After a reconnect, a second
+  stream clears the omitted row with an explicit empty array. Every decoder
+  applies both deltas.
+- `conformance-non-json-number.jsonl` (`non-json-number`) replaces the style
+  opacity `0.5` in a production keyframe with `NaN`, then with `Infinity`. A
+  `surface` payload is a JSON object, and RFC 8259 §6 has no spelling for
+  either value. Every decoder refuses both records and keeps its retained
+  baseline. The unmutated keyframe is then applied.
+
+`non-json-number` is the only class whose `surface` payload may fail JSON
+parsing. Every other emitted `surface` payload must be a JSON object. The
+contract does not say whether a syntax refusal requests a repair. Android
+requests one deduplicated keyframe. The browser decoder returns the line as
+plain text output and requests nothing. The mutated records therefore arrive
+while a keyframe repair is already outstanding, so the corpus does not assert
+that host policy.
+
 ## Source anchors
 
 The principal Swift sources for this contract are:

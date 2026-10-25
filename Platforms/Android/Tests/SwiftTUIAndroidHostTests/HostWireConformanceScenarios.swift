@@ -18,6 +18,8 @@
       scenarios.append(try imageDecodeFailureScenario(image))
       scenarios.append(try unknownTokenScenario())
       scenarios.append(try styleAppendScenario())
+      scenarios.append(omittedTrailingRowScenario())
+      scenarios.append(try nonJSONNumberScenario())
       scenarios.append(try androidDeliveryCommitScenario())
       scenarios.append(try websocketDetachedBacklogScenario())
       return scenarios
@@ -456,6 +458,185 @@
       )
     }
 
+    /// STUI-1144, from campaign two X1-026 and X1-027. A full frame may omit
+    /// trailing empty rows, and a later delta may populate or clear any
+    /// in-grid row (HOST-WIRE-CONTRACT.md "Admitted raster rows"). Both
+    /// streams start from a 4x2 raster without its second row, so a decoder's
+    /// retained row array is shorter than the grid when the delta names row 1.
+    /// The clear stream reconnects first, so the row it clears was never sent.
+    /// The expected grids come from the source rasters.
+    private static func omittedTrailingRowScenario() -> Scenario {
+      var populateState = HostWireEncodingState(deltaEnabled: true, epochID: 601)
+      let populateBaseline = encode(
+        surface: leadCellSurface(height: 2, [RasterCell(character: "A")]),
+        sequence: 1,
+        damage: nil,
+        state: &populateState
+      )
+      let populated = encode(
+        surface: leadCellSurface(
+          height: 2, [RasterCell(character: "A"), RasterCell(character: "B")]),
+        sequence: 2,
+        damage: rowDamage(1),
+        state: &populateState
+      )
+      var clearState = HostWireEncodingState(deltaEnabled: true, epochID: 602)
+      let clearBaseline = encode(
+        surface: leadCellSurface(height: 2, [RasterCell(character: "A")]),
+        sequence: 3,
+        damage: nil,
+        state: &clearState
+      )
+      let cleared = encode(
+        surface: leadCellSurface(height: 2, [RasterCell(character: "A")]),
+        sequence: 4,
+        damage: rowDamage(1),
+        state: &clearState
+      )
+      for baseline in [populateBaseline, clearBaseline] {
+        precondition(
+          !baseline.contains(#""encoding":"delta""#)
+            && baseline.contains(#""height":2"#)
+            && baseline.contains(#""rows":[[[0,"A",1,0]]]"#),
+          "the baseline full frame must omit its empty trailing row"
+        )
+      }
+      precondition(
+        populated.contains(#""deltaRows":[[1,[[0,"B",1,0]]]]"#),
+        "the populating delta must name only the omitted row"
+      )
+      precondition(
+        cleared.contains(#""deltaRows":[[1,[]]]"#),
+        "the clearing delta must send an explicit empty array for the omitted row"
+      )
+      return Scenario(
+        file: "conformance-omitted-trailing-row.jsonl",
+        scenario: "delta-populates-and-clears-omitted-trailing-row",
+        kind: .record,
+        mutationClass: .control,
+        requiresStage: .s1,
+        runners: [.swiftReference, .webCanvas, .webDOM, .android],
+        steps: [
+          ["emit": populateBaseline],
+          ["emit": populated],
+          [
+            "expect": expectation(rows: [
+              gridRow(0, [(0, "A", 1)]),
+              gridRow(1, [(0, "B", 1)]),
+            ])
+          ],
+          ["reconnect": [:]],
+          ["emit": clearBaseline],
+          ["emit": cleared],
+          ["expect": expectation(rows: [gridRow(0, [(0, "A", 1)])])],
+        ]
+      )
+    }
+
+    /// STUI-1145, from campaign two X1-053 and X1-054. RFC 8259 §6 has no
+    /// `NaN` or `Infinity` spelling, so a `surface` payload that carries one
+    /// is not JSON, and every decoder must refuse it without replacing its
+    /// retained baseline. The producer never emits such a number, so, as in
+    /// the unknown-token scenario, the recorder replaces one token of a real
+    /// encoder record. The mutated records are the keyframe repair that
+    /// follows a lost delta. The contract does not say whether a syntax
+    /// refusal requests another repair, and Android and the browser differ.
+    /// Refusing while the repair is outstanding keeps that host policy out of
+    /// the observation. The unmutated keyframe then repairs the stream, so the
+    /// replaced token is the only difference between refusal and repair.
+    private static func nonJSONNumberScenario() throws -> Scenario {
+      var state = HostWireEncodingState(deltaEnabled: true, epochID: 701)
+      let initial = encode(
+        surface: leadCellSurface(height: 1, [RasterCell(character: "A")]),
+        sequence: 1,
+        damage: nil,
+        state: &state
+      )
+      let dropped = encode(
+        surface: leadCellSurface(height: 1, [RasterCell(character: "L")]),
+        sequence: 2,
+        damage: columnDamage([0..<1]),
+        state: &state
+      )
+      let stale = encode(
+        surface: leadCellSurface(height: 1, [RasterCell(character: "S")]),
+        sequence: 3,
+        damage: columnDamage([0..<1]),
+        state: &state
+      )
+      state.requestResync(.init(scope: .keyframe))
+      let keyframe = encode(
+        surface: leadCellSurface(
+          height: 1,
+          [
+            RasterCell(
+              character: "B",
+              style: ResolvedTextStyle(foregroundColor: Color.white, opacity: 0.5)
+            )
+          ]),
+        sequence: 4,
+        damage: columnDamage([0..<1]),
+        state: &state
+      )
+      let opacity = #""opacity":0.5"#
+      precondition(
+        !keyframe.contains(#""encoding":"delta""#)
+          && keyframe.components(separatedBy: opacity).count == 2,
+        "the non-JSON fixture must mutate one opacity token of a full keyframe"
+      )
+      let mutated = ["NaN", "Infinity"].map {
+        keyframe.replacingOccurrences(of: opacity, with: #""opacity":"# + $0)
+      }
+      precondition(
+        mutated.allSatisfy {
+          (try? HostWireConformanceRecordDecoding.surfaceObject(in: $0, context: "mutated"))
+            == nil
+        },
+        "every mutated keyframe must fail JSON parsing"
+      )
+      let retained = try HostWireConformanceRecordDecoding.structuredRows(
+        in: initial,
+        context: "non-JSON initial"
+      )
+      return Scenario(
+        file: "conformance-non-json-number.jsonl",
+        scenario: "non-json-style-number-refused-before-clean-keyframe",
+        kind: .record,
+        mutationClass: .nonJSONNumber,
+        requiresStage: .s1,
+        runners: [.swiftReference, .webCanvas, .webDOM, .android],
+        steps: [
+          ["emit": initial],
+          ["emit": dropped],
+          ["drop": 1],
+          ["emit": stale],
+          ["expect": expectation(rows: retained, resyncRequests: [["scope": "keyframe"]])],
+          ["emit": mutated[0]],
+          ["expect": expectation(rows: retained)],
+          ["emit": mutated[1]],
+          ["expect": expectation(rows: retained)],
+          ["emit": keyframe],
+          [
+            "expect": expectation(
+              rows: try HostWireConformanceRecordDecoding.structuredRows(
+                in: keyframe,
+                context: "non-JSON clean keyframe"
+              ),
+              styleRuns: [
+                styleRun(
+                  row: 0,
+                  startColumn: 0,
+                  text: "B",
+                  span: 1,
+                  resolvedStyle: ["fg": "#FFFFFFFF", "opacity": 0.5]
+                )
+              ]
+            )
+          ],
+        ]
+      )
+    }
+
     private static func androidDeliveryCommitScenario() throws -> Scenario {
       var state = HostWireEncodingState(
         deltaEnabled: true,
@@ -882,6 +1063,24 @@
       _ columnRanges: [Range<Int>]
     ) -> PresentationDamage {
       PresentationDamage(textRows: [.init(row: 0, columnRanges: columnRanges)])
+    }
+
+    private static func rowDamage(
+      _ row: Int
+    ) -> PresentationDamage {
+      PresentationDamage(textRows: [.init(row: row, columnRanges: [0..<1])])
+    }
+
+    /// A four-column raster whose rows each hold one lead cell. Absent cells
+    /// and absent trailing rows stay absent on the wire.
+    private static func leadCellSurface(
+      height: Int,
+      _ leads: [RasterCell]
+    ) -> RasterSurface {
+      RasterSurface(
+        size: .init(width: 4, height: height),
+        cells: leads.map { [$0] }
+      )
     }
 
     /// Two single-cell glyphs with an untouched column between them, so damage

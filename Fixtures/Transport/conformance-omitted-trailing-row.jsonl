@@ -1,0 +1,8 @@
+{"formatVersion":1,"manifestSHA256":"e1ac17fef5cabd16955c6866dca041e457437b55ce5b2cd5593f1b53a804d9a6","bodySHA256":"e92690d9d503c40bc032a3a7fbf45b811fc5bee00a7bbadb3a22b7ba5a4a8c17"}
+{"emit":"\u001esurface:{\"version\":2,\"epoch\":601,\"gen\":1,\"sequence\":1,\"width\":4,\"height\":2,\"styles\":[null],\"rows\":[[[0,\"A\",1,0]]],\"images\":[]}\n"}
+{"emit":"\u001esurface:{\"version\":3,\"encoding\":\"delta\",\"epoch\":601,\"gen\":2,\"baselineGen\":1,\"sequence\":2,\"width\":4,\"height\":2,\"styles\":[null],\"deltaRows\":[[1,[[0,\"B\",1,0]]]],\"images\":[],\"damage\":{\"textRows\":[[1,[[0,1]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
+{"expect":{"imagesVisible":[],"resyncRequests":[],"rows":[{"cells":[{"column":0,"span":1,"text":"A"}],"row":0},{"cells":[{"column":0,"span":1,"text":"B"}],"row":1}]}}
+{"reconnect":{}}
+{"emit":"\u001esurface:{\"version\":2,\"epoch\":602,\"gen\":1,\"sequence\":3,\"width\":4,\"height\":2,\"styles\":[null],\"rows\":[[[0,\"A\",1,0]]],\"images\":[]}\n"}
+{"emit":"\u001esurface:{\"version\":3,\"encoding\":\"delta\",\"epoch\":602,\"gen\":2,\"baselineGen\":1,\"sequence\":4,\"width\":4,\"height\":2,\"styles\":[null],\"deltaRows\":[[1,[]]],\"images\":[],\"damage\":{\"textRows\":[[1,[[0,1]]]],\"requiresFullTextRepaint\":false,\"requiresFullGraphicsReplay\":false}}\n"}
+{"expect":{"imagesVisible":[],"resyncRequests":[],"rows":[{"cells":[{"column":0,"span":1,"text":"A"}],"row":0}]}}

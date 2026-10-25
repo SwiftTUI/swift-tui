@@ -62,7 +62,7 @@
       let corpus = try HostWireConformanceCorpus.load(
         directory: HostWireConformanceStreamRecorder.fixtureDirectory)
       #expect(corpus.manifest.formatVersion == 1)
-      #expect(corpus.manifest.fixtures.count == 10)
+      #expect(corpus.manifest.fixtures.count == 12)
       #expect(corpus.fixtures.count == corpus.manifest.fixtures.count)
       // S3d recorded its fixture from the real changed encoder, so `s3d` is now
       // part of the census rather than forbidden from it.
@@ -129,8 +129,36 @@
           "control-steady-delta",
           "epoch-reanchor-and-style-budget-full",
           "image-forget-requests-and-reapplies",
+          "non-json-style-number-refused-before-clean-keyframe",
+          "delta-populates-and-clears-omitted-trailing-row",
           "style-append-splices-onto-the-retained-table",
         ])
+    }
+
+    @Test("only the non-json-number class admits a non-JSON surface payload")
+    func onlyNonJSONNumberClassAdmitsNonJSONSurfacePayload() throws {
+      let record = "\u{001E}surface:{\"version\":2,\"opacity\":NaN}\n"
+      let step: HostWireConformanceJSON = .object(["emit": .string(record)])
+      func entry(
+        _ mutationClass: HostWireConformanceMutationClass
+      ) -> HostWireConformanceManifestEntry {
+        HostWireConformanceManifestEntry(
+          file: "conformance-non-json-meta.jsonl",
+          scenario: "non-json-meta",
+          kind: .record,
+          mutationClass: mutationClass,
+          bodySHA256: String(repeating: "0", count: 64),
+          requiresStage: .s1,
+          runners: [.swiftReference, .webCanvas, .webDOM, .android]
+        )
+      }
+      #expect(throws: HostWireConformanceError.self) {
+        try HostWireConformanceCorpus.parseStep(
+          step, entry: entry(.control), context: "non-json-meta")
+      }
+      #expect(
+        try HostWireConformanceCorpus.parseStep(
+          step, entry: entry(.nonJSONNumber), context: "non-json-meta") == .emit(record))
     }
 
     @Test("style-budget exhaustion records a same-epoch full frame")

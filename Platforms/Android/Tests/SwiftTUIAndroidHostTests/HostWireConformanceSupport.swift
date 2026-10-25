@@ -58,6 +58,10 @@
     case androidDeliveryCommit = "android-delivery-commit"
     case websocketDetachedBacklog = "websocket-detached-backlog"
     case styleAppend = "style-append"
+    /// A production record with one number token replaced by a spelling
+    /// outside RFC 8259 §6. This is the only class whose emitted `surface`
+    /// payload may fail JSON parsing.
+    case nonJSONNumber = "non-json-number"
   }
 
   struct HostWireConformanceManifestEntry: Equatable {
@@ -331,6 +335,8 @@
         expected = (.websocketChannel, .s3b, [.swiftWebSocketChannel])
       case .styleAppend:
         expected = (.record, .s3d, [.swiftReference, .webCanvas, .webDOM, .android])
+      case .nonJSONNumber:
+        expected = (.record, .s1, [.swiftReference, .webCanvas, .webDOM, .android])
       }
       guard entry.kind == expected.kind, entry.requiresStage == expected.stage,
         entry.runners == expected.runners
@@ -420,7 +426,11 @@
         }
         let record = try value.string(context: "\(context).emit")
         try validateEmittedRecord(
-          record, allowsNonSurface: entry.kind == .websocketChannel, context: context)
+          record,
+          allowsNonSurface: entry.kind == .websocketChannel,
+          allowsNonJSONPayload: entry.mutationClass == .nonJSONNumber,
+          context: context
+        )
         return .emit(record)
       case "drop":
         guard entry.kind == .record || entry.kind == .webPainter else {

@@ -256,6 +256,15 @@
       }
       let bytes = Array(record.utf8)
       let payload = Data(bytes[prefix.utf8.count..<(bytes.count - 1)])
+      // A payload outside RFC 8259, such as one with a `NaN` or `Infinity`
+      // number, is not a surface record. It is refused before any state
+      // changes. The contract does not say whether this refusal requests a
+      // repair, so the reference logs none.
+      guard
+        (try? JSONSerialization.jsonObject(with: payload, options: [.fragmentsAllowed])) != nil
+      else {
+        return
+      }
       let json = try HostWireConformanceJSON.parse(payload, context: "swift-reference.surface")
       guard case .object(let object) = json else {
         throw HostWireConformanceError.invalid("swift-reference: surface payload is not an object")
@@ -281,8 +290,14 @@
       requests: [HostWireConformanceJSON],
       includesStyleRuns: Bool
     ) -> HostWireConformanceReferenceObservation {
-      let rows = rowsByIndex.keys.sorted().map {
-        HostWireConformanceGridRow(row: $0, cells: rowsByIndex[$0]!.map(\.grid))
+      // A row without cells is not observable. The decoders report explicit
+      // cells only, and a delta's explicit empty array clears a row rather
+      // than adding one.
+      let rows = rowsByIndex.keys.sorted().compactMap { row -> HostWireConformanceGridRow? in
+        guard let cells = rowsByIndex[row], !cells.isEmpty else {
+          return nil
+        }
+        return HostWireConformanceGridRow(row: row, cells: cells.map(\.grid))
       }
       let visible = presentedImageIDs.intersection(imagePayloads).sorted()
       return .init(
@@ -305,9 +320,11 @@
         throw HostWireConformanceError.invalid("surface.rows: missing")
       }
       let rows = try decodeFullRows(rowsValue)
-      guard rows.count == height else {
+      // A full frame may omit trailing empty rows (HOST-WIRE-CONTRACT.md
+      // "Admitted raster rows"), so it carries at most `height` rows.
+      guard rows.count <= height else {
         throw HostWireConformanceError.invalid(
-          "surface.rows: full record row count does not equal height")
+          "surface.rows: full record carries more rows than its height")
       }
       try validateRowsInGrid(rows, width: width, height: height)
       rowsByIndex = Dictionary(uniqueKeysWithValues: rows.map { ($0.row, $0.cells) })
