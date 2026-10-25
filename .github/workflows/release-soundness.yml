@@ -59,7 +59,7 @@ env:
   # every expectation still has to hold.
   SWIFTTUI_TEST_TIMEOUT_SCALE: "4"
   # Per-launch silence watchdog (Scripts/lib/step_watchdog.sh), sized with
-  # the 60-minute cap the test jobs carry: worst-case kill of a silent launch
+  # the 75-minute cap the test jobs carry: worst-case kill of a silent launch
   # = 600 idle + 300 busy grace + 10 kill grace = 910 s, and the
   # livelock-while-printing backstop at 2400 s fits too. The release build
   # runs outside the watchdog (its whole-module test compile is silent for
@@ -67,7 +67,7 @@ env:
   SWIFTTUI_TEST_STEP_TIMEOUT_SECONDS: "600"
   SWIFTTUI_TEST_STEP_BUSY_GRACE_SECONDS: "300"
   SWIFTTUI_TEST_STEP_ABSOLUTE_TIMEOUT_SECONDS: "2400"
-  SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "3600"
+  SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "4500"
   SWIFTTUI_HANG_DIAGNOSTICS: "1"
 
 jobs:
@@ -101,7 +101,7 @@ jobs:
       options: --cap-add=SYS_PTRACE
     needs: changes
     if: needs.changes.outputs.changed == 'true'
-    timeout-minutes: 60
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -191,7 +191,13 @@ jobs:
       options: --cap-add=SYS_PTRACE
     needs: changes
     if: needs.changes.outputs.changed == 'true' && (github.event_name != 'workflow_dispatch' || inputs.run_race_checks)
-    timeout-minutes: 60
+    # The flag changes the build signature, so this job compiles every test
+    # target a second time, and the single whole-module SwiftTUITests compile
+    # dominates it. At 0d1cc221 that build alone ran past the old 60-minute
+    # cap on the hosted runner twice, where it had taken 44 minutes at 5fbcb1c8.
+    timeout-minutes: 90
+    env:
+      SWIFTTUI_TEST_STEP_WATCHDOG_DEADLINE_SECONDS: "5400"
 
     steps:
       - name: Checkout
