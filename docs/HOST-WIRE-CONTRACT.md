@@ -81,6 +81,36 @@ are decimal integers. Coordinates and deltas have a magnitude of at most
 including wasm32's 32-bit `Int`. A record outside this grammar or bound is
 dropped.
 
+Wheel deltas are signed integer counts of terminal cells, the unit of
+`ScrollWheelEvent`. Positive `deltaX` scrolls right and positive `deltaY`
+scrolls down, matching the SGR wheel buttons: 64 is `deltaY` -1, 65 is +1, 66
+is `deltaX` -1, and 67 is +1. A host converts its device units to cells before
+it sends a record:
+
+- Pixel and point deltas divide by the presented cell pitch, the same pitch
+  that pointer hit-testing uses.
+- A line is one cell.
+- A browser page is the presented grid on that axis.
+
+The browser and SwiftUI hosts carry sub-cell travel per axis to the next wheel
+event, drop it when the direction reverses, and send no record for an event
+without a whole cell. The receiver coalesces consecutive wheel events, whether
+from records or from SGR notches, by summing their deltas when they share a
+cell, modifiers, location precision and geometry revision. A sum that would
+overflow `Int` stays as separate events.
+
+First-party hosts bound each axis of one record to 16 cells and discard the
+excess:
+
+- the browser host (`swift-tui-web`);
+- the SwiftUI host's `NativeScrollWheelAccumulator`;
+- Android's `SwiftTUIInput.verticalScroll`, which sends one gesture as at most
+  `maxNotches` (16) SGR wheel notches of one cell each in the terminal byte
+  stream.
+
+The 16-cell bound is host policy, not grammar. A receiver must accept any delta
+within the 2^24 bound above.
+
 `pointer` is the only control record whose payload is `key=value` tokens
 rather than positional fields:
 
