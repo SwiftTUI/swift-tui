@@ -8,6 +8,8 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+## [0.19.4] - 2026-10-25
+
 ### Changed
 
 - `path(in:)` of a trimmed analytic shape returns the outline its fill paints:
@@ -22,6 +24,9 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
   counts, how hosts convert pixels, points, lines and pages to cells, and that
   first-party hosts bound each axis of one record to 16 cells (STUI-1191,
   STUI-1216).
+- The host-wire conformance corpus adds fixtures for deltas that fill or clear
+  omitted trailing raster rows and for non-JSON numeric tokens, and
+  `docs/HOST-WIRE-CONTRACT.md` documents the corpus (STUI-1146).
 
 ### Fixed
 
@@ -63,6 +68,29 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 - Refine `xterm-direct2`, `xterm-direct16` and `xterm-direct256` like
   `xterm-direct`, including OSC 8 hyperlink detection under VTE, VS Code and
   Windows Terminal (STUI-1247).
+
+### Coordinated packages
+
+- `SwiftTUITerminalView` highlights selected reverse-video cells (STUI-1253),
+  publishes the mouse encoding the emulator applies and only when it changes
+  (STUI-1254), keeps emulator diagnostics out of the host's standard output
+  (STUI-1258), and documents its `mouseModeChanged` event model (STUI-1214).
+- `SwiftTUICharts` draws consecutive samples in one plot cell as one sample
+  (STUI-1255) and places at most one axis tick per plot cell (STUI-1175).
+- The SwiftUI host gives every VoiceOver element a distinct identifier, so a
+  focus request names only the focused element (STUI-1256), and presents
+  disabled controls as disabled (STUI-1250).
+- The browser host sends proportional, bounded wheel deltas (STUI-1191) and
+  no longer duplicates image resync requests (STUI-1252).
+- The Android host refuses non-JSON tokens in surface records (STUI-1145)
+  and keeps its IME buffer in the runtime's line breaks (STUI-1251).
+- `mrkdwn` shows an out-of-grammar numeric reference before trailing
+  whitespace literally (STUI-1257), and `gifeditor` recognizes a GIF only by
+  a complete `GIF87a` or `GIF89a` header (STUI-1184).
+- The site build validates refs, mount paths and theme inputs before it
+  writes (STUI-1195–STUI-1206).
+- Browser packages, Charts, Terminal View, native hosts, examples, the counter
+  demo, and documentation move together to 0.19.4.
 
 ## [0.19.3] - 2026-10-25
 
@@ -2601,7 +2629,8 @@ precomposition work (still images), cache hardening, and glyph-aware backdrops.
 See the GitHub releases for the full per-tag history:
 <https://github.com/SwiftTUI/swift-tui/releases>.
 
-[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.3...HEAD
+[Unreleased]: https://github.com/SwiftTUI/swift-tui/compare/0.19.4...HEAD
+[0.19.4]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.4
 [0.19.3]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.3
 [0.19.2]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.2
 [0.19.1]: https://github.com/SwiftTUI/swift-tui/releases/tag/0.19.1

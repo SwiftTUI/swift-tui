@@ -4203,7 +4203,9 @@ var HostGeometrySession = class {
 };
 
 // dist/src/InputEventEncoder.js
-var InputEventEncoder = class {
+var DOM_DELTA_LINE = 1, DOM_DELTA_PAGE = 2, InputEventEncoder = class {
+  wheelRemainderX = 0;
+  wheelRemainderY = 0;
   encodeKey(event) {
     let key = keyInputFromKeyboardEvent(event);
     if (!key)
@@ -4250,13 +4252,16 @@ var InputEventEncoder = class {
       modifiers: modifierMask(event)
     }, geometryRevision, viewportRevision);
   }
-  encodeWheel(location, event, geometryRevision, viewportRevision) {
+  encodeWheel(location, event, metrics, geometryRevision, viewportRevision) {
+    let mode = event.deltaMode, [deltaX, remainderX] = wholeWheelCells(this.wheelRemainderX, wheelTravel(event.deltaX, mode, metrics.cellWidth, metrics.columns)), [deltaY, remainderY] = wholeWheelCells(this.wheelRemainderY, wheelTravel(event.deltaY, mode, metrics.cellHeight, metrics.rows));
+    if (this.wheelRemainderX = remainderX, this.wheelRemainderY = remainderY, deltaX === 0 && deltaY === 0)
+      return;
     return encodeMouseInputMessage({
       kind: "scrolled",
       x: location.x,
       y: location.y,
-      deltaX: normalizedWheelDelta(event.deltaX),
-      deltaY: normalizedWheelDelta(event.deltaY),
+      deltaX,
+      deltaY,
       modifiers: modifierMask(event)
     }, geometryRevision, viewportRevision);
   }
@@ -4319,12 +4324,23 @@ function modifierMask(event) {
     mask |= 4;
   return mask;
 }
-function normalizedWheelDelta(delta) {
-  if (delta > 0)
-    return 1;
-  if (delta < 0)
-    return -1;
-  return 0;
+function wheelTravel(delta, mode, pitch, extent) {
+  if (!Number.isFinite(delta) || delta === 0)
+    return 0;
+  switch (mode) {
+    case DOM_DELTA_LINE:
+      return delta;
+    case DOM_DELTA_PAGE:
+      return delta * (Number.isFinite(extent) && extent >= 1 ? extent : 1);
+    default:
+      return Number.isFinite(pitch) && pitch > 0 ? delta / pitch : Math.sign(delta);
+  }
+}
+function wholeWheelCells(remainder, travel) {
+  let total = (travel !== 0 && Math.sign(travel) !== Math.sign(remainder) ? 0 : remainder) + travel, whole = Math.trunc(total);
+  if (Math.abs(whole) > 16)
+    return [Math.sign(whole) * 16, 0];
+  return [whole || 0, total - whole];
 }
 
 // dist/src/PointerGeometry.js
@@ -5123,7 +5139,10 @@ var WebHostSceneRuntime = class {
         return;
       if (this.wheelMode === "chain" && !wheelTargetCanScroll(this.currentFrame?.scrollRegions, location, event.deltaX, event.deltaY))
         return;
-      this.onInput(this.inputEncoder.encodeWheel(location, event, this.pointerRevision, this.pointerViewportRevision)), event.preventDefault();
+      let record = this.inputEncoder.encodeWheel(location, event, this.pointerMetrics(), this.pointerRevision, this.pointerViewportRevision);
+      if (record)
+        this.onInput(record);
+      event.preventDefault();
     }, cancelPointer = (event) => {
       if (event.pointerId === this.capturedPointerId)
         this.cancelGeometryPointer();
@@ -5764,8 +5783,22 @@ function writeToRingBuffer(buffer, chunk, startIndex) {
     buffer.set(chunk.subarray(firstSegmentLength), 0);
 }
 
+// dist/src/wasi/StdIOPipeDelivery.js
+var deliverChunk;
+function provideStdIOPipeDelivery(deliver) {
+  deliverChunk = deliver;
+}
+function deliverToStdIOPipe(pipe, chunk) {
+  if (!deliverChunk)
+    throw Error("StdIOPipe is not loaded");
+  return deliverChunk(pipe, chunk);
+}
+
 // dist/src/wasi/StdIOPipe.js
 var StdIOPipe = class {
+  static {
+    provideStdIOPipeDelivery((pipe, chunk) => pipe.writeChunk(chunk).delivered);
+  }
   chunks = [];
   waiters = [];
   listeners = /* @__PURE__ */ new Set;
@@ -5775,9 +5808,16 @@ var StdIOPipe = class {
     return this.chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
   }
   write(chunk) {
+    let { delivered, observed } = this.writeChunk(chunk);
+    return delivered && observed;
+  }
+  writeChunk(chunk) {
     if (this.closed)
-      return !1;
-    let bytes = typeof chunk === "string" ? (/* @__PURE__ */ new TextEncoder()).encode(chunk) : new Uint8Array(chunk), accepted = !0, waiter = this.waiters.shift();
+      return {
+        delivered: !1,
+        observed: !0
+      };
+    let bytes = typeof chunk === "string" ? (/* @__PURE__ */ new TextEncoder()).encode(chunk) : new Uint8Array(chunk), delivered = !0, waiter = this.waiters.shift();
     if (waiter)
       waiter({
         done: !1,
@@ -5786,12 +5826,16 @@ var StdIOPipe = class {
     else {
       if (!this.consumer)
         this.chunks.push(bytes);
-      accepted = this.consumer?.(bytes) !== !1;
+      delivered = this.consumer?.(bytes) !== !1;
     }
+    let observed = !0;
     for (let listener of this.listeners)
       if (listener(bytes) === !1)
-        accepted = !1;
-    return accepted;
+        observed = !1;
+    return {
+      delivered,
+      observed
+    };
   }
   close() {
     if (this.closed)
@@ -5978,7 +6022,7 @@ var maximumWASIResyncControlBytes = sharedInputQueueDefaultCapacity - 1, Browser
       let request = this.decoder.takeResyncRequest(maximumWASIResyncControlBytes);
       if (!request)
         return;
-      if (!this.stdin.write(encodeResyncControlMessage(request))) {
+      if (!deliverToStdIOPipe(this.stdin, encodeResyncControlMessage(request))) {
         this.decoder.resyncRequestDeliveryFailed(request);
         return;
       }
