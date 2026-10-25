@@ -73,7 +73,7 @@ package func registerTextInputBinding(
       return false
     }
 
-    return applyTextInputCommand(
+    let handled = applyTextInputCommand(
       command,
       binding: binding,
       value: value,
@@ -82,6 +82,16 @@ package func registerTextInputBinding(
       clipboardWriteAction: context.environmentValues.clipboardWriteAction,
       clipboardReadAction: context.environmentValues.clipboardReadAction
     )
+    // Home and End are the editor's line-boundary keys: a jump to the edge
+    // the caret already occupies is still consumed, so the key never bubbles
+    // to an enclosing scroll view's edge command. Boundary arrows stay
+    // unclaimed so directional focus movement keeps working.
+    switch command {
+    case .move(.lineStart, _), .move(.lineEnd, _):
+      return true
+    default:
+      return handled
+    }
   }
   let handle: @MainActor (KeyPress) -> Bool = { keyPress in
     // Submit precedes editing-command resolution: it mutates no text, so it

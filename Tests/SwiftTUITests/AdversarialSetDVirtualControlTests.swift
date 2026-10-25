@@ -61,12 +61,10 @@ struct AdversarialSetDVirtualControlTests {
       try #require(h.runLoop.focusTracker.currentFocusIdentity == editor.identity)
       let beforeEnd = position.value
       _ = try h.pressKey(.init(.end))
-      setDKnown("STUI-1180: no-op End must remain owned by the editor") {
-        #expect(position.value == beforeEnd)
-      }
-      setDKnown("STUI-1180: ancestor scrolling must not evict focused input") {
-        #expect(h.runLoop.focusTracker.currentFocusIdentity == editor.identity)
-      }
+      // STUI-1180 (fixed in wave 2): the editor owns a no-op End, so the
+      // ancestor neither scrolls nor evicts the focused input.
+      #expect(position.value == beforeEnd)
+      #expect(h.runLoop.focusTracker.currentFocusIdentity == editor.identity)
       // Restore this fixture's viewport before the independent remount checks.
       // The assertions above retain the End-routing failure.
       position.value = beforeEnd
@@ -105,6 +103,59 @@ struct AdversarialSetDVirtualControlTests {
       #expect(rows[0].text == "seedzz")
       #expect(rows[20].text == "seedz")
     }
+  }
+}
+
+/// Wave 2 (STUI-1164) neighbors of the STUI-1180 repair: the editor owns its
+/// documented line-boundary keys even when the caret is already there, while
+/// boundary arrows stay unclaimed so directional focus keeps working.
+@MainActor
+@Suite("Wave 2 text input boundary key ownership", .serialized)
+struct Wave2TextInputBoundaryKeyTests {
+  private final class TextBox {
+    var value = "seed"
+  }
+
+  private func makeRegistry(
+    _ name: String, box: TextBox
+  ) -> (LocalKeyHandlerRegistry, Identity, DefaultRenderer) {
+    let identity = testIdentity("wave2a", name)
+    let registry = LocalKeyHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = identity
+    let renderer = DefaultRenderer()
+    _ = renderer.render(
+      TextField("Name", text: Binding(get: { box.value }, set: { box.value = $0 }))
+        .id(identity),
+      context: .init(
+        identity: testIdentity("wave2a", name, "root"),
+        environmentValues: environmentValues,
+        localKeyHandlerRegistry: registry,
+        applyEnvironmentValues: true
+      )
+    )
+    return (registry, identity, renderer)
+  }
+
+  @Test func wave2a21TextFieldConsumesBoundaryHomeAndEnd() {
+    let box = TextBox()
+    let (registry, identity, renderer) = makeRegistry("wave2a21", box: box)
+    defer { withExtendedLifetime(renderer) {} }
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.end)), "End at the end")
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.home)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.home)), "Home at the start")
+    #expect(box.value == "seed")
+  }
+
+  @Test func wave2a22TextFieldBoundaryArrowsStillDecline() {
+    let box = TextBox()
+    let (registry, identity, renderer) = makeRegistry("wave2a22", box: box)
+    defer { withExtendedLifetime(renderer) {} }
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.home)))
+    #expect(!registry.dispatch(identity: identity, keyPress: KeyPress(.arrowLeft)))
+    #expect(registry.dispatch(identity: identity, keyPress: KeyPress(.end)))
+    #expect(!registry.dispatch(identity: identity, keyPress: KeyPress(.arrowRight)))
+    #expect(box.value == "seed")
   }
 }
 

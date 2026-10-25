@@ -267,6 +267,19 @@ extension Table {
 
       if isEnabled {
         let policy = selectionPolicy
+        let interactionSource = resolvedContent.indexedSource
+        // Eligibility is authored row content (see `tableRowIsEnabled`).
+        // Indexed rows realize only a navigation or activation candidate on
+        // demand, never the dataset; the source caches the realized row.
+        let rowIsEnabled: @MainActor (Int) -> Bool = { index in
+          guard resolvedRows.indices.contains(index), resolvedRows[index].isEnabled else {
+            return false
+          }
+          guard let interactionSource else { return true }
+          let row = interactionSource.child(at: index)
+          return row.environmentSnapshot.style.isEnabled
+            && row.semanticMetadata.interactionAvailability.isEnabled
+        }
         let intake = HandlerDescriptorIntake(
           context: context,
           fallbackAuthoringScope: nil
@@ -337,7 +350,9 @@ extension Table {
           if policy.isMultiple {
             switch event {
             case .space, .return:
-              guard let index = activeRowIndex, let tag = resolvedRows[index].tag else {
+              guard let index = activeRowIndex, rowIsEnabled(index),
+                let tag = resolvedRows[index].tag
+              else {
                 return false
               }
               setActiveRow(index)
@@ -348,7 +363,17 @@ extension Table {
               let current =
                 activeRowIndex.flatMap { selectableRowIndices.firstIndex(of: $0) }
                 ?? (delta > 0 ? -1 : selectableRowIndices.count)
-              let next = min(max(0, current + delta), selectableRowIndices.count - 1)
+              // Skip disabled rows; with none ahead the cursor stays put.
+              var next = current + delta
+              while selectableRowIndices.indices.contains(next),
+                !rowIsEnabled(selectableRowIndices[next])
+              {
+                next += delta
+              }
+              if !selectableRowIndices.indices.contains(next) {
+                guard selectableRowIndices.indices.contains(current) else { return false }
+                next = current
+              }
               let index = selectableRowIndices[next]
               scrollCurrency?.pinCurrentAnchor()
               setActiveRow(index)
@@ -374,7 +399,11 @@ extension Table {
           }
 
           let selectableTags = selectableRowIndices.compactMap { resolvedRows[$0].tag }
-          guard policy.step(orderedTags: selectableTags, delta: delta) else {
+          guard
+            policy.step(
+              orderedTags: selectableTags, delta: delta,
+              isEnabled: { rowIsEnabled(selectableRowIndices[$0]) })
+          else {
             return false
           }
           if let scrollCurrency {
@@ -414,12 +443,15 @@ extension Table {
             intake.registerAction(
               identity: identity,
               accessibilityHandler: { action in
-                guard action == .activate else { return .unsupported }
+                guard action == .activate, rowIsEnabled(rowIndex) else { return .unsupported }
                 let previous = policy.contains(tag)
                 _ = policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
                 return previous == policy.contains(tag) ? .unchanged : .changed
               }
-            ) { policy.isMultiple ? policy.toggle(tag) : policy.select(tag) }
+            ) {
+              guard rowIsEnabled(rowIndex) else { return false }
+              return policy.isMultiple ? policy.toggle(tag) : policy.select(tag)
+            }
 
             let routeID = runtimePrimaryRouteID(
               for: tableRowIdentity(
@@ -428,6 +460,8 @@ extension Table {
               )
             )
             intake.registerPointerHandler(routeID: routeID) { event in
+              // A disabled row has no pointer action, like a disabled control.
+              guard rowIsEnabled(rowIndex) else { return .ignored }
               switch event.kind {
               case .down(.primary):
                 if policy.isMultiple { setActiveRow(rowIndex) }
@@ -615,7 +649,9 @@ extension Table {
       collectTableRows(from: nodes, into: &result)
       result.selections = .init(
         rows: zip(result.payloads, result.children).map {
-          .init(tag: $0.tag, identity: $1.identity)
+          .init(
+            tag: $0.tag, identity: $1.identity,
+            isEnabled: $1.semanticMetadata.interactionAvailability.isEnabled)
         })
       return result
     }
@@ -639,6 +675,7 @@ extension Table {
     result.indexedSource = HostedCollectionIndexedChildSource(base: source) { rawNode, index in
       var node = rawNode
       mergeCellRowPresentation(into: &node)
+      let isEnabled = tableRowIsEnabled(node, columnCount: columns.count)
       node.semanticMetadata.accessibilityRole = .tableRow
       let properties = AccessibilityProperties(rowIndex: index + 2)
       node.semanticMetadata.accessibilityProperties =
@@ -664,8 +701,11 @@ extension Table {
       )
       node.semanticMetadata.hostedCollectionItem = .init(
         role: .tableRow(rowIndex: index),
-        isSelectable: compatibleTag != nil
+        isSelectable: compatibleTag != nil && isEnabled
       )
+      if !isEnabled {
+        node.semanticMetadata.interactionAvailability = .disabled(reason: .authorRequested)
+      }
       if let compatibleTag {
         node.semanticMetadata.hostedCollectionItem?.selection = .init(
           isSelected: policy.isMultiple ? policy.contains(compatibleTag) : selectedIndex == index,
@@ -684,6 +724,19 @@ extension Table {
     return result
   }
 
+  /// A table row is disabled when the row itself is, or when every hosted
+  /// cell is. A data-driven table's row closure supplies the cells, so
+  /// `.disabled` on that content disables the row, while one disabled control
+  /// beside enabled cells leaves the row selectable (the List rule for a
+  /// disabled control inside an enabled row).
+  private func tableRowIsEnabled(_ node: ResolvedNode, columnCount: Int) -> Bool {
+    guard node.environmentSnapshot.style.isEnabled,
+      node.semanticMetadata.interactionAvailability.isEnabled
+    else { return false }
+    let cells = node.children.prefix(columnCount)
+    return cells.isEmpty || cells.contains { $0.environmentSnapshot.style.isEnabled }
+  }
+
   private func mergeCellRowPresentation(into node: inout ResolvedNode) {
     for child in node.children {
       if let style = child.drawMetadata.listStyle {
@@ -700,6 +753,7 @@ extension Table {
     while var node = work.popLast() {
       if node.semanticMetadata.accessibilityRole == .tableRow {
         mergeCellRowPresentation(into: &node)
+        let isEnabled = tableRowIsEnabled(node, columnCount: columns.count)
         let rowIndex = result.payloads.count
         let properties = AccessibilityProperties(rowIndex: rowIndex + 2)
         node.semanticMetadata.accessibilityProperties =
@@ -727,8 +781,11 @@ extension Table {
         )
         node.semanticMetadata.hostedCollectionItem = .init(
           role: .tableRow(rowIndex: rowIndex),
-          isSelectable: compatibleTag != nil
+          isSelectable: compatibleTag != nil && isEnabled
         )
+        if !isEnabled {
+          node.semanticMetadata.interactionAvailability = .disabled(reason: .authorRequested)
+        }
         result.children.append(node)
 
         guard selectionPolicy.isSelectable else {

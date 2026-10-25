@@ -70,6 +70,32 @@ package struct ContainerAllocationSnapshot: Equatable, Sendable {
   }
 }
 
+/// The separator edges a realized table row hides with
+/// `listRowSeparator(.hidden)`. A separator between two rows is hidden when
+/// the upper row hides its bottom edge or the lower row hides its top edge.
+package struct HiddenRowSeparatorEdges: Equatable, Sendable {
+  package var top: Bool
+  package var bottom: Bool
+
+  package init(top: Bool, bottom: Bool) {
+    self.top = top
+    self.bottom = bottom
+  }
+}
+
+/// The rows whose FOLLOWING separator is hidden, from per-row hidden edges.
+package func hiddenTableSeparators(
+  from edges: [Int: HiddenRowSeparatorEdges],
+  rowCount: Int
+) -> Set<Int> {
+  var hidden: Set<Int> = []
+  for (index, edge) in edges {
+    if edge.bottom, index >= 0, index < rowCount - 1 { hidden.insert(index) }
+    if edge.top, index > 0, index < rowCount { hidden.insert(index - 1) }
+  }
+  return hidden
+}
+
 /// Realized source indices for a node-hosted List or Table measurement.
 /// Child measurements are index-parallel with this bounded list.
 package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
@@ -98,6 +124,10 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
   /// collection's content extent and row positions do not change as the
   /// window slides. Rows never measured count as one cell.
   package var tallRowHeights: [Int: Int]
+  /// Every viewport-backed table row known to hide a separator edge, by row
+  /// index, retained like ``tallRowHeights``: realized rows replace their
+  /// entries, and rows never realized are assumed to draw both separators.
+  package var hiddenRowSeparatorEdges: [Int: HiddenRowSeparatorEdges]
 
   package init(
     sourceIndices: [Int],
@@ -106,7 +136,8 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
     estimatedRowStride: Int? = nil,
     listLayout: ListVisibleLayout? = nil,
     tableLayout: TableVisibleLayout? = nil,
-    tallRowHeights: [Int: Int] = [:]
+    tallRowHeights: [Int: Int] = [:],
+    hiddenRowSeparatorEdges: [Int: HiddenRowSeparatorEdges] = [:]
   ) {
     self.sourceIndices = sourceIndices
     self.tableColumnWidths = tableColumnWidths
@@ -115,6 +146,7 @@ package struct HostedCollectionAllocationSnapshot: Equatable, Sendable {
     self.listLayout = listLayout
     self.tableLayout = tableLayout
     self.tallRowHeights = tallRowHeights
+    self.hiddenRowSeparatorEdges = hiddenRowSeparatorEdges
   }
 }
 

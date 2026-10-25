@@ -35,6 +35,10 @@ extension LayoutEngine {
       source: source,
       passContext: passContext
     )
+    let retainedHiddenEdges =
+      collection.kind == .table
+      ? retainedHiddenRowSeparatorEdges(for: node, source: source, passContext: passContext)
+      : [:]
     let rowStride: Int
     switch (collection.kind, node.drawPayload) {
     case (.list, .list(let payload)):
@@ -63,7 +67,7 @@ extension LayoutEngine {
       usesLineModel = false
     }
 
-    let sourceIndices: [Int]
+    var sourceIndices: [Int]
     var measuredWindow: Range<Int>?
     if usesLineModel {
       // The proposal fits inside the viewport, so the line model's answer is
@@ -96,7 +100,8 @@ extension LayoutEngine {
       hint: hint,
       count: source.count,
       rowStride: rowStride,
-      tallRowHeights: retainedTallRows
+      tallRowHeights: retainedTallRows,
+      hiddenSeparators: hiddenTableSeparators(from: retainedHiddenEdges, rowCount: source.count)
     ),
       passContext?.claimCurrentMeasureViewportHint(for: node.identity) != nil
     {
@@ -148,6 +153,7 @@ extension LayoutEngine {
       passContext?.exitCustomLayoutCompatibilityBoundary()
     }
 
+    var hiddenEdges = retainedHiddenEdges
     var children: [ResolvedNode] = []
     var measurements: [MeasuredNode] = []
     children.reserveCapacity(sourceIndices.count)
@@ -179,6 +185,16 @@ extension LayoutEngine {
       measurements.append(
         measure(child, proposal: childProposal, passContext: passContext)
       )
+    }
+    if collection.kind == .table {
+      // Out of line: this function sits on every re-entrant measurement
+      // level, so its own stack frame must not grow (custom-layout depth).
+      widenWindowForHiddenTableSeparators(
+        node: node, source: source, bounds: bounds, hint: hint, rowStride: rowStride,
+        tallRowHeights: retainedTallRows, childProposal: childProposal,
+        passContext: passContext, sourceIndices: &sourceIndices,
+        measuredWindow: &measuredWindow, children: &children,
+        measurements: &measurements, hiddenEdges: &hiddenEdges)
     }
 
     let measuredSize: CellSize
@@ -268,11 +284,13 @@ extension LayoutEngine {
         at: sourceIndices,
         into: &tallRowHeights
       )
+      let hiddenSeparators = hiddenTableSeparators(from: hiddenEdges, rowCount: source.count)
       measuredSize = measuredHostedTableSize(
         for: payload,
         childMeasurements: measurements,
         sourceIndices: sourceIndices,
         retainedTallRowHeights: retainedTallRows,
+        hiddenSeparatorCount: hiddenSeparators.count,
         proposal: effectiveProposal
       )
       tableLayout = DrawExtractor().visibleTableLayout(
@@ -280,6 +298,7 @@ extension LayoutEngine {
         in: .init(origin: .zero, size: measuredSize),
         columnWidths: tableColumnWidths,
         rowHeights: tallRowHeights,
+        hiddenSeparators: hiddenSeparators,
         rowWindow: measuredWindow
       )
     default:
@@ -303,7 +322,8 @@ extension LayoutEngine {
           estimatedRowStride: measuredWindow == nil ? nil : rowStride,
           listLayout: listLayout,
           tableLayout: tableLayout,
-          tallRowHeights: tallRowHeights
+          tallRowHeights: tallRowHeights,
+          hiddenRowSeparatorEdges: hiddenEdges
         )
       )
     )
@@ -359,6 +379,122 @@ extension LayoutEngine {
       let height = measurement.measuredSize.height
       tallRowHeights[index] = height > 1 ? height : nil
     }
+  }
+
+  /// Hidden table separators let more rows into the window than the
+  /// one-separator-per-row estimate chose. Realized rows report their edges,
+  /// so widen the realized band until it covers every row the
+  /// separator-aware line model places. Tables whose realized and retained
+  /// rows hide no separator never widen.
+  @inline(never)
+  private func widenWindowForHiddenTableSeparators(
+    node: ResolvedNode,
+    source: any IndexedChildSource,
+    bounds: CellRect,
+    hint: MeasureViewportHint?,
+    rowStride: Int,
+    tallRowHeights: [Int: Int],
+    childProposal: ProposedSize,
+    passContext: LayoutPassContext?,
+    sourceIndices: inout [Int],
+    measuredWindow: inout Range<Int>?,
+    children: inout [ResolvedNode],
+    measurements: inout [MeasuredNode],
+    hiddenEdges: inout [Int: HiddenRowSeparatorEdges]
+  ) {
+    guard case .table(let payload) = node.drawPayload else { return }
+    for (index, child) in zip(sourceIndices, children) {
+      recordHiddenRowSeparatorEdges(of: child, at: index, into: &hiddenEdges)
+    }
+    while let lower = sourceIndices.first, let upper = sourceIndices.last,
+      let covered = hiddenSeparatorTableWindow(
+        payload: payload, bounds: bounds, count: source.count, hint: hint,
+        measuredWindow: measuredWindow, rowStride: rowStride,
+        tallRowHeights: tallRowHeights, hiddenEdges: hiddenEdges),
+      covered.lowerBound < lower || covered.upperBound > upper + 1
+    {
+      let widened = min(lower, covered.lowerBound)..<max(upper + 1, covered.upperBound)
+      var realized = Dictionary(
+        uniqueKeysWithValues: zip(sourceIndices, zip(children, measurements)).map { ($0, $1) })
+      for index in widened where realized[index] == nil {
+        let child = source.child(at: index)
+        recordHiddenRowSeparatorEdges(of: child, at: index, into: &hiddenEdges)
+        realized[index] = (child, measure(child, proposal: childProposal, passContext: passContext))
+      }
+      sourceIndices = Array(widened)
+      children = sourceIndices.compactMap { realized[$0]?.0 }
+      measurements = sourceIndices.compactMap { realized[$0]?.1 }
+      if measuredWindow != nil { measuredWindow = widened }
+    }
+  }
+
+  /// The hidden separator edges the previous frame recorded for this table,
+  /// on the same currency terms as ``retainedTallRowHeights(for:source:passContext:)``.
+  private func retainedHiddenRowSeparatorEdges(
+    for node: ResolvedNode,
+    source: any IndexedChildSource,
+    passContext: LayoutPassContext?
+  ) -> [Int: HiddenRowSeparatorEdges] {
+    guard
+      let retainedLayout = passContext?.retainedLayout ?? passContext?.measurementSeedSession
+    else {
+      return [:]
+    }
+    let previousMeasured =
+      node.viewNodeID.flatMap { retainedLayout.previousFrameIndex?.measuredByNodeID[$0] }
+      ?? retainedLayout.measuredNode(for: node.identity)
+    let previousResolved =
+      node.viewNodeID.flatMap { retainedLayout.previousFrameIndex?.resolvedByNodeID[$0] }
+      ?? retainedLayout.resolvedNode(for: node.identity)
+    guard
+      let snapshot = previousMeasured?.containerAllocationSnapshot?.hostedCollection,
+      !snapshot.hiddenRowSeparatorEdges.isEmpty,
+      let previousSource = previousResolved?.indexedChildSource,
+      previousSource.measurementSignature == source.measurementSignature
+    else {
+      return [:]
+    }
+    return snapshot.hiddenRowSeparatorEdges
+  }
+
+  /// Records a realized row's hidden separator edges over the retained ones.
+  private func recordHiddenRowSeparatorEdges(
+    of row: ResolvedNode,
+    at index: Int,
+    into edges: inout [Int: HiddenRowSeparatorEdges]
+  ) {
+    let style = row.drawMetadata.listStyle
+    let edge = HiddenRowSeparatorEdges(
+      top: style?.rowSeparatorTopVisibility == .hidden,
+      bottom: style?.rowSeparatorBottomVisibility == .hidden)
+    edges[index] = edge.top || edge.bottom ? edge : nil
+  }
+
+  /// The rows a table's separator-aware line model places for this pass: the
+  /// visible rows of the finite line model, or the hint window.
+  private func hiddenSeparatorTableWindow(
+    payload: TablePayload,
+    bounds: CellRect,
+    count: Int,
+    hint: MeasureViewportHint?,
+    measuredWindow: Range<Int>?,
+    rowStride: Int,
+    tallRowHeights: [Int: Int],
+    hiddenEdges: [Int: HiddenRowSeparatorEdges]
+  ) -> Range<Int>? {
+    let hidden = hiddenTableSeparators(from: hiddenEdges, rowCount: count)
+    guard !hidden.isEmpty else { return nil }
+    if measuredWindow != nil {
+      return hostedCollectionHintWindow(
+        hint: hint, count: count, rowStride: rowStride, tallRowHeights: tallRowHeights,
+        hiddenSeparators: hidden)
+    }
+    let visible = DrawExtractor().visibleTableLayout(
+      for: payload, in: bounds, rowHeights: tallRowHeights, hiddenSeparators: hidden
+    ).lines.compactMap(\.rowIndex)
+    let window = finiteHostedCollectionWindow(visibleIndices: visible, count: count)
+    guard let first = window.first, let last = window.last else { return nil }
+    return first..<(last + 1)
   }
 
   private func proposedCollectionDimension(
@@ -420,7 +556,8 @@ extension LayoutEngine {
     hint: MeasureViewportHint?,
     count: Int,
     rowStride: Int,
-    tallRowHeights: [Int: Int] = [:]
+    tallRowHeights: [Int: Int] = [:],
+    hiddenSeparators: Set<Int> = []
   ) -> Range<Int>? {
     guard let hint,
       hint.axes.contains(.vertical),
@@ -433,9 +570,14 @@ extension LayoutEngine {
     let offset = max(0, hint.contentOffset.y)
     let overscan = 1
     let geometry = CollectionScrollGeometry(
-      rowCount: count, rowSpan: stride, rowHeights: tallRowHeights)
+      rowCount: count, rowSpan: stride, rowHeights: tallRowHeights,
+      hiddenSeparators: hiddenSeparators)
     let anchor = geometry.row(atOrBeforeLine: offset)
-    let rowsPerViewport = (hint.viewportSize.height + stride - 1) / stride
+    // Rows whose separators are hidden pack one line closer each.
+    let rowsPerViewport =
+      hiddenSeparators.isEmpty
+      ? (hint.viewportSize.height + stride - 1) / stride
+      : max(1, geometry.row(atOrBeforeLine: offset + hint.viewportSize.height) - anchor + 1)
     let lower = max(0, anchor - overscan)
     let upper = min(count, anchor + rowsPerViewport + overscan + 1)
     guard lower < upper else {

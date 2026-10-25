@@ -11,27 +11,39 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
     let index: Int
     let height: Int
     let precedingExtraLines: Int
+    /// Lines this row adds beyond the one-line-per-row stride: the cells a
+    /// taller row spans, minus its following separator line when hidden.
+    let extraLines: Int
   }
 
   private let rows: Rows
 
+  /// `hiddenSeparators` names rows whose FOLLOWING separator line is not
+  /// drawn (a table row with `listRowSeparator(.hidden)`); it applies only to
+  /// strides that interleave a separator (`rowSpan > 1`) and never to the
+  /// last row, which has no following separator.
   package init(
     rowCount: Int,
     rowSpan: Int,
-    rowHeights: [Int: Int] = [:]
+    rowHeights: [Int: Int] = [:],
+    hiddenSeparators: Set<Int> = []
   ) {
     let count = max(0, rowCount)
+    let span = max(1, rowSpan)
+    let hidden = span > 1 ? hiddenSeparators.filter { $0 >= 0 && $0 < count - 1 } : []
     var extraLines = 0
-    let measured = rowHeights.keys.sorted().compactMap { index -> MeasuredRow? in
-      guard index >= 0, index < count, let height = rowHeights[index], height > 1 else {
-        return nil
-      }
-      let row = MeasuredRow(index: index, height: height, precedingExtraLines: extraLines)
-      extraLines += height - 1
+    let indices = Set(rowHeights.keys).union(hidden).sorted()
+    let measured = indices.compactMap { index -> MeasuredRow? in
+      guard index >= 0, index < count else { return nil }
+      let height = max(1, rowHeights[index] ?? 1)
+      let extra = (height - 1) - (hidden.contains(index) ? 1 : 0)
+      guard height > 1 || extra != 0 else { return nil }
+      let row = MeasuredRow(
+        index: index, height: height, precedingExtraLines: extraLines, extraLines: extra)
+      extraLines += extra
       return row
     }
-    rows = .indexed(
-      count: count, span: max(1, rowSpan), measured: measured)
+    rows = .indexed(count: count, span: span, measured: measured)
   }
 
   package init(rowRanges: [Range<Int>], displayLineCount: Int) {
@@ -60,7 +72,7 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
     case .indexed(let count, let span, let measured):
       guard count > 0 else { return 0 }
       let last = measured.last
-      let extraLines = last.map { $0.precedingExtraLines + $0.height - 1 } ?? 0
+      let extraLines = last.map { $0.precedingExtraLines + $0.extraLines } ?? 0
       return count * span - (span - 1) + extraLines
     case .materialized(_, let displayLineCount):
       return displayLineCount
@@ -79,7 +91,7 @@ package struct CollectionScrollGeometry: Equatable, Sendable {
       guard count > 0 else { return 0..<0 }
       let insertion = firstMeasuredRow(atOrAfter: index, in: measured)
       let previous = insertion > 0 ? measured[insertion - 1] : nil
-      let extraLines = previous.map { $0.precedingExtraLines + $0.height - 1 } ?? 0
+      let extraLines = previous.map { $0.precedingExtraLines + $0.extraLines } ?? 0
       let start = index * span + extraLines
       let height =
         insertion < measured.count && measured[insertion].index == index

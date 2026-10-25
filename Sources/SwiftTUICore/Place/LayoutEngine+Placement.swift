@@ -231,6 +231,12 @@ extension LayoutEngine {
     case .table(let payload):
       var idealSize = measuredTableIdealSize(for: payload)
       idealSize.height += knownTallRowExtraCells(in: measured)
+      if payload.isViewportBacked,
+        let edges = measured.containerAllocationSnapshot?.hostedCollection?.hiddenRowSeparatorEdges,
+        !edges.isEmpty
+      {
+        idealSize.height -= hiddenTableSeparators(from: edges, rowCount: payload.rowCount).count
+      }
       return union(
         childContentBounds,
         CellRect(origin: bounds.origin, size: idealSize)

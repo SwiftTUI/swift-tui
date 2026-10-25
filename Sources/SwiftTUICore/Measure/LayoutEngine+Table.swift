@@ -36,6 +36,7 @@ extension LayoutEngine {
     childMeasurements: [MeasuredNode],
     sourceIndices: [Int]? = nil,
     retainedTallRowHeights: [Int: Int] = [:],
+    hiddenSeparatorCount: Int = 0,
     proposal: ProposedSize
   ) -> CellSize {
     guard !payload.columns.isEmpty else { return .zero }
@@ -44,6 +45,11 @@ extension LayoutEngine {
     }
 
     var idealSize = measuredTableIdealSize(for: payload)
+    // A viewport-backed body counts one separator between rows; hidden ones
+    // take no line (`listRowSeparator(.hidden)`).
+    if payload.isViewportBacked {
+      idealSize.height -= min(hiddenSeparatorCount, max(0, payload.rowCount - 1))
+    }
     idealSize.height += childMeasurements.reduce(0) {
       $0 + max(0, $1.measuredSize.height - 1)
     }

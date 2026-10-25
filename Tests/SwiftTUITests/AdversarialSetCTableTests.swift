@@ -70,12 +70,10 @@ struct AdversarialSetCTableTests {
     let hiddenRows = SetCTable.contentRows(hidden, rows)
     try #require(plain.count == 4 && hiddenRows.count == 4, "\(hidden)")
     #expect(plain[1] - plain[0] == 2)
-    setCKnown(
-      "STUI-1209: hidden row separators in a data-driven table are still drawn: the indexed-source rows measure with rowSpan 2 (Table.swift:230) and the viewport-backed ideal height counts rowCount - 1 separators regardless of visibility (LayoutEngine+Table.swift:106-107); contract: SwiftUI listRowSeparator(.hidden); the static row path (setC124) honors it"
-    ) {
-      #expect(hiddenRows[1] - hiddenRows[0] == 1, "\(hidden)")
-      #expect(hiddenRows[3] - hiddenRows[0] == 3, "\(hidden)")
-    }
+    // STUI-1209 (fixed in wave 2): data-driven rows honor listRowSeparator(.hidden)
+    // like static rows (setC124).
+    #expect(hiddenRows[1] - hiddenRows[0] == 1, "\(hidden)")
+    #expect(hiddenRows[3] - hiddenRows[0] == 3, "\(hidden)")
   }
 
   @Test func setC126TitleAlignmentDefaultsToCellAlignment() throws {
@@ -143,6 +141,90 @@ struct AdversarialSetCTableTests {
     try #require(h.frame.contains("r0"), "\(h.frame)")
     let back = SetCTable.widths(h.frame.split(separator: "\n").map(String.init)).max() ?? 0
     #expect(back == wide, "\(h.frame)")
+  }
+
+  // Wave 2 (STUI-1164) neighbors of the STUI-1209 repair.
+  @Test func wave2a27DataTableMatchesStaticSeparators() throws {
+    let rows = ["alpha", "beta", "gamma", "delta"]
+    let data = SetCTable.lines(
+      Table(rows, id: \.self, columns: [TableColumn("Name")]) { row in
+        if row == "beta" {
+          Text(row).listRowSeparator(.hidden)
+        } else {
+          Text(row)
+        }
+      }, name: "wave2a27-data", width: 20, height: 16)
+    let authored = SetCTable.lines(
+      Table(columns: [TableColumn("Name")]) {
+        TableRow { Text("alpha") }
+        TableRow { Text("beta").listRowSeparator(.hidden) }
+        TableRow { Text("gamma") }
+        TableRow { Text("delta") }
+      }, name: "wave2a27-static", width: 20, height: 16)
+    let indices = SetCTable.contentRows(data, rows)
+    try #require(indices.count == 4, "\(data)")
+    #expect(zip(indices.dropFirst(), indices).map { $0 - $1 } == [1, 1, 2], "\(data)")
+    #expect(
+      data.map(SetCTable.trimmed).filter { !$0.isEmpty }
+        == authored.map(SetCTable.trimmed).filter { !$0.isEmpty },
+      "data \(data) vs static \(authored)")
+  }
+
+  @Test func wave2a28ScrolledDataTableHonorsHiddenSeparators() throws {
+    let rows = (0..<8).map { SetCTableRow(id: "r\($0)") }
+    let names = rows.map(\.id)
+    let box = SetCTableBox()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave2a28"),
+      size: .init(width: 20, height: 9)
+    ) {
+      Table(rows, selection: box.selection, columns: [TableColumn("Name")]) { row in
+        Text(row.id).listRowSeparator(.hidden)
+      }.scrollIndicators(.hidden)
+    }
+    defer { h.shutdown() }
+    func visible() -> [Int] {
+      SetCTable.contentRows(h.frame.split(separator: "\n").map(String.init), names)
+    }
+    let top = visible()
+    #expect(top.count == 5, "\(h.frame)")
+    #expect(zip(top.dropFirst(), top).allSatisfy { $0 - $1 == 1 }, "\(h.frame)")
+    _ = try h.pressKey(.init(.tab))
+    _ = try h.pressKey(.init(.end))
+    let bottom = visible()
+    #expect(h.frame.contains("r7"), "\(h.frame)")
+    #expect(bottom.count == 5, "\(h.frame)")
+    #expect(zip(bottom.dropFirst(), bottom).allSatisfy { $0 - $1 == 1 }, "\(h.frame)")
+  }
+
+  @Test func wave2a29ScrollHostedDataTableHonorsHiddenSeparators() throws {
+    // Equal-width ids keep the high-water column width out of the oracle.
+    let rows = (0..<30).map { SetCTableRow(id: $0 < 10 ? "row0\($0)" : "row\($0)") }
+    let names = rows.map(\.id)
+    let box = SetCTableBox()
+    let h = try StressRuntimeHarness(
+      rootIdentity: testIdentity("wave2a29"),
+      size: .init(width: 24, height: 10)
+    ) {
+      ScrollView {
+        Table(rows, selection: box.selection, columns: [TableColumn("Name")]) { row in
+          Text(row.id).listRowSeparator(.hidden)
+        }
+      }.scrollIndicators(.hidden)
+    }
+    defer { h.shutdown() }
+    func visible() -> [Int] {
+      SetCTable.contentRows(h.frame.split(separator: "\n").map(String.init), names)
+    }
+    let top = visible()
+    #expect(top.count >= 6, "\(h.frame)")
+    #expect(zip(top.dropFirst(), top).allSatisfy { $0 - $1 == 1 }, "\(h.frame)")
+    let point = try #require(h.point(forText: "row01"))
+    for _ in 0..<12 { _ = try h.scrollPointer(at: point, deltaY: 1) }
+    let middle = visible()
+    #expect(middle.count >= 9, "\(h.frame)")
+    #expect(zip(middle.dropFirst(), middle).allSatisfy { $0 - $1 == 1 }, "\(h.frame)")
+    #expect(h.frame.contains("row12"), "\(h.frame)")
   }
 
   @Test func setC129NoColumnsRendersNothing() {

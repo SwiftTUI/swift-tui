@@ -122,12 +122,22 @@ public struct ScrollView<Content: View>: PrimitiveView, IterativeResolvableView 
               return false
             }
             let event = keyPress.key
-            if keyPress.key == .home || keyPress.key == .end, let scrollCommandRegistry {
-              let destination = keyPress.key == .home ? 0 : Int.max
+            if keyPress.key == .home, let scrollCommandRegistry {
               return scrollCommandRegistry.scrollTo(
-                x: axes.contains(.horizontal) && targetAxis != .vertical ? destination : nil,
-                y: axes.contains(.vertical) && targetAxis != .horizontal ? destination : nil,
+                x: axes.contains(.horizontal) && targetAxis != .vertical ? 0 : nil,
+                y: axes.contains(.vertical) && targetAxis != .horizontal ? 0 : nil,
                 scopeIdentity: context.identity)
+            }
+            // End jumps to ONE far edge: the bottom whenever a vertical axis
+            // is in play, trailing only for a horizontal-only view or its
+            // horizontal indicator. The edge command also refines itself
+            // once the frame measures the content it lands on.
+            if keyPress.key == .end, let scrollCommandRegistry {
+              let vertical =
+                targetAxis == .vertical || (targetAxis == nil && axes.contains(.vertical))
+              let edge: Edge = vertical ? .bottom : .trailing
+              guard axes.contains(vertical ? .vertical : .horizontal) else { return false }
+              return scrollCommandRegistry.scrollToEdge(edge, scopeIdentity: context.identity)
             }
             if keyPress.key == .pageUp || keyPress.key == .pageDown,
               let scrollCommandRegistry

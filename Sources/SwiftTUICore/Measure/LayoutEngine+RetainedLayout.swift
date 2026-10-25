@@ -83,7 +83,10 @@ extension LayoutEngine {
           hint: passContext.currentMeasureViewportHint,
           count: resolved.indexedChildSource?.count ?? 0,
           rowStride: rowStride,
-          tallRowHeights: hostedSnapshot.tallRowHeights
+          tallRowHeights: hostedSnapshot.tallRowHeights,
+          hiddenSeparators: hiddenTableSeparators(
+            from: hostedSnapshot.hiddenRowSeparatorEdges,
+            rowCount: resolved.indexedChildSource?.count ?? 0)
         ) == storedWindow,
         passContext.claimCurrentMeasureViewportHint(for: resolved.identity) != nil
       else {

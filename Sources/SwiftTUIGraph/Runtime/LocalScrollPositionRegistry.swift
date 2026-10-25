@@ -94,6 +94,18 @@ package final class LocalScrollPositionRegistry: Equatable {
     let requestedAnchor: CollectionScrollAnchor
   }
   private var pendingCollectionTargets: [Identity: PendingCollectionTarget] = [:]
+  /// A far-edge command resolved against the extent the previous frame
+  /// measured. Lazy stacks estimate unrealized rows, so the frame that
+  /// realizes the edge can grow or shrink the content; the command is
+  /// re-resolved once that frame publishes its routes (see `sync`).
+  private struct PendingFarEdge {
+    let edge: Edge
+    var requestedOffset: ScrollOffset
+    var remainingRefinements: Int
+  }
+  private var pendingFarEdges: [Identity: PendingFarEdge] = [:]
+  /// Bounds re-resolution for content whose extent depends on its own offset.
+  private static let farEdgeRefinementLimit = 4
   /// What each scroll route last auto-revealed (focused element + text cursor),
   /// keyed by the route identity. Lets `sync` reveal changed focus or cursor
   /// instead of enforcing a standing per-frame constraint
@@ -519,6 +531,25 @@ package final class LocalScrollPositionRegistry: Equatable {
     }
 
     let currentOffset = registration.currentOffset()
+    let next = edgeOffset(edge, from: currentOffset, in: route)
+    guard next != currentOffset else {
+      return false
+    }
+
+    registration.applyOffset(next)
+    if edge == .bottom || edge == .trailing {
+      pendingFarEdges[route.identity] = .init(
+        edge: edge, requestedOffset: next,
+        remainingRefinements: Self.farEdgeRefinementLimit)
+    } else {
+      pendingFarEdges.removeValue(forKey: route.identity)
+    }
+    return true
+  }
+
+  private func edgeOffset(
+    _ edge: Edge, from currentOffset: ScrollOffset, in route: ScrollRoute
+  ) -> ScrollOffset {
     var next = currentOffset
     switch edge {
     case .top:
@@ -530,14 +561,7 @@ package final class LocalScrollPositionRegistry: Equatable {
     case .trailing:
       next.x = max(0, route.contentBounds.size.width - route.viewportRect.size.width)
     }
-
-    next = clampedOffset(next, in: route)
-    guard next != currentOffset else {
-      return false
-    }
-
-    registration.applyOffset(next)
-    return true
+    return clampedOffset(next, in: route)
   }
 
   @discardableResult
@@ -667,6 +691,30 @@ package final class LocalScrollPositionRegistry: Equatable {
         registration.applyOffset(pending.originalOffset)
         return true
       }
+    }
+
+    // Re-resolve a far-edge command against the extent this frame measured.
+    // Only while the route still holds the offset the command wrote: any
+    // other input (or a commit-time clamp) supersedes the command.
+    for (identity, pending) in pendingFarEdges {
+      guard let route = scrollRoutes.first(where: { $0.identity == identity }),
+        let registration = registrations[identity],
+        registration.currentOffset() == pending.requestedOffset,
+        pending.remainingRefinements > 0
+      else {
+        pendingFarEdges.removeValue(forKey: identity)
+        continue
+      }
+      let next = edgeOffset(pending.edge, from: pending.requestedOffset, in: route)
+      guard next != pending.requestedOffset else {
+        pendingFarEdges.removeValue(forKey: identity)
+        continue
+      }
+      pendingFarEdges[identity] = .init(
+        edge: pending.edge, requestedOffset: next,
+        remainingRefinements: pending.remainingRefinements - 1)
+      registration.applyOffset(next)
+      return true
     }
 
     // Refine once the requested collection window has been measured. Using

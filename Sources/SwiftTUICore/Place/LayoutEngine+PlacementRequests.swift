@@ -639,11 +639,14 @@ extension LayoutEngine {
       let stored = measured.containerAllocationSnapshot?.hostedCollection?.tableLayout,
       stored.contentBounds.size == DrawExtractor().tableInsetBounds(for: payload, in: bounds).size
     else {
+      let hosted = measured.containerAllocationSnapshot?.hostedCollection
       return DrawExtractor().visibleTableLayout(
         for: payload,
         in: bounds,
-        columnWidths: measured.containerAllocationSnapshot?.hostedCollection?.tableColumnWidths,
-        rowHeights: measured.containerAllocationSnapshot?.hostedCollection?.tallRowHeights
+        columnWidths: hosted?.tableColumnWidths,
+        rowHeights: hosted?.tallRowHeights,
+        hiddenSeparators: hiddenTableSeparators(
+          from: hosted?.hiddenRowSeparatorEdges ?? [:], rowCount: payload.rowCount)
       )
     }
     return stored.translated(by: bounds.origin)

@@ -167,9 +167,13 @@ package enum CollectionSelectionPolicy<Value: Hashable & Sendable> {
     }
   }
 
+  /// Moves single selection one eligible row in `delta`'s direction.
+  /// `isEnabled` receives an index into `orderedTags`; ineligible rows are
+  /// skipped, and a disabled selected row still anchors the walk.
   package func step(
     orderedTags: [SelectionTag],
-    delta: Int
+    delta: Int,
+    isEnabled: (Int) -> Bool = { _ in true }
   ) -> Bool {
     guard let direction = delta == 0 ? nil : delta.signum(), !orderedTags.isEmpty else {
       return false
@@ -183,8 +187,11 @@ package enum CollectionSelectionPolicy<Value: Hashable & Sendable> {
     let currentIndex =
       orderedTags.firstIndex(where: contains)
       ?? (direction > 0 ? -1 : orderedTags.count)
-    let nextIndex = min(max(currentIndex + delta, 0), orderedTags.count - 1)
-    guard nextIndex != currentIndex else {
+    var nextIndex = currentIndex + direction
+    while orderedTags.indices.contains(nextIndex), !isEnabled(nextIndex) {
+      nextIndex += direction
+    }
+    guard orderedTags.indices.contains(nextIndex) else {
       return false
     }
     return select(orderedTags[nextIndex])

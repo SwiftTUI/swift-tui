@@ -282,17 +282,24 @@ extension DrawExtractor {
   /// per row of the whole dataset even though only a window was realized. The
   /// skipped body lines still occupy their cells, arithmetically: one each, or
   /// the height `rowHeights` retained for a row known to be taller.
+  ///
+  /// `hiddenSeparators` names the viewport-backed rows whose following
+  /// separator is hidden (`listRowSeparator(.hidden)`); those lines take no
+  /// cell. Materialized payloads carry the same information on their rows.
   func visibleTableLayout(
     for payload: TablePayload,
     in bounds: CellRect,
     columnWidths: [Int]? = nil,
     rowHeights: [Int: Int]? = nil,
+    hiddenSeparators: Set<Int> = [],
     rowWindow: Range<Int>? = nil
   ) -> TableVisibleLayout {
     TableLayoutDerivationProbe.recordDerivation()
     let bounds = tableInsetBounds(for: payload, in: bounds)
+    let hiddenSeparators = payload.isViewportBacked ? hiddenSeparators : []
     let geometry = CollectionScrollGeometry(
-      rowCount: payload.rowCount, rowSpan: 2, rowHeights: rowHeights ?? [:])
+      rowCount: payload.rowCount, rowSpan: 2, rowHeights: rowHeights ?? [:],
+      hiddenSeparators: hiddenSeparators)
     let widths =
       columnWidths
       ?? measureTableColumnWidths(
@@ -307,7 +314,7 @@ extension DrawExtractor {
     {
       return positionedTableLayout(
         for: payload, in: bounds, widths: widths, rowHeights: rowHeights ?? [:],
-        geometry: geometry)
+        hiddenSeparators: hiddenSeparators, geometry: geometry)
     }
     if !payload.isViewportBacked, let rowHeights {
       return materializedHostedTableLayout(
@@ -320,6 +327,7 @@ extension DrawExtractor {
       showsIndicators: payload.showsIndicators,
       widths: widths,
       rowHeights: rowHeights,
+      hiddenSeparators: hiddenSeparators,
       rowWindow: rowWindow
     )
     var lines = generated.lines
@@ -376,7 +384,8 @@ extension DrawExtractor {
 
   private func positionedTableLayout(
     for payload: TablePayload, in bounds: CellRect, widths: [Int],
-    rowHeights: [Int: Int], geometry estimatedGeometry: CollectionScrollGeometry
+    rowHeights: [Int: Int], hiddenSeparators: Set<Int>,
+    geometry estimatedGeometry: CollectionScrollGeometry
   ) -> TableVisibleLayout {
     var chromePayload = payload
     if payload.isViewportBacked { chromePayload.rows = [] }
@@ -409,11 +418,13 @@ extension DrawExtractor {
       var last = first
       while last < geometry.rowCount, geometry.line(forRow: last) < end { last += 1 }
       let endPosition = min(geometry.rowCount * 2 - 1, last * 2)
+      let positions = ((first * 2)..<endPosition).filter {
+        $0.isMultiple(of: 2) || !hiddenSeparators.contains($0 / 2)
+      }
       body = viewportBackedTableBodyLines(
-        positions: (first * 2)..<endPosition,
+        positions: positions,
         payload: payload, widths: widths)
-      for index in body.indices {
-        let position = first * 2 + index
+      for (index, position) in positions.enumerated() {
         let range = geometry.lineRange(forRow: position / 2)
         body[index].height = position.isMultiple(of: 2) ? range.count : 1
         body[index].yOffset = position.isMultiple(of: 2) ? range.lowerBound : range.upperBound
@@ -613,6 +624,7 @@ extension DrawExtractor {
     showsIndicators: Bool,
     widths: [Int],
     rowHeights: [Int: Int]?,
+    hiddenSeparators: Set<Int>,
     rowWindow: Range<Int>?
   ) -> GeneratedTableLines {
     if payload.isViewportBacked {
@@ -623,6 +635,7 @@ extension DrawExtractor {
         showsIndicators: showsIndicators,
         widths: widths,
         rowHeights: rowHeights,
+        hiddenSeparators: hiddenSeparators,
         rowWindow: rowWindow
       )
     }
@@ -732,6 +745,7 @@ extension DrawExtractor {
     showsIndicators: Bool,
     widths: [Int],
     rowHeights: [Int: Int]?,
+    hiddenSeparators: Set<Int>,
     rowWindow: Range<Int>?
   ) -> GeneratedTableLines {
     guard viewportLineCount > 0 else {
@@ -755,8 +769,17 @@ extension DrawExtractor {
     // The body's cells: a row line is as tall as its hosted row measured, so
     // the rows `rowHeights` knows are taller add their extra cells.
     let bodyCellCount = geometry.displayLineCount
+    // A hidden separator keeps its position in the row/separator line model
+    // but takes no cell and generates no line.
+    func isHiddenSeparator(_ position: Int) -> Bool {
+      position % 2 == 1 && hiddenSeparators.contains(position / 2)
+    }
     func lineHeight(_ position: Int) -> Int {
-      position % 2 == 0 ? max(1, rowHeights?[position / 2] ?? 1) : 1
+      if position % 2 == 0 { return max(1, rowHeights?[position / 2] ?? 1) }
+      return isHiddenSeparator(position) ? 0 : 1
+    }
+    func hiddenSeparatorCount(in positions: Range<Int>) -> Int {
+      hiddenSeparators.reduce(0) { $0 + (positions.contains($1 * 2 + 1) ? 1 : 0) }
     }
     guard bodyCellCount > bodyCapacity else {
       // These bounds cover the whole content — the `ScrollView` case, and the
@@ -764,42 +787,55 @@ extension DrawExtractor {
       // overflow indicators shift the lines and every line's position is its
       // position in the content.
       let totalLineCount = top.count + bodyLineCount + bottom.count
-      guard let rowWindow, !rowWindow.isEmpty else {
-        let all =
-          top
+      let allLines = {
+        top
           + viewportBackedTableBodyLines(
             positions: 0..<bodyLineCount,
             payload: payload,
-            widths: widths
+            widths: widths,
+            hiddenSeparators: hiddenSeparators
           )
           + bottom
-        return (all, nil, totalLineCount, nil, nil, bodyCapacity)
+      }
+      let hiddenTotal = hiddenSeparatorCount(in: 0..<bodyLineCount)
+      guard let rowWindow, !rowWindow.isEmpty else {
+        return (allLines(), nil, totalLineCount - hiddenTotal, nil, nil, bodyCapacity)
       }
 
       let windowStart = max(0, rowWindow.lowerBound * 2)
       let windowEnd = min(bodyLineCount, max(0, rowWindow.upperBound * 2))
       guard windowStart < windowEnd, windowEnd - windowStart < bodyLineCount else {
-        let all =
-          top
-          + viewportBackedTableBodyLines(
-            positions: 0..<bodyLineCount,
-            payload: payload,
-            widths: widths
-          )
-          + bottom
-        return (all, nil, totalLineCount, nil, nil, bodyCapacity)
+        return (allLines(), nil, totalLineCount - hiddenTotal, nil, nil, bodyCapacity)
       }
 
       let body = viewportBackedTableBodyLines(
         positions: windowStart..<windowEnd,
         payload: payload,
-        widths: widths
+        widths: widths,
+        hiddenSeparators: hiddenSeparators
       )
+      // Positions inside the window close up over its hidden separators; the
+      // ones before it are already in the first row's geometry line, and the
+      // one after the last row is counted with the content after the window.
+      var hiddenSoFar = 0
+      var bodyPositions: [Int] = []
+      for position in windowStart..<windowEnd {
+        if isHiddenSeparator(position) {
+          hiddenSoFar += 1
+        } else {
+          bodyPositions.append(top.count + position - hiddenSoFar)
+        }
+      }
+      let lastRow = (windowEnd - 1) / 2
+      let hiddenInside = hiddenSeparatorCount(in: windowStart..<(lastRow * 2))
+      let hiddenFromWindow = hiddenSeparatorCount(in: windowStart..<bodyLineCount)
       let positions =
         Array(0..<top.count)
-        + (windowStart..<windowEnd).map { top.count + $0 }
-        + (bottom.isEmpty ? [] : [top.count + bodyLineCount])
-      return (top + body + bottom, positions, totalLineCount, nil, nil, bodyCapacity)
+        + bodyPositions
+        + (bottom.isEmpty ? [] : [top.count + bodyLineCount - hiddenFromWindow])
+      return (
+        top + body + bottom, positions, totalLineCount - hiddenInside, nil, nil, bodyCapacity
+      )
     }
 
     let selectedLine = min(
@@ -841,7 +877,7 @@ extension DrawExtractor {
     // Publish the first row at the fitted end window so navigation uses the
     // same whole-row endpoint as placement.
     func maximumAnchorRow(_ range: (offset: Int, end: Int, maxOffset: Int)) -> Int? {
-      bodyCellCount > bodyLineCount ? (range.maxOffset + 1) / 2 : nil
+      bodyCellCount != bodyLineCount ? (range.maxOffset + 1) / 2 : nil
     }
     func scrollPosition(_ range: (offset: Int, end: Int, maxOffset: Int))
       -> CollectionScrollPosition
@@ -873,7 +909,8 @@ extension DrawExtractor {
           viewportBackedTableBodyLines(
             positions: range.offset..<range.end,
             payload: payload,
-            widths: widths
+            widths: widths,
+            hiddenSeparators: hiddenSeparators
           ),
           capacity: bodyCapacity
         )
@@ -900,7 +937,8 @@ extension DrawExtractor {
       contentsOf: viewportBackedTableBodyLines(
         positions: range.offset..<range.end,
         payload: payload,
-        widths: widths
+        widths: widths,
+        hiddenSeparators: hiddenSeparators
       )
     )
     let hidesRowsBelow = range.end < bodyLineCount
@@ -918,17 +956,19 @@ extension DrawExtractor {
   }
 
   private func viewportBackedTableBodyLines(
-    positions: Range<Int>,
+    positions: some Sequence<Int>,
     payload: TablePayload,
-    widths: [Int]
+    widths: [Int],
+    hiddenSeparators: Set<Int> = []
   ) -> [TableDisplayLine] {
     let borderStyle = TextStyle(
       foregroundStyle: payload.borderStyle ?? payload.style.borderStyle ?? .semantic(.separator),
       opacity: payload.opacity
     )
     let glyphs = payload.style.borderGlyphs
-    return positions.map { position in
+    return positions.compactMap { position -> TableDisplayLine? in
       if position % 2 == 1 {
+        guard !hiddenSeparators.contains(position / 2) else { return nil }
         return TableDisplayLine(
           segments: borderSegments(
             widths: widths,
