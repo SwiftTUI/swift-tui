@@ -165,6 +165,62 @@ package final class LifecycleCoordinator {
     previousLifecycleHandlers.absorbNewer(snapshot)
   }
 
+  /// Cancels the tasks a committed pass retired, at that pass's commit, when
+  /// the pass's plan is carried past a suspension point instead of
+  /// dispatching (the focus-sync re-render). Runtime.md orders removal's
+  /// cancel first; a task left running across the re-render's suspended frame
+  /// tail writes into owners the commit already retired (STUI-1233). The
+  /// entries stay in the carried plan, so dispatch-time supersession and the
+  /// cancel counters see the plan unchanged; their dispatch finds nothing left
+  /// to cancel. A cancel without a view node stays for that dispatch, as now.
+  func cancelRetiredTasks(in entries: [LifecycleCommitEntry]) {
+    for entry in entries {
+      guard case .taskCancel(let descriptor) = entry.operation,
+        let viewNodeID = entry.viewNodeID
+      else {
+        continue
+      }
+      taskRunner.cancel(viewNodeID: viewNodeID, matching: descriptor)
+    }
+  }
+
+  /// Dispatches the handler entries among `entries` (disappear, appear and
+  /// change, in order, with the commit-time bookkeeping of
+  /// ``applyCommittedFrame(plan:currentLifecycleRegistry:currentTaskRegistry:)``)
+  /// and returns the task entries, in order, with any skip issues. For the
+  /// carried plan of an acquisition that presented nothing: its passes
+  /// committed, so their trees are live until the next commit, which can
+  /// retire the owners these handlers address (a dismissal that superseded an
+  /// open, STUI-1234). Running them now keeps them on live owners, keeps
+  /// disappearance before the replacement's appearance, and still runs appear
+  /// handlers before their owned tasks start; the task entries keep riding
+  /// the carry, so start supersession sees them with the next frame's plan.
+  func applyCarriedHandlers(
+    _ entries: [LifecycleCommitEntry],
+    currentLifecycleRegistry: LocalLifecycleRegistry,
+    currentTaskRegistry: LocalTaskRegistry
+  ) -> (remaining: [LifecycleCommitEntry], issues: [RuntimeIssue]) {
+    var handlers: [LifecycleCommitEntry] = []
+    var remaining: [LifecycleCommitEntry] = []
+    for entry in entries {
+      switch entry.operation {
+      case .disappear, .appear, .change:
+        handlers.append(entry)
+      case .taskStart, .taskCancel, .taskTransfer:
+        remaining.append(entry)
+      }
+    }
+    guard !handlers.isEmpty else {
+      return (remaining, [])
+    }
+    let issues = applyCommittedFrame(
+      plan: CommitPlan(lifecycle: handlers),
+      currentLifecycleRegistry: currentLifecycleRegistry,
+      currentTaskRegistry: currentTaskRegistry
+    )
+    return (remaining, issues)
+  }
+
   func beginShutdown() {
     taskRunner.beginShutdown()
   }

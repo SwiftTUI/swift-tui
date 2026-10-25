@@ -733,10 +733,7 @@ extension RunLoop {
           // here would claim a latency for pixels that never appeared.
           fireDeferredAnimationCompletions()
           restorePendingAnsweredInputs(answeredInputs)
-          appendLifecycleCarryForward(
-            convergence.lifecycleCarryForward,
-            into: &deferredLifecycleCarryForward
-          )
+          deferCarriedLifecycle(convergence.lifecycleCarryForward)
           requestNextAnimationFrameIfNeeded(
             renderer.internalAnimationController.lastTickResult,
             at: frameInstant

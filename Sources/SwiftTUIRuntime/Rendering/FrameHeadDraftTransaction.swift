@@ -182,6 +182,36 @@ package final class FrameHeadTransaction {
   }
 
   package func materializePreparedState() {
+    materializePreparedState(carryingBaselineStateMutations: false)
+  }
+
+  /// Suspends the prepared state for a suspension point inside the layout
+  /// stage when it retires an owner the committed baseline still holds, and
+  /// reports whether it did. The prepared graph is recorded first, so content
+  /// the inline layout realized joins its checkpoint; then the committed
+  /// baseline is the live graph while other main-actor work runs. A prepared
+  /// graph that retires nothing stays live: every owner that work can reach
+  /// is in it, and the stage's final suspension carries its writes back.
+  package func suspendPreparedStateForLayoutSuspension() -> Bool {
+    precondition(!didCommit && !didDiscard)
+    guard checkpoints != nil,
+      graphDraft.liveGraphRetiresBaselineOwner(in: viewGraph)
+    else {
+      return false
+    }
+    recordPreparedGraphState()
+    suspendPreparedState()
+    return true
+  }
+
+  /// Re-materializes the prepared state after a layout-stage suspension,
+  /// holding the baseline writes made meanwhile for the next baseline
+  /// restore, which re-applies them.
+  package func materializePreparedStateAfterLayoutSuspension() {
+    materializePreparedState(carryingBaselineStateMutations: true)
+  }
+
+  private func materializePreparedState(carryingBaselineStateMutations: Bool) {
     precondition(!didCommit && !didDiscard)
     guard let checkpoints else {
       return
@@ -190,7 +220,8 @@ package final class FrameHeadTransaction {
       frameHeadTimingRecorder.measure(.graphCheckpointRestore) {
         graphDraft.materializePreparedState(
           in: viewGraph,
-          preservingCurrentStateMutations: hasSuspendedPreparedState
+          preservingCurrentStateMutations: hasSuspendedPreparedState,
+          carryingBaselineStateMutations: carryingBaselineStateMutations
         )
       }
     }

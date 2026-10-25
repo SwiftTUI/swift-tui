@@ -384,7 +384,8 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       draft.frameTailInput,
       clock: draft.clock,
       cancellationToken: cancellationToken,
-      animationController: draft.animationDraft.controller
+      animationController: draft.animationDraft.controller,
+      preparedGraph: draft.transaction
     )
     if layoutResult.layout != nil {
       draft.transaction.recordPreparedGraphState()
@@ -392,12 +393,15 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
     return layoutResult
   }
 
+  /// - Parameter preparedGraph: The head whose prepared graph is live for this
+  ///   stage, if any; it is suspended across every offloaded pass.
   @MainActor
   private func renderLayoutResolvingLatePreferencesAsync(
     _ initialInput: FrameTailInput,
     clock: ContinuousClock?,
     cancellationToken: FrameTailJobCancellationToken?,
-    animationController: AnimationController
+    animationController: AnimationController,
+    preparedGraph: FrameHeadTransaction? = nil
   ) async -> AsyncLatePreferenceReconciliationOutput {
     await LatePreferenceReconciliationStage(
       policy: latePreferenceReconciliationPolicy,
@@ -415,7 +419,8 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
       await renderFrameTailLayoutAsync(
         input,
         clock: clock,
-        cancellationToken: cancellationToken
+        cancellationToken: cancellationToken,
+        preparedGraph: preparedGraph
       )
     }
   }
@@ -424,10 +429,26 @@ struct DefaultRendererFrameTailCoordinator: Sendable {
   private func renderFrameTailLayoutAsync(
     _ input: FrameTailInput,
     clock: ContinuousClock?,
-    cancellationToken: FrameTailJobCancellationToken?
+    cancellationToken: FrameTailJobCancellationToken?,
+    preparedGraph: FrameHeadTransaction? = nil
   ) async -> AsyncFrameTailLayoutPass {
     let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
     let layoutSuspends = frameTailRenderer.canOffloadLayout(input)
+    // An offloaded pass suspends the main actor, and the work that runs
+    // meanwhile (a departing tab's task wake, a timer, input) must see the
+    // committed graph, as it does while the raster stage is suspended. In the
+    // uncommitted prepared graph a tab switch has already retired the
+    // departing tab's owners, but their tasks are cancelled only when the
+    // frame commits (STUI-1233). The inline passes and the reconciliation
+    // steps between passes run on the main actor without suspending, so they
+    // keep the prepared graph.
+    let suspendedPreparedGraph =
+      layoutSuspends && preparedGraph?.suspendPreparedStateForLayoutSuspension() == true
+    defer {
+      if suspendedPreparedGraph {
+        preparedGraph?.materializePreparedStateAfterLayoutSuspension()
+      }
+    }
     let layoutSuspensionStart = layoutSuspends ? clock?.now : nil
     if layoutSuspends {
       suspensionHooks?.onBegin?()

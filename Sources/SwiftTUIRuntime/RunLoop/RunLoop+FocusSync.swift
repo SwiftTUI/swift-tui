@@ -151,6 +151,37 @@ extension RunLoop {
     LifecycleCarryForward.append(lifecycle, to: &carryForward)
   }
 
+  /// Folds a just-committed pass's lifecycle plan into the focus-sync
+  /// carry-forward, cancelling the tasks it retired at once (see
+  /// `LifecycleCoordinator.cancelRetiredTasks`).
+  func carryCommittedLifecycleForward(
+    _ lifecycle: [LifecycleCommitEntry],
+    into carryForward: inout [LifecycleCommitEntry]
+  ) {
+    lifecycleCoordinator.cancelRetiredTasks(in: lifecycle)
+    appendLifecycleCarryForward(lifecycle, into: &carryForward)
+  }
+
+  /// Defers the carried lifecycle of an acquisition that presented nothing
+  /// (cancelled before start, dropped, or elided) to the next frame, after
+  /// running its disappear, appear and change handlers while their owners
+  /// are still live (see `LifecycleCoordinator.applyCarriedHandlers`).
+  func deferCarriedLifecycle(_ carried: [LifecycleCommitEntry]) {
+    guard !carried.isEmpty else {
+      return
+    }
+    let carriedHandlers = lifecycleCoordinator.applyCarriedHandlers(
+      carried,
+      currentLifecycleRegistry: localLifecycleRegistry,
+      currentTaskRegistry: localTaskRegistry
+    )
+    reportRuntimeIssues(carriedHandlers.issues)
+    appendLifecycleCarryForward(
+      carriedHandlers.remaining,
+      into: &deferredLifecycleCarryForward
+    )
+  }
+
   /// Shared body of single-pass focus-sync. Applies the side effects that must
   /// run for every rendered tree (snapshot publication, gesture pruning,
   /// pointer-hover mode, pointer-capture release, focus/scroll/focused-value
@@ -276,7 +307,7 @@ extension RunLoop {
       convergence.rerenderedForFocusSync = true
       convergence.midFrameRelocationInvalidations.formUnion(
         schedulerPendingInvalidations().subtracting(convergence.pendingInvalidationsAtPassStart))
-      appendLifecycleCarryForward(
+      carryCommittedLifecycleForward(
         renderedArtifacts.commitPlan.lifecycle, into: &convergence.lifecycleCarryForward)
       return .rerender
     }
@@ -416,7 +447,7 @@ extension RunLoop {
       || focusStateChanged || accessibilityFocusChanged || focusedValuesChanged
       || scrollPositionChanged
     {
-      appendLifecycleCarryForward(
+      carryCommittedLifecycleForward(
         renderedArtifacts.commitPlan.lifecycle,
         into: &convergence.lifecycleCarryForward
       )

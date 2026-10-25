@@ -15,6 +15,15 @@ package final class ViewGraphFrameDraft {
   private let liveRegistrations: RuntimeRegistrationSet
   private let checkpoint: ViewGraph.Checkpoint?
   private var preparedCheckpoint: ViewGraph.Checkpoint?
+  /// State written against the baseline while the prepared graph was
+  /// suspended inside the layout stage, held across the prepared graph's
+  /// re-materialization (see `materializePreparedState`). The prepared graph
+  /// cannot hold writes to owners it has retired (a departing tab), and the
+  /// generation-gated baseline restore that follows would rewind them, so the
+  /// next baseline restore re-applies them: the rest of the tail then sees
+  /// the committed graph as that work left it, as it does after a write made
+  /// while the raster stage is suspended.
+  private var baselineStateMutationsAwaitingRestore: ViewGraph.StateMutationOverlay?
   private var dirtyEvaluationPlan: DirtyEvaluationPlan?
   /// The node count the most recent restore actually rewrote (the
   /// generation-gated restore skips nodes whose live generation matches the
@@ -98,19 +107,43 @@ package final class ViewGraphFrameDraft {
     }
   }
 
+  /// Restores the prepared checkpoint. With `carryingBaselineStateMutations`,
+  /// the baseline's restorable state writes are first held for the next
+  /// baseline restore; pass it only when re-materializing after a suspension
+  /// whose writes must survive the round trip.
   package func materializePreparedState(
     in viewGraph: ViewGraph,
-    preservingCurrentStateMutations: Bool = false
+    preservingCurrentStateMutations: Bool = false,
+    carryingBaselineStateMutations: Bool = false
   ) {
     precondition(!didCommit && !didDiscard)
     guard let preparedCheckpoint else {
       return
+    }
+    if carryingBaselineStateMutations, let checkpoint {
+      let baselineStateMutations = viewGraph.stateMutationOverlay(restorableInto: checkpoint)
+      if !baselineStateMutations.isEmpty {
+        baselineStateMutationsAwaitingRestore = baselineStateMutations
+      }
     }
     restoreGraphState(
       targetCheckpoint: preparedCheckpoint,
       in: viewGraph,
       preservingCurrentStateMutations: preservingCurrentStateMutations
     )
+  }
+
+  /// Whether the live graph has retired an owner the baseline still holds:
+  /// with the prepared state materialized, a departure this draft has not
+  /// committed. Work that runs while it is live would find that owner gone
+  /// although its tasks and handlers are still dispatched against it.
+  package func liveGraphRetiresBaselineOwner(in viewGraph: ViewGraph) -> Bool {
+    guard let checkpoint else {
+      return false
+    }
+    return checkpoint.index.nodesByOwnerLifetimeID.keys.contains {
+      viewGraph.nodeForOwnerLifetimeID($0) == nil
+    }
   }
 
   package func restoreBaselineState(
@@ -121,10 +154,13 @@ package final class ViewGraphFrameDraft {
     guard let checkpoint else {
       return
     }
+    let baselineStateMutations = baselineStateMutationsAwaitingRestore
+    baselineStateMutationsAwaitingRestore = nil
     restoreGraphState(
       targetCheckpoint: checkpoint,
       in: viewGraph,
-      preservingCurrentStateMutations: preservingCurrentStateMutations
+      preservingCurrentStateMutations: preservingCurrentStateMutations,
+      reapplying: baselineStateMutations
     )
   }
 
@@ -504,7 +540,8 @@ package final class ViewGraphFrameDraft {
   private func restoreGraphState(
     targetCheckpoint: ViewGraph.Checkpoint,
     in viewGraph: ViewGraph,
-    preservingCurrentStateMutations: Bool
+    preservingCurrentStateMutations: Bool,
+    reapplying heldStateMutations: ViewGraph.StateMutationOverlay? = nil
   ) {
     let stateMutations =
       preservingCurrentStateMutations
@@ -514,6 +551,11 @@ package final class ViewGraphFrameDraft {
     // gated-vs-ungated soundness oracle — no plan/fallback machinery here.
     let restoredNodeCount = viewGraph.restoreCheckpoint(targetCheckpoint)
     recordRestoreResult(restoredNodeCount: restoredNodeCount)
+    // Held writes are older than the current ones; apply them first so a
+    // newer write to the same slot wins.
+    if let heldStateMutations {
+      viewGraph.applyStateMutationOverlay(heldStateMutations)
+    }
     if let stateMutations, !stateMutations.isEmpty {
       viewGraph.applyStateMutationOverlay(stateMutations)
     }

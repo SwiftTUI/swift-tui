@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 @_spi(Testing) import SwiftTUITestSupport
+import Synchronization
 import Testing
 
 @testable import SwiftTUICore
@@ -1321,6 +1322,142 @@ struct DormantTabStateTests {
       )
     }
   }
+
+  // MARK: Departure ordering (STUI-1233)
+
+  /// A frame whose arriving tab realizes layout-dependent content keeps its
+  /// prepared graph live through the layout stage's main-actor work; the
+  /// realization snapshot's relayout then hops to the layout worker.
+  /// Main-actor work that runs during that hop (a departing tab's `.task`
+  /// wake, a timer) must see the committed graph, in which the departing tab
+  /// is still live, and its write must stay visible once the prepared graph
+  /// is re-materialized and suspended again for the raster stage.
+  @Test("a departing tab's write during an offloaded layout relayout reaches its live owner")
+  func departingWriteDuringOffloadedLayoutRelayoutReachesLiveOwner() async {
+    let model = DormantTabModel()
+    let probe = DepartingLayoutHopProbe()
+    let renderer = DefaultRenderer()
+    let root = testIdentity("DormantTabsLayoutHopWrite")
+    func render() async -> RenderSnapshot {
+      await renderer.renderAsync(
+        DepartingLayoutHopFixture(model: model, probe: probe),
+        context: dormantContext(root: root, actions: LocalActionRegistry())
+      )
+    }
+    #expect(surfaceText(await render()).contains("A count 0"))
+
+    // The inline pass that realizes the GeometryReader runs on the main
+    // actor, so the layout gate blocks only the first layout pass that starts
+    // after the realization: the offloaded relayout of its snapshot.
+    let layoutGate = AsyncFrameTailBlockingGate()
+    let rasterGate = AsyncFrameTailBlockingGate()
+    let realized = probe.realized
+    renderer.setFrameTailRenderHooks(
+      .init(
+        beforeLayout: {
+          if realized.isSet {
+            layoutGate.beforeRaster()
+          }
+        },
+        beforeRaster: { rasterGate.beforeRaster() }
+      )
+    )
+    defer {
+      layoutGate.release()
+      rasterGate.release()
+      renderer.setFrameTailRenderHooks(nil)
+    }
+
+    model.selection = "B"
+    let finished = AsyncEvent()
+    let switchTask = Task { @MainActor in
+      let snapshot = await render()
+      finished.fire()
+      return snapshot
+    }
+    let blocked = await firstFrameTailSignal(blocked: layoutGate, orFinished: finished)
+    #expect(blocked, "the arriving GeometryReader relayout never left the main actor")
+    guard blocked else {
+      return
+    }
+
+    // The task-wake shape: a body-created closure writes its own @State.
+    probe.write?(1)
+    #expect(probe.read?() == 1)
+    layoutGate.release()
+    await rasterGate.waitUntilBlocked()
+    #expect(probe.read?() == 1, "the write was rewound when the layout stage resumed")
+    rasterGate.release()
+    let switched = await switchTask.value
+    #expect(surfaceText(switched).contains("B width"))
+  }
+
+  /// The tab switch moves focus off the departing content, so the run loop
+  /// commits the switch and then re-renders once for focus, carrying the
+  /// committed lifecycle plan to the re-render's end. The departing tab's
+  /// owner is retired at the first commit; its `.task` must be cancelled
+  /// then, not after the re-render's suspended frame tail.
+  @Test("a departing tab's task is cancelled at the commit that retires it")
+  func departingTabTaskIsCancelledAtTheRetiringCommit() async throws {
+    let model = DormantTabModel()
+    let probe = DepartingTaskProbe()
+    let root = testIdentity("DormantTabsDepartingTask")
+    let harness = try StressRuntimeHarness(rootIdentity: root, size: .init(width: 48, height: 10)) {
+      DepartingTaskFixture(model: model, probe: probe)
+    }
+    defer { harness.shutdown() }
+    await probe.readyEvent(generation: 1).wait()
+    _ = try harness.focusText("Bump")
+    #expect(probe.taskStarts == 1)
+
+    // Raster entry 1 is the switch's own pass; entry 2 is the focus re-render.
+    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    harness.runLoop.renderer.setFrameTailRenderHooks(.init(beforeRaster: { gate.beforeRaster() }))
+    defer {
+      gate.release()
+      harness.runLoop.renderer.setFrameTailRenderHooks(nil)
+    }
+    let pump = SwiftTUIRuntime.RunLoop<Int, DepartingTaskFixture>.EventPump(
+      stream: AsyncStream { $0.finish() }, drainEvents: { [] }, hasPendingEvents: { false },
+      cancel: {}, scheduleDeadlineWake: { _ in })
+
+    model.selection = "B"
+    harness.runLoop.scheduler.requestInvalidation(of: [root])
+    let finished = AsyncEvent()
+    let renderTask = Task { @MainActor in
+      var frames = 0
+      _ = try await harness.runLoop.renderPendingFramesAsync(
+        renderedFrames: &frames, eventPump: pump)
+      finished.fire()
+    }
+    let blocked = await firstFrameTailSignal(blocked: gate, orFinished: finished)
+    #expect(blocked, "the tab switch did not re-render for focus")
+    if blocked {
+      // The switch committed; the departing owner is retired. Wake its task
+      // the way a timer or stream would while the re-render is suspended.
+      probe.departed = true
+      await probe.tick().wait()
+      #expect(probe.endedGenerations == [1], "the departing task was still running")
+      #expect(probe.cancellationObserved == [1])
+      #expect(probe.iterationsAfterDeparture == 0)
+    }
+    gate.release()
+    try await renderTask.value
+    #expect(probe.iterationsAfterDeparture == 0)
+    #expect(probe.changesAfterDeparture == 0)
+    #expect(probe.endedGenerations == [1])
+    #expect(harness.activeTaskCount == 0)
+
+    // Neighbour: the tab comes back with a fresh task, exactly one of it.
+    probe.departed = false
+    model.selection = "A"
+    _ = try harness.renderAfterExternalMutation()
+    await probe.readyEvent(generation: 2).wait()
+    #expect(probe.taskStarts == 2)
+    #expect(harness.activeTaskCount == 1)
+    await probe.tick().wait()
+    #expect(probe.iterations == 1)
+  }
 }
 
 private struct DormantTaskIdentityChurnFixture: View {
@@ -2051,5 +2188,195 @@ extension DormantTabStateTests {
     #expect(
       surfaceText(restored).contains("row1 count 1"),
       "row1 occurrence state lost at restore: \(surfaceText(restored))")
+  }
+}
+
+/// Races a frame-tail gate against the render that should reach it, so a
+/// premise failure (the render never blocks) ends the test instead of hanging.
+/// Shared with `PresentationSurfaceTests`.
+@MainActor
+func firstFrameTailSignal(
+  blocked gate: AsyncFrameTailBlockingGate,
+  orFinished finished: AsyncEvent
+) async -> Bool {
+  await withTaskGroup(of: Bool.self) { group in
+    group.addTask {
+      await gate.waitUntilBlocked()
+      return true
+    }
+    group.addTask {
+      await finished.wait()
+      return false
+    }
+    let first = await group.next() ?? false
+    group.cancelAll()
+    return first
+  }
+}
+
+@MainActor
+private final class DepartingLayoutHopProbe {
+  var write: ((Int) -> Void)?
+  var read: (() -> Int)?
+  let realized = LayoutRealizationFlag()
+}
+
+/// Set by the arriving tab's GeometryReader content when the inline layout
+/// pass realizes it; read by the frame-tail layout hook on any thread.
+private final class LayoutRealizationFlag: Sendable {
+  private let state = Mutex(false)
+
+  var isSet: Bool {
+    state.withLock { $0 }
+  }
+
+  func set() {
+    state.withLock { $0 = true }
+  }
+}
+
+@MainActor
+private struct DepartingLayoutHopFixture: View {
+  let model: DormantTabModel
+  let probe: DepartingLayoutHopProbe
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        DepartingLayoutHopContent(probe: probe)
+      }
+      Tab("B", value: "B") {
+        GeometryReader { proxy in
+          probe.realized.set()
+          return Text("B width \(proxy.size.width)")
+        }
+      }
+    }
+  }
+}
+
+@MainActor
+private struct DepartingLayoutHopContent: View {
+  let probe: DepartingLayoutHopProbe
+  @State private var value = 0
+
+  var body: some View {
+    probe.write = { value = $0 }
+    probe.read = { value }
+    return Text("A count \(value)")
+  }
+}
+
+/// Producer-owned signals for a tab's `.task` loop: each started task
+/// announces readiness, each tick reports whether the task consumed it, and
+/// the task records how it ended.
+@MainActor
+private final class DepartingTaskProbe {
+  var departed = false
+  private(set) var taskStarts = 0
+  private(set) var iterations = 0
+  private(set) var iterationsAfterDeparture = 0
+  private(set) var changesAfterDeparture = 0
+  private(set) var endedGenerations: [Int] = []
+  private(set) var cancellationObserved: [Int] = []
+  private var readyEvents: [Int: AsyncEvent] = [:]
+  private var continuation: AsyncStream<Void>.Continuation?
+  private var pendingTick: AsyncEvent?
+
+  func readyEvent(generation: Int) -> AsyncEvent {
+    if let event = readyEvents[generation] {
+      return event
+    }
+    let event = AsyncEvent()
+    readyEvents[generation] = event
+    return event
+  }
+
+  func startTask() -> (generation: Int, ticks: AsyncStream<Void>) {
+    taskStarts += 1
+    iterations = 0
+    let (ticks, continuation) = AsyncStream<Void>.makeStream()
+    self.continuation = continuation
+    readyEvent(generation: taskStarts).fire()
+    return (taskStarts, ticks)
+  }
+
+  /// Fires once the running task consumed the tick or has ended; immediately
+  /// when no task is running.
+  func tick() -> AsyncEvent {
+    let event = AsyncEvent()
+    guard let continuation else {
+      event.fire()
+      return event
+    }
+    pendingTick = event
+    continuation.yield(())
+    return event
+  }
+
+  func recordIteration() {
+    iterations += 1
+    if departed {
+      iterationsAfterDeparture += 1
+    }
+    pendingTick?.fire()
+    pendingTick = nil
+  }
+
+  func recordChange() {
+    if departed {
+      changesAfterDeparture += 1
+    }
+  }
+
+  func recordEnd(generation: Int, cancelled: Bool) {
+    endedGenerations.append(generation)
+    if cancelled {
+      cancellationObserved.append(generation)
+    }
+    continuation = nil
+    pendingTick?.fire()
+    pendingTick = nil
+  }
+}
+
+@MainActor
+private struct DepartingTaskFixture: View {
+  let model: DormantTabModel
+  let probe: DepartingTaskProbe
+
+  var body: some View {
+    TabView(selection: model.selectionBinding) {
+      Tab("A", value: "A") {
+        DepartingTaskContent(probe: probe)
+      }
+      Tab("B", value: "B") {
+        Text("plain-B")
+      }
+    }
+  }
+}
+
+@MainActor
+private struct DepartingTaskContent: View {
+  let probe: DepartingTaskProbe
+  @State private var count = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("A count \(count)")
+      Button("Bump") { count += 1 }
+    }
+    .onChange(of: count) {
+      probe.recordChange()
+    }
+    .task {
+      let (generation, ticks) = probe.startTask()
+      for await _ in ticks {
+        count += 1
+        probe.recordIteration()
+      }
+      probe.recordEnd(generation: generation, cancelled: Task.isCancelled)
+    }
   }
 }

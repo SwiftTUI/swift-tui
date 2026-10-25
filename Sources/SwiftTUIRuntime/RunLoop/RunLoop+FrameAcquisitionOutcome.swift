@@ -36,10 +36,7 @@ extension RunLoop {
         consecutivePreStartCancelCount = 0
       }
       reportRuntimeIssues(renderOutcome.runtimeIssues)
-      appendLifecycleCarryForward(
-        convergence.lifecycleCarryForward,
-        into: &deferredLifecycleCarryForward
-      )
+      deferCarriedLifecycle(convergence.lifecycleCarryForward)
       cancelledRenderCount += 1
       replayCancelledFrameIntent(scheduledFrame)
       emitCancelledFrameTail(
@@ -69,10 +66,7 @@ extension RunLoop {
       // Drop starvation is separately bounded by `progress_starvation`.
       consecutivePreStartCancelCount = 0
       reportRuntimeIssues(renderOutcome.runtimeIssues)
-      appendLifecycleCarryForward(
-        convergence.lifecycleCarryForward,
-        into: &deferredLifecycleCarryForward
-      )
+      deferCarriedLifecycle(convergence.lifecycleCarryForward)
       emitDroppedCompletedFrame(
         renderedFrames: renderedFrames,
         scheduledFrame: scheduledFrame,

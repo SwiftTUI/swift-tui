@@ -117,6 +117,17 @@ slot also contains semantic handler-installation work.
 - Removal cancels any owned task before running disappear handlers
 - Insertion runs appear handlers before starting any owned task
 - Task replacement on a stable identity cancels the old task before starting the new one
+- A pass that commits and then re-renders once for focus cancels the tasks it
+  removed at its own commit; its other lifecycle work runs after the frame
+  presents
+- When such a re-render is superseded or elided, so the frame presents
+  nothing, the committed pass's disappear, appear and change handlers run at
+  once, in order, before a later commit can remove the views that appeared;
+  its task starts run with the next presented frame
+- While a frame's tail is suspended, including an offloaded relayout of
+  layout-dependent content, the frame's uncommitted removals are not visible:
+  imperative work such as a task wake still reaches a departing view's live
+  state
 
 ### Task Rules
 
