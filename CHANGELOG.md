@@ -8,6 +8,55 @@ may make source-breaking API adjustments. Pin with `.upToNextMinor`.
 
 ## [Unreleased]
 
+### Added
+
+- `AccessibilityNode.runtimeFocusIdentity` in the `Runners` SPI, the identity
+  runtime keyboard focus selects (a collection row's selection control), so
+  native hosts can request assistive focus for a focused List row
+  (STUI-1211).
+
+### Changed
+
+- Centre stack, lazy-stack and `ZStack` children with the same rounding as
+  `frame` and `overlay` alignment: an odd leftover cell falls after the child
+  on both axes. A default-centred child of odd length in a stack or `ZStack`
+  with an even cross extent moves one cell toward the leading or top edge, and
+  shares its row with frame-centred siblings (STUI-1212).
+
+### Fixed
+
+- Bound numeric conversions that trapped on far but finite or non-finite
+  input: custom `Shape` strokes, dashes and trims (STUI-741), `Canvas` and
+  `BrailleCanvas` primitives, which now clip to the canvas before iterating
+  (STUI-753), `Point.containingCell` and pointer coordinates from the host wire
+  and terminal SGR reports (STUI-823), wheel and programmatic scroll deltas
+  (STUI-863), `ScrollViewProxy.scrollTo(_:anchor:)` with a non-finite anchor
+  (STUI-768), mesh gradients with far control points (STUI-745), and the frame
+  diagnostics and profiling formatters (STUI-1228). Host-wire pointer records
+  accept decimal numbers only (STUI-1229).
+- End scrolls only the bottom edge of a two-axis `ScrollView` (STUI-1170) and
+  reaches the last row of an estimated lazy stack (STUI-1171); focused text
+  inputs consume Home and End at their edges (STUI-1180).
+- Skip disabled `Table` rows in keyboard, pointer and assistive selection
+  (STUI-1172), and honor `listRowSeparator(.hidden)` in data-driven tables
+  (STUI-1209).
+- Discard a `@State` write from a removed view's closure instead of seeding
+  the next mount with it (STUI-1173); deliver the initial
+  `onChange(of:initial: true)` action inside conditional branches
+  (STUI-1174); stop in-process signal delivery at its end notification
+  (STUI-1192).
+- Measure trimmed shapes in the units of their painted trim (STUI-1208),
+  morph compatible paths inside a trimmed fill (STUI-1129), and keep gradient
+  stop colors with their locations when animated stops cross (STUI-1127).
+- Write linked trailing blanks on a full terminal repaint (STUI-1150) and
+  percent-encode non-ASCII OSC 8 destinations (STUI-1152).
+- Detect 24-bit color from `*-direct` terminfo names (STUI-1224) and OSC 8
+  support in VTE, VS Code and Windows Terminal under WSL (STUI-1225).
+- Report a presentation requested during a view update as a
+  `presentation.mutationDuringViewUpdate` runtime warning and refuse it in
+  every build configuration, instead of trapping in debug and replaying it a
+  frame late in release (STUI-1226).
+
 ## [0.19.2] - 2026-10-24
 
 ### Added
