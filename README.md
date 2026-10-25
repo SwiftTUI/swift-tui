@@ -67,9 +67,9 @@ counter at 40 columns
                   ┃┃┃
                   ┗━┛
 
-               ╭─────────╮
-               │Increment│
-               ╰─────────╯
+              ╭─────────╮
+              │Increment│
+              ╰─────────╯
 ```
 
 Space activates the focused button and the figure redraws — only the cells
