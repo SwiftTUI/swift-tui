@@ -118,6 +118,10 @@
       "category": "target-contract",
       "reason": "Tests the named SwiftPM target and its declared dependencies."
     },
+    "Platforms/WASI/Tests/WASISurfaceBridgeTests/Wave2HuntFBWireTests.swift": {
+      "category": "target-contract",
+      "reason": "Tests the named SwiftPM target and its declared dependencies."
+    },
     "Platforms/WASI/Tests/WASISurfaceBridgeTests/WebSurfaceCapabilityIngressTests.swift": {
       "category": "target-contract",
       "reason": "Tests the named SwiftPM target and its declared dependencies."
@@ -655,6 +659,10 @@
       "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
     },
     "Tests/SwiftTUICoreTests/UnitPointTests.swift": {
+      "category": "core-rendering",
+      "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
+    },
+    "Tests/SwiftTUICoreTests/Wave2HuntFBRasterTests.swift": {
       "category": "core-rendering",
       "reason": "Core phase products, extraction, layout, rasterization or commit contracts; Graph is a supported dependency."
     },
@@ -2941,6 +2949,10 @@
     "Tests/SwiftTUITests/Wave2HuntFATests.swift": {
       "category": "runtime-integration",
       "reason": "Campaign two wave-2 regression hunt part FA: scroll edges, table eligibility and separators, state lifetime, initial change events, signal reader end, centre rounding and runtime focus identity (STUI-1165) through the stress run loop and one-shot renderer."
+    },
+    "Tests/SwiftTUITests/Wave2HuntFBRuntimeTests.swift": {
+      "category": "runtime-integration",
+      "reason": "Exercises the composed renderer, run loop, host, or a runtime-backed fixture."
     },
     "Tests/SwiftTUITests/WindowedLineGenerationTests.swift": {
       "category": "runtime-integration",
