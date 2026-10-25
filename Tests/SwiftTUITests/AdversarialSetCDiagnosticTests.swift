@@ -116,8 +116,15 @@ struct AdversarialSetCDiagnosticTests {
       BodyChangeOutput.$sink.withValue(inner.sink) { record("b") }
       record("c")
     }
-    #expect(outer.records.map(\.typeName) == ["a", "c"])
-    #expect(inner.records.map(\.typeName) == ["b"])
+    #if DEBUG
+      #expect(outer.records.map(\.typeName) == ["a", "c"])
+      #expect(inner.records.map(\.typeName) == ["b"])
+    #else
+      // BodyChangeOutput.emit is debug-only (BodyChangeOutput.swift:23-24), so a
+      // release build delivers nothing to either sink.
+      #expect(outer.records.isEmpty)
+      #expect(inner.records.isEmpty)
+    #endif
   }
 }
 
